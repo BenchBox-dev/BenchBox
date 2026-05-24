@@ -1,16 +1,17 @@
 """Per-benchmark knowledge base for result integrity validation.
 
-Specifications are derived from DuckDB SF1 reference runs and loaded from
-``benchmark_specs.yaml`` to keep declarative validation data out of Python.
+Hardcoded specifications derived from DuckDB SF1 reference runs.
+These specs are intentionally self-contained - they do not import
+benchmark modules to avoid transitive dependency issues.
 
-``sf1_row_counts`` values are exact COUNT(*) results from DuckDB SF1
-reference runs - not rounded approximations. Many look round
+sf1_row_counts values are exact COUNT(*) results from DuckDB SF1
+reference runs - not rounded approximations.  Many look round
 (e.g. 35_000_000) because the synthetic generators produce exact
-multiples of their base counts x scale factor. The validator applies
-a +/-1% tolerance (see integrity_validator._check_sf1_row_counts) to
-accommodate minor cross-platform or cross-version variation without
-masking real failures. When recalibrating, always use exact counts from
-a fresh DuckDB SF1 run.
+multiples of their base counts × scale factor.  The validator
+applies a ±1% tolerance (see integrity_validator._check_sf1_row_counts)
+to accommodate minor cross-platform or cross-version variation
+without masking real failures (wrong SF, failed load).  When
+recalibrating, always use exact counts from a fresh DuckDB SF1 run.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -20,7 +21,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+from importlib import resources
+from typing import Any
 
 import yaml
 
@@ -39,29 +41,42 @@ class BenchmarkSpec:
     sf1_power_at_size_range: tuple[float, float] | None = None
 
 
-def _load_specs() -> tuple[dict[str, str], dict[str, BenchmarkSpec]]:
-    with (Path(__file__).with_name("benchmark_specs.yaml")).open(encoding="utf-8") as handle:
-        raw = yaml.safe_load(handle) or {}
-
-    specs = {
-        key: BenchmarkSpec(
-            benchmark_id=data["benchmark_id"],
-            unique_query_ids=frozenset(data.get("unique_query_ids", [])),
-            min_unique_queries=data.get("min_unique_queries", 0),
-            min_success_rate=data.get("min_success_rate", 1.0),
-            high_failure_expected=data.get("high_failure_expected", False),
-            requires_tables_object=data.get("requires_tables_object", True),
-            sf1_row_counts=data.get("sf1_row_counts"),
-            sf1_power_at_size_range=tuple(data["sf1_power_at_size_range"])
-            if data.get("sf1_power_at_size_range") is not None
-            else None,
-        )
-        for key, data in raw["benchmark_specs"].items()
-    }
-    return raw["legacy_aliases"], specs
+# --- Benchmark specs loaded from package data ---
 
 
-LEGACY_ALIASES, BENCHMARK_SPECS = _load_specs()
+def _load_benchmark_specs_payload() -> dict[str, Any]:
+    with resources.files(__package__).joinpath("benchmark_specs.yaml").open(encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise ValueError("benchmark_specs.yaml must contain a mapping")
+    return payload
+
+
+def _build_spec(entry: dict[str, Any]) -> BenchmarkSpec:
+    sf1_range = entry.get("sf1_power_at_size_range")
+    sf1_row_counts = entry.get("sf1_row_counts")
+    if sf1_row_counts is not None:
+        sf1_row_counts = dict(sf1_row_counts)
+        if sf1_row_counts == _TPCH_SF1_ROW_COUNTS:
+            sf1_row_counts = _TPCH_SF1_ROW_COUNTS
+    return BenchmarkSpec(
+        benchmark_id=str(entry["benchmark_id"]),
+        unique_query_ids=frozenset(str(query_id) for query_id in entry.get("unique_query_ids", ())),
+        min_unique_queries=int(entry.get("min_unique_queries", 0)),
+        min_success_rate=float(entry.get("min_success_rate", 1.0)),
+        high_failure_expected=bool(entry.get("high_failure_expected", False)),
+        requires_tables_object=bool(entry.get("requires_tables_object", True)),
+        sf1_row_counts=sf1_row_counts,
+        sf1_power_at_size_range=tuple(sf1_range) if sf1_range is not None else None,
+    )
+
+
+_SPECS_PAYLOAD = _load_benchmark_specs_payload()
+LEGACY_ALIASES: dict[str, str] = dict(_SPECS_PAYLOAD["legacy_aliases"])
+_TPCH_SF1_ROW_COUNTS: dict[str, int] = dict(_SPECS_PAYLOAD["tpch_sf1_row_counts"])
+BENCHMARK_SPECS: dict[str, BenchmarkSpec] = {
+    benchmark_id: _build_spec(spec) for benchmark_id, spec in _SPECS_PAYLOAD["benchmark_specs"].items()
+}
 
 
 def get_spec(benchmark_id: str) -> BenchmarkSpec | None:

@@ -13,386 +13,53 @@ Prices are organized by platform, cloud provider, region, and resource type.
 
 import logging
 from datetime import datetime
+from importlib import resources
+from typing import Any, cast
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
+
+def _load_pricing_data() -> dict[str, Any]:
+    with resources.files(__package__).joinpath("pricing_data.yaml").open(encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise ValueError("pricing_data.yaml must contain a mapping")
+    return cast("dict[str, Any]", payload)
+
+
+_PRICING_DATA = _load_pricing_data()
+_PRICING_METADATA = cast("dict[str, str]", _PRICING_DATA["metadata"])
+
 # Pricing metadata
-PRICING_VERSION = "2025.11"  # Semantic versioning (YYYY.MM)
-PRICING_LAST_UPDATED = "2025-11-09"  # ISO 8601 date
-PRICING_SOURCE = "Cloud provider public pricing pages"
+PRICING_VERSION = _PRICING_METADATA["version"]  # Semantic versioning (YYYY.MM)
+PRICING_LAST_UPDATED = _PRICING_METADATA["last_updated"]  # ISO 8601 date
+PRICING_SOURCE = _PRICING_METADATA["source"]
 PRICING_VALIDATION_DATE = datetime.fromisoformat(PRICING_LAST_UPDATED)
 
 # Currency for all prices
-CURRENCY = "USD"
+CURRENCY = _PRICING_METADATA["currency"]
 
-# ============================================================================
-# SNOWFLAKE PRICING
-# ============================================================================
-
-# Snowflake credit prices by edition, cloud provider, and region tier
-# Source: Snowflake public pricing (2025)
-SNOWFLAKE_CREDIT_PRICES: dict[str, dict[str, dict[str, float]]] = {
-    "standard": {
-        "aws": {
-            "us": 2.00,  # US regions (us-east-1, us-west-2, etc.)
-            "eu": 2.50,  # EU regions (20-25% premium)
-            "ap": 2.60,  # Asia-Pacific regions (20-30% premium)
-            "ca": 2.20,  # Canada regions
-            "other": 2.70,  # Other regions (Middle East, South America, etc.)
-        },
-        "azure": {
-            "us": 2.00,
-            "eu": 2.50,
-            "ap": 2.60,
-            "ca": 2.20,
-            "other": 2.70,
-        },
-        "gcp": {
-            "us": 2.00,
-            "eu": 2.50,
-            "ap": 2.60,
-            "ca": 2.20,
-            "other": 2.70,
-        },
-    },
-    "enterprise": {
-        "aws": {
-            "us": 3.00,
-            "eu": 3.75,
-            "ap": 3.90,
-            "ca": 3.30,
-            "other": 4.05,
-        },
-        "azure": {
-            "us": 3.00,
-            "eu": 3.75,
-            "ap": 3.90,
-            "ca": 3.30,
-            "other": 4.05,
-        },
-        "gcp": {
-            "us": 3.00,
-            "eu": 3.75,
-            "ap": 3.90,
-            "ca": 3.30,
-            "other": 4.05,
-        },
-    },
-    "business_critical": {
-        "aws": {
-            "us": 4.00,
-            "eu": 5.00,
-            "ap": 5.20,
-            "ca": 4.40,
-            "other": 5.40,
-        },
-        "azure": {
-            "us": 4.00,
-            "eu": 5.00,
-            "ap": 5.20,
-            "ca": 4.40,
-            "other": 5.40,
-        },
-        "gcp": {
-            "us": 4.00,
-            "eu": 5.00,
-            "ap": 5.20,
-            "ca": 4.40,
-            "other": 5.40,
-        },
-    },
-}
-
-# ============================================================================
-# ATHENA PRICING
-# ============================================================================
-
-# Athena pricing is simple: $5.00 per TB of data scanned
-# Source: AWS Athena pricing (2025)
-# Note: All regions use the same $5/TB rate. No regional variation.
-ATHENA_PRICE_PER_TB = 5.00
-
-
-# ============================================================================
-# BIGQUERY PRICING
-# ============================================================================
-
-# BigQuery on-demand analysis pricing (per TB of data processed)
-# Source: Google Cloud BigQuery pricing (2025)
-BIGQUERY_ON_DEMAND_PRICES: dict[str, float] = {
-    "us": 5.00,  # US multi-region and single regions
-    "eu": 5.00,  # EU multi-region
-    "asia": 5.00,  # Asia multi-region
-    "us-single": 5.00,  # US single regions (Iowa, Oregon, Virginia, etc.)
-    "eu-single": 5.50,  # EU single regions (some are higher)
-    "asia-single": 5.50,  # Asia single regions
-    "australia": 6.00,  # Australia regions
-    "southamerica": 6.25,  # South America regions
-    "middleeast": 6.00,  # Middle East regions
-    "other": 5.50,  # Other regions
-}
-
-# ============================================================================
-# REDSHIFT PRICING
-# ============================================================================
-
-# Redshift on-demand pricing by node type and region tier (per node-hour)
-# Source: AWS Redshift pricing (2025)
-REDSHIFT_NODE_PRICES: dict[str, dict[str, float]] = {
-    # DC2 (Dense Compute) nodes
-    "dc2.large": {
-        "us-east-1": 0.25,
-        "us-east-2": 0.25,
-        "us-west-1": 0.27,
-        "us-west-2": 0.25,
-        "eu-west-1": 0.28,
-        "eu-west-2": 0.32,
-        "eu-central-1": 0.30,
-        "ap-southeast-1": 0.29,
-        "ap-southeast-2": 0.31,
-        "ap-northeast-1": 0.29,
-        "other": 0.30,
-    },
-    "dc2.8xlarge": {
-        "us-east-1": 6.40,
-        "us-east-2": 6.40,
-        "us-west-1": 6.90,
-        "us-west-2": 6.40,
-        "eu-west-1": 7.20,
-        "eu-west-2": 8.20,
-        "eu-central-1": 7.60,
-        "ap-southeast-1": 7.40,
-        "ap-southeast-2": 7.90,
-        "ap-northeast-1": 7.40,
-        "other": 7.50,
-    },
-    # RA3 nodes (with managed storage)
-    "ra3.xlplus": {
-        "us-east-1": 1.086,
-        "us-east-2": 1.086,
-        "us-west-1": 1.173,
-        "us-west-2": 1.086,
-        "eu-west-1": 1.217,
-        "eu-west-2": 1.304,
-        "eu-central-1": 1.282,
-        "ap-southeast-1": 1.260,
-        "ap-southeast-2": 1.347,
-        "ap-northeast-1": 1.260,
-        "other": 1.250,
-    },
-    "ra3.4xlarge": {
-        "us-east-1": 3.61,
-        "us-east-2": 3.61,
-        "us-west-1": 3.90,
-        "us-west-2": 3.61,
-        "eu-west-1": 4.05,
-        "eu-west-2": 4.34,
-        "eu-central-1": 4.26,
-        "ap-southeast-1": 4.19,
-        "ap-southeast-2": 4.48,
-        "ap-northeast-1": 4.19,
-        "other": 4.15,
-    },
-    "ra3.16xlarge": {
-        "us-east-1": 14.44,
-        "us-east-2": 14.44,
-        "us-west-1": 15.60,
-        "us-west-2": 14.44,
-        "eu-west-1": 16.20,
-        "eu-west-2": 17.36,
-        "eu-central-1": 17.04,
-        "ap-southeast-1": 16.76,
-        "ap-southeast-2": 17.92,
-        "ap-northeast-1": 16.76,
-        "other": 16.60,
-    },
-    # DS2 (Dense Storage) - legacy
-    "ds2.xlarge": {
-        "us-east-1": 0.85,
-        "us-east-2": 0.85,
-        "us-west-1": 0.92,
-        "us-west-2": 0.85,
-        "eu-west-1": 0.95,
-        "eu-west-2": 1.02,
-        "eu-central-1": 1.00,
-        "other": 1.00,
-    },
-    "ds2.8xlarge": {
-        "us-east-1": 6.80,
-        "us-east-2": 6.80,
-        "us-west-1": 7.35,
-        "us-west-2": 6.80,
-        "eu-west-1": 7.60,
-        "eu-west-2": 8.15,
-        "eu-central-1": 8.00,
-        "other": 8.00,
-    },
-}
-
-# ============================================================================
-# DATABRICKS PRICING
-# ============================================================================
-
-# Databricks DBU prices by cloud provider, tier, and workload type
-# Source: Databricks public pricing (2025)
-# Note: These are DBU prices. Customer also pays underlying compute from cloud provider.
-
-DATABRICKS_DBU_PRICES: dict[str, dict[str, dict[str, float]]] = {
-    "aws": {
-        "standard": {
-            "all_purpose": 0.40,
-            "jobs": 0.15,
-            "sql_warehouse": 0.22,
-            "ml": 0.40,
-        },
-        "premium": {
-            "all_purpose": 0.55,
-            "jobs": 0.20,
-            "sql_warehouse": 0.22,
-            "ml": 0.55,
-        },
-        "enterprise": {
-            "all_purpose": 0.65,
-            "jobs": 0.20,
-            "sql_warehouse": 0.30,
-            "ml": 0.65,
-        },
-    },
-    "azure": {
-        "standard": {
-            "all_purpose": 0.44,  # Azure runs 10% higher
-            "jobs": 0.17,
-            "sql_warehouse": 0.24,
-            "ml": 0.44,
-        },
-        "premium": {
-            "all_purpose": 0.60,
-            "jobs": 0.22,
-            "sql_warehouse": 0.24,
-            "ml": 0.60,
-        },
-        "enterprise": {
-            "all_purpose": 0.71,
-            "jobs": 0.22,
-            "sql_warehouse": 0.33,
-            "ml": 0.71,
-        },
-    },
-    "gcp": {
-        "standard": {
-            "all_purpose": 0.40,
-            "jobs": 0.15,
-            "sql_warehouse": 0.22,
-            "ml": 0.40,
-        },
-        "premium": {
-            "all_purpose": 0.55,
-            "jobs": 0.20,
-            "sql_warehouse": 0.22,
-            "ml": 0.55,
-        },
-        "enterprise": {
-            "all_purpose": 0.65,
-            "jobs": 0.20,
-            "sql_warehouse": 0.30,
-            "ml": 0.65,
-        },
-    },
-}
-
-# ============================================================================
-# AZURE SYNAPSE PRICING
-# ============================================================================
-
-# Synapse Serverless SQL Pool: $5.00 per TB of data processed
-# Source: Azure Synapse Analytics pricing (2025)
-# Note: Same pricing model as Athena and BigQuery
-SYNAPSE_SERVERLESS_PRICE_PER_TB = 5.00
-
-# Synapse Dedicated SQL Pool: DWU-based pricing (per hour)
-# Source: Azure Synapse Analytics pricing (2025)
-# Prices shown are for East US region (typical US pricing)
-# DWU levels: DW100c to DW30000c (c = compute optimized)
-SYNAPSE_DEDICATED_DWU_PRICES: dict[str, dict[str, float]] = {
-    # Format: DWU level -> region tier -> price per hour
-    "dw100c": {"us": 1.20, "eu": 1.44, "ap": 1.56, "other": 1.68},
-    "dw200c": {"us": 2.40, "eu": 2.88, "ap": 3.12, "other": 3.36},
-    "dw300c": {"us": 3.60, "eu": 4.32, "ap": 4.68, "other": 5.04},
-    "dw400c": {"us": 4.80, "eu": 5.76, "ap": 6.24, "other": 6.72},
-    "dw500c": {"us": 6.00, "eu": 7.20, "ap": 7.80, "other": 8.40},
-    "dw1000c": {"us": 12.00, "eu": 14.40, "ap": 15.60, "other": 16.80},
-    "dw1500c": {"us": 18.00, "eu": 21.60, "ap": 23.40, "other": 25.20},
-    "dw2000c": {"us": 24.00, "eu": 28.80, "ap": 31.20, "other": 33.60},
-    "dw2500c": {"us": 30.00, "eu": 36.00, "ap": 39.00, "other": 42.00},
-    "dw3000c": {"us": 36.00, "eu": 43.20, "ap": 46.80, "other": 50.40},
-    "dw5000c": {"us": 60.00, "eu": 72.00, "ap": 78.00, "other": 84.00},
-    "dw6000c": {"us": 72.00, "eu": 86.40, "ap": 93.60, "other": 100.80},
-    "dw7500c": {"us": 90.00, "eu": 108.00, "ap": 117.00, "other": 126.00},
-    "dw10000c": {"us": 120.00, "eu": 144.00, "ap": 156.00, "other": 168.00},
-    "dw15000c": {"us": 180.00, "eu": 216.00, "ap": 234.00, "other": 252.00},
-    "dw30000c": {"us": 360.00, "eu": 432.00, "ap": 468.00, "other": 504.00},
-}
-
-
-# ============================================================================
-# AZURE FABRIC PRICING
-# ============================================================================
-
-# Fabric Capacity Units (CU) pricing per hour
-# Source: Microsoft Fabric pricing (2025)
-# Price varies by region; shown are approximate rates
-FABRIC_CU_PRICES: dict[str, float] = {
-    "us": 0.18,  # US regions (typical)
-    "eu": 0.20,  # European regions (~10% higher)
-    "ap": 0.22,  # Asia-Pacific regions (~20% higher)
-    "other": 0.20,  # Other regions
-}
-
-# Fabric capacity SKU sizes (SKU -> CU count)
-FABRIC_SKU_CU_MAP: dict[str, int] = {
-    "f2": 2,
-    "f4": 4,
-    "f8": 8,
-    "f16": 16,
-    "f32": 32,
-    "f64": 64,
-    "f128": 128,
-    "f256": 256,
-    "f512": 512,
-    "f1024": 1024,
-    "f2048": 2048,
-}
-
-
-# ============================================================================
-# FIREBOLT PRICING
-# ============================================================================
-
-# Firebolt uses Firebolt Units (FBUs) for billing
-# Source: Firebolt pricing documentation (2025)
-# FBU rate depends on engine node type; consumption is per-second
-#
-# Note: This implementation uses pay-as-you-go pricing. Firebolt also offers:
-# - Annual commitment discounts (varies by volume)
-# - Reserved capacity pricing (available through sales)
-# This default pricing (~$0.0833/FBU) reflects typical on-demand rates.
-
-# FBU consumption rates per hour by node type
-# These represent the FBU/hour consumption for each node type
-FIREBOLT_NODE_FBU_RATES: dict[str, float] = {
-    "s": 8.0,  # Small nodes
-    "m": 16.0,  # Medium nodes
-    "l": 32.0,  # Large nodes
-    "xl": 64.0,  # Extra-large nodes
-}
-
-# FBU price per unit (pay-as-you-go rate)
-# This is an approximation based on typical pricing. Actual rates may vary:
-# - Commitment discounts available for annual or multi-year contracts
-# - Volume discounts apply at higher consumption levels
-# - Reserved capacity pricing available through enterprise agreements
-FIREBOLT_FBU_PRICE = 0.0833  # ~$0.0833 per FBU (pay-as-you-go)
-
+SNOWFLAKE_CREDIT_PRICES: dict[str, dict[str, dict[str, float]]] = cast(
+    "dict[str, dict[str, dict[str, float]]]", _PRICING_DATA["snowflake_credit_prices"]
+)
+ATHENA_PRICE_PER_TB = float(_PRICING_DATA["athena_price_per_tb"])
+BIGQUERY_ON_DEMAND_PRICES: dict[str, float] = cast("dict[str, float]", _PRICING_DATA["bigquery_on_demand_prices"])
+REDSHIFT_NODE_PRICES: dict[str, dict[str, float]] = cast(
+    "dict[str, dict[str, float]]", _PRICING_DATA["redshift_node_prices"]
+)
+DATABRICKS_DBU_PRICES: dict[str, dict[str, dict[str, float]]] = cast(
+    "dict[str, dict[str, dict[str, float]]]", _PRICING_DATA["databricks_dbu_prices"]
+)
+SYNAPSE_SERVERLESS_PRICE_PER_TB = float(_PRICING_DATA["synapse_serverless_price_per_tb"])
+SYNAPSE_DEDICATED_DWU_PRICES: dict[str, dict[str, float]] = cast(
+    "dict[str, dict[str, float]]", _PRICING_DATA["synapse_dedicated_dwu_prices"]
+)
+FABRIC_CU_PRICES: dict[str, float] = cast("dict[str, float]", _PRICING_DATA["fabric_cu_prices"])
+FABRIC_SKU_CU_MAP: dict[str, int] = cast("dict[str, int]", _PRICING_DATA["fabric_sku_cu_map"])
+FIREBOLT_NODE_FBU_RATES: dict[str, float] = cast("dict[str, float]", _PRICING_DATA["firebolt_node_fbu_rates"])
+FIREBOLT_FBU_PRICE = float(_PRICING_DATA["firebolt_fbu_price"])
 
 # ============================================================================
 # HELPER FUNCTIONS

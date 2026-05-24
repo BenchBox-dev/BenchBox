@@ -522,7 +522,12 @@ paths_to_mutate = [
 tests_dir = ["tests/unit/"]
 
 [tool.setuptools.package-data]
+"benchbox.core" = ["benchmark_registry.yaml"]
+"benchbox.core.flightdata" = ["query_catalog.yaml"]
+"benchbox.core.nyctaxi" = ["query_catalog.yaml"]
+"benchbox.core.results" = ["benchmark_specs.yaml"]
 "benchbox.core.primitives.catalog" = ["queries.yaml"]
+"benchbox.core.tsbs_devops" = ["query_catalog.yaml"]
 "benchbox.data.coffeeshop" = ["*.csv"]
 
 [tool.ruff]
@@ -662,6 +667,15 @@ exclude = [
     "_project",
     "docs/_build",
     "benchbox/platforms/credentials",
+    # Bulk mechanical DataFrame query catalogs are generated-style
+    # implementations; keep the gate focused on hand-authored public APIs.
+    "benchbox/core/clickbench/dataframe_queries/queries.py",
+    "benchbox/core/datavault/dataframe_queries/queries.py",
+    "benchbox/core/flightdata/dataframe_queries.py",
+    "benchbox/core/nyctaxi/dataframe_queries/queries.py",
+    "benchbox/core/tpcds/dataframe_queries/queries.py",
+    "benchbox/core/tpcds_obt/dataframe_queries.py",
+    "benchbox/core/tpchavoc/dataframe_queries",
 ]
 verbose = 2
 quiet = false

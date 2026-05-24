@@ -1,0 +1,280 @@
+helper_queries:
+- query_id: 7
+  title: Promotion Analysis
+  expression_helper: _promotion_sales_expression
+  pandas_helper: _promotion_sales_pandas
+  args:
+  - store_sales
+  - ss_cdemo_sk
+  - ss_sold_date_sk
+  - ss_item_sk
+  - ss_promo_sk
+  - ss_quantity
+  - ss_list_price
+  - ss_coupon_amt
+  - ss_sales_price
+- query_id: 3
+  title: Date/Item Brand Sales Analysis
+  expression_helper: _date_item_sales_expression
+  pandas_helper: _date_item_sales_pandas
+  args:
+  - - - i_manufact_id
+      - manufact_id
+      - 128
+    - - d_moy
+      - month
+      - 11
+  - - d_year
+    - i_brand
+    - i_brand_id
+  - ss_ext_sales_price
+  - sum_agg
+  - - d_year
+    - sum_agg
+    - i_brand_id
+  - - false
+    - true
+    - false
+- query_id: 42
+  title: Date/Item Category Sales
+  expression_helper: _date_item_sales_expression
+  pandas_helper: _date_item_sales_pandas
+  args:
+  - - - i_manager_id
+      - null
+      - 1
+    - - d_moy
+      - month
+      - 11
+    - - d_year
+      - year
+      - 2000
+  - - d_year
+    - i_category_id
+    - i_category
+  - ss_ext_sales_price
+  - sum_sales
+  - - sum_sales
+    - d_year
+    - i_category_id
+    - i_category
+  - - true
+    - false
+    - false
+    - false
+- query_id: 52
+  title: Date/Brand Extended Sales
+  expression_helper: _date_item_sales_expression
+  pandas_helper: _date_item_sales_pandas
+  args:
+  - - - i_manager_id
+      - null
+      - 1
+    - - d_moy
+      - month
+      - 11
+    - - d_year
+      - year
+      - 2000
+  - - d_year
+    - i_brand
+    - i_brand_id
+  - ss_ext_sales_price
+  - ext_price
+  - - d_year
+    - ext_price
+    - i_brand_id
+  - - false
+    - true
+    - false
+- query_id: 55
+  title: Brand Manager Sales
+  expression_helper: _date_item_sales_expression
+  pandas_helper: _date_item_sales_pandas
+  args:
+  - - - i_manager_id
+      - manager_id
+      - 28
+    - - d_moy
+      - month
+      - 11
+    - - d_year
+      - year
+      - 1999
+  - - i_brand_id
+    - i_brand
+  - ss_ext_sales_price
+  - ext_price
+  - - ext_price
+    - i_brand_id
+  - - true
+    - false
+- query_id: 53
+  title: Store Manufacturer Sales
+  expression_helper: _manufacturer_month_expression
+  pandas_helper: _manufacturer_month_pandas
+  args:
+  - ss_sales_price
+  - sum_sales
+- query_id: 63
+  title: Store Manufacturer Profit
+  expression_helper: _manufacturer_month_expression
+  pandas_helper: _manufacturer_month_pandas
+  args:
+  - ss_net_profit
+  - sum_profit
+- query_id: 98
+  title: Store Sales Item Band
+  expression_helper: _item_category_sales_expression
+  pandas_helper: _item_category_sales_pandas
+  args:
+  - store_sales
+  - ss_item_sk
+  - ss_sold_date_sk
+  - ss_ext_sales_price
+  - categories
+  - 1
+  - - i_item_desc
+    - i_category
+    - i_class
+    - i_current_price
+  - - i_category
+    - i_class
+    - itemrevenue
+    - i_item_desc
+- query_id: 12
+  title: Web Sales Item Analysis
+  expression_helper: _item_category_sales_expression
+  pandas_helper: _item_category_sales_pandas
+  args:
+  - web_sales
+  - ws_item_sk
+  - ws_sold_date_sk
+  - ws_ext_sales_price
+  - item_categories
+  - 2
+  - - i_item_id
+    - i_item_desc
+    - i_category
+    - i_class
+    - i_current_price
+  - - i_category
+    - i_class
+    - itemrevenue
+    - i_item_id
+- query_id: 20
+  title: Catalog Sales Item Analysis
+  expression_helper: _item_category_sales_expression
+  pandas_helper: _item_category_sales_pandas
+  args:
+  - catalog_sales
+  - cs_item_sk
+  - cs_sold_date_sk
+  - cs_ext_sales_price
+  - item_categories
+  - 2
+  - - i_item_id
+    - i_item_desc
+    - i_category
+    - i_class
+    - i_current_price
+  - - i_category
+    - i_class
+    - itemrevenue
+    - i_item_id
+- query_id: 26
+  title: Catalog Sales Promo Analysis
+  expression_helper: _promotion_sales_expression
+  pandas_helper: _promotion_sales_pandas
+  args:
+  - catalog_sales
+  - cs_bill_cdemo_sk
+  - cs_sold_date_sk
+  - cs_item_sk
+  - cs_promo_sk
+  - cs_quantity
+  - cs_list_price
+  - cs_coupon_amt
+  - cs_sales_price
+- query_id: 32
+  title: Catalog Sales Excess Discount
+  expression_helper: _excess_discount_expression
+  pandas_helper: _excess_discount_pandas
+  args:
+  - catalog_sales
+  - cs_item_sk
+  - cs_sold_date_sk
+  - cs_ext_discount_amt
+  - 977
+- query_id: 37
+  title: Item Inventory Analysis
+  expression_helper: _inventory_item_expression
+  pandas_helper: _inventory_item_pandas
+  args:
+  - catalog_sales
+  - cs_item_sk
+  - - current_price_min
+    - current_price_max
+  - - 68
+    - 98
+  - true
+- query_id: 82
+  title: Store Sales Inventory
+  expression_helper: _inventory_item_expression
+  pandas_helper: _inventory_item_pandas
+  args:
+  - store_sales
+  - ss_item_sk
+  - - price_min
+    - price_max
+  - - 62
+    - 92
+  - false
+- query_id: 92
+  title: Web Sales Excess Discount
+  expression_helper: _excess_discount_expression
+  pandas_helper: _excess_discount_pandas
+  args:
+  - web_sales
+  - ws_item_sk
+  - ws_sold_date_sk
+  - ws_ext_discount_amt
+  - 350
+- query_id: 94
+  title: Web Orders from Multiple Warehouses Not Returned
+  expression_helper: _web_multi_warehouse_expression
+  pandas_helper: _web_multi_warehouse_pandas
+  args:
+  - anti
+  - false
+- query_id: 95
+  title: Web Orders from Multiple Warehouses with Returns
+  expression_helper: _web_multi_warehouse_expression
+  pandas_helper: _web_multi_warehouse_pandas
+  args:
+  - semi
+  - true
+- query_id: 56
+  title: Three-Channel Sales by Item (Color)
+  expression_helper: _three_channel_item_sales_expression
+  pandas_helper: _three_channel_item_sales_pandas
+  args:
+  - i_color
+  - colors
+  - - pale
+    - chiffon
+    - thistle
+  - 1
+  - - total_sales
+    - i_item_id
+- query_id: 60
+  title: Three-Channel Sales by Item (Category)
+  expression_helper: _three_channel_item_sales_expression
+  pandas_helper: _three_channel_item_sales_pandas
+  args:
+  - i_category
+  - category
+  - Children
+  - 8
+  - - i_item_id
+    - total_sales

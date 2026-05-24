@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import importlib
 from collections import Counter
-from pathlib import Path
+from importlib import resources
 from typing import Any, Literal, cast
 
 import yaml
@@ -29,51 +29,45 @@ BENCHMARK_SUPPORT_STATUS_VALUES: tuple[BenchmarkSupportStatus, ...] = (
     "document_only",
 )
 
-
-def _load_registry_specs() -> dict[str, Any]:
-    with (Path(__file__).with_name("benchmark_registry.yaml")).open(encoding="utf-8") as handle:
-        return yaml.safe_load(handle) or {}
+# Benchmark metadata is stored as package data so this module keeps only
+# behavior and validation logic in Python.
 
 
-def _metadata_from_specs(specs: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    metadata = cast(dict[str, dict[str, Any]], specs["benchmark_metadata"])
-    for meta in metadata.values():
-        if "estimated_time_range" in meta:
-            meta["estimated_time_range"] = tuple(meta["estimated_time_range"])
-    return metadata
+def _load_registry_payload() -> dict[str, Any]:
+    with resources.files(__package__).joinpath("benchmark_registry.yaml").open(encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise ValueError("benchmark_registry.yaml must contain a mapping")
+    return payload
 
 
-_REGISTRY_SPECS = _load_registry_specs()
+def _normalize_benchmark_metadata(raw: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(raw)
+    if "estimated_time_range" in normalized:
+        normalized["estimated_time_range"] = tuple(normalized["estimated_time_range"])
+    return normalized
 
-# Category ordering for display (most popular first)
-CATEGORY_ORDER = list(_REGISTRY_SPECS["category_order"])
 
-# Benchmark ordering within categories (most popular first)
-BENCHMARK_ORDER = cast(dict[str, list[str]], _REGISTRY_SPECS["benchmark_order"])
-
-# Mapping of benchmark IDs to their class names in the benchbox module.
-# Used for lazy loading via getattr(benchbox, class_name).
-BENCHMARK_CLASS_NAMES = cast(dict[str, str], _REGISTRY_SPECS["benchmark_class_names"])
-
-# Concrete class names in benchbox.core.<id>.benchmark, derived from BENCHMARK_CLASS_NAMES.
-# `benchbox.core.benchmark_loader` imports this map to avoid local benchmark-set drift.
-# Override individual entries where the core class name doesn't follow the {wrapper}Benchmark pattern.
-_CORE_CLASS_NAME_OVERRIDES = cast(dict[str, str], _REGISTRY_SPECS["core_class_name_overrides"])
+_REGISTRY_PAYLOAD = _load_registry_payload()
+CATEGORY_ORDER: list[str] = list(_REGISTRY_PAYLOAD["category_order"])
+BENCHMARK_ORDER: dict[str, list[str]] = {
+    category: list(benchmarks) for category, benchmarks in _REGISTRY_PAYLOAD["benchmark_order"].items()
+}
+BENCHMARK_CLASS_NAMES: dict[str, str] = dict(_REGISTRY_PAYLOAD["benchmark_class_names"])
+_CORE_CLASS_NAME_OVERRIDES: dict[str, str] = dict(_REGISTRY_PAYLOAD["core_class_name_overrides"])
 CORE_BENCHMARK_CLASS_NAMES: dict[str, str] = {
     bid: _CORE_CLASS_NAME_OVERRIDES.get(bid, f"{name}Benchmark") for bid, name in BENCHMARK_CLASS_NAMES.items()
 }
-
-# Benchmarks with runtime data-sharing declarations. The registry imports only
-# this narrow set during metadata normalization to avoid eager-loading every
-# benchmark at discovery time.
-BENCHMARK_DATA_SOURCE_PROBE_IDS = tuple(_REGISTRY_SPECS["benchmark_data_source_probe_ids"])
-
-TPC_OFFICIAL_SCALE_OPTIONS = tuple(float(value) for value in _REGISTRY_SPECS["tpc_official_scale_options"])
-
-
-# Complete benchmark metadata - the single source of truth.
-# All metadata fields are documented here for consistency.
-BENCHMARK_METADATA = _metadata_from_specs(_REGISTRY_SPECS)
+_BENCHMARK_ID_BY_CLASS_NAME: dict[str, str] = {
+    **{class_name: benchmark_id for benchmark_id, class_name in BENCHMARK_CLASS_NAMES.items()},
+    **{class_name: benchmark_id for benchmark_id, class_name in CORE_BENCHMARK_CLASS_NAMES.items()},
+}
+BENCHMARK_DATA_SOURCE_PROBE_IDS: tuple[str, ...] = tuple(_REGISTRY_PAYLOAD["data_source_probe_ids"])
+TPC_OFFICIAL_SCALE_OPTIONS: tuple[float, ...] = tuple(_REGISTRY_PAYLOAD["tpc_official_scale_options"])
+BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
+    benchmark_id: _normalize_benchmark_metadata(meta)
+    for benchmark_id, meta in _REGISTRY_PAYLOAD["benchmark_metadata"].items()
+}
 
 
 def _validate_benchmark_support_status() -> None:
@@ -92,38 +86,6 @@ def _validate_benchmark_support_status() -> None:
         raise ValueError("Invalid benchmark support_status metadata: " + "; ".join(details))
 
 
-def _default_scale_for_metadata_probe(benchmark_id: str) -> float:
-    meta = BENCHMARK_METADATA[benchmark_id]
-    default_scale = meta.get("default_scale")
-    if default_scale is not None:
-        return float(default_scale)
-    scale_options = meta.get("scale_options") or ()
-    if scale_options:
-        return float(scale_options[0])
-    return 1.0
-
-
-def _benchmark_data_source_from_instance(benchmark_id: str) -> str | None:
-    class_name = CORE_BENCHMARK_CLASS_NAMES[benchmark_id]
-    module = importlib.import_module(f"benchbox.core.{benchmark_id}.benchmark")
-    benchmark_class = getattr(module, class_name)
-    instance = benchmark_class(scale_factor=_default_scale_for_metadata_probe(benchmark_id))
-    getter = getattr(instance, "get_data_source_benchmark", None)
-    if getter is None:
-        return None
-    data_source = getter()
-    if data_source is None:
-        return None
-    return str(data_source)
-
-
-def _populate_benchmark_data_sources() -> None:
-    for meta in BENCHMARK_METADATA.values():
-        meta.setdefault("data_source", None)
-    for benchmark_id in BENCHMARK_DATA_SOURCE_PROBE_IDS:
-        BENCHMARK_METADATA[benchmark_id]["data_source"] = _benchmark_data_source_from_instance(benchmark_id)
-
-
 def _validate_benchmark_data_sources() -> None:
     missing = sorted(name for name, meta in BENCHMARK_METADATA.items() if "data_source" not in meta)
     invalid = sorted(
@@ -140,8 +102,48 @@ def _validate_benchmark_data_sources() -> None:
         raise ValueError("Invalid benchmark data_source metadata: " + "; ".join(details))
 
 
-_populate_benchmark_data_sources()
+def _validate_benchmark_estimate_metadata() -> None:
+    missing = sorted(
+        name
+        for name, meta in BENCHMARK_METADATA.items()
+        if "estimated_time_range" not in meta or "base_memory_gb" not in meta
+    )
+    invalid = sorted(
+        name
+        for name, meta in BENCHMARK_METADATA.items()
+        if (
+            "estimated_time_range" in meta
+            and "base_memory_gb" in meta
+            and (
+                not _is_valid_time_range(meta.get("estimated_time_range"))
+                or not _is_valid_base_memory(meta.get("base_memory_gb"))
+            )
+        )
+    )
+    if missing or invalid:
+        details: list[str] = []
+        if missing:
+            details.append(f"missing estimate metadata for: {', '.join(missing)}")
+        if invalid:
+            details.append(f"invalid estimate metadata for: {', '.join(invalid)}")
+        raise ValueError("Invalid benchmark estimate metadata: " + "; ".join(details))
+
+
+def _is_valid_time_range(value: Any) -> bool:
+    return (
+        isinstance(value, tuple)
+        and len(value) == 2
+        and all(isinstance(item, (int, float)) and item >= 0 for item in value)
+        and float(value[0]) <= float(value[1])
+    )
+
+
+def _is_valid_base_memory(value: Any) -> bool:
+    return isinstance(value, (int, float)) and value > 0
+
+
 _validate_benchmark_data_sources()
+_validate_benchmark_estimate_metadata()
 _validate_benchmark_support_status()
 
 
@@ -204,8 +206,13 @@ def get_core_benchmark_class_name(benchmark_id: str) -> str | None:
     return CORE_BENCHMARK_CLASS_NAMES.get(benchmark_id.lower())
 
 
-def get_benchmark_class(benchmark_id: str):
-    """Get the benchmark class from the benchbox module.
+def get_benchmark_id_for_class_name(class_name: str) -> str | None:
+    """Return the canonical benchmark ID for a public or core benchmark class."""
+    return _BENCHMARK_ID_BY_CLASS_NAME.get(class_name)
+
+
+def get_public_benchmark_class(benchmark_id: str):
+    """Get the public benchmark class from the benchbox module.
 
     Uses benchbox module's lazy loading mechanism.
 
@@ -239,6 +246,11 @@ def get_benchmark_class(benchmark_id: str):
             return None
 
 
+def get_benchmark_class(benchmark_id: str):
+    """Compatibility alias for :func:`get_public_benchmark_class`."""
+    return get_public_benchmark_class(benchmark_id)
+
+
 def is_benchmark_available(benchmark_id: str) -> bool:
     """Check if a benchmark is available (can be imported).
 
@@ -248,7 +260,7 @@ def is_benchmark_available(benchmark_id: str) -> bool:
     Returns:
         True if benchmark class can be imported.
     """
-    return get_benchmark_class(benchmark_id) is not None
+    return get_public_benchmark_class(benchmark_id) is not None
 
 
 def list_benchmark_ids() -> list[str]:
@@ -365,10 +377,10 @@ def validate_scale_factor(
     Raises:
         ScaleFactorNotSupportedError: If the benchmark declares
             ``scale_options`` and ``scale_factor`` is not in that list.
-        ValueError: If the legacy ``min_scale`` lower bound is violated
-            (subclass-compatible — ``ScaleFactorNotSupportedError``
-            inherits from ``ValueError`` so existing handlers keep
-            working).
+        ValueError: If ``benchmark_id`` is unknown or the legacy ``min_scale``
+            lower bound is violated (subclass-compatible —
+            ``ScaleFactorNotSupportedError`` inherits from ``ValueError`` so
+            existing handlers keep working).
     """
     from benchbox.core.errors import ScaleFactorNotSupportedError
 
@@ -381,7 +393,8 @@ def validate_scale_factor(
 
     meta = get_benchmark_metadata(benchmark_id)
     if meta is None:
-        return  # Unknown benchmark, skip validation
+        available = ", ".join(list_benchmark_ids())
+        raise ValueError(f"Unknown benchmark '{benchmark_id}'. Available: {available}")
 
     scale_options = meta.get("scale_options")
     if scale_options:

@@ -11,21 +11,17 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import abc
 from collections.abc import Mapping
-from pathlib import Path
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
+from benchbox.core.benchmark_result_validation import BenchmarkResultValidationMixin
 from benchbox.core.tuning import BenchmarkTunings
 
 BENCHMARK_API_SURFACE = "deprecated"
 BENCHMARK_API_DECISION = "retained-internal-compatibility-base"
 
-if TYPE_CHECKING:
-    from benchbox.core.results.models import BenchmarkResults
-    from benchbox.core.validation import ValidationResult
 
-
-class BaseBenchmark(abc.ABC):
+class BaseBenchmark(BenchmarkResultValidationMixin, abc.ABC):
     """
     Abstract base class for all benchmarks in BenchBox.
 
@@ -126,186 +122,12 @@ class BaseBenchmark(abc.ABC):
         """Get the human-readable benchmark name."""
         return getattr(self, "_name", type(self).__name__)
 
-    def create_enhanced_benchmark_result(
+    def _minimal_result_phases(
         self,
-        platform: str,
-        query_results: list[dict[str, Any]],
-        execution_metadata: Optional[dict[str, Any]] = None,
-        phases: Optional[dict[str, dict[str, Any]]] = None,
-        resource_utilization: Optional[dict[str, Any]] = None,
-        performance_characteristics: Optional[dict[str, Any]] = None,
-        duration_seconds: Optional[float] = None,
-        **kwargs: Any,
-    ) -> "BenchmarkResults":
-        """Create a BenchmarkResults object with standardized fields.
-
-        This centralizes the logic for creating benchmark results that was previously
-        duplicated across platform adapters and CLI orchestrator.
-
-        Args:
-            platform: Platform name (e.g., "DuckDB", "ClickHouse")
-            query_results: List of query execution results
-            execution_metadata: Optional execution metadata
-            phases: Optional phase tracking information
-            resource_utilization: Optional resource usage metrics
-            performance_characteristics: Optional performance analysis
-            duration_seconds: Optional explicit total duration override in seconds
-            **kwargs: Additional fields to override defaults
-
-        Returns:
-            Fully configured BenchmarkResults object
-        """
-        from benchbox.core.results.result_factory import build_enhanced_benchmark_result
-
-        return build_enhanced_benchmark_result(
-            benchmark=self,
-            platform=platform,
-            query_results=query_results,
-            execution_metadata=execution_metadata,
-            phases=phases,
-            resource_utilization=resource_utilization,
-            performance_characteristics=performance_characteristics,
-            duration_seconds=duration_seconds,
-            **kwargs,
-        )
-
-    def create_minimal_benchmark_result(
-        self,
-        *,
-        validation_status: str,
-        validation_details: Optional[dict[str, Any]] = None,
-        duration_seconds: float = 0.0,
-        platform: str = "unknown",
-        execution_metadata: Optional[dict[str, Any]] = None,
-        system_profile: Optional[dict[str, Any]] = None,
-        phases: Optional[dict[str, dict[str, Any]]] = None,
-        **overrides: Any,
-    ) -> "BenchmarkResults":
-        """Create a minimal BenchmarkResults instance for error/interrupt paths."""
-
-        metadata: dict[str, Any] = {
-            "result_type": "minimal",
-            "status": validation_status,
-        }
-        base_identifier = str(getattr(self, "name", self.benchmark_name))
-        metadata.setdefault(
-            "benchmark_id",
-            base_identifier.lower().replace(" ", "_").replace("-", "_"),
-        )
-        if execution_metadata:
-            metadata.update(execution_metadata)
-
-        result = self.create_enhanced_benchmark_result(
-            platform=platform,
-            query_results=[],
-            execution_metadata=metadata,
-            phases=None,  # phases parameter is dict but field expects ExecutionPhases dataclass
-            duration_seconds=duration_seconds,
-            validation_status=validation_status,
-            validation_details=validation_details or {},
-            system_profile=system_profile or {},
-            **overrides,
-        )
-
-        result._benchmark_id_override = metadata["benchmark_id"]
-        return result
-
-    # ------------------------------------------------------------------
-    # Validation helpers (core-facing)
-    # ------------------------------------------------------------------
-
-    def _resolve_output_dir(self, output_dir: Union[str, Path, None] = None) -> Union[Path, Any]:
-        """Resolve and cache the benchmark output directory handler.
-
-        Args:
-            output_dir: Optional override for the output directory.
-
-        Returns:
-            Path or cloud path handler representing the output directory.
-
-        Raises:
-            RuntimeError: If no output directory is configured and none is provided.
-        """
-
-        candidate = output_dir if output_dir is not None else getattr(self, "output_dir", None)
-        if candidate is None:
-            raise RuntimeError(
-                "Benchmark output directory is not configured. Set 'benchmark.output_dir' or pass output_root to the lifecycle runner."
-            )
-
-        from benchbox.utils.cloud_storage import create_path_handler
-
-        handler = create_path_handler(candidate)
-        self.output_dir = handler  # Cache resolved handler for subsequent operations
-        return handler
-
-    def validate_preflight(
-        self,
-        *,
-        output_dir: Union[str, Path, None] = None,
-        benchmark_name: Optional[str] = None,
-    ) -> "ValidationResult":
-        """Run core preflight validation for this benchmark.
-
-        Args:
-            output_dir: Optional override for the output directory used during validation.
-            benchmark_name: Optional benchmark identifier (defaults to ``self.name``).
-
-        Returns:
-            ValidationResult describing the outcome of preflight validation.
-        """
-
-        resolved_dir = self._resolve_output_dir(output_dir)
-
-        from benchbox.core.validation import DataValidationEngine
-
-        engine = DataValidationEngine()
-        benchmark_id = (benchmark_name or self.name).lower()
-        return engine.validate_preflight_conditions(benchmark_id, self.scale_factor, resolved_dir)
-
-    def validate_manifest(
-        self,
-        *,
-        manifest_path: Union[str, Path, None] = None,
-        benchmark_name: Optional[str] = None,
-    ) -> "ValidationResult":
-        """Validate the generated data manifest using core validation helpers."""
-
-        resolved_dir = self._resolve_output_dir()
-        manifest_candidate = manifest_path
-        if manifest_candidate is None and hasattr(resolved_dir, "joinpath"):
-            manifest_candidate = resolved_dir.joinpath("_datagen_manifest.json")
-
-        if manifest_candidate is None:
-            from benchbox.core.validation import ValidationResult as CoreValidationResult
-
-            return CoreValidationResult(
-                is_valid=False,
-                errors=["Manifest path is not available"],
-                warnings=[],
-                details={"benchmark": (benchmark_name or self.name)},
-            )
-
-        from benchbox.core.validation import DataValidationEngine
-
-        engine = DataValidationEngine()
-        # Ensure manifest_candidate is a Path
-        manifest_path_obj = Path(manifest_candidate) if isinstance(manifest_candidate, str) else manifest_candidate
-        return engine.validate_generated_data(manifest_path_obj)
-
-    def validate_loaded_data(
-        self,
-        connection: Any,
-        *,
-        benchmark_name: Optional[str] = None,
-    ) -> "ValidationResult":
-        """Validate database state after data loading for this benchmark."""
-
-        from benchbox.core.validation import DatabaseValidationEngine
-
-        engine = DatabaseValidationEngine()
-        benchmark_id = (benchmark_name or self.name).lower()
-        return engine.validate_loaded_data(connection, benchmark_id, self.scale_factor)
+        phases: Optional[dict[str, dict[str, Any]]],
+    ) -> None:
+        """Deprecated core base keeps legacy minimal-result phase normalization."""
+        return None
 
     @abc.abstractmethod
     def generate_data(self, tables: Optional[list[str]] = None, output_format: str = "memory") -> dict[str, Any]:

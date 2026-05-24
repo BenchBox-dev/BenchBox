@@ -1,0 +1,193 @@
+QUERIES:
+  single-host-12-hr:
+    id: '1'
+    name: Single Host - 12 Hours
+    description: CPU usage for a single host over 12 hours
+    category: single-host
+    sql: "\n            SELECT time, usage_user, usage_system, usage_idle\n            FROM cpu\n            WHERE hostname\
+      \ = '{hostname}'\n              AND time >= '{start_time}'\n              AND time < '{end_time}'\n            ORDER\
+      \ BY time\n        "
+    params:
+      duration_hours: 12
+  single-host-1-hr:
+    id: '2'
+    name: Single Host - 1 Hour
+    description: CPU usage for a single host over 1 hour
+    category: single-host
+    sql: "\n            SELECT time, usage_user, usage_system, usage_idle, usage_iowait\n            FROM cpu\n          \
+      \  WHERE hostname = '{hostname}'\n              AND time >= '{start_time}'\n              AND time < '{end_time}'\n\
+      \            ORDER BY time\n        "
+    params:
+      duration_hours: 1
+  cpu-max-all-1-hr:
+    id: '3'
+    name: CPU Max All Hosts - 1 Hour
+    description: Maximum CPU usage across all hosts in 1 hour
+    category: aggregation
+    sql: "\n            SELECT hostname, MAX(usage_user) as max_user, MAX(usage_system) as max_system\n            FROM cpu\n\
+      \            WHERE time >= '{start_time}'\n              AND time < '{end_time}'\n            GROUP BY hostname\n  \
+      \          ORDER BY max_user DESC\n        "
+    params:
+      duration_hours: 1
+  cpu-max-all-8-hr:
+    id: '4'
+    name: CPU Max All Hosts - 8 Hours
+    description: Maximum CPU usage across all hosts over 8 hours
+    category: aggregation
+    sql: "\n            SELECT hostname,\n                   MAX(usage_user) as max_user,\n                   MAX(usage_system)\
+      \ as max_system,\n                   MAX(usage_iowait) as max_iowait\n            FROM cpu\n            WHERE time >=\
+      \ '{start_time}'\n              AND time < '{end_time}'\n            GROUP BY hostname\n            ORDER BY max_user\
+      \ DESC\n        "
+    params:
+      duration_hours: 8
+  double-groupby-1-hr:
+    id: '5'
+    name: Double GroupBy - 1 Hour
+    description: CPU aggregations grouped by hostname and time bucket
+    category: groupby
+    sql: "\n            SELECT\n                hostname,\n                DATE_TRUNC('minute', time) as minute,\n       \
+      \         AVG(usage_user) as avg_user,\n                MAX(usage_user) as max_user\n            FROM cpu\n        \
+      \    WHERE time >= '{start_time}'\n              AND time < '{end_time}'\n            GROUP BY hostname, DATE_TRUNC('minute',\
+      \ time)\n            ORDER BY hostname, minute\n        "
+    params:
+      duration_hours: 1
+  double-groupby-5-min:
+    id: '6'
+    name: Double GroupBy - 5 Minutes
+    description: Fine-grained CPU aggregations
+    category: groupby
+    sql: "\n            SELECT\n                hostname,\n                DATE_TRUNC('second', time) as second,\n       \
+      \         AVG(usage_user) as avg_user,\n                AVG(usage_system) as avg_system\n            FROM cpu\n    \
+      \        WHERE time >= '{start_time}'\n              AND time < '{end_time}'\n            GROUP BY hostname, DATE_TRUNC('second',\
+      \ time)\n            ORDER BY hostname, second\n        "
+    params:
+      duration_minutes: 5
+  high-cpu-1-hr:
+    id: '7'
+    name: High CPU Usage - 1 Hour
+    description: Hosts with CPU usage above threshold
+    category: threshold
+    sql: "\n            SELECT DISTINCT hostname\n            FROM cpu\n            WHERE usage_user > 90\n              AND\
+      \ time >= '{start_time}'\n              AND time < '{end_time}'\n        "
+    params:
+      duration_hours: 1
+  high-cpu-12-hr:
+    id: '8'
+    name: High CPU Usage - 12 Hours
+    description: Hosts with sustained high CPU usage
+    category: threshold
+    sql: "\n            SELECT hostname, COUNT(*) as high_cpu_count\n            FROM cpu\n            WHERE usage_user >\
+      \ 90\n              AND time >= '{start_time}'\n              AND time < '{end_time}'\n            GROUP BY hostname\n\
+      \            HAVING COUNT(*) > 10\n            ORDER BY high_cpu_count DESC\n        "
+    params:
+      duration_hours: 12
+  mem-by-host-1-hr:
+    id: '9'
+    name: Memory by Host - 1 Hour
+    description: Memory statistics per host
+    category: memory
+    sql: "\n            SELECT\n                hostname,\n                AVG(used_percent) as avg_used_pct,\n          \
+      \      MAX(used_percent) as max_used_pct,\n                MIN(available) as min_available\n            FROM mem\n \
+      \           WHERE time >= '{start_time}'\n              AND time < '{end_time}'\n            GROUP BY hostname\n   \
+      \         ORDER BY avg_used_pct DESC\n        "
+    params:
+      duration_hours: 1
+  low-memory-hosts:
+    id: '10'
+    name: Low Memory Hosts
+    description: Hosts with low available memory
+    category: threshold
+    sql: "\n            SELECT hostname, MIN(available_percent) as min_avail_pct\n            FROM mem\n            WHERE\
+      \ time >= '{start_time}'\n              AND time < '{end_time}'\n            GROUP BY hostname\n            HAVING MIN(available_percent)\
+      \ < 10\n            ORDER BY min_avail_pct\n        "
+    params:
+      duration_hours: 1
+  disk-iops-1-hr:
+    id: '11'
+    name: Disk IOPS - 1 Hour
+    description: Disk read/write operations per host
+    category: disk
+    sql: "\n            SELECT\n                hostname,\n                device,\n                SUM(reads_completed) as\
+      \ total_reads,\n                SUM(writes_completed) as total_writes\n            FROM disk\n            WHERE time\
+      \ >= '{start_time}'\n              AND time < '{end_time}'\n            GROUP BY hostname, device\n            ORDER\
+      \ BY total_writes DESC\n        "
+    params:
+      duration_hours: 1
+  disk-latency:
+    id: '12'
+    name: Disk Latency Analysis
+    description: Average disk operation latency
+    category: disk
+    sql: "\n            SELECT\n                hostname,\n                device,\n                AVG(CASE WHEN reads_completed\
+      \ > 0 THEN read_time_ms * 1.0 / reads_completed ELSE 0 END) as avg_read_latency_ms,\n                AVG(CASE WHEN writes_completed\
+      \ > 0 THEN write_time_ms * 1.0 / writes_completed ELSE 0 END) as avg_write_latency_ms\n            FROM disk\n     \
+      \       WHERE time >= '{start_time}'\n              AND time < '{end_time}'\n            GROUP BY hostname, device\n\
+      \            ORDER BY avg_write_latency_ms DESC\n        "
+    params:
+      duration_hours: 1
+  net-throughput-1-hr:
+    id: '13'
+    name: Network Throughput - 1 Hour
+    description: Network bytes sent/received per host
+    category: network
+    sql: "\n            SELECT\n                hostname,\n                interface,\n                SUM(bytes_sent) as\
+      \ total_bytes_sent,\n                SUM(bytes_recv) as total_bytes_recv\n            FROM net\n            WHERE time\
+      \ >= '{start_time}'\n              AND time < '{end_time}'\n            GROUP BY hostname, interface\n            ORDER\
+      \ BY total_bytes_sent DESC\n        "
+    params:
+      duration_hours: 1
+  net-errors:
+    id: '14'
+    name: Network Errors
+    description: Hosts with network errors
+    category: threshold
+    sql: "\n            SELECT\n                hostname,\n                interface,\n                SUM(err_in + err_out)\
+      \ as total_errors,\n                SUM(drop_in + drop_out) as total_drops\n            FROM net\n            WHERE\
+      \ time >= '{start_time}'\n              AND time < '{end_time}'\n            GROUP BY hostname, interface\n        \
+      \    HAVING SUM(err_in + err_out + drop_in + drop_out) > 0\n            ORDER BY total_errors DESC\n        "
+    params:
+      duration_hours: 1
+  resource-utilization:
+    id: '15'
+    name: Resource Utilization Summary
+    description: Combined CPU, memory metrics per host
+    category: combined
+    sql: "\n            SELECT\n                c.hostname,\n                AVG(c.usage_user + c.usage_system) as avg_cpu_total,\n\
+      \                AVG(m.used_percent) as avg_mem_used\n            FROM cpu c\n            JOIN mem m ON c.hostname =\
+      \ m.hostname\n                      AND DATE_TRUNC('minute', c.time) = DATE_TRUNC('minute', m.time)\n            WHERE\
+      \ c.time >= '{start_time}'\n              AND c.time < '{end_time}'\n            GROUP BY c.hostname\n            ORDER\
+      \ BY avg_cpu_total DESC\n        "
+    params:
+      duration_hours: 1
+  lastpoint:
+    id: '16'
+    name: Last Point per Host
+    description: Most recent metrics for each host
+    category: lastpoint
+    sql: "\n            SELECT hostname, time, usage_user, usage_system, usage_idle\n            FROM cpu\n            WHERE\
+      \ (hostname, time) IN (\n                SELECT hostname, MAX(time)\n                FROM cpu\n                WHERE\
+      \ time >= '{start_time}'\n                GROUP BY hostname\n            )\n            ORDER BY hostname\n        "
+    params:
+      duration_hours: 24
+  by-region:
+    id: '17'
+    name: Metrics by Region
+    description: CPU metrics filtered by region
+    category: tags
+    sql: "\n            SELECT\n                t.region,\n                AVG(c.usage_user) as avg_cpu_user,\n          \
+      \      AVG(c.usage_system) as avg_cpu_system\n            FROM cpu c\n            JOIN tags t ON c.hostname = t.hostname\n\
+      \            WHERE c.time >= '{start_time}'\n              AND c.time < '{end_time}'\n              AND t.region = '{region}'\n\
+      \            GROUP BY t.region\n        "
+    params:
+      duration_hours: 1
+  by-service:
+    id: '18'
+    name: Metrics by Service
+    description: CPU metrics grouped by service
+    category: tags
+    sql: "\n            SELECT\n                t.service,\n                COUNT(DISTINCT c.hostname) as host_count,\n  \
+      \              AVG(c.usage_user + c.usage_system) as avg_cpu_total\n            FROM cpu c\n            JOIN tags t\
+      \ ON c.hostname = t.hostname\n            WHERE c.time >= '{start_time}'\n              AND c.time < '{end_time}'\n\
+      \            GROUP BY t.service\n            ORDER BY avg_cpu_total DESC\n        "
+    params:
+      duration_hours: 1

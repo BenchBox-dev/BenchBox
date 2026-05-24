@@ -1,3 +1,4 @@
+# ruff: noqa: SIM905
 """Normalized runtime/deployment metadata helpers for platform adapters."""
 
 from __future__ import annotations
@@ -21,88 +22,39 @@ from benchbox.platforms.base.docker_runtime import (
     docker_request_from_config,
 )
 
-_EMBEDDED_CONNECTION_MODES = {
-    "embedded",
-    "file",
-    "in-memory",
-    "in_memory",
-    "local_process",
-    "memory",
-}
+_EMBEDDED_CONNECTION_MODES = {"embedded", "file", "in-memory", "in_memory", "local_process", "memory"}
 _LOCAL_PROCESS_CONNECTION_MODES = _EMBEDDED_CONNECTION_MODES | {"local"}
-_SERVER_CONNECTION_MODES = {
-    "cluster",
-    "remote",
-    "server",
-    "tcp",
-}
-_SERVERLESS_PLATFORMS = {
-    "athena",
-    "athena_spark",
-    "bigquery",
-    "dataproc_serverless",
-    "emr_serverless",
-}
-_MANAGED_CLOUD_PLATFORMS = {
-    "azure_synapse",
-    "clickhouse_cloud",
-    "databricks",
-    "fabric_lakehouse",
-    "fabric_warehouse",
-    "firebolt",
-    "motherduck",
-    "onehouse",
-    "redshift",
-    "snowflake",
-    "starburst",
-}
-_CLOUD_PROVIDER_BY_PLATFORM = {
-    "athena": "aws",
-    "athena_spark": "aws",
-    "bigquery": "gcp",
-    "databricks": None,
-    "dataproc": "gcp",
-    "dataproc_serverless": "gcp",
-    "emr_serverless": "aws",
-    "fabric_lakehouse": "azure",
-    "fabric_warehouse": "azure",
-    "redshift": "aws",
-    "snowflake": None,
-    "azure_synapse": "azure",
-}
-_STANDARD_PLATFORM_INFO_KEYS = {
-    "client_library_version",
-    "connection_mode",
-    "configuration",
-    "engine_version",
-    "engine_version_source",
-    "execution_mode",
-    "family",
-    "host",
-    "name",
-    "platform",
-    "platform_name",
-    "platform_type",
-    "platform_version",
-    "port",
-    "version",
-}
-_STATUS_RANK = {
-    "not_requested": 0,
-    "unavailable": 0,
-    "error": 1,
-    "partial": 2,
-    "available": 3,
-}
+_SERVER_CONNECTION_MODES = {"cluster", "remote", "server", "tcp"}
+_SERVERLESS_PLATFORMS = {"athena", "athena_spark", "bigquery", "dataproc_serverless", "emr_serverless"}
+_MANAGED_CLOUD_PLATFORMS = set(  # noqa: C405
+    "azure_synapse clickhouse_cloud databricks fabric_lakehouse fabric_warehouse firebolt motherduck onehouse "
+    "redshift snowflake starburst".split()
+)
+_CLOUD_PROVIDER_BY_PLATFORM = dict(  # noqa: C408
+    athena="aws",
+    athena_spark="aws",
+    bigquery="gcp",
+    databricks=None,
+    dataproc="gcp",
+    dataproc_serverless="gcp",
+    emr_serverless="aws",
+    fabric_lakehouse="azure",
+    fabric_warehouse="azure",
+    redshift="aws",
+    snowflake=None,
+    azure_synapse="azure",
+)
+_STANDARD_PLATFORM_INFO_KEYS = set(  # noqa: SIM905
+    "client_library_version connection_mode configuration engine_version engine_version_source execution_mode family "
+    "host name platform platform_name platform_type platform_version port version".split()  # noqa: SIM905
+)
+_STATUS_RANK = {"not_requested": 0, "unavailable": 0, "error": 1, "partial": 2, "available": 3}
 _SOURCE_RANK = {
+    **dict.fromkeys(
+        ("registered_default", "saved_config", "environment_variable", "cli_option", "runtime_override", "requested"), 2
+    ),
     "unavailable": 0,
     "inferred": 1,
-    "registered_default": 2,
-    "saved_config": 2,
-    "environment_variable": 2,
-    "cli_option": 2,
-    "runtime_override": 2,
-    "requested": 2,
     "observed": 3,
 }
 

@@ -33,6 +33,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "support_status": "stable",
             "complexity": "medium",
             "estimated_time_range": (2, 10),
+            "base_memory_gb": 1.0,
             "scale_options": [0.01, 0.1, 1.0],
             "default_scale": 0.01,
             "supports_streams": True,
@@ -46,6 +47,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "support_status": "stable",
             "complexity": "high",
             "estimated_time_range": (5, 15),
+            "base_memory_gb": 15.0,
             "scale_options": [0.01, 0.1],
             "default_scale": 0.01,
             "supports_streams": False,
@@ -59,6 +61,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "support_status": "beta",
             "complexity": "low",
             "estimated_time_range": (1, 2),
+            "base_memory_gb": 0.01,
             "scale_options": [1.0],
             "default_scale": 1.0,
             "supports_streams": False,
@@ -72,6 +75,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "support_status": "stable",
             "complexity": "high",
             "estimated_time_range": (30, 90),
+            "base_memory_gb": 5.0,
             "scale_options": [1.0],
             "default_scale": 1.0,
             "supports_streams": False,
@@ -86,6 +90,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "support_status": "repo_only",
             "complexity": "medium",
             "estimated_time_range": (2, 10),
+            "base_memory_gb": 1.0,
             "scale_options": [0.01, 0.1, 1.0],
             "default_scale": 1.0,
             "supports_streams": False,
@@ -166,6 +171,13 @@ def test_internal_benchmarks_remain_directly_addressable(manager: BenchmarkManag
     assert "joinorder_synthetic" not in manager._get_public_benchmarks()
 
 
+def test_resource_estimates_use_registry_metadata() -> None:
+    manager = BenchmarkManager()
+
+    assert manager._estimate_memory_usage("vector_search", 0.1) == pytest.approx(0.1)
+    assert manager._estimate_execution_time("coffeeshop", 1.0) == pytest.approx(7.5)
+
+
 def test_display_all_benchmarks_warns_when_filters_match_nothing(
     monkeypatch: pytest.MonkeyPatch, manager: BenchmarkManager
 ):
@@ -200,7 +212,7 @@ def test_show_sample_queries_handles_empty_query_registry(monkeypatch: pytest.Mo
         def __init__(self, scale_factor: float):
             self.scale_factor = scale_factor
 
-    monkeypatch.setattr("benchbox.core.benchmark_loader.get_benchmark_class", lambda _bench: _Benchmark)
+    monkeypatch.setattr("benchbox.core.benchmark_loader.get_core_benchmark_class", lambda _bench: _Benchmark)
 
     manager._show_sample_queries("tpch")
 
@@ -217,7 +229,7 @@ def test_show_sample_queries_truncates_long_sql(monkeypatch: pytest.MonkeyPatch,
         def __init__(self, scale_factor: float):
             self.scale_factor = scale_factor
 
-    monkeypatch.setattr("benchbox.core.benchmark_loader.get_benchmark_class", lambda _bench: _Benchmark)
+    monkeypatch.setattr("benchbox.core.benchmark_loader.get_core_benchmark_class", lambda _bench: _Benchmark)
 
     manager._show_sample_queries("tpch", limit=1)
 

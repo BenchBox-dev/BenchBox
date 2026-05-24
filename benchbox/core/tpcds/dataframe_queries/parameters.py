@@ -1,6 +1,6 @@
 """TPC-DS query parameters for DataFrame implementations.
 
-Default parameter values are loaded from ``default_params.yaml``. They are
+Default parameter values are loaded from ``default_parameters.yaml``. They are
 representative values extracted from the TPC-DS specification and dsqgen output
 and are valid for SF >= 1.
 """
@@ -36,11 +36,13 @@ def _normalize_param_value(key: str, value: Any) -> Any:
 
 
 def _load_default_params() -> dict[int, dict[str, Any]]:
-    with (Path(__file__).with_name("default_params.yaml")).open(encoding="utf-8") as handle:
-        raw = yaml.safe_load(handle) or {}
+    with (Path(__file__).with_name("default_parameters.yaml")).open(encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise ValueError("TPC-DS default parameters must be a mapping")
     return {
         int(query_id): {key: _normalize_param_value(key, value) for key, value in params.items()}
-        for query_id, params in raw["default_params"].items()
+        for query_id, params in payload.items()
     }
 
 

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ast
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -14,19 +16,23 @@ from benchbox.core.base_benchmark import (
     BENCHMARK_API_SURFACE as CORE_BASE_API_SURFACE,
     BaseBenchmark as CoreBaseBenchmark,
 )
-from benchbox.core.benchmark_loader import BENCHMARK_LOADER_API_SURFACE
+from benchbox.core.benchmark_loader import BENCHMARK_LOADER_API_SURFACE, get_benchmark_class as get_core_benchmark_class
 from benchbox.core.benchmark_registry import (
     BENCHMARK_CLASS_NAMES,
     BENCHMARK_DATA_SOURCE_PROBE_IDS,
     BENCHMARK_METADATA,
     BENCHMARK_SUPPORT_STATUS_VALUES,
     CORE_BENCHMARK_CLASS_NAMES,
+    get_benchmark_default_scale,
+    get_benchmark_id_for_class_name,
     get_benchmark_registry_summary,
     get_benchmark_support_status,
     get_benchmarks_by_support_status,
+    get_public_benchmark_class,
     list_loader_benchmark_ids,
     list_public_benchmark_ids,
 )
+from benchbox.core.simple_benchmark_mixin import SimpleBenchmarkMixin
 
 pytestmark = [
     pytest.mark.unit,
@@ -75,6 +81,18 @@ def test_benchmark_api_surface_markers_match_contract_map() -> None:
     assert "| `benchbox.core.benchmark_loader` | `internal` |" in contract_doc
 
 
+def test_deprecated_core_base_usage_is_pinned_to_current_migration_exceptions() -> None:
+    """The deprecated base must not attract new benchmark consumers."""
+
+    deprecated_consumers = {
+        benchmark_id
+        for benchmark_id in list_loader_benchmark_ids()
+        if issubclass(get_core_benchmark_class(benchmark_id), CoreBaseBenchmark)
+    }
+
+    assert deprecated_consumers == {"datavault", "tpcds_obt"}
+
+
 def test_benchmark_registry_wrapper_and_loader_counts_match_contract_map() -> None:
     """Keep public facade, internal loader, and registry counts from drifting silently."""
 
@@ -98,6 +116,50 @@ def test_benchmark_registry_wrapper_and_loader_counts_match_contract_map() -> No
     assert set(list_public_benchmark_ids()) == set(BENCHMARK_METADATA) - {"joinorder_synthetic"}
 
     assert BENCHMARK_API_COUNT_MARKER in PUBLIC_CONTRACTS_DOC.read_text()
+
+
+def test_benchmark_class_reverse_lookup_matches_registry_maps() -> None:
+    """Public and core benchmark class names should map back to one canonical ID."""
+
+    for benchmark_id, class_name in BENCHMARK_CLASS_NAMES.items():
+        assert get_benchmark_id_for_class_name(class_name) == benchmark_id
+    for benchmark_id, class_name in CORE_BENCHMARK_CLASS_NAMES.items():
+        assert get_benchmark_id_for_class_name(class_name) == benchmark_id
+    assert get_benchmark_id_for_class_name("CustomDownstreamBenchmark") is None
+
+
+def test_simple_benchmark_mixin_rejects_missing_contract_members() -> None:
+    """SimpleBenchmarkMixin consumers should fail at class definition, not deep runtime."""
+
+    with pytest.raises(TypeError, match="missing required contract members"):
+
+        class BadSimple(SimpleBenchmarkMixin):
+            pass
+
+
+def test_simple_benchmark_mixin_rejects_inherited_abstract_contract_members() -> None:
+    """Inherited abstract base methods should not satisfy the concrete mixin contract."""
+
+    with pytest.raises(TypeError, match="get_query"):
+
+        class BadSimpleWithAbstractParent(SimpleBenchmarkMixin, PublicBaseBenchmark):
+            _benchmark_label = "bad"
+            _table_load_order = []
+
+            def execute_query(self) -> None:
+                return None
+
+            def get_create_tables_sql(self) -> dict[str, str]:
+                return {}
+
+            def _get_table_schema(self) -> dict[str, dict[str, str]]:
+                return {}
+
+
+def test_public_benchmark_class_lookup_name_returns_public_wrapper() -> None:
+    """The registry's intent-revealing class lookup should return the public wrapper surface."""
+
+    assert get_public_benchmark_class("tpch").__name__ == "TPCH"
 
 
 def test_benchmark_support_status_metadata_matches_contract_map() -> None:
@@ -129,7 +191,7 @@ def test_benchmark_support_status_metadata_matches_contract_map() -> None:
 
 
 def test_benchmark_data_source_metadata_matches_runtime_declarations() -> None:
-    """Every registry entry has a data_source key; runtime sharing declarations populate known consumers."""
+    """Every registry entry has a static data_source key matching runtime declarations."""
 
     assert all("data_source" in meta for meta in BENCHMARK_METADATA.values())
     assert BENCHMARK_DATA_SOURCE_PROBE_IDS == (
@@ -145,6 +207,70 @@ def test_benchmark_data_source_metadata_matches_runtime_declarations() -> None:
     assert BENCHMARK_METADATA["ai_primitives"]["data_source"] == "tpch"
     assert BENCHMARK_METADATA["tpcds_obt"]["data_source"] == "tpcds"
     assert BENCHMARK_METADATA["tpch"]["data_source"] is None
+
+    from benchbox.core.benchmark_loader import get_benchmark_class
+
+    for benchmark_id in BENCHMARK_DATA_SOURCE_PROBE_IDS:
+        benchmark_class = get_benchmark_class(benchmark_id)
+        benchmark = benchmark_class(scale_factor=get_benchmark_default_scale(benchmark_id))
+        assert benchmark.get_data_source_benchmark() == BENCHMARK_METADATA[benchmark_id]["data_source"]
+
+
+def test_benchmark_estimate_metadata_is_complete() -> None:
+    """Registry metadata should own CLI memory and time estimates for every benchmark."""
+
+    for benchmark_id, meta in BENCHMARK_METADATA.items():
+        assert "estimated_time_range" in meta, benchmark_id
+        assert "base_memory_gb" in meta, benchmark_id
+        low, high = meta["estimated_time_range"]
+        assert low >= 0, benchmark_id
+        assert high >= low, benchmark_id
+        assert meta["base_memory_gb"] > 0, benchmark_id
+
+
+def test_benchmark_registry_import_does_not_instantiate_probe_benchmarks() -> None:
+    """Static metadata should not instantiate benchmark classes during registry import."""
+
+    script = r"""
+import importlib
+
+orig = importlib.import_module
+calls = []
+
+class CallableProxy:
+    def __init__(self, cls, module_name, attr):
+        self._cls = cls
+        self._module_name = module_name
+        self._attr = attr
+        self.__name__ = getattr(cls, "__name__", attr)
+    def __call__(self, *args, **kwargs):
+        calls.append((self._module_name, self._attr, kwargs))
+        return self._cls(*args, **kwargs)
+    def __getattr__(self, name):
+        return getattr(self._cls, name)
+
+class ModuleProxy:
+    def __init__(self, module):
+        self._module = module
+        self.__name__ = module.__name__
+    def __getattr__(self, name):
+        attr = getattr(self._module, name)
+        if isinstance(attr, type):
+            return CallableProxy(attr, self._module.__name__, name)
+        return attr
+
+def wrapped(name, package=None):
+    mod = orig(name, package)
+    if name.startswith("benchbox.core.") and name.endswith(".benchmark"):
+        return ModuleProxy(mod)
+    return mod
+
+importlib.import_module = wrapped
+import benchbox.core.benchmark_registry  # noqa: F401
+print(len(calls))
+"""
+    result = subprocess.run([sys.executable, "-c", script], text=True, capture_output=True, check=True)
+    assert result.stdout.strip() == "0"
 
 
 def test_benchmark_api_import_boundary_excludes_platform_adapter_imports() -> None:

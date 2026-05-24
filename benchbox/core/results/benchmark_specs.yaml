@@ -7,6 +7,15 @@ legacy_aliases:
   nyc_taxi_olap: nyctaxi
   flight_data_olap: flightdata
   data_vault: datavault
+tpch_sf1_row_counts:
+  customer: 150000
+  lineitem: 6001215
+  nation: 25
+  orders: 1500000
+  part: 200000
+  partsupp: 800000
+  region: 5
+  supplier: 10000
 benchmark_specs:
   tpch:
     benchmark_id: tpch
@@ -33,6 +42,10 @@ benchmark_specs:
     - '7'
     - '8'
     - '9'
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       customer: 150000
       lineitem: 6001215
@@ -42,6 +55,7 @@ benchmark_specs:
       partsupp: 800000
       region: 5
       supplier: 10000
+    sf1_power_at_size_range: null
   tpcds:
     benchmark_id: tpcds
     unique_query_ids:
@@ -148,7 +162,10 @@ benchmark_specs:
     - '97'
     - '98'
     - '99'
+    min_unique_queries: 0
     min_success_rate: 0.95
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       call_center: 6
       catalog_page: 11718
@@ -175,10 +192,14 @@ benchmark_specs:
       web_returns: 71763
       web_sales: 719384
       web_site: 30
+    sf1_power_at_size_range: null
   tpchavoc:
     benchmark_id: tpchavoc
     unique_query_ids: []
+    min_unique_queries: 0
     min_success_rate: 0.95
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       customer: 150000
       lineitem: 6001215
@@ -188,6 +209,7 @@ benchmark_specs:
       partsupp: 800000
       region: 5
       supplier: 10000
+    sf1_power_at_size_range: null
   tpch_skew:
     benchmark_id: tpch_skew
     unique_query_ids:
@@ -213,6 +235,10 @@ benchmark_specs:
     - '7'
     - '8'
     - '9'
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       customer: 150000
       lineitem: 6001215
@@ -222,6 +248,7 @@ benchmark_specs:
       partsupp: 800000
       region: 5
       supplier: 10000
+    sf1_power_at_size_range: null
   tpcds_obt:
     benchmark_id: tpcds_obt
     unique_query_ids:
@@ -317,9 +344,13 @@ benchmark_specs:
     - '97'
     - '98'
     - '99'
+    min_unique_queries: 0
     min_success_rate: 0.95
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       tpcds_sales_returns_obt: 5041336
+    sf1_power_at_size_range: null
   ssb:
     benchmark_id: ssb
     unique_query_ids:
@@ -336,12 +367,17 @@ benchmark_specs:
     - '4.1'
     - '4.2'
     - '4.3'
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       customer: 30000
       date: 2557
       lineorder: 6000000
       part: 200000
       supplier: 2000
+    sf1_power_at_size_range: null
   clickbench:
     benchmark_id: clickbench
     unique_query_ids:
@@ -388,8 +424,13 @@ benchmark_specs:
     - '7'
     - '8'
     - '9'
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       hits: 499576
+    sf1_power_at_size_range: null
   h2odb:
     benchmark_id: h2odb
     unique_query_ids:
@@ -403,8 +444,13 @@ benchmark_specs:
     - '7'
     - '8'
     - '9'
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       trips: 10000000
+    sf1_power_at_size_range: null
   amplab:
     benchmark_id: amplab
     unique_query_ids:
@@ -416,10 +462,15 @@ benchmark_specs:
     - 3a
     - '4'
     - '5'
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       documents: 125000
       rankings: 250000
       uservisits: 2500000
+    sf1_power_at_size_range: null
   nyctaxi:
     benchmark_id: nyctaxi
     unique_query_ids:
@@ -448,9 +499,14 @@ benchmark_specs:
     - vendor-comparison
     - weekday-weekend-comparison
     - zone-detail
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       taxi_zones: 265
       trips: 8459839
+    sf1_power_at_size_range: null
   flightdata:
     benchmark_id: flightdata
     unique_query_ids:
@@ -474,10 +530,15 @@ benchmark_specs:
     - seasonal-trends
     - time-of-day
     - weather-impact
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       airlines: 26
       airports: 50
       flights: 25457793
+    sf1_power_at_size_range: null
   datavault:
     benchmark_id: datavault
     unique_query_ids:
@@ -503,6 +564,10 @@ benchmark_specs:
     - '7'
     - '8'
     - '9'
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       hub_customer: 150000
       hub_lineitem: 6001215
@@ -525,6 +590,7 @@ benchmark_specs:
       sat_partsupp: 800000
       sat_region: 5
       sat_supplier: 10000
+    sf1_power_at_size_range: null
   tpcdi:
     benchmark_id: tpcdi
     unique_query_ids:
@@ -566,6 +632,10 @@ benchmark_specs:
     - QVQ7
     - QVQ8
     - QVQ9
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       DimAccount: 100000
       DimBroker: 100
@@ -583,6 +653,7 @@ benchmark_specs:
       StatusType: 4
       TaxRate: 10
       TradeType: 6
+    sf1_power_at_size_range: null
   joinorder:
     benchmark_id: joinorder
     unique_query_ids:
@@ -599,6 +670,10 @@ benchmark_specs:
     - 7a
     - 8a
     - 9a
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       aka_name: 180000
       aka_title: 80000
@@ -621,6 +696,7 @@ benchmark_specs:
       person_info: 600000
       role_type: 12
       title: 500000
+    sf1_power_at_size_range: null
   coffeeshop:
     benchmark_id: coffeeshop
     unique_query_ids:
@@ -635,10 +711,15 @@ benchmark_specs:
     - QSA5
     - QTM1
     - QTR1
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       dim_locations: 1000
       dim_products: 26
       order_lines: 13260000
+    sf1_power_at_size_range: null
   tsbs_devops:
     benchmark_id: tsbs_devops
     unique_query_ids:
@@ -660,12 +741,17 @@ benchmark_specs:
     - resource-utilization
     - single-host-1-hr
     - single-host-12-hr
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       cpu: 1728000
       disk: 3456000
       mem: 1728000
       net: 3456000
       tags: 101
+    sf1_power_at_size_range: null
   transaction_primitives:
     benchmark_id: transaction_primitives
     unique_query_ids:
@@ -692,8 +778,10 @@ benchmark_specs:
     - transaction_savepoint_nested
     - transaction_truncate_in_transaction
     - transaction_with_cte
+    min_unique_queries: 0
     min_success_rate: 0.0
     high_failure_expected: true
+    requires_tables_object: true
     sf1_row_counts:
       customer: 150000
       lineitem: 6001215
@@ -703,10 +791,14 @@ benchmark_specs:
       partsupp: 800000
       region: 5
       supplier: 10000
+    sf1_power_at_size_range: null
   read_primitives:
     benchmark_id: read_primitives
     unique_query_ids: []
     min_unique_queries: 50
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       customer: 150000
       lineitem: 6001215
@@ -716,10 +808,14 @@ benchmark_specs:
       partsupp: 800000
       region: 5
       supplier: 10000
+    sf1_power_at_size_range: null
   write_primitives:
     benchmark_id: write_primitives
     unique_query_ids: []
     min_unique_queries: 50
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
     sf1_row_counts:
       customer: 150000
       lineitem: 6001215
@@ -729,9 +825,13 @@ benchmark_specs:
       partsupp: 800000
       region: 5
       supplier: 10000
+    sf1_power_at_size_range: null
   metadata_primitives:
     benchmark_id: metadata_primitives
     unique_query_ids: []
     min_unique_queries: 30
+    min_success_rate: 1.0
     high_failure_expected: true
     requires_tables_object: false
+    sf1_row_counts: null
+    sf1_power_at_size_range: null

@@ -19,10 +19,10 @@ from mcp.server.fastmcp import FastMCP
 
 from benchbox.core.benchmark_registry import (
     get_all_benchmarks,
-    get_benchmark_class,
     get_benchmark_default_scale,
     get_benchmark_metadata,
     get_benchmark_surface,
+    get_public_benchmark_class,
     list_public_benchmark_ids,
 )
 
@@ -51,7 +51,7 @@ def _get_benchmark_query_ids(benchmark_lower: str, name: str) -> list[str]:
     """Attempt to load query IDs for a benchmark."""
     query_ids: list[str] = []
     try:
-        benchmark_class = get_benchmark_class(benchmark_lower)
+        benchmark_class = get_public_benchmark_class(benchmark_lower)
         if benchmark_class is not None:
             bm = benchmark_class(scale_factor=get_benchmark_default_scale(benchmark_lower))
             if hasattr(bm, "query_manager") and hasattr(bm.query_manager, "get_all_queries"):

@@ -66,7 +66,7 @@ benchmark_class_names:
 core_class_name_overrides:
   h2odb: H2OBenchmark
   vector_search: VectorSearchBenchmark
-benchmark_data_source_probe_ids:
+data_source_probe_ids:
 - read_primitives
 - write_primitives
 - transaction_primitives
@@ -111,6 +111,8 @@ benchmark_metadata:
     estimated_time_range:
     - 2
     - 10
+    base_memory_gb: 1.0
+    data_source: null
     supports_dataframe: true
   tpcds:
     display_name: TPC-DS
@@ -131,6 +133,8 @@ benchmark_metadata:
     estimated_time_range:
     - 10
     - 60
+    base_memory_gb: 2.5
+    data_source: null
     supports_dataframe: true
   tpcds_obt:
     display_name: TPC-DS-OBT
@@ -148,6 +152,8 @@ benchmark_metadata:
     estimated_time_range:
     - 5
     - 20
+    base_memory_gb: 2.5
+    data_source: tpcds
     supports_dataframe: true
   tpcdi:
     display_name: TPC-DI
@@ -168,6 +174,8 @@ benchmark_metadata:
     estimated_time_range:
     - 5
     - 30
+    base_memory_gb: 1.5
+    data_source: null
     supports_dataframe: true
   ssb:
     display_name: SSB
@@ -188,6 +196,8 @@ benchmark_metadata:
     estimated_time_range:
     - 1
     - 5
+    base_memory_gb: 0.8
+    data_source: null
     supports_dataframe: true
   clickbench:
     display_name: ClickBench
@@ -205,6 +215,8 @@ benchmark_metadata:
     estimated_time_range:
     - 5
     - 15
+    base_memory_gb: 15.0
+    data_source: null
     supports_dataframe: true
   h2odb:
     display_name: H2ODB
@@ -224,6 +236,8 @@ benchmark_metadata:
     estimated_time_range:
     - 3
     - 15
+    base_memory_gb: 2.0
+    data_source: null
     supports_dataframe: true
   amplab:
     display_name: AMPLab
@@ -243,6 +257,8 @@ benchmark_metadata:
     estimated_time_range:
     - 3
     - 15
+    base_memory_gb: 1.2
+    data_source: null
     supports_dataframe: true
   read_primitives:
     display_name: Read Primitives
@@ -261,6 +277,8 @@ benchmark_metadata:
     estimated_time_range:
     - 1
     - 3
+    base_memory_gb: 0.1
+    data_source: tpch
     supports_dataframe: true
   write_primitives:
     display_name: Write Primitives
@@ -268,7 +286,8 @@ benchmark_metadata:
     category: Primitives
     support_status: beta
     num_queries: 12
-    query_description: 12 write operations (INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL, TRANSACTION)
+    query_description: 12 write operations (INSERT, UPDATE, DELETE, BULK_LOAD, MERGE,
+      DDL, TRANSACTION)
     supports_streams: false
     default_scale: 0.01
     scale_options:
@@ -280,6 +299,8 @@ benchmark_metadata:
     estimated_time_range:
     - 2
     - 5
+    base_memory_gb: 1.0
+    data_source: tpch
     supports_dataframe: true
   metadata_primitives:
     display_name: Metadata
@@ -287,8 +308,8 @@ benchmark_metadata:
     category: Primitives
     support_status: beta
     num_queries: 62
-    query_description: 62 catalog queries in the full SQL catalog; DataFrame mode runs platform-specific metadata operation
-      subsets
+    query_description: 62 catalog queries in the full SQL catalog; DataFrame mode
+      runs platform-specific metadata operation subsets
     supports_streams: false
     default_scale: 1.0
     scale_options:
@@ -298,6 +319,8 @@ benchmark_metadata:
     estimated_time_range:
     - 1
     - 2
+    base_memory_gb: 0.01
+    data_source: null
     supports_dataframe: true
   transaction_primitives:
     display_name: Transactions
@@ -317,10 +340,13 @@ benchmark_metadata:
     estimated_time_range:
     - 2
     - 5
+    base_memory_gb: 1.0
+    data_source: tpch
     supports_dataframe: true
   ai_primitives:
     display_name: AI Primitives
-    description: AI/ML function benchmarks (Snowflake Cortex, BigQuery ML, Databricks AI)
+    description: AI/ML function benchmarks (Snowflake Cortex, BigQuery ML, Databricks
+      AI)
     category: Primitives
     support_status: experimental
     num_queries: 16
@@ -336,6 +362,8 @@ benchmark_metadata:
     estimated_time_range:
     - 3
     - 15
+    base_memory_gb: 1.0
+    data_source: tpch
     supports_dataframe: false
   joinorder:
     display_name: JoinOrder
@@ -353,6 +381,7 @@ benchmark_metadata:
     estimated_time_range:
     - 30
     - 90
+    base_memory_gb: 5.0
     supports_dataframe: true
     surface: public
     data_source: canonical
@@ -378,6 +407,7 @@ benchmark_metadata:
     estimated_time_range:
     - 2
     - 10
+    base_memory_gb: 1.0
     supports_dataframe: true
     surface: internal
     data_source: synthetic
@@ -400,6 +430,8 @@ benchmark_metadata:
     estimated_time_range:
     - 3
     - 12
+    base_memory_gb: 1.0
+    data_source: null
     supports_dataframe: true
   tpchavoc:
     display_name: TPC-Havoc
@@ -420,6 +452,8 @@ benchmark_metadata:
     estimated_time_range:
     - 15
     - 60
+    base_memory_gb: 1.0
+    data_source: null
     supports_dataframe: true
   tpch_skew:
     display_name: TPC-H Skew
@@ -440,6 +474,8 @@ benchmark_metadata:
     estimated_time_range:
     - 2
     - 15
+    base_memory_gb: 1.0
+    data_source: null
     supports_dataframe: true
   tsbs_devops:
     display_name: TSBS DevOps
@@ -460,6 +496,8 @@ benchmark_metadata:
     estimated_time_range:
     - 2
     - 10
+    base_memory_gb: 0.8
+    data_source: null
     supports_dataframe: true
   nyctaxi:
     display_name: NYC Taxi
@@ -481,6 +519,8 @@ benchmark_metadata:
     estimated_time_range:
     - 5
     - 30
+    base_memory_gb: 1.0
+    data_source: null
     supports_dataframe: true
   flightdata:
     display_name: Flight Data
@@ -502,6 +542,8 @@ benchmark_metadata:
     estimated_time_range:
     - 5
     - 30
+    base_memory_gb: 1.0
+    data_source: null
     supports_dataframe: true
   datavault:
     display_name: TPC-H Data Vault
@@ -509,7 +551,8 @@ benchmark_metadata:
     category: Experimental
     support_status: experimental
     num_queries: 22
-    query_description: 22 analytical queries (TPC-H adapted for Hub-Link-Satellite model)
+    query_description: 22 analytical queries (TPC-H adapted for Hub-Link-Satellite
+      model)
     supports_streams: false
     default_scale: 0.01
     scale_options:
@@ -522,6 +565,8 @@ benchmark_metadata:
     estimated_time_range:
     - 5
     - 30
+    base_memory_gb: 3.0
+    data_source: null
     supports_dataframe: true
   vector_search:
     display_name: Vector Search
@@ -543,4 +588,6 @@ benchmark_metadata:
     estimated_time_range:
     - 1
     - 10
+    base_memory_gb: 1.0
+    data_source: null
     supports_dataframe: false

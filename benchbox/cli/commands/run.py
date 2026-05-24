@@ -561,9 +561,9 @@ def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
     s.parsed_benchmark_options = {}
     if s.benchmark and s.benchmark_option_pairs:
         try:
-            from benchbox.core.benchmark_loader import get_benchmark_class
+            from benchbox.core.benchmark_loader import get_core_benchmark_class
 
-            get_benchmark_class(s.benchmark)
+            get_core_benchmark_class(s.benchmark)
         except ValueError:
             pass
         try:

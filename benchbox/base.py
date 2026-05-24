@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
+from benchbox.core.benchmark_result_validation import BenchmarkResultValidationMixin
 from benchbox.core.connection import DatabaseConnection
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.cloud_storage import create_path_handler
@@ -23,7 +24,6 @@ if TYPE_CHECKING:
     import sqlglot
 
     from benchbox.core.results.models import BenchmarkResults
-    from benchbox.core.validation import ValidationResult
 else:
     try:
         import sqlglot
@@ -31,7 +31,7 @@ else:
         sqlglot = None
 
 
-class BaseBenchmark(VerbosityMixin, ABC):
+class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
     """Base class for all benchmarks.
 
     All benchmarks inherit from this class.
@@ -141,6 +141,7 @@ class BaseBenchmark(VerbosityMixin, ABC):
 
     @tables.setter
     def tables(self, value: dict) -> None:
+        """Set table-to-path mappings on the implementation or wrapper."""
         if hasattr(self, "_impl"):
             self._impl.tables = value
         else:
@@ -160,60 +161,22 @@ class BaseBenchmark(VerbosityMixin, ABC):
         return None
 
     def _get_benchmark_name(self) -> str:
-        """Derive benchmark name from class name.
-
-        Maps class names to benchmark names:
-        - TPCH -> tpch
-        - TPCDS -> tpcds
-        - ClickBench -> clickbench
-        - AMPLab -> amplab
-        - H2ODB -> h2odb
-        - JoinOrder -> joinorder
-        - TPCHavoc -> tpchavoc
-        - NYCTaxi -> nyctaxi
-        - etc.
-
-        Returns:
-            Lowercase benchmark name suitable for directory paths
-        """
+        """Return the canonical registry ID for this benchmark class."""
         class_name = self.__class__.__name__
 
-        # Handle special cases first
-        special_mappings = {
-            "ClickBench": "clickbench",
-            "ClickBenchBenchmark": "clickbench",
-            "AMPLab": "amplab",
-            "AMPLabBenchmark": "amplab",
-            "H2ODB": "h2odb",
-            "H2OBenchmark": "h2odb",
-            "JoinOrder": "joinorder",
-            "JoinOrderBenchmark": "joinorder",
-            "TPCHavoc": "tpchavoc",
-            "TPCHavocBenchmark": "tpchavoc",
-            "TPCHBenchmark": "tpch",
-            "TPCDSBenchmark": "tpcds",
-            "TPCDIBenchmark": "tpcdi",
-            "SSBBenchmark": "ssb",
-            "PrimitivesBenchmark": "primitives",
-            "MergeBenchmark": "merge",
-            "CoffeeShopBenchmark": "coffeeshop",
-            "NYCTaxi": "nyctaxi",
-            "NYCTaxiBenchmark": "nyctaxi",
-            "FlightData": "flightdata",
-            "FlightDataBenchmark": "flightdata",
-            "TSBSDevOps": "tsbs_devops",
-            "TSBSDevOpsBenchmark": "tsbs_devops",
-        }
+        try:
+            from benchbox.core.benchmark_registry import get_benchmark_id_for_class_name
+        except ImportError:
+            benchmark_id = None
+        else:
+            benchmark_id = get_benchmark_id_for_class_name(class_name)
+        if benchmark_id is not None:
+            return benchmark_id
 
-        if class_name in special_mappings:
-            return special_mappings[class_name]
-
-        # Prefer stripping the common suffix before lowercasing to keep
-        # class-based benchmark IDs stable (e.g. ClickBenchBenchmark -> clickbench).
+        # Keep unregistered tests and downstream custom benchmarks working.
         if class_name.endswith("Benchmark"):
             return class_name[:-9].lower()
 
-        # For standard cases, just lowercase (e.g. TPCH -> tpch).
         return class_name.lower()
 
     def get_data_source_benchmark(self) -> Optional[str]:
@@ -626,178 +589,6 @@ class BaseBenchmark(VerbosityMixin, ABC):
                 return self._impl.benchmark_name
         # For classes without _impl (like core implementation classes)
         return getattr(self, "_name", type(self).__name__)
-
-    def create_enhanced_benchmark_result(
-        self,
-        platform: str,
-        query_results: list[dict[str, Any]],
-        execution_metadata: Optional[dict[str, Any]] = None,
-        phases: Optional[dict[str, dict[str, Any]]] = None,
-        resource_utilization: Optional[dict[str, Any]] = None,
-        performance_characteristics: Optional[dict[str, Any]] = None,
-        duration_seconds: Optional[float] = None,
-        **kwargs: Any,
-    ) -> "BenchmarkResults":
-        """Create a BenchmarkResults object with standardized fields.
-
-        This centralizes the logic for creating benchmark results that was previously
-        duplicated across platform adapters and CLI orchestrator.
-
-        Args:
-            platform: Platform name (e.g., "DuckDB", "ClickHouse")
-            query_results: List of query execution results
-            execution_metadata: Optional execution metadata
-            phases: Optional phase tracking information
-            resource_utilization: Optional resource usage metrics
-            performance_characteristics: Optional performance analysis
-            duration_seconds: Optional explicit total duration override in seconds
-            **kwargs: Additional fields to override defaults
-
-        Returns:
-            Fully configured BenchmarkResults object
-        """
-        # Delegate to implementation's create method if available, otherwise use our own
-        if hasattr(self, "_impl") and hasattr(self._impl, "create_enhanced_benchmark_result"):
-            return self._impl.create_enhanced_benchmark_result(
-                platform=platform,
-                query_results=query_results,
-                execution_metadata=execution_metadata,
-                phases=phases,
-                resource_utilization=resource_utilization,
-                performance_characteristics=performance_characteristics,
-                duration_seconds=duration_seconds,
-                **kwargs,
-            )
-
-        # Fallback implementation for wrapper class delegates to shared result factory.
-        from benchbox.core.results.result_factory import build_enhanced_benchmark_result
-
-        result = build_enhanced_benchmark_result(
-            benchmark=self,
-            platform=platform,
-            query_results=query_results,
-            execution_metadata=execution_metadata,
-            phases=phases,
-            resource_utilization=resource_utilization,
-            performance_characteristics=performance_characteristics,
-            duration_seconds=duration_seconds,
-            **kwargs,
-        )
-        self._attach_performance_snapshot(result, performance_characteristics, **kwargs)
-        return result
-
-    def create_minimal_benchmark_result(
-        self,
-        *,
-        validation_status: str,
-        validation_details: Optional[dict[str, Any]] = None,
-        duration_seconds: float = 0.0,
-        platform: str = "unknown",
-        execution_metadata: Optional[dict[str, Any]] = None,
-        system_profile: Optional[dict[str, Any]] = None,
-        phases: Optional[dict[str, dict[str, Any]]] = None,
-        **overrides: Any,
-    ) -> "BenchmarkResults":
-        """Create a minimal BenchmarkResults instance for error and interrupt paths."""
-
-        metadata: dict[str, Any] = {
-            "result_type": "minimal",
-            "status": validation_status,
-        }
-        base_identifier = str(getattr(self, "name", self.benchmark_name))
-        metadata.setdefault(
-            "benchmark_id",
-            base_identifier.lower().replace(" ", "_").replace("-", "_"),
-        )
-        if execution_metadata:
-            metadata.update(execution_metadata)
-
-        result = self.create_enhanced_benchmark_result(
-            platform=platform,
-            query_results=[],
-            execution_metadata=metadata,
-            phases=phases,
-            duration_seconds=duration_seconds,
-            validation_status=validation_status,
-            validation_details=validation_details or {},
-            system_profile=system_profile or {},
-            **overrides,
-        )
-        result._benchmark_id_override = metadata["benchmark_id"]
-        return result
-
-    # ------------------------------------------------------------------
-    # Validation helpers (core-facing)
-    # ------------------------------------------------------------------
-
-    def _resolve_output_dir(self, output_dir: Optional[Union[str, Path]] = None) -> Union[Path, Any]:
-        """Resolve and cache the benchmark output directory handler."""
-
-        candidate = output_dir if output_dir is not None else getattr(self, "output_dir", None)
-        if candidate is None:
-            raise RuntimeError(
-                "Benchmark output directory is not configured. Set 'benchmark.output_dir' or pass output_root to the lifecycle runner."
-            )
-
-        handler = create_path_handler(candidate)
-        self.output_dir = handler
-        return handler
-
-    def validate_preflight(
-        self,
-        *,
-        output_dir: Optional[Union[str, Path]] = None,
-        benchmark_name: Optional[str] = None,
-    ) -> "ValidationResult":
-        """Run preflight validation for this benchmark."""
-
-        from benchbox.core.validation import DataValidationEngine
-
-        resolved_dir = self._resolve_output_dir(output_dir)
-        engine = DataValidationEngine()
-        benchmark_id = (benchmark_name or self._get_benchmark_name()).lower()
-        return engine.validate_preflight_conditions(benchmark_id, self.scale_factor, resolved_dir)
-
-    def validate_manifest(
-        self,
-        *,
-        manifest_path: Optional[Union[str, Path]] = None,
-        benchmark_name: Optional[str] = None,
-    ) -> "ValidationResult":
-        """Validate generated manifest for this benchmark."""
-
-        from benchbox.core.validation import DataValidationEngine, ValidationResult as CoreValidationResult
-
-        resolved_dir = self._resolve_output_dir()
-        manifest_candidate = manifest_path
-        if manifest_candidate is None and hasattr(resolved_dir, "joinpath"):
-            manifest_candidate = resolved_dir.joinpath("_datagen_manifest.json")
-
-        if manifest_candidate is None:
-            return CoreValidationResult(
-                is_valid=False,
-                errors=["Manifest path is not available"],
-                warnings=[],
-                details={"benchmark": (benchmark_name or self._get_benchmark_name())},
-            )
-
-        engine = DataValidationEngine()
-        manifest_path_obj = Path(manifest_candidate) if isinstance(manifest_candidate, str) else manifest_candidate
-        return engine.validate_generated_data(manifest_path_obj)
-
-    def validate_loaded_data(
-        self,
-        connection: Any,
-        *,
-        benchmark_name: Optional[str] = None,
-    ) -> "ValidationResult":
-        """Validate post-load database state for this benchmark."""
-
-        from benchbox.core.validation import DatabaseValidationEngine
-
-        engine = DatabaseValidationEngine()
-        benchmark_id = (benchmark_name or self._get_benchmark_name()).lower()
-        return engine.validate_loaded_data(connection, benchmark_id, self.scale_factor)
 
     def _create_result_builder(
         self,

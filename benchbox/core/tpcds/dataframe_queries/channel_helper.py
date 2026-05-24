@@ -16,7 +16,10 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+import yaml
 
 if TYPE_CHECKING:
     pass
@@ -25,204 +28,21 @@ if TYPE_CHECKING:
 # Column Mappings
 # =============================================================================
 
-# Sales fact table column mappings: standard_name -> channel-specific column
-SALES_COLUMN_MAPPINGS: dict[str, dict[str, str]] = {
-    "store": {
-        # Keys / Foreign Keys
-        "sold_date_sk": "ss_sold_date_sk",
-        "sold_time_sk": "ss_sold_time_sk",
-        "item_sk": "ss_item_sk",
-        "customer_sk": "ss_customer_sk",
-        "cdemo_sk": "ss_cdemo_sk",
-        "hdemo_sk": "ss_hdemo_sk",
-        "addr_sk": "ss_addr_sk",
-        "store_sk": "ss_store_sk",
-        "promo_sk": "ss_promo_sk",
-        "ticket_number": "ss_ticket_number",
-        # Measures
-        "quantity": "ss_quantity",
-        "wholesale_cost": "ss_wholesale_cost",
-        "list_price": "ss_list_price",
-        "sales_price": "ss_sales_price",
-        "ext_discount_amt": "ss_ext_discount_amt",
-        "ext_sales_price": "ss_ext_sales_price",
-        "ext_wholesale_cost": "ss_ext_wholesale_cost",
-        "ext_list_price": "ss_ext_list_price",
-        "ext_tax": "ss_ext_tax",
-        "coupon_amt": "ss_coupon_amt",
-        "net_paid": "ss_net_paid",
-        "net_paid_inc_tax": "ss_net_paid_inc_tax",
-        "net_profit": "ss_net_profit",
-    },
-    "catalog": {
-        # Keys / Foreign Keys
-        "sold_date_sk": "cs_sold_date_sk",
-        "sold_time_sk": "cs_sold_time_sk",
-        "ship_date_sk": "cs_ship_date_sk",
-        "item_sk": "cs_item_sk",
-        "customer_sk": "cs_bill_customer_sk",
-        "cdemo_sk": "cs_bill_cdemo_sk",
-        "hdemo_sk": "cs_bill_hdemo_sk",
-        "addr_sk": "cs_bill_addr_sk",
-        "call_center_sk": "cs_call_center_sk",
-        "catalog_page_sk": "cs_catalog_page_sk",
-        "ship_mode_sk": "cs_ship_mode_sk",
-        "warehouse_sk": "cs_warehouse_sk",
-        "promo_sk": "cs_promo_sk",
-        "order_number": "cs_order_number",
-        # Measures
-        "quantity": "cs_quantity",
-        "wholesale_cost": "cs_wholesale_cost",
-        "list_price": "cs_list_price",
-        "sales_price": "cs_sales_price",
-        "ext_discount_amt": "cs_ext_discount_amt",
-        "ext_sales_price": "cs_ext_sales_price",
-        "ext_wholesale_cost": "cs_ext_wholesale_cost",
-        "ext_list_price": "cs_ext_list_price",
-        "ext_ship_cost": "cs_ext_ship_cost",
-        "ext_tax": "cs_ext_tax",
-        "coupon_amt": "cs_coupon_amt",
-        "net_paid": "cs_net_paid",
-        "net_paid_inc_tax": "cs_net_paid_inc_tax",
-        "net_paid_inc_ship": "cs_net_paid_inc_ship",
-        "net_paid_inc_ship_tax": "cs_net_paid_inc_ship_tax",
-        "net_profit": "cs_net_profit",
-    },
-    "web": {
-        # Keys / Foreign Keys
-        "sold_date_sk": "ws_sold_date_sk",
-        "sold_time_sk": "ws_sold_time_sk",
-        "ship_date_sk": "ws_ship_date_sk",
-        "item_sk": "ws_item_sk",
-        "customer_sk": "ws_bill_customer_sk",
-        "cdemo_sk": "ws_bill_cdemo_sk",
-        "hdemo_sk": "ws_bill_hdemo_sk",
-        "addr_sk": "ws_bill_addr_sk",
-        "web_page_sk": "ws_web_page_sk",
-        "web_site_sk": "ws_web_site_sk",
-        "ship_mode_sk": "ws_ship_mode_sk",
-        "warehouse_sk": "ws_warehouse_sk",
-        "promo_sk": "ws_promo_sk",
-        "order_number": "ws_order_number",
-        # Measures
-        "quantity": "ws_quantity",
-        "wholesale_cost": "ws_wholesale_cost",
-        "list_price": "ws_list_price",
-        "sales_price": "ws_sales_price",
-        "ext_discount_amt": "ws_ext_discount_amt",
-        "ext_sales_price": "ws_ext_sales_price",
-        "ext_wholesale_cost": "ws_ext_wholesale_cost",
-        "ext_list_price": "ws_ext_list_price",
-        "ext_ship_cost": "ws_ext_ship_cost",
-        "ext_tax": "ws_ext_tax",
-        "coupon_amt": "ws_coupon_amt",
-        "net_paid": "ws_net_paid",
-        "net_paid_inc_tax": "ws_net_paid_inc_tax",
-        "net_paid_inc_ship": "ws_net_paid_inc_ship",
-        "net_paid_inc_ship_tax": "ws_net_paid_inc_ship_tax",
-        "net_profit": "ws_net_profit",
-    },
-}
 
-# Returns fact table column mappings
-RETURNS_COLUMN_MAPPINGS: dict[str, dict[str, str]] = {
-    "store": {
-        # Keys
-        "returned_date_sk": "sr_returned_date_sk",
-        "return_time_sk": "sr_return_time_sk",
-        "item_sk": "sr_item_sk",
-        "customer_sk": "sr_customer_sk",
-        "cdemo_sk": "sr_cdemo_sk",
-        "hdemo_sk": "sr_hdemo_sk",
-        "addr_sk": "sr_addr_sk",
-        "store_sk": "sr_store_sk",
-        "reason_sk": "sr_reason_sk",
-        "ticket_number": "sr_ticket_number",
-        # Measures
-        "return_quantity": "sr_return_quantity",
-        "return_amt": "sr_return_amt",
-        "return_tax": "sr_return_tax",
-        "return_amt_inc_tax": "sr_return_amt_inc_tax",
-        "fee": "sr_fee",
-        "return_ship_cost": "sr_return_ship_cost",
-        "refunded_cash": "sr_refunded_cash",
-        "reversed_charge": "sr_reversed_charge",
-        "store_credit": "sr_store_credit",
-        "net_loss": "sr_net_loss",
-    },
-    "catalog": {
-        # Keys
-        "returned_date_sk": "cr_returned_date_sk",
-        "return_time_sk": "cr_return_time_sk",
-        "item_sk": "cr_item_sk",
-        "refunded_customer_sk": "cr_refunded_customer_sk",
-        "refunded_cdemo_sk": "cr_refunded_cdemo_sk",
-        "refunded_hdemo_sk": "cr_refunded_hdemo_sk",
-        "refunded_addr_sk": "cr_refunded_addr_sk",
-        "returning_customer_sk": "cr_returning_customer_sk",
-        "returning_cdemo_sk": "cr_returning_cdemo_sk",
-        "returning_hdemo_sk": "cr_returning_hdemo_sk",
-        "returning_addr_sk": "cr_returning_addr_sk",
-        "call_center_sk": "cr_call_center_sk",
-        "catalog_page_sk": "cr_catalog_page_sk",
-        "ship_mode_sk": "cr_ship_mode_sk",
-        "warehouse_sk": "cr_warehouse_sk",
-        "reason_sk": "cr_reason_sk",
-        "order_number": "cr_order_number",
-        # Measures
-        "return_quantity": "cr_return_quantity",
-        "return_amount": "cr_return_amount",
-        "return_tax": "cr_return_tax",
-        "return_amt_inc_tax": "cr_return_amt_inc_tax",
-        "fee": "cr_fee",
-        "return_ship_cost": "cr_return_ship_cost",
-        "refunded_cash": "cr_refunded_cash",
-        "reversed_charge": "cr_reversed_charge",
-        "store_credit": "cr_store_credit",
-        "net_loss": "cr_net_loss",
-    },
-    "web": {
-        # Keys
-        "returned_date_sk": "wr_returned_date_sk",
-        "return_time_sk": "wr_return_time_sk",
-        "item_sk": "wr_item_sk",
-        "refunded_customer_sk": "wr_refunded_customer_sk",
-        "refunded_cdemo_sk": "wr_refunded_cdemo_sk",
-        "refunded_hdemo_sk": "wr_refunded_hdemo_sk",
-        "refunded_addr_sk": "wr_refunded_addr_sk",
-        "returning_customer_sk": "wr_returning_customer_sk",
-        "returning_cdemo_sk": "wr_returning_cdemo_sk",
-        "returning_hdemo_sk": "wr_returning_hdemo_sk",
-        "returning_addr_sk": "wr_returning_addr_sk",
-        "web_page_sk": "wr_web_page_sk",
-        "reason_sk": "wr_reason_sk",
-        "order_number": "wr_order_number",
-        # Measures
-        "return_quantity": "wr_return_quantity",
-        "return_amt": "wr_return_amt",
-        "return_tax": "wr_return_tax",
-        "return_amt_inc_tax": "wr_return_amt_inc_tax",
-        "fee": "wr_fee",
-        "return_ship_cost": "wr_return_ship_cost",
-        "refunded_cash": "wr_refunded_cash",
-        "reversed_charge": "wr_reversed_charge",
-        "account_credit": "wr_account_credit",
-        "net_loss": "wr_net_loss",
-    },
-}
+# Channel mapping data is loaded from package data to keep this module focused on behavior.
+def _load_channel_mappings() -> dict[str, Any]:
+    with (Path(__file__).with_name("channel_mappings.yaml")).open(encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise ValueError("TPC-DS channel mappings must be a mapping")
+    return payload
 
-# Table names for each channel
-SALES_TABLE_NAMES = {
-    "store": "store_sales",
-    "catalog": "catalog_sales",
-    "web": "web_sales",
-}
 
-RETURNS_TABLE_NAMES = {
-    "store": "store_returns",
-    "catalog": "catalog_returns",
-    "web": "web_returns",
-}
+_CHANNEL_MAPPINGS = _load_channel_mappings()
+SALES_COLUMN_MAPPINGS = _CHANNEL_MAPPINGS["sales_columns"]
+RETURNS_COLUMN_MAPPINGS = _CHANNEL_MAPPINGS["returns_columns"]
+SALES_TABLE_NAMES = _CHANNEL_MAPPINGS["sales_tables"]
+RETURNS_TABLE_NAMES = _CHANNEL_MAPPINGS["returns_tables"]
 
 
 # =============================================================================
