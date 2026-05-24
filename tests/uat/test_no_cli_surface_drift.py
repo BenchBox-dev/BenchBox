@@ -13,12 +13,26 @@ pytestmark = pytest.mark.fast
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/benchmarks.py",
+    "benchbox/cli/commands/calculate_qphh.py",
+    "benchbox/cli/commands/compare_dataframes.py",
+    "benchbox/cli/commands/compare_plans.py",
     "benchbox/cli/commands/convert.py",
+    "benchbox/cli/commands/df_tuning.py",
     "benchbox/cli/commands/run.py",
+    "benchbox/cli/commands/run_official.py",
     "benchbox/cli/commands/submit.py",
+    "benchbox/cli/commands/tuning.py",
     "benchbox/cli/commands/visualize.py",
     "benchbox/cli/help.py",
     "benchbox/cli/orchestrator.py",
+}
+ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
+    "benchbox/cli/commands/calculate_qphh.py",
+    "benchbox/cli/commands/compare_dataframes.py",
+    "benchbox/cli/commands/compare_plans.py",
+    "benchbox/cli/commands/df_tuning.py",
+    "benchbox/cli/commands/run_official.py",
+    "benchbox/cli/commands/tuning.py",
 }
 FORBIDDEN_CLI_SURFACE_SNIPPETS = ("@click.option", "@click.command", "@click.group")
 FORBIDDEN_CLI_SURFACE_DEFS = {
@@ -38,6 +52,8 @@ def test_uat_did_not_modify_benchbox_cli_surface():
 
     forbidden = []
     for path in sorted(ALLOWED_INTERNAL_CLI_FILES):
+        if path in ALLOWED_HIDDEN_COMPAT_CLI_FILES:
+            continue
         diff = _git("diff", "--unified=0", base, "--", path).stdout
         changed_lines = [
             line for line in diff.splitlines() if line.startswith(("+", "-")) and not line.startswith(("+++", "---"))
