@@ -242,8 +242,14 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
 
     def _catalog_listing_params(self) -> dict[str, Any]:
         """Return connection params suitable for SHOW CATALOGS."""
-        params = self._get_connection_params()
+        params = self._bootstrap_connection_params()
         params["schema"] = "information_schema"
+        return params
+
+    def _bootstrap_connection_params(self) -> dict[str, Any]:
+        """Return params for metadata/setup calls before the final query session."""
+        params = self._get_connection_params()
+        params.pop("session_properties", None)
         return params
 
     def _get_available_catalogs(self) -> list[str]:
@@ -304,7 +310,7 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
                 self.logger.warning(f"Invalid catalog or schema identifier: {catalog}.{schema}")
                 return False
 
-            params = self._get_connection_params()
+            params = self._bootstrap_connection_params()
             params["catalog"] = catalog
             params["schema"] = "information_schema"
 
@@ -408,8 +414,12 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         if not self.database_was_reused and not self.check_server_database_exists(
             schema=target_schema, catalog=target_catalog
         ):
+            if target_catalog is None and self.catalog:
+                target_catalog = self.catalog
+                params["catalog"] = target_catalog
             self.log_verbose(f"Creating schema: {target_catalog}.{target_schema}")
             temp_params = params.copy()
+            temp_params.pop("session_properties", None)
             temp_params["schema"] = "information_schema"
             temp_conn = self._connect_with_params(temp_params)
             temp_cursor = temp_conn.cursor()
@@ -419,6 +429,9 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             finally:
                 temp_cursor.close()
                 temp_conn.close()
+        elif target_catalog is None and self.catalog:
+            target_catalog = self.catalog
+            params["catalog"] = target_catalog
 
         self.log_very_verbose(
             f"{self.platform_log_name} connection params: host={params.get('host')}, catalog={target_catalog}"
@@ -647,7 +660,7 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
     def test_connection(self) -> bool:
         """Test connection to the coordinator."""
         try:
-            params = self._get_connection_params()
+            params = self._bootstrap_connection_params()
             params["schema"] = "information_schema"
             conn = self._connect_with_params(params)
             cursor = conn.cursor()

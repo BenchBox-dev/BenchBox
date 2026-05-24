@@ -108,7 +108,7 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
         return trino.dbapi.connect(**params)
 
     def _catalog_listing_params(self) -> dict[str, Any]:
-        params = self._get_connection_params()
+        params = self._bootstrap_connection_params()
         params["schema"] = "information_schema"
         if params.get("catalog"):
             del params["catalog"]

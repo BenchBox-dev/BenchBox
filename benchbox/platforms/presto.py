@@ -116,7 +116,7 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
         return prestodb.dbapi.connect(**params)
 
     def _catalog_listing_params(self) -> dict[str, Any]:
-        params = self._get_connection_params()
+        params = self._bootstrap_connection_params()
         params["catalog"] = "system"
         params["schema"] = "runtime"
         return params
