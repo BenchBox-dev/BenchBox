@@ -56,6 +56,25 @@ def test_validate_config_minimal():
     assert cfg.compatibility.release_gate_runtime_envelopes is False
 
 
+def test_validate_matrix_filter_tracks_explicit_empty_include():
+    cfg = config.validate_config(
+        {
+            "name": "smoke",
+            "platforms": {"include": []},
+            "benchmarks": {"include": []},
+        }
+    )
+    omitted = config.validate_config({"name": "smoke"})
+
+    assert cfg.platforms.include == ()
+    assert cfg.platforms.include_was_specified is True
+    assert cfg.platforms.uses_implicit_group_default is False
+    assert cfg.benchmarks.include_was_specified is True
+    assert cfg.benchmarks.uses_implicit_group_default is False
+    assert omitted.platforms.include_was_specified is False
+    assert omitted.platforms.uses_implicit_group_default is True
+
+
 def test_validate_config_rejects_parallel_platforms():
     with pytest.raises(config.ConfigError, match="parallel_platforms"):
         config.validate_config({"name": "smoke", "execute": {"parallel_platforms": True}})

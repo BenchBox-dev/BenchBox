@@ -248,6 +248,30 @@ def test_enumerate_records_pg_family_release_gate_compatibility_pruning():
     assert "datavault" not in timescaledb_caps.unsupported_benchmarks
 
 
+def test_enumerate_preserves_explicit_empty_include_as_default_suppression():
+    no_platforms = enum_phase.enumerate_cells(
+        _cfg(
+            {
+                "platforms": {"include": []},
+                "benchmarks": {"include": ["tpch"]},
+                "scales": {"rungs": [0.01]},
+            }
+        )
+    )
+    no_benchmarks = enum_phase.enumerate_cells(
+        _cfg(
+            {
+                "platforms": {"include": ["duckdb"]},
+                "benchmarks": {"include": []},
+                "scales": {"rungs": [0.01]},
+            }
+        )
+    )
+
+    assert no_platforms == []
+    assert no_benchmarks == []
+
+
 def test_enumerate_honours_scale_options():
     raw = {
         "platforms": {"include": ["duckdb"]},

@@ -134,6 +134,12 @@ def test_requested_platforms_from_config_matches_uat_defaults():
     assert "duckdb" in preflight.requested_platforms_from_config(config.validate_config({"name": "smoke"}))
 
 
+def test_requested_platforms_from_config_preserves_explicit_empty_include():
+    cfg = config.validate_config({"name": "smoke", "platforms": {"include": []}})
+
+    assert preflight.requested_platforms_from_config(cfg) == ()
+
+
 def test_uat_bring_up_unknown_platform_returns_clear_error(capsys):
     module = _load_bring_up_module()
     rc = module.main(["--platform", "does-not-exist"])

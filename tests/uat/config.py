@@ -74,6 +74,12 @@ class MatrixFilterConfig:
     groups: tuple[str, ...] | None = None
     include: tuple[str, ...] = ()
     exclude: tuple[str, ...] = ()
+    include_was_specified: bool = False
+
+    @property
+    def uses_implicit_group_default(self) -> bool:
+        """Whether callers should apply their phase-specific default group."""
+        return self.groups is None and not self.include_was_specified and not self.include
 
 
 @dataclass(frozen=True)
@@ -229,6 +235,7 @@ def _validate_matrix_filter(payload: dict[str, Any] | None, *, section: str) -> 
         groups=groups,
         include=_as_string_tuple(payload.get("include"), section=section, key="include"),
         exclude=_as_string_tuple(payload.get("exclude"), section=section, key="exclude"),
+        include_was_specified="include" in payload,
     )
 
 
