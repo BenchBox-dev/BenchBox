@@ -309,6 +309,10 @@ def _validate_translation_section(data: dict, vr: ValidationResult) -> None:
     if translation is None:
         return
 
+    if not isinstance(translation, dict):
+        vr.error("execution.translation must be an object when present")
+        return
+
     translation_status = _normalize_status(translation)
     if translation_status is None:
         vr.error("execution.translation.status is required when execution.translation is present")
