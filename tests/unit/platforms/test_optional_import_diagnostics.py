@@ -103,3 +103,22 @@ def test_platform_module_exposes_registry_optional_diagnostics(monkeypatch):
 
     assert platform_module.diagnose_optional_adapter_imports(["snowflake"]) == {"snowflake": {"status": "available"}}
     assert called["platform_names"] == ["snowflake"]
+
+
+def test_eager_optional_adapter_import_attribute_error_propagates(monkeypatch):
+    def fake_import_module(module_path: str, package: str):
+        raise AttributeError("adapter module bug")
+
+    monkeypatch.setattr(platform_module.importlib, "import_module", fake_import_module)
+
+    with pytest.raises(AttributeError, match="adapter module bug"):
+        platform_module._load_optional_adapter(".duckdb", "DuckDBAdapter")
+
+
+def test_eager_optional_adapter_missing_class_returns_none(monkeypatch):
+    def fake_import_module(module_path: str, package: str):
+        return SimpleNamespace()
+
+    monkeypatch.setattr(platform_module.importlib, "import_module", fake_import_module)
+
+    assert platform_module._load_optional_adapter(".duckdb", "DuckDBAdapter") is None

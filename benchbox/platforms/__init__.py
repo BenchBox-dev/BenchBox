@@ -249,9 +249,10 @@ def diagnose_optional_adapter_imports(platform_names: Optional[Iterable[str]] = 
 # Import local platform adapters (core/light dependencies).
 def _load_optional_adapter(module_path: str, class_name: str) -> Optional[Type[PlatformAdapter]]:
     try:
-        return getattr(importlib.import_module(module_path, __package__), class_name)
-    except (AttributeError, ImportError):
+        module = importlib.import_module(module_path, __package__)
+    except ImportError:
         return None
+    return getattr(module, class_name, None)
 
 
 DuckDBAdapter = _load_optional_adapter(".duckdb", "DuckDBAdapter")
