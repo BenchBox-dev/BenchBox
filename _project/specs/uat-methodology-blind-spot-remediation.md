@@ -4,7 +4,7 @@
 > **Source TODO:** `_project/TODO/main/active/results-explorer-uat-methodology-blind-spot-remediation.yaml`
 > **Triggering review:** 2026-05-03 code review of `results-explorer-uat-multi-scale-corpus-sweep`, which surfaced three L2 blind-spot findings about UAT methodology.
 > **Author inputs:** `_project/handoffs/uat-methodology-w2-proposals.md` (per-finding remediation), `_project/handoffs/uat-methodology-w3-stress-test.md` (replays against three historical UATs).
-> **Implementation note:** `_project/TODO/main/active/uat-framework-review-followups.yaml` reconciles this methodology with the current framework: validator-clean roll-up now runs in-process through `benchbox.validation.bundle`, and `make uat-validate` is the operator surface.
+> **Implementation note:** `_project/DONE/main/active/uat-framework-review-followups.yaml` reconciles this methodology with the current framework: validator-clean roll-up now runs in-process through `benchbox.validation.bundle`, and `make uat-validate` is the operator surface.
 
 ## 1. Executive summary
 
