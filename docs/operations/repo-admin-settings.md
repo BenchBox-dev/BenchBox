@@ -172,6 +172,43 @@ this document before relying on release-required enforcement. Do not treat a
 green `release-required-result` workflow run as mandatory unless the ruleset
 also requires that context.
 
+## Release canary and ruleset drift
+
+Release readiness has one scheduled/manual canary:
+
+```text
+workflow: .github/workflows/release-canary.yml
+schedule: daily at 08:00 UTC
+freshness_sla: 48h
+blocking_suite: (slow or resource_heavy) and not (stress or live_integration)
+advisory_suites: stress, live_integration, live cloud credentials, long-running UAT
+```
+
+`validate-main-pr.yml` keeps the required context name `validate-base`, but
+that job now also runs `scripts/release_readiness_check.py` for release PRs.
+It fails when the latest completed `release-canary.yml` run on `develop` is
+missing, red, older than 48 hours, or not an ancestor of the release PR head.
+
+Ruleset drift is checked by `scripts/ruleset_drift_check.py` inside
+`release-canary.yml`. The script parses this runbook for
+`develop-squash-only` and `main-release-only`, then compares live GitHub
+rulesets for required status check contexts, strict-base settings, bypass
+actors, linear history, non-fast-forward protection, deletion protection, and
+target refs. If GitHub API access fails, the canary is red; release PRs then
+fail on stale/red canary evidence instead of silently trusting comments.
+
+Emergency override is intentionally explicit and SHA-scoped. Admins may set
+both repository variables below, then remove them after the release:
+
+```text
+RELEASE_READINESS_OVERRIDE_SHA: exact release PR head SHA
+RELEASE_READINESS_OVERRIDE_REASON: incident or approval record
+```
+
+The override is recorded in the `validate-base` job summary. Do not use it for
+routine canary failures; fix the non-fast canary, ruleset drift, or GitHub API
+access and let the canary return to green.
+
 ## Repository labels
 
 The `develop-post-merge.yml` auto-revert job creates these labels on

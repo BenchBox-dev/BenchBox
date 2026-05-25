@@ -257,6 +257,70 @@ class TestReleaseInfrastructure:
             assert RELEASE_REQUIRED_CONTEXT in content
             assert "validate-base" in content
 
+    def test_release_canary_workflow_contract(self):
+        """Release canary must produce scheduled non-fast and ruleset drift evidence."""
+        workflow = _workflow("release-canary.yml")
+        on_events = workflow[True]
+        assert "workflow_dispatch" in on_events
+        assert on_events["schedule"] == [{"cron": "0 8 * * *"}]
+        assert workflow["permissions"]["actions"] == "read"
+        assert workflow["permissions"]["contents"] == "read"
+
+        jobs = workflow["jobs"]
+        assert set(jobs) == {"credential-free-non-fast", "ruleset-drift", "release-canary-result"}
+
+        non_fast_text = _workflow_job_run_text("release-canary.yml", "credential-free-non-fast")
+        assert "(slow or resource_heavy) and not (stress or live_integration)" in non_fast_text
+        assert "--collect-only" in non_fast_text
+        assert "release-canary-artifacts/non-fast-summary.json" in non_fast_text
+        assert "raw" not in non_fast_text.lower()
+
+        ruleset_text = _workflow_job_run_text("release-canary.yml", "ruleset-drift")
+        assert "scripts/ruleset_drift_check.py" in ruleset_text
+        assert "release-canary-artifacts/ruleset-drift.json" in ruleset_text
+
+        result_job = jobs["release-canary-result"]
+        assert result_job["name"] == "release-canary-result"
+        assert set(result_job["needs"]) == {"credential-free-non-fast", "ruleset-drift"}
+        result_text = _workflow_job_run_text("release-canary.yml", "release-canary-result")
+        assert '"freshness_contract_hours": 48' in result_text
+        assert "Release canary passed." in result_text
+
+    def test_validate_main_pr_checks_release_canary_freshness(self):
+        """The required validate-base context must include release canary freshness."""
+        workflow = _workflow("validate-main-pr.yml")
+        assert workflow["permissions"]["actions"] == "read"
+        assert workflow["permissions"]["contents"] == "read"
+
+        job = workflow["jobs"]["validate-base"]
+        steps = job["steps"]
+        assert any(step.get("uses") == "actions/checkout@v4" and step["with"]["fetch-depth"] == 0 for step in steps)
+        run_text = _workflow_job_run_text("validate-main-pr.yml", "validate-base")
+        assert "git fetch origin develop --prune" in run_text
+        assert "scripts/release_readiness_check.py" in run_text
+        assert "--head-sha" in run_text
+
+        readiness_step = next(step for step in steps if step["name"] == "Check release canary freshness")
+        assert readiness_step["env"]["RELEASE_CANARY_WORKFLOW"] == "release-canary.yml"
+        assert readiness_step["env"]["RELEASE_CANARY_BRANCH"] == "develop"
+        assert readiness_step["env"]["RELEASE_CANARY_MAX_AGE_HOURS"] == "48"
+        assert "RELEASE_READINESS_OVERRIDE_SHA" in readiness_step["env"]
+
+    def test_release_docs_name_canary_and_ruleset_drift(self):
+        """Release docs must name freshness, ruleset drift, and the override contract."""
+        docs_paths = [
+            REPO_ROOT / "docs" / "operations" / "release-guide.md",
+            REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md",
+            REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md",
+        ]
+
+        for path in docs_paths:
+            content = path.read_text(encoding="utf-8")
+            assert "canary" in content
+            assert "ruleset drift" in content
+            assert "48" in content
+            assert "RELEASE_READINESS_OVERRIDE_SHA" in content
+
     def test_release_finalize_checks_required_context_before_merge_and_tag(self):
         """release-finalize must hard-stop unless release-required-result is required and green."""
         makefile_content = _makefile_text()

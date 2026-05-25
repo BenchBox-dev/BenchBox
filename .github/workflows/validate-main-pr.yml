@@ -10,6 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -29,3 +30,32 @@ jobs:
           echo "::error::Only release branches matching 'vX.Y.Z' (optionally with a '-suffix') may merge into main. Got '${HEAD_REF}'."
           echo "::error::Open this PR against 'develop' instead, or cut a release branch via 'make release-cut VERSION=X.Y.Z'."
           exit 1
+
+      - name: Checkout release PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Fetch develop for canary ancestor check
+        run: git fetch origin develop --prune
+
+      - name: Check release canary freshness
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_CANARY_WORKFLOW: release-canary.yml
+          RELEASE_CANARY_BRANCH: develop
+          RELEASE_CANARY_MAX_AGE_HOURS: "48"
+          RELEASE_READINESS_OVERRIDE_SHA: ${{ vars.RELEASE_READINESS_OVERRIDE_SHA }}
+          RELEASE_READINESS_OVERRIDE_REASON: ${{ vars.RELEASE_READINESS_OVERRIDE_REASON }}
+        run: |
+          uv run -- python scripts/release_readiness_check.py \
+            --head-sha "${{ github.event.pull_request.head.sha }}"

@@ -1,0 +1,220 @@
+name: Release Canary
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily 08:00 UTC so release-readiness can use a 48h freshness window.
+    - cron: "0 8 * * *"
+
+concurrency:
+  group: release-canary-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  credential-free-non-fast:
+    name: credential-free non-fast canary
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      collected_count: ${{ steps.collect.outputs.collected_count }}
+      pytest_exit_code: ${{ steps.run-tests.outputs.pytest_exit_code }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Collect credential-free non-fast tests
+        id: collect
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-canary-artifacts
+          uv run -- python -m pytest \
+            --collect-only \
+            -q \
+            -n 0 \
+            -m "(slow or resource_heavy) and not (stress or live_integration)" \
+            | tee release-canary-artifacts/non-fast-collect.txt
+          count=$(grep -Eo '^[0-9]+/[0-9]+ tests collected' release-canary-artifacts/non-fast-collect.txt | tail -1 | cut -d/ -f1)
+          if [ -z "$count" ]; then
+            echo "::error::Could not parse collected non-fast canary count."
+            exit 1
+          fi
+          echo "collected_count=$count" >> "$GITHUB_OUTPUT"
+
+      - name: Run credential-free non-fast tests
+        id: run-tests
+        shell: bash
+        run: |
+          set +e
+          uv run -- python -m pytest \
+            -m "(slow or resource_heavy) and not (stress or live_integration)" \
+            -n 0 \
+            --tb=short \
+            --maxfail=5 \
+            2>&1 | tee release-canary-artifacts/non-fast-pytest.log
+          rc=${PIPESTATUS[0]}
+          echo "pytest_exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Write non-fast canary summary
+        if: always()
+        env:
+          COLLECTED_COUNT: ${{ steps.collect.outputs.collected_count }}
+          PYTEST_EXIT_CODE: ${{ steps.run-tests.outputs.pytest_exit_code }}
+        run: |
+          uv run -- python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          payload = {
+              "workflow": "release-canary.yml",
+              "job": "credential-free-non-fast",
+              "commit_sha": os.environ["GITHUB_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "completed_at": datetime.now(timezone.utc).isoformat(),
+              "suite_families": ["slow", "resource_heavy"],
+              "excluded_families": ["stress", "live_integration"],
+              "marker_expression": "(slow or resource_heavy) and not (stress or live_integration)",
+              "collected_count": os.environ.get("COLLECTED_COUNT", ""),
+              "pytest_exit_code": os.environ.get("PYTEST_EXIT_CODE", ""),
+          }
+          out = Path("release-canary-artifacts/non-fast-summary.json")
+          out.parent.mkdir(exist_ok=True)
+          out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload non-fast canary artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-canary-non-fast
+          path: release-canary-artifacts/
+          retention-days: 30
+
+      - name: Fail if non-fast canary failed
+        if: steps.run-tests.outputs.pytest_exit_code != '0'
+        run: |
+          echo "::error::Credential-free non-fast canary failed."
+          exit 1
+
+  ruleset-drift:
+    name: ruleset drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      drift_exit_code: ${{ steps.drift.outputs.drift_exit_code }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Check ruleset drift
+        id: drift
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_READINESS_OVERRIDE_SHA: ${{ vars.RELEASE_READINESS_OVERRIDE_SHA }}
+          RELEASE_READINESS_OVERRIDE_REASON: ${{ vars.RELEASE_READINESS_OVERRIDE_REASON }}
+        run: |
+          set +e
+          mkdir -p release-canary-artifacts
+          uv run -- python scripts/ruleset_drift_check.py \
+            --output release-canary-artifacts/ruleset-drift.json \
+            2>&1 | tee release-canary-artifacts/ruleset-drift.txt
+          rc=${PIPESTATUS[0]}
+          echo "drift_exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload ruleset drift artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-canary-ruleset-drift
+          path: release-canary-artifacts/
+          retention-days: 30
+
+      - name: Fail if ruleset drift was detected
+        if: steps.drift.outputs.drift_exit_code != '0'
+        run: |
+          echo "::error::Ruleset drift check failed."
+          exit 1
+
+  release-canary-result:
+    name: release-canary-result
+    runs-on: ubuntu-latest
+    needs: [credential-free-non-fast, ruleset-drift]
+    if: always()
+    steps:
+      - name: Write release canary summary
+        env:
+          NON_FAST_RESULT: ${{ needs.credential-free-non-fast.result }}
+          RULESET_DRIFT_RESULT: ${{ needs.ruleset-drift.result }}
+          NON_FAST_COUNT: ${{ needs.credential-free-non-fast.outputs.collected_count }}
+        run: |
+          mkdir -p release-canary-artifacts
+          cat > release-canary-artifacts/release-canary-summary.json <<EOF
+          {
+            "workflow": "release-canary.yml",
+            "commit_sha": "${GITHUB_SHA}",
+            "run_id": "${GITHUB_RUN_ID}",
+            "suite_families": ["slow", "resource_heavy"],
+            "excluded_families": ["stress", "live_integration"],
+            "freshness_contract_hours": 48,
+            "non_fast_result": "${NON_FAST_RESULT}",
+            "ruleset_drift_result": "${RULESET_DRIFT_RESULT}",
+            "non_fast_collected_count": "${NON_FAST_COUNT}"
+          }
+          EOF
+
+      - name: Upload release canary summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-canary-summary
+          path: release-canary-artifacts/release-canary-summary.json
+          retention-days: 30
+
+      - name: Aggregate release canary result
+        env:
+          NON_FAST_RESULT: ${{ needs.credential-free-non-fast.result }}
+          RULESET_DRIFT_RESULT: ${{ needs.ruleset-drift.result }}
+        run: |
+          set -euo pipefail
+          failed=0
+          for pair in \
+            "credential-free-non-fast=$NON_FAST_RESULT" \
+            "ruleset-drift=$RULESET_DRIFT_RESULT"; do
+            name="${pair%%=*}"
+            result="${pair#*=}"
+            if [ "$result" != "success" ]; then
+              echo "$name=$result"
+              failed=1
+            fi
+          done
+          if [ "$failed" != "0" ]; then
+            exit 1
+          fi
+          echo "Release canary passed."
