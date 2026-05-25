@@ -1159,7 +1159,6 @@ ignore_rules = [
         "benchbox/core/amplab/benchmark.py",
         "benchbox/core/clickbench/benchmark.py",
         "benchbox/core/ssb/benchmark.py",
-        "benchbox/core/tpcdi/tools/data_cleaners.py",
         "benchbox/platforms/base/data_loading.py",
         "benchbox/platforms/dataframe/unified_frame.py",
     ] },
