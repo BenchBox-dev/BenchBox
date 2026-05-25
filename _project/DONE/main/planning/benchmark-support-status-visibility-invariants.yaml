@@ -2,7 +2,8 @@ id: benchmark-support-status-visibility-invariants
 title: "Harden benchmark support-status visibility invariants across public surfaces"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-25"
 category: Benchmark Architecture
 
 deps:
@@ -27,7 +28,7 @@ description: |
 work:
   - id: w0
     summary: "Inventory current public, internal, and explicit-ID benchmark surfaces"
-    status: pending
+    status: done
     notes: |
       Re-check CLI interactive listing, CLI explicit benchmark execution, MCP
       list_available, MCP get_benchmark_info, MCP get_query_details, resources,
@@ -38,7 +39,7 @@ work:
   - id: w1
     summary: "Write a visibility policy table for support_status x surface x capability"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Specify expected behavior for stable, beta, experimental, repo_only,
       deprecated, and document_only when `surface` is public or internal. Include
@@ -49,7 +50,7 @@ work:
   - id: w2
     summary: "Add synthetic invariant tests for future repo_only and document_only benchmark metadata"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Use patch.dict or small helper fixtures to create temporary benchmark
       metadata entries for repo_only, document_only, deprecated, beta, and
@@ -60,7 +61,7 @@ work:
   - id: w3
     summary: "Extend CLI and MCP tests so non-stable public benchmarks are visibly labeled"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Keep the immediate CLI tests from the review fix, then broaden them to
       cover public beta and experimental cases in list trees, selection tables,
@@ -70,7 +71,7 @@ work:
   - id: w4
     summary: "Document explicit-ID exceptions and support-status exposure policy"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       If explicit-ID surfaces can inspect internal benchmarks, document what
       metadata may be returned and which support claims must be omitted. Keep the
@@ -79,7 +80,7 @@ work:
   - id: w5
     summary: "Run focused contract and MCP/CLI tests after invariant coverage lands"
     needs: [w2, w3, w4]
-    status: pending
+    status: done
     notes: |
       Run the narrowest tests for benchmark registry, CLI benchmark manager, MCP
       discovery/resources/tool handlers, and any result/explorer path touched by
@@ -94,7 +95,7 @@ metadata:
     - cli
   estimated_effort: "1-2 days"
   created_date: "2026-05-21"
-  last_updated: "2026-05-21T00:00:00Z"
+  last_updated: "2026-05-25T00:00:00Z"
 
 impact:
   business_value: |

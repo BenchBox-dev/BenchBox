@@ -78,6 +78,23 @@ class TestListBenchmarksTool:
         assert benchmarks["ai_primitives"]["support_status"] == "experimental"
         assert "joinorder_synthetic" not in benchmarks
 
+    def test_list_benchmarks_matches_registry_for_every_public_benchmark(self):
+        """No drift: MCP discovery must label every public benchmark with its registry tier.
+
+        Robust to future promotions/demotions and covers current public beta and
+        experimental benchmarks without hard-coding which ones they are.
+        """
+        from benchbox.core.benchmark_registry import get_benchmark_support_status, list_public_benchmark_ids
+        from benchbox.mcp.tools.discovery import _list_benchmarks_impl
+
+        projected = {row["name"]: row["support_status"] for row in _list_benchmarks_impl()["benchmarks"]}
+        expected = {bid: get_benchmark_support_status(bid) for bid in list_public_benchmark_ids()}
+
+        assert projected == expected
+        # The fleet still spans non-stable public tiers, so the labeling path is exercised.
+        assert "beta" in projected.values()
+        assert "experimental" in projected.values()
+
 
 class TestGetBenchmarkInfoTool:
     """Tests for get_benchmark_info tool functionality."""

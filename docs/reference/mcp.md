@@ -225,6 +225,8 @@ planning.
 Public benchmark query details include registry `support_status` in
 `benchmark_info`. Internal/repo-only benchmark details remain addressable by
 explicit ID where previously supported, but do not expose support-status claims.
+See the [Benchmark Visibility Policy](public-contracts.md#benchmark-visibility-policy)
+for the full surface-by-surface matrix.
 
 ### Results Tools
 
