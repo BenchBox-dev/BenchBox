@@ -756,7 +756,6 @@ exclude_functions = [
     "benchbox/core/tpcds/throughput_test.py:_execute_stream",          # 24 - TPC-DS throughput stream execution
     "benchbox/core/tpcds/benchmark/runner.py:run_throughput_test",     # 22 - TPC-DS throughput test per spec
     "benchbox/core/tpcds/benchmark/runner.py:run_power_test",          # 22 - TPC-DS power test per spec
-    "benchbox/core/tpcds/dist_parser.py:parse_file",                   # 22 - .dst state-machine parser
     "benchbox/core/results/display.py:print_dry_run_summary",          # 21 - conditional section display
     "benchbox/core/tpcds/throughput_test.py:run",                      # 18 - TPC-DS spec; outer loop coordinates concurrent streams
     "benchbox/core/tpcds_obt/query_conversion.py:_rewrite_select",     # 18 - AST rewrite with dependency ordering (role_map → column → join)
