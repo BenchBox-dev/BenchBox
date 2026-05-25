@@ -41,12 +41,50 @@ from __future__ import annotations
 from csv import reader
 from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRegistry
 
 if TYPE_CHECKING:
     from benchbox.core.dataframe.context import DataFrameContext
+
+
+class QueryImpl(Protocol):
+    """A DataFrame query implementation: takes a context, returns a frame.
+
+    The dispatch (`_impl_for`) and the registry below are typed against this
+    Protocol so factory-built impls are statically resolvable instead of
+    Any-typed module-global lookups.
+    """
+
+    def __call__(self, ctx: DataFrameContext) -> Any: ...
+
+
+# Single registry of every dispatchable impl, keyed by "<base>_<family>_impl".
+# Factory-built impls register here (see _register_generated_impl) instead of
+# mutating module globals, and the explicit module-level `def *_impl` functions
+# are indexed in once below; the dispatch then resolves both with one typed
+# lookup. This keeps generated impls discoverable and ty-visible without
+# reverting the factory consolidation to per-query defs.
+_IMPLS: dict[str, QueryImpl] = {}
+
+
+def _register_generated_impl(impl: QueryImpl) -> QueryImpl:
+    """Register a factory-built impl under its already-set ``__name__``."""
+    _IMPLS[impl.__name__] = impl
+    return impl
+
+
+def __getattr__(name: str) -> QueryImpl:
+    """Resolve factory-built impl names from the registry (PEP 562).
+
+    Generated impls live in `_IMPLS` rather than module globals, so importing
+    one by name (e.g. for a focused unit test) is served here instead of by a
+    module-global injection.
+    """
+    if name in _IMPLS:
+        return _IMPLS[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _tables(ctx: DataFrameContext, *names: str) -> tuple[Any, ...]:
@@ -308,7 +346,7 @@ def _make_groupby_impl(
     sort_cols: tuple[str, ...] = (),
     sort_desc: bool | list[bool] = False,
     limit: int | None = None,
-) -> Any:
+) -> QueryImpl:
     def impl(ctx: DataFrameContext) -> Any:
         return aggregation_groupby_impl(
             ctx,
@@ -433,8 +471,8 @@ for _spec in (
 ):
     _stem, _table_name, _group_cols, _agg_specs, *_opts = _spec
     for _family in ("expression", "pandas"):
-        globals()[f"{_stem}_{_family}_impl"] = _make_groupby_impl(
-            f"{_stem}_{_family}_impl", _table_name, _group_cols, _agg_specs, *_opts
+        _register_generated_impl(
+            _make_groupby_impl(f"{_stem}_{_family}_impl", _table_name, _group_cols, _agg_specs, *_opts)
         )
 
 
@@ -519,7 +557,7 @@ def _make_count_filter_impl(
     for family, impl in (("expression", expression_impl), ("pandas", pandas_impl)):
         impl.__name__ = f"{name}_{family}_impl"
         impl.__qualname__ = impl.__name__
-        globals()[impl.__name__] = impl
+        _register_generated_impl(impl)
 
 
 for _spec in (
@@ -582,7 +620,7 @@ def _make_filtered_select_impl(
     for family, impl in (("expression", expression_impl), ("pandas", pandas_impl)):
         impl.__name__ = f"{name}_{family}_impl"
         impl.__qualname__ = impl.__name__
-        globals()[impl.__name__] = impl
+        _register_generated_impl(impl)
 
 
 for _spec in (
@@ -704,7 +742,7 @@ def _make_extreme_row_impls(
         impl.__name__ = f"{name}_{family}_impl"
         impl.__qualname__ = impl.__name__
         impl.__doc__ = doc
-        globals()[impl.__name__] = impl
+        _register_generated_impl(impl)
 
 
 # fmt: off
@@ -774,7 +812,7 @@ def _make_select_sort_impls(
     for family, impl in (("expression", expression_impl), ("pandas", pandas_impl)):
         impl.__name__ = f"{name}_{family}_impl"
         impl.__qualname__ = impl.__name__
-        globals()[impl.__name__] = impl
+        _register_generated_impl(impl)
 
 
 for _spec in (
@@ -848,7 +886,7 @@ def approx_count_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     `nunique_approx()`, but no groupby equivalent in the dask-expr API,
     so this query remains an exact fallback for the pandas family.
     """
-    return globals()["aggregation_distinct_groupby_pandas_impl"](ctx)
+    return _IMPLS["aggregation_distinct_groupby_pandas_impl"](ctx)
 
 
 def aggregation_materialize_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1215,7 +1253,7 @@ def _make_shuffle_customer_order_impls(name: str, how: str, aggs: tuple[tuple[st
     for family, impl in (("expression", expression_impl), ("pandas", pandas_impl)):
         impl.__name__ = f"{name}_{family}_impl"
         impl.__qualname__ = impl.__name__
-        globals()[impl.__name__] = impl
+        _register_generated_impl(impl)
 
 
 _make_shuffle_customer_order_impls(
@@ -3633,9 +3671,21 @@ _CATEGORY_CODES = {
 
 _QUERY_METADATA = Path(__file__).with_name("dataframe_query_metadata.csv").read_text(encoding="utf-8")
 
+# Index the explicit module-level `def *_impl` functions into the same registry
+# the factories populate, so the dispatch resolves both kinds with one typed
+# lookup. Runs after every def and factory loop above; globals() is only read,
+# never mutated.
+_IMPLS.update(
+    {
+        name: obj
+        for name, obj in globals().items()
+        if name.endswith(("_expression_impl", "_pandas_impl")) and callable(obj)
+    }
+)
 
-def _impl_for(impl_base: str, family: str) -> Any:
-    return globals()[f"{impl_base}_{family}_impl"]
+
+def _impl_for(impl_base: str, family: str) -> QueryImpl:
+    return _IMPLS[f"{impl_base}_{family}_impl"]
 
 
 def _make_query(row: list[str]) -> DataFrameQuery:
