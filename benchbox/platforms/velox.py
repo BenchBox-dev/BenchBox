@@ -161,45 +161,29 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create VeloxAdapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-
-        if "database" in config and config["database"]:
-            adapter_config["database"] = config["database"]
-        else:
-            database_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                config,
                 platform="velox",
-                tuning_config=config.get("tuning_config"),
+                fields=[
+                    "deployment",
+                    "deployment_mode",
+                    "endpoint",
+                    "gluten_jar_path",
+                    "gluten_version",
+                    "offheap_size",
+                    "app_name",
+                    "driver_memory",
+                    "shuffle_partitions",
+                    "adaptive_enabled",
+                    "table_format",
+                    "spark_config",
+                    "disable_cache",
+                ],
             )
-            adapter_config["database"] = database_name
-
-        for key in [
-            "deployment",
-            "deployment_mode",
-            "endpoint",
-            "gluten_jar_path",
-            "gluten_version",
-            "offheap_size",
-            "app_name",
-            "driver_memory",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        for key in [
-            "shuffle_partitions",
-            "adaptive_enabled",
-            "table_format",
-            "spark_config",
-            "disable_cache",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get Velox platform information including velox_active probe."""
@@ -494,33 +478,6 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             raise
 
         return elapsed_seconds(start_time)
-
-    def load_data(
-        self, benchmark, connection: Any, data_dir: Path
-    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load benchmark data via SparkDataLoadMixin."""
-        return self._load_data_spark(benchmark, data_dir, connection)
-
-    def execute_query(
-        self,
-        connection: Any,
-        query: str,
-        query_id: str,
-        benchmark_type: str | None = None,
-        scale_factor: float | None = None,
-        validate_row_count: bool = True,
-        stream_id: int | None = None,
-    ) -> dict[str, Any]:
-        """Execute query via SparkQueryExecutionMixin."""
-        return self._execute_query_spark(
-            connection=connection,
-            query=query,
-            query_id=query_id,
-            benchmark_type=benchmark_type,
-            scale_factor=scale_factor,
-            validate_row_count=validate_row_count,
-            stream_id=stream_id,
-        )
 
     # ------------------------------------------------------------------
     # Query plans

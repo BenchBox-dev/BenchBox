@@ -16,13 +16,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
         TuningColumn,
         UnifiedTuningConfiguration,
     )
@@ -1772,26 +1771,7 @@ class BigQueryAdapter(PlatformAdapter):
             # Silently ignore transport cleanup errors
             pass
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if BigQuery supports a specific tuning type.
-
-        BigQuery supports:
-        - PARTITIONING: Via PARTITION BY clause (date/timestamp/integer columns)
-        - CLUSTERING: Via CLUSTER BY clause (up to 4 columns)
-
-        Args:
-            tuning_type: The type of tuning to check support for
-
-        Returns:
-            True if the tuning type is supported by BigQuery
-        """
-        # Import here to avoid circular imports
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {TuningType.PARTITIONING, TuningType.CLUSTERING}
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "CLUSTERING")
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate BigQuery-specific tuning clauses for CREATE TABLE statements.
@@ -1952,25 +1932,10 @@ class BigQueryAdapter(PlatformAdapter):
             raise ValueError(f"Failed to apply tunings to BigQuery table {table_name}: {e}") from e
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration to BigQuery.
+        """Apply unified tuning configuration to BigQuery."""
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        Args:
-            unified_config: Unified tuning configuration to apply
-            connection: BigQuery connection
-        """
-        if not unified_config:
-            return
-
-        # Apply constraint configurations
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        # Apply platform optimizations
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        # Apply table-level tunings
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
         """Apply BigQuery-specific platform optimizations.
@@ -1986,32 +1951,10 @@ class BigQueryAdapter(PlatformAdapter):
         # Store optimizations for use during query execution
         self.logger.info("BigQuery platform optimizations stored for query execution")
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to BigQuery.
-
-        Note: BigQuery has limited constraint support. Constraints are mainly for metadata/optimization.
-
-        Args:
-            primary_key_config: Primary key constraint configuration
-            foreign_key_config: Foreign key constraint configuration
-            connection: BigQuery connection
-        """
-        # BigQuery constraints are applied at table creation time
-        # This method is called after tables are created, so log the configurations
-
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info("Primary key constraints enabled for BigQuery (applied during table creation)")
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info("Foreign key constraints enabled for BigQuery (applied during table creation)")
-
-        # BigQuery doesn't support ALTER TABLE to add constraints after creation
-        # So there's no additional work to do here
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints enabled for BigQuery (applied during table creation)",
+        "Foreign key constraints enabled for BigQuery (applied during table creation)",
+    )
 
 
 def _build_bigquery_config(

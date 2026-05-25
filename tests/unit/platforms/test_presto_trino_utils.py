@@ -21,6 +21,7 @@ from benchbox.platforms.presto_trino_utils import (
     load_file_batches,
     normalize_existing_files,
     resolve_data_files,
+    show_tables_lower,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -128,6 +129,27 @@ class TestNormalizeExistingFiles:
         f.write_text("x\n")
         result = normalize_existing_files([str(f)])
         assert all(isinstance(p, Path) for p in result)
+
+
+class TestShowTablesLower:
+    def test_returns_lowercase_table_names_and_closes_cursor(self) -> None:
+        cursor = MagicMock()
+        cursor.fetchall.return_value = [("ORDERS",), ("LineItem",)]
+        connection = MagicMock()
+        connection.cursor.return_value = cursor
+
+        assert show_tables_lower(connection) == ["orders", "lineitem"]
+        cursor.execute.assert_called_once_with("SHOW TABLES")
+        cursor.close.assert_called_once_with()
+
+    def test_returns_empty_list_and_closes_cursor_on_error(self) -> None:
+        cursor = MagicMock()
+        cursor.execute.side_effect = RuntimeError("boom")
+        connection = MagicMock()
+        connection.cursor.return_value = cursor
+
+        assert show_tables_lower(connection) == []
+        cursor.close.assert_called_once_with()
 
 
 class TestLoadFileBatches:

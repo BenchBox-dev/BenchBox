@@ -44,6 +44,7 @@ from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import DataSourceResolver, FileFormatRegistry
 from .base.ddl_helpers import strip_with_properties
 from .base.runtime_metadata import build_default_normalized_result_metadata
+from .presto_trino_utils import normalize_existing_files, show_tables_lower
 
 try:
     import boto3
@@ -278,47 +279,34 @@ class AthenaAdapter(PlatformAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create Athena adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-
-        # Generate database name using benchmark characteristics
-        if "database" in config and config["database"]:
-            adapter_config["database"] = config["database"]
-        else:
-            database_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                config,
                 platform="athena",
-                tuning_config=config.get("tuning_config"),
+                fields=[
+                    "region",
+                    "aws_region",
+                    "aws_access_key_id",
+                    "aws_secret_access_key",
+                    "aws_profile",
+                    "workgroup",
+                    "catalog",
+                    "s3_output_location",
+                    "s3_staging_dir",
+                    "staging_root",
+                    "s3_bucket",
+                    "s3_prefix",
+                    "query_timeout",
+                    "encryption",
+                    "data_format",
+                    "default_format",
+                    "compression",
+                    "cleanup_staging",
+                ],
             )
-            adapter_config["database"] = database_name
-
-        # AWS configuration
-        for key in ["region", "aws_region", "aws_access_key_id", "aws_secret_access_key", "aws_profile"]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        # Athena-specific configuration
-        for key in [
-            "workgroup",
-            "catalog",
-            "s3_output_location",
-            "s3_staging_dir",
-            "staging_root",
-            "s3_bucket",
-            "s3_prefix",
-            "query_timeout",
-            "encryption",
-            "data_format",
-            "default_format",
-            "compression",
-            "cleanup_staging",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
     def _get_s3_client(self):
         """Get or create S3 client."""
@@ -1010,16 +998,7 @@ class AthenaAdapter(PlatformAdapter):
             raise ValueError("No data files found")
         return data_source.tables
 
-    @staticmethod
-    def _normalize_existing_files(file_paths: Any) -> list[Path]:
-        """Normalize file inputs to existing, non-empty local paths."""
-        normalized_paths = file_paths if isinstance(file_paths, list) else [file_paths]
-        valid_files: list[Path] = []
-        for file_path in normalized_paths:
-            path = Path(file_path)
-            if path.exists() and path.stat().st_size > 0:
-                valid_files.append(path)
-        return valid_files
+    _normalize_existing_files = staticmethod(normalize_existing_files)
 
     def _build_s3_table_path(self, table_name_lower: str, is_parquet_mode: bool) -> str:
         """Build the destination S3 prefix for a table load."""
@@ -1361,16 +1340,7 @@ class AthenaAdapter(PlatformAdapter):
             self.logger.debug(f"Connection test failed: {e}")
             return False
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if Athena supports a specific tuning type."""
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {
-                TuningType.PARTITIONING,
-            }
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING",)
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Athena-specific tuning clauses."""
@@ -1425,16 +1395,7 @@ class AthenaAdapter(PlatformAdapter):
         if primary_key_config and primary_key_config.enabled:
             self.logger.info("Primary key constraints noted (Athena does not enforce constraints)")
 
-    def _get_existing_tables(self, connection: Any) -> list[str]:
-        """Get list of existing tables."""
-        cursor = connection.cursor()
-        try:
-            cursor.execute("SHOW TABLES")
-            return [row[0].lower() for row in cursor.fetchall()]
-        except Exception:
-            return []
-        finally:
-            cursor.close()
+    _get_existing_tables = staticmethod(show_tables_lower)
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Run ANALYZE on table (not needed for Athena - stats auto-collected)."""

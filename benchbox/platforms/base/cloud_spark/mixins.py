@@ -41,6 +41,7 @@ if TYPE_CHECKING:
         PlatformOptimizationConfiguration,
         PrimaryKeyConfiguration,
         TableTuning,
+        UnifiedTuningConfiguration,
     )
 
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform, SparkConfigOptimizer
@@ -122,6 +123,22 @@ class SparkTuningMixin:
         """
         # Optimizations applied via Spark configuration, not DDL
         return []
+
+    def apply_tuning_configuration(
+        self,
+        config: UnifiedTuningConfiguration,
+    ) -> dict[str, Any]:
+        """Apply unified tuning configuration through the Spark tuning hooks."""
+        results: dict[str, Any] = {}
+        if config.scale_factor:
+            self._scale_factor = config.scale_factor
+        if config.primary_keys:
+            results["primary_keys"] = self.apply_primary_keys(config.primary_keys)
+        if config.foreign_keys:
+            results["foreign_keys"] = self.apply_foreign_keys(config.foreign_keys)
+        if config.platform:
+            results["platform_optimizations"] = self.apply_platform_optimizations(config.platform)
+        return results
 
     def apply_constraint_configuration(
         self,

@@ -225,26 +225,7 @@ class CedarDBAdapter(PostgreSQLAdapter):
             self.logger.warning(f"Failed to drop database {db_name}: {e}")
             raise
 
-    def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if CedarDB supports a specific tuning type.
-
-        CedarDB is a full relational database with ACID guarantees, so most
-        PostgreSQL tuning types apply. Distribution is not supported (single-node).
-        """
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            supported = {
-                TuningType.PARTITIONING: False,  # Not verified - needs live CedarDB testing
-                TuningType.SORTING: False,  # No native sort keys
-                TuningType.DISTRIBUTION: False,  # Single-node only
-                TuningType.CLUSTERING: False,  # Not verified - CLUSTER is PG-specific
-                TuningType.PRIMARY_KEYS: True,  # Full constraint support
-                TuningType.FOREIGN_KEYS: True,  # Full constraint support
-            }
-            return supported.get(tuning_type, False)
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PRIMARY_KEYS", "FOREIGN_KEYS")
 
 
 def _build_cedardb_config(

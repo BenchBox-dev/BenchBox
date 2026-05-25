@@ -56,7 +56,6 @@ from .base.mysql_wire import (
     NoOpTableTuningMixin,
     build_database_config,
 )
-from .base.sql_execution import execute_sql_query
 
 # Doris dialect for SQLGlot
 DORIS_DIALECT = "doris"
@@ -946,29 +945,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
 
         cursor.close()
 
-    def execute_query(
-        self,
-        connection: Any,
-        query: str,
-        query_id: str,
-        benchmark_type: str | None = None,
-        scale_factor: float | None = None,
-        validate_row_count: bool = True,
-        stream_id: int | None = None,
-    ) -> dict[str, Any]:
-        """Execute a single query and return detailed results."""
-        return execute_sql_query(
-            connection,
-            query,
-            query_id,
-            log_verbose=self.log_verbose,
-            build_query_result_with_validation=self._build_query_result_with_validation,
-            benchmark_type=benchmark_type,
-            scale_factor=scale_factor,
-            validate_row_count=validate_row_count,
-            stream_id=stream_id,
-        )
-
     def _explain_query_prefix(self, explain_options: dict[str, Any] | None = None) -> str:
         verbose = explain_options.get("verbose", False) if explain_options else False
         return "EXPLAIN VERBOSE" if verbose else "EXPLAIN"
@@ -1451,22 +1427,7 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
             validation_details["integrity_error"] = str(e)
             return "FAILED", validation_details
 
-    def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if Doris supports a specific tuning type."""
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            supported = {
-                TuningType.PARTITIONING: True,  # PARTITION BY RANGE
-                TuningType.SORTING: True,  # Sort keys in Duplicate model
-                TuningType.DISTRIBUTION: True,  # DISTRIBUTED BY HASH
-                TuningType.CLUSTERING: False,  # No CLUSTER command
-                TuningType.PRIMARY_KEYS: True,  # Unique/Primary key models
-                TuningType.FOREIGN_KEYS: False,  # No FK enforcement
-            }
-            return supported.get(tuning_type, False)
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "SORTING", "DISTRIBUTION", "PRIMARY_KEYS")
 
 
 def _build_doris_config(

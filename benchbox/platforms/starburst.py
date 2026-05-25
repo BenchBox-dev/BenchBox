@@ -230,45 +230,34 @@ class StarburstAdapter(TrinoAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create Starburst adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-
-        # Generate proper schema name using benchmark characteristics
-        if "schema" in config and config["schema"]:
-            adapter_config["schema"] = config["schema"]
-        else:
-            schema_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                config,
                 platform="starburst",
-                tuning_config=config.get("tuning_config"),
+                generated_key="schema",
+                fields=[
+                    "host",
+                    "port",
+                    "catalog",
+                    "username",
+                    "password",
+                    "role",
+                    "http_scheme",
+                    "verify_ssl",
+                    "ssl_cert_path",
+                    "session_properties",
+                    "query_timeout",
+                    "timezone",
+                    "encoding",
+                    "disable_result_cache",
+                    "table_format",
+                    "staging_root",
+                    "source_catalog",
+                ],
             )
-            adapter_config["schema"] = schema_name
-
-        # Core connection parameters
-        for key in ["host", "port", "catalog", "username", "password", "role"]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        # Optional configuration parameters
-        for key in [
-            "http_scheme",
-            "verify_ssl",
-            "ssl_cert_path",
-            "session_properties",
-            "query_timeout",
-            "timezone",
-            "encoding",
-            "disable_result_cache",
-            "table_format",
-            "staging_root",
-            "source_catalog",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
 
 def _build_starburst_config(

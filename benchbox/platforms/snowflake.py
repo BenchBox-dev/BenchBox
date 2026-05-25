@@ -18,9 +18,7 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
         TuningColumn,
         UnifiedTuningConfiguration,
     )
@@ -31,6 +29,8 @@ from ..utils.dependencies import check_platform_dependencies, get_dependency_err
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import NO_BENCHMARK, DataSource, DataSourceResolver, resolve_csv_dialect
 from .base.runtime_metadata import build_default_normalized_result_metadata
+from .base.tuning import make_informational_constraint_applier
+from .presto_trino_utils import normalize_existing_files
 
 try:
     import snowflake.connector
@@ -200,59 +200,41 @@ class SnowflakeAdapter(PlatformAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create Snowflake adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-
-        # Generate proper database name using benchmark characteristics
-        # (unless explicitly overridden in config)
-        if "database" in config and config["database"]:
-            # User explicitly provided database name - use it
-            adapter_config["database"] = config["database"]
-        else:
-            # Generate configuration-aware database name
-            database_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                config,
                 platform="snowflake",
-                tuning_config=config.get("tuning_config"),
+                fields=[
+                    "account",
+                    "warehouse",
+                    "schema",
+                    "username",
+                    "password",
+                    "role",
+                    "authenticator",
+                    "private_key_path",
+                    "private_key_passphrase",
+                    "warehouse_size",
+                    "auto_suspend",
+                    "auto_resume",
+                    "multi_cluster_warehouse",
+                    "query_tag",
+                    "timezone",
+                    "file_format",
+                    "compression",
+                    "staging_root",
+                    "iceberg_external_volume",
+                    "iceberg_catalog",
+                    "delta_table_format",
+                    "disable_result_cache",
+                    "strict_validation",
+                    "suppress_nondeterministic_errors",
+                    "modify_warehouse_settings",
+                ],
             )
-            adapter_config["database"] = database_name
-
-        # Copy other config keys
-        for key in [
-            "account",
-            "warehouse",
-            # "database" - handled above with generation logic
-            "schema",
-            "username",
-            "password",
-            "role",
-            "authenticator",
-            "private_key_path",
-            "private_key_passphrase",
-            "warehouse_size",
-            "auto_suspend",
-            "auto_resume",
-            "multi_cluster_warehouse",
-            "query_tag",
-            "timezone",
-            "file_format",
-            "compression",
-            "staging_root",
-            "iceberg_external_volume",
-            "iceberg_catalog",
-            "delta_table_format",
-            # Behavior control options
-            "disable_result_cache",
-            "strict_validation",
-            "suppress_nondeterministic_errors",
-            "modify_warehouse_settings",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get Snowflake platform information.
@@ -968,16 +950,7 @@ class SnowflakeAdapter(PlatformAdapter):
             raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
         return data_source
 
-    @staticmethod
-    def _normalize_existing_files(file_paths: Any) -> list[Path]:
-        """Normalize file inputs to existing, non-empty local paths."""
-        normalized_paths = file_paths if isinstance(file_paths, list) else [file_paths]
-        valid_files: list[Path] = []
-        for file_path in normalized_paths:
-            path = Path(file_path)
-            if path.exists() and path.stat().st_size > 0:
-                valid_files.append(path)
-        return valid_files
+    _normalize_existing_files = staticmethod(normalize_existing_files)
 
     def _get_file_format_for_table(
         self,
@@ -1599,26 +1572,7 @@ class SnowflakeAdapter(PlatformAdapter):
         except Exception as e:
             self.logger.warning(f"Error closing connection: {e}")
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if Snowflake supports a specific tuning type.
-
-        Snowflake supports:
-        - CLUSTERING: Via CLUSTER BY clause and automatic clustering
-        - PARTITIONING: Via micro-partitions (automatic) and manual clustering keys
-
-        Args:
-            tuning_type: The type of tuning to check support for
-
-        Returns:
-            True if the tuning type is supported by Snowflake
-        """
-        # Import here to avoid circular imports
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {TuningType.CLUSTERING, TuningType.PARTITIONING}
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("CLUSTERING", "PARTITIONING")
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Snowflake-specific tuning clauses for CREATE TABLE statements.
@@ -1773,19 +1727,9 @@ class SnowflakeAdapter(PlatformAdapter):
             unified_config: Unified tuning configuration to apply
             connection: Snowflake connection
         """
-        if not unified_config:
-            return
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        # Apply constraint configurations
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        # Apply platform optimizations
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        # Apply table-level tunings
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
         """Apply Snowflake-specific platform optimizations.
@@ -1807,38 +1751,10 @@ class SnowflakeAdapter(PlatformAdapter):
         # Store optimizations for use during query execution
         self.logger.info("Snowflake platform optimizations stored for warehouse and session management")
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to Snowflake.
-
-        Note: Snowflake supports PRIMARY KEY and FOREIGN KEY constraints but they are
-        not enforced (informational only). They are used for query optimization and
-        must be applied during table creation time.
-
-        Args:
-            primary_key_config: Primary key constraint configuration
-            foreign_key_config: Foreign key constraint configuration
-            connection: Snowflake connection
-        """
-        # Snowflake constraints are applied at table creation time for query optimization
-        # This method is called after tables are created, so log the configurations
-
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info(
-                "Primary key constraints enabled for Snowflake (informational only, applied during table creation)"
-            )
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info(
-                "Foreign key constraints enabled for Snowflake (informational only, applied during table creation)"
-            )
-
-        # Snowflake constraints are informational and used for query optimization
-        # No additional work to do here as they're applied during CREATE TABLE
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints enabled for Snowflake (informational only, applied during table creation)",
+        "Foreign key constraints enabled for Snowflake (informational only, applied during table creation)",
+    )
 
 
 def _build_snowflake_config(

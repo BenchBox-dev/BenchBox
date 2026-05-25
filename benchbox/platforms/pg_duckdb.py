@@ -410,28 +410,7 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
             entries=entries,
         )
 
-    def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if pg_duckdb supports a specific tuning type.
-
-        pg_duckdb operates on standard PostgreSQL heap tables, so tuning
-        capabilities match PostgreSQL. The main optimization is the DuckDB
-        execution engine itself, which benefits less from B-tree indexes
-        for analytical queries.
-        """
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            supported = {
-                TuningType.PARTITIONING: True,  # PostgreSQL declarative partitioning
-                TuningType.SORTING: False,  # No native sort keys
-                TuningType.DISTRIBUTION: False,  # Not distributed
-                TuningType.CLUSTERING: True,  # CLUSTER command available
-                TuningType.PRIMARY_KEYS: True,  # Full constraint support
-                TuningType.FOREIGN_KEYS: True,  # Full constraint support
-            }
-            return supported.get(tuning_type, False)
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "CLUSTERING", "PRIMARY_KEYS", "FOREIGN_KEYS")
 
 
 def _build_pg_duckdb_config(
