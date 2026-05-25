@@ -18,6 +18,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q10_expression_impl as _q10_expr_base,
     q10_pandas_impl as _q10_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SORT, build_yaml_variants
 
 # ---------------------------------------------------------------------------
@@ -223,32 +224,7 @@ def q10_v5_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def q10_v5_pandas_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-    nation = ctx.get_table("nation")
-
-    params = get_tpch_parameters(10)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    joined = joined[(joined["o_orderdate"] >= start_date) & (joined["o_orderdate"] < end_date)]
-    joined = joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    joined = joined[joined["l_returnflag"] == "R"]
-    joined = joined.merge(nation, left_on="c_nationkey", right_on="n_nationkey").copy()
-    # Pre-compute revenue
-    joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
-
-    return (
-        joined.groupby(
-            ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"], as_index=False
-        )
-        .agg(revenue=("revenue", "sum"))
-        .sort_values("revenue", ascending=False)
-        .head(20)
-    )
+q10_v5_pandas_impl = make_variant_delegate(q10_v4_pandas_impl, name="q10_v5_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------

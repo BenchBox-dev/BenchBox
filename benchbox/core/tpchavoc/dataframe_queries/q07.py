@@ -18,6 +18,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q7_expression_impl as _q7_expr_base,
     q7_pandas_impl as _q7_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
 # ---------------------------------------------------------------------------
@@ -350,42 +351,7 @@ def q7_v7_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def q7_v7_pandas_impl(ctx: DataFrameContext) -> Any:
-    supplier = ctx.get_table("supplier")
-    lineitem = ctx.get_table("lineitem")
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-    nation = ctx.get_table("nation")
-
-    params = get_tpch_parameters(7)
-    nation1 = params["nation1"]
-    nation2 = params["nation2"]
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    n1 = nation[["n_nationkey", "n_name"]].copy()
-    n1.columns = ["n1_nationkey", "supp_nation"]
-    n2 = nation[["n_nationkey", "n_name"]].copy()
-    n2.columns = ["n2_nationkey", "cust_nation"]
-
-    # Swapped: start from lineitem
-    filtered_li = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] <= end_date)]
-    joined = filtered_li.merge(supplier, left_on="l_suppkey", right_on="s_suppkey")
-    joined = joined.merge(n1, left_on="s_nationkey", right_on="n1_nationkey")
-    joined = joined.merge(orders, left_on="l_orderkey", right_on="o_orderkey")
-    joined = joined.merge(customer, left_on="o_custkey", right_on="c_custkey")
-    joined = joined.merge(n2, left_on="c_nationkey", right_on="n2_nationkey")
-    joined = joined[
-        ((joined["supp_nation"] == nation1) & (joined["cust_nation"] == nation2))
-        | ((joined["supp_nation"] == nation2) & (joined["cust_nation"] == nation1))
-    ].copy()
-    joined["l_year"] = joined["l_shipdate"].dt.year
-    joined["volume"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
-    return (
-        joined.groupby(["supp_nation", "cust_nation", "l_year"], as_index=False)
-        .agg(revenue=("volume", "sum"))
-        .sort_values(["supp_nation", "cust_nation", "l_year"])
-    )
+q7_v7_pandas_impl = make_variant_delegate(q7_v2_pandas_impl, name="q7_v7_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------

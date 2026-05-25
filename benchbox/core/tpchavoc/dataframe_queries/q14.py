@@ -19,6 +19,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q14_expression_impl as _q14_expr_base,
     q14_pandas_impl as _q14_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
 # ---------------------------------------------------------------------------
@@ -177,30 +178,7 @@ def q14_v4_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def q14_v4_pandas_impl(ctx: DataFrameContext) -> Any:
-    import pandas as pd
-
-    lineitem = ctx.get_table("lineitem")
-    part = ctx.get_table("part")
-
-    params = get_tpch_parameters(14)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    # Step 1: filter
-    filtered = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)]
-    # Step 2: join
-    joined = filtered.merge(part, left_on="l_partkey", right_on="p_partkey").copy()
-    # Step 3: derive columns
-    joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
-    joined["promo_revenue"] = joined["revenue"] * joined["p_type"].str.startswith("PROMO").astype(float)
-    # Step 4: compute scalars
-    total_val = joined["revenue"].sum()
-    promo_val = joined["promo_revenue"].sum()
-    total_val = total_val.compute() if hasattr(total_val, "compute") else total_val
-    promo_val = promo_val.compute() if hasattr(promo_val, "compute") else promo_val
-    promo_percent = 100.0 * promo_val / total_val if total_val > 0 else 0
-    return pd.DataFrame({"promo_revenue": [promo_percent]})
+q14_v4_pandas_impl = make_variant_delegate(q14_v2_pandas_impl, name="q14_v4_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------
