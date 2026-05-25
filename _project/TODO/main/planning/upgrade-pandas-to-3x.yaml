@@ -39,9 +39,8 @@ description: |
   4. TPC-DI ingest + ETL datetime resolution.
      pandas 3.0 defaults to microsecond resolution for datetime parsing
      (vs. nanoseconds in 2.x). Any code in `tpcdi/benchmark.py`,
-     `tpcdi/tools/file_parsers.py`, `tpcdi/etl/batch.py`,
-     `tpcdi/etl/transformations.py`, `tpcdi/etl/validation.py`, or
-     `tpcdi/tools/data_cleaners.py` that reads or normalizes date/time values
+     `tpcdi/tools/file_parsers.py`, `tpcdi/etl/transformations.py`, or
+     `tpcdi/etl/validation.py` that reads or normalizes date/time values
      via pd.read_csv / pd.read_fwf / pd.read_json / pd.to_datetime and then
      converts to int64 or compares values numerically can produce 1000×
      different results under 3.x. Audit and add explicit `dtype_backend`,
@@ -93,10 +92,8 @@ files_affected:
     - "benchbox/platforms/dataframe/pandas_df.py"
     - "benchbox/core/tpcdi/benchmark.py"
     - "benchbox/core/tpcdi/tools/file_parsers.py"
-    - "benchbox/core/tpcdi/etl/batch.py"
     - "benchbox/core/tpcdi/etl/transformations.py"
     - "benchbox/core/tpcdi/etl/validation.py"
-    - "benchbox/core/tpcdi/tools/data_cleaners.py"
     - "pyproject.toml"
 
 must_preserve:
@@ -144,10 +141,8 @@ scope_limit:
     - "benchbox/platforms/dataframe/pandas_df.py"
     - "benchbox/core/tpcdi/benchmark.py"
     - "benchbox/core/tpcdi/tools/file_parsers.py"
-    - "benchbox/core/tpcdi/etl/batch.py"
     - "benchbox/core/tpcdi/etl/transformations.py"
     - "benchbox/core/tpcdi/etl/validation.py"
-    - "benchbox/core/tpcdi/tools/data_cleaners.py"
     - "pyproject.toml"
     - "tests/unit/platforms/dataframe/"
     - "tests/unit/core/tpcdi/"

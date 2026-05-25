@@ -1,6 +1,6 @@
 # Removal Matrix (w1)
 
-Total tracked entries: 89
+Total tracked entries: 88
 
 ## By Module Prefix
 - `benchbox/base.py`: 1
@@ -17,7 +17,7 @@ Total tracked entries: 89
 - `benchbox/core/platform_registry.py`: 1
 - `benchbox/core/results`: 5
 - `benchbox/core/tpc_compliance.py`: 7
-- `benchbox/core/tpcdi`: 6
+- `benchbox/core/tpcdi`: 5
 - `benchbox/core/tpcds`: 11
 - `benchbox/core/tpch`: 3
 - `benchbox/core/tpchavoc`: 1
@@ -126,7 +126,6 @@ Total tracked entries: 89
 | `benchbox/core/expected_results/tpcds_results.py:106` | active | remove compatibility handling | use canonical API/behavior only |
 | `benchbox/core/tpcds/dataframe_queries/rollup_helper.py:296` | deprecate | remove legacy branch/path | use canonical API/behavior only |
 | `benchbox/core/tpcdi/etl/data_quality_monitor.py:60` | active | delete alias/re-export | use canonical API/behavior only |
-| `benchbox/core/tpcdi/tools/data_cleaners.py:566` | deprecate | delete alias/re-export | use canonical API/behavior only |
 | `benchbox/core/tpcdi/queries.py:56` | deprecate | remove compatibility handling | use canonical API/behavior only |
 | `benchbox/core/tpcdi/queries.py:271` | deprecate | remove compatibility handling | use canonical API/behavior only |
 | `benchbox/core/tpcdi/benchmark.py:112` | deprecate | remove compatibility handling | use canonical API/behavior only |
