@@ -721,44 +721,31 @@ job.commit()
         Returns:
             Configured AWSGlueAdapter instance.
         """
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-
-        # Generate database name using benchmark characteristics
-        if "database" in config and config["database"]:
-            adapter_config["database"] = config["database"]
-        else:
-            database_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                config,
                 platform="glue",
-                tuning_config=config.get("tuning_config"),
+                fields=[
+                    "region",
+                    "aws_region",
+                    "aws_access_key_id",
+                    "aws_secret_access_key",
+                    "aws_profile",
+                    "s3_staging_dir",
+                    "staging_root",
+                    "job_role",
+                    "iam_role",
+                    "worker_type",
+                    "number_of_workers",
+                    "glue_version",
+                    "job_timeout",
+                    "execution_mode",
+                    "spark_conf",
+                ],
             )
-            adapter_config["database"] = database_name
-
-        # AWS configuration
-        for key in ["region", "aws_region", "aws_access_key_id", "aws_secret_access_key", "aws_profile"]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        # Glue-specific configuration
-        for key in [
-            "s3_staging_dir",
-            "staging_root",
-            "job_role",
-            "iam_role",
-            "worker_type",
-            "number_of_workers",
-            "glue_version",
-            "job_timeout",
-            "execution_mode",
-            "spark_conf",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Configure Glue for benchmark execution.

@@ -373,14 +373,9 @@ class SparkLikeAdapterMixin:
 
     def apply_unified_tuning(self, unified_config: Any, connection: Any) -> None:
         """Dispatch unified tuning to the constraint / platform / per-table hooks."""
-        if not unified_config:
-            return
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)  # type: ignore[attr-defined]
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: Any, connection: Any) -> None:
         """Forward ``platform_config.spark`` settings to ``spark.conf.set``."""

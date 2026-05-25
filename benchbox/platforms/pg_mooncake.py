@@ -539,28 +539,8 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
             cursor.close()
 
     def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if pg_mooncake supports a specific tuning type.
-
-        pg_mooncake columnstore tables have different tuning characteristics
-        than PostgreSQL heap tables:
-        - No B-tree indexes on columnstore tables
-        - No CLUSTER support (Parquet-based storage)
-        - Partitioning handled at the Iceberg/Parquet level
-        """
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            supported = {
-                TuningType.PARTITIONING: False,  # Columnstore handles its own partitioning
-                TuningType.SORTING: False,  # No native sort keys on columnstore
-                TuningType.DISTRIBUTION: False,  # Not distributed
-                TuningType.CLUSTERING: False,  # No CLUSTER on columnstore tables
-                TuningType.PRIMARY_KEYS: False,  # Columnstore tables don't support constraints
-                TuningType.FOREIGN_KEYS: False,  # Columnstore tables don't support constraints
-            }
-            return supported.get(tuning_type, False)
-        except ImportError:
-            return False
+        """Check if pg_mooncake supports a specific tuning type."""
+        return False
 
 
 def _build_pg_mooncake_config(

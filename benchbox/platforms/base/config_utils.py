@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 POSTGRES_FAMILY_BASE_OPTIONS: dict[str, Any] = {
@@ -87,3 +88,32 @@ def build_platform_config(
         config_dict["database"] = overrides["database"]
 
     return DatabaseConfig(**config_dict)
+
+
+def build_adapter_config(
+    config: dict[str, Any],
+    *,
+    platform: str,
+    generated_key: str | None = "database",
+    fields: Iterable[str] = (),
+    include_none: bool = True,
+) -> dict[str, Any]:
+    """Build common adapter constructor kwargs from unified config."""
+    adapter_config: dict[str, Any] = {}
+    if generated_key:
+        if config.get(generated_key):
+            adapter_config[generated_key] = config[generated_key]
+        else:
+            from benchbox.utils.database_naming import generate_database_name
+
+            adapter_config[generated_key] = generate_database_name(
+                benchmark_name=config["benchmark"],
+                scale_factor=config["scale_factor"],
+                platform=platform,
+                tuning_config=config.get("tuning_config"),
+            )
+
+    for key in fields:
+        if key in config and (include_none or config[key] is not None):
+            adapter_config[key] = config[key]
+    return adapter_config

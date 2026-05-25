@@ -38,7 +38,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
-    from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+    pass
 
 from benchbox.core.exceptions import ConfigurationError
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
@@ -631,34 +631,6 @@ class QuantonAdapter(
                 params[key] = config[key]
 
         return cls(**params)
-
-    def apply_tuning_configuration(
-        self,
-        config: UnifiedTuningConfiguration,
-    ) -> dict[str, Any]:
-        """Apply unified tuning configuration.
-
-        Args:
-            config: Unified tuning configuration.
-
-        Returns:
-            Dict with results of applied configurations.
-        """
-        results: dict[str, Any] = {}
-
-        if config.scale_factor:
-            self._scale_factor = config.scale_factor
-
-        if config.primary_keys:
-            results["primary_keys"] = self.apply_primary_keys(config.primary_keys)
-
-        if config.foreign_keys:
-            results["foreign_keys"] = self.apply_foreign_keys(config.foreign_keys)
-
-        if config.platform:
-            results["platform_optimizations"] = self.apply_platform_optimizations(config.platform)
-
-        return results
 
     def get_target_dialect(self) -> str:
         """Return the target SQL dialect for Quanton.

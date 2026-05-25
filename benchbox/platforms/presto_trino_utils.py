@@ -110,6 +110,18 @@ def normalize_existing_files(file_paths: Any) -> list[Path]:
     return valid_files
 
 
+def show_tables_lower(connection: Any) -> list[str]:
+    """Return lower-cased table names from a cursor-based SHOW TABLES result."""
+    cursor = connection.cursor()
+    try:
+        cursor.execute("SHOW TABLES")
+        return [row[0].lower() for row in cursor.fetchall()]
+    except Exception:
+        return []
+    finally:
+        cursor.close()
+
+
 def validate_catalog_exists(
     catalog: str | None,
     *,

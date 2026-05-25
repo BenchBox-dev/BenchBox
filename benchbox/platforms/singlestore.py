@@ -40,7 +40,7 @@ from .base.data_loading import (
     resolve_csv_dialect,
 )
 from .base.mysql_wire import MySqlWireLifecycleMixin, NoOpTableTuningMixin, build_database_config
-from .base.sql_execution import execute_sql_query
+from .base.sql_execution import execute_sql_query  # noqa: F401 - tests patch this module-local execution hook.
 
 # SQLGlot dialect - SingleStore is MySQL-compatible
 SINGLESTORE_DIALECT = "mysql"
@@ -371,29 +371,6 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
         finally:
             cursor.close()
 
-    def execute_query(
-        self,
-        connection: Any,
-        query: str,
-        query_id: str,
-        benchmark_type: str | None = None,
-        scale_factor: float | None = None,
-        validate_row_count: bool = True,
-        stream_id: int | None = None,
-    ) -> dict[str, Any]:
-        """Execute a single query and return detailed results."""
-        return execute_sql_query(
-            connection,
-            query,
-            query_id,
-            log_verbose=self.log_verbose,
-            build_query_result_with_validation=self._build_query_result_with_validation,
-            benchmark_type=benchmark_type,
-            scale_factor=scale_factor,
-            validate_row_count=validate_row_count,
-            stream_id=stream_id,
-        )
-
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get SingleStore platform information."""
         platform_info: dict[str, Any] = {
@@ -641,22 +618,7 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
         except Exception:
             warnings.append("Could not query SingleStore version")
 
-    def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if SingleStore supports a specific tuning type."""
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            supported = {
-                TuningType.PARTITIONING: False,  # Not used in standard benchmarks
-                TuningType.SORTING: True,  # SORT KEY
-                TuningType.DISTRIBUTION: True,  # SHARD KEY
-                TuningType.CLUSTERING: False,  # No CLUSTER command
-                TuningType.PRIMARY_KEYS: False,  # No enforced PKs
-                TuningType.FOREIGN_KEYS: False,  # No FK enforcement
-            }
-            return supported.get(tuning_type, False)
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("SORTING", "DISTRIBUTION")
 
 
 def _build_singlestore_config(

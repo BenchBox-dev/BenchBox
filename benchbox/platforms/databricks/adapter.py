@@ -23,9 +23,7 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
         TuningColumn,
         UnifiedTuningConfiguration,
     )
@@ -33,6 +31,7 @@ if TYPE_CHECKING:
 from benchbox.core.upload_validation import UploadValidationEngine
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.runtime_metadata import build_default_normalized_result_metadata
+from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.datagen_manifest import MANIFEST_FILENAME
 from benchbox.utils.dependencies import (
     check_platform_dependencies,
@@ -2166,31 +2165,7 @@ class DatabricksAdapter(PlatformAdapter):
         except Exception as e:
             self.logger.warning(f"Error closing connection: {e}")
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if Databricks supports a specific tuning type.
-
-        Databricks supports:
-        - PARTITIONING: Via PARTITIONED BY clause in Delta Lake
-        - CLUSTERING: Via CLUSTER BY clause (Delta Lake 2.0+)
-        - DISTRIBUTION: Via Spark optimization hints and Z-ORDER clustering
-
-        Args:
-            tuning_type: The type of tuning to check support for
-
-        Returns:
-            True if the tuning type is supported by Databricks
-        """
-        # Import here to avoid circular imports
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {
-                TuningType.PARTITIONING,
-                TuningType.CLUSTERING,
-                TuningType.DISTRIBUTION,
-            }
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "CLUSTERING", "DISTRIBUTION")
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Databricks-specific tuning clauses for CREATE TABLE statements.
@@ -2410,25 +2385,10 @@ class DatabricksAdapter(PlatformAdapter):
             self.logger.warning(f"Failed to optimize Delta table {table_name}: {e}")
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration to Databricks.
+        """Apply unified tuning configuration to Databricks."""
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        Args:
-            unified_config: Unified tuning configuration to apply
-            connection: Databricks connection
-        """
-        if not unified_config:
-            return
-
-        # Apply constraint configurations
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        # Apply platform optimizations
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        # Apply table-level tunings
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
         """Apply Databricks-specific platform optimizations.
@@ -2450,35 +2410,7 @@ class DatabricksAdapter(PlatformAdapter):
         # Store optimizations for use during query execution and Delta Lake operations
         self.logger.info("Databricks platform optimizations stored for Spark session and Delta Lake management")
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to Databricks.
-
-        Note: Databricks (Spark SQL) supports PRIMARY KEY and FOREIGN KEY constraints
-        but they are informational only (not enforced). They are used for query optimization
-        in Catalyst optimizer and must be applied during table creation time.
-
-        Args:
-            primary_key_config: Primary key constraint configuration
-            foreign_key_config: Foreign key constraint configuration
-            connection: Databricks connection
-        """
-        # Databricks constraints are applied at table creation time for Catalyst optimization
-        # This method is called after tables are created, so log the configurations
-
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info(
-                "Primary key constraints enabled for Databricks (informational only, applied during table creation)"
-            )
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info(
-                "Foreign key constraints enabled for Databricks (informational only, applied during table creation)"
-            )
-
-        # Databricks constraints are informational and used by Catalyst optimizer
-        # No additional work to do here as they're applied during CREATE TABLE
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints enabled for Databricks (informational only, applied during table creation)",
+        "Foreign key constraints enabled for Databricks (informational only, applied during table creation)",
+    )

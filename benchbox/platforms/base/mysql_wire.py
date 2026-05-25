@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Any, Callable
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -104,6 +105,34 @@ class MySqlWireLifecycleMixin:
     current_database_sql = "SELECT DATABASE()"
     empty_load_details: Any = None
     reset_table_rows_on_load_error = False
+
+    def execute_query(
+        self,
+        connection: Any,
+        query: str,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Execute a single query through the shared SQL execution helper."""
+        from benchbox.platforms.base.sql_execution import execute_sql_query as default_execute_sql_query
+
+        module = sys.modules.get(type(self).__module__)
+        execute = getattr(module, "execute_sql_query", default_execute_sql_query)
+
+        return execute(
+            connection,
+            query,
+            query_id,
+            log_verbose=self.log_verbose,
+            build_query_result_with_validation=self._build_query_result_with_validation,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
 
     def _validate_identifier(self, identifier: str) -> bool:
         return is_valid_sql_identifier(identifier, max_length=self.database_identifier_max_length)

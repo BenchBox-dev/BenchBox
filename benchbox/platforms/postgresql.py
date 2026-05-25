@@ -42,7 +42,6 @@ from .base.data_loading import (
     prepare_local_load_file,
     resolve_csv_dialect,
 )
-from .base.sql_execution import execute_sql_query
 
 # PostgreSQL dialect for SQLGlot
 POSTGRES_DIALECT = "postgres"
@@ -686,29 +685,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         connection.commit()
         cursor.close()
 
-    def execute_query(
-        self,
-        connection: Any,
-        query: str,
-        query_id: str,
-        benchmark_type: str | None = None,
-        scale_factor: float | None = None,
-        validate_row_count: bool = True,
-        stream_id: int | None = None,
-    ) -> dict[str, Any]:
-        """Execute a single query and return detailed results."""
-        return execute_sql_query(
-            connection,
-            query,
-            query_id,
-            log_verbose=self.log_verbose,
-            build_query_result_with_validation=self._build_query_result_with_validation,
-            benchmark_type=benchmark_type,
-            scale_factor=scale_factor,
-            validate_row_count=validate_row_count,
-            stream_id=stream_id,
-        )
-
     def get_query_plan(
         self,
         connection: Any,
@@ -1021,23 +997,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             # Fallback if validation module not available
             return None
 
-    def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if PostgreSQL supports a specific tuning type."""
-        # Import here to avoid circular imports
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            supported = {
-                TuningType.PARTITIONING: True,  # PostgreSQL supports declarative partitioning
-                TuningType.SORTING: False,  # No native sort keys like columnar stores
-                TuningType.DISTRIBUTION: False,  # No distribution keys (not distributed)
-                TuningType.CLUSTERING: True,  # CLUSTER command available
-                TuningType.PRIMARY_KEYS: True,  # Full constraint support
-                TuningType.FOREIGN_KEYS: True,  # Full constraint support
-            }
-            return supported.get(tuning_type, False)
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "CLUSTERING", "PRIMARY_KEYS", "FOREIGN_KEYS")
 
 
 def _build_postgresql_config(

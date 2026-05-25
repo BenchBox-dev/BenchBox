@@ -44,6 +44,16 @@ def _run_load(adapter: _DummySparkAdapter, spark: MagicMock, table_path: Path) -
     assert stats["orders"] == 5
 
 
+def test_load_data_delegates_to_shared_spark_loader(tmp_path: Path) -> None:
+    adapter = _DummySparkAdapter()
+    adapter._load_data_spark = MagicMock(return_value=({"orders": 1}, 0.1, None))
+    benchmark = MagicMock()
+    connection = MagicMock()
+
+    assert adapter.load_data(benchmark, connection, tmp_path) == ({"orders": 1}, 0.1, None)
+    adapter._load_data_spark.assert_called_once_with(benchmark, tmp_path, connection)
+
+
 def test_load_data_spark_uses_delta_reader_for_delta_directory(tmp_path: Path) -> None:
     adapter = _DummySparkAdapter()
     spark = MagicMock()
@@ -590,6 +600,25 @@ class _DummyQueryAdapter(SparkQueryExecutionMixin):
 
     def log_verbose(self, msg: str) -> None:
         pass
+
+
+def test_execute_query_delegates_to_shared_spark_executor() -> None:
+    adapter = _DummyQueryAdapter()
+    adapter._execute_query_spark = MagicMock(return_value={"status": "ok"})
+    connection = MagicMock()
+
+    assert adapter.execute_query(connection, "select 1", "Q1", benchmark_type="tpch", scale_factor=0.01) == {
+        "status": "ok"
+    }
+    adapter._execute_query_spark.assert_called_once_with(
+        connection=connection,
+        query="select 1",
+        query_id="Q1",
+        benchmark_type="tpch",
+        scale_factor=0.01,
+        validate_row_count=True,
+        stream_id=None,
+    )
 
 
 def _make_spark(table_rows: dict[str, list] | None = None) -> MagicMock:

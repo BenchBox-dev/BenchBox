@@ -15,6 +15,7 @@ from benchbox.platforms.presto_trino_utils import (
     load_file_batches,
     normalize_existing_files,
     resolve_data_files,
+    show_tables_lower,
     validate_catalog_exists,
 )
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -115,24 +116,16 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create a Presto-family adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-        if config.get("schema"):
-            adapter_config["schema"] = config["schema"]
-        else:
-            adapter_config["schema"] = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                config,
                 platform=cls.platform_key,
-                tuning_config=config.get("tuning_config"),
+                generated_key="schema",
+                fields=("host", "port", "catalog", "username", "password", *cls.from_config_optional_fields),
             )
-
-        for key in ("host", "port", "catalog", "username", "password", *cls.from_config_optional_fields):
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
     def get_target_dialect(self) -> str:
         """Return the target SQL dialect."""
@@ -677,14 +670,9 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
 
     def apply_unified_tuning(self, unified_config: Any, connection: Any) -> None:
         """Apply unified tuning configuration."""
-        if not unified_config:
-            return
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: Any, connection: Any) -> None:
         """Apply platform optimizations."""
@@ -703,13 +691,4 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
                 f"Foreign key constraints enabled for {self.platform_log_name} (informational only, not enforced)"
             )
 
-    def _get_existing_tables(self, connection: Any) -> list[str]:
-        """Get list of existing tables from schema."""
-        cursor = connection.cursor()
-        try:
-            cursor.execute("SHOW TABLES")
-            return [row[0].lower() for row in cursor.fetchall()]
-        except Exception:
-            return []
-        finally:
-            cursor.close()
+    _get_existing_tables = staticmethod(show_tables_lower)

@@ -300,50 +300,31 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create Spark adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
         benchmark_name = str(config["benchmark"]).lower()
-
-        # Generate proper database name using benchmark characteristics
-        if "database" in config and config["database"]:
-            adapter_config["database"] = config["database"]
-        else:
-            database_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
-                platform="spark",
-                tuning_config=config.get("tuning_config"),
-            )
-            adapter_config["database"] = database_name
-
-        # Core configuration parameters
-        for key in [
-            "master",
-            "app_name",
-            "deploy_mode",
-            "driver_memory",
-            "executor_memory",
-            "executor_cores",
-            "num_executors",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        # Optional configuration parameters
-        for key in [
-            "warehouse_dir",
-            "shuffle_partitions",
-            "broadcast_threshold",
-            "adaptive_enabled",
-            "table_format",
-            "enable_hive",
-            "spark_config",
-            "staging_root",
-            "disable_cache",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
+        adapter_config = build_adapter_config(
+            config,
+            platform="spark",
+            fields=[
+                "master",
+                "app_name",
+                "deploy_mode",
+                "driver_memory",
+                "executor_memory",
+                "executor_cores",
+                "num_executors",
+                "warehouse_dir",
+                "shuffle_partitions",
+                "broadcast_threshold",
+                "adaptive_enabled",
+                "table_format",
+                "enable_hive",
+                "spark_config",
+                "staging_root",
+                "disable_cache",
+            ],
+        )
 
         spark_config = adapter_config.get("spark_config") or {}
         broadcast_threshold = adapter_config.get("broadcast_threshold")
@@ -640,16 +621,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
         return elapsed_seconds(start_time)
 
-    def load_data(
-        self, benchmark, connection: Any, data_dir: Path
-    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data using Spark DataFrame/SQL with DataSourceResolver.
-
-        Delegates to SparkDataLoadMixin._load_data_spark for the shared
-        DataFrame-based loading implementation.
-        """
-        return self._load_data_spark(benchmark, data_dir, connection)
-
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply Spark-specific optimizations based on benchmark type."""
 
@@ -670,31 +641,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
         except Exception as e:
             self.logger.warning(f"Failed to apply benchmark configuration: {e}")
-
-    def execute_query(
-        self,
-        connection: Any,
-        query: str,
-        query_id: str,
-        benchmark_type: str | None = None,
-        scale_factor: float | None = None,
-        validate_row_count: bool = True,
-        stream_id: int | None = None,
-    ) -> dict[str, Any]:
-        """Execute query with detailed timing and performance tracking.
-
-        Delegates to SparkQueryExecutionMixin._execute_query_spark for the
-        shared execution implementation.
-        """
-        return self._execute_query_spark(
-            connection=connection,
-            query=query,
-            query_id=query_id,
-            benchmark_type=benchmark_type,
-            scale_factor=scale_factor,
-            validate_row_count=validate_row_count,
-            stream_id=stream_id,
-        )
 
     def _remove_orphaned_table_location(self, spark: Any, table_name: str) -> None:
         """Remove orphaned managed-table directory when catalog entry is gone.
@@ -764,24 +710,7 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             self.logger.debug(f"Connection test failed: {e}")
             return False
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if Spark supports a specific tuning type.
-
-        Spark supports:
-        - PARTITIONING: Via partitionBy in DataFrame write
-        - BUCKETING: Via bucketBy in DataFrame write
-        - SORTING: Via sortBy in DataFrame write
-        - CLUSTERING: Via Z-ordering in Delta Lake
-        """
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {
-                TuningType.PARTITIONING,
-                TuningType.SORTING,
-            }
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "SORTING")
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Spark-specific tuning clauses for CREATE TABLE statements.

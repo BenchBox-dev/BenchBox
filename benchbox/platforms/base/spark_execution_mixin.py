@@ -217,6 +217,12 @@ class SparkDataLoadMixin:
             return "hudi"
         return None
 
+    def load_data(
+        self, benchmark: Any, connection: Any, data_dir: Path
+    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
+        """Load data using the shared Spark DataFrame implementation."""
+        return self._load_data_spark(benchmark, data_dir, connection)
+
     def _load_data_spark(
         self,
         benchmark: Any,
@@ -460,6 +466,27 @@ class SparkQueryExecutionMixin:
     # Spark Connect backends like LakeSail do not implement ClearCache, so they
     # override this flag to False and rely on session-level cache suppression.
     _catalog_clear_cache_supported: bool = True
+
+    def execute_query(
+        self,
+        connection: Any,
+        query: str,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Execute a SQL query with the shared Spark query implementation."""
+        return self._execute_query_spark(
+            connection=connection,
+            query=query,
+            query_id=query_id,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
 
     def _execute_query_spark(
         self,
