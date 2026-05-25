@@ -14,13 +14,14 @@ import sys
 
 import pytest
 
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
 
 def _run(code: str) -> list[str]:
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     return result.stdout.strip().splitlines()
 
 
-@pytest.mark.fast
 def test_catalogs_load_lazily_not_at_import() -> None:
     # Fresh interpreter: importing the modules must NOT populate the cache
     # (misses == 0); first access of a public symbol triggers exactly one load.
@@ -35,7 +36,6 @@ def test_catalogs_load_lazily_not_at_import() -> None:
     assert lines == ["0 0", "1 1"]
 
 
-@pytest.mark.fast
 def test_unknown_attribute_still_raises_attribute_error() -> None:
     import benchbox.core.benchmark_registry as r
     import benchbox.core.results.benchmark_specs as s
