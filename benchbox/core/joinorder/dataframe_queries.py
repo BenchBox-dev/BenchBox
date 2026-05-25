@@ -11,7 +11,11 @@ with WHERE join conditions) into explicit .join() chains.
 NOTE: Unlike the SQL version which stresses query optimizer join ordering,
 the DataFrame version defines an explicit join sequence. The intent shifts
 from optimizer stress-testing to measuring multi-join execution performance
-across platforms with identical join sequences.
+across platforms with identical join sequences. That fixed plan is produced by
+``_plan_join_sequence`` (a pure function of the query's SQL topology, shared by
+both executors) and pinned by tests/unit/core/joinorder/test_dataframe_join_plan_shape.py,
+so the "fixed plan, not cost-reordered" semantic cannot silently drift -- a
+property row-equality oracle tests cannot detect.
 
 Each query returns MIN aggregations over filtered multi-table joins.
 
@@ -24,7 +28,7 @@ from __future__ import annotations
 
 import re
 from csv import reader
-from typing import Any
+from typing import Any, NamedTuple
 
 import pandas as pd
 from sqlglot import exp, parse_one
@@ -134,6 +138,61 @@ def _select_min_columns(tree: exp.Select) -> list[tuple[str, str, str]]:
     return columns
 
 
+class _JoinStep(NamedTuple):
+    """One join in the fixed left-deep sequence.
+
+    ``existing_*`` is the key on the already-joined result; ``new_*`` is the key
+    on the table being added. ``predicate_index`` indexes into the query's
+    join-equality predicates, or is ``-1`` for a (canonically unreachable)
+    cross-join fallback over a disconnected join graph.
+    """
+
+    existing_alias: str
+    existing_column: str
+    new_alias: str
+    new_column: str
+    predicate_index: int
+
+
+def _plan_join_sequence(tables: list[tuple[str, str]], join_predicates: list[exp.Expression]) -> list[_JoinStep]:
+    """Deterministic left-deep join order derived purely from SQL topology.
+
+    JoinOrder DataFrame mode does NOT cost-reorder joins -- reordering is the
+    SQL optimizer's job, which the DataFrame path deliberately does not exercise
+    (see the module docstring). The sequence anchors on the first FROM-clause
+    table and, at each step, takes the first WHERE-clause join predicate (in
+    textual order) connecting an already-joined alias to a remaining one. This
+    is the single source of truth shared by both executors, so the measured
+    operation stays multi-join *execution* with a fixed plan.
+    """
+    anchor = tables[0][0]
+    joined = {anchor}
+    remaining = [alias for alias, _table in tables[1:]]
+    steps: list[_JoinStep] = []
+    while remaining:
+        for index, predicate in enumerate(join_predicates):
+            left_alias, left_column = _column_ref(predicate.this)
+            right_alias, right_column = _column_ref(predicate.expression)
+            if left_alias in joined and right_alias in remaining:
+                steps.append(_JoinStep(left_alias, left_column, right_alias, right_column, index))
+                joined.add(right_alias)
+                remaining.remove(right_alias)
+                break
+            if right_alias in joined and left_alias in remaining:
+                steps.append(_JoinStep(right_alias, right_column, left_alias, left_column, index))
+                joined.add(left_alias)
+                remaining.remove(left_alias)
+                break
+        else:
+            # Disconnected join graph: no canonical JOB query reaches this, but
+            # fall back to the next remaining table in SQL order (deterministic).
+            new_alias = remaining[0]
+            steps.append(_JoinStep(anchor, "", new_alias, "", -1))
+            joined.add(new_alias)
+            remaining.remove(new_alias)
+    return steps
+
+
 def _expr_value(ctx: DataFrameContext, node: exp.Expression) -> Any:
     if isinstance(node, exp.Column):
         alias, column = _column_ref(node)
@@ -215,40 +274,20 @@ def _execute_joinorder_expression_query(ctx: DataFrameContext, query_id: str) ->
         for alias, table_name in tables
     }
 
-    joined_aliases = {tables[0][0]}
     result = frames[tables[0][0]]
-    remaining_aliases = {alias for alias, _table in tables[1:]}
-    used_join_predicates: set[int] = set()
+    used_indices: set[int] = set()
+    for step in _plan_join_sequence(tables, join_predicates):
+        if step.predicate_index < 0:
+            result = result.join(frames[step.new_alias], how="cross")
+            continue
+        result = result.join(
+            frames[step.new_alias],
+            left_on=_join_key(step.existing_alias, step.existing_column, step.predicate_index),
+            right_on=_join_key(step.new_alias, step.new_column, step.predicate_index),
+        )
+        used_indices.add(step.predicate_index)
 
-    while remaining_aliases:
-        for predicate_index, predicate in enumerate(join_predicates):
-            left_alias, left_column = _column_ref(predicate.this)
-            right_alias, right_column = _column_ref(predicate.expression)
-            if left_alias in joined_aliases and right_alias in remaining_aliases:
-                result = result.join(
-                    frames[right_alias],
-                    left_on=_join_key(left_alias, left_column, predicate_index),
-                    right_on=_join_key(right_alias, right_column, predicate_index),
-                )
-                joined_aliases.add(right_alias)
-                remaining_aliases.remove(right_alias)
-                used_join_predicates.add(id(predicate))
-                break
-            if right_alias in joined_aliases and left_alias in remaining_aliases:
-                result = result.join(
-                    frames[left_alias],
-                    left_on=_join_key(right_alias, right_column, predicate_index),
-                    right_on=_join_key(left_alias, left_column, predicate_index),
-                )
-                joined_aliases.add(left_alias)
-                remaining_aliases.remove(left_alias)
-                used_join_predicates.add(id(predicate))
-                break
-        else:
-            alias = remaining_aliases.pop()
-            result = result.join(frames[alias], how="cross")
-            joined_aliases.add(alias)
-
+    used_join_predicates = {id(join_predicates[index]) for index in used_indices}
     for predicate in predicates:
         if id(predicate) not in used_join_predicates:
             result = result.filter(_expression_condition(ctx, predicate))
@@ -369,42 +408,21 @@ def _execute_joinorder_pandas_query(ctx: DataFrameContext, query_id: str) -> pd.
         alias: _prefixed_pandas_frame(ctx, table_name, alias, local_predicates[alias]) for alias, table_name in tables
     }
 
-    joined_aliases = {tables[0][0]}
     result = frames[tables[0][0]]
-    remaining_aliases = {alias for alias, _table in tables[1:]}
-    used_join_predicates: set[int] = set()
+    used_indices: set[int] = set()
+    for step in _plan_join_sequence(tables, join_predicates):
+        if step.predicate_index < 0:
+            result = result.merge(frames[step.new_alias], how="cross")
+            continue
+        result = result.merge(
+            frames[step.new_alias],
+            left_on=_qualified(step.existing_alias, step.existing_column),
+            right_on=_qualified(step.new_alias, step.new_column),
+            how="inner",
+        )
+        used_indices.add(step.predicate_index)
 
-    while remaining_aliases:
-        for predicate in join_predicates:
-            left_alias, left_column = _column_ref(predicate.this)
-            right_alias, right_column = _column_ref(predicate.expression)
-            if left_alias in joined_aliases and right_alias in remaining_aliases:
-                result = result.merge(
-                    frames[right_alias],
-                    left_on=_qualified(left_alias, left_column),
-                    right_on=_qualified(right_alias, right_column),
-                    how="inner",
-                )
-                joined_aliases.add(right_alias)
-                remaining_aliases.remove(right_alias)
-                used_join_predicates.add(id(predicate))
-                break
-            if right_alias in joined_aliases and left_alias in remaining_aliases:
-                result = result.merge(
-                    frames[left_alias],
-                    left_on=_qualified(right_alias, right_column),
-                    right_on=_qualified(left_alias, left_column),
-                    how="inner",
-                )
-                joined_aliases.add(left_alias)
-                remaining_aliases.remove(left_alias)
-                used_join_predicates.add(id(predicate))
-                break
-        else:
-            alias = remaining_aliases.pop()
-            result = result.merge(frames[alias], how="cross")
-            joined_aliases.add(alias)
-
+    used_join_predicates = {id(join_predicates[index]) for index in used_indices}
     for predicate in predicates:
         if id(predicate) not in used_join_predicates:
             result = _filter_pandas(result, predicate)
