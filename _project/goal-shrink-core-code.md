@@ -41,10 +41,10 @@ Unresolved TODOs, ADRs, and user decisions default to the conservative path. Aut
 
 - Objective-function TODO ratified (2026-05-24; see `_project/analysis/shrink-objective-backfill.md`): the logic-vs-data discriminator in "Ledger and Credit" plus the Guardrails *are* the objective function, validated against #587-604 (credits genuine logic reductions, refuses gamed relocations). The provisional credit formula and the conservative default below stand — `approved_credit_for_valid_data_extraction` remains 0 until a human approves that credit class; executor agents may not (see the executor-only boundary above).
 - JoinOrder/benchmark-semantics TODO unresolved: prove benchmark-shape preservation or stop; agents may not reclassify benchmark intent.
-- Import-loading TODO unresolved: default to lazy/memoized loading. Eager import-time loading needs linked approval, import-delta measurement, and budget.
-- Generated-implementation findability TODO unresolved: default to explicit registries or typed mappings. Dynamic symbol injection needs linked approval and grep/type-check evidence.
-- Codegen/runtime-source ADR unresolved: generated Python is tracked separately and earns no maintained-code shrink credit unless the ADR says otherwise.
-- New catalog/YAML migrations need a canonical-source decision; extending an existing catalog with newly relocated Python counts as a new migration.
+- Import-loading TODO resolved (2026-05-24; see `_project/DONE/main/shrink-followup-registry-lazy-cached-load.yaml`): default to lazy/memoized loading. Eager import-time loading needs linked approval, import-delta measurement, and budget.
+- Generated-implementation findability TODO resolved (2026-05-24; see `_project/DONE/main/shrink-followup-generated-impl-findability.yaml`): default to explicit registries or typed mappings. Dynamic symbol injection needs linked approval and grep/type-check evidence.
+- Codegen/runtime-source ADR resolved (2026-05-25; see `_project/decisions/catalog-runtime-parse-vs-codegen.md`): the canonical catalog pattern is human-authored structured source loaded through lazy runtime accessors, cached when the surface is hot or preserves compatibility exports. Build-time generated Python is not the default and earns no maintained-code shrink credit unless a future explicit ADR supersedes that decision.
+- New catalog/YAML migrations must name the canonical source, preserve reviewability, use lazy loading, include schema or typed validation, and fingerprint public symbols/queries when relevant. Extending an existing catalog with newly relocated Python counts as a new migration.
 
 ## Ledger and Credit
 

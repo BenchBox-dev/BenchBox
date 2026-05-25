@@ -2,8 +2,17 @@ id: shrink-followup-codegen-vs-runtime-parse-adr
 title: "ADR: choose runtime-parse-YAML vs build-time-codegen as the canonical catalog pattern"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-05-25"
 category: Documentation
+
+# Resolution (2026-05-25): accepted the existing runtime-parse direction as the
+# canonical catalog pattern, with lazy accessors by default and cached access for
+# hot paths / compatibility exports. Build-time generated Python is rejected as
+# the default because the measured import regression was solved by lazy cached
+# loading, while codegen would add build complexity, generated churn, and
+# separate accounting. Decision recorded in
+# _project/decisions/catalog-runtime-parse-vs-codegen.md.
 
 description: |
   The shrink campaign moved large amounts of data (metadata, specs, query
@@ -27,7 +36,7 @@ description: |
 work:
   - id: w1
     summary: "Document both options with measured/representative tradeoffs"
-    status: pending
+    status: done
     notes: |
       Cover: runtime-parse (current) vs build-time codegen. Dimensions: import
       time / runtime cost, static findability + ty coverage, build complexity,
@@ -38,7 +47,7 @@ work:
   - id: w2
     summary: "Recommend one as the canonical catalog pattern and record the ADR"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Write the ADR with decision, rationale, and rejected alternatives. If
       codegen is chosen, note that it supersedes the runtime lazy-load fix in
@@ -94,7 +103,7 @@ metadata:
     - catalog
   estimated_effort: "Small"
   created_date: "2026-05-23"
-  last_updated: "2026-05-23T16:00:00"
+  last_updated: "2026-05-25T00:00:00"
 
 impact:
   technical_debt: |
@@ -108,4 +117,4 @@ success_metrics:
 
 files_affected:
   added:
-    - "docs/ (or _project/) ADR file"
+    - "_project/decisions/catalog-runtime-parse-vs-codegen.md"
