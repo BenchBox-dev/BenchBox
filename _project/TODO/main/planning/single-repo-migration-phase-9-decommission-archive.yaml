@@ -2,12 +2,31 @@ id: single-repo-migration-phase-9-decommission-archive
 title: "Single-repo migration phase 9: decommission archived benchbox-private and retired private clone after 60-90 day soak"
 worktree: main
 priority: Low
-status: Not Started
+status: Blocked
 category: Release Tooling
 
 deps:
   needs:
   - single-repo-migration-phase-8-first-post-migration-release
+
+blockers:
+- date: "2026-05-25"
+  work: [w1, w2, w3, w4, w5, w6]
+  reason: |
+    Phase 9 is not ready. Its Phase 8 dependency is blocked, and the
+    explicit Phase 9 soak has not reached the minimum 60 days. Phase 5
+    completed on 2026-04-27, so the earliest 60-day checkpoint is
+    2026-06-26; the 90-day upper checkpoint is 2026-07-26.
+  evidence: |
+    - `deps.needs` requires `single-repo-migration-phase-8-first-post-migration-release`.
+    - PR #662 records Phase 8 as blocked on unresolved Phase 4 release recovery.
+    - `_project/DONE/main/planning/single-repo-migration-phase-5-repo-flip.yaml` has `completed_date: "2026-04-27"`.
+    - The TODO itself says default action is KEEP because deleting the archive is irreversible and costs nothing to defer.
+  unblock: |
+    Revisit on or after 2026-06-26, and only after Phase 8 or an
+    approved recovery-release TODO has completed. At that point audit the
+    retired clone and external references before deciding whether to keep
+    or delete the archived `joeharris76/benchbox-private` repo.
 
 description: |
   Optional final cleanup. After enough time has passed (60-90 days post
