@@ -30,6 +30,11 @@ def _workflow_job_run_text(workflow_name: str, job_name: str) -> str:
     return "\n".join(str(step.get("run", "")) for step in workflow["jobs"][job_name]["steps"])
 
 
+def _workflow(workflow_name: str) -> dict:
+    workflow_path = REPO_ROOT / ".github" / "workflows" / workflow_name
+    return yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+
+
 if sys.version_info >= (3, 11):
     import tomllib
 else:
@@ -183,6 +188,58 @@ class TestReleaseInfrastructure:
         assert "permissions" in publish_job
         assert "id-token" in publish_job["permissions"]
         assert publish_job["permissions"]["id-token"] == "write"
+
+    def test_release_required_result_contract(self):
+        """Test the main-PR release-required umbrella check shape."""
+        jobs = _workflow("test.yml")["jobs"]
+
+        assert jobs["integration"]["if"] == (
+            "github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'main')"
+        )
+        integration_run_text = _workflow_job_run_text("test.yml", "integration")
+        assert 'tests/integration -m "integration and not slow and not stress"' in integration_run_text
+
+        test_package_run_text = _workflow_job_run_text("test.yml", "test-package")
+        assert "wheel_count=$(find dist -maxdepth 1 -name '*.whl'" in test_package_run_text
+        assert 'uv run --isolated --no-project --with "$wheel"' in test_package_run_text
+        assert "benchbox --help" in test_package_run_text
+
+        release_readiness = jobs["release-readiness"]
+        assert release_readiness["if"] == "${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}"
+        readiness_run_text = _workflow_job_run_text("test.yml", "release-readiness")
+        assert "scripts/check_dependency_bounds.py" in readiness_run_text
+        assert "--fail-on=cap-reached" in readiness_run_text
+        assert "Check release branch curation" in str(jobs["release-readiness"]["steps"])
+        assert "Release branch still contains curated path" in readiness_run_text
+        assert "_project" in readiness_run_text
+        assert ".github/workflows/validate-submission.yml" in readiness_run_text
+
+        result_job = jobs["release-required-result"]
+        assert result_job["name"] == "release-required-result"
+        assert set(result_job["needs"]) == {"test", "integration", "test-package", "release-readiness"}
+        assert result_job["if"] == "${{ always() && github.event_name == 'pull_request' && github.base_ref == 'main' }}"
+        aggregate_run_text = _workflow_job_run_text("test.yml", "release-required-result")
+        for expected in [
+            "test (ubuntu-latest, 3.12)",
+            "integration",
+            "test-package",
+            "release-readiness",
+            "Release-required checks passed.",
+        ]:
+            assert expected in aggregate_run_text
+
+    def test_release_docs_name_required_contexts(self):
+        """Release docs must name the same stable required contexts."""
+        docs_paths = [
+            REPO_ROOT / "docs" / "operations" / "release-guide.md",
+            REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md",
+            REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md",
+        ]
+
+        for path in docs_paths:
+            content = path.read_text(encoding="utf-8")
+            assert "release-required-result" in content
+            assert "validate-base" in content
 
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""

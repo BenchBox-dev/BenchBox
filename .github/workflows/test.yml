@@ -228,11 +228,11 @@ jobs:
         run: |
           uv run -- python -m pytest -q tests/integration/core/data_organization/test_presorted_generation.py -m "requires_table_formats" --tb=short
 
-  # Full integration test suite - runs on push to main or with label
+  # Full integration test suite - release-required for main PRs and runs on main pushes.
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-integration'))
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'main')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -284,12 +284,20 @@ jobs:
       - name: Test package installation
         shell: bash
         run: |
+          set -euo pipefail
           # Use bash on all platforms so glob expansion works cross-platform.
           # GitHub Actions Windows runners have Git Bash available.
-          uv venv test-venv
-          uv pip install --python test-venv dist/*.whl
-          uv run --python test-venv python -c "import benchbox; print('Package installation successful')"
-          uv run --python test-venv benchbox --help
+          wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
+          if [ "$wheel_count" != "1" ]; then
+            echo "::error::Expected exactly one wheel, found $wheel_count"
+            find dist -maxdepth 1 -type f -print
+            exit 1
+          fi
+          wheel=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
+          tmpdir=$(mktemp -d)
+          cd "$tmpdir"
+          uv run --isolated --no-project --with "$wheel" -- python -c "import benchbox; print('Package installation successful')"
+          uv run --isolated --no-project --with "$wheel" -- benchbox --help
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -297,6 +305,110 @@ jobs:
           name: test-build-dist-${{ matrix.os }}
           path: dist/
           retention-days: 7  # Shorter retention for test artifacts
+
+  release-readiness:
+    name: release-readiness
+    if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Check dependency upper bounds
+        run: |
+          mkdir -p release-artifacts
+          uv run -- python scripts/check_dependency_bounds.py \
+            --fail-on=cap-reached \
+            --output release-artifacts/dependency-bounds.md
+
+      - name: Check release branch curation
+        run: |
+          missing=0
+          for forbidden in \
+            _project \
+            _blog \
+            results-data \
+            results-explorer \
+            .claude \
+            .codex \
+            .gemini \
+            .pre-commit-config.yaml \
+            _benchbox_pytest_xdist_safety.py \
+            todo.config.yaml \
+            skill-sync.yaml \
+            skill-sync.lock \
+            .coveragerc_core \
+            .dockerignore \
+            .env.example \
+            .mcp.json \
+            AGENTS.md \
+            CLAUDE.md \
+            GEMINI.md \
+            .github/workflows/results-explorer-browser.yml \
+            .github/workflows/seed-corpus.yml \
+            .github/workflows/sync-results-data-to-published.yml \
+            .github/workflows/validate-submission.yml; do
+            if [ -e "$forbidden" ]; then
+              echo "::error::Release branch still contains curated path: $forbidden"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Upload dependency bounds report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-pr-dependency-bounds
+          path: release-artifacts/dependency-bounds.md
+          retention-days: 30
+
+  release-required-result:
+    name: release-required-result
+    needs: [test, integration, test-package, release-readiness]
+    if: ${{ always() && github.event_name == 'pull_request' && github.base_ref == 'main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate release-required result
+        env:
+          FAST_TEST_RESULT: ${{ needs.test.result }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+          PACKAGE_RESULT: ${{ needs.test-package.result }}
+          RELEASE_READINESS_RESULT: ${{ needs.release-readiness.result }}
+        run: |
+          set -euo pipefail
+
+          failed=0
+          for pair in \
+            "test (ubuntu-latest, 3.12)=$FAST_TEST_RESULT" \
+            "integration=$INTEGRATION_RESULT" \
+            "test-package=$PACKAGE_RESULT" \
+            "release-readiness=$RELEASE_READINESS_RESULT"; do
+            name="${pair%%=*}"
+            result="${pair#*=}"
+            if [ "$result" != "success" ]; then
+              echo "$name=$result"
+              failed=1
+            fi
+          done
+
+          if [ "$failed" != "0" ]; then
+            exit 1
+          fi
+
+          echo "Release-required checks passed."
 
   # CLI↔explorer visualization parity check.
   # Verifies that the checked-in JSON fixtures in tests/parity/fixtures/

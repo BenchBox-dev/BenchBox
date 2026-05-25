@@ -15,6 +15,30 @@ make release-finalize VERSION=X.Y.Z
 
 That's the entire flow. The two Make targets do the rest.
 
+## Pre-merge release-required contract
+
+Release PRs target `main` and must be opened from branches accepted by
+`.github/workflows/validate-main-pr.yml` (`vX.Y.Z`, optionally with a suffix).
+Before a release PR can merge, the `main-release-only` ruleset must require:
+
+- `validate-base`
+- `release-required-result`
+
+`release-required-result` is the stable umbrella check in
+`.github/workflows/test.yml`. A green result means the release PR branch passed:
+
+- the required fast lane, `test (ubuntu-latest, 3.12)`;
+- the integration-not-slow suite:
+  `tests/integration -m "integration and not slow and not stress"`;
+- isolated exact-one-wheel package build/install smoke;
+- dependency upper-bound checks;
+- release-branch curation checks that confirm dev-only paths are absent.
+
+It does **not** guarantee live cloud credentials, stress suites, long-running
+UAT, or full slow/resource-heavy coverage. Those remain explicit manual,
+scheduled, or follow-up gates until separate release canary work makes them
+blocking.
+
 ### What `release-cut` does
 
 1. Cuts a `vX.Y.Z` branch off `develop` (`develop` itself is never modified).
@@ -38,8 +62,8 @@ That's the entire flow. The two Make targets do the rest.
 ### What `release-finalize` does
 
 1. Finds the open release PR for `vX.Y.Z` and squash-merges it. (Ruleset
-   `main-release-only` blocks the merge if `lint` or `test` aren't green;
-   no local poller is needed.)
+   `main-release-only` blocks the merge unless `validate-base` and
+   `release-required-result` are green; no local poller is needed.)
 2. Fast-forwards `main` and tags `vX.Y.Z`.
 3. Pushes the tag — which fires `.github/workflows/release.yml`:
    `dependency-bounds` → `build` (with `SOURCE_DATE_EPOCH` from the tag
