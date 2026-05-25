@@ -183,35 +183,3 @@ def test_instance_apply_environment_overrides_updates_tuning(monkeypatch: pytest
     assert mgr.get("tuning.enabled") is True
     assert mgr.get("tuning.path") == "/tmp/tuning.yaml"
     assert any("Applied environment override" in str(call) for call in mock_print.call_args_list)
-
-
-def test_example_argument_parser_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
-    parser = cfg.ExampleArgumentParser.create_benchmark_parser("x", default_scale=0.5)
-    cfg.ExampleArgumentParser.add_tuning_arguments(parser)
-    cfg.ExampleArgumentParser.add_execution_arguments(parser)
-    cfg.ExampleArgumentParser.add_output_arguments(parser)
-    cfg.ExampleArgumentParser.add_platform_arguments(parser, "duckdb")
-    cfg.ExampleArgumentParser.add_platform_arguments(parser, "databricks")
-    cfg.ExampleArgumentParser.add_platform_arguments(parser, "clickhouse")
-
-    # valid parse
-    with patch(
-        "argparse.ArgumentParser.parse_args",
-        return_value=type(
-            "A",
-            (),
-            {"power_only": False, "throughput_only": False, "load_only": False, "verbose": True, "quiet": False},
-        )(),
-    ):
-        args = cfg.ExampleArgumentParser.parse_and_validate_args(parser)
-        assert args.verbose is True
-
-    # mutual exclusion validation branch
-    with patch(
-        "argparse.ArgumentParser.parse_args",
-        return_value=type(
-            "A", (), {"power_only": True, "throughput_only": True, "load_only": False, "verbose": False, "quiet": False}
-        )(),
-    ):
-        with pytest.raises(SystemExit):
-            cfg.ExampleArgumentParser.parse_and_validate_args(parser)

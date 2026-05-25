@@ -36,6 +36,7 @@ from rich.console import Console
 
 _QUIET: bool = False
 _STD_CONSOLE: Console | None = None
+_STDERR_CONSOLE: Console | None = None
 _SINK_CONSOLE: Console | None = None
 
 
@@ -50,7 +51,7 @@ def is_quiet() -> bool:
     return _QUIET
 
 
-def get_console(quiet: bool | None = None) -> Console:
+def get_console(quiet: bool | None = None, *, stderr: bool = False) -> Console:
     """Return a Console that respects quiet mode.
 
     When quiet is True (or global quiet is enabled), a sink console that
@@ -58,6 +59,12 @@ def get_console(quiet: bool | None = None) -> Console:
     """
     q = _QUIET if quiet is None else bool(quiet)
     if not q:
+        if stderr:
+            global _STDERR_CONSOLE
+            if _STDERR_CONSOLE is None:
+                _STDERR_CONSOLE = Console(stderr=True)
+            return cast(Console, _STDERR_CONSOLE)
+
         global _STD_CONSOLE
         if _STD_CONSOLE is None:
             _STD_CONSOLE = Console()
@@ -94,7 +101,7 @@ def info(msg: str) -> None:
     emit(msg)
 
 
-def emit(msg: Any = "", *, quiet: bool | None = None) -> None:
+def emit(msg: Any = "", *, quiet: bool | None = None, stderr: bool = False) -> None:
     """Emit user-facing output through the centralized console channel.
 
     This is the primary interface for all user-facing output. It accepts any
@@ -106,11 +113,12 @@ def emit(msg: Any = "", *, quiet: bool | None = None) -> None:
         quiet: Per-call quiet override. If True, suppresses this call regardless
             of the global quiet flag. If False, forces output even in quiet mode.
             If None (default), defers to the global quiet policy set by set_quiet().
+        stderr: Emit to stderr instead of stdout while still respecting quiet mode.
     """
     q = _QUIET if quiet is None else bool(quiet)
     if q:
         return
-    get_console(quiet=False).print(msg)
+    get_console(quiet=False, stderr=stderr).print(msg)
 
 
 class QuietConsoleProxy:
@@ -144,7 +152,7 @@ def warn(msg: str) -> None:
 
 
 def error(msg: str) -> None:
-    emit(msg)
+    emit(msg, stderr=True)
 
 
 def debug(msg: str) -> None:

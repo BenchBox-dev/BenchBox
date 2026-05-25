@@ -31,6 +31,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterator, Literal
 
+from benchbox.utils.printing import emit
+
 CompatKind = Literal["skip", "rewrite", "ddl", "type_mapping", "session_setting", "benchmark_gate"]
 DdlGovernanceStatus = Literal[
     "registered_runtime_behavior",
@@ -1003,38 +1005,38 @@ def main(argv: list[str] | None = None) -> int:
     output = Path(args.output)
 
     if not root.exists():
-        print(f"ERROR: root directory not found: {root}", file=sys.stderr)
+        emit(f"ERROR: root directory not found: {root}", stderr=True)
         return 1
 
-    print(f"Scanning {root} ...", file=sys.stderr)
+    emit(f"Scanning {root} ...", stderr=True)
     entries = scan(root)
     write_jsonl(entries, output)
-    print(f"Wrote {len(entries)} entries to {output}", file=sys.stderr)
+    emit(f"Wrote {len(entries)} entries to {output}", stderr=True)
 
     exit_code = 0
 
     errors = _validate_mandatory_sites(entries)
     if errors:
         for err in errors:
-            print(f"VALIDATION ERROR: {err}", file=sys.stderr)
+            emit(f"VALIDATION ERROR: {err}", stderr=True)
         exit_code = 1
 
     if args.summary:
         kind_counts = Counter(e.kind for e in entries)
         phase_counts = Counter(e.suggested_phase for e in entries)
-        print("\nKind distribution:")
+        emit("\nKind distribution:")
         for kind, count in sorted(kind_counts.items()):
-            print(f"  {kind:20s} {count}")
-        print("\nSuggested phase distribution:")
+            emit(f"  {kind:20s} {count}")
+        emit("\nSuggested phase distribution:")
         for phase, count in sorted(phase_counts.items()):
-            print(f"  {phase:20s} {count}")
+            emit(f"  {phase:20s} {count}")
 
     if args.check_ddl_drift:
-        print("\nChecking DDL drift ...", file=sys.stderr)
+        emit("\nChecking DDL drift ...", stderr=True)
         statuses = collect_ddl_governance_statuses(root)
         counts = Counter(entry.status for entry in statuses)
         summary = ", ".join(f"{status}={counts.get(status, 0)}" for status in _DDL_STATUS_ORDER)
-        print(f"DDL governance status: {summary}", file=sys.stderr)
+        emit(f"DDL governance status: {summary}", stderr=True)
 
         drift = [
             entry
@@ -1042,24 +1044,27 @@ def main(argv: list[str] | None = None) -> int:
             if entry.status in {"unregistered_detected_behavior", "unknown_uninspectable_behavior"}
         ]
         if drift:
-            print(f"DDL DRIFT: {len(drift)} unregistered or uninspectable DDL-optimize transform(s):", file=sys.stderr)
+            emit(
+                f"DDL DRIFT: {len(drift)} unregistered or uninspectable DDL-optimize transform(s):",
+                stderr=True,
+            )
             for d in drift:
-                print(
+                emit(
                     f"  {d.file}:{d.line}  {d.func_name}()  "
                     f"[platform={d.inferred_platform_key!r}, status={d.status}, detector={d.detection_kind}]",
-                    file=sys.stderr,
+                    stderr=True,
                 )
                 if d.detail:
-                    print(f"    {d.detail}", file=sys.stderr)
-            print(
+                    emit(f"    {d.detail}", stderr=True)
+            emit(
                 "Register each unregistered transform in "
                 "benchbox/sql_compat/rules/ddl_optimize/{platform}_ddl_rewrites.py "
                 "or add an explicit drift exemption with rationale.",
-                file=sys.stderr,
+                stderr=True,
             )
             exit_code = 1
         else:
-            print("DDL drift check: CLEAN (0 unregistered or uninspectable transforms)", file=sys.stderr)
+            emit("DDL drift check: CLEAN (0 unregistered or uninspectable transforms)", stderr=True)
 
     return exit_code
 
