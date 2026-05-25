@@ -9,7 +9,7 @@ and `main` (release-only). This guide is the maintainer runbook.
 ```bash
 git checkout develop && git pull
 make release-cut VERSION=X.Y.Z
-# review the PR; wait for CI green
+# review the PR; wait for validate-base and release-required-result
 make release-finalize VERSION=X.Y.Z
 ```
 
@@ -61,23 +61,38 @@ blocking.
 
 ### What `release-finalize` does
 
-1. Finds the open release PR for `vX.Y.Z` and squash-merges it. (Ruleset
-   `main-release-only` blocks the merge unless `validate-base` and
-   `release-required-result` are green; no local poller is needed.)
-2. Fast-forwards `main` and tags `vX.Y.Z`.
-3. Pushes the tag — which fires `.github/workflows/release.yml`:
+1. Finds the open release PR for `vX.Y.Z`.
+2. Checks the required PR status list once and refuses to continue unless
+   `release-required-result` is present and green. Missing means the
+   ruleset/workflow contract is broken; pending means wait in GitHub
+   Actions and rerun the command. `release-finalize` does not poll.
+3. Squash-merges the PR. (Ruleset `main-release-only` also blocks the merge
+   unless `validate-base` and `release-required-result` are green.)
+4. Fast-forwards `main` and tags `vX.Y.Z`.
+5. Pushes the tag — which fires `.github/workflows/release.yml`:
    `dependency-bounds` → `build` (with `SOURCE_DATE_EPOCH` from the tag
    commit) → `publish` (PyPI trusted publisher) → `github-release` →
    `test-installation` (cross-platform pip install verification).
-4. Leaves `develop` untouched. Dev-only paths persist on develop by
+6. Leaves `develop` untouched. Dev-only paths persist on develop by
    design (per A3 in `_project/decisions/single-repo-migration.md`); the
    release squash on `main` does not need to be replayed onto develop.
 
+Push-to-main jobs are post-merge signals. They may still start when `main`
+advances, but they are not pre-publish evidence: the tag push follows the
+successful release PR merge and `.github/workflows/release.yml` begins from
+that public tag. If a post-merge `main` check fails after the tag is pushed,
+handle it as a patch release or incident; do not treat the already-published
+release as if it had been blocked.
+
 ## Recovering from common failures
 
-- **CI fails on the release PR**: fix on a feature branch off `develop`,
-  PR back to `develop`, then re-run `make release-cut` (the option-c
-  sweep will delete the stale `vX.Y.Z` branch automatically).
+- **`release-required-result` is missing**: stop. The
+  `main-release-only` ruleset or `.github/workflows/test.yml` contract is
+  out of sync; do not finalize until the stable required context exists.
+- **`release-required-result` is pending or failed**: wait for GitHub
+  Actions or fix on a feature branch off `develop`, PR back to `develop`,
+  then re-run `make release-cut` (the option-c sweep will delete the stale
+  `vX.Y.Z` branch automatically).
 - **Wheel content is wrong**: adjust `pyproject.toml` / `MANIFEST.in`
   excludes on `develop`, then cut a patch release. PyPI rejects
   re-uploads of an existing version, so always bump.
