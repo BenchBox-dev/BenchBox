@@ -17,8 +17,17 @@ import yaml
 
 pytestmark = [
     pytest.mark.unit,
-    pytest.mark.medium,
+    pytest.mark.fast,
 ]
+
+REPO_ROOT = Path(__file__).parent.parent.parent
+CI_FAST_EXPRESSION = "fast and not (slow or stress or resource_heavy or live_integration)"
+
+
+def _workflow_job_run_text(workflow_name: str, job_name: str) -> str:
+    workflow_path = REPO_ROOT / ".github" / "workflows" / workflow_name
+    workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    return "\n".join(str(step.get("run", "")) for step in workflow["jobs"][job_name]["steps"])
 
 
 if sys.version_info >= (3, 11):
@@ -32,12 +41,12 @@ class TestReleaseInfrastructure:
 
     def test_changelog_exists(self):
         """Test that CHANGELOG.md exists."""
-        changelog_path = Path(__file__).parent.parent.parent / "CHANGELOG.md"
+        changelog_path = REPO_ROOT / "CHANGELOG.md"
         assert changelog_path.exists(), "CHANGELOG.md file must exist"
 
     def test_pyproject_toml_release_config(self):
         """Test that pyproject.toml has correct release configuration."""
-        pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+        pyproject_path = REPO_ROOT / "pyproject.toml"
 
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)
@@ -67,7 +76,7 @@ class TestReleaseInfrastructure:
 
     def test_github_issue_url_fix(self):
         """Test that exceptions.py has correct GitHub issue URL."""
-        exceptions_path = Path(__file__).parent.parent.parent / "benchbox" / "cli" / "exceptions.py"
+        exceptions_path = REPO_ROOT / "benchbox" / "cli" / "exceptions.py"
 
         with open(exceptions_path, encoding="utf-8") as f:
             content = f.read()
@@ -79,7 +88,7 @@ class TestReleaseInfrastructure:
 
     def test_github_workflows_exist(self):
         """Test that GitHub workflows exist and are properly configured."""
-        workflows_dir = Path(__file__).parent.parent.parent / ".github" / "workflows"
+        workflows_dir = REPO_ROOT / ".github" / "workflows"
         assert workflows_dir.exists(), "GitHub workflows directory must exist"
 
         # Required workflows
@@ -90,7 +99,7 @@ class TestReleaseInfrastructure:
 
     def test_test_workflow_configuration(self):
         """Test that test workflow is properly configured."""
-        test_workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "test.yml"
+        test_workflow_path = REPO_ROOT / ".github" / "workflows" / "test.yml"
 
         with open(test_workflow_path, encoding="utf-8") as f:
             workflow = yaml.safe_load(f)
@@ -109,22 +118,37 @@ class TestReleaseInfrastructure:
         jobs = workflow["jobs"]
         assert "test" in jobs
 
-        # Check Python versions (simplified matrix: 3.10, 3.12, 3.13)
         test_job = jobs["test"]
-        matrix = test_job["strategy"]["matrix"]
-        python_versions = matrix["python-version"]
-        expected_versions = ["3.10", "3.12", "3.13"]
-        for version in expected_versions:
-            assert version in python_versions
+        assert test_job["name"] == "test (ubuntu-latest, 3.12)"
+        assert test_job["runs-on"] == "ubuntu-latest"
+        assert "strategy" not in test_job, "Required main test job is intentionally a single 3.12 lane"
 
-        # Check that it uses uv
         steps = test_job["steps"]
         uv_step_found = any("uv" in str(step).lower() for step in steps)
         assert uv_step_found, "Workflow should use uv for dependency management"
 
+        workflow_text = test_workflow_path.read_text(encoding="utf-8")
+        assert f'-m "{CI_FAST_EXPRESSION}"' in workflow_text
+        assert "--cov-fail-under=70" in workflow_text
+
+    def test_required_fast_marker_expression_is_consistent(self):
+        """Pin required PR fast-test marker selection across local and CI surfaces."""
+        makefile_content = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+        develop_pr_run_text = _workflow_job_run_text("pr.yml", "code-test")
+        main_pr_run_text = _workflow_job_run_text("test.yml", "test")
+
+        expected_marker_flag = f'-m "{CI_FAST_EXPRESSION}"'
+        assert expected_marker_flag in makefile_content
+        assert "-m fast -q" not in makefile_content
+        assert expected_marker_flag in develop_pr_run_text
+        assert expected_marker_flag in main_pr_run_text
+        assert "--cov-fail-under=70" in develop_pr_run_text
+        assert "--cov-fail-under=70" in main_pr_run_text
+        assert "coverage remains CI-only" in makefile_content
+
     def test_release_workflow_configuration(self):
         """Test that release workflow is properly configured."""
-        release_workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "release.yml"
+        release_workflow_path = REPO_ROOT / ".github" / "workflows" / "release.yml"
 
         with open(release_workflow_path, encoding="utf-8") as f:
             workflow = yaml.safe_load(f)
@@ -144,10 +168,15 @@ class TestReleaseInfrastructure:
 
         # Check jobs exist
         jobs = workflow["jobs"]
-        # Release workflow delegates testing to CI workflows via check-ci-passed
-        required_jobs = ["check-ci-passed", "build", "publish"]
+        required_jobs = ["dependency-bounds", "build", "publish", "github-release", "test-installation"]
         for job in required_jobs:
             assert job in jobs, f"Release workflow must have {job} job"
+        assert "check-ci-passed" not in jobs
+
+        release_workflow_text = release_workflow_path.read_text(encoding="utf-8")
+        forbidden_pytest_invocations = ["python -m pytest", "uv run pytest", "uv run -- pytest"]
+        for invocation in forbidden_pytest_invocations:
+            assert invocation not in release_workflow_text, "release.yml publishes from tags and does not run pytest"
 
         # Check that publish job uses trusted publishing
         publish_job = jobs["publish"]
@@ -157,7 +186,7 @@ class TestReleaseInfrastructure:
 
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""
-        templates_dir = Path(__file__).parent.parent.parent / ".github" / "ISSUE_TEMPLATE"
+        templates_dir = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
         assert templates_dir.exists(), "Issue templates directory must exist"
 
         # Required templates
@@ -169,14 +198,21 @@ class TestReleaseInfrastructure:
 
     def test_pr_template_exists(self):
         """Test that pull request template exists."""
-        pr_template_path = Path(__file__).parent.parent.parent / ".github" / "PULL_REQUEST_TEMPLATE.md"
+        pr_template_path = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
         assert pr_template_path.exists(), "Pull request template must exist"
 
         with open(pr_template_path, encoding="utf-8") as f:
             content = f.read()
 
         # Should have key sections
-        required_sections = ["## Description", "## Type of Change", "## Testing", "## Documentation", "## Code Quality"]
+        required_sections = [
+            "## Description",
+            "## Type of Change",
+            "## Testing",
+            "## Public Contract Check",
+            "## Artifact Hygiene",
+            "## Notes",
+        ]
 
         for section in required_sections:
             assert section in content, f"PR template must have {section} section"
@@ -188,7 +224,7 @@ class TestReleaseInfrastructure:
         import tempfile
         from pathlib import Path
 
-        project_root = Path(__file__).parent.parent.parent
+        project_root = REPO_ROOT
 
         # Run uv build in a temporary directory to avoid conflicts
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -213,7 +249,7 @@ class TestReleaseInfrastructure:
         import subprocess
         from pathlib import Path
 
-        project_root = Path(__file__).parent.parent.parent
+        project_root = REPO_ROOT
 
         # Test that benchbox command works
         result = subprocess.run(["uv", "run", "benchbox", "--help"], cwd=project_root, capture_output=True, text=True)
@@ -226,7 +262,7 @@ class TestReleaseInfrastructure:
         """Test that no files contain incorrect repository references."""
         from pathlib import Path
 
-        project_root = Path(__file__).parent.parent.parent
+        project_root = REPO_ROOT
 
         # Directories to search (explicitly avoid large cache/build directories)
         search_dirs = [
@@ -303,7 +339,7 @@ class TestVersionConsistency:
 
     def test_version_in_pyproject_toml(self):
         """Test that version is properly defined in pyproject.toml."""
-        pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+        pyproject_path = REPO_ROOT / "pyproject.toml"
 
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)
@@ -321,7 +357,7 @@ class TestVersionConsistency:
 
     def test_version_in_init_file(self):
         """Test that version is defined in __init__.py."""
-        init_path = Path(__file__).parent.parent.parent / "benchbox" / "__init__.py"
+        init_path = REPO_ROOT / "benchbox" / "__init__.py"
 
         with open(init_path, encoding="utf-8") as f:
             content = f.read()
@@ -331,13 +367,13 @@ class TestVersionConsistency:
     def test_version_consistency(self):
         """Test that version is consistent between pyproject.toml and __init__.py."""
         # Get version from pyproject.toml
-        pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+        pyproject_path = REPO_ROOT / "pyproject.toml"
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)
         pyproject_version = config["project"]["version"]
 
         # Get version from __init__.py
-        init_path = Path(__file__).parent.parent.parent / "benchbox" / "__init__.py"
+        init_path = REPO_ROOT / "benchbox" / "__init__.py"
         with open(init_path, encoding="utf-8") as f:
             content = f.read()
 
@@ -358,7 +394,7 @@ class TestReleaseWorkflowValidation:
 
     def test_workflows_are_valid_yaml(self):
         """Test that all workflow files are valid YAML."""
-        workflows_dir = Path(__file__).parent.parent.parent / ".github" / "workflows"
+        workflows_dir = REPO_ROOT / ".github" / "workflows"
 
         for workflow_file in workflows_dir.glob("*.yml"):
             with open(workflow_file, encoding="utf-8") as f:
@@ -369,7 +405,7 @@ class TestReleaseWorkflowValidation:
 
     def test_issue_templates_are_valid_yaml(self):
         """Test that issue templates are valid YAML."""
-        templates_dir = Path(__file__).parent.parent.parent / ".github" / "ISSUE_TEMPLATE"
+        templates_dir = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
 
         for template_file in templates_dir.glob("*.yml"):
             with open(template_file, encoding="utf-8") as f:
@@ -384,17 +420,17 @@ class TestPackageMetadata:
 
     def test_license_file_exists(self):
         """Test that LICENSE file exists."""
-        license_path = Path(__file__).parent.parent.parent / "LICENSE"
+        license_path = REPO_ROOT / "LICENSE"
         assert license_path.exists(), "LICENSE file must exist"
 
     def test_readme_file_exists(self):
         """Test that README.md exists."""
-        readme_path = Path(__file__).parent.parent.parent / "README.md"
+        readme_path = REPO_ROOT / "README.md"
         assert readme_path.exists(), "README.md file must exist"
 
     def test_pyproject_toml_build_config(self):
         """Test that pyproject.toml has proper build configuration."""
-        pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+        pyproject_path = REPO_ROOT / "pyproject.toml"
 
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)

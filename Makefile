@@ -531,7 +531,8 @@ ci-lint:
 
 # CI test check - exact match for test.yml workflow (fast tests with coverage)
 # Note: -p pytest_cov re-enables pytest-cov which is disabled by default in pytest.ini
-# Suite-wide coverage threshold set to 70%
+# Suite-wide coverage threshold set to 70%. tests/conftest.py emits a separate
+# non-failing advisory warning below 80%; 70 is the blocking CI floor.
 ci-test:
 	@echo "Running CI test suite..."
 	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
@@ -838,9 +839,9 @@ release-finalize:
 
 .PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
-# Mirror the CI gate locally before pushing. Catches ~all CI failures
-# without the network roundtrip. Delegates to ci-lint so the local
-# preflight surface stays in sync with lint.yml automatically.
+# Lightweight local gate before pushing. Mirrors CI lint and fast marker
+# selection, but not CI's coverage fail-under; run ci-test for the exact
+# coverage-enforced test workflow.
 pr-preflight:
 	@$(MAKE) ci-lint
 	@$(MAKE) pr-preflight-fast-tests
@@ -852,8 +853,8 @@ pr-preflight-fast-tests:
 	git fetch origin develop --quiet; \
 	uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
 	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
-		echo "==> fast tests"; \
-		uv run -- python -m pytest -m fast -q; \
+		echo "==> fast tests (CI marker selection; coverage remains CI-only)"; \
+		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q; \
 	else \
 		$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
 		echo "No code changes detected; skipping fast tests."; \
@@ -1786,7 +1787,7 @@ help:
 	@echo "  make test-dev        Fast development cycle testing"
 	@echo "  make test-smoke      Quick smoke testing"
 	@echo "  make test-local-matrix Run real local benchmark matrix (stress)"
-	@echo "  make test-ci         CI-optimized test suite"
+	@echo "  make test-ci         Maintained broad local CI profile"
 	@echo ""
 	@echo "Database-Specific Testing:"
 	@echo "  make test-duckdb     Run DuckDB-specific tests"
@@ -1802,7 +1803,7 @@ help:
 	@echo "  make test-window     Run window functions tests"
 	@echo ""
 	@echo "CI/CD Testing:"
-	@echo "  make test-ci         Run CI-optimized test suite"
+	@echo "  make test-ci         Run maintained broad local CI profile"
 	@echo ""
 	@echo "CI Local Equivalents (run before push):"
 	@echo "  make ci-local        Run ALL CI checks locally (lint+test+docs+package)"
@@ -1867,7 +1868,7 @@ help:
 	@echo "  make docs-check      Run all documentation checks (validate, linkcheck, build)"
 	@echo ""
 	@echo "PR Workflow & Worktrees:"
-	@echo "  make pr-preflight    Run lint + fast tests locally; mirrors CI gate"
+	@echo "  make pr-preflight    Run lint + fast marker tests locally (coverage remains CI-only)"
 	@echo "  make pr-open [PR_BODY_FILE=path] Push branch + open PR vs develop + enable auto-merge"
 	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
 	@echo "  make shrink-rollup   Sum merged shrink ledger fragments from origin/develop"

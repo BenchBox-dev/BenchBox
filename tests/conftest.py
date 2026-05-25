@@ -347,6 +347,8 @@ def pytest_terminal_summary(terminalreporter, config, exitstatus) -> None:
     This reads the `.coverage` data file and computes overall coverage using
     the coverage.py API to avoid relying on pytest-cov's fail-under behavior.
     It does not fail the test run; it only prints a prominent warning line.
+    CI remains the blocking gate at 70% via the workflow `--cov-fail-under`
+    flag; this 80% threshold is intentionally advisory.
 
     Only runs when pytest-cov is active (i.e. --cov was passed), so stale
     .coverage files from prior runs don't produce misleading warnings.
