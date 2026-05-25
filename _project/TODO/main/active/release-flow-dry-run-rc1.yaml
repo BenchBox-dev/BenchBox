@@ -2,7 +2,7 @@ id: release-flow-dry-run-rc1
 title: "Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end"
 worktree: main
 priority: High
-status: Not Started
+status: Blocked
 category: Release Tooling
 
 deps:
@@ -32,6 +32,37 @@ description: |
   Out of scope: the 0.3.0 GA cut. This TODO closes when 0.3.0-rc.1 has
   validated the flow; bumping to 0.3.0 is a separate decision made by
   the user once the rc is verified.
+
+  Status update 2026-05-25: this rc dry-run is no longer executable as
+  written. The GA `v0.3.0` tag, GitHub release, and PyPI release already
+  exist, while no `v0.3.0-rc.*` tag exists. Publishing `0.3.0rc1` after
+  GA would not validate the "before first GA release" decision gate this
+  TODO was created to prove. The actual `v0.3.0` release also exposed
+  the intended class of failure: publish succeeded, but the install
+  matrix failed because importing `benchbox` required `pandas` from a
+  dependency path not declared by the wheel. That failure has to be
+  handled by the next monotonic release, not by retroactively running an
+  obsolete rc.
+
+blockers:
+- date: "2026-05-25"
+  work: [w1, w2, w3, w4, w5, w6]
+  reason: |
+    Obsoleted by live release state: `v0.3.0` is already published on
+    GitHub/PyPI, no `v0.3.0-rc.*` tag exists, and PyPI versions/tags
+    are immutable. Running `0.3.0rc1` now would not validate the
+    pre-GA dry-run gate this TODO was scoped to validate.
+  evidence: |
+    - `git ls-remote --tags origin 'v0.3.0'` returned `038ad548875a674cc6de0a8956677e052eac1033 refs/tags/v0.3.0`.
+    - `git ls-remote --tags origin 'v0.3.0-rc*'` returned no refs.
+    - `gh release view v0.3.0 --repo joeharris76/BenchBox` showed `BenchBox 0.3.0`, published `2026-05-20T11:49:42Z`.
+    - `uv run --isolated --with pip -- python -m pip index versions benchbox` showed latest/available `0.3.0` and no rc.
+    - `gh run view 26160520298 --repo joeharris76/BenchBox --json jobs` showed build, publish, and GitHub release jobs succeeded, while all `test-installation` jobs failed.
+    - `uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c 'import benchbox; print(benchbox.__version__)'` failed with `ModuleNotFoundError: No module named 'pandas'`.
+  unblock: |
+    Do not run `v0.3.0-rc.1`. Either retire this TODO as superseded by
+    the GA release evidence, or create a new release-validation TODO for
+    the next monotonic version such as `0.3.1`.
 
 work:
 - id: w1
