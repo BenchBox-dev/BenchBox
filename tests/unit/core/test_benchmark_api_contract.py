@@ -229,6 +229,42 @@ def test_benchmark_support_status_criteria_matrix_covers_every_benchmark() -> No
     assert mismatched == {}, f"criteria-matrix status differs from registry: {mismatched}"
 
 
+def test_public_benchmark_count_claims_are_registry_derived() -> None:
+    """Durable public surfaces must carry the registry-derived benchmark counts.
+
+    Drift gate: if the public benchmark count or integrity-spec coverage changes,
+    these hand-written exact-count claims go stale and this test names the files to
+    fix. The registry stays the source of truth; the docs are checked against it.
+    """
+    from benchbox.core.results.benchmark_specs import BENCHMARK_SPECS
+
+    public_ids = set(list_public_benchmark_ids())
+    public_count = len(public_ids)
+    spec_count = len(set(BENCHMARK_SPECS) & public_ids)
+
+    required_claims = {
+        "landing/index.html": [
+            f"{public_count} Benchmarks",
+            f"{public_count} benchmarks (TPC",
+            f"Explore {public_count} benchmarks",
+        ],
+        "docs/design/architecture.md": [f"currently {public_count} benchmarks"],
+        "docs/development/result-integrity-validation.md": [
+            f"Specs exist for {spec_count} of {public_count} registered benchmarks"
+        ],
+        "docs/reference/cli/utilities.md": [f"Specs cover {spec_count} of {public_count} benchmarks"],
+    }
+
+    stale: list[str] = []
+    for rel_path, fragments in required_claims.items():
+        text = (PROJECT_ROOT / rel_path).read_text(encoding="utf-8")
+        stale.extend(
+            f"{rel_path}: missing registry-derived claim {fragment!r}" for fragment in fragments if fragment not in text
+        )
+
+    assert stale == [], "Stale public benchmark count claims (update to match the registry):\n" + "\n".join(stale)
+
+
 def test_benchmark_data_source_metadata_matches_runtime_declarations() -> None:
     """Every registry entry has a static data_source key matching runtime declarations."""
 
