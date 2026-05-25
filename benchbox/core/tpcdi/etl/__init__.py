@@ -7,7 +7,6 @@ from .results import ETLBatchResult, ETLPhaseResult, ETLResult
 from .sources import SourceDataGenerator
 from .sql_backend import SQLETLBackend
 from .transformations import TransformationEngine
-from .validation import BasicDataValidator as DataQualityValidator
 
 __all__ = [
     "TPCDIETLBackend",
@@ -15,7 +14,6 @@ __all__ = [
     "DataFrameETLBackend",
     "SourceDataGenerator",
     "TransformationEngine",
-    "DataQualityValidator",
     "TPCDIETLPipeline",
     "ETLResult",
     "ETLPhaseResult",
