@@ -17,6 +17,7 @@ from pydantic import ValidationError
 from benchbox.core.catalog_schema import (
     CATALOG_SCHEMAS,
     BenchmarkRegistryCatalog,
+    BenchmarkSpecsCatalog,
     StaticQueryCatalog,
     validate_all_catalogs,
     validate_catalog,
@@ -53,7 +54,15 @@ def test_registry_missing_required_field_rejected() -> None:
 def test_registry_wrong_type_rejected() -> None:
     bad = copy.deepcopy(_load("benchbox.core", "benchmark_registry.yaml"))
     first = next(iter(bad["benchmark_metadata"]))
-    bad["benchmark_metadata"][first]["num_queries"] = "not-an-int"
+    bad["benchmark_metadata"][first]["num_queries"] = "23"
+    with pytest.raises(ValidationError):
+        BenchmarkRegistryCatalog.model_validate(bad)
+
+
+def test_registry_scalar_coercion_rejected() -> None:
+    bad = copy.deepcopy(_load("benchbox.core", "benchmark_registry.yaml"))
+    first = next(iter(bad["benchmark_metadata"]))
+    bad["benchmark_metadata"][first]["supports_streams"] = "false"
     with pytest.raises(ValidationError):
         BenchmarkRegistryCatalog.model_validate(bad)
 
@@ -88,3 +97,15 @@ def test_query_catalog_typoed_field_rejected() -> None:
     }
     with pytest.raises(ValidationError):
         StaticQueryCatalog.model_validate(bad)
+
+
+def test_benchmark_specs_catalog_is_registered() -> None:
+    assert ("benchbox.core.results", "benchmark_specs.yaml") in CATALOG_SCHEMAS
+
+
+def test_benchmark_specs_wrong_type_rejected() -> None:
+    bad = copy.deepcopy(_load("benchbox.core.results", "benchmark_specs.yaml"))
+    first = next(iter(bad["benchmark_specs"]))
+    bad["benchmark_specs"][first]["min_success_rate"] = "1.0"
+    with pytest.raises(ValidationError):
+        BenchmarkSpecsCatalog.model_validate(bad)

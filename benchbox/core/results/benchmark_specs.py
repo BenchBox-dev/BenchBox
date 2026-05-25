@@ -20,12 +20,13 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import functools
 from dataclasses import dataclass
 from importlib import resources
 from typing import Any
 
 import yaml
+
+from benchbox.utils.singleflight_cache import SingleFlightValueCache
 
 
 @dataclass(frozen=True)
@@ -84,8 +85,7 @@ class _SpecsData:
     benchmark_specs: dict[str, BenchmarkSpec]
 
 
-@functools.lru_cache(maxsize=1)
-def _specs() -> _SpecsData:
+def _build_specs() -> _SpecsData:
     """Load and build the benchmark specs once, on first access."""
     payload = _load_benchmark_specs_payload()
     tpch_sf1_row_counts = dict(payload["tpch_sf1_row_counts"])
@@ -97,6 +97,8 @@ def _specs() -> _SpecsData:
         },
     )
 
+
+_specs = SingleFlightValueCache(_build_specs)
 
 _PUBLIC_SPECS_ATTRS = {
     "LEGACY_ALIASES": "legacy_aliases",
@@ -116,3 +118,12 @@ def get_spec(benchmark_id: str) -> BenchmarkSpec | None:
     specs = _specs()
     canonical = specs.legacy_aliases.get(benchmark_id, benchmark_id)
     return specs.benchmark_specs.get(canonical)
+
+
+__all__ = sorted(
+    list(_PUBLIC_SPECS_ATTRS)
+    + [
+        "BenchmarkSpec",
+        "get_spec",
+    ]
+)

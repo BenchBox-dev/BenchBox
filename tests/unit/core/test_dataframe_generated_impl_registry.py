@@ -49,6 +49,19 @@ def test_dispatch_resolves_explicit_and_generated_from_registry() -> None:
     assert generated is rp._IMPLS["aggregation_distinct_groupby_pandas_impl"]
 
 
+def test_generated_impl_names_survive_star_import() -> None:
+    read_primitives_ns: dict[str, object] = {}
+    exec("from benchbox.core.read_primitives.dataframe_queries import *", read_primitives_ns)
+    assert (
+        read_primitives_ns["aggregation_distinct_groupby_pandas_impl"]
+        is rp._IMPLS["aggregation_distinct_groupby_pandas_impl"]
+    )
+
+    joinorder_ns: dict[str, object] = {}
+    exec("from benchbox.core.joinorder.dataframe_queries import *", joinorder_ns)
+    assert joinorder_ns["q1a_pandas_impl"] is jo._IMPLS["q1a_pandas_impl"]
+
+
 def test_unknown_generated_name_raises_attribute_error() -> None:
     with pytest.raises(AttributeError):
         rp.totally_missing_query_impl  # noqa: B018

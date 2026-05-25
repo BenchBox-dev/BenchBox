@@ -6,15 +6,14 @@ status: Completed
 completed_date: "2026-05-24"
 category: Documentation
 
-# Resolution (2026-05-24): verification-first. w1 diffed #599/#600/#602 against
-# current modules. Genuine, non-surviving loss in ONE place: #599 removed the
-# Q-range category map from clickbench/dataframe_queries/queries.py (Q1-Q7 Basic
-# aggregation ... Q37-Q43 Time-based). It does not survive elsewhere -- queries.py:6
-# has an unranged category list and the metadata table only carries per-query
-# codes. Restored it (docstring only). flightdata (#600): category map SURVIVES
-# in the current module docstring -> not touched (anti-pattern: no redundant
-# restore). nyctaxi (#602): removed no orientation map -> nothing to restore.
-# JoinOrder semantic note handled separately by shrink-followup-joinorder-benchmark-semantics.
+# Resolution (2026-05-24, corrected 2026-05-25): verification-first. w1 diffed
+# #599/#600/#602 against current modules. Later adversarial review found the
+# ClickBench Q-range map already survives in benchbox/core/clickbench/queries.py
+# via get_query_categories(); the dataframe_queries docstring restore was
+# redundant and was removed by the review-follow-up fix. flightdata (#600):
+# category map survives in the current module docstring -> not touched. nyctaxi
+# (#602): removed no orientation map -> nothing to restore. JoinOrder semantic
+# note handled separately by shrink-followup-joinorder-benchmark-semantics.
 
 description: |
   The dataframe-query body-removal PRs (#599-#602) deleted query
