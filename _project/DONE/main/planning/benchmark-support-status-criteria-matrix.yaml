@@ -2,7 +2,8 @@ id: benchmark-support-status-criteria-matrix
 title: "Define auditable benchmark support-status promotion criteria"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-25"
 category: Benchmark Architecture
 
 deps:
@@ -28,7 +29,7 @@ description: |
 work:
   - id: w0
     summary: "Re-read the benchmark registry, public contract map, benchmark docs, and result-integrity spec list before proposing criteria"
-    status: pending
+    status: done
     notes: |
       Capture the checked SHA, current status counts, benchmark IDs, public IDs,
       and result-integrity spec coverage in the TODO or implementation PR body.
@@ -38,7 +39,7 @@ work:
   - id: w1
     summary: "Define status-specific acceptance criteria for benchmark families"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Write criteria for stable, beta, experimental, repo_only, deprecated, and
       document_only. Include benchmark-specific dimensions that platform status
@@ -49,7 +50,7 @@ work:
   - id: w2
     summary: "Score every registry benchmark against the criteria and record status rationale"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Produce one row per benchmark with the current registry status, rationale,
       evidence pointers, and any promotion/demotion blockers. The matrix may live
@@ -59,7 +60,7 @@ work:
   - id: w3
     summary: "Add tests or docs checks that keep the matrix synchronized with registry status values"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Add a focused test that fails when a benchmark status is added, removed, or
       changed without a corresponding criteria-matrix row or explicit rationale
@@ -69,12 +70,20 @@ work:
   - id: w4
     summary: "Record concrete promotion candidates and blockers as deferred work, not as silent comments"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       If the matrix shows that a beta benchmark is close to stable or that an
       experimental benchmark has unclear criteria, record follow-up TODOs or
       deferred entries with exact blockers. Do not change support_status values
       in this TODO unless the criteria evidence makes the change unambiguous.
+
+deferred:
+  - summary: "Promote vector_search beta -> stable once it has a BenchmarkSpec"
+    reason: "It is the only beta whose sole integrity-dimension gap is a missing result-integrity spec; adding one (plus a DataFrame routing decision) is the concrete blocker recorded in docs/benchmarks/support-status.md."
+  - summary: "Reassess tpcds_obt and datavault experimental status after the deprecated core base is removed"
+    reason: "Their status is partly coupled to the benchbox.core.base_benchmark.BaseBenchmark migration; revisit when that base is gone."
+  - summary: "Pin reproducible external-source contracts for nyctaxi and flightdata before any stable promotion"
+    reason: "External-dataset betas are gated on a pinned source contract, not on query coverage."
 
 metadata:
   tags:
@@ -84,7 +93,7 @@ metadata:
     - docs-drift
   estimated_effort: "1-2 days"
   created_date: "2026-05-21"
-  last_updated: "2026-05-21T00:00:00Z"
+  last_updated: "2026-05-25T00:00:00Z"
 
 impact:
   business_value: |

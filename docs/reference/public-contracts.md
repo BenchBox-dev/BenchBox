@@ -71,7 +71,11 @@ Allowed values:
 
 Platform and benchmark registry metadata now carry exactly one `support_status`
 for every runtime entry. Benchmark support status is distinct from benchmark
-`surface` visibility and from capability flags such as `supports_dataframe`.
+`surface` visibility and from capability flags such as `supports_dataframe`. The
+auditable per-benchmark rationale and promotion criteria are in
+[Benchmark Support Status Criteria](../benchmarks/support-status.md), whose
+per-benchmark status rows are drift-checked against the registry by
+`tests/unit/core/test_benchmark_api_contract.py`.
 
 ## Count and Drift Policy
 

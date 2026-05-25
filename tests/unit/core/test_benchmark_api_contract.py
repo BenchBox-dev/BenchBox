@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -39,6 +40,9 @@ pytestmark = [
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PUBLIC_CONTRACTS_DOC = PROJECT_ROOT / "docs/reference/public-contracts.md"
+SUPPORT_STATUS_CRITERIA_DOC = PROJECT_ROOT / "docs/benchmarks/support-status.md"
+# Matches a criteria-matrix table row whose first two cells are `id` and `status`.
+_CRITERIA_MATRIX_ROW = re.compile(r"^\|\s*`(?P<bid>[a-z0-9_]+)`\s*\|\s*`(?P<status>[a-z_]+)`\s*\|")
 CORE_ONLY_BENCHMARK_IDS = {"ai_primitives", "joinorder_synthetic"}
 BENCHMARK_API_COUNT_MARKER = (
     "Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; "
@@ -186,6 +190,43 @@ def test_benchmark_support_status_metadata_matches_contract_map() -> None:
     contract_doc = PUBLIC_CONTRACTS_DOC.read_text()
     assert "Benchmark support status: **5** stable, **12** beta, **5** experimental" in contract_doc
     assert "support status counts are stable=5, beta=12, experimental=5" in contract_doc
+
+
+def test_benchmark_support_status_criteria_matrix_covers_every_benchmark() -> None:
+    """The criteria matrix must carry one row per benchmark whose status matches the registry.
+
+    This is the drift guard: adding, removing, or re-classifying a benchmark in the
+    registry fails here until ``docs/benchmarks/support-status.md`` records the change.
+    """
+
+    registry_status = {bid: meta["support_status"] for bid, meta in BENCHMARK_METADATA.items()}
+    doc_text = SUPPORT_STATUS_CRITERIA_DOC.read_text()
+
+    matrix_status: dict[str, str] = {}
+    duplicates: list[str] = []
+    for line in doc_text.splitlines():
+        match = _CRITERIA_MATRIX_ROW.match(line)
+        if match is None:
+            continue
+        benchmark_id = match.group("bid")
+        if benchmark_id not in registry_status:
+            # Acceptance-criteria/legend rows whose first cell is not a benchmark id.
+            continue
+        if benchmark_id in matrix_status:
+            duplicates.append(benchmark_id)
+        matrix_status[benchmark_id] = match.group("status")
+
+    assert duplicates == [], f"benchmarks with more than one criteria-matrix row: {sorted(duplicates)}"
+
+    missing_rows = sorted(set(registry_status) - set(matrix_status))
+    assert missing_rows == [], f"benchmarks missing a criteria-matrix row: {missing_rows}"
+
+    mismatched = {
+        benchmark_id: {"matrix": matrix_status[benchmark_id], "registry": registry_status[benchmark_id]}
+        for benchmark_id in registry_status
+        if matrix_status[benchmark_id] != registry_status[benchmark_id]
+    }
+    assert mismatched == {}, f"criteria-matrix status differs from registry: {mismatched}"
 
 
 def test_benchmark_data_source_metadata_matches_runtime_declarations() -> None:
