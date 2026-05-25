@@ -30,6 +30,11 @@ from typing import Any
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 from .base import DriverIsolationCapability
+from .base.config_utils import (
+    POSTGRES_FAMILY_BASE_OPTIONS,
+    POSTGRES_FAMILY_PLATFORM_FIELDS,
+    make_platform_config_builder,
+)
 from .postgresql import (
     POSTGRES_DIALECT,
     PostgreSQLAdapter,
@@ -628,47 +633,16 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
             return False
 
 
-def _build_timescaledb_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build TimescaleDB database configuration with credential loading.
-
-    This function is registered with PlatformHookRegistry to provide
-    TimescaleDB-specific configuration handling.
-    """
-    from benchbox.platforms.base.config_utils import POSTGRES_FAMILY_BASE_OPTIONS, build_platform_config
-
-    return build_platform_config(
-        platform_type="timescaledb",
-        credential_key="timescaledb",
-        default_display_name="TimescaleDB",
-        default_driver_package="psycopg",
-        base_options={
-            **POSTGRES_FAMILY_BASE_OPTIONS,
-            "chunk_interval": "1 day",
-            "compression_enabled": False,
-            "compression_after": "7 days",
-        },
-        platform_fields=[
-            "host",
-            "port",
-            "username",
-            "password",
-            "database",
-            "admin_database",
-            "sslmode",
-            "work_mem",
-            "maintenance_work_mem",
-            "effective_cache_size",
-            "max_parallel_workers_per_gather",
-            "chunk_interval",
-            "compression_enabled",
-            "compression_after",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
+_build_timescaledb_config = make_platform_config_builder(
+    "timescaledb",
+    __name__,
+    "TimescaleDB",
+    "psycopg",
+    POSTGRES_FAMILY_PLATFORM_FIELDS + ("chunk_interval", "compression_enabled", "compression_after"),
+    base_options={
+        **POSTGRES_FAMILY_BASE_OPTIONS,
+        "chunk_interval": "1 day",
+        "compression_enabled": False,
+        "compression_after": "7 days",
+    },
+)

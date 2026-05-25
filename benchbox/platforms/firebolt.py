@@ -27,6 +27,7 @@ from urllib.parse import urlparse
 
 from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
 from benchbox.core.sql_utils import normalize_table_name_in_sql
+from benchbox.platforms.base.config_utils import make_registered_platform_config_builder
 from benchbox.platforms.base.runtime_metadata import build_default_normalized_result_metadata
 from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.platforms.presto_trino_utils import normalize_existing_files, show_tables_lower
@@ -1561,50 +1562,29 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return metadata
 
 
-def _build_firebolt_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="firebolt",
-        credential_key="firebolt",
-        default_display_name="Firebolt",
-        default_driver_package="firebolt-sdk",
-        platform_fields=[
-            "url",
-            "client_id",
-            "client_secret",
-            "account_name",
-            "engine_name",
-            "api_endpoint",
-            "database",
-            "region",
-            "cloud_region",
-            "cloud_provider",
-            "engine_type",
-            "engine_size",
-            "compute_size",
-            "deployment_mode",
-            "s3_staging_url",
-            "s3_region",
-            "disable_result_cache",
-            "strict_validation",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
-
-
-# Register the config builder with the platform hook registry
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("firebolt", _build_firebolt_config)
-except ImportError:
-    # Platform hooks may not be available in all contexts
-    pass
+_build_firebolt_config = make_registered_platform_config_builder(
+    "firebolt",
+    __name__,
+    "Firebolt",
+    "firebolt-sdk",
+    [
+        "url",
+        "client_id",
+        "client_secret",
+        "account_name",
+        "engine_name",
+        "api_endpoint",
+        "database",
+        "region",
+        "cloud_region",
+        "cloud_provider",
+        "engine_type",
+        "engine_size",
+        "compute_size",
+        "deployment_mode",
+        "s3_staging_url",
+        "s3_region",
+        "disable_result_cache",
+        "strict_validation",
+    ],
+)

@@ -27,7 +27,8 @@ from ..core.exceptions import ConfigurationError
 from ..utils.cloud_storage import get_cloud_path_info
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
 from .base import DriverIsolationCapability, PlatformAdapter
-from .base.data_loading import NO_BENCHMARK, DataSource, DataSourceResolver, resolve_csv_dialect
+from .base.config_utils import make_registered_platform_config_builder
+from .base.data_loading import NO_BENCHMARK, DataSource, resolve_adapter_data_source, resolve_csv_dialect
 from .base.runtime_metadata import build_default_normalized_result_metadata
 from .base.tuning import make_informational_constraint_applier
 from .presto_trino_utils import normalize_existing_files
@@ -939,16 +940,7 @@ class SnowflakeAdapter(PlatformAdapter):
 
     def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> DataSource:
         """Resolve benchmark data files from benchmark tables or manifest."""
-        resolver = DataSourceResolver(
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
-        )
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source
+        return resolve_adapter_data_source(self, benchmark, data_dir)
 
     _normalize_existing_files = staticmethod(normalize_existing_files)
 
@@ -1757,42 +1749,20 @@ class SnowflakeAdapter(PlatformAdapter):
     )
 
 
-def _build_snowflake_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="snowflake",
-        credential_key="snowflake",
-        default_display_name="Snowflake",
-        default_driver_package="snowflake-connector-python",
-        platform_fields=[
-            "account",
-            "warehouse",
-            "schema",
-            "username",
-            "password",
-            "role",
-            "authenticator",
-            "private_key_path",
-            "private_key_passphrase",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
-
-
-# Register the config builder with the platform hook registry
-# This must happen when the module is imported
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("snowflake", _build_snowflake_config)
-except ImportError:
-    # Platform hooks may not be available in all contexts (e.g., core-only usage)
-    pass
+_build_snowflake_config = make_registered_platform_config_builder(
+    "snowflake",
+    __name__,
+    "Snowflake",
+    "snowflake-connector-python",
+    [
+        "account",
+        "warehouse",
+        "schema",
+        "username",
+        "password",
+        "role",
+        "authenticator",
+        "private_key_path",
+        "private_key_passphrase",
+    ],
+)

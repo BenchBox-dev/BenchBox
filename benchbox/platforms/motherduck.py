@@ -39,6 +39,7 @@ except ImportError:
     duckdb = None
 
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.config_utils import make_platform_config_builder
 from .duckdb import _build_duckdb_ctas_sort_sql, _create_duckdb_external_views
 
 if TYPE_CHECKING:
@@ -55,38 +56,19 @@ def _redact_motherduck_token(message: str, token: str | None = None) -> str:
     return _MOTHERDUCK_TOKEN_RE.sub(r"\1****", redacted)
 
 
-def _build_motherduck_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build the MotherDuck DatabaseConfig.
-
-    The credential setup wizard (`benchbox/platforms/credentials/motherduck.py`)
-    saves a ``database`` field, but the default config builder did not call
-    CredentialManager, so runtime runs always fell back to the adapter's
-    internal default (``benchbox``) regardless of what the wizard captured.
-    Routing MotherDuck through the shared ``build_platform_config`` helper
-    pulls the saved database into ``options["database"]`` so the adapter's
-    ``config.get("database", "benchbox")`` resolves to the wizard value.
-    """
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="motherduck",
-        credential_key="motherduck",
-        default_display_name="MotherDuck",
-        default_driver_package="duckdb",
-        platform_fields=[
-            "database",
-            "memory_limit",
-            "token_env_var",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
+# MotherDuck credentials include ``database``; route through the shared
+# credential-aware builder so saved setup values reach adapter config.
+_build_motherduck_config = make_platform_config_builder(
+    "motherduck",
+    __name__,
+    "MotherDuck",
+    "duckdb",
+    [
+        "database",
+        "memory_limit",
+        "token_env_var",
+    ],
+)
 
 
 class MotherDuckAdapter(PlatformAdapter):

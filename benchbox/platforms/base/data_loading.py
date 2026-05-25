@@ -708,6 +708,20 @@ class DataSourceResolver:
         return source
 
 
+def resolve_adapter_data_source(adapter: Any, benchmark: Any, data_dir: Path) -> DataSource:
+    """Resolve data files for adapters that use standard DataSourceResolver state."""
+    resolver = DataSourceResolver(
+        platform_name=adapter.platform_name,
+        table_mode=adapter.table_mode,
+        platform_config=adapter.platform_config,
+        requested_format=adapter.requested_table_format,
+    )
+    data_source = resolver.resolve(benchmark, data_dir)
+    if not data_source or not data_source.tables:
+        raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
+    return data_source
+
+
 class CompressionHandler(ABC):
     """Abstract base class for compression handlers."""
 
