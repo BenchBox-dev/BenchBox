@@ -6,14 +6,12 @@ from .pipeline import TPCDIETLPipeline
 from .results import ETLBatchResult, ETLPhaseResult, ETLResult
 from .sources import SourceDataGenerator
 from .sql_backend import SQLETLBackend
-from .transformations import TransformationEngine
 
 __all__ = [
     "TPCDIETLBackend",
     "SQLETLBackend",
     "DataFrameETLBackend",
     "SourceDataGenerator",
-    "TransformationEngine",
     "TPCDIETLPipeline",
     "ETLResult",
     "ETLPhaseResult",
