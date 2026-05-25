@@ -2,7 +2,7 @@ id: single-repo-migration-phase-8-first-post-migration-release
 title: "Single-repo migration phase 8: cut the first release after deletion and docs cleanup"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Blocked
 category: Release Tooling
 
 deps:
@@ -10,6 +10,27 @@ deps:
   - single-repo-migration-phase-4-test-release-with-new-flow
   - single-repo-migration-phase-6-delete-obsolete-tooling
   - single-repo-migration-phase-7-docs-cleanup
+
+blockers:
+- date: "2026-05-25"
+  work: [w1, w2, w3, w4, w5, w6, w7]
+  reason: |
+    This release cannot start while its Phase 4 dependency is unresolved.
+    Phase 4 has now been classified in PR #661 as blocked on the
+    immutable `benchbox==0.3.0` wheel failing clean-install import smoke
+    with `ModuleNotFoundError: No module named 'pandas'`. Phases 6 and 7
+    are completed, but the failed Phase 4 release means this TODO should
+    not be used as an implicit dependency bypass.
+  evidence: |
+    - `_project/TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml` is the explicit dependency in `deps.needs`.
+    - PR #661 records the Phase 4 blocker and has auto-merge enabled.
+    - Live release evidence shows `v0.3.0` exists and PyPI lists `0.3.0`, but `release.yml` run `26160520298` concluded `failure`.
+    - `uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c 'import benchbox; print(benchbox.__version__)'` fails with missing `pandas`.
+  unblock: |
+    Decide explicitly whether Phase 8 is the approved monotonic recovery
+    release path for `0.3.1`, or create a new recovery-release TODO that
+    depends on the post-`v0.3.0` release-gate fixes. Do not run a release
+    from this TODO while Phase 4 remains blocked.
 
 description: |
   End-to-end validation that the new flow works in the now-canonical
