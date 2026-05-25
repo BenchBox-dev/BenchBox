@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import re
 from csv import reader
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Protocol
 
 import pandas as pd
 from sqlglot import exp, parse_one
@@ -37,6 +37,26 @@ from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRegistry
 from benchbox.core.joinorder.queries import CANONICAL_JOINORDER_QUERIES, JoinOrderQueryManager
 from benchbox.core.joinorder.schema import JoinOrderSchema
+
+
+class QueryImpl(Protocol):
+    """A DataFrame query implementation: takes a context, returns a frame."""
+
+    def __call__(self, ctx: DataFrameContext) -> Any: ...
+
+
+# Generated impls register here (keyed by "q<id>_<family>_impl") instead of
+# mutating module globals, so the registry build is statically typed and the
+# generated names stay resolvable. See __getattr__ for name-based access.
+_IMPLS: dict[str, QueryImpl] = {}
+
+
+def __getattr__(name: str) -> QueryImpl:
+    """Resolve factory-built impl names from the registry (PEP 562)."""
+    if name in _IMPLS:
+        return _IMPLS[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 IMPLEMENTED_DATAFRAME_QUERY_IDS = list(CANONICAL_JOINORDER_QUERIES)
 UNTRANSLATED_DATAFRAME_QUERY_IDS: list[str] = []
@@ -442,7 +462,7 @@ def _execute_joinorder_pandas_query(ctx: DataFrameContext, query_id: str) -> pd.
 # ===========================================================================
 
 
-def _make_generated_expression_impl(query_id: str) -> Any:
+def _make_generated_expression_impl(query_id: str) -> QueryImpl:
     def _impl(ctx: DataFrameContext) -> Any:
         return _execute_joinorder_expression_query(ctx, query_id)
 
@@ -451,7 +471,7 @@ def _make_generated_expression_impl(query_id: str) -> Any:
     return _impl
 
 
-def _make_generated_pandas_impl(query_id: str) -> Any:
+def _make_generated_pandas_impl(query_id: str) -> QueryImpl:
     def _impl(ctx: DataFrameContext) -> Any:
         return _execute_joinorder_pandas_query(ctx, query_id)
 
@@ -461,8 +481,8 @@ def _make_generated_pandas_impl(query_id: str) -> Any:
 
 
 for _query_id in CANONICAL_JOINORDER_QUERIES:
-    globals()[f"q{_query_id}_expression_impl"] = _make_generated_expression_impl(_query_id)
-    globals()[f"q{_query_id}_pandas_impl"] = _make_generated_pandas_impl(_query_id)
+    _IMPLS[f"q{_query_id}_expression_impl"] = _make_generated_expression_impl(_query_id)
+    _IMPLS[f"q{_query_id}_pandas_impl"] = _make_generated_pandas_impl(_query_id)
 
 
 # ===========================================================================
@@ -518,8 +538,8 @@ def _make_query(query_id: str) -> DataFrameQuery:
         query_name=query_name,
         description=description,
         categories=list(categories),
-        expression_impl=globals()[f"q{query_id}_expression_impl"],
-        pandas_impl=globals()[f"q{query_id}_pandas_impl"],
+        expression_impl=_IMPLS[f"q{query_id}_expression_impl"],
+        pandas_impl=_IMPLS[f"q{query_id}_pandas_impl"],
     )
 
 
