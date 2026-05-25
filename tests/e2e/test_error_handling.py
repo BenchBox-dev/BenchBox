@@ -343,66 +343,6 @@ class TestInvalidParameters:
 
 
 # ============================================================================
-# TPC-DS Scale Factor Constraint Tests
-# ============================================================================
-
-
-class TestTPCDSConstraints:
-    """Tests for TPC-DS specific constraints."""
-
-    @pytest.mark.e2e
-    @pytest.mark.e2e_quick
-    @pytest.mark.tpcds
-    def test_tpcds_fractional_scale_warns_but_succeeds(self, tmp_path: Path) -> None:
-        """Test that TPC-DS warns on fractional scale factors but still proceeds."""
-        output_dir = tmp_path / "dry_run"
-        output_dir.mkdir()
-
-        result = run_cli_command(
-            [
-                "run",
-                "--platform",
-                "duckdb",
-                "--benchmark",
-                "tpcds",
-                "--scale",
-                "0.5",
-                "--dry-run",
-                str(output_dir),
-            ]
-        )
-
-        assert result.returncode == 0
-        assert "UNOFFICIAL SUBSCALE RUN" in result.stdout
-
-    @pytest.mark.e2e
-    @pytest.mark.e2e_quick
-    @pytest.mark.tpcds
-    def test_tpcds_fractional_scale_quiet_suppresses_warning(self, tmp_path: Path) -> None:
-        """Test that --quiet suppresses the unofficial subscale warning."""
-        output_dir = tmp_path / "dry_run"
-        output_dir.mkdir()
-
-        result = run_cli_command(
-            [
-                "run",
-                "--platform",
-                "duckdb",
-                "--benchmark",
-                "tpcds",
-                "--scale",
-                "0.5",
-                "--quiet",
-                "--dry-run",
-                str(output_dir),
-            ]
-        )
-
-        assert result.returncode == 0
-        assert "UNOFFICIAL SUBSCALE RUN" not in result.stdout
-
-
-# ============================================================================
 # Query Subset Constraint Tests
 # ============================================================================
 

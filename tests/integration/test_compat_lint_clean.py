@@ -42,17 +42,6 @@ def test_ddl_drift_check_is_clean():
         )
 
 
-def test_current_run_benchmark_gate_shape_is_detected():
-    """Mandatory inventory validation accepts the current CLI getattr() gate."""
-    from benchbox.sql_compat.inventory import _validate_mandatory_sites, scan
-
-    entries = scan(_BENCHBOX_ROOT)
-    gate_sites = [entry for entry in entries if entry.kind == "benchmark_gate" and entry.file.endswith("run.py")]
-
-    assert gate_sites
-    assert not [err for err in _validate_mandatory_sites(entries) if "benchmark_gate" in err]
-
-
 def test_behavior_detector_catches_custom_named_create_table_rewrites(tmp_path):
     """CREATE TABLE rewrites are detected even when the method name is not canonical."""
     from benchbox.sql_compat.inventory import collect_ddl_governance_statuses

@@ -24,7 +24,8 @@ import pytest
 
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.fast,
+    pytest.mark.slow,
+    pytest.mark.resource_heavy,
 ]
 
 _FAKE_BUNDLE = {

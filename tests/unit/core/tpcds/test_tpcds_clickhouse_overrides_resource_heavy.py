@@ -1,0 +1,95 @@
+"""Resource-heavy TPC-DS ClickHouse override tests."""
+
+from __future__ import annotations
+
+import re
+
+import pytest
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.slow,
+    pytest.mark.resource_heavy,
+]
+
+TARGET_QUERY_IDS = ("47", "57", "66")
+
+
+def _bench():
+    from benchbox.core.tpcds.benchmark.runner import TPCDSBenchmark
+
+    return TPCDSBenchmark()
+
+
+def _extract_v2_suffix(query: str) -> str:
+    _, suffix = query.split(", v2 AS ", 1)
+    return suffix
+
+
+def _normalize_v2_suffix_for_comparison(query: str) -> str:
+    suffix = _extract_v2_suffix(query)
+    return re.sub(r"\bv1\.([a-zA-Z_][a-zA-Z0-9_]*)\s+AS\s+\1\b", r"v1.\1", suffix)
+
+
+def _extract_order_limit(query: str) -> tuple[str, str]:
+    match = re.search(r"ORDER BY (?P<order_by>.+) LIMIT (?P<limit>\d+)$", query)
+    assert match is not None, f"Expected ORDER BY ... LIMIT ... tail in query:\n{query}"
+    return match.group("order_by"), match.group("limit")
+
+
+def test_clickhouse_target_queries_are_present_and_non_empty():
+    """ClickHouse get_queries() must include all targeted overrides."""
+    clickhouse = _bench().get_queries(dialect="clickhouse")
+
+    for query_id in TARGET_QUERY_IDS:
+        assert query_id in clickhouse, f"Q{query_id} missing from ClickHouse query set"
+        assert clickhouse[query_id].strip(), f"Q{query_id} is empty in ClickHouse query set"
+
+
+def test_clickhouse_q47_q57_bulk_queries_drop_nested_avg_sum_but_keep_v2_shape():
+    """Bulk ClickHouse translation must rewrite Q47/Q57 without altering the v2 tail."""
+    bench = _bench()
+    base = bench.get_queries()
+    clickhouse = bench.get_queries(dialect="clickhouse")
+
+    for query_id in ("47", "57"):
+        assert "AVG(SUM(" in base[query_id], f"Base Q{query_id} must retain dsqgen nested aggregate shape"
+        assert "AVG(SUM(" not in clickhouse[query_id], f"ClickHouse Q{query_id} must not retain nested aggregate"
+        assert "AVG(sum_sales) OVER" in clickhouse[query_id], f"ClickHouse Q{query_id} must average materialized sums"
+        assert _normalize_v2_suffix_for_comparison(base[query_id]) == _normalize_v2_suffix_for_comparison(
+            clickhouse[query_id]
+        ), f"ClickHouse Q{query_id} must preserve dsqgen-selected projection/order tail"
+        assert "enable_analyzer = 0" not in clickhouse[query_id], f"ClickHouse Q{query_id} must not opt out"
+
+
+def test_clickhouse_q66_bulk_query_uses_stable_channel_sales_relation():
+    """Bulk ClickHouse Q66 must aggregate from a stable intermediate relation."""
+    bench = _bench()
+    base = bench.get_queries()["66"]
+    clickhouse = bench.get_queries(dialect="clickhouse")["66"]
+
+    assert "SUM(jan_sales)" in base, "Base Q66 must retain the original aggregate-alias shape"
+    assert "SUM(jan_sales)" not in clickhouse, "ClickHouse Q66 must not aggregate over jan_sales alias"
+    assert "SUM(jan_net)" not in clickhouse, "ClickHouse Q66 must not aggregate over jan_net alias"
+    assert "WITH channel_sales AS (" in clickhouse, "ClickHouse Q66 must aggregate from channel_sales"
+    assert _extract_order_limit(base) == _extract_order_limit(clickhouse), "ClickHouse Q66 must preserve ORDER/LIMIT"
+    assert "enable_analyzer = 0" not in clickhouse, "ClickHouse Q66 must not opt out"
+
+
+def test_clickhouse_overrides_compose_cleanly_with_generic_transformer():
+    """Benchmark-layer ClickHouse overrides must not break under the generic transformer pipeline."""
+    from benchbox.platforms.clickhouse.query_transformer import ClickHouseQueryTransformer
+
+    bench = _bench()
+    transformer = ClickHouseQueryTransformer()
+
+    for query_id in TARGET_QUERY_IDS:
+        ch_query = bench.get_queries(dialect="clickhouse")[query_id]
+        transformed = transformer.transform(ch_query)
+        final = transformer.add_query_settings(transformed)
+
+        assert "SETTINGS joined_subquery_requires_alias = 0" in final, (
+            f"Q{query_id}: generic transformer must append session settings"
+        )
+        assert "enable_analyzer" not in final, f"Q{query_id}: pipeline must not re-introduce analyzer opt-out"
+        assert "AVG(SUM(" not in final, f"Q{query_id}: pipeline must not re-introduce nested aggregate-over-window"
