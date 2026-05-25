@@ -39,7 +39,7 @@ These are the honest levers for a larger reduction, but they are product/archite
 
 Unresolved TODOs, ADRs, and user decisions default to the conservative path. Autonomous agents may repair blockers but must not choose the permissive arm of an open policy gate. Approved exceptions must cite the TODO, ADR, PR, or user instruction that resolved the gate.
 
-- Objective-function TODO unresolved: use the provisional credit formula below and mark accounting provisional.
+- Objective-function TODO ratified (2026-05-24; see `_project/analysis/shrink-objective-backfill.md`): the logic-vs-data discriminator in "Ledger and Credit" plus the Guardrails *are* the objective function, validated against #587-604 (credits genuine logic reductions, refuses gamed relocations). The provisional credit formula and the conservative default below stand — `approved_credit_for_valid_data_extraction` remains 0 until a human approves that credit class; executor agents may not (see the executor-only boundary above).
 - JoinOrder/benchmark-semantics TODO unresolved: prove benchmark-shape preservation or stop; agents may not reclassify benchmark intent.
 - Import-loading TODO unresolved: default to lazy/memoized loading. Eager import-time loading needs linked approval, import-delta measurement, and budget.
 - Generated-implementation findability TODO unresolved: default to explicit registries or typed mappings. Dynamic symbol injection needs linked approval and grep/type-check evidence.
