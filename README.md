@@ -477,7 +477,7 @@ Same benchmark, same scale factor, different execution paradigm.
 - Use `benchbox run` CLI for full benchmark execution
 
 **For Advanced Usage:**
-- Explore all 22 benchmark suites: TPC-H, TPC-DS, TPC-DI, ClickBench, H2ODB, NYC Taxi, Flight Data, Vector Search, and more
+- Explore the full benchmark suite: TPC-H, TPC-DS, TPC-DI, ClickBench, H2ODB, NYC Taxi, Flight Data, Vector Search, and more
 - Scale up with larger datasets (scale factors 1.0, 10.0, 100.0+)
 - Compare performance across different platforms
 - See [examples/INDEX.md](examples/INDEX.md) for complete examples navigation

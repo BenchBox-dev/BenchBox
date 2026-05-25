@@ -136,6 +136,35 @@ Authoritative count statements should come from the relevant registry metadata.
 Editorial lists may remain in narrative docs, but they must not claim to be
 exhaustive unless a generated or tested check keeps them synchronized.
 
+### Benchmark Claim Classes
+
+Public benchmark breadth claims fall into four classes:
+
+| Claim class | Rule | Example |
+|---|---|---|
+| Registry-derived | Generated from or checked against `benchmark_registry`. The number must equal a registry count. | README `benchbox-registry-counts` marker; the Benchmark API snapshot above. |
+| Checked exact claim | A hand-written exact count that a drift gate pins to the registry. Allowed on durable public surfaces. | Landing "22 Benchmarks"; architecture "currently 22 benchmarks". |
+| Editorial example | Narrative that names representative benchmarks without an exhaustive total. Preferred when the exact number does not matter. | "TPC-H, TPC-DS, ClickBench, and more". |
+| Generated output | Produced by a named generator; hand edits are drift. | Generated compatibility docs. |
+
+Rules:
+
+- An exact public benchmark count must be registry-derived **or** covered by a
+  drift gate; otherwise reword it as an editorial example with no total.
+- Integrity-spec coverage claims (`N of M benchmarks`) are checked exact claims:
+  `N` is the spec count and `M` is the public benchmark count.
+- Generated outputs must state their generator; do not hand-edit them.
+- Internal `TODO`/`DONE`/ADR history is not public contract — historical count
+  evidence there is never treated as a stale public claim.
+
+The drift gate for the checked exact claims is
+`tests/unit/core/test_benchmark_api_contract.py::test_public_benchmark_count_claims_are_registry_derived`,
+which derives the expected counts from the registry and names any stale source
+file. The currently gated durable surfaces are `landing/index.html`,
+`docs/design/architecture.md`, `docs/development/result-integrity-validation.md`,
+and `docs/reference/cli/utilities.md`; the README marker is gated separately by
+the platform-registry marker tests.
+
 ## Drift Check Ownership
 
 Each public claim class has one owner and one preferred verification gate:

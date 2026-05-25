@@ -2,7 +2,8 @@ id: public-benchmark-claim-drift-gate
 title: "Add a drift gate for public benchmark count and support claims"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-25"
 category: Documentation and Contracts
 
 deps:
@@ -26,7 +27,7 @@ description: |
 work:
   - id: w0
     summary: "Inventory exact benchmark count, coverage, and support-claim text across public docs, landing pages, scripts, and generated docs sources"
-    status: pending
+    status: done
     notes: |
       Search for phrases such as "22 benchmarks", "23 benchmark", "registered
       benchmarks", "supported benchmarks", "benchmark variety", and benchmark
@@ -37,7 +38,7 @@ work:
   - id: w1
     summary: "Define allowed claim classes and source-of-truth rules"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Extend the public contract map or a nearby developer doc with concrete
       rules: exact public counts must be registry-derived or checked; editorial
@@ -47,7 +48,7 @@ work:
   - id: w2
     summary: "Implement a focused drift check for benchmark count and support-status claims"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Prefer extending an existing lightweight docs/contract test over adding a
       broad fragile scanner. The check should cover durable public surfaces such
@@ -58,7 +59,7 @@ work:
   - id: w3
     summary: "Repair stale public claims or reword them as editorial examples"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Update exact count claims to derive from the registry-backed marker where
       practical. Where exact counts are not important, reword copy to avoid a
@@ -68,12 +69,16 @@ work:
   - id: w4
     summary: "Wire the drift check into the narrowest existing verification lane"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       Place the check where maintainers already expect public contract drift to
       fail, such as a unit contract test or the existing PR public-contract gate.
       Keep failure output concise and redirect any large inventory output to
       `/tmp` or a generated local artifact that is not committed.
+
+deferred:
+  - summary: "Fix stale 'eighteen benchmarks' claim in docs/usage/faq.md and add it to the drift gate"
+    reason: "docs/usage/ is outside this TODO's scope_limit. faq.md:32 says 'eighteen benchmarks' (stale; registry has 22 public). Repair it and extend test_public_benchmark_count_claims_are_registry_derived to cover faq.md in a follow-up that includes docs/usage/."
 
 metadata:
   tags:
@@ -83,7 +88,7 @@ metadata:
     - drift-gate
   estimated_effort: "1-2 days"
   created_date: "2026-05-21"
-  last_updated: "2026-05-21T00:00:00Z"
+  last_updated: "2026-05-25T00:00:00Z"
 
 impact:
   business_value: |
