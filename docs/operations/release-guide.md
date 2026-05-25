@@ -34,10 +34,34 @@ Before a release PR can merge, the `main-release-only` ruleset must require:
 - dependency upper-bound checks;
 - release-branch curation checks that confirm dev-only paths are absent.
 
-It does **not** guarantee live cloud credentials, stress suites, long-running
-UAT, or full slow/resource-heavy coverage. Those remain explicit manual,
-scheduled, or follow-up gates until separate release canary work makes them
-blocking.
+It does **not** guarantee live cloud credentials, stress suites, or
+long-running UAT. Slow/resource-heavy coverage is enforced through the
+freshness-based release canary below, not by rerunning that suite on every
+release PR.
+
+## Release canary and ruleset drift
+
+Release PRs also depend on the `validate-base` workflow's release-readiness
+steps. That workflow queries the latest completed `release-canary.yml` run on
+`develop` and fails the release PR when the canary is missing, red, older than
+48 hours, or not an ancestor of the release PR head.
+
+`release-canary.yml` runs daily and on manual dispatch. Its blocking canary
+suite is the credential-free non-fast family:
+`(slow or resource_heavy) and not (stress or live_integration)`. The same
+workflow also runs `scripts/ruleset_drift_check.py` against
+`docs/operations/repo-admin-settings.md`, so ruleset drift makes the canary red
+instead of silently invalidating release assumptions.
+
+Stress tests, live cloud integrations, and long-running UAT remain advisory
+until their credential, cost, and flake policies are stable enough to make
+them release-blocking.
+
+Emergency override is admin-only: set repository variables
+`RELEASE_READINESS_OVERRIDE_SHA` to the exact release PR head SHA and
+`RELEASE_READINESS_OVERRIDE_REASON` to the incident/approval record. Remove
+both variables after the release. API outages, stale canaries, or ruleset drift
+must not be bypassed with an undocumented local change.
 
 ### What `release-cut` does
 
@@ -93,6 +117,11 @@ release as if it had been blocked.
   Actions or fix on a feature branch off `develop`, PR back to `develop`,
   then re-run `make release-cut` (the option-c sweep will delete the stale
   `vX.Y.Z` branch automatically).
+- **Release canary is missing, stale, or red**: inspect the latest
+  `release-canary.yml` run. If the non-fast canary failed, fix through
+  `develop`; if ruleset drift failed, update the live GitHub ruleset or this
+  runbook so they match. Use the emergency override variables only with an
+  explicit incident/approval record.
 - **Wheel content is wrong**: adjust `pyproject.toml` / `MANIFEST.in`
   excludes on `develop`, then cut a patch release. PyPI rejects
   re-uploads of an existing version, so always bump.
@@ -104,6 +133,9 @@ release as if it had been blocked.
 
 - Makefile targets: `release-cut`, `release-finalize`.
 - Workflow: `.github/workflows/release.yml`.
+- Canary workflow: `.github/workflows/release-canary.yml`.
+- Release-readiness gate: `scripts/release_readiness_check.py`.
+- Ruleset drift gate: `scripts/ruleset_drift_check.py`.
 - Curation drift guard: `scripts/check_release_curation.py` (runs in
   `lint.yml` on every PR).
 - Version updater: `scripts/update_version.py`.

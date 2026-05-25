@@ -17,14 +17,25 @@ squash-merge into `main`.
 - [ ] No surprise file additions (the curation only *removes*)
 - [ ] `validate-base` is green for this release branch
 - [ ] `release-required-result` is green on this branch
+- [ ] Release canary freshness is green (latest `release-canary.yml` run is
+      successful, within 48h, and an ancestor of this release head)
+- [ ] Ruleset drift is green in the latest release canary
 
 ### Release-required guarantee
 
 `release-required-result` means this branch passed the fast test lane,
 integration-not-slow suite, isolated exact-one-wheel package install smoke,
 dependency upper-bound check, and release-branch curation check. It does
-not cover live cloud credentials, stress suites, long-running UAT, or full
-slow/resource-heavy coverage.
+not cover live cloud credentials, stress suites, or long-running UAT.
+Slow/resource-heavy coverage is enforced by the 48h release canary freshness
+gate in `validate-base`, not by rerunning that suite on every release PR.
+
+`release-canary.yml` runs the credential-free non-fast canary
+`(slow or resource_heavy) and not (stress or live_integration)` and the
+ruleset drift check against `docs/operations/repo-admin-settings.md`.
+Emergency override requires repository variables
+`RELEASE_READINESS_OVERRIDE_SHA` (exact release head SHA) and
+`RELEASE_READINESS_OVERRIDE_REASON` (incident/approval record).
 
 ### After release-required checks are green
 
