@@ -14,13 +14,12 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q15_expression_impl as _q15_expr_base,
     q15_pandas_impl as _q15_pandas_base,
 )
-from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SUBQUERY, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
@@ -189,31 +188,7 @@ def q15_v4_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q15_v4_pandas_impl(ctx: DataFrameContext) -> Any:
-    supplier = ctx.get_table("supplier")
-    lineitem = ctx.get_table("lineitem")
-
-    params = get_tpch_parameters(15)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    # Step 1: filter
-    filtered = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)].copy()
-    # Step 2: derive revenue column
-    filtered["revenue"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"])
-    # Step 3: aggregate per supplier
-    revenue = (
-        filtered.groupby("l_suppkey", as_index=False)
-        .agg(total_revenue=("revenue", "sum"))
-        .rename(columns={"l_suppkey": "supplier_no"})
-    )
-    # Step 4: find max
-    max_revenue = revenue["total_revenue"].max()
-    max_revenue = max_revenue.compute() if hasattr(max_revenue, "compute") else max_revenue
-    # Step 5: filter and join
-    top_suppliers = revenue[revenue["total_revenue"] == max_revenue]
-    return supplier.merge(top_suppliers, left_on="s_suppkey", right_on="supplier_no")[
-        ["s_suppkey", "s_name", "s_address", "s_phone", "total_revenue"]
-    ].sort_values("s_suppkey")
+    return q15_v2_pandas_impl(ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -548,16 +523,4 @@ def q15_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
-
-Q15_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q15v{v}",
-        query_name=f"TPC-H Q15 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q15_VARIANTS = build_yaml_variants(__file__, globals(), 15, JOIN_AGG_SUBQUERY)

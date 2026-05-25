@@ -13,13 +13,12 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q7_expression_impl as _q7_expr_base,
     q7_pandas_impl as _q7_pandas_base,
 )
-from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -228,43 +227,7 @@ def q7_v4_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q7_v5_expression_impl(ctx: DataFrameContext) -> Any:
-    supplier = ctx.get_table("supplier")
-    lineitem = ctx.get_table("lineitem")
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-    nation = ctx.get_table("nation")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(7)
-    nation1 = params["nation1"]
-    nation2 = params["nation2"]
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    n1 = nation.select(col("n_nationkey").alias("n1_nationkey"), col("n_name").alias("supp_nation"))
-    n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("cust_nation"))
-
-    return (
-        supplier.join(n1, left_on="s_nationkey", right_on="n1_nationkey")
-        .join(lineitem, left_on="s_suppkey", right_on="l_suppkey")
-        .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") <= lit(end_date)))
-        .join(orders, left_on="l_orderkey", right_on="o_orderkey")
-        .join(customer, left_on="o_custkey", right_on="c_custkey")
-        .join(n2, left_on="c_nationkey", right_on="n2_nationkey")
-        .filter(
-            ((col("supp_nation") == lit(nation1)) & (col("cust_nation") == lit(nation2)))
-            | ((col("supp_nation") == lit(nation2)) & (col("cust_nation") == lit(nation1)))
-        )
-        # Pre-compute both derived columns
-        .with_columns(
-            col("l_shipdate").dt.year().alias("l_year"),
-            (col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("volume"),
-        )
-        .group_by("supp_nation", "cust_nation", "l_year")
-        .agg(col("volume").sum().alias("revenue"))
-        .sort("supp_nation", "cust_nation", "l_year")
-    )
+    return _q7_expr_base(ctx)
 
 
 def q7_v5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -608,16 +571,4 @@ def q7_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
-
-Q7_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q7v{v}",
-        query_name=f"TPC-H Q7 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q7_VARIANTS = build_yaml_variants(__file__, globals(), 7, JOIN_AGG_FILTER)

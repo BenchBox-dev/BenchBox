@@ -13,13 +13,12 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q11_expression_impl as _q11_expr_base,
     q11_pandas_impl as _q11_pandas_base,
 )
-from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SUBQUERY, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -401,32 +400,7 @@ def q11_v8_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q11_v9_expression_impl(ctx: DataFrameContext) -> Any:
-    partsupp = ctx.get_table("partsupp")
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(11)
-    nation_name = params["nation_name"]
-    fraction = params["fraction"]
-
-    nation_stock = (
-        partsupp.join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
-        .join(nation, left_on="s_nationkey", right_on="n_nationkey")
-        .filter(col("n_name") == lit(nation_name))
-        .with_columns((col("ps_supplycost") * col("ps_availqty")).alias("value"))
-    )
-
-    total_value = ctx.scalar(nation_stock.select(col("value").sum().alias("total")))
-    threshold = total_value * fraction
-
-    return (
-        nation_stock.group_by("ps_partkey")
-        .agg(col("value").sum().alias("value"))
-        .filter(col("value") > lit(threshold))
-        .sort("value", descending=True)
-    )
+    return _q11_expr_base(ctx)
 
 
 def q11_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -513,16 +487,4 @@ def q11_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
-
-Q11_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q11v{v}",
-        query_name=f"TPC-H Q11 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q11_VARIANTS = build_yaml_variants(__file__, globals(), 11, JOIN_AGG_SUBQUERY)
