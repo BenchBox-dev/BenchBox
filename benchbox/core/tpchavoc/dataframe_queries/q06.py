@@ -11,12 +11,12 @@ from collections.abc import Callable
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q6_expression_impl as _q6_expr_base,
     q6_pandas_impl as _q6_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import AGG_FILTER, build_variants
 
 VariantImpl = Callable[[DataFrameContext], Any]
 
@@ -261,14 +261,4 @@ _IMPL_PAIRS = [
     (q6_v10_expression_impl, q6_v10_pandas_impl),
 ]
 
-Q6_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q6v{variant}",
-        query_name=f"TPC-H Q6 Variant {variant}",
-        description=_DESCRIPTIONS[variant - 1],
-        categories=[QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for variant, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q6_VARIANTS = build_variants(6, _IMPL_PAIRS, _DESCRIPTIONS, AGG_FILTER)

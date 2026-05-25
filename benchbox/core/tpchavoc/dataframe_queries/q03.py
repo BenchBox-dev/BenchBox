@@ -13,13 +13,12 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q3_expression_impl as _q3_expr_base,
     q3_pandas_impl as _q3_pandas_base,
 )
-from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SORT, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -405,27 +404,7 @@ def q3_v8_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q3_v9_expression_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(3)
-    segment = params["segment"]
-    order_date = params["order_date"]
-
-    return (
-        customer.filter(col("c_mktsegment") == lit(segment))
-        .join(orders, left_on="c_custkey", right_on="o_custkey")
-        .filter(col("o_orderdate") < lit(order_date))
-        .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-        .filter(col("l_shipdate") > lit(order_date))
-        .group_by("o_orderkey", "o_orderdate", "o_shippriority")
-        .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
-        .sort(["revenue", "o_orderdate"], descending=[True, False])
-        .limit(10)
-    )
+    return _q3_expr_base(ctx)
 
 
 def q3_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -512,16 +491,4 @@ def q3_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
-
-Q3_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q3v{v}",
-        query_name=f"TPC-H Q3 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SORT],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q3_VARIANTS = build_yaml_variants(__file__, globals(), 3, JOIN_AGG_SORT)

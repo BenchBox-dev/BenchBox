@@ -14,13 +14,12 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q13_expression_impl as _q13_expr_base,
     q13_pandas_impl as _q13_pandas_base,
 )
-from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_GROUP_BY, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
@@ -66,23 +65,7 @@ def q13_v2_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q13_v2_pandas_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-
-    params = get_tpch_parameters(13)
-    word1 = params["word1"]
-    word2 = params["word2"]
-
-    # Pre-filter orders before left join
-    filtered_orders = orders[~orders["o_comment"].str.contains(f"{word1}.*{word2}", regex=True, na=False)]
-    customer_orders = customer.merge(filtered_orders, left_on="c_custkey", right_on="o_custkey", how="left")
-    order_counts = customer_orders.groupby("c_custkey", as_index=False).agg(c_count=("o_orderkey", "count"))
-
-    return (
-        order_counts.groupby("c_count", as_index=False)
-        .agg(custdist=("c_custkey", "count"))
-        .sort_values(["custdist", "c_count"], ascending=[False, False])
-    )
+    return _q13_pandas_base(ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -379,49 +362,11 @@ def q13_v8_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q13_v9_expression_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    col = ctx.col
-
-    params = get_tpch_parameters(13)
-    word1 = params["word1"]
-    word2 = params["word2"]
-
-    customer_orders = (
-        customer.join(
-            orders.filter(~col("o_comment").str.contains(f"{word1}.*{word2}")),
-            left_on="c_custkey",
-            right_on="o_custkey",
-            how="left",
-        )
-        .group_by("c_custkey")
-        .agg(col("o_orderkey").count().alias("c_count"))
-    )
-
-    return (
-        customer_orders.group_by("c_count")
-        .agg(col("c_custkey").count().alias("custdist"))
-        .sort(["custdist", "c_count"], descending=[True, True])
-    )
+    return _q13_expr_base(ctx)
 
 
 def q13_v9_pandas_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-
-    params = get_tpch_parameters(13)
-    word1 = params["word1"]
-    word2 = params["word2"]
-
-    filtered_orders = orders[~orders["o_comment"].str.contains(f"{word1}.*{word2}", regex=True, na=False)]
-    customer_orders = customer.merge(filtered_orders, left_on="c_custkey", right_on="o_custkey", how="left")
-    order_counts = customer_orders.groupby("c_custkey", as_index=False).agg(c_count=("o_orderkey", "count"))
-
-    return (
-        order_counts.groupby("c_count", as_index=False)
-        .agg(custdist=("c_custkey", "count"))
-        .sort_values(["custdist", "c_count"], ascending=[False, False])
-    )
+    return _q13_pandas_base(ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -481,16 +426,4 @@ def q13_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
-
-Q13_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q13v{v}",
-        query_name=f"TPC-H Q13 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q13_VARIANTS = build_yaml_variants(__file__, globals(), 13, JOIN_AGG_GROUP_BY)

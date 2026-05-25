@@ -13,13 +13,12 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q9_expression_impl as _q9_expr_base,
     q9_pandas_impl as _q9_pandas_base,
 )
-from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -383,35 +382,7 @@ def q9_v8_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q9_v9_expression_impl(ctx: DataFrameContext) -> Any:
-    part = ctx.get_table("part")
-    supplier = ctx.get_table("supplier")
-    lineitem = ctx.get_table("lineitem")
-    partsupp = ctx.get_table("partsupp")
-    orders = ctx.get_table("orders")
-    nation = ctx.get_table("nation")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(9)
-    color = params["color"]
-
-    return (
-        part.filter(col("p_name").str.contains(color))
-        .join(lineitem, left_on="p_partkey", right_on="l_partkey")
-        .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
-        .join(partsupp, left_on=["l_suppkey", "p_partkey"], right_on=["ps_suppkey", "ps_partkey"])
-        .join(orders, left_on="l_orderkey", right_on="o_orderkey")
-        .join(nation, left_on="s_nationkey", right_on="n_nationkey")
-        .with_columns(
-            col("o_orderdate").dt.year().alias("o_year"),
-            (col("l_extendedprice") * (lit(1) - col("l_discount")) - col("ps_supplycost") * col("l_quantity")).alias(
-                "amount"
-            ),
-        )
-        .group_by(col("n_name").alias("nation"), "o_year")
-        .agg(col("amount").sum().alias("sum_profit"))
-        .sort(["nation", "o_year"], descending=[False, True])
-    )
+    return _q9_expr_base(ctx)
 
 
 def q9_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -491,16 +462,4 @@ def q9_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
-
-Q9_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q9v{v}",
-        query_name=f"TPC-H Q9 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q9_VARIANTS = build_yaml_variants(__file__, globals(), 9, JOIN_AGG_FILTER)
