@@ -9,7 +9,9 @@ This section provides systematic documentation for each benchmark implementation
 
 Benchmark support status is sourced from `benchbox.core.benchmark_registry`, not
 from hand-maintained docs. Current status counts are documented and checked in
-the [public contract map](../reference/public-contracts.md). `support_status` is
+the [public contract map](../reference/public-contracts.md). The auditable
+per-benchmark rationale and promotion criteria live in
+[Benchmark Support Status Criteria](support-status.md). `support_status` is
 separate from public discovery visibility and from DataFrame capability.
 
 ## Contents
@@ -286,6 +288,7 @@ time-series-benchmarks
 benchbox-primitives
 ai-ml-benchmarks
 benchbox-experimental
+support-status
 ```
 
 #### **Development and CI/CD**
