@@ -1,7 +1,7 @@
-"""Performance tests for TPC compliance implementation using DuckDB.
+"""Performance tests for TPC benchmark helpers using DuckDB.
 
-This module contains performance tests to ensure the TPC compliance features
-meet performance requirements with real DuckDB database operations.
+This module contains performance tests for TPC benchmark helpers with real
+DuckDB database operations.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -15,7 +15,7 @@ import duckdb
 import psutil
 import pytest
 
-from benchbox.core.tpc_compliance import TPCOfficialMetrics
+from benchbox.core.results.metrics import TPCMetricsCalculator
 from benchbox.core.tpcds.benchmark import TPCDSBenchmark
 from benchbox.core.tpch.benchmark import TPCHBenchmark
 
@@ -34,24 +34,15 @@ class TestTPCPerformanceDuckDB:
 
     def test_tpc_metrics_calculation_performance(self):
         """Test performance of TPC metrics calculations."""
-        metrics = TPCOfficialMetrics(benchmark_name="TPC-H", scale_factor=1.0)
-
-        # Test metrics calculation performance
         start_time = time.time()
 
-        # Calculate many metrics to test performance
         for i in range(1000):
             power_time = 100.0 + i * 0.1
             throughput_time = 200.0 + i * 0.2
-            num_streams = 2
+            power_at_size = 3600.0 / power_time
+            throughput_at_size = (2 * 3600.0) / throughput_time
+            qphh_size = TPCMetricsCalculator.calculate_qph(power_at_size, throughput_at_size)
 
-            qphh_size = metrics.calculate_qphh_size(
-                power_time=power_time,
-                throughput_time=throughput_time,
-                num_streams=num_streams,
-            )
-
-            # Ensure calculations are reasonable
             assert qphh_size > 0
 
         calculation_time = time.time() - start_time
