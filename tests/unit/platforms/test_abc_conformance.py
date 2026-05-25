@@ -37,7 +37,6 @@ _SKIP_FILES = {
     "__init__.py",
     "_spark_helpers.py",
     "adapter_factory.py",
-    "cloud_error_context.py",
     "cloud_shared.py",
     "presto_trino_utils.py",
     "questdb_rewriter.py",
