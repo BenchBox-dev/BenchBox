@@ -18,6 +18,7 @@ _TESTS_ROOT = _REPO_ROOT / "tests"
 _FAST_MEDIUM_DECORATOR_RE = re.compile(r"(?m)^\s*@pytest\.mark\.(fast|medium)\b")
 _SPEED_MARKERS = {"fast", "medium", "slow"}
 _SCOPE_MARKERS = {"unit", "integration", "performance"}
+_E2E_QUICK_INCOMPATIBLE = {"stress", "resource_heavy", "live_integration"}
 
 
 _test_modules_cache: list[Path] | None = None
@@ -54,7 +55,11 @@ def _has_real_tests(tree: ast.Module) -> bool:
 
 def _top_level_marker_names(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    for node in tree.body:
+    return _pytestmark_assignment_names(tree.body)
+
+
+def _pytestmark_assignment_names(nodes: list[ast.stmt]) -> set[str]:
+    for node in nodes:
         if isinstance(node, ast.Assign) and any(
             isinstance(target, ast.Name) and target.id == "pytestmark" for target in node.targets
         ):
@@ -76,6 +81,29 @@ def _marker_name(node: ast.AST) -> str | None:
     if not isinstance(mark_attr.value, ast.Name) or mark_attr.value.id != "pytest":
         return None
     return target.attr
+
+
+def _decorator_marker_names(node: ast.AST) -> set[str]:
+    return {name for name in (_marker_name(decorator) for decorator in getattr(node, "decorator_list", [])) if name}
+
+
+def _iter_test_marker_sets(path: Path) -> list[tuple[str, set[str]]]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    module_markers = _top_level_marker_names(path)
+    tests: list[tuple[str, set[str]]] = []
+
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith(("test_", "benchmark_")):
+            tests.append((node.name, module_markers | _decorator_marker_names(node)))
+        if isinstance(node, ast.ClassDef) and (node.name.startswith("Test") or node.name.endswith("Tests")):
+            class_markers = module_markers | _decorator_marker_names(node) | _pytestmark_assignment_names(node.body)
+            for child in node.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name.startswith(
+                    ("test_", "benchmark_")
+                ):
+                    tests.append((f"{node.name}::{child.name}", class_markers | _decorator_marker_names(child)))
+
+    return tests
 
 
 def test_conftest_has_no_collection_time_marker_rewrite():
@@ -132,5 +160,18 @@ def test_tree_has_no_fast_or_medium_decorators():
         text = path.read_text(encoding="utf-8")
         if _FAST_MEDIUM_DECORATOR_RE.search(text):
             offenders.append(rel)
+
+    assert offenders == []
+
+
+def test_e2e_quick_does_not_select_opt_in_heavy_tests():
+    offenders: list[tuple[str, list[str]]] = []
+
+    for path in _iter_test_modules():
+        rel = path.relative_to(_REPO_ROOT).as_posix()
+        for test_name, markers in _iter_test_marker_sets(path):
+            conflicts = sorted(markers & _E2E_QUICK_INCOMPATIBLE)
+            if "e2e_quick" in markers and conflicts:
+                offenders.append((f"{rel}::{test_name}", conflicts))
 
     assert offenders == []

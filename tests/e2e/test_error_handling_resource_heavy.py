@@ -34,7 +34,6 @@ def run_cli_command(args: Sequence[str], *, use_subprocess: bool = False) -> Sim
 class TestTPCDSConstraints:
     """Tests for TPC-DS specific constraints."""
 
-    @pytest.mark.e2e_quick
     @pytest.mark.tpcds
     def test_tpcds_fractional_scale_warns_but_succeeds(self, tmp_path: Path) -> None:
         """Test that TPC-DS warns on fractional scale factors but still proceeds."""
@@ -58,7 +57,6 @@ class TestTPCDSConstraints:
         assert result.returncode == 0
         assert "UNOFFICIAL SUBSCALE RUN" in result.stdout
 
-    @pytest.mark.e2e_quick
     @pytest.mark.tpcds
     def test_tpcds_fractional_scale_quiet_suppresses_warning(self, tmp_path: Path) -> None:
         """Test that --quiet suppresses the unofficial subscale warning."""
