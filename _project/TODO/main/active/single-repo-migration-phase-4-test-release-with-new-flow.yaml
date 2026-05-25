@@ -2,12 +2,35 @@ id: single-repo-migration-phase-4-test-release-with-new-flow
 title: "Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)"
 worktree: main
 priority: High
-status: In Progress
+status: Blocked
 category: Release Tooling
 
 deps:
   needs:
   - single-repo-migration-phase-3-new-release-flow
+
+blockers:
+- date: "2026-05-25"
+  work: [w8]
+  reason: |
+    The first public `v0.3.0` release was cut and published, but the
+    post-publish install verification failed. The latest `release.yml`
+    run for tag `v0.3.0` concluded `failure`: build, PyPI publish, and
+    GitHub release jobs succeeded, while all `test-installation` jobs
+    failed. A clean install of the immutable PyPI `benchbox==0.3.0`
+    still fails to import because `benchbox.platforms.clickhouse.client`
+    imports `pandas`, which was not available from the published wheel's
+    dependency set.
+  evidence: |
+    - `git rev-parse v0.3.0` returned `038ad548875a674cc6de0a8956677e052eac1033`.
+    - `gh release view v0.3.0 --repo joeharris76/BenchBox` showed `BenchBox 0.3.0`, published `2026-05-20T11:49:42Z`.
+    - `uv run --isolated --with pip -- python -m pip index versions benchbox` showed available/latest `0.3.0`.
+    - `gh run list --repo joeharris76/BenchBox --workflow=release.yml --limit 1` returned run `26160520298`, conclusion `failure`, branch `v0.3.0`, SHA `038ad548875a674cc6de0a8956677e052eac1033`.
+    - `uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c 'import benchbox; print(benchbox.__version__)'` failed with `ModuleNotFoundError: No module named 'pandas'`.
+  unblock: |
+    Do not re-tag or re-upload `0.3.0`. The only safe recovery is a
+    monotonic follow-up release, such as `0.3.1`, after confirming the
+    release-gate fixes that landed after `v0.3.0`.
 
 description: |
   Dominant phase of the migration under Option B. Three sequenced operations
@@ -187,51 +210,42 @@ work:
 - id: w7
   summary: "Determine release version (likely v0.3.0) and cut release"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
-    DEFERRED on user direction (2026-04-27): "We are not ready to cut
-    v0.3.0 yet. Proceed with steps 1-6." w7 and w8 stay pending until
-    the user signals readiness.
+    Completed after the 2026-04-27 deferral. The public repo has tag
+    `v0.3.0` at `038ad548875a674cc6de0a8956677e052eac1033`, the GitHub
+    release `BenchBox 0.3.0` was published at `2026-05-20T11:49:42Z`,
+    and PyPI lists `benchbox 0.3.0` as the latest available version.
 
-    Updated mechanics under the version-branch flow (see decisions doc
-    A4 / A5):
-      cd ~/Developer/benchbox-public
-      git checkout develop && git pull
-      # Bump version + draft changelog on develop (or in a release-prep PR)
-      make bump VERSION=0.3.0
-      make changelog-draft VERSION=0.3.0   # optional helper
-      # Commit version bump on develop
-      git add benchbox/__init__.py pyproject.toml CHANGELOG.md docs/ landing/
-      git commit -m "chore(release): bump to 0.3.0 + changelog draft"
-      git push origin develop
-      # Cut the release branch
-      make release-prepare VERSION=0.3.0
-      # Review the PR (curation drops _project/, _blog/, agent files).
-      # Squash-merge to main on GitHub.
-      # Tag main:
-      git checkout main && git pull
-      git tag v0.3.0 && git push origin v0.3.0
-      # release.yml fires; verify PyPI publish.
-      # Then rebase develop onto main:
-      make release-rebase-develop VERSION=0.3.0
+    Relevant PRs:
+      - #466 "Release v0.3.0" merged to `main` on 2026-05-19.
+      - #472 "Release v0.3.0 recovery" merged to `main` on 2026-05-20.
+      - #473 "Release v0.3.0 pandas runtime dependency repair" merged
+        to `main` after the tag; it cannot repair the immutable PyPI
+        `0.3.0` artifact.
 
 - id: w8
   summary: "Verify the release published to PyPI and is installable"
   needs: [w7]
   status: pending
   notes: |
-    DEFERRED on user direction (2026-04-27): blocked by w7.
+    Blocked as of 2026-05-25. The publish half succeeded, but the
+    installability half failed and cannot be repaired in-place because
+    PyPI rejects replacement uploads for an existing version.
 
-    Wait for release.yml to complete green.
-    pip index versions benchbox  # should show 0.3.0
-    python -m venv /tmp/post-release-test
-    /tmp/post-release-test/bin/pip install benchbox==0.3.0
-    /tmp/post-release-test/bin/benchbox --help
-    /tmp/post-release-test/bin/python -c "import benchbox; assert benchbox.__version__ == '0.3.0'"
-    # Confirm wheel content has no maintainer scaffolding:
-    /tmp/post-release-test/bin/pip show -f benchbox | \
-      grep -E '_project|_blog|automate_release|benchbox/release/|\.pre-commit'
-    # Should match nothing — Phase 1 wheel hygiene excludes these.
+    Evidence:
+      - `gh run list --repo joeharris76/BenchBox --workflow=release.yml --limit 1`
+        returned run `26160520298`, conclusion `failure`.
+      - `gh run view 26160520298 --repo joeharris76/BenchBox --json jobs`
+        showed build, PyPI publish, and GitHub release jobs succeeded.
+      - The same run showed all `test-installation` jobs failed.
+      - `uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c 'import benchbox; print(benchbox.__version__)'`
+        fails with `ModuleNotFoundError: No module named 'pandas'`.
+
+    Recovery path:
+      - Do not re-tag or re-upload `0.3.0`.
+      - Cut a monotonic follow-up release after confirming the release
+        hardening that landed after `v0.3.0` covers this failure mode.
 
 verification:
 - description: "PyPI has v0.3.0"
