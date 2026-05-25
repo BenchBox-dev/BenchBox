@@ -80,14 +80,16 @@ work:
     needs: [w0]
     status: pending
     notes: |
-      Compare `Makefile:pr-preflight-fast-tests` with `.github/workflows/pr.yml`
-      `code-test`.
+      Compare `Makefile:pr-preflight-fast-tests` with both required fast-test
+      surfaces:
+        - `.github/workflows/pr.yml:code-test` for develop PRs.
+        - `.github/workflows/test.yml:test` for main/release PRs.
 
       Preferred outcome:
         - Change local preflight to use the same marker expression as CI:
           `fast and not (slow or stress or resource_heavy or live_integration)`.
-        - Add a workflow/Makefile ratchet test that fails if these expressions
-          drift again.
+        - Add a workflow/Makefile ratchet test that fails if the Makefile,
+          develop PR workflow, and main PR workflow expressions drift again.
 
       Decision gate:
         - Do not add the full coverage run to local preflight unless the runtime
@@ -178,6 +180,8 @@ verification:
 scope_limit:
   only_modify:
     - "Makefile"
+    - ".github/workflows/pr.yml"
+    - ".github/workflows/test.yml"
     - "pytest.ini"
     - "pytest-ci.ini"
     - "tests/conftest.py"
@@ -186,8 +190,6 @@ scope_limit:
     - "_project/TODO/main/planning/release-test-command-ratchet-alignment.yaml"
   do_not_modify:
     - ".github/workflows/release.yml"
-    - ".github/workflows/test.yml"
-    - ".github/workflows/pr.yml"
 
 success_metrics:
   - "Release-infrastructure workflow ratchets are fast or explicitly split with a fast workflow-parsing subset."

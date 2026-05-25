@@ -16,14 +16,16 @@ description: |
   release guarantee.
 
   This TODO defines and wires the minimum mandatory release contract for
-  version branches targeting `main`. The contract must be explicit, named,
-  auditable from the repository, and suitable for GitHub ruleset enforcement.
+  release branches accepted by `validate-main-pr.yml` targeting `main`. The
+  contract must be explicit, named, auditable from the repository, and suitable
+  for GitHub ruleset enforcement.
 
   Target guarantee after completion:
-    - Release PRs from `v*` branches cannot merge unless the fast test lane,
-      release-critical non-fast tests, integration-not-slow suite, dependency
-      bounds, package build/install smoke, and release curation checks have
-      passed on the PR branch.
+    - Release PRs from branches matching the `validate-main-pr.yml` release
+      regex cannot merge unless the fast test lane, the explicitly named
+      integration-not-slow suite (`tests/integration -m "integration and not
+      slow and not stress"`), dependency bounds, package build/install smoke,
+      and release curation checks have passed on the PR branch.
     - The required check name is stable and documented for the
       `main-release-only` ruleset.
     - Optional/advisory lanes remain visible but are not confused with the
@@ -82,16 +84,19 @@ work:
     status: pending
     notes: |
       Change `.github/workflows/test.yml` so the `integration` job runs for
-      release PRs from `v*` branches targeting `main`, in addition to existing
-      push-to-main and `run-integration` label behavior.
+      every PR targeting `main`, in addition to existing push-to-main behavior.
+      This workflow already only receives `pull_request` events for `main`, and
+      `validate-main-pr.yml` owns the exact release-branch regex. Do not add a
+      second approximate release-branch matcher here.
 
       Candidate condition:
-        `github.event_name == 'push' || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'run-integration') || startsWith(github.head_ref, 'v')))`.
+        `github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'main')`.
 
       Decision gate:
-        - If release branch naming changes away from `vX.Y.Z`, use the same
-          release-branch matcher as `validate-main-pr.yml`; do not maintain two
-          incompatible release-branch regexes.
+        - If main PR volume makes running integration on every main PR too
+          expensive, first extract a single reusable release-branch classifier
+          from `validate-main-pr.yml`; do not use a broad `startsWith('v')`
+          approximation.
 
   - id: w3
     summary: "Add a stable `release-required-result` aggregator job for main PRs"
@@ -111,6 +116,10 @@ work:
           or adding a small release-readiness job in the same workflow
 
       Decision gate:
+        - Do not make `release-required-result` depend on jobs from another
+          workflow; GitHub Actions cannot express cross-workflow `needs`.
+          Duplicate or move the release-readiness checks into this workflow if
+          they must be aggregated.
         - Prefer one stable required context over requiring many individual job
           names in the GitHub ruleset. If individual contexts are selected
           instead, update `repo-admin-settings.md` with every exact context.
@@ -138,7 +147,8 @@ work:
     status: pending
     notes: |
       Add or update fast tests proving:
-        - release PRs from `v*` branches trigger integration without a label,
+        - main PRs accepted by the `validate-main-pr.yml` release regex trigger
+          integration without a label,
         - `release-required-result` aggregates the intended jobs,
         - release PR documentation names the same required context as the
           workflow,
@@ -199,8 +209,8 @@ verification:
     command: "uv run -- python - <<'PY'\nfrom pathlib import Path\nimport yaml\nfor path in ['.github/workflows/test.yml', '.github/workflows/release.yml', '.github/workflows/validate-main-pr.yml']:\n    yaml.safe_load(Path(path).read_text())\nprint('workflow yaml ok')\nPY"
     expected_output: "workflow yaml ok"
   - description: "Release docs mention the required check context"
-    command: "grep -R \"release-required-result\" docs/operations/release-guide.md docs/operations/repo-admin-settings.md .github/RELEASE_PR_TEMPLATE.md"
-    expected_output: "at least one match in each release operations surface"
+    command: "for path in docs/operations/release-guide.md docs/operations/repo-admin-settings.md .github/RELEASE_PR_TEMPLATE.md; do grep -q \"release-required-result\" \"$path\" || exit 1; done"
+    expected_output: "release-required-result is present in every release operations surface"
   - description: "TODO graph remains valid"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/release-required-main-pr-test-contract.yaml"
     expected_output: "exit 0"

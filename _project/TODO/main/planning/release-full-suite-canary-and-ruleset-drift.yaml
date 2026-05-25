@@ -81,6 +81,9 @@ work:
         - raw pytest logs only as CI artifacts, not committed files.
 
       Decision gate:
+        - If a dedicated workflow is needed, use the scoped name
+          `.github/workflows/release-canary.yml`; do not add an unreviewed
+          workflow filename outside `scope_limit`.
         - If live credentials are unavailable, explicitly mark live cloud tests
           advisory and keep the blocking canary to credential-free suites.
 
@@ -170,8 +173,8 @@ verification:
     command: "uv run -- python -m pytest tests/unit -k 'ruleset or release_readiness or canary' -q"
     expected_output: "all matching tests pass"
   - description: "Release docs mention canary freshness and ruleset drift"
-    command: "grep -R \"canary\" docs/operations/release-guide.md docs/operations/repo-admin-settings.md .github/RELEASE_PR_TEMPLATE.md && grep -R \"ruleset drift\" docs/operations/release-guide.md docs/operations/repo-admin-settings.md .github/RELEASE_PR_TEMPLATE.md"
-    expected_output: "matches in release documentation surfaces"
+    command: "for path in docs/operations/release-guide.md docs/operations/repo-admin-settings.md .github/RELEASE_PR_TEMPLATE.md; do grep -q \"canary\" \"$path\" || exit 1; grep -q \"ruleset drift\" \"$path\" || exit 1; done"
+    expected_output: "canary and ruleset drift are present in every release documentation surface"
   - description: "TODO graph remains valid"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/release-full-suite-canary-and-ruleset-drift.yaml"
     expected_output: "exit 0"
@@ -179,13 +182,17 @@ verification:
 scope_limit:
   only_modify:
     - ".github/workflows/nightly.yml"
+    - ".github/workflows/release-canary.yml"
     - ".github/workflows/cross-platform-validation.yml"
     - ".github/workflows/validate-main-pr.yml"
     - ".github/RELEASE_PR_TEMPLATE.md"
     - "docs/operations/release-guide.md"
     - "docs/operations/repo-admin-settings.md"
-    - "scripts/"
-    - "tests/unit/"
+    - "scripts/release_readiness_check.py"
+    - "scripts/ruleset_drift_check.py"
+    - "tests/unit/test_release_readiness.py"
+    - "tests/unit/test_ruleset_drift.py"
+    - "tests/unit/test_release_infrastructure.py"
     - "_project/TODO/main/planning/release-full-suite-canary-and-ruleset-drift.yaml"
   do_not_modify:
     - "benchbox/core/"
