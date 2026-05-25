@@ -36,13 +36,12 @@ description: |
      Fix: add an upper guard `pandas_version < (3, 0)` so the assignment is
      skipped on 3.x where CoW is always active.
 
-  4. TPC-DI ingest + ETL datetime resolution.
+  4. TPC-DI ingest datetime resolution.
      pandas 3.0 defaults to microsecond resolution for datetime parsing
-     (vs. nanoseconds in 2.x). Any code in `tpcdi/benchmark.py`,
-     `tpcdi/tools/file_parsers.py`, or `tpcdi/etl/transformations.py` that reads
-     or normalizes date/time values via pd.read_csv / pd.read_fwf /
-     pd.read_json / pd.to_datetime and then converts to int64 or compares values
-     numerically can produce 1000× different results under 3.x. Audit and add
+     (vs. nanoseconds in 2.x). Any remaining code in `tpcdi/benchmark.py` that
+     reads or normalizes date/time values via pd.read_csv / pd.read_fwf /
+     pd.read_json / pd.to_datetime and then converts to int64 or compares
+     values numerically can produce 1000× different results under 3.x. Audit and add
      explicit `dtype_backend`, `parse_dates=False`, or explicit resolution
      normalization where the downstream code is resolution-sensitive. (CoW
      in-place mutation audit was clean - no fixes needed there.)
@@ -53,8 +52,8 @@ description: |
   BenchBox codebase:
   - DataFrame.swapaxes / append / Index.format() - not used, no impact.
   - groupby/resample keyword changes - not used in DataFrame platform layer.
-  - datetime-unit changes in read/normalize paths - affects the TPC-DI ingest
-    and ETL pipeline only (item 4).
+  - datetime-unit changes in read/normalize paths - affects the remaining
+    TPC-DI benchmark ingest path only (item 4).
   - CoW mandatory - in-place mutation audit clean; only item 3 needs a guard.
   Estimated effort once gates clear: 1-2 days.
 
@@ -73,7 +72,7 @@ work:
     status: pending
 
   - id: w4
-    summary: "Audit the full TPC-DI datetime ingest/ETL path for resolution sensitivity; fix explicit dtype_backend / parse_dates / normalization where needed"
+    summary: "Audit the remaining TPC-DI benchmark ingest path for resolution sensitivity; fix explicit dtype_backend / parse_dates / normalization where needed"
     status: pending
 
   - id: w5
@@ -90,8 +89,6 @@ files_affected:
   modified:
     - "benchbox/platforms/dataframe/pandas_df.py"
     - "benchbox/core/tpcdi/benchmark.py"
-    - "benchbox/core/tpcdi/tools/file_parsers.py"
-    - "benchbox/core/tpcdi/etl/transformations.py"
     - "pyproject.toml"
 
 must_preserve:
@@ -138,8 +135,6 @@ scope_limit:
   only_modify:
     - "benchbox/platforms/dataframe/pandas_df.py"
     - "benchbox/core/tpcdi/benchmark.py"
-    - "benchbox/core/tpcdi/tools/file_parsers.py"
-    - "benchbox/core/tpcdi/etl/transformations.py"
     - "pyproject.toml"
     - "tests/unit/platforms/dataframe/"
     - "tests/unit/core/tpcdi/"
