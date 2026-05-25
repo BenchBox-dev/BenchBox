@@ -30,16 +30,6 @@ from .metadata import (
     TuningMetadata,
     TuningMetadataManager,
 )
-from .validation import (
-    ValidationIssue,
-    ValidationLevel,
-    ValidationResult,
-    detect_tuning_conflicts,
-    validate_benchmark_tunings,
-    validate_column_types,
-    validate_columns_exist,
-    validate_constraint_consistency,
-)
 
 __all__ = [
     # DDL Generator Protocol
@@ -58,15 +48,6 @@ __all__ = [
     "PartitioningConfig",
     "SortKeyConfig",
     "ClusteringConfig",
-    # Validation
-    "ValidationLevel",
-    "ValidationIssue",
-    "ValidationResult",
-    "validate_columns_exist",
-    "validate_column_types",
-    "detect_tuning_conflicts",
-    "validate_benchmark_tunings",
-    "validate_constraint_consistency",
     # Metadata
     "TuningMetadata",
     "TuningMetadataManager",
