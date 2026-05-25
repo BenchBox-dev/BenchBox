@@ -18,6 +18,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q5_expression_impl as _q5_expr_base,
     q5_pandas_impl as _q5_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
 # ---------------------------------------------------------------------------
@@ -348,34 +349,7 @@ def q5_v7_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def q5_v7_pandas_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
-
-    params = get_tpch_parameters(5)
-    region_name = params["region_name"]
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    asia_region = region[region["r_name"] == region_name]
-    asia_nations = nation.merge(asia_region, left_on="n_regionkey", right_on="r_regionkey")
-    asia_customers = customer.merge(asia_nations, left_on="c_nationkey", right_on="n_nationkey")
-    customer_orders = asia_customers.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    customer_orders = customer_orders[
-        (customer_orders["o_orderdate"] >= start_date) & (customer_orders["o_orderdate"] < end_date)
-    ]
-    order_lines = customer_orders.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    joined = order_lines.merge(
-        supplier, left_on=["l_suppkey", "c_nationkey"], right_on=["s_suppkey", "s_nationkey"]
-    ).copy()
-    joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
-    return (
-        joined.groupby("n_name", as_index=False).agg(revenue=("revenue", "sum")).sort_values("revenue", ascending=False)
-    )
+q5_v7_pandas_impl = make_variant_delegate(q5_v5_pandas_impl, name="q5_v7_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------

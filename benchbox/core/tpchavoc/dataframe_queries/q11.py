@@ -18,6 +18,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q11_expression_impl as _q11_expr_base,
     q11_pandas_impl as _q11_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SUBQUERY, build_yaml_variants
 
 # ---------------------------------------------------------------------------
@@ -338,27 +339,7 @@ def q11_v7_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def q11_v7_pandas_impl(ctx: DataFrameContext) -> Any:
-    partsupp = ctx.get_table("partsupp")
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-
-    params = get_tpch_parameters(11)
-    nation_name = params["nation_name"]
-    fraction = params["fraction"]
-
-    # Reordered: nation → supplier → partsupp
-    germany_nation = nation[nation["n_name"] == nation_name]
-    germany_suppliers = germany_nation.merge(supplier, left_on="n_nationkey", right_on="s_nationkey")
-    joined = germany_suppliers.merge(partsupp, left_on="s_suppkey", right_on="ps_suppkey").copy()
-    joined["value"] = joined["ps_supplycost"] * joined["ps_availqty"]
-
-    total_value = joined["value"].sum()
-    total_value = total_value.compute() if hasattr(total_value, "compute") else total_value
-    threshold = total_value * fraction
-
-    aggregated = joined.groupby("ps_partkey", as_index=False).agg(value=("value", "sum"))
-    return aggregated[aggregated["value"] > threshold].sort_values("value", ascending=False)
+q11_v7_pandas_impl = make_variant_delegate(q11_v2_pandas_impl, name="q11_v7_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -403,26 +384,7 @@ def q11_v9_expression_impl(ctx: DataFrameContext) -> Any:
     return _q11_expr_base(ctx)
 
 
-def q11_v9_pandas_impl(ctx: DataFrameContext) -> Any:
-    partsupp = ctx.get_table("partsupp")
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-
-    params = get_tpch_parameters(11)
-    nation_name = params["nation_name"]
-    fraction = params["fraction"]
-
-    joined = partsupp.merge(supplier, left_on="ps_suppkey", right_on="s_suppkey")
-    joined = joined.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
-    joined = joined[joined["n_name"] == nation_name].copy()
-    joined["value"] = joined["ps_supplycost"] * joined["ps_availqty"]
-
-    total_value = joined["value"].sum()
-    total_value = total_value.compute() if hasattr(total_value, "compute") else total_value
-    threshold = total_value * fraction
-
-    aggregated = joined.groupby("ps_partkey", as_index=False).agg(value=("value", "sum"))
-    return aggregated[aggregated["value"] > threshold].sort_values("value", ascending=False)
+q11_v9_pandas_impl = make_variant_delegate(q11_v4_pandas_impl, name="q11_v9_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -430,57 +392,10 @@ def q11_v9_pandas_impl(ctx: DataFrameContext) -> Any:
 # ---------------------------------------------------------------------------
 
 
-def q11_v10_expression_impl(ctx: DataFrameContext) -> Any:
-    partsupp = ctx.get_table("partsupp")
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(11)
-    nation_name = params["nation_name"]
-    fraction = params["fraction"]
-
-    # Commuted: availqty * supplycost
-    nation_stock = (
-        partsupp.join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
-        .join(nation, left_on="s_nationkey", right_on="n_nationkey")
-        .filter(col("n_name") == lit(nation_name))
-        .with_columns((col("ps_availqty") * col("ps_supplycost")).alias("value"))
-    )
-
-    total_value = ctx.scalar(nation_stock.select(col("value").sum().alias("total")))
-    threshold = total_value * fraction
-
-    return (
-        nation_stock.group_by("ps_partkey")
-        .agg(col("value").sum().alias("value"))
-        .filter(col("value") > lit(threshold))
-        .sort("value", descending=True)
-    )
+q11_v10_expression_impl = make_variant_delegate(_q11_expr_base, name="q11_v10_expression_impl", module=__name__)
 
 
-def q11_v10_pandas_impl(ctx: DataFrameContext) -> Any:
-    partsupp = ctx.get_table("partsupp")
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-
-    params = get_tpch_parameters(11)
-    nation_name = params["nation_name"]
-    fraction = params["fraction"]
-
-    joined = partsupp.merge(supplier, left_on="ps_suppkey", right_on="s_suppkey")
-    joined = joined.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
-    joined = joined[joined["n_name"] == nation_name].copy()
-    # Commuted: availqty * supplycost
-    joined["value"] = joined["ps_availqty"] * joined["ps_supplycost"]
-
-    total_value = joined["value"].sum()
-    total_value = total_value.compute() if hasattr(total_value, "compute") else total_value
-    threshold = total_value * fraction
-
-    aggregated = joined.groupby("ps_partkey", as_index=False).agg(value=("value", "sum"))
-    return aggregated[aggregated["value"] > threshold].sort_values("value", ascending=False)
+q11_v10_pandas_impl = make_variant_delegate(q11_v4_pandas_impl, name="q11_v10_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------
