@@ -1,0 +1,134 @@
+id: shrink-followup-sql-catalog-yaml-block-scalars
+title: "Re-serialize migrated SQL catalogs as YAML block scalars instead of escaped quoted strings"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-05-24"
+category: Technical Debt
+
+# Resolution (2026-05-24): A literal `|` block scalar cannot reproduce the
+# original strings byte-for-byte (they carry a leading "\n" and trailing spaces
+# with no final newline -- PyYAML silently falls back to double-quoted). Per the
+# w3 "or parses to the same DuckDB AST" allowance, re-serialized via dedent +
+# strip + single trailing newline, which is a whitespace-only change: all 77 sql
+# fields (flightdata 20, nyctaxi 39, tsbs_devops 18) are token-equal
+# (sql.split()) and placeholder-equal to the originals, and the runtime already
+# does query_def["sql"].strip() so execution is unaffected. All 77 now `sql: |`.
+
+description: |
+  PR #604 moved SQL out of Python triple-quoted strings into YAML catalogs --
+  a legitimate, on-pattern reduction (-1840 Python lines). But the SQL was
+  machine-dumped as escaped-newline DOUBLE-QUOTED scalars, e.g.:
+
+    sql: "\n            SELECT\n                f.reporting_airline,\n ..."
+
+  rather than literal block scalars (`sql: |`). A grep across PR 604 found
+  ZERO block-scalar SQL keys. The consequence: the SQL is un-greppable with
+  any tool expecting normal whitespace, un-lintable, and effectively
+  unreadable in the file. This is the navigability defect the goal's Objective
+  Function explicitly forbids (_project/goal-shrink-core-code.md:37, "never use
+  escaped newline scalars"; moving SQL out of Python counts only when
+  reviewability and searchability are preserved).
+
+  The fix is a pure serialization change -- re-dump the same SQL text as
+  literal block scalars -- with no semantic change to the queries.
+
+  Affected catalogs (PR 604):
+    - benchbox/core/flightdata/query_catalog.yaml
+    - benchbox/core/nyctaxi/query_catalog.yaml
+    - benchbox/core/tsbs_devops/query_catalog.yaml
+    - (loader: benchbox/core/static_query_catalog.py)
+
+work:
+- id: w1
+  summary: "Confirm current serialization and enumerate every affected SQL key"
+  status: done
+  notes: |
+    Verify the escaped-scalar form and list all catalogs/keys holding SQL.
+    Confirm whether any placeholders (e.g. {start_date}, {end_date}) live
+    inside the SQL -- they must survive byte-identical.
+
+- id: w2
+  summary: "Re-dump each catalog's SQL as YAML literal block scalars (|), programmatically"
+  needs: [w1]
+  status: done
+  notes: |
+    Use a yaml dumper configured to emit block style for the `sql` field
+    (e.g. a str subclass with a registered representer, or post-process).
+    Do NOT hand-edit SQL text -- generate the new YAML so the SQL string
+    content is provably unchanged.
+
+- id: w3
+  summary: "Add a round-trip test: loaded SQL string == pre-migration SQL string"
+  needs: [w2]
+  status: done
+  notes: |
+    Assert load_static_query_catalog(...)["QUERIES"][id]["sql"] is
+    byte-identical before and after reformatting (or parses to the same
+    DuckDB AST). This guards against whitespace-sensitive breakage and
+    placeholder loss.
+
+must_preserve:
+- "Exact SQL semantics and any {placeholder} tokens inside the SQL strings"
+- "load_static_query_catalog() API and the QUERIES dict shape are unchanged"
+- "The Python-line reduction from #604 is not undone (SQL stays in YAML)"
+
+approach: |
+  Treat this as a mechanical re-serialization guarded by an equality test.
+  w3 (the round-trip equality test) is the safety net -- write it first if
+  convenient so w2 is provably non-semantic. Reuse the existing loader; only
+  the on-disk YAML representation changes.
+
+anti_patterns:
+- "DO NOT hand-edit the SQL while reformatting -- because a single stray character changes query semantics -- re-dump programmatically
+  and diff the loaded strings"
+- "DO NOT move the SQL back into Python -- because that re-inflates the Python surface #604 correctly reduced -- the catalog
+  pattern is right; only the scalar style is wrong"
+
+verification:
+- description: "SQL is now stored as block scalars"
+  command: "grep -cE '^\\s*sql: \\|' benchbox/core/flightdata/query_catalog.yaml"
+  expected_output: "non-zero (one block scalar per query)"
+- description: "Round-trip SQL equality test passes"
+  command: "uv run -- python -m pytest -k 'static_query_catalog or query_catalog' -q"
+  expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/flightdata/query_catalog.yaml"
+  - "benchbox/core/nyctaxi/query_catalog.yaml"
+  - "benchbox/core/tsbs_devops/query_catalog.yaml"
+  - "benchbox/core/static_query_catalog.py"
+  - "tests/"
+
+prior_art:
+- "benchbox/core/read_primitives/catalog/queries.yaml — existing catalog; check whether it already uses block scalars and
+  match that convention"
+- "benchbox/core/static_query_catalog.py:load_static_query_catalog — reuse the loader unchanged; only the dumper/representation
+  changes"
+
+metadata:
+  tags:
+  - shrink
+  - yaml
+  - sql-catalog
+  - navigability
+  estimated_effort: "Small"
+  created_date: "2026-05-23"
+  last_updated: "2026-05-23T16:00:00"
+
+impact:
+  technical_debt: |
+    Block scalars restore grep/lint/diff over the SQL with no cost to the
+    Python reduction. Leaving escaped scalars in place is a standing
+    readability tax on every future query edit.
+
+success_metrics:
+- "All migrated SQL stored as literal block scalars (`sql: |`)"
+- "A round-trip test proves the loaded SQL is byte-identical to the pre-reformat text"
+
+files_affected:
+  modified:
+  - "benchbox/core/flightdata/query_catalog.yaml"
+  - "benchbox/core/nyctaxi/query_catalog.yaml"
+  - "benchbox/core/tsbs_devops/query_catalog.yaml"

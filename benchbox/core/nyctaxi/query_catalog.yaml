@@ -4,9 +4,15 @@ QUERIES:
     name: Trips per Hour
     description: Count trips by hour of day
     category: temporal
-    sql: "\n            SELECT\n                EXTRACT(HOUR FROM pickup_datetime) as hour,\n                COUNT(*) as trip_count\n\
-      \            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n              AND pickup_datetime < '{end_date}'\n\
-      \            GROUP BY EXTRACT(HOUR FROM pickup_datetime)\n            ORDER BY hour\n        "
+    sql: |
+      SELECT
+          EXTRACT(HOUR FROM pickup_datetime) as hour,
+          COUNT(*) as trip_count
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+      GROUP BY EXTRACT(HOUR FROM pickup_datetime)
+      ORDER BY hour
     params:
       duration_days: 30
   trips-per-day:
@@ -14,9 +20,15 @@ QUERIES:
     name: Trips per Day
     description: Daily trip counts
     category: temporal
-    sql: "\n            SELECT\n                DATE_TRUNC('day', pickup_datetime) as day,\n                COUNT(*) as trip_count\n\
-      \            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n              AND pickup_datetime < '{end_date}'\n\
-      \            GROUP BY DATE_TRUNC('day', pickup_datetime)\n            ORDER BY day\n        "
+    sql: |
+      SELECT
+          DATE_TRUNC('day', pickup_datetime) as day,
+          COUNT(*) as trip_count
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+      GROUP BY DATE_TRUNC('day', pickup_datetime)
+      ORDER BY day
     params:
       duration_days: 365
   trips-per-month:
@@ -24,10 +36,16 @@ QUERIES:
     name: Trips per Month
     description: Monthly trip counts over time
     category: temporal
-    sql: "\n            SELECT\n                DATE_TRUNC('month', pickup_datetime) as month,\n                COUNT(*) as\
-      \ trip_count,\n                SUM(total_amount) as total_revenue\n            FROM trips\n            WHERE pickup_datetime\
-      \ >= '{start_date}'\n              AND pickup_datetime < '{end_date}'\n            GROUP BY DATE_TRUNC('month', pickup_datetime)\n\
-      \            ORDER BY month\n        "
+    sql: |
+      SELECT
+          DATE_TRUNC('month', pickup_datetime) as month,
+          COUNT(*) as trip_count,
+          SUM(total_amount) as total_revenue
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+      GROUP BY DATE_TRUNC('month', pickup_datetime)
+      ORDER BY month
     params:
       duration_days: 365
   trips-by-day-of-week:
@@ -35,10 +53,17 @@ QUERIES:
     name: Trips by Day of Week
     description: Trip patterns by weekday
     category: temporal
-    sql: "\n            SELECT\n                EXTRACT(DOW FROM pickup_datetime) as day_of_week,\n                COUNT(*)\
-      \ as trip_count,\n                AVG(trip_distance) as avg_distance,\n                AVG(total_amount) as avg_fare\n\
-      \            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n              AND pickup_datetime < '{end_date}'\n\
-      \            GROUP BY EXTRACT(DOW FROM pickup_datetime)\n            ORDER BY day_of_week\n        "
+    sql: |
+      SELECT
+          EXTRACT(DOW FROM pickup_datetime) as day_of_week,
+          COUNT(*) as trip_count,
+          AVG(trip_distance) as avg_distance,
+          AVG(total_amount) as avg_fare
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+      GROUP BY EXTRACT(DOW FROM pickup_datetime)
+      ORDER BY day_of_week
     params:
       duration_days: 90
   top-pickup-zones:
@@ -46,11 +71,19 @@ QUERIES:
     name: Top Pickup Zones
     description: Most popular pickup locations
     category: geographic
-    sql: "\n            SELECT\n                t.pickup_location_id,\n                z.zone,\n                z.borough,\n\
-      \                COUNT(*) as trip_count\n            FROM trips t\n            LEFT JOIN taxi_zones z ON t.pickup_location_id\
-      \ = z.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n\
-      \            GROUP BY t.pickup_location_id, z.zone, z.borough\n            ORDER BY trip_count DESC\n            LIMIT\
-      \ 20\n        "
+    sql: |
+      SELECT
+          t.pickup_location_id,
+          z.zone,
+          z.borough,
+          COUNT(*) as trip_count
+      FROM trips t
+      LEFT JOIN taxi_zones z ON t.pickup_location_id = z.location_id
+      WHERE t.pickup_datetime >= '{start_date}'
+        AND t.pickup_datetime < '{end_date}'
+      GROUP BY t.pickup_location_id, z.zone, z.borough
+      ORDER BY trip_count DESC
+      LIMIT 20
     params:
       duration_days: 30
   top-dropoff-zones:
@@ -58,11 +91,19 @@ QUERIES:
     name: Top Dropoff Zones
     description: Most popular dropoff locations
     category: geographic
-    sql: "\n            SELECT\n                t.dropoff_location_id,\n                z.zone,\n                z.borough,\n\
-      \                COUNT(*) as trip_count\n            FROM trips t\n            LEFT JOIN taxi_zones z ON t.dropoff_location_id\
-      \ = z.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n\
-      \            GROUP BY t.dropoff_location_id, z.zone, z.borough\n            ORDER BY trip_count DESC\n            LIMIT\
-      \ 20\n        "
+    sql: |
+      SELECT
+          t.dropoff_location_id,
+          z.zone,
+          z.borough,
+          COUNT(*) as trip_count
+      FROM trips t
+      LEFT JOIN taxi_zones z ON t.dropoff_location_id = z.location_id
+      WHERE t.pickup_datetime >= '{start_date}'
+        AND t.pickup_datetime < '{end_date}'
+      GROUP BY t.dropoff_location_id, z.zone, z.borough
+      ORDER BY trip_count DESC
+      LIMIT 20
     params:
       duration_days: 30
   top-routes:
@@ -70,13 +111,23 @@ QUERIES:
     name: Top Routes
     description: Most popular pickup-dropoff pairs
     category: geographic
-    sql: "\n            SELECT\n                t.pickup_location_id,\n                pz.zone as pickup_zone,\n         \
-      \       t.dropoff_location_id,\n                dz.zone as dropoff_zone,\n                COUNT(*) as trip_count,\n\
-      \                AVG(t.trip_distance) as avg_distance,\n                AVG(t.total_amount) as avg_fare\n          \
-      \  FROM trips t\n            LEFT JOIN taxi_zones pz ON t.pickup_location_id = pz.location_id\n            LEFT JOIN\
-      \ taxi_zones dz ON t.dropoff_location_id = dz.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n \
-      \             AND t.pickup_datetime < '{end_date}'\n            GROUP BY t.pickup_location_id, pz.zone, t.dropoff_location_id,\
-      \ dz.zone\n            ORDER BY trip_count DESC\n            LIMIT 50\n        "
+    sql: |
+      SELECT
+          t.pickup_location_id,
+          pz.zone as pickup_zone,
+          t.dropoff_location_id,
+          dz.zone as dropoff_zone,
+          COUNT(*) as trip_count,
+          AVG(t.trip_distance) as avg_distance,
+          AVG(t.total_amount) as avg_fare
+      FROM trips t
+      LEFT JOIN taxi_zones pz ON t.pickup_location_id = pz.location_id
+      LEFT JOIN taxi_zones dz ON t.dropoff_location_id = dz.location_id
+      WHERE t.pickup_datetime >= '{start_date}'
+        AND t.pickup_datetime < '{end_date}'
+      GROUP BY t.pickup_location_id, pz.zone, t.dropoff_location_id, dz.zone
+      ORDER BY trip_count DESC
+      LIMIT 50
     params:
       duration_days: 30
   borough-summary:
@@ -84,11 +135,20 @@ QUERIES:
     name: Borough Summary
     description: Trip statistics by borough
     category: geographic
-    sql: "\n            SELECT\n                z.borough,\n                COUNT(*) as trip_count,\n                SUM(t.total_amount)\
-      \ as total_revenue,\n                AVG(t.trip_distance) as avg_distance,\n                AVG(t.tip_amount) as avg_tip\n\
-      \            FROM trips t\n            LEFT JOIN taxi_zones z ON t.pickup_location_id = z.location_id\n            WHERE\
-      \ t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n              AND z.borough\
-      \ IS NOT NULL\n            GROUP BY z.borough\n            ORDER BY trip_count DESC\n        "
+    sql: |
+      SELECT
+          z.borough,
+          COUNT(*) as trip_count,
+          SUM(t.total_amount) as total_revenue,
+          AVG(t.trip_distance) as avg_distance,
+          AVG(t.tip_amount) as avg_tip
+      FROM trips t
+      LEFT JOIN taxi_zones z ON t.pickup_location_id = z.location_id
+      WHERE t.pickup_datetime >= '{start_date}'
+        AND t.pickup_datetime < '{end_date}'
+        AND z.borough IS NOT NULL
+      GROUP BY z.borough
+      ORDER BY trip_count DESC
     params:
       duration_days: 90
   revenue-by-payment-type:
@@ -96,11 +156,19 @@ QUERIES:
     name: Revenue by Payment Type
     description: Revenue breakdown by payment method
     category: financial
-    sql: "\n            SELECT\n                payment_type,\n                COUNT(*) as trip_count,\n                SUM(total_amount)\
-      \ as total_revenue,\n                SUM(tip_amount) as total_tips,\n                AVG(tip_amount / NULLIF(fare_amount,\
-      \ 0)) * 100 as avg_tip_percentage\n            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n   \
-      \           AND pickup_datetime < '{end_date}'\n              AND fare_amount > 0\n            GROUP BY payment_type\n\
-      \            ORDER BY total_revenue DESC\n        "
+    sql: |
+      SELECT
+          payment_type,
+          COUNT(*) as trip_count,
+          SUM(total_amount) as total_revenue,
+          SUM(tip_amount) as total_tips,
+          AVG(tip_amount / NULLIF(fare_amount, 0)) * 100 as avg_tip_percentage
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+        AND fare_amount > 0
+      GROUP BY payment_type
+      ORDER BY total_revenue DESC
     params:
       duration_days: 30
   fare-distribution:
@@ -108,11 +176,18 @@ QUERIES:
     name: Fare Distribution
     description: Distribution of fare amounts
     category: financial
-    sql: "\n            SELECT\n                FLOOR(fare_amount / 5) * 5 as fare_bucket,\n                COUNT(*) as trip_count,\n\
-      \                AVG(trip_distance) as avg_distance,\n                AVG(tip_amount) as avg_tip\n            FROM trips\n\
-      \            WHERE pickup_datetime >= '{start_date}'\n              AND pickup_datetime < '{end_date}'\n           \
-      \   AND fare_amount BETWEEN 0 AND 100\n            GROUP BY FLOOR(fare_amount / 5) * 5\n            ORDER BY fare_bucket\n\
-      \        "
+    sql: |
+      SELECT
+          FLOOR(fare_amount / 5) * 5 as fare_bucket,
+          COUNT(*) as trip_count,
+          AVG(trip_distance) as avg_distance,
+          AVG(tip_amount) as avg_tip
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+        AND fare_amount BETWEEN 0 AND 100
+      GROUP BY FLOOR(fare_amount / 5) * 5
+      ORDER BY fare_bucket
     params:
       duration_days: 30
   tip-analysis:
@@ -120,11 +195,18 @@ QUERIES:
     name: Tip Analysis
     description: Tip patterns by time and location
     category: financial
-    sql: "\n            SELECT\n                EXTRACT(HOUR FROM pickup_datetime) as hour,\n                COUNT(*) as trip_count,\n\
-      \                AVG(tip_amount) as avg_tip,\n                AVG(CASE WHEN fare_amount > 0 THEN tip_amount / fare_amount\
-      \ * 100 END) as avg_tip_pct\n            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n         \
-      \     AND pickup_datetime < '{end_date}'\n              AND payment_type = 1\n            GROUP BY EXTRACT(HOUR FROM\
-      \ pickup_datetime)\n            ORDER BY hour\n        "
+    sql: |
+      SELECT
+          EXTRACT(HOUR FROM pickup_datetime) as hour,
+          COUNT(*) as trip_count,
+          AVG(tip_amount) as avg_tip,
+          AVG(CASE WHEN fare_amount > 0 THEN tip_amount / fare_amount * 100 END) as avg_tip_pct
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+        AND payment_type = 1
+      GROUP BY EXTRACT(HOUR FROM pickup_datetime)
+      ORDER BY hour
     params:
       duration_days: 30
   surcharge-revenue:
@@ -132,11 +214,19 @@ QUERIES:
     name: Surcharge Revenue
     description: Revenue from surcharges and extras
     category: financial
-    sql: "\n            SELECT\n                DATE_TRUNC('month', pickup_datetime) as month,\n                SUM(extra)\
-      \ as extra_revenue,\n                SUM(mta_tax) as mta_tax_revenue,\n                SUM(improvement_surcharge) as\
-      \ improvement_revenue,\n                SUM(congestion_surcharge) as congestion_revenue,\n                SUM(tolls_amount)\
-      \ as tolls_revenue\n            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n              AND pickup_datetime\
-      \ < '{end_date}'\n            GROUP BY DATE_TRUNC('month', pickup_datetime)\n            ORDER BY month\n        "
+    sql: |
+      SELECT
+          DATE_TRUNC('month', pickup_datetime) as month,
+          SUM(extra) as extra_revenue,
+          SUM(mta_tax) as mta_tax_revenue,
+          SUM(improvement_surcharge) as improvement_revenue,
+          SUM(congestion_surcharge) as congestion_revenue,
+          SUM(tolls_amount) as tolls_revenue
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+      GROUP BY DATE_TRUNC('month', pickup_datetime)
+      ORDER BY month
     params:
       duration_days: 365
   distance-distribution:
@@ -144,10 +234,17 @@ QUERIES:
     name: Distance Distribution
     description: Distribution of trip distances
     category: characteristics
-    sql: "\n            SELECT\n                FLOOR(trip_distance) as distance_miles,\n                COUNT(*) as trip_count,\n\
-      \                AVG(total_amount) as avg_fare\n            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n\
-      \              AND pickup_datetime < '{end_date}'\n              AND trip_distance BETWEEN 0 AND 30\n            GROUP\
-      \ BY FLOOR(trip_distance)\n            ORDER BY distance_miles\n        "
+    sql: |
+      SELECT
+          FLOOR(trip_distance) as distance_miles,
+          COUNT(*) as trip_count,
+          AVG(total_amount) as avg_fare
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+        AND trip_distance BETWEEN 0 AND 30
+      GROUP BY FLOOR(trip_distance)
+      ORDER BY distance_miles
     params:
       duration_days: 30
   passenger-count-analysis:
@@ -155,11 +252,19 @@ QUERIES:
     name: Passenger Count Analysis
     description: Trip patterns by passenger count
     category: characteristics
-    sql: "\n            SELECT\n                passenger_count,\n                COUNT(*) as trip_count,\n              \
-      \  AVG(trip_distance) as avg_distance,\n                AVG(total_amount) as avg_fare,\n                AVG(total_amount\
-      \ / NULLIF(trip_distance, 0)) as avg_fare_per_mile\n            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n\
-      \              AND pickup_datetime < '{end_date}'\n              AND passenger_count BETWEEN 1 AND 6\n            GROUP\
-      \ BY passenger_count\n            ORDER BY passenger_count\n        "
+    sql: |
+      SELECT
+          passenger_count,
+          COUNT(*) as trip_count,
+          AVG(trip_distance) as avg_distance,
+          AVG(total_amount) as avg_fare,
+          AVG(total_amount / NULLIF(trip_distance, 0)) as avg_fare_per_mile
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+        AND passenger_count BETWEEN 1 AND 6
+      GROUP BY passenger_count
+      ORDER BY passenger_count
     params:
       duration_days: 30
   trip-duration-analysis:
@@ -167,12 +272,19 @@ QUERIES:
     name: Trip Duration Analysis
     description: Trip duration patterns
     category: characteristics
-    sql: "\n            SELECT\n                FLOOR(EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) / 60 / 5) *\
-      \ 5 as duration_bucket_min,\n                COUNT(*) as trip_count,\n                AVG(trip_distance) as avg_distance,\n\
-      \                AVG(total_amount) as avg_fare\n            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n\
-      \              AND pickup_datetime < '{end_date}'\n              AND dropoff_datetime > pickup_datetime\n          \
-      \    AND EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) BETWEEN 60 AND 7200\n            GROUP BY FLOOR(EXTRACT(EPOCH\
-      \ FROM (dropoff_datetime - pickup_datetime)) / 60 / 5) * 5\n            ORDER BY duration_bucket_min\n        "
+    sql: |
+      SELECT
+          FLOOR(EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) / 60 / 5) * 5 as duration_bucket_min,
+          COUNT(*) as trip_count,
+          AVG(trip_distance) as avg_distance,
+          AVG(total_amount) as avg_fare
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+        AND dropoff_datetime > pickup_datetime
+        AND EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) BETWEEN 60 AND 7200
+      GROUP BY FLOOR(EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) / 60 / 5) * 5
+      ORDER BY duration_bucket_min
     params:
       duration_days: 30
   rate-code-summary:
@@ -180,10 +292,18 @@ QUERIES:
     name: Rate Code Summary
     description: Trip statistics by rate code
     category: rates
-    sql: "\n            SELECT\n                rate_code_id,\n                COUNT(*) as trip_count,\n                AVG(trip_distance)\
-      \ as avg_distance,\n                AVG(total_amount) as avg_fare,\n                SUM(total_amount) as total_revenue\n\
-      \            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n              AND pickup_datetime < '{end_date}'\n\
-      \            GROUP BY rate_code_id\n            ORDER BY trip_count DESC\n        "
+    sql: |
+      SELECT
+          rate_code_id,
+          COUNT(*) as trip_count,
+          AVG(trip_distance) as avg_distance,
+          AVG(total_amount) as avg_fare,
+          SUM(total_amount) as total_revenue
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+      GROUP BY rate_code_id
+      ORDER BY trip_count DESC
     params:
       duration_days: 90
   airport-trips:
@@ -191,12 +311,22 @@ QUERIES:
     name: Airport Trips
     description: Analysis of airport trips (rate codes 2, 3)
     category: rates
-    sql: "\n            SELECT\n                rate_code_id,\n                z.zone as pickup_zone,\n                COUNT(*)\
-      \ as trip_count,\n                AVG(trip_distance) as avg_distance,\n                AVG(total_amount) as avg_fare,\n\
-      \                AVG(tip_amount) as avg_tip\n            FROM trips t\n            LEFT JOIN taxi_zones z ON t.pickup_location_id\
-      \ = z.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n\
-      \              AND t.rate_code_id IN (2, 3)\n            GROUP BY rate_code_id, z.zone\n            ORDER BY trip_count\
-      \ DESC\n            LIMIT 20\n        "
+    sql: |
+      SELECT
+          rate_code_id,
+          z.zone as pickup_zone,
+          COUNT(*) as trip_count,
+          AVG(trip_distance) as avg_distance,
+          AVG(total_amount) as avg_fare,
+          AVG(tip_amount) as avg_tip
+      FROM trips t
+      LEFT JOIN taxi_zones z ON t.pickup_location_id = z.location_id
+      WHERE t.pickup_datetime >= '{start_date}'
+        AND t.pickup_datetime < '{end_date}'
+        AND t.rate_code_id IN (2, 3)
+      GROUP BY rate_code_id, z.zone
+      ORDER BY trip_count DESC
+      LIMIT 20
     params:
       duration_days: 90
   vendor-comparison:
@@ -204,11 +334,19 @@ QUERIES:
     name: Vendor Comparison
     description: Compare vendors by various metrics
     category: vendor
-    sql: "\n            SELECT\n                vendor_id,\n                COUNT(*) as trip_count,\n                AVG(trip_distance)\
-      \ as avg_distance,\n                AVG(total_amount) as avg_fare,\n                AVG(tip_amount) as avg_tip,\n  \
-      \              SUM(total_amount) as total_revenue\n            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n\
-      \              AND pickup_datetime < '{end_date}'\n            GROUP BY vendor_id\n            ORDER BY trip_count DESC\n\
-      \        "
+    sql: |
+      SELECT
+          vendor_id,
+          COUNT(*) as trip_count,
+          AVG(trip_distance) as avg_distance,
+          AVG(total_amount) as avg_fare,
+          AVG(tip_amount) as avg_tip,
+          SUM(total_amount) as total_revenue
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+      GROUP BY vendor_id
+      ORDER BY trip_count DESC
     params:
       duration_days: 30
   hourly-zone-heatmap:
@@ -216,10 +354,16 @@ QUERIES:
     name: Hourly Zone Heatmap
     description: Trip density by hour and zone
     category: complex
-    sql: "\n            SELECT\n                EXTRACT(HOUR FROM pickup_datetime) as hour,\n                pickup_location_id,\n\
-      \                COUNT(*) as trip_count\n            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n\
-      \              AND pickup_datetime < '{end_date}'\n            GROUP BY EXTRACT(HOUR FROM pickup_datetime), pickup_location_id\n\
-      \            ORDER BY hour, trip_count DESC\n        "
+    sql: |
+      SELECT
+          EXTRACT(HOUR FROM pickup_datetime) as hour,
+          pickup_location_id,
+          COUNT(*) as trip_count
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+      GROUP BY EXTRACT(HOUR FROM pickup_datetime), pickup_location_id
+      ORDER BY hour, trip_count DESC
     params:
       duration_days: 7
   weekday-weekend-comparison:
@@ -227,12 +371,20 @@ QUERIES:
     name: Weekday vs Weekend
     description: Compare weekday and weekend patterns
     category: complex
-    sql: "\n            SELECT\n                CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend' ELSE\
-      \ 'weekday' END as day_type,\n                EXTRACT(HOUR FROM pickup_datetime) as hour,\n                COUNT(*)\
-      \ as trip_count,\n                AVG(trip_distance) as avg_distance,\n                AVG(total_amount) as avg_fare\n\
-      \            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n              AND pickup_datetime < '{end_date}'\n\
-      \            GROUP BY\n                CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend' ELSE 'weekday'\
-      \ END,\n                EXTRACT(HOUR FROM pickup_datetime)\n            ORDER BY day_type, hour\n        "
+    sql: |
+      SELECT
+          CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend' ELSE 'weekday' END as day_type,
+          EXTRACT(HOUR FROM pickup_datetime) as hour,
+          COUNT(*) as trip_count,
+          AVG(trip_distance) as avg_distance,
+          AVG(total_amount) as avg_fare
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+      GROUP BY
+          CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend' ELSE 'weekday' END,
+          EXTRACT(HOUR FROM pickup_datetime)
+      ORDER BY day_type, hour
     params:
       duration_days: 30
   rush-hour-analysis:
@@ -240,15 +392,28 @@ QUERIES:
     name: Rush Hour Analysis
     description: Analysis of rush hour patterns
     category: complex
-    sql: "\n            SELECT\n                CASE\n                    WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN\
-      \ 7 AND 9 THEN 'morning_rush'\n                    WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 17 AND 19 THEN 'evening_rush'\n\
-      \                    ELSE 'off_peak'\n                END as period,\n                COUNT(*) as trip_count,\n    \
-      \            AVG(trip_distance) as avg_distance,\n                AVG(total_amount) as avg_fare,\n                AVG(EXTRACT(EPOCH\
-      \ FROM (dropoff_datetime - pickup_datetime)) / 60) as avg_duration_min\n            FROM trips\n            WHERE pickup_datetime\
-      \ >= '{start_date}'\n              AND pickup_datetime < '{end_date}'\n              AND dropoff_datetime > pickup_datetime\n\
-      \            GROUP BY\n                CASE\n                    WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 7 AND\
-      \ 9 THEN 'morning_rush'\n                    WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 17 AND 19 THEN 'evening_rush'\n\
-      \                    ELSE 'off_peak'\n                END\n            ORDER BY trip_count DESC\n        "
+    sql: |
+      SELECT
+          CASE
+              WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 7 AND 9 THEN 'morning_rush'
+              WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 17 AND 19 THEN 'evening_rush'
+              ELSE 'off_peak'
+          END as period,
+          COUNT(*) as trip_count,
+          AVG(trip_distance) as avg_distance,
+          AVG(total_amount) as avg_fare,
+          AVG(EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) / 60) as avg_duration_min
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+        AND dropoff_datetime > pickup_datetime
+      GROUP BY
+          CASE
+              WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 7 AND 9 THEN 'morning_rush'
+              WHEN EXTRACT(HOUR FROM pickup_datetime) BETWEEN 17 AND 19 THEN 'evening_rush'
+              ELSE 'off_peak'
+          END
+      ORDER BY trip_count DESC
     params:
       duration_days: 30
   monthly-year-over-year:
@@ -256,11 +421,18 @@ QUERIES:
     name: Monthly Year-over-Year
     description: Compare monthly patterns across years
     category: complex
-    sql: "\n            SELECT\n                EXTRACT(YEAR FROM pickup_datetime) as year,\n                EXTRACT(MONTH\
-      \ FROM pickup_datetime) as month,\n                COUNT(*) as trip_count,\n                SUM(total_amount) as total_revenue,\n\
-      \                AVG(total_amount) as avg_fare\n            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n\
-      \              AND pickup_datetime < '{end_date}'\n            GROUP BY EXTRACT(YEAR FROM pickup_datetime), EXTRACT(MONTH\
-      \ FROM pickup_datetime)\n            ORDER BY year, month\n        "
+    sql: |
+      SELECT
+          EXTRACT(YEAR FROM pickup_datetime) as year,
+          EXTRACT(MONTH FROM pickup_datetime) as month,
+          COUNT(*) as trip_count,
+          SUM(total_amount) as total_revenue,
+          AVG(total_amount) as avg_fare
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+      GROUP BY EXTRACT(YEAR FROM pickup_datetime), EXTRACT(MONTH FROM pickup_datetime)
+      ORDER BY year, month
     params:
       duration_days: 730
   single-day-summary:
@@ -268,11 +440,18 @@ QUERIES:
     name: Single Day Summary
     description: Summary statistics for a single day
     category: point
-    sql: "\n            SELECT\n                COUNT(*) as trip_count,\n                SUM(total_amount) as total_revenue,\n\
-      \                AVG(trip_distance) as avg_distance,\n                AVG(total_amount) as avg_fare,\n             \
-      \   AVG(tip_amount) as avg_tip,\n                MIN(pickup_datetime) as first_trip,\n                MAX(pickup_datetime)\
-      \ as last_trip\n            FROM trips\n            WHERE pickup_datetime >= '{start_date}'\n              AND pickup_datetime\
-      \ < '{end_date}'\n        "
+    sql: |
+      SELECT
+          COUNT(*) as trip_count,
+          SUM(total_amount) as total_revenue,
+          AVG(trip_distance) as avg_distance,
+          AVG(total_amount) as avg_fare,
+          AVG(tip_amount) as avg_tip,
+          MIN(pickup_datetime) as first_trip,
+          MAX(pickup_datetime) as last_trip
+      FROM trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
     params:
       duration_days: 1
   zone-detail:
@@ -280,11 +459,20 @@ QUERIES:
     name: Zone Detail
     description: Detailed statistics for a specific zone
     category: point
-    sql: "\n            SELECT\n                z.zone,\n                z.borough,\n                COUNT(*) as pickup_count,\n\
-      \                AVG(t.trip_distance) as avg_distance,\n                AVG(t.total_amount) as avg_fare,\n         \
-      \       SUM(t.total_amount) as total_revenue\n            FROM trips t\n            JOIN taxi_zones z ON t.pickup_location_id\
-      \ = z.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n\
-      \              AND t.pickup_location_id = {zone_id}\n            GROUP BY z.zone, z.borough\n        "
+    sql: |
+      SELECT
+          z.zone,
+          z.borough,
+          COUNT(*) as pickup_count,
+          AVG(t.trip_distance) as avg_distance,
+          AVG(t.total_amount) as avg_fare,
+          SUM(t.total_amount) as total_revenue
+      FROM trips t
+      JOIN taxi_zones z ON t.pickup_location_id = z.location_id
+      WHERE t.pickup_datetime >= '{start_date}'
+        AND t.pickup_datetime < '{end_date}'
+        AND t.pickup_location_id = {zone_id}
+      GROUP BY z.zone, z.borough
     params:
       duration_days: 30
   full-scan-count:
@@ -292,7 +480,9 @@ QUERIES:
     name: Full Scan Count
     description: Count all trips (baseline scan query)
     category: baseline
-    sql: "\n            SELECT COUNT(*) as total_trips\n            FROM trips\n        "
+    sql: |
+      SELECT COUNT(*) as total_trips
+      FROM trips
     params: {}
 GREEN_QUERIES:
   green-borough-trips:
@@ -300,12 +490,21 @@ GREEN_QUERIES:
     name: Green Taxi Borough Patterns
     description: Trip patterns by outer borough for Green Taxi (outer-borough specialist)
     category: green-geographic
-    sql: "\n            SELECT\n                z.borough,\n                COUNT(*) as trip_count,\n                AVG(g.trip_distance)\
-      \ as avg_distance,\n                AVG(g.total_amount) as avg_fare,\n                AVG(g.tip_amount) as avg_tip,\n\
-      \                SUM(g.total_amount) as total_revenue\n            FROM green_trips g\n            LEFT JOIN taxi_zones\
-      \ z ON g.pickup_location_id = z.location_id\n            WHERE g.pickup_datetime >= '{start_date}'\n              AND\
-      \ g.pickup_datetime < '{end_date}'\n              AND z.borough IS NOT NULL\n            GROUP BY z.borough\n      \
-      \      ORDER BY trip_count DESC\n        "
+    sql: |
+      SELECT
+          z.borough,
+          COUNT(*) as trip_count,
+          AVG(g.trip_distance) as avg_distance,
+          AVG(g.total_amount) as avg_fare,
+          AVG(g.tip_amount) as avg_tip,
+          SUM(g.total_amount) as total_revenue
+      FROM green_trips g
+      LEFT JOIN taxi_zones z ON g.pickup_location_id = z.location_id
+      WHERE g.pickup_datetime >= '{start_date}'
+        AND g.pickup_datetime < '{end_date}'
+        AND z.borough IS NOT NULL
+      GROUP BY z.borough
+      ORDER BY trip_count DESC
     params:
       duration_days: 90
   green-airport-outer-boro:
@@ -313,13 +512,24 @@ GREEN_QUERIES:
     name: Green Taxi Airport Pickups from Outer Boroughs
     description: Airport-bound trips originating in outer boroughs (Green Taxi specialty)
     category: green-geographic
-    sql: "\n            SELECT\n                pz.borough as pickup_borough,\n                pz.zone as pickup_zone,\n \
-      \               dz.zone as dropoff_zone,\n                COUNT(*) as trip_count,\n                AVG(g.trip_distance)\
-      \ as avg_distance,\n                AVG(g.total_amount) as avg_fare\n            FROM green_trips g\n            LEFT\
-      \ JOIN taxi_zones pz ON g.pickup_location_id = pz.location_id\n            LEFT JOIN taxi_zones dz ON g.dropoff_location_id\
-      \ = dz.location_id\n            WHERE g.pickup_datetime >= '{start_date}'\n              AND g.pickup_datetime < '{end_date}'\n\
-      \              AND dz.service_zone = 'Airports'\n              AND pz.borough NOT IN ('Manhattan', 'Unknown')\n    \
-      \        GROUP BY pz.borough, pz.zone, dz.zone\n            ORDER BY trip_count DESC\n            LIMIT 30\n        "
+    sql: |
+      SELECT
+          pz.borough as pickup_borough,
+          pz.zone as pickup_zone,
+          dz.zone as dropoff_zone,
+          COUNT(*) as trip_count,
+          AVG(g.trip_distance) as avg_distance,
+          AVG(g.total_amount) as avg_fare
+      FROM green_trips g
+      LEFT JOIN taxi_zones pz ON g.pickup_location_id = pz.location_id
+      LEFT JOIN taxi_zones dz ON g.dropoff_location_id = dz.location_id
+      WHERE g.pickup_datetime >= '{start_date}'
+        AND g.pickup_datetime < '{end_date}'
+        AND dz.service_zone = 'Airports'
+        AND pz.borough NOT IN ('Manhattan', 'Unknown')
+      GROUP BY pz.borough, pz.zone, dz.zone
+      ORDER BY trip_count DESC
+      LIMIT 30
     params:
       duration_days: 90
   green-trip-type-split:
@@ -327,11 +537,20 @@ GREEN_QUERIES:
     name: Green Taxi Street-Hail vs Dispatch
     description: Split of Green Taxi trips by type (1=street-hail, 2=dispatch)
     category: green-characteristics
-    sql: "\n            SELECT\n                trip_type,\n                COUNT(*) as trip_count,\n                AVG(trip_distance)\
-      \ as avg_distance,\n                AVG(total_amount) as avg_fare,\n                AVG(tip_amount) as avg_tip,\n  \
-      \              AVG(passenger_count) as avg_passengers\n            FROM green_trips\n            WHERE pickup_datetime\
-      \ >= '{start_date}'\n              AND pickup_datetime < '{end_date}'\n              AND trip_type IN (1, 2)\n     \
-      \       GROUP BY trip_type\n            ORDER BY trip_type\n        "
+    sql: |
+      SELECT
+          trip_type,
+          COUNT(*) as trip_count,
+          AVG(trip_distance) as avg_distance,
+          AVG(total_amount) as avg_fare,
+          AVG(tip_amount) as avg_tip,
+          AVG(passenger_count) as avg_passengers
+      FROM green_trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+        AND trip_type IN (1, 2)
+      GROUP BY trip_type
+      ORDER BY trip_type
     params:
       duration_days: 90
   green-top-zones:
@@ -339,12 +558,21 @@ GREEN_QUERIES:
     name: Green Taxi Top Pickup Zones
     description: Most popular Green Taxi pickup zones (outer-borough focus)
     category: green-geographic
-    sql: "\n            SELECT\n                g.pickup_location_id,\n                z.zone,\n                z.borough,\n\
-      \                z.service_zone,\n                COUNT(*) as trip_count,\n                AVG(g.total_amount) as avg_fare\n\
-      \            FROM green_trips g\n            LEFT JOIN taxi_zones z ON g.pickup_location_id = z.location_id\n      \
-      \      WHERE g.pickup_datetime >= '{start_date}'\n              AND g.pickup_datetime < '{end_date}'\n            GROUP\
-      \ BY g.pickup_location_id, z.zone, z.borough, z.service_zone\n            ORDER BY trip_count DESC\n            LIMIT\
-      \ 25\n        "
+    sql: |
+      SELECT
+          g.pickup_location_id,
+          z.zone,
+          z.borough,
+          z.service_zone,
+          COUNT(*) as trip_count,
+          AVG(g.total_amount) as avg_fare
+      FROM green_trips g
+      LEFT JOIN taxi_zones z ON g.pickup_location_id = z.location_id
+      WHERE g.pickup_datetime >= '{start_date}'
+        AND g.pickup_datetime < '{end_date}'
+      GROUP BY g.pickup_location_id, z.zone, z.borough, z.service_zone
+      ORDER BY trip_count DESC
+      LIMIT 25
     params:
       duration_days: 30
 HVFHV_QUERIES:
@@ -353,14 +581,24 @@ HVFHV_QUERIES:
     name: HVFHV Shared Ride Adoption Rate
     description: Shared ride request and match rates by HVFHV base (Uber/Lyft)
     category: hvfhv-rideshare
-    sql: "\n            SELECT\n                hvfhs_license_num,\n                COUNT(*) as total_trips,\n           \
-      \     SUM(CASE WHEN shared_request_flag = 'Y' THEN 1 ELSE 0 END) as shared_requests,\n                SUM(CASE WHEN\
-      \ shared_match_flag = 'Y' THEN 1 ELSE 0 END) as shared_matches,\n                ROUND(\n                    SUM(CASE\
-      \ WHEN shared_request_flag = 'Y' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2\n                ) as shared_request_pct,\n\
-      \                ROUND(\n                    SUM(CASE WHEN shared_match_flag = 'Y' THEN 1 ELSE 0 END) * 100.0 /\n  \
-      \                  NULLIF(SUM(CASE WHEN shared_request_flag = 'Y' THEN 1 ELSE 0 END), 0), 2\n                ) as shared_match_rate_pct\n\
-      \            FROM hvfhv_trips\n            WHERE pickup_datetime >= '{start_date}'\n              AND pickup_datetime\
-      \ < '{end_date}'\n            GROUP BY hvfhs_license_num\n            ORDER BY total_trips DESC\n        "
+    sql: |
+      SELECT
+          hvfhs_license_num,
+          COUNT(*) as total_trips,
+          SUM(CASE WHEN shared_request_flag = 'Y' THEN 1 ELSE 0 END) as shared_requests,
+          SUM(CASE WHEN shared_match_flag = 'Y' THEN 1 ELSE 0 END) as shared_matches,
+          ROUND(
+              SUM(CASE WHEN shared_request_flag = 'Y' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2
+          ) as shared_request_pct,
+          ROUND(
+              SUM(CASE WHEN shared_match_flag = 'Y' THEN 1 ELSE 0 END) * 100.0 /
+              NULLIF(SUM(CASE WHEN shared_request_flag = 'Y' THEN 1 ELSE 0 END), 0), 2
+          ) as shared_match_rate_pct
+      FROM hvfhv_trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+      GROUP BY hvfhs_license_num
+      ORDER BY total_trips DESC
     params:
       duration_days: 30
   hvfhv-base-dispatch-patterns:
@@ -368,13 +606,22 @@ HVFHV_QUERIES:
     name: HVFHV Base Dispatch Patterns
     description: Trip metrics by dispatching base (Uber HV0003, Lyft HV0005, etc.)
     category: hvfhv-rideshare
-    sql: "\n            SELECT\n                hvfhs_license_num,\n                COUNT(*) as trip_count,\n            \
-      \    AVG(trip_miles) as avg_miles,\n                AVG(trip_time / 60.0) as avg_duration_min,\n                AVG(base_passenger_fare)\
-      \ as avg_passenger_fare,\n                AVG(driver_pay) as avg_driver_pay,\n                ROUND(AVG(driver_pay /\
-      \ NULLIF(base_passenger_fare, 0)) * 100, 2) as driver_share_pct,\n                SUM(base_passenger_fare) as total_revenue\n\
-      \            FROM hvfhv_trips\n            WHERE pickup_datetime >= '{start_date}'\n              AND pickup_datetime\
-      \ < '{end_date}'\n              AND base_passenger_fare > 0\n            GROUP BY hvfhs_license_num\n            ORDER\
-      \ BY trip_count DESC\n        "
+    sql: |
+      SELECT
+          hvfhs_license_num,
+          COUNT(*) as trip_count,
+          AVG(trip_miles) as avg_miles,
+          AVG(trip_time / 60.0) as avg_duration_min,
+          AVG(base_passenger_fare) as avg_passenger_fare,
+          AVG(driver_pay) as avg_driver_pay,
+          ROUND(AVG(driver_pay / NULLIF(base_passenger_fare, 0)) * 100, 2) as driver_share_pct,
+          SUM(base_passenger_fare) as total_revenue
+      FROM hvfhv_trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+        AND base_passenger_fare > 0
+      GROUP BY hvfhs_license_num
+      ORDER BY trip_count DESC
     params:
       duration_days: 30
   hvfhv-driver-pay-analysis:
@@ -382,12 +629,20 @@ HVFHV_QUERIES:
     name: HVFHV Driver Pay vs Passenger Fare
     description: Distribution of driver pay relative to passenger fare
     category: hvfhv-financial
-    sql: "\n            SELECT\n                FLOOR(base_passenger_fare / 5) * 5 as fare_bucket,\n                COUNT(*)\
-      \ as trip_count,\n                AVG(driver_pay) as avg_driver_pay,\n                AVG(tips) as avg_tips,\n     \
-      \           AVG(congestion_surcharge) as avg_congestion,\n                ROUND(AVG(driver_pay / NULLIF(base_passenger_fare,\
-      \ 0)) * 100, 2) as avg_driver_share_pct\n            FROM hvfhv_trips\n            WHERE pickup_datetime >= '{start_date}'\n\
-      \              AND pickup_datetime < '{end_date}'\n              AND base_passenger_fare BETWEEN 2 AND 100\n       \
-      \     GROUP BY FLOOR(base_passenger_fare / 5) * 5\n            ORDER BY fare_bucket\n        "
+    sql: |
+      SELECT
+          FLOOR(base_passenger_fare / 5) * 5 as fare_bucket,
+          COUNT(*) as trip_count,
+          AVG(driver_pay) as avg_driver_pay,
+          AVG(tips) as avg_tips,
+          AVG(congestion_surcharge) as avg_congestion,
+          ROUND(AVG(driver_pay / NULLIF(base_passenger_fare, 0)) * 100, 2) as avg_driver_share_pct
+      FROM hvfhv_trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+        AND base_passenger_fare BETWEEN 2 AND 100
+      GROUP BY FLOOR(base_passenger_fare / 5) * 5
+      ORDER BY fare_bucket
     params:
       duration_days: 30
   hvfhv-wait-time-analysis:
@@ -395,14 +650,22 @@ HVFHV_QUERIES:
     name: HVFHV Wait Time Analysis
     description: Passenger wait time (request to pickup) by time of day and base
     category: hvfhv-service
-    sql: "\n            SELECT\n                hvfhs_license_num,\n                EXTRACT(HOUR FROM pickup_datetime) as\
-      \ hour,\n                COUNT(*) as trip_count,\n                AVG(EXTRACT(EPOCH FROM (pickup_datetime - request_datetime))\
-      \ / 60) as avg_wait_min,\n                PERCENTILE_CONT(0.5) WITHIN GROUP (\n                    ORDER BY EXTRACT(EPOCH\
-      \ FROM (pickup_datetime - request_datetime)) / 60\n                ) as median_wait_min\n            FROM hvfhv_trips\n\
-      \            WHERE pickup_datetime >= '{start_date}'\n              AND pickup_datetime < '{end_date}'\n           \
-      \   AND request_datetime < pickup_datetime\n              AND EXTRACT(EPOCH FROM (pickup_datetime - request_datetime))\
-      \ BETWEEN 60 AND 1800\n            GROUP BY hvfhs_license_num, EXTRACT(HOUR FROM pickup_datetime)\n            ORDER\
-      \ BY hvfhs_license_num, hour\n        "
+    sql: |
+      SELECT
+          hvfhs_license_num,
+          EXTRACT(HOUR FROM pickup_datetime) as hour,
+          COUNT(*) as trip_count,
+          AVG(EXTRACT(EPOCH FROM (pickup_datetime - request_datetime)) / 60) as avg_wait_min,
+          PERCENTILE_CONT(0.5) WITHIN GROUP (
+              ORDER BY EXTRACT(EPOCH FROM (pickup_datetime - request_datetime)) / 60
+          ) as median_wait_min
+      FROM hvfhv_trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+        AND request_datetime < pickup_datetime
+        AND EXTRACT(EPOCH FROM (pickup_datetime - request_datetime)) BETWEEN 60 AND 1800
+      GROUP BY hvfhs_license_num, EXTRACT(HOUR FROM pickup_datetime)
+      ORDER BY hvfhs_license_num, hour
     params:
       duration_days: 30
 CROSS_TYPE_QUERIES:
@@ -411,22 +674,52 @@ CROSS_TYPE_QUERIES:
     name: Cross-Type Market Share by Month
     description: Monthly trip volume and market share for Yellow, Green, and HVFHV
     category: cross-market
-    sql: "\n            WITH monthly_counts AS (\n                SELECT\n                    DATE_TRUNC('month', pickup_datetime)\
-      \ as month,\n                    'yellow' as taxi_type,\n                    COUNT(*) as trip_count\n              \
-      \  FROM trips\n                WHERE pickup_datetime >= '{start_date}'\n                  AND pickup_datetime < '{end_date}'\n\
-      \                GROUP BY DATE_TRUNC('month', pickup_datetime)\n\n                UNION ALL\n\n                SELECT\n\
-      \                    DATE_TRUNC('month', pickup_datetime) as month,\n                    'green' as taxi_type,\n   \
-      \                 COUNT(*) as trip_count\n                FROM green_trips\n                WHERE pickup_datetime >=\
-      \ '{start_date}'\n                  AND pickup_datetime < '{end_date}'\n                GROUP BY DATE_TRUNC('month',\
-      \ pickup_datetime)\n\n                UNION ALL\n\n                SELECT\n                    DATE_TRUNC('month', pickup_datetime)\
-      \ as month,\n                    'hvfhv' as taxi_type,\n                    COUNT(*) as trip_count\n               \
-      \ FROM hvfhv_trips\n                WHERE pickup_datetime >= '{start_date}'\n                  AND pickup_datetime <\
-      \ '{end_date}'\n                GROUP BY DATE_TRUNC('month', pickup_datetime)\n            ),\n            monthly_totals\
-      \ AS (\n                SELECT month, SUM(trip_count) as total_trips\n                FROM monthly_counts\n        \
-      \        GROUP BY month\n            )\n            SELECT\n                mc.month,\n                mc.taxi_type,\n\
-      \                mc.trip_count,\n                ROUND(mc.trip_count * 100.0 / mt.total_trips, 2) as market_share_pct\n\
-      \            FROM monthly_counts mc\n            JOIN monthly_totals mt ON mc.month = mt.month\n            ORDER BY\
-      \ mc.month, mc.taxi_type\n        "
+    sql: |
+      WITH monthly_counts AS (
+          SELECT
+              DATE_TRUNC('month', pickup_datetime) as month,
+              'yellow' as taxi_type,
+              COUNT(*) as trip_count
+          FROM trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+          GROUP BY DATE_TRUNC('month', pickup_datetime)
+
+          UNION ALL
+
+          SELECT
+              DATE_TRUNC('month', pickup_datetime) as month,
+              'green' as taxi_type,
+              COUNT(*) as trip_count
+          FROM green_trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+          GROUP BY DATE_TRUNC('month', pickup_datetime)
+
+          UNION ALL
+
+          SELECT
+              DATE_TRUNC('month', pickup_datetime) as month,
+              'hvfhv' as taxi_type,
+              COUNT(*) as trip_count
+          FROM hvfhv_trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+          GROUP BY DATE_TRUNC('month', pickup_datetime)
+      ),
+      monthly_totals AS (
+          SELECT month, SUM(trip_count) as total_trips
+          FROM monthly_counts
+          GROUP BY month
+      )
+      SELECT
+          mc.month,
+          mc.taxi_type,
+          mc.trip_count,
+          ROUND(mc.trip_count * 100.0 / mt.total_trips, 2) as market_share_pct
+      FROM monthly_counts mc
+      JOIN monthly_totals mt ON mc.month = mt.month
+      ORDER BY mc.month, mc.taxi_type
     params:
       duration_days: 365
   cross-geographic-coverage:
@@ -434,19 +727,39 @@ CROSS_TYPE_QUERIES:
     name: Cross-Type Geographic Coverage by Borough
     description: Borough-level trip distribution for each taxi type
     category: cross-geographic
-    sql: "\n            SELECT\n                z.borough,\n                SUM(CASE WHEN src.taxi_type = 'yellow' THEN src.trip_count\
-      \ ELSE 0 END) as yellow_trips,\n                SUM(CASE WHEN src.taxi_type = 'green' THEN src.trip_count ELSE 0 END)\
-      \ as green_trips,\n                SUM(CASE WHEN src.taxi_type = 'hvfhv' THEN src.trip_count ELSE 0 END) as hvfhv_trips,\n\
-      \                SUM(src.trip_count) as total_trips\n            FROM (\n                SELECT pickup_location_id,\
-      \ 'yellow' as taxi_type, COUNT(*) as trip_count\n                FROM trips\n                WHERE pickup_datetime >=\
-      \ '{start_date}'\n                  AND pickup_datetime < '{end_date}'\n                GROUP BY pickup_location_id\n\
-      \n                UNION ALL\n\n                SELECT pickup_location_id, 'green' as taxi_type, COUNT(*) as trip_count\n\
-      \                FROM green_trips\n                WHERE pickup_datetime >= '{start_date}'\n                  AND pickup_datetime\
-      \ < '{end_date}'\n                GROUP BY pickup_location_id\n\n                UNION ALL\n\n                SELECT\
-      \ pickup_location_id, 'hvfhv' as taxi_type, COUNT(*) as trip_count\n                FROM hvfhv_trips\n             \
-      \   WHERE pickup_datetime >= '{start_date}'\n                  AND pickup_datetime < '{end_date}'\n                GROUP\
-      \ BY pickup_location_id\n            ) src\n            JOIN taxi_zones z ON src.pickup_location_id = z.location_id\n\
-      \            GROUP BY z.borough\n            ORDER BY total_trips DESC\n        "
+    sql: |
+      SELECT
+          z.borough,
+          SUM(CASE WHEN src.taxi_type = 'yellow' THEN src.trip_count ELSE 0 END) as yellow_trips,
+          SUM(CASE WHEN src.taxi_type = 'green' THEN src.trip_count ELSE 0 END) as green_trips,
+          SUM(CASE WHEN src.taxi_type = 'hvfhv' THEN src.trip_count ELSE 0 END) as hvfhv_trips,
+          SUM(src.trip_count) as total_trips
+      FROM (
+          SELECT pickup_location_id, 'yellow' as taxi_type, COUNT(*) as trip_count
+          FROM trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+          GROUP BY pickup_location_id
+
+          UNION ALL
+
+          SELECT pickup_location_id, 'green' as taxi_type, COUNT(*) as trip_count
+          FROM green_trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+          GROUP BY pickup_location_id
+
+          UNION ALL
+
+          SELECT pickup_location_id, 'hvfhv' as taxi_type, COUNT(*) as trip_count
+          FROM hvfhv_trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+          GROUP BY pickup_location_id
+      ) src
+      JOIN taxi_zones z ON src.pickup_location_id = z.location_id
+      GROUP BY z.borough
+      ORDER BY total_trips DESC
     params:
       duration_days: 30
   cross-fare-comparison:
@@ -454,19 +767,42 @@ CROSS_TYPE_QUERIES:
     name: Cross-Type Fare Comparison
     description: Average fare comparison across taxi types (metered vs app-based pricing)
     category: cross-financial
-    sql: "\n            SELECT\n                taxi_type,\n                COUNT(*) as trip_count,\n                AVG(fare)\
-      \ as avg_fare,\n                AVG(distance) as avg_distance,\n                AVG(fare / NULLIF(distance, 0)) as avg_fare_per_mile,\n\
-      \                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY fare) as median_fare\n            FROM (\n            \
-      \    SELECT 'yellow' as taxi_type, total_amount as fare, trip_distance as distance\n                FROM trips\n   \
-      \             WHERE pickup_datetime >= '{start_date}'\n                  AND pickup_datetime < '{end_date}'\n      \
-      \            AND total_amount BETWEEN 2.50 AND 200\n\n                UNION ALL\n\n                SELECT 'green' as\
-      \ taxi_type, total_amount as fare, trip_distance as distance\n                FROM green_trips\n                WHERE\
-      \ pickup_datetime >= '{start_date}'\n                  AND pickup_datetime < '{end_date}'\n                  AND total_amount\
-      \ BETWEEN 2.50 AND 200\n\n                UNION ALL\n\n                SELECT 'hvfhv' as taxi_type,\n              \
-      \         base_passenger_fare + tips + tolls + congestion_surcharge as fare,\n                       trip_miles as distance\n\
-      \                FROM hvfhv_trips\n                WHERE pickup_datetime >= '{start_date}'\n                  AND pickup_datetime\
-      \ < '{end_date}'\n                  AND base_passenger_fare BETWEEN 2.50 AND 200\n            ) all_trips\n        \
-      \    WHERE distance > 0\n            GROUP BY taxi_type\n            ORDER BY avg_fare DESC\n        "
+    sql: |
+      SELECT
+          taxi_type,
+          COUNT(*) as trip_count,
+          AVG(fare) as avg_fare,
+          AVG(distance) as avg_distance,
+          AVG(fare / NULLIF(distance, 0)) as avg_fare_per_mile,
+          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY fare) as median_fare
+      FROM (
+          SELECT 'yellow' as taxi_type, total_amount as fare, trip_distance as distance
+          FROM trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+            AND total_amount BETWEEN 2.50 AND 200
+
+          UNION ALL
+
+          SELECT 'green' as taxi_type, total_amount as fare, trip_distance as distance
+          FROM green_trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+            AND total_amount BETWEEN 2.50 AND 200
+
+          UNION ALL
+
+          SELECT 'hvfhv' as taxi_type,
+                 base_passenger_fare + tips + tolls + congestion_surcharge as fare,
+                 trip_miles as distance
+          FROM hvfhv_trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+            AND base_passenger_fare BETWEEN 2.50 AND 200
+      ) all_trips
+      WHERE distance > 0
+      GROUP BY taxi_type
+      ORDER BY avg_fare DESC
     params:
       duration_days: 30
   cross-peak-hour-patterns:
@@ -474,19 +810,37 @@ CROSS_TYPE_QUERIES:
     name: Cross-Type Peak Hour Patterns
     description: Hourly trip demand comparison across Yellow, Green, and HVFHV
     category: cross-temporal
-    sql: "\n            SELECT\n                hour,\n                SUM(CASE WHEN taxi_type = 'yellow' THEN trip_count\
-      \ ELSE 0 END) as yellow_trips,\n                SUM(CASE WHEN taxi_type = 'green' THEN trip_count ELSE 0 END) as green_trips,\n\
-      \                SUM(CASE WHEN taxi_type = 'hvfhv' THEN trip_count ELSE 0 END) as hvfhv_trips\n            FROM (\n\
-      \                SELECT EXTRACT(HOUR FROM pickup_datetime) as hour, 'yellow' as taxi_type, COUNT(*) as trip_count\n\
-      \                FROM trips\n                WHERE pickup_datetime >= '{start_date}'\n                  AND pickup_datetime\
-      \ < '{end_date}'\n                GROUP BY EXTRACT(HOUR FROM pickup_datetime)\n\n                UNION ALL\n\n     \
-      \           SELECT EXTRACT(HOUR FROM pickup_datetime) as hour, 'green' as taxi_type, COUNT(*) as trip_count\n      \
-      \          FROM green_trips\n                WHERE pickup_datetime >= '{start_date}'\n                  AND pickup_datetime\
-      \ < '{end_date}'\n                GROUP BY EXTRACT(HOUR FROM pickup_datetime)\n\n                UNION ALL\n\n     \
-      \           SELECT EXTRACT(HOUR FROM pickup_datetime) as hour, 'hvfhv' as taxi_type, COUNT(*) as trip_count\n      \
-      \          FROM hvfhv_trips\n                WHERE pickup_datetime >= '{start_date}'\n                  AND pickup_datetime\
-      \ < '{end_date}'\n                GROUP BY EXTRACT(HOUR FROM pickup_datetime)\n            ) hourly\n            GROUP\
-      \ BY hour\n            ORDER BY hour\n        "
+    sql: |
+      SELECT
+          hour,
+          SUM(CASE WHEN taxi_type = 'yellow' THEN trip_count ELSE 0 END) as yellow_trips,
+          SUM(CASE WHEN taxi_type = 'green' THEN trip_count ELSE 0 END) as green_trips,
+          SUM(CASE WHEN taxi_type = 'hvfhv' THEN trip_count ELSE 0 END) as hvfhv_trips
+      FROM (
+          SELECT EXTRACT(HOUR FROM pickup_datetime) as hour, 'yellow' as taxi_type, COUNT(*) as trip_count
+          FROM trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+          GROUP BY EXTRACT(HOUR FROM pickup_datetime)
+
+          UNION ALL
+
+          SELECT EXTRACT(HOUR FROM pickup_datetime) as hour, 'green' as taxi_type, COUNT(*) as trip_count
+          FROM green_trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+          GROUP BY EXTRACT(HOUR FROM pickup_datetime)
+
+          UNION ALL
+
+          SELECT EXTRACT(HOUR FROM pickup_datetime) as hour, 'hvfhv' as taxi_type, COUNT(*) as trip_count
+          FROM hvfhv_trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+          GROUP BY EXTRACT(HOUR FROM pickup_datetime)
+      ) hourly
+      GROUP BY hour
+      ORDER BY hour
     params:
       duration_days: 30
   cross-weekday-weekend:
@@ -494,17 +848,36 @@ CROSS_TYPE_QUERIES:
     name: Cross-Type Weekday vs Weekend Demand
     description: Weekday vs weekend trip volume shift by taxi type
     category: cross-temporal
-    sql: "\n            SELECT\n                CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend' ELSE\
-      \ 'weekday' END as day_type,\n                taxi_type,\n                COUNT(*) as trip_count,\n                AVG(distance)\
-      \ as avg_distance\n            FROM (\n                SELECT pickup_datetime, 'yellow' as taxi_type, trip_distance\
-      \ as distance\n                FROM trips\n                WHERE pickup_datetime >= '{start_date}'\n               \
-      \   AND pickup_datetime < '{end_date}'\n\n                UNION ALL\n\n                SELECT pickup_datetime, 'green'\
-      \ as taxi_type, trip_distance as distance\n                FROM green_trips\n                WHERE pickup_datetime >=\
-      \ '{start_date}'\n                  AND pickup_datetime < '{end_date}'\n\n                UNION ALL\n\n            \
-      \    SELECT pickup_datetime, 'hvfhv' as taxi_type, trip_miles as distance\n                FROM hvfhv_trips\n      \
-      \          WHERE pickup_datetime >= '{start_date}'\n                  AND pickup_datetime < '{end_date}'\n         \
-      \   ) all_trips\n            GROUP BY\n                CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend'\
-      \ ELSE 'weekday' END,\n                taxi_type\n            ORDER BY day_type, taxi_type\n        "
+    sql: |
+      SELECT
+          CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend' ELSE 'weekday' END as day_type,
+          taxi_type,
+          COUNT(*) as trip_count,
+          AVG(distance) as avg_distance
+      FROM (
+          SELECT pickup_datetime, 'yellow' as taxi_type, trip_distance as distance
+          FROM trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+
+          UNION ALL
+
+          SELECT pickup_datetime, 'green' as taxi_type, trip_distance as distance
+          FROM green_trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+
+          UNION ALL
+
+          SELECT pickup_datetime, 'hvfhv' as taxi_type, trip_miles as distance
+          FROM hvfhv_trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+      ) all_trips
+      GROUP BY
+          CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend' ELSE 'weekday' END,
+          taxi_type
+      ORDER BY day_type, taxi_type
     params:
       duration_days: 90
   cross-volume-trends:
@@ -512,15 +885,36 @@ CROSS_TYPE_QUERIES:
     name: Cross-Type Volume Trends
     description: Year-over-year volume trends showing Yellow decline vs HVFHV growth
     category: cross-temporal
-    sql: "\n            SELECT\n                EXTRACT(YEAR FROM pickup_datetime) as year,\n                EXTRACT(MONTH\
-      \ FROM pickup_datetime) as month,\n                taxi_type,\n                COUNT(*) as trip_count\n            FROM\
-      \ (\n                SELECT pickup_datetime, 'yellow' as taxi_type\n                FROM trips\n                WHERE\
-      \ pickup_datetime >= '{start_date}'\n                  AND pickup_datetime < '{end_date}'\n\n                UNION ALL\n\
-      \n                SELECT pickup_datetime, 'green' as taxi_type\n                FROM green_trips\n                WHERE\
-      \ pickup_datetime >= '{start_date}'\n                  AND pickup_datetime < '{end_date}'\n\n                UNION ALL\n\
-      \n                SELECT pickup_datetime, 'hvfhv' as taxi_type\n                FROM hvfhv_trips\n                WHERE\
-      \ pickup_datetime >= '{start_date}'\n                  AND pickup_datetime < '{end_date}'\n            ) all_trips\n\
-      \            GROUP BY\n                EXTRACT(YEAR FROM pickup_datetime),\n                EXTRACT(MONTH FROM pickup_datetime),\n\
-      \                taxi_type\n            ORDER BY year, month, taxi_type\n        "
+    sql: |
+      SELECT
+          EXTRACT(YEAR FROM pickup_datetime) as year,
+          EXTRACT(MONTH FROM pickup_datetime) as month,
+          taxi_type,
+          COUNT(*) as trip_count
+      FROM (
+          SELECT pickup_datetime, 'yellow' as taxi_type
+          FROM trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+
+          UNION ALL
+
+          SELECT pickup_datetime, 'green' as taxi_type
+          FROM green_trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+
+          UNION ALL
+
+          SELECT pickup_datetime, 'hvfhv' as taxi_type
+          FROM hvfhv_trips
+          WHERE pickup_datetime >= '{start_date}'
+            AND pickup_datetime < '{end_date}'
+      ) all_trips
+      GROUP BY
+          EXTRACT(YEAR FROM pickup_datetime),
+          EXTRACT(MONTH FROM pickup_datetime),
+          taxi_type
+      ORDER BY year, month, taxi_type
     params:
       duration_days: 730
