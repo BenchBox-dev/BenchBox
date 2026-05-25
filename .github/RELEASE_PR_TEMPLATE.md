@@ -15,9 +15,18 @@ squash-merge into `main`.
       were removed from this branch (verify with `git diff main...HEAD --stat`
       — the diff should look like a curated subtree, not arbitrary edits)
 - [ ] No surprise file additions (the curation only *removes*)
-- [ ] CI is green on this branch (Tests + Lint workflows must pass)
+- [ ] `validate-base` is green for this release branch
+- [ ] `release-required-result` is green on this branch
 
-### After CI green
+### Release-required guarantee
+
+`release-required-result` means this branch passed the fast test lane,
+integration-not-slow suite, isolated exact-one-wheel package install smoke,
+dependency upper-bound check, and release-branch curation check. It does
+not cover live cloud credentials, stress suites, long-running UAT, or full
+slow/resource-heavy coverage.
+
+### After release-required checks are green
 
 ```bash
 make release-finalize VERSION=X.Y.Z

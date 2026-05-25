@@ -108,17 +108,69 @@ History:
 
 ## Branch ruleset — `main`
 
-Release-only branch. Required status checks live in
-`.github/workflows/lint.yml` and `.github/workflows/test.yml` (which still
-run for `main` PRs and pushes); the umbrella does not apply to `main`.
-Direct pushes are not allowed; releases land via the `release-cut` /
-`release-finalize` Make targets documented in `release-guide.md`.
+Ruleset name: `main-release-only`, targets `refs/heads/main`.
+
+Release-only branch. Direct pushes are not allowed; releases land via the
+`release-cut` / `release-finalize` Make targets documented in
+`release-guide.md`.
+
+Required status checks:
+
+```text
+- validate-base
+- release-required-result
+```
+
+`validate-base` is the branch-shape guard in
+`.github/workflows/validate-main-pr.yml`. It allows only release branches
+matching `vX.Y.Z` with an optional suffix.
+
+`release-required-result` is the umbrella job in `.github/workflows/test.yml`
+for release PR correctness. It aggregates the required fast lane,
+integration-not-slow suite, isolated exact-one-wheel package smoke,
+dependency upper-bound checks, and release-branch curation checks. It is
+the ruleset context maintainers should use instead of individual matrix job
+names such as `test-package (...)`.
+
+Other ruleset properties to preserve:
+
+```text
+strict_required_status_checks_policy: false
+required_linear_history: true
+non_fast_forward: true
+deletion: blocked
+bypass_actors: (none)
+```
 
 Verify (ruleset id varies; list and inspect):
 
 ```bash
 gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | {id, name, target}'
+gh api repos/joeharris76/BenchBox/rulesets/<main-ruleset-id> --jq '
+  {
+    target: .target,
+    enforcement: .enforcement,
+    bypass_actors: [.bypass_actors[]?.actor_type],
+    required_checks: [
+      .rules[]
+      | select(.type == "required_status_checks")
+      | .parameters.required_status_checks[]?.context
+    ],
+    strict_base: (
+      .rules[]
+      | select(.type == "required_status_checks")
+      | .parameters.strict_required_status_checks_policy
+    ),
+    linear_history: any(.rules[]; .type == "required_linear_history"),
+    non_fast_forward: any(.rules[]; .type == "non_fast_forward"),
+    deletion: any(.rules[]; .type == "deletion")
+  }'
 ```
+
+If live GitHub ruleset state differs from this runbook, update the ruleset or
+this document before relying on release-required enforcement. Do not treat a
+green `release-required-result` workflow run as mandatory unless the ruleset
+also requires that context.
 
 ## Repository labels
 
