@@ -18,6 +18,8 @@ import yaml
 
 from benchbox.core.static_query_catalog import load_static_query_catalog
 
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
 CATALOG_PACKAGES = [
     "benchbox.core.flightdata",
     "benchbox.core.nyctaxi",
@@ -39,7 +41,6 @@ def _iter_sql(obj: object):
             yield from _iter_sql(item)
 
 
-@pytest.mark.fast
 @pytest.mark.parametrize("package", CATALOG_PACKAGES)
 def test_all_sql_fields_are_block_scalars(package: str) -> None:
     raw = resources.files(package).joinpath("query_catalog.yaml").read_text(encoding="utf-8")
@@ -51,7 +52,6 @@ def test_all_sql_fields_are_block_scalars(package: str) -> None:
     assert len(_BLOCK_SQL.findall(raw)) == n_fields, f"{package}: not every sql field is a block scalar"
 
 
-@pytest.mark.fast
 @pytest.mark.parametrize("package", CATALOG_PACKAGES)
 def test_sql_survives_yaml_round_trip(package: str) -> None:
     for sql in _iter_sql(load_static_query_catalog(package)):
