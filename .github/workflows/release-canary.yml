@@ -60,16 +60,15 @@ jobs:
         id: run-tests
         shell: bash
         run: |
-          set +e
+          rc=0
           uv run -- python -m pytest \
             -m "(slow or resource_heavy) and not (stress or live_integration)" \
             -n 0 \
             --tb=short \
             --maxfail=5 \
-            2>&1 | tee release-canary-artifacts/non-fast-pytest.log
-          rc=${PIPESTATUS[0]}
+            2>&1 | tee release-canary-artifacts/non-fast-pytest.log \
+            || rc=${PIPESTATUS[0]}
           echo "pytest_exit_code=$rc" >> "$GITHUB_OUTPUT"
-          exit 0
 
       - name: Write non-fast canary summary
         if: always()
@@ -140,14 +139,13 @@ jobs:
           RELEASE_READINESS_OVERRIDE_SHA: ${{ vars.RELEASE_READINESS_OVERRIDE_SHA }}
           RELEASE_READINESS_OVERRIDE_REASON: ${{ vars.RELEASE_READINESS_OVERRIDE_REASON }}
         run: |
-          set +e
           mkdir -p release-canary-artifacts
+          rc=0
           uv run -- python scripts/ruleset_drift_check.py \
             --output release-canary-artifacts/ruleset-drift.json \
-            2>&1 | tee release-canary-artifacts/ruleset-drift.txt
-          rc=${PIPESTATUS[0]}
+            2>&1 | tee release-canary-artifacts/ruleset-drift.txt \
+            || rc=${PIPESTATUS[0]}
           echo "drift_exit_code=$rc" >> "$GITHUB_OUTPUT"
-          exit 0
 
       - name: Upload ruleset drift artifacts
         if: always()
