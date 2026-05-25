@@ -16,36 +16,15 @@ not a static rewrite.
 
 from __future__ import annotations
 
-from benchbox.sql_compat.actions import CompatAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.decision import (
-    CompatibilityDecision,
-    FailureMode,
-    RewriteDDLPayload,
-    SupportLevel,
-)
-from benchbox.sql_compat.registry import REGISTRY
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.fabric_dw.all.optimize_table_definition",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.SYNTAX_ERROR,
-        payload=RewriteDDLPayload(
-            transformer_id="fabric_dw_ddl_optimizer",
-            description=(
-                "Inject schema prefix ([schema].[table_name]) into CREATE TABLE statements "
-                "for Fabric Warehouse; DuckDB DDL output omits the schema qualifier."
-            ),
-            governance_only=True,
-        ),
-        reason=(
-            "Fabric Warehouse requires schema-qualified table names in CREATE TABLE. "
-            "Without the schema prefix, tables are created in the wrong schema or the "
-            "statement references an unqualified name that doesn't resolve correctly."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "fabric_dw",
+register_ddl_rewrite(
+    platform="fabric_dw",
+    rule_name="optimize_table_definition",
+    transformer_id="fabric_dw_ddl_optimizer",
+    description="Inject schema prefix ([schema].[table_name]) into CREATE TABLE statements "
+    "for Fabric Warehouse; DuckDB DDL output omits the schema qualifier.",
+    reason="Fabric Warehouse requires schema-qualified table names in CREATE TABLE. "
+    "Without the schema prefix, tables are created in the wrong schema or the "
+    "statement references an unqualified name that doesn't resolve correctly.",
 )

@@ -11,35 +11,14 @@ compat_lint enforcement only; transformer_id is not resolved at runtime.
 
 from __future__ import annotations
 
-from benchbox.sql_compat.actions import CompatAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.decision import (
-    CompatibilityDecision,
-    FailureMode,
-    RewriteDDLPayload,
-    SupportLevel,
-)
-from benchbox.sql_compat.registry import REGISTRY
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.firebolt.all.optimize_table_definition",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.SYNTAX_ERROR,
-        payload=RewriteDDLPayload(
-            transformer_id="firebolt_ddl_optimizer",
-            description=(
-                "Convert DuckDB-style DDL to Firebolt dialect: VARCHAR(n)/CHAR(n) → TEXT, "
-                "DECIMAL → NUMERIC, strip PRIMARY KEY and FOREIGN KEY constraint clauses"
-            ),
-            governance_only=True,
-        ),
-        reason=(
-            "Firebolt uses TEXT for all string types (not VARCHAR/CHAR), NUMERIC for exact "
-            "decimals (not DECIMAL), and does not enforce PRIMARY KEY or FOREIGN KEY constraints."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "firebolt",
+register_ddl_rewrite(
+    platform="firebolt",
+    rule_name="optimize_table_definition",
+    transformer_id="firebolt_ddl_optimizer",
+    description="Convert DuckDB-style DDL to Firebolt dialect: VARCHAR(n)/CHAR(n) → TEXT, "
+    "DECIMAL → NUMERIC, strip PRIMARY KEY and FOREIGN KEY constraint clauses",
+    reason="Firebolt uses TEXT for all string types (not VARCHAR/CHAR), NUMERIC for exact "
+    "decimals (not DECIMAL), and does not enforce PRIMARY KEY or FOREIGN KEY constraints.",
 )

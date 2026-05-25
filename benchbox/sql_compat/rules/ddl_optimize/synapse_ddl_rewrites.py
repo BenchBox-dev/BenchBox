@@ -13,35 +13,15 @@ governance - compat_lint enforcement only; transformer_id is not resolved at run
 
 from __future__ import annotations
 
-from benchbox.sql_compat.actions import CompatAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.decision import (
-    CompatibilityDecision,
-    FailureMode,
-    RewriteDDLPayload,
-    SupportLevel,
-)
-from benchbox.sql_compat.registry import REGISTRY
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.azure_synapse.all.optimize_table_definition",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.SYNTAX_ERROR,
-        payload=RewriteDDLPayload(
-            transformer_id="azure_synapse_ddl_optimizer",
-            description=(
-                "Append Azure Synapse distribution clause to CREATE TABLE: "
-                "WITH (DISTRIBUTION = ROUND_ROBIN) or configured default"
-            ),
-            governance_only=True,
-        ),
-        reason=(
-            "Azure Synapse Dedicated SQL Pool requires a WITH (DISTRIBUTION = ...) clause "
-            "on every CREATE TABLE statement; DuckDB DDL output omits this clause."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "synapse",
+register_ddl_rewrite(
+    platform="synapse",
+    rule_platform="azure_synapse",
+    rule_name="optimize_table_definition",
+    transformer_id="azure_synapse_ddl_optimizer",
+    description="Append Azure Synapse distribution clause to CREATE TABLE: "
+    "WITH (DISTRIBUTION = ROUND_ROBIN) or configured default",
+    reason="Azure Synapse Dedicated SQL Pool requires a WITH (DISTRIBUTION = ...) clause "
+    "on every CREATE TABLE statement; DuckDB DDL output omits this clause.",
 )

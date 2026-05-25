@@ -12,36 +12,15 @@ enforcement only; transformer_id is not resolved at runtime.
 
 from __future__ import annotations
 
-from benchbox.sql_compat.actions import CompatAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.decision import (
-    CompatibilityDecision,
-    FailureMode,
-    RewriteDDLPayload,
-    SupportLevel,
-)
-from benchbox.sql_compat.registry import REGISTRY
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.databricks.all.convert_to_delta_table",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.SYNTAX_ERROR,
-        payload=RewriteDDLPayload(
-            transformer_id="databricks_delta_ddl_optimizer",
-            description=(
-                "Convert DuckDB-style DDL to Databricks Delta Lake format: "
-                "CREATE OR REPLACE TABLE, USING DELTA, TBLPROPERTIES auto-optimize settings"
-            ),
-            governance_only=True,
-        ),
-        reason=(
-            "Databricks requires Delta Lake DDL: CREATE TABLE must use CREATE OR REPLACE TABLE "
-            "for idempotency, tables must declare USING DELTA, and auto-optimize TBLPROPERTIES "
-            "improve write performance when delta_auto_optimize is enabled."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "databricks",
+register_ddl_rewrite(
+    platform="databricks",
+    rule_name="convert_to_delta_table",
+    transformer_id="databricks_delta_ddl_optimizer",
+    description="Convert DuckDB-style DDL to Databricks Delta Lake format: "
+    "CREATE OR REPLACE TABLE, USING DELTA, TBLPROPERTIES auto-optimize settings",
+    reason="Databricks requires Delta Lake DDL: CREATE TABLE must use CREATE OR REPLACE TABLE "
+    "for idempotency, tables must declare USING DELTA, and auto-optimize TBLPROPERTIES "
+    "improve write performance when delta_auto_optimize is enabled.",
 )
