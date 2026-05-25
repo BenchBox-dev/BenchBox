@@ -11,35 +11,14 @@ compat_lint enforcement only; transformer_id is not resolved at runtime.
 
 from __future__ import annotations
 
-from benchbox.sql_compat.actions import CompatAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.decision import (
-    CompatibilityDecision,
-    FailureMode,
-    RewriteDDLPayload,
-    SupportLevel,
-)
-from benchbox.sql_compat.registry import REGISTRY
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.databend.all.optimize_table_definition",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.SYNTAX_ERROR,
-        payload=RewriteDDLPayload(
-            transformer_id="databend_ddl_optimizer",
-            description=(
-                "Convert DuckDB-style DDL to Databend dialect: CHAR(n) → VARCHAR(n), "
-                "strip PRIMARY KEY and FOREIGN KEY constraint clauses"
-            ),
-            governance_only=True,
-        ),
-        reason=(
-            "Databend uses VARCHAR for all string types (not CHAR), and does not enforce "
-            "PRIMARY KEY or FOREIGN KEY constraints - both must be removed from DDL."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "databend",
+register_ddl_rewrite(
+    platform="databend",
+    rule_name="optimize_table_definition",
+    transformer_id="databend_ddl_optimizer",
+    description="Convert DuckDB-style DDL to Databend dialect: CHAR(n) → VARCHAR(n), "
+    "strip PRIMARY KEY and FOREIGN KEY constraint clauses",
+    reason="Databend uses VARCHAR for all string types (not CHAR), and does not enforce "
+    "PRIMARY KEY or FOREIGN KEY constraints - both must be removed from DDL.",
 )

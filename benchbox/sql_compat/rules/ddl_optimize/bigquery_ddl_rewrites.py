@@ -12,36 +12,15 @@ governance_only=True.
 
 from __future__ import annotations
 
-from benchbox.sql_compat.actions import CompatAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.decision import (
-    CompatibilityDecision,
-    FailureMode,
-    RewriteDDLPayload,
-    SupportLevel,
-)
-from benchbox.sql_compat.registry import REGISTRY
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.bigquery.all.convert_to_bigquery_table",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.SYNTAX_ERROR,
-        payload=RewriteDDLPayload(
-            transformer_id="bigquery_convert_to_bigquery_table",
-            description=(
-                "Convert DuckDB-style CREATE TABLE to BigQuery DDL: CREATE OR REPLACE TABLE, "
-                "project.dataset table qualification, and optional PARTITION BY / CLUSTER BY clauses."
-            ),
-            governance_only=True,
-        ),
-        reason=(
-            "BigQuery DDL runs in a project/dataset namespace and benchmark schema creation must be "
-            "idempotent across repeated runs. Optional partitioning and clustering clauses are appended "
-            "from adapter configuration because DuckDB DDL does not emit BigQuery storage layout hints."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "bigquery",
+register_ddl_rewrite(
+    platform="bigquery",
+    rule_name="convert_to_bigquery_table",
+    transformer_id="bigquery_convert_to_bigquery_table",
+    description="Convert DuckDB-style CREATE TABLE to BigQuery DDL: CREATE OR REPLACE TABLE, "
+    "project.dataset table qualification, and optional PARTITION BY / CLUSTER BY clauses.",
+    reason="BigQuery DDL runs in a project/dataset namespace and benchmark schema creation must be "
+    "idempotent across repeated runs. Optional partitioning and clustering clauses are appended "
+    "from adapter configuration because DuckDB DDL does not emit BigQuery storage layout hints.",
 )
