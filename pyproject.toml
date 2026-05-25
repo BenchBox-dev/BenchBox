@@ -699,9 +699,8 @@ omit = [
     "benchbox/core/datavault/dataframe_queries/queries.py",
     "benchbox/core/nyctaxi/dataframe_queries/queries.py",
     # TPC-DI ETL: requires full CDC/SCD pipeline infrastructure with staged
-    # incremental loads. Cannot be meaningfully unit-tested (~2,226 miss stmts).
+    # incremental loads. Cannot be meaningfully unit-tested at unit granularity.
     "benchbox/core/tpcdi/etl/transformations.py",
-    "benchbox/core/tpcdi/etl/batch.py",
     "benchbox/core/tpcdi/etl/scd_processor.py",
     # Experimental concurrency: changes frequently, pool tester requires real
     # concurrent database connections (~284 miss stmts).
@@ -788,8 +787,6 @@ exclude_functions = [
     # --- MCP tool registration (structural nesting from framework) ---
     "benchbox/mcp/tools/discovery.py:register_discovery_tools",        # 29 - MCP registration pattern
     "benchbox/mcp/tools/analytics.py:register_analytics_tools",        # 22 - MCP registration pattern
-    # --- Parallel / concurrency patterns (async coordination is inherent) ---
-    "benchbox/core/tpcdi/etl/batch.py:_execute_parallel_pipeline",     # 20 - thread-pool ETL with future management, timeout, and result collection
     # --- Thread-safety (single-flight cache; locking protocol cannot be simplified) ---
     "benchbox/core/expected_results/registry.py:_get_benchmark_results",  # 17 - single-flight cache with cross-thread coordination
     # --- Query plan parsers (AST node dispatch; each operator has distinct properties) ---

@@ -1,4 +1,4 @@
-"""Coverage tests for remaining TPC-DI ETL transformation/batch/SCD modules."""
+"""Coverage tests for remaining TPC-DI ETL transformation/SCD modules."""
 
 from __future__ import annotations
 
@@ -11,19 +11,6 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from benchbox.core.tpcdi.etl.batch import (
-    BatchMetrics,
-    BatchProcessor,
-    BatchStatus,
-    BatchType,
-    ExtractOperation,
-    LineageRecord,
-    LoadOperation,
-    ParallelConfig,
-    ParallelExecutionContext,
-    TransformOperation,
-    ValidationOperation,
-)
 from benchbox.core.tpcdi.etl.scd_processor import EnhancedSCDType2Processor
 from benchbox.core.tpcdi.etl.transformations import (
     BusinessRuleTransformation,
@@ -289,172 +276,7 @@ def test_transformations_core_paths_and_engine_streaming():
     assert streamed[0][0] == "Other"
 
 
-def test_batch_and_scd_modules_core_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    # BatchMetrics / BatchStatus helpers
-    metrics = BatchMetrics()
-    metrics.add_processed("T", 2)
-    metrics.add_inserted("T", 1)
-    metrics.add_updated("T", 1)
-    metrics.add_rejected("T", 0)
-    metrics.add_processing_time("op", 0.5)
-    assert metrics.get_total_processed() == 2
-    assert metrics.get_total_errors() == 0
-
-    status = BatchStatus(batch_id=1, batch_type=BatchType.HISTORICAL, start_time=datetime.now())
-    status.add_lineage(
-        LineageRecord(
-            source_file="s",
-            target_table="t",
-            transformation_applied="x",
-            records_affected=1,
-            batch_id=1,
-            timestamp=datetime.now(),
-            checksum="abc",
-        )
-    )
-    status.mark_completed(datetime.now())
-    assert status.get_summary()["lineage_records"] == 1
-
-    # ExtractOperation across csv/xml/txt
-    csv_path = tmp_path / "customers.csv"
-    xml_path = tmp_path / "securities.xml"
-    txt_path = tmp_path / "trades.txt"
-    pd.DataFrame({"id": [1], "name": ["a"]}).to_csv(csv_path, index=False)
-    xml_path.write_text("<Root><Record><id>1</id><name>x</name></Record></Root>")
-    txt_path.write_text("id|amount\n1|10\n")
-    ex = ExtractOperation(
-        source_dir=tmp_path,
-        file_patterns={"DimCustomer": "customers.csv", "DimSecurity": "securities.xml", "FactTrade": "trades.txt"},
-    )
-    ctx: dict[str, Any] = {"lineage": []}
-    batch_data: dict[str, pd.DataFrame] = {}
-    ex_result = ex.execute(batch_data, batch_id=1, context=ctx)
-    assert ex_result["success"] is True
-    assert set(ex_result["tables_processed"]) == {"DimCustomer", "DimSecurity", "FactTrade"}
-    assert ex.extract_table("DimCustomer", 1).shape[0] == 1
-    # stream extract import-missing branch
-    monkeypatch.setitem(__import__("sys").modules, "benchbox.core.tpcdi.tools.file_parsers", None)
-    list(ex.execute_streaming(batch_id=1, context={"lineage": []}))
-
-    # TransformOperation
-    tr = TransformOperation(transformation_rules={"DimCustomer": ["x"], "FactTrade": ["y"]})
-    transform_data = {
-        "DimCustomer": pd.DataFrame(
-            {"CustomerID": [1], "LastName": [" A "], "FirstName": ["B"], "Email1": ["a@b.com"]}
-        ),
-        "FactTrade": pd.DataFrame({"TradePrice": [2.0], "Quantity": [3], "Fee": [1.0], "Commission": [2.0]}),
-    }
-    tr_result = tr.execute(transform_data, batch_id=7, context={"batch_type": "incremental", "lineage": []})
-    assert tr_result["success"] is True
-    assert "TradeValue" in transform_data["FactTrade"].columns
-    assert tr._calculate_quality_score(pd.DataFrame()) == 0.0
-    monkeypatch.setattr(
-        TransformationEngine,
-        "transform_batch_streaming",
-        lambda self, source_data_chunks, batch_id, memory_limit_mb=None, progress_callback=None: iter(
-            [("DimCustomer", pd.DataFrame({"CustomerID": [1]}))]
-        ),
-    )
-    list(
-        tr.execute_streaming(
-            {"DimCustomer": iter([pd.DataFrame({"CustomerID": [1], "LastName": ["A"], "FirstName": ["B"]})])},
-            batch_id=1,
-            context={"lineage": []},
-        )
-    )
-
-    # LoadOperation with fake connection object supporting commit/rollback
-    class _DB:
-        def __init__(self):
-            self.did_commit = False
-            self.did_rollback = False
-
-        def commit(self):
-            self.did_commit = True
-
-        def rollback(self):
-            self.did_rollback = True
-
-    load = LoadOperation(
-        connection_config={"db": "x"}, load_strategies={"DimCustomer": "append", "FactTrade": "upsert"}
-    )
-    db = _DB()
-    monkeypatch.setattr(load, "_establish_connection", lambda: setattr(load, "connection", db))
-    monkeypatch.setattr(load, "_close_connection", lambda: None)
-    load_result = load.execute(
-        {"DimCustomer": pd.DataFrame({"id": [1]}), "FactTrade": pd.DataFrame({"id": [1], "x": [2]})},
-        batch_id=1,
-        context={"lineage": []},
-    )
-    assert load_result["success"] is True
-    assert db.did_commit is True
-    assert load.load_table("DimCustomer", pd.DataFrame({"id": [1]}), "replace")["inserted"] == 1
-    assert load.load_table("DimCustomer", pd.DataFrame({"id": [1]}), "bogus")["rejected"] == 1
-    list(load.load_table_streaming("DimCustomer", iter([pd.DataFrame({"id": [1]}), pd.DataFrame()]), "append"))
-    list(
-        load.execute_streaming({"DimCustomer": iter([pd.DataFrame({"id": [1]})])}, batch_id=1, context={"lineage": []})
-    )
-
-    # ValidationOperation
-    val = ValidationOperation(validation_rules={"DimCustomer": ["custom_rule"]})
-    val_df = pd.DataFrame(
-        {
-            "SK_CustomerID": [1, 1],
-            "Status": ["ACTV", "BAD"],
-            "CreditRating": [5, 20],
-            "Email1": ["ok@example.com", "bad"],
-            "EffectiveDate": ["2025-01-01", "2025-01-03"],
-            "EndDate": ["2025-12-31", "2025-01-01"],
-        }
-    )
-    val_result = val.execute({"DimCustomer": val_df}, batch_id=1, context={"lineage": []})
-    assert "summary" in val_result
-    list(val.validate_table_streaming("DimCustomer", iter([val_df])))
-    stream_val = list(val.execute_streaming({"DimCustomer": iter([val_df])}, batch_id=1, context={"lineage": []}))
-    assert stream_val[-1]["operation"] == "streaming_validation_summary"
-
-    # ParallelConfig / ExecutionContext / BatchProcessor
-    cfg = ParallelConfig(max_workers=2, chunk_size=2, enable_parallel=False, worker_timeout=10.0)
-    bc = SimpleNamespace(get_batch_config=lambda: {"max_workers": 2, "chunk_size": 2, "parallel_processing": False})
-    assert ParallelConfig.from_tpcdi_config(bc).chunk_size == 2
-
-    exec_ctx = ParallelExecutionContext(cfg)
-    exec_ctx.add_worker("w")
-    exec_ctx.increment_completed()
-    exec_ctx.increment_failed()
-    exec_ctx.add_performance_metric("extract_times", 0.1)
-    exec_ctx.remove_worker("w")
-    assert exec_ctx.get_task_summary()["completed"] == 1
-
-    processor = BatchProcessor(scale_factor=1.0, parallel_processing=False, parallel_config=cfg)
-    processor.add_operation(ex)
-    processor.add_operation(tr)
-    processor.add_operation(load)
-    processor.add_operation(val)
-    processor.add_dependency("batch_2", "batch_1")
-    assert processor.validate_batch_dependencies(1) is True
-    b1 = processor.process_historical_load(source_config={"root": str(tmp_path)}, target_config={"db": "x"})
-    assert b1.status in {"completed", "failed"}
-    monkeypatch.setattr(processor, "validate_batch_dependencies", lambda _batch_id: True)
-    b2 = processor.process_incremental_batch(
-        batch_number=2,
-        batch_date=date(2025, 1, 1),
-        source_config={"root": str(tmp_path)},
-        target_config={"db": "x"},
-    )
-    assert b2.batch_type == BatchType.INCREMENTAL
-    with pytest.raises(ValueError):
-        processor.process_incremental_batch(5, date(2025, 1, 1), {}, {})
-    assert processor.get_batch_status(1) is not None
-    assert "total_batches" in processor.get_processing_statistics()
-    processor.cleanup_batch_resources(1)
-    # non-parallel report branch
-    assert "error" in processor.get_parallel_performance_report()
-    # worker wrapper branch
-    assert processor._execute_operation_with_monitoring(ex, {}, 1, {"lineage": []}, "w")["worker_id"] == "w"
-    assert "batch_status" in processor.get_lineage_report(1)
-
-    # SCD processor main branches
+def test_scd_module_core_paths(tmp_path: Path):
     conn = _Conn(rows=[(1, "A", 100, 1)], columns=["CustomerID", "Status", "SK_CustomerID", "IsCurrent"])
     scd = EnhancedSCDType2Processor(connection=conn)
     assert scd.process_dimension("DimCustomer", "CustomerID", ["Status"], 1)["success"] is True

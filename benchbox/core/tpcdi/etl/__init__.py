@@ -1,7 +1,6 @@
 """TPC-DI ETL module for data integration and transformation operations."""
 
 from .backend import TPCDIETLBackend
-from .batch import BatchProcessor
 from .dataframe_backend import DataFrameETLBackend
 from .pipeline import TPCDIETLPipeline
 from .results import ETLBatchResult, ETLPhaseResult, ETLResult
@@ -14,7 +13,6 @@ __all__ = [
     "TPCDIETLBackend",
     "SQLETLBackend",
     "DataFrameETLBackend",
-    "BatchProcessor",
     "SourceDataGenerator",
     "TransformationEngine",
     "DataQualityValidator",
