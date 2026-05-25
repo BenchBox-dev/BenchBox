@@ -1,0 +1,218 @@
+id: release-full-suite-canary-and-ruleset-drift
+title: "Add full-suite canary and GitHub ruleset drift detection for release readiness"
+worktree: main
+priority: High
+status: Not Started
+category: Release Tooling
+
+deps:
+  needs:
+    - release-required-main-pr-test-contract
+
+description: |
+  The first release-required gate should stay focused enough to be reliable on
+  every release PR. That still leaves long-tail risk: slow/resource-heavy/stress
+  tests, live integration tests, scheduled cross-platform validation, and
+  GitHub ruleset drift can invalidate release confidence without blocking a
+  single release PR.
+
+  This TODO adds defense-in-depth:
+    - a periodic canary that runs the broader non-fast suite families on a
+      clear schedule,
+    - a compact release-readiness check that fails release PRs when the latest
+      required canary is stale or red,
+    - a repository-visible ruleset drift check so comments about
+      `main-release-only` and `develop-squash-only` do not silently diverge from
+      live GitHub settings.
+
+work:
+  - id: w0
+    summary: "Re-validate current scheduled workflows, suite sizes, and ruleset runbook state"
+    status: pending
+    notes: |
+      Capture raw output under `/tmp/release-canary-ruleset-w0/` and commit only
+      a compact summary in PR body or TODO notes.
+
+      Required commands:
+        - `rg -n "schedule:|cron:|workflow_dispatch:|integration:|test-all|test-slow|resource_heavy|stress" .github/workflows Makefile pytest.ini`
+        - `BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest --collect-only -q -n 0 -m "slow or resource_heavy or stress"`
+        - `BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest --collect-only -q -n 0 -m "live_integration"`
+        - `sed -n '47,130p' docs/operations/repo-admin-settings.md`
+
+      Optional live ruleset verification, only with user authorization:
+        - `gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | {id, name, target}'`
+
+      Decision gate:
+        - If slow/resource/stress collection is too large or unstable for one
+          job, split the canary by suite family and make the readiness check
+          require the configured subset, not an impossible monolith.
+
+  - id: w1
+    summary: "Define the canary freshness contract and override policy"
+    needs: [w0]
+    status: pending
+    notes: |
+      Document:
+        - Which scheduled workflow(s) count as release canaries.
+        - Maximum allowed age, initially 48h unless CI quota/runtime evidence
+          says otherwise.
+        - Which failures block release PRs.
+        - Who can approve an emergency override and where that override is
+          recorded.
+
+      Decision gate:
+        - Do not add a release-readiness check until the stale/red behavior and
+          emergency override semantics are documented.
+
+  - id: w2
+    summary: "Add scheduled non-fast canary workflow jobs with compact artifacts"
+    needs: [w1]
+    status: pending
+    notes: |
+      Extend `nightly.yml` or add a dedicated workflow that runs:
+        - slow + resource-heavy families serially or in bounded parallelism,
+        - stress subset only if runtime/resource limits are acceptable,
+        - selected live-integration/cross-platform jobs only when credentials
+          and Docker/service constraints are stable.
+
+      Artifacts:
+        - compact JSON summary with commit SHA, workflow name, job conclusions,
+          suite families, collected counts, and completion time,
+        - raw pytest logs only as CI artifacts, not committed files.
+
+      Decision gate:
+        - If live credentials are unavailable, explicitly mark live cloud tests
+          advisory and keep the blocking canary to credential-free suites.
+
+  - id: w3
+    summary: "Add release-readiness check that fails release PRs on stale or red canary"
+    needs: [w2]
+    status: pending
+    notes: |
+      Add a `validate-main-pr.yml` job or release-required workflow job that:
+        - applies only to release PRs targeting `main`,
+        - queries the latest successful configured canary run or reads a
+          durable canary artifact,
+        - fails if no canary is green within the freshness window,
+        - reports the canary SHA and age in the job summary.
+
+      Decision gate:
+        - Do not allow this job to silently pass when GitHub API queries fail.
+          API failure is either blocking or requires an explicit documented
+          emergency override.
+
+  - id: w4
+    summary: "Add ruleset drift detection against the repository runbook"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add a script or workflow check that compares live GitHub rulesets with
+      `docs/operations/repo-admin-settings.md`.
+
+      Required checks:
+        - required status check contexts for `main` and `develop`,
+        - strict-base settings,
+        - bypass actor list,
+        - linear history / non-fast-forward / deletion protections where
+          documented.
+
+      Decision gate:
+        - If live GitHub API access is unavailable in PR CI, make this a
+          scheduled/manual workflow with a release-readiness artifact. Do not
+          pretend local YAML alone proves external ruleset state.
+
+  - id: w5
+    summary: "Wire canary freshness and ruleset drift into release docs and PR template"
+    needs: [w3, w4]
+    status: pending
+    notes: |
+      Update release docs and release PR template:
+        - exact canary freshness SLA,
+        - exact ruleset drift check,
+        - what to do when canary is red,
+        - what to do when ruleset API is unavailable,
+        - what remains manual/advisory.
+
+deferred:
+  - summary: "Block every release on all live cloud integrations"
+    reason: "Requires credential availability, cloud spend policy, and flake history; start with credential-free canary plus explicit live-test advisory status."
+  - summary: "Automatically revert published releases on canary failure"
+    reason: "Package indexes are immutable for version uploads; recovery should be patch release or incident process, not automated destructive action."
+
+prior_art:
+  - ".github/workflows/nightly.yml:scheduled validation — extend existing scheduled validation surface"
+  - ".github/workflows/cross-platform-validation.yml:TPC-H SF=0.01 validation — reuse structured diff artifact pattern for canary evidence"
+  - "docs/operations/repo-admin-settings.md:ruleset runbook — use as local expected-state source"
+  - ".github/workflows/develop-post-merge.yml:auto-revert metrics — reuse compact workflow-summary style, not raw logs in git"
+
+must_preserve:
+  - "Routine develop PR latency remains governed by the lightweight PR gate; canary work runs scheduled/manual or release-readiness only."
+  - "Raw pytest, Docker, and live-test logs remain CI artifacts or `/tmp` files, not tracked source."
+  - "Release-readiness checks fail closed on stale evidence unless an explicit documented override path is used."
+
+approach: |
+  Treat canary and ruleset drift as evidence freshness problems. First define
+  which evidence is required and how fresh it must be; then produce compact
+  artifacts; then make release PRs consume those artifacts. Keep live cloud
+  suites advisory unless credential and cost policy are explicitly resolved.
+
+anti_patterns:
+  - "DO NOT wire a long full-suite run directly into every develop PR - because this defeats the current path-aware dev loop - use scheduled canary plus release-readiness."
+  - "DO NOT make API failure pass silently - because ruleset drift is external-state risk - fail or require an explicit override."
+  - "DO NOT commit raw CI logs or screenshots as evidence - because release readiness needs compact durable summaries."
+  - "DO NOT use stale nightly success from a SHA that does not contain the release branch changes unless the release-readiness policy explicitly permits ancestor-based evidence."
+
+verification:
+  - description: "Canary workflow YAML parses"
+    command: "uv run -- python - <<'PY'\nfrom pathlib import Path\nimport yaml\nfor path in Path('.github/workflows').glob('*.yml'):\n    yaml.safe_load(path.read_text())\nprint('workflow yaml ok')\nPY"
+    expected_output: "workflow yaml ok"
+  - description: "Ruleset drift script or workflow test passes with mocked expected data"
+    command: "uv run -- python -m pytest tests/unit -k 'ruleset or release_readiness or canary' -q"
+    expected_output: "all matching tests pass"
+  - description: "Release docs mention canary freshness and ruleset drift"
+    command: "grep -R \"canary\" docs/operations/release-guide.md docs/operations/repo-admin-settings.md .github/RELEASE_PR_TEMPLATE.md && grep -R \"ruleset drift\" docs/operations/release-guide.md docs/operations/repo-admin-settings.md .github/RELEASE_PR_TEMPLATE.md"
+    expected_output: "matches in release documentation surfaces"
+  - description: "TODO graph remains valid"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/release-full-suite-canary-and-ruleset-drift.yaml"
+    expected_output: "exit 0"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/nightly.yml"
+    - ".github/workflows/cross-platform-validation.yml"
+    - ".github/workflows/validate-main-pr.yml"
+    - ".github/RELEASE_PR_TEMPLATE.md"
+    - "docs/operations/release-guide.md"
+    - "docs/operations/repo-admin-settings.md"
+    - "scripts/"
+    - "tests/unit/"
+    - "_project/TODO/main/planning/release-full-suite-canary-and-ruleset-drift.yaml"
+  do_not_modify:
+    - "benchbox/core/"
+    - "benchbox/platforms/"
+    - "results-data/"
+
+success_metrics:
+  - "Release PRs fail when configured canary evidence is missing, stale, or red."
+  - "Ruleset required-context drift is detected by a repo-owned script or workflow."
+  - "Nightly/canary artifacts contain compact release-readiness evidence without committing raw logs."
+
+open_questions:
+  - question: "What is the first blocking canary suite family: slow+resource only, or slow+resource+stress?"
+    gating: true
+    affects: ["w2", "w3", "success_metrics: release PRs fail on stale/red canary"]
+    default: "Start with slow+resource credential-free suites; keep stress advisory until runtime evidence is stable."
+  - question: "Should release readiness require canary SHA to be an ancestor of the release branch, or is freshness by time sufficient?"
+    gating: true
+    affects: ["w3", "success_metrics: canary evidence is meaningful for release branch"]
+    default: "Require the canary SHA to be an ancestor of the release PR head unless that blocks too often; document any relaxation."
+
+metadata:
+  tags:
+    - release-gate
+    - nightly
+    - ruleset
+    - canary
+  estimated_effort: "Large"
+  created_date: "2026-05-25"
+  last_updated: "2026-05-25T00:00:00"

@@ -1,0 +1,211 @@
+id: release-test-command-ratchet-alignment
+title: "Align release-test command surfaces and repair stale release ratchets"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  The release-path adversarial review found several test-command and ratchet
+  mismatches that create false confidence before any stronger release gate can
+  be made trustworthy.
+
+  Baseline evidence from 2026-05-25:
+    - Required PR test jobs use fast-only pytest selection.
+    - `pr-preflight-fast-tests` uses `-m fast -q`, while CI excludes
+      slow/stress/resource/live tests and enforces coverage.
+    - `tests/unit/test_release_infrastructure.py` is `medium`, outside the
+      required fast gate, and the review run found stale workflow/template
+      assertions in that file.
+    - `make test-ci` is not part of mandatory CI and uses a legacy marker
+      expression plus the separate `pytest-ci.ini` coverage scope.
+    - CI enforces coverage at 70%, while `tests/conftest.py` only warns below
+      80% when pytest-cov is active.
+
+  This TODO is the prerequisite cleanup item. It does NOT decide the final
+  release quality contract; it makes the existing command surfaces honest,
+  revalidates the stale-release-ratchet failures, and removes mismatches that
+  would otherwise hide or confuse release-gate work.
+
+deps: {}
+
+work:
+  - id: w0
+    summary: "Re-validate the release-test command drift evidence against the current branch"
+    status: pending
+    notes: |
+      Capture raw output under `/tmp/release-test-command-ratchet-w0/` and
+      commit only a compact summary in the PR body or TODO notes.
+
+      Required commands:
+        - `git status --short --branch`
+        - `uv run -- python -m pytest tests/unit/test_release_infrastructure.py -q`
+        - `BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest --collect-only -q -n 0 -m fast tests/test_tpcds_direct.py`
+        - `BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest --collect-only -q -n 0 -m "fast and not (slow or stress or resource_heavy or live_integration)" tests/test_tpcds_direct.py`
+        - `BENCHBOX_SKIP_TEST_LOCK=1 uv run -- python -m pytest -c pytest-ci.ini --collect-only -q -n 0 -m "not (slow or flaky or local_only)"`
+
+      Decision gate:
+        - If `test_release_infrastructure.py` no longer fails, update the work
+          notes to name the fixing commit before changing tests.
+        - If `make test-ci` becomes an actual required workflow target before
+          implementation starts, stop and split that work into the release gate
+          TODO instead of treating it as cleanup.
+
+  - id: w1
+    summary: "Repair stale release-infrastructure ratchet tests and place them in the correct lane"
+    needs: [w0]
+    status: pending
+    notes: |
+      Update `tests/unit/test_release_infrastructure.py` so it asserts the
+      current release architecture rather than the retired one:
+        - `release.yml` has `dependency-bounds`, `build`, `publish`,
+          `github-release`, and `test-installation`; it must not expect the
+          removed `check-ci-passed` job.
+        - `test.yml` must be inspected as the current job set; do not assume a
+          matrix under `jobs.test` unless the workflow actually has one.
+        - PR template checks must match `.github/PULL_REQUEST_TEMPLATE.md`.
+        - Add a narrow assertion documenting that `release.yml` itself runs no
+          pytest, so future reviewers see the release-path dependency clearly.
+
+      Decision gate:
+        - If the repaired assertions run in <10s and do not build artifacts,
+          mark this file `fast` and `unit` so release-infrastructure drift is
+          covered by mandatory fast gates.
+        - If any assertion needs build/package work, split that single assertion
+          into a separate `medium` test and keep the pure workflow parsing tests
+          fast.
+
+  - id: w2
+    summary: "Align local preflight test selection with the required CI test job or rename the local guarantee"
+    needs: [w0]
+    status: pending
+    notes: |
+      Compare `Makefile:pr-preflight-fast-tests` with `.github/workflows/pr.yml`
+      `code-test`.
+
+      Preferred outcome:
+        - Change local preflight to use the same marker expression as CI:
+          `fast and not (slow or stress or resource_heavy or live_integration)`.
+        - Add a workflow/Makefile ratchet test that fails if these expressions
+          drift again.
+
+      Decision gate:
+        - Do not add the full coverage run to local preflight unless the runtime
+          cost is explicitly accepted in the PR body. If coverage remains CI-only,
+          update `Makefile` help/comments so preflight no longer claims to fully
+          mirror CI.
+
+  - id: w3
+    summary: "Make `test-ci` either a maintained command or remove its broad-CI implication"
+    needs: [w0]
+    status: pending
+    notes: |
+      Decide whether `make test-ci` should survive as a broad local command.
+
+      Acceptable paths:
+        - Maintain it: register any intentionally used markers in both pytest
+          configs, align the coverage source with the authoritative CI scope,
+          add a fast unit ratchet for the command string, and document what it
+          covers that `ci-test` does not.
+        - De-emphasize it: rename or update help/comments so it is not presented
+          as a current CI mirror, and prefer `ci-test`/release-specific targets.
+
+      Decision gate:
+        - Do not silently keep `test-ci` with divergent coverage semantics. The
+          PR must state whether it is maintained, deprecated, or re-scoped.
+
+  - id: w4
+    summary: "Resolve the 70% enforced coverage floor vs 80% local warning mismatch"
+    needs: [w0]
+    status: pending
+    notes: |
+      Pick one explicit policy:
+        - Raise CI `--cov-fail-under` to 80 if the project intends 80 as the
+          real floor.
+        - Lower/remove the local 80 warning if 70 is the intended enforced
+          release floor.
+        - Keep both only if docs/comments explain 70 as blocking and 80 as
+          advisory, with a test proving the warning remains non-failing.
+
+      Decision gate:
+        - Do not change the threshold opportunistically to make current CI pass.
+          Record the current measured coverage from the updated CI command and
+          justify the selected threshold.
+
+deferred:
+  - summary: "Define the final release-critical suite"
+    reason: "Owned by `release-required-main-pr-test-contract`; this cleanup item only removes misleading command drift."
+
+prior_art:
+  - "Makefile:ci-test and pr-preflight-fast-tests — extend existing local/CI command mirrors instead of adding another shell wrapper"
+  - ".github/workflows/pr.yml:code-test — reuse as authoritative required develop PR test expression"
+  - "tests/unit/test_standardized_test_commands.py — extend existing command-surface ratchets"
+  - "tests/unit/test_release_infrastructure.py — repair existing release ratchets rather than adding parallel workflow tests"
+
+must_preserve:
+  - "`make pr-preflight` remains a lightweight local gate and still skips code tests for safe content-only PRs through the existing path classifier."
+  - "Required GitHub PR checks continue to report the existing `lint`, `test (ubuntu-latest, 3.12)`, and `ci-required-result` names unless a downstream ruleset TODO updates the required contexts."
+  - "No raw test logs or coverage files are committed; compact evidence belongs in TODO notes, PR body, or CI artifacts."
+
+approach: |
+  Start by running w0 and updating the TODO or PR body with the current evidence
+  summary. Then fix only the stale command/test ratchets. Prefer extending
+  existing tests under `tests/unit/test_standardized_test_commands.py` and
+  `tests/unit/test_release_infrastructure.py` so future drift fails in the fast
+  lane. Treat coverage threshold changes as a policy decision, not a mechanical
+  edit.
+
+anti_patterns:
+  - "DO NOT broaden `make pr-preflight` into a full release suite - because local preflight is intentionally lightweight - create release-specific gates in dependent TODOs instead."
+  - "DO NOT edit generated workflow mirrors or indexes directly - because TODO indexes are generated - run the project TODO index command after edits."
+  - "DO NOT hide currently failing release ratchets by deleting assertions - because those tests are the evidence trail for release confidence - update them to assert the current architecture."
+  - "DO NOT commit `/tmp` logs, `.coverage`, `coverage.xml`, `test-results.xml`, or build artifacts."
+
+verification:
+  - description: "Repaired release-infrastructure tests pass"
+    command: "uv run -- python -m pytest tests/unit/test_release_infrastructure.py -q"
+    expected_output: "all tests pass"
+  - description: "Command-surface ratchets pass"
+    command: "uv run -- python -m pytest tests/unit/test_standardized_test_commands.py -q"
+    expected_output: "all tests pass"
+  - description: "Fast lane policy remains green"
+    command: "uv run -- python _project/scripts/timing_policy_check.py --only-fast-lane --strict"
+    expected_output: "Fast lane policy violations: 0"
+  - description: "TODO graph remains valid after this item is moved or updated"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/release-test-command-ratchet-alignment.yaml"
+    expected_output: "exit 0"
+
+scope_limit:
+  only_modify:
+    - "Makefile"
+    - "pytest.ini"
+    - "pytest-ci.ini"
+    - "tests/conftest.py"
+    - "tests/unit/test_release_infrastructure.py"
+    - "tests/unit/test_standardized_test_commands.py"
+    - "_project/TODO/main/planning/release-test-command-ratchet-alignment.yaml"
+  do_not_modify:
+    - ".github/workflows/release.yml"
+    - ".github/workflows/test.yml"
+    - ".github/workflows/pr.yml"
+
+success_metrics:
+  - "Release-infrastructure workflow ratchets are fast or explicitly split with a fast workflow-parsing subset."
+  - "Local preflight and CI marker-expression differences are either eliminated or documented with tests."
+  - "`test-ci` has an explicit maintained/deprecated status and no longer implies a release gate that does not exist."
+
+open_questions:
+  - question: "Should CI coverage fail-under become 80%, or should the 80% local warning be documented as advisory?"
+    gating: true
+    affects: ["w4", "success_metrics: coverage threshold policy is explicit"]
+    default: "Keep 70 blocking and document 80 advisory unless the measured current CI coverage comfortably clears 80."
+
+metadata:
+  tags:
+    - release-gate
+    - ci
+    - pytest
+    - coverage
+  estimated_effort: "Medium"
+  created_date: "2026-05-25"
+  last_updated: "2026-05-25T00:00:00"
