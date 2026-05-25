@@ -26,6 +26,8 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from benchbox.utils.printing import emit
+
 SCHEMA_VERSION = 1
 DEFAULT_OUTPUT = "_project/compat/baseline.v1.jsonl"
 
@@ -361,23 +363,23 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     output = Path(args.output)
-    print("Generating baseline records ...", file=sys.stderr)
+    emit("Generating baseline records ...", stderr=True)
 
     records = generate()
     write_jsonl(records, output)
-    print(f"Wrote {len(records)} records to {output}", file=sys.stderr)
+    emit(f"Wrote {len(records)} records to {output}", stderr=True)
 
     if args.summary:
         from collections import Counter
 
         phase_counts = Counter(r.phase for r in records)
         decision_counts = Counter(r.decision for r in records)
-        print("\nPhase distribution:")
+        emit("\nPhase distribution:")
         for phase, count in sorted(phase_counts.items()):
-            print(f"  {phase:20s} {count}")
-        print("\nDecision distribution:")
+            emit(f"  {phase:20s} {count}")
+        emit("\nDecision distribution:")
         for decision, count in sorted(decision_counts.items()):
-            print(f"  {decision:20s} {count}")
+            emit(f"  {decision:20s} {count}")
 
     return 0
 

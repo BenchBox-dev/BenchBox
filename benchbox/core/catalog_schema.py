@@ -25,6 +25,8 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, RootModel, ValidationError
 
+from benchbox.utils.printing import emit
+
 SupportStatus = Literal["stable", "beta", "experimental", "repo_only", "deprecated", "document_only"]
 Surface = Literal["public", "internal"]
 
@@ -131,9 +133,9 @@ def main() -> int:
     try:
         count = validate_all_catalogs()
     except CatalogSchemaError as exc:
-        print(f"catalog-schema-check FAILED:\n{exc}")
+        emit(f"catalog-schema-check FAILED:\n{exc}")
         return 1
-    print(f"catalog-schema-check OK: {count} migrated catalogs valid")
+    emit(f"catalog-schema-check OK: {count} migrated catalogs valid")
     return 0
 
 

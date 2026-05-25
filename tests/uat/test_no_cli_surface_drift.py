@@ -24,6 +24,9 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/submit.py",
     "benchbox/cli/commands/tuning.py",
     "benchbox/cli/commands/visualize.py",
+    "benchbox/cli/config.py",
+    "benchbox/cli/execution.py",
+    "benchbox/cli/validation.py",
     "benchbox/cli/help.py",
     "benchbox/cli/orchestrator.py",
 }
