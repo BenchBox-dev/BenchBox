@@ -22,7 +22,7 @@ from __future__ import annotations
 from csv import reader
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import yaml
 
@@ -38,6 +38,26 @@ from .registry import register_query
 # =============================================================================
 
 _FilterSpec = tuple[str, str | None, Any]
+
+
+class QueryImpl(Protocol):
+    """DataFrame query implementation callable."""
+
+    def __call__(self, ctx: DataFrameContext) -> Any: ...
+
+
+_GENERATED_IMPLS: dict[str, QueryImpl] = {}
+
+
+def _register_generated_impl(impl: QueryImpl) -> QueryImpl:
+    _GENERATED_IMPLS[impl.__name__] = impl
+    return impl
+
+
+def __getattr__(name: str) -> QueryImpl:
+    if name in _GENERATED_IMPLS:
+        return _GENERATED_IMPLS[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _tables(ctx: DataFrameContext, *names: str) -> tuple[Any, ...]:
@@ -1112,7 +1132,7 @@ def _load_helper_query_specs() -> list[dict[str, Any]]:
 _HELPER_QUERY_SPECS = _load_helper_query_specs()
 
 
-def _make_helper_impl(query_id: int, title: str, family: str, helper: Any, helper_args: tuple[Any, ...]) -> Any:
+def _make_helper_impl(query_id: int, title: str, family: str, helper: Any, helper_args: tuple[Any, ...]) -> QueryImpl:
     def impl(ctx: DataFrameContext) -> Any:
         return helper(ctx, query_id, *helper_args)
 
@@ -1125,11 +1145,11 @@ def _make_helper_impl(query_id: int, title: str, family: str, helper: Any, helpe
 for _spec in _HELPER_QUERY_SPECS:
     _qid = _spec["query_id"]
     _title = _spec["title"]
-    globals()[f"q{_qid}_expression_impl"] = _make_helper_impl(
-        _qid, _title, "expression", globals()[_spec["expression_helper"]], _spec["args"]
+    _register_generated_impl(
+        _make_helper_impl(_qid, _title, "expression", globals()[_spec["expression_helper"]], _spec["args"])
     )
-    globals()[f"q{_qid}_pandas_impl"] = _make_helper_impl(
-        _qid, _title, "pandas", globals()[_spec["pandas_helper"]], _spec["args"]
+    _register_generated_impl(
+        _make_helper_impl(_qid, _title, "pandas", globals()[_spec["pandas_helper"]], _spec["args"])
     )
 
 
@@ -1268,7 +1288,7 @@ def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
     return result if limit is None else result.head(limit)
 
 
-def _make_joined_agg_impl(query_id: int, title: str, family: str, spec: dict[str, Any]) -> Any:
+def _make_joined_agg_impl(query_id: int, title: str, family: str, spec: dict[str, Any]) -> QueryImpl:
     engine = _joined_agg_expression_impl if family == "expression" else _joined_agg_pandas_impl
 
     def impl(ctx: DataFrameContext) -> Any:
@@ -1347,7 +1367,7 @@ def _state_average_returns_pandas_impl(ctx: DataFrameContext, spec: dict[str, An
     return result[cols].sort_values(cols).head(100)
 
 
-def _make_state_average_returns_impl(query_id: int, title: str, family: str, spec: dict[str, Any]) -> Any:
+def _make_state_average_returns_impl(query_id: int, title: str, family: str, spec: dict[str, Any]) -> QueryImpl:
     engine = _state_average_returns_expression_impl if family == "expression" else _state_average_returns_pandas_impl
 
     def impl(ctx: DataFrameContext) -> Any:
@@ -1362,16 +1382,14 @@ def _make_state_average_returns_impl(query_id: int, title: str, family: str, spe
 for _spec in _QUERY_SPECS["joined_aggregate"]:
     _query_id = _spec["query_id"]
     _query_title = _spec["title"]
-    globals()[f"q{_query_id}_expression_impl"] = _make_joined_agg_impl(_query_id, _query_title, "expression", _spec)
-    globals()[f"q{_query_id}_pandas_impl"] = _make_joined_agg_impl(_query_id, _query_title, "pandas", _spec)
+    _register_generated_impl(_make_joined_agg_impl(_query_id, _query_title, "expression", _spec))
+    _register_generated_impl(_make_joined_agg_impl(_query_id, _query_title, "pandas", _spec))
 
 for _spec in _QUERY_SPECS["state_average_returns"]:
     _query_id = _spec["query_id"]
     _query_title = _spec["title"]
-    globals()[f"q{_query_id}_expression_impl"] = _make_state_average_returns_impl(
-        _query_id, _query_title, "expression", _spec
-    )
-    globals()[f"q{_query_id}_pandas_impl"] = _make_state_average_returns_impl(_query_id, _query_title, "pandas", _spec)
+    _register_generated_impl(_make_state_average_returns_impl(_query_id, _query_title, "expression", _spec))
+    _register_generated_impl(_make_state_average_returns_impl(_query_id, _query_title, "pandas", _spec))
 
 
 def q96_expression_impl(ctx: DataFrameContext) -> Any:
@@ -9770,8 +9788,12 @@ _CATEGORY_CODES = {
 _QUERY_METADATA = Path(__file__).with_name("query_metadata.csv").read_text(encoding="utf-8")
 
 
-def _impl_for(query_id: str, family: str) -> Any:
-    return globals()[f"q{query_id[1:].lower()}_{family}_impl"]
+def _impl_for(query_id: str, family: str) -> QueryImpl:
+    name = f"q{query_id[1:].lower()}_{family}_impl"
+    impl = globals().get(name)
+    if impl is not None:
+        return impl
+    return _GENERATED_IMPLS[name]
 
 
 def _register_all_queries() -> None:

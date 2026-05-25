@@ -33,6 +33,15 @@ def test_joinorder_generated_impls_in_registry_not_globals() -> None:
     assert getattr(jo, sample) is jo._IMPLS[sample]
 
 
+def test_tpcds_generated_impls_in_registry_not_globals() -> None:
+    from benchbox.core.tpcds.dataframe_queries import queries as tpcds
+
+    for name in ("q3_expression_impl", "q19_pandas_impl"):
+        assert name in tpcds._GENERATED_IMPLS
+        assert name not in vars(tpcds)
+        assert getattr(tpcds, name) is tpcds._GENERATED_IMPLS[name]
+
+
 def test_dispatch_resolves_explicit_and_generated_from_registry() -> None:
     # _impl_for resolves both explicit module defs and generated impls via the
     # single typed registry.
@@ -45,3 +54,7 @@ def test_unknown_generated_name_raises_attribute_error() -> None:
         rp.totally_missing_query_impl  # noqa: B018
     with pytest.raises(AttributeError):
         jo.totally_missing_query_impl  # noqa: B018
+    from benchbox.core.tpcds.dataframe_queries import queries as tpcds
+
+    with pytest.raises(AttributeError):
+        tpcds.totally_missing_query_impl  # noqa: B018
