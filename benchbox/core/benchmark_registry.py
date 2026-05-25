@@ -11,8 +11,10 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import functools
 import importlib
 from collections import Counter
+from dataclasses import dataclass
 from importlib import resources
 from typing import Any, Literal, cast
 
@@ -30,7 +32,10 @@ BENCHMARK_SUPPORT_STATUS_VALUES: tuple[BenchmarkSupportStatus, ...] = (
 )
 
 # Benchmark metadata is stored as package data so this module keeps only
-# behavior and validation logic in Python.
+# behavior and validation logic in Python. The payload is loaded lazily and
+# cached on first access (see _registry) so the file I/O + YAML parse stay off
+# the import-critical path -- benchmark_loader imports this module -- matching
+# the repo's other catalog loaders (e.g. write_primitives/catalog/loader.py).
 
 
 def _load_registry_payload() -> dict[str, Any]:
@@ -48,33 +53,76 @@ def _normalize_benchmark_metadata(raw: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-_REGISTRY_PAYLOAD = _load_registry_payload()
-CATEGORY_ORDER: list[str] = list(_REGISTRY_PAYLOAD["category_order"])
-BENCHMARK_ORDER: dict[str, list[str]] = {
-    category: list(benchmarks) for category, benchmarks in _REGISTRY_PAYLOAD["benchmark_order"].items()
-}
-BENCHMARK_CLASS_NAMES: dict[str, str] = dict(_REGISTRY_PAYLOAD["benchmark_class_names"])
-_CORE_CLASS_NAME_OVERRIDES: dict[str, str] = dict(_REGISTRY_PAYLOAD["core_class_name_overrides"])
-CORE_BENCHMARK_CLASS_NAMES: dict[str, str] = {
-    bid: _CORE_CLASS_NAME_OVERRIDES.get(bid, f"{name}Benchmark") for bid, name in BENCHMARK_CLASS_NAMES.items()
-}
-_BENCHMARK_ID_BY_CLASS_NAME: dict[str, str] = {
-    **{class_name: benchmark_id for benchmark_id, class_name in BENCHMARK_CLASS_NAMES.items()},
-    **{class_name: benchmark_id for benchmark_id, class_name in CORE_BENCHMARK_CLASS_NAMES.items()},
-}
-BENCHMARK_DATA_SOURCE_PROBE_IDS: tuple[str, ...] = tuple(_REGISTRY_PAYLOAD["data_source_probe_ids"])
-TPC_OFFICIAL_SCALE_OPTIONS: tuple[float, ...] = tuple(_REGISTRY_PAYLOAD["tpc_official_scale_options"])
-BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
-    benchmark_id: _normalize_benchmark_metadata(meta)
-    for benchmark_id, meta in _REGISTRY_PAYLOAD["benchmark_metadata"].items()
+@dataclass(frozen=True)
+class _RegistryData:
+    """Derived registry structures, built once from the YAML payload."""
+
+    category_order: list[str]
+    benchmark_order: dict[str, list[str]]
+    benchmark_class_names: dict[str, str]
+    core_benchmark_class_names: dict[str, str]
+    benchmark_id_by_class_name: dict[str, str]
+    data_source_probe_ids: tuple[str, ...]
+    tpc_official_scale_options: tuple[float, ...]
+    benchmark_metadata: dict[str, dict[str, Any]]
+
+
+@functools.lru_cache(maxsize=1)
+def _registry() -> _RegistryData:
+    """Load, derive, and validate benchmark metadata once, on first access."""
+    payload = _load_registry_payload()
+    benchmark_class_names = dict(payload["benchmark_class_names"])
+    core_class_name_overrides = dict(payload["core_class_name_overrides"])
+    core_benchmark_class_names = {
+        bid: core_class_name_overrides.get(bid, f"{name}Benchmark") for bid, name in benchmark_class_names.items()
+    }
+    benchmark_metadata = {
+        benchmark_id: _normalize_benchmark_metadata(meta)
+        for benchmark_id, meta in payload["benchmark_metadata"].items()
+    }
+    data = _RegistryData(
+        category_order=list(payload["category_order"]),
+        benchmark_order={category: list(benchmarks) for category, benchmarks in payload["benchmark_order"].items()},
+        benchmark_class_names=benchmark_class_names,
+        core_benchmark_class_names=core_benchmark_class_names,
+        benchmark_id_by_class_name={
+            **{class_name: benchmark_id for benchmark_id, class_name in benchmark_class_names.items()},
+            **{class_name: benchmark_id for benchmark_id, class_name in core_benchmark_class_names.items()},
+        },
+        data_source_probe_ids=tuple(payload["data_source_probe_ids"]),
+        tpc_official_scale_options=tuple(payload["tpc_official_scale_options"]),
+        benchmark_metadata=benchmark_metadata,
+    )
+    _validate_registry(data.benchmark_metadata)
+    return data
+
+
+# Public module constants resolve to the lazily built, cached payload above via
+# PEP 562 module __getattr__, so importers keep their names while the file I/O
+# stays off the import path.
+_PUBLIC_REGISTRY_ATTRS = {
+    "CATEGORY_ORDER": "category_order",
+    "BENCHMARK_ORDER": "benchmark_order",
+    "BENCHMARK_CLASS_NAMES": "benchmark_class_names",
+    "CORE_BENCHMARK_CLASS_NAMES": "core_benchmark_class_names",
+    "BENCHMARK_DATA_SOURCE_PROBE_IDS": "data_source_probe_ids",
+    "TPC_OFFICIAL_SCALE_OPTIONS": "tpc_official_scale_options",
+    "BENCHMARK_METADATA": "benchmark_metadata",
 }
 
 
-def _validate_benchmark_support_status() -> None:
-    missing = sorted(name for name, meta in BENCHMARK_METADATA.items() if "support_status" not in meta)
+def __getattr__(name: str) -> Any:
+    attr = _PUBLIC_REGISTRY_ATTRS.get(name)
+    if attr is not None:
+        return getattr(_registry(), attr)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def _validate_benchmark_support_status(metadata: dict[str, dict[str, Any]]) -> None:
+    missing = sorted(name for name, meta in metadata.items() if "support_status" not in meta)
     invalid = sorted(
         f"{name}={meta.get('support_status')!r}"
-        for name, meta in BENCHMARK_METADATA.items()
+        for name, meta in metadata.items()
         if meta.get("support_status") not in BENCHMARK_SUPPORT_STATUS_VALUES
     )
     if missing or invalid:
@@ -86,11 +134,11 @@ def _validate_benchmark_support_status() -> None:
         raise ValueError("Invalid benchmark support_status metadata: " + "; ".join(details))
 
 
-def _validate_benchmark_data_sources() -> None:
-    missing = sorted(name for name, meta in BENCHMARK_METADATA.items() if "data_source" not in meta)
+def _validate_benchmark_data_sources(metadata: dict[str, dict[str, Any]]) -> None:
+    missing = sorted(name for name, meta in metadata.items() if "data_source" not in meta)
     invalid = sorted(
         f"{name}={meta.get('data_source')!r}"
-        for name, meta in BENCHMARK_METADATA.items()
+        for name, meta in metadata.items()
         if meta.get("data_source") is not None and not isinstance(meta.get("data_source"), str)
     )
     if missing or invalid:
@@ -102,15 +150,13 @@ def _validate_benchmark_data_sources() -> None:
         raise ValueError("Invalid benchmark data_source metadata: " + "; ".join(details))
 
 
-def _validate_benchmark_estimate_metadata() -> None:
+def _validate_benchmark_estimate_metadata(metadata: dict[str, dict[str, Any]]) -> None:
     missing = sorted(
-        name
-        for name, meta in BENCHMARK_METADATA.items()
-        if "estimated_time_range" not in meta or "base_memory_gb" not in meta
+        name for name, meta in metadata.items() if "estimated_time_range" not in meta or "base_memory_gb" not in meta
     )
     invalid = sorted(
         name
-        for name, meta in BENCHMARK_METADATA.items()
+        for name, meta in metadata.items()
         if (
             "estimated_time_range" in meta
             and "base_memory_gb" in meta
@@ -142,9 +188,11 @@ def _is_valid_base_memory(value: Any) -> bool:
     return isinstance(value, (int, float)) and value > 0
 
 
-_validate_benchmark_data_sources()
-_validate_benchmark_estimate_metadata()
-_validate_benchmark_support_status()
+def _validate_registry(metadata: dict[str, dict[str, Any]]) -> None:
+    """Run all metadata validations; called once from the cached loader."""
+    _validate_benchmark_data_sources(metadata)
+    _validate_benchmark_estimate_metadata(metadata)
+    _validate_benchmark_support_status(metadata)
 
 
 def get_all_benchmarks() -> dict[str, dict[str, Any]]:
@@ -153,7 +201,7 @@ def get_all_benchmarks() -> dict[str, dict[str, Any]]:
     Returns:
         Dictionary mapping benchmark IDs to their metadata.
     """
-    return BENCHMARK_METADATA.copy()
+    return _registry().benchmark_metadata.copy()
 
 
 def get_benchmark_metadata(benchmark_id: str) -> dict[str, Any] | None:
@@ -165,7 +213,7 @@ def get_benchmark_metadata(benchmark_id: str) -> dict[str, Any] | None:
     Returns:
         Benchmark metadata dict, or None if not found.
     """
-    return BENCHMARK_METADATA.get(benchmark_id.lower())
+    return _registry().benchmark_metadata.get(benchmark_id.lower())
 
 
 def get_benchmark_default_scale(benchmark_id: str, fallback: float = 0.01) -> float:
@@ -191,7 +239,7 @@ def get_benchmark_class_name(benchmark_id: str) -> str | None:
     Returns:
         Class name (e.g., 'TPCH', 'TPCDS'), or None if not found.
     """
-    return BENCHMARK_CLASS_NAMES.get(benchmark_id.lower())
+    return _registry().benchmark_class_names.get(benchmark_id.lower())
 
 
 def get_core_benchmark_class_name(benchmark_id: str) -> str | None:
@@ -203,12 +251,12 @@ def get_core_benchmark_class_name(benchmark_id: str) -> str | None:
     Returns:
         Core benchmark class name (e.g., 'TPCHBenchmark'), or None if not found.
     """
-    return CORE_BENCHMARK_CLASS_NAMES.get(benchmark_id.lower())
+    return _registry().core_benchmark_class_names.get(benchmark_id.lower())
 
 
 def get_benchmark_id_for_class_name(class_name: str) -> str | None:
     """Return the canonical benchmark ID for a public or core benchmark class."""
-    return _BENCHMARK_ID_BY_CLASS_NAME.get(class_name)
+    return _registry().benchmark_id_by_class_name.get(class_name)
 
 
 def get_public_benchmark_class(benchmark_id: str):
@@ -269,7 +317,7 @@ def list_benchmark_ids() -> list[str]:
     Returns:
         List of benchmark identifiers.
     """
-    return list(BENCHMARK_METADATA.keys())
+    return list(_registry().benchmark_metadata.keys())
 
 
 def list_public_benchmark_ids() -> list[str]:
@@ -283,7 +331,7 @@ def list_loader_benchmark_ids() -> list[str]:
     Returns:
         List of benchmark identifiers loadable via benchbox.core.benchmark_loader.
     """
-    return list(CORE_BENCHMARK_CLASS_NAMES.keys())
+    return list(_registry().core_benchmark_class_names.keys())
 
 
 def get_benchmark_support_status(benchmark_id: str) -> BenchmarkSupportStatus | None:
@@ -301,20 +349,20 @@ def get_benchmarks_by_support_status(status: BenchmarkSupportStatus) -> list[str
             f"Unknown benchmark support_status {status!r}. "
             f"Expected one of: {', '.join(BENCHMARK_SUPPORT_STATUS_VALUES)}"
         )
-    return sorted(name for name, meta in BENCHMARK_METADATA.items() if meta["support_status"] == status)
+    metadata = _registry().benchmark_metadata
+    return sorted(name for name, meta in metadata.items() if meta["support_status"] == status)
 
 
 def get_benchmark_registry_summary() -> dict[str, Any]:
     """Return count summaries for benchmark contract and docs drift checks."""
-    support_counts = Counter(
-        cast(BenchmarkSupportStatus, meta["support_status"]) for meta in BENCHMARK_METADATA.values()
-    )
-    surface_counts = Counter(str(meta.get("surface", "public")) for meta in BENCHMARK_METADATA.values())
+    metadata = _registry().benchmark_metadata
+    support_counts = Counter(cast(BenchmarkSupportStatus, meta["support_status"]) for meta in metadata.values())
+    surface_counts = Counter(str(meta.get("surface", "public")) for meta in metadata.values())
     return {
-        "total": len(BENCHMARK_METADATA),
+        "total": len(metadata),
         "loader": len(list_loader_benchmark_ids()),
         "public": len(list_public_benchmark_ids()),
-        "dataframe_supported": sum(1 for meta in BENCHMARK_METADATA.values() if meta.get("supports_dataframe", False)),
+        "dataframe_supported": sum(1 for meta in metadata.values() if meta.get("supports_dataframe", False)),
         "support_status": {status: support_counts.get(status, 0) for status in BENCHMARK_SUPPORT_STATUS_VALUES},
         "surface": dict(sorted(surface_counts.items())),
     }
@@ -329,7 +377,7 @@ def get_benchmarks_by_category(category: str) -> dict[str, dict[str, Any]]:
     Returns:
         Dictionary of benchmarks in that category.
     """
-    return {bid: meta for bid, meta in BENCHMARK_METADATA.items() if meta.get("category") == category}
+    return {bid: meta for bid, meta in _registry().benchmark_metadata.items() if meta.get("category") == category}
 
 
 def get_categories() -> list[str]:
@@ -339,12 +387,13 @@ def get_categories() -> list[str]:
         List of category names.
     """
     # Return categories that actually have benchmarks
+    registry = _registry()
     categories_with_benchmarks = set()
-    for meta in BENCHMARK_METADATA.values():
+    for meta in registry.benchmark_metadata.values():
         categories_with_benchmarks.add(meta.get("category", "Unknown"))
 
     # Return in preferred order, adding any extras at the end
-    result = [c for c in CATEGORY_ORDER if c in categories_with_benchmarks]
+    result = [c for c in registry.category_order if c in categories_with_benchmarks]
     for c in categories_with_benchmarks:
         if c not in result:
             result.append(c)

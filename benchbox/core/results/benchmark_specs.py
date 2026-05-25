@@ -20,6 +20,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import functools
 from dataclasses import dataclass
 from importlib import resources
 from typing import Any
@@ -41,7 +42,11 @@ class BenchmarkSpec:
     sf1_power_at_size_range: tuple[float, float] | None = None
 
 
-# --- Benchmark specs loaded from package data ---
+# --- Benchmark specs loaded lazily from package data ---
+#
+# Like benchmark_registry, the payload is parsed on first access and cached so
+# the YAML I/O stays off the import path. Public names (BENCHMARK_SPECS,
+# LEGACY_ALIASES) are served via PEP 562 module __getattr__.
 
 
 def _load_benchmark_specs_payload() -> dict[str, Any]:
@@ -52,13 +57,13 @@ def _load_benchmark_specs_payload() -> dict[str, Any]:
     return payload
 
 
-def _build_spec(entry: dict[str, Any]) -> BenchmarkSpec:
+def _build_spec(entry: dict[str, Any], tpch_sf1_row_counts: dict[str, int]) -> BenchmarkSpec:
     sf1_range = entry.get("sf1_power_at_size_range")
     sf1_row_counts = entry.get("sf1_row_counts")
     if sf1_row_counts is not None:
         sf1_row_counts = dict(sf1_row_counts)
-        if sf1_row_counts == _TPCH_SF1_ROW_COUNTS:
-            sf1_row_counts = _TPCH_SF1_ROW_COUNTS
+        if sf1_row_counts == tpch_sf1_row_counts:
+            sf1_row_counts = tpch_sf1_row_counts
     return BenchmarkSpec(
         benchmark_id=str(entry["benchmark_id"]),
         unique_query_ids=frozenset(str(query_id) for query_id in entry.get("unique_query_ids", ())),
@@ -71,15 +76,43 @@ def _build_spec(entry: dict[str, Any]) -> BenchmarkSpec:
     )
 
 
-_SPECS_PAYLOAD = _load_benchmark_specs_payload()
-LEGACY_ALIASES: dict[str, str] = dict(_SPECS_PAYLOAD["legacy_aliases"])
-_TPCH_SF1_ROW_COUNTS: dict[str, int] = dict(_SPECS_PAYLOAD["tpch_sf1_row_counts"])
-BENCHMARK_SPECS: dict[str, BenchmarkSpec] = {
-    benchmark_id: _build_spec(spec) for benchmark_id, spec in _SPECS_PAYLOAD["benchmark_specs"].items()
+@dataclass(frozen=True)
+class _SpecsData:
+    """Derived spec structures, built once from the YAML payload."""
+
+    legacy_aliases: dict[str, str]
+    benchmark_specs: dict[str, BenchmarkSpec]
+
+
+@functools.lru_cache(maxsize=1)
+def _specs() -> _SpecsData:
+    """Load and build the benchmark specs once, on first access."""
+    payload = _load_benchmark_specs_payload()
+    tpch_sf1_row_counts = dict(payload["tpch_sf1_row_counts"])
+    return _SpecsData(
+        legacy_aliases=dict(payload["legacy_aliases"]),
+        benchmark_specs={
+            benchmark_id: _build_spec(spec, tpch_sf1_row_counts)
+            for benchmark_id, spec in payload["benchmark_specs"].items()
+        },
+    )
+
+
+_PUBLIC_SPECS_ATTRS = {
+    "LEGACY_ALIASES": "legacy_aliases",
+    "BENCHMARK_SPECS": "benchmark_specs",
 }
+
+
+def __getattr__(name: str) -> Any:
+    attr = _PUBLIC_SPECS_ATTRS.get(name)
+    if attr is not None:
+        return getattr(_specs(), attr)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def get_spec(benchmark_id: str) -> BenchmarkSpec | None:
     """Look up a benchmark spec, resolving legacy aliases automatically."""
-    canonical = LEGACY_ALIASES.get(benchmark_id, benchmark_id)
-    return BENCHMARK_SPECS.get(canonical)
+    specs = _specs()
+    canonical = specs.legacy_aliases.get(benchmark_id, benchmark_id)
+    return specs.benchmark_specs.get(canonical)

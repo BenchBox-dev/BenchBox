@@ -1,0 +1,144 @@
+id: shrink-followup-registry-lazy-cached-load
+title: "Make benchmark registry/specs YAML loads lazy+cached to match the repo's loader pattern"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-05-24"
+category: Performance
+
+# w0 evidence (measured 2026-05-24): with the eager load, module self-time at
+# import was ~10.2 ms (benchmark_registry) and ~12.6 ms (benchmark_specs),
+# essentially all YAML parse (isolated parse: registry.yaml 8.98 ms,
+# specs.yaml 10.70 ms per load). After converting to lazy+cached, module
+# self-time dropped to ~0.40 ms and ~0.57 ms respectively. Decision (w1):
+# convert to lazy `@functools.lru_cache` loader + PEP 562 module __getattr__
+# (matches write_primitives/catalog/loader.py); material delta + restores
+# consistency with the 6 existing lazy loaders.
+
+description: |
+  PR #590 moved benchmark metadata from Python literals to YAML, then loaded
+  it eagerly at module scope:
+
+    benchbox/core/benchmark_registry.py:51   _REGISTRY_PAYLOAD = _load_registry_payload()
+    benchbox/core/results/benchmark_specs.py:74  _SPECS_PAYLOAD = _load_benchmark_specs_payload()
+
+  This executes file I/O + pure-Python YAML parse at import. `benchmark_registry`
+  is on the import-critical path (imported by benchmark_loader). The defect is
+  also self-inconsistent: the repo's six other catalog loaders load LAZILY
+  inside a function -- e.g. benchbox/core/write_primitives/catalog/loader.py:111
+  (`_load_catalog_payload`) is only called from inside
+  `load_write_primitives_catalog()` at line 315, not at module scope.
+
+  This is a direct product of the original Python having module-level
+  constants (CATEGORY_ORDER, BENCHMARK_ORDER, ...); the cheapest
+  metric-preserving translation kept them module-level but sourced from YAML.
+  The fix restores lazy+cached loading while preserving those public symbols.
+
+work:
+- id: w0
+  summary: "Measure the import-time cost of the eager YAML loads (baseline evidence)"
+  status: done
+  notes: |
+    Evidence gate. Measure import time of benchbox.core.benchmark_registry
+    and benchbox.core.results.benchmark_specs with the eager loads, e.g.
+    `uv run -- python -X importtime -c 'import benchbox.core.benchmark_registry'`
+    isolating the YAML parse cost. Capture raw stdout to
+    `/tmp/shrink-followup-registry-lazy-cached-load-w0.log`; record a compact
+    summary (command, measured ms, key lines) in this TODO / PR body. This
+    decides whether w1 is a perf fix or purely a consistency fix.
+
+- id: w1
+  summary: "Decide: convert to lazy+cached accessor, or document accepted eager tradeoff"
+  needs: [w0]
+  status: done
+  notes: |
+    GATING. If the import delta is material, convert both modules to a
+    lazy `@functools.lru_cache` loader + module `__getattr__` (or accessor
+    functions) so the public symbols still resolve, matching
+    write_primitives/catalog/loader.py. If the delta is negligible AND the
+    module-level-constant contract genuinely requires eager values,
+    document the accepted tradeoff in a comment instead.
+
+- id: w2
+  summary: "Implement the chosen path, preserving every public symbol"
+  needs: [w1]
+  status: done
+  notes: |
+    CATEGORY_ORDER, BENCHMARK_ORDER, BENCHMARK_CLASS_NAMES,
+    BENCHMARK_DATA_SOURCE_PROBE_IDS, TPC_OFFICIAL_SCALE_OPTIONS and the
+    benchmark_specs public names must remain importable with identical
+    values. Use module __getattr__ (PEP 562) if needed to keep names while
+    deferring I/O.
+
+open_questions:
+- question: "Does the codegen-vs-runtime-parse ADR supersede this runtime-parse fix?"
+  gating: false
+  affects: ["w1 success_metric: lazy-load approach"]
+  default: "Proceed -- lazy+cached runtime parse is strictly better than eager regardless of the codegen decision in [[shrink-followup-codegen-vs-runtime-parse-adr]];
+    if codegen is later chosen it replaces the loader entirely, making this a safe interim improvement."
+
+must_preserve:
+- "benchbox.core.benchmark_registry public symbols (CATEGORY_ORDER, BENCHMARK_ORDER, BENCHMARK_CLASS_NAMES, etc.) remain importable
+  with identical values"
+- "benchbox.core.results.benchmark_specs public API unchanged"
+- "The circular-imports test (tests/unit/test_circular_imports.py) still passes"
+
+approach: |
+  w0 first -- measure before deciding. Reuse the lazy loader shape already
+  proven in write_primitives/catalog/loader.py rather than inventing a new
+  caching scheme. PEP 562 module __getattr__ lets the public constant names
+  survive while the actual I/O is deferred to first access and cached.
+
+anti_patterns:
+- "DO NOT rename the public constants into accessor calls that break importers -- because benchmark_loader and others import
+  these names -- use module __getattr__ or cached module-level accessors that keep the names"
+- "DO NOT leave uncached file I/O on a hot import path -- because repeated process starts pay it every time -- cache with
+  lru_cache or a module-level sentinel"
+
+verification:
+- description: "Public symbols still resolve to identical values"
+  command: "uv run -- python -c 'import benchbox.core.benchmark_registry as r; print(len(r.CATEGORY_ORDER), len(r.BENCHMARK_CLASS_NAMES))'"
+  expected_output: "same counts as before the change"
+- description: "No module-level YAML load remains (lazy path chosen)"
+  command: "grep -nE '^_REGISTRY_PAYLOAD = |^_SPECS_PAYLOAD = ' benchbox/core/benchmark_registry.py benchbox/core/results/benchmark_specs.py"
+  expected_output: "no module-scope eager load (or a documented justification comment if eager retained)"
+- description: "Circular imports test passes"
+  command: "uv run -- python -m pytest tests/unit/test_circular_imports.py -q"
+  expected_output: "pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/benchmark_registry.py"
+  - "benchbox/core/results/benchmark_specs.py"
+  - "tests/"
+
+prior_art:
+- "benchbox/core/write_primitives/catalog/loader.py:111,315 — reuse the lazy load-inside-function pattern (the repo's own
+  convention)"
+- "PEP 562 module __getattr__ — extend to keep public constant names while deferring I/O"
+
+metadata:
+  tags:
+  - shrink
+  - performance
+  - import-time
+  - registry
+  estimated_effort: "Small"
+  created_date: "2026-05-23"
+  last_updated: "2026-05-23T12:00:00"
+
+impact:
+  technical_debt: |
+    Restores consistency with the six existing lazy catalog loaders and
+    removes uncached I/O from the import-critical path. Aligns with the
+    "zero regression on critical paths" performance bar.
+
+success_metrics:
+- "Import-time delta for benchmark_registry/specs measured and recorded (w0)"
+- "Either lazy+cached loading matching the repo pattern, or a documented justification for retaining eager load"
+- "All public symbols preserved; circular-imports test green"
+
+files_affected:
+  modified:
+  - "benchbox/core/benchmark_registry.py"
+  - "benchbox/core/results/benchmark_specs.py"
