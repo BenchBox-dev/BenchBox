@@ -362,6 +362,7 @@ from types import SimpleNamespace  # noqa: E402
 from unittest.mock import MagicMock, patch  # noqa: E402
 
 import benchbox.platforms.dataframe.lakesail_df as _lakesail_mod  # noqa: E402
+import benchbox.platforms.dataframe.pyspark_df as _pyspark_mod  # noqa: E402
 
 
 def _make_lakesail_F():
@@ -410,6 +411,8 @@ def _new_lakesail_adapter(monkeypatch):
     monkeypatch.setattr(_lakesail_mod, "PYSPARK_AVAILABLE", True)
     monkeypatch.setattr(_lakesail_mod, "F", mock_F)
     monkeypatch.setattr(_lakesail_mod, "Window", mock_Window)
+    monkeypatch.setattr(_pyspark_mod, "F", mock_F)
+    monkeypatch.setattr(_pyspark_mod, "Window", mock_Window)
 
     # Mock SparkSession.builder.remote chain
     mock_builder = MagicMock()
@@ -460,6 +463,8 @@ class TestLakeSailMockedCoverage:
         monkeypatch.setattr(_lakesail_mod, "PYSPARK_AVAILABLE", True)
         monkeypatch.setattr(_lakesail_mod, "F", mock_F)
         monkeypatch.setattr(_lakesail_mod, "Window", MagicMock())
+        monkeypatch.setattr(_pyspark_mod, "F", mock_F)
+        monkeypatch.setattr(_pyspark_mod, "Window", MagicMock())
         monkeypatch.setattr(_lakesail_mod, "SparkSession", MagicMock(builder=mock_builder))
 
         adapter = _lakesail_mod.LakeSailDataFrameAdapter(endpoint="sc://host:50051", verbose=True)
