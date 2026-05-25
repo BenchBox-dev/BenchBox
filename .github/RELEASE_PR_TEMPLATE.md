@@ -32,11 +32,21 @@ slow/resource-heavy coverage.
 make release-finalize VERSION=X.Y.Z
 ```
 
-`release-finalize` squash-merges this PR, fast-forwards `main`, tags
-`vX.Y.Z`, and pushes the tag — which fires `.github/workflows/release.yml`:
-`dependency-bounds` → `build` (with `SOURCE_DATE_EPOCH` from the tag
-commit) → `publish` (PyPI trusted publisher) → `github-release` →
-`test-installation` (cross-platform pip install verification).
+`release-finalize` re-checks that the required `release-required-result`
+context is present and green before merge. If the context is missing,
+pending, skipped, failed, or canceled, stop and fix the release PR or
+ruleset/workflow contract before rerunning the command.
+
+After that pre-merge check passes, `release-finalize` squash-merges this PR,
+fast-forwards `main`, tags `vX.Y.Z`, and pushes the tag — which fires
+`.github/workflows/release.yml`: `dependency-bounds` → `build` (with
+`SOURCE_DATE_EPOCH` from the tag commit) → `publish` (PyPI trusted
+publisher) → `github-release` → `test-installation` (cross-platform pip
+install verification).
+
+Push-to-main jobs are post-merge signals. They can fail after the tag has
+already started publication; recovery is a patch release or incident process,
+not treating the public tag as if it had been blocked.
 
 `develop` is intentionally NOT modified by `release-finalize`. Dev-only
 paths (`_project/`, `_blog/`, agent configs, etc.) live only on develop

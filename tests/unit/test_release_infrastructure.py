@@ -22,6 +22,22 @@ pytestmark = [
 
 REPO_ROOT = Path(__file__).parent.parent.parent
 CI_FAST_EXPRESSION = "fast and not (slow or stress or resource_heavy or live_integration)"
+RELEASE_REQUIRED_CONTEXT = "release-required-result"
+
+
+def _makefile_text() -> str:
+    return (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+
+
+def _make_target_recipe(target: str) -> str:
+    lines = _makefile_text().splitlines()
+    start = lines.index(f"{target}:") + 1
+    recipe_lines: list[str] = []
+    for line in lines[start:]:
+        if line and not line.startswith("\t"):
+            break
+        recipe_lines.append(line)
+    return "\n".join(recipe_lines)
 
 
 def _workflow_job_run_text(workflow_name: str, job_name: str) -> str:
@@ -238,8 +254,63 @@ class TestReleaseInfrastructure:
 
         for path in docs_paths:
             content = path.read_text(encoding="utf-8")
-            assert "release-required-result" in content
+            assert RELEASE_REQUIRED_CONTEXT in content
             assert "validate-base" in content
+
+    def test_release_finalize_checks_required_context_before_merge_and_tag(self):
+        """release-finalize must hard-stop unless release-required-result is required and green."""
+        makefile_content = _makefile_text()
+        recipe = _make_target_recipe("release-finalize")
+
+        assert f"RELEASE_REQUIRED_CONTEXT := {RELEASE_REQUIRED_CONTEXT}" in makefile_content
+        assert 'gh pr checks "$$PR" --required --json name,bucket,state' in recipe
+        assert 'select(.name == "$(RELEASE_REQUIRED_CONTEXT)")' in recipe
+        assert "--watch" not in recipe
+        assert 'CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8"' in recipe
+
+        assert recipe.index("no open PR found for v$(VERSION)") < recipe.index("gh pr checks")
+        assert recipe.index("gh pr checks") < recipe.index("gh pr merge --squash")
+        assert recipe.index("gh pr merge --squash") < recipe.index("git fetch origin --tags")
+        assert recipe.index("git tag v$(VERSION)") < recipe.index("git push origin v$(VERSION)")
+
+    def test_release_finalize_failure_modes_are_explicit(self):
+        """The one-shot release-finalize precondition must fail closed for drift and non-green states."""
+        recipe = _make_target_recipe("release-finalize")
+
+        for expected in [
+            "missing)",
+            "pending)",
+            "fail|cancel|skipping)",
+            "duplicate)",
+            "unexpected $(RELEASE_REQUIRED_CONTEXT) status",
+        ]:
+            assert expected in recipe
+
+        assert "no open PR found for v$(VERSION)" in recipe
+        assert "required release context '$(RELEASE_REQUIRED_CONTEXT)' is missing" in recipe
+        assert "Wait for GitHub Actions, then rerun" in recipe
+        assert "Fix the release PR before finalizing" in recipe
+        assert "Fix workflow/ruleset drift" in recipe
+        assert "gh pr merge --squash" in recipe
+        assert "|| true" not in recipe
+
+    def test_release_finalize_docs_separate_premerge_and_postmerge_signals(self):
+        """Release docs must not imply post-merge push checks are pre-publish blockers."""
+        makefile_content = _makefile_text()
+        release_guide = (REPO_ROOT / "docs" / "operations" / "release-guide.md").read_text(encoding="utf-8")
+        release_template = (REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md").read_text(encoding="utf-8")
+
+        assert "Wait for CI green" not in makefile_content
+        assert "CI is not green" not in makefile_content
+        assert "required release context: $(RELEASE_REQUIRED_CONTEXT)" in makefile_content
+        assert "Push-to-main jobs are post-merge signals" in makefile_content
+
+        for content in [release_guide, release_template]:
+            normalized = content.lower()
+            assert RELEASE_REQUIRED_CONTEXT in content
+            assert "post-merge" in normalized
+            assert "pre-merge" in normalized
+            assert "patch release or incident" in content
 
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""
