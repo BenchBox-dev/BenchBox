@@ -43,6 +43,7 @@ from ._spark_helpers import (
     validate_spark_identifier,
 )
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.config_utils import make_registered_platform_config_builder
 from .base.spark_execution_mixin import SparkDataLoadMixin, SparkQueryExecutionMixin
 
 try:
@@ -636,42 +637,21 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
         analyze_spark_table(connection, table_name, logger=self.logger)
 
 
-def _build_lakesail_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build LakeSail database configuration with credential loading."""
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="lakesail",
-        credential_key="lakesail",
-        default_display_name="LakeSail Sail",
-        default_driver_package="pyspark",
-        platform_fields=[
-            "endpoint",
-            "app_name",
-            "driver_memory",
-            "sail_mode",
-            "sail_workers",
-            "shuffle_partitions",
-            "adaptive_enabled",
-            "table_format",
-            "spark_config",
-            "disable_cache",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
-
-
-# Register the config builder with the platform hook registry
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("lakesail", _build_lakesail_config)
-except ImportError:
-    pass
+_build_lakesail_config = make_registered_platform_config_builder(
+    "lakesail",
+    __name__,
+    "LakeSail Sail",
+    "pyspark",
+    [
+        "endpoint",
+        "app_name",
+        "driver_memory",
+        "sail_mode",
+        "sail_workers",
+        "shuffle_partitions",
+        "adaptive_enabled",
+        "table_format",
+        "spark_config",
+        "disable_cache",
+    ],
+)

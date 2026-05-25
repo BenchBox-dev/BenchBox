@@ -10,11 +10,11 @@ from typing import Any
 
 from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
 from benchbox.core.sql_utils import normalize_table_name_in_sql
+from benchbox.platforms.base.data_loading import resolve_adapter_data_source
 from benchbox.platforms.base.external_table_mixin import HiveExternalTableMixin
 from benchbox.platforms.presto_trino_utils import (
     load_file_batches,
     normalize_existing_files,
-    resolve_data_files,
     show_tables_lower,
     validate_catalog_exists,
 )
@@ -472,14 +472,7 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
 
     def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> dict[str, Any]:
         """Resolve benchmark data files from benchmark tables or manifest."""
-        return resolve_data_files(
-            benchmark,
-            data_dir,
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
-        )
+        return resolve_adapter_data_source(self, benchmark, data_dir).tables
 
     def _load_table_data(
         self,

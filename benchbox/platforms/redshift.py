@@ -34,7 +34,14 @@ from ..utils.dependencies import (
 )
 from ..utils.file_format import detect_compression, is_parquet_format
 from .base import DriverIsolationCapability, PlatformAdapter
-from .base.data_loading import NO_BENCHMARK, DataSource, DataSourceResolver, FileFormatRegistry, resolve_csv_dialect
+from .base.config_utils import make_registered_platform_config_builder
+from .base.data_loading import (
+    NO_BENCHMARK,
+    DataSource,
+    FileFormatRegistry,
+    resolve_adapter_data_source,
+    resolve_csv_dialect,
+)
 from .base.runtime_metadata import build_default_normalized_result_metadata
 
 try:
@@ -1319,16 +1326,7 @@ class RedshiftAdapter(PlatformAdapter):
 
     def _resolve_data_files(self, benchmark, data_dir: Path) -> Any:
         """Resolve data files from benchmark tables or manifest fallback."""
-        resolver = DataSourceResolver(
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
-        )
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source
+        return resolve_adapter_data_source(self, benchmark, data_dir)
 
     def _create_s3_client(self):
         """Create S3 client with explicit error handling."""
@@ -2653,68 +2651,32 @@ class RedshiftAdapter(PlatformAdapter):
     )
 
 
-def _build_redshift_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build Redshift database configuration with credential loading.
-
-    This function loads saved credentials from the CredentialManager and
-    merges them with CLI options and runtime overrides.
-
-    Args:
-        platform: Platform name (should be 'redshift')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded
-    """
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="redshift",
-        credential_key="redshift",
-        default_display_name="Amazon Redshift",
-        default_driver_package="redshift-connector",
-        base_options={"admin_database": "dev"},
-        platform_fields=[
-            "host",
-            "port",
-            "username",
-            "password",
-            "schema",
-            "s3_bucket",
-            "s3_prefix",
-            "staging_root",
-            "iam_role",
-            "aws_access_key_id",
-            "aws_secret_access_key",
-            "aws_session_token",
-            "aws_region",
-            "cluster_identifier",
-            "admin_database",
-            "connect_timeout",
-            "statement_timeout",
-            "sslmode",
-            "disable_result_cache",
-            "strict_validation",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
-
-
-# Register the config builder with the platform hook registry
-# This must happen when the module is imported
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("redshift", _build_redshift_config)
-except ImportError:
-    # Platform hooks may not be available in all contexts (e.g., core-only usage)
-    pass
+_build_redshift_config = make_registered_platform_config_builder(
+    "redshift",
+    __name__,
+    "Amazon Redshift",
+    "redshift-connector",
+    [
+        "host",
+        "port",
+        "username",
+        "password",
+        "schema",
+        "s3_bucket",
+        "s3_prefix",
+        "staging_root",
+        "iam_role",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "aws_session_token",
+        "aws_region",
+        "cluster_identifier",
+        "admin_database",
+        "connect_timeout",
+        "statement_timeout",
+        "sslmode",
+        "disable_result_cache",
+        "strict_validation",
+    ],
+    base_options={"admin_database": "dev"},
+)

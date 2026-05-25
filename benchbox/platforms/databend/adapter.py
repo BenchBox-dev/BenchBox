@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 
 from benchbox.core.exceptions import ConfigurationError
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
-from benchbox.platforms.base.data_loading import FileFormatRegistry
+from benchbox.platforms.base.data_loading import FileFormatRegistry, resolve_adapter_data_source
 from benchbox.platforms.base.ddl_helpers import strip_foreign_keys
 from benchbox.utils.dependencies import (
     check_platform_dependencies,
@@ -497,18 +497,7 @@ class DatabendAdapter(PlatformAdapter):
 
     def _resolve_data_files(self, benchmark, data_dir: Path) -> Any:
         """Resolve data files via DataSourceResolver."""
-        from benchbox.platforms.base.data_loading import DataSourceResolver
-
-        resolver = DataSourceResolver(
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
-        )
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source
+        return resolve_adapter_data_source(self, benchmark, data_dir)
 
     def execute_query(
         self,

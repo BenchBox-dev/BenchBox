@@ -37,6 +37,7 @@ from ._spark_helpers import (
     validate_spark_identifier,
 )
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.config_utils import make_registered_platform_config_builder
 from .base.spark_execution_mixin import SparkDataLoadMixin, SparkQueryExecutionMixin
 from .base.spark_logging import suppress_window_exec_warning
 
@@ -804,47 +805,26 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         analyze_spark_table(connection, table_name, logger=self.logger)
 
 
-def _build_spark_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="spark",
-        credential_key="spark",
-        default_display_name="Apache Spark",
-        default_driver_package="pyspark",
-        platform_fields=[
-            "master",
-            "app_name",
-            "deploy_mode",
-            "driver_memory",
-            "executor_memory",
-            "executor_cores",
-            "num_executors",
-            "shuffle_partitions",
-            "broadcast_threshold",
-            "adaptive_enabled",
-            "table_format",
-            "enable_hive",
-            "spark_config",
-            "java_home",
-            "staging_root",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
-
-
-# Register the config builder with the platform hook registry
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("spark", _build_spark_config)
-except ImportError:
-    # Platform hooks may not be available in all contexts
-    pass
+_build_spark_config = make_registered_platform_config_builder(
+    "spark",
+    __name__,
+    "Apache Spark",
+    "pyspark",
+    [
+        "master",
+        "app_name",
+        "deploy_mode",
+        "driver_memory",
+        "executor_memory",
+        "executor_cores",
+        "num_executors",
+        "shuffle_partitions",
+        "broadcast_threshold",
+        "adaptive_enabled",
+        "table_format",
+        "enable_hive",
+        "spark_config",
+        "java_home",
+        "staging_root",
+    ],
+)

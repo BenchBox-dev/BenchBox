@@ -27,13 +27,14 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from .base.config_utils import (
+    POSTGRES_FAMILY_BASE_OPTIONS,
+    POSTGRES_FAMILY_PLATFORM_FIELDS,
+    make_platform_config_builder,
+)
 from .postgresql import POSTGRES_DIALECT, PostgreSQLAdapter
-
-if TYPE_CHECKING:
-    from benchbox.core.platform_registry import PlatformInfo
-    from benchbox.core.schemas import DatabaseConfig
 
 logger = logging.getLogger(__name__)
 
@@ -543,44 +544,14 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         return False
 
 
-def _build_pg_mooncake_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: PlatformInfo | None,
-) -> DatabaseConfig:
-    """Build pg_mooncake database configuration with credential loading.
-
-    This function is registered with PlatformHookRegistry to provide
-    pg_mooncake-specific configuration handling.
-    """
-    from benchbox.platforms.base.config_utils import POSTGRES_FAMILY_BASE_OPTIONS, build_platform_config
-
-    return build_platform_config(
-        platform_type="pg-mooncake",
-        credential_key="pg-mooncake",
-        default_display_name="pg_mooncake",
-        default_driver_package="psycopg",
-        base_options={
-            **POSTGRES_FAMILY_BASE_OPTIONS,
-            "storage_mode": "local",
-        },
-        platform_fields=[
-            "host",
-            "port",
-            "username",
-            "password",
-            "database",
-            "admin_database",
-            "sslmode",
-            "work_mem",
-            "maintenance_work_mem",
-            "effective_cache_size",
-            "max_parallel_workers_per_gather",
-            "storage_mode",
-            "mooncake_bucket",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
+_build_pg_mooncake_config = make_platform_config_builder(
+    "pg-mooncake",
+    __name__,
+    "pg_mooncake",
+    "psycopg",
+    POSTGRES_FAMILY_PLATFORM_FIELDS + ("storage_mode", "mooncake_bucket"),
+    base_options={
+        **POSTGRES_FAMILY_BASE_OPTIONS,
+        "storage_mode": "local",
+    },
+)

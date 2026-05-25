@@ -57,6 +57,7 @@ from ._spark_helpers import (
     validate_spark_identifier,
 )
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.config_utils import make_registered_platform_config_builder
 from .base.spark_execution_mixin import SparkDataLoadMixin, SparkQueryExecutionMixin
 
 try:
@@ -565,43 +566,23 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         analyze_spark_table(connection, table_name, logger=self.logger)
 
 
-def _build_velox_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build Velox configuration for the platform hook registry."""
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="velox",
-        credential_key="velox",
-        default_display_name="Apache Gluten + Velox",
-        default_driver_package="pyspark",
-        platform_fields=[
-            "deployment",
-            "endpoint",
-            "gluten_jar_path",
-            "gluten_version",
-            "offheap_size",
-            "app_name",
-            "driver_memory",
-            "shuffle_partitions",
-            "adaptive_enabled",
-            "table_format",
-            "spark_config",
-            "disable_cache",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
-
-
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("velox", _build_velox_config)
-except ImportError:
-    pass
+_build_velox_config = make_registered_platform_config_builder(
+    "velox",
+    __name__,
+    "Apache Gluten + Velox",
+    "pyspark",
+    [
+        "deployment",
+        "endpoint",
+        "gluten_jar_path",
+        "gluten_version",
+        "offheap_size",
+        "app_name",
+        "driver_memory",
+        "shuffle_partitions",
+        "adaptive_enabled",
+        "table_format",
+        "spark_config",
+        "disable_cache",
+    ],
+)

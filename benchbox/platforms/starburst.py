@@ -21,6 +21,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from benchbox.platforms.base.adapter import DriverIsolationCapability
+from benchbox.platforms.base.config_utils import make_registered_platform_config_builder
 
 from .trino import TrinoAdapter
 
@@ -260,47 +261,26 @@ class StarburstAdapter(TrinoAdapter):
         )
 
 
-def _build_starburst_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="starburst",
-        credential_key="starburst",
-        default_display_name="Starburst",
-        default_driver_package="trino",
-        platform_fields=[
-            "host",
-            "port",
-            "catalog",
-            "username",
-            "password",
-            "role",
-            "http_scheme",
-            "verify_ssl",
-            "ssl_cert_path",
-            "session_properties",
-            "query_timeout",
-            "timezone",
-            "table_format",
-            "staging_root",
-            "schema",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
-
-
-# Register the config builder with the platform hook registry
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("starburst", _build_starburst_config)
-except ImportError:
-    # Platform hooks may not be available in all contexts
-    pass
+_build_starburst_config = make_registered_platform_config_builder(
+    "starburst",
+    __name__,
+    "Starburst",
+    "trino",
+    [
+        "host",
+        "port",
+        "catalog",
+        "username",
+        "password",
+        "role",
+        "http_scheme",
+        "verify_ssl",
+        "ssl_cert_path",
+        "session_properties",
+        "query_timeout",
+        "timezone",
+        "table_format",
+        "staging_root",
+        "schema",
+    ],
+)

@@ -36,6 +36,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from benchbox.platforms.base.adapter import DriverIsolationCapability
+from benchbox.platforms.base.config_utils import make_registered_platform_config_builder
 from benchbox.platforms.base.runtime_metadata import build_default_normalized_result_metadata
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -736,17 +737,9 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         Raises:
             ValueError: If no data files are found.
         """
-        from benchbox.platforms.base.data_loading import DataSourceResolver
+        from benchbox.platforms.base.data_loading import resolve_adapter_data_source
 
-        resolver = DataSourceResolver(
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
-        )
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
+        data_source = resolve_adapter_data_source(self, benchmark, data_dir)
         return {table: [Path(p) for p in paths] for table, paths in data_source.tables.items()}
 
     def _load_data_via_object_storage(
@@ -958,54 +951,33 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         return parse_gcs_url(gcs_url)
 
 
-def _build_clickhouse_cloud_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="clickhouse-cloud",
-        credential_key="clickhouse-cloud",
-        default_display_name="ClickHouse Cloud",
-        default_driver_package="clickhouse-connect",
-        platform_fields=[
-            "host",
-            "password",
-            "username",
-            "database",
-            "oauth_token",
-            "region",
-            "cloud_region",
-            "cloud_provider",
-            "service_id",
-            "service_name",
-            "service_tier",
-            "compute_size",
-            "s3_staging_url",
-            "s3_region",
-            "gcs_staging_url",
-            "max_memory_usage",
-            "max_execution_time",
-            "disable_result_cache",
-            "compression",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
-
-
-# Register the config builder with the platform hook registry
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("clickhouse-cloud", _build_clickhouse_cloud_config)
-except ImportError:
-    # Platform hooks may not be available in all contexts (e.g., minimal installs, testing)
-    logger.debug("Platform hooks not available, skipping ClickHouse Cloud config builder registration")
+_build_clickhouse_cloud_config = make_registered_platform_config_builder(
+    "clickhouse-cloud",
+    __name__,
+    "ClickHouse Cloud",
+    "clickhouse-connect",
+    [
+        "host",
+        "password",
+        "username",
+        "database",
+        "oauth_token",
+        "region",
+        "cloud_region",
+        "cloud_provider",
+        "service_id",
+        "service_name",
+        "service_tier",
+        "compute_size",
+        "s3_staging_url",
+        "s3_region",
+        "gcs_staging_url",
+        "max_memory_usage",
+        "max_execution_time",
+        "disable_result_cache",
+        "compression",
+    ],
+)
 
 
 __all__ = ["ClickHouseCloudAdapter"]

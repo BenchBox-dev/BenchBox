@@ -26,7 +26,8 @@ if TYPE_CHECKING:
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
 from .base import DriverIsolationCapability, PlatformAdapter
-from .base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
+from .base.config_utils import make_registered_platform_config_builder
+from .base.data_loading import NO_BENCHMARK, DataSource, resolve_adapter_data_source, resolve_csv_dialect
 from .base.tuning import make_informational_constraint_applier
 from .presto_trino_utils import normalize_existing_files
 
@@ -710,18 +711,7 @@ class AzureSynapseAdapter(PlatformAdapter):
 
     def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> DataSource:
         """Resolve benchmark data files via DataSourceResolver."""
-        from benchbox.platforms.base.data_loading import DataSourceResolver
-
-        resolver = DataSourceResolver(
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
-        )
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source
+        return resolve_adapter_data_source(self, benchmark, data_dir)
 
     def _upload_external_parquet_to_blob(self, table_name: str, files: list[Path]) -> str:
         """Upload Parquet files for external mode and return Synapse LOCATION path."""
@@ -1243,42 +1233,21 @@ class AzureSynapseAdapter(PlatformAdapter):
     )
 
 
-def _build_synapse_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build Azure Synapse database configuration with credential loading."""
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="synapse",
-        credential_key="synapse",
-        default_display_name="Azure Synapse",
-        default_driver_package="pyodbc",
-        platform_fields=[
-            "server",
-            "port",
-            "username",
-            "password",
-            "schema",
-            "auth_method",
-            "storage_account",
-            "container",
-            "staging_root",
-            "storage_sas_token",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
-
-
-# Register the config builder with the platform hook registry
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("synapse", _build_synapse_config)
-except ImportError:
-    pass
+_build_synapse_config = make_registered_platform_config_builder(
+    "synapse",
+    __name__,
+    "Azure Synapse",
+    "pyodbc",
+    [
+        "server",
+        "port",
+        "username",
+        "password",
+        "schema",
+        "auth_method",
+        "storage_account",
+        "container",
+        "staging_root",
+        "storage_sas_token",
+    ],
+)

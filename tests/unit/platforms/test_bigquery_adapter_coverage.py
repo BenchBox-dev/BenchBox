@@ -2691,41 +2691,33 @@ class TestResolveDataFiles:
 
     def test_returns_tables_from_resolver(self):
         adapter = _make_adapter()
+        benchmark = Mock()
+        data_dir = Path("/tmp/data")
 
         mock_data_source = Mock()
         mock_data_source.tables = {"LINEITEM": [Path("/tmp/lineitem.parquet")]}
 
-        with patch("benchbox.platforms.bigquery.DataSourceResolver") as mock_resolver_cls:
-            mock_resolver = Mock()
-            mock_resolver.resolve.return_value = mock_data_source
-            mock_resolver_cls.return_value = mock_resolver
+        with patch("benchbox.platforms.bigquery.resolve_adapter_data_source", return_value=mock_data_source) as resolve:
+            result = adapter._resolve_data_files(benchmark, data_dir)
 
-            result = adapter._resolve_data_files(Mock(), Path("/tmp/data"))
-
+        resolve.assert_called_once_with(adapter, benchmark, data_dir)
         assert "LINEITEM" in result.tables
 
     def test_raises_when_no_data_files(self):
         adapter = _make_adapter()
 
-        with patch("benchbox.platforms.bigquery.DataSourceResolver") as mock_resolver_cls:
-            mock_resolver = Mock()
-            mock_resolver.resolve.return_value = None
-            mock_resolver_cls.return_value = mock_resolver
-
+        with patch(
+            "benchbox.platforms.bigquery.resolve_adapter_data_source", side_effect=ValueError("No data files found")
+        ):
             with pytest.raises(ValueError, match="No data files found"):
                 adapter._resolve_data_files(Mock(), Path("/tmp/data"))
 
     def test_raises_when_empty_tables(self):
         adapter = _make_adapter()
 
-        mock_data_source = Mock()
-        mock_data_source.tables = {}
-
-        with patch("benchbox.platforms.bigquery.DataSourceResolver") as mock_resolver_cls:
-            mock_resolver = Mock()
-            mock_resolver.resolve.return_value = mock_data_source
-            mock_resolver_cls.return_value = mock_resolver
-
+        with patch(
+            "benchbox.platforms.bigquery.resolve_adapter_data_source", side_effect=ValueError("No data files found")
+        ):
             with pytest.raises(ValueError, match="No data files found"):
                 adapter._resolve_data_files(Mock(), Path("/tmp/data"))
 

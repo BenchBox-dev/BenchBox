@@ -41,6 +41,7 @@ from ..utils.dependencies import (
     get_dependency_error_message,
 )
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.config_utils import make_registered_platform_config_builder
 from .base.data_loading import DataSourceResolver, FileFormatRegistry
 from .base.ddl_helpers import strip_with_properties
 from .base.runtime_metadata import build_default_normalized_result_metadata
@@ -1402,51 +1403,33 @@ class AthenaAdapter(PlatformAdapter):
         self.logger.debug(f"ANALYZE not needed for Athena - statistics are auto-collected for {table_name}")
 
 
-def _build_athena_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build Athena database configuration with credential loading."""
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    config = build_platform_config(
-        platform_type="athena",
-        credential_key="athena",
-        default_display_name="AWS Athena",
-        default_driver_package="pyathena",
-        platform_fields=[
-            "workgroup",
-            "database",
-            "catalog",
-            "s3_output_location",
-            "s3_staging_dir",
-            "staging_root",
-            "s3_bucket",
-            "s3_prefix",
-            "aws_profile",
-            "aws_access_key_id",
-            "aws_secret_access_key",
-            "data_format",
-            "default_format",
-            "compression",
-            "cleanup_staging",
-            "query_timeout",
-            "encryption",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
+def _apply_athena_config_fields(config: Any) -> None:
     config.region = config.options.get("region") or config.options.get("aws_region")
-    return config
 
 
-# Register the config builder with the platform hook registry
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("athena", _build_athena_config)
-except ImportError:
-    pass
+_build_athena_config = make_registered_platform_config_builder(
+    "athena",
+    __name__,
+    "AWS Athena",
+    "pyathena",
+    [
+        "workgroup",
+        "database",
+        "catalog",
+        "s3_output_location",
+        "s3_staging_dir",
+        "staging_root",
+        "s3_bucket",
+        "s3_prefix",
+        "aws_profile",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "data_format",
+        "default_format",
+        "compression",
+        "cleanup_staging",
+        "query_timeout",
+        "encryption",
+    ],
+    postprocess=_apply_athena_config_fields,
+)
