@@ -39,7 +39,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -628,6 +628,10 @@ typecheck-uv: typecheck
 # Import validation
 validate-imports:
 	uv run -- python scripts/validate_imports.py
+
+# Field-level schema validation for migrated YAML catalogs (see benchbox/core/catalog_schema.py).
+catalog-schema-check:
+	uv run -- python -m benchbox.core.catalog_schema
 
 # Dependency matrix / validation
 dependency-check:
