@@ -1,0 +1,180 @@
+id: shrink-objective-function-and-guardrail
+title: "Ratify and validate the corrected shrink objective function now encoded in the goal statement"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-05-24"
+category: Technical Debt
+
+# Resolution (2026-05-24): RATIFICATION + VALIDATION, no re-authoring. w0/w1
+# confirmed all five gates are explicit in the goal: logic-vs-data (L86-90),
+# import-I/O (Guardrail 1, L116), benchmark-semantics (Guardrail 3 L118 +
+# Non-negotiables L29/31), readable-SQL (Guardrail 4 L119 + L90), schema/typed
+# validation (Guardrail 5 L120). w2 backfill (_project/analysis/
+# shrink-objective-backfill.md) proves the objective function separates genuine
+# logic reductions (#587-589, #594-597, #599-603; net -400..-1100 .py) from
+# gamed relocations (#590 +468, #591 +296, #604 escaped SQL) -- and the flagged
+# PRs are exactly those needing this batch's defect-fix follow-ups. Conservative:
+# left approved_credit_for_valid_data_extraction = 0 (permissive arm is a human
+# decision, not an executor agent's). Deferred make shrink-guardrail tooling not
+# built (goal chose narrative gates).
+
+description: |
+  The shrink campaign (#587-#604, 18 PRs merged in ~6h) was originally driven
+  by a single metric: `cloc --include-lang=Python benchbox/`, with reductions
+  outside `benchbox/**/*.py` not counting. A three-round review concluded that
+  metric is a gameable proxy that induced two confirmed defects (module-level
+  eager YAML I/O; SQL relocated into escaped-newline quoted scalars).
+
+  RESOLVED UPSTREAM (verified 2026-05-23, see w0): `_project/goal-shrink-core-code.md`
+  has since been rewritten to encode the corrected objective function this item
+  was originally going to author. The goal now states:
+    - "Raw `cloc` is an input, not the objective" (goal:26) -- cloc is advisory,
+      the gates are the objective (answers the headline-metric open question).
+    - The logic-vs-data discriminator (goal:35): credit relocation only when the
+      content is pure data/metadata/query surface, schema or typed validation is
+      exercised, and loading is lazy or import-neutral (answers the logic-vs-data
+      open question).
+    - "never use escaped newline scalars" for SQL (goal:37) -- the navigability
+      gate.
+    - A six-point Guardrails section (goal:68-77): import-I/O (1), globals() (2),
+      benchmark-semantics (3), readable SQL (4), schema validation (5), coherent
+      PR boundaries (6).
+    - New YAML/catalog migrations blocked without a canonical-source decision
+      (goal:39, goal:106) -- the relocation gate that made this item a "campaign
+      gate" is now live in the goal itself, so this item no longer gates the
+      campaign and is downgraded from Critical to High.
+
+  What remains is therefore not authoring but RATIFICATION + VALIDATION: confirm
+  the goal still encodes the gates, and prove the corrected objective function
+  actually separates the campaign's genuine wins (#587-589 dead code, #594-595
+  DRY) from its gamed relocations (#590 eager load, #604 escaped SQL) when
+  applied to real history. The automated `make shrink-guardrail` measurement
+  tooling originally proposed here is DEFERRED: the goal deliberately chose a
+  narrative planning-thesis + PR-stated guardrail-evidence design (goal:64,
+  goal:102), not a Makefile metric gate -- adding one would re-litigate a
+  settled decision.
+
+work:
+- id: w0
+  summary: "Re-read the current goal statement and confirm the Objective Function + Guardrails sections exist"
+  status: done
+  notes: |
+    Evidence gate. The original framing of this item was authored against an
+    older goal file and went stale once the goal was rewritten. Re-read
+    `_project/goal-shrink-core-code.md` and record a compact summary in this
+    TODO / the PR body: which sections (Objective Function ~24-39, Guardrails
+    ~68-77, Stop Conditions ~104-110) are present, and which of the five gates
+    (logic-vs-data, import-I/O, benchmark-semantics, readable-SQL,
+    schema-validation) each encodes. If a gate is genuinely missing, this item
+    reverts to authoring it; if all are present, w1 is ratification only.
+
+- id: w1
+  summary: "Ratify: confirm the goal encodes the logic-vs-data rule and the countervailing gates"
+  needs: [w0]
+  status: done
+  notes: |
+    Confirm goal:26/35/37/39 and the Guardrails section cover: the
+    logic-vs-data credit rule, no net-new module-level import I/O, benchmark-
+    semantics preservation (see [[shrink-followup-joinorder-benchmark-semantics]]),
+    readable migrated SQL (see [[shrink-followup-sql-catalog-yaml-block-scalars]]),
+    and schema validation (see [[shrink-followup-catalog-schema-validation]]).
+    Add only clarifying edits if a gate is implicit rather than explicit; do
+    not re-author text that already exists.
+
+- id: w2
+  summary: "Backfill-classify #587-604 against the corrected objective function"
+  needs: [w1]
+  status: done
+  notes: |
+    The validation that the new metric is not just another unmeasured proxy.
+    Apply the goal's Objective Function to each campaign PR and confirm it
+    credits the genuine wins (#587-589 dead code, #594-595 DRY) and refuses
+    credit for the gamed relocations (#604 escaped SQL, #590 eager load). If
+    it does not separate them cleanly, the objective function is wrong --
+    file a goal-statement fix. Record the classification as a short note under
+    `_project/`.
+
+deferred:
+- summary: "Automated per-PR guardrail measurement (`make shrink-guardrail`: logic-LOC, import-time, type-coverage deltas)
+    wired into preflight"
+  reason: >
+    The goal statement deliberately chose a narrative planning-thesis +
+    PR-stated guardrail-evidence design (goal:64, goal:102), not a Makefile
+    metric gate. Building the tooling now would re-litigate that settled
+    design. Revisit only if the narrative gates prove insufficient in practice
+    (e.g. a future relocation slips past review undetected) -- w2's backfill
+    is the test of whether that risk is real.
+
+must_preserve:
+- "The genuine wins already merged (#587-589, #594-595) are not penalized or reverted retroactively"
+- "`benchbox/**/*.py` remains the primary surface of concern -- this item ratifies gates, it does not abandon the Python-reduction
+  goal"
+- "The goal statement's chosen narrative-gate design (planning thesis + PR-stated guardrail evidence) is not replaced by a
+  tooling gate"
+
+approach: |
+  Read-then-validate, not author. w0 re-establishes the current goal state (the
+  original framing went stale once the goal was rewritten). w1 ratifies. w2 is
+  the real remaining value: prove the now-written objective function separates
+  good from gamed reductions on the #587-604 history. Do NOT build the deferred
+  measurement tooling unless w2 shows the narrative gates miss a gamed
+  relocation.
+
+anti_patterns:
+- "DO NOT retroactively revert merged PRs -- because the genuine reductions are valuable and reverting churns develop -- targeted
+  defect-fix TODOs (this set) handle the specific regressions"
+- "DO NOT re-author the objective function from scratch -- because the goal already encodes it (goal:24-39, goal:68-77) --
+  w0/w1 ratify the existing text and only patch a genuinely-missing gate"
+- "DO NOT add the `make shrink-guardrail` tooling gate -- because it conflicts with the goal's chosen narrative-gate design
+  -- it is deferred pending evidence the narrative gates are insufficient"
+
+verification:
+- description: "Goal statement already encodes the objective function and the countervailing gates (ratification, not authoring)"
+  command: "grep -nE 'input, not the objective|escaped newline scalars|module-level I/O|benchmark semantics|schema or typed
+    validation|canonical-source' _project/goal-shrink-core-code.md"
+  expected_output: "matches in the Objective Function and Guardrails sections"
+- description: "Backfill classification of #587-604 recorded"
+  command: "grep -rniE 'backfill|#587|#604|credited|gamed' _project/ | grep -i shrink"
+  expected_output: "a note classifying #587-604 against the corrected objective function"
+
+scope_limit:
+  only_modify:
+  - "_project/goal-shrink-core-code.md"
+  - "_project/"
+
+prior_art:
+- "_project/goal-shrink-core-code.md:24-39,68-77 — the Objective Function + Guardrails sections already encode the corrected
+  metric; ratify/validate rather than re-author"
+- "[[shrink-followup-codegen-vs-runtime-parse-adr]] — the canonical-source decision the goal's relocation gate (goal:39) defers
+  to"
+
+metadata:
+  tags:
+  - shrink
+  - goal-statement
+  - metric
+  - goodhart
+  - ratification
+  estimated_effort: "Small"
+  created_date: "2026-05-23"
+  last_updated: "2026-05-23T16:00:00"
+
+impact:
+  technical_debt: |
+    The metric was the upstream cause of the campaign's defects. The goal has
+    been corrected; this item closes the loop by proving the correction actually
+    separates genuine from gamed reductions on real history, so the same class
+    of regression cannot recur uncaught.
+
+success_metrics:
+- "Confirmed record (w0/w1) that the goal statement encodes the logic-vs-data rule and the runtime/navigability/benchmark-semantics/schema
+  gates"
+- "Backfill classification (w2) credits #587-589/#594-595 and flags #590/#604 -- proving the metric separates genuine from
+  gamed reductions"
+
+files_affected:
+  modified:
+  - "_project/goal-shrink-core-code.md"
+  added:
+  - "_project/ (backfill classification note)"
