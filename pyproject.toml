@@ -1237,9 +1237,6 @@ ignore_rules = [
 
     # --- Wave-3 ignore rules (2026-03-12): wave-2 extraction residuals ---
 
-    # w3-G1: TPC-DI dimension generator wrappers (residual after _build_dimension_sql extraction)
-    { function_names = ["generate_company_dimension", "generate_customer_dimension", "generate_security_dimension"], path_contains = ["benchbox/core/tpcdi/generator/sql.py"] },
-
     # w3-G6: Schema get_all_create_table_sql wrappers (residual after collect_create_table_sql extraction)
     { function_names = ["get_all_create_table_sql"], path_contains = [
         "benchbox/core/amplab/schema.py",
@@ -1289,7 +1286,4 @@ ignore_rules = [
 
     # w3-G7: Capability-matrix methods in metadata_primitives (each defines different platform set)
     { function_names = ["supports_acl_introspection", "supports_column_grants", "supports_role_hierarchy"], path_contains = ["benchbox/core/metadata_primitives/ddl.py"] },
-
-    # w3-G20: TPC-DI domain-specific validators (same isin pattern, different valid value sets)
-    { function_names = ["validate_customer_tier", "validate_gender", "validate_trade_type"], path_contains = ["benchbox/core/tpcdi/etl/validation.py"] },
 ]
