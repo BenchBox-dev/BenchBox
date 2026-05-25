@@ -101,3 +101,54 @@ def test_public_benchmark_ids_exclude_joinorder_synthetic() -> None:
 
     assert "joinorder" in public_ids
     assert "joinorder_synthetic" not in public_ids
+
+
+def _synthetic_meta(support_status: str, surface: str, *, supports_dataframe: bool = False) -> dict[str, object]:
+    """Build a metadata entry for a hypothetical future benchmark."""
+    return {
+        "display_name": f"Synthetic {support_status}/{surface}",
+        "description": "synthetic future-status fixture",
+        "category": "Test",
+        "num_queries": 0,
+        "query_description": "n/a",
+        "supports_streams": False,
+        "default_scale": 1.0,
+        "scale_options": [1.0],
+        "min_scale": 1.0,
+        "complexity": "Low",
+        "estimated_time_range": (0, 0),
+        "supports_dataframe": supports_dataframe,
+        "support_status": support_status,
+        "surface": surface,
+    }
+
+
+@pytest.mark.parametrize("support_status", sorted(benchmark_registry.BENCHMARK_SUPPORT_STATUS_VALUES))
+def test_surface_gates_discovery_independent_of_support_status(support_status: str) -> None:
+    """`surface` alone controls public discovery; `support_status` never hides or reveals.
+
+    Future-proofing invariant: a benchmark of ANY support tier is listed when
+    public and hidden when internal. Visibility must not be repurposed onto the
+    status field.
+    """
+    fixtures = {
+        "x_future_public": _synthetic_meta(support_status, "public"),
+        "x_future_internal": _synthetic_meta(support_status, "internal"),
+    }
+    with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False):
+        public_ids = benchmark_registry.list_public_benchmark_ids()
+        assert "x_future_public" in public_ids, f"public {support_status} benchmark must be discoverable"
+        assert "x_future_internal" not in public_ids, f"internal {support_status} benchmark must be hidden"
+        assert benchmark_registry.get_benchmark_support_status("x_future_public") == support_status
+        assert benchmark_registry.get_benchmark_support_status("x_future_internal") == support_status
+
+
+def test_supports_dataframe_independent_of_support_status() -> None:
+    """The DataFrame capability flag is read directly, never inferred from support tier."""
+    fixtures = {
+        "x_experimental_df": _synthetic_meta("experimental", "public", supports_dataframe=True),
+        "x_stable_nodf": _synthetic_meta("stable", "public", supports_dataframe=False),
+    }
+    with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False):
+        assert benchmark_registry.BENCHMARK_METADATA["x_experimental_df"]["supports_dataframe"] is True
+        assert benchmark_registry.BENCHMARK_METADATA["x_stable_nodf"]["supports_dataframe"] is False

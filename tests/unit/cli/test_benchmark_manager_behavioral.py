@@ -510,3 +510,68 @@ def test_validate_scale_choice_emits_info_for_high_but_safe_usage(
     manager._validate_scale_choice(8.0, "tpch", manager.benchmarks["tpch"], {"memory_gb": 10.0})
 
     assert "This will use ~8.0GB of your 10.0GB memory" in stream.getvalue()
+
+
+def _future_status_benchmark(name: str, support_status: str, surface: str) -> dict[str, object]:
+    return {
+        "display_name": name,
+        "description": f"{support_status} fixture",
+        "query_description": f"{support_status} queries",
+        "category": f"Cat-{support_status}",
+        "num_queries": 1,
+        "support_status": support_status,
+        "complexity": "low",
+        "estimated_time_range": (1, 2),
+        "base_memory_gb": 0.1,
+        "scale_options": [1.0],
+        "default_scale": 1.0,
+        "supports_streams": False,
+        "surface": surface,
+    }
+
+
+@pytest.fixture
+def future_status_manager() -> BenchmarkManager:
+    """Manager whose benchmarks span every public support tier plus an internal one."""
+    mgr = BenchmarkManager()
+    mgr.benchmarks = {
+        "f_stable": _future_status_benchmark("F Stable", "stable", "public"),
+        "f_beta": _future_status_benchmark("F Beta", "beta", "public"),
+        "f_experimental": _future_status_benchmark("F Experimental", "experimental", "public"),
+        "f_deprecated": _future_status_benchmark("F Deprecated", "deprecated", "public"),
+        "f_document_only": _future_status_benchmark("F DocOnly", "document_only", "public"),
+        "f_internal_beta": _future_status_benchmark("F Internal Beta", "beta", "internal"),
+    }
+    return mgr
+
+
+def test_cli_labels_every_public_support_status(
+    monkeypatch: pytest.MonkeyPatch, future_status_manager: BenchmarkManager
+):
+    """The interactive listing labels each public benchmark with its support tier."""
+    console, stream = _capture_console()
+    monkeypatch.setattr(bench_mod, "console", console)
+
+    future_status_manager.list_available_benchmarks()
+
+    output = stream.getvalue()
+    assert "Support: Stable" in output
+    assert "Support: Beta" in output
+    assert "Support: Experimental" in output
+    assert "Support: Deprecated" in output
+    assert "Support: Document-only" in output
+
+
+def test_cli_hides_internal_benchmark_regardless_of_support_status(
+    monkeypatch: pytest.MonkeyPatch, future_status_manager: BenchmarkManager
+):
+    """`surface: internal` hides a benchmark even when its status would otherwise show."""
+    console, stream = _capture_console()
+    monkeypatch.setattr(bench_mod, "console", console)
+
+    public = future_status_manager._get_public_benchmarks()
+    assert "f_internal_beta" not in public
+    assert "f_beta" in public
+
+    future_status_manager.list_available_benchmarks()
+    assert "F Internal Beta" not in stream.getvalue()

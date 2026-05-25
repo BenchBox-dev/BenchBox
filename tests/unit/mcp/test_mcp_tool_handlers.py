@@ -188,6 +188,76 @@ class TestGetQueryDetailsTool:
         assert "support_status" not in info
 
 
+def _future_benchmark_meta(support_status: str, surface: str) -> dict[str, object]:
+    """Metadata for a hypothetical future benchmark used to pin visibility invariants."""
+    return {
+        "display_name": f"Future {support_status}/{surface}",
+        "description": "synthetic future-status fixture",
+        "category": "Test",
+        "num_queries": 0,
+        "query_description": "n/a",
+        "supports_streams": False,
+        "default_scale": 1.0,
+        "scale_options": [1.0],
+        "min_scale": 1.0,
+        "complexity": "Low",
+        "estimated_time_range": (0, 0),
+        "supports_dataframe": False,
+        "support_status": support_status,
+        "surface": surface,
+    }
+
+
+class TestFutureSupportStatusVisibilityInvariants:
+    """Cross-surface invariants for future support_status x surface combinations.
+
+    These use synthetic metadata so that adding a real `document_only`,
+    `deprecated`, `beta`, or `experimental` benchmark later cannot silently
+    expose or hide it contrary to the surface policy.
+    """
+
+    def test_internal_future_status_hidden_from_mcp_discovery(self):
+        """An internal benchmark of any future status stays off MCP discovery surfaces."""
+        from benchbox.core import benchmark_registry
+        from benchbox.mcp.tools.discovery import _get_benchmark_info_impl, _list_benchmarks_impl
+
+        fixtures = {"x_future_internal": _future_benchmark_meta("document_only", "internal")}
+        with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False):
+            listed = {row["name"] for row in _list_benchmarks_impl()["benchmarks"]}
+            assert "x_future_internal" not in listed
+
+            info = _get_benchmark_info_impl("x_future_internal")
+            assert "error" in info
+            assert "x_future_internal" not in info["available_benchmarks"]
+
+    def test_internal_future_status_query_details_omit_support_status(self):
+        """Explicit-ID query details for an internal benchmark omit support claims."""
+        from benchbox.core import benchmark_registry
+        from benchbox.mcp.tools.benchmark import _build_query_details_benchmark_info
+
+        meta = _future_benchmark_meta("deprecated", "internal")
+        fixtures = {"x_future_internal": meta}
+        with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False):
+            info = _build_query_details_benchmark_info("x_future_internal", meta)
+
+        assert info["display_name"] == "Future deprecated/internal"
+        assert "support_status" not in info
+
+    def test_public_future_status_exposed_and_labeled_over_mcp(self):
+        """A public benchmark of a future status is discoverable with its support_status."""
+        from benchbox.core import benchmark_registry
+        from benchbox.mcp.tools.discovery import _get_benchmark_info_impl, _list_benchmarks_impl
+
+        fixtures = {"x_future_public": _future_benchmark_meta("deprecated", "public")}
+        with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False):
+            listed = {row["name"]: row for row in _list_benchmarks_impl()["benchmarks"]}
+            assert listed["x_future_public"]["support_status"] == "deprecated"
+
+            info = _get_benchmark_info_impl("x_future_public")
+            assert "error" not in info
+            assert info["support_status"] == "deprecated"
+
+
 # ---------------------------------------------------------------------------
 # list_available with category="platforms" (consolidated list_platforms)
 # ---------------------------------------------------------------------------

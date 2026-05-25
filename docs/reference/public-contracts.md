@@ -77,6 +77,48 @@ auditable per-benchmark rationale and promotion criteria are in
 per-benchmark status rows are drift-checked against the registry by
 `tests/unit/core/test_benchmark_api_contract.py`.
 
+## Benchmark Visibility Policy
+
+Three registry fields govern how a benchmark appears on public surfaces, and
+they are **independent**. Tests in `tests/unit/core/test_registry_surface_field.py`,
+`tests/unit/cli/test_benchmark_manager_behavioral.py`, and the MCP discovery /
+resource / handler suites enforce this matrix for current and future statuses.
+
+`surface` is the **only discovery gate**. It decides whether a benchmark is
+listed or hidden, regardless of `support_status`:
+
+| `surface` | CLI interactive listing | MCP `list_available` / `get_benchmark_info` | MCP resources | Runnable by explicit ID | MCP `get_query_details` |
+|---|---|---|---|---|---|
+| `public` | Listed and labeled with its status | Exposed, including `support_status` | Exposed, including `support_status` | Yes | Returns metadata including `support_status` |
+| `internal` | Hidden | Hidden (`error` / not-found) | Hidden | Yes (explicit-ID exception) | Returns `display_name` and `category` only, **omits `support_status`** |
+
+`support_status` controls the **product-support label** shown next to a public
+benchmark; it never hides one. For any `public` benchmark, regardless of status:
+
+| `support_status` | CLI label | Listed by default | DataFrame routing |
+|---|---|---|---|
+| `stable` | `Stable` | Yes | Per `supports_dataframe` |
+| `beta` | `Beta` | Yes | Per `supports_dataframe` |
+| `experimental` | `Experimental` | Yes | Per `supports_dataframe` |
+| `deprecated` | `Deprecated` | Yes, until the removal window | Per `supports_dataframe` |
+| `document_only` | `Document-only` | Yes | Per `supports_dataframe` |
+| `repo_only` | `Repo-only` | Only if also `surface: public` (normally `internal`) | Per `supports_dataframe` |
+
+`supports_dataframe` is a **capability flag**: it controls DataFrame routing and
+is never inferred from `support_status`. A `beta` benchmark may be
+DataFrame-capable; an `experimental` one may not.
+
+**Explicit-ID exception.** Internal benchmarks (for example `joinorder_synthetic`)
+stay runnable by exact ID so contributor workflows keep working, but they must
+not leak product-support claims onto discovery surfaces. `get_query_details`
+therefore returns only neutral identifiers (`display_name`, `category`) for an
+internal benchmark and omits `support_status`; `get_benchmark_info`,
+`list_available`, and the benchmark resources hide them entirely.
+
+To hide a public benchmark, change its `surface` to `internal` — do not repurpose
+`support_status`. Demotion to `deprecated` keeps it listed (with a label) until a
+separate `surface`/removal decision.
+
 ## Count and Drift Policy
 
 Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; **22** public discovery entries; **21** top-level Python benchmark facades; **14** lazy facades; **7** eager facades; **2** core-only benchmark IDs. Benchmark support status: **5** stable, **12** beta, **5** experimental, **1** repo-only, **0** deprecated, **0** document-only.
