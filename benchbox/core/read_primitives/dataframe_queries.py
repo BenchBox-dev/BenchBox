@@ -3776,3 +3776,6 @@ def get_skip_for_datafusion() -> list[str]:
         List of query IDs to skip for DataFusion
     """
     return SKIP_FOR_DATAFUSION.copy()
+
+
+__all__ = sorted({name for name in globals() if not name.startswith("_")} | set(_IMPLS))

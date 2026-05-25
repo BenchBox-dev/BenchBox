@@ -565,3 +565,6 @@ def get_implemented_dataframe_query_ids() -> list[str]:
 def get_untranslated_dataframe_query_ids() -> list[str]:
     """Return canonical query IDs that are not available in DataFrame mode."""
     return list(UNTRANSLATED_DATAFRAME_QUERY_IDS)
+
+
+__all__ = sorted({name for name in globals() if not name.startswith("_")} | set(_IMPLS))

@@ -17,11 +17,7 @@ from unittest.mock import patch
 
 import pytest
 
-from benchbox.core.benchmark_registry import (
-    BENCHMARK_METADATA,
-    get_benchmark_surface,
-    list_public_benchmark_ids,
-)
+from benchbox.core import benchmark_registry
 
 pytestmark = [
     pytest.mark.unit,
@@ -29,14 +25,14 @@ pytestmark = [
 ]
 
 
-@pytest.mark.parametrize("benchmark_id", sorted(BENCHMARK_METADATA.keys()))
+@pytest.mark.parametrize("benchmark_id", sorted(benchmark_registry.BENCHMARK_METADATA.keys()))
 def test_existing_benchmarks_default_to_public(benchmark_id: str) -> None:
     """Regression guard: any benchmark NOT explicitly marked internal must
     appear public. Foundation is additive — no behavior change for existing
     entries.
     """
-    surface = get_benchmark_surface(benchmark_id)
-    declared = BENCHMARK_METADATA[benchmark_id].get("surface")
+    surface = benchmark_registry.get_benchmark_surface(benchmark_id)
+    declared = benchmark_registry.BENCHMARK_METADATA[benchmark_id].get("surface")
     if declared == "internal":
         assert surface == "internal"
     else:
@@ -45,7 +41,7 @@ def test_existing_benchmarks_default_to_public(benchmark_id: str) -> None:
 
 def test_unregistered_benchmark_defaults_public() -> None:
     """Defensive default for ids not in BENCHMARK_METADATA."""
-    assert get_benchmark_surface("does-not-exist") == "public"
+    assert benchmark_registry.get_benchmark_surface("does-not-exist") == "public"
 
 
 def test_internal_surface_recognized() -> None:
@@ -67,8 +63,8 @@ def test_internal_surface_recognized() -> None:
             "surface": "internal",
         }
     }
-    with patch.dict(BENCHMARK_METADATA, fake_meta, clear=False):
-        assert get_benchmark_surface("x_internal") == "internal"
+    with patch.dict(benchmark_registry.BENCHMARK_METADATA, fake_meta, clear=False):
+        assert benchmark_registry.get_benchmark_surface("x_internal") == "internal"
 
 
 def test_public_surface_recognized() -> None:
@@ -90,18 +86,18 @@ def test_public_surface_recognized() -> None:
             "surface": "public",
         }
     }
-    with patch.dict(BENCHMARK_METADATA, fake_meta, clear=False):
-        assert get_benchmark_surface("x_public") == "public"
+    with patch.dict(benchmark_registry.BENCHMARK_METADATA, fake_meta, clear=False):
+        assert benchmark_registry.get_benchmark_surface("x_public") == "public"
 
 
 def test_joinorder_synthetic_hidden() -> None:
     """The cutover's synthetic compatibility surface is not public."""
-    assert get_benchmark_surface("joinorder_synthetic") == "internal"
+    assert benchmark_registry.get_benchmark_surface("joinorder_synthetic") == "internal"
 
 
 def test_public_benchmark_ids_exclude_joinorder_synthetic() -> None:
     """Public discovery helpers omit internal benchmark surfaces."""
-    public_ids = list_public_benchmark_ids()
+    public_ids = benchmark_registry.list_public_benchmark_ids()
 
     assert "joinorder" in public_ids
     assert "joinorder_synthetic" not in public_ids

@@ -81,11 +81,11 @@ Credit unit is Python `cloc` code lines. Provisional formula:
 
 `credited = net_deleted_or_consolidated_maintained_python_logic - added_maintained_python - uncredited_relocation`
 
-Until the objective-function TODO resolves, `approved_credit_for_valid_data_extraction = 0`. When in doubt, classify Python-to-data movement as uncredited relocation. Consolidation credit is net maintained-Python reduction after additions.
+The objective-function TODO resolved without approving data-extraction credit: `approved_credit_for_valid_data_extraction = 0`. When in doubt, classify Python-to-data movement as uncredited relocation. Consolidation credit is net maintained-Python reduction after additions.
 
 Do not count Python logic moved into data/string blobs; SQL/query semantics moved into escaped scalars or opaque blobs; control flow, lookup rules, or execution rules relocated without simplification; generated Python unless the codegen ADR defines accounting; or whitespace/comment/formatting/cosmetic edits.
 
-Python-to-data relocation earns credit only after the objective-function TODO approves that class and only when content is pure data, metadata, or declared query surface; the target is more readable/searchable/maintainable; validation is exercised; loading is lazy or import-neutral by approved budget; and maintenance burden falls.
+Python-to-data relocation earns credit only after a separate human-approved decision approves that class and only when content is pure data, metadata, or declared query surface; the target is more readable/searchable/maintainable; validation is exercised; loading is lazy or import-neutral by approved budget; and maintenance burden falls.
 
 SQL is benchmark/query surface. Moving SQL out of Python counts only when reviewability, searchability, and tooling are preserved. Prefer existing `.sql` assets or structured catalogs. YAML SQL requires block scalars and round-trip equality; escaped newline scalars are forbidden.
 

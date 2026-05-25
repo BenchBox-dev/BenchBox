@@ -1,10 +1,10 @@
-"""Shared schema validation for migrated YAML catalogs.
+"""Shared schema validation for shrink-campaign YAML migrations.
 
-The shrink campaign moved benchmark metadata and static query catalogs from
-Python literals into YAML (PRs #590, #604). Those catalogs are loaded as plain
-dicts, so a typo'd field name, a missing required field, or a wrong type
-surfaces as a runtime error at first use rather than a CI failure -- the
-implicit type safety the Python literals used to provide is gone.
+The shrink campaign moved benchmark metadata, benchmark result specs, and static
+query catalogs from Python literals into YAML (PRs #590, #604). Those catalogs
+are loaded as plain dicts, so a typo'd field name, a missing required field, or a
+wrong type surfaces as a runtime error at first use rather than a CI failure --
+the implicit type safety the Python literals used to provide is gone.
 
 This module recovers that safety with one shared set of Pydantic models plus a
 ``CATALOG_SCHEMAS`` registry of ``(package, filename) -> model``. A single test
@@ -23,12 +23,13 @@ from importlib import resources
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, RootModel, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, RootModel, ValidationError
 
 from benchbox.utils.printing import emit
 
 SupportStatus = Literal["stable", "beta", "experimental", "repo_only", "deprecated", "document_only"]
 Surface = Literal["public", "internal"]
+_STRICT_MODEL_CONFIG = ConfigDict(extra="forbid", strict=True)
 
 
 class CatalogSchemaError(ValueError):
@@ -38,7 +39,7 @@ class CatalogSchemaError(ValueError):
 class BenchmarkMeta(BaseModel):
     """Per-benchmark metadata entry in ``benchmark_registry.yaml``."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = _STRICT_MODEL_CONFIG
 
     display_name: str
     description: str
@@ -50,7 +51,7 @@ class BenchmarkMeta(BaseModel):
     default_scale: float
     scale_options: list[float]
     complexity: str
-    estimated_time_range: tuple[float, float]
+    estimated_time_range: list[float] = Field(min_length=2, max_length=2)
     base_memory_gb: float
     data_source: str | None
     supports_dataframe: bool
@@ -62,7 +63,7 @@ class BenchmarkMeta(BaseModel):
 class BenchmarkRegistryCatalog(BaseModel):
     """Schema for ``benchbox/core/benchmark_registry.yaml`` (PR #590)."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = _STRICT_MODEL_CONFIG
 
     category_order: list[str]
     benchmark_order: dict[str, list[str]]
@@ -73,10 +74,35 @@ class BenchmarkRegistryCatalog(BaseModel):
     benchmark_metadata: dict[str, BenchmarkMeta]
 
 
+class BenchmarkSpecEntry(BaseModel):
+    """Per-benchmark result-integrity spec in ``benchmark_specs.yaml``."""
+
+    model_config = _STRICT_MODEL_CONFIG
+
+    benchmark_id: str
+    unique_query_ids: list[str]
+    min_unique_queries: int = 0
+    min_success_rate: float = 1.0
+    high_failure_expected: bool = False
+    requires_tables_object: bool = True
+    sf1_row_counts: dict[str, int] | None = None
+    sf1_power_at_size_range: list[float] | None = Field(default=None, min_length=2, max_length=2)
+
+
+class BenchmarkSpecsCatalog(BaseModel):
+    """Schema for ``benchbox/core/results/benchmark_specs.yaml`` (PR #590)."""
+
+    model_config = _STRICT_MODEL_CONFIG
+
+    legacy_aliases: dict[str, str]
+    tpch_sf1_row_counts: dict[str, int]
+    benchmark_specs: dict[str, BenchmarkSpecEntry]
+
+
 class StaticQueryEntry(BaseModel):
     """A single query in a static ``query_catalog.yaml`` collection."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = _STRICT_MODEL_CONFIG
 
     id: str
     name: str
@@ -94,13 +120,16 @@ class StaticQueryCatalog(RootModel[dict[str, dict[str, StaticQueryEntry]]]):
     query key to a :class:`StaticQueryEntry`.
     """
 
+    model_config = ConfigDict(strict=True)
 
-# (package, filename) -> Pydantic model. Register a migrated catalog here to put
-# it under the CI schema gate. Covers the campaign catalogs that lack a
-# field-level dataclass layer; catalogs already parsed into typed dataclasses
-# (e.g. write_primitives/catalog/loader.py) keep their existing field safety.
+
+# (package, filename) -> Pydantic model. Register shrink-campaign migrated
+# catalogs here to put them under the CI schema gate. This intentionally covers
+# raw-dict migrations that lack a field-level dataclass layer; older catalogs
+# already parsed into typed loaders keep their existing validators.
 CATALOG_SCHEMAS: dict[tuple[str, str], type[BaseModel]] = {
     ("benchbox.core", "benchmark_registry.yaml"): BenchmarkRegistryCatalog,
+    ("benchbox.core.results", "benchmark_specs.yaml"): BenchmarkSpecsCatalog,
     ("benchbox.core.flightdata", "query_catalog.yaml"): StaticQueryCatalog,
     ("benchbox.core.nyctaxi", "query_catalog.yaml"): StaticQueryCatalog,
     ("benchbox.core.tsbs_devops", "query_catalog.yaml"): StaticQueryCatalog,

@@ -3,16 +3,6 @@
 All 43 ClickBench queries implemented for both Expression and Pandas families.
 All queries operate on a single flat 'hits' table (no joins).
 
-Query categories by ID range:
-- Basic aggregation (Q1-Q7): COUNT, SUM, AVG, MIN/MAX, COUNT(DISTINCT)
-- Grouping and ordering (Q8-Q15): GROUP BY with various aggregates
-- User analysis (Q16-Q20): User-centric grouping and point lookups
-- Text and pattern matching (Q21-Q27): LIKE, string filtering
-- String operations (Q28-Q29): LENGTH, REGEXP_REPLACE, HAVING
-- Mathematical operations (Q30): Wide aggregation (90 columns)
-- Complex grouping (Q31-Q36): Multi-column GROUP BY with derived columns
-- Time-based analysis (Q37-Q43): Date filtering, OFFSET, CASE WHEN, DATE_TRUNC
-
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.

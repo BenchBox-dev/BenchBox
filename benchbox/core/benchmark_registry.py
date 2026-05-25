@@ -11,7 +11,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import functools
 import importlib
 from collections import Counter
 from dataclasses import dataclass
@@ -19,6 +18,8 @@ from importlib import resources
 from typing import Any, Literal, cast
 
 import yaml
+
+from benchbox.utils.singleflight_cache import SingleFlightValueCache
 
 BenchmarkSupportStatus = Literal["stable", "beta", "experimental", "repo_only", "deprecated", "document_only"]
 
@@ -67,8 +68,7 @@ class _RegistryData:
     benchmark_metadata: dict[str, dict[str, Any]]
 
 
-@functools.lru_cache(maxsize=1)
-def _registry() -> _RegistryData:
+def _build_registry() -> _RegistryData:
     """Load, derive, and validate benchmark metadata once, on first access."""
     payload = _load_registry_payload()
     benchmark_class_names = dict(payload["benchmark_class_names"])
@@ -96,6 +96,8 @@ def _registry() -> _RegistryData:
     _validate_registry(data.benchmark_metadata)
     return data
 
+
+_registry = SingleFlightValueCache(_build_registry)
 
 # Public module constants resolve to the lazily built, cached payload above via
 # PEP 562 module __getattr__, so importers keep their names while the file I/O
@@ -477,3 +479,31 @@ def get_benchmark_surface(benchmark_id: str) -> str:
     if meta is None:
         return "public"
     return str(meta.get("surface", "public"))
+
+
+__all__ = sorted(
+    list(_PUBLIC_REGISTRY_ATTRS)
+    + [
+        "BENCHMARK_SUPPORT_STATUS_VALUES",
+        "BenchmarkSupportStatus",
+        "get_all_benchmarks",
+        "get_benchmark_class",
+        "get_benchmark_class_name",
+        "get_benchmark_default_scale",
+        "get_benchmark_id_for_class_name",
+        "get_benchmark_metadata",
+        "get_benchmark_registry_summary",
+        "get_benchmark_support_status",
+        "get_benchmark_surface",
+        "get_benchmarks_by_category",
+        "get_benchmarks_by_support_status",
+        "get_categories",
+        "get_core_benchmark_class_name",
+        "get_public_benchmark_class",
+        "is_benchmark_available",
+        "list_benchmark_ids",
+        "list_loader_benchmark_ids",
+        "list_public_benchmark_ids",
+        "validate_scale_factor",
+    ]
+)
