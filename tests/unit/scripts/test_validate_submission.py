@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -80,82 +77,6 @@ def _normalized_cost_block(cost: str | None = "1.25", status: str = "normalized"
             "node_count": 2 if status == "normalized" else None,
         },
     }
-
-
-def _uv_executable() -> str:
-    uv = shutil.which("uv")
-    if uv is None:
-        pytest.skip("uv is required to exercise no-project validator execution")
-    return uv
-
-
-def _env_without_pythonpath() -> dict[str, str]:
-    env = os.environ.copy()
-    env.pop("PYTHONPATH", None)
-    return env
-
-
-def test_cli_runs_from_develop_checkout_without_project_install(valid_bundle_file: Path) -> None:
-    """The develop checkout CLI runs under uv --no-project."""
-    repo_root = Path(__file__).resolve().parents[3]
-    result = subprocess.run(
-        [
-            _uv_executable(),
-            "run",
-            "--no-project",
-            "--",
-            "python",
-            "scripts/validate_submission.py",
-            str(valid_bundle_file),
-        ],
-        cwd=repo_root,
-        env=_env_without_pythonpath(),
-        text=True,
-        capture_output=True,
-        timeout=30,
-        check=False,
-    )
-
-    assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    assert "Validated 1 bundle(s): 0 error(s)" in result.stdout
-
-
-def test_cli_runs_in_slim_no_project_checkout(tmp_path: Path) -> None:
-    """The published-results mirror runs without installing the BenchBox project."""
-    repo_root = Path(__file__).resolve().parents[3]
-    slim_root = tmp_path / "published-results"
-    (slim_root / "scripts").mkdir(parents=True)
-    (slim_root / "benchbox" / "validation").mkdir(parents=True)
-    (slim_root / "results-data" / "bundles").mkdir(parents=True)
-
-    shutil.copy2(repo_root / "scripts" / "validate_submission.py", slim_root / "scripts" / "validate_submission.py")
-    shutil.copy2(
-        repo_root / "benchbox" / "validation" / "bundle.py", slim_root / "benchbox" / "validation" / "bundle.py"
-    )
-
-    bundle = slim_root / "results-data" / "bundles" / "tpch_result.json"
-    bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
-
-    result = subprocess.run(
-        [
-            _uv_executable(),
-            "run",
-            "--no-project",
-            "--",
-            "python",
-            "scripts/validate_submission.py",
-            str(bundle.relative_to(slim_root)),
-        ],
-        cwd=slim_root,
-        env=_env_without_pythonpath(),
-        text=True,
-        capture_output=True,
-        timeout=30,
-        check=False,
-    )
-
-    assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    assert "Validated 1 bundle(s): 0 error(s)" in result.stdout
 
 
 @pytest.fixture

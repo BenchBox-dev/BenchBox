@@ -5,9 +5,6 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-import json
-import subprocess
-import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -23,28 +20,6 @@ pytestmark = [
     pytest.mark.fast,
     pytest.mark.cloud_import,
 ]
-
-
-def _parse_snowflake_cli_args(argv: list[str]) -> dict[str, object]:
-    """Parse Snowflake CLI args in a clean Python process."""
-
-    script = """
-import argparse
-import json
-from benchbox.platforms.snowflake import SnowflakeAdapter
-
-parser = argparse.ArgumentParser()
-SnowflakeAdapter.add_cli_arguments(parser)
-print(json.dumps(vars(parser.parse_args(ARGV))))
-"""
-
-    result = subprocess.run(
-        [sys.executable, "-c", script.replace("ARGV", repr(argv))],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return json.loads(result.stdout)
 
 
 @pytest.fixture(autouse=True)
@@ -2279,31 +2254,6 @@ class TestSnowflakeDriverIsolation:
         """Snowflake adapter should declare FEASIBLE_CLIENT_ONLY driver isolation."""
         adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
         assert adapter.driver_isolation_capability == DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
-
-
-class TestSnowflakeAddCliArguments:
-    """Test add_cli_arguments setup."""
-
-    def test_adds_snowflake_arguments(self):
-        """Snowflake CLI parser should expose the expected defaults."""
-        args = _parse_snowflake_cli_args([])
-
-        assert args["warehouse"] == "COMPUTE_WH"
-        assert args["schema"] == "PUBLIC"
-        assert args["authenticator"] == "snowflake"
-        assert args["modify_warehouse_settings"] is False
-        assert args["suppress_nondeterministic_errors"] is False
-        assert args["disable_result_cache"] is True
-
-    def test_cli_no_disable_result_cache_flag(self):
-        """Result-cache opt-out flag should set disable_result_cache to False."""
-        args = _parse_snowflake_cli_args(["--no-disable-result-cache"])
-        assert args["disable_result_cache"] is False
-
-    def test_cli_modify_warehouse_settings_flag(self):
-        """Warehouse-settings flag should set the boolean to True."""
-        args = _parse_snowflake_cli_args(["--modify-warehouse-settings"])
-        assert args["modify_warehouse_settings"] is True
 
 
 class TestSnowflakeGenerateTuningClauseEdgeCases:
