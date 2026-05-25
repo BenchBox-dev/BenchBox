@@ -23,6 +23,8 @@ from benchbox.core.joinorder.dataframe_queries import (
 )
 from benchbox.core.joinorder.queries import CANONICAL_JOINORDER_QUERIES
 
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
 QUERY_IDS = list(CANONICAL_JOINORDER_QUERIES)
 
 
@@ -34,7 +36,6 @@ def _plan_for(query_id: str):
     return tables, join_predicates, _plan_join_sequence(tables, join_predicates)
 
 
-@pytest.mark.fast
 @pytest.mark.parametrize("query_id", QUERY_IDS)
 def test_join_plan_is_left_deep_chain_over_all_tables(query_id: str) -> None:
     tables, _join_predicates, steps = _plan_for(query_id)
@@ -51,7 +52,6 @@ def test_join_plan_is_left_deep_chain_over_all_tables(query_id: str) -> None:
     assert joined == {alias for alias, _table in tables}
 
 
-@pytest.mark.fast
 @pytest.mark.parametrize("query_id", QUERY_IDS)
 def test_join_plan_is_pure_function_of_sql_not_data(query_id: str) -> None:
     # The plan is computed from SQL topology alone (no data / cardinality input),
