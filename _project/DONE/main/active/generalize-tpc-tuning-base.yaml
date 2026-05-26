@@ -418,7 +418,7 @@ completion_notes: |
   - `uv run -- python _project/scripts/tuning_profile_check.py --benchmarks tpch,tpcds --platforms databricks,duckdb --strict`: all four cells passed.
   - `uv run -- python -c "...ConfigManager..."; print("ok")`: ok.
   - `uv run -- python -m pytest tests/uat/test_tuning_coverage.py -m fast -q`: 6 passed.
-  - `make pr-preflight`: 22709 passed, 5 skipped, 42 warnings.
+  - `make pr-preflight`: 22712 passed, 5 skipped, 42 warnings.
 
 metadata:
   tags:
