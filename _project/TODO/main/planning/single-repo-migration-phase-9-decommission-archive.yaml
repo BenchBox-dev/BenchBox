@@ -24,9 +24,11 @@ blockers:
     - The TODO itself says default action is KEEP because deleting the archive is irreversible and costs nothing to defer.
   unblock: |
     Revisit on or after 2026-06-26, and only after Phase 8 or an
-    approved recovery-release TODO has completed. At that point audit the
-    retired clone and external references before deciding whether to keep
-    or delete the archived `joeharris76/benchbox-private` repo.
+    approved recovery-release TODO such as `release-recovery-v0-3-1` has
+    completed and been accepted as satisfying the release dependency. At
+    that point audit the retired clone and external references before
+    deciding whether to keep or delete the archived
+    `joeharris76/benchbox-private` repo.
 
 description: |
   Optional final cleanup. After enough time has passed (60-90 days post

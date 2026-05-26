@@ -23,14 +23,14 @@ blockers:
     not be used as an implicit dependency bypass.
   evidence: |
     - `_project/TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml` is the explicit dependency in `deps.needs`.
-    - PR #661 records the Phase 4 blocker and has auto-merge enabled.
+    - PR #661 merged the Phase 4 blocker record to `develop`.
     - Live release evidence shows `v0.3.0` exists and PyPI lists `0.3.0`, but `release.yml` run `26160520298` concluded `failure`.
     - `uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c 'import benchbox; print(benchbox.__version__)'` fails with missing `pandas`.
   unblock: |
-    Decide explicitly whether Phase 8 is the approved monotonic recovery
-    release path for `0.3.1`, or create a new recovery-release TODO that
-    depends on the post-`v0.3.0` release-gate fixes. Do not run a release
-    from this TODO while Phase 4 remains blocked.
+    Complete `release-recovery-v0-3-1`, then decide explicitly whether
+    its `v0.3.1` release satisfies this Phase 8 release exercise or this
+    TODO still needs a separate later post-migration release. Do not run
+    a release from this TODO while Phase 4 remains blocked.
 
 description: |
   End-to-end validation that the new flow works in the now-canonical

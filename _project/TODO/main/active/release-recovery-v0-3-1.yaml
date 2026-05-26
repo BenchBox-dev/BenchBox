@@ -1,0 +1,180 @@
+id: release-recovery-v0-3-1
+title: "Recover the failed v0.3.0 install smoke with a monotonic v0.3.1 release"
+worktree: main
+priority: Critical
+status: Not Started
+category: Release Tooling
+
+deps:
+  needs:
+  - release-finalize-pretag-ci-wait
+  - single-repo-migration-phase-6-delete-obsolete-tooling
+  - single-repo-migration-phase-7-docs-cleanup
+
+description: |
+  The public `v0.3.0` tag, GitHub release, and PyPI files are immutable and
+  already published. The release workflow run for that tag published the
+  artifacts, then failed every install-smoke job because a clean install of
+  `benchbox==0.3.0` could not import `benchbox` without `pandas`.
+
+  This TODO owns the explicit recovery path that PRs #659/#661/#662 recorded
+  only as blocker prose: cut the next monotonic release, `v0.3.1`, after
+  confirming the post-`v0.3.0` release-gate fixes are present on `develop`.
+  Completion of this TODO provides the evidence needed to close Phase 4's
+  release verification work and then make an explicit Phase 8 decision.
+
+work:
+- id: w1
+  summary: "Revalidate the live v0.3.0 failure and current PyPI version state"
+  status: pending
+  notes: |
+    Capture only compact evidence in the PR body or TODO notes. Required
+    checks:
+      - `git ls-remote --tags origin 'refs/tags/v0.3.0*'`
+      - `gh release view v0.3.0 --repo joeharris76/BenchBox`
+      - `gh run view 26160520298 --repo joeharris76/BenchBox --json conclusion,jobs`
+      - `uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c 'import benchbox'`
+      - `uv run --isolated --with pip -- python -m pip index versions benchbox`
+
+- id: w2
+  summary: "Confirm the recovery fixes are present on develop before cutting v0.3.1"
+  needs: [w1]
+  status: pending
+  notes: |
+    Confirm at minimum:
+      - base runtime dependencies include the `pandas` dependency needed by
+        the import path that broke `v0.3.0`;
+      - release finalization waits for the stable required release context
+        before tagging;
+      - local `make pr-preflight` is green on the recovery branch before any
+        release side effects.
+
+- id: w3
+  summary: "Get explicit maintainer approval and run release-cut VERSION=0.3.1"
+  needs: [w2]
+  status: pending
+  notes: |
+    This is a real public release. Do not proceed without explicit maintainer
+    approval after w1/w2 evidence is available.
+
+    Command:
+      make release-cut VERSION=0.3.1
+
+    Expected result: a `v0.3.1 -> main` release PR with curated release-tree
+    changes, version bumps, and changelog updates.
+
+- id: w4
+  summary: "Review the v0.3.1 release PR and required release context"
+  needs: [w3]
+  status: pending
+  notes: |
+    Confirm the release PR diff is only the expected release curation,
+    version, changelog, docs, and landing marker changes. Confirm
+    `release-required-result` is the required context and succeeds before
+    finalization. Do not use post-merge push-to-main checks as pre-publish
+    evidence.
+
+- id: w5
+  summary: "Run release-finalize VERSION=0.3.1 after required checks pass"
+  needs: [w4]
+  status: pending
+  notes: |
+    Command:
+      make release-finalize VERSION=0.3.1
+
+    Expected result: release PR squash-merged to `main`, tag `v0.3.1` pushed,
+    and release.yml triggered for the immutable `v0.3.1` artifact.
+
+- id: w6
+  summary: "Verify v0.3.1 publishes and clean install/import passes"
+  needs: [w5]
+  status: pending
+  notes: |
+    Required checks:
+      - release.yml for tag `v0.3.1` concludes success;
+      - PyPI lists `benchbox 0.3.1`;
+      - clean isolated install/import succeeds:
+        `uv run --isolated --no-project --with 'benchbox==0.3.1' -- python -c 'import benchbox; print(benchbox.__version__)'`;
+      - wheel contents remain clean of maintainer scaffolding.
+
+- id: w7
+  summary: "Close migration bookkeeping from the recovery evidence"
+  needs: [w6]
+  status: pending
+  notes: |
+    After v0.3.1 is verified, update Phase 4 w8 with the recovery-release
+    evidence and move Phase 4 to DONE if the maintainer accepts the monotonic
+    recovery as terminal for the failed v0.3.0 installability gate.
+
+    Then make an explicit Phase 8 decision: either retire Phase 8 as
+    satisfied by the v0.3.1 recovery release, or keep Phase 8 as a separate
+    later post-migration release. Do not let that decision remain implicit.
+
+verification:
+- description: "Recovery release workflow succeeded"
+  command: "gh run list --repo joeharris76/BenchBox --workflow=release.yml --branch v0.3.1 --limit 1 --json conclusion --jq '.[0].conclusion'"
+  expected_output: "success"
+- description: "PyPI lists the monotonic recovery version"
+  command: "uv run --isolated --with pip -- python -m pip index versions benchbox | grep -c '0.3.1'"
+  expected_output: "at least 1"
+- description: "Clean install/import from PyPI succeeds"
+  command: "uv run --isolated --no-project --with 'benchbox==0.3.1' -- python -c 'import benchbox; print(benchbox.__version__)'"
+  expected_output: "0.3.1"
+- description: "TODO graph remains valid after migration bookkeeping"
+  command: "uv run _project/scripts/todo_cli.py check-graph && uv run _project/scripts/validate_todo.py --all"
+  expected_output: "exit 0"
+
+must_preserve:
+- Do not re-tag, force-push, delete, or re-upload `v0.3.0` / `0.3.0`; PyPI
+  artifacts and public tags are immutable release history.
+- Do not treat a failed `0.3.0` install smoke as repaired until a later
+  monotonic version has passed clean install/import from PyPI.
+- Do not bypass Phase 8 dependency semantics. Phase 8 remains blocked until
+  Phase 4 is explicitly closed or Phase 8 is explicitly retired as satisfied
+  by this recovery release.
+- Do not weaken the release-required context or publish path to get v0.3.1 out.
+
+approach: |
+  Treat v0.3.1 as a small recovery release, not a broad product event. The
+  implementation surface should be the normal release-cut/release-finalize
+  flow plus the TODO bookkeeping that records the recovery evidence.
+
+anti_patterns:
+- "DO NOT re-run `v0.3.0-rc.1` - because the pre-GA validation window is gone and the GA version already exists."
+- "DO NOT re-upload `0.3.0` - because PyPI rejects replacement files and the public artifact history must remain immutable."
+- "DO NOT mark Phase 4 complete before the recovery release has passed clean install/import - because the original release verification failed after publish."
+- "DO NOT let Phase 8 proceed merely because a recovery PR exists - because the dependency is completion evidence, not intent."
+
+scope_limit:
+  only_modify:
+  - "benchbox/__init__.py"
+  - "pyproject.toml"
+  - "CHANGELOG.md"
+  - "README.md"
+  - "docs/"
+  - "landing/"
+  - "_project/TODO/main/active/release-recovery-v0-3-1.yaml"
+  - "_project/TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml"
+  - "_project/TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml"
+  - "_project/decisions/single-repo-migration.md"
+  notes: |
+    The recovery release should only touch normal release-version surfaces and
+    the TODO/decision bookkeeping needed to close the failed installability
+    gate. Any functional code fix discovered during w2 belongs in its own
+    feature/fix PR before cutting v0.3.1.
+
+success_metrics:
+- "A `v0.3.1` GitHub release and PyPI artifact exist."
+- "The `v0.3.1` release workflow concludes success."
+- "A clean isolated install/import of `benchbox==0.3.1` succeeds."
+- "Phase 4 and Phase 8 no longer rely on blocker prose to hide the release recovery obligation."
+
+metadata:
+  tags:
+  - release
+  - recovery
+  - pypi
+  - single-repo-migration
+  estimated_effort: "Medium"
+  created_date: "2026-05-25"
+  last_updated: "2026-05-25T00:00:00"
