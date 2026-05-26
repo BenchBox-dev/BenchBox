@@ -12,6 +12,7 @@ from benchbox.cli.config import ConfigManager
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.schema import build_result_payload, build_tuning_payload
 from benchbox.core.tuning.interface import TuningColumn, UnifiedTuningConfiguration
+from benchbox.core.tuning.platform_capabilities import map_candidate_to_platform
 from benchbox.core.tuning.profile_validation import (
     build_tuning_profile_metadata,
     validate_tuning_template,
@@ -83,6 +84,47 @@ def test_dropped_low_evidence_candidates_fail_when_reintroduced() -> None:
     assert any(issue.candidate_key == "tpcds.WEB_RETURNS.WR_WEB_PAGE_SK" for issue in result.issues)
 
 
+def test_multi_mechanism_candidates_fail_when_one_mapping_type_is_lost() -> None:
+    tuning_config = _load_tuning("databricks", "tpch")
+    tuning_config.table_tunings["LINEITEM"].distribution = []
+
+    result = validate_tuning_template(
+        profile=load_tpc_tuning_profile(),
+        benchmark="tpch",
+        platform="databricks",
+        tuning_config=tuning_config,
+    )
+
+    assert not result.is_valid
+    assert any(
+        issue.candidate_key == "tpch.LINEITEM.L_ORDERKEY" and "distribution" in issue.message for issue in result.issues
+    )
+    assert {
+        unmapped["candidate"]: unmapped.get("missing_tuning_types", [])
+        for unmapped in result.unmapped_logical_candidates
+    }["tpch.LINEITEM.L_ORDERKEY"] == ["distribution"]
+
+
+def test_future_platform_mappings_expose_distribution_limitations() -> None:
+    profile = load_tpc_tuning_profile()
+    order_key = next(
+        candidate
+        for candidate in profile.required_candidates("tpch")
+        if candidate.table == "ORDERS" and candidate.column == "O_ORDERKEY"
+    )
+
+    bigquery = map_candidate_to_platform("bigquery", order_key)
+    redshift = map_candidate_to_platform("redshift", order_key)
+    snowflake = map_candidate_to_platform("snowflake", order_key)
+
+    assert bigquery.tuning_types == ("clustering",)
+    assert "no user-visible distribution key" in bigquery.reason
+    assert redshift.tuning_types == ("distribution", "sorting")
+    assert redshift.max_columns == 1
+    assert snowflake.tuning_types == ("clustering",)
+    assert "no user-managed distribution key" in snowflake.reason
+
+
 @pytest.mark.parametrize(
     ("platform", "benchmark_id", "expected_mechanism"),
     [
@@ -118,6 +160,18 @@ def test_tuning_profile_metadata_is_omitted_for_basic_constraints_fallback() -> 
     )
 
     assert metadata is None
+
+
+def test_tuning_profile_metadata_normalizes_display_benchmark_names() -> None:
+    metadata = build_tuning_profile_metadata(
+        benchmark="TPC-H Benchmark",
+        platform="duckdb",
+        tuning_config=_load_tuning("duckdb", "tpch"),
+    )
+
+    assert metadata is not None
+    assert metadata["logical_tuning_profile_id"] == "tpc-v1"
+    assert metadata["logical_profile_coverage"]["unmapped_count"] == 0
 
 
 def test_tuning_companion_payload_carries_logical_profile_metadata() -> None:

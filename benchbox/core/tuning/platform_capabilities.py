@@ -20,11 +20,11 @@ DISTRIBUTION = "distribution"
 SORTING = "sorting"
 SORTED_INGESTION = "sorted_ingestion"
 Z_ORDER = "z_order"
-LIQUID_CLUSTERING = "liquid_clustering"
 
 MAPPED = "mapped"
 UNSUPPORTED = "unsupported"
 WAIVED = "waived"
+LOCALITY_ROLES = frozenset({JOIN_LOCALITY, FACT_DIMENSION_JOIN, HIGH_SELECTIVITY_FILTER, GROUP_ORDER_LOCALITY})
 
 
 @dataclass(frozen=True)
@@ -83,7 +83,7 @@ def _map_databricks(roles: set[str]) -> PlatformTuningMapping:
             physical_mechanisms=(Z_ORDER, DISTRIBUTION),
             reason="Current Databricks tuned templates build Z-ORDER candidates from clustering plus distribution.",
         )
-    if roles & {JOIN_LOCALITY, FACT_DIMENSION_JOIN, HIGH_SELECTIVITY_FILTER, GROUP_ORDER_LOCALITY}:
+    if roles & LOCALITY_ROLES:
         return PlatformTuningMapping(
             platform="databricks",
             tuning_types=(CLUSTERING,),
@@ -125,12 +125,15 @@ def _map_bigquery(roles: set[str]) -> PlatformTuningMapping:
             physical_mechanisms=(PARTITIONING,),
             reason="Temporal locality maps to BigQuery partitioning when the column shape is supported.",
         )
-    if roles & {JOIN_LOCALITY, FACT_DIMENSION_JOIN, HIGH_SELECTIVITY_FILTER, GROUP_ORDER_LOCALITY}:
+    if roles & LOCALITY_ROLES:
+        reason = "Logical locality maps to BigQuery clustering with its four-column table limit."
+        if DISTRIBUTION_CANDIDATE in roles:
+            reason += " BigQuery has no user-visible distribution key."
         return PlatformTuningMapping(
             platform="bigquery",
             tuning_types=(CLUSTERING,),
             physical_mechanisms=(CLUSTERING,),
-            reason="Logical locality maps to BigQuery clustering with its four-column table limit.",
+            reason=reason,
             max_columns=4,
         )
     if DISTRIBUTION_CANDIDATE in roles:
@@ -146,6 +149,17 @@ def _map_bigquery(roles: set[str]) -> PlatformTuningMapping:
 
 def _map_redshift(roles: set[str]) -> PlatformTuningMapping:
     if DISTRIBUTION_CANDIDATE in roles:
+        if roles & ({TEMPORAL_PARTITION} | LOCALITY_ROLES):
+            return PlatformTuningMapping(
+                platform="redshift",
+                tuning_types=(DISTRIBUTION, SORTING),
+                physical_mechanisms=(DISTRIBUTION, SORTING),
+                reason=(
+                    "Distribution candidates map to Redshift DISTKEY decisions, while locality roles map to "
+                    "SORTKEY decisions; DISTKEY remains single-key limited."
+                ),
+                max_columns=1,
+            )
         return PlatformTuningMapping(
             platform="redshift",
             tuning_types=(DISTRIBUTION,),
@@ -153,7 +167,7 @@ def _map_redshift(roles: set[str]) -> PlatformTuningMapping:
             reason="Distribution candidates map to Redshift DISTKEY decisions with single-key limitations.",
             max_columns=1,
         )
-    if roles & {TEMPORAL_PARTITION, JOIN_LOCALITY, FACT_DIMENSION_JOIN, HIGH_SELECTIVITY_FILTER, GROUP_ORDER_LOCALITY}:
+    if roles & ({TEMPORAL_PARTITION} | LOCALITY_ROLES):
         return PlatformTuningMapping(
             platform="redshift",
             tuning_types=(SORTING,),
@@ -164,12 +178,15 @@ def _map_redshift(roles: set[str]) -> PlatformTuningMapping:
 
 
 def _map_snowflake(roles: set[str]) -> PlatformTuningMapping:
-    if roles & {TEMPORAL_PARTITION, JOIN_LOCALITY, FACT_DIMENSION_JOIN, HIGH_SELECTIVITY_FILTER, GROUP_ORDER_LOCALITY}:
+    if roles & ({TEMPORAL_PARTITION} | LOCALITY_ROLES):
+        reason = "Logical locality maps to Snowflake clustering keys where useful."
+        if DISTRIBUTION_CANDIDATE in roles:
+            reason += " Snowflake has no user-managed distribution key."
         return PlatformTuningMapping(
             platform="snowflake",
             tuning_types=(CLUSTERING,),
             physical_mechanisms=(CLUSTERING,),
-            reason="Logical locality maps to Snowflake clustering keys where useful.",
+            reason=reason,
         )
     if DISTRIBUTION_CANDIDATE in roles:
         return PlatformTuningMapping(

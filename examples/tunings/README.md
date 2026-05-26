@@ -136,8 +136,8 @@ decision.
 
 Platform templates map that logical profile into platform-native mechanisms:
 Databricks uses partitioning plus clustering/distribution consumed by Delta
-Z-ORDER or liquid clustering paths; DuckDB uses partitioning plus sorting and
-sorted layout semantics. The physical mechanisms are different, so
+Z-ORDER in the checked-in TPC templates; DuckDB uses partitioning plus sorting
+and sorted layout semantics. The physical mechanisms are different, so
 `tuning_mode == "tuned"` means "same logical profile coverage where mapped",
 not "identical storage features".
 

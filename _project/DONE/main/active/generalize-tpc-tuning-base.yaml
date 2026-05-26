@@ -413,7 +413,7 @@ completion_notes: |
     sorting.
 
   Verification:
-  - `uv run -- python -m pytest tests/unit/core/tuning/test_tpc_workload_profiles.py tests/unit/core/tuning/test_tpc_tuning_template_parity.py -q`: 15 passed.
+  - `uv run -- python -m pytest tests/unit/core/tuning/test_tpc_workload_profiles.py tests/unit/core/tuning/test_tpc_tuning_template_parity.py -q`: 18 passed.
   - `uv run -- python -m pytest tests/unit/cli/test_databricks_tuning_examples.py -q`: 4 passed.
   - `uv run -- python _project/scripts/tuning_profile_check.py --benchmarks tpch,tpcds --platforms databricks,duckdb --strict`: all four cells passed.
   - `uv run -- python -c "...ConfigManager..."; print("ok")`: ok.

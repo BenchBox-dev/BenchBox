@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from benchbox.core.results.builder import normalize_benchmark_id
 from benchbox.core.tuning.platform_capabilities import (
     CLUSTERING,
     DISTRIBUTION,
@@ -65,7 +66,12 @@ class CandidateTemplateMapping:
 
     @property
     def mapped(self) -> bool:
-        return bool(self.mapped_tuning_types)
+        return self.platform_mapping.decision == MAPPED and not self.missing_tuning_types
+
+    @property
+    def missing_tuning_types(self) -> tuple[str, ...]:
+        mapped = set(self.mapped_tuning_types)
+        return tuple(tuning_type for tuning_type in self.platform_mapping.tuning_types if tuning_type not in mapped)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -124,16 +130,20 @@ class TuningProfileValidationResult:
         return tuple(sorted(mechanisms))
 
     @property
-    def unmapped_logical_candidates(self) -> tuple[dict[str, str], ...]:
-        return tuple(
-            {
+    def unmapped_logical_candidates(self) -> tuple[dict[str, Any], ...]:
+        unmapped: list[dict[str, Any]] = []
+        for mapping in self.mappings:
+            if mapping.mapped:
+                continue
+            entry = {
                 "candidate": mapping.candidate_key,
                 "decision": mapping.platform_mapping.decision,
                 "reason": mapping.platform_mapping.reason or "required candidate was not mapped to the template",
             }
-            for mapping in self.mappings
-            if not mapping.mapped
-        )
+            if mapping.missing_tuning_types:
+                entry["missing_tuning_types"] = list(mapping.missing_tuning_types)
+            unmapped.append(entry)
+        return tuple(unmapped)
 
     def to_metadata(self, *, max_unmapped: int = 20) -> dict[str, Any]:
         return {
@@ -163,7 +173,7 @@ def validate_tuning_template(
     tuning_config: Any,
 ) -> TuningProfileValidationResult:
     """Validate a concrete tuning template against a logical workload profile."""
-    benchmark_key = benchmark.lower().replace("-", "_")
+    benchmark_key = _normalize_profile_benchmark(benchmark)
     platform_key = platform.lower().replace("_", "-")
     template_columns = extract_template_columns(tuning_config)
     candidates = profile.candidates(benchmark_key)
@@ -204,13 +214,14 @@ def validate_tuning_template(
             )
         )
 
-        if platform_mapping.decision == MAPPED and not mapped_tuning_types:
-            expected = ", ".join(platform_mapping.tuning_types) or "a mapped tuning type"
+        missing_tuning_types = mappings[-1].missing_tuning_types
+        if platform_mapping.decision == MAPPED and missing_tuning_types:
+            expected = ", ".join(missing_tuning_types) or "a mapped tuning type"
             issues.append(
                 TuningProfileValidationIssue(
                     severity=ERROR,
                     candidate_key=candidate_key(candidate),
-                    message=f"required logical candidate is missing from template {expected}",
+                    message=f"required logical candidate is missing template mapping for {expected}",
                     decision=platform_mapping.decision,
                     reason=platform_mapping.reason,
                 )
@@ -243,7 +254,7 @@ def build_tuning_profile_metadata(
         return None
 
     profile = profile or load_tpc_tuning_profile()
-    benchmark_key = benchmark.lower().replace("-", "_")
+    benchmark_key = _normalize_profile_benchmark(benchmark)
     if not profile.candidates(benchmark_key):
         return None
 
@@ -287,6 +298,10 @@ def hash_tuning_template(tuning_config: Any) -> str:
 
 def candidate_key(candidate: WorkloadTuningCandidate) -> str:
     return f"{candidate.benchmark}.{candidate.table}.{candidate.column}"
+
+
+def _normalize_profile_benchmark(benchmark: str) -> str:
+    return normalize_benchmark_id(benchmark).replace("-", "_")
 
 
 def _candidate_present(template_columns: dict[str, dict[str, set[str]]], candidate: WorkloadTuningCandidate) -> bool:

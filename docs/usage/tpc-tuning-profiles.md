@@ -41,13 +41,13 @@ Logical parity does not require identical physical features.
 | Platform | Logical roles | Physical mapping |
 | --- | --- | --- |
 | Databricks | temporal locality | `partitioning` |
-| Databricks | joins, filters, group/order locality | `clustering`, consumed by Z-ORDER or liquid clustering paths |
+| Databricks | joins, filters, group/order locality | `clustering`, consumed by the Z-ORDER path in the checked-in TPC templates |
 | Databricks | distribution candidates | `clustering` plus `distribution` hints |
 | DuckDB | temporal locality | `partitioning` hints in unified tuning |
 | DuckDB | joins, filters, group/order locality, distribution candidates | `sorting` / sorted layout |
 | BigQuery | temporal locality | partitioning when column shape is supported |
-| BigQuery | joins, filters, group/order locality | clustering, with the four-column limit explicit |
-| Redshift | distribution candidates | dist-key decisions, limited to a single key |
+| BigQuery | joins, filters, group/order locality | clustering, with the four-column limit explicit; distribution keys are unsupported |
+| Redshift | distribution plus locality candidates | dist-key plus sort-key decisions; dist-key remains limited to a single key |
 | Redshift | locality candidates | sort-key decisions |
 | Snowflake | locality candidates | clustering keys where useful |
 | Snowflake | distribution candidates | unsupported; no user-managed distribution key |
