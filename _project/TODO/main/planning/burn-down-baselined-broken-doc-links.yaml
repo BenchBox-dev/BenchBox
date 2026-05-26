@@ -42,14 +42,24 @@ description: |
       `./unified_frame_any_survey.csv`
 
 work:
-  - id: w1
-    summary: "Triage all baselined links into a disposition table"
+  - id: w0
+    summary: "Re-validate the baseline count against current develop"
     status: pending
     notes: |
-      Regenerate the live broken set first:
-        `uv run -- python scripts/check_doc_relative_links.py --update-baseline`
-      then `git diff scripts/doc_relative_link_baseline.txt` to confirm the
-      count hasn't drifted from 42. For each (source, target) pair assign one
+      Bind the cited evidence before editing. On the implementation branch run
+      `uv run -- python scripts/check_doc_relative_links.py --update-baseline`
+      and `git diff scripts/doc_relative_link_baseline.txt`. Record in the PR
+      description: the develop SHA, the regenerated data-entry count, and any
+      drift from the 42 captured 2026-05-26 (the per-target counts in this
+      TODO's description are that snapshot). If the count shifted materially,
+      re-derive the w2-w4 groupings before proceeding.
+
+  - id: w1
+    summary: "Triage all baselined links into a disposition table"
+    needs: [w0]
+    status: pending
+    notes: |
+      For each (source, target) pair in the regenerated baseline assign one
       disposition:
         - RENAME: target exists under a corrected name/path (fix the link).
         - REPOINT: the intended doc exists elsewhere (rewrite the link).
@@ -102,20 +112,22 @@ work:
     notes: |
       Final `--update-baseline` should leave zero data entries. Run
       `uv run -- python scripts/check_doc_relative_links.py` (reports
-      `broken total  : 0`, exit 0) and `make docs-validate` (exit 0). If any
-      link is a genuinely-intentional exception, keep it in the baseline with
-      an inline `#` comment justifying it — but the goal is an empty data set.
-      Standard cycle: `make lint format typecheck`, `make pr-preflight`,
-      `make pr-open`.
+      `broken total  : 0`, exit 0) and `make docs-validate` (exit 0). The goal
+      is an empty data set. Note `--update-baseline` rewrites the file as the
+      fixed header comments plus sorted entries — it does NOT preserve
+      per-entry inline comments, so a genuinely-intentional exception must be
+      fixed/removed rather than annotated in place (or hand-added below the
+      header and never regenerated over). Standard cycle:
+      `make lint format typecheck`, `make pr-preflight`, `make pr-open`.
 
 verification:
   - description: "No broken repo-local relative links remain"
     command: "uv run -- python scripts/check_doc_relative_links.py"
     expected_output: "exit 0 with 'broken total  : 0'"
   - description: "Baseline has no data entries (only header comments)"
-    command: "grep -cE $'^[^#].*\\t' scripts/doc_relative_link_baseline.txt"
-    expected_output: "0"
-  - description: "The wrong-name benchmark links are gone"
+    command: "test \"$(grep -cvE '^#|^$' scripts/doc_relative_link_baseline.txt)\" = 0"
+    expected_output: "exit 0 (no data rows remain)"
+  - description: "Spot-check: the wrong-name benchmark links are gone (full gate is check 1)"
     command: "! rg -n 'benchmarks/tpch\\.md|benchmarks/tpcds\\.md' docs/"
     expected_output: "no matches"
   - description: "Docs validation gate passes end to end"
@@ -166,5 +178,5 @@ impact:
 
 success_metrics:
   - "scripts/doc_relative_link_baseline.txt has zero data entries"
-  - "check_doc_relative_links.py reports 0 broken links and exits 0"
+  - "check_doc_relative_links.py reports 0 broken links and exits 0 (scope: inline `[text](target)` relative links; reference-style `[t][ref]` links and autolinks are outside the checker and not measured here)"
   - "make docs-validate passes"
