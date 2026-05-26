@@ -143,12 +143,15 @@ def test_surface_gates_discovery_independent_of_support_status(support_status: s
         assert benchmark_registry.get_benchmark_support_status("x_future_internal") == support_status
 
 
-def test_supports_dataframe_independent_of_support_status() -> None:
-    """The DataFrame capability flag is read directly, never inferred from support tier."""
+@pytest.mark.parametrize("support_status", sorted(benchmark_registry.BENCHMARK_SUPPORT_STATUS_VALUES))
+def test_registry_summary_counts_dataframe_capability_independent_of_support_status(support_status: str) -> None:
+    """Registry summaries count supports_dataframe, not support tier."""
+    base_supported = benchmark_registry.get_benchmark_registry_summary()["dataframe_supported"]
     fixtures = {
-        "x_experimental_df": _synthetic_meta("experimental", "public", supports_dataframe=True),
-        "x_stable_nodf": _synthetic_meta("stable", "public", supports_dataframe=False),
+        f"x_{support_status}_df": _synthetic_meta(support_status, "public", supports_dataframe=True),
+        f"x_{support_status}_nodf": _synthetic_meta(support_status, "public", supports_dataframe=False),
     }
     with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False):
-        assert benchmark_registry.BENCHMARK_METADATA["x_experimental_df"]["supports_dataframe"] is True
-        assert benchmark_registry.BENCHMARK_METADATA["x_stable_nodf"]["supports_dataframe"] is False
+        summary = benchmark_registry.get_benchmark_registry_summary()
+
+    assert summary["dataframe_supported"] == base_supported + 1
