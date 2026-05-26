@@ -216,6 +216,24 @@ def test_handle_existing_database_dry_run_skips_managed_table_hook(adapter):
     assert adapter.database_was_reused is False
 
 
+def test_get_expected_tables_normalizes_schema_dict(adapter):
+    benchmark = SimpleNamespace(get_schema=lambda: {"Orders": {}, "LINEITEM": {}})
+
+    assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
+
+
+def test_get_expected_tables_normalizes_schema_list_of_names(adapter):
+    benchmark = SimpleNamespace(get_schema=lambda: ["Orders", "LINEITEM"])
+
+    assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
+
+
+def test_get_expected_tables_normalizes_table_name_api(adapter):
+    benchmark = SimpleNamespace(get_table_names=lambda: ["Orders", "LINEITEM"])
+
+    assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
+
+
 def test_handle_existing_database_skips_reuse_logic_while_validating(adapter):
     adapter._validating_database = True
     adapter.check_database_exists = Mock(return_value=True)

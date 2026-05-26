@@ -2,7 +2,8 @@ id: generalize-database-table-reuse-detection
 title: "Generalize benchmark table reuse detection for managed databases"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-05-26"
 description: |
   QuestDB's handle_existing_database() override validates that all expected
   benchmark tables exist and contain data before marking the database as reused.

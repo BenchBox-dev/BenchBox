@@ -191,7 +191,8 @@ class ConnectionLifecycleMixin:
         - If force_recreate=True, always recreate
         - If database is valid, reuse it
         - If database has issues, recreate it
-        - If skip_database_management=True, skip all database management
+        - If skip_database_management=True, skip create/drop management while
+          allowing adapters to opt into table-readiness checks
         """
         self.log_operation_start("Database validation", "Checking existing database compatibility")
 
