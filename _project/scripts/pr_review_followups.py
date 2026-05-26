@@ -614,6 +614,19 @@ def print_usage_limit_retry_table(retries: Sequence[UsageLimitReviewRetry]) -> N
         )
 
 
+def select_usage_limit_retry_triggers(
+    retries: Sequence[UsageLimitReviewRetry],
+    *,
+    max_comments: int,
+    pending_count: int,
+) -> list[UsageLimitReviewRetry]:
+    candidates = [retry for retry in retries if retry.needs_trigger]
+    if max_comments <= 0:
+        return candidates
+    remaining_budget = max(max_comments - pending_count, 0)
+    return candidates[:remaining_budget]
+
+
 def git_state_snapshot(runner: CommandRunner) -> str:
     """Snapshot of local Git state used as a disposition baseline.
 
@@ -1103,7 +1116,11 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
     print_usage_limit_retry_table(usage_limit_retries)
     if args.command == "list" or args.dry_run:
         return 0
-    retried_usage_limit_reviews = [retry for retry in usage_limit_retries if retry.needs_trigger]
+    retried_usage_limit_reviews = select_usage_limit_retry_triggers(
+        usage_limit_retries,
+        max_comments=args.max_comments,
+        pending_count=len(pending),
+    )
     for retry in retried_usage_limit_reviews:
         trigger_usage_limit_review_retry(runner, repo=repo, retry=retry)
     if retried_usage_limit_reviews:

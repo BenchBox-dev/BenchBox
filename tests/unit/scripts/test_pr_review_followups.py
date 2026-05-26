@@ -662,6 +662,129 @@ def test_run_action_loop_triggers_usage_limit_review_retry(monkeypatch) -> None:
     ]
 
 
+def test_run_action_loop_caps_usage_limit_review_retries_with_max_comments(monkeypatch) -> None:
+    retries = [
+        pr_review_followups.UsageLimitReviewRetry(
+            pr=pr_review_followups.PullRequest(
+                number=number,
+                title=f"Example merged PR {number}",
+                merged_at="2026-05-04T12:00:00Z",
+                url=f"https://github.com/joeharris76/BenchBox/pull/{number}",
+            ),
+            usage_comment=_issue_comment(number, body=pr_review_followups.CODEX_USAGE_LIMIT_REVIEW_TEXT),
+        )
+        for number in (123, 124, 125)
+    ]
+    finalize_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(pr_review_followups, "check_executor_version", lambda runner: (0, 128, 0))
+    monkeypatch.setattr(pr_review_followups, "discover_pending_comments", lambda runner, **_: [])
+    monkeypatch.setattr(pr_review_followups, "discover_usage_limit_review_retries", lambda runner, **_: retries)
+    monkeypatch.setattr(
+        pr_review_followups,
+        "finalize_changes",
+        lambda runner, **kwargs: finalize_calls.append(kwargs),
+    )
+
+    runner = RecordingRunner()
+    args = pr_review_followups.build_parser().parse_args(
+        [
+            "run",
+            "--repo",
+            "joeharris76/BenchBox",
+            "--base",
+            "develop",
+            "--max-comments",
+            "1",
+            "--no-submit",
+        ]
+    )
+
+    rc = pr_review_followups.run_action_loop(args, runner)
+
+    assert rc == 0
+    assert [cmd for cmd in runner.commands if cmd[:3] == ["gh", "pr", "comment"]] == [
+        [
+            "gh",
+            "pr",
+            "comment",
+            "123",
+            "--repo",
+            "joeharris76/BenchBox",
+            "--body",
+            pr_review_followups.CODEX_REVIEW_TRIGGER_BODY,
+        ]
+    ]
+    assert finalize_calls == [
+        {
+            "base_ref": "origin/develop",
+            "commit_message": args.commit_message,
+            "no_submit": True,
+        }
+    ]
+
+
+def test_run_action_loop_spends_max_comments_on_pending_before_usage_limit_retries(monkeypatch) -> None:
+    pending = pr_review_followups.PendingComment(pr=_pr(), comment=_comment(321), replies=())
+    retry = pr_review_followups.UsageLimitReviewRetry(
+        pr=pr_review_followups.PullRequest(
+            number=124,
+            title="Example merged PR 124",
+            merged_at="2026-05-04T12:00:00Z",
+            url="https://github.com/joeharris76/BenchBox/pull/124",
+        ),
+        usage_comment=_issue_comment(99, body=pr_review_followups.CODEX_USAGE_LIMIT_REVIEW_TEXT),
+    )
+    executor_calls: list[int] = []
+    finalize_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(pr_review_followups, "check_executor_version", lambda runner: (0, 128, 0))
+    monkeypatch.setattr(pr_review_followups, "discover_pending_comments", lambda runner, **_: [pending])
+    monkeypatch.setattr(pr_review_followups, "discover_usage_limit_review_retries", lambda runner, **_: [retry])
+    monkeypatch.setattr(
+        pr_review_followups,
+        "run_executor_for_comment",
+        lambda runner, item, **_: (
+            executor_calls.append(item.comment.id)
+            or pr_review_followups.ActionResult(pending=item, disposition="no-current-action", summary="skip")
+        ),
+    )
+    monkeypatch.setattr(pr_review_followups, "commit_changes_for_result", lambda runner, result: None)
+    monkeypatch.setattr(
+        pr_review_followups,
+        "finalize_changes",
+        lambda runner, **kwargs: finalize_calls.append(kwargs),
+    )
+
+    runner = RecordingRunner()
+    args = pr_review_followups.build_parser().parse_args(
+        [
+            "run",
+            "--repo",
+            "joeharris76/BenchBox",
+            "--base",
+            "develop",
+            "--max-comments",
+            "1",
+            "--no-reply",
+            "--no-submit",
+        ]
+    )
+
+    rc = pr_review_followups.run_action_loop(args, runner)
+
+    assert rc == 0
+    assert executor_calls == [321]
+    assert [cmd for cmd in runner.commands if cmd[:3] == ["gh", "pr", "comment"]] == []
+    assert finalize_calls == [
+        {
+            "base_ref": "origin/develop",
+            "commit_message": args.commit_message,
+            "no_submit": True,
+        }
+    ]
+
+
 def test_run_action_loop_does_not_duplicate_inflight_usage_limit_retry(monkeypatch) -> None:
     retry = pr_review_followups.UsageLimitReviewRetry(
         pr=_pr(),
