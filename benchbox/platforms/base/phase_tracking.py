@@ -458,6 +458,8 @@ class PhaseTrackingMixin:
                 # Support both list[dict{name}] and list[str]
                 if isinstance(schema, list) and schema and isinstance(schema[0], dict) and "name" in schema[0]:
                     return [t["name"].lower() for t in schema]
+                if isinstance(schema, dict):
+                    return [str(t).lower() for t in schema]
         except Exception:
             pass
         # 2) Prefer explicit table listing if provided by the benchmark

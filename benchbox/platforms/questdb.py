@@ -329,8 +329,8 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         )
         return conn
 
-    def handle_existing_database(self, **connection_config) -> None:
-        """Override to validate that required tables exist before marking database as reused.
+    def check_benchmark_tables_exist(self, **connection_config) -> bool | None:
+        """Validate that required benchmark tables exist and are non-empty.
 
         QuestDB is a server-based database (skip_database_management=True) but we still need
         to check if the required benchmark tables for the current benchmark exist. If the
@@ -342,17 +342,9 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
             msg = "psycopg is required for QuestDB but is not installed"
             raise ImportError(msg)
 
-        self.log_operation_start("Database validation", "Checking existing database compatibility")
-
-        # Quick checks that can't be overridden
-        if self.dry_run:
-            self.log_verbose("Database validation skipped (dry run mode)")
-            return
-
         if self.force_recreate:
             self.log_verbose("Force recreate enabled - will recreate schema and reload data")
-            self.database_was_reused = False
-            return
+            return False
 
         # For external databases like QuestDB, validate that the expected tables for
         # the current benchmark exist (not just any tables from a previous benchmark)
@@ -363,25 +355,25 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
             try:
                 # Get expected table names from the current benchmark
-                if not hasattr(self, "benchmark") or self.benchmark is None:
+                benchmark = getattr(self, "benchmark", None) or getattr(self, "benchmark_instance", None)
+                if benchmark is None:
                     self.log_verbose("Benchmark not available - treating as fresh database")
-                    self.database_was_reused = False
-                    return
+                    return False
 
-                expected_tables = set(self.benchmark.tables.keys())
+                expected_tables = self._get_expected_tables(benchmark)
                 if not expected_tables:
                     # Benchmarks that initialize tables={} (e.g. clickbench, which populates
                     # tables only after downloading data) will always take this path, meaning
                     # QuestDB reuse detection is disabled for them. Acceptable for now since
                     # QuestDB is primarily used with TPC benchmarks that pre-declare tables.
                     self.log_verbose("Benchmark has no tables - treating as fresh database")
-                    self.database_was_reused = False
-                    return
+                    return False
+                expected_tables = set(expected_tables)
 
                 # Query QuestDB for all table names
                 with test_conn.cursor() as cursor:
                     cursor.execute("SELECT table_name FROM tables()")
-                    existing_tables = {row[0] for row in cursor.fetchall()}
+                    existing_tables = {str(row[0]).lower() for row in cursor.fetchall()}
 
                 # Check if all expected tables are present
                 missing_tables = expected_tables - existing_tables
@@ -390,8 +382,7 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
                         f"Expected benchmark tables not found: {', '.join(sorted(missing_tables))} "
                         "- treating as fresh database (will create schema)"
                     )
-                    self.database_was_reused = False
-                    return
+                    return False
 
                 # All expected tables exist; verify they are non-empty.
                 # A prior partial run may have created the schema without ever
@@ -411,14 +402,13 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
                         f"Tables exist but are empty: {', '.join(empty_tables)} "
                         "- treating as fresh database (will reload data)"
                     )
-                    self.database_was_reused = False
-                    return
+                    return False
 
                 self.log_verbose(
                     f"Found all {len(expected_tables)} expected benchmark tables with data - "
                     "attempting to reuse existing database"
                 )
-                self.database_was_reused = True
+                return True
 
             finally:
                 test_conn.close()
@@ -426,7 +416,7 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         except (psycopg.Error, OSError) as e:
             self.logger.debug(f"Error checking existing tables: {e}")
             self.log_verbose("Unable to verify existing tables - treating as fresh database")
-            self.database_was_reused = False
+            return False
 
     # ──────────────────────────────────────────────────────────────
     # Schema creation with designated timestamp, partitioning, and

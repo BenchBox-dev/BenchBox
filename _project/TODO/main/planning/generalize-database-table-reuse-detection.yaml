@@ -124,7 +124,7 @@ metadata:
 work:
   - id: w0
     summary: "Re-validate current lifecycle and adapter evidence before editing code"
-    status: pending
+    status: done
     notes: |
       Run focused current-state checks and record the compact replayable summary
       in the implementation PR body or TODO completion note: checked SHA, whether
@@ -136,7 +136,7 @@ work:
   - id: w1
     summary: "Add an opt-in managed-database table-readiness hook to the base lifecycle"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Introduce check_benchmark_tables_exist() or an equivalently narrow hook in
       ConnectionLifecycleMixin and call it from the
@@ -148,7 +148,7 @@ work:
   - id: w2
     summary: "Migrate QuestDB to the shared hook without weakening reuse safety"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Preserve the current QuestDB outcomes: dry-run exits without a connection,
       force_recreate sets database_was_reused=False, missing benchmark/table
@@ -161,7 +161,7 @@ work:
   - id: w3
     summary: "Migrate InfluxDB while preserving its force_recreate warning"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Keep InfluxDBSetupMixin.handle_existing_database() warning behavior for
       force_recreate=True and add table-readiness validation through the shared
@@ -173,7 +173,7 @@ work:
   - id: w4
     summary: "Add focused tests for default behavior, QuestDB, and InfluxDB"
     needs: [w1, w2, w3]
-    status: pending
+    status: done
     notes: |
       Cover the base default hook path for non-opted-in adapters, the opted-in
       false/true paths, QuestDB's non-empty table guard, and InfluxDB's preserved
@@ -184,7 +184,7 @@ work:
   - id: w5
     summary: "Run targeted verification and confirm scope stayed within the allowlist"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Run the TODO verification commands, then compare changed paths against
       scope_limit.only_modify before completing the item.

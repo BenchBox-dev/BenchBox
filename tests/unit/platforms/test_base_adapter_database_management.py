@@ -171,10 +171,49 @@ def test_handle_existing_database_skips_in_dry_run(adapter):
 
 def test_handle_existing_database_skips_managed_cloud_database(adapter):
     adapter.skip_database_management = True
+    adapter.check_benchmark_tables_exist = Mock(wraps=adapter.check_benchmark_tables_exist)
+    adapter.check_database_exists = Mock(return_value=True)
 
     adapter.handle_existing_database()
 
+    adapter.check_benchmark_tables_exist.assert_called_once()
+    adapter.check_database_exists.assert_not_called()
     assert adapter.database_was_reused is True
+
+
+def test_handle_existing_database_reuses_managed_database_when_tables_present(adapter):
+    adapter.skip_database_management = True
+    adapter.check_benchmark_tables_exist = Mock(return_value=True)
+    adapter.check_database_exists = Mock(return_value=True)
+
+    adapter.handle_existing_database()
+
+    adapter.check_benchmark_tables_exist.assert_called_once()
+    adapter.check_database_exists.assert_not_called()
+    assert adapter.database_was_reused is True
+
+
+def test_handle_existing_database_treats_managed_database_as_fresh_when_tables_missing(adapter):
+    adapter.skip_database_management = True
+    adapter.check_benchmark_tables_exist = Mock(return_value=False)
+    adapter.check_database_exists = Mock(return_value=True)
+
+    adapter.handle_existing_database()
+
+    adapter.check_benchmark_tables_exist.assert_called_once()
+    adapter.check_database_exists.assert_not_called()
+    assert adapter.database_was_reused is False
+
+
+def test_handle_existing_database_dry_run_skips_managed_table_hook(adapter):
+    adapter.dry_run = True
+    adapter.skip_database_management = True
+    adapter.check_benchmark_tables_exist = Mock(return_value=False)
+
+    adapter.handle_existing_database()
+
+    adapter.check_benchmark_tables_exist.assert_not_called()
+    assert adapter.database_was_reused is False
 
 
 def test_handle_existing_database_skips_reuse_logic_while_validating(adapter):
