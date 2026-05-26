@@ -253,7 +253,10 @@ jobs:
         run: |
           uv run -- python -m pytest tests/integration -m "integration and not slow and not stress" --tb=short --maxfail=5 --timeout=300
 
-  # Package build and install test
+  # Package build and install test — builds a fresh wheel from this branch to verify
+  # the package is importable and the CLI entry point resolves. This is an independent
+  # build from the wheel published by release.yml; it validates pre-merge correctness,
+  # not artifact identity.
   test-package:
     if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ${{ matrix.os }}

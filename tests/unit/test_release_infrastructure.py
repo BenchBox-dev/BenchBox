@@ -274,10 +274,15 @@ class TestReleaseInfrastructure:
         assert "--collect-only" in non_fast_text
         assert "release-canary-artifacts/non-fast-summary.json" in non_fast_text
         assert "raw" not in non_fast_text.lower()
+        # Exit code must propagate via rc= variable, not be swallowed by set+e/exit 0.
+        assert "set +e" not in non_fast_text
+        assert "exit 0" not in non_fast_text
 
         ruleset_text = _workflow_job_run_text("release-canary.yml", "ruleset-drift")
         assert "scripts/ruleset_drift_check.py" in ruleset_text
         assert "release-canary-artifacts/ruleset-drift.json" in ruleset_text
+        assert "set +e" not in ruleset_text
+        assert "exit 0" not in ruleset_text
 
         result_job = jobs["release-canary-result"]
         assert result_job["name"] == "release-canary-result"
@@ -285,6 +290,18 @@ class TestReleaseInfrastructure:
         result_text = _workflow_job_run_text("release-canary.yml", "release-canary-result")
         assert '"freshness_contract_hours": 48' in result_text
         assert "Release canary passed." in result_text
+
+    def test_canary_collect_count_regex_matches_pytest_deselect_format(self):
+        """The canary collect-step grep regex must match the actual pytest --collect-only output format."""
+        collect_text = _workflow_job_run_text("release-canary.yml", "credential-free-non-fast")
+        assert "'^[0-9]+/[0-9]+ tests collected'" in collect_text
+
+        # Verify the regex semantics using Python re (same logic as the grep ERE pattern).
+        pattern = re.compile(r"^\d+/\d+ tests collected")
+        assert pattern.match("92/24795 tests collected (24703 deselected) in 16.98s")
+        assert pattern.match("1/100 tests collected")
+        assert not pattern.match("24795 tests collected in 16.98s")
+        assert not pattern.match("0 tests collected")
 
     def test_validate_main_pr_checks_release_canary_freshness(self):
         """The required validate-base context must include release canary freshness."""
