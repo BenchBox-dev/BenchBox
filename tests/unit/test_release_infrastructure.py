@@ -369,12 +369,23 @@ class TestReleaseInfrastructure:
         assert 'select(.name == \\"$$context\\")' in recipe
         assert "for context in $(RELEASE_REQUIRED_CONTEXTS)" in recipe
         assert "--watch" not in recipe
-        assert 'CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8"' in recipe
+        assert 'CHECK_RC" = "8"' in recipe
+        assert 'CHECK_RC" != "0"' in recipe
+        assert 'CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8"' not in recipe
 
         assert recipe.index("no open PR found for v$(VERSION)") < recipe.index("gh pr checks")
         assert recipe.index("gh pr checks") < recipe.index("gh pr merge --squash")
         assert recipe.index("gh pr merge --squash") < recipe.index("git fetch origin --tags")
         assert recipe.index("git tag v$(VERSION)") < recipe.index("git push origin v$(VERSION)")
+
+    def test_release_finalize_blocks_pending_required_check_exit_code(self):
+        """gh pr checks exit 8 means at least one required check is still pending."""
+        recipe = _make_target_recipe("release-finalize")
+
+        assert 'if [ "$$CHECK_RC" = "8" ]; then' in recipe
+        assert "required PR checks are pending. Wait for GitHub Actions, then rerun" in recipe
+        assert 'CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8"' not in recipe
+        assert recipe.index('if [ "$$CHECK_RC" = "8" ]') < recipe.index('case "$$CHECK_BUCKET"')
 
     def test_release_finalize_failure_modes_are_explicit(self):
         """The one-shot release-finalize precondition must fail closed for drift and non-green states."""
