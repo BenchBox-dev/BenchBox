@@ -75,6 +75,24 @@ def test_registry_bad_support_status_rejected() -> None:
         BenchmarkRegistryCatalog.model_validate(bad)
 
 
+@pytest.mark.parametrize("value", [[10, 2], [-1, 2]])
+def test_registry_bad_estimated_time_range_rejected(value: list[float]) -> None:
+    bad = copy.deepcopy(_load("benchbox.core", "benchmark_registry.yaml"))
+    first = next(iter(bad["benchmark_metadata"]))
+    bad["benchmark_metadata"][first]["estimated_time_range"] = value
+    with pytest.raises(ValidationError):
+        BenchmarkRegistryCatalog.model_validate(bad)
+
+
+@pytest.mark.parametrize("value", [0, -1])
+def test_registry_non_positive_base_memory_rejected(value: float) -> None:
+    bad = copy.deepcopy(_load("benchbox.core", "benchmark_registry.yaml"))
+    first = next(iter(bad["benchmark_metadata"]))
+    bad["benchmark_metadata"][first]["base_memory_gb"] = value
+    with pytest.raises(ValidationError):
+        BenchmarkRegistryCatalog.model_validate(bad)
+
+
 def test_registry_unknown_field_rejected() -> None:
     # extra="forbid" turns a misspelled/unknown field into a schema failure, not
     # a silently-ignored key that surfaces as a runtime KeyError later.
