@@ -10,38 +10,50 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 from typing import Iterable, Mapping
 
 import yaml
 
-_SPEC = yaml.safe_load((Path(__file__).with_suffix(".yaml")).read_text(encoding="utf-8"))
-_STATUS_BY_KEY = {status["key"]: status for status in _SPEC["statuses"]}
-_DECISION_BY_KEY = {decision["key"]: decision for decision in _SPEC["decisions"]}
+TUNED_TEMPLATE = "tuned_template"
+BASIC_CONSTRAINTS = "basic_constraints"
+UNTUNED = "untuned"
+VALID_STATUSES = frozenset({TUNED_TEMPLATE, BASIC_CONSTRAINTS, UNTUNED})
 
-TUNED_TEMPLATE = _STATUS_BY_KEY["tuned_template"]["value"]
-BASIC_CONSTRAINTS = _STATUS_BY_KEY["basic_constraints"]["value"]
-UNTUNED = _STATUS_BY_KEY["untuned"]["value"]
-VALID_STATUSES = frozenset(status["value"] for status in _SPEC["statuses"])
+DECISION_AUTHOR = "author"
+DECISION_WAIVED = "waived"
+DECISION_DONE = "done"
+VALID_DECISIONS = frozenset({DECISION_AUTHOR, DECISION_WAIVED, DECISION_DONE})
 
-DECISION_AUTHOR = _DECISION_BY_KEY["author"]["value"]
-DECISION_WAIVED = _DECISION_BY_KEY["waived"]["value"]
-DECISION_DONE = _DECISION_BY_KEY["done"]["value"]
-VALID_DECISIONS = frozenset(decision["value"] for decision in _SPEC["decisions"])
-
-STATUS_RANK = {status["value"]: status["rank"] for status in _SPEC["statuses"]}
+STATUS_RANK = {
+    TUNED_TEMPLATE: 2,
+    BASIC_CONSTRAINTS: 1,
+    UNTUNED: 0,
+}
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TUNING_TEMPLATE_ROOT = REPO_ROOT / "examples" / "tunings"
-MATRIX_COLUMNS = tuple(_SPEC["matrix_columns"])
+MATRIX_COLUMNS = ("platform", "benchmark", "status", "decision", "reason", "template_path")
 
-# The 2026-05-05 handoff called these out as high-priority tuned-template gaps.
-HIGH_PRIORITY_AUTHOR_BACKLOG = frozenset(
-    (entry["platform"], entry["benchmark"]) for entry in _SPEC["high_priority_author_backlog"]
+_RUNTIME_STATUS_MARKERS: tuple[tuple[str, str], ...] = (
+    ("Tuning: auto-discovered template", TUNED_TEMPLATE),
+    ("Tuning: using basic constraints", BASIC_CONSTRAINTS),
+    ("Tuning disabled:", UNTUNED),
 )
-_RUNTIME_STATUS_MARKERS: tuple[tuple[str, str], ...] = tuple(
-    (status["runtime_marker"], status["value"]) for status in _SPEC["statuses"]
-)
+
+
+@cache
+def _coverage_spec() -> dict:
+    return yaml.safe_load((Path(__file__).with_suffix(".yaml")).read_text(encoding="utf-8"))
+
+
+@cache
+def _high_priority_author_backlog() -> frozenset[tuple[str, str]]:
+    # The 2026-05-05 handoff called these out as high-priority tuned-template gaps.
+    return frozenset(
+        (entry["platform"], entry["benchmark"]) for entry in _coverage_spec()["high_priority_author_backlog"]
+    )
 
 
 @dataclass(frozen=True)
@@ -122,7 +134,7 @@ def default_decision(platform: str, benchmark: str, status: str) -> tuple[str, s
     """Return the matrix disposition for one platform/benchmark status."""
     if status == TUNED_TEMPLATE:
         return DECISION_DONE, "benchmark-specific tuned template exists"
-    if (platform, benchmark) in HIGH_PRIORITY_AUTHOR_BACKLOG:
+    if (platform, benchmark) in _high_priority_author_backlog():
         return DECISION_AUTHOR, "high-priority backlog from 2026-05-05 fallback evidence"
     if status == BASIC_CONSTRAINTS:
         return DECISION_WAIVED, "basic constraints are acceptable until measured benefit justifies a template"

@@ -17,7 +17,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable
+from threading import Lock
+from typing import TYPE_CHECKING, Any, Callable, Iterable, NamedTuple
 
 if TYPE_CHECKING:
     from benchbox.core.dataframe.context import DataFrameContext
@@ -275,7 +276,7 @@ class QueryRegistry:
         ```
     """
 
-    def __init__(self, benchmark: str) -> None:
+    def __init__(self, benchmark: str, loader: Callable[[], Iterable[DataFrameQuery]] | None = None) -> None:
         """Initialize a new QueryRegistry.
 
         Args:
@@ -283,6 +284,38 @@ class QueryRegistry:
         """
         self.benchmark = benchmark
         self._queries: dict[str, DataFrameQuery] = {}
+        self._loader = loader
+        self._load_lock = Lock()
+        self._loaded = False
+        self._load_hits = 0
+        self._load_misses = 0
+
+    def set_loader(self, loader: Callable[[], Iterable[DataFrameQuery]]) -> None:
+        """Set the lazy loader before the registry has been populated."""
+        with self._load_lock:
+            if self._loaded or self._queries:
+                raise RuntimeError(f"{self.benchmark} registry loader cannot be changed after loading")
+            self._loader = loader
+
+    def _register_query(self, query: DataFrameQuery) -> None:
+        if query.query_id in self._queries:
+            raise ValueError(f"Query '{query.query_id}' already registered in {self.benchmark} registry")
+        self._queries[query.query_id] = query
+
+    def _ensure_loaded(self) -> None:
+        if self._loader is None:
+            return
+        with self._load_lock:
+            if self._loaded:
+                self._load_hits += 1
+                return
+            if self._loader is None:
+                return
+
+            self._load_misses += 1
+            for query in self._loader():
+                self._register_query(query)
+            self._loaded = True
 
     def register(self, query: DataFrameQuery) -> None:
         """Register a query in the registry.
@@ -293,9 +326,8 @@ class QueryRegistry:
         Raises:
             ValueError: If a query with the same ID already exists
         """
-        if query.query_id in self._queries:
-            raise ValueError(f"Query '{query.query_id}' already registered in {self.benchmark} registry")
-        self._queries[query.query_id] = query
+        self._ensure_loaded()
+        self._register_query(query)
 
     def register_many(self, queries: list[DataFrameQuery]) -> None:
         """Register multiple queries at once.
@@ -303,8 +335,9 @@ class QueryRegistry:
         Args:
             queries: List of queries to register
         """
+        self._ensure_loaded()
         for query in queries:
-            self.register(query)
+            self._register_query(query)
 
     def get(self, query_id: str) -> DataFrameQuery | None:
         """Get a query by ID.
@@ -315,6 +348,7 @@ class QueryRegistry:
         Returns:
             The query, or None if not found
         """
+        self._ensure_loaded()
         return self._queries.get(query_id)
 
     def get_or_raise(self, query_id: str) -> DataFrameQuery:
@@ -340,6 +374,7 @@ class QueryRegistry:
         Returns:
             List of all queries, sorted by query_id
         """
+        self._ensure_loaded()
         return sorted(self._queries.values(), key=lambda q: q.query_id)
 
     def get_query_ids(self) -> list[str]:
@@ -348,6 +383,7 @@ class QueryRegistry:
         Returns:
             Sorted list of query IDs
         """
+        self._ensure_loaded()
         return sorted(self._queries.keys())
 
     def get_queries_by_category(self, category: QueryCategory) -> list[DataFrameQuery]:
@@ -409,12 +445,34 @@ class QueryRegistry:
 
     def __len__(self) -> int:
         """Return the number of registered queries."""
+        self._ensure_loaded()
         return len(self._queries)
 
     def __contains__(self, query_id: str) -> bool:
         """Check if a query ID is registered."""
+        self._ensure_loaded()
         return query_id in self._queries
 
     def __iter__(self):
         """Iterate over query IDs."""
+        self._ensure_loaded()
         return iter(sorted(self._queries.keys()))
+
+    def load_info(self) -> QueryRegistryLoadInfo:
+        """Return lazy-load statistics."""
+        with self._load_lock:
+            return QueryRegistryLoadInfo(
+                hits=self._load_hits,
+                misses=self._load_misses,
+                maxsize=1,
+                currsize=1 if self._loaded else 0,
+            )
+
+
+class QueryRegistryLoadInfo(NamedTuple):
+    """Lazy query-registry load statistics for import-path tests."""
+
+    hits: int
+    misses: int
+    maxsize: int
+    currsize: int

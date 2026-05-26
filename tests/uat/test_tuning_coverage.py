@@ -11,9 +11,14 @@ from benchbox.core.tuning.coverage import (
     DECISION_AUTHOR,
     DECISION_DONE,
     DECISION_WAIVED,
+    MATRIX_COLUMNS,
+    STATUS_RANK,
     TUNED_TEMPLATE,
+    UNTUNED,
     VALID_DECISIONS,
+    VALID_STATUSES,
     TuningCoverageRow,
+    _coverage_spec,
     build_tuning_coverage_rows,
     parse_runtime_tuning_logs,
     read_tuning_coverage_tsv,
@@ -26,6 +31,23 @@ from tests.uat.matrix import PLATFORM_GROUPS, load_benchmarks, resolve_benchmark
 pytestmark = pytest.mark.fast
 
 MATRIX_PATH = Path(__file__).resolve().parent / "data" / "tuning_coverage.tsv"
+
+
+def test_tuning_coverage_import_constants_match_yaml_spec():
+    spec = _coverage_spec()
+    statuses = {status["key"]: status for status in spec["statuses"]}
+    decisions = {decision["key"]: decision for decision in spec["decisions"]}
+
+    assert statuses["tuned_template"]["value"] == TUNED_TEMPLATE
+    assert statuses["basic_constraints"]["value"] == BASIC_CONSTRAINTS
+    assert statuses["untuned"]["value"] == UNTUNED
+    assert {status["value"] for status in spec["statuses"]} == VALID_STATUSES
+    assert {status["value"]: status["rank"] for status in spec["statuses"]} == STATUS_RANK
+    assert decisions["author"]["value"] == DECISION_AUTHOR
+    assert decisions["waived"]["value"] == DECISION_WAIVED
+    assert decisions["done"]["value"] == DECISION_DONE
+    assert {decision["value"] for decision in spec["decisions"]} == VALID_DECISIONS
+    assert tuple(spec["matrix_columns"]) == MATRIX_COLUMNS
 
 
 def test_tuning_coverage_matrix_is_checked_in_and_has_decisions():

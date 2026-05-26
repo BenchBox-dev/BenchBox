@@ -31,7 +31,7 @@ from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 
 from .parameters import get_parameters
-from .registry import register_query
+from .registry import configure_query_loader
 
 # =============================================================================
 # Simple Queries - 3-table joins with straightforward aggregation
@@ -9785,8 +9785,6 @@ _CATEGORY_CODES = {
     "W": QueryCategory.WINDOW,
 }
 
-_QUERY_METADATA = Path(__file__).with_name("query_metadata.csv").read_text(encoding="utf-8")
-
 
 def _impl_for(query_id: str, family: str) -> QueryImpl:
     name = f"q{query_id[1:].lower()}_{family}_impl"
@@ -9796,20 +9794,20 @@ def _impl_for(query_id: str, family: str) -> QueryImpl:
     return _GENERATED_IMPLS[name]
 
 
-def _register_all_queries() -> None:
-    """Register all TPC-DS DataFrame queries."""
-    for query_id, query_name, description, category_codes in reader(_QUERY_METADATA.splitlines(), delimiter="|"):
-        register_query(
-            DataFrameQuery(
-                query_id=query_id,
-                query_name=query_name,
-                description=description,
-                categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
-                expression_impl=_impl_for(query_id, "expression"),
-                pandas_impl=_impl_for(query_id, "pandas"),
-            )
+def _load_queries() -> list[DataFrameQuery]:
+    """Load all TPC-DS DataFrame query metadata."""
+    metadata = Path(__file__).with_name("query_metadata.csv").read_text(encoding="utf-8")
+    return [
+        DataFrameQuery(
+            query_id=query_id,
+            query_name=query_name,
+            description=description,
+            categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+            expression_impl=_impl_for(query_id, "expression"),
+            pandas_impl=_impl_for(query_id, "pandas"),
         )
+        for query_id, query_name, description, category_codes in reader(metadata.splitlines(), delimiter="|")
+    ]
 
 
-# Register all queries when module is imported
-_register_all_queries()
+configure_query_loader(_load_queries)

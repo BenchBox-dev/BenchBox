@@ -631,7 +631,6 @@ max-complexity = 18
 # preview mode for names defined in TYPE_CHECKING blocks or deferred imports.
 "**/__init__.py" = ["F401", "F811", "F822"]
 # Pre-existing violations surfaced by preview mode; out of scope for windows-ci-hardening.
-"benchbox/core/tpcdi/etl/transformations.py" = ["C419"]  # unnecessary list comprehension in max()
 "benchbox/utils/runtime_env.py" = ["F401"]               # unused importlib.machinery import
 # PLW1514 (unspecified-encoding): all benchbox/ sites now have explicit encoding=
 # (fixed under quality-bulk-fix-encoding-lint-and-ratchet). Per-file-ignores removed.
@@ -700,7 +699,6 @@ omit = [
     "benchbox/core/nyctaxi/dataframe_queries/queries.py",
     # TPC-DI ETL: requires full CDC/SCD pipeline infrastructure with staged
     # incremental loads. Cannot be meaningfully unit-tested at unit granularity.
-    "benchbox/core/tpcdi/etl/transformations.py",
     "benchbox/core/tpcdi/etl/scd_processor.py",
     # Experimental concurrency: changes frequently, pool tester requires real
     # concurrent database connections (~284 miss stmts).
