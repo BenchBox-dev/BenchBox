@@ -3669,8 +3669,6 @@ _CATEGORY_CODES = {
     "W": QueryCategory.WINDOW,
 }
 
-_QUERY_METADATA = Path(__file__).with_name("dataframe_query_metadata.csv").read_text(encoding="utf-8")
-
 # Index the explicit module-level `def *_impl` functions into the same registry
 # the factories populate, so the dispatch resolves both kinds with one typed
 # lookup. Runs after every def and factory loop above; globals() is only read,
@@ -3702,11 +3700,12 @@ def _make_query(row: list[str]) -> DataFrameQuery:
     )
 
 
-_QUERIES = [_make_query(row) for row in reader(_QUERY_METADATA.splitlines(), delimiter="|")]
+def _load_queries() -> list[DataFrameQuery]:
+    metadata = Path(__file__).with_name("dataframe_query_metadata.csv").read_text(encoding="utf-8")
+    return [_make_query(row) for row in reader(metadata.splitlines(), delimiter="|")]
 
-# Register all queries
-for query in _QUERIES:
-    REGISTRY.register(query)
+
+REGISTRY.set_loader(_load_queries)
 
 
 def get_dataframe_queries() -> QueryRegistry:

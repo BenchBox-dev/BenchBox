@@ -39,6 +39,18 @@ def test_catalogs_load_lazily_not_at_import() -> None:
     assert lines == ["0 0", "1 1"]
 
 
+def test_dataframe_query_metadata_loads_lazily_not_at_import() -> None:
+    lines = _run(
+        "import benchbox.core.read_primitives.dataframe_queries as rp;"
+        "import benchbox.core.tpcds.dataframe_queries as tpcds;"
+        "print(rp.REGISTRY.load_info().misses, tpcds.TPCDS_DATAFRAME_QUERIES.load_info().misses);"
+        "len(rp.REGISTRY);"
+        "len(tpcds.TPCDS_DATAFRAME_QUERIES);"
+        "print(rp.REGISTRY.load_info().misses, tpcds.TPCDS_DATAFRAME_QUERIES.load_info().misses)"
+    )
+    assert lines == ["0 0", "1 1"]
+
+
 def test_lazy_registry_first_access_is_single_flight(monkeypatch: pytest.MonkeyPatch) -> None:
     import benchbox.core.benchmark_registry as r
 
