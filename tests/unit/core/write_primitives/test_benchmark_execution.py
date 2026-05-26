@@ -1376,6 +1376,20 @@ def test_get_queries_returns_all(fast_bench):
     assert len(queries) > 0
 
 
+def test_default_sql_operations_exclude_sketch_category(fast_bench):
+    operations = fast_bench.get_all_operations()
+
+    assert "sketch_query_theta_union_merge" not in operations
+    assert all(operation.category != "sketch" for operation in operations.values())
+
+
+def test_get_query_allows_explicit_sql_sketch_operation(fast_bench):
+    result = fast_bench.get_query("sketch_query_theta_union_merge")
+
+    assert isinstance(result, str)
+    assert "sketch_ops_daily_users" in result
+
+
 def test_get_queries_by_category_returns_subset(fast_bench):
     queries = fast_bench.get_queries_by_category("insert")
     assert isinstance(queries, dict)
@@ -1526,6 +1540,25 @@ def test_get_effective_write_sql_no_overrides(fast_bench):
     sql, skip = fast_bench._get_effective_write_sql(operation)
     assert sql == "INSERT INTO t VALUES (1)"
     assert skip is None
+
+
+def test_get_effective_write_sql_skips_when_file_dependencies_missing(fast_bench, tmp_path):
+    """Bulk-load operations should be skipped when required files are unavailable."""
+    fast_bench.data_generator.files_dir = tmp_path
+    operation = SimpleNamespace(
+        id="bulk_load_csv_small_uncompressed",
+        write_sql="COPY bulk_load_ops_target FROM 'unused';",
+        platform_overrides={},
+        category="bulk_load",
+        file_dependencies=["csv_small_1k.csv", "csv_missing.csv"],
+    )
+
+    sql, skip = fast_bench._get_effective_write_sql(operation)
+
+    assert sql is None
+    assert skip is not None
+    assert "csv_small_1k.csv" in skip
+    assert "csv_missing.csv" in skip
 
 
 # ---------------------------------------------------------------------------
