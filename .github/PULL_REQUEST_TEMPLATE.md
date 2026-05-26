@@ -28,6 +28,19 @@ How did you verify the change? Include the commands you ran (e.g.
 - [ ] Any platform/benchmark count claim in docs is generated/checked from
       registry metadata, or explicitly marked editorial/non-authoritative.
 
+## Documentation
+
+- [ ] I updated the relevant user-facing docs.
+- [ ] I added regression notes for behavior changes.
+- [ ] I confirmed API contract wording remains accurate.
+
+## Code Quality
+
+- [ ] I ran formatting and lint/type checks.
+- [ ] I reviewed impacted modules for backwards compatibility and migration impact.
+- [ ] I added/updated tests for behavior changes and error paths.
+- [ ] I confirmed public contracts and release checklists are still valid.
+
 ## Artifact Hygiene
 
 - [ ] I did not commit raw screenshots, browser reports, generated logs,

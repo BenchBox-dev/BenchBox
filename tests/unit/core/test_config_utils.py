@@ -307,6 +307,7 @@ class TestBuildPlatformAdapterConfig:
 
         expected = {
             "deployment_mode": "server",
+            "mode": "server",
             "data_path": "/tmp/ch_data",
             "host": "clickhouse.example.com",
             "port": 9000,
@@ -317,7 +318,7 @@ class TestBuildPlatformAdapterConfig:
         assert result == expected
 
     def test_build_clickhouse_config_normalizes_legacy_mode_alias(self):
-        """Legacy `mode` input should emit canonical deployment_mode."""
+        """Legacy `mode` input should emit matching canonical and compatibility keys."""
         args = SimpleNamespace(
             deployment_mode=None,
             mode="embedded",
@@ -332,7 +333,7 @@ class TestBuildPlatformAdapterConfig:
         result = build_platform_adapter_config("clickhouse", args)
 
         assert result["deployment_mode"] == "local"
-        assert "mode" not in result
+        assert result["mode"] == "local"
 
     def test_build_clickhouse_config_rejects_cloud_mode(self):
         """Passing cloud deployment through config helpers must raise."""
