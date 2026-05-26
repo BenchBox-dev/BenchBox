@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a CHANGELOG.md entry from conventional commits since the last tag.
+"""Generate a CHANGELOG.md entry from conventional commits since a release boundary.
 
 Standalone CLI extracted from scripts/automate_release.py for the version-branch
 release flow. Run on the develop branch to draft a `## [VERSION] - DATE` section
@@ -7,7 +7,8 @@ ahead of cutting the release branch with `make release-prepare`.
 
 Behaviour mirrors the legacy automate_release.py:_build_raw_changelog,
 _summarize_changelog_with_claude, and generate_changelog_entry helpers:
-- Parses commits since the most recent v* tag (or all commits if no tag exists).
+- Parses commits since an explicit lower-bound ref, or since the most recent
+  v* tag when no lower-bound ref is supplied.
 - Categorises conventional commits into Added (feat), Fixed (fix), and
   Changed (perf). Skips test/docs/chore/ci/build/refactor/style and
   non-conventional commits.
@@ -21,6 +22,8 @@ Usage:
     uv run python scripts/generate_changelog_entry.py --version 0.3.0
     uv run python scripts/generate_changelog_entry.py --version 0.3.0 \
         --release-date 2026-04-30 --since-tag v0.2.1
+    uv run python scripts/generate_changelog_entry.py --version 0.3.1 \
+        --since-ref origin/main
 """
 
 from __future__ import annotations
@@ -145,20 +148,11 @@ Now summarize the following raw commits:
     return f"## [{version}] - {release_date}\n\n{summary}\n"
 
 
-def generate_changelog_entry(source: Path, version: str, release_date: str, since_tag: str | None = None) -> bool:
-    """Generate a changelog entry from conventional commits since the last tag.
-
-    Args:
-        source: Source repository path.
-        version: New version string (without leading 'v').
-        release_date: Release date in YYYY-MM-DD format.
-        since_tag: Tag to use as the lower bound (e.g. 'v0.2.1'). If None,
-            the latest matching v* tag is auto-detected.
-
-    Returns:
-        True if changelog was updated, False otherwise.
-    """
-    print(f"\n  Auto-generating changelog entry for v{version}...")
+def _resolve_log_range(source: Path, since_ref: str | None, since_tag: str | None) -> str | None:
+    """Return the git log range for changelog generation."""
+    if since_ref is not None:
+        print(f"  Since ref: {since_ref}")
+        return f"{since_ref}..HEAD"
 
     if since_tag is None:
         result = subprocess.run(
@@ -169,14 +163,40 @@ def generate_changelog_entry(source: Path, version: str, release_date: str, sinc
         )
         if result.returncode != 0:
             print("  Warning: No previous version tag found, using all commits")
-            since_tag = None
-        else:
-            since_tag = result.stdout.strip()
-            print(f"  Previous tag: {since_tag}")
+            return None
+        since_tag = result.stdout.strip()
+        print(f"  Previous tag: {since_tag}")
     else:
         print(f"  Since tag: {since_tag}")
 
-    log_range = f"{since_tag}..HEAD" if since_tag else "HEAD"
+    return f"{since_tag}..HEAD"
+
+
+def generate_changelog_entry(
+    source: Path,
+    version: str,
+    release_date: str,
+    since_tag: str | None = None,
+    since_ref: str | None = None,
+) -> bool:
+    """Generate a changelog entry from conventional commits.
+
+    Args:
+        source: Source repository path.
+        version: New version string (without leading 'v').
+        release_date: Release date in YYYY-MM-DD format.
+        since_tag: Tag to use as the lower bound (e.g. 'v0.2.1'). Ignored
+            when since_ref is set. If neither is set, the latest matching v*
+            tag is auto-detected.
+        since_ref: Ref to use as the lower bound (e.g. 'origin/main'). This is
+            the release-branch flow default because `develop` is intentionally
+            not tagged after releases.
+
+    Returns:
+        True if changelog was updated, False otherwise.
+    """
+    print(f"\n  Auto-generating changelog entry for v{version}...")
+    log_range = _resolve_log_range(source, since_ref=since_ref, since_tag=since_tag) or "HEAD"
     result = subprocess.run(
         ["git", "log", "--format=%s", log_range],
         cwd=source,
@@ -248,7 +268,7 @@ def generate_changelog_entry(source: Path, version: str, release_date: str, sinc
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Generate a CHANGELOG.md entry from conventional commits since the last v* tag."
+        description="Generate a CHANGELOG.md entry from conventional commits since a release boundary."
     )
     parser.add_argument(
         "--version",
@@ -263,7 +283,12 @@ def main() -> int:
     parser.add_argument(
         "--since-tag",
         default=None,
-        help="Lower-bound tag for commit range (default: auto-detect latest v* tag)",
+        help="Lower-bound tag for commit range (default: auto-detect latest v* tag unless --since-ref is set)",
+    )
+    parser.add_argument(
+        "--since-ref",
+        default=None,
+        help="Lower-bound ref for commit range, e.g. origin/main. Overrides --since-tag.",
     )
     parser.add_argument(
         "--source",
@@ -282,6 +307,7 @@ def main() -> int:
         version=args.version,
         release_date=args.release_date,
         since_tag=args.since_tag,
+        since_ref=args.since_ref,
     )
     return 0 if success else 1
 

@@ -2,8 +2,8 @@
 
 This PR was opened by `make release-cut VERSION=X.Y.Z` from `develop`.
 It cuts the release branch, bumps the version sources, generates the
-CHANGELOG entry, drops maintainer paths (`_project/`, `_blog/`, agent
-configs, dev-tooling root files), and queues the change for a
+CHANGELOG entry from `origin/main..HEAD`, drops maintainer paths (`_project/`,
+`_blog/`, agent configs, dev-tooling root files), and queues the change for a
 squash-merge into `main`.
 
 ### Reviewer checklist
