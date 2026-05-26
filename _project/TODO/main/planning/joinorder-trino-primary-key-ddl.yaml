@@ -2,7 +2,7 @@ id: joinorder-trino-primary-key-ddl
 title: "Strip JoinOrder primary-key constraints from Trino CREATE TABLE DDL"
 worktree: main
 priority: Medium
-status: Not Started
+status: Under Review
 category: Platform Compatibility
 
 description: |
@@ -20,17 +20,23 @@ description: |
 work:
   - id: w1
     summary: "Confirm Trino connector behavior for PRIMARY KEY metadata"
-    status: pending
+    status: done
     notes: |
       Re-check Trino memory and Hive/Iceberg connector CREATE TABLE behavior
       with a minimal statement containing both inline and table-level PRIMARY
       KEY metadata. If current Trino accepts the metadata, document that and
       close this as no-op.
 
+      2026-05-26 evidence: Trino 481 CREATE TABLE syntax documents column
+      type/default/null/comment/properties and table WITH properties, not inline
+      or table-level PRIMARY KEY constraints. Memory, Hive, and Iceberg connector
+      docs document CREATE TABLE support and connector properties, with no
+      PRIMARY KEY acceptance path. No live Trino run was used.
+
   - id: w2
     summary: "Apply the shared primary-key stripping helper if Trino rejects the metadata"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       If Trino rejects PRIMARY KEY metadata, import `strip_primary_keys` from
       `benchbox.platforms.base.ddl_helpers` and call it before memory/Hive
@@ -39,7 +45,7 @@ work:
   - id: w3
     summary: "Add focused Trino optimizer regression coverage"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Cover inline `id INTEGER PRIMARY KEY` and table-level
       `PRIMARY KEY (id, coalesce(other_id, 0))` inputs. Keep the test focused

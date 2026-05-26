@@ -28,7 +28,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from benchbox.platforms.base.ddl_helpers import strip_with_properties
+from benchbox.platforms.base.ddl_helpers import strip_primary_keys, strip_with_properties
 
 from ..utils.dependencies import (
     check_platform_dependencies,
@@ -194,6 +194,11 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
         """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
+
+        # Trino CREATE TABLE syntax does not include PRIMARY KEY constraints.
+        # BenchBox workloads load immutable benchmark data, so the constraint is
+        # metadata only and can be stripped for all Trino catalogs.
+        statement = strip_primary_keys(statement)
 
         # For memory catalog, remove any Trino-incompatible syntax
         # Memory catalog doesn't support WITH properties for the most part
