@@ -37,6 +37,15 @@ def _load_ini_section(path: Path, section: str) -> dict[str, str]:
     return dict(parser[section])
 
 
+def _marker_names(path: Path) -> set[str]:
+    marker_lines = _load_ini_section(path, "pytest")["markers"].splitlines()
+    return {
+        line.split(":", 1)[0].strip()
+        for line in marker_lines
+        if line.strip() and ":" in line and not line.strip().startswith("#")
+    }
+
+
 class TestStandardizedTestCommands:
     """Test the standardized test command system."""
 
@@ -228,6 +237,7 @@ class TestMakefileCommands:
         assert "local_only:" in pytest_ci_content
         assert "source = benchbox" in pytest_ci_content
         assert "--cov-config=.coveragerc_core" in pytest_ci_addopts
+        assert _marker_names(repo_root / "pytest.ini") <= _marker_names(repo_root / "pytest-ci.ini")
 
     def test_coverage_threshold_policy_distinguishes_blocking_and_advisory_thresholds(self):
         repo_root = Path.cwd()

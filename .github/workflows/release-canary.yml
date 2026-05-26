@@ -14,17 +14,28 @@ permissions:
   actions: read
   contents: read
 
+env:
+  RELEASE_CANARY_REF: develop
+
 jobs:
   credential-free-non-fast:
     name: credential-free non-fast canary
     runs-on: ubuntu-latest
     timeout-minutes: 90
     outputs:
+      checked_sha: ${{ steps.checked-ref.outputs.checked_sha }}
       collected_count: ${{ steps.collect.outputs.collected_count }}
       pytest_exit_code: ${{ steps.run-tests.outputs.pytest_exit_code }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_CANARY_REF }}
+          fetch-depth: 0
+
+      - name: Record checked ref
+        id: checked-ref
+        run: echo "checked_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -74,6 +85,7 @@ jobs:
       - name: Write non-fast canary summary
         if: always()
         env:
+          CHECKED_SHA: ${{ steps.checked-ref.outputs.checked_sha }}
           COLLECTED_COUNT: ${{ steps.collect.outputs.collected_count }}
           PYTEST_EXIT_CODE: ${{ steps.run-tests.outputs.pytest_exit_code }}
         run: |
@@ -86,7 +98,8 @@ jobs:
           payload = {
               "workflow": "release-canary.yml",
               "job": "credential-free-non-fast",
-              "commit_sha": os.environ["GITHUB_SHA"],
+              "checked_ref": "develop",
+              "commit_sha": os.environ["CHECKED_SHA"],
               "run_id": os.environ["GITHUB_RUN_ID"],
               "completed_at": datetime.now(timezone.utc).isoformat(),
               "suite_families": ["slow", "resource_heavy"],
@@ -123,6 +136,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_CANARY_REF }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -136,13 +152,15 @@ jobs:
         id: drift
         shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RULESET_DRIFT_TOKEN: ${{ secrets.RULESET_DRIFT_TOKEN }}
           RELEASE_READINESS_OVERRIDE_SHA: ${{ vars.RELEASE_READINESS_OVERRIDE_SHA }}
           RELEASE_READINESS_OVERRIDE_REASON: ${{ vars.RELEASE_READINESS_OVERRIDE_REASON }}
         run: |
           set +e
           mkdir -p release-canary-artifacts
           uv run -- python scripts/ruleset_drift_check.py \
+            --token "${RULESET_DRIFT_TOKEN}" \
+            --require-bypass-actor-visibility \
             --output release-canary-artifacts/ruleset-drift.json \
             2>&1 | tee release-canary-artifacts/ruleset-drift.txt
           rc=${PIPESTATUS[0]}
@@ -171,6 +189,7 @@ jobs:
     steps:
       - name: Write release canary summary
         env:
+          CHECKED_SHA: ${{ needs.credential-free-non-fast.outputs.checked_sha }}
           NON_FAST_RESULT: ${{ needs.credential-free-non-fast.result }}
           RULESET_DRIFT_RESULT: ${{ needs.ruleset-drift.result }}
           NON_FAST_COUNT: ${{ needs.credential-free-non-fast.outputs.collected_count }}
@@ -179,7 +198,8 @@ jobs:
           cat > release-canary-artifacts/release-canary-summary.json <<EOF
           {
             "workflow": "release-canary.yml",
-            "commit_sha": "${GITHUB_SHA}",
+            "checked_ref": "develop",
+            "commit_sha": "${CHECKED_SHA}",
             "run_id": "${GITHUB_RUN_ID}",
             "suite_families": ["slow", "resource_heavy"],
             "excluded_families": ["stress", "live_integration"],

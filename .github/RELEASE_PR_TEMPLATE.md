@@ -18,21 +18,26 @@ squash-merge into `main`.
 - [ ] `validate-base` is green for this release branch
 - [ ] `release-required-result` is green on this branch
 - [ ] Release canary freshness is green (latest `release-canary.yml` run is
-      successful, within 48h, and an ancestor of this release head)
+      successful, within 48h, and its checked `develop` SHA is an ancestor of
+      this release head)
 - [ ] Ruleset drift is green in the latest release canary
 
 ### Release-required guarantee
 
 `release-required-result` means this branch passed the fast test lane,
-integration-not-slow suite, isolated exact-one-wheel package install smoke,
-dependency upper-bound check, and release-branch curation check. It does
-not cover live cloud credentials, stress suites, or long-running UAT.
+credential-free integration-not-slow suite, isolated exact-one-wheel package
+install smoke, dependency upper-bound check, and release-branch curation check.
+It does not cover live cloud credentials, stress suites, or long-running UAT.
 Slow/resource-heavy coverage is enforced by the 48h release canary freshness
 gate in `validate-base`, not by rerunning that suite on every release PR.
 
 `release-canary.yml` runs the credential-free non-fast canary
 `(slow or resource_heavy) and not (stress or live_integration)` and the
 ruleset drift check against `docs/operations/repo-admin-settings.md`.
+Scheduled runs execute from the default branch, then check out `develop` and
+record the checked SHA in `release-canary-summary.json` for release-readiness.
+The first release that introduces the workflow may run the same evidence inline
+from `validate-base` until GitHub can run the canary from the default branch.
 Emergency override requires repository variables
 `RELEASE_READINESS_OVERRIDE_SHA` (exact release head SHA) and
 `RELEASE_READINESS_OVERRIDE_REASON` (incident/approval record).
@@ -43,10 +48,10 @@ Emergency override requires repository variables
 make release-finalize VERSION=X.Y.Z
 ```
 
-`release-finalize` re-checks that the required `release-required-result`
-context is present and green before merge. If the context is missing,
-pending, skipped, failed, or canceled, stop and fix the release PR or
-ruleset/workflow contract before rerunning the command.
+`release-finalize` re-checks that the required `validate-base` and
+`release-required-result` contexts are present and green before merge. If either
+context is missing, pending, skipped, failed, or canceled, stop and fix the
+release PR or ruleset/workflow contract before rerunning the command.
 
 After that pre-merge check passes, `release-finalize` squash-merges this PR,
 fast-forwards `main`, tags `vX.Y.Z`, and pushes the tag — which fires

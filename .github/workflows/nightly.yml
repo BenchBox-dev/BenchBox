@@ -191,7 +191,7 @@ jobs:
 
       - name: Run integration tests
         run: |
-          uv run -- python -m pytest tests/integration -m "integration and not slow and not stress" --tb=short --maxfail=5 --timeout=300
+          uv run -- python -m pytest tests/integration -m "integration and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5 --timeout=300
 
   test-package:
     runs-on: ${{ matrix.os }}
@@ -222,10 +222,18 @@ jobs:
       - name: Test package installation
         shell: bash
         run: |
-          uv venv test-venv
-          uv pip install --python test-venv dist/*.whl
-          uv run --python test-venv python -c "import benchbox; print('Package installation successful')"
-          uv run --python test-venv benchbox --help
+          set -euo pipefail
+          wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
+          if [ "$wheel_count" != "1" ]; then
+            echo "::error::Expected exactly one wheel, found $wheel_count"
+            find dist -maxdepth 1 -type f -print
+            exit 1
+          fi
+          wheel=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
+          tmpdir=$(mktemp -d)
+          cd "$tmpdir"
+          uv run --isolated --no-project --with "$wheel" -- python -c "import benchbox; print('Package installation successful')"
+          uv run --isolated --no-project --with "$wheel" -- benchbox --help
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

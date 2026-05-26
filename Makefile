@@ -579,13 +579,22 @@ docstring-coverage:
 # Package build and install test - exact match for test.yml test-package job
 test-package:
 	@echo "Building and testing package installation..."
+	rm -rf dist/
 	uv build
 	uvx twine check dist/*
 	@echo "Testing package installation..."
-	@rm -rf test-venv
-	uv venv test-venv
-	. test-venv/bin/activate && uv pip install dist/*.whl && python -c "import benchbox; print('Package installation successful')" && benchbox --help > /dev/null
-	@rm -rf test-venv
+	@wheel_count=$$(find "$$PWD/dist" -maxdepth 1 -type f -name '*.whl' | wc -l | tr -d '[:space:]'); \
+	if [ "$$wheel_count" != "1" ]; then \
+		echo "Expected exactly one wheel, found $$wheel_count"; \
+		find "$$PWD/dist" -maxdepth 1 -type f -print; \
+		exit 1; \
+	fi; \
+	wheel=$$(find "$$PWD/dist" -maxdepth 1 -type f -name '*.whl' -print -quit); \
+	tmpdir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmpdir"' EXIT; \
+	cd "$$tmpdir"; \
+	uv run --isolated --no-project --with "$$wheel" -- python -c "import benchbox; print('Package installation successful')"; \
+	uv run --isolated --no-project --with "$$wheel" -- benchbox --help > /dev/null
 	@echo "✅ Package test passed"
 
 # Integration smoke tests - exact match for test.yml integration-smoke job
@@ -758,7 +767,7 @@ run-test:
 #
 # See docs/operations/release-guide.md and _project/decisions/single-repo-migration.md.
 
-RELEASE_REQUIRED_CONTEXT := release-required-result
+RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 
 .PHONY: release-cut release-finalize
 
@@ -811,33 +820,35 @@ release-cut:
 	@echo
 	@echo "Release PR opened. Next steps:"
 	@echo "  1. Review the PR diff; confirm CHANGELOG and curation are correct."
-	@echo "  2. Wait for the required release context: $(RELEASE_REQUIRED_CONTEXT)."
+	@echo "  2. Wait for the required release contexts: $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "  3. make release-finalize VERSION=$(VERSION)"
 
-# After release-cut's PR is approved and release-required-result is green:
-# squash-merge it, tag main, push the tag (fires release.yml), and leave
-# develop alone.
+# After release-cut's PR is approved and all required release contexts are
+# green: squash-merge it, tag main, push the tag (fires release.yml), and
+# leave develop alone.
 # Usage: make release-finalize VERSION=X.Y.Z
 release-finalize:
 	@test -n "$(VERSION)" || (echo "Usage: make release-finalize VERSION=X.Y.Z" && exit 1)
 	@PR=$$(gh pr list --base main --head v$(VERSION) --state open --json number --jq '.[0].number'); \
 	test -n "$$PR" || (echo "Error: no open PR found for v$(VERSION) → main" && exit 1); \
-	echo "==> Verifying required release context '$(RELEASE_REQUIRED_CONTEXT)' for PR #$$PR"; \
-	CHECK_BUCKET=$$(gh pr checks "$$PR" --required --json name,bucket,state --jq 'map(select(.name == "$(RELEASE_REQUIRED_CONTEXT)")) | if length == 1 then .[0].bucket elif length == 0 then "missing" else "duplicate" end'); \
-	CHECK_RC=$$?; \
-	if [ "$$CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8" ]; then \
-		echo "Error: gh pr checks failed while verifying $(RELEASE_REQUIRED_CONTEXT) (exit $$CHECK_RC)" >&2; \
-		exit "$$CHECK_RC"; \
-	fi; \
-	case "$$CHECK_BUCKET" in \
-		pass) echo "==> $(RELEASE_REQUIRED_CONTEXT) is green; proceeding with release merge";; \
-		missing) echo "Error: required release context '$(RELEASE_REQUIRED_CONTEXT)' is missing. Check main-release-only and .github/workflows/test.yml." >&2; exit 1;; \
-		pending) echo "Error: required release context '$(RELEASE_REQUIRED_CONTEXT)' is pending. Wait for GitHub Actions, then rerun." >&2; exit 1;; \
-		fail|cancel|skipping) echo "Error: required release context '$(RELEASE_REQUIRED_CONTEXT)' is $$CHECK_BUCKET. Fix the release PR before finalizing." >&2; exit 1;; \
-		duplicate) echo "Error: multiple required contexts named '$(RELEASE_REQUIRED_CONTEXT)' were returned. Fix workflow/ruleset drift." >&2; exit 1;; \
-		*) echo "Error: unexpected $(RELEASE_REQUIRED_CONTEXT) status '$$CHECK_BUCKET'." >&2; exit 1;; \
-	esac; \
-	echo "==> Squash-merging PR #$$PR ($(RELEASE_REQUIRED_CONTEXT) is green)"; \
+	echo "==> Verifying required release contexts '$(RELEASE_REQUIRED_CONTEXTS)' for PR #$$PR"; \
+	for context in $(RELEASE_REQUIRED_CONTEXTS); do \
+		CHECK_BUCKET=$$(gh pr checks "$$PR" --required --json name,bucket,state --jq "map(select(.name == \"$$context\")) | if length == 1 then .[0].bucket elif length == 0 then \"missing\" else \"duplicate\" end"); \
+		CHECK_RC=$$?; \
+		if [ "$$CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8" ]; then \
+			echo "Error: gh pr checks failed while verifying $$context (exit $$CHECK_RC)" >&2; \
+			exit "$$CHECK_RC"; \
+		fi; \
+		case "$$CHECK_BUCKET" in \
+			pass) echo "==> $$context is green";; \
+			missing) echo "Error: required release context '$$context' is missing. Check main-release-only and release workflows." >&2; exit 1;; \
+			pending) echo "Error: required release context '$$context' is pending. Wait for GitHub Actions, then rerun." >&2; exit 1;; \
+			fail|cancel|skipping) echo "Error: required release context '$$context' is $$CHECK_BUCKET. Fix the release PR before finalizing." >&2; exit 1;; \
+			duplicate) echo "Error: multiple required contexts named '$$context' were returned. Fix workflow/ruleset drift." >&2; exit 1;; \
+			*) echo "Error: unexpected $$context status '$$CHECK_BUCKET'." >&2; exit 1;; \
+		esac; \
+	done; \
+	echo "==> Squash-merging PR #$$PR (required release contexts are green)"; \
 	gh pr merge --squash "$$PR"
 	git fetch origin --tags
 	git checkout main
@@ -846,7 +857,7 @@ release-finalize:
 	git push origin v$(VERSION)
 	@echo
 	@echo "Tag v$(VERSION) pushed; release.yml will publish to PyPI."
-	@echo "Push-to-main jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXT)."
+	@echo "Push-to-main jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "develop is intentionally unchanged — dev-only paths persist on develop."
 
 # =============================================================================
@@ -1918,6 +1929,6 @@ help:
 	@echo ""
 	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
 	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs main"
-	@echo "  make release-finalize VERSION=X.Y.Z Verify release-required-result, squash-merge the release PR, tag main, push tag"
+	@echo "  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag main, push tag"
 	@echo ""
 	@echo "  make help            Show this help message"
