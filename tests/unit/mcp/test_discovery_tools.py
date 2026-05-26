@@ -95,6 +95,40 @@ class TestListBenchmarksTool:
         assert "beta" in projected.values()
         assert "experimental" in projected.values()
 
+    def test_discovery_reads_live_registry_not_import_bound_metadata(self, monkeypatch: pytest.MonkeyPatch):
+        """Discovery must not depend on a BENCHMARK_METADATA object captured at import."""
+        from unittest.mock import patch
+
+        from benchbox.core import benchmark_registry
+        from benchbox.mcp.tools import discovery
+
+        monkeypatch.setattr(discovery, "BENCHMARK_METADATA", {}, raising=False)
+        fixture = {
+            "x_live_registry": {
+                "display_name": "Live Registry",
+                "description": "synthetic registry fixture",
+                "category": "Test",
+                "num_queries": 0,
+                "query_description": "n/a",
+                "supports_streams": False,
+                "default_scale": 1.0,
+                "scale_options": [1.0],
+                "min_scale": 1.0,
+                "complexity": "Low",
+                "estimated_time_range": (0, 0),
+                "supports_dataframe": False,
+                "support_status": "deprecated",
+                "surface": "public",
+            }
+        }
+
+        with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixture, clear=False):
+            listed = {row["name"]: row for row in discovery._list_benchmarks_impl()["benchmarks"]}
+            assert listed["x_live_registry"]["support_status"] == "deprecated"
+
+            info = discovery._get_benchmark_info_impl("x_live_registry")
+            assert info["support_status"] == "deprecated"
+
 
 class TestGetBenchmarkInfoTool:
     """Tests for get_benchmark_info tool functionality."""

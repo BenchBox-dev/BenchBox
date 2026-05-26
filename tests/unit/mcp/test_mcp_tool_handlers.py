@@ -189,7 +189,7 @@ class TestGetQueryDetailsTool:
         assert "support_status" not in info
 
 
-def _future_benchmark_meta(support_status: str, surface: str) -> dict[str, object]:
+def _future_benchmark_meta(support_status: str, surface: str, *, supports_dataframe: bool = False) -> dict[str, object]:
     """Metadata for a hypothetical future benchmark used to pin visibility invariants."""
     return {
         "display_name": f"Future {support_status}/{surface}",
@@ -203,7 +203,7 @@ def _future_benchmark_meta(support_status: str, surface: str) -> dict[str, objec
         "min_scale": 1.0,
         "complexity": "Low",
         "estimated_time_range": (0, 0),
-        "supports_dataframe": False,
+        "supports_dataframe": supports_dataframe,
         "support_status": support_status,
         "surface": surface,
     }
@@ -211,22 +211,11 @@ def _future_benchmark_meta(support_status: str, surface: str) -> dict[str, objec
 
 @contextmanager
 def _registered_future_benchmark(benchmark_id: str, meta: dict[str, object]):
-    """Inject a synthetic benchmark so both registry-backed lookups and the discovery
-    module's import-bound metadata see it.
-
-    `discovery._list_benchmarks_impl` iterates the `BENCHMARK_METADATA` it imported at
-    module load, while `get_benchmark_surface` reads the live registry cache. Under the
-    full parallel suite another test can rebuild that cache, leaving the two dicts as
-    distinct objects, so a single `patch.dict` on the registry is not enough — patch both.
-    """
+    """Inject a synthetic benchmark through the live registry surface."""
     from benchbox.core import benchmark_registry
-    from benchbox.mcp.tools import discovery
 
     fixtures = {benchmark_id: meta}
-    with (
-        patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False),
-        patch.dict(discovery.BENCHMARK_METADATA, fixtures, clear=False),
-    ):
+    with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False):
         yield
 
 
@@ -272,6 +261,26 @@ class TestFutureSupportStatusVisibilityInvariants:
             info = _get_benchmark_info_impl("x_future_public")
             assert "error" not in info
             assert info["support_status"] == "deprecated"
+
+    def test_dataframe_routing_uses_capability_not_support_status(self):
+        """DataFrame validation must read supports_dataframe, not infer from support tier."""
+        from benchbox.core import benchmark_registry
+        from benchbox.mcp.tools.benchmark import _validate_benchmark_config
+
+        fixtures = {
+            "x_experimental_df": _future_benchmark_meta("experimental", "public", supports_dataframe=True),
+            "x_stable_nodf": _future_benchmark_meta("stable", "public", supports_dataframe=False),
+        }
+        with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False):
+            errors: list[str] = []
+            warnings: list[str] = []
+            _validate_benchmark_config("x_experimental_df", "x_experimental_df", 1.0, "polars-df", errors, warnings)
+            assert errors == []
+
+            errors = []
+            warnings = []
+            _validate_benchmark_config("x_stable_nodf", "x_stable_nodf", 1.0, "polars-df", errors, warnings)
+            assert errors == ["DataFrame mode does not support x_stable_nodf benchmark"]
 
 
 # ---------------------------------------------------------------------------
