@@ -1097,6 +1097,10 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     if result.tuning_validation_status:
         payload["validation_status"] = result.tuning_validation_status.lower()
 
+    tuning_profile = _extract_tuning_profile_metadata(result)
+    if tuning_profile:
+        payload["logical_profile"] = tuning_profile
+
     # Clauses breakdown
     clauses: dict[str, Any] = {}
     if "indexes" in tuning_applied:
@@ -1225,7 +1229,29 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
     if clauses_count > 0:
         summary["clauses_applied"] = clauses_count
 
+    tuning_profile = _extract_tuning_profile_metadata(result)
+    if tuning_profile:
+        coverage = tuning_profile.get("logical_profile_coverage")
+        logical_profile = {
+            "id": tuning_profile.get("logical_tuning_profile_id"),
+            "version": tuning_profile.get("logical_tuning_profile_version"),
+            "template_hash": tuning_profile.get("tuning_template_hash"),
+            "physical_mechanisms": tuning_profile.get("platform_physical_tuning_mechanisms", []),
+        }
+        if coverage:
+            logical_profile["coverage"] = coverage
+        summary["logical_profile"] = {key: value for key, value in logical_profile.items() if value}
+
     return summary if summary else None
+
+
+def _extract_tuning_profile_metadata(result: BenchmarkResults) -> dict[str, Any] | None:
+    if not isinstance(result.execution_metadata, Mapping):
+        return None
+    tuning_profile = result.execution_metadata.get("tuning_profile")
+    if not isinstance(tuning_profile, Mapping):
+        return None
+    return dict(tuning_profile)
 
 
 def _build_environment_block(result: BenchmarkResults) -> dict[str, Any]:

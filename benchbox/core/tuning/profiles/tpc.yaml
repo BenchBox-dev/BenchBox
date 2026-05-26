@@ -1,0 +1,411 @@
+profile:
+  id: tpc-v1
+  version: "2026-05-26"
+  description: "Platform-neutral logical tuning profile for TPC-H and TPC-DS checked-in tuned templates."
+  benchmarks:
+    tpch:
+      evidence_source: "benchbox/_binaries/tpc-h/templates/{queries,variants}/"
+      candidates:
+      - table: LINEITEM
+        column: L_SHIPDATE
+        type: DATE
+        roles: [temporal_partition, high_selectivity_filter]
+        query_count: 8
+        query_ids: ["1", "3", "6", "7", "12", "14", "15", "20"]
+        status: existing_baseline
+        rationale: "Existing partition/date locality column in checked TPC-H tuned templates."
+      - table: LINEITEM
+        column: L_ORDERKEY
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 10
+        query_ids: ["3", "4", "5", "7", "8", "9", "10", "12", "18", "21"]
+        status: existing_baseline
+        rationale: "Existing fact-table join/distribution key used across order joins."
+      - table: LINEITEM
+        column: L_PARTKEY
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 6
+        query_ids: ["8", "9", "14", "17", "19", "20"]
+        status: existing_baseline
+        rationale: "Existing Databricks clustering key and product join locality candidate."
+      - table: LINEITEM
+        column: L_SUPPKEY
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 7
+        query_ids: ["5", "7", "8", "9", "15", "20", "21"]
+        status: accepted
+        rationale: "Supplier join locality appears in seven TPC-H templates."
+      - table: ORDERS
+        column: O_ORDERDATE
+        type: DATE
+        roles: [temporal_partition, high_selectivity_filter]
+        query_count: 7
+        query_ids: ["3", "4", "5", "8", "9", "10", "18"]
+        status: existing_baseline
+        rationale: "Existing date partition/filter column in checked TPC-H tuned templates."
+      - table: ORDERS
+        column: O_ORDERKEY
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 11
+        query_ids: ["3", "4", "5", "7", "8", "9", "10", "12", "13", "18", "21"]
+        status: existing_baseline
+        rationale: "Existing order join/distribution key."
+      - table: ORDERS
+        column: O_CUSTKEY
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 8
+        query_ids: ["3", "5", "7", "8", "10", "13", "18", "22"]
+        status: accepted
+        rationale: "Customer join locality appears in eight TPC-H templates."
+      - table: CUSTOMER
+        column: C_CUSTKEY
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 8
+        query_ids: ["3", "5", "7", "8", "10", "13", "18", "22"]
+        status: existing_baseline
+        rationale: "Existing customer dimension join/distribution key."
+      - table: CUSTOMER
+        column: C_NATIONKEY
+        type: INTEGER
+        roles: [fact_dimension_join, high_selectivity_filter]
+        query_count: 4
+        query_ids: ["5", "7", "8", "10"]
+        status: accepted
+        rationale: "Nation dimension filter/join locality appears in four TPC-H templates."
+      - table: SUPPLIER
+        column: S_SUPPKEY
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 10
+        query_ids: ["2", "5", "7", "8", "9", "11", "15", "16", "20", "21"]
+        status: existing_baseline
+        rationale: "Existing supplier dimension join/distribution key."
+      - table: SUPPLIER
+        column: S_NATIONKEY
+        type: INTEGER
+        roles: [fact_dimension_join, high_selectivity_filter]
+        query_count: 8
+        query_ids: ["2", "5", "7", "8", "9", "11", "20", "21"]
+        status: accepted
+        rationale: "Nation dimension filter/join locality appears in eight TPC-H templates."
+      - table: PART
+        column: P_PARTKEY
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 8
+        query_ids: ["2", "8", "9", "14", "16", "17", "19", "20"]
+        status: existing_baseline
+        rationale: "Existing part dimension join/distribution key."
+      - table: PART
+        column: P_TYPE
+        type: VARCHAR
+        roles: [high_selectivity_filter, group_order_locality]
+        query_count: 4
+        query_ids: ["2", "8", "14", "16"]
+        status: accepted
+        rationale: "Part type predicate/grouping appears in four TPC-H templates."
+      - table: PART
+        column: P_SIZE
+        type: INTEGER
+        roles: [high_selectivity_filter]
+        query_count: 3
+        query_ids: ["2", "16", "19"]
+        status: accepted
+        rationale: "Part size predicate appears in three TPC-H templates."
+      - table: PARTSUPP
+        column: PS_PARTKEY
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 5
+        query_ids: ["2", "9", "11", "16", "20"]
+        status: existing_baseline
+        rationale: "Existing part-supplier join key."
+      - table: PARTSUPP
+        column: PS_SUPPKEY
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 5
+        query_ids: ["2", "9", "11", "16", "20"]
+        status: existing_baseline
+        rationale: "Existing part-supplier join key."
+    tpcds:
+      evidence_source: "benchbox/_binaries/tpc-ds/templates/{query_templates,query_variants}/"
+      candidates:
+      - table: STORE_SALES
+        column: SS_SOLD_DATE_SK
+        type: INTEGER
+        roles: [temporal_partition]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing fact table date partition key in checked TPC-DS tuned templates."
+      - table: STORE_SALES
+        column: SS_ITEM_SK
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing store sales item join/distribution key."
+      - table: STORE_SALES
+        column: SS_CUSTOMER_SK
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing store sales customer join key."
+      - table: STORE_SALES
+        column: SS_STORE_SK
+        type: INTEGER
+        roles: [fact_dimension_join, high_selectivity_filter]
+        query_count: 34
+        query_ids: ["5", "8", "13", "17", "19", "24", "25", "27", "29", "34", "36", "43", "44", "46", "47", "48", "50", "53", "59", "61", "63", "64", "65", "67", "68", "70", "73", "76", "77", "79", "80", "88", "89", "96"]
+        status: accepted
+        rationale: "Store dimension locality appears in 34 TPC-DS templates."
+      - table: STORE_SALES
+        column: SS_PROMO_SK
+        type: INTEGER
+        roles: [fact_dimension_join, high_selectivity_filter]
+        query_count: 6
+        query_ids: ["7", "44", "61", "64", "76", "80"]
+        status: accepted
+        rationale: "Promotion dimension locality appears in six TPC-DS templates."
+      - table: STORE_SALES
+        column: SS_TICKET_NUMBER
+        type: INTEGER
+        roles: [join_locality, group_order_locality]
+        query_count: 16
+        query_ids: ["17", "24", "25", "29", "34", "46", "49", "50", "64", "68", "73", "75", "78", "79", "80", "93"]
+        status: accepted
+        rationale: "Ticket locality appears in 16 TPC-DS templates."
+      - table: STORE_RETURNS
+        column: SR_RETURNED_DATE_SK
+        type: INTEGER
+        roles: [temporal_partition]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing return date partition key."
+      - table: STORE_RETURNS
+        column: SR_ITEM_SK
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing store returns item join/distribution key."
+      - table: STORE_RETURNS
+        column: SR_CUSTOMER_SK
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 5
+        query_ids: ["1", "17", "25", "29", "50"]
+        status: accepted
+        rationale: "Customer return locality appears in five TPC-DS templates."
+      - table: STORE_RETURNS
+        column: SR_STORE_SK
+        type: INTEGER
+        roles: [fact_dimension_join]
+        query_count: 3
+        query_ids: ["1", "5", "77"]
+        status: accepted
+        rationale: "Store return locality appears in three TPC-DS templates."
+      - table: STORE_RETURNS
+        column: SR_TICKET_NUMBER
+        type: INTEGER
+        roles: [join_locality, group_order_locality]
+        query_count: 11
+        query_ids: ["17", "24", "25", "29", "49", "50", "64", "75", "78", "80", "93"]
+        status: accepted
+        rationale: "Return ticket locality appears in 11 TPC-DS templates."
+      - table: CATALOG_SALES
+        column: CS_SOLD_DATE_SK
+        type: INTEGER
+        roles: [temporal_partition]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing catalog sales date partition key."
+      - table: CATALOG_SALES
+        column: CS_ITEM_SK
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing catalog sales item join/distribution key."
+      - table: CATALOG_SALES
+        column: CS_SHIP_MODE_SK
+        type: INTEGER
+        roles: [fact_dimension_join, high_selectivity_filter]
+        query_count: 3
+        query_ids: ["66", "76", "99"]
+        status: accepted
+        rationale: "Ship mode locality appears in three TPC-DS templates."
+      - table: CATALOG_RETURNS
+        column: CR_RETURNED_DATE_SK
+        type: INTEGER
+        roles: [temporal_partition]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing catalog returns date partition key."
+      - table: CATALOG_RETURNS
+        column: CR_ITEM_SK
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing catalog returns item join/distribution key."
+      - table: CATALOG_RETURNS
+        column: CR_SHIP_MODE_SK
+        type: INTEGER
+        roles: [fact_dimension_join]
+        query_count: 0
+        query_ids: []
+        status: dropped_low_evidence
+        rationale: "Scratchpad candidate had no observed TPC-DS template evidence."
+      - table: WEB_SALES
+        column: WS_SOLD_DATE_SK
+        type: INTEGER
+        roles: [temporal_partition]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing web sales date partition key."
+      - table: WEB_SALES
+        column: WS_ITEM_SK
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing web sales item join/distribution key."
+      - table: WEB_SALES
+        column: WS_WEB_PAGE_SK
+        type: INTEGER
+        roles: [fact_dimension_join, high_selectivity_filter]
+        query_count: 4
+        query_ids: ["76", "77", "85", "90"]
+        status: accepted
+        rationale: "Web page locality appears in four TPC-DS templates."
+      - table: WEB_SALES
+        column: WS_WEB_SITE_SK
+        type: INTEGER
+        roles: [fact_dimension_join, high_selectivity_filter]
+        query_count: 6
+        query_ids: ["5", "62", "76", "80", "94", "95"]
+        status: accepted
+        rationale: "Web site locality appears in six TPC-DS templates."
+      - table: WEB_SALES
+        column: WS_SHIP_MODE_SK
+        type: INTEGER
+        roles: [fact_dimension_join, high_selectivity_filter]
+        query_count: 3
+        query_ids: ["62", "66", "76"]
+        status: accepted
+        rationale: "Ship mode locality appears in three TPC-DS templates."
+      - table: WEB_RETURNS
+        column: WR_RETURNED_DATE_SK
+        type: INTEGER
+        roles: [temporal_partition]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing web returns date partition key."
+      - table: WEB_RETURNS
+        column: WR_ITEM_SK
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing web returns item join/distribution key."
+      - table: WEB_RETURNS
+        column: WR_WEB_PAGE_SK
+        type: INTEGER
+        roles: [fact_dimension_join]
+        query_count: 1
+        query_ids: ["77"]
+        status: dropped_low_evidence
+        rationale: "Scratchpad candidate had only one observed TPC-DS template use."
+      - table: DATE_DIM
+        column: D_DATE_SK
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing date dimension key."
+      - table: DATE_DIM
+        column: D_YEAR
+        type: INTEGER
+        roles: [high_selectivity_filter, group_order_locality]
+        query_count: 58
+        query_ids: ["1", "2", "3", "4", "6", "7", "8", "10", "11", "13", "14", "15", "18", "19", "23", "25", "26", "27", "29", "30", "31", "33", "34", "35", "36", "39", "42", "43", "45", "46", "47", "48", "49", "50", "52", "54", "55", "56", "57", "60", "61", "64", "66", "67", "68", "69", "71", "72", "73", "74", "75", "76", "78", "79", "81", "85", "89", "91"]
+        status: accepted
+        rationale: "Year predicate/grouping appears in 58 TPC-DS templates."
+      - table: DATE_DIM
+        column: D_MOY
+        type: INTEGER
+        roles: [high_selectivity_filter, group_order_locality]
+        query_count: 28
+        query_ids: ["3", "6", "10", "14", "19", "23", "25", "29", "33", "39", "42", "47", "49", "50", "52", "54", "55", "56", "57", "60", "61", "63", "66", "67", "69", "71", "89", "91"]
+        status: accepted
+        rationale: "Month predicate/grouping appears in 28 TPC-DS templates."
+      - table: ITEM
+        column: I_ITEM_SK
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing item dimension key."
+      - table: ITEM
+        column: I_CATEGORY
+        type: VARCHAR
+        roles: [high_selectivity_filter, group_order_locality]
+        query_count: 21
+        query_ids: ["6", "12", "20", "22", "33", "36", "41", "42", "47", "53", "54", "57", "60", "61", "63", "67", "75", "76", "86", "89", "98"]
+        status: accepted
+        rationale: "Item category predicate/grouping appears in 21 TPC-DS templates."
+      - table: ITEM
+        column: I_CLASS
+        type: VARCHAR
+        roles: [high_selectivity_filter, group_order_locality]
+        query_count: 11
+        query_ids: ["12", "20", "22", "36", "53", "54", "63", "67", "86", "89", "98"]
+        status: accepted
+        rationale: "Item class predicate/grouping appears in 11 TPC-DS templates."
+      - table: CUSTOMER
+        column: C_CUSTOMER_SK
+        type: INTEGER
+        roles: [join_locality, distribution_candidate]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing customer dimension key."
+      - table: CUSTOMER
+        column: C_CURRENT_ADDR_SK
+        type: INTEGER
+        roles: [fact_dimension_join, high_selectivity_filter]
+        query_count: 19
+        query_ids: ["6", "8", "10", "15", "18", "19", "24", "30", "35", "45", "46", "54", "61", "64", "68", "69", "81", "84", "91"]
+        status: accepted
+        rationale: "Customer address locality appears in 19 TPC-DS templates."
+      - table: CUSTOMER
+        column: C_CURRENT_CDEMO_SK
+        type: INTEGER
+        roles: [fact_dimension_join, high_selectivity_filter]
+        query_count: 7
+        query_ids: ["10", "18", "35", "64", "69", "84", "91"]
+        status: accepted
+        rationale: "Customer demographic locality appears in seven TPC-DS templates."

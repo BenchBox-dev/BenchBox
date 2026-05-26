@@ -30,6 +30,19 @@ from .metadata import (
     TuningMetadata,
     TuningMetadataManager,
 )
+from .profile_validation import (
+    CandidateTemplateMapping,
+    TuningProfileValidationIssue,
+    TuningProfileValidationResult,
+    build_tuning_profile_metadata,
+    validate_tuning_template,
+)
+from .workload_profiles import (
+    WorkloadTuningCandidate,
+    WorkloadTuningProfile,
+    load_tpc_tuning_profile,
+    load_workload_tuning_profile,
+)
 
 __all__ = [
     # DDL Generator Protocol
@@ -52,4 +65,14 @@ __all__ = [
     "TuningMetadata",
     "TuningMetadataManager",
     "MetadataValidationResult",
+    # Workload tuning profiles
+    "WorkloadTuningCandidate",
+    "WorkloadTuningProfile",
+    "load_workload_tuning_profile",
+    "load_tpc_tuning_profile",
+    "CandidateTemplateMapping",
+    "TuningProfileValidationIssue",
+    "TuningProfileValidationResult",
+    "validate_tuning_template",
+    "build_tuning_profile_metadata",
 ]
