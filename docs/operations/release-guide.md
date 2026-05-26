@@ -28,8 +28,8 @@ Before a release PR can merge, the `main-release-only` ruleset must require:
 `.github/workflows/test.yml`. A green result means the release PR branch passed:
 
 - the required fast lane, `test (ubuntu-latest, 3.12)`;
-- the integration-not-slow suite:
-  `tests/integration -m "integration and not slow and not stress"`;
+- the credential-free integration-not-slow suite:
+  `tests/integration -m "integration and not (slow or stress or resource_heavy or live_integration)"`;
 - isolated exact-one-wheel package build/install smoke;
 - dependency upper-bound checks;
 - release-branch curation checks that confirm dev-only paths are absent.
@@ -42,16 +42,26 @@ release PR.
 ## Release canary and ruleset drift
 
 Release PRs also depend on the `validate-base` workflow's release-readiness
-steps. That workflow queries the latest completed `release-canary.yml` run on
-`develop` and fails the release PR when the canary is missing, red, older than
-48 hours, or not an ancestor of the release PR head.
+steps. That workflow queries the latest completed `release-canary.yml` run,
+reads the canary summary artifact, and fails the release PR when the canary is
+missing, red, older than 48 hours, or when the tested `develop` SHA recorded in
+the artifact is not an ancestor of the release PR head. The only bootstrap
+exception is the first release that introduces `release-canary.yml` before the
+workflow exists on the default branch; in that case `validate-base` runs the
+same non-fast canary suite and ruleset drift check inline, then later releases
+return to the scheduled/manual canary evidence path.
 
-`release-canary.yml` runs daily and on manual dispatch. Its blocking canary
-suite is the credential-free non-fast family:
+`release-canary.yml` runs daily and on manual dispatch. Scheduled runs execute
+from the default branch, but the workflow checks out `develop` before running
+release evidence and records that checked SHA in `release-canary-summary.json`.
+Its blocking canary suite is the credential-free non-fast family:
 `(slow or resource_heavy) and not (stress or live_integration)`. The same
 workflow also runs `scripts/ruleset_drift_check.py` against
 `docs/operations/repo-admin-settings.md`, so ruleset drift makes the canary red
-instead of silently invalidating release assumptions.
+instead of silently invalidating release assumptions. The ruleset drift check
+must use `RULESET_DRIFT_TOKEN`, a repository secret with enough ruleset
+visibility to expose bypass actors; the default `GITHUB_TOKEN` is insufficient
+for that part of the contract.
 
 Stress tests, live cloud integrations, and long-running UAT remain advisory
 until their credential, cost, and flake policies are stable enough to make
@@ -87,9 +97,9 @@ must not be bypassed with an undocumented local change.
 
 1. Finds the open release PR for `vX.Y.Z`.
 2. Checks the required PR status list once and refuses to continue unless
-   `release-required-result` is present and green. Missing means the
-   ruleset/workflow contract is broken; pending means wait in GitHub
-   Actions and rerun the command. `release-finalize` does not poll.
+   both `validate-base` and `release-required-result` are present and green.
+   Missing means the ruleset/workflow contract is broken; pending means wait
+   in GitHub Actions and rerun the command. `release-finalize` does not poll.
 3. Squash-merges the PR. (Ruleset `main-release-only` also blocks the merge
    unless `validate-base` and `release-required-result` are green.)
 4. Fast-forwards `main` and tags `vX.Y.Z`.
@@ -110,13 +120,13 @@ release as if it had been blocked.
 
 ## Recovering from common failures
 
-- **`release-required-result` is missing**: stop. The
-  `main-release-only` ruleset or `.github/workflows/test.yml` contract is
-  out of sync; do not finalize until the stable required context exists.
-- **`release-required-result` is pending or failed**: wait for GitHub
-  Actions or fix on a feature branch off `develop`, PR back to `develop`,
-  then re-run `make release-cut` (the option-c sweep will delete the stale
-  `vX.Y.Z` branch automatically).
+- **`validate-base` or `release-required-result` is missing**: stop. The
+  `main-release-only` ruleset or release workflow contract is out of sync;
+  do not finalize until both stable required contexts exist.
+- **`validate-base` or `release-required-result` is pending or failed**: wait
+  for GitHub Actions or fix on a feature branch off `develop`, PR back to
+  `develop`, then re-run `make release-cut` (the option-c sweep will delete
+  the stale `vX.Y.Z` branch automatically).
 - **Release canary is missing, stale, or red**: inspect the latest
   `release-canary.yml` run. If the non-fast canary failed, fix through
   `develop`; if ruleset drift failed, update the live GitHub ruleset or this

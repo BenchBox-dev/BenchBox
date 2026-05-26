@@ -22,7 +22,8 @@ pytestmark = [
 
 REPO_ROOT = Path(__file__).parent.parent.parent
 CI_FAST_EXPRESSION = "fast and not (slow or stress or resource_heavy or live_integration)"
-RELEASE_REQUIRED_CONTEXT = "release-required-result"
+RELEASE_INTEGRATION_EXPRESSION = "integration and not (slow or stress or resource_heavy or live_integration)"
+RELEASE_REQUIRED_CONTEXTS = ("validate-base", "release-required-result")
 
 
 def _makefile_text() -> str:
@@ -213,12 +214,17 @@ class TestReleaseInfrastructure:
             "github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'main')"
         )
         integration_run_text = _workflow_job_run_text("test.yml", "integration")
-        assert 'tests/integration -m "integration and not slow and not stress"' in integration_run_text
+        assert f'tests/integration -m "{RELEASE_INTEGRATION_EXPRESSION}"' in integration_run_text
 
         test_package_run_text = _workflow_job_run_text("test.yml", "test-package")
         assert "wheel_count=$(find dist -maxdepth 1 -name '*.whl'" in test_package_run_text
         assert 'uv run --isolated --no-project --with "$wheel"' in test_package_run_text
         assert "benchbox --help" in test_package_run_text
+
+        make_test_package = _make_target_recipe("test-package")
+        assert "test-venv" not in make_test_package
+        assert "Expected exactly one wheel" in make_test_package
+        assert 'uv run --isolated --no-project --with "$$wheel"' in make_test_package
 
         release_readiness = jobs["release-readiness"]
         assert release_readiness["if"] == "${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}"
@@ -254,8 +260,8 @@ class TestReleaseInfrastructure:
 
         for path in docs_paths:
             content = path.read_text(encoding="utf-8")
-            assert RELEASE_REQUIRED_CONTEXT in content
-            assert "validate-base" in content
+            for context in RELEASE_REQUIRED_CONTEXTS:
+                assert context in content
 
     def test_release_canary_workflow_contract(self):
         """Release canary must produce scheduled non-fast and ruleset drift evidence."""
@@ -265,14 +271,19 @@ class TestReleaseInfrastructure:
         assert on_events["schedule"] == [{"cron": "0 8 * * *"}]
         assert workflow["permissions"]["actions"] == "read"
         assert workflow["permissions"]["contents"] == "read"
+        assert workflow["env"]["RELEASE_CANARY_REF"] == "develop"
 
         jobs = workflow["jobs"]
         assert set(jobs) == {"credential-free-non-fast", "ruleset-drift", "release-canary-result"}
+        assert jobs["credential-free-non-fast"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
+        assert jobs["ruleset-drift"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
 
         non_fast_text = _workflow_job_run_text("release-canary.yml", "credential-free-non-fast")
         assert "(slow or resource_heavy) and not (stress or live_integration)" in non_fast_text
         assert "--collect-only" in non_fast_text
         assert "release-canary-artifacts/non-fast-summary.json" in non_fast_text
+        assert '"checked_ref": "develop"' in non_fast_text
+        assert '"commit_sha": os.environ["CHECKED_SHA"]' in non_fast_text
         assert "raw" not in non_fast_text.lower()
         # Exit code must propagate via rc= variable, not be swallowed by set+e/exit 0.
         assert "set +e" not in non_fast_text
@@ -280,6 +291,8 @@ class TestReleaseInfrastructure:
 
         ruleset_text = _workflow_job_run_text("release-canary.yml", "ruleset-drift")
         assert "scripts/ruleset_drift_check.py" in ruleset_text
+        assert "RULESET_DRIFT_TOKEN" in ruleset_text
+        assert "--require-bypass-actor-visibility" in ruleset_text
         assert "release-canary-artifacts/ruleset-drift.json" in ruleset_text
         assert "set +e" not in ruleset_text
         assert "exit 0" not in ruleset_text
@@ -288,6 +301,8 @@ class TestReleaseInfrastructure:
         assert result_job["name"] == "release-canary-result"
         assert set(result_job["needs"]) == {"credential-free-non-fast", "ruleset-drift"}
         result_text = _workflow_job_run_text("release-canary.yml", "release-canary-result")
+        assert '"checked_ref": "develop"' in result_text
+        assert '"commit_sha": "${CHECKED_SHA}"' in result_text
         assert '"freshness_contract_hours": 48' in result_text
         assert "Release canary passed." in result_text
 
@@ -316,10 +331,16 @@ class TestReleaseInfrastructure:
         assert "git fetch origin develop --prune" in run_text
         assert "scripts/release_readiness_check.py" in run_text
         assert "--head-sha" in run_text
+        assert "--bootstrap-on-missing-workflow" in run_text
+        assert "bootstrap_required=true" in run_text
+        assert "(slow or resource_heavy) and not (stress or live_integration)" in run_text
+        assert "scripts/ruleset_drift_check.py" in run_text
+        assert "--require-bypass-actor-visibility" in run_text
 
         readiness_step = next(step for step in steps if step["name"] == "Check release canary freshness")
         assert readiness_step["env"]["RELEASE_CANARY_WORKFLOW"] == "release-canary.yml"
-        assert readiness_step["env"]["RELEASE_CANARY_BRANCH"] == "develop"
+        assert readiness_step["env"]["RELEASE_CANARY_CHECKED_REF"] == "develop"
+        assert "RELEASE_CANARY_BRANCH" not in readiness_step["env"]
         assert readiness_step["env"]["RELEASE_CANARY_MAX_AGE_HOURS"] == "48"
         assert "RELEASE_READINESS_OVERRIDE_SHA" in readiness_step["env"]
 
@@ -339,13 +360,14 @@ class TestReleaseInfrastructure:
             assert "RELEASE_READINESS_OVERRIDE_SHA" in content
 
     def test_release_finalize_checks_required_context_before_merge_and_tag(self):
-        """release-finalize must hard-stop unless release-required-result is required and green."""
+        """release-finalize must hard-stop unless required release contexts are required and green."""
         makefile_content = _makefile_text()
         recipe = _make_target_recipe("release-finalize")
 
-        assert f"RELEASE_REQUIRED_CONTEXT := {RELEASE_REQUIRED_CONTEXT}" in makefile_content
+        assert "RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result" in makefile_content
         assert 'gh pr checks "$$PR" --required --json name,bucket,state' in recipe
-        assert 'select(.name == "$(RELEASE_REQUIRED_CONTEXT)")' in recipe
+        assert 'select(.name == \\"$$context\\")' in recipe
+        assert "for context in $(RELEASE_REQUIRED_CONTEXTS)" in recipe
         assert "--watch" not in recipe
         assert 'CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8"' in recipe
 
@@ -363,12 +385,12 @@ class TestReleaseInfrastructure:
             "pending)",
             "fail|cancel|skipping)",
             "duplicate)",
-            "unexpected $(RELEASE_REQUIRED_CONTEXT) status",
+            "unexpected $$context status",
         ]:
             assert expected in recipe
 
         assert "no open PR found for v$(VERSION)" in recipe
-        assert "required release context '$(RELEASE_REQUIRED_CONTEXT)' is missing" in recipe
+        assert "required release context '$$context' is missing" in recipe
         assert "Wait for GitHub Actions, then rerun" in recipe
         assert "Fix the release PR before finalizing" in recipe
         assert "Fix workflow/ruleset drift" in recipe
@@ -383,12 +405,13 @@ class TestReleaseInfrastructure:
 
         assert "Wait for CI green" not in makefile_content
         assert "CI is not green" not in makefile_content
-        assert "required release context: $(RELEASE_REQUIRED_CONTEXT)" in makefile_content
+        assert "required release contexts: $(RELEASE_REQUIRED_CONTEXTS)" in makefile_content
         assert "Push-to-main jobs are post-merge signals" in makefile_content
 
         for content in [release_guide, release_template]:
             normalized = content.lower()
-            assert RELEASE_REQUIRED_CONTEXT in content
+            for context in RELEASE_REQUIRED_CONTEXTS:
+                assert context in content
             assert "post-merge" in normalized
             assert "pre-merge" in normalized
             assert "patch release or incident" in content

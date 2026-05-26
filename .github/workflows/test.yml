@@ -228,7 +228,7 @@ jobs:
         run: |
           uv run -- python -m pytest -q tests/integration/core/data_organization/test_presorted_generation.py -m "requires_table_formats" --tb=short
 
-  # Full integration test suite - release-required for main PRs and runs on main pushes.
+  # Credential-free integration suite - release-required for main PRs and runs on main pushes.
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -251,7 +251,7 @@ jobs:
 
       - name: Run integration tests
         run: |
-          uv run -- python -m pytest tests/integration -m "integration and not slow and not stress" --tb=short --maxfail=5 --timeout=300
+          uv run -- python -m pytest tests/integration -m "integration and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5 --timeout=300
 
   # Package build and install test — builds a fresh wheel from this branch to verify
   # the package is importable and the CLI entry point resolves. This is an independent

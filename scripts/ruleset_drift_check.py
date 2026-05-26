@@ -132,7 +132,12 @@ def _ref_includes(ruleset: dict[str, Any]) -> tuple[str, ...]:
     return tuple(ref_name.get("include", []) or ())
 
 
-def compare_ruleset(expected: ExpectedRuleset, live: dict[str, Any]) -> list[str]:
+def compare_ruleset(
+    expected: ExpectedRuleset,
+    live: dict[str, Any],
+    *,
+    require_bypass_actor_visibility: bool = False,
+) -> list[str]:
     """Return human-readable drift findings for one ruleset."""
     findings: list[str] = []
     if live.get("enforcement") != "active":
@@ -161,10 +166,17 @@ def compare_ruleset(expected: ExpectedRuleset, live: dict[str, Any]) -> list[str
         if live_present != expected_present:
             findings.append(f"{expected.name}: {rule_type} present={live_present!r}, expected {expected_present!r}")
 
-    bypass_actors = live.get("bypass_actors", []) or []
-    if expected.bypass_actors_none and bypass_actors:
-        actor_types = [actor.get("actor_type", "(unknown)") for actor in bypass_actors]
-        findings.append(f"{expected.name}: bypass actors {actor_types!r}, expected none")
+    if expected.bypass_actors_none:
+        if require_bypass_actor_visibility and "bypass_actors" not in live:
+            findings.append(
+                f"{expected.name}: bypass actors are not visible to this token; "
+                "use RULESET_DRIFT_TOKEN with ruleset write/admin visibility"
+            )
+        else:
+            bypass_actors = live.get("bypass_actors", []) or []
+            if bypass_actors:
+                actor_types = [actor.get("actor_type", "(unknown)") for actor in bypass_actors]
+                findings.append(f"{expected.name}: bypass actors {actor_types!r}, expected none")
     return findings
 
 
@@ -205,10 +217,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "joeharris76/BenchBox"))
     parser.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--require-bypass-actor-visibility",
+        action="store_true",
+        help="Fail if the GitHub API response does not expose bypass_actors.",
+    )
     args = parser.parse_args(argv)
 
     override, reason = _override_active(os.environ)
-    expected = parse_expected_rulesets(args.runbook.read_text(encoding="utf-8"))
+    try:
+        expected = parse_expected_rulesets(args.runbook.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"ERROR: failed to parse ruleset runbook: {exc}", file=sys.stderr)
+        return 1
     if override:
         payload = {"status": "override", "reason": reason, "rulesets": sorted(expected)}
         if args.output:
@@ -216,17 +237,33 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Ruleset drift override active: {reason}")
         return 0
     if not args.token:
-        print("ERROR: ruleset drift check requires GITHUB_TOKEN or --token.", file=sys.stderr)
+        print("ERROR: ruleset drift check requires RULESET_DRIFT_TOKEN or --token.", file=sys.stderr)
         return 1
 
-    live_by_name = _fetch_live_rulesets(args.repo, args.token)
+    try:
+        live_by_name = _fetch_live_rulesets(args.repo, args.token)
+    except Exception as exc:
+        if args.output:
+            args.output.write_text(
+                json.dumps({"status": "error", "error": str(exc)}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+        print(f"ERROR: ruleset drift check failed while querying GitHub: {exc}", file=sys.stderr)
+        return 1
+
     findings: list[str] = []
     for name, expected_ruleset in expected.items():
         live = live_by_name.get(name)
         if live is None:
             findings.append(f"{name}: live ruleset is missing")
             continue
-        findings.extend(compare_ruleset(expected_ruleset, live))
+        findings.extend(
+            compare_ruleset(
+                expected_ruleset,
+                live,
+                require_bypass_actor_visibility=args.require_bypass_actor_visibility,
+            )
+        )
 
     summary = render_summary(findings, expected)
     if args.output:

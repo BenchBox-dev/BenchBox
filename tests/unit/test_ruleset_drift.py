@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
+from scripts import ruleset_drift_check
 from scripts.ruleset_drift_check import compare_ruleset, parse_expected_rulesets
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -84,3 +86,33 @@ def test_ruleset_policy_drift_is_reported() -> None:
     assert any("strict_required_status_checks_policy" in finding for finding in findings)
     assert any("deletion" in finding for finding in findings)
     assert any("bypass actors" in finding for finding in findings)
+
+
+def test_bypass_actor_visibility_can_be_required() -> None:
+    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
+        "main-release-only"
+    ]
+    live = _live_ruleset("refs/heads/main", ["validate-base", "release-required-result"])
+    del live["bypass_actors"]
+
+    findings = compare_ruleset(expected, live, require_bypass_actor_visibility=True)
+
+    assert any("bypass actors are not visible" in finding for finding in findings)
+
+
+def test_github_api_failure_is_reported_without_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def _raise_api_error(_repo: str, _token: str) -> dict:
+        raise RuntimeError("api unavailable")
+
+    output = tmp_path / "ruleset-drift.json"
+    monkeypatch.setattr(ruleset_drift_check, "_fetch_live_rulesets", _raise_api_error)
+    monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_SHA", raising=False)
+    monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_REASON", raising=False)
+
+    rc = ruleset_drift_check.main(["--token", "token", "--output", str(output)])
+
+    assert rc == 1
+    assert json.loads(output.read_text()) == {"status": "error", "error": "api unavailable"}

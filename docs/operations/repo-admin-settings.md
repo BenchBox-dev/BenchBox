@@ -127,8 +127,8 @@ matching `vX.Y.Z` with an optional suffix.
 
 `release-required-result` is the umbrella job in `.github/workflows/test.yml`
 for release PR correctness. It aggregates the required fast lane,
-integration-not-slow suite, isolated exact-one-wheel package smoke,
-dependency upper-bound checks, and release-branch curation checks. It is
+credential-free integration-not-slow suite, isolated exact-one-wheel package
+smoke, dependency upper-bound checks, and release-branch curation checks. It is
 the ruleset context maintainers should use instead of individual matrix job
 names such as `test-package (...)`.
 
@@ -168,9 +168,9 @@ gh api repos/joeharris76/BenchBox/rulesets/<main-ruleset-id> --jq '
 ```
 
 If live GitHub ruleset state differs from this runbook, update the ruleset or
-this document before relying on release-required enforcement. Do not treat a
-green `release-required-result` workflow run as mandatory unless the ruleset
-also requires that context.
+this document before relying on release-required enforcement. Do not treat green
+`validate-base` and `release-required-result` workflow runs as mandatory unless
+the ruleset also requires both contexts.
 
 ## Release canary and ruleset drift
 
@@ -186,16 +186,25 @@ advisory_suites: stress, live_integration, live cloud credentials, long-running 
 
 `validate-main-pr.yml` keeps the required context name `validate-base`, but
 that job now also runs `scripts/release_readiness_check.py` for release PRs.
-It fails when the latest completed `release-canary.yml` run on `develop` is
-missing, red, older than 48 hours, or not an ancestor of the release PR head.
+It fails when the latest completed `release-canary.yml` run is missing, red,
+older than 48 hours, or when the tested `develop` SHA recorded in the canary
+summary artifact is not an ancestor of the release PR head. Scheduled canary
+runs execute from the default branch, then check out `develop` before running
+release evidence and recording `commit_sha` in `release-canary-summary.json`.
+For the first release that introduces `release-canary.yml`, before GitHub can
+run the workflow from the default branch, `validate-base` runs the same
+non-fast canary suite and ruleset drift check inline as bootstrap evidence.
 
 Ruleset drift is checked by `scripts/ruleset_drift_check.py` inside
 `release-canary.yml`. The script parses this runbook for
 `develop-squash-only` and `main-release-only`, then compares live GitHub
 rulesets for required status check contexts, strict-base settings, bypass
 actors, linear history, non-fast-forward protection, deletion protection, and
-target refs. If GitHub API access fails, the canary is red; release PRs then
-fail on stale/red canary evidence instead of silently trusting comments.
+target refs. The workflow must use the repository secret `RULESET_DRIFT_TOKEN`
+with enough ruleset write/admin visibility for the API to expose
+`bypass_actors`; the default `GITHUB_TOKEN` is intentionally not used for this
+check. If GitHub API access fails, the canary is red; release PRs then fail on
+stale/red canary evidence instead of silently trusting comments.
 
 Emergency override is intentionally explicit and SHA-scoped. Admins may set
 both repository variables below, then remove them after the release:
