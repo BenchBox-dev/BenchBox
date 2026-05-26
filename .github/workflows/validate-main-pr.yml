@@ -31,10 +31,10 @@ jobs:
           echo "::error::Open this PR against 'develop' instead, or cut a release branch via 'make release-cut VERSION=X.Y.Z'."
           exit 1
 
-      - name: Checkout release PR head
+      - name: Checkout trusted release policy
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -45,8 +45,12 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Fetch develop for canary ancestor check
-        run: git fetch origin develop --prune
+      - name: Fetch release refs for canary ancestor check
+        run: |
+          set -euo pipefail
+          git fetch --prune origin develop
+          git fetch --prune origin \
+            "+refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/origin/pr-${{ github.event.pull_request.number }}-head"
 
       - name: Check release canary freshness
         id: release-readiness

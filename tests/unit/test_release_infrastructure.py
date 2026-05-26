@@ -326,11 +326,17 @@ class TestReleaseInfrastructure:
 
         job = workflow["jobs"]["validate-base"]
         steps = job["steps"]
-        assert any(step.get("uses") == "actions/checkout@v4" and step["with"]["fetch-depth"] == 0 for step in steps)
+        checkout_step = next(step for step in steps if step.get("uses") == "actions/checkout@v4")
+        assert checkout_step["name"] == "Checkout trusted release policy"
+        assert checkout_step["with"]["ref"] == "${{ github.event.pull_request.base.sha }}"
+        assert checkout_step["with"]["fetch-depth"] == 0
+        assert "${{ github.event.pull_request.head.sha }}" not in str(checkout_step)
+
         run_text = _workflow_job_run_text("validate-main-pr.yml", "validate-base")
-        assert "git fetch origin develop --prune" in run_text
+        assert "git fetch --prune origin develop" in run_text
+        assert "refs/pull/${{ github.event.pull_request.number }}/head" in run_text
         assert "scripts/release_readiness_check.py" in run_text
-        assert "--head-sha" in run_text
+        assert '--head-sha "${{ github.event.pull_request.head.sha }}"' in run_text
         assert "--bootstrap-on-missing-workflow" in run_text
         assert "bootstrap_required=true" in run_text
         assert "(slow or resource_heavy) and not (stress or live_integration)" in run_text
