@@ -173,11 +173,39 @@ def test_release_canary_commit_sha_requires_expected_checked_ref(monkeypatch: py
         )
 
 
-def test_workflow_runs_url_does_not_filter_branch_by_default() -> None:
-    url = release_readiness_check._workflow_runs_url("owner/repo", "release-canary.yml", "")
+def test_workflow_runs_url_requires_trusted_branch_filter() -> None:
+    with pytest.raises(ValueError, match="trusted branch"):
+        release_readiness_check._workflow_runs_url("owner/repo", "release-canary.yml", "")
 
-    assert "branch=" not in url
+
+def test_workflow_runs_url_filters_to_trusted_branch() -> None:
+    url = release_readiness_check._workflow_runs_url("owner/repo", "release-canary.yml", "main")
+
+    assert "branch=main" in url
     assert "status=completed" in url
+
+
+def test_main_queries_trusted_default_branch(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured_urls: list[str] = []
+
+    def _fake_api_json(url: str, _token: str) -> dict:
+        captured_urls.append(url)
+        return {"workflow_runs": []}
+
+    monkeypatch.setattr(release_readiness_check, "_api_json", _fake_api_json)
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    monkeypatch.delenv("RELEASE_CANARY_BRANCH", raising=False)
+    monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_SHA", raising=False)
+    monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_REASON", raising=False)
+
+    rc = release_readiness_check.main(["--head-sha", "release-head"])
+
+    assert rc == 1
+    assert captured_urls == [
+        "https://api.github.com/repos/joeharris76/BenchBox/actions/workflows/release-canary.yml/runs?"
+        "branch=main&status=completed&per_page=20"
+    ]
 
 
 def test_override_requires_exact_head_sha_and_reason() -> None:

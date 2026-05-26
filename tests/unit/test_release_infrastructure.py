@@ -345,8 +345,8 @@ class TestReleaseInfrastructure:
 
         readiness_step = next(step for step in steps if step["name"] == "Check release canary freshness")
         assert readiness_step["env"]["RELEASE_CANARY_WORKFLOW"] == "release-canary.yml"
+        assert readiness_step["env"]["RELEASE_CANARY_BRANCH"] == "main"
         assert readiness_step["env"]["RELEASE_CANARY_CHECKED_REF"] == "develop"
-        assert "RELEASE_CANARY_BRANCH" not in readiness_step["env"]
         assert readiness_step["env"]["RELEASE_CANARY_MAX_AGE_HOURS"] == "48"
         assert "RELEASE_READINESS_OVERRIDE_SHA" in readiness_step["env"]
 

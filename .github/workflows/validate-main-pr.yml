@@ -57,6 +57,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_CANARY_WORKFLOW: release-canary.yml
+          RELEASE_CANARY_BRANCH: main
           RELEASE_CANARY_CHECKED_REF: develop
           RELEASE_CANARY_MAX_AGE_HOURS: "48"
           RELEASE_READINESS_OVERRIDE_SHA: ${{ vars.RELEASE_READINESS_OVERRIDE_SHA }}
