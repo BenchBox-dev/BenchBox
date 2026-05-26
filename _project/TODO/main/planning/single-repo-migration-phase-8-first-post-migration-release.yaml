@@ -48,8 +48,25 @@ description: |
   Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 8).
 
 work:
+- id: w0
+  summary: "Decide: is Phase 8 satisfied by the v0.3.1 recovery release, or is a separate release needed?"
+  status: pending
+  notes: |
+    release-recovery-v0-3-1 cuts and verifies v0.3.1 as the first real
+    release on the new flow with no fallback — the exact exercise this phase
+    was created to perform. Before any release work here, make the call
+    explicit (record it in _project/decisions/single-repo-migration.md):
+      - RETIRE: if the v0.3.1 recovery release already exercised the new flow
+        end-to-end, move this TODO to DONE as "satisfied by v0.3.1" and skip
+        w1-w7.
+      - SEPARATE: if a distinct later validation release is still wanted,
+        proceed to w1-w7 using v0.3.2+ (v0.3.1 is consumed by recovery).
+    Mirrors the decision required by release-recovery-v0-3-1 w7; do not leave
+    it implicit in the dependency graph.
+
 - id: w1
   summary: "Confirm main is green and all migration phases are merged"
+  needs: [w0]
   status: pending
   notes: |
     git checkout main && git pull
@@ -57,11 +74,13 @@ work:
     Confirm Phase 6 deletions and Phase 7 docs are merged to main.
 
 - id: w2
-  summary: "Pick the next version (likely 0.3.1 if Phase 4 was 0.3.0)"
+  summary: "Pick the next version (v0.3.2+, since v0.3.1 is the recovery release)"
+  needs: [w0]
   status: pending
   notes: |
     git describe --tags --abbrev=0
-    Next version: bump patch number unless a new feature warrants minor.
+    v0.3.1 is consumed by release-recovery-v0-3-1, so the next version here is
+    v0.3.2 unless a new feature warrants a minor bump.
 
 - id: w3
   summary: "Run make release VERSION=X.Y.Z"
@@ -101,14 +120,12 @@ work:
     Watch release.yml run. Should complete green and publish to PyPI.
 
 - id: w6
-  summary: "Smoke test from PyPI in a fresh venv"
+  summary: "Smoke test from PyPI in an isolated environment"
   needs: [w5]
   status: pending
   notes: |
-    python -m venv /tmp/post-migration-test
-    /tmp/post-migration-test/bin/pip install benchbox==X.Y.Z
-    /tmp/post-migration-test/bin/benchbox --help
-    /tmp/post-migration-test/bin/python -c "import benchbox; print(benchbox.__version__)"
+    uv run --isolated --no-project --with 'benchbox==X.Y.Z' -- benchbox --help
+    uv run --isolated --no-project --with 'benchbox==X.Y.Z' -- python -c 'import benchbox; print(benchbox.__version__)'
     Verify wheel contents have no maintainer scaffolding (Phase 1 excludes
     are still in effect).
 
@@ -126,11 +143,11 @@ work:
 
 verification:
 - description: "PyPI has the new version"
-  command: "pip index versions benchbox 2>&1 | head -1"
+  command: "uv run --isolated --with pip -- python -m pip index versions benchbox 2>&1 | head -1"
   expected_output: "shows the new version"
-- description: "Wheel installs and is clean"
-  command: "python -m venv /tmp/pmt && /tmp/pmt/bin/pip install benchbox==<version>"
-  expected_output: "exit 0, clean install"
+- description: "Wheel installs and imports cleanly from PyPI"
+  command: "uv run --isolated --no-project --with 'benchbox==<version>' -- python -c 'import benchbox; print(benchbox.__version__)'"
+  expected_output: "<version>"
 - description: "release.yml succeeded"
   command: "gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'"
   expected_output: "success"

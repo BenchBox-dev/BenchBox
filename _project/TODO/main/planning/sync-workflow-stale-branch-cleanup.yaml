@@ -42,9 +42,16 @@ work:
     Skip merged or human-edited (label `needs-review` or non-draft) PRs.
 
 verification:
-- description: "Auto-mirror branch count on origin returns to baseline after cleanup."
-  command: "git ls-remote origin | grep -c 'auto/results-mirror-' || true"
-  expected_output: "Count consistent with the cleanup window's expectations (defined in W2 implementation)."
+- description: "No superseded auto-mirror draft PR older than the 30-day staleness window remains open"
+  command: "gh pr list --base published-results --state open --search 'head:auto/results-mirror- draft:true' --json createdAt --jq '[.[] | select((now - (.createdAt|fromdateiso8601)) > 2592000)] | length'"
+  expected_output: "0 after cleanup runs — older superseded auto-mirror drafts are closed; the newest mirror per series may remain open"
+- description: "Auto-mirror branches on origin do not grow unbounded"
+  command: "git ls-remote origin 'refs/heads/auto/results-mirror-*' | wc -l"
+  expected_output: "<= the configured retention count chosen in w2 (bounded; not monotonically increasing across runs)"
+
+prior_art:
+- ".github/workflows/sync-results-data-to-published.yml — the W4 workflow that opens the auto-mirror draft PRs; EXTEND it with a cleanup step (preferred) rather than introducing a new module"
+- ".github/workflows/nightly.yml, .github/workflows/release-canary.yml — existing `schedule:`-triggered workflows; REUSE their cron + gh-cli idiom if a sibling cleanup workflow is added instead of extending the W4 workflow"
 
 must_preserve:
 - "Auto-mirror PRs that a maintainer has flipped from draft to ready-for-review must NOT be auto-closed."
