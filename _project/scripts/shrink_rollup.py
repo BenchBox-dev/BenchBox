@@ -59,10 +59,7 @@ def _int_field(data: dict[str, Any], path: str, name: str) -> int:
 
 
 def _ledger_paths(ref: str, ledger_dir: str) -> list[str]:
-    try:
-        output = _git("ls-tree", "-r", "--name-only", ref, ledger_dir)
-    except subprocess.CalledProcessError:
-        return []
+    output = _git("ls-tree", "-r", "--name-only", ref, ledger_dir)
     return [line for line in output.splitlines() if line.endswith(".md") and not line.endswith("/TEMPLATE.md")]
 
 
