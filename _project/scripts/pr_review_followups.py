@@ -902,7 +902,7 @@ def _is_transient_gh_failure(stderr: str) -> bool:
     return bool(_TRANSIENT_GH_STDERR_REGEX.search(stderr))
 
 
-def _gh_api_with_retry(
+def _gh_command_with_retry(
     runner: CommandRunner,
     args: Sequence[str],
     *,
@@ -910,11 +910,11 @@ def _gh_api_with_retry(
     backoffs: Sequence[int] = GH_API_RETRY_BACKOFFS,
     sleeper: Callable[[float], None] = time.sleep,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a `gh api` call, retrying only on transient failures.
+    """Run a GitHub CLI mutation, retrying only on transient failures.
 
-    Targeted at the reply-posting path: a flaky network or transient GitHub 5xx
-    aborted multiple sweeps in 2026-05-04. Permanent failures (e.g. 404) still
-    raise immediately — see `_is_transient_gh_failure`.
+    Targeted at mutation paths: flaky network errors or transient GitHub 5xx
+    responses aborted multiple sweeps in 2026-05. Permanent failures (e.g. 404)
+    still raise immediately; see `_is_transient_gh_failure`.
     """
     for attempt in range(1, attempts + 1):
         result = runner.run(args)
@@ -925,13 +925,13 @@ def _gh_api_with_retry(
             raise CommandError(args, result)
         backoff = backoffs[attempt - 1] if attempt - 1 < len(backoffs) else backoffs[-1]
         print(
-            f"Transient gh api failure on attempt {attempt}/{attempts}; retrying in {backoff}s.",
+            f"Transient GitHub CLI failure on attempt {attempt}/{attempts}; retrying in {backoff}s.",
             file=sys.stderr,
             flush=True,
         )
         sleeper(backoff)
     # Defensive: the loop always returns or raises above.
-    raise RuntimeError("_gh_api_with_retry exited without returning or raising")
+    raise RuntimeError("_gh_command_with_retry exited without returning or raising")
 
 
 def reply_to_comment(
@@ -945,7 +945,7 @@ def reply_to_comment(
     pr_number = result.pending.pr.number
     comment_id = result.pending.comment.id
     body = build_reply_body(result, branch=branch)
-    _gh_api_with_retry(
+    _gh_command_with_retry(
         runner,
         [
             "gh",
@@ -966,8 +966,9 @@ def trigger_usage_limit_review_retry(
     *,
     repo: str,
     retry: UsageLimitReviewRetry,
+    sleeper: Callable[[float], None] = time.sleep,
 ) -> None:
-    checked(
+    _gh_command_with_retry(
         runner,
         [
             "gh",
@@ -979,6 +980,7 @@ def trigger_usage_limit_review_retry(
             "--body",
             CODEX_REVIEW_TRIGGER_BODY,
         ],
+        sleeper=sleeper,
     )
     print(f"Triggered Codex review retry on PR #{retry.pr.number}.")
 

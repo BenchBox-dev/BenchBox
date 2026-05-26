@@ -334,6 +334,37 @@ def test_trigger_usage_limit_review_retry_posts_codex_review_comment() -> None:
     ]
 
 
+def test_trigger_usage_limit_review_retry_retries_transient_gh_failure_then_succeeds() -> None:
+    transient = subprocess.CompletedProcess([], 1, "", "gh: HTTP 503: Service Unavailable\n")
+    success = subprocess.CompletedProcess([], 0, "", "")
+    retry = pr_review_followups.UsageLimitReviewRetry(
+        pr=_pr(),
+        usage_comment=_issue_comment(99, body=pr_review_followups.CODEX_USAGE_LIMIT_REVIEW_TEXT),
+    )
+    command = (
+        "gh",
+        "pr",
+        "comment",
+        "123",
+        "--repo",
+        "joeharris76/BenchBox",
+        "--body",
+        pr_review_followups.CODEX_REVIEW_TRIGGER_BODY,
+    )
+    runner = RecordingRunner(scripted={command: [transient, success]})
+    sleeps: list[float] = []
+
+    pr_review_followups.trigger_usage_limit_review_retry(
+        runner,
+        repo="joeharris76/BenchBox",
+        retry=retry,
+        sleeper=sleeps.append,
+    )
+
+    assert runner.commands == [list(command), list(command)]
+    assert sleeps == [1]
+
+
 def test_submit_branch_guard_refuses_protected_branches() -> None:
     with pytest.raises(RuntimeError, match="Claim a feature worktree"):
         pr_review_followups.ensure_action_branch("develop", no_submit=False)
