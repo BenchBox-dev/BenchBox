@@ -64,6 +64,40 @@ BENCHMARK_SUPPORT_STATUS_COUNTS = {
 }
 
 
+def _collect_criteria_matrix_rows(
+    doc_text: str, registry_status: dict[str, str]
+) -> tuple[dict[str, dict[str, str]], list[str], list[str]]:
+    matrix_rows: dict[str, dict[str, str]] = {}
+    duplicates: list[str] = []
+    non_registry_rows: list[str] = []
+    in_benchmark_matrix = False
+
+    for line in doc_text.splitlines():
+        if line == "## Benchmark Status Rationale":
+            in_benchmark_matrix = True
+            continue
+        if in_benchmark_matrix and line.startswith("## "):
+            break
+        if not in_benchmark_matrix:
+            continue
+
+        match = _CRITERIA_MATRIX_ROW.match(line)
+        if match is None:
+            continue
+        benchmark_id = match.group("bid")
+        if benchmark_id not in registry_status:
+            non_registry_rows.append(benchmark_id)
+            continue
+        if benchmark_id in matrix_rows:
+            duplicates.append(benchmark_id)
+        matrix_rows[benchmark_id] = {
+            "status": match.group("status"),
+            "rationale": match.group("rationale"),
+        }
+
+    return matrix_rows, duplicates, non_registry_rows
+
+
 def test_benchmark_api_surface_markers_match_contract_map() -> None:
     """Runtime modules should expose the API tiers documented for users and contributors."""
 
@@ -205,24 +239,10 @@ def test_benchmark_support_status_criteria_matrix_covers_every_benchmark() -> No
     registry_status = {bid: meta["support_status"] for bid, meta in BENCHMARK_METADATA.items()}
     doc_text = SUPPORT_STATUS_CRITERIA_DOC.read_text()
 
-    matrix_rows: dict[str, dict[str, str]] = {}
-    duplicates: list[str] = []
-    for line in doc_text.splitlines():
-        match = _CRITERIA_MATRIX_ROW.match(line)
-        if match is None:
-            continue
-        benchmark_id = match.group("bid")
-        if benchmark_id not in registry_status:
-            # Acceptance-criteria/legend rows whose first cell is not a benchmark id.
-            continue
-        if benchmark_id in matrix_rows:
-            duplicates.append(benchmark_id)
-        matrix_rows[benchmark_id] = {
-            "status": match.group("status"),
-            "rationale": match.group("rationale"),
-        }
+    matrix_rows, duplicates, non_registry_rows = _collect_criteria_matrix_rows(doc_text, registry_status)
 
     assert duplicates == [], f"benchmarks with more than one criteria-matrix row: {sorted(duplicates)}"
+    assert non_registry_rows == [], f"criteria-matrix rows for non-registry benchmarks: {sorted(non_registry_rows)}"
 
     missing_rows = sorted(set(registry_status) - set(matrix_rows))
     assert missing_rows == [], f"benchmarks missing a criteria-matrix row: {missing_rows}"
@@ -264,6 +284,38 @@ def test_benchmark_support_status_criteria_matrix_covers_every_benchmark() -> No
     assert dataframe_claim_mismatched == {}, (
         f"criteria-matrix DataFrame evidence differs from registry: {dataframe_claim_mismatched}"
     )
+
+
+def test_benchmark_support_status_criteria_matrix_rejects_stale_benchmark_rows() -> None:
+    """A removed benchmark must not remain silently documented in the criteria matrix."""
+
+    doc_text = """
+## Acceptance Criteria by Status
+
+| Status | User docs | Result-integrity spec |
+|---|---|---|
+| `future_status` | `not_a_benchmark` | Outside the benchmark matrix. |
+
+## Benchmark Status Rationale
+
+| Benchmark | Status | Rationale and evidence | Promotion / demotion blockers |
+|---|---|---|---|
+| `tpch` | `stable` | Canonical 22-query TPC-H; DataFrame-capable. | None. |
+| `removed_benchmark` | `beta` | Stale 1-query row; not DataFrame-capable. | Remove. |
+
+## Promotion Candidates and Blockers
+"""
+
+    matrix_rows, duplicates, non_registry_rows = _collect_criteria_matrix_rows(doc_text, {"tpch": "stable"})
+
+    assert duplicates == []
+    assert matrix_rows == {
+        "tpch": {
+            "status": "stable",
+            "rationale": "Canonical 22-query TPC-H; DataFrame-capable.",
+        }
+    }
+    assert non_registry_rows == ["removed_benchmark"]
 
 
 def test_public_benchmark_count_claims_are_registry_derived() -> None:
