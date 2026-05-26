@@ -8,6 +8,7 @@ category: Release Tooling
 deps:
   needs:
   - single-repo-migration-phase-3-new-release-flow
+  - release-recovery-v0-3-1
 
 blockers:
 - date: "2026-05-25"
@@ -28,9 +29,10 @@ blockers:
     - `gh run list --repo joeharris76/BenchBox --workflow=release.yml --limit 1` returned run `26160520298`, conclusion `failure`, branch `v0.3.0`, SHA `038ad548875a674cc6de0a8956677e052eac1033`.
     - `uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c 'import benchbox; print(benchbox.__version__)'` failed with `ModuleNotFoundError: No module named 'pandas'`.
   unblock: |
-    Do not re-tag or re-upload `0.3.0`. The only safe recovery is a
-    monotonic follow-up release, such as `0.3.1`, after confirming the
-    release-gate fixes that landed after `v0.3.0`.
+    Do not re-tag or re-upload `0.3.0`. Complete
+    `release-recovery-v0-3-1`, then use its `v0.3.1` publish and clean
+    install/import evidence to decide whether Phase 4 can close as
+    recovery-complete.
 
 description: |
   Dominant phase of the migration under Option B. Three sequenced operations
@@ -244,8 +246,10 @@ work:
 
     Recovery path:
       - Do not re-tag or re-upload `0.3.0`.
-      - Cut a monotonic follow-up release after confirming the release
-        hardening that landed after `v0.3.0` covers this failure mode.
+      - Complete `release-recovery-v0-3-1`; if its `v0.3.1` release
+        passes clean PyPI install/import, record that evidence here and
+        close this work item as recovery-complete rather than pretending
+        immutable `0.3.0` became installable.
 
 verification:
 - description: "PyPI has v0.3.0"

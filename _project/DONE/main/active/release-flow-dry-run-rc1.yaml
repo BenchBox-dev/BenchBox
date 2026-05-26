@@ -2,7 +2,8 @@ id: release-flow-dry-run-rc1
 title: "Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end"
 worktree: main
 priority: High
-status: Blocked
+status: Completed
+completed_date: "2026-05-25"
 category: Release Tooling
 
 deps:
@@ -44,6 +45,14 @@ description: |
   handled by the next monotonic release, not by retroactively running an
   obsolete rc.
 
+terminal_state: |
+  Superseded without running the rc. This TODO's only safe terminal state is
+  retirement: the GA `v0.3.0` release has already happened, the intended
+  `v0.3.0-rc.1` validation window is gone, and attempting the rc now would
+  create more release-state confusion instead of validating the pre-GA gate.
+  The remaining recovery obligation is tracked by
+  `release-recovery-v0-3-1`.
+
 blockers:
 - date: "2026-05-25"
   work: [w1, w2, w3, w4, w5, w6]
@@ -60,9 +69,8 @@ blockers:
     - `gh run view 26160520298 --repo joeharris76/BenchBox --json jobs` showed build, publish, and GitHub release jobs succeeded, while all `test-installation` jobs failed.
     - `uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c 'import benchbox; print(benchbox.__version__)'` failed with `ModuleNotFoundError: No module named 'pandas'`.
   unblock: |
-    Do not run `v0.3.0-rc.1`. Either retire this TODO as superseded by
-    the GA release evidence, or create a new release-validation TODO for
-    the next monotonic version such as `0.3.1`.
+    Retired as superseded. Do not run `v0.3.0-rc.1`; the remaining
+    release-validation obligation is owned by `release-recovery-v0-3-1`.
 
 work:
 - id: w1
@@ -263,19 +271,17 @@ scope_limit:
 
 impact:
   business_value: |
-    Validates that the simplified release flow (parent TODO) actually
-    works end-to-end on a real PyPI publish. Without this dry-run,
-    the first 0.3.0 GA release is itself the validation — too
-    risky given the parent TODO's claim of fixing a latent bug.
+    Records that the intended pre-GA validation window was missed and
+    that the actual GA release exposed the same class of installability
+    failure this dry-run was meant to catch.
   user_impact: |
-    The 0.3.0-rc.1 wheel becomes available on PyPI (`pip install
-    benchbox==0.3.0rc1`). Standard `pip install benchbox` users do
-    NOT get rc tags by default (--pre is required), so user impact
-    is limited to maintainers and explicit early adopters.
+    No rc wheel is created. Users are affected through the already-published
+    `0.3.0` install failure, which is now owned by the monotonic recovery
+    TODO instead of this obsolete rc exercise.
   technical_debt: |
-    Closes the validation gate that simplify-dev-loop-and-release-flow
-    deferred. After this passes, single-repo-migration-phase-4 can be
-    marked complete and phase-8 (first 0.3.0 GA release) can proceed.
+    Retires this obsolete gate without hiding the remaining obligation:
+    `release-recovery-v0-3-1` must publish and verify the next version before
+    Phase 4/Phase 8 can be closed or superseded.
 
 files_affected:
   modified: []
@@ -292,12 +298,9 @@ metadata:
   - pypi
 
 success_metrics:
-- "v0.3.0-rc.1 dry-run completes end-to-end: PR opened, CI green, squash-merged, tagged, PyPI publish succeeds, GH release created, cross-OS install matrix passes."
-- "After dry-run, develop tree is unchanged (`git diff origin/develop develop` is empty) AND all dev-only paths (_project/, _blog/, AGENTS.md, etc.) are still present on develop."
-- "main tree after dry-run contains zero dev-only paths."
-- "Release PR shows perf-smoke and parity as not-fired (validates w12 of parent TODO)."
-- "Previous v* branch sweep ran (no-op for first run)."
+- "The obsolete `v0.3.0-rc.1` item no longer appears in the ready queue."
+- "No `v0.3.0-rc.1` tag, GitHub release, or PyPI release is created after GA."
+- "`release-recovery-v0-3-1` owns the remaining release-validation and installability recovery obligation."
 
 open_questions:
-- "After rc.1 validates, is 0.3.0 GA the right next step or should we cut another rc? Decide based on the rc.1 outcome."
-- "Should we add a smoke-test step to run `pip install benchbox==0.3.0rc1 && benchbox --version` from a clean venv as part of release-finalize verification? Currently relies on release.yml's test-installation matrix."
+- "After `release-recovery-v0-3-1` completes, should Phase 8 be retired as satisfied by v0.3.1 or kept as a separate later release exercise?"
