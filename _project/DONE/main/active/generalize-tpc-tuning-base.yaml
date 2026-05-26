@@ -2,7 +2,7 @@ id: generalize-tpc-tuning-base
 title: "Generalize Databricks TPC tuning columns into a reusable platform-neutral tuning base"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Core Functionality
 
 deps:
@@ -43,7 +43,7 @@ description: |
 work:
 - id: w0
   summary: "Rebind current tuning architecture, Databricks integration, and comparison-risk evidence"
-  status: pending
+  status: done
   notes: |
     Start by re-validating the current facts against the branch tip, because
     this TODO is about turning a local Databricks patch into a generalized
@@ -72,7 +72,7 @@ work:
 - id: w1
   summary: "Define the platform-neutral TPC logical tuning profile schema and data"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Add a canonical logical profile for TPC-H and TPC-DS that is independent of
     any one database engine. Recommended shape:
@@ -140,7 +140,7 @@ work:
 - id: w2
   summary: "Add platform capability mapping from logical profile roles to physical tuning mechanisms"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Add an explicit mapping layer that answers: for this platform and logical
     role, should the candidate be represented as partitioning, clustering,
@@ -177,7 +177,7 @@ work:
 - id: w3
   summary: "Validate existing Databricks and DuckDB TPC templates against the logical profile"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Add validation that checks checked-in example templates against the logical
     profile and platform capability mapping. This may be implemented as a
@@ -205,7 +205,7 @@ work:
 - id: w4
   summary: "Replace Databricks-only regression coverage with cross-platform TPC tuning parity tests"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Supersede the narrow Databricks-only test shape with generalized tests that
     protect tuned-mode comparability.
@@ -231,7 +231,7 @@ work:
 - id: w5
   summary: "Expose tuning profile coverage and physical mechanisms in result metadata"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Add result metadata that lets downstream comparison answer what `tuned`
     actually meant for each run. Use existing result/tuning metadata patterns
@@ -259,7 +259,7 @@ work:
 - id: w6
   summary: "Document comparison semantics for tuned-vs-tuned results"
   needs: [w3, w5]
-  status: pending
+  status: done
   notes: |
     Update docs so users understand that tuned-vs-tuned is a logical profile
     comparison with platform-specific physical implementations, not proof that
@@ -282,7 +282,7 @@ work:
 - id: w7
   summary: "Run profile, template, result-metadata, and coverage verification"
   needs: [w4, w5, w6]
-  status: pending
+  status: done
   notes: |
     Run the narrow verification listed below before broad preflight. Capture a
     concise summary of mapping coverage and comparison impact in DONE notes or
@@ -290,13 +290,15 @@ work:
 
 verification:
 - description: "New profile and template parity tests pass"
-  command: "uv run -- python -m pytest tests/unit/core/tuning/test_tpc_workload_profiles.py tests/unit/core/tuning/test_tpc_tuning_template_parity.py -q"
+  command: "uv run -- python -m pytest tests/unit/core/tuning/test_tpc_workload_profiles.py tests/unit/core/tuning/test_tpc_tuning_template_parity.py
+    -q"
   expected_output: "all tests pass"
 - description: "Existing Databricks tuning example coverage is generalized or remains green during migration"
   command: "uv run -- python -m pytest tests/unit/cli/test_databricks_tuning_examples.py -q"
   expected_output: "all tests pass, or test is intentionally removed/replaced by the generalized parity suite"
 - description: "TPC profile checker reports no unmapped required candidates for Databricks and DuckDB"
-  command: "uv run -- python _project/scripts/tuning_profile_check.py --benchmarks tpch,tpcds --platforms databricks,duckdb --strict"
+  command: "uv run -- python _project/scripts/tuning_profile_check.py --benchmarks tpch,tpcds --platforms databricks,duckdb
+    --strict"
   expected_output: "no unmapped accepted candidates without explicit unsupported/waiver decisions"
 - description: "Unified tuning examples still load through the real loader"
   command: |
@@ -313,8 +315,8 @@ must_preserve:
 - "Existing `--tuning notuning` baseline semantics: constraints disabled, no platform physical tuning."
 - "Existing `--tuning tuned` template discovery behavior unless this TODO explicitly introduces a backward-compatible profile
   resolution layer."
-- "Databricks accepted columns added by validate-and-integrate-tpc-tuning-json remain represented unless a newer evidence audit
-  documents a removal."
+- "Databricks accepted columns added by validate-and-integrate-tpc-tuning-json remain represented unless a newer evidence
+  audit documents a removal."
 - "DuckDB tuned templates are not modified to imitate Databricks Z-ordering; use DuckDB-appropriate sorting/layout semantics."
 - "No raw UAT logs, scratchpad files, or large generated reports are committed."
 
@@ -334,8 +336,8 @@ anti_patterns:
   second-class consumers."
 - "DO NOT require identical physical mechanisms across platforms - because Z-ORDER, ORDER BY, CLUSTER BY, distribution keys,
   and sorted ingestion have different semantics and costs."
-- "DO NOT call a tuned-vs-tuned comparison fair unless result metadata shows which logical candidates were mapped, waived, or
-  unsupported."
+- "DO NOT call a tuned-vs-tuned comparison fair unless result metadata shows which logical candidates were mapped, waived,
+  or unsupported."
 - "DO NOT add speculative columns to platform templates without query-template evidence or a profile-level rationale."
 - "DO NOT hide fallback/basic-constraints cells behind `tuning_mode == tuned` without a coverage grade or waiver reason."
 - "DO NOT make the profile validator depend on live cloud credentials; use checked-in YAML and dry-run/unit-level assertions."
@@ -373,8 +375,8 @@ prior_art:
   presence to logical-profile parity."
 - "benchbox/core/tuning/interface.py:TableTuning - reuse existing partitioning/clustering/distribution/sorting fields instead
   of adding per-platform ad hoc table keys."
-- "benchbox/platforms/databricks/adapter.py:_build_zorder_columns - reuse Databricks mapping from clustering/distribution to
-  Z-ORDER/liquid behavior."
+- "benchbox/platforms/databricks/adapter.py:_build_zorder_columns - reuse Databricks mapping from clustering/distribution
+  to Z-ORDER/liquid behavior."
 - "benchbox/platforms/base/sorted_ingestion.py - reuse capability-matrix and resolved-strategy pattern for platform-specific
   physical mechanisms."
 - "docs/usage/cloud-sorted-ingestion.md - reuse comparison language around native tuning, sorted ingestion, and result metadata."
@@ -389,6 +391,35 @@ deferred:
 - summary: "Extending the logical profile beyond TPC-H and TPC-DS"
   reason: "Keep the first generalized profile scoped to the recovered TPC tuning evidence."
 
+completion_notes: |
+  Completed on 2026-05-26.
+
+  Implemented a platform-neutral TPC profile at
+  `benchbox/core/tuning/profiles/tpc.yaml`, with typed loading,
+  role/status validation, platform capability mapping, checked-template
+  validation, and result metadata emission.
+
+  Databricks and DuckDB TPC-H/TPC-DS templates now validate against the same
+  logical profile:
+  - Databricks TPC-H: mapped 16/16 required candidates; mechanisms
+    distribution, partitioning, z_order.
+  - DuckDB TPC-H: mapped 16/16 required candidates; mechanisms partitioning,
+    sorted_ingestion, sorting.
+  - Databricks TPC-DS: mapped 32/32 required candidates; 2 low-evidence
+    dropped candidates remain excluded; mechanisms distribution, partitioning,
+    z_order.
+  - DuckDB TPC-DS: mapped 32/32 required candidates; 2 low-evidence dropped
+    candidates remain excluded; mechanisms partitioning, sorted_ingestion,
+    sorting.
+
+  Verification:
+  - `uv run -- python -m pytest tests/unit/core/tuning/test_tpc_workload_profiles.py tests/unit/core/tuning/test_tpc_tuning_template_parity.py -q`: 15 passed.
+  - `uv run -- python -m pytest tests/unit/cli/test_databricks_tuning_examples.py -q`: 4 passed.
+  - `uv run -- python _project/scripts/tuning_profile_check.py --benchmarks tpch,tpcds --platforms databricks,duckdb --strict`: all four cells passed.
+  - `uv run -- python -c "...ConfigManager..."; print("ok")`: ok.
+  - `uv run -- python -m pytest tests/uat/test_tuning_coverage.py -m fast -q`: 6 passed.
+  - `make pr-preflight`: 22709 passed, 5 skipped, 42 warnings.
+
 metadata:
   tags:
   - tuning
@@ -401,6 +432,7 @@ metadata:
   estimated_effort: "Large"
   created_date: "2026-05-26"
   updated_date: "2026-05-26"
+  completed_date: "2026-05-26"
 
 impact:
   business_value: |

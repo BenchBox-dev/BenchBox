@@ -29,6 +29,7 @@ Your daily reference for using BenchBox. This section covers configuration, runn
 - [Dry Run](dry-run.md) - Preview queries and configuration without executing
 - [Dialect Translation](dialect-translation.md) - SQL dialect translation vs platform adapters
 - [Cloud Sorted Ingestion](cloud-sorted-ingestion.md) - Opt-in deep sorting strategy for cloud DW comparisons
+- [TPC Logical Tuning Profiles](tpc-tuning-profiles.md) - Tuned-template profile coverage and comparison semantics
 - [Databricks Liquid Clustering](databricks-liquid-clustering.md) - Strategy control and migration from Z-ORDER
 
 ## Examples
@@ -77,6 +78,7 @@ dry-run
 data-generation
 dialect-translation
 cloud-sorted-ingestion
+tpc-tuning-profiles
 databricks-liquid-clustering
 intelligent-guidance
 faq

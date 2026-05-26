@@ -126,6 +126,32 @@ All tuning configurations follow the unified tuning format with these sections:
 ### Metadata
 - `_metadata` - Configuration metadata including database, benchmark, and type information
 
+## TPC Logical Tuning Profile
+
+TPC-H and TPC-DS tuned templates consume a shared logical profile in
+`benchbox/core/tuning/profiles/tpc.yaml`. The profile records workload-level
+candidate columns, query evidence, accepted baseline columns, and
+low-evidence candidates that must stay excluded unless new evidence changes the
+decision.
+
+Platform templates map that logical profile into platform-native mechanisms:
+Databricks uses partitioning plus clustering/distribution consumed by Delta
+Z-ORDER or liquid clustering paths; DuckDB uses partitioning plus sorting and
+sorted layout semantics. The physical mechanisms are different, so
+`tuning_mode == "tuned"` means "same logical profile coverage where mapped",
+not "identical storage features".
+
+Run the checked-template profile gate with:
+
+```bash
+uv run -- python _project/scripts/tuning_profile_check.py --benchmarks tpch,tpcds --platforms databricks,duckdb --strict
+```
+
+See `docs/usage/tpc-tuning-profiles.md` for the profile schema, current
+Databricks/DuckDB mapping matrix, result metadata fields, and comparison
+caveats. Do not treat a benchmark-specific tuned template and a
+basic-constraints fallback as equivalent tuned runs.
+
 ## Tuned vs No-Tuning Configurations
 
 ### Tuned Configurations

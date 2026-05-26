@@ -1508,4 +1508,24 @@ class ResultCaptureMixin:
             },
             "sorted_ingestion": self.get_sorted_ingestion_metadata(),
         }
+        tuning_profile_metadata = self._build_tuning_profile_metadata(run_config)
+        if tuning_profile_metadata:
+            execution_metadata["tuning_profile"] = tuning_profile_metadata
         return execution_metadata, system_profile, anonymous_machine_id
+
+    def _build_tuning_profile_metadata(self, run_config: dict) -> dict[str, Any] | None:
+        """Build workload-profile tuning metadata without making result capture brittle."""
+        try:
+            from benchbox.core.tuning.profile_validation import build_tuning_profile_metadata
+
+            effective_config = self.get_effective_tuning_configuration()
+            return build_tuning_profile_metadata(
+                benchmark=run_config.get("benchmark_name"),
+                platform=getattr(self, "platform_name", None),
+                tuning_config=effective_config,
+            )
+        except Exception as exc:  # pragma: no cover - metadata must not fail result capture
+            logger = getattr(self, "logger", None)
+            if logger is not None:
+                logger.debug("Unable to build tuning profile metadata: %s", exc)
+            return None
