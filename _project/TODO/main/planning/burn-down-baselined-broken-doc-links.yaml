@@ -1,0 +1,170 @@
+id: burn-down-baselined-broken-doc-links
+title: "Burn down the 42 baselined broken docs relative links"
+worktree: main
+priority: Low
+status: Not Started
+category: Documentation
+
+description: |
+  PR #683 (`dry-run-followup-broken-getting-started-link`) added
+  `scripts/check_doc_relative_links.py` — a repo-local Markdown
+  relative-link checker wired into the blocking `make docs-validate`
+  gate. Running it surfaced **42 pre-existing broken relative links**
+  across ~20 docs files (the originating dry-run knew of only one,
+  `getting-started.rst`, already fixed). Those 42 were recorded in
+  `scripts/doc_relative_link_baseline.txt` so the gate blocks *new*
+  breakage immediately without forcing a same-PR mass cleanup.
+
+  This TODO is that cleanup: fix or remove every baselined link and
+  drive the baseline to zero data entries, so the gate enforces
+  "no broken repo-local relative links" repo-wide rather than only
+  "no new ones".
+
+  Target groups in the baseline as of 2026-05-26 (regenerate to
+  confirm before starting — counts may shift as docs change):
+    - `../benchmarks/tpch.md`  x7  -> `../benchmarks/tpc-h.md` (target exists)
+    - `../benchmarks/tpcds.md` x4  -> `../benchmarks/tpc-ds.md` (target exists)
+    - `../reference/cli-reference.md` x5 + `../../reference/cli-reference.md` x2
+      -> no `docs/reference/cli-reference.md`; locate the real CLI reference
+      doc and repoint, or rewrite the links
+    - `README.md` x3 (from `docs/benchmarks/*`) -> likely `index.md`
+    - `../reference/result_schema_v1.md` x2, `../reference/results-schema.md` x1
+      -> schema-doc references; find the canonical schema doc
+    - singles: `synapse.md`, `pyspark.md`, `glue.md`,
+      `platform-development.md`, `python-api/results.md`,
+      `getting-started.md` / `examples.md` / `configuration.md`
+      (from `docs/reference/api-reference.md`),
+      `benchmarks/tpc-ds.md` (wrong relative depth from `guides/tpc/`),
+      `../advanced/tuning.md`, `../advanced/cost-optimization.md`,
+      `../api/query-plan-models.md`, `../performance/index.md`,
+      `../usage/result-analysis.md`, `../getting-started/quick-start.md`,
+      `./profiling.md`, `./duplication-inventory.csv`,
+      `./unified_frame_any_survey.csv`
+
+work:
+  - id: w1
+    summary: "Triage all baselined links into a disposition table"
+    status: pending
+    notes: |
+      Regenerate the live broken set first:
+        `uv run -- python scripts/check_doc_relative_links.py --update-baseline`
+      then `git diff scripts/doc_relative_link_baseline.txt` to confirm the
+      count hasn't drifted from 42. For each (source, target) pair assign one
+      disposition:
+        - RENAME: target exists under a corrected name/path (fix the link).
+        - REPOINT: the intended doc exists elsewhere (rewrite the link).
+        - REMOVE: the referenced doc was never written / has been deleted and
+          has no successor (delete the link, keep the surrounding prose sane).
+        - CREATE: a genuinely-missing doc that *should* exist (rare; prefer
+          REPOINT/REMOVE — do not stub empty files just to satisfy the gate).
+      Record the table in the PR description; it is the audit trail for w2-w4.
+
+  - id: w2
+    summary: "Apply the unambiguous benchmark-filename renames"
+    needs: [w1]
+    status: pending
+    notes: |
+      The high-confidence cluster (targets already exist):
+        - `../benchmarks/tpch.md`  -> `../benchmarks/tpc-h.md`  (7 refs)
+        - `../benchmarks/tpcds.md` -> `../benchmarks/tpc-ds.md` (4 refs)
+        - `docs/guides/tpc/*` `benchmarks/tpc-ds.md` -> correct relative depth
+          to the real `docs/benchmarks/tpc-ds.md`.
+      After editing, regenerate the baseline and confirm these entries drop
+      out (the checker reports a stale-baseline error until you do).
+
+  - id: w3
+    summary: "Resolve the cli-reference.md cluster (7 refs)"
+    needs: [w1]
+    status: pending
+    notes: |
+      `docs/reference/cli-reference.md` does not exist. Find the actual CLI
+      reference doc (search `docs/reference/` and the toctree in
+      `docs/index.rst`) and repoint all 7 references, or rewrite them if the
+      CLI is documented under a different page. Regenerate the baseline.
+
+  - id: w4
+    summary: "Resolve the remaining single-target broken links"
+    needs: [w1]
+    status: pending
+    notes: |
+      Work through the remaining entries per their w1 disposition: README ->
+      index, schema-doc references, platform cross-links (synapse/pyspark/
+      glue/platform-development), api-reference.md's getting-started/examples/
+      configuration links, the advanced/performance/usage/api targets, and the
+      two `.csv` data-file links (confirm whether the CSVs were removed and
+      remove or repoint accordingly). Fix local links only; leave external
+      (http/https) links to the Sphinx linkcheck. Regenerate the baseline.
+
+  - id: w5
+    summary: "Drive the baseline to zero and confirm the gate is green"
+    needs: [w2, w3, w4]
+    status: pending
+    notes: |
+      Final `--update-baseline` should leave zero data entries. Run
+      `uv run -- python scripts/check_doc_relative_links.py` (reports
+      `broken total  : 0`, exit 0) and `make docs-validate` (exit 0). If any
+      link is a genuinely-intentional exception, keep it in the baseline with
+      an inline `#` comment justifying it — but the goal is an empty data set.
+      Standard cycle: `make lint format typecheck`, `make pr-preflight`,
+      `make pr-open`.
+
+verification:
+  - description: "No broken repo-local relative links remain"
+    command: "uv run -- python scripts/check_doc_relative_links.py"
+    expected_output: "exit 0 with 'broken total  : 0'"
+  - description: "Baseline has no data entries (only header comments)"
+    command: "grep -cE $'^[^#].*\\t' scripts/doc_relative_link_baseline.txt"
+    expected_output: "0"
+  - description: "The wrong-name benchmark links are gone"
+    command: "! rg -n 'benchmarks/tpch\\.md|benchmarks/tpcds\\.md' docs/"
+    expected_output: "no matches"
+  - description: "Docs validation gate passes end to end"
+    command: "make docs-validate"
+    expected_output: "exit 0"
+
+must_preserve:
+  - "The checker's baseline + anti-rot mechanism stays intact — do not weaken `check_doc_relative_links.py` to pass; fix the links."
+  - "Existing relative links in docs/ that currently resolve continue to resolve (no collateral breakage)."
+  - "External-link handling is unchanged — http/https links remain the Sphinx linkcheck's responsibility, not this checker's."
+
+anti_patterns:
+  - "DO NOT delete or blank the baseline file to make the check pass -- because that disables the regression gate -- drive the broken COUNT to zero by fixing links."
+  - "DO NOT re-add entries to the baseline to silence the count -- because the baseline is debt being burned down, not a suppression list."
+  - "DO NOT create empty stub docs solely to satisfy a link -- because a stub is worse than an honest rewrite/removal -- prefer REPOINT or REMOVE when the target was never meant to exist."
+
+scope_limit:
+  only_modify:
+    - "docs/"
+    - "scripts/doc_relative_link_baseline.txt"
+  do_not_modify:
+    - "scripts/check_doc_relative_links.py"  # the checker is correct; only the baseline changes
+    - ".github/workflows/"
+
+prior_art:
+  - "scripts/check_doc_relative_links.py — the checker introduced in PR #683; REUSE its `--update-baseline` to regenerate the baseline after each batch of fixes."
+  - "scripts/doc_relative_link_baseline.txt — the 42-entry baseline this TODO empties; the input artifact, not new infrastructure."
+  - "docs/benchmarks/tpc-h.md, docs/benchmarks/tpc-ds.md — existing canonical targets for the tpch/tpcds rename cluster (REUSE; do not create new benchmark pages)."
+
+metadata:
+  tags:
+    - docs
+    - ci
+    - tech-debt
+    - dry-run-followup
+  estimated_effort: "Medium"
+  created_date: "2026-05-26"
+
+impact:
+  technical_debt: |
+    Empties the relative-link baseline so the `docs-validate` gate
+    enforces "zero broken repo-local relative links" repo-wide, not just
+    "no new breakage". Removes ~42 latent broken links that a contributor
+    or agent could hit while navigating the docs.
+  user_impact: |
+    Docs navigation stops dead-ending on broken in-repo links — the same
+    class of friction the originating dry-run surfaced.
+
+success_metrics:
+  - "scripts/doc_relative_link_baseline.txt has zero data entries"
+  - "check_doc_relative_links.py reports 0 broken links and exits 0"
+  - "make docs-validate passes"
