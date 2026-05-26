@@ -8,6 +8,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.slow,
     pytest.mark.resource_heavy,
+    pytest.mark.platform_smoke,
 ]
 
 
