@@ -35,6 +35,54 @@ files_affected:
   modified:
     - benchbox/core/nyctaxi/benchmark.py
     - benchbox/core/clickbench/generator.py
+    - benchbox/core/amplab/generator.py
+
+work:
+  - id: w1
+    summary: 'Set explicit csv_null_marker="" for nyctaxi, clickbench, and amplab manifests'
+    status: pending
+    notes: |
+      Pass csv_null_marker="" into each benchmark's write_generator_manifest()
+      call so manifest path (a) wins and the resolved dialect carries an explicit
+      NULL marker:
+        - benchbox/core/clickbench/generator.py:385 (currently None)
+        - benchbox/core/amplab/generator.py:392 (currently sets nothing)
+        - benchbox/core/nyctaxi/benchmark.py:294 (currently None explicitly)
+      Empty string is the correct marker: SingleStore LOAD DATA INFILE emits
+      NULL DEFINED BY '' so empty fields in nullable integer columns load as NULL
+      instead of raising error 1264.
+  - id: w2
+    summary: "Verify the resolved CSV dialect carries a non-None null marker for each benchmark"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add/extend a unit or integration assertion (closest harness:
+      tests/integration/test_manifest_driven_loading.py) that resolve_csv_dialect
+      yields a non-None null_marker for nyctaxi, clickbench, and amplab so the
+      SingleStore _load_data_infile path emits NULL DEFINED BY. A dry-run check is
+      acceptable if a unit assertion is impractical; do not require a live
+      SingleStore server.
+
+verification:
+  - description: "Manifest-driven loading / dialect resolution coverage passes"
+    command: "uv run -- python -m pytest tests/integration/test_manifest_driven_loading.py -q"
+    expected_output: "passes"
+  - description: "TODO graph and schema remain valid"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/platform-expansion/planning/singlestore-non-tpc-csv-null-marker.yaml"
+    expected_output: "passes"
+
+must_preserve:
+  - "TPC benchmark CSV dialects are unchanged; only nyctaxi/clickbench/amplab gain an explicit marker"
+  - "csv_null_marker='' (empty string), not None, so NULL DEFINED BY is actually emitted"
+  - "No live SingleStore server required for verification"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/nyctaxi/benchmark.py"
+    - "benchbox/core/clickbench/generator.py"
+    - "benchbox/core/amplab/generator.py"
+    - "tests/integration/test_manifest_driven_loading.py"
+    - "_project/TODO/platform-expansion/planning/singlestore-non-tpc-csv-null-marker.yaml"
 
 metadata:
   tags:
