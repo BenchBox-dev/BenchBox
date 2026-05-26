@@ -5,18 +5,26 @@ priority: Medium
 status: Not Started
 description: |
   QuestDB's handle_existing_database() override validates that all expected
-  benchmark tables exist before marking the database as reused. InfluxDB has a
-  separate override that logs a warning when force_recreate=True (it has no
-  table-validation logic). Both overrides work around a base class limitation:
-  when skip_database_management=True, the base class immediately returns with
-  database_was_reused=True without any table validation.
+  benchmark tables exist and contain data before marking the database as reused.
+  InfluxDB has a separate override that logs a warning when force_recreate=True
+  but does not validate benchmark table presence. Both overrides work around a
+  base class limitation: when skip_database_management=True, the base class
+  immediately returns with database_was_reused=True without table validation.
 
   Refactor the base class (benchbox/platforms/base/connection_lifecycle.py)
-  to provide a check_benchmark_tables_exist() hook that managed-database
-  adapters can implement without duplicating connection and set-comparison logic.
+  to provide an opt-in check_benchmark_tables_exist() hook that managed-database
+  adapters can implement without duplicating connection and set-comparison
+  logic. The hook result must cover adapter-specific data-readiness semantics,
+  not just metadata presence, so QuestDB's existing non-empty table guard is not
+  lost.
 
   Migration plan:
-  - QuestDB: replace the full override body with a call to the base hook
+  - Base lifecycle: keep legacy skip_database_management behavior for adapters
+    that do not implement the hook; only opted-in adapters should trigger
+    validation work in the skip path.
+  - QuestDB: replace the full override body with a call to the base hook while
+    preserving dry-run, force-recreate, missing-benchmark, missing-table, and
+    empty-table outcomes.
   - InfluxDB: keep its custom force_recreate warning; add a hook call for table
     validation (the two concerns are independent and both should be preserved)
   - Future managed-database adapters get correct reuse detection automatically
@@ -103,15 +111,220 @@ metadata:
     - refactoring
   estimated_effort: "Small"
   created_date: "2026-04-14"
-  source_review: "Review findings on commit dbc84af27"
-  related_commits:
-    - dbc84af27
+  last_updated: "2026-05-26T00:00:00Z"
+  source_review: >-
+    Current-state TODO review on 2026-05-26; original dbc84af27 reference is not
+    present in this checkout.
+
+work:
+  - id: w0
+    summary: "Re-validate current lifecycle and adapter evidence before editing code"
+    status: pending
+    notes: |
+      Run focused current-state checks and record the compact replayable summary
+      in the implementation PR body or TODO completion note: checked SHA, whether
+      the original dbc84af27 reference is resolvable, and the current locations
+      of the base skip path, QuestDB table/non-empty guard, InfluxDB warning, and
+      other skip_database_management users. Raw stdout belongs in /tmp, CI
+      artifacts, or BENCHBOX_OUTPUT_DIR, not committed verification logs.
+
+  - id: w1
+    summary: "Add an opt-in managed-database table-readiness hook to the base lifecycle"
+    needs: [w0]
+    status: pending
+    notes: |
+      Introduce check_benchmark_tables_exist() or an equivalently narrow hook in
+      ConnectionLifecycleMixin. The default implementation must mean "not
+      implemented" and preserve the existing skip_database_management=True path:
+      adapters that do not opt in still set database_was_reused=True without
+      opening validation connections.
+
+  - id: w2
+    summary: "Migrate QuestDB to the shared hook without weakening reuse safety"
+    needs: [w1]
+    status: pending
+    notes: |
+      Preserve the current QuestDB outcomes: dry-run exits without a connection,
+      force_recreate sets database_was_reused=False, missing benchmark/table
+      metadata is treated as fresh, missing expected tables are treated as fresh,
+      and expected tables that exist but are empty are treated as fresh.
+
+  - id: w3
+    summary: "Migrate InfluxDB while preserving its force_recreate warning"
+    needs: [w1]
+    status: pending
+    notes: |
+      Keep InfluxDBSetupMixin.handle_existing_database() warning behavior for
+      force_recreate=True and add table-readiness validation through the shared
+      hook. Reuse the existing get_tables()/table_exists() metadata path or add a
+      narrow _get_existing_tables() adapter method instead of issuing duplicate
+      metadata SQL in setup code.
+
+  - id: w4
+    summary: "Add focused tests for default behavior, QuestDB, and InfluxDB"
+    needs: [w1, w2, w3]
+    status: pending
+    notes: |
+      Cover the base default hook path for non-opted-in adapters, the opted-in
+      false/true paths, QuestDB's non-empty table guard, and InfluxDB's preserved
+      force_recreate warning plus table-validation branch.
+
+  - id: w5
+    summary: "Run targeted verification and confirm scope stayed within the allowlist"
+    needs: [w4]
+    status: pending
+    notes: |
+      Run the TODO verification commands, then compare changed paths against
+      scope_limit.only_modify before completing the item.
 
 impact:
   user_impact: |
-    None - this is internal refactoring. Behavior is already correct after
-    dbc84af27; this eliminates duplication.
+    None - this is internal refactoring. The implementation must preserve
+    existing runtime behavior for adapters that do not opt into the new hook.
   maintainer_impact: |
     Reduces duplication between QuestDB and InfluxDB adapters. Makes it
     easier for future managed-database adapters to get reuse detection right
     from the start.
+  technical_debt: |
+    Consolidates managed-database reuse decisions in the base lifecycle while
+    keeping adapter-specific table-readiness checks local to the adapters that
+    understand their metadata and row-presence semantics.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/base/connection_lifecycle.py"
+    - "benchbox/platforms/base/phase_tracking.py"
+    - "benchbox/platforms/questdb.py"
+    - "benchbox/platforms/influxdb/adapter.py"
+    - "benchbox/platforms/influxdb/setup.py"
+    - "tests/unit/platforms/test_base_adapter_database_management.py"
+    - "tests/unit/platforms/test_questdb_adapter.py"
+    - "tests/unit/platforms/test_questdb_coverage.py"
+    - "tests/unit/platforms/influxdb/test_setup_mixin.py"
+
+context_sections:
+  Current Evidence: |
+    As of 2026-05-26 on current develop, the original cited commit dbc84af27 is
+    not resolvable in this checkout. Current code still shows the actionable
+    pattern: ConnectionLifecycleMixin.handle_existing_database() sets
+    database_was_reused=True immediately when skip_database_management=True;
+    QuestDB overrides that path and checks expected table presence plus
+    non-empty tables; InfluxDBSetupMixin.handle_existing_database() only warns
+    for force_recreate=True; multiple live-test fixtures manually set
+    skip_database_management=True on adapters outside QuestDB/InfluxDB.
+
+  Adapter Compatibility Matrix: |
+    | Adapter class | Current skip_database_management use | Required outcome |
+    |---|---|---|
+    | Base/default adapters | Base immediately marks reused | Preserve unless adapter explicitly opts into the hook |
+    | QuestDBAdapter | Class sets skip_database_management=True and overrides handle_existing_database() | Migrate to the base hook while preserving table presence and non-empty checks |
+    | InfluxDBAdapter | Setup override warns on force_recreate; live fixture sets skip_database_management=True | Preserve warning and add table-readiness validation through the hook |
+    | Other live-test managed adapters | Fixtures may set skip_database_management=True for ClickHouse, Databend, PostgreSQL, Presto, Trino, Doris, SingleStore, and StarRocks | Do not start validating or connecting in the skip path unless those adapters opt in |
+
+prior_art:
+  - >-
+    benchbox/platforms/base/connection_lifecycle.py:ConnectionLifecycleMixin.handle_existing_database
+    - extend skip_database_management handling with an opt-in hook
+  - >-
+    benchbox/platforms/base/phase_tracking.py:_get_expected_tables - reuse
+    expected-table resolution order instead of inventing a second benchmark-table
+    parser
+  - >-
+    benchbox/platforms/base/phase_tracking.py:_get_existing_tables - reuse or
+    override the existing metadata-query convention for adapter table listing
+  - >-
+    benchbox/platforms/base/validation.py:SchemaValidator - reuse the
+    expected-vs-existing set-comparison semantics where practical, but do not
+    invoke full database compatibility validation in the managed skip path by
+    default
+  - >-
+    benchbox/platforms/questdb.py:QuestDBAdapter.handle_existing_database -
+    supersede the duplicated lifecycle override while preserving non-empty table
+    checks
+  - >-
+    benchbox/platforms/influxdb/adapter.py:get_tables/table_exists - extend this
+    InfluxDB metadata path for hook implementation instead of duplicating metadata
+    SQL in setup.py
+  - >-
+    tests/unit/platforms/test_base_adapter_database_management.py and
+    tests/unit/platforms/test_questdb_coverage.py - extend existing lifecycle and
+    QuestDB regression coverage
+
+must_preserve:
+  - "ConnectionLifecycleMixin.handle_existing_database() still returns early in dry_run mode before any database existence or table-readiness checks."
+  - "Adapters with skip_database_management=True and no hook implementation still set database_was_reused=True without opening validation connections."
+  - "QuestDBAdapter force_recreate=True sets database_was_reused=False without connecting to QuestDB."
+  - "QuestDBAdapter treats missing benchmark metadata, empty expected-table lists, missing expected tables, and empty expected tables as fresh database states."
+  - "QuestDBAdapter marks database_was_reused=True only when all expected tables exist and each expected table has at least one row."
+  - "InfluxDBSetupMixin.handle_existing_database() still logs the current force_recreate warning."
+  - "Existing CLI/orchestrator paths that bind adapter.benchmark_instance for validation remain compatible."
+
+approach: |
+  Start with the base lifecycle contract, not QuestDB. Add a narrow opt-in hook
+  whose default preserves existing skip_database_management behavior. Use the
+  current expected-table and existing-table helper patterns where they fit, but
+  keep adapter-specific readiness checks local: QuestDB needs a non-empty-table
+  probe, while InfluxDB can use its existing metadata-listing API. After the
+  hook is covered by base tests, migrate QuestDB and InfluxDB one adapter at a
+  time and keep each adapter's existing unit tests green before broadening the
+  verification command.
+
+anti_patterns:
+  - >-
+    DO NOT make skip_database_management=True globally trigger full
+    DatabaseValidator work - because several managed/live adapters rely on the
+    current fast skip path - require explicit adapter opt-in instead.
+  - >-
+    DO NOT reduce QuestDB readiness to table-name presence - because prior
+    partial runs can leave empty tables that must not be reused - preserve the
+    LIMIT 1 non-empty check.
+  - >-
+    DO NOT duplicate expected-table resolution with ad hoc benchmark.tables-only
+    logic - because generated-data keys can be incomplete or late-populated -
+    reuse the existing expected-table helper order or document any
+    adapter-specific exception.
+  - >-
+    DO NOT remove InfluxDB's force_recreate warning while adding validation -
+    because recreation support and table-readiness validation are independent
+    concerns - keep both branches tested.
+  - >-
+    DO NOT add live cloud or Docker requirements to prove this refactor - because
+    the behavior can be covered with unit-level adapter mocks - keep live tests
+    out unless explicitly requested.
+
+verification:
+  - description: "Base, QuestDB, and InfluxDB focused unit coverage passes"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_base_adapter_database_management.py tests/unit/platforms/test_questdb_adapter.py tests/unit/platforms/test_questdb_coverage.py tests/unit/platforms/influxdb/test_setup_mixin.py -q"
+    expected_output: "all selected tests pass with 0 failures"
+  - description: "Validation helper expectations still pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_platform_validation.py -q"
+    expected_output: "all selected tests pass with 0 failures"
+  - description: "Edited Python files satisfy Ruff"
+    command: "uv run -- ruff check benchbox/platforms/base/connection_lifecycle.py benchbox/platforms/questdb.py benchbox/platforms/influxdb/adapter.py benchbox/platforms/influxdb/setup.py tests/unit/platforms/test_base_adapter_database_management.py tests/unit/platforms/test_questdb_adapter.py tests/unit/platforms/test_questdb_coverage.py tests/unit/platforms/influxdb/test_setup_mixin.py"
+    expected_output: "All checks passed!"
+  - description: "TODO remains valid after implementation notes and completion updates"
+    command: "uv run -- python _project/scripts/todo_cli.py validate _project/TODO/main/planning/generalize-database-table-reuse-detection.yaml"
+    expected_output: "TODO validates successfully"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/connection_lifecycle.py"
+    - "benchbox/platforms/base/phase_tracking.py"
+    - "benchbox/platforms/questdb.py"
+    - "benchbox/platforms/influxdb/adapter.py"
+    - "benchbox/platforms/influxdb/setup.py"
+    - "tests/unit/platforms/test_base_adapter_database_management.py"
+    - "tests/unit/platforms/test_questdb_adapter.py"
+    - "tests/unit/platforms/test_questdb_coverage.py"
+    - "tests/unit/platforms/influxdb/test_setup_mixin.py"
+    - "_project/TODO/main/planning/generalize-database-table-reuse-detection.yaml"
+  do_not_modify:
+    - "benchbox/cli/"
+    - "benchbox/core/runner/"
+    - "tests/integration/platforms/"
+
+success_metrics:
+  - "Default non-opted-in skip_database_management behavior is covered and unchanged."
+  - "QuestDB table reuse still requires all expected tables to exist and contain at least one row."
+  - "InfluxDB keeps its force_recreate warning and gains hook-driven table-readiness validation."
+  - "The implementation changes only files listed in scope_limit.only_modify."
