@@ -77,7 +77,11 @@ must not be bypassed with an undocumented local change.
 
 1. Cuts a `vX.Y.Z` branch off `develop` (`develop` itself is never modified).
 2. Bumps the 6 version sources via `scripts/update_version.py` and generates
-   the CHANGELOG entry via `scripts/generate_changelog_entry.py`.
+   the CHANGELOG entry via `scripts/generate_changelog_entry.py --since-ref
+   origin/main`. The release note boundary is the current release branch diff
+   against `main`, not the latest tag reachable from `develop`, because
+   `release-finalize` intentionally does not replay release commits onto
+   `develop`.
 3. Opens `$EDITOR` on `CHANGELOG.md` for hand-curation. (Headless mode:
    refuses to skip the curation step rather than silently committing
    raw output.)
