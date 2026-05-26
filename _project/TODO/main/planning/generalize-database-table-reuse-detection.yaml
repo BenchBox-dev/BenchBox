@@ -112,9 +112,14 @@ metadata:
   estimated_effort: "Small"
   created_date: "2026-04-14"
   last_updated: "2026-05-26T00:00:00Z"
+  related_prs:
+    - 673
+  related_commits:
+    - "2cd86e68efc73bc67a5a7c9e546832c7ad57058e"
   source_review: >-
     Current-state TODO review on 2026-05-26; original dbc84af27 reference is not
-    present in this checkout.
+    present in this checkout; synthesized with PR #673's first-pass work-unit
+    plan from head 2cd86e68efc73bc67a5a7c9e546832c7ad57058e.
 
 work:
   - id: w0
@@ -134,10 +139,11 @@ work:
     status: pending
     notes: |
       Introduce check_benchmark_tables_exist() or an equivalently narrow hook in
-      ConnectionLifecycleMixin. The default implementation must mean "not
-      implemented" and preserve the existing skip_database_management=True path:
-      adapters that do not opt in still set database_was_reused=True without
-      opening validation connections.
+      ConnectionLifecycleMixin and call it from the
+      skip_database_management=True branch. The default implementation should
+      return None (unknown/no opinion) or an equivalent not-implemented sentinel
+      so existing adapters that do not opt in still set database_was_reused=True
+      without opening validation connections.
 
   - id: w2
     summary: "Migrate QuestDB to the shared hook without weakening reuse safety"
@@ -147,7 +153,10 @@ work:
       Preserve the current QuestDB outcomes: dry-run exits without a connection,
       force_recreate sets database_was_reused=False, missing benchmark/table
       metadata is treated as fresh, missing expected tables are treated as fresh,
-      and expected tables that exist but are empty are treated as fresh.
+      and expected tables that exist but are empty are treated as fresh. The
+      replacement should use the base-class flow plus a QuestDB
+      check_benchmark_tables_exist() implementation, not a second
+      handle_existing_database() rewrite.
 
   - id: w3
     summary: "Migrate InfluxDB while preserving its force_recreate warning"
@@ -158,7 +167,8 @@ work:
       force_recreate=True and add table-readiness validation through the shared
       hook. Reuse the existing get_tables()/table_exists() metadata path or add a
       narrow _get_existing_tables() adapter method instead of issuing duplicate
-      metadata SQL in setup code.
+      metadata SQL in setup code. Do not collapse the force_recreate warning into
+      the hook; recreation support and table-readiness validation stay separate.
 
   - id: w4
     summary: "Add focused tests for default behavior, QuestDB, and InfluxDB"
@@ -167,7 +177,9 @@ work:
     notes: |
       Cover the base default hook path for non-opted-in adapters, the opted-in
       false/true paths, QuestDB's non-empty table guard, and InfluxDB's preserved
-      force_recreate warning plus table-validation branch.
+      force_recreate warning plus table-validation branch. Assert the hook is
+      called where expected and cover present, missing, and partial table sets
+      without requiring a live QuestDB or InfluxDB server.
 
   - id: w5
     summary: "Run targeted verification and confirm scope stayed within the allowlist"
@@ -213,6 +225,15 @@ context_sections:
     for force_recreate=True; multiple live-test fixtures manually set
     skip_database_management=True on adapters outside QuestDB/InfluxDB.
 
+  PR 673 Synthesis: |
+    PR #673 added an initial work-unit and guardrail block for this TODO. This
+    item keeps its useful specifics - a default hook result of None/unknown,
+    calling the hook from the managed skip path, keeping InfluxDB's warning
+    separate, and testing hook parity without live servers - while retaining the
+    stricter review findings from this branch: a w0 freshness gate, explicit
+    non-empty QuestDB reuse semantics, current prior-art references, an adapter
+    compatibility matrix, and broader focused verification.
+
   Adapter Compatibility Matrix: |
     | Adapter class | Current skip_database_management use | Required outcome |
     |---|---|---|
@@ -253,6 +274,7 @@ prior_art:
 must_preserve:
   - "ConnectionLifecycleMixin.handle_existing_database() still returns early in dry_run mode before any database existence or table-readiness checks."
   - "Adapters with skip_database_management=True and no hook implementation still set database_was_reused=True without opening validation connections."
+  - "The base hook default is a no-op/no-opinion result, such as None, so old adapters keep the current database_was_reused=True skip behavior."
   - "QuestDBAdapter force_recreate=True sets database_was_reused=False without connecting to QuestDB."
   - "QuestDBAdapter treats missing benchmark metadata, empty expected-table lists, missing expected tables, and empty expected tables as fresh database states."
   - "QuestDBAdapter marks database_was_reused=True only when all expected tables exist and each expected table has at least one row."
