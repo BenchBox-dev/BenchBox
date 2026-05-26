@@ -9,7 +9,7 @@ related_paths:
   - CLAUDE.md
   - AGENTS.md
 suggested_sweep: "After one release with worktree-add deprecated, remove it and reduce the surface to two paths"
-todo_id: null
+todo_id: remove-worktree-add-deprecated-alias
 ---
 
 # Four worktree creation paths now coexist; agents must learn which to use when
@@ -41,6 +41,8 @@ ownership boundaries produces ambiguity rather than ergonomics.
       listing them flat (this PR).
 - [x] CLAUDE.md and AGENTS.md prose explicitly call out
       `worktree-claim` as the preferred path for new write sessions.
-- [ ] After one release with the deprecation notice live, remove
+- [x] After one release with the deprecation notice live, remove
       `make worktree-add` and the corresponding docs paragraphs.
       Track via a one-shot follow-up TODO at deprecation deadline.
+      (Done: removed in PR for `remove-worktree-add-deprecated-alias`,
+      one release after v0.3.0 (2026-05-20); PR #73 merged 2026-04-30.)
