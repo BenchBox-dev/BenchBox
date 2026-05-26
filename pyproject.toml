@@ -47,6 +47,9 @@ dependencies = [
     # pyarrow: ABI-sensitive (bundled C++); wide cap to <25 to give runway while catching jumps.
     "pyarrow>=21.0.0,<25.0.0",
     "numpy>=1.24.0",
+    # ClickHouse local result handling is reachable during `import benchbox`
+    # today and materializes pandas DataFrames from Arrow streams.
+    "pandas>=2.0.0",
     "zstandard>=0.20.0",
     # grpcio / grpcio-status are NOT declared at the core level. They are
     # pulled in transitively by optional cloud / connectivity extras
