@@ -3,7 +3,7 @@ iteration: shrink-campaign-pr-audit-followups
 date: 2026-05-26
 surface: shrink campaign audit follow-up repairs
 branch: fix/shrink-campaign-pr-audit
-pr:
+pr: 675
 raw_cloc_delta: -60
 credited_reduction: 0
 uncredited_relocation: 0
@@ -75,8 +75,8 @@ artifact.
 
 ## Verification
 
-- `make shrink-rollup`: 26 merged fragments before this PR body, 12090
-  cumulative merged credited reduction, 0 remaining to the committed floor.
+- `make shrink-rollup`: 27 local fragments including this PR body, 12090
+  cumulative credited reduction, 0 remaining to the committed floor.
 - `cloc --include-lang=Python benchbox/`: 913 Python files and 195139 code
   lines after repairs.
 - `uv run -- ruff check ...`: pass for all touched runtime and test files.
@@ -89,6 +89,36 @@ artifact.
 - `make compat-docs-check`: pass.
 - `make pr-preflight`: pass; CI lint passed and the fast lane reported 22692
   passed, 5 skipped, 42 warnings, and 4 subtests passed.
+
+## Blind-Spot Follow-up Audit
+
+After the first correction PR was opened, a second pass covered the main
+blind spots from the review process:
+
+- PR-set completeness: regenerated the merged shrink PR query and compared it
+  with the seeded list. Both sets contain 102 PRs, with no `query_minus_seed`
+  or `seed_minus_query` differences. The 26 ledger-backed PRs are all present
+  in that merged shrink PR set.
+- Ledger recomputation: recomputed `cloc --include-lang=Python benchbox/` at
+  each `origin/develop` ledger fragment's introducing squash commit and its
+  parent. All 26 fragments were classified `ok`; credited reduction sums to
+  12090. The raw parent-to-commit reduction sums to 12078 because PR #630 is a
+  zero-credit repair that intentionally added 12 maintained Python lines.
+- Package artifact smoke: `uv build --out-dir /tmp/shrink-campaign-pr-audit-dist`
+  produced both wheel and sdist. The sdist contains the moved query/catalog
+  resources, and an isolated installed-wheel smoke confirmed those resources
+  are accessible via `importlib.resources`.
+- Installed-wheel API smoke: from outside the checkout, the wheel exposes
+  `TPCDS_DATAFRAME_QUERIES` through `benchbox.__all__` as `QueryRegistry`, and
+  lazy registry loading keeps miss counts at 0 before first access and 1 after
+  `len()` for both Read Primitives and TPC-DS.
+- Runtime query semantics: `uv run -- python -m pytest
+  tests/integration/validation/test_read_primitives_variant_parity.py -q -n 0`
+  passed 44 integration parity tests against the DuckDB SF=0.01 reference
+  surface.
+- Follow-up branch gate: after PR #675 merged, this evidence-only update was
+  replayed onto current `origin/develop`; `make pr-preflight` passed with
+  22716 passed, 5 skipped, 42 warnings, and 4 subtests.
 
 ## Residual Risk
 
