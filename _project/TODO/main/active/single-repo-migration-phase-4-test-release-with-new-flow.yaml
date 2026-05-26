@@ -253,7 +253,7 @@ work:
 
 verification:
 - description: "PyPI has v0.3.0"
-  command: "pip index versions benchbox 2>&1 | grep -c '0.3.0'"
+  command: "uv run --isolated --with pip -- python -m pip index versions benchbox 2>&1 | grep -c '0.3.0'"
   expected_output: "at least 1"
 - description: "Tag exists on public main"
   command: "git -C ~/Developer/benchbox-public rev-parse v0.3.0"
@@ -265,11 +265,11 @@ verification:
   command: "test -f ~/Developer/benchbox-public/.pre-commit-config.yaml && echo OK"
   expected_output: "OK"
 - description: "Installed wheel is clean of maintainer scaffolding"
-  command: "pip show -f benchbox | grep -E '_project|automate_release|benchbox/release/' | wc -l"
+  command: "uv run --isolated --with pip -- python -m pip show -f benchbox | grep -E '_project|automate_release|benchbox/release/' | wc -l"
   expected_output: "0"
-- description: "release.yml workflow concluded successfully"
-  command: "gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'"
-  expected_output: "success"
+- description: "Installability gate closed via the v0.3.1 recovery release (NOT the failed v0.3.0 run)"
+  command: "uv run --isolated --no-project --with 'benchbox==0.3.1' -- python -c 'import benchbox; print(benchbox.__version__)'"
+  expected_output: "0.3.1 — closure is recovery-complete per release-recovery-v0-3-1; the original v0.3.0 release.yml run (26160520298) is expected `failure` and is explicitly NOT a closure criterion"
 
 must_preserve:
 - Results Explorer DOES NOT SHIP in v0.3.0. Do not describe repository

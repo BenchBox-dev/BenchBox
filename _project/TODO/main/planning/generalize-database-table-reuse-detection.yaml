@@ -24,6 +24,77 @@ description: |
 
 category: Architecture & Refactoring
 
+work:
+  - id: w1
+    summary: "Add check_benchmark_tables_exist() hook to base connection_lifecycle"
+    status: pending
+    notes: |
+      In benchbox/platforms/base/connection_lifecycle.py, add a
+      check_benchmark_tables_exist() hook (default no-op returning None ->
+      "unknown") and call it from the skip_database_management=True branch of
+      handle_existing_database() (around line 192) so managed-database adapters
+      can validate table presence without duplicating connection / set-comparison
+      logic. Preserve the current database_was_reused=True default when the hook
+      returns None (no opinion).
+  - id: w2
+    summary: "Migrate QuestDB handle_existing_database() to call the base hook"
+    needs: [w1]
+    status: pending
+    notes: |
+      Replace the QuestDB override body in benchbox/platforms/questdb.py with the
+      base-class flow plus a check_benchmark_tables_exist() implementation that
+      performs the existing all-expected-tables-exist validation. No behavior
+      change to the reuse decision.
+  - id: w3
+    summary: "Wire InfluxDB table validation through the hook, preserving its force_recreate warning"
+    needs: [w1]
+    status: pending
+    notes: |
+      In benchbox/platforms/influxdb/setup.py, keep the custom force_recreate
+      warning exactly as-is (independent concern) and add a
+      check_benchmark_tables_exist() implementation so InfluxDB gains the same
+      validation QuestDB has. Do not collapse the warning into the hook.
+  - id: w4
+    summary: "Add unit coverage proving reuse-detection parity"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Extend tests/unit/platforms/test_questdb_adapter.py (and an InfluxDB unit
+      test if one exists, else the closest unit harness) to assert the hook is
+      called and the reuse decision is unchanged for present/missing/partial
+      table sets. Avoid requiring a live QuestDB/InfluxDB server.
+
+verification:
+  - description: "QuestDB adapter reuse-detection unit coverage passes"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_questdb_adapter.py tests/unit/platforms/test_questdb_coverage.py -q"
+    expected_output: "passes"
+  - description: "TODO graph and schema remain valid"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/generalize-database-table-reuse-detection.yaml"
+    expected_output: "passes"
+
+must_preserve:
+  - "Reuse decision (database_was_reused) is unchanged for every existing input: present, missing, and partial table sets"
+  - "InfluxDB's force_recreate warning stays a separate concern from table validation"
+  - "No live QuestDB/InfluxDB server required for unit coverage"
+
+approach: |
+  Pure internal refactor: extract the shared table-presence check into a base
+  hook, then have QuestDB and InfluxDB implement it. Behavior is already correct
+  after dbc84af27; this only removes duplication.
+
+anti_patterns:
+  - "DO NOT change reuse semantics or the skip_database_management default while extracting the hook"
+  - "DO NOT fold InfluxDB's force_recreate warning into the table-validation hook"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/connection_lifecycle.py"
+    - "benchbox/platforms/questdb.py"
+    - "benchbox/platforms/influxdb/setup.py"
+    - "tests/unit/platforms/test_questdb_adapter.py"
+    - "tests/unit/platforms/test_questdb_coverage.py"
+    - "_project/TODO/main/planning/generalize-database-table-reuse-detection.yaml"
+
 metadata:
   tags:
     - architecture

@@ -60,7 +60,7 @@ work:
   summary: "Audit the retired private clone for any uncommitted/unpushed work"
   status: pending
   notes: |
-    cd /Users/joe/Developer/BenchBox.retired-YYYYMMDD
+    cd /Users/joe/Developer/BenchBox.retired-20260427
     git status                        # any unstaged or staged work?
     git stash list                    # any stashed work?
     git branch -vv                    # any branch with [ahead N] vs upstream?
@@ -109,7 +109,7 @@ work:
   needs: [w2]
   status: pending
   notes: |
-    rm -rf /Users/joe/Developer/BenchBox.retired-YYYYMMDD
+    rm -rf /Users/joe/Developer/BenchBox.retired-20260427
     Default action: delete after w2 confirms no lost work. Costs disk
     space; serves no purpose once the archive is verified.
     Skip if disk space is fine and you want a permanent local snapshot.
@@ -157,7 +157,7 @@ scope_limit:
   only_modify:
   - _project/decisions/single-repo-migration.md  # record final decision
   - MIGRATION-NOTES.md  # remove if it was added
-  - /Users/joe/Developer/BenchBox.retired-YYYYMMDD/  # delete if w5 chooses delete
+  - /Users/joe/Developer/BenchBox.retired-20260427/  # delete if w5 chooses delete
   notes: |
     GitHub UI changes only (potential archive deletion). No code
     changes in the canonical repo beyond the optional notes file removal.
