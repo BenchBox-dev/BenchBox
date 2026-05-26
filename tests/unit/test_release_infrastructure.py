@@ -96,6 +96,16 @@ class TestReleaseInfrastructure:
             assert "anthropics/claude-code" not in url
             assert "anthropic" not in url
 
+    def test_core_runtime_dependencies_cover_clean_import_path(self):
+        """Clean package installs must include dependencies needed by import-time platform wiring."""
+        pyproject_path = REPO_ROOT / "pyproject.toml"
+
+        with open(pyproject_path, "rb") as f:
+            config = tomllib.load(f)
+
+        dependencies = config["project"]["dependencies"]
+        assert any(dep.startswith("pandas>=") for dep in dependencies)
+
     def test_github_issue_url_fix(self):
         """Test that exceptions.py has correct GitHub issue URL."""
         exceptions_path = REPO_ROOT / "benchbox" / "cli" / "exceptions.py"
