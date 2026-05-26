@@ -7,7 +7,7 @@ inject both shapes directly.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -19,16 +19,22 @@ from phase2_metrics import (
     SECTION_ORG,
     SECTION_PRIVATE,
     GhError,
+    MetricResult,
     _count_distinct_lowercased,
     _count_entries,
     _glyph,
     _split_sections,
     _trigger_q1_size,
     _trigger_q2_pr_volume,
+    build_payload,
+    compute_trend,
+    find_prior_review,
     metric_backlog,
     metric_merged_volume,
     metric_qualitative,
     metric_review_latency,
+    parse_prior_metrics,
+    render_trend_section,
 )
 
 pytestmark = [
@@ -279,3 +285,146 @@ class TestGlyph:
 
     def test_unmeasurable(self):
         assert _glyph(None) == "?"
+
+
+# ---------------------------------------------------------------------------
+# JSON payload + trend vs prior review
+# ---------------------------------------------------------------------------
+
+
+def _review_doc(rows: list[tuple[int, str, str, str]]) -> str:
+    """Build a minimal review markdown with a `## Metrics` table.
+
+    `rows` are (num, name, value, status) tuples.
+    """
+    lines = [
+        "# Phase 3 Promotion Metrics",
+        "",
+        "## Summary",
+        "",
+        "body",
+        "",
+        "## Metrics",
+        "",
+        "| # | Metric | Value | Threshold | Status | Note |",
+        "|---|--------|-------|-----------|--------|------|",
+    ]
+    for num, name, value, status in rows:
+        lines.append(f"| {num} | {name} | {value} | thr | {status} |  |")
+    lines += ["", "## results-data/ Extraction Triggers", "", "none", ""]
+    return "\n".join(lines) + "\n"
+
+
+class TestParsePriorMetrics:
+    def test_parses_ordered_rows_only_from_metrics_section(self, tmp_path: Path):
+        path = tmp_path / "phase-3-review-2026-04-27.md"
+        path.write_text(_review_doc([(1, "Metric A", "0 / 0 / 0", "ok"), (2, "Metric B", "5.0h", "BREACHED")]))
+        rows = parse_prior_metrics(path)
+        assert [r["num"] for r in rows] == [1, 2]
+        assert rows[0] == {"num": 1, "name": "Metric A", "value": "0 / 0 / 0", "status": "ok"}
+        assert rows[1]["status"] == "BREACHED"
+
+    def test_ignores_extraction_table_and_separators(self, tmp_path: Path):
+        path = tmp_path / "phase-3-review-2026-04-27.md"
+        path.write_text(_review_doc([(1, "Only", "1", "ok")]))
+        # The extraction-trigger table rows have no leading integer and live
+        # under a different ## section -> excluded.
+        assert len(parse_prior_metrics(path)) == 1
+
+
+class TestFindPriorReview:
+    def _seed(self, d: Path):
+        for name, rows in [
+            ("phase-3-review-2026-01-05.md", [(1, "A", "old", "ok")]),
+            ("phase-3-review-baseline-2026-04-27.md", [(1, "A", "mid", "ok")]),
+            ("phase-3-review-2026-12-31.md", [(1, "A", "future", "ok")]),
+        ]:
+            (d / name).write_text(_review_doc(rows))
+
+    def test_picks_most_recent_before_today(self, tmp_path: Path):
+        self._seed(tmp_path)
+        result = find_prior_review(tmp_path, date(2026, 5, 26))
+        assert result is not None
+        since, rows = result
+        assert since == "2026-04-27"  # not the future-dated one
+        assert rows[0]["value"] == "mid"
+
+    def test_none_when_no_earlier_review(self, tmp_path: Path):
+        self._seed(tmp_path)
+        # Today before every review -> nothing strictly earlier.
+        assert find_prior_review(tmp_path, date(2026, 1, 1)) is None
+
+    def test_missing_dir_is_none(self, tmp_path: Path):
+        assert find_prior_review(tmp_path / "nope", date(2026, 5, 26)) is None
+
+
+class TestComputeTrend:
+    def _results(self) -> list[MetricResult]:
+        return [
+            MetricResult("M1", "now1", breached=False, threshold="t"),
+            MetricResult("M2", "now2", breached=True, threshold="t"),
+        ]
+
+    def test_none_prior_yields_none(self):
+        assert compute_trend(None, self._results()) is None
+
+    def test_pairs_by_position_and_flags_status_change(self):
+        prior = (
+            "2026-04-27",
+            [
+                {"num": 1, "name": "old-name-1", "value": "then1", "status": "ok"},
+                {"num": 2, "name": "old-name-2", "value": "then2", "status": "ok"},
+            ],
+        )
+        trend = compute_trend(prior, self._results())
+        assert trend["since"] == "2026-04-27"
+        m1, m2 = trend["metrics"]
+        # Current name is used; prior value paired by position despite name drift.
+        assert m1["name"] == "M1" and m1["value_then"] == "then1" and m1["value_now"] == "now1"
+        assert m1["status_changed"] is False  # ok -> ok
+        assert m2["status_then"] == "ok" and m2["status_now"] == "BREACHED"
+        assert m2["status_changed"] is True
+
+    def test_more_current_than_prior_rows_pads_na(self):
+        prior = ("2026-04-27", [{"num": 1, "name": "x", "value": "then1", "status": "ok"}])
+        trend = compute_trend(prior, self._results())
+        assert trend["metrics"][1]["value_then"] == "n/a"
+        assert trend["metrics"][1]["status_then"] == "n/a"
+
+
+class TestRenderTrendSection:
+    def test_header_when_present(self):
+        trend = {
+            "since": "2026-04-27",
+            "metrics": [
+                {
+                    "name": "M",
+                    "value_then": "a",
+                    "value_now": "b",
+                    "status_then": "ok",
+                    "status_now": "BREACHED",
+                    "status_changed": True,
+                },
+            ],
+        }
+        out = "\n".join(render_trend_section(trend))
+        assert "## Trend vs 2026-04-27" in out
+        assert "ok -> BREACHED" in out
+
+    def test_placeholder_when_absent(self):
+        out = "\n".join(render_trend_section(None))
+        assert out.startswith("## Trend")
+        assert "No prior" in out
+
+
+class TestBuildPayload:
+    def test_shape_and_json_serializable(self):
+        import json
+
+        now = datetime(2026, 5, 26, 9, 0, 0, tzinfo=timezone.utc)
+        results = [MetricResult("M1", "v", breached=None, threshold="t", note="n")]
+        triggers = [MetricResult("Q1", "1 MB", breached=False, threshold="t")]
+        payload = build_payload("o/r", "published-results", results, triggers, now, trend=None)
+        assert set(payload) == {"generated_at", "repo", "base_branch", "results", "extraction_triggers", "trend"}
+        assert payload["results"][0]["breached"] is None  # None survives round-trip
+        assert json.loads(json.dumps(payload))["base_branch"] == "published-results"

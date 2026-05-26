@@ -85,8 +85,11 @@ wastes the largest engineering investment in the project.
   of January; Q2: April; Q3: July; Q4: October).
 - **Owner**: BenchBox maintainer rotation — currently the single
   maintainer; revisit when a rotation exists.
-- **Calendar**: source of truth lives in the maintainer's calendar.
-  This document does not invent a scheduler.
+- **Scheduler**: `.github/workflows/phase3-promotion-review.yml` fires the
+  review automatically on the first Monday of each quarter (cron on days
+  1-7 of Jan/Apr/Jul/Oct plus a Monday guard) and opens a PR with the
+  generated report. The maintainer no longer has to remember the date.
+  `workflow_dispatch` is the manual fallback if the cron is ever missed.
 
 ### Procedure (run each quarter)
 
@@ -94,16 +97,22 @@ wastes the largest engineering investment in the project.
    `_project/notes/phase-2-requests.md` with anything captured from
    issues, Discord, email, or in-PR conversations since the last
    review.
-2. Run the metrics script:
+2. Review the auto-generated PR titled `chore(phase-3): quarterly
+   promotion review <date>` opened by
+   `.github/workflows/phase3-promotion-review.yml`. If the cron was
+   missed, regenerate it manually with `gh workflow run
+   phase3-promotion-review.yml`, or run the script directly:
 
    ```bash
    uv run python scripts/phase2_metrics.py --output \
      _project/handoffs/phase-3-review-$(date +%Y-%m-%d).md
    ```
 
-3. Open the resulting handoff file. For each breached threshold, write
-   a one-paragraph interpretation: is this a sustained signal or an
-   artifact (e.g., a single contributor's bulk submission spike)?
+3. In the PR (or the handoff file), for each breached threshold write a
+   one-paragraph interpretation: is this a sustained signal or an
+   artifact (e.g., a single contributor's bulk submission spike)? The
+   "Trend vs <date>" section diffs each metric against the prior review
+   so the two-consecutive-quarters signal is explicit.
 4. **Decision rule**: if **two or more** quantitative thresholds are
    breached *for the second consecutive quarter*, OR any **two**
    qualitative thresholds are breached in a single review, promote the
@@ -111,7 +120,8 @@ wastes the largest engineering investment in the project.
    - `design-results-ingest-storage-and-derived-read-model`
    - `integrate-benchbox-cli-submit-and-service-auth`
    - `operate-results-platform-security-observability-and-abuse-controls`
-5. Commit the handoff file. The commit history is the audit trail.
+5. Merge the PR (or commit the handoff file, if generated manually).
+   The commit history is the audit trail.
 
 The "two thresholds, two consecutive quarters" rule is deliberate
 hysteresis: it prevents one bursty quarter from triggering a
