@@ -162,8 +162,8 @@ The drift gate for the checked exact claims is
 which derives the expected counts from the registry and names any stale source
 file. The currently gated durable surfaces are `landing/index.html`,
 `docs/design/architecture.md`, `docs/development/result-integrity-validation.md`,
-and `docs/reference/cli/utilities.md`; the README marker is gated separately by
-the platform-registry marker tests.
+`docs/reference/cli/utilities.md`, and `docs/usage/faq.md`; the README marker is
+gated separately by the platform-registry marker tests.
 
 ## Drift Check Ownership
 

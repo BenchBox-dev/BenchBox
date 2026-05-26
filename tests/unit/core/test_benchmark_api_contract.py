@@ -41,8 +41,11 @@ pytestmark = [
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PUBLIC_CONTRACTS_DOC = PROJECT_ROOT / "docs/reference/public-contracts.md"
 SUPPORT_STATUS_CRITERIA_DOC = PROJECT_ROOT / "docs/benchmarks/support-status.md"
-# Matches a criteria-matrix table row whose first two cells are `id` and `status`.
-_CRITERIA_MATRIX_ROW = re.compile(r"^\|\s*`(?P<bid>[a-z0-9_]+)`\s*\|\s*`(?P<status>[a-z_]+)`\s*\|")
+# Matches a criteria-matrix table row whose first cells are `id`, `status`, and rationale.
+_CRITERIA_MATRIX_ROW = re.compile(
+    r"^\|\s*`(?P<bid>[a-z0-9_]+)`\s*\|\s*`(?P<status>[a-z_]+)`\s*\|\s*(?P<rationale>.*?)\s*\|"
+)
+_CRITERIA_MATRIX_QUERY_COUNT = re.compile(r"\b(?P<count>\d+)-(?:query|variant)\b")
 CORE_ONLY_BENCHMARK_IDS = {"ai_primitives", "joinorder_synthetic"}
 BENCHMARK_API_COUNT_MARKER = (
     "Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; "
@@ -202,7 +205,7 @@ def test_benchmark_support_status_criteria_matrix_covers_every_benchmark() -> No
     registry_status = {bid: meta["support_status"] for bid, meta in BENCHMARK_METADATA.items()}
     doc_text = SUPPORT_STATUS_CRITERIA_DOC.read_text()
 
-    matrix_status: dict[str, str] = {}
+    matrix_rows: dict[str, dict[str, str]] = {}
     duplicates: list[str] = []
     for line in doc_text.splitlines():
         match = _CRITERIA_MATRIX_ROW.match(line)
@@ -212,21 +215,55 @@ def test_benchmark_support_status_criteria_matrix_covers_every_benchmark() -> No
         if benchmark_id not in registry_status:
             # Acceptance-criteria/legend rows whose first cell is not a benchmark id.
             continue
-        if benchmark_id in matrix_status:
+        if benchmark_id in matrix_rows:
             duplicates.append(benchmark_id)
-        matrix_status[benchmark_id] = match.group("status")
+        matrix_rows[benchmark_id] = {
+            "status": match.group("status"),
+            "rationale": match.group("rationale"),
+        }
 
     assert duplicates == [], f"benchmarks with more than one criteria-matrix row: {sorted(duplicates)}"
 
-    missing_rows = sorted(set(registry_status) - set(matrix_status))
+    missing_rows = sorted(set(registry_status) - set(matrix_rows))
     assert missing_rows == [], f"benchmarks missing a criteria-matrix row: {missing_rows}"
 
     mismatched = {
-        benchmark_id: {"matrix": matrix_status[benchmark_id], "registry": registry_status[benchmark_id]}
+        benchmark_id: {"matrix": matrix_rows[benchmark_id]["status"], "registry": registry_status[benchmark_id]}
         for benchmark_id in registry_status
-        if matrix_status[benchmark_id] != registry_status[benchmark_id]
+        if matrix_rows[benchmark_id]["status"] != registry_status[benchmark_id]
     }
     assert mismatched == {}, f"criteria-matrix status differs from registry: {mismatched}"
+
+    missing_query_claims: list[str] = []
+    query_count_mismatched: dict[str, dict[str, int]] = {}
+    dataframe_claim_mismatched: dict[str, str] = {}
+    for benchmark_id, meta in BENCHMARK_METADATA.items():
+        rationale = matrix_rows[benchmark_id]["rationale"]
+
+        query_count = _CRITERIA_MATRIX_QUERY_COUNT.search(rationale)
+        if query_count is None:
+            missing_query_claims.append(benchmark_id)
+        elif int(query_count.group("count")) != int(meta["num_queries"]):
+            query_count_mismatched[benchmark_id] = {
+                "matrix": int(query_count.group("count")),
+                "registry": int(meta["num_queries"]),
+            }
+
+        if meta.get("supports_dataframe", False):
+            if "DataFrame-capable" not in rationale or "not DataFrame-capable" in rationale:
+                dataframe_claim_mismatched[benchmark_id] = "expected DataFrame-capable"
+        elif "not DataFrame-capable" not in rationale:
+            dataframe_claim_mismatched[benchmark_id] = "expected not DataFrame-capable"
+
+    assert missing_query_claims == [], (
+        f"benchmarks missing parseable matrix query-count evidence: {missing_query_claims}"
+    )
+    assert query_count_mismatched == {}, (
+        f"criteria-matrix query-count evidence differs from registry: {query_count_mismatched}"
+    )
+    assert dataframe_claim_mismatched == {}, (
+        f"criteria-matrix DataFrame evidence differs from registry: {dataframe_claim_mismatched}"
+    )
 
 
 def test_public_benchmark_count_claims_are_registry_derived() -> None:
@@ -253,6 +290,7 @@ def test_public_benchmark_count_claims_are_registry_derived() -> None:
             f"Specs exist for {spec_count} of {public_count} registered benchmarks"
         ],
         "docs/reference/cli/utilities.md": [f"Specs cover {spec_count} of {public_count} benchmarks"],
+        "docs/usage/faq.md": [f"BenchBox includes **{public_count}** public-discovery benchmarks"],
     }
 
     stale: list[str] = []

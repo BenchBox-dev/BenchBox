@@ -49,10 +49,11 @@ above define the bar a future entry would have to meet.
 
 ## Benchmark Status Rationale
 
-One row per registry benchmark. The `Benchmark` and `Status` columns are checked
-against `benchbox.core.benchmark_registry` so a status change without an updated
-rationale fails the contract test. Evidence dimensions: docs page, integrity
-spec, query count, dataset/source, scales, and DataFrame capability.
+One row per registry benchmark. The `Benchmark`, `Status`, parseable query-count
+claim, and DataFrame capability claim are checked against
+`benchbox.core.benchmark_registry` so status or evidence changes without an
+updated rationale fail the contract test. Evidence dimensions: docs page,
+integrity spec, query count, dataset/source, scales, and DataFrame capability.
 
 | Benchmark | Status | Rationale and evidence | Promotion / demotion blockers |
 |---|---|---|---|

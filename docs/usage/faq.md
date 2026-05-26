@@ -29,11 +29,11 @@ See the [Platform Selection Guide](../platforms/platform-selection-guide.md) and
 
 ### Which benchmarks are available?
 
-BenchBox includes eighteen benchmarks:
+BenchBox includes **22** public-discovery benchmarks, with examples across:
 - **TPC Standards**: TPC-H, TPC-DS, TPC-DI, TPC-DS-OBT, TPC-H Skew, TPC-Havoc
 - **Academic Benchmarks**: SSB, AMPLab, JoinOrder
-- **Industry Benchmarks**: ClickBench, H2ODB, NYC Taxi, TSBS DevOps, CoffeeShop
-- **BenchBox Primitives**: Read Primitives, Write Primitives, Transaction Primitives, TPC-H Data Vault
+- **Industry and real-world workloads**: ClickBench, H2ODB, NYC Taxi, FlightData, TSBS DevOps, CoffeeShop
+- **BenchBox Primitives and AI/ML**: Read Primitives, Write Primitives, Metadata Primitives, Transaction Primitives, AI Primitives, Vector Search, TPC-H Data Vault
 
 See the [Benchmarks Catalog](../benchmarks/index.md) for feature details and selection guidance.
 

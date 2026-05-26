@@ -16,8 +16,9 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import (
-    BENCHMARK_METADATA,
+    get_all_benchmarks,
     get_benchmark_default_scale,
+    get_benchmark_metadata,
     get_benchmark_surface,
     get_public_benchmark_class,
     list_public_benchmark_ids,
@@ -77,13 +78,13 @@ def _collect_benchmark_queries_and_tables(benchmark_lower: str) -> tuple[list[di
 
 def _get_benchmark_info_impl(benchmark: str) -> dict[str, Any]:
     benchmark_lower = benchmark.lower()
-    if benchmark_lower not in BENCHMARK_METADATA or get_benchmark_surface(benchmark_lower) != "public":
+    meta = get_benchmark_metadata(benchmark_lower)
+    if meta is None or get_benchmark_surface(benchmark_lower) != "public":
         return {
             "error": f"Benchmark '{benchmark}' not found",
             "available_benchmarks": list_public_benchmark_ids(),
         }
 
-    meta = BENCHMARK_METADATA[benchmark_lower]
     queries, tables = _collect_benchmark_queries_and_tables(benchmark_lower)
 
     return {
@@ -338,7 +339,7 @@ def _list_platforms_impl() -> dict[str, Any]:
 def _list_benchmarks_impl() -> dict[str, Any]:
     """List all available benchmarks."""
     benchmarks = []
-    for name, meta in BENCHMARK_METADATA.items():
+    for name, meta in get_all_benchmarks().items():
         if get_benchmark_surface(name) != "public":
             continue
         benchmark_data = {
