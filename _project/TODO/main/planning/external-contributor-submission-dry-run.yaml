@@ -110,6 +110,9 @@ work:
       - Render correctly in the explorer after redeploy
     Resolve any defects in this PR review like a normal review (don't
     skip the rigour because they're external; that defeats the test).
+    Capture the PR URL/number, merge timestamp, base branch, and final
+    trust label in the retrospective; verification must query GitHub for
+    these facts rather than inferring success from local git history.
 
 - id: w5
   summary: "Convert friction notes to follow-up TODOs"
@@ -122,17 +125,32 @@ work:
       - Tool/CLI fix (defect → file separate TODO with steps to reproduce)
       - Process gap (e.g., "no review SLA mentioned" → file under the
         Phase 2 ops runbook TODO)
-    Write a short retrospective at
-    `_project/handoffs/external-dry-run-retrospective-<date>.md`
+    Write a short human-specific retrospective at
+    `_project/handoffs/external-human-dry-run-retrospective-<date>.md`
     summarizing what worked, what didn't, and the resulting TODO list.
+    Include a compact evidence block with:
+      - `human_dry_run: true`
+      - `contributor_type: external`
+      - `github_pr: https://github.com/joeharris76/BenchBox/pull/<n>`
+      - `base_branch: published-results`
+      - `merged_at: <ISO timestamp>`
+      - `trust_label: community-submission`
+    The existing 2026-04-28 and 2026-04-29 agent-proxy retrospectives are
+    useful prior evidence but must not satisfy this TODO's verification.
 
 verification:
-- description: "Retrospective file exists and lists at least 3 captured friction items"
-  command: "test -f _project/handoffs/external-dry-run-retrospective-*.md && grep -c '^[-*] ' _project/handoffs/external-dry-run-retrospective-*.md"
+- description: "Human-specific retrospective exists and lists at least 3 captured friction items"
+  command: |
+    uv run -- python -c "from pathlib import Path; files=sorted(Path('_project/handoffs').glob('external-human-dry-run-retrospective-*.md')); assert files, 'missing human retrospective'; text=files[-1].read_text(encoding='utf-8'); assert 'human_dry_run: true' in text; assert 'contributor_type: external' in text; assert '## Friction' in text, 'missing friction section'; section=text.split('## Friction', 1)[1].split('\n## ', 1)[0]; print(sum(line.startswith(('- ', '* ')) for line in section.splitlines()))"
   expected_output: ">= 3"
-- description: "External contributor's PR is merged with community-submission trust label"
-  command: "git log published-results --format='%s' | grep -i 'community'"
-  expected_output: "at least one merge commit referencing the contribution"
+- description: "External contributor's PR is merged to published-results with community-submission trust label"
+  command: |
+    pr="$(rg -o 'https://github.com/joeharris76/BenchBox/pull/[0-9]+' _project/handoffs/external-human-dry-run-retrospective-*.md | tail -1 | sed 's#.*/##')"; test -n "$pr"; gh pr view "$pr" --repo joeharris76/BenchBox --json baseRefName,mergedAt,labels --jq 'select(.baseRefName == "published-results" and .mergedAt != null and ([.labels[].name] | index("community-submission"))) | "ok"'
+  expected_output: "ok"
+
+prior_art:
+- "_project/handoffs/external-dry-run-retrospective-2026-04-28.md — agent-proxy retrospective format; REUSE the compact friction-summary style but do not count this file as human evidence"
+- "_project/handoffs/external-dry-run-retrospective-2026-04-29.md — second agent-proxy retrospective with PR/CI forensic context; SUPERSEDE for human-run proof with the `external-human-dry-run-retrospective-*` naming convention"
 
 success_metrics:
 - "Submission terminal state: merged-to-published-results (PR opened, CI green, merge complete)"
@@ -150,7 +168,7 @@ anti_patterns:
 
 scope_limit:
   only_modify:
-  - _project/handoffs/external-dry-run-retrospective-*.md
+  - _project/handoffs/external-human-dry-run-retrospective-*.md
   - docs/contributing-results.md  # only if w5 lists doc fixes
   - _project/TODO/main/planning/  # follow-up TODOs only
   do_not_touch:

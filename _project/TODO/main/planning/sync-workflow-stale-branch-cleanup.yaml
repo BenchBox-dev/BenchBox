@@ -2,7 +2,7 @@ id: sync-workflow-stale-branch-cleanup
 title: "Clean up stale auto-mirror branches/PRs after sync workflow runs in prod"
 worktree: main
 priority: "Low"
-status: "Not Started"
+status: "Blocked"
 category: "Operations"
 
 deps:
@@ -18,16 +18,36 @@ description: |
 
   Wait for the workflow to run in production for one or two months, then
   decide what cleanup looks like based on actual cadence and PR volume.
+  As of the 2026-05-26 TODO review, live GitHub state showed the first
+  matching auto-mirror PR was opened on 2026-05-06, so the earliest
+  one-month review point is 2026-06-06. Keep this TODO Blocked until
+  that date, then run W0/W1 against current GitHub state before designing
+  cleanup.
 
 work:
-- id: w1
-  summary: "Audit auto-mirror PR/branch accumulation after first prod month"
+- id: w0
+  summary: "Revalidate the 2026-06-06 production-window gate"
   status: pending
   notes: |
+    Earliest start is 2026-06-06 based on the first observed
+    auto/results-mirror PR date from the 2026-05-26 TODO review. On or
+    after that date, re-run the GitHub PR/branch queries and record the
+    first observed auto-mirror PR date in the PR body. If the first date
+    has changed, keep at least one full month of production runtime before
+    proceeding to W1.
+
+- id: w1
+  summary: "Revalidate the calendar gate and audit auto-mirror PR/branch accumulation"
+  needs: [w0]
+  status: pending
+  notes: |
+    Do not start before 2026-06-06 unless the first auto-mirror PR date
+    is rechecked and proves an earlier full-month window. Run:
     `gh pr list --base published-results --state all --search "head:auto/results-mirror-"`
-    after a month of workflow runtime. Count PRs by status (open/draft,
-    merged, closed-without-merge). Decide whether cleanup is needed
-    based on observed cadence.
+    and `gh api repos/joeharris76/BenchBox/git/matching-refs/heads/auto/results-mirror`.
+    Count PRs by status (open/draft, open ready-for-review, merged,
+    closed-without-merge) and count matching branches. Decide whether
+    cleanup is needed based on observed cadence.
 
 - id: w2
   summary: "Implement cleanup if needed"
@@ -42,6 +62,9 @@ work:
     Skip merged or human-edited (label `needs-review` or non-draft) PRs.
 
 verification:
+- description: "One-month production window has elapsed before cleanup design begins"
+  command: "uv run -- python -c \"from datetime import datetime, timezone; raise SystemExit(0 if datetime.now(timezone.utc).date().isoformat() >= '2026-06-06' else 1)\""
+  expected_output: "exit 0 on or after 2026-06-06"
 - description: "No superseded auto-mirror draft PR older than the 30-day staleness window remains open"
   command: "gh pr list --base published-results --state open --search 'head:auto/results-mirror- draft:true' --json createdAt --jq '[.[] | select((now - (.createdAt|fromdateiso8601)) > 2592000)] | length'"
   expected_output: "0 after cleanup runs — older superseded auto-mirror drafts are closed; the newest mirror per series may remain open"

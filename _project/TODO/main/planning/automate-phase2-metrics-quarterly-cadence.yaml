@@ -52,9 +52,12 @@ work:
     status: pending
     notes: |
       `.github/workflows/phase3-promotion-review.yml` runs on a cron of
-      `0 9 1 1,4,7,10 *` (first day of Jan/Apr/Jul/Oct, 09:00 UTC) and
-      `workflow_dispatch`. Step 1: `uv run python scripts/phase2_metrics.py
-      --output _project/handoffs/phase-3-review-$(date +%Y-%m-%d).md`.
+      `0 9 1-7 1,4,7,10 *` plus a shell guard that exits unless
+      `date -u +%u` is `1`. That implements "first Monday of each
+      quarter" without relying on day-of-month/day-of-week OR semantics.
+      `workflow_dispatch` remains available for manual recovery.
+      Step 1: `uv run -- python scripts/phase2_metrics.py --output
+      _project/handoffs/phase-3-review-$(date +%Y-%m-%d).md`.
       Step 2: open a PR titled `chore(phase-3): quarterly promotion review
       <date>` with the handoff committed. The maintainer reviews the PR
       and writes the one-paragraph interpretation per metric per the
@@ -116,17 +119,23 @@ approach: |
 anti_patterns:
   - "DO NOT auto-promote the Phase 3 design TODOs from the workflow -- because the human-judgment paragraph per metric is the safeguard against false-positive promotion -- only generate the report"
   - "DO NOT run the workflow on every push -- because the cadence is what gives the metrics meaning -- quarterly + manual dispatch is correct"
+  - "DO NOT schedule the workflow on the first calendar day while documenting first Monday -- because the cadence must be machine-checkable -- use the 1-7 day cron plus Monday guard."
 
 verification:
   - description: "JSON output validates as JSON"
-    command: "uv run python scripts/phase2_metrics.py --format json | python -c 'import json,sys; json.load(sys.stdin)'"
+    command: "bash -o pipefail -c 'uv run -- python scripts/phase2_metrics.py --format json | uv run -- python -c \"import json,sys; json.load(sys.stdin)\"'"
     expected_output: ""
-  - description: "Workflow file exists and the cron is correct"
-    command: "grep -c 'cron:.*1 1,4,7,10' .github/workflows/phase3-promotion-review.yml"
-    expected_output: "1"
+  - description: "Workflow file exists and implements first-Monday quarterly cadence"
+    command: "rg -q '0 9 1-7 1,4,7,10 \\*' .github/workflows/phase3-promotion-review.yml && rg -q 'date -u \\+%u' .github/workflows/phase3-promotion-review.yml"
+    expected_output: "cron and Monday guard are both present"
   - description: "Diff section appears when at least two reviews exist"
-    command: "uv run python scripts/phase2_metrics.py | grep -c 'Trend vs'"
+    command: "uv run -- python scripts/phase2_metrics.py | grep -c 'Trend vs'"
     expected_output: ">= 1"
+
+prior_art:
+  - ".github/workflows/nightly.yml and .github/workflows/release-canary.yml — existing scheduled workflow idioms; REUSE cron plus workflow_dispatch structure"
+  - ".github/workflows/sync-results-data-to-published.yml and .github/workflows/seed-corpus.yml — existing GitHub Actions PR-creation flows; REUSE scoped write permissions and gh-cli PR creation rather than adding a bespoke GitHub client"
+  - "_project/handoffs/phase-3-review-baseline-2026-04-27.md — current markdown report shape; EXTEND with JSON sidecar/diff data without breaking markdown default output"
 
 files_affected:
   modified:

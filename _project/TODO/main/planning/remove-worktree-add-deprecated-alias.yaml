@@ -36,6 +36,10 @@ work:
       TODO will remove). Confirm the help table and pre-approved
       command bucket no longer have downstream consumers expecting
       `worktree-add`.
+      As of the 2026-05-26 TODO review, PR #73 had merged on
+      2026-04-30 and v0.3.0 had published on 2026-05-20; re-check
+      before implementation and include the current tag/PR evidence in
+      the PR body.
 
   - id: w2
     summary: "Remove `worktree-add` Make target and its .PHONY entry"
@@ -81,14 +85,14 @@ work:
 
 verification:
   - description: "Makefile no longer references worktree-add"
-    command: "grep -cE '^worktree-add:|^\\.PHONY.*worktree-add' Makefile"
-    expected_output: "0"
+    command: "! rg -n '^worktree-add:|^\\.PHONY.*worktree-add|make worktree-add' Makefile"
+    expected_output: "no matches"
   - description: "CLAUDE.md no longer mentions worktree-add"
-    command: "grep -cE 'worktree-add|worktree add' CLAUDE.md"
-    expected_output: "0"
+    command: "! rg -n 'worktree-add' CLAUDE.md"
+    expected_output: "no matches"
   - description: "AGENTS.md no longer mentions worktree-add"
-    command: "grep -cE 'worktree-add|worktree add' AGENTS.md"
-    expected_output: "0"
+    command: "! rg -n 'worktree-add' AGENTS.md"
+    expected_output: "no matches"
   - description: "Blind-spot file 143501 marked actioned with todo_id"
     command: "grep -cE 'todo_id: remove-worktree-add-deprecated-alias' _project/blind-spots/2026-04-30-143501-four-worktree-creation-paths.md"
     expected_output: "1"
@@ -109,10 +113,10 @@ anti_patterns:
 
 scope_limit:
   only_modify:
-    - "Makefile (worktree-add target + .PHONY + help only)"
-    - "CLAUDE.md (worktree-add paragraph)"
-    - "AGENTS.md (worktree-add paragraph)"
-    - "_project/blind-spots/2026-04-30-143501-four-worktree-creation-paths.md (status update)"
+    - "Makefile"
+    - "CLAUDE.md"
+    - "AGENTS.md"
+    - "_project/blind-spots/2026-04-30-143501-four-worktree-creation-paths.md"
   do_not_modify:
     - "Any other Makefile target"
     - "scripts/_with_pool_lock.sh, scripts/_pool_lock.py"
