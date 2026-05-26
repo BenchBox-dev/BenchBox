@@ -688,6 +688,9 @@ docs-validate:
 	@echo ""
 	@echo "Validating visualization screenshot sync..."
 	@uv run -- python scripts/validate_visualization_images.py
+	@echo ""
+	@echo "Checking repo-local doc relative links..."
+	@uv run -- python scripts/check_doc_relative_links.py
 
 # Refresh generated visualization screenshots and sync shared docs/blog copies
 docs-images:

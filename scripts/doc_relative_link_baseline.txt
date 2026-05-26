@@ -1,0 +1,46 @@
+# Pre-existing broken repo-local relative links in docs/.
+# Format: <source-path-from-repo-root><TAB><link-target>
+# Regenerate: uv run -- python scripts/check_doc_relative_links.py --update-baseline
+# Burn this list down; do NOT add new entries to silence regressions.
+docs/benchmarks/clickbench.md	README.md
+docs/benchmarks/read-primitives.md	../reference/cli-reference.md
+docs/benchmarks/tpc-h.md	../reference/cli-reference.md
+docs/benchmarks/tpc-h.md	README.md
+docs/blog/2026-01-22-welcome.md	../getting-started/quick-start.md
+docs/concepts/architecture.md	../reference/result_schema_v1.md
+docs/concepts/data-model.md	../reference/result_schema_v1.md
+docs/development/duplication-residuals.md	./duplication-inventory.csv
+docs/development/roadmap.md	platform-development.md
+docs/development/unified_frame_any_survey.md	./unified_frame_any_survey.csv
+docs/features/query-plan-analysis.md	../api/query-plan-models.md
+docs/features/query-plan-analysis.md	../benchmarks/tpch.md
+docs/guides/platform-comparison.md	../reference/cli-reference.md
+docs/guides/tpc/maintenance-phase-guide.md	../../reference/cli-reference.md
+docs/guides/tpc/tpc-ds-official-guide.md	README.md
+docs/guides/tpc/tpc-ds-official-guide.md	benchmarks/tpc-ds.md
+docs/performance/dataframe-benchmarks.md	../usage/result-analysis.md
+docs/performance/dataframe-optimization.md	../advanced/tuning.md
+docs/performance/dataframe-optimization.md	./profiling.md
+docs/platforms/athena-spark.md	glue.md
+docs/platforms/clickhouse-cloud.md	../benchmarks/tpch.md
+docs/platforms/clickhouse-local-mode.md	../benchmarks/tpch.md
+docs/platforms/databend.md	../benchmarks/tpcds.md
+docs/platforms/databend.md	../benchmarks/tpch.md
+docs/platforms/doris.md	../benchmarks/tpcds.md
+docs/platforms/doris.md	../benchmarks/tpch.md
+docs/platforms/questdb.md	../benchmarks/tpcds.md
+docs/platforms/questdb.md	../benchmarks/tpch.md
+docs/platforms/snowpark-connect.md	pyspark.md
+docs/platforms/starrocks.md	../benchmarks/tpcds.md
+docs/platforms/starrocks.md	../benchmarks/tpch.md
+docs/platforms/synapse-spark.md	synapse.md
+docs/reference/api-reference.md	configuration.md
+docs/reference/api-reference.md	examples.md
+docs/reference/api-reference.md	getting-started.md
+docs/reference/result-formats.md	python-api/results.md
+docs/tutorials/comparing-platforms.md	../advanced/cost-optimization.md
+docs/tutorials/understanding-results.md	../performance/index.md
+docs/tutorials/understanding-results.md	../reference/results-schema.md
+docs/usage/configuration.md	../reference/cli-reference.md
+docs/usage/examples-directory.md	../reference/cli-reference.md
+docs/usage/examples/index.md	../../reference/cli-reference.md
