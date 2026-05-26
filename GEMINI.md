@@ -11,7 +11,7 @@ This file provides guidance to Gemini when working with BenchBox.
   review, and L2 blind-spot audit actions are read-only plus local capture per
   the synced `SHARED/review-protocol` skill. Local capture does not authorize
   commit, push, PR creation, or auto-merge.
-- **Worktrees**: `~/Developer/BenchBox/` stays on `develop`, always. `make worktree-add BRANCH=fix/foo` creates `../BenchBox.fix-foo/` off `origin/develop`. `cd` in, `uv sync --group dev`, work, `make pr-open` from inside. **Agents must not `git checkout`/`switch`/`branch -m` in the main clone without explicit user approval; create a worktree first.**
+- **Worktrees**: `~/Developer/BenchBox/` stays on `develop`, always. `make worktree-claim BRANCH=fix/foo` claims a retained pool worktree off `origin/develop`; `cd` into the printed `WORKTREE_PATH`, `uv sync --group dev`, work, `make pr-open` from inside. **Agents must not `git checkout`/`switch`/`branch -m` in the main clone without explicit user approval; create a worktree first.**
 - **Releases**: 2-command flow on `develop` — `make release-cut VERSION=X.Y.Z` then `make release-finalize VERSION=X.Y.Z`. See `docs/operations/release-guide.md`.
 
 ## Quick Commands

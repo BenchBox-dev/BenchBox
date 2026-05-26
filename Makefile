@@ -39,7 +39,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -870,7 +870,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Lightweight local gate before pushing. Mirrors CI lint and fast marker
 # selection, but not CI's coverage fail-under; run ci-test for the exact
@@ -1624,21 +1624,6 @@ worktree-pool-disk-clean:
 	done; \
 	echo "Cleaned $$cleaned slot(s); freed $${freed_total}K total."
 
-# Path convention: ../BenchBox.<branch-with-slashes-as-dashes>/
-# After: cd into the path, work, run `make pr-open` from inside.
-worktree-add:
-	@test -n "$(BRANCH)" || { echo "Usage: make worktree-add BRANCH=<branch-name>"; exit 1; }
-	@echo "DEPRECATED: use \`make worktree-claim BRANCH=...\` instead. The pool model retains worktrees rather than creating new ones. \`worktree-add\` will be removed in the next release." >&2
-	@WTNAME=$$(echo "$(BRANCH)" | tr '/' '-'); \
-	WTPATH="../BenchBox.$$WTNAME"; \
-	test ! -e "$$WTPATH" || { echo "Path exists: $$WTPATH"; exit 1; }; \
-	git fetch origin develop --quiet && \
-	git worktree add -b "$(BRANCH)" "$$WTPATH" origin/develop && \
-	echo "" && \
-	echo "Worktree ready: $$WTPATH" && \
-	echo "Branch:        $(BRANCH) (based on origin/develop)" && \
-	echo "Next:          cd $$WTPATH && uv sync --group dev"
-
 worktree-list:
 	@git worktree list
 
@@ -1920,8 +1905,7 @@ help:
 	@echo "  make worktree-pool-disk-clean     Drop pytest/mypy/ruff/coverage caches from pool slots (preserves .venv)"
 	@echo "  make worktree-pool-reset POOL=NN  Manual escape hatch for stuck pool slots"
 	@echo ""
-	@echo "Legacy / non-pool worktree paths (deprecated, kept for one release):"
-	@echo "  make worktree-add BRANCH=name  Deprecated legacy worktree creator (prefer worktree-claim)"
+	@echo "Legacy / non-pool worktree utilities (pool path via worktree-claim is preferred):"
 	@echo "  make worktree-list             List active worktrees"
 	@echo "  make worktree-prune            Remove legacy non-pool worktrees whose branches are gone on origin"
 	@echo ""

@@ -57,9 +57,10 @@ The canonical loop is **branch → edit → preflight → `make pr-open`**. Auto
    git checkout develop && git pull
    git checkout -b feat/your-thing
 
-   # Or, parallel-friendly (creates ../BenchBox.feat-your-thing/):
-   make worktree-add BRANCH=feat/your-thing
-   cd ../BenchBox.feat-your-thing && uv sync --group dev
+   # Or, parallel-friendly — claim a retained pool worktree off develop
+   # (run `make worktree-pool-init` once first):
+   WORKTREE_PATH=$(make -s worktree-claim BRANCH=feat/your-thing | sed -n 's/^WORKTREE_PATH=//p')
+   cd "$WORKTREE_PATH" && uv sync --group dev
    ```
 
 2. **Make your changes.** Iterate with the fast lane:
