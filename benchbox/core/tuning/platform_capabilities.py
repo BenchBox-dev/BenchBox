@@ -20,6 +20,21 @@ DISTRIBUTION = "distribution"
 SORTING = "sorting"
 SORTED_INGESTION = "sorted_ingestion"
 Z_ORDER = "z_order"
+LIQUID_CLUSTERING = "liquid_clustering"
+LIQUID_CLUSTERING_AUTO = "liquid_clustering_auto"
+OPTIMIZE = "optimize"
+OPTIMIZE_FULL = "optimize_full"
+
+DATABRICKS_Z_ORDER_RENDERING = "databricks_z_order"
+DATABRICKS_LIQUID_MANUAL_RENDERING = "databricks_liquid_manual"
+DATABRICKS_LIQUID_AUTO_RENDERING = "databricks_liquid_auto"
+DATABRICKS_RENDERINGS = frozenset(
+    {
+        DATABRICKS_Z_ORDER_RENDERING,
+        DATABRICKS_LIQUID_MANUAL_RENDERING,
+        DATABRICKS_LIQUID_AUTO_RENDERING,
+    }
+)
 
 MAPPED = "mapped"
 UNSUPPORTED = "unsupported"
@@ -37,19 +52,25 @@ class PlatformTuningMapping:
     decision: str = MAPPED
     reason: str = ""
     max_columns: int | None = None
+    physical_rendering_id: str | None = None
 
     @property
     def is_required_in_template(self) -> bool:
         return self.decision == MAPPED and bool(self.tuning_types)
 
 
-def map_candidate_to_platform(platform: str, candidate: WorkloadTuningCandidate) -> PlatformTuningMapping:
+def map_candidate_to_platform(
+    platform: str,
+    candidate: WorkloadTuningCandidate,
+    *,
+    physical_rendering_id: str | None = None,
+) -> PlatformTuningMapping:
     """Map a logical tuning candidate to one platform's physical tuning vocabulary."""
     platform_key = platform.lower().replace("_", "-")
     roles = set(candidate.roles)
 
     if platform_key == "databricks":
-        return _map_databricks(roles)
+        return _map_databricks(roles, physical_rendering_id or DATABRICKS_Z_ORDER_RENDERING)
     if platform_key == "duckdb":
         return _map_duckdb(roles)
     if platform_key == "bigquery":
@@ -68,29 +89,64 @@ def map_candidate_to_platform(platform: str, candidate: WorkloadTuningCandidate)
     )
 
 
-def _map_databricks(roles: set[str]) -> PlatformTuningMapping:
+def _map_databricks(roles: set[str], physical_rendering_id: str) -> PlatformTuningMapping:
+    if physical_rendering_id == DATABRICKS_LIQUID_AUTO_RENDERING:
+        return PlatformTuningMapping(
+            platform="databricks",
+            tuning_types=(),
+            physical_mechanisms=(LIQUID_CLUSTERING_AUTO, OPTIMIZE),
+            reason=(
+                "Automatic Liquid Clustering delegates key selection to Databricks; logical candidates are "
+                "reported as workload intent, not as BenchBox-selected physical keys."
+            ),
+            physical_rendering_id=physical_rendering_id,
+        )
+
+    if physical_rendering_id == DATABRICKS_LIQUID_MANUAL_RENDERING:
+        if roles & ({TEMPORAL_PARTITION, DISTRIBUTION_CANDIDATE} | LOCALITY_ROLES):
+            reason = (
+                "Manual Liquid Clustering folds partitioning, locality, and ZORDER-style columns into clustering keys."
+            )
+            if DISTRIBUTION_CANDIDATE in roles:
+                reason += " Databricks has no user-managed distribution key."
+            return PlatformTuningMapping(
+                platform="databricks",
+                tuning_types=(CLUSTERING,),
+                physical_mechanisms=(LIQUID_CLUSTERING, OPTIMIZE),
+                reason=reason,
+                max_columns=4,
+                physical_rendering_id=physical_rendering_id,
+            )
+        return _unsupported("databricks", roles, physical_rendering_id=physical_rendering_id)
+
     if TEMPORAL_PARTITION in roles:
         return PlatformTuningMapping(
             platform="databricks",
             tuning_types=(PARTITIONING,),
             physical_mechanisms=(PARTITIONING,),
             reason="Temporal locality maps to Delta partitioning where the template already uses it.",
+            physical_rendering_id=physical_rendering_id,
         )
     if DISTRIBUTION_CANDIDATE in roles:
         return PlatformTuningMapping(
             platform="databricks",
             tuning_types=(CLUSTERING, DISTRIBUTION),
-            physical_mechanisms=(Z_ORDER, DISTRIBUTION),
-            reason="Current Databricks tuned templates build Z-ORDER candidates from clustering plus distribution.",
+            physical_mechanisms=(Z_ORDER, OPTIMIZE),
+            reason=(
+                "Legacy Databricks Z-ORDER templates fold logical distribution candidates into ZORDER locality; "
+                "Databricks has no user-managed distribution key."
+            ),
+            physical_rendering_id=physical_rendering_id,
         )
     if roles & LOCALITY_ROLES:
         return PlatformTuningMapping(
             platform="databricks",
             tuning_types=(CLUSTERING,),
-            physical_mechanisms=(Z_ORDER,),
+            physical_mechanisms=(Z_ORDER, OPTIMIZE),
             reason="Logical locality maps to Databricks clustering, consumed by the Z-ORDER path in current templates.",
+            physical_rendering_id=physical_rendering_id,
         )
-    return _unsupported("databricks", roles)
+    return _unsupported("databricks", roles, physical_rendering_id=physical_rendering_id)
 
 
 def _map_duckdb(roles: set[str]) -> PlatformTuningMapping:
@@ -199,7 +255,7 @@ def _map_snowflake(roles: set[str]) -> PlatformTuningMapping:
     return _unsupported("snowflake", roles)
 
 
-def _unsupported(platform: str, roles: set[str]) -> PlatformTuningMapping:
+def _unsupported(platform: str, roles: set[str], *, physical_rendering_id: str | None = None) -> PlatformTuningMapping:
     sorted_roles = ", ".join(sorted(roles)) or "none"
     return PlatformTuningMapping(
         platform=platform,
@@ -207,4 +263,5 @@ def _unsupported(platform: str, roles: set[str]) -> PlatformTuningMapping:
         physical_mechanisms=(),
         decision=UNSUPPORTED,
         reason=f"No physical tuning mapping for roles: {sorted_roles}",
+        physical_rendering_id=physical_rendering_id,
     )

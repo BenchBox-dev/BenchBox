@@ -49,12 +49,14 @@ This directory contains pre-built tuning configuration files for all benchmark e
 ### Databricks Configurations
 
 #### TPC-H Benchmark
-- `databricks_tpch_tuned.yaml` - Delta Lake optimizations with Z-ordering, auto-optimize, and bloom filters
-- `databricks_tpch_notuning.yaml` - Baseline performance
+- `databricks/tpch_tuned.yaml` - Legacy Delta Lake Z-ORDER rendering, auto-optimize, and bloom filters
+- `databricks/tpch_liquid_tuned.yaml` - Liquid Clustering AUTO rendering of the same logical TPC profile
+- `databricks/tpch_notuning.yaml` - Baseline performance
 
 #### TPC-DS Benchmark
-- `databricks_tpcds_tuned.yaml` - Full Delta Lake optimizations for large-scale analytics
-- `databricks_tpcds_notuning.yaml` - Baseline configuration
+- `databricks/tpcds_tuned.yaml` - Legacy Delta Lake Z-ORDER rendering for large-scale analytics
+- `databricks/tpcds_liquid_tuned.yaml` - Liquid Clustering AUTO rendering of the same logical TPC profile
+- `databricks/tpcds_notuning.yaml` - Baseline configuration
 
 #### TPC-Havoc Benchmark
 - `databricks_tpchavoc_tuned.yaml` - Delta Lake optimizations for optimizer stress testing
@@ -135,11 +137,16 @@ low-evidence candidates that must stay excluded unless new evidence changes the
 decision.
 
 Platform templates map that logical profile into platform-native mechanisms:
-Databricks uses partitioning plus clustering/distribution consumed by Delta
-Z-ORDER in the checked-in TPC templates; DuckDB uses partitioning plus sorting
-and sorted layout semantics. The physical mechanisms are different, so
-`tuning_mode == "tuned"` means "same logical profile coverage where mapped",
-not "identical storage features".
+Databricks keeps the existing `*_tuned.yaml` files as legacy Z-ORDER renderings
+and adds `*_liquid_tuned.yaml` files for Liquid Clustering AUTO. DuckDB uses
+partitioning plus sorting and sorted layout semantics. The physical mechanisms
+are different, so `tuning_mode == "tuned"` means "same logical profile coverage
+where mapped", not "identical storage features".
+
+Databricks Liquid templates set `physical_rendering_id:
+databricks_liquid_auto`, keep ZORDER disabled, and avoid per-table partitioning
+or distribution fields. The listed table columns are logical workload intent;
+with `CLUSTER BY AUTO`, Databricks chooses effective Liquid keys asynchronously.
 
 Run the checked-template profile gate with:
 

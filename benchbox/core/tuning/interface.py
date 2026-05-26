@@ -310,7 +310,12 @@ PartitionGranularityType = Literal["HOURLY", "DAILY", "MONTHLY", "YEARLY"]
 SortKeyStyleType = Literal["COMPOUND", "INTERLEAVED", "AUTO"]
 SortedIngestionModeType = Literal["off", "auto", "force"]
 SortedIngestionMethodType = Literal["auto", "ctas", "z_order", "hilbert", "liquid_clustering", "vacuum_sort"]
-DatabricksClusteringStrategyType = Literal["z_order", "liquid_clustering", "none"]
+DatabricksClusteringStrategyType = Literal["z_order", "liquid_clustering", "liquid_clustering_auto", "none"]
+DatabricksPhysicalRenderingType = Literal[
+    "databricks_z_order",
+    "databricks_liquid_manual",
+    "databricks_liquid_auto",
+]
 
 
 @dataclass
@@ -1040,6 +1045,7 @@ class PlatformOptimizationConfiguration:
     liquid_clustering_enabled: bool = False
     liquid_clustering_columns: list[str] = field(default_factory=list)
     databricks_clustering_strategy: DatabricksClusteringStrategyType = "z_order"
+    physical_rendering_id: Optional[DatabricksPhysicalRenderingType] = None
     sorted_ingestion_mode: SortedIngestionModeType = "off"
     sorted_ingestion_method: SortedIngestionMethodType = "auto"
     auto_optimize_enabled: bool = False
@@ -1052,7 +1058,8 @@ class PlatformOptimizationConfiguration:
         """Validate strategy fields for deterministic tuning behavior."""
         valid_modes = {"off", "auto", "force"}
         valid_methods = {"auto", "ctas", "z_order", "hilbert", "liquid_clustering", "vacuum_sort"}
-        valid_dbx_strategies = {"z_order", "liquid_clustering", "none"}
+        valid_dbx_strategies = {"z_order", "liquid_clustering", "liquid_clustering_auto", "none"}
+        valid_dbx_renderings = {"databricks_z_order", "databricks_liquid_manual", "databricks_liquid_auto"}
 
         if self.sorted_ingestion_mode not in valid_modes:
             raise ValueError(
@@ -1068,6 +1075,11 @@ class PlatformOptimizationConfiguration:
                 f"Invalid databricks_clustering_strategy: '{self.databricks_clustering_strategy}'. "
                 f"Must be one of {sorted(valid_dbx_strategies)}."
             )
+        if self.physical_rendering_id is not None and self.physical_rendering_id not in valid_dbx_renderings:
+            raise ValueError(
+                f"Invalid physical_rendering_id: '{self.physical_rendering_id}'. "
+                f"Must be one of {sorted(valid_dbx_renderings)}."
+            )
 
         if self.sorted_ingestion_mode == "off" and self.sorted_ingestion_method != "auto":
             raise ValueError("sorted_ingestion_method must be 'auto' when sorted_ingestion_mode is 'off'")
@@ -1075,12 +1087,39 @@ class PlatformOptimizationConfiguration:
         if self.liquid_clustering_columns and not self.liquid_clustering_enabled:
             raise ValueError("liquid_clustering_columns requires liquid_clustering_enabled=true")
 
-        if self.databricks_clustering_strategy == "none" and self.liquid_clustering_enabled:
-            raise ValueError("liquid_clustering_enabled cannot be true when databricks_clustering_strategy is 'none'")
+        liquid_strategy = self.databricks_clustering_strategy in {"liquid_clustering", "liquid_clustering_auto"}
+        liquid_requested = liquid_strategy or self.liquid_clustering_enabled or bool(self.liquid_clustering_columns)
+        z_order_requested = self.z_ordering_enabled or bool(self.z_ordering_columns)
+
+        if self.databricks_clustering_strategy == "none" and (
+            self.liquid_clustering_enabled or self.liquid_clustering_columns or z_order_requested
+        ):
+            raise ValueError(
+                "databricks_clustering_strategy='none' cannot be combined with liquid_clustering_enabled, "
+                "liquid_clustering_columns, z_ordering_enabled, or z_ordering_columns"
+            )
+        if liquid_requested and z_order_requested:
+            raise ValueError(
+                "Databricks Liquid Clustering cannot be combined with z_ordering_enabled or z_ordering_columns; "
+                "set z_ordering_enabled=false and remove z_ordering_columns, or use databricks_z_order."
+            )
+        if self.databricks_clustering_strategy == "liquid_clustering_auto" and self.liquid_clustering_columns:
+            raise ValueError(
+                "liquid_clustering_columns cannot be set with databricks_clustering_strategy='liquid_clustering_auto'; "
+                "automatic Liquid Clustering uses CLUSTER BY AUTO and Databricks selects keys asynchronously."
+            )
+        if self.physical_rendering_id == "databricks_z_order" and liquid_requested:
+            raise ValueError(
+                "physical_rendering_id=databricks_z_order cannot be combined with Liquid Clustering fields"
+            )
+        if self.physical_rendering_id in {"databricks_liquid_manual", "databricks_liquid_auto"} and z_order_requested:
+            raise ValueError(
+                f"physical_rendering_id={self.physical_rendering_id} cannot be combined with ZORDER fields"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
-        return {
+        result = {
             "z_ordering_enabled": self.z_ordering_enabled,
             "z_ordering_columns": self.z_ordering_columns,
             "liquid_clustering_enabled": self.liquid_clustering_enabled,
@@ -1094,18 +1133,27 @@ class PlatformOptimizationConfiguration:
             "bloom_filter_columns": self.bloom_filter_columns,
             "materialized_views_enabled": self.materialized_views_enabled,
         }
+        if self.physical_rendering_id is not None:
+            result["physical_rendering_id"] = self.physical_rendering_id
+        return result
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "PlatformOptimizationConfiguration":
         """Create from dictionary."""
         sorted_ingestion_mode = data.get("sorted_ingestion_mode", data.get("deep_sort_mode", "off"))
         sorted_ingestion_method = data.get("sorted_ingestion_method", data.get("deep_sort_method", "auto"))
+        strategy = data.get("databricks_clustering_strategy")
+        if strategy is None and (data.get("liquid_clustering_enabled", False) or data.get("liquid_clustering_columns")):
+            strategy = "liquid_clustering"
+        if strategy is None:
+            strategy = "z_order"
         return cls(
             z_ordering_enabled=data.get("z_ordering_enabled", False),
             z_ordering_columns=data.get("z_ordering_columns", []),
             liquid_clustering_enabled=data.get("liquid_clustering_enabled", False),
             liquid_clustering_columns=data.get("liquid_clustering_columns", []),
-            databricks_clustering_strategy=data.get("databricks_clustering_strategy", "z_order"),
+            databricks_clustering_strategy=strategy,
+            physical_rendering_id=data.get("physical_rendering_id"),
             sorted_ingestion_mode=sorted_ingestion_mode,
             sorted_ingestion_method=sorted_ingestion_method,
             auto_optimize_enabled=data.get("auto_optimize_enabled", False),
@@ -1271,6 +1319,63 @@ class UnifiedTuningConfiguration:
         for tuning_type in enabled_types:
             if not tuning_type.is_compatible_with_platform(platform):
                 errors.append(f"Tuning type '{tuning_type.value}' is not supported by platform '{platform}'")
+
+        platform_key = platform.lower().replace("_", "-")
+        if platform_key == "databricks":
+            errors.extend(self._validate_databricks_effective_layout())
+
+        return errors
+
+    def _validate_databricks_effective_layout(self) -> list[str]:
+        """Validate Databricks layout combinations that require the full tuning config."""
+        errors: list[str] = []
+        try:
+            self.platform_optimizations.__post_init__()
+        except ValueError as exc:
+            errors.append(str(exc))
+
+        strategy = self.platform_optimizations.databricks_clustering_strategy
+        liquid_requested = (
+            strategy in {"liquid_clustering", "liquid_clustering_auto"}
+            or self.platform_optimizations.liquid_clustering_enabled
+            or bool(self.platform_optimizations.liquid_clustering_columns)
+            or self.platform_optimizations.physical_rendering_id
+            in {"databricks_liquid_manual", "databricks_liquid_auto"}
+        )
+        if not liquid_requested:
+            return errors
+
+        partitioned_tables = sorted(
+            table_name for table_name, table_tuning in self.table_tunings.items() if table_tuning.partitioning
+        )
+        if partitioned_tables:
+            errors.append(
+                "Databricks Liquid Clustering is incompatible with per-table partitioning; "
+                f"move partition columns to Liquid clustering intent or use databricks_z_order. Tables: "
+                f"{', '.join(partitioned_tables)}"
+            )
+
+        distributed_tables = sorted(
+            table_name for table_name, table_tuning in self.table_tunings.items() if table_tuning.distribution
+        )
+        if distributed_tables:
+            errors.append(
+                "Databricks Liquid Clustering has no user-managed distribution key; "
+                f"fold distribution candidates into clustering intent or use databricks_z_order. Tables: "
+                f"{', '.join(distributed_tables)}"
+            )
+
+        if strategy == "liquid_clustering":
+            oversized_tables = sorted(
+                table_name
+                for table_name, table_tuning in self.table_tunings.items()
+                if table_tuning.clustering and len(table_tuning.clustering) > 4
+            )
+            if oversized_tables:
+                errors.append(
+                    "Databricks manual Liquid Clustering supports at most four clustering keys per table; "
+                    f"use databricks_liquid_auto or reduce clustering columns. Tables: {', '.join(oversized_tables)}"
+                )
 
         return errors
 

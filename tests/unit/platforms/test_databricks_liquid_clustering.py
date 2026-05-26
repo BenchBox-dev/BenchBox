@@ -79,6 +79,11 @@ def test_apply_table_tunings_uses_liquid_clustering_when_configured(_mock_databr
             "statement": "ALTER TABLE TEST_TABLE CLUSTER BY (event_time, customer_id)",
         }
     ]
+    assert [operation["mechanism"] for operation in adapter._applied_layout_operations] == [
+        "liquid_clustering",
+        "optimize",
+        "analyze",
+    ]
 
 
 @patch("benchbox.platforms.databricks.adapter.databricks_sql")
@@ -113,10 +118,15 @@ def test_apply_table_tunings_keeps_z_order_default_behavior(_mock_databricks_sql
             "statement": "OPTIMIZE TEST_TABLE ZORDER BY (cluster_key, dist_key)",
         }
     ]
+    assert [operation["mechanism"] for operation in adapter._applied_layout_operations] == [
+        "z_order",
+        "optimize",
+        "analyze",
+    ]
 
 
 @patch("benchbox.platforms.databricks.adapter.databricks_sql")
-def test_strategy_precedence_prefers_liquid_when_legacy_z_order_is_also_enabled(_mock_databricks_sql):
+def test_strategy_conflict_rejects_liquid_when_legacy_z_order_is_also_enabled(_mock_databricks_sql):
     adapter = DatabricksAdapter(
         server_hostname="test.cloud.databricks.com",
         http_path="/sql/1.0/warehouses/test",
@@ -136,11 +146,46 @@ def test_strategy_precedence_prefers_liquid_when_legacy_z_order_is_also_enabled(
     mock_connection.cursor.return_value = mock_cursor
 
     table_tuning = _make_table_tuning(cluster_cols=[_make_col("cluster_key", 1)])
+    with pytest.raises(ValueError, match="Liquid Clustering cannot be combined"):
+        adapter.apply_table_tunings(table_tuning, mock_connection)
+
+
+@patch("benchbox.platforms.databricks.adapter.databricks_sql")
+def test_apply_table_tunings_uses_liquid_auto_when_configured(_mock_databricks_sql):
+    adapter = DatabricksAdapter(
+        server_hostname="test.cloud.databricks.com",
+        http_path="/sql/1.0/warehouses/test",
+        access_token="test_token",
+    )
+
+    unified = UnifiedTuningConfiguration()
+    unified.platform_optimizations.databricks_clustering_strategy = "liquid_clustering_auto"
+    unified.platform_optimizations.liquid_clustering_enabled = True
+    adapter.unified_tuning_configuration = unified
+
+    mock_cursor = Mock()
+    mock_cursor.fetchall.return_value = [("Provider", "delta")]
+    mock_connection = Mock()
+    mock_connection.cursor.return_value = mock_cursor
+
+    table_tuning = _make_table_tuning(cluster_cols=[_make_col("cluster_key", 1)])
     adapter.apply_table_tunings(table_tuning, mock_connection)
 
     execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
-    assert any("ALTER TABLE TEST_TABLE CLUSTER BY (event_time)" in call for call in execute_calls)
-    assert not any("ZORDER BY" in call for call in execute_calls)
+    assert any("ALTER TABLE TEST_TABLE CLUSTER BY AUTO" in call for call in execute_calls)
+    assert adapter._liquid_clustering_operations == [
+        {
+            "table": "TEST_TABLE",
+            "columns": [],
+            "statement": "ALTER TABLE TEST_TABLE CLUSTER BY AUTO",
+            "mode": "auto",
+        }
+    ]
+    assert [operation["mechanism"] for operation in adapter._applied_layout_operations] == [
+        "liquid_clustering_auto",
+        "optimize",
+        "analyze",
+    ]
 
 
 @patch("benchbox.platforms.databricks.adapter.databricks_sql")
@@ -211,8 +256,14 @@ def test_platform_metadata_includes_clustering_strategy_and_operations(_mock_wor
         }
     ]
     assert metadata["z_order_operations"] == []
+    assert metadata["requested_databricks_clustering_strategy"] == "liquid_clustering"
+    assert metadata["resolved_databricks_clustering_strategy"] == "liquid_clustering"
+    assert metadata["applied_layout_operations"] == []
+    assert metadata["skipped_layout_operations"] == []
 
     platform_info = adapter.get_platform_info(mock_connection)
+    assert platform_info["configuration"]["requested_databricks_clustering_strategy"] == "liquid_clustering"
+    assert platform_info["configuration"]["resolved_databricks_clustering_strategy"] == "liquid_clustering"
     assert platform_info["configuration"]["databricks_clustering_strategy"] == "liquid_clustering"
     assert platform_info["configuration"]["liquid_clustering_enabled"] is True
     assert platform_info["configuration"]["liquid_clustering_columns_config"] == ["event_time"]
@@ -224,3 +275,5 @@ def test_platform_metadata_includes_clustering_strategy_and_operations(_mock_wor
         }
     ]
     assert platform_info["configuration"]["z_order_operations"] == []
+    assert platform_info["configuration"]["applied_layout_operations"] == []
+    assert platform_info["configuration"]["skipped_layout_operations"] == []

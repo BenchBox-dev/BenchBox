@@ -941,6 +941,9 @@ class DryRunExecutor:
             },
             "platform_optimizations": {
                 "z_ordering": unified_config.platform_optimizations.z_ordering_enabled,
+                "databricks_clustering_strategy": unified_config.platform_optimizations.databricks_clustering_strategy,
+                "physical_rendering_id": unified_config.platform_optimizations.physical_rendering_id,
+                "liquid_clustering": unified_config.platform_optimizations.liquid_clustering_enabled,
                 "auto_optimize": unified_config.platform_optimizations.auto_optimize_enabled,
                 "bloom_filters": unified_config.platform_optimizations.bloom_filters_enabled,
                 "materialized_views": unified_config.platform_optimizations.materialized_views_enabled,

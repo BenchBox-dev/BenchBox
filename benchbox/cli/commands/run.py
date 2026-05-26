@@ -138,7 +138,7 @@ def _apply_platform_optimization_overrides(
     if resolved_strategy:
         strategy = str(resolved_strategy).lower()
         platform_optimizations.databricks_clustering_strategy = strategy
-        platform_optimizations.liquid_clustering_enabled = strategy == "liquid_clustering"
+        platform_optimizations.liquid_clustering_enabled = strategy in {"liquid_clustering", "liquid_clustering_auto"}
 
     resolved_liquid_columns = platform_options.get("liquid_clustering_columns")
     if resolved_liquid_columns:
@@ -146,6 +146,8 @@ def _apply_platform_optimization_overrides(
         platform_optimizations.liquid_clustering_columns = columns
         if columns:
             platform_optimizations.liquid_clustering_enabled = True
+
+    platform_optimizations.__post_init__()
 
 
 def _build_data_organization_from_tuning(unified_tuning: Any) -> dict[str, Any] | None:
@@ -176,7 +178,12 @@ def _build_data_organization_from_tuning(unified_tuning: Any) -> dict[str, Any] 
     platform_opts = getattr(unified_tuning, "platform_optimizations", None)
     method = "z_order"
     method_hint = str(getattr(platform_opts, "sorted_ingestion_method", "auto") or "auto").lower()
-    if method_hint == "hilbert":
+    databricks_strategy = str(getattr(platform_opts, "databricks_clustering_strategy", "") or "").lower()
+    if databricks_strategy in {"liquid_clustering", "liquid_clustering_auto"} or getattr(
+        platform_opts, "liquid_clustering_enabled", False
+    ):
+        method = "liquid_clustering"
+    elif method_hint == "hilbert":
         method = "hilbert"
     elif method_hint == "z_order" or getattr(platform_opts, "z_ordering_enabled", False):
         method = "z_order"
