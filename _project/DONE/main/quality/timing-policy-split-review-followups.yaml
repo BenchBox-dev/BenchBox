@@ -2,7 +2,18 @@ id: timing-policy-split-review-followups
 title: "Address follow-up findings from timing-policy pre-commit split review"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-05-26"
+completion_note: |
+  Documented that existing clones need to re-run `pre-commit install` once
+  to pick up the pre-push timing-policy stage.
+
+  Moved shared test database creation from pre-collection session startup to
+  `pytest_collection_modifyitems`, where selected item markers are populated,
+  so selections without `database` or `integration` markers do not pay the
+  persistent database setup cost. Added marker-strategy guardrails for the new
+  hook and for persistent DB fixtures that must declare `database` or
+  `integration`.
 category: Testing & Quality
 
 description: |
@@ -18,7 +29,7 @@ work:
 - id: w1
   summary: "Document pre-commit re-install requirement for existing clones"
   needs: []
-  status: pending
+  status: done
   notes: |
     `default_install_hook_types: [pre-commit, pre-push]` in
     .pre-commit-config.yaml:6 only takes effect on the next
@@ -44,7 +55,7 @@ work:
 - id: w2
   summary: "Gate DB-setup properly in pytest_collection_modifyitems if cost grows"
   needs: []
-  status: pending
+  status: done
   notes: |
     tests/conftest.py:270 - the dead marker gate was removed because
     `session.items` is empty at `pytest_sessionstart` (pre-collection).

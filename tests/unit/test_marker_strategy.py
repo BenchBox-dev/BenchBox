@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from tests import conftest as benchbox_conftest
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -19,6 +21,13 @@ _FAST_MEDIUM_DECORATOR_RE = re.compile(r"(?m)^\s*@pytest\.mark\.(fast|medium)\b"
 _SPEED_MARKERS = {"fast", "medium", "slow"}
 _SCOPE_MARKERS = {"unit", "integration", "performance"}
 _E2E_QUICK_INCOMPATIBLE = {"stress", "resource_heavy", "live_integration"}
+_PERSISTENT_DATABASE_FIXTURES = {
+    "basic_test_db",
+    "tpch_test_db",
+    "tpcds_test_db",
+    "ssb_test_db",
+    "primitives_test_db",
+}
 
 
 _test_modules_cache: list[Path] | None = None
@@ -88,31 +97,69 @@ def _decorator_marker_names(node: ast.AST) -> set[str]:
 
 
 def _iter_test_marker_sets(path: Path) -> list[tuple[str, set[str]]]:
+    return [(name, markers) for name, markers, _fixture_args in _iter_test_marker_sets_with_fixtures(path)]
+
+
+def _iter_test_marker_sets_with_fixtures(path: Path) -> list[tuple[str, set[str], set[str]]]:
     tree = ast.parse(path.read_text(encoding="utf-8"))
     module_markers = _top_level_marker_names(path)
-    tests: list[tuple[str, set[str]]] = []
+    tests: list[tuple[str, set[str], set[str]]] = []
 
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith(("test_", "benchmark_")):
-            tests.append((node.name, module_markers | _decorator_marker_names(node)))
+            tests.append((node.name, module_markers | _decorator_marker_names(node), _function_arg_names(node)))
         if isinstance(node, ast.ClassDef) and (node.name.startswith("Test") or node.name.endswith("Tests")):
             class_markers = module_markers | _decorator_marker_names(node) | _pytestmark_assignment_names(node.body)
             for child in node.body:
                 if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name.startswith(
                     ("test_", "benchmark_")
                 ):
-                    tests.append((f"{node.name}::{child.name}", class_markers | _decorator_marker_names(child)))
+                    tests.append(
+                        (
+                            f"{node.name}::{child.name}",
+                            class_markers | _decorator_marker_names(child),
+                            _function_arg_names(child),
+                        )
+                    )
 
     return tests
 
 
-def test_conftest_has_no_collection_time_marker_rewrite():
+def _function_arg_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    args = [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]
+    return {arg.arg for arg in args}
+
+
+class _FakeCollectedItem:
+    def __init__(self, markers: set[str]) -> None:
+        self._markers = markers
+
+    def get_closest_marker(self, name: str) -> object | None:
+        return object() if name in self._markers else None
+
+
+def test_conftest_has_no_collection_time_speed_marker_rewrite():
     text = (_TESTS_ROOT / "conftest.py").read_text(encoding="utf-8")
 
-    assert "pytest_collection_modifyitems" not in text
     assert "test_speed_buckets.json" not in text
     assert "_get_measured_speed_marker" not in text
     assert "Expression.compile" not in text
+
+
+def test_conftest_database_setup_gate_uses_collected_item_markers(monkeypatch: pytest.MonkeyPatch):
+    calls = []
+
+    monkeypatch.setattr(benchbox_conftest, "_create_test_databases", lambda: calls.append("created"))
+
+    benchbox_conftest.pytest_collection_modifyitems(None, None, [_FakeCollectedItem({"unit", "fast"})])
+    assert calls == []
+
+    benchbox_conftest.pytest_collection_modifyitems(None, None, [_FakeCollectedItem({"database", "fast"})])
+    assert calls == ["created"]
+
+    calls.clear()
+    benchbox_conftest.pytest_collection_modifyitems(None, None, [_FakeCollectedItem({"integration", "medium"})])
+    assert calls == ["created"]
 
 
 def test_unit_integration_and_performance_modules_have_explicit_scope_markers():
@@ -150,6 +197,19 @@ def test_routine_test_modules_have_a_single_top_level_speed_marker():
 
     assert missing == []
     assert conflicting == []
+
+
+def test_persistent_database_fixtures_require_database_or_integration_marker():
+    offenders: list[str] = []
+
+    for path in _iter_test_modules():
+        rel = path.relative_to(_REPO_ROOT).as_posix()
+        for test_name, markers, fixture_args in _iter_test_marker_sets_with_fixtures(path):
+            persistent_fixtures = sorted(fixture_args & _PERSISTENT_DATABASE_FIXTURES)
+            if persistent_fixtures and not {"database", "integration"} & markers:
+                offenders.append(f"{rel}::{test_name}: {', '.join(persistent_fixtures)}")
+
+    assert offenders == []
 
 
 def test_tree_has_no_fast_or_medium_decorators():

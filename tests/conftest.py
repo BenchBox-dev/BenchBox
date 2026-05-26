@@ -67,6 +67,7 @@ def joinorder_canonical_tiny(tmp_path: Path) -> Path:
 
 # ── Parallel test run mutual exclusion ──────────────────────────────────────
 _test_lock_fd: int | None = None  # Kept open to hold the flock for the session lifetime.
+_test_databases_created = False
 
 
 def _get_test_lock_path() -> Path:
@@ -267,6 +268,47 @@ def _warn_on_unreasoned_skip_markers(items) -> None:
             )
 
 
+def _items_require_test_databases(items) -> bool:
+    """Return True when the selected test set includes database/integration coverage."""
+    return any(item.get_closest_marker("integration") or item.get_closest_marker("database") for item in items)
+
+
+def _create_test_databases() -> None:
+    """Create shared test databases for tests that use persistent DB fixtures."""
+    global _test_databases_created
+    if _test_databases_created:
+        return
+
+    import subprocess
+    import sys
+
+    test_db_dir = Path(__file__).parent / "databases"
+    test_db_dir.mkdir(exist_ok=True)
+
+    create_script = test_db_dir / "create_test_databases.py"
+    if create_script.exists():
+        try:
+            result = subprocess.run(
+                [sys.executable, str(create_script)],
+                capture_output=True,
+                text=True,
+                cwd=str(Path(__file__).parent.parent),
+            )
+            if result.returncode != 0:
+                print(f"Warning: Failed to create test databases: {result.stderr}")
+        except Exception as e:
+            print(f"Warning: Error creating test databases: {e}")
+
+    _test_databases_created = True
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(session, config, items) -> None:
+    """Create shared test databases only when the selected test set needs them."""
+    if _items_require_test_databases(items):
+        _create_test_databases()
+
+
 def pytest_collection_finish(session) -> None:
     """Run read-only marker hygiene checks after collection completes."""
     _warn_on_unreasoned_skip_markers(session.items)
@@ -288,41 +330,6 @@ def pytest_runtest_setup(item) -> None:
 
     if item.get_closest_marker("local_only") and os.environ.get("CI"):
         pytest.skip("Local-only test skipped in CI")
-
-
-def pytest_sessionstart(session) -> None:
-    """Create test databases before the test session starts."""
-    # Skip database setup for unit-only test runs
-    markers = set()
-    for item in session.items:
-        for mark in item.iter_markers():
-            markers.add(mark.name)
-
-    if markers and "integration" not in markers and "database" not in markers:
-        return
-
-    import subprocess
-    import sys
-    from pathlib import Path
-
-    # the test databases directory
-    test_db_dir = Path(__file__).parent / "databases"
-    test_db_dir.mkdir(exist_ok=True)
-
-    # Run the database creation script
-    create_script = test_db_dir / "create_test_databases.py"
-    if create_script.exists():
-        try:
-            result = subprocess.run(
-                [sys.executable, str(create_script)],
-                capture_output=True,
-                text=True,
-                cwd=str(Path(__file__).parent.parent),
-            )
-            if result.returncode != 0:
-                print(f"Warning: Failed to create test databases: {result.stderr}")
-        except Exception as e:
-            print(f"Warning: Error creating test databases: {e}")
 
 
 def pytest_sessionfinish(session, exitstatus) -> None:
