@@ -162,6 +162,9 @@ checked automatically:
 pre-commit install
 ```
 
+If this clone installed hooks before BenchBox added its pre-push timing-policy
+stage, re-run `pre-commit install` once so the pre-push hook is installed too.
+
 ## Questions?
 
 Open an [issue](https://github.com/joeharris76/BenchBox/issues) or start a [discussion](https://github.com/joeharris76/BenchBox/discussions).

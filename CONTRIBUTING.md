@@ -36,6 +36,7 @@ This document provides guidelines and instructions for contributing.
    This installs two hooks (configured in `.pre-commit-config.yaml`):
    - **pre-commit**: ruff format/check, codespell, YAML / markdown lint, timing-policy check.
    - **pre-push**: `pr-preflight-fast-tests` — when `BENCHBOX_PREPUSH=1`, runs the path-aware fast-test lane so code PR pushes don't discover failures via the CI roundtrip.
+   Existing clones that installed hooks before the pre-push stage was added should re-run `pre-commit install` once.
 
    If `pre-commit install` errors with `Cowardly refusing to install hooks with core.hooksPath set` and points at the default `.git/hooks` location, run `git config --unset-all core.hooksPath` and try again — that's a redundant override left over from earlier tooling.
 
