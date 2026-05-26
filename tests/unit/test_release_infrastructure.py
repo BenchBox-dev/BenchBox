@@ -326,11 +326,17 @@ class TestReleaseInfrastructure:
 
         job = workflow["jobs"]["validate-base"]
         steps = job["steps"]
-        assert any(step.get("uses") == "actions/checkout@v4" and step["with"]["fetch-depth"] == 0 for step in steps)
+        checkout_step = next(step for step in steps if step.get("uses") == "actions/checkout@v4")
+        assert checkout_step["name"] == "Checkout trusted release policy"
+        assert checkout_step["with"]["ref"] == "${{ github.event.pull_request.base.sha }}"
+        assert checkout_step["with"]["fetch-depth"] == 0
+        assert "${{ github.event.pull_request.head.sha }}" not in str(checkout_step)
+
         run_text = _workflow_job_run_text("validate-main-pr.yml", "validate-base")
-        assert "git fetch origin develop --prune" in run_text
+        assert "git fetch --prune origin develop" in run_text
+        assert "refs/pull/${{ github.event.pull_request.number }}/head" in run_text
         assert "scripts/release_readiness_check.py" in run_text
-        assert "--head-sha" in run_text
+        assert '--head-sha "${{ github.event.pull_request.head.sha }}"' in run_text
         assert "--bootstrap-on-missing-workflow" in run_text
         assert "bootstrap_required=true" in run_text
         assert "(slow or resource_heavy) and not (stress or live_integration)" in run_text
@@ -339,8 +345,8 @@ class TestReleaseInfrastructure:
 
         readiness_step = next(step for step in steps if step["name"] == "Check release canary freshness")
         assert readiness_step["env"]["RELEASE_CANARY_WORKFLOW"] == "release-canary.yml"
+        assert readiness_step["env"]["RELEASE_CANARY_BRANCH"] == "main"
         assert readiness_step["env"]["RELEASE_CANARY_CHECKED_REF"] == "develop"
-        assert "RELEASE_CANARY_BRANCH" not in readiness_step["env"]
         assert readiness_step["env"]["RELEASE_CANARY_MAX_AGE_HOURS"] == "48"
         assert "RELEASE_READINESS_OVERRIDE_SHA" in readiness_step["env"]
 
@@ -369,12 +375,23 @@ class TestReleaseInfrastructure:
         assert 'select(.name == \\"$$context\\")' in recipe
         assert "for context in $(RELEASE_REQUIRED_CONTEXTS)" in recipe
         assert "--watch" not in recipe
-        assert 'CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8"' in recipe
+        assert 'CHECK_RC" = "8"' in recipe
+        assert 'CHECK_RC" != "0"' in recipe
+        assert 'CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8"' not in recipe
 
         assert recipe.index("no open PR found for v$(VERSION)") < recipe.index("gh pr checks")
         assert recipe.index("gh pr checks") < recipe.index("gh pr merge --squash")
         assert recipe.index("gh pr merge --squash") < recipe.index("git fetch origin --tags")
         assert recipe.index("git tag v$(VERSION)") < recipe.index("git push origin v$(VERSION)")
+
+    def test_release_finalize_blocks_pending_required_check_exit_code(self):
+        """gh pr checks exit 8 means at least one required check is still pending."""
+        recipe = _make_target_recipe("release-finalize")
+
+        assert 'if [ "$$CHECK_RC" = "8" ]; then' in recipe
+        assert "required PR checks are pending. Wait for GitHub Actions, then rerun" in recipe
+        assert 'CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8"' not in recipe
+        assert recipe.index('if [ "$$CHECK_RC" = "8" ]') < recipe.index('case "$$CHECK_BUCKET"')
 
     def test_release_finalize_failure_modes_are_explicit(self):
         """The one-shot release-finalize precondition must fail closed for drift and non-green states."""

@@ -5,6 +5,7 @@ import sys
 import click
 
 from benchbox.cli.commands.run import run
+from benchbox.cli.composite_params import ValidationConfig
 from benchbox.cli.shared import console
 
 TPC_ALLOWED_SCALE_FACTORS = {1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000}
@@ -62,7 +63,7 @@ def run_official(ctx, benchmark, platform, scale, phases, streams, seed, output_
             seed=seed,
             output=output_dir,
             verbose=verbose,
-            validate_results=validate_results,
+            validation=ValidationConfig.parse("full") if validate_results else None,
         )
     except Exception as e:
         console.print(f"[red]Benchmark execution failed: {e}[/red]")

@@ -164,6 +164,13 @@ def test_tree_has_no_fast_or_medium_decorators():
     assert offenders == []
 
 
+def test_starrocks_resource_heavy_smoke_stays_in_integration_smoke_lane():
+    path = _TESTS_ROOT / "integration" / "platforms" / "test_starrocks_smoke_resource_heavy.py"
+
+    assert path.exists()
+    assert "platform_smoke" in _top_level_marker_names(path)
+
+
 def test_e2e_quick_does_not_select_opt_in_heavy_tests():
     offenders: list[tuple[str, list[str]]] = []
 

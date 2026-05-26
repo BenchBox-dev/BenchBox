@@ -76,11 +76,26 @@ generated_python_delta: 0
 
 def test_load_rows_treats_missing_ledger_dir_as_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_git(*args: str) -> str:
-        raise subprocess.CalledProcessError(128, ["git", *args])
+        if args == ("ls-tree", "-r", "--name-only", "origin/develop", "_project/shrink-ledger"):
+            return ""
+        raise AssertionError(args)
 
     monkeypatch.setattr(shrink_rollup, "_git", fake_git)
 
     assert shrink_rollup.load_rows("origin/develop", "_project/shrink-ledger") == []
+
+
+def test_main_reports_git_lookup_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fake_git(*args: str) -> str:
+        raise subprocess.CalledProcessError(128, ["git", *args])
+
+    monkeypatch.setattr(shrink_rollup, "_git", fake_git)
+
+    assert shrink_rollup.main(["--ref", "refs/heads/missing"]) == 2
+    assert "shrink-rollup:" in capsys.readouterr().err
 
 
 def test_main_reports_target_band_and_remaining_distance(

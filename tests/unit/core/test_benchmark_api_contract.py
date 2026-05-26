@@ -62,6 +62,56 @@ BENCHMARK_SUPPORT_STATUS_COUNTS = {
     "deprecated": 0,
     "document_only": 0,
 }
+_REGISTRY_CLAIM_NUMBER = re.compile(r"\d+")
+
+
+def _registry_claim_fragment_pattern(fragment: str) -> re.Pattern[str]:
+    pattern_parts: list[str] = []
+    offset = 0
+    for match in _REGISTRY_CLAIM_NUMBER.finditer(fragment):
+        pattern_parts.append(re.escape(fragment[offset : match.start()]))
+        pattern_parts.append(rf"\b{re.escape(match.group())}\b")
+        offset = match.end()
+    pattern_parts.append(re.escape(fragment[offset:]))
+    return re.compile("".join(pattern_parts))
+
+
+def _contains_registry_derived_claim(text: str, fragment: str) -> bool:
+    return _registry_claim_fragment_pattern(fragment).search(text) is not None
+
+
+def _collect_criteria_matrix_rows(
+    doc_text: str, registry_status: dict[str, str]
+) -> tuple[dict[str, dict[str, str]], list[str], list[str]]:
+    matrix_rows: dict[str, dict[str, str]] = {}
+    duplicates: list[str] = []
+    non_registry_rows: list[str] = []
+    in_benchmark_matrix = False
+
+    for line in doc_text.splitlines():
+        if line == "## Benchmark Status Rationale":
+            in_benchmark_matrix = True
+            continue
+        if in_benchmark_matrix and line.startswith("## "):
+            break
+        if not in_benchmark_matrix:
+            continue
+
+        match = _CRITERIA_MATRIX_ROW.match(line)
+        if match is None:
+            continue
+        benchmark_id = match.group("bid")
+        if benchmark_id not in registry_status:
+            non_registry_rows.append(benchmark_id)
+            continue
+        if benchmark_id in matrix_rows:
+            duplicates.append(benchmark_id)
+        matrix_rows[benchmark_id] = {
+            "status": match.group("status"),
+            "rationale": match.group("rationale"),
+        }
+
+    return matrix_rows, duplicates, non_registry_rows
 
 
 def test_benchmark_api_surface_markers_match_contract_map() -> None:
@@ -205,24 +255,10 @@ def test_benchmark_support_status_criteria_matrix_covers_every_benchmark() -> No
     registry_status = {bid: meta["support_status"] for bid, meta in BENCHMARK_METADATA.items()}
     doc_text = SUPPORT_STATUS_CRITERIA_DOC.read_text()
 
-    matrix_rows: dict[str, dict[str, str]] = {}
-    duplicates: list[str] = []
-    for line in doc_text.splitlines():
-        match = _CRITERIA_MATRIX_ROW.match(line)
-        if match is None:
-            continue
-        benchmark_id = match.group("bid")
-        if benchmark_id not in registry_status:
-            # Acceptance-criteria/legend rows whose first cell is not a benchmark id.
-            continue
-        if benchmark_id in matrix_rows:
-            duplicates.append(benchmark_id)
-        matrix_rows[benchmark_id] = {
-            "status": match.group("status"),
-            "rationale": match.group("rationale"),
-        }
+    matrix_rows, duplicates, non_registry_rows = _collect_criteria_matrix_rows(doc_text, registry_status)
 
     assert duplicates == [], f"benchmarks with more than one criteria-matrix row: {sorted(duplicates)}"
+    assert non_registry_rows == [], f"criteria-matrix rows for non-registry benchmarks: {sorted(non_registry_rows)}"
 
     missing_rows = sorted(set(registry_status) - set(matrix_rows))
     assert missing_rows == [], f"benchmarks missing a criteria-matrix row: {missing_rows}"
@@ -266,6 +302,63 @@ def test_benchmark_support_status_criteria_matrix_covers_every_benchmark() -> No
     )
 
 
+def test_benchmark_support_status_criteria_matrix_rejects_stale_benchmark_rows() -> None:
+    """A removed benchmark must not remain silently documented in the criteria matrix."""
+
+    doc_text = """
+## Acceptance Criteria by Status
+
+| Status | User docs | Result-integrity spec |
+|---|---|---|
+| `future_status` | `not_a_benchmark` | Outside the benchmark matrix. |
+
+## Benchmark Status Rationale
+
+| Benchmark | Status | Rationale and evidence | Promotion / demotion blockers |
+|---|---|---|---|
+| `tpch` | `stable` | Canonical 22-query TPC-H; DataFrame-capable. | None. |
+| `removed_benchmark` | `beta` | Stale 1-query row; not DataFrame-capable. | Remove. |
+
+## Promotion Candidates and Blockers
+"""
+
+    matrix_rows, duplicates, non_registry_rows = _collect_criteria_matrix_rows(doc_text, {"tpch": "stable"})
+
+    assert duplicates == []
+    assert matrix_rows == {
+        "tpch": {
+            "status": "stable",
+            "rationale": "Canonical 22-query TPC-H; DataFrame-capable.",
+        }
+    }
+    assert non_registry_rows == ["removed_benchmark"]
+
+
+def test_registry_derived_claim_matcher_requires_numeric_boundaries() -> None:
+    """Exact count claims must not pass by matching inside larger numbers."""
+
+    assert _contains_registry_derived_claim(
+        "Explore 22 benchmarks (TPC-H, TPC-DS, and more)",
+        "22 benchmarks (TPC",
+    )
+    assert _contains_registry_derived_claim(
+        "BenchBox includes **22** public-discovery benchmarks",
+        "BenchBox includes **22** public-discovery benchmarks",
+    )
+    assert not _contains_registry_derived_claim(
+        "Explore 122 benchmarks (TPC-H, TPC-DS, and more)",
+        "22 benchmarks (TPC",
+    )
+    assert not _contains_registry_derived_claim(
+        "Specs cover 20 of 122 benchmarks",
+        "20 of 22 benchmarks",
+    )
+    assert not _contains_registry_derived_claim(
+        "Specs cover 120 of 22 benchmarks",
+        "20 of 22 benchmarks",
+    )
+
+
 def test_public_benchmark_count_claims_are_registry_derived() -> None:
     """Durable public surfaces must carry the registry-derived benchmark counts.
 
@@ -297,7 +390,9 @@ def test_public_benchmark_count_claims_are_registry_derived() -> None:
     for rel_path, fragments in required_claims.items():
         text = (PROJECT_ROOT / rel_path).read_text(encoding="utf-8")
         stale.extend(
-            f"{rel_path}: missing registry-derived claim {fragment!r}" for fragment in fragments if fragment not in text
+            f"{rel_path}: missing registry-derived claim {fragment!r}"
+            for fragment in fragments
+            if not _contains_registry_derived_claim(text, fragment)
         )
 
     assert stale == [], "Stale public benchmark count claims (update to match the registry):\n" + "\n".join(stale)

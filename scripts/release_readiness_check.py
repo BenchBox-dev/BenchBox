@@ -183,10 +183,11 @@ def evaluate_canary_runs(
 
 
 def _workflow_runs_url(repo: str, workflow: str, branch: str) -> str:
+    branch = branch.strip()
+    if not branch:
+        raise ValueError("release canary workflow run lookup requires a trusted branch filter")
     workflow_quoted = urllib.parse.quote(workflow, safe="")
-    query_args = {"status": "completed", "per_page": "20"}
-    if branch:
-        query_args["branch"] = branch
+    query_args = {"branch": branch, "status": "completed", "per_page": "20"}
     query = urllib.parse.urlencode(query_args)
     return f"https://api.github.com/repos/{repo}/actions/workflows/{workflow_quoted}/runs?{query}"
 
@@ -206,7 +207,11 @@ def _write_summary(result: ReadinessResult, *, summary_path: str | None, overrid
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workflow", default=os.environ.get("RELEASE_CANARY_WORKFLOW", "release-canary.yml"))
-    parser.add_argument("--branch", default=os.environ.get("RELEASE_CANARY_BRANCH", ""))
+    parser.add_argument(
+        "--branch",
+        default=os.environ.get("RELEASE_CANARY_BRANCH", "main"),
+        help="Trusted branch/ref that owns the release-canary workflow runs.",
+    )
     parser.add_argument(
         "--max-age-hours", type=float, default=float(os.environ.get("RELEASE_CANARY_MAX_AGE_HOURS", "48"))
     )

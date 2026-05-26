@@ -130,14 +130,15 @@ class SparkTuningMixin:
     ) -> dict[str, Any]:
         """Apply unified tuning configuration through the Spark tuning hooks."""
         results: dict[str, Any] = {}
-        if config.scale_factor:
-            self._scale_factor = config.scale_factor
+        scale_factor = getattr(config, "scale_factor", None)
+        if scale_factor:
+            self._scale_factor = scale_factor
         if config.primary_keys:
             results["primary_keys"] = self.apply_primary_keys(config.primary_keys)
         if config.foreign_keys:
             results["foreign_keys"] = self.apply_foreign_keys(config.foreign_keys)
-        if config.platform:
-            results["platform_optimizations"] = self.apply_platform_optimizations(config.platform)
+        if config.platform_optimizations:
+            results["platform_optimizations"] = self.apply_platform_optimizations(config.platform_optimizations)
         return results
 
     def apply_constraint_configuration(

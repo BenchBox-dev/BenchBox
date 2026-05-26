@@ -79,7 +79,12 @@ def test_apply_tuning_configuration_collects_results() -> None:
     adapter.apply_foreign_keys = MagicMock(return_value={"fk": 1})
     adapter.apply_platform_optimizations = MagicMock(return_value={"opt": 1})
 
-    config = SimpleNamespace(scale_factor=5.0, primary_keys=["a"], foreign_keys=["b"], platform={"x": 1})
+    config = SimpleNamespace(
+        scale_factor=5.0,
+        primary_keys=["a"],
+        foreign_keys=["b"],
+        platform_optimizations={"x": 1},
+    )
     result = adapter.apply_tuning_configuration(config)
 
     assert adapter._scale_factor == 5.0
@@ -521,7 +526,7 @@ def test_apply_tuning_configuration_sets_scale_factor() -> None:
         scale_factor=5.0,
         primary_keys=None,
         foreign_keys=None,
-        platform=None,
+        platform_optimizations=None,
     )
     result = adapter.apply_tuning_configuration(config)
     assert adapter._scale_factor == 5.0

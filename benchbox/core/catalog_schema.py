@@ -23,7 +23,7 @@ from importlib import resources
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, RootModel, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, RootModel, ValidationError, field_validator
 
 from benchbox.utils.printing import emit
 
@@ -52,12 +52,19 @@ class BenchmarkMeta(BaseModel):
     scale_options: list[float]
     complexity: str
     estimated_time_range: list[float] = Field(min_length=2, max_length=2)
-    base_memory_gb: float
+    base_memory_gb: float = Field(gt=0)
     data_source: str | None
     supports_dataframe: bool
     min_scale: float | None = None
     surface: Surface | None = None
     data_manifest: str | None = None
+
+    @field_validator("estimated_time_range")
+    @classmethod
+    def _validate_estimated_time_range(cls, value: list[float]) -> list[float]:
+        if any(item < 0 for item in value) or value[0] > value[1]:
+            raise ValueError("estimated_time_range must contain non-negative ordered bounds")
+        return value
 
 
 class BenchmarkRegistryCatalog(BaseModel):

@@ -835,7 +835,10 @@ release-finalize:
 	for context in $(RELEASE_REQUIRED_CONTEXTS); do \
 		CHECK_BUCKET=$$(gh pr checks "$$PR" --required --json name,bucket,state --jq "map(select(.name == \"$$context\")) | if length == 1 then .[0].bucket elif length == 0 then \"missing\" else \"duplicate\" end"); \
 		CHECK_RC=$$?; \
-		if [ "$$CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8" ]; then \
+		if [ "$$CHECK_RC" = "8" ]; then \
+			echo "Error: required PR checks are pending. Wait for GitHub Actions, then rerun." >&2; \
+			exit 1; \
+		elif [ "$$CHECK_RC" != "0" ]; then \
 			echo "Error: gh pr checks failed while verifying $$context (exit $$CHECK_RC)" >&2; \
 			exit "$$CHECK_RC"; \
 		fi; \
