@@ -171,10 +171,73 @@ def test_handle_existing_database_skips_in_dry_run(adapter):
 
 def test_handle_existing_database_skips_managed_cloud_database(adapter):
     adapter.skip_database_management = True
+    adapter.check_benchmark_tables_exist = Mock(wraps=adapter.check_benchmark_tables_exist)
+    adapter.check_database_exists = Mock(return_value=True)
 
     adapter.handle_existing_database()
 
+    adapter.check_benchmark_tables_exist.assert_called_once()
+    adapter.check_database_exists.assert_not_called()
     assert adapter.database_was_reused is True
+
+
+def test_handle_existing_database_reuses_managed_database_when_tables_present(adapter):
+    adapter.skip_database_management = True
+    adapter.check_benchmark_tables_exist = Mock(return_value=True)
+    adapter.check_database_exists = Mock(return_value=True)
+
+    adapter.handle_existing_database()
+
+    adapter.check_benchmark_tables_exist.assert_called_once()
+    adapter.check_database_exists.assert_not_called()
+    assert adapter.database_was_reused is True
+
+
+def test_handle_existing_database_treats_managed_database_as_fresh_when_tables_missing(adapter):
+    adapter.skip_database_management = True
+    adapter.check_benchmark_tables_exist = Mock(return_value=False)
+    adapter.check_database_exists = Mock(return_value=True)
+
+    adapter.handle_existing_database()
+
+    adapter.check_benchmark_tables_exist.assert_called_once()
+    adapter.check_database_exists.assert_not_called()
+    assert adapter.database_was_reused is False
+
+
+def test_handle_existing_database_dry_run_skips_managed_table_hook(adapter):
+    adapter.dry_run = True
+    adapter.skip_database_management = True
+    adapter.check_benchmark_tables_exist = Mock(return_value=False)
+
+    adapter.handle_existing_database()
+
+    adapter.check_benchmark_tables_exist.assert_not_called()
+    assert adapter.database_was_reused is False
+
+
+def test_get_expected_tables_normalizes_schema_dict(adapter):
+    benchmark = SimpleNamespace(get_schema=lambda: {"Orders": {}, "LINEITEM": {}})
+
+    assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
+
+
+def test_get_expected_tables_normalizes_schema_list_of_dicts(adapter):
+    benchmark = SimpleNamespace(get_schema=lambda: [{"name": "Orders"}, {"name": "LINEITEM"}])
+
+    assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
+
+
+def test_get_expected_tables_normalizes_schema_list_of_names(adapter):
+    benchmark = SimpleNamespace(get_schema=lambda: ["Orders", "LINEITEM"])
+
+    assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
+
+
+def test_get_expected_tables_normalizes_table_name_api(adapter):
+    benchmark = SimpleNamespace(get_table_names=lambda: ["Orders", "LINEITEM"])
+
+    assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
 
 
 def test_handle_existing_database_skips_reuse_logic_while_validating(adapter):
