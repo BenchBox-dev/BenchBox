@@ -222,6 +222,12 @@ def test_get_expected_tables_normalizes_schema_dict(adapter):
     assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
 
 
+def test_get_expected_tables_normalizes_schema_list_of_dicts(adapter):
+    benchmark = SimpleNamespace(get_schema=lambda: [{"name": "Orders"}, {"name": "LINEITEM"}])
+
+    assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
+
+
 def test_get_expected_tables_normalizes_schema_list_of_names(adapter):
     benchmark = SimpleNamespace(get_schema=lambda: ["Orders", "LINEITEM"])
 

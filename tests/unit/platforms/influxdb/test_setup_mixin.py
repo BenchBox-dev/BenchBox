@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -117,6 +118,21 @@ def test_check_benchmark_tables_exist_returns_true_when_all_tables_present(monke
     fake_conn.close.assert_called_once_with()
 
 
+def test_check_benchmark_tables_exist_uses_expected_table_resolver(monkeypatch):
+    adapter = _Adapter()
+    adapter.benchmark = SimpleNamespace(tables={})
+    adapter._get_expected_tables = MagicMock(return_value=["cpu", "mem"])
+    adapter.get_tables = MagicMock(return_value=["CPU", "mem"])
+    fake_conn = MagicMock()
+    monkeypatch.setattr("benchbox.platforms.influxdb.setup.InfluxDBConnection", lambda **kwargs: fake_conn)
+
+    assert adapter.check_benchmark_tables_exist() is True
+
+    adapter._get_expected_tables.assert_called_once_with(adapter.benchmark)
+    adapter.get_tables.assert_called_once_with(fake_conn)
+    fake_conn.close.assert_called_once_with()
+
+
 def test_check_benchmark_tables_exist_returns_false_when_tables_missing(monkeypatch):
     adapter = _Adapter()
     adapter.benchmark = MagicMock()
@@ -130,6 +146,27 @@ def test_check_benchmark_tables_exist_returns_false_when_tables_missing(monkeypa
     fake_conn.connect.assert_called_once_with()
     adapter.get_tables.assert_called_once_with(fake_conn)
     fake_conn.close.assert_called_once_with()
+
+
+def test_check_benchmark_tables_exist_returns_false_without_benchmark(monkeypatch):
+    adapter = _Adapter()
+    connection_factory = MagicMock()
+    monkeypatch.setattr("benchbox.platforms.influxdb.setup.InfluxDBConnection", connection_factory)
+
+    assert adapter.check_benchmark_tables_exist() is False
+
+    connection_factory.assert_not_called()
+
+
+def test_check_benchmark_tables_exist_returns_false_without_expected_tables(monkeypatch):
+    adapter = _Adapter()
+    adapter.benchmark = SimpleNamespace(tables={})
+    connection_factory = MagicMock()
+    monkeypatch.setattr("benchbox.platforms.influxdb.setup.InfluxDBConnection", connection_factory)
+
+    assert adapter.check_benchmark_tables_exist() is False
+
+    connection_factory.assert_not_called()
 
 
 def test_check_benchmark_tables_exist_returns_false_for_force_recreate(monkeypatch):
