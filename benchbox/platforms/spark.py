@@ -336,6 +336,22 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         ):
             adapter_config["broadcast_threshold"] = -1
 
+        # Default warehouse_dir to benchmark_runs/databases/{benchmark}_{sf}/ so
+        # Spark's Hive metastore lands there instead of ./spark-warehouse in the CWD.
+        if not adapter_config.get("warehouse_dir"):
+            from benchbox.utils.path_utils import get_benchmark_runs_databases_path
+
+            if config.get("output_dir"):
+                warehouse_path = get_benchmark_runs_databases_path(
+                    config["benchmark"],
+                    config["scale_factor"],
+                    base_dir=Path(config["output_dir"]) / "databases",
+                )
+            else:
+                warehouse_path = get_benchmark_runs_databases_path(config["benchmark"], config["scale_factor"])
+            warehouse_path.mkdir(parents=True, exist_ok=True)
+            adapter_config["warehouse_dir"] = str(warehouse_path)
+
         return cls(**adapter_config)
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:

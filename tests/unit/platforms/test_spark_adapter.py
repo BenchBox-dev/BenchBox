@@ -1290,6 +1290,97 @@ class TestBuildSparkConfig:
         assert config.driver_version == "3.5.1"
 
 
+class TestSparkAdapterWarehouseDir:
+    """Tests for warehouse_dir defaulting in from_config().
+
+    Regression guard: Spark must never fall through to its own CWD default
+    (./spark-warehouse). All local warehouse output must land under the
+    canonical benchmark_runs/databases/ tree.
+    """
+
+    _PATCH_TARGET = "benchbox.utils.path_utils.get_benchmark_runs_databases_path"
+
+    def _mock_warehouse(self, tmp_path, name="tpch_sf1"):
+        """Return a MagicMock path whose str() looks like a real databases path."""
+        mock_path = MagicMock()
+        mock_path.__str__ = lambda self: str(tmp_path / "databases" / name)
+        mock_path.mkdir = MagicMock()
+        return mock_path
+
+    def test_from_config_defaults_warehouse_to_databases_path(self, tmp_path):
+        """from_config() without warehouse_dir sets it to benchmark_runs/databases/{benchmark}_{sf}."""
+        from benchbox.platforms.spark import SparkAdapter
+
+        mock_path = self._mock_warehouse(tmp_path)
+        with patch(self._PATCH_TARGET, return_value=mock_path) as mock_path_fn:
+            adapter = SparkAdapter.from_config({"benchmark": "tpch", "scale_factor": 1.0})
+
+        mock_path_fn.assert_called_once_with("tpch", 1.0)
+        assert adapter.warehouse_dir == str(mock_path)
+
+    def test_from_config_warehouse_not_in_cwd(self, tmp_path):
+        """Warehouse path must not be the CWD-relative spark-warehouse default."""
+        from benchbox.platforms.spark import SparkAdapter
+
+        mock_path = self._mock_warehouse(tmp_path, "joinorder_sf1")
+        with patch(self._PATCH_TARGET, return_value=mock_path):
+            adapter = SparkAdapter.from_config({"benchmark": "joinorder", "scale_factor": 1.0})
+
+        assert "spark-warehouse" not in adapter.warehouse_dir
+        assert "spark_warehouse" not in adapter.warehouse_dir
+
+    def test_from_config_respects_output_dir_override(self, tmp_path):
+        """When output_dir is provided, warehouse lands under output_dir/databases/."""
+        from pathlib import Path
+
+        from benchbox.platforms.spark import SparkAdapter
+
+        custom_output = tmp_path / "custom_output"
+        mock_path = self._mock_warehouse(tmp_path, "tpch_sf001")
+
+        with patch(self._PATCH_TARGET, return_value=mock_path) as mock_path_fn:
+            adapter = SparkAdapter.from_config(
+                {
+                    "benchmark": "tpch",
+                    "scale_factor": 0.01,
+                    "output_dir": str(custom_output),
+                }
+            )
+
+        mock_path_fn.assert_called_once_with("tpch", 0.01, base_dir=Path(str(custom_output)) / "databases")
+        assert adapter.warehouse_dir == str(mock_path)
+
+    def test_from_config_explicit_warehouse_dir_not_overridden(self, tmp_path):
+        """An explicit warehouse_dir in config is used verbatim, not replaced."""
+        from benchbox.platforms.spark import SparkAdapter
+
+        explicit_dir = str(tmp_path / "my_custom_warehouse")
+
+        with patch(self._PATCH_TARGET) as mock_path_fn:
+            adapter = SparkAdapter.from_config(
+                {
+                    "benchmark": "tpch",
+                    "scale_factor": 1.0,
+                    "warehouse_dir": explicit_dir,
+                }
+            )
+
+        mock_path_fn.assert_not_called()
+        assert adapter.warehouse_dir == explicit_dir
+
+    def test_warehouse_dir_propagates_to_spark_conf(self, tmp_path):
+        """warehouse_dir must appear in Spark conf as spark.sql.warehouse.dir."""
+        from benchbox.platforms.spark import SparkAdapter
+
+        mock_path = self._mock_warehouse(tmp_path)
+        with patch(self._PATCH_TARGET, return_value=mock_path):
+            adapter = SparkAdapter.from_config({"benchmark": "tpch", "scale_factor": 1.0})
+
+        conf = adapter._get_spark_conf()
+        assert "spark.sql.warehouse.dir" in conf
+        assert conf["spark.sql.warehouse.dir"] == str(mock_path)
+
+
 class TestJavaCompatibility:
     """Tests for Java version compatibility detection."""
 
