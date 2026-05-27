@@ -66,6 +66,7 @@ docs/site/
 data/
 generated/
 benchmark_runs/
+spark-warehouse/
 *.db
 *.csv
 *.parquet
