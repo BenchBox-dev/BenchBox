@@ -8,7 +8,7 @@ import pytest
 
 from benchbox.core.benchmark_registry import CATEGORY_ORDER
 from benchbox.core.platform_registry import PlatformRegistry
-from tests.uat import matrix
+from tests.uat import compatibility, matrix
 
 pytestmark = pytest.mark.fast
 
@@ -48,6 +48,27 @@ def test_platform_groups_are_registry_backed():
     assert set(matrix.SQL_PLATFORMS).issubset(PlatformRegistry.get_sql_platforms())
     assert set(matrix.DOCKER_PLATFORMS).issubset(PlatformRegistry.get_self_hosted_platforms())
     assert tuple(f"{platform}-df" for platform in matrix.UAT_DATAFRAME_PLATFORM_BASES) == matrix.DATAFRAME_PLATFORMS
+
+
+def test_dataframe_mutation_compatibility_rules_cover_dataframe_group():
+    benchmarks = matrix.load_benchmarks()
+
+    for platform in matrix.DATAFRAME_PLATFORMS:
+        for benchmark in ("transaction_primitives", "tpcdi"):
+            rule = compatibility.compatibility_rule_for(platform, benchmark, benchmarks[benchmark])
+            assert rule is not None
+            assert rule.rule_id == f"uat.compat.{platform}.{benchmark}.benchmark_gate"
+
+
+def test_native_model_compatibility_rules_cover_fast_native_targets():
+    benchmarks = matrix.load_benchmarks()
+
+    for platform in ("datafusion", "clickhouse-local"):
+        assert platform in matrix.PLATFORM_GROUPS["fast"]
+        for benchmark in ("write_primitives", "transaction_primitives", "ai_primitives"):
+            rule = compatibility.compatibility_rule_for(platform, benchmark, benchmarks[benchmark])
+            assert rule is not None
+            assert rule.rule_id == f"uat.compat.{platform}.{benchmark}.benchmark_gate"
 
 
 def test_resolve_benchmarks_categories():
