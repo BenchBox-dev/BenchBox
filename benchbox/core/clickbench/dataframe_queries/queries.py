@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 from csv import reader
+from datetime import date
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
@@ -83,7 +84,9 @@ def _expr_no_refresh(ctx: DataFrameContext) -> Any:
 
 
 def _pandas_july_mask(hits: Any, start: str = _DATE_FROM, end: str = _DATE_TO) -> Any:
-    return (hits["CounterID"] == 62) & (hits["EventDate"] >= start) & (hits["EventDate"] <= end)
+    start_value = date.fromisoformat(start) if isinstance(start, str) else start
+    end_value = date.fromisoformat(end) if isinstance(end, str) else end
+    return (hits["CounterID"] == 62) & (hits["EventDate"] >= start_value) & (hits["EventDate"] <= end_value)
 
 
 def _pandas_filter(hits: Any, code: str) -> Any:

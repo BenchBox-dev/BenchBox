@@ -11,6 +11,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -151,6 +152,47 @@ class TestPandasDataLoading:
         )
 
         assert list(df.columns) == ["id", "name", "amount"]
+
+    def test_read_csv_with_column_names_parses_dates(self, tmp_path):
+        """Explicit-schema raw CSV loads parse date columns without date surrogate keys."""
+        adapter = PandasDataFrameAdapter()
+
+        csv_path = tmp_path / "orders.tbl"
+        csv_path.write_text("1|1998-01-02|2450815|2013-07-01 12:34:56|\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["o_orderkey", "o_orderdate", "d_date_sk", "EventTime"],
+            null_marker="",
+        )
+
+        assert df["o_orderdate"].iloc[0] == date(1998, 1, 2)
+        assert df["o_orderdate"].dt.year.iloc[0] == 1998
+        assert not pd.api.types.is_datetime64_any_dtype(df["d_date_sk"])
+        assert pd.api.types.is_datetime64_any_dtype(df["EventTime"])
+
+    def test_load_headered_csv_with_column_names_parses_dates(self, tmp_path):
+        """Headered CSV loads still use schema names for pandas date converters."""
+        adapter = PandasDataFrameAdapter()
+        ctx = adapter.create_context()
+
+        csv_path = tmp_path / "flights.csv"
+        csv_path.write_text("flight_id,flight_date,EventTime\n1,2018-01-02,2018-01-02 12:34:56\n")
+
+        adapter.load_table(
+            ctx,
+            "flights",
+            [csv_path],
+            column_names=["flight_id", "flight_date", "EventTime"],
+            format_hint="csv",
+        )
+
+        df = ctx.get_table("flights")._df
+        assert df["flight_date"].iloc[0] == date(2018, 1, 2)
+        assert df["flight_date"].dt.year.iloc[0] == 2018
+        assert pd.api.types.is_datetime64_any_dtype(df["EventTime"])
 
     def test_read_parquet(self, tmp_path):
         """Test reading a Parquet file."""

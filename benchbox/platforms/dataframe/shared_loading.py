@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from benchbox.core.dataframe.schema_utils import column_name, iter_schema_columns
+
 
 @runtime_checkable
 class LoadableAdapter(Protocol):
@@ -35,7 +37,7 @@ def load_tables_from_data_source_impl(
     adapter: LoadableAdapter,
     ctx: Any,
     data_dir: Path,
-    schema_info: dict[str, dict] | None = None,
+    schema_info: dict[str, Any] | None = None,
 ) -> dict[str, int]:
     """Shared implementation for ``load_tables_from_data_source``.
 
@@ -81,8 +83,8 @@ def load_tables_from_data_source_impl(
 
         column_names = None
         if schema_info and table_name.lower() in schema_info:
-            columns = schema_info[table_name.lower()].get("columns", [])
-            column_names = [col["name"] for col in columns if "name" in col]
+            columns = iter_schema_columns(schema_info[table_name.lower()])
+            column_names = [name for column in columns if (name := column_name(column))]
 
         table_formats = getattr(data_source, "table_formats", {}) or {}
         format_hint = table_formats.get(table_name) or table_formats.get(table_name.lower())

@@ -753,6 +753,40 @@ class TestDataFrameDataLoader:
 
         assert format == DataFormat.PARQUET
 
+    def test_get_schema_info_accepts_table_objects(self):
+        """Table-like schema values provide column names for conversion."""
+        loader = DataFrameDataLoader()
+
+        column = MagicMock()
+        column.name = "load_end_dts"
+        table = MagicMock()
+        table.columns = [column]
+        benchmark = MagicMock()
+        benchmark.get_schema.return_value = {"sat_lineitem": table}
+
+        schema_info = loader._get_schema_info(benchmark)
+
+        assert schema_info["sat_lineitem"] == ["load_end_dts"]
+
+    def test_get_schema_info_accepts_column_mapping(self):
+        """Dict-of-columns schemas provide column names for raw CSV loads."""
+        loader = DataFrameDataLoader()
+        benchmark = MagicMock()
+        benchmark.get_schema.return_value = {
+            "trips": {
+                "columns": {
+                    "pickup_datetime": {"type": "TIMESTAMP"},
+                    "total_amount": {"type": "DOUBLE"},
+                }
+            }
+        }
+
+        schema_info = loader._get_schema_info(benchmark)
+        pyarrow_types = loader._get_pyarrow_types(benchmark)
+
+        assert schema_info["trips"] == ["pickup_datetime", "total_amount"]
+        assert pyarrow_types["trips"]["pickup_datetime"] == "timestamp[us]"
+
     def test_get_source_files_from_benchmark(self):
         """Test getting source files from benchmark.tables."""
         loader = DataFrameDataLoader()
