@@ -1,0 +1,155 @@
+id: uat-artifact-integrity-and-failure-capture
+title: "UAT: make every sweep produce a traceable, abort-safe certification artifact"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-05-29"
+category: Testing and Quality Assurance
+
+description: |
+  The 2026-05-28/29 native + docker UAT runs could not be approved partly
+  because the *evidence* was incomplete, not only because cells failed. An
+  adversarial review of these run dirs found the process blockers below
+  (paths under ~/Developer/benchmark_runs/logs/):
+
+  - uat_complete_native_20260528_20260528: aborted on the /tmp disk floor
+    in the execute phase. Only resume.json survived; no matrix_summary.tsv,
+    no validator_rollup.tsv, no report footer. validate/package/
+    explorer_smoke/report never ran.
+  - uat_complete_native_remaining_non_oltp_20260528_20260529 (dataframe):
+    no manifests at all (no resume.json, cells.jsonl, uat_lifecycle.log,
+    matrix_summary.tsv). Pass/fail was only reconstructable from per-cell
+    result JSONs.
+  - NO_JSON failures (e.g. duckdb write_primitives/ai_primitives, all
+    modin-df cells) captured ZERO error text: the per-cell log held only
+    the command header (run with --quiet), and the tee log
+    /tmp/uat-logs/native_non_oltp_20260528.log was 0 bytes.
+  - No git commit SHA is recorded in any artifact; result JSONs carry only
+    driver versions (e.g. duckdb 1.3.2), so runs cannot be pinned to source.
+
+  This item makes the framework emit a complete, source-traceable artifact
+  for EVERY sweep, including aborted ones, so a reviewer can always prove
+  source SHA, command, phase status, terminal state, and failure cause.
+
+  Implementation correction from current code reading: the cited
+  tests/uat/phases/execute.py:708 line is Docker command detail handling,
+  not CellResult stderr storage. Per-cell subprocess output is already
+  written to each durable cell log by tests/uat/runner.py; the remediation
+  reads a bounded tail from that log and stamps the tail/classification into
+  cells.jsonl while appending a UAT_FAILURE_TAIL block for failed or
+  missing-result cells. This avoids adding output text to CellResult or
+  re-capturing subprocess streams per cell.
+
+  Original evidence pin: the stale line references above were from commit
+  da6a33c14. This implementation re-confirmed the drift on current develop
+  before relying on the code path.
+
+prior_art:
+- "tests/uat/orchestrator.py:resume.json writer — extend to also stamp run-level commit SHA + emit partial manifests on abort"
+- "tests/uat/phases/report.py:REPORT_HEADER + aborted footer (line 41) — reuse for an always-emitted matrix_summary.partial
+  + COMPLETED/ABORTED/BLOCKED footer"
+- "tests/uat/phases/execute.py:708 detail = result.error or result.stderr ... — reuse the already-captured stderr/stdout;
+  persist it, do not re-capture"
+- "tests/uat/test_no_cli_surface_drift.py:155 _git('rev-parse', ...) — reuse the existing git rev-parse helper pattern for
+  SHA capture"
+
+work:
+- id: w1
+  summary: "Capture run commit SHA + dirty flag at sweep start; persist into resume.json, cells.jsonl, matrix_summary.tsv
+    header, and report footer"
+  status: done
+  notes: |
+    Read HEAD via the existing rev-parse pattern. Record short+full SHA
+    and a working-tree-dirty boolean once at sweep start, thread it
+    through the orchestrator into every manifest writer. A dirty tree
+    must be visibly flagged so a reviewer never mistakes an uncommitted
+    run for a pinned one.
+- id: w2
+  summary: "Persist captured per-cell stderr/stdout tail to the durable per-cell log on nonzero exit / NO_JSON"
+  status: done
+  notes: |
+    The CellResult already holds the text (execute.py:708). Write the
+    tail (bounded, e.g. last ~50 lines) into the per-cell .log after the
+    command header, and into the cells.jsonl row, regardless of --quiet.
+    Acceptance: a failed modin-df or duckdb cell carries its exact error
+    without relying on the tee log.
+- id: w3
+  summary: "Add explicit NO_JSON / terminal-state classification to cell records"
+  needs: [w2]
+  status: done
+  notes: |
+    Distinguish: exited 0 but no JSON; exited nonzero with no JSON;
+    timeout (124); killed (-9 / OOM); infra-terminated (e.g. sweep abort
+    before the cell finished). Surface the class in cells.jsonl and the
+    matrix_summary status column. Today these all collapse to "failed".
+- id: w4
+  summary: "Guarantee abort-safe manifest + report emission"
+  needs: [w1, w3]
+  status: done
+  notes: |
+    On disk-floor abort or any hard stop, still write cells.jsonl for
+    attempted cells, a matrix_summary.partial.tsv, compatibility_pruned.jsonl
+    for the enumerated complement, and a report footer with an explicit
+    COMPLETED | ABORTED | BLOCKED status. Ensure dataframe/native sweeps
+    always open a run-level uat_lifecycle.log (the dataframe run wrote
+    none). report.py already supports the aborted footer; wire the
+    orchestrator abort path to call it.
+
+must_preserve:
+- "Successful (non-aborted) sweeps emit byte-identical artifacts to today apart from the new SHA fields and richer status
+  column."
+- "execute.parallel_platforms remains hard-rejected; sequential platform execution is unchanged."
+- "No new always-on subprocess cost on the hot per-cell path beyond writing already-captured text."
+
+approach: |
+  Start in tests/uat/orchestrator.py: add a single run-context object holding
+  the commit SHA + dirty flag captured once at sweep start, and a finally/
+  except path around the execute phase that always invokes the manifest +
+  report writers (matrix_summary.partial, footer) before propagating an
+  abort. Thread the run-context into phases/report.py (header + footer),
+  phases/execute.py (per-cell log + cells.jsonl rows), and phases/enumerate.py
+  (compatibility_pruned on abort). Add the SHA column to REPORT_HEADER and the
+  matrix_summary header. Keep stderr persistence bounded (tail only).
+
+anti_patterns:
+- "DO NOT shell out to git per cell - because it adds latency to the hot path - capture the SHA once at sweep start and pass
+  it down."
+- "DO NOT write full multi-MB stderr into per-cell logs - because some failures spew huge output - persist a bounded tail."
+- "DO NOT treat the empty tee log as a fallback evidence source - it is operator redirection, not a framework artifact; the
+  framework must self-contain its evidence."
+
+verification:
+- description: "UAT framework unit suite passes"
+  command: "uv run -- python -m pytest tests/uat -m fast -q"
+  expected_output: "all pass, 0 failures"
+- description: "Simulated abort still emits a complete artifact set"
+  command: "uv run -- python -m pytest tests/uat/test_orchestrator.py tests/uat/test_report.py -q"
+  expected_output: "abort-path tests assert cells.jsonl, matrix_summary.partial.tsv, and an ABORTED footer all exist"
+- description: "A forced-failure cell carries its stderr tail in the per-cell log and cells.jsonl"
+  command: "uv run -- python -m pytest tests/uat/test_phases.py -k 'failure or stderr or classification' -q"
+  expected_output: "tests assert NO_JSON classification and persisted stderr"
+
+scope_limit:
+  only_modify:
+  - "tests/uat/orchestrator.py"
+  - "tests/uat/phases/report.py"
+  - "tests/uat/phases/execute.py"
+  - "tests/uat/phases/enumerate.py"
+  - "tests/uat/phases/__init__.py"
+  - "tests/uat/test_orchestrator.py"
+  - "tests/uat/test_report.py"
+  - "tests/uat/test_phases.py"
+  - "docs/operations/uat-framework.md"
+  do_not_modify:
+  - "benchbox/"
+
+success_metrics:
+- "Every run directory (including aborted) contains: commit SHA, per-cell command, phase status, terminal-state class, and
+  a COMPLETED|ABORTED|BLOCKED footer."
+- "A NO_JSON failure is debuggable from the run dir alone, with no tee log."
+
+metadata:
+  tags: [uat, traceability, observability, certification]
+  estimated_effort: "Medium"
+  created_date: "2026-05-28"
+  last_updated: "2026-05-28T00:00:00"

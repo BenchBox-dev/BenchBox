@@ -56,6 +56,32 @@ def test_write_report_counts(tmp_path: Path):
     text = (tmp_path / "out.tsv").read_text()
     assert text.startswith(report.REPORT_HEADER)
     assert "candidates=6 executed=3 compatibility_pruned=2 early_stop_pruned=1" in text
+    assert "# run_status=COMPLETED" in text
+
+
+def test_write_report_records_terminal_state_and_source_footer(tmp_path: Path):
+    source_info = type("SourceInfo", (), {"commit_sha": "abc123", "dirty": True})()
+    cell = _cell("duckdb", "write_primitives", 0.01, status="failed")
+
+    summary = report.write_report(
+        [cell],
+        output_path=tmp_path / "out.tsv",
+        source_info=source_info,
+        run_status="ABORTED",
+        abort_phase="execute",
+        abort_reason="free space\nfloor",
+    )
+
+    text = (tmp_path / "out.tsv").read_text(encoding="utf-8")
+    lines = text.splitlines()
+    assert "terminal_state" in lines[0].split("\t")
+    assert "source_commit_sha" in lines[0].split("\t")
+    assert "failed\tno_json_nonzero\t" in lines[1]
+    assert "abc123\ttrue" in lines[1]
+    assert "# run_status=ABORTED source_commit_sha=abc123 source_dirty=true" in text
+    assert "abort_phase=execute" in text
+    assert "abort_reason=free space floor" in text
+    assert summary.exit_code() == 2
 
 
 def test_cross_scale_clean_counts_full_ladder():
