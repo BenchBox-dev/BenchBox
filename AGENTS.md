@@ -9,6 +9,32 @@ Use `rg`; read files in focused chunks. Prefer existing local helpers and
 patterns. For write work, research the affected path, change the narrowest
 surface that solves the problem, verify, then commit only authorized files.
 
+## Worktree Isolation
+
+BenchBox uses retained pool worktrees for routine write work. This is a
+BenchBox-local rule, not a global agent preference.
+
+Before any write action, first classify the task:
+
+- Read-only review, research, audit, or explanation: the primary clone is OK.
+- Any task that may edit files, switch branches, rebase, commit, push, or open
+  a PR: do not work in the primary clone. From `/Users/joe/Developer/BenchBox`,
+  claim a pool slot first:
+
+```bash
+make worktree-claim BRANCH=fix/descriptive-slug
+cd <WORKTREE_PATH>
+make agent-write-preflight
+```
+
+If `git rev-parse --show-toplevel` is `/Users/joe/Developer/BenchBox`, stop
+before editing and claim a worktree. Do not run `git switch`, `git checkout`,
+`git rebase`, `apply_patch`, commit, or `make pr-open` in the primary clone.
+
+Emergency release or hotfix work in the primary clone requires explicit user
+authorization in the prompt plus `BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1` on the
+guarded command. State the exception in the final response.
+
 ## Tooling
 
 `make` wrappers are preferred when present. Direct Python tools still run
@@ -128,6 +154,12 @@ Do not use `git add -A`; stage explicit paths only. Repo `origin` is
 `joeharris76/BenchBox`. Long-lived branches: `develop` for dev, `main` for
 release. Dev PRs target `develop`, squash-merge, linear history. `develop` is
 PR-gated; do not direct-push routine work.
+
+Run the local write guard before the first edit and before PR creation:
+
+```bash
+make agent-write-preflight
+```
 
 Push-to-PR gate (the implement-to-PR ritual is in "Default write-task
 close-out" below):
