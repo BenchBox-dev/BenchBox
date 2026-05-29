@@ -178,18 +178,31 @@ directory remains debuggable without relying on an operator tee log.
 
 ## Disk-budget estimate and resume manifests
 
-Preflight now prints an advisory line before workload cells run:
+Preflight prints a disk-budget line and a per-root free-space report before
+workload cells run:
 
 ```text
 Disk budget estimate: 12.34 GiB peak (10.50 GiB steady; cells=141; unknown=4)
+Free space: tmp                     18.63 GiB (required 12.34 GiB) /tmp
+Free space: output                 240.12 GiB (required 12.34 GiB) ~/Developer/benchmark_runs
+Free space: benchmark-data         240.12 GiB (required 12.34 GiB) ~/Developer/benchmark_runs/datagen
+Free space: docker-data            240.12 GiB (required 12.34 GiB) ~/Developer/benchmark_runs
 ```
 
 The estimate comes from `tests/uat/data/disk_budget_table.tsv`, an
-operator-maintained inventory from prior sweeps. It is intentionally
-not a hard gate: unknown cells are reported in the count, and the
-existing `preflight.free_space_min_gib` cutoff is still the only disk
-abort. Treat a large `unknown=` count as a prompt to partition the
-sweep into smaller configs or refresh the table after the next run.
+operator-maintained inventory from prior sweeps. Preflight gates the
+sweep on the largest configured scale's estimated peak against every
+required root (`/tmp`, the output root, the datagen root, and the
+managed Docker data root when Docker lifecycle management is enabled).
+Unknown cells are still reported in the count and as a preflight warning;
+they are not treated as zero. Treat a large `unknown=` count as a prompt
+to partition the sweep into smaller configs or refresh the table after
+the next run.
+
+Operators who know a run fits can override the disk gates by explicitly
+setting `preflight.free_space_min_gib: 0`. Use that only for supervised
+reruns; it disables both the static free-space floor and the budget
+headroom gate.
 
 When a sweep aborts on the free-space floor after some cells have run,
 the orchestrator writes `<log-dir>/resume.json`. Resume with:

@@ -104,6 +104,7 @@ def test_main_preflight_returns_2_when_preflight_aborts(tmp_path, monkeypatch, c
     def fake_run_preflight(**kwargs):
         return SimpleNamespace(
             disk_budget_summary="budget: high water mark 1 GiB",
+            free_space_report=("Free space: tmp 10.00 GiB (required 5.00 GiB) /tmp",),
             warnings=("disk nearly full",),
             aborted=True,
             abort_reason="free space 0.1 GiB < cutoff 1000.0 GiB",
@@ -118,6 +119,7 @@ def test_main_preflight_returns_2_when_preflight_aborts(tmp_path, monkeypatch, c
     captured = capsys.readouterr()
     assert rc == 2
     assert "budget: high water mark 1 GiB" in captured.out
+    assert "Free space: tmp 10.00 GiB (required 5.00 GiB) /tmp" in captured.out
     assert "[preflight warn] disk nearly full" in captured.err
     assert "[preflight] ABORT: free space 0.1 GiB < cutoff 1000.0 GiB" in captured.err
 
@@ -150,6 +152,7 @@ def test_execute_and_sweep_use_same_preflight_kwargs(tmp_path, monkeypatch):
         calls.append(kwargs)
         return SimpleNamespace(
             disk_budget_summary=None,
+            free_space_report=(),
             warnings=(),
             aborted=True,
             abort_reason="stop after capturing preflight kwargs",
