@@ -1,0 +1,89 @@
+id: uat-preflight-disk-headroom-gate
+title: "UAT: preflight disk report + headroom gate sized to the largest configured scale"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  The native SQL sweep (uat_complete_native_20260528_20260528) aborted
+  mid-execute when /tmp fell below the 4.0 GiB floor:
+  resume.json abort_reason = "free space 3.6 GiB < cutoff 4.0 GiB at /tmp".
+  uat_lifecycle.log shows free space drifting down (18.63 -> 11.01 -> 7.36
+  -> 4.86 GiB) across platforms with docker_cleanup_status=not-run until the
+  floor tripped. The existing preflight.free_space_min_gib cutoff is a single
+  static floor; it does not relate available headroom to the workload the
+  config actually demands, and it watches a limited set of paths.
+
+  Make preflight (a) report free space at every relevant root and (b) gate
+  the sweep against the largest configured scale's expected peak from the
+  disk-budget table, so a sweep does not start only to abort halfway.
+
+prior_art:
+  - "tests/uat/preflight_budget.py — existing disk-budget estimate from tests/uat/data/disk_budget_table.tsv; extend it from advisory-only into a gate input"
+  - "tests/uat/phases/* free_space_min_gib cutoff (docs/operations/uat-framework.md 'Disk-budget estimate and resume manifests') — reuse the cutoff mechanism, add per-root reporting"
+
+work:
+  - id: w1
+    summary: "Emit a preflight free-space report for /tmp, output root, benchmark data root, and (managed mode) Docker data root"
+    status: pending
+    notes: |
+      One compact table line per root, printed before workload cells run.
+      The native abort was on /tmp specifically while the output root still
+      had headroom, so per-root visibility is the point.
+  - id: w2
+    summary: "Relate the disk-budget peak estimate to the largest configured scale and gate on it"
+    needs: [w1]
+    status: pending
+    notes: |
+      Use preflight_budget.py's peak estimate. If estimated peak for the
+      largest configured scale exceeds free headroom on any required root,
+      fail preflight with an actionable message (free space, shrink matrix,
+      or override). Keep unknown-cell handling explicit (count + warn), per
+      the existing advisory contract; do not silently pass unknowns.
+  - id: w3
+    summary: "Document the disk gate and override in docs/operations/uat-framework.md"
+    needs: [w2]
+    status: pending
+
+must_preserve:
+  - "free_space_min_gib remains a valid explicit override; the new gate must be overridable for operators who know the run fits."
+  - "preserve_datagen:false stays rejected by the config validator."
+  - "Unknown disk-budget cells are still reported, not treated as zero."
+
+approach: |
+  Extend preflight_budget.py to expose both the steady and peak estimate per
+  scale, and a helper that compares peak against shutil.disk_usage on each
+  configured root. Wire it into the preflight phase before the existing
+  free_space_min_gib check; emit the per-root table either way. Largest scale
+  = max(scale) across the config matrix.
+
+anti_patterns:
+  - "DO NOT make the gate a hard non-overridable block - because budget table coverage is incomplete (unknown cells exist) - keep an explicit override and surface unknowns."
+  - "DO NOT only watch the output root - because the 2026-05-28 abort was on /tmp - report every root the run writes to."
+
+verification:
+  - description: "Preflight budget + disk tests pass"
+    command: "uv run -- python -m pytest tests/uat/test_preflight.py tests/uat/test_preflight_budget.py -q"
+    expected_output: "all pass"
+  - description: "A configured matrix whose peak exceeds free space fails preflight with an actionable message"
+    command: "uv run -- python -m pytest tests/uat/test_preflight_budget.py -k 'gate or headroom' -q"
+    expected_output: "gate test asserts non-zero preflight + message naming the short root"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/preflight_budget.py"
+    - "tests/uat/test_preflight_budget.py"
+    - "tests/uat/test_preflight.py"
+    - "tests/uat/data/disk_budget_table.tsv"
+    - "docs/operations/uat-framework.md"
+
+success_metrics:
+  - "No sweep starts unless estimated peak for the largest configured scale fits free headroom on every required root, or the operator overrides explicitly."
+  - "Preflight output shows free space at /tmp, output root, benchmark data root, and Docker data root (managed mode)."
+
+metadata:
+  tags: [uat, preflight, disk, certification]
+  estimated_effort: "Small"
+  created_date: "2026-05-28"
+  last_updated: "2026-05-28T00:00:00"
