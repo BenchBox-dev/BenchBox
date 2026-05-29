@@ -30,6 +30,7 @@ except ImportError:
     SessionConfig = None  # type: ignore[assignment, misc]
     RuntimeEnv = None  # type: ignore[assignment, misc]  # ty: ignore[conflicting-declarations]
 
+from benchbox.core.dataframe.schema_utils import extract_schema_columns
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
 from benchbox.platforms.base.no_constraint_mixin import NoConstraintEnforcementMixin
@@ -646,33 +647,7 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             self.log_verbose("Benchmark returned empty schema, will rely on schema inference")
             return {}
 
-        # Convert benchmark schema format to our internal format
-        # Benchmark schema: {table_name: {'name': str, 'columns': [{'name': str, 'type': str, ...}]}}
-        for table_name_key, table_def in benchmark_schema.items():
-            # Normalize table name to lowercase
-            table_name = table_name_key.lower()
-
-            # Extract column information
-            columns = []
-            if isinstance(table_def, dict) and "columns" in table_def:
-                for col in table_def["columns"]:
-                    if isinstance(col, dict) and "name" in col:
-                        # Get type from the column definition
-                        col_type = col.get("type", "VARCHAR")
-                        # Handle both string types and potentially nested type info
-                        if not isinstance(col_type, str):
-                            col_type = "VARCHAR"
-
-                        columns.append({"name": col["name"], "type": col_type})
-                    else:
-                        self.log_very_verbose(f"Skipping invalid column definition in {table_name}: {col}")
-            elif hasattr(table_def, "columns"):
-                # Handle dataclass-style schema objects (e.g., OBTTable with OBTColumn instances)
-                for col in table_def.columns:
-                    if hasattr(col, "name"):
-                        col_type = col.sql_type() if hasattr(col, "sql_type") else "VARCHAR"
-                        columns.append({"name": col.name, "type": col_type})
-
+        for table_name, columns in extract_schema_columns(benchmark_schema).items():
             if columns:
                 schemas[table_name] = {"columns": columns}
                 self.log_very_verbose(f"Extracted schema for {table_name}: {len(columns)} columns")
@@ -784,7 +759,13 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                 row_count = self._load_table_iceberg(connection, table_name_lower, file_paths[0])
             elif self.data_format == "parquet":
                 row_count = self._load_table_parquet(
-                    connection, table_name_lower, file_paths, data_dir, csv_format=table_csv_format
+                    connection,
+                    table_name_lower,
+                    file_paths,
+                    data_dir,
+                    csv_format=table_csv_format,
+                    data_source=data_source,
+                    benchmark=benchmark,
                 )
             else:
                 # Load CSV directly
@@ -1063,7 +1044,14 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         return sql_type
 
     def _load_table_parquet(
-        self, connection: Any, table_name: str, file_paths: list[Path], data_dir: Path, csv_format: str | None = None
+        self,
+        connection: Any,
+        table_name: str,
+        file_paths: list[Path],
+        data_dir: Path,
+        csv_format: str | None = None,
+        data_source: DataSource | None = None,
+        benchmark: Any = None,
     ) -> int:
         """Load table as Parquet, converting from CSV/TBL if needed.
 
@@ -1079,7 +1067,16 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         if input_is_parquet:
             return self._register_parquet_files(connection, table_name, file_paths)
 
-        return self._convert_and_register_parquet(connection, table_name, file_paths, pa, pq, csv_format=csv_format)
+        return self._convert_and_register_parquet(
+            connection,
+            table_name,
+            file_paths,
+            pa,
+            pq,
+            csv_format=csv_format,
+            data_source=data_source,
+            benchmark=benchmark,
+        )
 
     def _is_parquet_file(self, file_path: Path) -> bool:
         """Check if a file is Parquet by extension (stripping compression suffixes)."""
@@ -1331,7 +1328,15 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             raise RuntimeError(f"Failed to register Parquet table {table_name}: {e}") from e
 
     def _convert_and_register_parquet(
-        self, connection: Any, table_name: str, file_paths: list[Path], pa: Any, pq: Any, csv_format: str | None = None
+        self,
+        connection: Any,
+        table_name: str,
+        file_paths: list[Path],
+        pa: Any,
+        pq: Any,
+        csv_format: str | None = None,
+        data_source: DataSource | None = None,
+        benchmark: Any = None,
     ) -> int:
         """Convert CSV/TBL files to Parquet and register with DataFusion."""
         import pyarrow.csv as csv
@@ -1340,14 +1345,27 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         parquet_dir.mkdir(exist_ok=True)
         parquet_file = parquet_dir / f"{table_name}.parquet"
 
-        delimiter = self._detect_csv_format(file_paths, csv_format=csv_format)
+        dialect = resolve_csv_dialect(
+            data_source or DataSource(source_type="datafusion_csv", tables={}),
+            table_name,
+            file_paths[0],
+            benchmark if benchmark is not None else NO_BENCHMARK,
+        )
+        delimiter = self._detect_csv_format(
+            file_paths,
+            csv_format=csv_format,
+            data_source=data_source,
+            table_name=table_name,
+            benchmark=benchmark,
+        )
         column_names, column_types = self._build_pyarrow_columns(table_name, pa)
 
         self.log_very_verbose(f"Converting {len(file_paths)} CSV file(s) to Parquet for {table_name}")
 
         read_opts = csv.ReadOptions(
             column_names=column_names,
-            autogenerate_column_names=(column_names is None),
+            autogenerate_column_names=(column_names is None and not dialect.has_header),
+            skip_rows=1 if column_names is not None and dialect.has_header else 0,
         )
         parse_opts = csv.ParseOptions(delimiter=delimiter, quote_char='"', escape_char="\\")
         conv_opts = csv.ConvertOptions(null_values=[""], strings_can_be_null=True, column_types=column_types)

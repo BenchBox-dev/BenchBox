@@ -53,6 +53,46 @@ logger = logging.getLogger(__name__)
 PandasDF = pd.DataFrame if PANDAS_AVAILABLE else Any
 
 
+def _parse_date_value(value: Any) -> Any:
+    if value is None or value == "":
+        return None
+    return pd.to_datetime(value).date()
+
+
+def _pandas_parse_date_columns(names: list[str] | None) -> tuple[list[str], list[str]]:
+    """Infer date and timestamp columns for raw CSV/TBL loads with explicit schemas."""
+    if not names:
+        return [], []
+
+    date_columns: list[str] = []
+    datetime_columns: list[str] = []
+    for name in names:
+        lower_name = name.lower()
+        if lower_name.endswith("_sk"):
+            continue
+        if lower_name.endswith(("datetime", "_datetime", "timestamp", "_timestamp", "_dts")):
+            datetime_columns.append(name)
+        elif lower_name.endswith(("date", "_date")):
+            date_columns.append(name)
+        elif lower_name in {"eventtime"}:
+            datetime_columns.append(name)
+
+    return date_columns, datetime_columns
+
+
+def _coerce_date_columns(df: PandasDF, date_columns: list[str]) -> PandasDF:
+    if not date_columns:
+        return df
+
+    import pyarrow as pa
+
+    date_dtype = pd.ArrowDtype(pa.date32())
+    for column in date_columns:
+        if column in df.columns:
+            df[column] = pd.array(df[column], dtype=date_dtype)
+    return df
+
+
 class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
     """Pandas adapter for Pandas-family DataFrame benchmarking.
 
@@ -224,10 +264,16 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
             "header": header,
             "on_bad_lines": "skip",
         }
+        date_columns: list[str] = []
 
         # Add column names if provided
         if names:
             read_kwargs["names"] = names
+            date_columns, datetime_columns = _pandas_parse_date_columns(names)
+            if date_columns:
+                read_kwargs["converters"] = dict.fromkeys(date_columns, _parse_date_value)
+            if datetime_columns:
+                read_kwargs["parse_dates"] = datetime_columns
 
         # Trailing-delimiter probing only for TPC-style sources (null_marker is not None).
         if null_marker is not None and names and has_trailing_delimiter(path, delimiter, names):
@@ -235,6 +281,7 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
             read_kwargs["names"] = extended_names
 
         df = pd.read_csv(path, **read_kwargs)
+        df = _coerce_date_columns(df, date_columns)
 
         # Drop trailing column if present
         if TRAILING_DUMMY_COLUMN in df.columns:

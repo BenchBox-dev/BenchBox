@@ -35,6 +35,7 @@ from benchbox.core.dataframe.query_resolution import (
     get_tpcds_dataframe_queries,
     get_tpch_dataframe_queries,
 )
+from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
 from benchbox.core.exceptions import InsufficientMemoryError
 from benchbox.core.results import (
     BenchmarkInfoInput,
@@ -564,7 +565,12 @@ class BenchmarkExecutionMixin:
             source_benchmark = getattr(benchmark_instance, "get_data_source_benchmark", lambda: None)()
             if source_benchmark == "tpch":
                 benchmark_id = "tpch"
-        column_names_map = get_tpch_column_names() if benchmark_id == "tpch" else {}
+        column_names_map = {
+            table_name: [column["name"] for column in columns]
+            for table_name, columns in get_benchmark_schema_columns(benchmark_instance).items()
+        }
+        if benchmark_id == "tpch":
+            column_names_map.update(get_tpch_column_names())
 
         csv_delimiter = getattr(benchmark_instance, "csv_delimiter", None)
 

@@ -366,6 +366,32 @@ class TestUnifiedStrExpr:
         result = df.with_columns(result_expr.alias("has_o")).collect()
         assert result["has_o"].to_list() == [True, True, False, False]
 
+    def test_contains_accepts_unified_literal(self, polars_context):
+        """String methods unwrap UnifiedExpr literals before delegating."""
+        pl = polars_context["polars"]
+        df = polars_context["df"]
+        unified_expr_cls = _get_unified_expr()
+
+        text_col = unified_expr_cls(pl.col("text"))
+        pattern = unified_expr_cls(pl.lit("World"))
+        result_expr = text_col.str.contains(pattern)
+
+        result = df.with_columns(result_expr.alias("has_world")).collect()
+        assert result["has_world"].to_list() == [True, False, False, False]
+
+    def test_string_literal_unwrap_returns_scalar_value(self):
+        """String namespace methods need the original scalar, not a backend literal expression."""
+        from benchbox.platforms.dataframe.unified_frame import _unwrap_unified_expr
+
+        unified_expr_cls = _get_unified_expr()
+        native_expr = object()
+
+        wrapped = unified_expr_cls(native_expr, _is_string_literal=True, _literal_value="google")
+        assert _unwrap_unified_expr(wrapped) == "google"
+
+        column_expr = unified_expr_cls(native_expr)
+        assert _unwrap_unified_expr(column_expr) is native_expr
+
     def test_slice(self, polars_context):
         """Test slice method."""
         pl = polars_context["polars"]

@@ -1333,7 +1333,9 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             Combined DataFrame
         """
         header = 0 if has_header else None
-        names = column_names if not has_header else None
+        # Headered CSVs still need schema names so adapter-specific readers can
+        # apply type converters for date/timestamp columns.
+        names = column_names
 
         if len(file_paths) == 1:
             return self.read_csv(

@@ -47,6 +47,7 @@ from benchbox.core.dataframe.capabilities import (
     DataFormat,
     get_platform_capabilities,
 )
+from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
 from benchbox.core.dataframe.tuning.write_config import (
     DataFrameWriteConfiguration,
 )
@@ -165,6 +166,7 @@ class SchemaMapper:
         "VARCHAR": "Utf8",
         "CHAR": "Utf8",
         "DATE": "Date",
+        "TIMESTAMP": "Datetime",
     }
 
     # Mapping from TPC DataType enum values to Pandas types
@@ -174,6 +176,7 @@ class SchemaMapper:
         "VARCHAR": "object",
         "CHAR": "object",
         "DATE": "datetime64[ns]",
+        "TIMESTAMP": "datetime64[ns]",
     }
 
     # Mapping for PyArrow types (used in Parquet conversion)
@@ -183,6 +186,7 @@ class SchemaMapper:
         "VARCHAR": "string",
         "CHAR": "string",
         "DATE": "date32",
+        "TIMESTAMP": "timestamp[us]",
     }
 
     @classmethod
@@ -359,6 +363,7 @@ class FormatConverter:
 
         type_lookup = {
             "date32": pa.date32(),
+            "timestamp[us]": pa.timestamp("us"),
             "int64": pa.int64(),
             "float64": pa.float64(),
             "string": pa.string(),
@@ -1298,15 +1303,8 @@ class DataFrameDataLoader:
         """
         schema_info: dict[str, list[str]] = {}
 
-        # Try get_schema() method
-        if hasattr(benchmark, "get_schema"):
-            try:
-                schema = benchmark.get_schema()
-                for table_name, table_schema in schema.items():
-                    columns = table_schema.get("columns", [])
-                    schema_info[table_name.lower()] = [c["name"] for c in columns]
-            except Exception:
-                pass
+        for table_name, columns in get_benchmark_schema_columns(benchmark).items():
+            schema_info[table_name] = [column["name"] for column in columns]
 
         # Merge TPC-H base table schema for any tables not already covered
         # (e.g. Write Primitives returns staging table schemas but uses TPC-H base data)
@@ -1336,21 +1334,14 @@ class DataFrameDataLoader:
         """
         type_info: dict[str, dict[str, str]] = {}
 
-        # Try get_schema() method (returns dicts with "type" field from get_sql_type())
-        if hasattr(benchmark, "get_schema"):
-            try:
-                schema = benchmark.get_schema()
-                for table_name, table_schema in schema.items():
-                    columns = table_schema.get("columns", [])
-                    col_types = self._extract_arrow_types(
-                        columns,
-                        get_name=lambda column: column["name"],
-                        get_sql_type=lambda column: column.get("type", ""),
-                    )
-                    if col_types:
-                        type_info[table_name.lower()] = col_types
-            except Exception:
-                pass
+        for table_name, columns in get_benchmark_schema_columns(benchmark).items():
+            col_types = self._extract_arrow_types(
+                columns,
+                get_name=lambda column: column["name"],
+                get_sql_type=lambda column: column.get("type", ""),
+            )
+            if col_types:
+                type_info[table_name] = col_types
 
         # Merge TPC-H base table types for any tables not already covered
         try:
@@ -1374,7 +1365,9 @@ class DataFrameDataLoader:
         """Extract supported Arrow types from a schema column iterable."""
         col_types: dict[str, str] = {}
         for column in columns:
-            arrow_type = SchemaMapper.PYARROW_TYPE_MAP.get(get_sql_type(column))
+            sql_type = str(get_sql_type(column)).upper()
+            base_type = sql_type.split("(", 1)[0]
+            arrow_type = SchemaMapper.PYARROW_TYPE_MAP.get(sql_type) or SchemaMapper.PYARROW_TYPE_MAP.get(base_type)
             if arrow_type:
                 col_types[get_name(column)] = arrow_type
         return col_types

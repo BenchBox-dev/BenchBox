@@ -42,6 +42,7 @@ from benchbox.core.dataframe.query_resolution import (
     resolve_tpcds_query_manager,
     resolve_tpcds_stream_queries,
 )
+from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
 from benchbox.core.exceptions import InsufficientMemoryError
 from benchbox.core.results import (
     BenchmarkInfoInput,
@@ -345,9 +346,15 @@ def _load_dataframe_data(
         write_config=write_config,
     )
 
-    # Get schema info for column names
+    # Get schema info for column names. Raw CSV/TBL loads need explicit names
+    # for benchmarks beyond TPC-H (for example TPC-DS .dat shards).
     benchmark_id = normalize_benchmark_id(benchmark_config.name)
-    column_names_map = get_tpch_column_names() if benchmark_id == "tpch" else {}
+    column_names_map = {
+        table_name: [column["name"] for column in columns]
+        for table_name, columns in get_benchmark_schema_columns(benchmark_ref).items()
+    }
+    if benchmark_id == "tpch":
+        column_names_map.update(get_tpch_column_names())
 
     # Load tables
     table_stats: dict[str, int] = {}

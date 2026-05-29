@@ -51,6 +51,7 @@ Expr = TypeVar("Expr")
 # Maps string type names to PyArrow types for DataFusion casting.
 # Defined at module level to avoid recreation on each cast() call.
 _DATAFUSION_TYPE_MAPPING: dict[str, Any] | None = None
+_NO_LITERAL_VALUE = object()
 
 
 def _get_datafusion_type_mapping() -> dict[str, Any]:
@@ -93,6 +94,13 @@ def _is_polars_expr(expr: Any) -> bool:
     return "polars" in type_name and "Expr" in type(expr).__name__
 
 
+def _unwrap_unified_expr(value: Any) -> Any:
+    if isinstance(value, UnifiedExpr):
+        literal_value = getattr(value, "_literal_value", _NO_LITERAL_VALUE)
+        return value._expr if literal_value is _NO_LITERAL_VALUE else literal_value
+    return value
+
+
 class UnifiedStrExpr:
     """Platform-agnostic string expression namespace.
 
@@ -123,12 +131,14 @@ class UnifiedStrExpr:
         Returns:
             UnifiedExpr with boolean result
         """
+        prefix = _unwrap_unified_expr(prefix)
         if self._is_pyspark:
             return UnifiedExpr(self._expr.startswith(prefix))
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
 
-            return UnifiedExpr(df_f.starts_with(self._expr, df_lit(prefix)))
+            prefix = prefix if _is_datafusion_expr(prefix) else df_lit(prefix)
+            return UnifiedExpr(df_f.starts_with(self._expr, prefix))
         return UnifiedExpr(self._expr.str.starts_with(prefix))
 
     def ends_with(self, suffix: str) -> UnifiedExpr:
@@ -140,12 +150,14 @@ class UnifiedStrExpr:
         Returns:
             UnifiedExpr with boolean result
         """
+        suffix = _unwrap_unified_expr(suffix)
         if self._is_pyspark:
             return UnifiedExpr(self._expr.endswith(suffix))
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
 
-            return UnifiedExpr(df_f.ends_with(self._expr, df_lit(suffix)))
+            suffix = suffix if _is_datafusion_expr(suffix) else df_lit(suffix)
+            return UnifiedExpr(df_f.ends_with(self._expr, suffix))
         return UnifiedExpr(self._expr.str.ends_with(suffix))
 
     def contains(self, pattern: str) -> UnifiedExpr:
@@ -157,6 +169,7 @@ class UnifiedStrExpr:
         Returns:
             UnifiedExpr with boolean result
         """
+        pattern = _unwrap_unified_expr(pattern)
         if self._is_pyspark:
             # PySpark .contains() uses SQL LIKE pattern, but .rlike() uses regex
             # For compatibility with Polars regex, use rlike
@@ -164,7 +177,8 @@ class UnifiedStrExpr:
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
 
-            return UnifiedExpr(df_f.regexp_like(self._expr, df_lit(pattern)))
+            pattern = pattern if _is_datafusion_expr(pattern) else df_lit(pattern)
+            return UnifiedExpr(df_f.regexp_like(self._expr, pattern))
         return UnifiedExpr(self._expr.str.contains(pattern))
 
     def slice(self, offset: int, length: int | None = None) -> UnifiedExpr:
@@ -223,6 +237,7 @@ class UnifiedStrExpr:
         Returns:
             UnifiedListExpr wrapping the resulting list-typed expression
         """
+        separator = _unwrap_unified_expr(separator)
         if self._is_pyspark:
             from pyspark.sql import functions as F  # noqa: N812
 
@@ -738,13 +753,20 @@ class UnifiedExpr:
       runtime branches via isinstance / getattr.
     """
 
-    def __init__(self, expr: Any, *, _is_string_literal: bool = False) -> None:
+    def __init__(
+        self,
+        expr: Any,
+        *,
+        _is_string_literal: bool = False,
+        _literal_value: Any = _NO_LITERAL_VALUE,
+    ) -> None:
         """Initialize the expression wrapper.
 
         Args:
             expr: Native expression (PySpark Column, Polars Expr, or DataFusion Expr)
             _is_string_literal: Internal flag indicating this is a string literal
                                (used for PySpark string concatenation detection)
+            _literal_value: Optional scalar value behind a backend literal expression.
 
         `expr: Any` is the same escape-hatch documented on `.native`: the
         honest type is the union of every backend's expression class plus
@@ -756,6 +778,7 @@ class UnifiedExpr:
         self._is_pyspark = _is_pyspark_column(expr)
         self._is_datafusion = _is_datafusion_expr(expr)
         self._is_string_literal = _is_string_literal
+        self._literal_value = _literal_value
 
     @property
     def native(self) -> Any:
