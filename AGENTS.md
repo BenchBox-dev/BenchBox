@@ -35,6 +35,10 @@ temporary evidence is not source.
 - Verification ladder: read TODO `verification:`; run the narrowest listed or
   targeted check that proves the change; fast suite once pre-commit;
   `make pr-preflight` once pre-`pr-open`.
+- Delegate boilerplate gates to a low-effort subagent when available: full/fast
+  suites, `make pr-preflight`, `make pr-open`, PR-followup runners, and bounded
+  CI checks. The main agent chooses the command and interprets failures; the
+  subagent only runs it, captures status/log tail/PR URL, and reports back.
 - PR triage uses compact `gh pr list --json <fields>` first (for example,
   `number,title,headRefName,baseRefName,state,mergeStateStatus`); inspect
   failed-job JSON before logs. Do not poll — pending is a valid terminal state.
@@ -140,6 +144,8 @@ make pr-open
 `pr-open` is idempotent: pushes, opens/reuses a PR to `develop`, and enables
 squash auto-merge when CI passes. Do not poll; post-merge safety opens a
 revert PR or incident issue if `develop` goes red.
+Run `make pr-preflight` and `make pr-open` through a low-effort subagent when
+the agent environment supports it.
 
 Use retained pool worktrees for parallel work:
 
@@ -149,6 +155,9 @@ cd <WORKTREE_PATH>
 make pr-preflight && make pr-open
 make worktree-release
 ```
+
+For the example above, prefer delegating the `make pr-preflight && make pr-open`
+step to a low-effort subagent with a log path and clear stop condition.
 
 Inspect with `make worktree-pool-status`; sweep with
 `make worktree-pool-sweep-stale`. Use `make worktree-pool-reset POOL=NN` only
