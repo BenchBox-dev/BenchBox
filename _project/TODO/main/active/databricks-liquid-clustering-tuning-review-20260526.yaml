@@ -1,0 +1,176 @@
+id: databricks-liquid-clustering-tuning-review-20260526
+title: "Databricks liquid clustering review follow-up: runtime compatibility, validation gaps, and live certification"
+worktree: main
+priority: High
+status: Blocked
+category: Testing and Quality Assurance
+
+description: |
+  Follow-up validation for commit `b56457e17` ("feat(databricks): add liquid TPC rendering profiles").
+  Goal is to keep a concrete evidence ledger for remaining Databricks liquid TPC coverage gaps, including
+  runtime compatibility, conflict validation, metadata integrity, and comparison-path behavior.
+
+context_sections:
+  Executive evidence matrix:
+    date: "2026-05-26"
+    commit: "b56457e17"
+    branch: "fix/backport-v031-recovery-fixes-to-develop"
+    commands:
+      - id: "profile-check"
+        command: "uv run -- python _project/scripts/tuning_profile_check.py --benchmarks tpch,tpcds --platforms databricks,duckdb --strict"
+        result: "PASS. tpch/tpcds mappings pass for databricks tuned+liquid and duckdb tuned with hashes."
+        details:
+          - "databricks/tpch/liquid -> rendering=databricks_liquid_auto, mechanisms=liquid_clustering_auto,optimize, hash=94bdedc6d379cd20"
+          - "databricks/tpch/tuned -> rendering=databricks_z_order, mechanisms=optimize,partitioning,z_order, hash=0375f94a8317413e"
+          - "databricks/tpcds/liquid -> rendering=databricks_liquid_auto, mechanisms=liquid_clustering_auto,optimize, hash=6d178b4f0b517a66"
+          - "databricks/tpcds/tuned -> rendering=databricks_z_order, mechanisms=optimize,partitioning,z_order, hash=fe5fa1b4a8f666b6"
+      - id: "unit-suite"
+        command: "uv run -- python -m pytest -n 0 tests/unit/core/tuning/test_tpc_workload_profiles.py tests/unit/core/tuning/test_tpc_tuning_template_parity.py tests/unit/cli/test_databricks_tuning_examples.py tests/unit/cli/test_platform_hooks.py tests/unit/cli/test_run_command_branches.py tests/unit/core/tuning/test_platform_optimization_config.py tests/unit/platforms/test_databricks_liquid_clustering.py tests/unit/platforms/test_databricks_adapter.py tests/unit/platforms/test_databricks_adapter_coverage.py -q"
+        result: "PASS: 455 passed"
+      - id: "liquid-sql-generation"
+        command: "uv run -- python -m pytest -n 0 tests/unit/platforms/test_databricks_liquid_clustering.py -k \"liquid_auto or manual or optimize or strategy\" -q && uv run -- python -m pytest -n 0 tests/unit/platforms/test_databricks_adapter.py -k \"liquid_clustering_method_generates_alter_table or optimize or analyze or liquid_clustering_auto\" -q"
+        result: "PASS: 3 + 13 tests selected and passing"
+        details:
+          - "Asserts explicit/auto `ALTER TABLE ... CLUSTER BY ...` generation"
+          - "Asserts optimize/analyze statement generation and mechanism accounting"
+
+  Live attempt:
+    date: "2026-05-26"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs uv run -- benchbox run --platform databricks --benchmark tpch --scale 0.01 --tuning examples/tunings/databricks/tpch_liquid_tuned.yaml --output dbfs:/Volumes/main/default/benchbox/ --phases generate,load --non-interactive"
+    status: "FAIL"
+    precondition: "uv sync --extra databricks installed"
+    failure: "Invalid access token at Databricks API auth step after data generation completed."
+    artifact_path: "No Databricks run output artifact produced due auth failure"
+    runtime_fields_missing: "runtime version, warehouse version, staging mode, predictive optimization state could not be collected from live run"
+    blocked_by: "invalid Databricks credentials in environment"
+
+  Conflict-path checks (all pre-exec, local):
+    - id: mixed_liquid_zorder
+      command: "uv run -- benchbox run --dry-run /tmp/review_mixed --platform databricks --benchmark tpch --scale 0.01 --tuning /tmp/benchbox_tuning_mixed.yaml --output dbfs:/Volumes/main/default/benchbox/ --non-interactive"
+      expected: "fail"
+      result: "FAIL as expected; error: Liquid Clustering cannot be combined with z_ordering"
+    - id: none_with_layout
+      command: "uv run -- benchbox run --dry-run /tmp/review_none_invalid --platform databricks --benchmark tpch --scale 0.01 --tuning /tmp/benchbox_tuning_none_invalid.yaml --output dbfs:/Volumes/main/default/benchbox/ --non-interactive"
+      expected: "fail"
+      result: "FAIL as expected; error: databricks_clustering_strategy='none' cannot be combined with liquid/zorder"
+    - id: liquid_with_partitioning
+      command: "uv run -- benchbox run --dry-run /tmp/review_liquid_partition --platform databricks --benchmark tpch --scale 0.01 --tuning /tmp/benchbox_tuning_liquid_with_partitioning.yaml --output dbfs:/Volumes/main/default/benchbox/ --non-interactive"
+      expected: "fail"
+      result: "FAIL as expected; partitioning rejected for liquid"
+    - id: liquid_with_distribution
+      command: "uv run -- benchbox run --dry-run /tmp/review_liquid_distribution --platform databricks --benchmark tpch --scale 0.01 --tuning /tmp/benchbox_tuning_liquid_with_distribution.yaml --output dbfs:/Volumes/main/default/benchbox/ --non-interactive"
+      expected: "fail"
+      result: "FAIL as expected; distribution rejected for liquid"
+
+  Render/path comparison:
+    databricks_zorder_tpch_artifacts:
+      - /tmp/review_zorder/tpch_databricks_20260526_114002.json
+      - /tmp/review_zorder/tpch_databricks_20260526_114002.yaml
+      - /tmp/review_zorder/tpch_databricks_20260526_114002.sql
+    databricks_liquid_auto_tpch_artifacts:
+      - /tmp/review_liquid/tpch_databricks_20260526_114005.json
+      - /tmp/review_liquid/tpch_databricks_20260526_114005.yaml
+      - /tmp/review_liquid/tpch_databricks_20260526_114005.sql
+    databricks_liquid_manual_tpch_artifacts:
+      - /tmp/benchbox-manual5/tpch_databricks_20260526_113953.json
+      - /tmp/benchbox-manual5/tpch_databricks_20260526_113953.yaml
+    duckdb_tuned_tpcd_artifacts:
+      - /tmp/review_duckdb/tpch_duckdb_20260526_114008.json
+      - /tmp/review_duckdb/tpch_databricks_20260526_114008.yaml
+      - /tmp/review_duckdb/tpch_databricks_20260526_114008.sql
+    databricks_tpcds_artifacts:
+      - /tmp/review_zorder_tpcds/tpcds_databricks_20260526_114051.json
+      - /tmp/review_liquid_tpcds/tpcds_databricks_20260526_114101.json
+      - /tmp/review_zorder_tpcds/tpcds_databricks_20260526_114051.sql
+      - /tmp/review_liquid_tpcds/tpcds_databricks_20260526_114101.sql
+    findings:
+      - PASS: databricks zorder and liquid commands execute dry-run and export artifacts.
+      - PASS: liquid AUTO uses `physical_rendering_id=databricks_liquid_auto`; manual dry-run uses `databricks_liquid_manual`.
+      - PASS: zorder path and liquid path remain distinct in platform rendering and profile-check outputs.
+      - PASS: manual path currently does not fail local dry-run with 5 liquid_clustering_columns (gap below).
+
+  Runtime/version assumptions:
+    check: "No live runtime metadata available due auth failure; assumptions not exercised end-to-end"
+    gap: "Adapter path does not enforce documented DBR floor behavior in execution path (15.2 GA, 15.4 AUTO key selection, 16.0 OPTIMIZE FULL)."
+    code_refs:
+      - "benchbox/platforms/databricks/adapter.py: _apply_clustering_strategy, _apply_liquid_auto_clustering"
+      - "benchbox/platforms/databricks/adapter.py: _apply_liquid_clustering"
+      - "benchbox/platforms/databricks/adapter.py: _apply_delta_optimize"
+      - "benchbox/platforms/databricks/adapter.py: _get_platform_metadata"
+
+  Reproduction and comparison notes:
+    steps:
+      - "Use temp files: /tmp/benchbox_tuning_mixed.yaml, /tmp/benchbox_tuning_none_invalid.yaml, /tmp/benchbox_tuning_liquid_with_partitioning.yaml, /tmp/benchbox_tuning_liquid_with_distribution.yaml, /tmp/benchbox_tuning_manual_5cols.yaml."
+      - "Run the conflict checks listed above with --dry-run; each fails before execution as expected except manual_5cols dry-run succeeds."
+      - "Run dry-runs for zorder/liquid/manual/duckdb for tpch and tpcds using commands above for artifact comparison."
+
+work:
+  - id: w1
+    summary: "Preserve all evidence and rerun the listed baseline checks after any future changes"
+    status: done
+  - id: w2
+    summary: "Add explicit validation for `liquid_clustering_columns` over 4 keys in manual mode and add regression test.
+      Current behavior passes 5-key liquid_clustering_columns in `/tmp/benchbox_tuning_manual_5cols.yaml` without rejection."
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "Add runtime compatibility checks (DBR/channel/warehouse/UC/optimize-full eligibility) before emitting liquid-clustering SQL and add unit/integration assertions for each failure mode."
+    needs: [w1]
+    status: pending
+  - id: w4
+    summary: "Run live Databricks SF 0.01 executions for tpch/tpcds liquid templates with valid credentials and verify all requested Databricks metadata fields."
+    needs: [w3]
+    status: blocked
+    notes: "Blocked until valid environment credentials and approved Databricks target are available."
+  - id: w5
+    summary: "On successful live run, verify result metadata includes requested/resolved strategy, physical rendering id, applied/skipped operations, logical tuning profile id, and platform physical tuning mechanisms."
+    needs: [w4]
+    status: pending
+
+must_preserve:
+  - "No silent migration of legacy ZORDER templates to Liquid semantics."
+  - "Keep clear comparison boundary across zorder, liquid auto/manual, and duckdb tuned results (physical rendering / profile identity)."
+  - "Do not claim Databricks live certification without successful real run(s) proving live acceptance and metadata fields."
+  - "Do not commit raw Databricks logs or benchmark output directories; only reference artifact paths and summarize in evidence."
+
+deps:
+  needs: []
+
+verification:
+  - description: "Re-run baseline profile and unit checks"
+    command: "uv run -- python _project/scripts/tuning_profile_check.py --benchmarks tpch,tpcds --platforms databricks,duckdb --strict"
+    expected_output: "All tuned/liquid templates map and render as expected"
+  - description: "Re-run conflict + rendering dry-runs and confirm PASS/FAIL matrix"
+    command: "uv run -- benchbox run --dry-run /tmp/review_mixed ...; uv run -- benchbox run --dry-run /tmp/review_none_invalid ...; uv run -- benchbox run --dry-run /tmp/review_liquid_partition ...; uv run -- benchbox run --dry-run /tmp/review_liquid_distribution ..."
+    expected_output: "Expected failures for all four conflict cases"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - databricks
+    - liquid-clustering
+    - validation
+    - runtime-compatibility
+  estimated_effort: Medium
+  due_date: "2026-06-05"
+  created_date: "2026-05-26"
+  last_updated: "2026-05-26T11:55:00"
+
+prior_art:
+  - "benchbox/platforms/databricks/adapter.py: metadata and strategy application paths"
+  - "benchbox/core/tuning/interface.py: databricks effective layout validation"
+  - "tests/unit/platforms/test_databricks_liquid_clustering.py: metadata assertions for requested/resolved/operations"
+
+open_questions:
+  - question: "Should DBR compatibility checks for liquid be hard errors or runtime warnings?"
+    gating: true
+    affects: [w3]
+    default: "warn-first, block by default only for explicit unsafe runtimes"
+  - question: "Should manual mode >4 explicit liquid columns always fail or auto-fallback to auto strategy?"
+    gating: true
+    affects: [w2]
+    default: "hard-fail for explicit >4, preserve deterministic behavior"
+
+commits:
+  - "b56457e17"
