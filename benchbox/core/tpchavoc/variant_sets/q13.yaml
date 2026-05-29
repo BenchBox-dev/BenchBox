@@ -206,21 +206,27 @@ variants:
   description: 'Window functions: Use window functions for distribution analysis (OLAP)'
   sql: |2
 
-    select distinct
+    with customer_distribution as (
+        select distinct
+            c_count,
+            count(*) over (partition by c_count) as custdist
+        from (
+            select
+                c_custkey,
+                count(o_orderkey) as c_count
+            from
+                customer left outer join orders on
+                    c_custkey = o_custkey
+                    and o_comment not like '%special%requests%'
+            group by
+                c_custkey
+        ) as c_orders
+    )
+    select
         c_count,
-        count(*) over (partition by c_count) as custdist,
-        rank() over (order by count(*) over (partition by c_count) desc, c_count desc) as dist_rank
-    from (
-        select
-            c_custkey,
-            count(o_orderkey) as c_count
-        from
-            customer left outer join orders on
-                c_custkey = o_custkey
-                and o_comment not like '%special%requests%'
-        group by
-            c_custkey
-    ) as c_orders
+        custdist,
+        rank() over (order by custdist desc, c_count desc) as dist_rank
+    from customer_distribution
     order by
         custdist desc,
         c_count desc

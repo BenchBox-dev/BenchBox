@@ -2,7 +2,8 @@ id: uat-duckdb-reference-triage
 title: "Triage DuckDB reference-platform failures before any certification re-run"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-29"
 category: Testing and Quality Assurance
 
 description: |
@@ -35,7 +36,7 @@ prior_art:
 work:
   - id: w0
     summary: "Re-run the NO_JSON cells with stderr persistence enabled and capture exact root cause"
-    status: pending
+    status: done
     notes: |
       duckdb write_primitives (all scales) + ai_primitives (0.01, 1.0).
       Requires the failure-capture work to have landed. Capture to an
@@ -43,26 +44,40 @@ work:
   - id: w1
     summary: "Resolve tpchavoc window-definition parser error + l_partkey ambiguity, or prune as a query-authoring gap"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Decide: query rewrite (preferred if DuckDB-valid form exists) vs
       compatibility exclusion (if the construct is genuinely unsupported).
   - id: w2
     summary: "Fix or justify tpchavoc@1.0 1200s timeout (optimize, raise with justification, or prune if stress-only)"
     needs: [w1]
-    status: pending
+    status: done
+    notes: |
+      Root cause was query 10_v8 ("EXISTS pattern"), NOT a slow run: its
+      EXISTS subquery used unqualified columns (l2.l_orderkey = l_orderkey)
+      that silently bound to the inner alias l2, degenerating the correlated
+      semi-join into an uncorrelated full scan that DuckDB's planner blew up
+      at SF1 (>180s, uninterruptible in-engine; EXPLAIN showed a
+      self-equality filter l_orderkey=l_orderkey). Fixed by qualifying the
+      correlation to the outer table (l2.l_orderkey = lineitem.l_orderkey),
+      which DuckDB decorrelates into a RIGHT_SEMI hash join.
+      Evidence (2026-05-29, DuckDB 1.3.2 / tpchavoc_sf1):
+        - before: query 10_v8 hung >180s; tpchavoc@1.0 exit 124.
+        - after:  10_v8 EXPLAIN shows SEMI join, executes in 0.1s; full
+                  tpchavoc@1.0 load,power = 880/880 executions, 100%, PASSED.
+      Timeout was NOT raised (anti-pattern: cell was hung, not slow).
   - id: w3
     summary: "Fix transaction_primitives staging-table init + parser syntax failures"
     needs: [w0]
-    status: pending
+    status: done
   - id: w4
     summary: "Fix write_primitives / ai_primitives NO_JSON failures per w0 root cause"
     needs: [w0]
-    status: pending
+    status: done
   - id: w5
     summary: "Confirm DuckDB passes all required, non-pruned cells at 0.01/0.1/1.0"
     needs: [w1, w2, w3, w4]
-    status: pending
+    status: done
 
 deps:
   needs:

@@ -403,6 +403,20 @@ class TestExecuteOperation:
         assert "MERGE" in (result.skip_reason or "")
         mock_conn.execute.assert_not_called()
 
+    def test_execute_operation_skips_duckdb_merge_gap(self, wp_benchmark, monkeypatch):
+        """DuckDB 1.3.2 does not accept the write-primitives MERGE catalog."""
+        mock_conn = Mock()
+        mock_conn.execute = Mock()
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("merge_simple_upsert_small", mock_conn, platform_key="duckdb")
+
+        assert result.status == "SKIPPED"
+        assert result.success is True
+        assert result.error is None
+        assert "MERGE" in (result.skip_reason or "")
+        mock_conn.execute.assert_not_called()
+
     def test_execute_operation_uses_platform_override_when_available(self, wp_benchmark, monkeypatch):
         """Platform override SQL should be used instead of base write_sql."""
         operation = wp_benchmark.get_operation("insert_on_conflict_ignore")
@@ -1346,6 +1360,13 @@ def test_get_schema_returns_normalized_dict(fast_bench):
     # Staging tables should be present
     for table_name, table_def in schema.items():
         assert "columns" in table_def or isinstance(table_def, dict)
+
+
+def test_get_schema_excludes_operation_created_sketch_tables(fast_bench):
+    schema = fast_bench.get_schema()
+
+    assert "sketch_ops_daily_users" not in schema
+    assert "sketch_ops_topk" not in schema
 
 
 # ---------------------------------------------------------------------------

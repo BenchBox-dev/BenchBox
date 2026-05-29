@@ -340,8 +340,8 @@ variants:
         and exists (
             select 1
             from lineitem l2
-            where l2.l_orderkey = l_orderkey
-              and l2.l_linenumber = l_linenumber
+            where l2.l_orderkey = lineitem.l_orderkey
+              and l2.l_linenumber = lineitem.l_linenumber
               and l2.l_returnflag = 'R'
         )
     group by
@@ -358,28 +358,40 @@ variants:
   description: 'Window functions: Use window functions for customer analysis (OLAP)'
   sql: |2
 
-    select distinct
+    with customer_revenue as (
+        select distinct
+            c_custkey,
+            c_name,
+            sum(l_extendedprice * (1 - l_discount)) over (partition by c_custkey) as revenue,
+            c_acctbal,
+            n_name,
+            c_address,
+            c_phone,
+            c_comment
+        from
+            customer,
+            orders,
+            lineitem,
+            nation
+        where
+            c_custkey = o_custkey
+            and l_orderkey = o_orderkey
+            and o_orderdate >= date '1993-10-01'
+            and o_orderdate < date '1993-10-01' + interval '3' month
+            and l_returnflag = 'R'
+            and c_nationkey = n_nationkey
+    )
+    select
         c_custkey,
         c_name,
-        sum(l_extendedprice * (1 - l_discount)) over (partition by c_custkey) as revenue,
+        revenue,
         c_acctbal,
         n_name,
         c_address,
         c_phone,
         c_comment,
-        rank() over (order by sum(l_extendedprice * (1 - l_discount)) over (partition by c_custkey) desc) as revenue_rank
-    from
-        customer,
-        orders,
-        lineitem,
-        nation
-    where
-        c_custkey = o_custkey
-        and l_orderkey = o_orderkey
-        and o_orderdate >= date '1993-10-01'
-        and o_orderdate < date '1993-10-01' + interval '3' month
-        and l_returnflag = 'R'
-        and c_nationkey = n_nationkey
+        rank() over (order by revenue desc) as revenue_rank
+    from customer_revenue
     order by
         revenue desc
 - id: 10

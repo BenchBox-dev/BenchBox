@@ -6,7 +6,7 @@ variants:
 - id: 2
   description: 'HAVING clause: Use HAVING for post-aggregation filtering'
   sql: |
-    with avg_qty as (select l_partkey, 0.2 * avg(l_quantity) as threshold from lineitem group by l_partkey) select sum(l_extendedprice) / 7.0 as avg_yearly from lineitem, part, avg_qty where p_partkey = l_partkey and p_brand = 'Brand#23' and p_container = 'MED BOX' and avg_qty.l_partkey = l_partkey and l_quantity < avg_qty.threshold
+    with avg_qty as (select l_partkey, 0.2 * avg(l_quantity) as threshold from lineitem group by l_partkey) select sum(l_extendedprice) / 7.0 as avg_yearly from lineitem, part, avg_qty where p_partkey = lineitem.l_partkey and p_brand = 'Brand#23' and p_container = 'MED BOX' and avg_qty.l_partkey = lineitem.l_partkey and l_quantity < avg_qty.threshold
 - id: 3
   description: 'Explicit JOINs: Replace comma-separated tables with explicit JOINs'
   sql: |
@@ -14,7 +14,7 @@ variants:
 - id: 4
   description: 'UNION ALL: Split query by conditions'
   sql: |
-    select sum(revenue) / 7.0 as avg_yearly from (select l_extendedprice as revenue from lineitem, part where p_partkey = l_partkey and p_brand = 'Brand#23' and p_container = 'MED BOX' and l_quantity < (select 0.2 * avg(l_quantity) from lineitem where l_partkey = p_partkey) union all select 0 as revenue from dual where false) combined
+    select sum(revenue) / 7.0 as avg_yearly from (select l_extendedprice as revenue from lineitem, part where p_partkey = l_partkey and p_brand = 'Brand#23' and p_container = 'MED BOX' and l_quantity < (select 0.2 * avg(l_quantity) from lineitem where l_partkey = p_partkey) union all select 0 as revenue from (select 1) as dual where false) combined
 - id: 5
   description: 'CTE: Use common table expressions for modular design'
   sql: |

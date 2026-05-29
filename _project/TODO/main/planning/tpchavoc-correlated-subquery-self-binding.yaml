@@ -1,0 +1,91 @@
+id: tpchavoc-correlated-subquery-self-binding
+title: "Fix tpchavoc variants whose correlated subqueries silently self-bind to the inner alias"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  While fixing the DuckDB SF1 hang in tpchavoc 10_v8 (uat-duckdb-reference-triage),
+  the root cause was a correlated subquery whose unqualified columns
+  (`l2.l_orderkey = l_orderkey`) silently bound to the INNER alias (l2)
+  instead of the outer table, degenerating the intended correlated
+  semi-join into an uncorrelated full scan. 10_v8 was fixed by qualifying
+  the correlation to the outer table.
+
+  Two more variants carry the identical pattern but do NOT currently break
+  any platform (they execute in <0.1s at SF1 on DuckDB because the
+  degenerate subquery folds to a cheap one-time scalar), so they were left
+  out of the duckdb-reference-triage scope:
+
+  - q11 variant 1 ("Scalar subqueries"): subquery
+    `from partsupp ps2, ... where ps2.ps_partkey = ps_partkey` — unqualified
+    `ps_partkey` binds to ps2, so the threshold becomes an uncorrelated
+    avg over all German partsupp rows instead of per-part.
+  - q17 variant 8 ("EXISTS pattern"): EXISTS subquery
+    `from (...) avg_calc where avg_calc.l_partkey = l_partkey` — unqualified
+    `l_partkey` binds to avg_calc, dropping the per-part correlation.
+
+  These likely produce semantically-incorrect variant results on EVERY
+  platform (tpchavoc validates execution, not result equivalence, so the
+  defect is silent). This item is about correctness of the shared variant
+  SQL, not a DuckDB-specific failure.
+
+prior_art:
+  - "benchbox/core/tpchavoc/variant_sets/q10.yaml:8 — 10_v8 fix qualifies the EXISTS correlation to the outer table (lineitem.l_orderkey); reuse the same qualification approach"
+  - "benchbox/core/tpchavoc/variant_sets/q17.yaml:2 — q17_v2 already qualifies l_partkey -> lineitem.l_partkey for the same class of ambiguity"
+
+work:
+  - id: w0
+    summary: "Confirm intended semantics of q11_v1 and q17_v8 against the base TPC-H query they vary"
+    status: pending
+    notes: |
+      Establish the correct correlated form before editing. The fix is to
+      qualify the correlation column to the outer table, matching 10_v8.
+  - id: w1
+    summary: "Qualify the correlation in q11_v1 (ps2.ps_partkey = partsupp.ps_partkey) and verify it decorrelates"
+    needs: [w0]
+    status: pending
+  - id: w2
+    summary: "Qualify the correlation in q17_v8 (avg_calc.l_partkey = lineitem.l_partkey) and verify it decorrelates"
+    needs: [w0]
+    status: pending
+  - id: w3
+    summary: "Sweep all tpchavoc variant_sets for the same alias-self-binding pattern and fix any others"
+    needs: [w0]
+    status: pending
+
+must_preserve:
+  - "All tpchavoc variants must still parse, bind, and execute on every supported platform."
+  - "DuckDB tpchavoc must remain 100% green at 0.01/0.1/1.0 after the changes."
+
+approach: |
+  These are shared variant queries, so a change affects all platforms. Fix
+  by qualifying the correlation column to the outer table (the 10_v8 pattern),
+  not by restructuring the query. Add the affected variants to the DuckDB
+  regression EXPLAIN/decorrelation test in tests/integration/test_tpchavoc_duckdb.py.
+
+anti_patterns:
+  - "DO NOT restructure the variant into a different SQL shape - the variant's identity is its shape; only fix the correlation binding."
+
+verification:
+  - description: "DuckDB tpchavoc still 100% at 1.0"
+    command: "uv run -- benchbox run --platform duckdb --benchmark tpchavoc --scale 1.0 --non-interactive --phases load,power"
+    expected_output: "880/880 executions, 100%"
+  - description: "tpchavoc duckdb integration tests pass"
+    command: "uv run -- python -m pytest tests/integration/test_tpchavoc_duckdb.py -q"
+    expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpchavoc/variant_sets/"
+    - "tests/integration/test_tpchavoc_duckdb.py"
+
+success_metrics:
+  - "q11_v1 and q17_v8 (and any others found) correlate to the outer table; tpchavoc stays green on all platforms."
+
+metadata:
+  tags: [tpchavoc, sql, correctness, dataframe, defect]
+  estimated_effort: "Small"
+  created_date: "2026-05-29"
+  last_updated: "2026-05-29T00:00:00"
