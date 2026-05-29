@@ -158,6 +158,72 @@ def test_enumerate_records_registry_benchmark_gates():
     assert pruned_by_benchmark["metadata_primitives"].evidence.startswith("benchbox.sql_compat benchmark_gate")
 
 
+def test_enumerate_records_datafusion_clickhouse_pruned_benchmark_gates():
+    raw = {
+        "platforms": {"include": ["datafusion", "clickhouse-local"]},
+        "benchmarks": {
+            "include": ["write_primitives", "transaction_primitives", "ai_primitives", "vector_search", "tpch"]
+        },
+        "scales": {"rungs": [0.01]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
+
+    assert {(c.platform, c.benchmark) for c in result.cells} == {
+        ("clickhouse-local", "vector_search"),
+        ("clickhouse-local", "tpch"),
+        ("datafusion", "tpch"),
+    }
+    pruned = {(c.platform, c.benchmark): c for c in result.compatibility_pruned}
+    expected_pruned = {
+        ("datafusion", "write_primitives"),
+        ("datafusion", "transaction_primitives"),
+        ("datafusion", "ai_primitives"),
+        ("datafusion", "vector_search"),
+        ("clickhouse-local", "write_primitives"),
+        ("clickhouse-local", "transaction_primitives"),
+        ("clickhouse-local", "ai_primitives"),
+    }
+    assert set(pruned) == expected_pruned
+    for platform, benchmark in expected_pruned:
+        assert pruned[(platform, benchmark)].rule_id == f"uat.compat.{platform}.{benchmark}.benchmark_gate"
+        assert pruned[(platform, benchmark)].status == "blocked"
+    assert "DataFusion" in pruned[("datafusion", "transaction_primitives")].reason
+    assert "AI primitives" in pruned[("clickhouse-local", "ai_primitives")].reason
+    assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
+
+
+def test_enumerate_records_dataframe_pruned_mutation_and_maintenance_gates():
+    raw = {
+        "platforms": {"include": ["polars-df", "pandas-df", "pyspark-df", "dask-df", "datafusion-df", "modin-df"]},
+        "benchmarks": {"include": ["write_primitives", "transaction_primitives", "tpcdi", "tpch"]},
+        "scales": {"rungs": [0.01]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
+
+    cell_pairs = {(c.platform, c.benchmark) for c in result.cells}
+    for platform in ("polars-df", "pandas-df", "pyspark-df"):
+        assert (platform, "write_primitives") in cell_pairs
+        assert (platform, "tpch") in cell_pairs
+    for platform in ("dask-df", "datafusion-df", "modin-df"):
+        assert (platform, "write_primitives") not in cell_pairs
+        assert (platform, "tpch") in cell_pairs
+
+    pruned = {(c.platform, c.benchmark): c for c in result.compatibility_pruned}
+    for platform in matrix.DATAFRAME_PLATFORMS:
+        assert pruned[(platform, "transaction_primitives")].rule_id == (
+            f"uat.compat.{platform}.transaction_primitives.benchmark_gate"
+        )
+        assert pruned[(platform, "tpcdi")].rule_id == f"uat.compat.{platform}.tpcdi.benchmark_gate"
+        assert "transaction" in pruned[(platform, "tpcdi")].reason.lower()
+    for platform in ("dask-df", "datafusion-df", "modin-df"):
+        assert pruned[(platform, "write_primitives")].rule_id == (
+            f"uat.compat.{platform}.write_primitives.benchmark_gate"
+        )
+    assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
+
+
 def test_enumerate_keeps_release_gate_runtime_envelopes_for_diagnostic_sweeps():
     raw = {
         "platforms": {"include": ["pg-duckdb", "pg-mooncake", "timescaledb"]},

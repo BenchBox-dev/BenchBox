@@ -2,7 +2,7 @@ id: uat-native-dataframe-compatibility-rules
 title: "UAT: add compatibility-prune rules for read-only native + dataframe engine gaps"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -50,7 +50,7 @@ prior_art:
 work:
   - id: w1
     summary: "Catalogue genuinely-unsupported engine x benchmark-family pairs with engine-model evidence"
-    status: pending
+    status: done
     notes: |
       For datafusion + clickhouse-local: write_primitives, transaction_primitives,
       and any maintenance/DML-only families that the SQL operation executor
@@ -58,18 +58,26 @@ work:
       write/maintenance families that are policy-incompatible (cf. polars
       tpcdi self-report). Each entry needs a one-line model-level reason, not
       a stack trace.
+      Catalogued native datafusion/clickhouse-local AI/write/transaction/vector
+      gates and DataFrame transaction/TPC-DI/write-manager gaps with source-file
+      evidence.
   - id: w2
     summary: "Add the rules to compatibility.py with rule_id, status=blocked, reason, evidence"
     needs: [w1]
-    status: pending
+    status: done
+    notes: |
+      Added UAT-local benchmark_gate rules in tests/uat/compatibility.py while
+      preserving the existing registry-backed docker/platform gates.
   - id: w3
     summary: "Assert in tests that these cells enumerate as compatibility-pruned, not as executable"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Extend tests/uat/test_phases.py and tests/uat/test_matrix.py candidate/
       executed/pruned accounting so a regression that drops a rule (and lets
       the cell fail instead) is caught.
+      Added phase enumeration tests for native/dataframe prunes and matrix
+      coverage tests for all UAT DataFrame selectors.
 
 deps:
   needs:
@@ -115,4 +123,5 @@ metadata:
   tags: [uat, compatibility, pruning, certification]
   estimated_effort: "Medium"
   created_date: "2026-05-28"
-  last_updated: "2026-05-28T00:00:00"
+  completed_date: "2026-05-29"
+  last_updated: "2026-05-29T15:07:12Z"
