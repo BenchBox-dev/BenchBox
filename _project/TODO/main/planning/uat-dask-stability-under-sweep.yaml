@@ -1,0 +1,98 @@
+id: uat-dask-stability-under-sweep
+title: "Stabilize dask-df under UAT so cluster failures record FAIL and the sweep continues"
+worktree: main
+priority: Medium
+status: Not Started
+category: Platform Expansion
+
+description: |
+  In the 2026-05-29 dataframe sweep, dask-df produced only 5 per-cell logs
+  (tpch 0.01/0.1/1.0, tpcds 0.01/0.1) before the run stopped — it was the
+  last platform by wall-clock and the sweep ended there with no resume.json
+  and no abort_reason. The dask tpcds 0.1 log ends with:
+  "distributed.scheduler - ERROR - Task ('_groupby_apply_funcs-...', 0)
+  marked as failed because 4 workers died while trying to run it".
+
+  Two problems: (a) tpcds on local Dask kills workers (likely memory
+  pressure during groupby/concat), and (b) a Dask cluster death did not
+  cleanly record FAIL and advance — it left the sweep truncated. A worker
+  death must terminate the cell as FAIL (with the captured scheduler error)
+  and the sweep must move on, never hang or silently stop.
+
+  NOTE: the plan draft cited "KeyError('ca_county')" for Dask; that is NOT
+  in the evidence. The verified Dask signature is the "4 workers died"
+  scheduler error on tpcds; "KeyError 'd_date_sk'" was the pandas-df tpcds
+  failure (tracked in uat-cross-engine-dataframe-defects). Use the verified
+  signatures.
+
+prior_art:
+  - "benchbox/ dask-df adapter + LocalCluster/Client setup (locate via the dask platform module) — reuse existing client lifecycle; add bounded resources"
+  - "tests/uat/timeouts.py — per-cell timeout mechanism; ensure a dask worker death trips a clean FAIL within the timeout, not a hang"
+
+work:
+  - id: w0
+    summary: "Reproduce dask tpcds 0.1 worker deaths locally and capture the scheduler/worker logs"
+    status: pending
+    notes: "Capture to an ignored local path; record memory profile / worker death cause in the PR body."
+  - id: w1
+    summary: "Add bounded memory/worker resource limits + timeouts to the dask client lifecycle under UAT"
+    needs: [w0]
+    status: pending
+  - id: w2
+    summary: "Ensure a dask cluster failure records FAIL with the captured error and the sweep advances (no truncation/hang)"
+    needs: [w0]
+    status: pending
+  - id: w3
+    summary: "Decide and document whether dask tpcds@0.1/1.0 is supported locally under UAT constraints (support, prune, or scale-cap)"
+    needs: [w1, w2]
+    status: pending
+
+deps:
+  needs:
+    - uat-artifact-integrity-and-failure-capture
+
+must_preserve:
+  - "dask-df cells that pass (tpch 0.01/0.1/1.0) must not regress."
+  - "Sequential platform execution and per-cell timeout semantics are unchanged."
+
+approach: |
+  Localize whether the worker deaths are OOM (most likely for groupby/concat
+  on tpcds) and cap worker memory / spill behaviour for the UAT Dask client.
+  Independently, harden the cell runner so a dead cluster surfaces as a FAIL
+  cell carrying the scheduler error (depends on failure-capture) rather than
+  ending the sweep. If tpcds cannot fit local Dask within UAT constraints,
+  prune it via a model-level rule (coordinate with
+  uat-native-dataframe-compatibility-rules) or cap its scale — do not leave
+  it as a silent hang.
+
+anti_patterns:
+  - "DO NOT chase the phantom 'ca_county' KeyError - it is not in the evidence - the real signal is '4 workers died' on tpcds."
+  - "DO NOT let a cluster death stop the whole sweep - one platform's failure must not truncate the matrix."
+
+verification:
+  - description: "dask tpch cells still pass"
+    command: "uv run -- benchbox run --platform dask-df --benchmark tpch --scale 0.1 --non-interactive --phases load,power"
+    expected_output: "0 query failures"
+  - description: "A simulated dask cluster failure records FAIL and the runner continues"
+    command: "uv run -- python -m pytest tests/uat -m fast -k 'dask or cluster or worker' -q"
+    expected_output: "test asserts FAIL recorded with captured error, no hang"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/dataframe/dask_df.py"
+    - "tests/"
+  do_not_modify:
+    # The clean-FAIL-and-advance behavior is owned upstream by
+    # uat-artifact-integrity-and-failure-capture; this item relies on it
+    # rather than editing the runner/orchestrator directly.
+    - "tests/uat/orchestrator.py"
+    - "tests/uat/phases/execute.py"
+
+success_metrics:
+  - "A dask worker death always yields a FAIL cell with the scheduler error and the sweep completes; tpcds support decision documented."
+
+metadata:
+  tags: [dask, dataframe, stability, uat]
+  estimated_effort: "Medium"
+  created_date: "2026-05-28"
+  last_updated: "2026-05-28T00:00:00"

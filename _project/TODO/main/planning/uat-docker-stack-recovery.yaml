@@ -1,0 +1,114 @@
+id: uat-docker-stack-recovery
+title: "Recover UAT Docker stacks: LakeSail startup timeout + empty Docker-OLTP run"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Platform Expansion
+
+description: |
+  Neither Docker UAT run from 2026-05-28 produced usable certification
+  evidence:
+
+  - uat_complete_docker_non_oltp_20260528_20260528: cells.jsonl is EMPTY
+    (0 bytes) -> zero cells executed. uat_lifecycle.log shows only LakeSail:
+    "platform=lakesail action=up status=failed ... docker command timed out
+    after 300s", then "action=down status=ok". compatibility_pruned.jsonl
+    has 54 rows (lakesail, pg-duckdb, pg-mooncake, timescaledb, questdb) but
+    no non-pruned cell for any platform executed — the run ended after the
+    LakeSail compose-up timeout without attempting the remaining stacks.
+  - uat_complete_docker_oltp_20260528_20260528: the run directory is EMPTY
+    (0 files) — nothing ran; no manifests, no logs. No Docker-platform
+    result JSONs dated 2026-05-28/29 exist anywhere.
+
+  Two failures to fix: (1) LakeSail compose-up exceeds the 300s
+  docker_start_timeout_s (Spark Connect SparkSession startup); (2) the
+  Docker-OLTP sweep never started / produced nothing and must be re-run from
+  scratch with verified daemon + disk preconditions. Each Docker platform
+  must run individually (up -> run -> down) with lifecycle logs and a
+  non-empty run directory.
+
+prior_art:
+  - "docs/operations/uat-framework.md 'Docker storage cleanup' — docker_manage_platforms up/run/down lifecycle, docker_start_timeout_s, make uat-docker-cleanup; reuse the managed-lifecycle contract"
+  - "tests/uat/docker_assets.py + tests/uat/docker_cleanup.py — existing UAT-owned compose project handling; extend, do not replace"
+  - "uat_complete_docker_non_oltp_20260528 uat_lifecycle.log — reference for the docker action/status log line shape"
+
+work:
+  - id: w0
+    summary: "Confirm Docker daemon health + Docker data-root free space as a precondition before a Docker sweep"
+    status: pending
+    notes: "Ties to uat-preflight-disk-headroom-gate (Docker data root reporting)."
+  - id: w1
+    summary: "Measure LakeSail normal compose-up time; raise docker_start_timeout_s only to a justified value"
+    status: pending
+    notes: |
+      Do not raise blindly. Confirm the Spark Connect service actually
+      becomes healthy and how long it takes, then set the timeout above that.
+  - id: w2
+    summary: "Ensure a single platform's compose-up failure does not end the sweep; remaining stacks still attempt"
+    needs: [w0]
+    status: pending
+    notes: |
+      The non-oltp run stopped after LakeSail. A failed up should record the
+      platform's cells as BLOCKED/FAIL (infra) and advance to the next stack
+      (one stack at a time), per uat-artifact-integrity-and-failure-capture.
+  - id: w3
+    summary: "Re-run Docker-OLTP from scratch into a fresh run root with full lifecycle logs"
+    needs: [w0, w1, w2]
+    status: pending
+    notes: "Current oltp dir is empty and has no evidentiary value; discard it."
+  - id: w4
+    summary: "Re-run Docker-non-OLTP; verify per-platform up/run/down + non-empty cells.jsonl"
+    needs: [w0, w1, w2]
+    status: pending
+
+deps:
+  needs:
+    - uat-artifact-integrity-and-failure-capture
+
+must_preserve:
+  - "UAT never runs docker system/volume/image prune or unqualified compose down; only project-scoped benchbox-uat-* teardown."
+  - "Exactly one Docker stack runs at a time (sequential); PostgreSQL-family stacks sharing 5432 stay serialized."
+  - "Existing compatibility_pruned rules for docker platforms are unchanged."
+
+approach: |
+  Split infra hardening from re-runs. First confirm daemon + disk (w0) and
+  the real LakeSail startup time (w1). Then make a failed compose-up a
+  recorded, non-fatal event so the sweep advances (w2, depends on the
+  failure-capture/abort-safe work). Only after that, re-run both Docker
+  configs into a fresh run root (w3, w4) and verify every run dir is
+  non-empty with up/run/down lifecycle lines.
+
+anti_patterns:
+  - "DO NOT raise docker_start_timeout_s until you have measured a healthy startup - a longer timeout on a broken service just wastes 5+ minutes per attempt."
+  - "DO NOT reuse the empty 2026-05-28 oltp run dir as evidence - it has none; re-run into a fresh root."
+  - "DO NOT let one compose-up timeout abort the entire Docker sweep."
+
+verification:
+  - description: "Docker assets + cleanup tests pass"
+    command: "uv run -- python -m pytest tests/uat/test_docker_assets.py tests/uat/test_docker_cleanup.py tests/uat/test_cleanup.py -q"
+    expected_output: "all pass"
+  - description: "A managed Docker smoke produces a non-empty cells.jsonl with up/run/down lifecycle lines"
+    command: "make uat-sweep CONFIG=tests/uat/configs/stress-docker-managed.yaml"
+    expected_output: "run dir contains non-empty cells.jsonl and uat_lifecycle.log with action=up/down status lines per platform"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/docker_assets.py"
+    - "tests/uat/docker_cleanup.py"
+    - "tests/uat/cleanup.py"
+    - "tests/uat/config.py"
+    - "tests/uat/configs/"
+    - "tests/uat/test_docker_assets.py"
+    - "tests/uat/test_docker_cleanup.py"
+    - "tests/uat/test_cleanup.py"
+    - "docs/operations/uat-framework.md"
+
+success_metrics:
+  - "Both Docker stacks re-run into a fresh root with non-empty cells.jsonl, per-platform up/run/down lifecycle logs, and no empty run directories."
+  - "A single stack's compose-up failure no longer ends the sweep."
+
+metadata:
+  tags: [docker, lakesail, oltp, uat, certification]
+  estimated_effort: "Medium"
+  created_date: "2026-05-28"
+  last_updated: "2026-05-28T00:00:00"

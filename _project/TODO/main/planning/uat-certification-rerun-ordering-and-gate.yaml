@@ -1,0 +1,122 @@
+id: uat-certification-rerun-ordering-and-gate
+title: "UAT certification re-run: enforce ordering, fresh root, and an explicit approval gate"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Once the framework and defect fixes land, a clean certification sweep must
+  be run — and its ordering and approval criteria must be explicit, because
+  the 2026-05-28/29 evidence had two structural problems beyond cell
+  failures:
+
+  - Ordering: the docker non-OLTP run started 2026-05-28 23:14, but a
+    native-execution dataframe sweep ran afterwards (2026-05-29 01:17-07:50).
+    A Docker stack began before all native/dataframe platforms had completed,
+    so cross-run certification value is compromised.
+  - Completeness: no run reached validate/package/explorer_smoke/report; no
+    matrix_summary.tsv or validator_rollup.tsv exists for any run.
+
+  Certification re-run contract:
+    1. native SQL platforms first
+    2. dataframe (native-execution) platforms second
+    3. Docker non-OLTP stacks third
+    4. Docker OLTP stacks last
+  Run sequentially, one platform at a time; lifecycle logs must prove native
+  completion before any Docker stack starts. Use a FRESH run root (not the
+  failed 2026-05-28 dirs), BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs,
+  a recorded seed, non-OLTP scales 0.01/0.1/1, OLTP scale 0.01.
+
+  APPROVAL GATE — APPROVE only if every non-blocked locally-testable platform
+  reaches the report phase and all required, non-pruned cells pass. HOLD if
+  ANY of: missing manifests, missing commit SHA, DuckDB reference failures,
+  a Docker zero-cell run, a hung platform, or a NO_JSON without error text.
+
+prior_art:
+  - "docs/operations/uat-framework.md 'Sequential platform execution' + 'Cross-scale coverage assertion (opt-in)' — reuse the report.cross_scale_coverage_min_pairs teeth; extend the doc with the ordering + approval-gate runbook"
+  - "tests/uat/configs/ historical + template configs — clone a template for the certification config rather than authoring from scratch"
+  - "tests/uat/phases/report.py REPORT_HEADER / footer — the report-phase artifact the approval gate reads"
+
+work:
+  - id: w1
+    summary: "Author/refresh the certification config(s) cloned from a template: scales 0.01/0.1/1 (non-OLTP), 0.01 (OLTP), recorded seed, fresh run root"
+    status: pending
+  - id: w2
+    summary: "Add an ordering assertion/lint: native completes before any Docker stack starts, provable from lifecycle logs"
+    status: pending
+    notes: |
+      Each sweep config is a separate invocation, so enforce via a documented
+      runbook ordering plus a lightweight check (e.g. a helper that verifies
+      no Docker action=up precedes the last native cell across the run set).
+  - id: w3
+    summary: "Encode the APPROVE/HOLD gate as a checklist + optional report teeth (cross_scale_coverage_min_pairs)"
+    needs: [w1]
+    status: pending
+  - id: w4
+    summary: "Write the certification runbook section in docs/operations/uat-framework.md"
+    needs: [w1, w2, w3]
+    status: pending
+  - id: w5
+    summary: "Execute the full certification re-run into a fresh root and confirm every config reaches the report phase"
+    needs: [w4]
+    status: pending
+    notes: |
+      Required terminal artifacts per run: cells.jsonl, compatibility_pruned.jsonl,
+      resume.json (if aborted), matrix_summary.tsv, validator_rollup.tsv,
+      uat_lifecycle.log, final report with COMPLETED footer + commit SHA.
+
+deps:
+  needs:
+    - uat-artifact-integrity-and-failure-capture
+    - uat-preflight-disk-headroom-gate
+    - uat-native-dataframe-compatibility-rules
+    - uat-cross-engine-dataframe-defects
+    - uat-duckdb-reference-triage
+    - uat-docker-stack-recovery
+
+must_preserve:
+  - "execute.parallel_platforms stays hard-rejected; one platform / one Docker stack at a time."
+  - "The 2026-05-28/29 run dirs are retained as failed-evidence reference, not reused as the certification root."
+  - "preserve_datagen:true; datagen reuse and reuse-aware pruning are unchanged."
+
+approach: |
+  This is the integration/sign-off item: it should be worked LAST, after the
+  five upstream fixes merge (see deps). Clone a config template, encode the
+  four-stage ordering and scales, add a lightweight ordering check and the
+  approval-gate checklist (reuse cross_scale_coverage_min_pairs for teeth),
+  document the runbook, then execute into a fresh root. The deliverable is a
+  COMPLETED report per config with a commit SHA — the artifact the original
+  review found missing.
+
+anti_patterns:
+  - "DO NOT start a Docker stack before native + dataframe platforms finish - that contaminated the 2026-05-28 evidence."
+  - "DO NOT resume into the failed 2026-05-28 dirs - treat them as non-evidentiary; use a fresh root."
+  - "DO NOT APPROVE on a partial run - the gate requires the report phase to complete with all required non-pruned cells green."
+
+verification:
+  - description: "Config validation + report-teeth tests pass"
+    command: "uv run -- python -m pytest tests/uat/test_config.py tests/uat/test_report.py -q"
+    expected_output: "all pass; cross_scale_coverage teeth exercised"
+  - description: "Certification re-run reaches report phase for every config"
+    command: "make uat-sweep CONFIG=<certification-config.yaml>"
+    expected_output: "each run dir has matrix_summary.tsv + validator_rollup.tsv + a COMPLETED report footer with commit SHA"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/configs/"
+    - "tests/uat/config.py"
+    - "tests/uat/test_config.py"
+    - "tests/uat/phases/report.py"
+    - "tests/uat/test_report.py"
+    - "docs/operations/uat-framework.md"
+
+success_metrics:
+  - "A full certification sweep runs in the required order from a fresh root, every config reaches the report phase, and the APPROVE/HOLD gate is evaluable from the artifacts alone."
+  - "Lifecycle logs prove native completion before any Docker stack starts."
+
+metadata:
+  tags: [uat, certification, ordering, approval-gate]
+  estimated_effort: "Medium"
+  created_date: "2026-05-28"
+  last_updated: "2026-05-28T00:00:00"

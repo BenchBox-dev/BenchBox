@@ -1,0 +1,107 @@
+id: uat-duckdb-reference-triage
+title: "Triage DuckDB reference-platform failures before any certification re-run"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  DuckDB is the reference/oracle platform; comparative UAT results are only
+  trustworthy if it is green or its unsupported cells are explicitly pruned.
+  In the 2026-05-28 native sweep (uat_complete_native_20260528_20260528)
+  DuckDB was NOT clean: 46 passed / 10 failed / 1 timed-out of 57 cells.
+  Evidence (from resume.json + per-cell result JSONs):
+
+  - tpchavoc 0.01/0.1: "Parser Error: window functions are not allowed in
+    window definitions"; also "Binder Error: Ambiguous reference to column
+    name l_partkey" (q27/660).
+  - tpchavoc 1.0: timed-out, exit 124, UAT_TIMEOUT timeout_s=1200.
+  - transaction_primitives 0.01: "Parser Error: syntax error" on
+    transaction_isolation_* ops; 0.1/1.0: "Failed to initialize staging
+    tables before executing 'transaction_create_temp_table' /
+    'transaction_long_running_mixed'" (q23/23 all fail).
+  - write_primitives 0.01/0.1/1.0 and ai_primitives 0.01/1.0: NO_JSON,
+    exit 1, with ZERO captured error text (per-cell log held only the
+    command header; tee log was 0 bytes).
+
+  The NO_JSON root causes are currently unrecoverable from the artifacts;
+  they become debuggable once stderr persistence lands. This item depends on
+  uat-artifact-integrity-and-failure-capture for that reason.
+
+prior_art:
+  - "benchbox/ duckdb adapter + transaction/write/ai primitive executors (locate via the failing benchmark families) — reuse existing duckdb adapter patterns"
+  - "tests/uat/timeouts.py — existing UAT_TIMEOUT mechanism; reuse for any justified timeout change on tpchavoc@1.0"
+
+work:
+  - id: w0
+    summary: "Re-run the NO_JSON cells with stderr persistence enabled and capture exact root cause"
+    status: pending
+    notes: |
+      duckdb write_primitives (all scales) + ai_primitives (0.01, 1.0).
+      Requires the failure-capture work to have landed. Capture to an
+      ignored local path; summarize cause in the PR body.
+  - id: w1
+    summary: "Resolve tpchavoc window-definition parser error + l_partkey ambiguity, or prune as a query-authoring gap"
+    needs: [w0]
+    status: pending
+    notes: |
+      Decide: query rewrite (preferred if DuckDB-valid form exists) vs
+      compatibility exclusion (if the construct is genuinely unsupported).
+  - id: w2
+    summary: "Fix or justify tpchavoc@1.0 1200s timeout (optimize, raise with justification, or prune if stress-only)"
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "Fix transaction_primitives staging-table init + parser syntax failures"
+    needs: [w0]
+    status: pending
+  - id: w4
+    summary: "Fix write_primitives / ai_primitives NO_JSON failures per w0 root cause"
+    needs: [w0]
+    status: pending
+  - id: w5
+    summary: "Confirm DuckDB passes all required, non-pruned cells at 0.01/0.1/1.0"
+    needs: [w1, w2, w3, w4]
+    status: pending
+
+deps:
+  needs:
+    - uat-artifact-integrity-and-failure-capture
+
+must_preserve:
+  - "DuckDB cells that already pass (46/57) must not regress."
+  - "Any timeout change is justified with measured runtime, not raised blindly."
+  - "DuckDB remains the reference for cross-platform validation/comparison."
+
+approach: |
+  Gate on w0: do not guess NO_JSON causes — recover them with the new stderr
+  persistence. For tpchavoc, prefer a DuckDB-valid query rewrite over pruning;
+  prune only if the construct is genuinely unsupported. For
+  transaction_primitives staging-table init, trace the setup path that fails
+  before the operations run. Each cell ends as PASS or an explicitly-pruned
+  model-level gap — never an unexplained FAIL.
+
+anti_patterns:
+  - "DO NOT prune a duckdb cell to make the reference look green - because that destroys the oracle's value - fix it or cite a real engine limit."
+  - "DO NOT raise the tpchavoc timeout without measuring actual runtime first - the 1.0 cell may be hung, not slow."
+
+verification:
+  - description: "DuckDB tpchavoc and transaction_primitives pass at 0.01"
+    command: "uv run -- benchbox run --platform duckdb --benchmark tpchavoc --scale 0.01 --non-interactive --phases load,power && uv run -- benchbox run --platform duckdb --benchmark transaction_primitives --scale 0.01 --non-interactive --phases load,power"
+    expected_output: "0 query failures"
+  - description: "DuckDB write_primitives / ai_primitives produce a result JSON (no NO_JSON)"
+    command: "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --non-interactive --phases load,power"
+    expected_output: "result JSON written; summary.queries.failed == 0 or explicit prune"
+
+scope_limit:
+  do_not_modify:
+    - "tests/uat/orchestrator.py"
+
+success_metrics:
+  - "DuckDB reference passes all required locally-testable cells at 0.01/0.1/1.0, with any exclusions documented as model-level prunes."
+
+metadata:
+  tags: [duckdb, reference, defect, uat, certification]
+  estimated_effort: "Medium"
+  created_date: "2026-05-28"
+  last_updated: "2026-05-28T00:00:00"
