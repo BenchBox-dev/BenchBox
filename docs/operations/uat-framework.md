@@ -160,6 +160,22 @@ The fixed developer fixture route regressions still run from
 `results-explorer/` with `npm run test:e2e:fixtures && npm run build &&
 npx playwright test --grep @smoke --project chromium`.
 
+## Artifact provenance and abort evidence
+
+Every non-dry-run sweep captures the current git commit once at sweep
+start and threads that source identity into durable artifacts. `cells.jsonl`
+records `source_commit_sha`, `source_commit_short_sha`, `source_dirty`,
+`terminal_state`, and a bounded `failure_tail` for failed or missing-result
+cells. `matrix_summary.tsv` includes source and terminal-state columns, and
+its footer records `run_status=COMPLETED` plus the same source identity.
+
+If a sweep aborts before the configured report phase, the orchestrator still
+emits `cells.jsonl`, `compatibility_pruned.jsonl`, and
+`matrix_summary.partial.tsv`. The partial report footer records
+`run_status=ABORTED`, the aborting phase, and the abort reason. Failed
+per-cell logs also receive a bounded `UAT_FAILURE_TAIL` block so the run
+directory remains debuggable without relying on an operator tee log.
+
 ## Disk-budget estimate and resume manifests
 
 Preflight now prints an advisory line before workload cells run:
@@ -184,10 +200,11 @@ uv run -- python -m tests.uat._cli sweep --config <config.yaml> --resume <log-di
 uv run -- python -m tests.uat._cli execute --config <config.yaml> --resume <log-dir>/resume.json
 ```
 
-The manifest records attempted cell keys plus terminal state and result
-paths. Resuming reuses those records instead of rerunning the cells and
-continues through the complement. It does not delete datagen or loaded
-DBs, so normal datagen reuse and reuse-aware pruning remain intact.
+The manifest records attempted cell keys plus terminal state, result
+paths, and source commit identity. Resuming reuses those records instead
+of rerunning the cells and continues through the complement. It does not
+delete datagen or loaded DBs, so normal datagen reuse and reuse-aware
+pruning remain intact.
 
 ## Submission terminal states
 
@@ -222,8 +239,9 @@ UAT rules only explain why a platform/benchmark cell is not attempted.
 When a rule blocks a cell, the execute phase records it in
 `compatibility_pruned.jsonl` with the rule metadata. The report footer includes
 candidate, executed, compatibility-pruned, early-stop-pruned, passed, failed,
-and timed-out counts. Early-stop pruning is separate from compatibility
-pruning and must not be treated as a pass or a compatibility exclusion.
+and timed-out counts, followed by a run-status/source-provenance footer.
+Early-stop pruning is separate from compatibility pruning and must not be
+treated as a pass or a compatibility exclusion.
 
 ## Historical vs editable configs
 

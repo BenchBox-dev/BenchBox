@@ -12,14 +12,20 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Protocol
 
 from tests.uat.phases import PhaseResult
 from tests.uat.runner import CellResult
 
 REPORT_HEADER = (
-    "platform\tbenchmark\tscale\tstatus\telapsed_s\tlog_path\tresult_path\tsubmit_terminal_state\tvalidator_status"
+    "platform\tbenchmark\tscale\tstatus\tterminal_state\telapsed_s\tlog_path\tresult_path\t"
+    "submit_terminal_state\tvalidator_status\tsource_commit_sha\tsource_dirty"
 )
+
+
+class SourceInfo(Protocol):
+    commit_sha: str
+    dirty: bool
 
 
 @dataclass(frozen=True)
@@ -47,13 +53,34 @@ def render_row(
     cell: CellResult,
     *,
     validator_status: str = "",
+    source_info: SourceInfo | None = None,
 ) -> str:
     """Render one row matching the current matrix-summary column order."""
+    source_commit_sha = source_info.commit_sha if source_info else ""
+    source_dirty = str(source_info.dirty).lower() if source_info else ""
     return (
         f"{cell.platform}\t{cell.benchmark}\t{cell.scale}\t"
-        f"{cell.status}\t{cell.elapsed_s:.2f}\t"
-        f"{cell.log_path}\t{cell.result_path or ''}\t{cell.submit_terminal_state}\t{validator_status}"
+        f"{cell.status}\t{terminal_state(cell)}\t{cell.elapsed_s:.2f}\t"
+        f"{cell.log_path}\t{cell.result_path or ''}\t{cell.submit_terminal_state}\t{validator_status}\t"
+        f"{source_commit_sha}\t{source_dirty}"
     )
+
+
+def terminal_state(cell: CellResult) -> str:
+    """Classify the terminal state visible in durable UAT artifacts."""
+    if cell.status == "passed":
+        return "passed"
+    if cell.status == "timed-out" or cell.exit_code == 124:
+        return "timeout"
+    if cell.exit_code in {-9, 137}:
+        return "killed"
+    if cell.result_path is None:
+        if cell.exit_code == 0:
+            return "no_json_exit_0"
+        return "no_json_nonzero"
+    if cell.submit_terminal_state:
+        return cell.submit_terminal_state
+    return cell.status
 
 
 def _validator_status_for_path(validator_status_by_path: dict[Path, str], result_path: Path | None) -> str:
@@ -104,6 +131,10 @@ def write_report(
     validator_status_by_path: dict[Path, str] | None = None,
     compatibility_pruned_count: int = 0,
     early_stop_pruned_count: int = 0,
+    source_info: SourceInfo | None = None,
+    run_status: str = "COMPLETED",
+    abort_phase: str | None = None,
+    abort_reason: str | None = None,
 ) -> ReportSummary:
     """Write the matrix summary TSV; optionally enforce a cross-scale floor."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -123,7 +154,7 @@ def write_report(
                 if validator_status_by_path
                 else ""
             )
-            fh.write(render_row(cell, validator_status=v) + "\n")
+            fh.write(render_row(cell, validator_status=v, source_info=source_info) + "\n")
         fh.write(
             "# "
             f"rows={len(rows)} "
@@ -135,6 +166,14 @@ def write_report(
             f"failed={fail_count} "
             f"timed_out={timeout_count}\n"
         )
+        footer = f"# run_status={run_status}"
+        if source_info is not None:
+            footer += f" source_commit_sha={source_info.commit_sha} source_dirty={str(source_info.dirty).lower()}"
+        if abort_phase:
+            footer += f" abort_phase={abort_phase}"
+        if abort_reason:
+            footer += f" abort_reason={_footer_value(abort_reason)}"
+        fh.write(footer + "\n")
 
     if rungs:
         clean_pairs = cross_scale_clean_pair_count(rows, rungs, validator_status_by_path=validator_status_by_path)
@@ -157,4 +196,10 @@ def write_report(
         cross_scale_clean_pairs=clean_pairs,
         cross_scale_floor=cross_scale_floor,
         cross_scale_floor_breached=floor_breached,
+        aborted=run_status in {"ABORTED", "BLOCKED"},
+        abort_reason=abort_reason,
     )
+
+
+def _footer_value(value: str) -> str:
+    return value.replace("\t", " ").replace("\n", " ")

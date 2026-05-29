@@ -215,6 +215,8 @@ def test_orchestrator_cells_jsonl_marks_timed_out_cells(tmp_path: Path):
             "scales": {"rungs": [0.01]},
         }
     )
+    cell_log = tmp_path / "cell.log"
+    cell_log.write_text("# benchbox run\nstderr tail line\n", encoding="utf-8")
     timed_out_cell = CellResult(
         platform="duckdb",
         benchmark="tpch",
@@ -222,7 +224,7 @@ def test_orchestrator_cells_jsonl_marks_timed_out_cells(tmp_path: Path):
         status="timed-out",
         exit_code=124,
         elapsed_s=1.0,
-        log_path=tmp_path / "cell.log",
+        log_path=cell_log,
         result_path=None,
     )
     fake_execute = type(
@@ -244,8 +246,13 @@ def test_orchestrator_cells_jsonl_marks_timed_out_cells(tmp_path: Path):
     assert result.phase_exit_codes["execute"] == 1
     cells = [json.loads(line) for line in (tmp_path / "logs" / "cells.jsonl").read_text().splitlines()]
     assert cells[0]["status"] == "timed-out"
+    assert cells[0]["terminal_state"] == "timeout"
     assert cells[0]["timed_out"] is True
     assert cells[0]["exit_code"] == 124
+    assert cells[0]["source_commit_sha"]
+    assert isinstance(cells[0]["source_dirty"], bool)
+    assert cells[0]["failure_tail"] == "stderr tail line"
+    assert "# UAT_TERMINAL_STATE terminal_state=timeout" in cell_log.read_text(encoding="utf-8")
 
 
 def test_orchestrator_writes_compatibility_pruned_jsonl_and_report_count(tmp_path: Path):
@@ -347,7 +354,15 @@ def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
     manifest = tmp_path / "logs" / "resume.json"
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     assert payload["aborted_phase"] == "execute"
+    assert payload["source"]["commit_sha"]
     assert payload["attempted"][0]["cell_key"] == "duckdb|tpch|0.01"
+    cells = [json.loads(line) for line in (tmp_path / "logs" / "cells.jsonl").read_text().splitlines()]
+    assert cells[0]["source_commit_sha"] == payload["source"]["commit_sha"]
+    partial_report = tmp_path / "logs" / "matrix_summary.partial.tsv"
+    assert partial_report.exists()
+    partial_text = partial_report.read_text(encoding="utf-8")
+    assert "# run_status=ABORTED" in partial_text
+    assert "abort_phase=execute" in partial_text
 
 
 def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
@@ -404,6 +419,7 @@ def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     assert payload["aborted_phase"] == "execute"
     assert payload["attempted"][0]["cell_key"] == "duckdb|tpch|0.01"
+    assert (tmp_path / "logs" / "matrix_summary.partial.tsv").exists()
 
 
 def test_manifest_runner_reuses_attempted_cells_and_runs_complement(tmp_path: Path):
