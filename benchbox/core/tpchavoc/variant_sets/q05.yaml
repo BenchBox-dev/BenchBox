@@ -275,27 +275,33 @@ variants:
   description: 'Window functions: Use window functions for regional analysis (OLAP)'
   sql: |2
 
-    select distinct
+    with regional_revenue as (
+        select distinct
+            n_name,
+            sum(l_extendedprice * (1 - l_discount)) over (partition by n_name) as revenue
+        from
+            customer,
+            orders,
+            lineitem,
+            supplier,
+            nation,
+            region
+        where
+            c_custkey = o_custkey
+            and l_orderkey = o_orderkey
+            and l_suppkey = s_suppkey
+            and c_nationkey = s_nationkey
+            and s_nationkey = n_nationkey
+            and n_regionkey = r_regionkey
+            and r_name = 'ASIA'
+            and o_orderdate >= date '1994-01-01'
+            and o_orderdate < date '1994-01-01' + interval '1' year
+    )
+    select
         n_name,
-        sum(l_extendedprice * (1 - l_discount)) over (partition by n_name) as revenue,
-        rank() over (order by sum(l_extendedprice * (1 - l_discount)) over (partition by n_name) desc) as revenue_rank
-    from
-        customer,
-        orders,
-        lineitem,
-        supplier,
-        nation,
-        region
-    where
-        c_custkey = o_custkey
-        and l_orderkey = o_orderkey
-        and l_suppkey = s_suppkey
-        and c_nationkey = s_nationkey
-        and s_nationkey = n_nationkey
-        and n_regionkey = r_regionkey
-        and r_name = 'ASIA'
-        and o_orderdate >= date '1994-01-01'
-        and o_orderdate < date '1994-01-01' + interval '1' year
+        revenue,
+        rank() over (order by revenue desc) as revenue_rank
+    from regional_revenue
     order by
         revenue desc
 - id: 10

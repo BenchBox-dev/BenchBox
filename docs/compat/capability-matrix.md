@@ -4,9 +4,9 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 333
+**Total registered rules:** 339
 
-**Platforms covered:** 29
+**Platforms covered:** 30
 
 ## Phase coverage by platform
 
@@ -19,6 +19,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | databricks | - | - | - | 2 | 1 | - | 3 |
 | datafusion | - | - | 4 | 2 | - | - | 6 |
 | doris | - | 7 | - | 2 | 1 | - | 10 |
+| duckdb | - | - | - | - | - | 6 | 6 |
 | fabric_dw | - | - | - | - | 1 | - | 1 |
 | firebolt | - | - | - | - | 1 | - | 1 |
 | lakesail | 5 | 6 | - | - | 1 | 69 | 81 |
@@ -123,6 +124,17 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.doris.transaction_primitives.pk_lock_table_unsupported` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.doris.write_primitives.pk_lock_table_unsupported` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.doris.all.inject_ddl_clauses` |
+
+### duckdb
+
+| phase | scope | action | support | failure mode | rule_id |
+|---|---|---|---|---|---|
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_read_committed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.transaction_primitives.transaction_isolation_read_committed` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.transaction_primitives.transaction_isolation_repeatable_read` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_serializable | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.transaction_primitives.transaction_isolation_serializable` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.transaction_primitives.transaction_savepoint_deep_nesting` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_nested | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.transaction_primitives.transaction_savepoint_nested` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_upsert_mode | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.bulk_load_upsert_mode` |
 
 ### fabric_dw
 

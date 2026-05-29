@@ -160,8 +160,8 @@ class AIPrimitivesBenchmark(BaseBenchmark):
         self.dry_run = dry_run
         self.cost_tracker = CostTracker(budget_usd=max_cost_usd)
 
-        # Data file mapping (reuses TPC-H)
-        self.tables: dict[str, str] = {}
+        # Data file mapping (reuses TPC-H). Values may be sharded file lists.
+        self.tables: dict[str, Any] = {}
 
     def get_data_source_benchmark(self) -> str | None:
         """AI Primitives benchmark shares TPC-H data."""
@@ -179,13 +179,19 @@ class AIPrimitivesBenchmark(BaseBenchmark):
         # AI Primitives uses TPC-H data - delegate to TPC-H generator
         from benchbox.core.tpch.benchmark import TPCHBenchmark
 
-        tpch = TPCHBenchmark(scale_factor=self.scale_factor)
-        data_files = tpch.generate_data()
+        tpch = TPCHBenchmark(scale_factor=self.scale_factor, output_dir=self.output_dir)
+        tpch.generate_data()
 
-        # Store table mappings
-        self.tables = {Path(f).stem: str(f) for f in data_files}
+        # Preserve TPC-H's table-name mapping so loaders can handle sharded files.
+        self.tables = dict(tpch.tables)
 
-        return data_files
+        flattened: list[Union[str, Path]] = []
+        for table_files in self.tables.values():
+            if isinstance(table_files, (list, tuple)):
+                flattened.extend(table_files)
+            else:
+                flattened.append(table_files)
+        return flattened
 
     def is_platform_supported(self, platform: str) -> bool:
         """Check if a platform supports AI functions.

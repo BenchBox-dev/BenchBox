@@ -4,13 +4,24 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 240
+**Total rules:** 246
 
-**Platforms with rules:** 17
+**Platforms with rules:** 18
 
 ## Will not run
 
 Queries or benchmarks that are **omitted from the result set** - either because the benchmark is refused at preflight (BLOCKED) or a specific query is excluded from execution (SKIPPED_QUERY). Users see these as missing entries in result counts.
+
+### duckdb
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_read_committed | execution_filter | DuckDB rejects explicit SET TRANSACTION ISOLATION LEVEL syntax. | `execution_filter.duckdb.transaction_primitives.transaction_isolation_read_committed` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | execution_filter | DuckDB rejects explicit SET TRANSACTION ISOLATION LEVEL syntax. | `execution_filter.duckdb.transaction_primitives.transaction_isolation_repeatable_read` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_serializable | execution_filter | DuckDB rejects explicit SET TRANSACTION ISOLATION LEVEL syntax. | `execution_filter.duckdb.transaction_primitives.transaction_isolation_serializable` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | execution_filter | DuckDB rejects SAVEPOINT syntax in transaction_primitives operations. | `execution_filter.duckdb.transaction_primitives.transaction_savepoint_deep_nesting` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_nested | execution_filter | DuckDB rejects SAVEPOINT syntax in transaction_primitives operations. | `execution_filter.duckdb.transaction_primitives.transaction_savepoint_nested` |
+| SKIPPED_QUERY | benchmark=write_primitives, query=bulk_load_upsert_mode | execution_filter | DuckDB 1.3.2 rejects the catalog's MERGE statements; keep them explicit skips until the bundled driver supports MERGE. | `execution_filter.duckdb.write_primitives.bulk_load_upsert_mode` |
 
 ### lakesail
 
