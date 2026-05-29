@@ -252,6 +252,10 @@ def run_sweep(  # noqa: C901
             disk_budget_summary = getattr(result, "disk_budget_summary", None)
             if disk_budget_summary:
                 print(disk_budget_summary, file=sys.stderr)
+            for line in getattr(result, "free_space_report", ()):
+                print(line, file=sys.stderr)
+            for warning in getattr(result, "warnings", ()):
+                print(f"[preflight warn] {warning}", file=sys.stderr)
             phase_exit_codes[phase] = result.exit_code()
             if result.aborted:
                 aborted_phase = phase

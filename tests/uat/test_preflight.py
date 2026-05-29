@@ -127,6 +127,95 @@ def test_preflight_disk_budget_table_error_is_advisory(tmp_path: Path, monkeypat
     assert "scale_factor" in result.warnings[0]
 
 
+def test_preflight_reports_all_required_disk_roots(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path / "runs",
+        benchmark_runs_dir=tmp_path / "runs",
+        docker_manage_platforms=True,
+    )
+
+    assert result.aborted is False
+    assert any("tmp" in line and "/tmp" in line for line in result.free_space_report)
+    assert any("output" in line and str(tmp_path / "runs") in line for line in result.free_space_report)
+    assert any(
+        "benchmark-data" in line and str(tmp_path / "runs" / "datagen") in line for line in result.free_space_report
+    )
+    assert any("docker-data" in line and str(tmp_path / "runs") in line for line in result.free_space_report)
+
+
+def test_preflight_disk_headroom_gate_aborts_short_root(tmp_path: Path, monkeypatch):
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
+        "duckdb\ttpch\t0.01\t6.0\t3.0\t1.0\n",
+        encoding="utf-8",
+    )
+    cfg = config.validate_config(
+        {
+            "name": "budget-smoke",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+
+    def fake_free_space(path):
+        return 8.0 if Path(path) == Path("/tmp") else 20.0
+
+    monkeypatch.setattr(preflight, "free_space_gib", fake_free_space)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path / "runs",
+        benchmark_runs_dir=tmp_path / "runs",
+        disk_budget_config=cfg,
+    )
+
+    assert result.aborted is True
+    assert "disk headroom gate failed" in (result.abort_reason or "")
+    assert "tmp /tmp: 8.0 GiB free < 10.0 GiB required" in (result.abort_reason or "")
+
+
+def test_preflight_disk_headroom_gate_respects_zero_override(tmp_path: Path, monkeypatch):
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
+        "duckdb\ttpch\t0.01\t6.0\t3.0\t1.0\n",
+        encoding="utf-8",
+    )
+    cfg = config.validate_config(
+        {
+            "name": "budget-smoke",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "preflight": {"free_space_min_gib": 0},
+        }
+    )
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 1.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path / "runs",
+        benchmark_runs_dir=tmp_path / "runs",
+        free_space_min_gib=0,
+        disk_budget_config=cfg,
+    )
+
+    assert result.aborted is False
+    assert result.abort_reason is None
+    assert all("(required 0.00 GiB)" in line for line in result.free_space_report)
+
+
 def test_requested_platforms_from_config_matches_uat_defaults():
     assert preflight.requested_platforms_from_config(
         config.validate_config({"name": "smoke", "platforms": {"include": ["postgresql"]}})

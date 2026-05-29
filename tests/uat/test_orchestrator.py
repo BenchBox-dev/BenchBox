@@ -31,7 +31,7 @@ def test_dry_run_records_zero_per_phase(tmp_path: Path):
     assert set(result.phase_exit_codes) == {"preflight", "execute", "report"}
 
 
-def test_preflight_abort_short_circuits(tmp_path: Path):
+def test_preflight_abort_short_circuits(tmp_path: Path, capsys):
     cfg = validate_config(
         {
             "name": "smoke",
@@ -41,7 +41,14 @@ def test_preflight_abort_short_circuits(tmp_path: Path):
     fake_result = type(
         "Stub",
         (),
-        {"aborted": True, "abort_reason": "no disk", "warnings": (), "exit_code": lambda self: 2},
+        {
+            "aborted": True,
+            "abort_reason": "no disk",
+            "warnings": ("disk budget gate has 1 unknown largest-scale cell(s); estimate may be low",),
+            "disk_budget_summary": "Disk budget estimate: 12.34 GiB peak",
+            "free_space_report": ("Free space: tmp 10.00 GiB (required 12.34 GiB) /tmp",),
+            "exit_code": lambda self: 2,
+        },
     )()
     with patch.object(
         orchestrator.preflight_phase,
@@ -52,6 +59,10 @@ def test_preflight_abort_short_circuits(tmp_path: Path):
     assert result.aborted_phase == "preflight"
     assert "execute" not in result.phase_exit_codes
     assert result.exit_code() == 2
+    captured = capsys.readouterr()
+    assert "Disk budget estimate: 12.34 GiB peak" in captured.err
+    assert "Free space: tmp 10.00 GiB (required 12.34 GiB) /tmp" in captured.err
+    assert "[preflight warn] disk budget gate has 1 unknown largest-scale cell(s); estimate may be low" in captured.err
 
 
 def test_stress_default_yaml_loads():
@@ -164,7 +175,7 @@ def test_orchestrator_uses_output_root_for_preflight_execute_and_cleanup(tmp_pat
     fake_preflight = type(
         "Preflight",
         (),
-        {"aborted": False, "abort_reason": None, "warnings": (), "exit_code": lambda self: 0},
+        {"aborted": False, "abort_reason": None, "warnings": (), "free_space_report": (), "exit_code": lambda self: 0},
     )()
     fake_execute = type(
         "ExecuteOutcome",

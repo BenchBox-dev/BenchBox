@@ -137,6 +137,8 @@ def _handle_preflight(args: argparse.Namespace) -> int:
     result = run_preflight(**preflight_kwargs_from_config(config, benchmark_runs_dir=benchmark_runs_dir))
     if result.disk_budget_summary:
         print(result.disk_budget_summary)
+    for line in getattr(result, "free_space_report", ()):
+        print(line)
     for warning in result.warnings:
         print(f"[preflight warn] {warning}", file=sys.stderr)
     if result.aborted:
@@ -349,6 +351,8 @@ def _handle_execute(args: argparse.Namespace) -> int:
         preflight = run_preflight(**preflight_kwargs_from_config(config, benchmark_runs_dir=benchmark_runs_dir))
         if preflight.disk_budget_summary:
             print(preflight.disk_budget_summary, file=sys.stderr)
+        for line in getattr(preflight, "free_space_report", ()):
+            print(line, file=sys.stderr)
         for warning in preflight.warnings:
             print(f"[preflight warn] {warning}", file=sys.stderr)
         if preflight.aborted:

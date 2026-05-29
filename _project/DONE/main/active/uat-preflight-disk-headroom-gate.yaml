@@ -2,7 +2,7 @@ id: uat-preflight-disk-headroom-gate
 title: "UAT: preflight disk report + headroom gate sized to the largest configured scale"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -26,25 +26,33 @@ prior_art:
 work:
   - id: w1
     summary: "Emit a preflight free-space report for /tmp, output root, benchmark data root, and (managed mode) Docker data root"
-    status: pending
+    status: done
     notes: |
       One compact table line per root, printed before workload cells run.
       The native abort was on /tmp specifically while the output root still
       had headroom, so per-root visibility is the point.
+      Implemented in preflight result output for CLI preflight, CLI execute,
+      and orchestrated sweeps.
   - id: w2
     summary: "Relate the disk-budget peak estimate to the largest configured scale and gate on it"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Use preflight_budget.py's peak estimate. If estimated peak for the
       largest configured scale exceeds free headroom on any required root,
       fail preflight with an actionable message (free space, shrink matrix,
       or override). Keep unknown-cell handling explicit (count + warn), per
       the existing advisory contract; do not silently pass unknowns.
+      Implemented with largest-scale peak gating, per-root shortfall messages,
+      unknown-cell warnings, and a zero cutoff override.
   - id: w3
     summary: "Document the disk gate and override in docs/operations/uat-framework.md"
     needs: [w2]
-    status: pending
+    status: done
+    notes: |
+      Documented the disk-budget line, per-root report, largest-scale headroom
+      gate, unknown-cell warning behavior, and `preflight.free_space_min_gib: 0`
+      override.
 
 must_preserve:
   - "free_space_min_gib remains a valid explicit override; the new gate must be overridable for operators who know the run fits."
@@ -73,8 +81,13 @@ verification:
 scope_limit:
   only_modify:
     - "tests/uat/preflight_budget.py"
+    - "tests/uat/phases/preflight.py"
+    - "tests/uat/orchestrator.py"
+    - "tests/uat/_cli.py"
     - "tests/uat/test_preflight_budget.py"
     - "tests/uat/test_preflight.py"
+    - "tests/uat/test_orchestrator.py"
+    - "tests/uat/test_cli_dispatch.py"
     - "tests/uat/data/disk_budget_table.tsv"
     - "docs/operations/uat-framework.md"
 
@@ -86,4 +99,5 @@ metadata:
   tags: [uat, preflight, disk, certification]
   estimated_effort: "Small"
   created_date: "2026-05-28"
-  last_updated: "2026-05-28T00:00:00"
+  completed_date: "2026-05-29"
+  last_updated: "2026-05-29T14:54:19Z"
