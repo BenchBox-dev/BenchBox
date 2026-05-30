@@ -12,9 +12,8 @@ from __future__ import annotations
 
 import re
 from csv import reader
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pandas as pd
 from sqlglot import exp, parse_one
 
 from benchbox.core.dataframe.context import DataFrameContext
@@ -34,6 +33,9 @@ from benchbox.core.joinorder.dataframe_queries import (
     _sql_tables,
 )
 from benchbox.core.joinorder_synthetic.queries import JoinOrderQueryManager
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 _QUERY_MANAGER = JoinOrderQueryManager()
 _PARENTHESIZED_LIKE_PATTERN = re.compile(r"(NOT\s+LIKE|LIKE)\s+'%\(([^%()]+)\)%'", re.IGNORECASE)
@@ -159,6 +161,8 @@ def _execute_joinorder_expression_query(ctx: DataFrameContext, query_id: str) ->
 
 
 def _execute_joinorder_pandas_query(ctx: DataFrameContext, query_id: str) -> pd.DataFrame:
+    import pandas as pd
+
     tree = parse_one(_query_sql(query_id), read="duckdb")
     tables, predicates, join_predicates = _join_predicates(tree)
     local_predicates = {

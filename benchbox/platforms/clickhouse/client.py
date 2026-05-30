@@ -8,7 +8,6 @@ import io
 import logging
 import re
 
-import pandas as pd
 import pyarrow as pa
 
 logger = logging.getLogger(__name__)
@@ -139,6 +138,8 @@ class ClickHouseLocalClient:
         decode here can be reverted to a direct DataFrame fetch. File / track
         this in the chdb upstream issue tracker.
         """
+        import pandas as pd
+
         data = result.bytes()
         if not data:
             return pd.DataFrame()

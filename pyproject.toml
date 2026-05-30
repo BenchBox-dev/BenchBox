@@ -47,9 +47,12 @@ dependencies = [
     # pyarrow: ABI-sensitive (bundled C++); wide cap to <25 to give runway while catching jumps.
     "pyarrow>=21.0.0,<25.0.0",
     "numpy>=1.24.0",
-    # ClickHouse local result handling is reachable during `import benchbox`
-    # today and materializes pandas DataFrames from Arrow streams.
-    "pandas>=2.0.0",
+    # pandas is intentionally NOT a core dependency. It is an optional
+    # engine/DataFrame dep (DataFrame mode, TPC-DI, ClickHouse-local) declared
+    # in the relevant extras (pandas, dataframe-pandas, tpcdi, modin, dask) and
+    # pulled transitively by chdb. All pandas uses on the import path are lazy;
+    # the minimal-import-surface CI gate enforces this. See
+    # docs/development/dependency-inventory.md (pandas = DataFrame/Benchmark).
     "zstandard>=0.20.0",
     # grpcio / grpcio-status are NOT declared at the core level. They are
     # pulled in transitively by optional cloud / connectivity extras
