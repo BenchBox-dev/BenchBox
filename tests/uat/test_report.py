@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 from pathlib import Path
 
 import pytest
@@ -158,3 +159,47 @@ def test_cross_scale_validator_status_normalizes_lookup_paths(tmp_path: Path, mo
     )
 
     assert n == 0
+
+
+# ---------------------------------------------------------------------------
+# Certification re-run ordering check.
+# ---------------------------------------------------------------------------
+
+_NATIVE_LOG = """2026-05-30T01:00:00 [report] native+dataframe stage complete
+"""
+
+_DOCKER_LOG_OK = """2026-05-30T02:00:00 [docker] platform=lakesail action=up status=ok project=benchbox-uat-cert-lakesail command=['docker'] message=started
+2026-05-30T02:30:00 [docker] platform=lakesail action=down status=ok project=benchbox-uat-cert-lakesail command=['docker'] message=removed
+2026-05-30T02:31:00 [docker] platform=clickhouse-server action=up status=ok project=benchbox-uat-cert-ch command=['docker'] message=started
+"""
+
+_DOCKER_LOG_EARLY = """2026-05-30T00:30:00 [docker] platform=cedardb action=up status=ok project=benchbox-uat-cert-cedardb command=['docker'] message=started
+"""
+
+
+def test_parse_docker_up_events_extracts_timestamp_and_platform():
+    events = report.parse_docker_up_events(_DOCKER_LOG_OK)
+    # Only `action=up` lines are returned (the `action=down` line is ignored).
+    assert [p for _, p in events] == ["lakesail", "clickhouse-server"]
+    assert all(isinstance(ts, _dt.datetime) for ts, _ in events)
+
+
+def test_parse_docker_up_events_ignores_non_docker_and_garbage_lines():
+    assert report.parse_docker_up_events(_NATIVE_LOG) == []
+    assert report.parse_docker_up_events("not-a-timestamp [docker] action=up platform=x") == []
+
+
+def test_certification_ordering_no_violation_when_docker_starts_after_native():
+    boundary = _dt.datetime(2026, 5, 30, 1, 0, 0)
+    violations = report.certification_ordering_violations([_DOCKER_LOG_OK], native_stage_completed_at=boundary)
+    assert violations == []
+
+
+def test_certification_ordering_flags_docker_up_before_native_completion():
+    boundary = _dt.datetime(2026, 5, 30, 1, 0, 0)
+    violations = report.certification_ordering_violations(
+        [_DOCKER_LOG_EARLY, _DOCKER_LOG_OK], native_stage_completed_at=boundary
+    )
+    assert len(violations) == 1
+    assert "cedardb" in violations[0]
+    assert "at/before native+dataframe stage completion" in violations[0]
