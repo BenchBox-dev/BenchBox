@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Release gate hardening** - Added stable main-release validation contexts,
+  pre-tag release-finalize checks, release canary freshness, ruleset drift
+  checks, dependency-bound reporting, and isolated package smoke gates so
+  release PRs have explicit pre-publish evidence before a public tag is pushed.
 - **Benchmark support-status diagnostics** - You can now check which benchmarks
   and platforms are supported, and why a given combination is gated, from
   registry-backed metadata instead of inferring it from docs.
@@ -29,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without pulling pandas. Optional engine and DataFrame imports (ClickHouse
   local, DataFrame mode) are now loaded lazily, so the base install stays
   minimal. This resolves the v0.3.0 clean-install failure.
+- **Release publication workflow** - Release finalization now waits for stable
+  pre-merge release contexts before tagging, avoiding post-publish failures on
+  immutable public artifacts.
 - **Trino table creation** - JoinOrder `CREATE TABLE` no longer emits
   primary-key clauses that Trino rejects.
 - **JoinOrder across engines** - SQLite now indexes JoinOrder tables, Spark
@@ -668,7 +675,9 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 - **Issues**: [Report bugs and request features](https://github.com/joeharris76/benchbox/issues)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
-[Unreleased]: https://github.com/joeharris76/benchbox/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/joeharris76/benchbox/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/joeharris76/benchbox/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/joeharris76/benchbox/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/joeharris76/benchbox/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/joeharris76/benchbox/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/joeharris76/benchbox/compare/v0.1.4...v0.1.5

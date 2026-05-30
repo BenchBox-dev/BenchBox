@@ -28,7 +28,7 @@ BenchBox _loosely_ follows [Semantic Versioning](https://semver.org/) using the 
 - **MINOR** when we add backward-compatible changes _OR significantly expand functionality_.
 - **PATCH** when we make bug fixes or documentation updates, _bug-fixes may not be backward-compatible_.
 
-Current release: v0.2.1. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
+Current release: v0.3.1. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
 
 **For Developers**: See [Release Automation Guide](release/RELEASE_AUTOMATION.md) for the automated release process with reproducible builds and timestamp normalization.
 
