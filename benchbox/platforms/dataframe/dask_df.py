@@ -79,6 +79,11 @@ _RESOURCE_ENVELOPE_PATTERNS = (
     "killedworker",
     "worker was killed",
     "worker died",
+    # Scheduler-side phrasing observed in UAT, e.g. "Task ... marked as failed
+    # because 4 workers died while trying to run it". The KilledWorker exception
+    # type name already matches above, but the plural message form can also
+    # surface wrapped in other exception types, so match it explicitly.
+    "workers died",
     "exceeded memory",
     "memory budget",
     "memoryerror",

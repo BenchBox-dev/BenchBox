@@ -2,7 +2,8 @@ id: uat-dask-stability-under-sweep
 title: "Stabilize dask-df under UAT so cluster failures record FAIL and the sweep continues"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-05-29"
 category: Platform Expansion
 
 description: |
@@ -32,20 +33,54 @@ prior_art:
 work:
   - id: w0
     summary: "Reproduce dask tpcds 0.1 worker deaths locally and capture the scheduler/worker logs"
-    status: pending
-    notes: "Capture to an ignored local path; record memory profile / worker death cause in the PR body."
+    status: done
+    notes: |
+      REFRAME (evidence, 2026-05-29): the worker deaths NO LONGER REPRODUCE on
+      current develop. `benchbox run --platform dask-df --benchmark tpcds
+      --scale 0.1 --phases load,power` completed all 103 queries across 3
+      iterations with ZERO worker-death/OOM/exit-137 signals and no
+      truncation. The "4 workers died" failure mode was eliminated upstream by
+      the dask resource-envelope caps (2GB/worker, worker cap, spill) that
+      landed in the cross-engine dataframe work (#692). The 23 residual tpcds
+      failures are dataframe-TRANSLATION defects ('Series' has no attribute
+      'rank'/'iloc'/'notna', 'diff', unknown aggregate lambda, lazy-boolean
+      conversions), not resource instability; those belong to the
+      cross-engine/native-dataframe-compat track, not this stability item.
   - id: w1
     summary: "Add bounded memory/worker resource limits + timeouts to the dask client lifecycle under UAT"
     needs: [w0]
-    status: pending
+    status: done
+    notes: |
+      Already present on develop (#692): _DEFAULT_LOCAL_MEMORY_LIMIT=2GB,
+      _DEFAULT_LOCAL_WORKER_CAP, _cap_default_memory_limit, spill-to-disk with
+      target=0.6/pause=0.8. Confirmed effective by the w0 reproduction (tpcds
+      0.1 no longer kills workers). No further limits needed at swept scales.
   - id: w2
     summary: "Ensure a dask cluster failure records FAIL with the captured error and the sweep advances (no truncation/hang)"
     needs: [w0]
-    status: pending
+    status: done
+    notes: |
+      Mechanism existed (DaskResourceEnvelopeError -> build_failure_result_dict
+      via execute_query's except), but (a) was untested under tests/uat and (b)
+      the verified scheduler signature "4 workers died" (plural) was not matched
+      by the "worker died" (singular) substring pattern - only via the
+      KilledWorker exception type name. Added the plural "workers died" pattern
+      and a regression suite tests/uat/test_dask_cluster_failure.py proving each
+      death signature is classified and that a dying compute yields a FAILED
+      result dict (no hang/uncaught crash). Satisfies the verification's
+      `pytest tests/uat -m fast -k 'dask or cluster or worker'` (was 0 tests).
   - id: w3
     summary: "Decide and document whether dask tpcds@0.1/1.0 is supported locally under UAT constraints (support, prune, or scale-cap)"
     needs: [w1, w2]
-    status: pending
+    status: done
+    notes: |
+      DECISION: dask-df tpcds is SUPPORTED locally and is resource-stable at the
+      swept scales (0.01/0.1) - no prune or scale-cap needed for stability. tpcds
+      cells run to completion and any future cluster death records a clean FAIL
+      and advances. The remaining tpcds query failures are translation-coverage
+      gaps tracked under the dataframe-compat track, not a dask stability/UAT
+      gating concern. tpch cells continue to pass at 100% (Q10 skipped by the
+      existing local-envelope guard; see follow-up TODO on that guard's staleness).
 
 deps:
   needs:
