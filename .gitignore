@@ -147,6 +147,8 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 .codex/shared-skills.lock.json
 .gemini/skills/
 .antigravity/skills/
+.agents/
+.antigravitycli/
 
 # TODO system infrastructure (added for distributed TODO structure)
 !_project/TODO/
