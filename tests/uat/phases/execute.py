@@ -157,9 +157,10 @@ def run_execute(
         )
         docker_state = _DockerPlatformState(cleanup_status=last_docker_cleanup_status)
 
+        docker_startup_failed = False
         try:
             if platform_abort_reason is None:
-                docker_state, platform_abort_reason = _start_docker_platform_if_needed(
+                docker_state, startup_reason = _start_docker_platform_if_needed(
                     config,
                     platform=platform,
                     benchmark_runs_dir=benchmark_runs_dir,
@@ -168,7 +169,22 @@ def run_execute(
                     log_dir=log_dir,
                 )
                 last_docker_cleanup_status = docker_state.cleanup_status
-            if platform_abort_reason is None:
+                if startup_reason is not None:
+                    # A managed Docker compose-up failure (e.g. the LakeSail
+                    # Spark Connect service exceeding docker_start_timeout_s) is
+                    # a per-platform infrastructure failure, not a global abort.
+                    # The failure is already captured in docker_events /
+                    # uat_lifecycle.log (action=up status=failed). Record this
+                    # platform's cells as unreachable and advance to the next
+                    # stack so one stack's startup failure cannot truncate the
+                    # whole sweep. Genuine global aborts (free space, fixed
+                    # container-name policy, teardown failure) still abort below.
+                    if docker_state.cleanup_status == "startup-failed":
+                        skipped_unreachable.extend(cell for _, pb_cells in platform_pairs for cell in pb_cells)
+                        docker_startup_failed = True
+                    else:
+                        platform_abort_reason = startup_reason
+            if platform_abort_reason is None and not docker_startup_failed:
                 _run_or_skip_platform(
                     config,
                     platform=platform,
