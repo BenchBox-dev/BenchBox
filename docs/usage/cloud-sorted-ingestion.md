@@ -73,7 +73,7 @@ benchbox compare <baseline.json> <native.json> <sorted.json>
 ## Platform Notes
 
 - Snowflake: supports `ctas` sorted-ingestion path when mode is enabled.
-- Databricks: supports `ctas`, `z_order`, and `liquid_clustering` strategy methods.
+- Databricks: supports `ctas`, `z_order`, and `liquid_clustering` strategy methods. TPC templates now distinguish legacy `databricks_z_order` from `databricks_liquid_auto`; do not combine Liquid Clustering with ZORDER or per-table partitioning fields.
 - Redshift: supports `ctas` and `vacuum_sort`.
 - Amazon Athena and Azure Synapse Analytics: support `ctas` method.
 - BigQuery: forcing sorted ingestion currently returns an actionable error for CTAS-hook execution path.

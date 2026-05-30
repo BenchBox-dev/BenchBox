@@ -1123,6 +1123,15 @@ class TestDatabricksSqlGenerationHelpers:
         )
         assert cursor.execute.call_args_list[1].args[0] == "SELECT COUNT(*) FROM ORDERS"
         assert cursor.execute.call_args_list[2].args[0] == "OPTIMIZE ORDERS"
+        assert adapter._applied_layout_operations == [
+            {
+                "mechanism": "optimize",
+                "table": "ORDERS",
+                "statement": "OPTIMIZE ORDERS",
+                "phase": "post_load",
+                "status": "applied",
+            }
+        ]
 
     def test_vacuum_table_executes_delta_maintenance(self):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
@@ -1351,7 +1360,7 @@ class TestResolveClusteringStrategy:
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
             assert adapter._resolve_databricks_clustering_strategy() == "z_order"
 
-    def test_liquid_enabled_overrides_z_order(self):
+    def test_liquid_enabled_rejects_z_order(self):
         adapter = self._make_adapter()
         mock_config = Mock()
         mock_opts = Mock()
@@ -1360,8 +1369,12 @@ class TestResolveClusteringStrategy:
         mock_opts.liquid_clustering_columns = []
         mock_opts.z_ordering_enabled = True
         mock_config.platform_optimizations = mock_opts
-        with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
-            assert adapter._resolve_databricks_clustering_strategy() == "liquid_clustering"
+        mock_opts.z_ordering_columns = []
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config),
+            pytest.raises(ValueError, match="Liquid Clustering cannot be combined"),
+        ):
+            adapter._resolve_databricks_clustering_strategy()
 
     def test_liquid_columns_set_selects_liquid(self):
         adapter = self._make_adapter()
@@ -1371,9 +1384,23 @@ class TestResolveClusteringStrategy:
         mock_opts.liquid_clustering_enabled = False
         mock_opts.liquid_clustering_columns = ["col1", "col2"]
         mock_opts.z_ordering_enabled = False
+        mock_opts.z_ordering_columns = []
         mock_config.platform_optimizations = mock_opts
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
             assert adapter._resolve_databricks_clustering_strategy() == "liquid_clustering"
+
+    def test_liquid_auto_strategy_selects_auto(self):
+        adapter = self._make_adapter()
+        mock_config = Mock()
+        mock_opts = Mock()
+        mock_opts.databricks_clustering_strategy = "liquid_clustering_auto"
+        mock_opts.liquid_clustering_enabled = True
+        mock_opts.liquid_clustering_columns = []
+        mock_opts.z_ordering_enabled = False
+        mock_opts.z_ordering_columns = []
+        mock_config.platform_optimizations = mock_opts
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
+            assert adapter._resolve_databricks_clustering_strategy() == "liquid_clustering_auto"
 
     def test_explicit_strategy_none_returns_none(self):
         adapter = self._make_adapter()
@@ -1383,6 +1410,7 @@ class TestResolveClusteringStrategy:
         mock_opts.liquid_clustering_enabled = False
         mock_opts.liquid_clustering_columns = []
         mock_opts.z_ordering_enabled = False
+        mock_opts.z_ordering_columns = []
         mock_config.platform_optimizations = mock_opts
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
             assert adapter._resolve_databricks_clustering_strategy() == "none"
@@ -1395,6 +1423,7 @@ class TestResolveClusteringStrategy:
         mock_opts.liquid_clustering_enabled = False
         mock_opts.liquid_clustering_columns = []
         mock_opts.z_ordering_enabled = True
+        mock_opts.z_ordering_columns = []
         mock_config.platform_optimizations = mock_opts
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
             assert adapter._resolve_databricks_clustering_strategy() == "z_order"
@@ -1420,6 +1449,37 @@ class TestDeltaOperationsSql:
         conn.cursor.return_value = cursor
         adapter.optimize_table(conn, "lineitem")
         cursor.execute.assert_called_once_with("OPTIMIZE LINEITEM")
+        assert adapter._applied_layout_operations == [
+            {
+                "mechanism": "optimize",
+                "table": "LINEITEM",
+                "statement": "OPTIMIZE LINEITEM",
+                "phase": "manual",
+                "status": "applied",
+            }
+        ]
+
+    def test_optimize_table_records_skipped_operation_on_failure(self):
+        adapter = self._make_adapter(enable_delta_optimization=True)
+        conn = Mock()
+        cursor = Mock()
+        cursor.execute.side_effect = RuntimeError("optimize unavailable")
+        conn.cursor.return_value = cursor
+
+        adapter.optimize_table(conn, "lineitem")
+
+        assert adapter._applied_layout_operations == []
+        assert adapter._skipped_layout_operations == [
+            {
+                "mechanism": "optimize",
+                "table": "LINEITEM",
+                "statement": "OPTIMIZE LINEITEM",
+                "phase": "manual",
+                "status": "skipped",
+                "error_class": "RuntimeError",
+                "error_message": "optimize unavailable",
+            }
+        ]
 
     def test_optimize_table_skips_when_disabled(self):
         adapter = self._make_adapter(enable_delta_optimization=False)
@@ -2050,6 +2110,15 @@ class TestCopyIntoSqlGeneration:
         assert row_count == 10
         calls = [c.args[0] for c in cursor.execute.call_args_list]
         assert "OPTIMIZE NATION" in calls
+        assert adapter._applied_layout_operations == [
+            {
+                "mechanism": "optimize",
+                "table": "NATION",
+                "statement": "OPTIMIZE NATION",
+                "phase": "post_load",
+                "status": "applied",
+            }
+        ]
 
     def test_load_single_table_skips_optimize_when_delta_disabled(self):
         adapter = self._make_adapter(enable_delta_optimization=False)

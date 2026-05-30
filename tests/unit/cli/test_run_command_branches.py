@@ -242,6 +242,59 @@ class TestApplyPlatformOptimizationOverrides:
         assert unified.platform_optimizations.databricks_clustering_strategy == "none"
         assert unified.platform_optimizations.liquid_clustering_enabled is False
 
+    def test_liquid_auto_strategy_via_platform_options(self):
+        from benchbox.cli.commands.run import _apply_platform_optimization_overrides
+        from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+        unified = UnifiedTuningConfiguration()
+
+        _apply_platform_optimization_overrides(
+            unified,
+            sorted_ingestion_mode=None,
+            sorted_ingestion_method=None,
+            parsed_platform_options={"databricks_clustering_strategy": "liquid_clustering_auto"},
+        )
+
+        assert unified.platform_optimizations.databricks_clustering_strategy == "liquid_clustering_auto"
+        assert unified.platform_optimizations.liquid_clustering_enabled is True
+
+    def test_liquid_strategy_rejects_legacy_zorder_template_fields(self):
+        from benchbox.cli.commands.run import _apply_platform_optimization_overrides
+        from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+        unified = UnifiedTuningConfiguration()
+        unified.platform_optimizations.z_ordering_enabled = True
+
+        with pytest.raises(ValueError, match="Liquid Clustering cannot be combined"):
+            _apply_platform_optimization_overrides(
+                unified,
+                sorted_ingestion_mode=None,
+                sorted_ingestion_method=None,
+                parsed_platform_options={"databricks_clustering_strategy": "liquid_clustering_auto"},
+            )
+
+    def test_strategy_override_resets_stale_physical_rendering_id(self):
+        from benchbox.cli.commands.run import _apply_platform_optimization_overrides
+        from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+        # A liquid template carries physical_rendering_id=databricks_liquid_auto; overriding to z_order must drop
+        # it so the reported rendering identity follows the authoritative strategy instead of diverging.
+        unified = UnifiedTuningConfiguration()
+        unified.platform_optimizations.databricks_clustering_strategy = "liquid_clustering_auto"
+        unified.platform_optimizations.liquid_clustering_enabled = True
+        unified.platform_optimizations.physical_rendering_id = "databricks_liquid_auto"
+
+        _apply_platform_optimization_overrides(
+            unified,
+            sorted_ingestion_mode=None,
+            sorted_ingestion_method=None,
+            parsed_platform_options={"databricks_clustering_strategy": "z_order"},
+        )
+
+        assert unified.platform_optimizations.databricks_clustering_strategy == "z_order"
+        assert unified.platform_optimizations.liquid_clustering_enabled is False
+        assert unified.platform_optimizations.physical_rendering_id is None
+
     def test_sorted_ingestion_validation_is_preserved(self):
         from benchbox.cli.commands.run import _apply_platform_optimization_overrides
         from benchbox.core.tuning.interface import UnifiedTuningConfiguration

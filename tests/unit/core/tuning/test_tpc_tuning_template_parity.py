@@ -52,6 +52,34 @@ def test_tpc_tuned_templates_map_required_logical_profile_candidates(platform: s
     assert result.waived_count == 0
 
 
+@pytest.mark.parametrize(
+    ("filename", "benchmark_id"),
+    [("tpch_liquid_tuned.yaml", "tpch"), ("tpcds_liquid_tuned.yaml", "tpcds")],
+)
+def test_databricks_liquid_templates_map_same_logical_profile_with_distinct_rendering(
+    filename: str,
+    benchmark_id: str,
+) -> None:
+    tuning_config = ConfigManager().load_unified_tuning_config(
+        TUNING_ROOT / "databricks" / filename,
+        platform="databricks",
+    )
+    result = validate_tuning_template(
+        profile=load_tpc_tuning_profile(),
+        benchmark=benchmark_id,
+        platform="databricks",
+        tuning_config=tuning_config,
+    )
+
+    assert result.is_valid, [issue.to_dict() for issue in result.issues]
+    assert result.mapped_count == result.required_count
+    metadata = result.to_metadata()
+    assert metadata["physical_rendering_id"] == "databricks_liquid_auto"
+    assert "liquid_clustering_auto" in metadata["platform_physical_tuning_mechanisms"]
+    assert "z_order" not in metadata["platform_physical_tuning_mechanisms"]
+    assert "distribution" not in metadata["platform_physical_tuning_mechanisms"]
+
+
 def test_duckdb_maps_logical_profile_to_sorting_not_databricks_clustering() -> None:
     tuning_config = _load_tuning("duckdb", "tpch")
     result = validate_tuning_template(
@@ -105,6 +133,20 @@ def test_multi_mechanism_candidates_fail_when_one_mapping_type_is_lost() -> None
     }["tpch.LINEITEM.L_ORDERKEY"] == ["distribution"]
 
 
+def test_databricks_z_order_mapping_does_not_report_distribution_as_physical_mechanism() -> None:
+    tuning_config = _load_tuning("databricks", "tpch")
+    result = validate_tuning_template(
+        profile=load_tpc_tuning_profile(),
+        benchmark="tpch",
+        platform="databricks",
+        tuning_config=tuning_config,
+    )
+
+    assert result.to_metadata()["physical_rendering_id"] == "databricks_z_order"
+    assert "z_order" in result.physical_mechanisms
+    assert "distribution" not in result.physical_mechanisms
+
+
 def test_future_platform_mappings_expose_distribution_limitations() -> None:
     profile = load_tpc_tuning_profile()
     order_key = next(
@@ -145,6 +187,7 @@ def test_tuning_profile_metadata_exposes_comparison_semantics(
 
     assert metadata is not None
     assert metadata["logical_tuning_profile_id"] == "tpc-v1"
+    assert metadata["physical_rendering_id"] == ("databricks_z_order" if platform == "databricks" else "duckdb")
     assert expected_mechanism in metadata["platform_physical_tuning_mechanisms"]
     assert (
         metadata["logical_profile_coverage"]["mapped_count"] == metadata["logical_profile_coverage"]["required_count"]
@@ -232,6 +275,7 @@ def test_result_payload_platform_tuning_summary_carries_logical_profile_metadata
 
     logical_profile = payload["platform"]["tuning"]["logical_profile"]
     assert logical_profile["id"] == "tpc-v1"
+    assert logical_profile["physical_rendering_id"] == "duckdb"
     assert "sorting" in logical_profile["physical_mechanisms"]
     assert logical_profile["coverage"]["unmapped_count"] == 0
 

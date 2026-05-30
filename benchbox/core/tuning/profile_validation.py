@@ -11,6 +11,10 @@ from typing import Any
 from benchbox.core.results.builder import normalize_benchmark_id
 from benchbox.core.tuning.platform_capabilities import (
     CLUSTERING,
+    DATABRICKS_LIQUID_AUTO_RENDERING,
+    DATABRICKS_LIQUID_MANUAL_RENDERING,
+    DATABRICKS_RENDERINGS,
+    DATABRICKS_Z_ORDER_RENDERING,
     DISTRIBUTION,
     MAPPED,
     PARTITIONING,
@@ -94,6 +98,7 @@ class TuningProfileValidationResult:
     benchmark: str
     platform: str
     template_hash: str
+    physical_rendering_id: str
     mappings: tuple[CandidateTemplateMapping, ...]
     issues: tuple[TuningProfileValidationIssue, ...]
     accepted_count: int
@@ -150,6 +155,7 @@ class TuningProfileValidationResult:
             "logical_tuning_profile_id": self.profile_id,
             "logical_tuning_profile_version": self.profile_version,
             "tuning_template_hash": self.template_hash,
+            "physical_rendering_id": self.physical_rendering_id,
             "platform_physical_tuning_mechanisms": list(self.physical_mechanisms),
             "logical_profile_coverage": {
                 "accepted_count": self.accepted_count,
@@ -176,11 +182,13 @@ def validate_tuning_template(
     benchmark_key = _normalize_profile_benchmark(benchmark)
     platform_key = platform.lower().replace("_", "-")
     template_columns = extract_template_columns(tuning_config)
+    physical_rendering_id = resolve_physical_rendering_id(platform_key, tuning_config)
     candidates = profile.candidates(benchmark_key)
     accepted_count = sum(1 for candidate in candidates if candidate.status == ACCEPTED)
     dropped_candidates = tuple(candidate for candidate in candidates if candidate.status == DROPPED_LOW_EVIDENCE)
 
     issues: list[TuningProfileValidationIssue] = []
+    issues.extend(_config_validation_issues(platform_key, tuning_config))
     mappings: list[CandidateTemplateMapping] = []
 
     for candidate in candidates:
@@ -200,7 +208,11 @@ def validate_tuning_template(
         if not candidate.is_required_for_mapping:
             continue
 
-        platform_mapping = map_candidate_to_platform(platform_key, candidate)
+        platform_mapping = map_candidate_to_platform(
+            platform_key,
+            candidate,
+            physical_rendering_id=physical_rendering_id,
+        )
         mapped_tuning_types = tuple(
             tuning_type
             for tuning_type in platform_mapping.tuning_types
@@ -233,6 +245,7 @@ def validate_tuning_template(
         benchmark=benchmark_key,
         platform=platform_key,
         template_hash=hash_tuning_template(tuning_config),
+        physical_rendering_id=physical_rendering_id,
         mappings=tuple(mappings),
         issues=tuple(issues),
         accepted_count=accepted_count,
@@ -250,7 +263,9 @@ def build_tuning_profile_metadata(
     """Build compact result metadata for TPC tuning profile coverage."""
     if not benchmark or not platform or tuning_config is None:
         return None
-    if not _get_value(tuning_config, "table_tunings"):
+    if not _get_value(tuning_config, "table_tunings") and (
+        platform is None or resolve_physical_rendering_id(platform, tuning_config) != DATABRICKS_LIQUID_AUTO_RENDERING
+    ):
         return None
 
     profile = profile or load_tpc_tuning_profile()
@@ -284,6 +299,28 @@ def extract_template_columns(tuning_config: Any) -> dict[str, dict[str, set[str]
     return extracted
 
 
+def resolve_physical_rendering_id(platform: str, tuning_config: Any | None) -> str:
+    """Resolve the physical rendering id used for logical profile validation."""
+    platform_key = platform.lower().replace("_", "-")
+    if platform_key != "databricks":
+        return platform_key
+
+    platform_opts = _get_value(tuning_config, "platform_optimizations") if tuning_config is not None else None
+    explicit = _get_value(platform_opts, "physical_rendering_id")
+    if explicit:
+        return str(explicit)
+
+    strategy = str(_get_value(platform_opts, "databricks_clustering_strategy") or "z_order").lower()
+    liquid_enabled = bool(_get_value(platform_opts, "liquid_clustering_enabled"))
+    liquid_columns = bool(_get_value(platform_opts, "liquid_clustering_columns"))
+
+    if strategy == "liquid_clustering_auto":
+        return DATABRICKS_LIQUID_AUTO_RENDERING
+    if strategy == "liquid_clustering" or liquid_enabled or liquid_columns:
+        return DATABRICKS_LIQUID_MANUAL_RENDERING
+    return DATABRICKS_Z_ORDER_RENDERING
+
+
 def hash_tuning_template(tuning_config: Any) -> str:
     """Return a stable compact hash for a tuning configuration."""
     if hasattr(tuning_config, "to_dict"):
@@ -306,6 +343,37 @@ def _normalize_profile_benchmark(benchmark: str) -> str:
 
 def _candidate_present(template_columns: dict[str, dict[str, set[str]]], candidate: WorkloadTuningCandidate) -> bool:
     return any(candidate.column in columns for columns in template_columns.get(candidate.table, {}).values())
+
+
+def _config_validation_issues(platform: str, tuning_config: Any) -> list[TuningProfileValidationIssue]:
+    issues: list[TuningProfileValidationIssue] = []
+    if hasattr(tuning_config, "validate_for_platform"):
+        for error_message in tuning_config.validate_for_platform(platform):
+            issues.append(
+                TuningProfileValidationIssue(
+                    severity=ERROR,
+                    candidate_key="__config__",
+                    message=error_message,
+                    decision=UNSUPPORTED,
+                    reason="effective tuning configuration is internally conflicting for the selected platform",
+                )
+            )
+
+    if platform != "databricks":
+        return issues
+
+    physical_rendering_id = resolve_physical_rendering_id(platform, tuning_config)
+    if physical_rendering_id not in DATABRICKS_RENDERINGS:
+        issues.append(
+            TuningProfileValidationIssue(
+                severity=ERROR,
+                candidate_key="__config__",
+                message=f"unknown Databricks physical_rendering_id: {physical_rendering_id}",
+                decision=UNSUPPORTED,
+                reason="Databricks TPC profile validation requires a known physical rendering id",
+            )
+        )
+    return issues
 
 
 def _extract_column_names(raw_columns: Any) -> set[str]:

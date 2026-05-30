@@ -1236,6 +1236,7 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
             "id": tuning_profile.get("logical_tuning_profile_id"),
             "version": tuning_profile.get("logical_tuning_profile_version"),
             "template_hash": tuning_profile.get("tuning_template_hash"),
+            "physical_rendering_id": tuning_profile.get("physical_rendering_id"),
             "physical_mechanisms": tuning_profile.get("platform_physical_tuning_mechanisms", []),
         }
         if coverage:

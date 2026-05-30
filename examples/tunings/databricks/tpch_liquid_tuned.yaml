@@ -1,0 +1,118 @@
+# Databricks TPC-H Liquid AUTO Tuned Configuration
+# Renders the shared logical TPC profile through Databricks Liquid Clustering AUTO.
+
+primary_keys:
+  enabled: true
+  enforce_uniqueness: true
+  nullable: false
+
+foreign_keys:
+  enabled: true
+  enforce_referential_integrity: true
+  on_delete_action: CASCADE
+  on_update_action: RESTRICT
+
+unique_constraints:
+  enabled: true
+  ignore_nulls: false
+
+check_constraints:
+  enabled: true
+  enforce_on_insert: true
+  enforce_on_update: true
+
+platform_optimizations:
+  z_ordering_enabled: false
+  z_ordering_columns: []
+  liquid_clustering_enabled: true
+  liquid_clustering_columns: []
+  databricks_clustering_strategy: liquid_clustering_auto
+  physical_rendering_id: databricks_liquid_auto
+  auto_optimize_enabled: true
+  auto_compact_enabled: true
+  materialized_views_enabled: true
+
+table_tunings:
+  LINEITEM:
+    table_name: LINEITEM
+    clustering:
+    - name: L_SHIPDATE
+      type: DATE
+      order: 1
+    - name: L_ORDERKEY
+      type: INTEGER
+      order: 2
+    - name: L_PARTKEY
+      type: INTEGER
+      order: 3
+    - name: L_SUPPKEY
+      type: INTEGER
+      order: 4
+
+  ORDERS:
+    table_name: ORDERS
+    clustering:
+    - name: O_ORDERDATE
+      type: DATE
+      order: 1
+    - name: O_ORDERKEY
+      type: INTEGER
+      order: 2
+    - name: O_CUSTKEY
+      type: INTEGER
+      order: 3
+
+  PART:
+    table_name: PART
+    clustering:
+    - name: P_PARTKEY
+      type: INTEGER
+      order: 1
+    - name: P_TYPE
+      type: VARCHAR
+      order: 2
+    - name: P_SIZE
+      type: INTEGER
+      order: 3
+
+  SUPPLIER:
+    table_name: SUPPLIER
+    clustering:
+    - name: S_SUPPKEY
+      type: INTEGER
+      order: 1
+    - name: S_NATIONKEY
+      type: INTEGER
+      order: 2
+
+  CUSTOMER:
+    table_name: CUSTOMER
+    clustering:
+    - name: C_CUSTKEY
+      type: INTEGER
+      order: 1
+    - name: C_NATIONKEY
+      type: INTEGER
+      order: 2
+
+  PARTSUPP:
+    table_name: PARTSUPP
+    clustering:
+    - name: PS_PARTKEY
+      type: INTEGER
+      order: 1
+    - name: PS_SUPPKEY
+      type: INTEGER
+      order: 2
+
+_metadata:
+  version: '2.0'
+  format: unified_tuning
+  database: databricks
+  benchmark: tpch
+  configuration_type: tuned
+  logical_tuning_profile_id: tpc-v1
+  physical_rendering_id: databricks_liquid_auto
+  description: "Databricks TPC-H Liquid AUTO rendering of the platform-neutral TPC tuning profile"
+  created: '2026-05-26'
+  generated_by: benchbox-project
