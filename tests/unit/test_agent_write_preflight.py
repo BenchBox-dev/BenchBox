@@ -54,7 +54,7 @@ def test_preflight_allows_explicit_primary_clone_override() -> None:
 
 
 def test_preflight_allows_non_primary_worktree() -> None:
-    result = _run_preflight(primary_clone=Path.cwd().parent / "BenchBox")
+    result = _run_preflight(primary_clone=Path.cwd().parent)
 
     assert result.returncode == 0
     assert "BenchBox write preflight OK" in result.stdout
