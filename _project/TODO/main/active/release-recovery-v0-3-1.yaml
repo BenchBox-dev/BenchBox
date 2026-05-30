@@ -26,7 +26,7 @@ description: |
 work:
 - id: w1
   summary: "Revalidate the live v0.3.0 failure and current PyPI version state"
-  status: pending
+  status: done
   notes: |
     Capture only compact evidence in the PR body or TODO notes. Required
     checks:
@@ -39,7 +39,7 @@ work:
 - id: w2
   summary: "Confirm the recovery fixes are present on develop before cutting v0.3.1"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Confirm at minimum:
       - base runtime dependencies include the `pandas` dependency needed by
@@ -125,13 +125,12 @@ verification:
   expected_output: "exit 0"
 
 must_preserve:
-- Do not re-tag, force-push, delete, or re-upload `v0.3.0` / `0.3.0`; PyPI
-  artifacts and public tags are immutable release history.
-- Do not treat a failed `0.3.0` install smoke as repaired until a later
-  monotonic version has passed clean install/import from PyPI.
-- Do not bypass Phase 8 dependency semantics. Phase 8 remains blocked until
-  Phase 4 is explicitly closed or Phase 8 is explicitly retired as satisfied
-  by this recovery release.
+- Do not re-tag, force-push, delete, or re-upload `v0.3.0` / `0.3.0`; PyPI artifacts and public tags are immutable
+  release history.
+- Do not treat a failed `0.3.0` install smoke as repaired until a later monotonic version has passed clean
+  install/import from PyPI.
+- Do not bypass Phase 8 dependency semantics. Phase 8 remains blocked until Phase 4 is explicitly closed or Phase 8 is
+  explicitly retired as satisfied by this recovery release.
 - Do not weaken the release-required context or publish path to get v0.3.1 out.
 
 approach: |
@@ -142,7 +141,8 @@ approach: |
 anti_patterns:
 - "DO NOT re-run `v0.3.0-rc.1` - because the pre-GA validation window is gone and the GA version already exists."
 - "DO NOT re-upload `0.3.0` - because PyPI rejects replacement files and the public artifact history must remain immutable."
-- "DO NOT mark Phase 4 complete before the recovery release has passed clean install/import - because the original release verification failed after publish."
+- "DO NOT mark Phase 4 complete before the recovery release has passed clean install/import - because the original release
+  verification failed after publish."
 - "DO NOT let Phase 8 proceed merely because a recovery PR exists - because the dependency is completion evidence, not intent."
 
 scope_limit:
