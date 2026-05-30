@@ -25,9 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Clean install now imports** - `pip install benchbox` imports without
-  manually adding pandas; the runtime dependency is now declared. This resolves
-  the v0.3.0 clean-install failure.
+- **Clean install now imports** - `pip install benchbox` imports cleanly
+  without pulling pandas. Optional engine and DataFrame imports (ClickHouse
+  local, DataFrame mode) are now loaded lazily, so the base install stays
+  minimal. This resolves the v0.3.0 clean-install failure.
 - **Trino table creation** - JoinOrder `CREATE TABLE` no longer emits
   primary-key clauses that Trino rejects.
 - **JoinOrder across engines** - SQLite now indexes JoinOrder tables, Spark

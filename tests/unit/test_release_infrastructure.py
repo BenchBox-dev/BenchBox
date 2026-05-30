@@ -9,6 +9,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -96,15 +97,38 @@ class TestReleaseInfrastructure:
             assert "anthropics/claude-code" not in url
             assert "anthropic" not in url
 
-    def test_core_runtime_dependencies_cover_clean_import_path(self):
-        """Clean package installs must include dependencies needed by import-time platform wiring."""
-        pyproject_path = REPO_ROOT / "pyproject.toml"
+    def test_import_benchbox_succeeds_without_pandas(self):
+        """`import benchbox` must work on a clean core install even when pandas is absent.
 
-        with open(pyproject_path, "rb") as f:
-            config = tomllib.load(f)
+        This is the real contract behind the v0.3.0 clean-install failure: the
+        base import surface must not require an optional engine/DataFrame
+        dependency. Run in a fresh interpreter with pandas made unimportable.
+        """
+        code = (
+            "import sys; sys.modules['pandas'] = None; "  # any `import pandas` now raises ImportError
+            "import benchbox; "
+            "print(benchbox.__version__)"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"import benchbox failed without pandas:\n{result.stderr}"
 
-        dependencies = config["project"]["dependencies"]
-        assert any(dep.startswith("pandas>=") for dep in dependencies)
+    def test_import_benchbox_does_not_pull_pandas(self):
+        """Importing benchbox must not eagerly import pandas onto the base surface.
+
+        Guards against a future top-level `import pandas` silently re-entering the
+        import path and forcing pandas back into the core dependency set.
+        """
+        code = "import benchbox, sys; assert 'pandas' not in sys.modules, sorted(m for m in sys.modules if m == 'pandas' or m.startswith('pandas.'))"
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"import benchbox eagerly imported pandas:\n{result.stdout}{result.stderr}"
 
     def test_github_issue_url_fix(self):
         """Test that exceptions.py has correct GitHub issue URL."""

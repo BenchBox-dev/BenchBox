@@ -178,14 +178,14 @@ jobs:
         if: github.event.inputs.test_pypi != 'true'
         run: |
           pip install benchbox
-          python -c "import benchbox; print(f'BenchBox {benchbox.__version__} installed successfully')"
+          python -c "import importlib.util, sys; import benchbox; assert 'pandas' not in sys.modules, 'pandas must not load on the base import surface'; assert importlib.util.find_spec('pandas') is None, 'published core wheel must not pull pandas'; print(f'BenchBox {benchbox.__version__} installed successfully (minimal import surface)')"
           benchbox --help
 
       - name: Test installation from Test PyPI
         if: github.event.inputs.test_pypi == 'true'
         run: |
           pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ benchbox
-          python -c "import benchbox; print(f'BenchBox {benchbox.__version__} installed successfully')"
+          python -c "import importlib.util, sys; import benchbox; assert 'pandas' not in sys.modules, 'pandas must not load on the base import surface'; assert importlib.util.find_spec('pandas') is None, 'published core wheel must not pull pandas'; print(f'BenchBox {benchbox.__version__} installed successfully (minimal import surface)')"
           benchbox --help
 
   # Delete old workflow artifacts to prevent confusion

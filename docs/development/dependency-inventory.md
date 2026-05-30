@@ -156,7 +156,7 @@ or declaration appears unused.
 | `influxdb3-python` | SQL | `benchbox/platforms/influxdb/_dependencies.py` | 1 | KEEP |
 | `mcp` | MCP | `benchbox/mcp/**`, tests | 18 | KEEP |
 | `modin` | DF | `benchbox/platforms/dataframe/modin_df.py` | 2 | KEEP |
-| `pandas` | DF/BM | `benchbox/core/**`, `benchbox/experimental/**`, `benchbox/platforms/**`, tests | 182 | KEEP |
+| `pandas` | DF/BM | `benchbox/core/**`, `benchbox/experimental/**`, `benchbox/platforms/**`, tests | 182 | KEEP (extras only) - removed from core deps; supplied by `extras:{pandas,dataframe-pandas,tpcdi,modin,dask}` and transitively by `chdb`. See finding F7. |
 | `polars` | DF | `benchbox/cli/**`, `benchbox/core/**`, `benchbox/platforms/**`, tests | 60 | KEEP |
 | `presto-python-client` | SQL | `benchbox/platforms/presto.py` | 2 | KEEP |
 | `psycopg2-binary` | SQL | `benchbox/platforms/pg_*.py`, `scripts/`, tests | 18 | KEEP |
@@ -295,6 +295,36 @@ or declaration appears unused.
     copy buttons in code blocks are wanted.
   Either choice is fine - the current state (declared, not wired) is a bug.
 - **Risk:** None for the drop path. Wiring it up requires a docs rebuild.
+
+### F7 - `pandas` removed from core dependencies (RESOLVED 2026-05-30)
+
+- **Where:** `pyproject.toml` `[project] dependencies` (previously `pandas>=2.0.0`).
+- **Background:** v0.3.0 shipped a broken clean install: `import benchbox`
+  raised `ImportError` without pandas because `clickhouse/client.py` did a
+  top-level `import pandas`, reachable from `import benchbox` via
+  `adapter_factory` -> `clickhouse/__init__` eager re-exports. PR #681 patched
+  the symptom by adding pandas to core deps (~41.5 MB tax on every install,
+  incl. SQL-only users), contradicting this inventory's `DF/BM` classification.
+- **Resolution (applies the F1 pattern to pandas):**
+  - Made the sole reachable pandas import lazy (`clickhouse/client.py`
+    `_arrow_to_dataframe`); made `clickhouse/__init__` re-exports lazy (PEP 562)
+    so importing `clickhouse.deployment_mode` no longer pulls adapter/client;
+    converted latent top-level pandas imports in `joinorder`, `ssb`, and
+    `joinorder_synthetic` dataframe_queries to in-function imports.
+  - Removed `pandas>=2.0.0` from core deps. It remains in
+    `extras:{pandas,dataframe-pandas,tpcdi,modin,dask,all}` and is pulled
+    transitively by `chdb`, so DataFrame mode, TPC-DI, and ClickHouse-local
+    runs are unaffected.
+- **Import-surface audit (post-fix):** heavy modules still eagerly imported on
+  `import benchbox` are `numpy`, `pydantic`, and `sqlglot` - all genuinely core
+  (numerics, config models, SQL translation); accepted. `duckdb` is reached
+  only via guarded/optional paths and is **not** required for a core import
+  (verified: a core-only wheel installs 24 packages, excludes pandas, imports
+  and runs `benchbox --help`).
+- **Regression guard:** the wheel smoke in `test.yml`/`nightly.yml` (and the
+  post-publish check in `release.yml`) now asserts `find_spec('pandas') is None`
+  on a core install, and `tests/unit/test_release_infrastructure.py` asserts
+  `import benchbox` succeeds with pandas unavailable and never imports it.
 
 ---
 
