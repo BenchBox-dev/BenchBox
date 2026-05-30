@@ -1188,29 +1188,43 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Join customer -> orders, filter by date
-    customer_orders = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    customer_orders = customer_orders[
-        (customer_orders["o_orderdate"] >= start_date) & (customer_orders["o_orderdate"] < end_date)
+    # Projection pushdown: carry only the columns each stage needs so the wide
+    # string columns (c_comment, l_comment, o_comment, ...) never ride through
+    # the large lineitem join. Push the l_returnflag='R' filter below the join,
+    # and group by the narrow integer keys (c_custkey is the customer PK so it
+    # functionally determines the other customer attributes; c_nationkey -> n_name),
+    # then rejoin the small detail columns onto the aggregated result. This keeps
+    # the groupby off wide string keys and is what lets the graph fit a
+    # constrained local Dask envelope; the result is identical to grouping by all
+    # seven output columns.
+    customer_keys = customer[["c_custkey", "c_nationkey"]]
+    customer_detail = customer[["c_custkey", "c_name", "c_acctbal", "c_phone", "c_address", "c_comment"]]
+
+    orders_window = orders[["o_orderkey", "o_custkey", "o_orderdate"]]
+    orders_window = orders_window[
+        (orders_window["o_orderdate"] >= start_date) & (orders_window["o_orderdate"] < end_date)
     ]
 
-    # Join with lineitem, filter for returns
-    order_lines = customer_orders.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    order_lines = order_lines[order_lines["l_returnflag"] == "R"]
+    returned_lines = lineitem[["l_orderkey", "l_extendedprice", "l_discount", "l_returnflag"]]
+    returned_lines = returned_lines[returned_lines["l_returnflag"] == "R"]
+    returned_lines = returned_lines.assign(
+        revenue=returned_lines["l_extendedprice"] * (1 - returned_lines["l_discount"])
+    )[["l_orderkey", "revenue"]]
 
-    # Join with nation
-    joined = order_lines.merge(nation, left_on="c_nationkey", right_on="n_nationkey")
+    customer_orders = customer_keys.merge(orders_window, left_on="c_custkey", right_on="o_custkey")
+    order_lines = customer_orders.merge(returned_lines, left_on="o_orderkey", right_on="l_orderkey")
 
-    # Calculate revenue
-    joined = joined.copy()
-    joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
+    revenue_by_customer = order_lines.groupby(["c_custkey", "c_nationkey"], as_index=False).agg(
+        revenue=("revenue", "sum")
+    )
 
-    # Aggregate
+    with_nation = revenue_by_customer.merge(
+        nation[["n_nationkey", "n_name"]], left_on="c_nationkey", right_on="n_nationkey"
+    )
+    with_detail = with_nation.merge(customer_detail, on="c_custkey")
+
     return (
-        joined.groupby(
-            ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"], as_index=False
-        )
-        .agg(revenue=("revenue", "sum"))
+        with_detail[["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment", "revenue"]]
         .sort_values("revenue", ascending=False)
         .head(20)
     )
