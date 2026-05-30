@@ -139,6 +139,11 @@ def _apply_platform_optimization_overrides(
         strategy = str(resolved_strategy).lower()
         platform_optimizations.databricks_clustering_strategy = strategy
         platform_optimizations.liquid_clustering_enabled = strategy in {"liquid_clustering", "liquid_clustering_auto"}
+        # An explicit strategy override is authoritative over the template's reporting identity: drop the stale
+        # physical_rendering_id so it is re-derived from the new strategy downstream, preventing result JSON from
+        # claiming a rendering the executor no longer applies. Genuinely contradictory layout fields are still
+        # rejected by __post_init__ below rather than silently rewritten.
+        platform_optimizations.physical_rendering_id = None
 
     resolved_liquid_columns = platform_options.get("liquid_clustering_columns")
     if resolved_liquid_columns:

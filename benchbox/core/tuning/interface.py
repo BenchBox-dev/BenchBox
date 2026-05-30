@@ -1116,6 +1116,37 @@ class PlatformOptimizationConfiguration:
             raise ValueError(
                 f"physical_rendering_id={self.physical_rendering_id} cannot be combined with ZORDER fields"
             )
+        if self.databricks_clustering_strategy == "z_order" and (
+            self.liquid_clustering_enabled or self.liquid_clustering_columns
+        ):
+            raise ValueError(
+                "databricks_clustering_strategy='z_order' cannot be combined with liquid_clustering_enabled or "
+                "liquid_clustering_columns; set databricks_clustering_strategy='liquid_clustering' for explicit keys "
+                "or 'liquid_clustering_auto' for CLUSTER BY AUTO."
+            )
+
+        # physical_rendering_id, when set, must agree with the resolved clustering strategy. The reporter
+        # (resolve_physical_rendering_id) prefers this field while the executor
+        # (_resolve_databricks_clustering_strategy) reads the strategy/flags, so a mismatch would let result JSON
+        # claim a rendering identity the adapter never applied.
+        if self.physical_rendering_id == "databricks_liquid_auto" and (
+            self.databricks_clustering_strategy != "liquid_clustering_auto"
+        ):
+            raise ValueError(
+                "physical_rendering_id=databricks_liquid_auto requires "
+                "databricks_clustering_strategy='liquid_clustering_auto'"
+            )
+        if self.physical_rendering_id == "databricks_liquid_manual" and (
+            self.databricks_clustering_strategy == "liquid_clustering_auto" or not liquid_requested
+        ):
+            raise ValueError(
+                "physical_rendering_id=databricks_liquid_manual requires manual Liquid Clustering "
+                "(databricks_clustering_strategy='liquid_clustering' or liquid_clustering_enabled/columns)"
+            )
+        if self.physical_rendering_id == "databricks_z_order" and self.databricks_clustering_strategy != "z_order":
+            raise ValueError(
+                "physical_rendering_id=databricks_z_order requires databricks_clustering_strategy='z_order'"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""

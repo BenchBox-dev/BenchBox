@@ -108,6 +108,58 @@ def test_platform_optimization_rejects_rendering_strategy_conflict() -> None:
         )
 
 
+def test_platform_optimization_rejects_zorder_strategy_with_liquid_flags() -> None:
+    with pytest.raises(ValueError, match="databricks_clustering_strategy='z_order' cannot be combined"):
+        PlatformOptimizationConfiguration(
+            databricks_clustering_strategy="z_order",
+            liquid_clustering_enabled=True,
+        )
+
+
+def test_platform_optimization_rejects_liquid_auto_rendering_without_auto_strategy() -> None:
+    with pytest.raises(ValueError, match="databricks_liquid_auto requires"):
+        PlatformOptimizationConfiguration(
+            databricks_clustering_strategy="liquid_clustering",
+            liquid_clustering_enabled=True,
+            physical_rendering_id="databricks_liquid_auto",
+        )
+
+
+def test_platform_optimization_rejects_liquid_manual_rendering_with_auto_strategy() -> None:
+    with pytest.raises(ValueError, match="databricks_liquid_manual requires manual"):
+        PlatformOptimizationConfiguration(
+            databricks_clustering_strategy="liquid_clustering_auto",
+            liquid_clustering_enabled=True,
+            physical_rendering_id="databricks_liquid_manual",
+        )
+
+
+def test_platform_optimization_rejects_liquid_manual_rendering_without_liquid_request() -> None:
+    with pytest.raises(ValueError, match="databricks_liquid_manual requires manual"):
+        PlatformOptimizationConfiguration(
+            databricks_clustering_strategy="z_order",
+            physical_rendering_id="databricks_liquid_manual",
+        )
+
+
+def test_platform_optimization_rejects_zorder_rendering_with_non_zorder_strategy() -> None:
+    with pytest.raises(ValueError, match="databricks_z_order requires databricks_clustering_strategy='z_order'"):
+        PlatformOptimizationConfiguration(
+            databricks_clustering_strategy="none",
+            physical_rendering_id="databricks_z_order",
+        )
+
+
+def test_platform_optimization_accepts_liquid_manual_rendering_with_manual_strategy() -> None:
+    config = PlatformOptimizationConfiguration(
+        databricks_clustering_strategy="liquid_clustering",
+        liquid_clustering_enabled=True,
+        liquid_clustering_columns=["event_time"],
+        physical_rendering_id="databricks_liquid_manual",
+    )
+    assert config.physical_rendering_id == "databricks_liquid_manual"
+
+
 def test_databricks_liquid_validation_rejects_partitioning_and_distribution_fields() -> None:
     from benchbox.core.tuning.interface import TableTuning, TuningColumn
 

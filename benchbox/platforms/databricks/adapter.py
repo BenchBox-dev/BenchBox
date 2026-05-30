@@ -2497,7 +2497,7 @@ class DatabricksAdapter(PlatformAdapter):
             try:
                 cursor.execute(clause)
                 self._liquid_clustering_operations.append(
-                    {"table": table_name, "columns": list(liquid_columns), "statement": clause}
+                    {"table": table_name, "columns": list(liquid_columns), "statement": clause, "mode": "manual"}
                 )
                 self._record_layout_operation(
                     mechanism="liquid_clustering",

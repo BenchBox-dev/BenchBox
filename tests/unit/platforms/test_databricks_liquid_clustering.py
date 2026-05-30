@@ -77,6 +77,7 @@ def test_apply_table_tunings_uses_liquid_clustering_when_configured(_mock_databr
             "table": "TEST_TABLE",
             "columns": ["event_time", "customer_id"],
             "statement": "ALTER TABLE TEST_TABLE CLUSTER BY (event_time, customer_id)",
+            "mode": "manual",
         }
     ]
     assert [operation["mechanism"] for operation in adapter._applied_layout_operations] == [
