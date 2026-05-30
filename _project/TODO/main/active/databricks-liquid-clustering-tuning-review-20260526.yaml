@@ -109,8 +109,8 @@ work:
     summary: "Preserve all evidence and rerun the listed baseline checks after any future changes"
     status: done
   - id: w2
-    summary: "Add explicit validation for `liquid_clustering_columns` over 4 keys in manual mode and add regression test.
-      Current behavior passes 5-key liquid_clustering_columns in `/tmp/benchbox_tuning_manual_5cols.yaml` without rejection."
+    summary: "Add explicit validation for `liquid_clustering_columns` over 4 keys in manual mode and add regression test"
+    notes: "Current behavior passes 5-key liquid_clustering_columns in /tmp/benchbox_tuning_manual_5cols.yaml without rejection."
     needs: [w1]
     status: pending
   - id: w3
@@ -120,10 +120,11 @@ work:
   - id: w4
     summary: "Run live Databricks SF 0.01 executions for tpch/tpcds liquid templates with valid credentials and verify all requested Databricks metadata fields."
     needs: [w3]
-    status: blocked
+    status: pending
     notes: "Blocked until valid environment credentials and approved Databricks target are available."
   - id: w5
-    summary: "On successful live run, verify result metadata includes requested/resolved strategy, physical rendering id, applied/skipped operations, logical tuning profile id, and platform physical tuning mechanisms."
+    summary: "On successful live run, verify result metadata contains all liquid-specific fields"
+    notes: "Verify result metadata includes requested/resolved strategy, physical rendering id, applied/skipped operations, logical tuning profile id, and platform physical tuning mechanisms."
     needs: [w4]
     status: pending
 
