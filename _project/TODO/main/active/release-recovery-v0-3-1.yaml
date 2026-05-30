@@ -10,6 +10,7 @@ deps:
   - release-finalize-pretag-ci-wait
   - single-repo-migration-phase-6-delete-obsolete-tooling
   - single-repo-migration-phase-7-docs-cleanup
+  - drop-pandas-from-core-dependencies
 
 description: |
   The public `v0.3.0` tag, GitHub release, and PyPI files are immutable and
