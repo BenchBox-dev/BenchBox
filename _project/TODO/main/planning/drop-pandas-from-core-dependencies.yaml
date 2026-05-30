@@ -44,8 +44,31 @@ description: |
   VERSION=0.3.1`): the cut should carry the minimal-surface fix, not the patch.
 
 work:
+- id: w0
+  summary: "Re-validate the import chain and measure the core dependency-size baseline"
+  status: pending
+  notes: |
+    Bind the evidence this TODO rests on before changing code, and capture the
+    BEFORE baseline that the size success-metric is measured against. Re-run and
+    record a compact summary (command + PASS/FAIL + key counts) — not raw logs —
+    in this work unit's notes and the PR body:
+      - Import surface still pulls pandas (expect pandas present today):
+        `uv run -- python -c 'import benchbox, sys; print("pandas" in sys.modules)'`
+        -> expect True (this is the defect; expect False after w1).
+      - Reachable chain unchanged at the cited lines:
+        `clickhouse/client.py:11` import, `:144` sole `pd.` use;
+        `adapter_factory.py` -> `clickhouse/deployment_mode`;
+        `clickhouse/__init__.py` eager `.adapter/.client/.setup` re-export.
+      - Core dependency-size baseline:
+        `uv export --no-dev --no-emit-project | grep -cE '^(pandas|pytz|tzdata|python-dateutil|six)=='`
+        and record installed size of those wheels. Pin the measured number so
+        the "~49 MB" / "drops ~49 MB" claims are re-runnable, not asserted.
+    If any cited line has drifted, update the dependent work units before
+    starting.
+
 - id: w1
   summary: "Lazy-ize the one reachable eager pandas import in the ClickHouse client"
+  needs: [w0]
   status: pending
   notes: |
     Move `import pandas as pd` out of module scope in
@@ -136,8 +159,8 @@ work:
     pandas in isolation.
 
 verification:
-- description: "benchbox imports on a core install with pandas absent"
-  command: "uv run --isolated --no-project --with duckdb -- python -c 'import sys; sys.modules[\"pandas\"]=None; import benchbox; print(benchbox.__version__)'"
+- description: "benchbox imports with pandas made unavailable in-process"
+  command: "uv run -- python -c 'import sys; sys.modules[\"pandas\"]=None; import benchbox; print(benchbox.__version__)'"
   expected_output: "prints the version without ImportError"
 - description: "No top-level pandas import remains reachable from import benchbox"
   command: "uv run -- python -c 'import benchbox, sys; assert \"pandas\" not in sys.modules, sorted(m for m in sys.modules if \"pandas\" in m)'"
@@ -195,7 +218,7 @@ scope_limit:
 
 success_metrics:
 - "`import benchbox` succeeds on a core install with pandas not installed."
-- "`pandas` no longer appears in the resolved core dependency set; net install size drops ~49 MB for SQL-only users."
+- "`pandas` no longer appears in the resolved core dependency set; net install size drops by the w0-measured baseline (~49 MB) for SQL-only users."
 - "A CI gate fails if any future change reintroduces a top-level heavy import on the `import benchbox` surface."
 - "pandas is declared in exactly one place per role (extras), with the version floor justified."
 - "v0.3.1 is cut from a develop that carries the minimal-core fix, not the #681 patch."
