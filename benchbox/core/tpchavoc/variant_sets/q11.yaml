@@ -253,25 +253,36 @@ variants:
   description: 'Window functions: Use window functions for inventory analysis (OLAP)'
   sql: |2
 
-    select distinct
+    with inventory_values as (
+        select distinct
+            ps_partkey,
+            sum(ps_supplycost * ps_availqty) over (partition by ps_partkey) as value
+        from
+            partsupp,
+            supplier,
+            nation
+        where
+            ps_suppkey = s_suppkey
+            and s_nationkey = n_nationkey
+            and n_name = 'GERMANY'
+    ),
+    inventory_threshold as (
+        select
+            sum(ps_supplycost * ps_availqty) * 0.0001 as threshold
+        from partsupp, supplier, nation
+        where ps_suppkey = s_suppkey
+          and s_nationkey = n_nationkey
+          and n_name = 'GERMANY'
+    )
+    select
         ps_partkey,
-        sum(ps_supplycost * ps_availqty) over (partition by ps_partkey) as value,
-        rank() over (order by sum(ps_supplycost * ps_availqty) over (partition by ps_partkey) desc) as value_rank
+        value,
+        rank() over (order by value desc) as value_rank
     from
-        partsupp,
-        supplier,
-        nation
+        inventory_values,
+        inventory_threshold
     where
-        ps_suppkey = s_suppkey
-        and s_nationkey = n_nationkey
-        and n_name = 'GERMANY'
-        and sum(ps_supplycost * ps_availqty) over (partition by ps_partkey) > (
-            select sum(ps_supplycost * ps_availqty) * 0.0001
-            from partsupp, supplier, nation
-            where ps_suppkey = s_suppkey
-              and s_nationkey = n_nationkey
-              and n_name = 'GERMANY'
-        )
+        value > threshold
     order by
         value desc
 - id: 10

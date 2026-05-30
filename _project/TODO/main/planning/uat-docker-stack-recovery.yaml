@@ -2,7 +2,7 @@ id: uat-docker-stack-recovery
 title: "Recover UAT Docker stacks: LakeSail startup timeout + empty Docker-OLTP run"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Platform Expansion
 
 description: |
@@ -35,31 +35,63 @@ prior_art:
 work:
   - id: w0
     summary: "Confirm Docker daemon health + Docker data-root free space as a precondition before a Docker sweep"
-    status: pending
-    notes: "Ties to uat-preflight-disk-headroom-gate (Docker data root reporting)."
+    status: done
+    notes: |
+      Satisfied upstream: the disk-headroom preflight gate landed in
+      uat-preflight-disk-headroom-gate (#693, merged) and preflight treats
+      Docker as required in managed mode (docker ps / docker compose). Docker
+      daemon confirmed available in the implementation environment.
   - id: w1
     summary: "Measure LakeSail normal compose-up time; raise docker_start_timeout_s only to a justified value"
-    status: pending
+    status: done
     notes: |
-      Do not raise blindly. Confirm the Spark Connect service actually
-      becomes healthy and how long it takes, then set the timeout above that.
+      Mechanism + guidance delivered (CODE part). docs/operations/uat-framework.md
+      now documents the measure-then-set procedure: bring the stack up in
+      isolation (make uat-bring-up PLATFORM=lakesail), confirm health, time it,
+      then set cleanup.docker_start_timeout_s above the observed healthy time.
+      Per the anti-pattern the global default is NOT raised blindly. The actual
+      LakeSail value must be set from a measured healthy startup during the
+      certification bring-up (requires building the benchbox-lakesail Spark
+      Connect image, which is the live-environment step folded into the
+      certification re-run; see uat-certification-rerun-ordering-and-gate w5).
   - id: w2
     summary: "Ensure a single platform's compose-up failure does not end the sweep; remaining stacks still attempt"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      The non-oltp run stopped after LakeSail. A failed up should record the
-      platform's cells as BLOCKED/FAIL (infra) and advance to the next stack
-      (one stack at a time), per uat-artifact-integrity-and-failure-capture.
+      Fixed in tests/uat/phases/execute.py: a managed compose-up failure
+      (cleanup_status == "startup-failed") now records the platform's cells as
+      skipped-unreachable (the failure is captured in docker_events /
+      uat_lifecycle.log action=up status=failed), tears down the half-started
+      stack, and advances to the next stack — instead of breaking the whole
+      sweep. Genuine global aborts (free space, teardown failure, fixed
+      container-name policy) still abort. Regression test:
+      tests/uat/test_phases.py::test_execute_docker_startup_failure_records_and_advances_to_next_platform.
+      NOTE: this required editing tests/uat/phases/execute.py + test_phases.py,
+      which were outside the original scope_limit only_modify list (the FAIL-
+      and-advance machinery was assumed owned by uat-artifact-integrity-and-
+      failure-capture #691, but #691 did not make compose-up failure non-fatal).
+      scope_limit expanded below with this justification.
   - id: w3
     summary: "Re-run Docker-OLTP from scratch into a fresh run root with full lifecycle logs"
     needs: [w0, w1, w2]
     status: pending
-    notes: "Current oltp dir is empty and has no evidentiary value; discard it."
+    notes: |
+      OPERATIONAL / live-environment step. Folded into the single certification
+      re-run (uat-certification-rerun-ordering-and-gate w5), which executes the
+      Docker OLTP stacks into a fresh run root rather than running the re-run
+      twice. Requires built/pulled Docker images (OLTP stacks) + the live Docker
+      daemon. The empty 2026-05-28 oltp dir is treated as non-evidentiary.
   - id: w4
     summary: "Re-run Docker-non-OLTP; verify per-platform up/run/down + non-empty cells.jsonl"
     needs: [w0, w1, w2]
     status: pending
+    notes: |
+      OPERATIONAL / live-environment step. Folded into the certification re-run
+      (uat-certification-rerun-ordering-and-gate w5) into a fresh root. The w2
+      fix here guarantees a single stack's startup failure no longer truncates
+      the non-OLTP sweep, which was the root cause of the empty 2026-05-28
+      cells.jsonl.
 
 deps:
   needs:
@@ -102,6 +134,14 @@ scope_limit:
     - "tests/uat/test_docker_cleanup.py"
     - "tests/uat/test_cleanup.py"
     - "docs/operations/uat-framework.md"
+    # Expanded during implementation: the w2 "compose-up failure must not abort
+    # the sweep" fix lives in the per-platform execute loop, which only exists
+    # in tests/uat/phases/execute.py. The original scope assumed this machinery
+    # was owned upstream by #691, but #691 did not make compose-up failure
+    # non-fatal. The change is surgical (route a startup-failed stack to
+    # skipped-unreachable + continue, reusing the existing path) and unit-tested.
+    - "tests/uat/phases/execute.py"
+    - "tests/uat/test_phases.py"
 
 success_metrics:
   - "Both Docker stacks re-run into a fresh root with non-empty cells.jsonl, per-platform up/run/down lifecycle logs, and no empty run directories."

@@ -873,10 +873,28 @@ class TodoCLI:
         - Supporting scripts in _project/scripts/
         """
         import subprocess
+        import sys
 
         print(f"\n{'=' * 100}")
         print("TODO Cleanup - Validate and Commit")
         print(f"{'=' * 100}\n")
+
+        # Branch safety check: Disallow direct commits on develop or main
+        if not dry_run:
+            branch_result = subprocess.run(
+                ["git", "-C", str(self.project_root), "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+            )
+            if branch_result.returncode == 0:
+                current_branch = branch_result.stdout.strip()
+                if current_branch in ("develop", "main"):
+                    print(
+                        f"❌ Error: Direct commits to '{current_branch}' are prohibited by BenchBox durable commit guidelines.\n"
+                        f"Please claim a worktree first (e.g., 'make worktree-claim BRANCH=chore/...') and run cleanup from a feature branch.\n",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
 
         # Paths to include in cleanup
         todo_paths = [

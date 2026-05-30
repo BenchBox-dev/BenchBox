@@ -36,6 +36,10 @@ from benchbox.core.write_primitives.schema import (
     get_all_staging_tables_sql,
     get_create_table_sql,
 )
+from benchbox.sql_compat.rules.execution_filter.duckdb_write_primitives import (
+    DUCKDB_WRITE_PRIMITIVES_CATEGORY_SKIPS,
+    DUCKDB_WRITE_PRIMITIVES_OPERATION_SKIPS,
+)
 from benchbox.sql_compat.rules.execution_filter.postgres_write_primitives import (
     POSTGRES_WRITE_PRIMITIVES_CATEGORY_SKIPS,
     POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS,
@@ -390,6 +394,19 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 return None, (
                     f"Operation '{operation.id}' is skipped on PostgreSQL-family platforms: "
                     f"{POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS[operation.id]}"
+                )
+
+        if (platform_key or "").lower() == "duckdb":
+            category = getattr(operation, "category", "")
+            if category in DUCKDB_WRITE_PRIMITIVES_CATEGORY_SKIPS:
+                return None, (
+                    f"Operation '{operation.id}' is skipped on DuckDB: "
+                    f"{DUCKDB_WRITE_PRIMITIVES_CATEGORY_SKIPS[category]}"
+                )
+            if operation.id in DUCKDB_WRITE_PRIMITIVES_OPERATION_SKIPS:
+                return None, (
+                    f"Operation '{operation.id}' is skipped on DuckDB: "
+                    f"{DUCKDB_WRITE_PRIMITIVES_OPERATION_SKIPS[operation.id]}"
                 )
 
         effective_sql = operation.write_sql
@@ -851,7 +868,25 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         """
         normalized: dict[str, dict[str, Any]] = {}
 
+        # The 8 base TPC-H tables (fixed by the spec) plus the write-primitives
+        # staging tables. Anything else in TABLES (e.g. operation-created sketch
+        # tables) is created at execution time, not loaded, so it is excluded.
+        loadable_table_names = {
+            "region",
+            "nation",
+            "customer",
+            "supplier",
+            "part",
+            "partsupp",
+            "orders",
+            "lineitem",
+            *STAGING_TABLES.keys(),
+        }
+
         for table_name, table_def in TABLES.items():
+            if table_name not in loadable_table_names:
+                continue
+
             # Write Primitives staging tables are already dict-shaped.
             if isinstance(table_def, dict) and "columns" in table_def:
                 normalized[table_name] = table_def

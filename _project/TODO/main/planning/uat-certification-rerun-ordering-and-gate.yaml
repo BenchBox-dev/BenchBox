@@ -2,7 +2,7 @@ id: uat-certification-rerun-ordering-and-gate
 title: "UAT certification re-run: enforce ordering, fresh root, and an explicit approval gate"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
@@ -41,30 +41,55 @@ prior_art:
 work:
   - id: w1
     summary: "Author/refresh the certification config(s) cloned from a template: scales 0.01/0.1/1 (non-OLTP), 0.01 (OLTP), recorded seed, fresh run root"
-    status: pending
+    status: done
+    notes: |
+      Three stage-ordered configs cloned from uat-enabled-platforms-full.yaml:
+      certification-01-native-dataframe.yaml (groups sql+dataframe, 0.01/0.1/1),
+      certification-02-docker-nonoltp.yaml (docker-fast, 0.01/0.1/1),
+      certification-03-docker-oltp.yaml (docker-slow, 0.01). Numeric prefixes +
+      runbook encode the run order. Fresh-root + recorded-seed are documented in
+      the configs and runbook (config schema has no seed field; the operator
+      records BENCHBOX_SEED). Validated in tests/uat/test_config.py.
   - id: w2
     summary: "Add an ordering assertion/lint: native completes before any Docker stack starts, provable from lifecycle logs"
-    status: pending
+    status: done
     notes: |
-      Each sweep config is a separate invocation, so enforce via a documented
-      runbook ordering plus a lightweight check (e.g. a helper that verifies
-      no Docker action=up precedes the last native cell across the run set).
+      report.parse_docker_up_events + report.certification_ordering_violations:
+      parse Docker action=up timestamps from each stage's uat_lifecycle.log and
+      flag any that precede the native+dataframe completion boundary. Stage 1 is
+      Docker-free (docker_manage_platforms=false), so it emits no action=up
+      events. Tested in tests/uat/test_report.py. Cross-stage order is also
+      enforced by the runbook (separate sequential invocations).
   - id: w3
     summary: "Encode the APPROVE/HOLD gate as a checklist + optional report teeth (cross_scale_coverage_min_pairs)"
     needs: [w1]
-    status: pending
+    status: done
+    notes: |
+      cross_scale_coverage_min_pairs armed in all three configs (report-phase
+      teeth: a floor breach forces a non-zero report exit). APPROVE/HOLD
+      checklist written in the runbook.
   - id: w4
     summary: "Write the certification runbook section in docs/operations/uat-framework.md"
     needs: [w1, w2, w3]
-    status: pending
+    status: done
+    notes: |
+      "Certification re-run" section added: four-stage ordering, fresh root +
+      seed, one-stack-at-a-time, measure-then-set Docker timeout, the ordering-
+      check snippet, the cross-scale teeth, and the APPROVE/HOLD gate checklist.
   - id: w5
     summary: "Execute the full certification re-run into a fresh root and confirm every config reaches the report phase"
     needs: [w4]
     status: pending
     notes: |
+      OPERATIONAL / live-environment sign-off step (deferred; not runnable in the
+      implementation sandbox). Requires all platforms incl. built/pulled Docker
+      stacks (LakeSail Spark image etc.) and a long multi-stage sweep. This is
+      where uat-docker-stack-recovery w3/w4 (the Docker re-runs) are executed.
       Required terminal artifacts per run: cells.jsonl, compatibility_pruned.jsonl,
       resume.json (if aborted), matrix_summary.tsv, validator_rollup.tsv,
-      uat_lifecycle.log, final report with COMPLETED footer + commit SHA.
+      uat_lifecycle.log, final report with COMPLETED footer + commit SHA. The
+      code scaffolding (configs, ordering check, gate teeth, runbook) is in place
+      so this becomes a run-and-evaluate step.
 
 deps:
   needs:

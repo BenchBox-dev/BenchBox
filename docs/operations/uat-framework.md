@@ -277,6 +277,25 @@ parallel platforms contaminate timings. The framework hard-rejects
 `execute.parallel_platforms: true` at config load time; do not work
 around this.
 
+### Managed Docker startup failures are non-fatal
+
+A managed Docker compose-up failure (e.g. a heavy stack exceeding
+`cleanup.docker_start_timeout_s`) is treated as a per-platform
+infrastructure failure, not a sweep abort. The failure is recorded in
+`uat_lifecycle.log` (`action=up status=failed`), the platform's cells are
+recorded as skipped-unreachable, the half-started stack is torn down, and
+the sweep advances to the next stack — one stack at a time. Genuine global
+aborts (disk free-space, teardown failure, fixed `container_name` policy)
+still stop the sweep.
+
+Setting `docker_start_timeout_s` for a slow stack (e.g. LakeSail Spark
+Connect): **measure a healthy startup first, then set the timeout above it.**
+Bring the stack up in isolation (`make uat-bring-up PLATFORM=lakesail`),
+confirm the service becomes healthy, time it, and set
+`cleanup.docker_start_timeout_s` to a value comfortably above the observed
+healthy time. Do not raise it blindly — a longer timeout on a broken service
+just wastes the timeout window each attempt.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
@@ -285,8 +304,70 @@ around this.
 | Mid-sweep execute aborts on disk | free space fell below `preflight.free_space_min_gib` after a platform | inspect `uat_lifecycle.log`; increase space or reduce the matrix before resuming |
 | Skipped-unreachable platforms | local Docker / TCP services not running and Docker is externally managed | `docker compose up` for the relevant services, or set `execute.skip_unreachable: false` to surface as failures |
 | Docker daemon unavailable in managed mode | `cleanup.docker_manage_platforms: true` requires `docker ps` and `docker compose` | start Docker Desktop/daemon; preflight treats Docker as required in managed mode |
-| Compose stack startup timeout | image pull/build or healthcheck exceeded `cleanup.docker_start_timeout_s` | inspect the compose logs and raise the timeout only after confirming the service is healthy |
+| Compose stack startup timeout | image pull/build or healthcheck exceeded `cleanup.docker_start_timeout_s` | the sweep records the stack as failed and advances (see "Managed Docker startup failures are non-fatal"); inspect compose logs and raise the timeout only after measuring a healthy startup |
 | Cleanup command failed | UAT-owned `docker compose down ...` returned non-zero | inspect `uat_lifecycle.log`, then run the logged command manually if safe |
 | Fixed `container_name` collision | a compose file declares a global container name already in use | stop the conflicting developer stack or keep that platform external-only until the compose file is fixed |
 | Validator clean rate breaches floor | bundle quality regression | run `make uat-validate` standalone; it validates via `benchbox.validation.bundle` and writes the rollup TSV |
 | Make target missing | new release not synced | `make worktree-pool-status` to check pool freshness |
+
+## Certification re-run
+
+A certification sweep produces the sign-off evidence (a COMPLETED report per
+config with a commit SHA). It runs in four stages, in this order, so that all
+native and dataframe platforms finish before any Docker stack starts — the
+ordering the 2026-05-28/29 evidence violated.
+
+Stages (run each to completion before starting the next):
+
+1. **Native SQL + dataframe** — `tests/uat/configs/certification-01-native-dataframe.yaml` (scales 0.01/0.1/1)
+2. **Docker non-OLTP** — `tests/uat/configs/certification-02-docker-nonoltp.yaml` (scales 0.01/0.1/1)
+3. **Docker OLTP** — `tests/uat/configs/certification-03-docker-oltp.yaml` (scale 0.01)
+
+(Stage 1 covers certification stages 1–2 of the contract — native SQL then
+dataframe — in a single Docker-free sweep; stages 2 and 3 are the Docker tiers.)
+
+Run rules:
+
+- Use a **fresh run root** under `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`;
+  never resume into the failed 2026-05-28/29 dirs (they are non-evidentiary).
+- Record the run **seed** (`BENCHBOX_SEED`) in the certification log.
+- One platform / one Docker stack at a time (`execute.parallel_platforms` is
+  hard-rejected). A single Docker stack's compose-up failure records FAIL and
+  the sweep advances; it does not truncate the run.
+- For slow Docker stacks (e.g. LakeSail), set `cleanup.docker_start_timeout_s`
+  from a measured healthy startup (see "Managed Docker startup failures are
+  non-fatal") before the stage-2 run.
+
+Ordering check: after the runs, capture the stage-1 completion timestamp (the
+last line of stage 1's `uat_lifecycle.log`, or the stage-1 run-dir completion
+time) and verify no Docker stack came up earlier:
+
+```python
+from tests.uat.phases.report import certification_ordering_violations
+violations = certification_ordering_violations(
+    [open(stage2_lifecycle_log).read(), open(stage3_lifecycle_log).read()],
+    native_stage_completed_at=stage1_completed_at,
+)
+assert not violations, violations
+```
+
+`cross_scale_coverage_min_pairs` in each config is the report-phase teeth: a
+breach forces a non-zero report exit, so a partial or regressed sweep cannot be
+APPROVED. Tune the value to the certified pair count during bring-up.
+
+### APPROVE / HOLD gate
+
+APPROVE only if **all** of the following hold for every config:
+
+- [ ] The run reached the **report** phase with a `# run_status=COMPLETED`
+      footer carrying a `source_commit_sha` (and `source_dirty=false`).
+- [ ] `matrix_summary.tsv` and `validator_rollup.tsv` exist and are non-empty.
+- [ ] Every required, non-pruned cell **passed**; `cross_scale_coverage_min_pairs`
+      is met (no floor breach).
+- [ ] The ordering check returns no violations (no Docker `action=up` before
+      native + dataframe completion).
+- [ ] DuckDB (the reference) is green or its cells are explicitly pruned.
+
+HOLD if **any** of: missing manifests, missing commit SHA, a DuckDB reference
+failure, a Docker zero-cell run, a hung platform, or a `NO_JSON` cell without
+captured error text.

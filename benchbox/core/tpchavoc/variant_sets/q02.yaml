@@ -215,7 +215,7 @@ variants:
 
     with min_costs as (
         select
-            ps_partkey,
+            ps_partkey as min_ps_partkey,
             min(ps_supplycost) as min_cost
         from
             partsupp,
@@ -254,7 +254,7 @@ variants:
         and s_nationkey = n_nationkey
         and n_regionkey = r_regionkey
         and r_name = 'EUROPE'
-        and p_partkey = mc.ps_partkey
+        and p_partkey = mc.min_ps_partkey
         and ps_supplycost = mc.min_cost
     order by
         s_acctbal desc,

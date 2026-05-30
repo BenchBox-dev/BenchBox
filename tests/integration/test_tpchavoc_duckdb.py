@@ -197,3 +197,41 @@ class TestTPCHavocDuckDBIntegration:
                 assert query_text.count("(") == query_text.count(")"), (
                     f"Q{query_id}.{variant_id} should have balanced parentheses"
                 )
+
+    def test_duckdb_regression_variants_explain(self, tpchavoc, duckdb_conn):
+        """Previously failing DuckDB TPC-Havoc variants should parse and bind."""
+        for statement in tpchavoc.get_create_tables_sql(dialect="duckdb").strip().split(";"):
+            if statement.strip():
+                duckdb_conn.execute(statement.strip())
+
+        regression_variants = [
+            "2_v5",
+            "5_v9",
+            "7_v9",
+            "9_v9",
+            "10_v8",
+            "10_v9",
+            "11_v9",
+            "13_v9",
+            "17_v2",
+            "17_v4",
+        ]
+        for query_id in regression_variants:
+            duckdb_conn.execute(f"EXPLAIN {tpchavoc.get_query(query_id)}")
+
+    def test_q10_v8_exists_correlates_to_outer_lineitem(self, tpchavoc, duckdb_conn):
+        """10_v8's EXISTS must correlate to the outer lineitem, not self-bind to l2.
+
+        The unqualified form (`l2.l_orderkey = l_orderkey`) silently bound to the
+        inner alias, turning a semi-join into an uncorrelated full scan that hung
+        DuckDB at SF1. The qualified form must decorrelate into a semi-join.
+        """
+        for statement in tpchavoc.get_create_tables_sql(dialect="duckdb").strip().split(";"):
+            if statement.strip():
+                duckdb_conn.execute(statement.strip())
+
+        sql = tpchavoc.get_query("10_v8")
+        assert "l2.l_orderkey = lineitem.l_orderkey" in sql, "EXISTS must correlate to the outer lineitem"
+
+        plan = duckdb_conn.execute(f"EXPLAIN {sql}").fetchall()[0][1]
+        assert "SEMI" in plan.upper(), "EXISTS should decorrelate into a semi-join, not a self-referential scan"

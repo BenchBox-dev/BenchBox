@@ -545,6 +545,81 @@ def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
     assert commands == ["up:clickhouse-server", "down:clickhouse-server"]
 
 
+def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tmp_path):
+    """A managed compose-up failure must not truncate the sweep.
+
+    Regression for uat-docker-stack-recovery: the 2026-05-28 non-OLTP run ended
+    after the LakeSail compose-up timed out, so no other stack ran. A failed
+    `up` should record the platform's cells (the failure is captured in
+    docker_events / uat_lifecycle.log) and advance to the next stack, one stack
+    at a time. Only genuine global aborts (free space, teardown failure, fixed
+    container-name policy) may stop the sweep.
+    """
+    cfg = validate_config(
+        {
+            "name": "docker startup failure",
+            "platforms": {"include": ["clickhouse-server", "postgresql"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    sequence: list[tuple[str, str, str]] = []
+
+    def fake_docker(argv, **kwargs):
+        action = "up" if "up" in argv else "down"
+        platform = _docker_platform_from_argv(argv)
+        sequence.append(("docker", action, platform))
+        # clickhouse-server compose-up fails (e.g. start timeout); others succeed.
+        if action == "up" and platform == "clickhouse-server":
+            return docker_assets.DockerCommandResult(
+                tuple(argv), 1, "", "docker command timed out after 300s", timed_out=True
+            )
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def recording_runner(platform, benchmark, scale, **kwargs):
+        sequence.append(("cell", "run", platform))
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=tmp_path / f"{platform}.log",
+            result_path=None,
+        )
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=recording_runner,
+            docker_runner=fake_docker,
+            free_space_checks_enabled=True,
+            free_space_reader=lambda _path: 100.0,
+        )
+
+    # The sweep is NOT aborted by one stack's startup failure.
+    assert outcome.aborted is False
+    # The failed stack ran no cells but was still torn down; the next stack ran.
+    assert sequence == [
+        ("docker", "up", "clickhouse-server"),
+        ("docker", "down", "clickhouse-server"),
+        ("docker", "up", "postgresql"),
+        ("cell", "run", "postgresql"),
+        ("docker", "down", "postgresql"),
+    ]
+    # The failed platform's cells are recorded as unreachable (not silently dropped),
+    # and the compose-up failure is captured in the lifecycle events.
+    assert any(cell.platform == "clickhouse-server" for cell in outcome.skipped_unreachable)
+    assert any(
+        event.platform == "clickhouse-server" and event.action == "up" and event.status == "failed"
+        for event in outcome.docker_events
+    )
+
+
 def test_execute_unmanaged_docker_keeps_skip_probe_without_commands(tmp_path):
     cfg = validate_config(
         {
