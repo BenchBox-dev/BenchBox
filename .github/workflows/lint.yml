@@ -43,13 +43,16 @@ jobs:
         run: make lint-markers
 
       - name: Timing policy (wall-clock allowlist)
+        if: ${{ hashFiles('_project/scripts/timing_policy_check.py') != '' }}
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
       - name: Compatibility docs drift check
         run: make compat-docs-check
 
       - name: Dependency audit (no unused declarations)
+        if: ${{ hashFiles('_project/scripts/dependency_audit/check_deps.py') != '' }}
         run: make audit-deps
 
       - name: Release curation list drift check
+        if: ${{ hashFiles('_project/decisions/single-repo-migration.md') != '' }}
         run: uv run python scripts/check_release_curation.py

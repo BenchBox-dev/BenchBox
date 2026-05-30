@@ -236,7 +236,7 @@ class TestMakefileCommands:
         assert "flaky:" in pytest_ci_content
         assert "local_only:" in pytest_ci_content
         assert "source = benchbox" in pytest_ci_content
-        assert "--cov-config=.coveragerc_core" in pytest_ci_addopts
+        assert "--cov-config=.coveragerc_core" not in pytest_ci_addopts
         assert _marker_names(repo_root / "pytest.ini") <= _marker_names(repo_root / "pytest-ci.ini")
 
     def test_coverage_threshold_policy_distinguishes_blocking_and_advisory_thresholds(self):

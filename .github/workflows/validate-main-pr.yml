@@ -51,6 +51,12 @@ jobs:
           git fetch --prune origin develop
           git fetch --prune origin \
             "+refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/origin/pr-${{ github.event.pull_request.number }}-head"
+          if [ ! -f scripts/release_readiness_check.py ] || [ ! -f scripts/ruleset_drift_check.py ]; then
+            echo "::warning::main does not yet have release-readiness scripts; bootstrapping them from the release PR head."
+            git checkout "refs/remotes/origin/pr-${{ github.event.pull_request.number }}-head" -- \
+              scripts/release_readiness_check.py \
+              scripts/ruleset_drift_check.py
+          fi
 
       - name: Check release canary freshness
         id: release-readiness

@@ -43,8 +43,8 @@ def test_ci_profile_includes_full_instrumentation():
     addopts = _tokenize_addopts(section["addopts"])
 
     # Coverage source/branch flags live in Makefile targets (coverage-fast, coverage-all, test-ci)
-    # so each target controls its own scope. The profile still wires up the coverage config and JUnit.
-    assert "--cov-config=.coveragerc_core" in addopts
+    # so each target controls its own scope. The release profile keeps JUnit output but avoids
+    # depending on curated developer-only coverage config files.
     assert "--junit-xml=test-results.xml" in section["addopts"]
     assert "no:cov" not in addopts
 

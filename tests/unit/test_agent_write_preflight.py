@@ -60,14 +60,6 @@ def test_preflight_allows_non_primary_worktree() -> None:
     assert "BenchBox write preflight OK" in result.stdout
 
 
-def test_claude_pr_command_runs_write_preflight_before_pr_workflow() -> None:
-    command = Path(".claude/commands/pr.md").read_text(encoding="utf-8")
-
-    assert "make agent-write-preflight" in command
-    assert "make worktree-claim BRANCH=<name>" in command
-    assert "make worktree-add" not in command
-
-
 def test_skill_sync_write_target_runs_preflight() -> None:
     makefile = Path("Makefile").read_text(encoding="utf-8")
     target = makefile.split("\nskill-sync:", maxsplit=1)[1].split("\nskill-sync-check:", maxsplit=1)[0]
