@@ -41,7 +41,7 @@ def _valid_submission_bundle() -> dict:
         },
         "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 0.01},
         "platform": {"name": "duckdb", "version": "1.3.0"},
-        "summary": {"queries": {"total": 1, "passed": 1, "failed": 0}},
+        "summary": {"validation": "passed", "queries": {"total": 1, "passed": 1, "failed": 0}},
         "queries": [{"id": "Q1", "ms": 123, "status": "pass"}],
     }
 
@@ -266,146 +266,27 @@ def test_submit_dry_run_validation_rejects_pr_package_errors(monkeypatch: pytest
 
 
 # ---------------------------------------------------------------------------
-# 4d. w10: dry-run still emits preview when validate_submission.py is missing
-#     w11: dry-run never loads/executes a scripts/validate_submission.py from
-#          an arbitrary current working directory (security regression)
+# 4d. Dry-run validation uses the packaged library, not a cwd-loadable script.
 # ---------------------------------------------------------------------------
 
 
-def test_submit_dry_run_soft_warns_when_validator_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """w10 regression: when ``scripts/validate_submission.py`` is not packaged
-    (typical for wheel installs), dry-run downgrades to a soft warning and
-    still prints its preview output."""
-    src = tmp_path / "tpch_duckdb.json"
-    _write_valid_submission_bundle(src)
-    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
-
-    def _raise_missing() -> None:
-        raise FileNotFoundError("scripts/validate_submission.py not found")
-
-    monkeypatch.setattr(sub, "_load_submission_validator_module", _raise_missing)
-
-    out_dir = tmp_path / "submission"
-    result = CliRunner().invoke(sub.submit, [str(src), "--dry-run", "--output", str(out_dir)])
-
-    assert result.exit_code == 0, result.output
-    assert "Dry-run preview without schema validation" in result.output
-    assert "Dry-run preview" in result.output
-    assert not out_dir.exists()
-
-
-def test_load_submission_validator_module_does_not_execute_cwd_sentinel(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """w11 security regression (runtime): call the real loader with a
-    controlled package-relative path that does not exist, plus a sentinel
-    ``scripts/validate_submission.py`` planted in cwd. Pre-fix the loader
-    iterated ``[repo_root/scripts/..., Path.cwd()/scripts/...]`` and would
-    have ``exec_module``'d the sentinel. Post-fix it raises FileNotFoundError
-    without touching cwd.
-
-    The original w11 regression test monkeypatched the loader itself, which
-    short-circuited every code path under test — it could not detect a
-    re-introduced cwd fallback. This test exercises the loader directly.
-    """
-    cwd_scripts = tmp_path / "scripts"
-    cwd_scripts.mkdir()
-    sentinel = cwd_scripts / "validate_submission.py"
-    marker = tmp_path / "cwd_sentinel_was_executed"
-    # The sentinel writes a marker file when imported; if the loader had a cwd
-    # fallback it would exec this and the marker would appear. SystemExit
-    # alone isn't a deterministic signal because pytest captures it.
-    sentinel.write_text(
-        f"from pathlib import Path\n"
-        f"Path({str(marker)!r}).write_text('executed')\n"
-        f"raise SystemExit('CWD_VALIDATOR_EXECUTED')\n",
-        encoding="utf-8",
-    )
-    monkeypatch.chdir(tmp_path)
-
-    # Redirect the loader's `Path(__file__).resolve().parents[3]` resolution
-    # to a directory with no `scripts/validate_submission.py`. This forces
-    # the function to take the "not found" branch via a real call.
-    empty_root = tmp_path / "empty_repo_root"
-    fake_module_file = empty_root / "benchbox" / "cli" / "commands" / "submit.py"
-    fake_module_file.parent.mkdir(parents=True)
-    fake_module_file.write_text("# placeholder\n", encoding="utf-8")
-    monkeypatch.setattr(sub, "__file__", str(fake_module_file))
-
-    with pytest.raises(FileNotFoundError, match="scripts/validate_submission.py not found"):
-        sub._load_submission_validator_module()
-
-    assert not marker.exists(), (
-        "loader executed cwd-relative validate_submission.py — w11 regression. "
-        "The fix in PR #175 dropped the Path.cwd() candidate; if this assertion "
-        "fires, a cwd-derived path has come back into the loader."
-    )
-
-
-def test_submit_dry_run_does_not_execute_cwd_validator(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """w11 defense-in-depth (integration): even if the loader-level guard
-    were bypassed, ``benchbox submit --dry-run`` itself must never execute a
-    cwd-relative ``scripts/validate_submission.py``. This test stubs the
-    loader to raise FileNotFoundError and verifies that the surrounding
-    dry-run flow does not have any *other* code path that touches cwd.
-
-    Note: the loader-level regression is covered by
-    ``test_load_submission_validator_module_does_not_execute_cwd_sentinel``;
-    this test is a sibling integration check. The original test by this name
-    (in PR #175) was relabelled — it is actually a soft-warn integration
-    check, not a loader regression test.
-    """
-    src = tmp_path / "tpch_duckdb.json"
-    _write_valid_submission_bundle(src)
-    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
-
-    cwd_scripts = tmp_path / "scripts"
-    cwd_scripts.mkdir()
-    sentinel = cwd_scripts / "validate_submission.py"
-    sentinel.write_text(
-        "import sys\nsys.stderr.write('CWD_VALIDATOR_EXECUTED\\n')\nraise SystemExit('CWD_VALIDATOR_EXECUTED')\n",
-        encoding="utf-8",
-    )
-
-    def _force_missing(*_args, **_kwargs):
-        raise FileNotFoundError("scripts/validate_submission.py not found at <repo>")
-
-    monkeypatch.setattr(sub, "_load_submission_validator_module", _force_missing)
-    monkeypatch.chdir(tmp_path)
-
-    out_dir = tmp_path / "submission"
-    result = CliRunner().invoke(sub.submit, [str(src), "--dry-run", "--output", str(out_dir)])
-
-    assert result.exit_code == 0, result.output
-    assert "CWD_VALIDATOR_EXECUTED" not in result.output
-    assert "Dry-run preview" in result.output
-    assert not out_dir.exists()
-
-
-def test_submission_validator_loader_does_not_fall_back_to_cwd() -> None:
-    """w11 security regression (static contract check):
-    ``_load_submission_validator_module`` must never consult any cwd-derived
-    path as a fallback. Runtime coverage lives in
-    ``test_load_submission_validator_module_does_not_execute_cwd_sentinel``;
-    this is a fast belt-and-suspenders guard against literal regressions.
-
-    Matches several common shapes that would re-introduce the cwd surface:
-    ``Path.cwd``, ``os.getcwd``, ``os.environ["PWD"]``, ``os.getenv("PWD")``,
-    and ``Path("")`` resolution. Add new shapes here if review surfaces them.
-    """
+def test_submit_dry_run_validator_is_packaged_library() -> None:
     import inspect
     import re
 
-    source = inspect.getsource(sub._load_submission_validator_module)
+    assert not hasattr(sub, "_load_submission_validator_module")
+    source = inspect.getsource(sub._validate_submission_bundle_for_dry_run)
     forbidden_patterns = [
+        r"importlib",
         r"\bPath\.cwd\b",
         r"\bos\.getcwd\b",
         r"""os\.environ\[\s*['"]PWD['"]\s*\]""",
         r"""os\.getenv\(\s*['"]PWD['"]""",
         r"""Path\(\s*['"]['"]\s*\)""",
+        r"validate_submission\.py",
     ]
     for pattern in forbidden_patterns:
-        assert not re.search(pattern, source), f"loader regressed — matched forbidden cwd-derived shape /{pattern}/"
+        assert not re.search(pattern, source), f"validator loader regressed — matched /{pattern}/"
 
 
 # ---------------------------------------------------------------------------

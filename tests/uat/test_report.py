@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 from pathlib import Path
 
 import pytest
@@ -56,6 +57,32 @@ def test_write_report_counts(tmp_path: Path):
     text = (tmp_path / "out.tsv").read_text()
     assert text.startswith(report.REPORT_HEADER)
     assert "candidates=6 executed=3 compatibility_pruned=2 early_stop_pruned=1" in text
+    assert "# run_status=COMPLETED" in text
+
+
+def test_write_report_records_terminal_state_and_source_footer(tmp_path: Path):
+    source_info = type("SourceInfo", (), {"commit_sha": "abc123", "dirty": True})()
+    cell = _cell("duckdb", "write_primitives", 0.01, status="failed")
+
+    summary = report.write_report(
+        [cell],
+        output_path=tmp_path / "out.tsv",
+        source_info=source_info,
+        run_status="ABORTED",
+        abort_phase="execute",
+        abort_reason="free space\nfloor",
+    )
+
+    text = (tmp_path / "out.tsv").read_text(encoding="utf-8")
+    lines = text.splitlines()
+    assert "terminal_state" in lines[0].split("\t")
+    assert "source_commit_sha" in lines[0].split("\t")
+    assert "failed\tno_json_nonzero\t" in lines[1]
+    assert "abc123\ttrue" in lines[1]
+    assert "# run_status=ABORTED source_commit_sha=abc123 source_dirty=true" in text
+    assert "abort_phase=execute" in text
+    assert "abort_reason=free space floor" in text
+    assert summary.exit_code() == 2
 
 
 def test_cross_scale_clean_counts_full_ladder():
@@ -132,3 +159,47 @@ def test_cross_scale_validator_status_normalizes_lookup_paths(tmp_path: Path, mo
     )
 
     assert n == 0
+
+
+# ---------------------------------------------------------------------------
+# Certification re-run ordering check.
+# ---------------------------------------------------------------------------
+
+_NATIVE_LOG = """2026-05-30T01:00:00 [report] native+dataframe stage complete
+"""
+
+_DOCKER_LOG_OK = """2026-05-30T02:00:00 [docker] platform=lakesail action=up status=ok project=benchbox-uat-cert-lakesail command=['docker'] message=started
+2026-05-30T02:30:00 [docker] platform=lakesail action=down status=ok project=benchbox-uat-cert-lakesail command=['docker'] message=removed
+2026-05-30T02:31:00 [docker] platform=clickhouse-server action=up status=ok project=benchbox-uat-cert-ch command=['docker'] message=started
+"""
+
+_DOCKER_LOG_EARLY = """2026-05-30T00:30:00 [docker] platform=cedardb action=up status=ok project=benchbox-uat-cert-cedardb command=['docker'] message=started
+"""
+
+
+def test_parse_docker_up_events_extracts_timestamp_and_platform():
+    events = report.parse_docker_up_events(_DOCKER_LOG_OK)
+    # Only `action=up` lines are returned (the `action=down` line is ignored).
+    assert [p for _, p in events] == ["lakesail", "clickhouse-server"]
+    assert all(isinstance(ts, _dt.datetime) for ts, _ in events)
+
+
+def test_parse_docker_up_events_ignores_non_docker_and_garbage_lines():
+    assert report.parse_docker_up_events(_NATIVE_LOG) == []
+    assert report.parse_docker_up_events("not-a-timestamp [docker] action=up platform=x") == []
+
+
+def test_certification_ordering_no_violation_when_docker_starts_after_native():
+    boundary = _dt.datetime(2026, 5, 30, 1, 0, 0)
+    violations = report.certification_ordering_violations([_DOCKER_LOG_OK], native_stage_completed_at=boundary)
+    assert violations == []
+
+
+def test_certification_ordering_flags_docker_up_before_native_completion():
+    boundary = _dt.datetime(2026, 5, 30, 1, 0, 0)
+    violations = report.certification_ordering_violations(
+        [_DOCKER_LOG_EARLY, _DOCKER_LOG_OK], native_stage_completed_at=boundary
+    )
+    assert len(violations) == 1
+    assert "cedardb" in violations[0]
+    assert "at/before native+dataframe stage completion" in violations[0]

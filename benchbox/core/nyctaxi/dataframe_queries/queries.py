@@ -1,28 +1,11 @@
-"""NYC Taxi DataFrame query implementations.
-
-All 25 NYC Taxi benchmark queries implemented for both Expression and Pandas families.
-
-Categories:
-- Temporal (Q1-Q4): Time-based aggregations (hourly, daily, monthly, day-of-week)
-- Geographic (Q5-Q8): Zone-based analytics with LEFT JOIN to taxi_zones
-- Financial (Q9-Q12): Revenue, tip, fare, surcharge analysis
-- Characteristics (Q13-Q15): Distance, passenger, duration distributions
-- Rates (Q16-Q17): Rate code and airport trip analysis
-- Vendor (Q18): Vendor comparison
-- Complex (Q19-Q22): Multi-dimensional analytics (heatmap, weekday/weekend, rush hour, YoY)
-- Point (Q23-Q24): Single-day summary, zone detail
-- Baseline (Q25): Full scan count
-
-Schema: trips fact table with optional LEFT JOIN to taxi_zones dimension.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+"""NYC Taxi DataFrame query implementations."""
 
 from __future__ import annotations
 
+from csv import reader
 from typing import Any
+
+import numpy as np
 
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
@@ -30,266 +13,348 @@ from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from .parameters import get_parameters
 from .registry import register_query
 
-# =============================================================================
-# Temporal Aggregations (Q1-Q4)
-# =============================================================================
+
+def _items(value: str) -> list[str]:
+    return [item for item in value.split(",") if item]
 
 
-def q1_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q1: Trips per hour - EXTRACT(HOUR) grouping."""
-    params = get_parameters("Q1")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
+def _date_bounds(query_id: str, default_start: str, default_end: str) -> tuple[Any, Any]:
+    params = get_parameters(query_id)
+    return params.get("start_date", default_start), params.get("end_date", default_end)
 
+
+def _expression_window(
+    ctx: DataFrameContext, query_id: str, start: str, end: str, extra: Any = None
+) -> tuple[Any, Any, Any]:
+    start_date, end_date = _date_bounds(query_id, start, end)
+    col, lit = ctx.col, ctx.lit
+    condition = (col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date))
+    if extra is not None:
+        extras = extra(col, lit)
+        for extra_condition in extras if isinstance(extras, tuple) else (extras,):
+            condition = condition & extra_condition
+    return ctx.get_table("trips").filter(condition), col, lit
+
+
+def _pandas_window(
+    ctx: DataFrameContext, query_id: str, start: str, end: str, *, copy: bool = False, extra: Any = None
+) -> Any:
+    start_date, end_date = _date_bounds(query_id, start, end)
     trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
+    condition = (trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)
+    if extra is not None:
+        condition &= extra(trips)
+    filtered = trips[condition]
+    return filtered.copy() if copy else filtered
 
+
+def _expression_top_zone(ctx: DataFrameContext, query_id: str, location_col: str) -> Any:
+    trips, col, _ = _expression_window(ctx, query_id, "2019-01-01", "2019-01-31")
     return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .with_columns(col("pickup_datetime").dt.hour().alias("hour"))
-        .group_by("hour")
-        .agg(col("hour").count().alias("trip_count"))
-        .sort("hour")
+        trips.join(ctx.get_table("taxi_zones"), left_on=location_col, right_on="location_id", how="left")
+        .group_by(location_col, "zone", "borough")
+        .agg(col(location_col).count().alias("trip_count"))
+        .sort("trip_count", descending=True)
+        .limit(20)
     )
 
 
-def q1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q1: Trips per hour - EXTRACT(HOUR) grouping."""
-    params = get_parameters("Q1")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)].copy()
-    filtered["hour"] = filtered["pickup_datetime"].dt.hour
-    return filtered.groupby(["hour"], as_index=False).agg(trip_count=("hour", "count")).sort_values("hour")
-
-
-def q2_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q2: Trips per day - DATE_TRUNC('day') grouping."""
-    params = get_parameters("Q2")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-12-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
+def _pandas_top_zone(ctx: DataFrameContext, query_id: str, location_col: str) -> Any:
+    merged = _pandas_window(ctx, query_id, "2019-01-01", "2019-01-31").merge(
+        ctx.get_table("taxi_zones"), left_on=location_col, right_on="location_id", how="left"
+    )
     return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .with_columns(col("pickup_datetime").dt.truncate("1d").alias("day"))
-        .group_by("day")
-        .agg(col("day").count().alias("trip_count"))
-        .sort("day")
+        merged.groupby([location_col, "zone", "borough"], as_index=False)
+        .agg(trip_count=(location_col, "count"))
+        .sort_values("trip_count", ascending=False)
+        .head(20)
     )
 
 
-def q2_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q2: Trips per day - DATE_TRUNC('day') grouping."""
-    params = get_parameters("Q2")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-12-31")
+def _expression_trip_summary(ctx: DataFrameContext, query_id: str, end: str, group_col: str, *, tip: bool) -> Any:
+    trips, col, _ = _expression_window(ctx, query_id, "2019-01-01", end)
+    aggs = [
+        col(group_col).count().alias("trip_count"),
+        col("trip_distance").mean().alias("avg_distance"),
+        col("total_amount").mean().alias("avg_fare"),
+    ]
+    if tip:
+        aggs.append(col("tip_amount").mean().alias("avg_tip"))
+    aggs.append(col("total_amount").sum().alias("total_revenue"))
+    return trips.group_by(group_col).agg(*aggs).sort("trip_count", descending=True)
 
-    trips = ctx.get_table("trips")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)].copy()
-    filtered["day"] = filtered["pickup_datetime"].dt.floor("D")
-    return filtered.groupby(["day"], as_index=False).agg(trip_count=("day", "count")).sort_values("day")
 
-
-def q3_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q3: Trips and revenue per month."""
-    params = get_parameters("Q3")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-12-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
+def _pandas_trip_summary(ctx: DataFrameContext, query_id: str, end: str, group_col: str, *, tip: bool) -> Any:
+    aggs = {
+        "trip_count": (group_col, "count"),
+        "avg_distance": ("trip_distance", "mean"),
+        "avg_fare": ("total_amount", "mean"),
+    }
+    if tip:
+        aggs["avg_tip"] = ("tip_amount", "mean")
+    aggs["total_revenue"] = ("total_amount", "sum")
     return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .with_columns(col("pickup_datetime").dt.truncate("1mo").alias("month"))
-        .group_by("month")
-        .agg(
-            col("month").count().alias("trip_count"),
-            col("total_amount").sum().alias("total_revenue"),
-        )
-        .sort("month")
+        _pandas_window(ctx, query_id, "2019-01-01", end)
+        .groupby([group_col], as_index=False)
+        .agg(**aggs)
+        .sort_values("trip_count", ascending=False)
     )
 
 
-def q3_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q3: Trips and revenue per month."""
-    params = get_parameters("Q3")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-12-31")
+def _expr_extra(name: str) -> Any:
+    return {
+        "fare_positive": lambda col, lit: col("fare_amount") > lit(0),
+        "fare_0_100": lambda col, lit: (col("fare_amount") >= lit(0), col("fare_amount") <= lit(100)),
+        "card": lambda col, lit: col("payment_type") == lit(1),
+        "distance_0_30": lambda col, lit: (col("trip_distance") >= lit(0), col("trip_distance") <= lit(30)),
+        "passenger_1_6": lambda col, lit: (col("passenger_count") >= lit(1), col("passenger_count") <= lit(6)),
+        "duration_positive": lambda col, _lit: col("dropoff_datetime") > col("pickup_datetime"),
+        "airport_rate": lambda col, _lit: col("rate_code_id").is_in([2, 3]),
+    }[name]
 
-    trips = ctx.get_table("trips")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)].copy()
-    filtered["month"] = filtered["pickup_datetime"].dt.to_period("M").dt.to_timestamp()
-    return (
-        filtered.groupby(["month"], as_index=False)
-        .agg(trip_count=("month", "count"), total_revenue=("total_amount", "sum"))
-        .sort_values("month")
+
+def _pandas_extra(name: str) -> Any:
+    return {
+        "fare_positive": lambda t: t["fare_amount"] > 0,
+        "fare_0_100": lambda t: (t["fare_amount"] >= 0) & (t["fare_amount"] <= 100),
+        "card": lambda t: t["payment_type"] == 1,
+        "distance_0_30": lambda t: (t["trip_distance"] >= 0) & (t["trip_distance"] <= 30),
+        "passenger_1_6": lambda t: (t["passenger_count"] >= 1) & (t["passenger_count"] <= 6),
+        "duration_positive": lambda t: t["dropoff_datetime"] > t["pickup_datetime"],
+        "airport_rate": lambda t: t["rate_code_id"].isin([2, 3]),
+    }[name]
+
+
+def _expr_derive(ctx: DataFrameContext, frame: Any, names: str) -> Any:
+    col, lit = ctx.col, ctx.lit
+    for name in _items(names):
+        if name == "hour":
+            frame = frame.with_columns(col("pickup_datetime").dt.hour().alias("hour"))
+        elif name == "day":
+            frame = frame.with_columns(col("pickup_datetime").dt.truncate("1d").alias("day"))
+        elif name == "month":
+            frame = frame.with_columns(col("pickup_datetime").dt.truncate("1mo").alias("month"))
+        elif name == "day_of_week":
+            frame = frame.with_columns(col("pickup_datetime").dt.weekday().alias("day_of_week"))
+        elif name == "tip_pct_nonzero":
+            frame = frame.with_columns(
+                ctx.when(col("fare_amount") != lit(0))
+                .then(col("tip_amount") / col("fare_amount") * lit(100))
+                .otherwise(lit(None))
+                .alias("tip_pct")
+            )
+        elif name == "tip_pct_positive":
+            frame = frame.with_columns(
+                ctx.when(col("fare_amount") > lit(0))
+                .then(col("tip_amount") / col("fare_amount") * lit(100))
+                .otherwise(lit(None))
+                .alias("tip_pct")
+            )
+        elif name == "fare_bucket":
+            frame = frame.with_columns(((col("fare_amount") / lit(5)).floor() * lit(5)).alias("fare_bucket"))
+        elif name == "distance_miles":
+            frame = frame.with_columns(col("trip_distance").floor().alias("distance_miles"))
+        elif name == "fare_per_mile":
+            frame = frame.with_columns(
+                ctx.when(col("trip_distance") != lit(0))
+                .then(col("total_amount") / col("trip_distance"))
+                .otherwise(lit(None))
+                .alias("fare_per_mile")
+            )
+        elif name == "duration":
+            frame = frame.with_columns(
+                ((col("dropoff_datetime") - col("pickup_datetime")).dt.total_seconds()).alias("duration_sec")
+            )
+        elif name == "duration_bucket":
+            frame = frame.filter((col("duration_sec") >= lit(60)) & (col("duration_sec") <= lit(7200))).with_columns(
+                ((col("duration_sec") / lit(60) / lit(5)).floor() * lit(5)).alias("duration_bucket_min")
+            )
+        elif name == "day_type":
+            frame = frame.with_columns(
+                col("pickup_datetime").dt.hour().alias("hour"),
+                ctx.when(col("pickup_datetime").dt.weekday().is_in([5, 6]))
+                .then(lit("weekend"))
+                .otherwise(lit("weekday"))
+                .alias("day_type"),
+            )
+        elif name == "period":
+            frame = frame.with_columns(
+                col("pickup_datetime").dt.hour().alias("hour"),
+                ((col("dropoff_datetime") - col("pickup_datetime")).dt.total_seconds() / lit(60)).alias("duration_min"),
+            )
+            frame = frame.with_columns(
+                ctx.when((col("hour") >= lit(7)) & (col("hour") <= lit(9)))
+                .then(lit("morning_rush"))
+                .otherwise(
+                    ctx.when((col("hour") >= lit(17)) & (col("hour") <= lit(19)))
+                    .then(lit("evening_rush"))
+                    .otherwise(lit("off_peak"))
+                )
+                .alias("period")
+            )
+        elif name == "year_month":
+            frame = frame.with_columns(
+                col("pickup_datetime").dt.year().alias("year"), col("pickup_datetime").dt.month().alias("month")
+            )
+    return frame
+
+
+def _pandas_derive(frame: Any, names: str) -> Any:
+    for name in _items(names):
+        if name == "hour":
+            frame["hour"] = frame["pickup_datetime"].dt.hour
+        elif name == "day":
+            frame["day"] = frame["pickup_datetime"].dt.floor("D")
+        elif name == "month":
+            frame["month"] = frame["pickup_datetime"].dt.to_period("M").dt.to_timestamp()
+        elif name == "day_of_week":
+            frame["day_of_week"] = frame["pickup_datetime"].dt.dayofweek
+        elif name == "tip_pct_nonzero":
+            frame["tip_pct"] = np.where(
+                frame["fare_amount"] != 0, frame["tip_amount"] / frame["fare_amount"] * 100, np.nan
+            )
+        elif name == "tip_pct_positive":
+            frame["tip_pct"] = np.where(
+                frame["fare_amount"] > 0, frame["tip_amount"] / frame["fare_amount"] * 100, np.nan
+            )
+        elif name == "fare_bucket":
+            frame["fare_bucket"] = np.floor(frame["fare_amount"] / 5) * 5
+        elif name == "distance_miles":
+            frame["distance_miles"] = np.floor(frame["trip_distance"])
+        elif name == "fare_per_mile":
+            frame["fare_per_mile"] = np.where(
+                frame["trip_distance"] != 0, frame["total_amount"] / frame["trip_distance"], np.nan
+            )
+        elif name == "duration":
+            frame["duration_sec"] = (frame["dropoff_datetime"] - frame["pickup_datetime"]).dt.total_seconds()
+        elif name == "duration_bucket":
+            frame = frame[(frame["duration_sec"] >= 60) & (frame["duration_sec"] <= 7200)]
+            frame["duration_bucket_min"] = np.floor(frame["duration_sec"] / 60 / 5) * 5
+        elif name == "day_type":
+            frame["hour"] = frame["pickup_datetime"].dt.hour
+            frame["day_type"] = np.where(frame["pickup_datetime"].dt.dayofweek.isin([5, 6]), "weekend", "weekday")
+        elif name == "period":
+            frame["hour"] = frame["pickup_datetime"].dt.hour
+            frame["duration_min"] = (frame["dropoff_datetime"] - frame["pickup_datetime"]).dt.total_seconds() / 60
+            frame["period"] = np.select(
+                [(frame["hour"] >= 7) & (frame["hour"] <= 9), (frame["hour"] >= 17) & (frame["hour"] <= 19)],
+                ["morning_rush", "evening_rush"],
+                default="off_peak",
+            )
+        elif name == "year_month":
+            frame["year"] = frame["pickup_datetime"].dt.year
+            frame["month"] = frame["pickup_datetime"].dt.month
+    return frame
+
+
+def _parse_aggs(value: str) -> dict[str, tuple[str, str]]:
+    return {out: (source, func) for out, source, func in (item.split(":") for item in value.split(";") if item)}
+
+
+def _expr_aggs(col: Any, aggs: str) -> list[Any]:
+    operations = []
+    for out, source, func in (item.split(":") for item in aggs.split(";") if item):
+        expr = getattr(col(source), func)() if func in {"count", "sum", "mean", "min", "max"} else None
+        operations.append(expr.alias(out))
+    return operations
+
+
+def _sort_expr(frame: Any, sort: str, desc: str) -> Any:
+    if not sort:
+        return frame
+    columns, flags = _items(sort), [item == "True" for item in _items(desc)]
+    return frame.sort(
+        columns if len(columns) > 1 else columns[0], descending=flags if len(flags) > 1 else bool(flags and flags[0])
     )
 
 
-def q4_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q4: Trips by day of week with avg distance and fare."""
-    params = get_parameters("Q4")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-03-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .with_columns(col("pickup_datetime").dt.weekday().alias("day_of_week"))
-        .group_by("day_of_week")
-        .agg(
-            col("day_of_week").count().alias("trip_count"),
-            col("trip_distance").mean().alias("avg_distance"),
-            col("total_amount").mean().alias("avg_fare"),
-        )
-        .sort("day_of_week")
+def _sort_pandas(frame: Any, sort: str, desc: str) -> Any:
+    if not sort:
+        return frame
+    columns, flags = _items(sort), [item == "True" for item in _items(desc)]
+    return frame.sort_values(
+        columns if len(columns) > 1 else columns[0],
+        ascending=[not f for f in flags] if len(flags) > 1 else not bool(flags and flags[0]),
     )
 
 
-def q4_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q4: Trips by day of week with avg distance and fare."""
-    params = get_parameters("Q4")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-03-31")
+def _make_group_query(row: list[str]) -> tuple[Any, Any]:
+    qid, start, end, extra, derives, group, aggs, sort, desc, limit = row
 
-    trips = ctx.get_table("trips")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)].copy()
-    filtered["day_of_week"] = filtered["pickup_datetime"].dt.dayofweek
-    return (
-        filtered.groupby(["day_of_week"], as_index=False)
-        .agg(
-            trip_count=("day_of_week", "count"),
-            avg_distance=("trip_distance", "mean"),
-            avg_fare=("total_amount", "mean"),
-        )
-        .sort_values("day_of_week")
-    )
+    def expression_impl(ctx: DataFrameContext) -> Any:
+        frame, col, _ = _expression_window(ctx, qid, start, end, _expr_extra(extra) if extra else None)
+        frame = _expr_derive(ctx, frame, derives).group_by(*_items(group)).agg(*_expr_aggs(col, aggs))
+        frame = _sort_expr(frame, sort, desc)
+        return frame.limit(int(limit)) if limit else frame
+
+    def pandas_impl(ctx: DataFrameContext) -> Any:
+        frame = _pandas_window(ctx, qid, start, end, copy=True, extra=_pandas_extra(extra) if extra else None)
+        frame = _pandas_derive(frame, derives).groupby(_items(group), as_index=False).agg(**_parse_aggs(aggs))
+        frame = _sort_pandas(frame, sort, desc)
+        return frame.head(int(limit)) if limit else frame
+
+    expression_impl.__name__ = f"q{qid[1:]}_expression_impl"
+    pandas_impl.__name__ = f"q{qid[1:]}_pandas_impl"
+    expression_impl.__qualname__ = expression_impl.__name__
+    pandas_impl.__qualname__ = pandas_impl.__name__
+    return expression_impl, pandas_impl
 
 
-# =============================================================================
-# Geographic Analytics (Q5-Q8)
-# =============================================================================
+_GROUP_SPECS = """\
+Q1|2019-01-01|2019-01-31||hour|hour|trip_count:hour:count|hour||
+Q2|2019-01-01|2019-12-31||day|day|trip_count:day:count|day||
+Q3|2019-01-01|2019-12-31||month|month|trip_count:month:count;total_revenue:total_amount:sum|month||
+Q4|2019-01-01|2019-03-31||day_of_week|day_of_week|trip_count:day_of_week:count;avg_distance:trip_distance:mean;avg_fare:total_amount:mean|day_of_week||
+Q9|2019-01-01|2019-01-31|fare_positive|tip_pct_nonzero|payment_type|trip_count:payment_type:count;total_revenue:total_amount:sum;total_tips:tip_amount:sum;avg_tip_percentage:tip_pct:mean|total_revenue|True|
+Q10|2019-01-01|2019-01-31|fare_0_100|fare_bucket|fare_bucket|trip_count:fare_bucket:count;avg_distance:trip_distance:mean;avg_tip:tip_amount:mean|fare_bucket||
+Q11|2019-01-01|2019-01-31|card|hour,tip_pct_positive|hour|trip_count:hour:count;avg_tip:tip_amount:mean;avg_tip_pct:tip_pct:mean|hour||
+Q12|2019-01-01|2019-12-31||month|month|extra_revenue:extra:sum;mta_tax_revenue:mta_tax:sum;improvement_revenue:improvement_surcharge:sum;congestion_revenue:congestion_surcharge:sum;tolls_revenue:tolls_amount:sum|month||
+Q13|2019-01-01|2019-01-31|distance_0_30|distance_miles|distance_miles|trip_count:distance_miles:count;avg_fare:total_amount:mean|distance_miles||
+Q14|2019-01-01|2019-01-31|passenger_1_6|fare_per_mile|passenger_count|trip_count:passenger_count:count;avg_distance:trip_distance:mean;avg_fare:total_amount:mean;avg_fare_per_mile:fare_per_mile:mean|passenger_count||
+Q15|2019-01-01|2019-01-31|duration_positive|duration,duration_bucket|duration_bucket_min|trip_count:duration_bucket_min:count;avg_distance:trip_distance:mean;avg_fare:total_amount:mean|duration_bucket_min||
+Q19|2019-01-01|2019-01-07||hour|hour,pickup_location_id|trip_count:hour:count|hour,trip_count|False,True|
+Q20|2019-01-01|2019-01-31||day_type|day_type,hour|trip_count:hour:count;avg_distance:trip_distance:mean;avg_fare:total_amount:mean|day_type,hour||
+Q21|2019-01-01|2019-01-31|duration_positive|period|period|trip_count:period:count;avg_distance:trip_distance:mean;avg_fare:total_amount:mean;avg_duration_min:duration_min:mean|trip_count|True|
+Q22|2019-01-01|2019-12-31||year_month|year,month|trip_count:year:count;total_revenue:total_amount:sum;avg_fare:total_amount:mean|year,month||
+"""
+
+for _row in reader(_GROUP_SPECS.splitlines(), delimiter="|"):
+    globals()[f"q{_row[0][1:]}_expression_impl"], globals()[f"q{_row[0][1:]}_pandas_impl"] = _make_group_query(_row)
 
 
 def q5_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q5: Top pickup zones - LEFT JOIN to taxi_zones."""
-    params = get_parameters("Q5")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    zones = ctx.get_table("taxi_zones")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .join(zones, left_on="pickup_location_id", right_on="location_id", how="left")
-        .group_by("pickup_location_id", "zone", "borough")
-        .agg(col("pickup_location_id").count().alias("trip_count"))
-        .sort("trip_count", descending=True)
-        .limit(20)
-    )
+    return _expression_top_zone(ctx, "Q5", "pickup_location_id")
 
 
 def q5_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q5: Top pickup zones - LEFT JOIN to taxi_zones."""
-    params = get_parameters("Q5")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    zones = ctx.get_table("taxi_zones")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)]
-    merged = filtered.merge(zones, left_on="pickup_location_id", right_on="location_id", how="left")
-    return (
-        merged.groupby(["pickup_location_id", "zone", "borough"], as_index=False)
-        .agg(trip_count=("pickup_location_id", "count"))
-        .sort_values("trip_count", ascending=False)
-        .head(20)
-    )
+    return _pandas_top_zone(ctx, "Q5", "pickup_location_id")
 
 
 def q6_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q6: Top dropoff zones."""
-    params = get_parameters("Q6")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    zones = ctx.get_table("taxi_zones")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .join(zones, left_on="dropoff_location_id", right_on="location_id", how="left")
-        .group_by("dropoff_location_id", "zone", "borough")
-        .agg(col("dropoff_location_id").count().alias("trip_count"))
-        .sort("trip_count", descending=True)
-        .limit(20)
-    )
+    return _expression_top_zone(ctx, "Q6", "dropoff_location_id")
 
 
 def q6_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q6: Top dropoff zones."""
-    params = get_parameters("Q6")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    zones = ctx.get_table("taxi_zones")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)]
-    merged = filtered.merge(zones, left_on="dropoff_location_id", right_on="location_id", how="left")
-    return (
-        merged.groupby(["dropoff_location_id", "zone", "borough"], as_index=False)
-        .agg(trip_count=("dropoff_location_id", "count"))
-        .sort_values("trip_count", ascending=False)
-        .head(20)
-    )
+    return _pandas_top_zone(ctx, "Q6", "dropoff_location_id")
 
 
 def q7_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q7: Top routes - double LEFT JOIN to taxi_zones for pickup and dropoff."""
-    params = get_parameters("Q7")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
+    trips, col, _ = _expression_window(ctx, "Q7", "2019-01-01", "2019-01-31")
     zones = ctx.get_table("taxi_zones")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Join pickup zones
-    with_pickup = trips.filter(
-        (col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date))
-    ).join(
-        zones.rename({"zone": "pickup_zone", "borough": "pickup_borough", "service_zone": "pickup_svc"}),
-        left_on="pickup_location_id",
-        right_on="location_id",
-        how="left",
-    )
-    # Join dropoff zones
-    with_both = with_pickup.join(
-        zones.rename({"zone": "dropoff_zone", "borough": "dropoff_borough", "service_zone": "dropoff_svc"}),
-        left_on="dropoff_location_id",
-        right_on="location_id",
-        how="left",
-    )
     return (
-        with_both.group_by("pickup_location_id", "pickup_zone", "dropoff_location_id", "dropoff_zone")
+        trips.join(
+            zones.rename({"zone": "pickup_zone", "borough": "pickup_borough", "service_zone": "pickup_svc"}),
+            left_on="pickup_location_id",
+            right_on="location_id",
+            how="left",
+        )
+        .join(
+            zones.rename({"zone": "dropoff_zone", "borough": "dropoff_borough", "service_zone": "dropoff_svc"}),
+            left_on="dropoff_location_id",
+            right_on="location_id",
+            how="left",
+        )
+        .group_by("pickup_location_id", "pickup_zone", "dropoff_location_id", "dropoff_zone")
         .agg(
             col("pickup_location_id").count().alias("trip_count"),
             col("trip_distance").mean().alias("avg_distance"),
@@ -301,30 +366,20 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q7_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q7: Top routes - double LEFT JOIN to taxi_zones."""
-    params = get_parameters("Q7")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
     zones = ctx.get_table("taxi_zones")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)]
-
-    # Join pickup zones with suffix
-    pz = zones.rename(columns={"zone": "pickup_zone", "borough": "pickup_borough"})
-    merged = filtered.merge(
-        pz[["location_id", "pickup_zone"]], left_on="pickup_location_id", right_on="location_id", how="left"
+    merged = _pandas_window(ctx, "Q7", "2019-01-01", "2019-01-31").merge(
+        zones.rename(columns={"zone": "pickup_zone"})[["location_id", "pickup_zone"]],
+        left_on="pickup_location_id",
+        right_on="location_id",
+        how="left",
     )
-    # Join dropoff zones with suffix
-    dz = zones.rename(columns={"zone": "dropoff_zone", "borough": "dropoff_borough"})
     merged = merged.merge(
-        dz[["location_id", "dropoff_zone"]],
+        zones.rename(columns={"zone": "dropoff_zone"})[["location_id", "dropoff_zone"]],
         left_on="dropoff_location_id",
         right_on="location_id",
         how="left",
         suffixes=("", "_dz"),
     )
-
     return (
         merged.groupby(["pickup_location_id", "pickup_zone", "dropoff_location_id", "dropoff_zone"], as_index=False)
         .agg(
@@ -338,19 +393,9 @@ def q7_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q8_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q8: Borough summary with LEFT JOIN."""
-    params = get_parameters("Q8")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-03-31")
-
-    trips = ctx.get_table("trips")
-    zones = ctx.get_table("taxi_zones")
-    col = ctx.col
-    lit = ctx.lit
-
+    trips, col, _ = _expression_window(ctx, "Q8", "2019-01-01", "2019-03-31")
     return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .join(zones, left_on="pickup_location_id", right_on="location_id", how="left")
+        trips.join(ctx.get_table("taxi_zones"), left_on="pickup_location_id", right_on="location_id", how="left")
         .filter(col("borough").is_not_null())
         .group_by("borough")
         .agg(
@@ -364,15 +409,9 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q8_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q8: Borough summary with LEFT JOIN."""
-    params = get_parameters("Q8")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-03-31")
-
-    trips = ctx.get_table("trips")
-    zones = ctx.get_table("taxi_zones")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)]
-    merged = filtered.merge(zones, left_on="pickup_location_id", right_on="location_id", how="left")
+    merged = _pandas_window(ctx, "Q8", "2019-01-01", "2019-03-31").merge(
+        ctx.get_table("taxi_zones"), left_on="pickup_location_id", right_on="location_id", how="left"
+    )
     merged = merged[merged["borough"].notna()]
     return (
         merged.groupby(["borough"], as_index=False)
@@ -386,470 +425,18 @@ def q8_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# Financial Analytics (Q9-Q12)
-# =============================================================================
-
-
-def q9_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q9: Revenue by payment type with tip percentage using NULLIF."""
-    params = get_parameters("Q9")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    # NULLIF(fare_amount, 0) -> when fare_amount != 0 then fare_amount else null
-    return (
-        trips.filter(
-            (col("pickup_datetime") >= lit(start_date))
-            & (col("pickup_datetime") < lit(end_date))
-            & (col("fare_amount") > lit(0))
-        )
-        .with_columns(
-            ctx.when(col("fare_amount") != lit(0))
-            .then(col("tip_amount") / col("fare_amount") * lit(100))
-            .otherwise(lit(None))
-            .alias("tip_pct")
-        )
-        .group_by("payment_type")
-        .agg(
-            col("payment_type").count().alias("trip_count"),
-            col("total_amount").sum().alias("total_revenue"),
-            col("tip_amount").sum().alias("total_tips"),
-            col("tip_pct").mean().alias("avg_tip_percentage"),
-        )
-        .sort("total_revenue", descending=True)
-    )
-
-
-def q9_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q9: Revenue by payment type with tip percentage."""
-    import numpy as np
-
-    params = get_parameters("Q9")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[
-        (trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date) & (trips["fare_amount"] > 0)
-    ].copy()
-    filtered["tip_pct"] = np.where(
-        filtered["fare_amount"] != 0, filtered["tip_amount"] / filtered["fare_amount"] * 100, np.nan
-    )
-    return (
-        filtered.groupby(["payment_type"], as_index=False)
-        .agg(
-            trip_count=("payment_type", "count"),
-            total_revenue=("total_amount", "sum"),
-            total_tips=("tip_amount", "sum"),
-            avg_tip_percentage=("tip_pct", "mean"),
-        )
-        .sort_values("total_revenue", ascending=False)
-    )
-
-
-def q10_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q10: Fare distribution in $5 buckets."""
-    params = get_parameters("Q10")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter(
-            (col("pickup_datetime") >= lit(start_date))
-            & (col("pickup_datetime") < lit(end_date))
-            & (col("fare_amount") >= lit(0))
-            & (col("fare_amount") <= lit(100))
-        )
-        .with_columns(((col("fare_amount") / lit(5)).floor() * lit(5)).alias("fare_bucket"))
-        .group_by("fare_bucket")
-        .agg(
-            col("fare_bucket").count().alias("trip_count"),
-            col("trip_distance").mean().alias("avg_distance"),
-            col("tip_amount").mean().alias("avg_tip"),
-        )
-        .sort("fare_bucket")
-    )
-
-
-def q10_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q10: Fare distribution in $5 buckets."""
-    import numpy as np
-
-    params = get_parameters("Q10")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[
-        (trips["pickup_datetime"] >= start_date)
-        & (trips["pickup_datetime"] < end_date)
-        & (trips["fare_amount"] >= 0)
-        & (trips["fare_amount"] <= 100)
-    ].copy()
-    filtered["fare_bucket"] = np.floor(filtered["fare_amount"] / 5) * 5
-    return (
-        filtered.groupby(["fare_bucket"], as_index=False)
-        .agg(
-            trip_count=("fare_bucket", "count"), avg_distance=("trip_distance", "mean"), avg_tip=("tip_amount", "mean")
-        )
-        .sort_values("fare_bucket")
-    )
-
-
-def q11_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q11: Tip analysis by hour for credit card payments."""
-    params = get_parameters("Q11")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter(
-            (col("pickup_datetime") >= lit(start_date))
-            & (col("pickup_datetime") < lit(end_date))
-            & (col("payment_type") == lit(1))
-        )
-        .with_columns(
-            col("pickup_datetime").dt.hour().alias("hour"),
-            ctx.when(col("fare_amount") > lit(0))
-            .then(col("tip_amount") / col("fare_amount") * lit(100))
-            .otherwise(lit(None))
-            .alias("tip_pct"),
-        )
-        .group_by("hour")
-        .agg(
-            col("hour").count().alias("trip_count"),
-            col("tip_amount").mean().alias("avg_tip"),
-            col("tip_pct").mean().alias("avg_tip_pct"),
-        )
-        .sort("hour")
-    )
-
-
-def q11_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q11: Tip analysis by hour for credit card payments."""
-    import numpy as np
-
-    params = get_parameters("Q11")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[
-        (trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date) & (trips["payment_type"] == 1)
-    ].copy()
-    filtered["hour"] = filtered["pickup_datetime"].dt.hour
-    filtered["tip_pct"] = np.where(
-        filtered["fare_amount"] > 0, filtered["tip_amount"] / filtered["fare_amount"] * 100, np.nan
-    )
-    return (
-        filtered.groupby(["hour"], as_index=False)
-        .agg(trip_count=("hour", "count"), avg_tip=("tip_amount", "mean"), avg_tip_pct=("tip_pct", "mean"))
-        .sort_values("hour")
-    )
-
-
-def q12_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q12: Surcharge revenue by month."""
-    params = get_parameters("Q12")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-12-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .with_columns(col("pickup_datetime").dt.truncate("1mo").alias("month"))
-        .group_by("month")
-        .agg(
-            col("extra").sum().alias("extra_revenue"),
-            col("mta_tax").sum().alias("mta_tax_revenue"),
-            col("improvement_surcharge").sum().alias("improvement_revenue"),
-            col("congestion_surcharge").sum().alias("congestion_revenue"),
-            col("tolls_amount").sum().alias("tolls_revenue"),
-        )
-        .sort("month")
-    )
-
-
-def q12_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q12: Surcharge revenue by month."""
-    params = get_parameters("Q12")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-12-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)].copy()
-    filtered["month"] = filtered["pickup_datetime"].dt.to_period("M").dt.to_timestamp()
-    return (
-        filtered.groupby(["month"], as_index=False)
-        .agg(
-            extra_revenue=("extra", "sum"),
-            mta_tax_revenue=("mta_tax", "sum"),
-            improvement_revenue=("improvement_surcharge", "sum"),
-            congestion_revenue=("congestion_surcharge", "sum"),
-            tolls_revenue=("tolls_amount", "sum"),
-        )
-        .sort_values("month")
-    )
-
-
-# =============================================================================
-# Trip Characteristics (Q13-Q15)
-# =============================================================================
-
-
-def q13_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q13: Distance distribution in 1-mile buckets."""
-    params = get_parameters("Q13")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter(
-            (col("pickup_datetime") >= lit(start_date))
-            & (col("pickup_datetime") < lit(end_date))
-            & (col("trip_distance") >= lit(0))
-            & (col("trip_distance") <= lit(30))
-        )
-        .with_columns(col("trip_distance").floor().alias("distance_miles"))
-        .group_by("distance_miles")
-        .agg(
-            col("distance_miles").count().alias("trip_count"),
-            col("total_amount").mean().alias("avg_fare"),
-        )
-        .sort("distance_miles")
-    )
-
-
-def q13_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q13: Distance distribution in 1-mile buckets."""
-    import numpy as np
-
-    params = get_parameters("Q13")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[
-        (trips["pickup_datetime"] >= start_date)
-        & (trips["pickup_datetime"] < end_date)
-        & (trips["trip_distance"] >= 0)
-        & (trips["trip_distance"] <= 30)
-    ].copy()
-    filtered["distance_miles"] = np.floor(filtered["trip_distance"])
-    return (
-        filtered.groupby(["distance_miles"], as_index=False)
-        .agg(trip_count=("distance_miles", "count"), avg_fare=("total_amount", "mean"))
-        .sort_values("distance_miles")
-    )
-
-
-def q14_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q14: Passenger count analysis with NULLIF for fare per mile."""
-    params = get_parameters("Q14")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter(
-            (col("pickup_datetime") >= lit(start_date))
-            & (col("pickup_datetime") < lit(end_date))
-            & (col("passenger_count") >= lit(1))
-            & (col("passenger_count") <= lit(6))
-        )
-        .with_columns(
-            ctx.when(col("trip_distance") != lit(0))
-            .then(col("total_amount") / col("trip_distance"))
-            .otherwise(lit(None))
-            .alias("fare_per_mile")
-        )
-        .group_by("passenger_count")
-        .agg(
-            col("passenger_count").count().alias("trip_count"),
-            col("trip_distance").mean().alias("avg_distance"),
-            col("total_amount").mean().alias("avg_fare"),
-            col("fare_per_mile").mean().alias("avg_fare_per_mile"),
-        )
-        .sort("passenger_count")
-    )
-
-
-def q14_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q14: Passenger count analysis with NULLIF for fare per mile."""
-    import numpy as np
-
-    params = get_parameters("Q14")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[
-        (trips["pickup_datetime"] >= start_date)
-        & (trips["pickup_datetime"] < end_date)
-        & (trips["passenger_count"] >= 1)
-        & (trips["passenger_count"] <= 6)
-    ].copy()
-    filtered["fare_per_mile"] = np.where(
-        filtered["trip_distance"] != 0, filtered["total_amount"] / filtered["trip_distance"], np.nan
-    )
-    return (
-        filtered.groupby(["passenger_count"], as_index=False)
-        .agg(
-            trip_count=("passenger_count", "count"),
-            avg_distance=("trip_distance", "mean"),
-            avg_fare=("total_amount", "mean"),
-            avg_fare_per_mile=("fare_per_mile", "mean"),
-        )
-        .sort_values("passenger_count")
-    )
-
-
-def q15_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q15: Trip duration analysis in 5-minute buckets."""
-    params = get_parameters("Q15")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter(
-            (col("pickup_datetime") >= lit(start_date))
-            & (col("pickup_datetime") < lit(end_date))
-            & (col("dropoff_datetime") > col("pickup_datetime"))
-        )
-        .with_columns(((col("dropoff_datetime") - col("pickup_datetime")).dt.total_seconds()).alias("duration_sec"))
-        .filter((col("duration_sec") >= lit(60)) & (col("duration_sec") <= lit(7200)))
-        .with_columns(((col("duration_sec") / lit(60) / lit(5)).floor() * lit(5)).alias("duration_bucket_min"))
-        .group_by("duration_bucket_min")
-        .agg(
-            col("duration_bucket_min").count().alias("trip_count"),
-            col("trip_distance").mean().alias("avg_distance"),
-            col("total_amount").mean().alias("avg_fare"),
-        )
-        .sort("duration_bucket_min")
-    )
-
-
-def q15_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q15: Trip duration analysis in 5-minute buckets."""
-    import numpy as np
-
-    params = get_parameters("Q15")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[
-        (trips["pickup_datetime"] >= start_date)
-        & (trips["pickup_datetime"] < end_date)
-        & (trips["dropoff_datetime"] > trips["pickup_datetime"])
-    ].copy()
-    filtered["duration_sec"] = (filtered["dropoff_datetime"] - filtered["pickup_datetime"]).dt.total_seconds()
-    filtered = filtered[(filtered["duration_sec"] >= 60) & (filtered["duration_sec"] <= 7200)]
-    filtered["duration_bucket_min"] = np.floor(filtered["duration_sec"] / 60 / 5) * 5
-    return (
-        filtered.groupby(["duration_bucket_min"], as_index=False)
-        .agg(
-            trip_count=("duration_bucket_min", "count"),
-            avg_distance=("trip_distance", "mean"),
-            avg_fare=("total_amount", "mean"),
-        )
-        .sort_values("duration_bucket_min")
-    )
-
-
-# =============================================================================
-# Rate Code Analysis (Q16-Q17)
-# =============================================================================
-
-
 def q16_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q16: Rate code summary."""
-    params = get_parameters("Q16")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-03-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .group_by("rate_code_id")
-        .agg(
-            col("rate_code_id").count().alias("trip_count"),
-            col("trip_distance").mean().alias("avg_distance"),
-            col("total_amount").mean().alias("avg_fare"),
-            col("total_amount").sum().alias("total_revenue"),
-        )
-        .sort("trip_count", descending=True)
-    )
+    return _expression_trip_summary(ctx, "Q16", "2019-03-31", "rate_code_id", tip=False)
 
 
 def q16_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q16: Rate code summary."""
-    params = get_parameters("Q16")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-03-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)]
-    return (
-        filtered.groupby(["rate_code_id"], as_index=False)
-        .agg(
-            trip_count=("rate_code_id", "count"),
-            avg_distance=("trip_distance", "mean"),
-            avg_fare=("total_amount", "mean"),
-            total_revenue=("total_amount", "sum"),
-        )
-        .sort_values("trip_count", ascending=False)
-    )
+    return _pandas_trip_summary(ctx, "Q16", "2019-03-31", "rate_code_id", tip=False)
 
 
 def q17_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q17: Airport trips with zone join."""
-    params = get_parameters("Q17")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-03-31")
-
-    trips = ctx.get_table("trips")
-    zones = ctx.get_table("taxi_zones")
-    col = ctx.col
-    lit = ctx.lit
-
+    trips, col, _ = _expression_window(ctx, "Q17", "2019-01-01", "2019-03-31", _expr_extra("airport_rate"))
     return (
-        trips.filter(
-            (col("pickup_datetime") >= lit(start_date))
-            & (col("pickup_datetime") < lit(end_date))
-            & (col("rate_code_id").is_in([2, 3]))
-        )
-        .join(zones, left_on="pickup_location_id", right_on="location_id", how="left")
+        trips.join(ctx.get_table("taxi_zones"), left_on="pickup_location_id", right_on="location_id", how="left")
         .group_by("rate_code_id", "zone")
         .agg(
             col("rate_code_id").count().alias("trip_count"),
@@ -863,19 +450,9 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q17_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q17: Airport trips with zone join."""
-    params = get_parameters("Q17")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-03-31")
-
-    trips = ctx.get_table("trips")
-    zones = ctx.get_table("taxi_zones")
-    filtered = trips[
-        (trips["pickup_datetime"] >= start_date)
-        & (trips["pickup_datetime"] < end_date)
-        & (trips["rate_code_id"].isin([2, 3]))
-    ]
-    merged = filtered.merge(zones, left_on="pickup_location_id", right_on="location_id", how="left")
+    merged = _pandas_window(ctx, "Q17", "2019-01-01", "2019-03-31", extra=_pandas_extra("airport_rate")).merge(
+        ctx.get_table("taxi_zones"), left_on="pickup_location_id", right_on="location_id", how="left"
+    )
     return (
         merged.groupby(["rate_code_id", "zone"], as_index=False)
         .agg(
@@ -889,277 +466,17 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# Vendor Analysis (Q18)
-# =============================================================================
-
-
 def q18_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q18: Vendor comparison."""
-    params = get_parameters("Q18")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .group_by("vendor_id")
-        .agg(
-            col("vendor_id").count().alias("trip_count"),
-            col("trip_distance").mean().alias("avg_distance"),
-            col("total_amount").mean().alias("avg_fare"),
-            col("tip_amount").mean().alias("avg_tip"),
-            col("total_amount").sum().alias("total_revenue"),
-        )
-        .sort("trip_count", descending=True)
-    )
+    return _expression_trip_summary(ctx, "Q18", "2019-01-31", "vendor_id", tip=True)
 
 
 def q18_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q18: Vendor comparison."""
-    params = get_parameters("Q18")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)]
-    return (
-        filtered.groupby(["vendor_id"], as_index=False)
-        .agg(
-            trip_count=("vendor_id", "count"),
-            avg_distance=("trip_distance", "mean"),
-            avg_fare=("total_amount", "mean"),
-            avg_tip=("tip_amount", "mean"),
-            total_revenue=("total_amount", "sum"),
-        )
-        .sort_values("trip_count", ascending=False)
-    )
-
-
-# =============================================================================
-# Complex Analytics (Q19-Q22)
-# =============================================================================
-
-
-def q19_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q19: Hourly zone heatmap - 2D grouping."""
-    params = get_parameters("Q19")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-07")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .with_columns(col("pickup_datetime").dt.hour().alias("hour"))
-        .group_by("hour", "pickup_location_id")
-        .agg(col("hour").count().alias("trip_count"))
-        .sort(["hour", "trip_count"], descending=[False, True])
-    )
-
-
-def q19_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q19: Hourly zone heatmap - 2D grouping."""
-    params = get_parameters("Q19")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-07")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)].copy()
-    filtered["hour"] = filtered["pickup_datetime"].dt.hour
-    return (
-        filtered.groupby(["hour", "pickup_location_id"], as_index=False)
-        .agg(trip_count=("hour", "count"))
-        .sort_values(["hour", "trip_count"], ascending=[True, False])
-    )
-
-
-def q20_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q20: Weekday vs weekend comparison with CASE WHEN."""
-    params = get_parameters("Q20")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .with_columns(
-            col("pickup_datetime").dt.hour().alias("hour"),
-            ctx.when(col("pickup_datetime").dt.weekday().is_in([5, 6]))
-            .then(lit("weekend"))
-            .otherwise(lit("weekday"))
-            .alias("day_type"),
-        )
-        .group_by("day_type", "hour")
-        .agg(
-            col("hour").count().alias("trip_count"),
-            col("trip_distance").mean().alias("avg_distance"),
-            col("total_amount").mean().alias("avg_fare"),
-        )
-        .sort(["day_type", "hour"])
-    )
-
-
-def q20_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q20: Weekday vs weekend comparison."""
-    import numpy as np
-
-    params = get_parameters("Q20")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)].copy()
-    filtered["hour"] = filtered["pickup_datetime"].dt.hour
-    filtered["day_type"] = np.where(filtered["pickup_datetime"].dt.dayofweek.isin([5, 6]), "weekend", "weekday")
-    return (
-        filtered.groupby(["day_type", "hour"], as_index=False)
-        .agg(trip_count=("hour", "count"), avg_distance=("trip_distance", "mean"), avg_fare=("total_amount", "mean"))
-        .sort_values(["day_type", "hour"])
-    )
-
-
-def q21_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q21: Rush hour analysis with multi-way CASE WHEN."""
-    params = get_parameters("Q21")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    filtered = trips.filter(
-        (col("pickup_datetime") >= lit(start_date))
-        & (col("pickup_datetime") < lit(end_date))
-        & (col("dropoff_datetime") > col("pickup_datetime"))
-    )
-    with_cols = filtered.with_columns(
-        col("pickup_datetime").dt.hour().alias("hour"),
-        ((col("dropoff_datetime") - col("pickup_datetime")).dt.total_seconds() / lit(60)).alias("duration_min"),
-    )
-    with_period = with_cols.with_columns(
-        ctx.when((col("hour") >= lit(7)) & (col("hour") <= lit(9)))
-        .then(lit("morning_rush"))
-        .otherwise(
-            ctx.when((col("hour") >= lit(17)) & (col("hour") <= lit(19)))
-            .then(lit("evening_rush"))
-            .otherwise(lit("off_peak"))
-        )
-        .alias("period")
-    )
-    return (
-        with_period.group_by("period")
-        .agg(
-            col("period").count().alias("trip_count"),
-            col("trip_distance").mean().alias("avg_distance"),
-            col("total_amount").mean().alias("avg_fare"),
-            col("duration_min").mean().alias("avg_duration_min"),
-        )
-        .sort("trip_count", descending=True)
-    )
-
-
-def q21_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q21: Rush hour analysis with multi-way CASE WHEN."""
-    import numpy as np
-
-    params = get_parameters("Q21")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[
-        (trips["pickup_datetime"] >= start_date)
-        & (trips["pickup_datetime"] < end_date)
-        & (trips["dropoff_datetime"] > trips["pickup_datetime"])
-    ].copy()
-    filtered["hour"] = filtered["pickup_datetime"].dt.hour
-    filtered["duration_min"] = (filtered["dropoff_datetime"] - filtered["pickup_datetime"]).dt.total_seconds() / 60
-    conditions = [
-        (filtered["hour"] >= 7) & (filtered["hour"] <= 9),
-        (filtered["hour"] >= 17) & (filtered["hour"] <= 19),
-    ]
-    filtered["period"] = np.select(conditions, ["morning_rush", "evening_rush"], default="off_peak")
-    return (
-        filtered.groupby(["period"], as_index=False)
-        .agg(
-            trip_count=("period", "count"),
-            avg_distance=("trip_distance", "mean"),
-            avg_fare=("total_amount", "mean"),
-            avg_duration_min=("duration_min", "mean"),
-        )
-        .sort_values("trip_count", ascending=False)
-    )
-
-
-def q22_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q22: Monthly year-over-year comparison."""
-    params = get_parameters("Q22")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-12-31")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date)))
-        .with_columns(
-            col("pickup_datetime").dt.year().alias("year"),
-            col("pickup_datetime").dt.month().alias("month"),
-        )
-        .group_by("year", "month")
-        .agg(
-            col("year").count().alias("trip_count"),
-            col("total_amount").sum().alias("total_revenue"),
-            col("total_amount").mean().alias("avg_fare"),
-        )
-        .sort(["year", "month"])
-    )
-
-
-def q22_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q22: Monthly year-over-year comparison."""
-    params = get_parameters("Q22")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-12-31")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)].copy()
-    filtered["year"] = filtered["pickup_datetime"].dt.year
-    filtered["month"] = filtered["pickup_datetime"].dt.month
-    return (
-        filtered.groupby(["year", "month"], as_index=False)
-        .agg(trip_count=("year", "count"), total_revenue=("total_amount", "sum"), avg_fare=("total_amount", "mean"))
-        .sort_values(["year", "month"])
-    )
-
-
-# =============================================================================
-# Point Queries (Q23-Q24) and Baseline (Q25)
-# =============================================================================
+    return _pandas_trip_summary(ctx, "Q18", "2019-01-31", "vendor_id", tip=True)
 
 
 def q23_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q23: Single-day summary - scalar aggregation."""
-    params = get_parameters("Q23")
-    start_date = params.get("start_date", "2019-06-15")
-    end_date = params.get("end_date", "2019-06-16")
-
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    lit = ctx.lit
-
-    return trips.filter((col("pickup_datetime") >= lit(start_date)) & (col("pickup_datetime") < lit(end_date))).select(
+    trips, col, _ = _expression_window(ctx, "Q23", "2019-06-15", "2019-06-16")
+    return trips.select(
         col("trip_id").count().alias("trip_count"),
         col("total_amount").sum().alias("total_revenue"),
         col("trip_distance").mean().alias("avg_distance"),
@@ -1171,47 +488,29 @@ def q23_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q23_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q23: Single-day summary - scalar aggregation."""
     import pandas as pd
 
-    params = get_parameters("Q23")
-    start_date = params.get("start_date", "2019-06-15")
-    end_date = params.get("end_date", "2019-06-16")
-
-    trips = ctx.get_table("trips")
-    filtered = trips[(trips["pickup_datetime"] >= start_date) & (trips["pickup_datetime"] < end_date)]
+    trips = _pandas_window(ctx, "Q23", "2019-06-15", "2019-06-16")
     return pd.DataFrame(
         {
-            "trip_count": [len(filtered)],
-            "total_revenue": [filtered["total_amount"].sum()],
-            "avg_distance": [filtered["trip_distance"].mean()],
-            "avg_fare": [filtered["total_amount"].mean()],
-            "avg_tip": [filtered["tip_amount"].mean()],
-            "first_trip": [filtered["pickup_datetime"].min()],
-            "last_trip": [filtered["pickup_datetime"].max()],
+            "trip_count": [len(trips)],
+            "total_revenue": [trips["total_amount"].sum()],
+            "avg_distance": [trips["trip_distance"].mean()],
+            "avg_fare": [trips["total_amount"].mean()],
+            "avg_tip": [trips["tip_amount"].mean()],
+            "first_trip": [trips["pickup_datetime"].min()],
+            "last_trip": [trips["pickup_datetime"].max()],
         }
     )
 
 
 def q24_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q24: Zone detail with INNER JOIN and zone_id filter."""
-    params = get_parameters("Q24")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-    zone_id = params.get("zone_id", 132)
-
-    trips = ctx.get_table("trips")
-    zones = ctx.get_table("taxi_zones")
-    col = ctx.col
-    lit = ctx.lit
-
+    zone_id = get_parameters("Q24").get("zone_id", 132)
+    trips, col, _ = _expression_window(
+        ctx, "Q24", "2019-01-01", "2019-01-31", lambda col, lit: col("pickup_location_id") == lit(zone_id)
+    )
     return (
-        trips.filter(
-            (col("pickup_datetime") >= lit(start_date))
-            & (col("pickup_datetime") < lit(end_date))
-            & (col("pickup_location_id") == lit(zone_id))
-        )
-        .join(zones, left_on="pickup_location_id", right_on="location_id")
+        trips.join(ctx.get_table("taxi_zones"), left_on="pickup_location_id", right_on="location_id")
         .group_by("zone", "borough")
         .agg(
             col("zone").count().alias("pickup_count"),
@@ -1223,377 +522,83 @@ def q24_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q24_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q24: Zone detail with INNER JOIN and zone_id filter."""
-    params = get_parameters("Q24")
-    start_date = params.get("start_date", "2019-01-01")
-    end_date = params.get("end_date", "2019-01-31")
-    zone_id = params.get("zone_id", 132)
-
-    trips = ctx.get_table("trips")
-    zones = ctx.get_table("taxi_zones")
-    filtered = trips[
-        (trips["pickup_datetime"] >= start_date)
-        & (trips["pickup_datetime"] < end_date)
-        & (trips["pickup_location_id"] == zone_id)
-    ]
-    merged = filtered.merge(zones, left_on="pickup_location_id", right_on="location_id")
-    return merged.groupby(["zone", "borough"], as_index=False).agg(
-        pickup_count=("zone", "count"),
-        avg_distance=("trip_distance", "mean"),
-        avg_fare=("total_amount", "mean"),
-        total_revenue=("total_amount", "sum"),
+    zone_id = get_parameters("Q24").get("zone_id", 132)
+    trips = _pandas_window(
+        ctx, "Q24", "2019-01-01", "2019-01-31", extra=lambda trips: trips["pickup_location_id"] == zone_id
+    )
+    return (
+        trips.merge(ctx.get_table("taxi_zones"), left_on="pickup_location_id", right_on="location_id")
+        .groupby(["zone", "borough"], as_index=False)
+        .agg(
+            pickup_count=("zone", "count"),
+            avg_distance=("trip_distance", "mean"),
+            avg_fare=("total_amount", "mean"),
+            total_revenue=("total_amount", "sum"),
+        )
     )
 
 
 def q25_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q25: Full scan count - baseline."""
-    trips = ctx.get_table("trips")
-    col = ctx.col
-    return trips.select(col("trip_id").count().alias("total_trips"))
+    return ctx.get_table("trips").select(ctx.col("trip_id").count().alias("total_trips"))
 
 
 def q25_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q25: Full scan count - baseline."""
     import pandas as pd
 
-    trips = ctx.get_table("trips")
-    return pd.DataFrame({"total_trips": [len(trips)]})
+    return pd.DataFrame({"total_trips": [len(ctx.get_table("trips"))]})
 
 
-# =============================================================================
-# Query Registration
-# =============================================================================
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "AN": QueryCategory.ANALYTICAL,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "JO": QueryCategory.JOIN,
+    "MJ": QueryCategory.MULTI_JOIN,
+    "SC": QueryCategory.SCAN,
+    "SO": QueryCategory.SORT,
+}
+
+_QUERY_METADATA = """Q1|Trips per Hour|Hourly trip count distribution using EXTRACT(HOUR)|FI,GB,AG,AN
+Q2|Trips per Day|Daily trip count using DATE_TRUNC('day')|FI,GB,AG,AN
+Q3|Trips per Month|Monthly trip count and total revenue using DATE_TRUNC('month')|FI,GB,AG,AN
+Q4|Trips by Day of Week|Day-of-week distribution with avg distance and fare|FI,GB,AG,AN
+Q5|Top Pickup Zones|Top 20 pickup zones by trip count with LEFT JOIN to taxi_zones|FI,JO,GB,SO
+Q6|Top Dropoff Zones|Top 20 dropoff zones by trip count with LEFT JOIN to taxi_zones|FI,JO,GB,SO
+Q7|Top Routes|Top 50 routes (pickup->dropoff) with double LEFT JOIN to taxi_zones|FI,MJ,GB,SO
+Q8|Borough Summary|Borough-level trip count, revenue, distance, and tip averages|FI,JO,GB,SO
+Q9|Revenue by Payment Type|Revenue and tip analysis by payment type with NULLIF protection|FI,GB,AG,AN
+Q10|Fare Distribution|Fare distribution in $5 buckets using FLOOR bucketing|FI,GB,AG,AN
+Q11|Tip Analysis|Tip analysis by hour for credit card payments with conditional avg|FI,GB,AG,AN
+Q12|Surcharge Revenue|Monthly surcharge revenue breakdown (extra, MTA tax, improvement, congestion, tolls)|FI,GB,AG,AN
+Q13|Distance Distribution|Trip distance distribution in 1-mile buckets|FI,GB,AG
+Q14|Passenger Count Analysis|Metrics by passenger count (1-6) with NULLIF fare-per-mile|FI,GB,AG,AN
+Q15|Trip Duration Analysis|Duration distribution in 5-min buckets using timestamp arithmetic|FI,GB,AG,AN
+Q16|Rate Code Summary|Trip metrics by rate code (Standard, JFK, Newark, etc.)|FI,GB,AG
+Q17|Airport Trips|Airport trip analysis (JFK/Newark) with zone join|FI,JO,GB,SO
+Q18|Vendor Comparison|Vendor-level trip metrics comparison|FI,GB,AG
+Q19|Hourly Zone Heatmap|2D grouping by hour and pickup zone for heatmap visualization|FI,GB,SO,AN
+Q20|Weekday/Weekend Comparison|Weekday vs weekend metrics by hour using CASE WHEN on day-of-week|FI,GB,SO,AN
+Q21|Rush Hour Analysis|Morning rush, evening rush, and off-peak period comparison|FI,GB,AG,AN
+Q22|Monthly Year-over-Year|Year and month grouping for YoY comparison over 2-year window|FI,GB,AG,AN
+Q23|Single-Day Summary|Scalar aggregation for a single day (no GROUP BY)|FI,AG
+Q24|Zone Detail|Detailed metrics for a specific zone with INNER JOIN|FI,JO,GB,AG
+Q25|Full Scan Count|COUNT(*) baseline full table scan|SC,AG
+"""
 
 
-def _register_all_queries() -> None:
-    """Register all 25 NYC Taxi DataFrame queries."""
-    # Temporal (Q1-Q4)
-    register_query(
-        DataFrameQuery(
-            query_id="Q1",
-            query_name="Trips per Hour",
-            description="Hourly trip count distribution using EXTRACT(HOUR)",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q1_expression_impl,
-            pandas_impl=q1_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q2",
-            query_name="Trips per Day",
-            description="Daily trip count using DATE_TRUNC('day')",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q2_expression_impl,
-            pandas_impl=q2_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q3",
-            query_name="Trips per Month",
-            description="Monthly trip count and total revenue using DATE_TRUNC('month')",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q3_expression_impl,
-            pandas_impl=q3_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q4",
-            query_name="Trips by Day of Week",
-            description="Day-of-week distribution with avg distance and fare",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q4_expression_impl,
-            pandas_impl=q4_pandas_impl,
-        )
-    )
-
-    # Geographic (Q5-Q8)
-    register_query(
-        DataFrameQuery(
-            query_id="Q5",
-            query_name="Top Pickup Zones",
-            description="Top 20 pickup zones by trip count with LEFT JOIN to taxi_zones",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q5_expression_impl,
-            pandas_impl=q5_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q6",
-            query_name="Top Dropoff Zones",
-            description="Top 20 dropoff zones by trip count with LEFT JOIN to taxi_zones",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q6_expression_impl,
-            pandas_impl=q6_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q7",
-            query_name="Top Routes",
-            description="Top 50 routes (pickup->dropoff) with double LEFT JOIN to taxi_zones",
-            categories=[QueryCategory.FILTER, QueryCategory.MULTI_JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q7_expression_impl,
-            pandas_impl=q7_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q8",
-            query_name="Borough Summary",
-            description="Borough-level trip count, revenue, distance, and tip averages",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q8_expression_impl,
-            pandas_impl=q8_pandas_impl,
-        )
-    )
-
-    # Financial (Q9-Q12)
-    register_query(
-        DataFrameQuery(
-            query_id="Q9",
-            query_name="Revenue by Payment Type",
-            description="Revenue and tip analysis by payment type with NULLIF protection",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q9_expression_impl,
-            pandas_impl=q9_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q10",
-            query_name="Fare Distribution",
-            description="Fare distribution in $5 buckets using FLOOR bucketing",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q10_expression_impl,
-            pandas_impl=q10_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q11",
-            query_name="Tip Analysis",
-            description="Tip analysis by hour for credit card payments with conditional avg",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q11_expression_impl,
-            pandas_impl=q11_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q12",
-            query_name="Surcharge Revenue",
-            description="Monthly surcharge revenue breakdown (extra, MTA tax, improvement, congestion, tolls)",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q12_expression_impl,
-            pandas_impl=q12_pandas_impl,
-        )
-    )
-
-    # Characteristics (Q13-Q15)
-    register_query(
-        DataFrameQuery(
-            query_id="Q13",
-            query_name="Distance Distribution",
-            description="Trip distance distribution in 1-mile buckets",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q13_expression_impl,
-            pandas_impl=q13_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q14",
-            query_name="Passenger Count Analysis",
-            description="Metrics by passenger count (1-6) with NULLIF fare-per-mile",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q14_expression_impl,
-            pandas_impl=q14_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q15",
-            query_name="Trip Duration Analysis",
-            description="Duration distribution in 5-min buckets using timestamp arithmetic",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q15_expression_impl,
-            pandas_impl=q15_pandas_impl,
-        )
-    )
-
-    # Rates (Q16-Q17)
-    register_query(
-        DataFrameQuery(
-            query_id="Q16",
-            query_name="Rate Code Summary",
-            description="Trip metrics by rate code (Standard, JFK, Newark, etc.)",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q16_expression_impl,
-            pandas_impl=q16_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q17",
-            query_name="Airport Trips",
-            description="Airport trip analysis (JFK/Newark) with zone join",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q17_expression_impl,
-            pandas_impl=q17_pandas_impl,
-        )
-    )
-
-    # Vendor (Q18)
-    register_query(
-        DataFrameQuery(
-            query_id="Q18",
-            query_name="Vendor Comparison",
-            description="Vendor-level trip metrics comparison",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q18_expression_impl,
-            pandas_impl=q18_pandas_impl,
-        )
-    )
-
-    # Complex (Q19-Q22)
-    register_query(
-        DataFrameQuery(
-            query_id="Q19",
-            query_name="Hourly Zone Heatmap",
-            description="2D grouping by hour and pickup zone for heatmap visualization",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
-            expression_impl=q19_expression_impl,
-            pandas_impl=q19_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q20",
-            query_name="Weekday/Weekend Comparison",
-            description="Weekday vs weekend metrics by hour using CASE WHEN on day-of-week",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
-            expression_impl=q20_expression_impl,
-            pandas_impl=q20_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q21",
-            query_name="Rush Hour Analysis",
-            description="Morning rush, evening rush, and off-peak period comparison",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q21_expression_impl,
-            pandas_impl=q21_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q22",
-            query_name="Monthly Year-over-Year",
-            description="Year and month grouping for YoY comparison over 2-year window",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q22_expression_impl,
-            pandas_impl=q22_pandas_impl,
-        )
-    )
-
-    # Point (Q23-Q24)
-    register_query(
-        DataFrameQuery(
-            query_id="Q23",
-            query_name="Single-Day Summary",
-            description="Scalar aggregation for a single day (no GROUP BY)",
-            categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-            expression_impl=q23_expression_impl,
-            pandas_impl=q23_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q24",
-            query_name="Zone Detail",
-            description="Detailed metrics for a specific zone with INNER JOIN",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q24_expression_impl,
-            pandas_impl=q24_pandas_impl,
-        )
-    )
-
-    # Baseline (Q25)
-    register_query(
-        DataFrameQuery(
-            query_id="Q25",
-            query_name="Full Scan Count",
-            description="COUNT(*) baseline full table scan",
-            categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
-            expression_impl=q25_expression_impl,
-            pandas_impl=q25_pandas_impl,
-        )
-    )
+def _impl_for(query_id: str, family: str) -> Any:
+    return globals()[f"q{query_id[1:]}_{family}_impl"]
 
 
-_register_all_queries()
+for _query_id, _query_name, _description, _category_codes in reader(_QUERY_METADATA.splitlines(), delimiter="|"):
+    register_query(
+        DataFrameQuery(
+            query_id=_query_id,
+            query_name=_query_name,
+            description=_description,
+            categories=[_CATEGORY_CODES[code] for code in _category_codes.split(",")],
+            expression_impl=_impl_for(_query_id, "expression"),
+            pandas_impl=_impl_for(_query_id, "pandas"),
+        )
+    )

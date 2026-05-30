@@ -23,6 +23,7 @@ from benchbox.core.results.models import (
     NativeComparisonEntry,
     SetupPhase,
 )
+from benchbox.core.results.schema_policy import LOADER_SCHEMA_POLICY, is_loader_supported_result_schema
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +76,8 @@ def find_latest_result(
             with open(filepath, encoding="utf-8") as f:
                 data = json.load(f)
 
-            # Only consider v2.0/v2.1 files
-            version = data.get("version")
-            if version not in ("2.0", "2.1"):
+            # Only consider files accepted by the runtime loader policy.
+            if not is_loader_supported_result_schema(data):
                 continue
 
             # Extract metadata for filtering (v2.0 format)
@@ -140,14 +140,10 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
     except OSError as e:
         raise ResultLoadError(f"Failed to read result file: {e}") from e
 
-    # Check schema version - v2.0 and v2.1 are supported
-    version = data.get("version")
-    if version not in ("2.0", "2.1"):
-        raise UnsupportedSchemaError(
-            f"Unsupported schema version: {version}. "
-            f"Only schema v2.0 and v2.1 are supported. "
-            f"Please re-export the result using the current version of BenchBox."
-        )
+    # Check schema version through the named runtime loader policy.
+    version_decision = LOADER_SCHEMA_POLICY.evaluate(data.get("version"))
+    if not version_decision.accepted:
+        raise UnsupportedSchemaError(version_decision.error_message())
 
     # Load companion files if they exist
     plans_data = _load_companion_file(filepath_obj, ".plans.json")
@@ -206,6 +202,7 @@ def reconstruct_benchmark_results(
     benchmark_section = data.get("benchmark", {})
     platform_section = data.get("platform", {})
     summary_section = data.get("summary", {})
+    execution_section = data.get("execution", {})
 
     timestamp = _parse_timestamp(run_section.get("timestamp", ""))
     query_results = _reconstruct_query_results(data.get("queries", []), data.get("errors", []))
@@ -251,7 +248,8 @@ def reconstruct_benchmark_results(
         qph_at_size=tpc["qph_at_size"],
         geometric_mean_execution_time=tpc["geometric_mean_execution_time"],
         test_execution_type=benchmark_section.get("mode", "standard"),
-        validation_status=summary_section.get("validation", "PASSED"),
+        validation_status=summary_section.get("validation", "NOT_RUN"),
+        execution_metadata=_extract_execution_metadata(execution_section),
         execution_environment=execution_environment,
         platform_deployment=platform_section.get("deployment"),
         platform_cloud=platform_section.get("cloud"),
@@ -277,6 +275,15 @@ def reconstruct_benchmark_results(
         manifest_hash=benchmark_section.get("manifest_hash"),
         data_archive_hash=benchmark_section.get("data_archive_hash"),
     )
+
+
+def _extract_execution_metadata(execution_section: dict[str, Any]) -> dict[str, Any] | None:
+    """Preserve execution metadata that is not otherwise reconstructed."""
+    metadata: dict[str, Any] = {}
+    translation = execution_section.get("translation")
+    if isinstance(translation, dict):
+        metadata["translation"] = translation
+    return metadata or None
 
 
 def _parse_timestamp(timestamp_str: str) -> datetime:

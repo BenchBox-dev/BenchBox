@@ -9,20 +9,28 @@ Finding 1 scoping (default OFF; sweep authors enable explicitly).
 
 from __future__ import annotations
 
+import datetime as _dt
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Protocol
 
+from tests.uat.phases import PhaseResult
 from tests.uat.runner import CellResult
 
 REPORT_HEADER = (
-    "platform\tbenchmark\tscale\tstatus\telapsed_s\tlog_path\tresult_path\tsubmit_terminal_state\tvalidator_status"
+    "platform\tbenchmark\tscale\tstatus\tterminal_state\telapsed_s\tlog_path\tresult_path\t"
+    "submit_terminal_state\tvalidator_status\tsource_commit_sha\tsource_dirty"
 )
 
 
+class SourceInfo(Protocol):
+    commit_sha: str
+    dirty: bool
+
+
 @dataclass(frozen=True)
-class ReportSummary:
+class ReportSummary(PhaseResult):
     tsv_path: Path
     rows: int
     pass_count: int
@@ -37,6 +45,8 @@ class ReportSummary:
     cross_scale_floor_breached: bool
 
     def exit_code(self) -> int:
+        if self.aborted:
+            return 2
         return 1 if self.cross_scale_floor_breached else 0
 
 
@@ -44,13 +54,34 @@ def render_row(
     cell: CellResult,
     *,
     validator_status: str = "",
+    source_info: SourceInfo | None = None,
 ) -> str:
     """Render one row matching the current matrix-summary column order."""
+    source_commit_sha = source_info.commit_sha if source_info else ""
+    source_dirty = str(source_info.dirty).lower() if source_info else ""
     return (
         f"{cell.platform}\t{cell.benchmark}\t{cell.scale}\t"
-        f"{cell.status}\t{cell.elapsed_s:.2f}\t"
-        f"{cell.log_path}\t{cell.result_path or ''}\t{cell.submit_terminal_state}\t{validator_status}"
+        f"{cell.status}\t{terminal_state(cell)}\t{cell.elapsed_s:.2f}\t"
+        f"{cell.log_path}\t{cell.result_path or ''}\t{cell.submit_terminal_state}\t{validator_status}\t"
+        f"{source_commit_sha}\t{source_dirty}"
     )
+
+
+def terminal_state(cell: CellResult) -> str:
+    """Classify the terminal state visible in durable UAT artifacts."""
+    if cell.status == "passed":
+        return "passed"
+    if cell.status == "timed-out" or cell.exit_code == 124:
+        return "timeout"
+    if cell.exit_code in {-9, 137}:
+        return "killed"
+    if cell.result_path is None:
+        if cell.exit_code == 0:
+            return "no_json_exit_0"
+        return "no_json_nonzero"
+    if cell.submit_terminal_state:
+        return cell.submit_terminal_state
+    return cell.status
 
 
 def _validator_status_for_path(validator_status_by_path: dict[Path, str], result_path: Path | None) -> str:
@@ -101,6 +132,10 @@ def write_report(
     validator_status_by_path: dict[Path, str] | None = None,
     compatibility_pruned_count: int = 0,
     early_stop_pruned_count: int = 0,
+    source_info: SourceInfo | None = None,
+    run_status: str = "COMPLETED",
+    abort_phase: str | None = None,
+    abort_reason: str | None = None,
 ) -> ReportSummary:
     """Write the matrix summary TSV; optionally enforce a cross-scale floor."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -120,7 +155,7 @@ def write_report(
                 if validator_status_by_path
                 else ""
             )
-            fh.write(render_row(cell, validator_status=v) + "\n")
+            fh.write(render_row(cell, validator_status=v, source_info=source_info) + "\n")
         fh.write(
             "# "
             f"rows={len(rows)} "
@@ -132,6 +167,14 @@ def write_report(
             f"failed={fail_count} "
             f"timed_out={timeout_count}\n"
         )
+        footer = f"# run_status={run_status}"
+        if source_info is not None:
+            footer += f" source_commit_sha={source_info.commit_sha} source_dirty={str(source_info.dirty).lower()}"
+        if abort_phase:
+            footer += f" abort_phase={abort_phase}"
+        if abort_reason:
+            footer += f" abort_reason={_footer_value(abort_reason)}"
+        fh.write(footer + "\n")
 
     if rungs:
         clean_pairs = cross_scale_clean_pair_count(rows, rungs, validator_status_by_path=validator_status_by_path)
@@ -141,6 +184,7 @@ def write_report(
     floor_breached = cross_scale_floor is not None and clean_pairs < cross_scale_floor
 
     return ReportSummary(
+        phase="report",
         tsv_path=output_path,
         rows=len(rows),
         pass_count=pass_count,
@@ -153,4 +197,77 @@ def write_report(
         cross_scale_clean_pairs=clean_pairs,
         cross_scale_floor=cross_scale_floor,
         cross_scale_floor_breached=floor_breached,
+        aborted=run_status in {"ABORTED", "BLOCKED"},
+        abort_reason=abort_reason,
     )
+
+
+def _footer_value(value: str) -> str:
+    return value.replace("\t", " ").replace("\n", " ")
+
+
+# ---------------------------------------------------------------------------
+# Certification re-run ordering check.
+#
+# The certification contract (uat-certification-rerun-ordering-and-gate) runs
+# four stages — native SQL, then dataframe, then Docker non-OLTP, then Docker
+# OLTP — and requires that ALL native + dataframe platforms complete before any
+# Docker stack starts. The 2026-05-28/29 evidence was contaminated because a
+# Docker stack began before the dataframe sweep finished. Each sweep is a
+# separate invocation, so the cross-stage order is enforced by the runbook; this
+# helper provides the lightweight, machine-checkable proof from lifecycle logs.
+# ---------------------------------------------------------------------------
+
+
+def parse_docker_up_events(lifecycle_log_text: str) -> list[tuple[_dt.datetime, str]]:
+    """Extract ``(timestamp, platform)`` for each Docker ``action=up`` line.
+
+    Parses ``uat_lifecycle.log`` lines of the shape::
+
+        2026-05-30T01:02:03 [docker] platform=lakesail action=up status=ok ...
+
+    Lines without a Docker ``action=up`` marker, or with an unparseable leading
+    ISO timestamp, are skipped.
+    """
+    events: list[tuple[_dt.datetime, str]] = []
+    for raw in lifecycle_log_text.splitlines():
+        line = raw.strip()
+        if "[docker]" not in line or "action=up" not in line:
+            continue
+        timestamp_token = line.split(" ", 1)[0]
+        try:
+            timestamp = _dt.datetime.fromisoformat(timestamp_token)
+        except ValueError:
+            continue
+        platform = "unknown"
+        for token in line.split():
+            if token.startswith("platform="):
+                platform = token.split("=", 1)[1]
+                break
+        events.append((timestamp, platform))
+    return events
+
+
+def certification_ordering_violations(
+    docker_stage_lifecycle_logs: Iterable[str],
+    *,
+    native_stage_completed_at: _dt.datetime,
+) -> list[str]:
+    """Return ordering violations for a certification run-set.
+
+    Given the ``uat_lifecycle.log`` text of each Docker stage and the timestamp
+    at which the native + dataframe stage completed, return a human-readable
+    violation for every Docker ``action=up`` that started at or before that
+    boundary. An empty list means the four-stage ordering held: no Docker stack
+    came up before native + dataframe finished.
+    """
+    violations: list[str] = []
+    for log_text in docker_stage_lifecycle_logs:
+        for timestamp, platform in parse_docker_up_events(log_text):
+            if timestamp <= native_stage_completed_at:
+                violations.append(
+                    f"Docker stack '{platform}' started at {timestamp.isoformat()} "
+                    f"at/before native+dataframe stage completion "
+                    f"{native_stage_completed_at.isoformat()}"
+                )
+    return violations

@@ -13,6 +13,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
@@ -468,6 +469,63 @@ class TestTrinoAdapter:
         # Verify CREATE SCHEMA was executed
         execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
         assert any("CREATE SCHEMA" in call for call in execute_calls)
+
+    def test_create_connection_keeps_session_properties_on_final_connection_after_auto_select(self, monkeypatch):
+        """Bootstrap connections should not receive catalog-scoped session properties."""
+        import benchbox.platforms.trino as trino_module
+
+        mock_dbapi = Mock()
+        monkeypatch.setattr(trino_module, "trino", SimpleNamespace(dbapi=mock_dbapi))
+
+        catalog_connection = Mock()
+        catalog_cursor = Mock()
+        catalog_cursor.fetchall.return_value = [("memory",), ("system",)]
+        catalog_connection.cursor.return_value = catalog_cursor
+
+        validation_catalog_connection = Mock()
+        validation_catalog_cursor = Mock()
+        validation_catalog_cursor.fetchall.return_value = [("memory",), ("system",)]
+        validation_catalog_connection.cursor.return_value = validation_catalog_cursor
+
+        schema_check_connection = Mock()
+        schema_check_cursor = Mock()
+        schema_check_cursor.fetchone.return_value = None
+        schema_check_connection.cursor.return_value = schema_check_cursor
+
+        schema_create_connection = Mock()
+        schema_create_cursor = Mock()
+        schema_create_connection.cursor.return_value = schema_create_cursor
+
+        final_connection = Mock()
+        final_cursor = Mock()
+        final_cursor.fetchone.return_value = (1,)
+        final_connection.cursor.return_value = final_cursor
+
+        mock_dbapi.connect.side_effect = [
+            catalog_connection,
+            validation_catalog_connection,
+            schema_check_connection,
+            schema_create_connection,
+            final_connection,
+        ]
+
+        session_properties = {"memory.query_partition_filter_required": "false"}
+        adapter = TrinoAdapter(schema="new_schema", session_properties=session_properties)
+
+        with patch.object(adapter, "handle_existing_database"):
+            connection = adapter.create_connection()
+
+        assert connection is final_connection
+        assert adapter.catalog == "memory"
+
+        connect_kwargs = [call.kwargs for call in mock_dbapi.connect.call_args_list]
+        assert len(connect_kwargs) == 5
+        assert all("session_properties" not in kwargs for kwargs in connect_kwargs[:4])
+        assert connect_kwargs[2]["catalog"] == "memory"
+        assert connect_kwargs[3]["catalog"] == "memory"
+        assert connect_kwargs[4]["catalog"] == "memory"
+        assert connect_kwargs[4]["session_properties"] == session_properties
+        schema_create_cursor.execute.assert_called_once_with("CREATE SCHEMA IF NOT EXISTS memory.new_schema")
 
     def test_create_schema(self):
         """Test schema creation with Trino table definitions."""
@@ -1349,6 +1407,46 @@ class TestTrinoTableDefinitionOptimization:
         sql = "CREATE TABLE orders (id BIGINT)"
         result = adapter._optimize_table_definition(sql)
         assert "WITH (format = 'PARQUET')" in result
+
+    @pytest.mark.parametrize(
+        ("table_format", "adds_format"),
+        [("memory", False), ("hive", True), ("iceberg", True), ("delta", False)],
+    )
+    def test_strips_inline_primary_key_metadata(self, table_format, adds_format):
+        adapter = self._adapter(table_format=table_format)
+        sql = "CREATE TABLE kind_type (id INTEGER PRIMARY KEY, kind VARCHAR(15) NOT NULL)"
+        result = adapter._optimize_table_definition(sql)
+        result_upper = result.upper()
+
+        assert "PRIMARY KEY" not in result_upper
+        assert "id INTEGER" in result
+        if table_format == "memory":
+            assert "NOT NULL" not in result_upper
+        else:
+            assert "NOT NULL" in result_upper
+        if adds_format:
+            assert "WITH (format = 'PARQUET')" in result
+        else:
+            assert "WITH" not in result_upper
+
+    @pytest.mark.parametrize(
+        ("table_format", "adds_format"),
+        [("memory", False), ("hive", True), ("iceberg", True), ("delta", False)],
+    )
+    def test_strips_table_level_primary_key_metadata_with_nested_expression(self, table_format, adds_format):
+        adapter = self._adapter(table_format=table_format)
+        sql = "CREATE TABLE edge_case (id BIGINT, other_id BIGINT, PRIMARY KEY (id, coalesce(other_id, 0)))"
+        result = adapter._optimize_table_definition(sql)
+        result_upper = result.upper()
+
+        assert "PRIMARY KEY" not in result_upper
+        assert "coalesce" not in result
+        assert "id BIGINT" in result
+        assert "other_id BIGINT" in result
+        if adds_format:
+            assert "WITH (format = 'PARQUET')" in result
+        else:
+            assert "WITH" not in result_upper
 
 
 class TestTrinoConfigureForBenchmark:

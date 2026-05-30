@@ -19,7 +19,7 @@ pytestmark = [
 KNOWN_ZERO_UNDERLYING = {"2c", "5a", "5b", "10b", "32a"}
 REPO_ROOT = Path(__file__).resolve().parents[4]
 TINY_FIXTURE = REPO_ROOT / "tests" / "fixtures" / "joinorder_canonical_tiny"
-TINY_REFERENCE = TINY_FIXTURE / "tiny_reference_cardinalities.json"
+TINY_REFERENCE = REPO_ROOT / "_project" / "joinorder" / "tiny_reference_cardinalities.json"
 DUCKDB_INTEGER_RANGES = {
     "TINYINT": (-(2**7), 2**7 - 1),
     "SMALLINT": (-(2**15), 2**15 - 1),

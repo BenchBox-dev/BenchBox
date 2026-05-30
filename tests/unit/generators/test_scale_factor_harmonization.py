@@ -8,11 +8,9 @@ import pytest
 
 from benchbox.core.clickbench.generator import ClickBenchDataGenerator
 from benchbox.core.coffeeshop.generator import CoffeeShopDataGenerator
-from benchbox.core.flightdata.benchmark import FlightDataBenchmark
 from benchbox.core.flightdata.downloader import MONTHS_PER_SCALE_FACTOR
 from benchbox.core.h2odb.generator import H2ODataGenerator
 from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
-from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
 from benchbox.core.nyctaxi.downloader import SCALE_FACTOR_SAMPLE_DIVISOR
 from benchbox.core.ssb.generator import SSBDataGenerator
 from benchbox.core.tsbs_devops.generator import DEFAULT_DURATION_DAYS, TSBSDevOpsDataGenerator
@@ -102,44 +100,6 @@ def test_tsbs_devops_supports_compressed_generation(tmp_path):
     table_files = generator.generate()
     assert set(table_files) == {"tags", "cpu", "mem", "disk", "net"}
     assert all(path.suffix == ".zst" for path in table_files.values())
-
-    manifest = json.loads((tmp_path / "_datagen_manifest.json").read_text())
-    assert manifest["compression"]["enabled"] is True
-    assert manifest["compression"]["type"] == "zstd"
-
-
-def test_flightdata_benchmark_supports_compressed_generation(tmp_path):
-    benchmark = FlightDataBenchmark(
-        scale_factor=0.01,
-        output_dir=tmp_path,
-        seed=42,
-        compress_data=True,
-        compression_type="zstd",
-    )
-
-    paths = benchmark.generate_data()
-    assert len(paths) == 3
-    assert all(path.suffix == ".zst" for path in paths)
-
-    manifest = json.loads((tmp_path / "_datagen_manifest.json").read_text())
-    assert manifest["compression"]["enabled"] is True
-    assert manifest["compression"]["type"] == "zstd"
-
-
-def test_nyctaxi_benchmark_supports_compressed_generation(tmp_path):
-    benchmark = NYCTaxiBenchmark(
-        scale_factor=0.01,
-        output_dir=tmp_path,
-        year=2019,
-        months=[1],
-        seed=42,
-        compress_data=True,
-        compression_type="zstd",
-    )
-
-    paths = benchmark.generate_data()
-    assert len(paths) == 2
-    assert all(path.suffix == ".zst" for path in paths)
 
     manifest = json.loads((tmp_path / "_datagen_manifest.json").read_text())
     assert manifest["compression"]["enabled"] is True

@@ -36,6 +36,10 @@ from benchbox.core.write_primitives.schema import (
     get_all_staging_tables_sql,
     get_create_table_sql,
 )
+from benchbox.sql_compat.rules.execution_filter.duckdb_write_primitives import (
+    DUCKDB_WRITE_PRIMITIVES_CATEGORY_SKIPS,
+    DUCKDB_WRITE_PRIMITIVES_OPERATION_SKIPS,
+)
 from benchbox.sql_compat.rules.execution_filter.postgres_write_primitives import (
     POSTGRES_WRITE_PRIMITIVES_CATEGORY_SKIPS,
     POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS,
@@ -392,6 +396,19 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     f"{POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS[operation.id]}"
                 )
 
+        if (platform_key or "").lower() == "duckdb":
+            category = getattr(operation, "category", "")
+            if category in DUCKDB_WRITE_PRIMITIVES_CATEGORY_SKIPS:
+                return None, (
+                    f"Operation '{operation.id}' is skipped on DuckDB: "
+                    f"{DUCKDB_WRITE_PRIMITIVES_CATEGORY_SKIPS[category]}"
+                )
+            if operation.id in DUCKDB_WRITE_PRIMITIVES_OPERATION_SKIPS:
+                return None, (
+                    f"Operation '{operation.id}' is skipped on DuckDB: "
+                    f"{DUCKDB_WRITE_PRIMITIVES_OPERATION_SKIPS[operation.id]}"
+                )
+
         effective_sql = operation.write_sql
 
         if platform_key and operation.platform_overrides and platform_key in operation.platform_overrides:
@@ -400,7 +417,46 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 return None, f"Operation '{operation.id}' is unsupported on platform '{platform_key}'."
             effective_sql = override
 
+        if (missing_file := self._check_bulk_load_file_dependencies(operation)) is not None:
+            return None, (
+                f"Operation '{operation.id}' is skipped because required bulk-load files are missing: {missing_file}"
+            )
+
         return effective_sql, None
+
+    def _check_bulk_load_file_dependencies(self, operation: Any) -> str | None:
+        """Return a comma-separated list of missing file-dependency paths, if any.
+
+        Only operations that declare `file_dependencies` are checked. Missing files
+        are treated as a non-fatal skip reason to keep benchmark runs stable when
+        auxiliary data has not been generated yet.
+        """
+        dependencies = list(getattr(operation, "file_dependencies", []))
+        if not dependencies:
+            return None
+
+        files_dir = getattr(self.data_generator, "files_dir", None)
+        if files_dir is None:
+            return ", ".join(dependencies)
+
+        missing: list[str] = []
+        for filename in dependencies:
+            try:
+                if "*" in filename:
+                    matches = list(files_dir.glob(filename))
+                    if not matches:
+                        missing.append(filename)
+                else:
+                    dependency_path = files_dir / filename
+                    if not dependency_path.exists():
+                        missing.append(filename)
+            except Exception:
+                missing.append(filename)
+
+        if not missing:
+            return None
+
+        return ", ".join(missing)
 
     def _table_exists(self, connection: DatabaseConnection, table_name: str) -> bool:
         """Check if a table exists in the database.
@@ -812,7 +868,25 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         """
         normalized: dict[str, dict[str, Any]] = {}
 
+        # The 8 base TPC-H tables (fixed by the spec) plus the write-primitives
+        # staging tables. Anything else in TABLES (e.g. operation-created sketch
+        # tables) is created at execution time, not loaded, so it is excluded.
+        loadable_table_names = {
+            "region",
+            "nation",
+            "customer",
+            "supplier",
+            "part",
+            "partsupp",
+            "orders",
+            "lineitem",
+            *STAGING_TABLES.keys(),
+        }
+
         for table_name, table_def in TABLES.items():
+            if table_name not in loadable_table_names:
+                continue
+
             # Write Primitives staging tables are already dict-shaped.
             if isinstance(table_def, dict) and "columns" in table_def:
                 normalized[table_name] = table_def
@@ -866,16 +940,63 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             raise ValueError(f"Operation '{operation.id}' is DataFrame aggregate-state only and is not exposed as SQL")
         return operation.write_sql
 
+    def get_all_operations(self) -> dict[str, Any]:
+        """Return SQL-operable operations.
+
+        Aggregate-state operations are routed through the DataFrame execution
+        path and intentionally excluded here so SQL-only counts and defaults
+        match legacy write-primitives behavior.
+        """
+        return {
+            op_id: operation
+            for op_id, operation in self.operations_manager.get_all_operations().items()
+            if operation.aggregate_state is None and operation.category.lower() != "sketch"
+        }
+
+    def get_operation_categories(self) -> list[str]:
+        """Get categories for SQL-operable operations."""
+        return sorted({operation.category for operation in self.get_all_operations().values()})
+
+    def get_operations_by_category(self, category: str) -> dict[str, Any]:
+        """Get SQL-operable operations filtered by category."""
+        normalized = category.lower()
+        return {
+            op_id: operation
+            for op_id, operation in self.get_all_operations().items()
+            if operation.category.lower() == normalized
+        }
+
+    def get_benchmark_info(self) -> dict[str, Any]:
+        """Return benchmark metadata using SQL operation count/category."""
+        return {
+            "name": self._name,
+            "version": self._version,
+            "description": self._description,
+            "scale_factor": self.scale_factor,
+            "total_operations": len(self.get_all_operations()),
+            "categories": self.get_operation_categories(),
+            "tables": list(self._staging_tables.keys()),
+            "data_source": "tpch",
+        }
+
     def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
         """Get SQL-runnable write operations, excluding DataFrame-only aggregate-state ops."""
         _ = dialect
         operations = self.operations_manager.get_all_operations()
-        return {op_id: op.write_sql for op_id, op in operations.items() if op.aggregate_state is None}
+        return {
+            op_id: op.write_sql
+            for op_id, op in operations.items()
+            if op.aggregate_state is None and op.category.lower() != "sketch"
+        }
 
     def get_queries_by_category(self, category: str) -> dict[str, str]:
         """Get SQL-runnable write operations for a category."""
         operations = self.operations_manager.get_operations_by_category(category)
-        return {op_id: op.write_sql for op_id, op in operations.items() if op.aggregate_state is None}
+        return {
+            op_id: op.write_sql
+            for op_id, op in operations.items()
+            if op.aggregate_state is None and op.category.lower() != "sketch"
+        }
 
     def execute_operation(
         self,

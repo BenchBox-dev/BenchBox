@@ -19,12 +19,15 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from benchbox.core.results.loader import load_result_file
+from benchbox.core.results.status import bundle_non_clean_reason, result_non_clean_reason
+from benchbox.validation.bundle import COMPANION_SUFFIXES
+
 from .store import PublicationRecord, PublicationStore, build_reference
 
 logger = logging.getLogger(__name__)
 
 VALID_LABELS = ("maintainer-run", "community-submission", "ci", "local", "unofficial-research")
-COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
 
 
 @dataclass
@@ -117,6 +120,10 @@ class BundlePublisher:
                 ],
             )
 
+        validation_errors = _validate_source_bundle_for_publication(bundle_path)
+        if validation_errors:
+            return BundlePublishResult(success=False, errors=validation_errors)
+
         # Extract informational metadata from the bundle header
         metadata = _read_bundle_metadata(bundle_path)
 
@@ -170,6 +177,19 @@ class _BundleMetadata:
     dataset_version: str | None = None
     manifest_hash: str | None = None
     data_archive_hash: str | None = None
+
+
+def _validate_source_bundle_for_publication(bundle_path: Path) -> list[str]:
+    """Return publication-blocking errors for source bundles that are not clean passes."""
+    try:
+        result, data = load_result_file(bundle_path)
+    except Exception as exc:
+        return [f"Source bundle is not a loadable schema-v2 result bundle: {exc}"]
+
+    reason = bundle_non_clean_reason(data) or result_non_clean_reason(result)
+    if reason:
+        return [f"Source bundle is not a clean pass: {reason}"]
+    return []
 
 
 def _read_bundle_metadata(bundle_path: Path) -> _BundleMetadata:

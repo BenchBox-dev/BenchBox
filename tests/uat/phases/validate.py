@@ -1,28 +1,20 @@
-"""Validate phase: invoke scripts/uat_validator_rollup.py per sweep.
-
-INTEGRATION work, not reimplementation. The
-`scripts/uat_validator_rollup.py` helper from
-`uat-template-validator-clean-rate-runner` is the source of truth for
-validation; this phase invokes it as a subprocess and consumes the
-resulting TSV.
-"""
+"""Validate phase: run public bundle validation in-process for a UAT sweep."""
 
 from __future__ import annotations
 
-import shutil
-import subprocess
-import sys
+import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-ROLLUP_SCRIPT = REPO_ROOT / "scripts" / "uat_validator_rollup.py"
+from benchbox.validation.bundle import CLI_REFUSED_COMPLIANCE_CLASSES, discover_bundles, validate_bundles
+from tests.uat.phases import PhaseResult
+
 TSV_HEADER = "platform\tbenchmark\tscale\tresult_path\tvalidator_status\terror_count\twarning_count\tfirst_error"
 
 
 @dataclass(frozen=True)
-class ValidateResult:
+class ValidateResult(PhaseResult):
     rollup_tsv_path: Path
     clean_count: int
     warning_count: int
@@ -32,18 +24,39 @@ class ValidateResult:
     clean_rate: float
     floor: float
     floor_breached: bool
-    script_returncode: int = 0
 
     def exit_code(self) -> int:
-        if self.script_returncode != 0:
-            return self.script_returncode
+        if self.aborted:
+            return 2
         if self.floor_breached:
             return 1
         return 0
 
 
-class ValidatePhaseError(RuntimeError):
-    """Raised when the validator subprocess fails before producing a TSV."""
+@dataclass(frozen=True)
+class _RollupRow:
+    platform: str
+    benchmark: str
+    scale: str
+    result_path: str
+    validator_status: str
+    error_count: int
+    warning_count: int
+    first_error: str
+
+    def to_tsv(self) -> str:
+        return "\t".join(
+            [
+                self.platform,
+                self.benchmark,
+                self.scale,
+                self.result_path,
+                self.validator_status,
+                str(self.error_count),
+                str(self.warning_count),
+                self.first_error.replace("\t", " ").replace("\n", " "),
+            ]
+        )
 
 
 def run_validate(
@@ -51,157 +64,131 @@ def run_validate(
     *,
     output_tsv: Path,
     floor: float = 0.80,
-    extra_args: tuple[str, ...] = (),
-    rollup_script: Path | None = None,
-    runner=None,
 ) -> ValidateResult:
-    """Execute the validate phase against results_dir, writing the rollup to output_tsv.
-
-    Does NOT raise on non-zero validator exit. The returncode is surfaced
-    through `ValidateResult.script_returncode` and folded into
-    `exit_code()` so the orchestrator can keep the phase contract uniform
-    (set phase_exit_codes, never propagate CalledProcessError).
-    Raises `ValidatePhaseError` only when the subprocess fails AND no TSV
-    was produced — in that case there is nothing to parse.
-    """
-    if runner is None:
-        runner = subprocess.run
-    script = rollup_script or ROLLUP_SCRIPT
-    if not script.exists():
-        raise FileNotFoundError(f"validator rollup helper not found at {script}")
+    """Validate result bundles and write the rollup TSV consumed by report."""
     output_tsv.parent.mkdir(parents=True, exist_ok=True)
-    if output_tsv.exists():
-        output_tsv.unlink()
-    if not isinstance(results_dir, Path):
-        return _run_validate_paths(
-            tuple(results_dir),
-            output_tsv=output_tsv,
-            floor=floor,
-            extra_args=extra_args,
-            rollup_script=script,
-            runner=runner,
+    bundle_paths = _bundle_paths(results_dir)
+    if bundle_paths is None:
+        return _aborted_validate_result(output_tsv, floor=floor, reason=f"results path not found: {results_dir}")
+
+    rows = _build_rows(bundle_paths)
+    output_tsv.write_text(_render_tsv(rows), encoding="utf-8")
+    return _result_from_rows(output_tsv, rows, floor=floor)
+
+
+def _bundle_paths(results_dir: Path | Sequence[Path]) -> list[Path] | None:
+    if isinstance(results_dir, Path):
+        if not results_dir.exists():
+            return None
+        if results_dir.is_dir():
+            return discover_bundles(results_dir)
+        return [results_dir]
+    return list(results_dir)
+
+
+def _build_rows(bundle_paths: Sequence[Path]) -> list[_RollupRow]:
+    rows: list[_RollupRow] = []
+    for bundle_path in bundle_paths:
+        platform, benchmark, scale, compliance_class = _read_bundle_metadata(bundle_path)
+
+        if compliance_class in CLI_REFUSED_COMPLIANCE_CLASSES:
+            rows.append(
+                _RollupRow(
+                    platform=platform,
+                    benchmark=benchmark,
+                    scale=scale,
+                    result_path=str(bundle_path),
+                    validator_status="refused-by-cli",
+                    error_count=0,
+                    warning_count=0,
+                    first_error=f"compliance_class={compliance_class}",
+                )
+            )
+            continue
+
+        results = validate_bundles([bundle_path])
+        if not results:
+            rows.append(
+                _RollupRow(
+                    platform=platform,
+                    benchmark=benchmark,
+                    scale=scale,
+                    result_path=str(bundle_path),
+                    validator_status="error",
+                    error_count=1,
+                    warning_count=0,
+                    first_error="validate_bundles returned no result (manifest sidecar?)",
+                )
+            )
+            continue
+
+        result = results[0]
+        rows.append(
+            _RollupRow(
+                platform=platform,
+                benchmark=benchmark,
+                scale=scale,
+                result_path=str(bundle_path),
+                validator_status=_classify(len(result.errors), len(result.warnings)),
+                error_count=len(result.errors),
+                warning_count=len(result.warnings),
+                first_error=result.errors[0] if result.errors else "",
+            )
         )
-    argv = [
-        sys.executable,
-        str(script),
-        str(results_dir),
-        "--output",
-        str(output_tsv),
-        *extra_args,
-    ]
-    completed = runner(argv, check=False)
-    rc = getattr(completed, "returncode", 0)
-    if rc != 0 and not output_tsv.exists():
-        raise ValidatePhaseError(f"validator subprocess exited {rc} without producing {output_tsv}")
-    parsed = parse_rollup(output_tsv, floor=floor)
-    if rc == 0:
-        return parsed
+    return rows
+
+
+def _read_bundle_metadata(bundle_path: Path) -> tuple[str, str, str, str | None]:
+    try:
+        data = json.loads(bundle_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "-", "-", "-", None
+    if not isinstance(data, dict):
+        return "-", "-", "-", None
+
+    platform = "-"
+    raw_platform = data.get("platform")
+    if isinstance(raw_platform, dict):
+        name = raw_platform.get("name")
+        if isinstance(name, str) and name:
+            platform = name
+
+    benchmark = "-"
+    scale = "-"
+    compliance_class: str | None = None
+    raw_benchmark = data.get("benchmark")
+    if isinstance(raw_benchmark, dict):
+        benchmark_id = raw_benchmark.get("id")
+        if isinstance(benchmark_id, str) and benchmark_id:
+            benchmark = benchmark_id
+        scale_factor = raw_benchmark.get("scale_factor")
+        if scale_factor is not None:
+            scale = str(scale_factor)
+        raw_compliance = raw_benchmark.get("compliance_class")
+        if isinstance(raw_compliance, str):
+            compliance_class = raw_compliance
+
+    return platform, benchmark, scale, compliance_class
+
+
+def _classify(error_count: int, warning_count: int) -> str:
+    if error_count > 0:
+        return "error"
+    if warning_count > 0:
+        return "warning_only"
+    return "clean"
+
+
+def _result_from_rows(rollup_tsv: Path, rows: Sequence[_RollupRow], *, floor: float) -> ValidateResult:
+    clean = sum(1 for row in rows if row.validator_status == "clean")
+    warning = sum(1 for row in rows if row.validator_status == "warning_only")
+    error = sum(1 for row in rows if row.validator_status == "error")
+    refused = sum(1 for row in rows if row.validator_status == "refused-by-cli")
+    total = len(rows)
+    denominator = total - refused
+    clean_rate = clean / denominator if denominator > 0 else 0.0
     return ValidateResult(
-        rollup_tsv_path=parsed.rollup_tsv_path,
-        clean_count=parsed.clean_count,
-        warning_count=parsed.warning_count,
-        error_count=parsed.error_count,
-        refused_count=parsed.refused_count,
-        total=parsed.total,
-        clean_rate=parsed.clean_rate,
-        floor=parsed.floor,
-        floor_breached=parsed.floor_breached,
-        script_returncode=rc,
-    )
-
-
-def _run_validate_paths(
-    result_paths: tuple[Path, ...],
-    *,
-    output_tsv: Path,
-    floor: float,
-    extra_args: tuple[str, ...],
-    rollup_script: Path,
-    runner,
-) -> ValidateResult:
-    """Run the rollup helper against exact execute result paths and merge its TSV rows."""
-    rows: list[str] = []
-    script_returncode = 0
-    for idx, result_path in enumerate(result_paths):
-        tmp_tsv = output_tsv.with_name(f".{output_tsv.name}.{idx}.tmp")
-        if tmp_tsv.exists():
-            tmp_tsv.unlink()
-        argv = [
-            sys.executable,
-            str(rollup_script),
-            str(result_path),
-            "--output",
-            str(tmp_tsv),
-            *extra_args,
-        ]
-        completed = runner(argv, check=False)
-        rc = getattr(completed, "returncode", 0)
-        if script_returncode == 0 and rc != 0:
-            script_returncode = rc
-        if rc != 0 and not tmp_tsv.exists():
-            raise ValidatePhaseError(f"validator subprocess exited {rc} without producing {tmp_tsv}")
-        rows.extend(_rollup_body_rows(tmp_tsv))
-        tmp_tsv.unlink(missing_ok=True)
-
-    output_tsv.write_text(TSV_HEADER + "\n" + "\n".join(rows) + ("\n" if rows else ""), encoding="utf-8")
-    parsed = parse_rollup(output_tsv, floor=floor)
-    if script_returncode == 0:
-        return parsed
-    return ValidateResult(
-        rollup_tsv_path=parsed.rollup_tsv_path,
-        clean_count=parsed.clean_count,
-        warning_count=parsed.warning_count,
-        error_count=parsed.error_count,
-        refused_count=parsed.refused_count,
-        total=parsed.total,
-        clean_rate=parsed.clean_rate,
-        floor=parsed.floor,
-        floor_breached=parsed.floor_breached,
-        script_returncode=script_returncode,
-    )
-
-
-def _rollup_body_rows(rollup_tsv: Path) -> list[str]:
-    with rollup_tsv.open("r", encoding="utf-8") as fh:
-        lines = [line.rstrip("\n") for line in fh]
-    return [line for line in lines[1:] if line and not line.startswith("#")]
-
-
-def parse_rollup(rollup_tsv: Path, *, floor: float = 0.80) -> ValidateResult:
-    """Parse the TSV emitted by scripts/uat_validator_rollup.py and compute clean-rate."""
-    clean = warning = error = refused = 0
-    with rollup_tsv.open("r", encoding="utf-8") as fh:
-        header = fh.readline().rstrip("\n").split("\t")
-        try:
-            status_idx = header.index("validator_status")
-        except ValueError as exc:
-            raise ValueError(f"rollup TSV header missing validator_status column: {header}") from exc
-        for line in fh:
-            if line.startswith("#") or not line.strip():
-                continue
-            fields = line.rstrip("\n").split("\t")
-            if len(fields) <= status_idx:
-                continue
-            status = fields[status_idx]
-            if status == "clean":
-                clean += 1
-            elif status == "warning_only":
-                warning += 1
-            elif status == "error":
-                error += 1
-            elif status == "refused-by-cli":
-                refused += 1
-    total = clean + warning + error + refused
-    if total == 0:
-        clean_rate = 0.0
-    else:
-        # Clean-rate is computed against all bundles the validator
-        # actually ran on (i.e. excluding refused). Matches the
-        # interpretation used in the 2026-05-02 retrospective.
-        denom = total - refused
-        clean_rate = clean / denom if denom > 0 else 0.0
-    floor_breached = clean_rate < floor
-    return ValidateResult(
+        phase="validate",
         rollup_tsv_path=rollup_tsv,
         clean_count=clean,
         warning_count=warning,
@@ -210,12 +197,87 @@ def parse_rollup(rollup_tsv: Path, *, floor: float = 0.80) -> ValidateResult:
         total=total,
         clean_rate=clean_rate,
         floor=floor,
-        floor_breached=floor_breached,
+        floor_breached=clean_rate < floor,
+    )
+
+
+def _render_tsv(rows: Sequence[_RollupRow]) -> str:
+    body = [TSV_HEADER]
+    body.extend(row.to_tsv() for row in rows)
+    body.extend(_format_footer(rows))
+    return "\n".join(body) + "\n"
+
+
+def _format_footer(rows: Sequence[_RollupRow]) -> list[str]:
+    total = len(rows)
+    clean = sum(1 for row in rows if row.validator_status == "clean")
+    error = sum(1 for row in rows if row.validator_status == "error")
+    warning_only = sum(1 for row in rows if row.validator_status == "warning_only")
+    refused = sum(1 for row in rows if row.validator_status == "refused-by-cli")
+    submittable = total - refused
+    lines = [
+        f"# overall: total={total} submittable={submittable} clean={clean} "
+        f"warning_only={warning_only} error={error} refused-by-cli={refused} "
+        f"validator_clean_rate={_rate(clean, submittable)}"
+    ]
+
+    by_platform: dict[str, list[_RollupRow]] = {}
+    by_benchmark: dict[str, list[_RollupRow]] = {}
+    for row in rows:
+        by_platform.setdefault(row.platform, []).append(row)
+        by_benchmark.setdefault(row.benchmark, []).append(row)
+
+    for platform in sorted(by_platform):
+        platform_rows = by_platform[platform]
+        submittable_rows = [row for row in platform_rows if row.validator_status != "refused-by-cli"]
+        platform_clean = sum(1 for row in submittable_rows if row.validator_status == "clean")
+        lines.append(
+            f"# platform={platform}: total={len(platform_rows)} submittable={len(submittable_rows)} "
+            f"clean={platform_clean} validator_clean_rate={_rate(platform_clean, len(submittable_rows))}"
+        )
+
+    for benchmark in sorted(by_benchmark):
+        benchmark_rows = by_benchmark[benchmark]
+        submittable_rows = [row for row in benchmark_rows if row.validator_status != "refused-by-cli"]
+        benchmark_clean = sum(1 for row in submittable_rows if row.validator_status == "clean")
+        lines.append(
+            f"# benchmark={benchmark}: total={len(benchmark_rows)} submittable={len(submittable_rows)} "
+            f"clean={benchmark_clean} validator_clean_rate={_rate(benchmark_clean, len(submittable_rows))}"
+        )
+
+    return lines
+
+
+def _rate(numerator: int, denominator: int) -> str:
+    if denominator == 0:
+        return "n/a"
+    return f"{(100 * numerator / denominator):.1f}%"
+
+
+def _aborted_validate_result(
+    rollup_tsv: Path,
+    *,
+    floor: float,
+    reason: str,
+) -> ValidateResult:
+    return ValidateResult(
+        phase="validate",
+        aborted=True,
+        abort_reason=reason,
+        rollup_tsv_path=rollup_tsv,
+        clean_count=0,
+        warning_count=0,
+        error_count=0,
+        refused_count=0,
+        total=0,
+        clean_rate=0.0,
+        floor=floor,
+        floor_breached=False,
     )
 
 
 def parse_validator_status_by_path(rollup_tsv: Path) -> dict[Path, str]:
-    """Extract result_path → validator_status from a rollup TSV.
+    """Extract result_path -> validator_status from a rollup TSV.
 
     Used by the report phase so cross_scale_clean_pair_count can apply
     the validator-clean dimension. Missing or short rows are skipped.
@@ -239,18 +301,3 @@ def parse_validator_status_by_path(rollup_tsv: Path) -> dict[Path, str]:
                 continue
             out[Path(result_path).resolve()] = fields[status_idx]
     return out
-
-
-def standalone_argv(results_dir: Path, output_tsv: Path) -> list[str]:
-    """Help text helper for `make uat-validate`."""
-    return [
-        sys.executable,
-        str(ROLLUP_SCRIPT),
-        str(results_dir),
-        "--output",
-        str(output_tsv),
-    ]
-
-
-def has_rollup_script() -> bool:
-    return ROLLUP_SCRIPT.exists() or shutil.which("uat_validator_rollup.py") is not None

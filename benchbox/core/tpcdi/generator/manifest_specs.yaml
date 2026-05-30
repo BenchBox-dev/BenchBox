@@ -1,0 +1,3 @@
+csv_metadata:
+  csv_normalize_booleans: true
+  csv_null_marker: ''

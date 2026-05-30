@@ -24,95 +24,53 @@ IMPORTANT — multi-rule conflict:
 
 from __future__ import annotations
 
-from benchbox.sql_compat.actions import CompatAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.decision import (
-    CompatibilityDecision,
-    FailureMode,
-    RewriteDDLPayload,
-    SupportLevel,
-)
-from benchbox.sql_compat.registry import REGISTRY
+from benchbox.sql_compat.decision import FailureMode
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.singlestore.all.strip_foreign_keys",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.SYNTAX_ERROR,
-        payload=RewriteDDLPayload(
-            transformer_id="singlestore_strip_foreign_keys",
-            description="Remove FOREIGN KEY clauses from CREATE TABLE (SingleStore error 2752).",
-        ),
-        reason=(
-            "SingleStore raises error 2752 when a CREATE TABLE statement contains FOREIGN KEY "
-            "clauses with referential actions. FK constraints are stripped so tables can be created "
-            "without enforcement (acceptable for benchmarking workloads)."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "singlestore",
+register_ddl_rewrite(
+    platform="singlestore",
+    rule_name="strip_foreign_keys",
+    transformer_id="singlestore_strip_foreign_keys",
+    description="Remove FOREIGN KEY clauses from CREATE TABLE (SingleStore error 2752).",
+    reason="SingleStore raises error 2752 when a CREATE TABLE statement contains FOREIGN KEY "
+    "clauses with referential actions. FK constraints are stripped so tables can be created "
+    "without enforcement (acceptable for benchmarking workloads).",
+    governance_only=False,
 )
 
-# reference_table must run before inject_shard_key / inject_sort_key so that the
-# REFERENCE TABLE keyword is already present when those guards check for it.
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.singlestore.all.reference_table_for_dimensions",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.PERFORMANCE_REGRESSION,
-        payload=RewriteDDLPayload(
-            transformer_id="singlestore_reference_table",
-            description="Rewrite small dimension tables (nation, region) to CREATE REFERENCE TABLE.",
-        ),
-        reason=(
-            "Small TPC-H dimension tables (nation, region) benefit from REFERENCE TABLE replication "
-            "in SingleStore, which eliminates broadcast joins at query time. "
-            "Tables in _REFERENCE_TABLES are converted from CREATE TABLE to CREATE REFERENCE TABLE."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "singlestore",
+register_ddl_rewrite(
+    platform="singlestore",
+    rule_name="reference_table_for_dimensions",
+    transformer_id="singlestore_reference_table",
+    description="Rewrite small dimension tables (nation, region) to CREATE REFERENCE TABLE.",
+    reason="Small TPC-H dimension tables (nation, region) benefit from REFERENCE TABLE replication "
+    "in SingleStore, which eliminates broadcast joins at query time. "
+    "Tables in _REFERENCE_TABLES are converted from CREATE TABLE to CREATE REFERENCE TABLE.",
+    failure_mode=FailureMode.PERFORMANCE_REGRESSION,
+    governance_only=False,
 )
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.singlestore.all.inject_shard_key",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.PERFORMANCE_REGRESSION,
-        payload=RewriteDDLPayload(
-            transformer_id="singlestore_inject_shard_key",
-            description="Inject SHARD KEY clause for columnstore tables (per-table or random distribution).",
-        ),
-        reason=(
-            "SingleStore columnstore tables require an explicit SHARD KEY for data distribution. "
-            "Without it, tables default to random sharding which degrades co-located join performance. "
-            "Shard columns are mapped from _TPCH_SHARD_KEYS; tables without a known shard column "
-            "receive SHARD KEY () (random distribution)."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "singlestore",
+register_ddl_rewrite(
+    platform="singlestore",
+    rule_name="inject_shard_key",
+    transformer_id="singlestore_inject_shard_key",
+    description="Inject SHARD KEY clause for columnstore tables (per-table or random distribution).",
+    reason="SingleStore columnstore tables require an explicit SHARD KEY for data distribution. "
+    "Without it, tables default to random sharding which degrades co-located join performance. "
+    "Shard columns are mapped from _TPCH_SHARD_KEYS; tables without a known shard column "
+    "receive SHARD KEY () (random distribution).",
+    failure_mode=FailureMode.PERFORMANCE_REGRESSION,
+    governance_only=False,
 )
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.singlestore.all.inject_sort_key",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.PERFORMANCE_REGRESSION,
-        payload=RewriteDDLPayload(
-            transformer_id="singlestore_inject_sort_key",
-            description="Inject SORT KEY clause for columnstore tables from _TPCH_SORT_KEYS mapping.",
-        ),
-        reason=(
-            "SingleStore columnstore SORT KEY controls the on-disk ordering used by analytical scans. "
-            "Without an appropriate sort key, range-scan and aggregation queries suffer. "
-            "Sort columns are mapped from _TPCH_SORT_KEYS per table."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "singlestore",
+register_ddl_rewrite(
+    platform="singlestore",
+    rule_name="inject_sort_key",
+    transformer_id="singlestore_inject_sort_key",
+    description="Inject SORT KEY clause for columnstore tables from _TPCH_SORT_KEYS mapping.",
+    reason="SingleStore columnstore SORT KEY controls the on-disk ordering used by analytical scans. "
+    "Without an appropriate sort key, range-scan and aggregation queries suffer. "
+    "Sort columns are mapped from _TPCH_SORT_KEYS per table.",
+    failure_mode=FailureMode.PERFORMANCE_REGRESSION,
+    governance_only=False,
 )

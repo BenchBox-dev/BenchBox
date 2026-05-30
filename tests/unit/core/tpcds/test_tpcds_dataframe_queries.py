@@ -113,6 +113,22 @@ class TestTPCDSQueryRegistry:
             assert query.expression_impl is not None, f"{query.query_id} missing expression impl"
             assert query.pandas_impl is not None, f"{query.query_id} missing pandas impl"
 
+    def test_registry_callable_fingerprint(self):
+        """Fingerprint query IDs and callable names before generated-query shrink work."""
+        from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES, queries as query_module
+
+        queries = sorted(TPCDS_DATAFRAME_QUERIES.get_all_queries(), key=lambda query: int(query.query_id[1:]))
+
+        assert [query.query_id for query in queries] == [f"Q{query_id}" for query_id in range(1, 100)]
+        for query in queries:
+            assert QueryCategory.TPCDS in query.categories, f"{query.query_id} missing TPCDS category"
+            normalized_id = query.query_id[1:].lower()
+            for family, impl in (("expression", query.expression_impl), ("pandas", query.pandas_impl)):
+                expected_name = f"q{normalized_id}_{family}_impl"
+                assert impl.__name__ == expected_name
+                assert impl.__qualname__ == expected_name
+                assert getattr(query_module, expected_name) is impl
+
 
 class TestTPCDSParameters:
     """Tests for TPC-DS query parameters."""

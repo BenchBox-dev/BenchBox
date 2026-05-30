@@ -7,9 +7,9 @@ import json
 from pathlib import Path
 
 import pytest
+
 from _project.scripts.explorer_pipeline.models import DetailResult, ManifestEntry
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
-
 from benchbox.core.cost.models import DeploymentMetadata, NormalizedCost
 from tests.unit.core.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
@@ -65,6 +65,47 @@ class TestToManifestEntry:
         entry = transformer.to_manifest_entry(bundle_file, result_id=explicit_id)
 
         assert entry.result_id == explicit_id
+
+    def test_current_result_extension_blocks_are_ingested_without_projection_breakage(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["platform"].update(
+            {
+                "deployment": {"deployment_type": "local", "endpoint_class": "localhost_port"},
+                "cloud": {"provider": "none"},
+                "compute": {"instance_type": "developer-laptop"},
+                "storage": {"storage_type": "local_disk"},
+                "raw_config": {"host": "localhost", "port": 5432},
+                "raw_metadata": {"server_version": "16.2"},
+            }
+        )
+        data["phases"] = {
+            "migration": {
+                "status": "COMPLETED",
+                "duration_ms": 2500,
+                "tables_migrated": 8,
+                "tables_failed": 0,
+            }
+        }
+        data["comparisons"] = {
+            "native_duckdb": {
+                "generated_at": "2026-05-22T12:00:00",
+                "scale_factor": 0.01,
+                "total_queries": 1,
+                "mean_delta_ms": 12.5,
+                "max_delta_ms": 12.5,
+                "queries": [{"id": "Q1", "pg_duckdb_ms": 42.5, "duckdb_ms": 30.0, "delta_ms": 12.5}],
+            }
+        }
+        bundle = tmp_path / "extension_bundle.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+        detail = transformer.to_detail_result(bundle, entry.result_id)
+
+        assert entry.platform_version == "1.2.0"
+        assert detail.phase_durations == {"migration": 2.5}
+        assert detail.environment["os"] == "macOS 15.3.0"
 
 
 class TestToDetailResult:
@@ -181,6 +222,45 @@ class TestMalformedJson:
         transformer = BundleTransformer()
         with pytest.raises(Exception):
             transformer.to_manifest_entry(bad_file)
+
+
+class TestSchemaGate:
+    @pytest.mark.parametrize("version", ["2.99", "1.0", "2.x"])
+    def test_unsupported_schema_rejected_before_manifest_projection(self, tmp_path: Path, version: str) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["version"] = version
+        bundle = tmp_path / "unsupported_schema.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        with pytest.raises(ValueError) as exc_info:
+            transformer.to_manifest_entry(bundle)
+
+        message = str(exc_info.value)
+        assert "explorer input schema policy" in message
+        assert "schema versions 2.0 and 2.1" in message
+        assert "Re-export or normalize" in message
+
+    def test_missing_schema_rejected_before_detail_projection(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        del data["version"]
+        bundle = tmp_path / "missing_schema.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        with pytest.raises(ValueError) as exc_info:
+            transformer.to_detail_result(bundle, "missing-schema")
+
+        assert "<missing>" in str(exc_info.value)
+        assert "explorer input schema policy" in str(exc_info.value)
+
+    def test_preloaded_data_uses_same_schema_gate(self, bundle_file: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["version"] = "2.99"
+
+        transformer = BundleTransformer()
+        with pytest.raises(ValueError, match="explorer input schema policy"):
+            transformer.result_id_from_bundle(bundle_file, data=data, raw=b"{}")
 
 
 class TestZeroDurationQuery:
@@ -319,6 +399,25 @@ class TestExtendedManifestFields:
         entry = transformer.to_manifest_entry(bundle)
 
         assert entry.validation_status == "passed"
+
+    def test_translation_fallback_marks_explorer_validation_uncertain(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["summary"]["validation"] = "passed"
+        data["execution"] = {
+            "mode": "sql",
+            "translation": {"status": "fallback", "strict_mode": False},
+        }
+        bundle = tmp_path / "translation_fallback.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+        detail = transformer.to_detail_result(bundle, result_id="translation-fallback")
+
+        assert entry.validation_status == "uncertain"
+        assert entry.ranking_exclusion_reason == "validation_not_clean"
+        assert detail.validation_status == "uncertain"
+        assert detail.ranking_exclusion_reason == "validation_not_clean"
 
     def test_partial_query_failure_count_and_status_extracted(self, tmp_path: Path) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)

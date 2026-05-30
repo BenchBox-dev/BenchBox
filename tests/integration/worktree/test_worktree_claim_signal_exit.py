@@ -44,9 +44,6 @@ def create_origin_with_develop(tmp_path: Path) -> Path:
 
 
 def test_worktree_claim_int_trap_exits_nonzero_after_cleanup(tmp_path: Path) -> None:
-    if os.name == "nt":
-        pytest.skip("SIGINT trap behavior is not portable through Windows make/git shell wrappers")
-
     real_git = shutil.which("git")
     assert real_git is not None
     origin = create_origin_with_develop(tmp_path)

@@ -17,7 +17,6 @@ class TestPlatformLabelAgreement:
         """Two results with same platform but different driver_version get identical labels
         whether rendered via the CLI plotter or the shared disambiguator directly."""
         from _project.scripts.explorer_pipeline.models import DetailResult
-
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         # Pipeline path: DetailResult objects fed directly to disambiguate_platform_labels
@@ -58,7 +57,6 @@ class TestPlatformLabelAgreement:
     def test_single_result_no_suffix_both_paths(self) -> None:
         """A single result keeps the bare platform name on both paths."""
         from _project.scripts.explorer_pipeline.models import DetailResult
-
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         base: dict = {

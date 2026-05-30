@@ -66,6 +66,7 @@ docs/site/
 data/
 generated/
 benchmark_runs/
+spark-warehouse/
 *.db
 *.csv
 *.parquet
@@ -145,6 +146,9 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 .codex/shared-skills/
 .codex/shared-skills.lock.json
 .gemini/skills/
+.antigravity/skills/
+.agents/
+.antigravitycli/
 
 # TODO system infrastructure (added for distributed TODO structure)
 !_project/TODO/

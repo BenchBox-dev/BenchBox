@@ -11,36 +11,15 @@ only; transformer_id is not resolved at runtime.
 
 from __future__ import annotations
 
-from benchbox.sql_compat.actions import CompatAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.decision import (
-    CompatibilityDecision,
-    FailureMode,
-    RewriteDDLPayload,
-    SupportLevel,
-)
-from benchbox.sql_compat.registry import REGISTRY
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.postgresql.all.strip_foreign_keys",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.SYNTAX_ERROR,
-        payload=RewriteDDLPayload(
-            transformer_id="postgresql_strip_foreign_keys",
-            description=(
-                "Remove FOREIGN KEY constraint clauses on retry when CREATE TABLE fails; "
-                "some PostgreSQL-compatible engines (e.g., CedarDB) reject FK syntax."
-            ),
-            governance_only=True,
-        ),
-        reason=(
-            "PostgreSQL itself supports FOREIGN KEY constraints, but PostgreSQL-compatible "
-            "engines may reject them at CREATE TABLE time. The adapter strips FK clauses "
-            "on retry so tables can be created without FK enforcement."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "postgresql",
+register_ddl_rewrite(
+    platform="postgresql",
+    rule_name="strip_foreign_keys",
+    transformer_id="postgresql_strip_foreign_keys",
+    description="Remove FOREIGN KEY constraint clauses on retry when CREATE TABLE fails; "
+    "some PostgreSQL-compatible engines (e.g., CedarDB) reject FK syntax.",
+    reason="PostgreSQL itself supports FOREIGN KEY constraints, but PostgreSQL-compatible "
+    "engines may reject them at CREATE TABLE time. The adapter strips FK clauses "
+    "on retry so tables can be created without FK enforcement.",
 )

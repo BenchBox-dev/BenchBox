@@ -38,6 +38,14 @@ def test_databricks_platform_options_support_tuning_overrides():
     parsed = PlatformHookRegistry.parse_options(
         "databricks",
         [
+            ("databricks_clustering_strategy", "liquid_clustering_auto"),
+        ],
+    )
+    assert parsed["databricks_clustering_strategy"] == "liquid_clustering_auto"
+
+    parsed = PlatformHookRegistry.parse_options(
+        "databricks",
+        [
             ("databricks_clustering_strategy", "liquid_clustering"),
             ("liquid_clustering_columns", "event_time,customer_id"),
         ],

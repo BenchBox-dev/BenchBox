@@ -83,6 +83,7 @@ benchbox run [OPTIONS]
   - `disabled`: No validation
   - `full`: All validation checks enabled (preflight, postgen, postload, platform check)
   - `preflight`, `postgen`, `postload`, `check-platforms`: Individual validation types
+- `--strict-translation`: Fail instead of falling back when SQL dialect translation cannot produce target SQL
 
 **Platform-Specific Configuration:**
 - `--platform-option KEY=VALUE`: Platform-specific option (can be used multiple times)
@@ -307,7 +308,7 @@ benchbox run --platform snowflake --benchmark tpch --scale 1 \
 
 These overrides are Databricks-specific and are passed via `--platform-option`.
 
-- `--platform-option databricks_clustering_strategy=[z_order|liquid_clustering|none]`: SQL tuning strategy for Databricks tables
+- `--platform-option databricks_clustering_strategy=[z_order|liquid_clustering|liquid_clustering_auto|none]`: SQL tuning strategy for Databricks tables
 - `--platform-option liquid_clustering_columns=col1,col2`: Comma-separated liquid clustering columns
 
 ```bash
@@ -319,6 +320,10 @@ benchbox run --platform databricks --benchmark tpch --scale 1 \
 benchbox run --platform databricks --benchmark tpch --scale 1 \
   --platform-option databricks_clustering_strategy=liquid_clustering \
   --platform-option liquid_clustering_columns=l_shipdate,l_orderkey
+
+# Databricks with automatic liquid clustering
+benchbox run --platform databricks --benchmark tpch --scale 1 \
+  --platform-option databricks_clustering_strategy=liquid_clustering_auto
 ```
 
 ## Execution Control Options

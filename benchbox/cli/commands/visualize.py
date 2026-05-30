@@ -12,7 +12,8 @@ from benchbox.core.visualization import (
     ResultPlotter,
     list_templates,
 )
-from benchbox.core.visualization.chart_types import ALL_CHART_TYPES, CHART_TYPE_SPECS
+from benchbox.core.visualization.chart_types import ALL_CHART_TYPES
+from benchbox.core.visualization.orchestration import render_chart_set
 
 SUPPORTED_CHART_TYPES = ALL_CHART_TYPES
 
@@ -29,16 +30,20 @@ def _render_ascii_charts(
     """Render ASCII charts to console using ResultPlotter for normalization."""
     from rich.text import Text
 
-    from benchbox.core.visualization.ascii_api import ChartOptions, render_ascii_chart_from_results
+    from benchbox.core.visualization.ascii_api import ChartOptions
 
     def print_ansi(content: str) -> None:
         """Print string with ANSI codes through Rich console."""
         console.print(Text.from_ansi(content))
 
-    # Resolve chart types from template or explicit list
-    types_to_render, strict_pairwise_validation = _resolve_chart_types(ctx, chart_types, template_name)
+    # Resolve explicit chart types here; template expansion is shared in core orchestration.
+    if template_name:
+        types_to_render = []
+        strict_pairwise_validation = True
+    else:
+        types_to_render, strict_pairwise_validation = _resolve_chart_types(ctx, chart_types)
 
-    if not types_to_render:
+    if not types_to_render and template_name is None:
         types_to_render = ["performance_bar"]
 
     # Resolve source paths
@@ -52,50 +57,46 @@ def _render_ascii_charts(
         console.print(f"[red]Error loading results: {e}[/red]")
         ctx.exit(1)
 
-    # Pairwise comparison charts require exactly two results.
-    pairwise_only = [
-        ct for ct in types_to_render if CHART_TYPE_SPECS.get(ct, None) and CHART_TYPE_SPECS[ct].requires_two_results
-    ]
-    if pairwise_only and len(results) != 2 and strict_pairwise_validation:
-        charts = ", ".join(pairwise_only)
-        console.print(f"[red]Error: chart type(s) require exactly 2 results: {charts}[/red]")
-        console.print(f"[yellow]Provided result count: {len(results)}[/yellow]")
-        ctx.exit(1)
-
     opts = ChartOptions(use_color=use_color, use_unicode=use_unicode, theme=theme)
 
-    from benchbox.core.visualization.utils import extract_chart_subtitle
+    try:
+        outcome = render_chart_set(
+            results,
+            types_to_render,
+            template_name=template_name,
+            options=opts,
+            strict_pairwise_validation=strict_pairwise_validation,
+        )
+    except Exception as e:
+        console.print(f"[yellow]Warning: Could not render charts: {e}[/yellow]")
+        return
 
-    subtitle = extract_chart_subtitle(results)
+    if outcome.validation_error:
+        console.print(f"[red]Error: {outcome.validation_error.message}[/red]")
+        if "actual_result_count" in outcome.validation_error.details:
+            console.print(
+                f"[yellow]Provided result count: {outcome.validation_error.details['actual_result_count']}[/yellow]"
+            )
+        ctx.exit(1)
 
-    for chart_type in types_to_render:
-        try:
-            content = render_ascii_chart_from_results(results, chart_type, options=opts, subtitle=subtitle)
-            if content:
-                print_ansi(content)
-                console.print()
-            elif template_name:
-                console.print(f"[yellow]Skipped {chart_type}: not applicable for current inputs.[/yellow]")
-        except Exception as e:
-            console.print(f"[yellow]Warning: Could not render {chart_type}: {e}[/yellow]")
+    for chart in outcome.rendered:
+        print_ansi(chart.content)
+        console.print()
+
+    for skipped in outcome.skipped:
+        if skipped.reason == "renderer failed":
+            message = skipped.details.get("message") or skipped.details.get("exception_type") or skipped.reason
+            console.print(f"[yellow]Warning: Could not render {skipped.chart_type}: {message}[/yellow]")
+        elif template_name:
+            console.print(f"[yellow]Skipped {skipped.chart_type}: {skipped.reason}.[/yellow]")
 
 
 def _resolve_chart_types(
     ctx: click.Context,
     chart_types: Sequence[str],
-    template_name: str | None,
 ) -> tuple[list[str], bool]:
     """Resolve chart types from template or explicit list. Returns (types, strict_pairwise)."""
     strict_pairwise_validation = True
-    if template_name:
-        from benchbox.core.visualization.templates import get_template
-
-        try:
-            tmpl = get_template(template_name)
-            return list(tmpl.chart_types), strict_pairwise_validation
-        except Exception as e:
-            console.print(f"[red]Error: {e}[/red]")
-            ctx.exit(1)
 
     lowered = [c.lower() for c in chart_types]
     if "auto" in lowered or "all" in lowered:

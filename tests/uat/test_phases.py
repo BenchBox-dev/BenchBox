@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from tests.uat import docker_assets, matrix
-from tests.uat.config import validate_config
+from tests.uat.config import ExecuteConfig, UATConfig, validate_config
 from tests.uat.phases import (
     enumerate as enum_phase,
     execute as exec_phase,
@@ -44,6 +44,10 @@ def _write_submit_result(path: Path, *, failed: int = 0) -> None:
         "phases": {},
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _cfg(payload: dict) -> UATConfig:
+    return validate_config({"name": "phase-test", **payload})
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +90,7 @@ def test_enumerate_filters_dataframe_against_sql_only():
         "benchmarks": {"include": ["vector_search", "tpch"]},
         "scales": {"rungs": [0.01]},
     }
-    cells = enum_phase.enumerate_cells(raw)
+    cells = enum_phase.enumerate_cells(_cfg(raw))
     benches = {c.benchmark for c in cells}
     assert "vector_search" not in benches  # sql-only
     assert "tpch" in benches
@@ -99,7 +103,7 @@ def test_enumerate_records_compatibility_pruned_cells():
         "scales": {"rungs": [0.01, 0.1]},
     }
 
-    result = enum_phase.enumerate_cells_with_pruning(raw)
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
 
     assert {c.benchmark for c in result.cells} == {"tpch"}
     assert len(result.compatibility_pruned) == 2
@@ -110,6 +114,29 @@ def test_enumerate_records_compatibility_pruned_cells():
     assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
 
 
+def test_enumerate_uses_registry_supports_dataframe_without_name_fallback():
+    raw = {
+        "platforms": {"include": ["polars-df"]},
+        "benchmarks": {"include": ["vector_search"]},
+        "scales": {"rungs": [0.01]},
+    }
+    benchmarks = {
+        "vector_search": matrix.BenchmarkInfo(
+            benchmark_id="vector_search",
+            category="AI/ML",
+            default_scale=0.01,
+            min_scale=0.01,
+            scale_options=(0.01,),
+            supports_dataframe=True,
+        )
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw), benchmarks=benchmarks)
+
+    assert [(c.platform, c.benchmark, c.scale) for c in result.cells] == [("polars-df", "vector_search", 0.01)]
+    assert result.compatibility_pruned == ()
+
+
 def test_enumerate_records_registry_benchmark_gates():
     raw = {
         "platforms": {"include": ["lakesail"]},
@@ -117,7 +144,7 @@ def test_enumerate_records_registry_benchmark_gates():
         "scales": {"rungs": [0.01]},
     }
 
-    result = enum_phase.enumerate_cells_with_pruning(raw)
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
 
     assert {c.benchmark for c in result.cells} == {"tpch"}
     assert len(result.compatibility_pruned) == 3
@@ -129,6 +156,72 @@ def test_enumerate_records_registry_benchmark_gates():
     )
     assert pruned_by_benchmark["vector_search"].rule_id == "uat.compat.lakesail.vector_search.benchmark_gate"
     assert pruned_by_benchmark["metadata_primitives"].evidence.startswith("benchbox.sql_compat benchmark_gate")
+
+
+def test_enumerate_records_datafusion_clickhouse_pruned_benchmark_gates():
+    raw = {
+        "platforms": {"include": ["datafusion", "clickhouse-local"]},
+        "benchmarks": {
+            "include": ["write_primitives", "transaction_primitives", "ai_primitives", "vector_search", "tpch"]
+        },
+        "scales": {"rungs": [0.01]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
+
+    assert {(c.platform, c.benchmark) for c in result.cells} == {
+        ("clickhouse-local", "vector_search"),
+        ("clickhouse-local", "tpch"),
+        ("datafusion", "tpch"),
+    }
+    pruned = {(c.platform, c.benchmark): c for c in result.compatibility_pruned}
+    expected_pruned = {
+        ("datafusion", "write_primitives"),
+        ("datafusion", "transaction_primitives"),
+        ("datafusion", "ai_primitives"),
+        ("datafusion", "vector_search"),
+        ("clickhouse-local", "write_primitives"),
+        ("clickhouse-local", "transaction_primitives"),
+        ("clickhouse-local", "ai_primitives"),
+    }
+    assert set(pruned) == expected_pruned
+    for platform, benchmark in expected_pruned:
+        assert pruned[(platform, benchmark)].rule_id == f"uat.compat.{platform}.{benchmark}.benchmark_gate"
+        assert pruned[(platform, benchmark)].status == "blocked"
+    assert "DataFusion" in pruned[("datafusion", "transaction_primitives")].reason
+    assert "AI primitives" in pruned[("clickhouse-local", "ai_primitives")].reason
+    assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
+
+
+def test_enumerate_records_dataframe_pruned_mutation_and_maintenance_gates():
+    raw = {
+        "platforms": {"include": ["polars-df", "pandas-df", "pyspark-df", "dask-df", "datafusion-df", "modin-df"]},
+        "benchmarks": {"include": ["write_primitives", "transaction_primitives", "tpcdi", "tpch"]},
+        "scales": {"rungs": [0.01]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
+
+    cell_pairs = {(c.platform, c.benchmark) for c in result.cells}
+    for platform in ("polars-df", "pandas-df", "pyspark-df"):
+        assert (platform, "write_primitives") in cell_pairs
+        assert (platform, "tpch") in cell_pairs
+    for platform in ("dask-df", "datafusion-df", "modin-df"):
+        assert (platform, "write_primitives") not in cell_pairs
+        assert (platform, "tpch") in cell_pairs
+
+    pruned = {(c.platform, c.benchmark): c for c in result.compatibility_pruned}
+    for platform in matrix.DATAFRAME_PLATFORMS:
+        assert pruned[(platform, "transaction_primitives")].rule_id == (
+            f"uat.compat.{platform}.transaction_primitives.benchmark_gate"
+        )
+        assert pruned[(platform, "tpcdi")].rule_id == f"uat.compat.{platform}.tpcdi.benchmark_gate"
+        assert "transaction" in pruned[(platform, "tpcdi")].reason.lower()
+    for platform in ("dask-df", "datafusion-df", "modin-df"):
+        assert pruned[(platform, "write_primitives")].rule_id == (
+            f"uat.compat.{platform}.write_primitives.benchmark_gate"
+        )
+    assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
 
 
 def test_enumerate_keeps_release_gate_runtime_envelopes_for_diagnostic_sweeps():
@@ -149,7 +242,7 @@ def test_enumerate_keeps_release_gate_runtime_envelopes_for_diagnostic_sweeps():
         "scales": {"rungs": [0.01]},
     }
 
-    result = enum_phase.enumerate_cells_with_pruning(raw)
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
 
     cell_pairs = {(c.platform, c.benchmark) for c in result.cells}
     for platform in ("pg-duckdb", "pg-mooncake", "timescaledb"):
@@ -183,7 +276,7 @@ def test_enumerate_records_pg_family_release_gate_compatibility_pruning():
         "scales": {"rungs": [0.01]},
     }
 
-    result = enum_phase.enumerate_cells_with_pruning(raw)
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
 
     assert {(c.platform, c.benchmark) for c in result.cells} == {
         ("pg-duckdb", "tpch"),
@@ -221,13 +314,37 @@ def test_enumerate_records_pg_family_release_gate_compatibility_pruning():
     assert "datavault" not in timescaledb_caps.unsupported_benchmarks
 
 
+def test_enumerate_preserves_explicit_empty_include_as_default_suppression():
+    no_platforms = enum_phase.enumerate_cells(
+        _cfg(
+            {
+                "platforms": {"include": []},
+                "benchmarks": {"include": ["tpch"]},
+                "scales": {"rungs": [0.01]},
+            }
+        )
+    )
+    no_benchmarks = enum_phase.enumerate_cells(
+        _cfg(
+            {
+                "platforms": {"include": ["duckdb"]},
+                "benchmarks": {"include": []},
+                "scales": {"rungs": [0.01]},
+            }
+        )
+    )
+
+    assert no_platforms == []
+    assert no_benchmarks == []
+
+
 def test_enumerate_honours_scale_options():
     raw = {
         "platforms": {"include": ["duckdb"]},
         "benchmarks": {"include": ["tpch"]},
         "scales": {"rungs": [0.01, 0.1, 1.0, 50.0, 100.0]},
     }
-    cells = enum_phase.enumerate_cells(raw)
+    cells = enum_phase.enumerate_cells(_cfg(raw))
     scales = {c.scale for c in cells}
     # tpch scale_options = development subscales + official TPC ladder
     # (PR #332 review follow-up): 0.01, 0.1, 1.0, 10.0, 30.0, 100.0, 300.0…
@@ -242,7 +359,7 @@ def test_enumerate_override_replaces_rungs():
         "benchmarks": {"include": ["tpch"]},
         "scales": {"rungs": [0.01, 0.1, 1.0], "override": 0.1},
     }
-    cells = enum_phase.enumerate_cells(raw)
+    cells = enum_phase.enumerate_cells(_cfg(raw))
     assert {c.scale for c in cells} == {0.1}
 
 
@@ -270,7 +387,6 @@ def _stub_runner_factory(elapsed_map: dict[float, float], pass_map: dict[float, 
 
 
 def test_execute_walks_ladder_and_prunes_after_slow_rung(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "fake",
@@ -296,8 +412,19 @@ def test_execute_walks_ladder_and_prunes_after_slow_rung(tmp_path):
     assert 1.0 in pruned_scales
 
 
+def test_execute_asserts_if_parallel_platforms_bypasses_yaml_validation(tmp_path):
+    cfg = UATConfig(name="parallel-bypass", execute=ExecuteConfig(parallel_platforms=True))
+
+    with pytest.raises(AssertionError, match="parallel_platforms must remain False"):
+        exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({}, {}),
+        )
+
+
 def test_execute_skips_unreachable_platform(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "fake",
@@ -319,7 +446,7 @@ def test_execute_skips_unreachable_platform(tmp_path):
 
 
 def _docker_platform_from_argv(argv: list[str]) -> str:
-    compose_file = argv[argv.index("-f") + 1].replace("\\", "/")
+    compose_file = argv[argv.index("-f") + 1]
     if "/clickhouse/" in compose_file:
         return "clickhouse-server"
     if "/postgresql/" in compose_file:
@@ -330,7 +457,6 @@ def _docker_platform_from_argv(argv: list[str]) -> str:
 
 
 def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "docker smoke",
@@ -386,7 +512,6 @@ def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path)
 
 
 def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "docker cleanup failure",
@@ -420,8 +545,82 @@ def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
     assert commands == ["up:clickhouse-server", "down:clickhouse-server"]
 
 
+def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tmp_path):
+    """A managed compose-up failure must not truncate the sweep.
+
+    Regression for uat-docker-stack-recovery: the 2026-05-28 non-OLTP run ended
+    after the LakeSail compose-up timed out, so no other stack ran. A failed
+    `up` should record the platform's cells (the failure is captured in
+    docker_events / uat_lifecycle.log) and advance to the next stack, one stack
+    at a time. Only genuine global aborts (free space, teardown failure, fixed
+    container-name policy) may stop the sweep.
+    """
+    cfg = validate_config(
+        {
+            "name": "docker startup failure",
+            "platforms": {"include": ["clickhouse-server", "postgresql"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    sequence: list[tuple[str, str, str]] = []
+
+    def fake_docker(argv, **kwargs):
+        action = "up" if "up" in argv else "down"
+        platform = _docker_platform_from_argv(argv)
+        sequence.append(("docker", action, platform))
+        # clickhouse-server compose-up fails (e.g. start timeout); others succeed.
+        if action == "up" and platform == "clickhouse-server":
+            return docker_assets.DockerCommandResult(
+                tuple(argv), 1, "", "docker command timed out after 300s", timed_out=True
+            )
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def recording_runner(platform, benchmark, scale, **kwargs):
+        sequence.append(("cell", "run", platform))
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=tmp_path / f"{platform}.log",
+            result_path=None,
+        )
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=recording_runner,
+            docker_runner=fake_docker,
+            free_space_checks_enabled=True,
+            free_space_reader=lambda _path: 100.0,
+        )
+
+    # The sweep is NOT aborted by one stack's startup failure.
+    assert outcome.aborted is False
+    # The failed stack ran no cells but was still torn down; the next stack ran.
+    assert sequence == [
+        ("docker", "up", "clickhouse-server"),
+        ("docker", "down", "clickhouse-server"),
+        ("docker", "up", "postgresql"),
+        ("cell", "run", "postgresql"),
+        ("docker", "down", "postgresql"),
+    ]
+    # The failed platform's cells are recorded as unreachable (not silently dropped),
+    # and the compose-up failure is captured in the lifecycle events.
+    assert any(cell.platform == "clickhouse-server" for cell in outcome.skipped_unreachable)
+    assert any(
+        event.platform == "clickhouse-server" and event.action == "up" and event.status == "failed"
+        for event in outcome.docker_events
+    )
+
+
 def test_execute_unmanaged_docker_keeps_skip_probe_without_commands(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "external",
@@ -458,7 +657,6 @@ def test_execute_scopes_local_managed_platform_options_to_managed_docker(
     expected_local_managed: bool,
     tmp_path,
 ):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "docker scope",
@@ -503,7 +701,6 @@ def test_execute_scopes_local_managed_platform_options_to_managed_docker(
 
 
 def test_execute_runner_exception_still_tears_down_managed_docker(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "docker failure",
@@ -578,7 +775,6 @@ def test_execute_fixed_container_name_platform_aborts_before_docker_command(tmp_
 
 
 def test_execute_free_space_abort_reports_context_after_docker_teardown(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "docker disk",
@@ -612,7 +808,6 @@ def test_execute_free_space_abort_reports_context_after_docker_teardown(tmp_path
 
 
 def test_execute_passes_config_extra_args_to_runner(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "fake",
@@ -649,7 +844,6 @@ def test_execute_passes_config_extra_args_to_runner(tmp_path):
 
 
 def test_execute_outcome_carries_compatibility_pruned_cells(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "compat",
@@ -672,7 +866,6 @@ def test_execute_outcome_carries_compatibility_pruned_cells(tmp_path):
 
 
 def test_execute_downgrades_passed_cell_with_query_failure_result(tmp_path):
-    matrix.reset_reachability_cache()
     result_path = tmp_path / "benchmark_runs" / "results" / "failed-query.json"
     _write_submit_result(result_path, failed=1)
     cfg = validate_config(
@@ -764,7 +957,7 @@ def test_topological_sort_moves_source_before_consumer():
 
 
 def test_topological_sort_stable_when_no_constraint():
-    """Benchmarks unconstrained by SOURCE_REUSE_GRAPH keep input order."""
+    """Benchmarks unconstrained by the reuse graph keep input order."""
     out = exec_phase._topological_sort(["clickbench", "ssb", "h2odb"], {})
     assert out == ["clickbench", "ssb", "h2odb"]
 
@@ -800,7 +993,6 @@ def test_topological_sort_keeps_available_unrelated_benchmark_before_source():
 
 def test_execute_reorders_consumer_before_source(tmp_path):
     """Even if include lists read_primitives first, tpch must run first."""
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "fake",
@@ -837,7 +1029,6 @@ def test_execute_reorders_consumer_before_source(tmp_path):
 
 def test_execute_prunes_source_after_consumer_completes(tmp_path):
     """The tpch DB should be pruned once its only consumer (read_primitives) finishes."""
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "fake",
@@ -867,7 +1058,6 @@ def test_execute_prunes_source_after_consumer_completes(tmp_path):
 
 def test_execute_does_not_prune_source_while_consumer_pending(tmp_path):
     """During the (duckdb, tpch) cleanup pass, read_primitives is still pending — DB stays."""
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "fake",

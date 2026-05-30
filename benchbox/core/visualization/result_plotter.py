@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -15,7 +16,8 @@ from benchbox.core.results.loader import find_latest_result
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.normalizer import normalize_result_dict
 from benchbox.core.visualization.exceptions import VisualizationError
-from benchbox.core.visualization.utils import is_power_run_result
+from benchbox.core.visualization.suggestions import recommend_charts
+from benchbox.core.visualization.utils import natural_query_sort_key
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +111,6 @@ class ResultPlotter:
         multi-version comparisons, regardless of run timestamp or file order.
         Non-versioned labels sort last, preserving their relative order.
         """
-        import re
 
         def _version_key(result: NormalizedResult) -> tuple:
             m = re.search(r"(\d+)\.(\d+)(?:\.(\d+))?(?:-(\w+))?", result.platform)
@@ -277,19 +278,7 @@ class ResultPlotter:
 
     # ---------------------------------------------------------------- Utilities
     def _suggest_chart_types(self) -> list[str]:
-        types = ["performance_bar"]
-        if any(result.power_at_size is not None or is_power_run_result(result) for result in self.results):
-            types.append("power_bar")
-        if any(result.cost_total is not None for result in self.results):
-            types.append("cost_scatter")
-        if any(result.queries for result in self.results):
-            types.append("distribution_box")
-            types.append("query_histogram")
-        if len(self.results) > 1 and any(result.queries for result in self.results):
-            types.append("query_heatmap")
-        if len(self.results) > 2:
-            types.append("time_series")
-        return types
+        return [recommendation.chart_type for recommendation in recommend_charts(self.results)]
 
     def _performance_score(self, result: NormalizedResult) -> float:
         if result.avg_time_ms and result.avg_time_ms > 0:
@@ -307,13 +296,7 @@ class ResultPlotter:
     @staticmethod
     def _natural_sort_key(s: str) -> tuple[float, str]:
         """Sort key for natural ordering of query IDs."""
-        import re
-
-        match = re.match(r"^(\D*)(\d+)(.*)$", s)
-        if match:
-            prefix, num, suffix = match.groups()
-            return (float(num), prefix + suffix)
-        return (float("inf"), s)
+        return natural_query_sort_key(s)
 
     def group_by(self, field: str) -> dict[str, ResultPlotter]:
         """Split results by a field (platform or benchmark) for batch rendering."""

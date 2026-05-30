@@ -11,486 +11,247 @@
 #
 # Copyright 2026 Joe Harris / BenchBox Project
 # Licensed under the MIT License. See LICENSE file in the project root for details.
+# NOTE: Catalog body is compact YAML; parsed data must remain identical.
 
 operations:
-  # OVERHEAD OPERATIONS (5 operations)
-  # Tests basic transaction commit and rollback overhead with varying sizes
-  # ============================================================================
-
-  - id: transaction_commit_small
-    category: overhead
-    description: Tests BEGIN plus multiple writes plus COMMIT with small transaction containing 10 writes
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_lineitem VALUES (9100001, 1, 1, 1, 10.0, 1000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx1');
-      INSERT INTO txn_lineitem VALUES (9100002, 2, 2, 1, 20.0, 2000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx2');
-      INSERT INTO txn_lineitem VALUES (9100003, 3, 3, 1, 30.0, 3000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx3');
-      INSERT INTO txn_lineitem VALUES (9100004, 4, 4, 1, 40.0, 4000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx4');
-      INSERT INTO txn_lineitem VALUES (9100005, 5, 5, 1, 50.0, 5000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx5');
-      INSERT INTO txn_lineitem VALUES (9100006, 6, 6, 1, 60.0, 6000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx6');
-      INSERT INTO txn_lineitem VALUES (9100007, 7, 7, 1, 70.0, 7000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx7');
-      INSERT INTO txn_lineitem VALUES (9100008, 8, 8, 1, 80.0, 8000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx8');
-      INSERT INTO txn_lineitem VALUES (9100009, 9, 9, 1, 90.0, 9000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx9');
-      INSERT INTO txn_lineitem VALUES (9100010, 10, 10, 1, 100.0, 10000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx10');
-      COMMIT;
-    validation_queries:
-      - id: verify_commit
-        sql: SELECT l_orderkey FROM txn_lineitem WHERE l_orderkey BETWEEN 9100001 AND 9100010 ORDER BY l_orderkey
-        expected_rows: 10
-    cleanup_sql: |
-      DELETE FROM txn_lineitem WHERE l_orderkey BETWEEN 9100001 AND 9100010
-    expected_rows_affected: 10
-
-  - id: transaction_commit_medium
-    category: overhead
-    description: Tests transaction with 100 write operations to measure medium transaction overhead
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders
-      SELECT 9200000 + n, 1, 'O', 1000.0 * n, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'tx_medium'
-      FROM (SELECT unnest(generate_series(1, 100)) AS n) t;
-      COMMIT;
-    validation_queries:
-      - id: verify_medium_commit
-        sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey BETWEEN 9200000 AND 9200099
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9200000 AND 9200099
-    expected_rows_affected: 100
-
-  - id: transaction_commit_large
-    category: overhead
-    description: Tests transaction with 1000 write operations to measure large transaction and log overhead
-    write_sql: |
-      BEGIN TRANSACTION;
-      DELETE FROM txn_lineitem WHERE l_comment = 'tx_large';
-      INSERT INTO txn_lineitem
-      SELECT 9300000 + n, 1, 1, 1, 10.0, 1000.0, 0.05, 0.02, 'N', 'O',
-             DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20',
-             'DELIVER IN PERSON', 'TRUCK', 'tx_large'
-      FROM (SELECT unnest(generate_series(1, 1000)) AS n) t;
-      COMMIT;
-    validation_queries:
-      - id: verify_large_commit
-        sql: SELECT COUNT(*) as cnt FROM txn_lineitem WHERE l_comment = 'tx_large'
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_lineitem WHERE l_comment = 'tx_large'
-    expected_rows_affected: 1000
-
-  - id: transaction_rollback_small
-    category: overhead
-    description: Tests transaction ROLLBACK with small transaction to measure rollback overhead
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders VALUES (9400001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'rollback_test');
-      INSERT INTO txn_orders VALUES (9400002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'rollback_test');
-      INSERT INTO txn_orders VALUES (9400003, 3, 'O', 3000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'rollback_test');
-      ROLLBACK;
-    validation_queries:
-      - id: verify_rollback
-        sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_comment = 'rollback_test'
-        expected_rows: 1
-    cleanup_sql: null  # Rollback already cleaned up
-    expected_rows_affected: 0
-
-  - id: transaction_rollback_medium
-    category: overhead
-    description: Tests transaction ROLLBACK with medium transaction 100 writes to measure larger rollback overhead
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_lineitem
-      SELECT 9500000 + n, 1, 1, 1, 10.0, 1000.0, 0.05, 0.02, 'N', 'O',
-             DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20',
-             'DELIVER IN PERSON', 'TRUCK', 'rollback_medium'
-      FROM (SELECT unnest(generate_series(1, 100)) AS n) t;
-      ROLLBACK;
-    validation_queries:
-      - id: verify_medium_rollback
-        sql: SELECT COUNT(*) as cnt FROM txn_lineitem WHERE l_comment = 'rollback_medium'
-        expected_rows: 1
-    cleanup_sql: null  # Rollback already cleaned up
-    expected_rows_affected: 0
-
-  # SAVEPOINT OPERATIONS (2 operations)
-  # Tests savepoint functionality and nested transaction handling
-  # ============================================================================
-
-  - id: transaction_savepoint_nested
-    category: savepoint
-    description: Tests nested savepoints with partial rollback to measure savepoint overhead
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders VALUES (9600001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'outer_tx');
-      SAVEPOINT sp1;
-      INSERT INTO txn_orders VALUES (9600002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'inner_tx');
-      SAVEPOINT sp2;
-      INSERT INTO txn_orders VALUES (9600003, 3, 'O', 3000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'innermost_tx');
-      ROLLBACK TO SAVEPOINT sp2;
-      COMMIT;
-    validation_queries:
-      - id: verify_savepoint
-        sql: |
-          SELECT COUNT(*) as cnt FROM txn_orders
-          WHERE o_orderkey IN (9600001, 9600002, 9600003)
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey IN (9600001, 9600002, 9600003)
-    expected_rows_affected: 2
-    platform_overrides:
-      duckdb:
-        # DuckDB does not support SAVEPOINT syntax
-        write_sql: null
-
-  - id: transaction_savepoint_deep_nesting
-    category: savepoint
-    description: Tests deep savepoint nesting with selective rollback at different levels
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders VALUES (9610001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'level0');
-      SAVEPOINT sp1;
-      INSERT INTO txn_orders VALUES (9610002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'level1');
-      SAVEPOINT sp2;
-      INSERT INTO txn_orders VALUES (9610003, 3, 'O', 3000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'level2');
-      SAVEPOINT sp3;
-      INSERT INTO txn_orders VALUES (9610004, 4, 'O', 4000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'level3');
-      SAVEPOINT sp4;
-      INSERT INTO txn_orders VALUES (9610005, 5, 'O', 5000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'level4');
-      ROLLBACK TO SAVEPOINT sp3;
-      INSERT INTO txn_orders VALUES (9610006, 6, 'O', 6000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'level3_alt');
-      COMMIT;
-    validation_queries:
-      - id: verify_deep_savepoint
-        sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey BETWEEN 9610001 AND 9610006
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9610001 AND 9610006
-    expected_rows_affected: 4
-    platform_overrides:
-      duckdb:
-        # DuckDB does not support SAVEPOINT syntax
-        write_sql: null
-
-  # ISOLATION LEVEL OPERATIONS (3 operations)
-  # Tests different isolation levels and their overhead
-  # ============================================================================
-
-  - id: transaction_isolation_read_committed
-    category: isolation
-    description: Tests READ COMMITTED isolation level to measure isolation overhead
-    write_sql: |
-      SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders VALUES (9700001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'read_committed');
-      INSERT INTO txn_orders VALUES (9700002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'read_committed');
-      COMMIT;
-    validation_queries:
-      - id: verify_isolation
-        sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_comment = 'read_committed'
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_comment = 'read_committed'
-    expected_rows_affected: 2
-
-  - id: transaction_isolation_repeatable_read
-    category: isolation
-    description: Tests REPEATABLE READ isolation level to measure mid-tier isolation overhead
-    write_sql: |
-      SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders VALUES (9710001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'repeatable_read');
-      INSERT INTO txn_orders VALUES (9710002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'repeatable_read');
-      COMMIT;
-    validation_queries:
-      - id: verify_repeatable_read
-        sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_comment = 'repeatable_read'
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_comment = 'repeatable_read'
-    expected_rows_affected: 2
-
-  - id: transaction_isolation_serializable
-    category: isolation
-    description: Tests SERIALIZABLE isolation level to measure strictest isolation overhead
-    write_sql: |
-      SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders VALUES (9800001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'serializable');
-      INSERT INTO txn_orders VALUES (9800002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'serializable');
-      COMMIT;
-    validation_queries:
-      - id: verify_serializable
-        sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_comment = 'serializable'
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_comment = 'serializable'
-    expected_rows_affected: 2
-
-  # MULTI-STATEMENT OPERATIONS (8 operations)
-  # Tests multiple DML statements within a single transaction
-  # ============================================================================
-
-  - id: transaction_mixed_dml_small
-    category: multi_statement
-    description: Tests mixed INSERT/UPDATE/DELETE within single transaction (small scale)
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders VALUES (9900001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'mixed_dml');
-      UPDATE txn_orders SET o_totalprice = 1500.0 WHERE o_orderkey = 9900001;
-      INSERT INTO txn_orders VALUES (9900002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'mixed_dml');
-      DELETE FROM txn_orders WHERE o_orderkey = 9900002;
-      INSERT INTO txn_orders VALUES (9900003, 3, 'O', 3000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'mixed_dml');
-      COMMIT;
-    validation_queries:
-      - id: verify_mixed_dml
-        sql: SELECT o_orderkey, o_totalprice FROM txn_orders WHERE o_orderkey BETWEEN 9900001 AND 9900003 ORDER BY o_orderkey
-        expected_rows: 2
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9900001 AND 9900003
-    expected_rows_affected: 2
-
-  - id: transaction_mixed_dml_medium
-    category: multi_statement
-    description: Tests mixed DML operations on multiple rows with JOINs
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders
-      SELECT 9910000 + n, 1, 'O', 1000.0 * n, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'mixed_medium'
-      FROM (SELECT unnest(generate_series(1, 50)) AS n) t;
-      UPDATE txn_orders SET o_totalprice = o_totalprice * 1.1 WHERE o_orderkey BETWEEN 9910001 AND 9910025;
-      DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9910026 AND 9910050;
-      COMMIT;
-    validation_queries:
-      - id: verify_mixed_medium
-        sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey BETWEEN 9910001 AND 9910050
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9910001 AND 9910050
-    expected_rows_affected: 25
-
-  - id: transaction_insert_update_chain
-    category: multi_statement
-    description: Tests dependent INSERT then UPDATE on same rows within transaction
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_customer VALUES (9000001, 'Customer#000000001', '123 Main St', 1, '555-1234', 1000.00, 'AUTOMOBILE', 'initial');
-      INSERT INTO txn_customer VALUES (9000002, 'Customer#000000002', '456 Oak Ave', 1, '555-5678', 2000.00, 'BUILDING', 'initial');
-      UPDATE txn_customer SET c_comment = 'updated', c_acctbal = c_acctbal * 1.5 WHERE c_custkey >= 9000001;
-      COMMIT;
-    validation_queries:
-      - id: verify_chain
-        sql: SELECT c_custkey, c_comment, c_acctbal FROM txn_customer WHERE c_custkey BETWEEN 9000001 AND 9000002 ORDER BY c_custkey
-        expected_rows: 2
-    cleanup_sql: |
-      DELETE FROM txn_customer WHERE c_custkey BETWEEN 9000001 AND 9000002
-    expected_rows_affected: 2
-
-  - id: transaction_delete_insert_same_key
-    category: multi_statement
-    description: Tests DELETE then re-INSERT of same primary key within transaction
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders VALUES (9920001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'original');
-      DELETE FROM txn_orders WHERE o_orderkey = 9920001;
-      INSERT INTO txn_orders VALUES (9920001, 2, 'O', 2000.0, DATE '1998-02-01', '1-URGENT', 'Clerk#000000002', 0, 'replaced');
-      COMMIT;
-    validation_queries:
-      - id: verify_key_reuse
-        sql: SELECT o_custkey, o_comment FROM txn_orders WHERE o_orderkey = 9920001
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey = 9920001
-    expected_rows_affected: 1
-
-  - id: transaction_read_your_writes
-    category: multi_statement
-    description: Tests that transaction sees its own uncommitted changes
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders VALUES (9930001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'read_test');
-      UPDATE txn_orders SET o_totalprice = (SELECT o_totalprice FROM txn_orders WHERE o_orderkey = 9930001) * 2 WHERE o_orderkey = 9930001;
-      COMMIT;
-    validation_queries:
-      - id: verify_read_writes
-        sql: SELECT o_totalprice FROM txn_orders WHERE o_orderkey = 9930001
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey = 9930001
-    expected_rows_affected: 1
-
-  - id: transaction_insert_with_subquery
-    category: multi_statement
-    description: Tests INSERT...SELECT from same table within transaction
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders VALUES (9940001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'source');
-      INSERT INTO txn_orders
-      SELECT o_orderkey + 1, o_custkey, o_orderstatus, o_totalprice * 2, o_orderdate, o_orderpriority, o_clerk, o_shippriority, 'derived'
-      FROM txn_orders WHERE o_orderkey = 9940001;
-      COMMIT;
-    validation_queries:
-      - id: verify_subquery_insert
-        sql: SELECT o_orderkey, o_comment FROM txn_orders WHERE o_orderkey IN (9940001, 9940002) ORDER BY o_orderkey
-        expected_rows: 2
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey IN (9940001, 9940002)
-    expected_rows_affected: 2
-
-  - id: transaction_multi_table_writes
-    category: multi_statement
-    description: Tests writes to multiple tables within single transaction
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_customer VALUES (9000010, 'Customer#000000010', '789 Pine Rd', 1, '555-9999', 5000.00, 'MACHINERY', 'multi_table_test');
-      INSERT INTO txn_orders VALUES (9950001, 9000010, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'multi_table_test');
-      INSERT INTO txn_orders VALUES (9950002, 9000010, 'O', 2000.0, DATE '1998-01-02', '5-LOW', 'Clerk#000000001', 0, 'multi_table_test');
-      COMMIT;
-    validation_queries:
-      - id: verify_multi_table
-        sql: |
-          SELECT COUNT(*) as cnt
-          FROM txn_customer c
-          JOIN txn_orders o ON c.c_custkey = o.o_custkey
-          WHERE c.c_custkey = 9000010
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_custkey = 9000010;
-      DELETE FROM txn_customer WHERE c_custkey = 9000010
-    expected_rows_affected: 3
-
-  - id: transaction_long_running_mixed
-    category: multi_statement
-    description: Tests long-running transaction with many statements to measure log/lock overhead
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders
-      SELECT 9960000 + n, 1, 'O', 1000.0 * n, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'long_tx'
-      FROM (SELECT unnest(generate_series(1, 100)) AS n) t;
-      UPDATE txn_orders SET o_totalprice = o_totalprice * 1.05 WHERE o_orderkey BETWEEN 9960001 AND 9960050;
-      DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9960051 AND 9960100;
-      INSERT INTO txn_orders
-      SELECT 9960100 + n, 2, 'O', 2000.0 * n, DATE '1998-01-02', '1-URGENT', 'Clerk#000000002', 0, 'long_tx_2'
-      FROM (SELECT unnest(generate_series(1, 50)) AS n) t;
-      COMMIT;
-    validation_queries:
-      - id: verify_long_tx
-        sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey BETWEEN 9960001 AND 9960150
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9960001 AND 9960150
-    expected_rows_affected: 100
-
-  # ADVANCED OPERATIONS (5 operations)
-  # Tests advanced transaction features like deferred constraints, DDL in transactions, etc.
-  # ============================================================================
-
-  - id: transaction_truncate_in_transaction
-    category: advanced
-    description: Tests TRUNCATE within transaction and rollback behavior (platform-specific)
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders VALUES (9970001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'before_truncate');
-      TRUNCATE TABLE txn_orders;
-      INSERT INTO txn_orders VALUES (9970002, 2, 'O', 2000.0, DATE '1998-01-02', '5-LOW', 'Clerk#000000001', 0, 'after_truncate');
-      COMMIT;
-    validation_queries:
-      - id: verify_truncate
-        sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey IN (9970001, 9970002)
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey = 9970002
-    expected_rows_affected: 1
-    platform_overrides:
-      mysql:
-        # MySQL TRUNCATE is not transactional - skip this test
-        write_sql: null
-      mariadb:
-        write_sql: null
-
-  - id: transaction_create_temp_table
-    category: advanced
-    description: Tests transaction-scoped temporary table creation and usage
-    write_sql: |
-      BEGIN TRANSACTION;
-      CREATE TEMP TABLE IF NOT EXISTS temp_orders_9980000 AS SELECT * FROM orders WHERE 1=0;
-      INSERT INTO temp_orders_9980000 VALUES (9980001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'temp_test');
-      INSERT INTO txn_orders SELECT * FROM temp_orders_9980000;
-      DROP TABLE IF EXISTS temp_orders_9980000;
-      COMMIT;
-    validation_queries:
-      - id: verify_temp_table
-        sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey = 9980001
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey = 9980001
-    expected_rows_affected: 1
-
-  - id: transaction_with_cte
-    category: advanced
-    description: Tests complex CTE within transaction
-    write_sql: |
-      BEGIN TRANSACTION;
-      WITH order_data AS (
-        SELECT 9990000 + n AS o_orderkey,
-               1 AS o_custkey,
-               'O' AS o_orderstatus,
-               1000.0 * n AS o_totalprice,
-               DATE '1998-01-01' AS o_orderdate,
-               '5-LOW' AS o_orderpriority,
-               'Clerk#000000001' AS o_clerk,
-               0 AS o_shippriority,
-               'cte_test' AS o_comment
-        FROM (SELECT unnest(generate_series(1, 10)) AS n) t
-      )
-      INSERT INTO txn_orders SELECT * FROM order_data;
-      UPDATE txn_orders SET o_totalprice = o_totalprice * 2 WHERE o_orderkey BETWEEN 9990001 AND 9990010;
-      COMMIT;
-    validation_queries:
-      - id: verify_cte
-        sql: SELECT COUNT(*) as cnt, SUM(o_totalprice) as total FROM txn_orders WHERE o_orderkey BETWEEN 9990001 AND 9990010
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9990001 AND 9990010
-    expected_rows_affected: 10
-
-  - id: transaction_nested_subquery_updates
-    category: advanced
-    description: Tests UPDATE with nested subqueries within transaction
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders
-      SELECT 8000000 + n, 1, 'O', 1000.0 * n, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'subquery_update'
-      FROM (SELECT unnest(generate_series(1, 20)) AS n) t;
-      UPDATE txn_orders
-      SET o_totalprice = (
-        SELECT AVG(o_totalprice) * 1.5
-        FROM txn_orders
-        WHERE o_orderkey BETWEEN 8000001 AND 8000020
-      )
-      WHERE o_orderkey BETWEEN 8000001 AND 8000010;
-      COMMIT;
-    validation_queries:
-      - id: verify_subquery_update
-        sql: |
-          SELECT COUNT(DISTINCT o_totalprice) as distinct_prices
-          FROM txn_orders
-          WHERE o_orderkey BETWEEN 8000001 AND 8000010
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey BETWEEN 8000001 AND 8000020
-    expected_rows_affected: 20
-
-  - id: transaction_rollback_after_error
-    category: advanced
-    description: Tests automatic rollback behavior after constraint violation
-    write_sql: |
-      BEGIN TRANSACTION;
-      INSERT INTO txn_orders VALUES (8100001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'error_test');
-      COMMIT;
-    validation_queries:
-      - id: verify_error_handling
-        sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey = 8100001
-        expected_rows: 1
-    cleanup_sql: |
-      DELETE FROM txn_orders WHERE o_orderkey = 8100001
-    expected_rows_affected: 1
+- id: transaction_commit_small
+  category: overhead
+  description: Tests BEGIN plus multiple writes plus COMMIT with small transaction containing 10 writes
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_lineitem VALUES (9100001, 1, 1, 1, 10.0, 1000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx1');\nINSERT INTO txn_lineitem VALUES (9100002, 2, 2, 1, 20.0, 2000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx2');\nINSERT INTO txn_lineitem VALUES (9100003, 3, 3, 1, 30.0, 3000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx3');\nINSERT INTO txn_lineitem VALUES (9100004, 4, 4, 1, 40.0, 4000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx4');\nINSERT INTO txn_lineitem VALUES (9100005, 5, 5, 1, 50.0, 5000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx5');\nINSERT INTO txn_lineitem VALUES (9100006, 6, 6, 1, 60.0, 6000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx6');\nINSERT INTO txn_lineitem VALUES (9100007, 7, 7, 1, 70.0, 7000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx7');\nINSERT INTO txn_lineitem VALUES (9100008, 8, 8, 1, 80.0, 8000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx8');\nINSERT INTO txn_lineitem VALUES (9100009, 9, 9, 1, 90.0, 9000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx9');\nINSERT INTO txn_lineitem VALUES (9100010, 10, 10, 1, 100.0, 10000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx10');\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_commit
+    sql: SELECT l_orderkey FROM txn_lineitem WHERE l_orderkey BETWEEN 9100001 AND 9100010 ORDER BY l_orderkey
+    expected_rows: 10
+  cleanup_sql: "DELETE FROM txn_lineitem WHERE l_orderkey BETWEEN 9100001 AND 9100010\n"
+  expected_rows_affected: 10
+- id: transaction_commit_medium
+  category: overhead
+  description: Tests transaction with 100 write operations to measure medium transaction overhead
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders\nSELECT 9200000 + n, 1, 'O', 1000.0 * n, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'tx_medium'\nFROM (SELECT unnest(generate_series(1, 100)) AS n) t;\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_medium_commit
+    sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey BETWEEN 9200000 AND 9200099
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9200000 AND 9200099\n"
+  expected_rows_affected: 100
+- id: transaction_commit_large
+  category: overhead
+  description: Tests transaction with 1000 write operations to measure large transaction and log overhead
+  write_sql: "BEGIN TRANSACTION;\nDELETE FROM txn_lineitem WHERE l_comment = 'tx_large';\nINSERT INTO txn_lineitem\nSELECT 9300000 + n, 1, 1, 1, 10.0, 1000.0, 0.05, 0.02, 'N', 'O',\n       DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20',\n       'DELIVER IN PERSON', 'TRUCK', 'tx_large'\nFROM (SELECT unnest(generate_series(1, 1000)) AS n) t;\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_large_commit
+    sql: SELECT COUNT(*) as cnt FROM txn_lineitem WHERE l_comment = 'tx_large'
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_lineitem WHERE l_comment = 'tx_large'\n"
+  expected_rows_affected: 1000
+- id: transaction_rollback_small
+  category: overhead
+  description: Tests transaction ROLLBACK with small transaction to measure rollback overhead
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders VALUES (9400001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'rollback_test');\nINSERT INTO txn_orders VALUES (9400002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'rollback_test');\nINSERT INTO txn_orders VALUES (9400003, 3, 'O', 3000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'rollback_test');\nROLLBACK;\n"
+  validation_queries:
+  - id: verify_rollback
+    sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_comment = 'rollback_test'
+    expected_rows: 1
+  cleanup_sql: null
+  expected_rows_affected: 0
+- id: transaction_rollback_medium
+  category: overhead
+  description: Tests transaction ROLLBACK with medium transaction 100 writes to measure larger rollback overhead
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_lineitem\nSELECT 9500000 + n, 1, 1, 1, 10.0, 1000.0, 0.05, 0.02, 'N', 'O',\n       DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20',\n       'DELIVER IN PERSON', 'TRUCK', 'rollback_medium'\nFROM (SELECT unnest(generate_series(1, 100)) AS n) t;\nROLLBACK;\n"
+  validation_queries:
+  - id: verify_medium_rollback
+    sql: SELECT COUNT(*) as cnt FROM txn_lineitem WHERE l_comment = 'rollback_medium'
+    expected_rows: 1
+  cleanup_sql: null
+  expected_rows_affected: 0
+- id: transaction_savepoint_nested
+  category: savepoint
+  description: Tests nested savepoints with partial rollback to measure savepoint overhead
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders VALUES (9600001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'outer_tx');\nSAVEPOINT sp1;\nINSERT INTO txn_orders VALUES (9600002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'inner_tx');\nSAVEPOINT sp2;\nINSERT INTO txn_orders VALUES (9600003, 3, 'O', 3000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'innermost_tx');\nROLLBACK TO SAVEPOINT sp2;\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_savepoint
+    sql: "SELECT COUNT(*) as cnt FROM txn_orders\nWHERE o_orderkey IN (9600001, 9600002, 9600003)\n"
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey IN (9600001, 9600002, 9600003)\n"
+  expected_rows_affected: 2
+  platform_overrides:
+    duckdb:
+      write_sql: null
+- id: transaction_savepoint_deep_nesting
+  category: savepoint
+  description: Tests deep savepoint nesting with selective rollback at different levels
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders VALUES (9610001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'level0');\nSAVEPOINT sp1;\nINSERT INTO txn_orders VALUES (9610002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'level1');\nSAVEPOINT sp2;\nINSERT INTO txn_orders VALUES (9610003, 3, 'O', 3000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'level2');\nSAVEPOINT sp3;\nINSERT INTO txn_orders VALUES (9610004, 4, 'O', 4000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'level3');\nSAVEPOINT sp4;\nINSERT INTO txn_orders VALUES (9610005, 5, 'O', 5000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'level4');\nROLLBACK TO SAVEPOINT sp3;\nINSERT INTO txn_orders VALUES (9610006, 6, 'O', 6000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'level3_alt');\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_deep_savepoint
+    sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey BETWEEN 9610001 AND 9610006
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9610001 AND 9610006\n"
+  expected_rows_affected: 4
+  platform_overrides:
+    duckdb:
+      write_sql: null
+- id: transaction_isolation_read_committed
+  category: isolation
+  description: Tests READ COMMITTED isolation level to measure isolation overhead
+  write_sql: "SET TRANSACTION ISOLATION LEVEL READ COMMITTED;\nBEGIN TRANSACTION;\nINSERT INTO txn_orders VALUES (9700001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'read_committed');\nINSERT INTO txn_orders VALUES (9700002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'read_committed');\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_isolation
+    sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_comment = 'read_committed'
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_comment = 'read_committed'\n"
+  expected_rows_affected: 2
+- id: transaction_isolation_repeatable_read
+  category: isolation
+  description: Tests REPEATABLE READ isolation level to measure mid-tier isolation overhead
+  write_sql: "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;\nBEGIN TRANSACTION;\nINSERT INTO txn_orders VALUES (9710001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'repeatable_read');\nINSERT INTO txn_orders VALUES (9710002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'repeatable_read');\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_repeatable_read
+    sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_comment = 'repeatable_read'
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_comment = 'repeatable_read'\n"
+  expected_rows_affected: 2
+- id: transaction_isolation_serializable
+  category: isolation
+  description: Tests SERIALIZABLE isolation level to measure strictest isolation overhead
+  write_sql: "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;\nBEGIN TRANSACTION;\nINSERT INTO txn_orders VALUES (9800001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'serializable');\nINSERT INTO txn_orders VALUES (9800002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'serializable');\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_serializable
+    sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_comment = 'serializable'
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_comment = 'serializable'\n"
+  expected_rows_affected: 2
+- id: transaction_mixed_dml_small
+  category: multi_statement
+  description: Tests mixed INSERT/UPDATE/DELETE within single transaction (small scale)
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders VALUES (9900001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'mixed_dml');\nUPDATE txn_orders SET o_totalprice = 1500.0 WHERE o_orderkey = 9900001;\nINSERT INTO txn_orders VALUES (9900002, 2, 'O', 2000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'mixed_dml');\nDELETE FROM txn_orders WHERE o_orderkey = 9900002;\nINSERT INTO txn_orders VALUES (9900003, 3, 'O', 3000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'mixed_dml');\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_mixed_dml
+    sql: SELECT o_orderkey, o_totalprice FROM txn_orders WHERE o_orderkey BETWEEN 9900001 AND 9900003 ORDER BY o_orderkey
+    expected_rows: 2
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9900001 AND 9900003\n"
+  expected_rows_affected: 2
+- id: transaction_mixed_dml_medium
+  category: multi_statement
+  description: Tests mixed DML operations on multiple rows with JOINs
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders\nSELECT 9910000 + n, 1, 'O', 1000.0 * n, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'mixed_medium'\nFROM (SELECT unnest(generate_series(1, 50)) AS n) t;\nUPDATE txn_orders SET o_totalprice = o_totalprice * 1.1 WHERE o_orderkey BETWEEN 9910001 AND 9910025;\nDELETE FROM txn_orders WHERE o_orderkey BETWEEN 9910026 AND 9910050;\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_mixed_medium
+    sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey BETWEEN 9910001 AND 9910050
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9910001 AND 9910050\n"
+  expected_rows_affected: 25
+- id: transaction_insert_update_chain
+  category: multi_statement
+  description: Tests dependent INSERT then UPDATE on same rows within transaction
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_customer VALUES (9000001, 'Customer#000000001', '123 Main St', 1, '555-1234', 1000.00, 'AUTOMOBILE', 'initial');\nINSERT INTO txn_customer VALUES (9000002, 'Customer#000000002', '456 Oak Ave', 1, '555-5678', 2000.00, 'BUILDING', 'initial');\nUPDATE txn_customer SET c_comment = 'updated', c_acctbal = c_acctbal * 1.5 WHERE c_custkey >= 9000001;\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_chain
+    sql: SELECT c_custkey, c_comment, c_acctbal FROM txn_customer WHERE c_custkey BETWEEN 9000001 AND 9000002 ORDER BY c_custkey
+    expected_rows: 2
+  cleanup_sql: "DELETE FROM txn_customer WHERE c_custkey BETWEEN 9000001 AND 9000002\n"
+  expected_rows_affected: 2
+- id: transaction_delete_insert_same_key
+  category: multi_statement
+  description: Tests DELETE then re-INSERT of same primary key within transaction
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders VALUES (9920001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'original');\nDELETE FROM txn_orders WHERE o_orderkey = 9920001;\nINSERT INTO txn_orders VALUES (9920001, 2, 'O', 2000.0, DATE '1998-02-01', '1-URGENT', 'Clerk#000000002', 0, 'replaced');\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_key_reuse
+    sql: SELECT o_custkey, o_comment FROM txn_orders WHERE o_orderkey = 9920001
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey = 9920001\n"
+  expected_rows_affected: 1
+- id: transaction_read_your_writes
+  category: multi_statement
+  description: Tests that transaction sees its own uncommitted changes
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders VALUES (9930001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'read_test');\nUPDATE txn_orders SET o_totalprice = (SELECT o_totalprice FROM txn_orders WHERE o_orderkey = 9930001) * 2 WHERE o_orderkey = 9930001;\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_read_writes
+    sql: SELECT o_totalprice FROM txn_orders WHERE o_orderkey = 9930001
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey = 9930001\n"
+  expected_rows_affected: 1
+- id: transaction_insert_with_subquery
+  category: multi_statement
+  description: Tests INSERT...SELECT from same table within transaction
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders VALUES (9940001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'source');\nINSERT INTO txn_orders\nSELECT o_orderkey + 1, o_custkey, o_orderstatus, o_totalprice * 2, o_orderdate, o_orderpriority, o_clerk, o_shippriority, 'derived'\nFROM txn_orders WHERE o_orderkey = 9940001;\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_subquery_insert
+    sql: SELECT o_orderkey, o_comment FROM txn_orders WHERE o_orderkey IN (9940001, 9940002) ORDER BY o_orderkey
+    expected_rows: 2
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey IN (9940001, 9940002)\n"
+  expected_rows_affected: 2
+- id: transaction_multi_table_writes
+  category: multi_statement
+  description: Tests writes to multiple tables within single transaction
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_customer VALUES (9000010, 'Customer#000000010', '789 Pine Rd', 1, '555-9999', 5000.00, 'MACHINERY', 'multi_table_test');\nINSERT INTO txn_orders VALUES (9950001, 9000010, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'multi_table_test');\nINSERT INTO txn_orders VALUES (9950002, 9000010, 'O', 2000.0, DATE '1998-01-02', '5-LOW', 'Clerk#000000001', 0, 'multi_table_test');\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_multi_table
+    sql: "SELECT COUNT(*) as cnt\nFROM txn_customer c\nJOIN txn_orders o ON c.c_custkey = o.o_custkey\nWHERE c.c_custkey = 9000010\n"
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_custkey = 9000010;\nDELETE FROM txn_customer WHERE c_custkey = 9000010\n"
+  expected_rows_affected: 3
+- id: transaction_long_running_mixed
+  category: multi_statement
+  description: Tests long-running transaction with many statements to measure log/lock overhead
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders\nSELECT 9960000 + n, 1, 'O', 1000.0 * n, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'long_tx'\nFROM (SELECT unnest(generate_series(1, 100)) AS n) t;\nUPDATE txn_orders SET o_totalprice = o_totalprice * 1.05 WHERE o_orderkey BETWEEN 9960001 AND 9960050;\nDELETE FROM txn_orders WHERE o_orderkey BETWEEN 9960051 AND 9960100;\nINSERT INTO txn_orders\nSELECT 9960100 + n, 2, 'O', 2000.0 * n, DATE '1998-01-02', '1-URGENT', 'Clerk#000000002', 0, 'long_tx_2'\nFROM (SELECT unnest(generate_series(1, 50)) AS n) t;\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_long_tx
+    sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey BETWEEN 9960001 AND 9960150
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9960001 AND 9960150\n"
+  expected_rows_affected: 100
+- id: transaction_truncate_in_transaction
+  category: advanced
+  description: Tests TRUNCATE within transaction and rollback behavior (platform-specific)
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders VALUES (9970001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'before_truncate');\nTRUNCATE TABLE txn_orders;\nINSERT INTO txn_orders VALUES (9970002, 2, 'O', 2000.0, DATE '1998-01-02', '5-LOW', 'Clerk#000000001', 0, 'after_truncate');\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_truncate
+    sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey IN (9970001, 9970002)
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey = 9970002\n"
+  expected_rows_affected: 1
+  platform_overrides:
+    mysql:
+      write_sql: null
+    mariadb:
+      write_sql: null
+- id: transaction_create_temp_table
+  category: advanced
+  description: Tests transaction-scoped temporary table creation and usage
+  write_sql: "BEGIN TRANSACTION;\nCREATE TEMP TABLE IF NOT EXISTS temp_orders_9980000 AS SELECT * FROM orders WHERE 1=0;\nINSERT INTO temp_orders_9980000 VALUES (9980001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'temp_test');\nINSERT INTO txn_orders SELECT * FROM temp_orders_9980000;\nDROP TABLE IF EXISTS temp_orders_9980000;\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_temp_table
+    sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey = 9980001
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey = 9980001\n"
+  expected_rows_affected: 1
+- id: transaction_with_cte
+  category: advanced
+  description: Tests complex CTE within transaction
+  write_sql: "BEGIN TRANSACTION;\nWITH order_data AS (\n  SELECT 9990000 + n AS o_orderkey,\n         1 AS o_custkey,\n         'O' AS o_orderstatus,\n         1000.0 * n AS o_totalprice,\n         DATE '1998-01-01' AS o_orderdate,\n         '5-LOW' AS o_orderpriority,\n         'Clerk#000000001' AS o_clerk,\n         0 AS o_shippriority,\n         'cte_test' AS o_comment\n  FROM (SELECT unnest(generate_series(1, 10)) AS n) t\n)\nINSERT INTO txn_orders SELECT * FROM order_data;\nUPDATE txn_orders SET o_totalprice = o_totalprice * 2 WHERE o_orderkey BETWEEN 9990001 AND 9990010;\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_cte
+    sql: SELECT COUNT(*) as cnt, SUM(o_totalprice) as total FROM txn_orders WHERE o_orderkey BETWEEN 9990001 AND 9990010
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9990001 AND 9990010\n"
+  expected_rows_affected: 10
+- id: transaction_nested_subquery_updates
+  category: advanced
+  description: Tests UPDATE with nested subqueries within transaction
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders\nSELECT 8000000 + n, 1, 'O', 1000.0 * n, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'subquery_update'\nFROM (SELECT unnest(generate_series(1, 20)) AS n) t;\nUPDATE txn_orders\nSET o_totalprice = (\n  SELECT AVG(o_totalprice) * 1.5\n  FROM txn_orders\n  WHERE o_orderkey BETWEEN 8000001 AND 8000020\n)\nWHERE o_orderkey BETWEEN 8000001 AND 8000010;\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_subquery_update
+    sql: "SELECT COUNT(DISTINCT o_totalprice) as distinct_prices\nFROM txn_orders\nWHERE o_orderkey BETWEEN 8000001 AND 8000010\n"
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey BETWEEN 8000001 AND 8000020\n"
+  expected_rows_affected: 20
+- id: transaction_rollback_after_error
+  category: advanced
+  description: Tests automatic rollback behavior after constraint violation
+  write_sql: "BEGIN TRANSACTION;\nINSERT INTO txn_orders VALUES (8100001, 1, 'O', 1000.0, DATE '1998-01-01', '5-LOW', 'Clerk#000000001', 0, 'error_test');\nCOMMIT;\n"
+  validation_queries:
+  - id: verify_error_handling
+    sql: SELECT COUNT(*) as cnt FROM txn_orders WHERE o_orderkey = 8100001
+    expected_rows: 1
+  cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey = 8100001\n"
+  expected_rows_affected: 1

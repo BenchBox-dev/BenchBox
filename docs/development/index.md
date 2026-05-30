@@ -20,6 +20,7 @@ Documentation for contributors and developers working on BenchBox.
 ## Contributing
 
 - [Adding New Platforms](adding-new-platforms.md) - How to add support for new database platforms
+- [New Platform Acceptance Checklist](new-platform-acceptance-checklist.md) - Required registry, docs, tests, compatibility, and UAT gates
 - [Import Patterns](import-patterns.md) - Lazy loading and dependency management patterns
 - [TPC Compilation Guide](tpc-compilation-guide.md) - Compiling TPC benchmark tools
 
@@ -63,6 +64,7 @@ development
 platform-development
 adding-new-platforms
 adding-dataframe-platform
+new-platform-acceptance-checklist
 architecture-design
 data-dependencies
 import-patterns

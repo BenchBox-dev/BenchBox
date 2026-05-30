@@ -167,7 +167,6 @@ local pre-push hook lock doesn't bottleneck it.
 | `make worktree-pool-disk-clean` | Strip pytest/coverage/ruff caches across all slots. |
 | `make worktree-list` | `git worktree list` passthrough. |
 | `make worktree-prune` | Legacy non-pool worktree cleanup; explicitly skips pool slots. |
-| `make worktree-add BRANCH=…` | **Deprecated** alias of `worktree-claim`; tracked for removal. |
 
 ## Invariants
 

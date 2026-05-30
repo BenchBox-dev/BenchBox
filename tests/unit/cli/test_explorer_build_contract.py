@@ -7,8 +7,9 @@ import json
 from typing import cast
 
 import pytest
-from _project.scripts.explorer_pipeline.contract import EXPLORER_BUILD_CONTRACT, EXPLORER_READ_MODEL_VERSION
 from click.testing import CliRunner
+
+from _project.scripts.explorer_pipeline.contract import EXPLORER_BUILD_CONTRACT, EXPLORER_READ_MODEL_VERSION
 
 explorer_module = importlib.import_module("_project.scripts.explorer_publish")
 

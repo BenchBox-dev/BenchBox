@@ -1,0 +1,41 @@
+variants:
+- id: 1
+  expression_impl: q6_v1_expression_impl
+  pandas_impl: q6_v1_pandas_impl
+  description: 'Baseline: direct delegation to TPC-H Q6 implementation'
+- id: 2
+  expression_impl: q6_v2_expression_impl
+  pandas_impl: q6_v2_pandas_impl
+  description: 'Pre-filter: apply each WHERE predicate separately before revenue computation'
+- id: 3
+  expression_impl: q6_v3_expression_impl
+  pandas_impl: q6_v3_pandas_impl
+  description: 'Column prune: select only needed columns before filtering'
+- id: 4
+  expression_impl: q6_v4_expression_impl
+  pandas_impl: q6_v4_pandas_impl
+  description: 'Intermediate vars: named DataFrames for date, discount, quantity filter steps'
+- id: 5
+  expression_impl: q6_v5_expression_impl
+  pandas_impl: q6_v5_pandas_impl
+  description: 'Pre-compute derived: add revenue column before summing'
+- id: 6
+  expression_impl: q6_v6_expression_impl
+  pandas_impl: q6_v6_pandas_impl
+  description: 'Chained style: maximum method chaining, no named intermediates'
+- id: 7
+  expression_impl: q6_v7_expression_impl
+  pandas_impl: q6_v7_pandas_impl
+  description: 'Aggregation alternative: discount+quantity filter first, then date filter'
+- id: 8
+  expression_impl: q6_v8_expression_impl
+  pandas_impl: q6_v8_pandas_impl
+  description: 'Filter combination: two compound predicates ANDed together'
+- id: 9
+  expression_impl: q6_v9_expression_impl
+  pandas_impl: q6_v9_pandas_impl
+  description: 'Explicit select: explicit revenue column selection before sum'
+- id: 10
+  expression_impl: q6_v10_expression_impl
+  pandas_impl: q6_v10_pandas_impl
+  description: 'Alternative formula: commuted discount*price instead of price*discount'

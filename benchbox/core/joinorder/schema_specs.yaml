@@ -1,0 +1,244 @@
+tables:
+  title:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - title TEXT NOT NULL
+    - imdb_index VARCHAR(12)
+    - kind_id INTEGER NOT NULL
+    - production_year INTEGER
+    - imdb_id INTEGER
+    - phonetic_code VARCHAR(5)
+    - episode_of_id INTEGER
+    - season_nr INTEGER
+    - episode_nr INTEGER
+    - series_years VARCHAR(49)
+    - md5sum VARCHAR(32)
+    foreign_keys:
+    - FOREIGN KEY (kind_id) REFERENCES kind_type(id)
+    - FOREIGN KEY (episode_of_id) REFERENCES title(id)
+  name:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - name TEXT NOT NULL
+    - imdb_index VARCHAR(12)
+    - imdb_id INTEGER
+    - gender VARCHAR(1)
+    - name_pcode_cf VARCHAR(5)
+    - name_pcode_nf VARCHAR(5)
+    - surname_pcode VARCHAR(5)
+    - md5sum VARCHAR(32)
+    foreign_keys: []
+  company_name:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - name TEXT NOT NULL
+    - country_code VARCHAR(255)
+    - imdb_id INTEGER
+    - name_pcode_nf VARCHAR(5)
+    - name_pcode_sf VARCHAR(5)
+    - md5sum VARCHAR(32)
+    foreign_keys: []
+  keyword:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - keyword TEXT NOT NULL
+    - phonetic_code VARCHAR(5)
+    foreign_keys: []
+  char_name:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - name TEXT NOT NULL
+    - imdb_index VARCHAR(12)
+    - imdb_id INTEGER
+    - name_pcode_nf VARCHAR(5)
+    - surname_pcode VARCHAR(5)
+    - md5sum VARCHAR(32)
+    foreign_keys: []
+  kind_type:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - kind VARCHAR(15) NOT NULL
+    foreign_keys: []
+  company_type:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - kind VARCHAR(32) NOT NULL
+    foreign_keys: []
+  info_type:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - info VARCHAR(32) NOT NULL
+    foreign_keys: []
+  role_type:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - role VARCHAR(32) NOT NULL
+    foreign_keys: []
+  comp_cast_type:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - kind VARCHAR(32) NOT NULL
+    foreign_keys: []
+  link_type:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - link VARCHAR(32) NOT NULL
+    foreign_keys: []
+  cast_info:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - person_id INTEGER NOT NULL
+    - movie_id INTEGER NOT NULL
+    - person_role_id INTEGER
+    - note TEXT
+    - nr_order INTEGER
+    - role_id INTEGER NOT NULL
+    foreign_keys:
+    - FOREIGN KEY (person_id) REFERENCES name(id)
+    - FOREIGN KEY (movie_id) REFERENCES title(id)
+    - FOREIGN KEY (person_role_id) REFERENCES char_name(id)
+    - FOREIGN KEY (role_id) REFERENCES role_type(id)
+  movie_companies:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - movie_id INTEGER NOT NULL
+    - company_id INTEGER NOT NULL
+    - company_type_id INTEGER NOT NULL
+    - note TEXT
+    foreign_keys:
+    - FOREIGN KEY (movie_id) REFERENCES title(id)
+    - FOREIGN KEY (company_id) REFERENCES company_name(id)
+    - FOREIGN KEY (company_type_id) REFERENCES company_type(id)
+  movie_info:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - movie_id INTEGER NOT NULL
+    - info_type_id INTEGER NOT NULL
+    - info TEXT NOT NULL
+    - note TEXT
+    foreign_keys:
+    - FOREIGN KEY (movie_id) REFERENCES title(id)
+    - FOREIGN KEY (info_type_id) REFERENCES info_type(id)
+  movie_info_idx:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - movie_id INTEGER NOT NULL
+    - info_type_id INTEGER NOT NULL
+    - info TEXT NOT NULL
+    - note TEXT
+    foreign_keys:
+    - FOREIGN KEY (movie_id) REFERENCES title(id)
+    - FOREIGN KEY (info_type_id) REFERENCES info_type(id)
+  movie_keyword:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - movie_id INTEGER NOT NULL
+    - keyword_id INTEGER NOT NULL
+    foreign_keys:
+    - FOREIGN KEY (movie_id) REFERENCES title(id)
+    - FOREIGN KEY (keyword_id) REFERENCES keyword(id)
+  movie_link:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - movie_id INTEGER NOT NULL
+    - linked_movie_id INTEGER NOT NULL
+    - link_type_id INTEGER NOT NULL
+    foreign_keys:
+    - FOREIGN KEY (movie_id) REFERENCES title(id)
+    - FOREIGN KEY (linked_movie_id) REFERENCES title(id)
+    - FOREIGN KEY (link_type_id) REFERENCES link_type(id)
+  person_info:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - person_id INTEGER NOT NULL
+    - info_type_id INTEGER NOT NULL
+    - info TEXT NOT NULL
+    - note TEXT
+    foreign_keys:
+    - FOREIGN KEY (person_id) REFERENCES name(id)
+    - FOREIGN KEY (info_type_id) REFERENCES info_type(id)
+  complete_cast:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - movie_id INTEGER
+    - subject_id INTEGER NOT NULL
+    - status_id INTEGER NOT NULL
+    foreign_keys:
+    - FOREIGN KEY (movie_id) REFERENCES title(id)
+    - FOREIGN KEY (subject_id) REFERENCES comp_cast_type(id)
+    - FOREIGN KEY (status_id) REFERENCES comp_cast_type(id)
+  aka_name:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - person_id INTEGER NOT NULL
+    - name TEXT NOT NULL
+    - imdb_index VARCHAR(12)
+    - name_pcode_cf VARCHAR(5)
+    - name_pcode_nf VARCHAR(5)
+    - surname_pcode VARCHAR(5)
+    - md5sum VARCHAR(32)
+    foreign_keys:
+    - FOREIGN KEY (person_id) REFERENCES name(id)
+  aka_title:
+    columns:
+    - id INTEGER PRIMARY KEY
+    - movie_id INTEGER NOT NULL
+    - title TEXT NOT NULL
+    - imdb_index VARCHAR(12)
+    - kind_id INTEGER NOT NULL
+    - production_year INTEGER
+    - phonetic_code VARCHAR(5)
+    - episode_of_id INTEGER
+    - season_nr INTEGER
+    - episode_nr INTEGER
+    - note TEXT
+    - md5sum VARCHAR(32)
+    foreign_keys:
+    - FOREIGN KEY (movie_id) REFERENCES title(id)
+    - FOREIGN KEY (kind_id) REFERENCES kind_type(id)
+    - FOREIGN KEY (episode_of_id) REFERENCES title(id)
+table_order:
+- kind_type
+- company_type
+- info_type
+- role_type
+- comp_cast_type
+- link_type
+- title
+- name
+- company_name
+- keyword
+- char_name
+- cast_info
+- movie_companies
+- movie_info
+- movie_info_idx
+- movie_keyword
+- movie_link
+- person_info
+- complete_cast
+- aka_name
+- aka_title
+relationship_tables:
+- cast_info
+- movie_companies
+- movie_info
+- movie_info_idx
+- movie_keyword
+- movie_link
+- person_info
+- complete_cast
+- aka_name
+- aka_title
+dimension_tables:
+- title
+- name
+- company_name
+- keyword
+- char_name
+- kind_type
+- company_type
+- info_type
+- role_type
+- comp_cast_type
+- link_type

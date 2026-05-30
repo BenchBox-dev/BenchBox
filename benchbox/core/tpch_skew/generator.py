@@ -19,9 +19,10 @@ import logging
 import shutil
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+import yaml
 
 from benchbox.core.tpch.generator import TPCHDataGenerator
 from benchbox.core.tpch_skew.distributions import (
@@ -37,98 +38,18 @@ if TYPE_CHECKING:
     from benchbox.core.tpch_skew.skew_config import SkewConfiguration
 
 
+def _load_generator_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("generator_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_GENERATOR_SPECS = _load_generator_specs()
+
 # TPC-H row counts at SF=1
-_TPCH_BASE_ROW_COUNTS = {
-    "customer": 150_000,
-    "lineitem": 6_001_215,
-    "nation": 25,
-    "orders": 1_500_000,
-    "part": 200_000,
-    "partsupp": 800_000,
-    "region": 5,
-    "supplier": 10_000,
-}
+_TPCH_BASE_ROW_COUNTS = dict(_GENERATOR_SPECS["base_row_counts"])
 
 # Column indices for each TPC-H table (0-based)
-_COLUMN_INDICES = {
-    "customer": {
-        "c_custkey": 0,
-        "c_name": 1,
-        "c_address": 2,
-        "c_nationkey": 3,
-        "c_phone": 4,
-        "c_acctbal": 5,
-        "c_mktsegment": 6,
-        "c_comment": 7,
-    },
-    "orders": {
-        "o_orderkey": 0,
-        "o_custkey": 1,
-        "o_orderstatus": 2,
-        "o_totalprice": 3,
-        "o_orderdate": 4,
-        "o_orderpriority": 5,
-        "o_clerk": 6,
-        "o_shippriority": 7,
-        "o_comment": 8,
-    },
-    "lineitem": {
-        "l_orderkey": 0,
-        "l_partkey": 1,
-        "l_suppkey": 2,
-        "l_linenumber": 3,
-        "l_quantity": 4,
-        "l_extendedprice": 5,
-        "l_discount": 6,
-        "l_tax": 7,
-        "l_returnflag": 8,
-        "l_linestatus": 9,
-        "l_shipdate": 10,
-        "l_commitdate": 11,
-        "l_receiptdate": 12,
-        "l_shipinstruct": 13,
-        "l_shipmode": 14,
-        "l_comment": 15,
-    },
-    "part": {
-        "p_partkey": 0,
-        "p_name": 1,
-        "p_mfgr": 2,
-        "p_brand": 3,
-        "p_type": 4,
-        "p_size": 5,
-        "p_container": 6,
-        "p_retailprice": 7,
-        "p_comment": 8,
-    },
-    "partsupp": {
-        "ps_partkey": 0,
-        "ps_suppkey": 1,
-        "ps_availqty": 2,
-        "ps_supplycost": 3,
-        "ps_comment": 4,
-    },
-    "supplier": {
-        "s_suppkey": 0,
-        "s_name": 1,
-        "s_address": 2,
-        "s_nationkey": 3,
-        "s_phone": 4,
-        "s_acctbal": 5,
-        "s_comment": 6,
-    },
-    "nation": {
-        "n_nationkey": 0,
-        "n_name": 1,
-        "n_regionkey": 2,
-        "n_comment": 3,
-    },
-    "region": {
-        "r_regionkey": 0,
-        "r_name": 1,
-        "r_comment": 2,
-    },
-}
+_COLUMN_INDICES = _GENERATOR_SPECS["column_indices"]
 
 
 class TPCHSkewDataGenerator(VerbosityMixin):

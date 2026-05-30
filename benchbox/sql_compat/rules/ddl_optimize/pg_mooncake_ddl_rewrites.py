@@ -11,36 +11,17 @@ implemented outside ``BaseDdlOptimizer`` by the adapter load/promotion path.
 
 from __future__ import annotations
 
-from benchbox.sql_compat.actions import CompatAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.decision import (
-    CompatibilityDecision,
-    FailureMode,
-    RewriteDDLPayload,
-    SupportLevel,
-)
-from benchbox.sql_compat.registry import REGISTRY
+from benchbox.sql_compat.decision import FailureMode
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.pg_mooncake.all.heap_load_then_mooncake_mirror",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.PERFORMANCE_REGRESSION,
-        payload=RewriteDDLPayload(
-            transformer_id="pg_mooncake_heap_load_then_mirror",
-            description=(
-                "Keep CREATE TABLE loadable as heap DDL, then promote loaded tables "
-                "into mooncake mirrors with the original benchmark table names."
-            ),
-            governance_only=True,
-        ),
-        reason=(
-            "Direct COPY into mooncake access-method tables fails on pg_mooncake 0.2.0; "
-            "heap-load plus mirror promotion preserves both load compatibility and "
-            "DuckDB-backed columnar query execution."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "pg_mooncake",
+register_ddl_rewrite(
+    platform="pg_mooncake",
+    rule_name="heap_load_then_mooncake_mirror",
+    transformer_id="pg_mooncake_heap_load_then_mirror",
+    description="Keep CREATE TABLE loadable as heap DDL, then promote loaded tables "
+    "into mooncake mirrors with the original benchmark table names.",
+    reason="Direct COPY into mooncake access-method tables fails on pg_mooncake 0.2.0; "
+    "heap-load plus mirror promotion preserves both load compatibility and "
+    "DuckDB-backed columnar query execution.",
+    failure_mode=FailureMode.PERFORMANCE_REGRESSION,
 )

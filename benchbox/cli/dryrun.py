@@ -44,6 +44,7 @@ def generate_cli_command(
     force: str | None = None,
     official: bool = False,
     capture_plans: bool = False,
+    strict_translation: bool = False,
     validation: str | None = None,
     verbose: int = 0,
     platform_options: dict[str, str] | None = None,
@@ -75,6 +76,7 @@ def generate_cli_command(
         force: Force mode (all, datagen, upload)
         official: TPC-compliant mode
         capture_plans: Capture query execution plans
+        strict_translation: Fail when SQL dialect translation falls back
         validation: Validation mode (exact, loose, range, disabled, full)
         verbose: Verbosity level (0=off, 1=-v, 2=-vv)
         platform_options: Platform-specific key=value options
@@ -140,6 +142,7 @@ def generate_cli_command(
     _BOOL_PARAMS = [
         (official, "--official"),
         (capture_plans, "--capture-plans"),
+        (strict_translation, "--strict-translation"),
         (global_cache, "--global-cache"),
         (publish, "--publish"),
     ]
@@ -200,6 +203,7 @@ def display_interactive_preview(
     force: str | None = None,
     official: bool = False,
     capture_plans: bool = False,
+    strict_translation: bool = False,
     validation: str | None = None,
     verbose: int = 0,
     console_obj: Console | None = None,
@@ -227,6 +231,7 @@ def display_interactive_preview(
         force: Force mode (all, datagen, upload)
         official: TPC-compliant mode
         capture_plans: Capture query execution plans
+        strict_translation: Fail when SQL dialect translation falls back
         validation: Validation mode
         verbose: Verbosity level (0=off, 1=-v, 2=-vv)
         console_obj: Rich console for output
@@ -299,6 +304,7 @@ def display_interactive_preview(
         ),
         ("Ingestion Method:", sorted_ingestion_method),
         ("Plan Config:", plan_config),
+        ("Strict Translation:", "Enabled" if strict_translation else None),
         ("Global Cache:", "Enabled" if global_cache else None),
     ]
     for label, value in optional_rows:
@@ -342,6 +348,7 @@ def display_interactive_preview(
         force=force,
         official=official,
         capture_plans=capture_plans,
+        strict_translation=strict_translation,
         validation=validation,
         verbose=verbose,
         platform_options=platform_options,

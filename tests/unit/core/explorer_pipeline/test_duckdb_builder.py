@@ -6,10 +6,10 @@ from pathlib import Path
 
 import duckdb
 import pytest
+
 from _project.scripts.explorer_pipeline.contract import EXPLORER_READ_MODEL_VERSION
 from _project.scripts.explorer_pipeline.duckdb_builder import DuckDBSnapshotBuilder
 from _project.scripts.explorer_pipeline.models import ManifestEntry
-
 from benchbox.core.cost.models import DeploymentMetadata, NormalizedCost
 from benchbox.core.cost.pricing import PRICING_VERSION
 

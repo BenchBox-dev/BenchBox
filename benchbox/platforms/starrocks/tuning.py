@@ -5,11 +5,11 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 
+from benchbox.platforms.base.tuning import make_informational_constraint_applier, supports_named_tuning_type
+
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
         UnifiedTuningConfiguration,
     )
 
@@ -83,36 +83,16 @@ class StarRocksTuningMixin:
         finally:
             cursor.close()
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to StarRocks.
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints enabled (applied during table creation)",
+        "Foreign key constraints noted (StarRocks does not enforce foreign keys)",
+    )
 
-        StarRocks uses data model keys (DUPLICATE/AGGREGATE/UNIQUE/PRIMARY)
-        defined at table creation time. This method logs the configuration
-        since constraints are applied during CREATE TABLE.
-        """
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info("Primary key constraints enabled (applied during table creation)")
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info("Foreign key constraints noted (StarRocks does not enforce foreign keys)")
+    _supported_tuning_type_names = ("PARTITIONING", "SORTING", "DISTRIBUTION")
 
     def supports_tuning_type(self, tuning_type) -> bool:
         """Check if StarRocks supports a specific tuning type."""
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {
-                TuningType.PARTITIONING,
-                TuningType.SORTING,
-                TuningType.DISTRIBUTION,
-            }
-        except ImportError:
-            return False
+        return supports_named_tuning_type(tuning_type, self._supported_tuning_type_names)
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
         """Apply StarRocks-specific table tunings.
@@ -157,16 +137,9 @@ class StarRocksTuningMixin:
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to StarRocks."""
-        if not unified_config:
-            return
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
 
 __all__ = ["StarRocksTuningMixin"]

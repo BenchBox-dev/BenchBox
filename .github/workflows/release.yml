@@ -10,11 +10,6 @@ on:
         required: false
         default: false
         type: boolean
-      wheel_build_number:
-        description: 'Optional wheel build tag for same-version repair wheels'
-        required: false
-        default: ''
-        type: string
 
 jobs:
   # Note: ruleset main-release-only gates the release-cut PR on lint + test
@@ -80,25 +75,12 @@ jobs:
           echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Build package with reproducible timestamp
-        env:
-          WHEEL_BUILD_NUMBER: ${{ inputs.wheel_build_number }}
         run: |
           # Use commit timestamp for reproducible builds
           # Anyone building from the same commit gets identical artifacts
           export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
           echo "Building with SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
-          rm -rf dist
-          if [[ -n "$WHEEL_BUILD_NUMBER" ]]; then
-            if [[ ! "$WHEEL_BUILD_NUMBER" =~ ^[0-9][A-Za-z0-9_.]*$ ]]; then
-              echo "::error::wheel_build_number must start with a digit and contain only letters, digits, underscores, or dots."
-              exit 1
-            fi
-            uv build --wheel \
-              --config-setting=--build-option=--build-number \
-              --config-setting=--build-option="$WHEEL_BUILD_NUMBER"
-          else
-            uv build
-          fi
+          uv build
 
       - name: Check package
         run: uvx twine check dist/*
@@ -110,37 +92,8 @@ jobs:
           path: dist/
           retention-days: 30
 
-  pre-publish-smoke:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: release-dist
-          path: dist/
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Test wheel import and CLI before publish
-        shell: bash
-        run: |
-          # --no-project plus a temp cwd prevents uv from syncing a checkout env.
-          mapfile -t wheels < <(find "$PWD/dist" -maxdepth 1 -type f -name '*.whl' | sort)
-          if [ "${#wheels[@]}" -ne 1 ]; then
-            printf 'Expected exactly one wheel in dist/, found %s:\n' "${#wheels[@]}"
-            printf '  %s\n' "${wheels[@]}"
-            exit 1
-          fi
-          wheel="${wheels[0]}"
-          smoke_dir="$(mktemp -d)"
-          cd "$smoke_dir"
-          uv run --isolated --no-project --with "$wheel" -- python -c "import benchbox; assert 'site-packages' in benchbox.__file__, benchbox.__file__; print(f'BenchBox {benchbox.__version__} imported from wheel')"
-          uv run --isolated --no-project --with "$wheel" -- benchbox --help
-
   publish:
-    needs: pre-publish-smoke
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.event.inputs.test_pypi == 'true' && 'test-pypi' || 'pypi' }}
@@ -187,31 +140,18 @@ jobs:
           name: release-dist
           path: dist/
 
-      - name: Create or update GitHub Release
-        run: |
-          tag="${{ github.ref_name }}"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            existing_assets="$(gh release view "$tag" --json assets --jq '.assets[].name')"
-            for artifact in dist/*; do
-              name="$(basename "$artifact")"
-              if printf '%s\n' "$existing_assets" | grep -Fxq "$name"; then
-                echo "Asset $name already exists; skipping."
-              else
-                gh release upload "$tag" "$artifact"
-              fi
-            done
-          else
-            gh release create "$tag" \
-              dist/* \
-              --title "BenchBox ${{ needs.build.outputs.version }}" \
-              --generate-notes
-          fi
+      - name: Create GitHub Release
+        run: >
+          gh release create "${{ github.ref_name }}"
+          dist/*
+          --title "BenchBox ${{ needs.build.outputs.version }}"
+          --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # Verify installation works across platforms after publishing
   test-installation:
-    needs: [publish, build]
+    needs: publish
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -237,15 +177,15 @@ jobs:
       - name: Test installation from PyPI
         if: github.event.inputs.test_pypi != 'true'
         run: |
-          pip install "benchbox==${{ needs.build.outputs.version }}"
-          python -c "import benchbox; print(f'BenchBox {benchbox.__version__} installed successfully')"
+          pip install benchbox
+          python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'published core wheel must not pull pandas'; print(f'BenchBox {benchbox.__version__} installed successfully (minimal import surface)')"
           benchbox --help
 
       - name: Test installation from Test PyPI
         if: github.event.inputs.test_pypi == 'true'
         run: |
-          pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ "benchbox==${{ needs.build.outputs.version }}"
-          python -c "import benchbox; print(f'BenchBox {benchbox.__version__} installed successfully')"
+          pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ benchbox
+          python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'published core wheel must not pull pandas'; print(f'BenchBox {benchbox.__version__} installed successfully (minimal import surface)')"
           benchbox --help
 
   # Delete old workflow artifacts to prevent confusion

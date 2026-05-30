@@ -67,6 +67,14 @@ class TestTPCMetricsCalculator:
         result = TPCMetricsCalculator.calculate_power_at_size(times, scale_factor=1.0)
         assert result == 0.0
 
+    def test_calculate_power_at_size_matches_legacy_power_formula(self) -> None:
+        """Power@Size is SF * 3600 divided by geometric mean query seconds."""
+        times = [float(i + 1) for i in range(22)]
+
+        result = TPCMetricsCalculator.calculate_power_at_size(times, scale_factor=10.0)
+
+        assert result == pytest.approx((10.0 * 3600.0) / math.prod(times) ** (1 / len(times)))
+
     def test_calculate_throughput_at_size_basic(self) -> None:
         """Test basic Throughput@Size calculation."""
         # (total_queries * scale_factor * 3600) / total_time
@@ -112,6 +120,17 @@ class TestTPCMetricsCalculator:
         )
         assert result == 0.0
 
+    def test_calculate_throughput_at_size_uses_total_query_count(self) -> None:
+        """Canonical throughput uses total executed query count and total time."""
+        result = TPCMetricsCalculator.calculate_throughput_at_size(
+            total_queries=44,
+            total_time_seconds=22.0,
+            scale_factor=1.0,
+            num_streams=2,
+        )
+
+        assert result == pytest.approx((44 * 3600.0) / 22.0)
+
     def test_calculate_qph_basic(self) -> None:
         """Test basic QphH calculation."""
         # QphH = sqrt(power * throughput)
@@ -129,6 +148,11 @@ class TestTPCMetricsCalculator:
             throughput_at_size=100.0,
         )
         assert abs(result - 200.0) < 0.0001
+
+    def test_calculate_qph_matches_legacy_tpc_h_and_tpc_ds_composite_formula(self) -> None:
+        """TPC-H QphH and TPC-DS QphDS both use sqrt(power * throughput)."""
+        assert TPCMetricsCalculator.calculate_qph(1000.0, 4000.0) == pytest.approx(2000.0)
+        assert TPCMetricsCalculator.calculate_qph(900.0, 100.0) == pytest.approx(300.0)
 
     def test_calculate_qph_zero_power(self) -> None:
         """Test QphH with zero power returns 0."""

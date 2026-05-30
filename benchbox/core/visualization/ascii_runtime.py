@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-import re
 import statistics
 import warnings
 from datetime import datetime
@@ -22,7 +21,7 @@ from benchbox.core.visualization.ascii.box_plot import BoxPlotSeries
 from benchbox.core.visualization.ascii.histogram import HistogramBar
 from benchbox.core.visualization.ascii.line_chart import LinePoint
 from benchbox.core.visualization.ascii.scatter_plot import ScatterPoint
-from benchbox.core.visualization.utils import is_power_run_result
+from benchbox.core.visualization.utils import is_power_run_result, natural_query_sort_key
 
 # Percentage change within ±STABLE_THRESHOLD is classified as "stable" (no meaningful regression or improvement).
 # 2% accounts for typical run-to-run variance in OLAP benchmarks at SF≥1.
@@ -620,11 +619,7 @@ def _extract_platform_query_timings(results: list[NormalizedResultLike]) -> list
 
 def _natural_sort_key(s: str) -> tuple[float, str]:
     """Sort key for natural ordering of query IDs (e.g. Q1, Q2, ... Q10)."""
-    match = re.match(r"^(\D*)(\d+)(.*)$", s)
-    if match:
-        prefix, num, suffix = match.groups()
-        return (float(num), prefix + suffix)
-    return (float("inf"), s)
+    return natural_query_sort_key(s)
 
 
 def _build_query_matrix(results: list[NormalizedResultLike]) -> tuple[list[str], list[str], list[list[float]]]:

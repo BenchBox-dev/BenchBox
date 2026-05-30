@@ -195,6 +195,13 @@ class TestGenerateCliCommand:
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, capture_plans=True)
         assert "--capture-plans" in cmd
 
+    def test_strict_translation_included(self):
+        """Test that strict-translation flag is included."""
+        from benchbox.cli.dryrun import generate_cli_command
+
+        cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, strict_translation=True)
+        assert "--strict-translation" in cmd
+
     def test_validation_included(self):
         """Test that validation mode is included."""
         from benchbox.cli.dryrun import generate_cli_command

@@ -52,3 +52,8 @@ def test_render_ascii_chart_handles_performance_bar_objects() -> None:
 def test_render_ascii_chart_rejects_unknown_type() -> None:
     with pytest.raises(VisualizationError, match="Unsupported ASCII chart type"):
         render_ascii_chart("nope", [])
+
+
+def test_render_ascii_chart_explains_result_aware_only_chart() -> None:
+    with pytest.raises(VisualizationError, match="requires normalized BenchBox results"):
+        render_ascii_chart("power_bar", [])

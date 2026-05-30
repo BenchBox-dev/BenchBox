@@ -1,39 +1,21 @@
-"""Tuning configuration command implementation.
-
-DEPRECATED: This module is kept for backwards compatibility.
-Use `benchbox tuning init` instead of `benchbox create-sample-tuning`.
-"""
-
-from pathlib import Path
+"""Deprecated create-sample-tuning compatibility command."""
 
 import click
-from rich.panel import Panel
-from rich.text import Text
 
+from benchbox.cli.commands.tuning_group import init as tuning_init
 from benchbox.cli.shared import console
 
 
 @click.command("create-sample-tuning", hidden=True)
-@click.option(
-    "--platform",
-    type=str,
-    required=True,
-    help="Target platform (duckdb, databricks, snowflake, etc.)",
-)
-@click.option(
-    "--output",
-    type=str,
-    default="tuning_config.yaml",
-    help="Output file path (default: tuning_config.yaml)",
-)
+@click.option("--platform", type=str, required=True, help="Target platform (duckdb, databricks, snowflake, etc.)")
+@click.option("--output", type=str, default="tuning_config.yaml", help="Output file path")
 @click.pass_context
 def create_sample_tuning(ctx, platform, output):
-    """Create a sample unified tuning configuration for a specific platform.
+    """Create a sample unified tuning configuration.
 
     DEPRECATED: Use `benchbox tuning init --platform <platform>` instead.
 
-    Generates a YAML configuration file with platform-specific tuning options
-    including constraints, indexes, and optimization settings.
+    Generates a YAML configuration file with platform-specific tuning options.
 
     Examples:
         benchbox tuning init --platform databricks
@@ -42,29 +24,4 @@ def create_sample_tuning(ctx, platform, output):
     console.print(
         "[yellow]Warning: 'create-sample-tuning' is deprecated. Use 'benchbox tuning init' instead.[/yellow]\n"
     )
-
-    console.print(
-        Panel.fit(
-            Text(
-                f"Creating Sample Tuning Configuration for {platform.title()}",
-                style="bold cyan",
-            ),
-            style="cyan",
-        )
-    )
-
-    config_manager = ctx.obj["config"]
-    output_path = Path(output)
-
-    try:
-        config_manager.create_sample_unified_tuning_config(output_path, platform)
-        console.print("\n[green]Tuning configuration created[/green]")
-        console.print(f"File: [cyan]{output_path}[/cyan]")
-        console.print(f"Platform: [yellow]{platform}[/yellow]")
-        console.print("\nEdit this file to customize tuning settings for your benchmarks.")
-    except Exception as e:
-        console.print(f"[red]Failed to create tuning configuration: {e}[/red]")
-        ctx.exit(1)
-
-
-__all__ = ["create_sample_tuning"]
+    ctx.invoke(tuning_init, platform=platform, mode="sql", profile="default", output=output, smart_defaults=False)

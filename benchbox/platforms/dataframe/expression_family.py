@@ -128,7 +128,7 @@ class ExpressionFamilyContext(DataFrameContextImpl[DF], Generic[DF, Expr]):
             return value
         # Track if this is a string literal for PySpark concat detection
         is_string = isinstance(value, str)
-        return UnifiedExpr(self._adapter.lit(value), _is_string_literal=is_string)
+        return UnifiedExpr(self._adapter.lit(value), _is_string_literal=is_string, _literal_value=value)
 
     def element(self) -> UnifiedExpr:
         """Create a list element expression for use inside list.eval().

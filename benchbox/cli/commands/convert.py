@@ -51,10 +51,10 @@ def _get_schemas_from_manifest(manifest: ManifestV2, benchmark_name: str | None)
         )
 
     # Import benchmark loader to get schemas
-    from benchbox.core.benchmark_loader import get_benchmark_class
+    from benchbox.core.benchmark_loader import get_core_benchmark_class
 
     try:
-        benchmark_class = get_benchmark_class(benchmark_name)
+        benchmark_class = get_core_benchmark_class(benchmark_name)
         benchmark_instance = benchmark_class()
 
         # Get schemas from benchmark

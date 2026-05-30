@@ -147,7 +147,7 @@ The implementation adds more than the initial report requested, especially aroun
 - JoinOrder follow-up paper: [Query Optimization Through the Looking Glass, and What We Found Running the Join Order Benchmark](https://db.in.tum.de/~leis/papers/lookingglass.pdf)
 - Query corpus: [gregrahn/join-order-benchmark](https://github.com/gregrahn/join-order-benchmark)
 - Dataset DOI: [10.7910/DVN/2QYZBT](https://doi.org/10.7910/DVN/2QYZBT)
-- Changelog entry: `CHANGELOG.md` (`[0.3.0] - 2026-05-18`)
+- Changelog entry: `CHANGELOG.md` (`[0.3.0] - 2026-05-16`)
 - JoinOrder benchmark docs: `docs/benchmarks/join-order.md`, `docs/reference/python-api/benchmarks/joinorder.rst`
 - JoinOrder data manifest: `benchbox/core/joinorder/data_manifest.toml`
 - JoinOrder data license note: `benchbox/core/joinorder/DATA-LICENSE.md`

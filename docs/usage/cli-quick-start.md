@@ -41,6 +41,7 @@ The `run` subcommand accepts a rich set of options. The defaults favor the inter
 ### Validation and tuning
 
 - `--validation MODE` - Validation mode: `exact`, `loose`, `range`, `disabled`, `full` (enables all checks).
+- `--strict-translation` - Fail closed on SQL dialect translation fallback; use for CI and public correctness runs.
 - `--tuning tuned|notuning|PATH` - Apply optional tuning configs (`tuned` enables platform-specific constraints; supply a YAML path to use a custom profile).
 - `--platform-option KEY=VALUE` - Pass adapter-specific options (repeatable). Use `benchbox platforms status <name>` to see platform details.
 - `--platform-option driver_version=X.Y.Z` - Pin a platform driver package (DuckDB, Databricks connector, etc.). Add `driver_auto_install=true` or export `BENCHBOX_DRIVER_AUTO_INSTALL=1` to let BenchBox install the requested build before execution.

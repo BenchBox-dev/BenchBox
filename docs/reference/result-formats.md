@@ -43,167 +43,161 @@ benchbox run --platform duckdb --benchmark tpch --output ./my_results/
 benchbox run --platform snowflake --benchmark tpch --output s3://bucket/results/
 ```
 
-## JSON Format (Schema v1.1)
+## JSON Format (Schema v2.1)
 
-The JSON export is the canonical format containing complete benchmark details.
+The JSON export is the canonical schema-v2 result bundle containing complete
+benchmark details. BenchBox currently writes schema version `"2.1"` in the
+top-level `version` field.
+
+Consumer policy is intentionally split by use case:
+
+| Consumer | Accepted versions | Behavior |
+|---|---|---|
+| Producer/exporter | `"2.1"` | New bundles are written with the current producer version. |
+| Runtime loader and exporter listing | `"2.0"`, `"2.1"` | Unknown versions fail closed and should be re-exported. |
+| Normalizer | `"2.0"`, `"2.1"` as v2; other shapes as legacy | Known v2 bundles use exact v2 field mapping; v1.x and unknown shapes use legacy best-effort extraction. |
+| Public submission validator | Numeric `2.x` | Forward-compatible for schema-v2 minor versions, but missing or malformed versions are rejected. |
+| Explorer pipeline input | `"2.0"`, `"2.1"` | Unsupported bundles are rejected before explorer read-model projection. |
 
 ### Schema Structure
 
 ```json
 {
-  "_schema": {
-    "version": "1.1",
-    "generator": "benchbox-exporter",
-    "generated_at": "2025-12-12T14:30:21.123456Z"
+  "version": "2.1",
+  "run": {
+    "id": "tpch-duckdb-20260521",
+    "timestamp": "2026-05-21T14:30:21.123456Z",
+    "total_duration_ms": 45230,
+    "query_time_ms": 39800
   },
   "benchmark": {
-    "name": "tpch",
-    "scale_factor": 0.1,
-    "version": "3.0.1"
+    "id": "tpch",
+    "name": "TPC-H",
+    "scale_factor": 0.1
   },
   "platform": {
     "name": "duckdb",
-    "version": "0.10.0",
-    "dialect": "duckdb"
+    "version": "1.2.0"
   },
-  "execution": {
-    "timestamp": "2025-12-12T14:30:21.123456Z",
-    "duration_ms": 45230,
-    "status": "completed"
+  "config": {
+    "execution_mode": "sql"
+  },
+  "summary": {
+    "queries": {
+      "total": 22,
+      "passed": 22,
+      "failed": 0
+    },
+    "timing": {
+      "total_ms": 39800,
+      "avg_ms": 1809.1
+    },
+    "validation": "passed",
+    "tpc_metrics": {
+      "power_at_size": 89.5
+    }
   },
   "phases": {
-    "setup": { ... },
-    "power_test": { ... },
-    "throughput_test": { ... }
+    "data_generation": { "...": "..." },
+    "schema_creation": { "...": "..." },
+    "data_loading": { "...": "..." },
+    "power_test": { "...": "..." }
   },
-  "metrics": {
-    "geometric_mean_time": 1.234,
-    "power_at_size": 89.5,
-    "throughput_at_size": 156.2,
-    "qph_at_size": 1250.5
+  "queries": [
+    {
+      "id": "Q1",
+      "ms": 1520,
+      "rows": 4,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    }
+  ],
+  "environment": {
+    "os": "macOS",
+    "arch": "arm64"
   }
 }
 ```
 
 ### Field Reference
 
-#### Schema Block
+#### Version
 | Field | Type | Description |
 |-------|------|-------------|
-| `version` | string | Schema version (currently "1.1") |
-| `generator` | string | Tool that generated the export |
-| `generated_at` | string | ISO 8601 timestamp |
+| `version` | string | Result bundle schema version. Current producer version is `"2.1"`. |
 
 #### Benchmark Block
 | Field | Type | Description |
 |-------|------|-------------|
-| `name` | string | Benchmark identifier (tpch, tpcds, ssb, etc.) |
+| `id` | string | Benchmark identifier (tpch, tpcds, ssb, etc.) |
+| `name` | string | Display name |
 | `scale_factor` | float | Data scale factor |
-| `version` | string | TPC specification version |
-| `tuning` | string | Tuning mode (tuned, notuning, auto) |
+| `test_type` | string | Optional run/test classification |
 
 #### Platform Block
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | string | Platform identifier |
 | `version` | string | Platform/driver version |
-| `dialect` | string | SQL dialect used |
-| `connection_info` | object | Anonymized connection details |
+| `deployment` | object | Optional normalized deployment metadata |
+| `cloud`, `compute`, `storage` | object | Optional normalized environment facets |
 
-#### Execution Block
+Platform-specific extensions should stay inside the existing schema-v2 blocks
+where possible. Current canonical locations are `platform.*` for platform
+facets and raw platform metadata, `phases.<stage>` for lifecycle-stage
+summaries, and `comparisons.*` for cross-engine comparison data. New top-level
+keys require a public-contract update and consumer tests.
+
+#### Run Block
 | Field | Type | Description |
 |-------|------|-------------|
 | `timestamp` | string | Run start time (ISO 8601) |
-| `duration_ms` | int | Total execution time |
-| `status` | string | completed, failed, partial |
-| `phases_run` | array | List of executed phases |
+| `id` | string | Run identifier |
+| `total_duration_ms` | number | Total benchmark duration |
+| `query_time_ms` | number | Total query execution duration |
 
 #### Phases Block
 
-**Setup Phase:**
-```json
-{
-  "setup": {
-    "data_generation": {
-      "duration_ms": 5230,
-      "status": "completed",
-      "tables_generated": 8,
-      "total_rows_generated": 150000,
-      "total_data_size_bytes": 45000000
-    },
-    "schema_creation": {
-      "duration_ms": 120,
-      "tables_created": 8,
-      "constraints_applied": 16,
-      "indexes_created": 8
-    },
-    "data_loading": {
-      "duration_ms": 3500,
-      "total_rows_loaded": 150000,
-      "tables_loaded": 8,
-      "per_table_stats": { ... }
-    }
-  }
-}
-```
+Phases are keyed by lifecycle stage. Each phase block may carry status,
+duration, counts, and stage-specific metadata.
 
-**Power Test Phase:**
 ```json
 {
+  "data_generation": {
+    "duration_ms": 5230,
+    "status": "SUCCESS",
+    "tables_generated": 8,
+    "total_rows_generated": 150000
+  },
+  "schema_creation": {
+    "duration_ms": 120,
+    "status": "SUCCESS",
+    "tables_created": 8
+  },
+  "data_loading": {
+    "duration_ms": 3500,
+    "status": "SUCCESS",
+    "tables_loaded": 8
+  },
   "power_test": {
-    "start_time": "2025-12-12T14:30:25.000Z",
-    "end_time": "2025-12-12T14:31:42.000Z",
-    "duration_ms": 77000,
-    "geometric_mean_time": 1.234,
-    "power_at_size": 89.5,
-    "query_executions": [
-      {
-        "query_id": "Q1",
-        "stream_id": "power",
-        "execution_order": 1,
-        "execution_time_ms": 1520,
-        "status": "success",
-        "rows_returned": 4,
-        "row_count_validation": {
-          "expected": 4,
-          "actual": 4,
-          "status": "valid"
-        }
-      }
-    ]
+    "duration_ms": 39800,
+    "status": "SUCCESS"
   }
 }
 ```
 
-**Throughput Test Phase:**
-```json
-{
-  "throughput_test": {
-    "start_time": "2025-12-12T14:31:45.000Z",
-    "end_time": "2025-12-12T14:35:12.000Z",
-    "duration_ms": 207000,
-    "num_streams": 4,
-    "total_queries_executed": 88,
-    "throughput_at_size": 156.2,
-    "streams": [
-      {
-        "stream_id": 1,
-        "duration_ms": 51000,
-        "query_executions": [ ... ]
-      }
-    ]
-  }
-}
-```
-
-#### Metrics Block
+#### Summary Block
 | Field | Type | Description |
 |-------|------|-------------|
-| `geometric_mean_time` | float | Geometric mean of query times (seconds) |
-| `power_at_size` | float | TPC Power metric |
-| `throughput_at_size` | float | TPC Throughput metric |
-| `qph_at_size` | float | Queries per hour at scale |
-| `cost_estimate_usd` | float | Estimated run cost (cloud platforms) |
+| `queries.total` | int | Total query records represented in the bundle |
+| `queries.passed` | int | Count of passed queries |
+| `queries.failed` | int | Count of failed queries |
+| `timing.total_ms` | number | Total query execution time in milliseconds |
+| `timing.avg_ms` | number | Average query execution time in milliseconds |
+| `validation` | string or object | Validation result summary |
+| `tpc_metrics` | object | Optional TPC-style metrics such as `power_at_size` |
 
 ### Query Execution Details
 
@@ -211,24 +205,13 @@ Each query execution record contains:
 
 ```json
 {
-  "query_id": "Q6",
-  "stream_id": "power",
-  "execution_order": 6,
-  "execution_time_ms": 234,
-  "status": "success",
-  "rows_returned": 1,
-  "row_count_validation": {
-    "expected": 1,
-    "actual": 1,
-    "status": "valid"
-  },
-  "cost": 0.0023,
-  "query_plan": {
-    "root_operation": "ProjectionExec",
-    "total_operators": 12,
-    "estimated_rows": 150000
-  },
-  "plan_fingerprint": "a1b2c3d4..."
+  "id": "Q6",
+  "ms": 234,
+  "rows": 1,
+  "iter": 1,
+  "stream": 0,
+  "run_type": "measurement",
+  "status": "SUCCESS"
 }
 ```
 
@@ -239,10 +222,10 @@ CSV export provides tabular query-level data for spreadsheet analysis.
 ### Query Results CSV
 
 ```csv
-query_id,stream_id,execution_order,execution_time_ms,status,rows_returned,expected_rows,validation_status
-Q1,power,1,1520,success,4,4,valid
-Q2,power,2,892,success,460,460,valid
-Q3,power,3,1230,success,10,10,valid
+id,ms,rows,iter,stream,run_type,status
+Q1,1520,4,1,0,measurement,SUCCESS
+Q2,892,460,1,0,measurement,SUCCESS
+Q3,1230,10,1,0,measurement,SUCCESS
 ...
 ```
 
@@ -253,9 +236,9 @@ metric,value
 benchmark,tpch
 scale_factor,0.1
 platform,duckdb
-geometric_mean_time,1.234
+total_time_ms,39800
+avg_time_ms,1809.1
 power_at_size,89.5
-throughput_at_size,156.2
 total_duration_ms,45230
 ```
 
@@ -312,12 +295,12 @@ with result_file.open() as f:
     results = json.load(f)
 
 # Access metrics
-print(f"Power at Size: {results['metrics']['power_at_size']}")
-print(f"Geometric Mean: {results['metrics']['geometric_mean_time']}s")
+print(f"Power at Size: {results['summary']['tpc_metrics']['power_at_size']}")
+print(f"Total time: {results['summary']['timing']['total_ms']}ms")
 
 # Access query details
-for query in results['phases']['power_test']['query_executions']:
-    print(f"{query['query_id']}: {query['execution_time_ms']}ms")
+for query in results['queries']:
+    print(f"{query['id']}: {query['ms']}ms")
 ```
 
 ### Load into Pandas
@@ -331,12 +314,12 @@ with open("benchmark_runs/results/tpch_duckdb_sf0.01_*.json") as f:
     results = json.load(f)
 
 # Convert queries to DataFrame
-queries = results['phases']['power_test']['query_executions']
+queries = results['queries']
 df = pd.DataFrame(queries)
 
 # Analyze
 print(df.describe())
-print(df.groupby('query_id')['execution_time_ms'].mean())
+print(df.groupby('id')['ms'].mean())
 ```
 
 ### Load CSV Results
@@ -349,8 +332,8 @@ df = pd.read_csv("benchmark_runs/results/tpch_duckdb_sf0.01_queries.csv")
 
 # Quick analysis
 print(f"Total queries: {len(df)}")
-print(f"Mean execution time: {df['execution_time_ms'].mean():.2f}ms")
-print(f"Slowest query: {df.loc[df['execution_time_ms'].idxmax(), 'query_id']}")
+print(f"Mean execution time: {df['ms'].mean():.2f}ms")
+print(f"Slowest query: {df.loc[df['ms'].idxmax(), 'id']}")
 ```
 
 ## Visualization Examples
@@ -396,29 +379,38 @@ export_ascii(
 
 ## Schema Versioning
 
-### Current Version: 1.1
+### Current Version: 2.1
 
-Version 1.1 includes:
-- Query plan capture
-- Cost estimation
-- Row count validation details
-- Phase-level error tracking
+Schema v2.1 is the current producer version for BenchBox result bundles. It
+uses top-level `version`, `run`, `benchmark`, `platform`, `summary`, `queries`,
+and optional companion blocks such as `phases`, `environment`,
+`normalized_cost`, `validation`, and `comparisons`.
+
+Runtime loading and explorer generation intentionally accept only known v2
+minor versions (`"2.0"` and `"2.1"`). The public submission validator accepts
+numeric `2.x` versions to allow forward-compatible submissions, but it rejects
+missing values and malformed strings such as `"2.x"`. Legacy v1.x result shapes
+are not runtime-loadable; they are handled only by the normalizer's best-effort
+compatibility path.
 
 ### Version History
 
 | Version | Changes |
 |---------|---------|
-| 1.1 | Added query plans, cost estimation, validation details |
-| 1.0 | Initial canonical schema |
+| 2.1 | Current producer schema for result bundles |
+| 2.0 | First schema-v2 bundle contract consumed by loader, submissions, and explorer |
+| 1.x | Legacy shape supported only by normalization helpers |
 
 ### Loading Legacy Results
 
 ```python
-from benchbox.core.results.loader import load_result
+import json
 
-# Automatically handles schema versions
-result = load_result("old_result.json")
-print(f"Schema version: {result.schema_version}")
+from benchbox.core.results.normalizer import normalize_result_dict
+
+with open("old_result.json") as f:
+    result = normalize_result_dict(json.load(f))
+print(f"Schema version family: {result.schema_version}")
 ```
 
 ## Anonymization
@@ -464,10 +456,10 @@ with open("results.json") as f:
 
 # Flatten to table
 queries = []
-for q in results['phases']['power_test']['query_executions']:
+for q in results['queries']:
     queries.append({
-        'run_id': results['execution']['timestamp'],
-        'benchmark': results['benchmark']['name'],
+        'run_id': results['run']['id'],
+        'benchmark': results['benchmark']['id'],
         'platform': results['platform']['name'],
         'scale_factor': results['benchmark']['scale_factor'],
         **q
@@ -487,14 +479,14 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
   --output ./results/
 
 # Parse results in CI script
-python -c "
+uv run -- python -c "
 import json
 import sys
 
 with open('results/tpch_duckdb_sf0.01_*.json') as f:
     results = json.load(f)
 
-power = results['metrics']['power_at_size']
+power = results['summary']['tpc_metrics']['power_at_size']
 if power < 50:  # Performance threshold
     print(f'FAIL: Power@Size {power} below threshold 50')
     sys.exit(1)

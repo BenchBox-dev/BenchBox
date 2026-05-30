@@ -34,6 +34,18 @@ _VARIANT_STRATEGIES: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 
+def make_variant_delegate(impl: VariantImpl, *, name: str, module: str) -> VariantImpl:
+    """Return a named variant callable that delegates to an equivalent body."""
+
+    def _variant(ctx: DataFrameContext) -> Any:
+        return impl(ctx)
+
+    _variant.__name__ = name
+    _variant.__qualname__ = name
+    _variant.__module__ = module
+    return _variant
+
+
 def build_result_replay_variants(
     query_number: int,
     *,

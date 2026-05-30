@@ -264,6 +264,7 @@ def build_platform_adapter_config(
                 }
             )
         cfg["data_path"] = get_value("data_path", "/tmp/benchbox_ch_local")
+        cfg.setdefault("mode", cfg["deployment_mode"])
 
         if cfg["deployment_mode"] == "server":
             cfg.update(

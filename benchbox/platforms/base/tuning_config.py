@@ -18,6 +18,18 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
 
+def apply_standard_unified_tuning(adapter: Any, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
+    """Apply the standard constraint, platform, then table-tuning hook sequence."""
+    if not unified_config:
+        return
+
+    adapter.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
+    if unified_config.platform_optimizations:
+        adapter.apply_platform_optimizations(unified_config.platform_optimizations, connection)
+    for _table_name, table_tuning in unified_config.table_tunings.items():
+        adapter.apply_table_tunings(table_tuning, connection)
+
+
 class TuningConfigMixin:
     """Mixin providing unified-tuning configuration handling for `PlatformAdapter`.
 

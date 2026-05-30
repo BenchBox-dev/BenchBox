@@ -9,6 +9,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -17,8 +18,39 @@ import yaml
 
 pytestmark = [
     pytest.mark.unit,
-    pytest.mark.medium,
+    pytest.mark.fast,
 ]
+
+REPO_ROOT = Path(__file__).parent.parent.parent
+CI_FAST_EXPRESSION = "fast and not (slow or stress or resource_heavy or live_integration)"
+RELEASE_INTEGRATION_EXPRESSION = "integration and not (slow or stress or resource_heavy or live_integration)"
+RELEASE_REQUIRED_CONTEXTS = ("validate-base", "release-required-result")
+
+
+def _makefile_text() -> str:
+    return (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+
+
+def _make_target_recipe(target: str) -> str:
+    lines = _makefile_text().splitlines()
+    start = lines.index(f"{target}:") + 1
+    recipe_lines: list[str] = []
+    for line in lines[start:]:
+        if line and not line.startswith("\t"):
+            break
+        recipe_lines.append(line)
+    return "\n".join(recipe_lines)
+
+
+def _workflow_job_run_text(workflow_name: str, job_name: str) -> str:
+    workflow_path = REPO_ROOT / ".github" / "workflows" / workflow_name
+    workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    return "\n".join(str(step.get("run", "")) for step in workflow["jobs"][job_name]["steps"])
+
+
+def _workflow(workflow_name: str) -> dict:
+    workflow_path = REPO_ROOT / ".github" / "workflows" / workflow_name
+    return yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
 
 
 if sys.version_info >= (3, 11):
@@ -32,12 +64,12 @@ class TestReleaseInfrastructure:
 
     def test_changelog_exists(self):
         """Test that CHANGELOG.md exists."""
-        changelog_path = Path(__file__).parent.parent.parent / "CHANGELOG.md"
+        changelog_path = REPO_ROOT / "CHANGELOG.md"
         assert changelog_path.exists(), "CHANGELOG.md file must exist"
 
     def test_pyproject_toml_release_config(self):
         """Test that pyproject.toml has correct release configuration."""
-        pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+        pyproject_path = REPO_ROOT / "pyproject.toml"
 
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)
@@ -65,9 +97,42 @@ class TestReleaseInfrastructure:
             assert "anthropics/claude-code" not in url
             assert "anthropic" not in url
 
+    def test_import_benchbox_succeeds_without_pandas(self):
+        """`import benchbox` must work on a clean core install even when pandas is absent.
+
+        This is the real contract behind the v0.3.0 clean-install failure: the
+        base import surface must not require an optional engine/DataFrame
+        dependency. Run in a fresh interpreter with pandas made unimportable.
+        """
+        code = (
+            "import sys; sys.modules['pandas'] = None; "  # any `import pandas` now raises ImportError
+            "import benchbox; "
+            "print(benchbox.__version__)"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"import benchbox failed without pandas:\n{result.stderr}"
+
+    def test_import_benchbox_does_not_pull_pandas(self):
+        """Importing benchbox must not eagerly import pandas onto the base surface.
+
+        Guards against a future top-level `import pandas` silently re-entering the
+        import path and forcing pandas back into the core dependency set.
+        """
+        code = "import benchbox, sys; assert 'pandas' not in sys.modules, sorted(m for m in sys.modules if m == 'pandas' or m.startswith('pandas.'))"
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"import benchbox eagerly imported pandas:\n{result.stdout}{result.stderr}"
+
     def test_github_issue_url_fix(self):
         """Test that exceptions.py has correct GitHub issue URL."""
-        exceptions_path = Path(__file__).parent.parent.parent / "benchbox" / "cli" / "exceptions.py"
+        exceptions_path = REPO_ROOT / "benchbox" / "cli" / "exceptions.py"
 
         with open(exceptions_path, encoding="utf-8") as f:
             content = f.read()
@@ -79,7 +144,7 @@ class TestReleaseInfrastructure:
 
     def test_github_workflows_exist(self):
         """Test that GitHub workflows exist and are properly configured."""
-        workflows_dir = Path(__file__).parent.parent.parent / ".github" / "workflows"
+        workflows_dir = REPO_ROOT / ".github" / "workflows"
         assert workflows_dir.exists(), "GitHub workflows directory must exist"
 
         # Required workflows
@@ -90,7 +155,7 @@ class TestReleaseInfrastructure:
 
     def test_test_workflow_configuration(self):
         """Test that test workflow is properly configured."""
-        test_workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "test.yml"
+        test_workflow_path = REPO_ROOT / ".github" / "workflows" / "test.yml"
 
         with open(test_workflow_path, encoding="utf-8") as f:
             workflow = yaml.safe_load(f)
@@ -109,22 +174,37 @@ class TestReleaseInfrastructure:
         jobs = workflow["jobs"]
         assert "test" in jobs
 
-        # Check Python versions (simplified matrix: 3.10, 3.12, 3.13)
         test_job = jobs["test"]
-        matrix = test_job["strategy"]["matrix"]
-        python_versions = matrix["python-version"]
-        expected_versions = ["3.10", "3.12", "3.13"]
-        for version in expected_versions:
-            assert version in python_versions
+        assert test_job["name"] == "test (ubuntu-latest, 3.12)"
+        assert test_job["runs-on"] == "ubuntu-latest"
+        assert "strategy" not in test_job, "Required main test job is intentionally a single 3.12 lane"
 
-        # Check that it uses uv
         steps = test_job["steps"]
         uv_step_found = any("uv" in str(step).lower() for step in steps)
         assert uv_step_found, "Workflow should use uv for dependency management"
 
+        workflow_text = test_workflow_path.read_text(encoding="utf-8")
+        assert f'-m "{CI_FAST_EXPRESSION}"' in workflow_text
+        assert "--cov-fail-under=70" in workflow_text
+
+    def test_required_fast_marker_expression_is_consistent(self):
+        """Pin required PR fast-test marker selection across local and CI surfaces."""
+        makefile_content = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+        develop_pr_run_text = _workflow_job_run_text("pr.yml", "code-test")
+        main_pr_run_text = _workflow_job_run_text("test.yml", "test")
+
+        expected_marker_flag = f'-m "{CI_FAST_EXPRESSION}"'
+        assert expected_marker_flag in makefile_content
+        assert "-m fast -q" not in makefile_content
+        assert expected_marker_flag in develop_pr_run_text
+        assert expected_marker_flag in main_pr_run_text
+        assert "--cov-fail-under=70" in develop_pr_run_text
+        assert "--cov-fail-under=70" in main_pr_run_text
+        assert "coverage remains CI-only" in makefile_content
+
     def test_release_workflow_configuration(self):
         """Test that release workflow is properly configured."""
-        release_workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "release.yml"
+        release_workflow_path = REPO_ROOT / ".github" / "workflows" / "release.yml"
 
         with open(release_workflow_path, encoding="utf-8") as f:
             workflow = yaml.safe_load(f)
@@ -144,10 +224,15 @@ class TestReleaseInfrastructure:
 
         # Check jobs exist
         jobs = workflow["jobs"]
-        # Release workflow delegates testing to CI workflows via check-ci-passed
-        required_jobs = ["check-ci-passed", "build", "publish"]
+        required_jobs = ["dependency-bounds", "build", "publish", "github-release", "test-installation"]
         for job in required_jobs:
             assert job in jobs, f"Release workflow must have {job} job"
+        assert "check-ci-passed" not in jobs
+
+        release_workflow_text = release_workflow_path.read_text(encoding="utf-8")
+        forbidden_pytest_invocations = ["python -m pytest", "uv run pytest", "uv run -- pytest"]
+        for invocation in forbidden_pytest_invocations:
+            assert invocation not in release_workflow_text, "release.yml publishes from tags and does not run pytest"
 
         # Check that publish job uses trusted publishing
         publish_job = jobs["publish"]
@@ -155,9 +240,247 @@ class TestReleaseInfrastructure:
         assert "id-token" in publish_job["permissions"]
         assert publish_job["permissions"]["id-token"] == "write"
 
+    def test_release_required_result_contract(self):
+        """Test the main-PR release-required umbrella check shape."""
+        jobs = _workflow("test.yml")["jobs"]
+
+        assert jobs["integration"]["if"] == (
+            "github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'main')"
+        )
+        integration_run_text = _workflow_job_run_text("test.yml", "integration")
+        assert f'tests/integration -m "{RELEASE_INTEGRATION_EXPRESSION}"' in integration_run_text
+
+        test_package_run_text = _workflow_job_run_text("test.yml", "test-package")
+        assert "wheel_count=$(find dist -maxdepth 1 -name '*.whl'" in test_package_run_text
+        assert 'uv run --isolated --no-project --with "$wheel"' in test_package_run_text
+        assert "benchbox --help" in test_package_run_text
+
+        make_test_package = _make_target_recipe("test-package")
+        assert "test-venv" not in make_test_package
+        assert "Expected exactly one wheel" in make_test_package
+        assert 'uv run --isolated --no-project --with "$$wheel"' in make_test_package
+
+        release_readiness = jobs["release-readiness"]
+        assert release_readiness["if"] == "${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}"
+        readiness_run_text = _workflow_job_run_text("test.yml", "release-readiness")
+        assert "scripts/check_dependency_bounds.py" in readiness_run_text
+        assert "--fail-on=cap-reached" in readiness_run_text
+        assert "Check release branch curation" in str(jobs["release-readiness"]["steps"])
+        assert "Release branch still contains curated path" in readiness_run_text
+        assert "_project" in readiness_run_text
+        assert ".github/workflows/validate-submission.yml" in readiness_run_text
+
+        result_job = jobs["release-required-result"]
+        assert result_job["name"] == "release-required-result"
+        assert set(result_job["needs"]) == {"test", "integration", "test-package", "release-readiness"}
+        assert result_job["if"] == "${{ always() && github.event_name == 'pull_request' && github.base_ref == 'main' }}"
+        aggregate_run_text = _workflow_job_run_text("test.yml", "release-required-result")
+        for expected in [
+            "test (ubuntu-latest, 3.12)",
+            "integration",
+            "test-package",
+            "release-readiness",
+            "Release-required checks passed.",
+        ]:
+            assert expected in aggregate_run_text
+
+    def test_release_docs_name_required_contexts(self):
+        """Release docs must name the same stable required contexts."""
+        docs_paths = [
+            REPO_ROOT / "docs" / "operations" / "release-guide.md",
+            REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md",
+            REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md",
+        ]
+
+        for path in docs_paths:
+            content = path.read_text(encoding="utf-8")
+            for context in RELEASE_REQUIRED_CONTEXTS:
+                assert context in content
+
+    def test_release_canary_workflow_contract(self):
+        """Release canary must produce scheduled non-fast and ruleset drift evidence."""
+        workflow = _workflow("release-canary.yml")
+        on_events = workflow[True]
+        assert "workflow_dispatch" in on_events
+        assert on_events["schedule"] == [{"cron": "0 8 * * *"}]
+        assert workflow["permissions"]["actions"] == "read"
+        assert workflow["permissions"]["contents"] == "read"
+        assert workflow["env"]["RELEASE_CANARY_REF"] == "develop"
+
+        jobs = workflow["jobs"]
+        assert set(jobs) == {"credential-free-non-fast", "ruleset-drift", "release-canary-result"}
+        assert jobs["credential-free-non-fast"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
+        assert jobs["ruleset-drift"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
+
+        non_fast_text = _workflow_job_run_text("release-canary.yml", "credential-free-non-fast")
+        assert "(slow or resource_heavy) and not (stress or live_integration)" in non_fast_text
+        assert "--collect-only" in non_fast_text
+        assert "release-canary-artifacts/non-fast-summary.json" in non_fast_text
+        assert '"checked_ref": "develop"' in non_fast_text
+        assert '"commit_sha": os.environ["CHECKED_SHA"]' in non_fast_text
+        assert "raw" not in non_fast_text.lower()
+        # Exit code must propagate via rc= variable, not be swallowed by set+e/exit 0.
+        assert "set +e" not in non_fast_text
+        assert "exit 0" not in non_fast_text
+
+        ruleset_text = _workflow_job_run_text("release-canary.yml", "ruleset-drift")
+        assert "scripts/ruleset_drift_check.py" in ruleset_text
+        assert "RULESET_DRIFT_TOKEN" in ruleset_text
+        assert "--require-bypass-actor-visibility" in ruleset_text
+        assert "release-canary-artifacts/ruleset-drift.json" in ruleset_text
+        assert "set +e" not in ruleset_text
+        assert "exit 0" not in ruleset_text
+
+        result_job = jobs["release-canary-result"]
+        assert result_job["name"] == "release-canary-result"
+        assert set(result_job["needs"]) == {"credential-free-non-fast", "ruleset-drift"}
+        result_text = _workflow_job_run_text("release-canary.yml", "release-canary-result")
+        assert '"checked_ref": "develop"' in result_text
+        assert '"commit_sha": "${CHECKED_SHA}"' in result_text
+        assert '"freshness_contract_hours": 48' in result_text
+        assert "Release canary passed." in result_text
+
+    def test_canary_collect_count_regex_matches_pytest_deselect_format(self):
+        """The canary collect-step grep regex must match the actual pytest --collect-only output format."""
+        collect_text = _workflow_job_run_text("release-canary.yml", "credential-free-non-fast")
+        assert "'^[0-9]+/[0-9]+ tests collected'" in collect_text
+
+        # Verify the regex semantics using Python re (same logic as the grep ERE pattern).
+        pattern = re.compile(r"^\d+/\d+ tests collected")
+        assert pattern.match("92/24795 tests collected (24703 deselected) in 16.98s")
+        assert pattern.match("1/100 tests collected")
+        assert not pattern.match("24795 tests collected in 16.98s")
+        assert not pattern.match("0 tests collected")
+
+    def test_validate_main_pr_checks_release_canary_freshness(self):
+        """The required validate-base context must include release canary freshness."""
+        workflow = _workflow("validate-main-pr.yml")
+        assert workflow["permissions"]["actions"] == "read"
+        assert workflow["permissions"]["contents"] == "read"
+
+        job = workflow["jobs"]["validate-base"]
+        steps = job["steps"]
+        checkout_step = next(step for step in steps if step.get("uses") == "actions/checkout@v4")
+        assert checkout_step["name"] == "Checkout trusted release policy"
+        assert checkout_step["with"]["ref"] == "${{ github.event.pull_request.base.sha }}"
+        assert checkout_step["with"]["fetch-depth"] == 0
+        assert "${{ github.event.pull_request.head.sha }}" not in str(checkout_step)
+
+        run_text = _workflow_job_run_text("validate-main-pr.yml", "validate-base")
+        assert "git fetch --prune origin develop" in run_text
+        assert "refs/pull/${{ github.event.pull_request.number }}/head" in run_text
+        assert "scripts/release_readiness_check.py" in run_text
+        assert '--head-sha "${{ github.event.pull_request.head.sha }}"' in run_text
+        assert "--bootstrap-on-missing-workflow" in run_text
+        assert "bootstrap_required=true" in run_text
+        assert "(slow or resource_heavy) and not (stress or live_integration)" in run_text
+        assert "scripts/ruleset_drift_check.py" in run_text
+        assert "--require-bypass-actor-visibility" in run_text
+
+        readiness_step = next(step for step in steps if step["name"] == "Check release canary freshness")
+        assert readiness_step["env"]["RELEASE_CANARY_WORKFLOW"] == "release-canary.yml"
+        assert readiness_step["env"]["RELEASE_CANARY_BRANCH"] == "main"
+        assert readiness_step["env"]["RELEASE_CANARY_CHECKED_REF"] == "develop"
+        assert readiness_step["env"]["RELEASE_CANARY_MAX_AGE_HOURS"] == "48"
+        assert "RELEASE_READINESS_OVERRIDE_SHA" in readiness_step["env"]
+
+    def test_release_docs_name_canary_and_ruleset_drift(self):
+        """Release docs must name freshness, ruleset drift, and the override contract."""
+        docs_paths = [
+            REPO_ROOT / "docs" / "operations" / "release-guide.md",
+            REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md",
+            REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md",
+        ]
+
+        for path in docs_paths:
+            content = path.read_text(encoding="utf-8")
+            assert "canary" in content
+            assert "ruleset drift" in content
+            assert "48" in content
+            assert "RELEASE_READINESS_OVERRIDE_SHA" in content
+
+    def test_release_finalize_checks_required_context_before_merge_and_tag(self):
+        """release-finalize must hard-stop unless required release contexts are required and green."""
+        makefile_content = _makefile_text()
+        recipe = _make_target_recipe("release-finalize")
+
+        assert "RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result" in makefile_content
+        assert 'gh pr checks "$$PR" --required --json name,bucket,state' in recipe
+        assert 'select(.name == \\"$$context\\")' in recipe
+        assert "for context in $(RELEASE_REQUIRED_CONTEXTS)" in recipe
+        assert "--watch" not in recipe
+        assert 'CHECK_RC" = "8"' in recipe
+        assert 'CHECK_RC" != "0"' in recipe
+        assert 'CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8"' not in recipe
+
+        assert recipe.index("no open PR found for v$(VERSION)") < recipe.index("gh pr checks")
+        assert recipe.index("gh pr checks") < recipe.index("gh pr merge --squash")
+        assert recipe.index("gh pr merge --squash") < recipe.index("git fetch origin --tags")
+        assert recipe.index("git tag v$(VERSION)") < recipe.index("git push origin v$(VERSION)")
+
+    def test_release_finalize_blocks_pending_required_check_exit_code(self):
+        """gh pr checks exit 8 means at least one required check is still pending."""
+        recipe = _make_target_recipe("release-finalize")
+
+        assert 'if [ "$$CHECK_RC" = "8" ]; then' in recipe
+        assert "required PR checks are pending. Wait for GitHub Actions, then rerun" in recipe
+        assert 'CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8"' not in recipe
+        assert recipe.index('if [ "$$CHECK_RC" = "8" ]') < recipe.index('case "$$CHECK_BUCKET"')
+
+    def test_release_finalize_failure_modes_are_explicit(self):
+        """The one-shot release-finalize precondition must fail closed for drift and non-green states."""
+        recipe = _make_target_recipe("release-finalize")
+
+        for expected in [
+            "missing)",
+            "pending)",
+            "fail|cancel|skipping)",
+            "duplicate)",
+            "unexpected $$context status",
+        ]:
+            assert expected in recipe
+
+        assert "no open PR found for v$(VERSION)" in recipe
+        assert "required release context '$$context' is missing" in recipe
+        assert "Wait for GitHub Actions, then rerun" in recipe
+        assert "Fix the release PR before finalizing" in recipe
+        assert "Fix workflow/ruleset drift" in recipe
+        assert "gh pr merge --squash" in recipe
+        assert "|| true" not in recipe
+
+    def test_release_finalize_docs_separate_premerge_and_postmerge_signals(self):
+        """Release docs must not imply post-merge push checks are pre-publish blockers."""
+        makefile_content = _makefile_text()
+        release_guide = (REPO_ROOT / "docs" / "operations" / "release-guide.md").read_text(encoding="utf-8")
+        release_template = (REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md").read_text(encoding="utf-8")
+
+        assert "Wait for CI green" not in makefile_content
+        assert "CI is not green" not in makefile_content
+        assert "required release contexts: $(RELEASE_REQUIRED_CONTEXTS)" in makefile_content
+        assert "Push-to-main jobs are post-merge signals" in makefile_content
+
+        for content in [release_guide, release_template]:
+            normalized = content.lower()
+            for context in RELEASE_REQUIRED_CONTEXTS:
+                assert context in content
+            assert "post-merge" in normalized
+            assert "pre-merge" in normalized
+            assert "patch release or incident" in content
+
+    def test_release_cut_generates_changelog_from_main_delta(self):
+        """The release branch changelog boundary is main..HEAD, not develop tag ancestry."""
+        recipe = _make_target_recipe("release-cut")
+        release_guide = (REPO_ROOT / "docs" / "operations" / "release-guide.md").read_text(encoding="utf-8")
+        release_template = (REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md").read_text(encoding="utf-8")
+
+        assert "scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/main" in recipe
+        assert "origin/main..HEAD" in release_template
+        assert "origin/main" in release_guide
+        assert "release-finalize` intentionally does not replay release commits onto" in release_guide
+
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""
-        templates_dir = Path(__file__).parent.parent.parent / ".github" / "ISSUE_TEMPLATE"
+        templates_dir = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
         assert templates_dir.exists(), "Issue templates directory must exist"
 
         # Required templates
@@ -169,14 +492,21 @@ class TestReleaseInfrastructure:
 
     def test_pr_template_exists(self):
         """Test that pull request template exists."""
-        pr_template_path = Path(__file__).parent.parent.parent / ".github" / "PULL_REQUEST_TEMPLATE.md"
+        pr_template_path = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
         assert pr_template_path.exists(), "Pull request template must exist"
 
         with open(pr_template_path, encoding="utf-8") as f:
             content = f.read()
 
         # Should have key sections
-        required_sections = ["## Description", "## Type of Change", "## Testing", "## Documentation", "## Code Quality"]
+        required_sections = [
+            "## Description",
+            "## Type of Change",
+            "## Testing",
+            "## Public Contract Check",
+            "## Artifact Hygiene",
+            "## Notes",
+        ]
 
         for section in required_sections:
             assert section in content, f"PR template must have {section} section"
@@ -188,7 +518,7 @@ class TestReleaseInfrastructure:
         import tempfile
         from pathlib import Path
 
-        project_root = Path(__file__).parent.parent.parent
+        project_root = REPO_ROOT
 
         # Run uv build in a temporary directory to avoid conflicts
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -213,7 +543,7 @@ class TestReleaseInfrastructure:
         import subprocess
         from pathlib import Path
 
-        project_root = Path(__file__).parent.parent.parent
+        project_root = REPO_ROOT
 
         # Test that benchbox command works
         result = subprocess.run(["uv", "run", "benchbox", "--help"], cwd=project_root, capture_output=True, text=True)
@@ -226,7 +556,7 @@ class TestReleaseInfrastructure:
         """Test that no files contain incorrect repository references."""
         from pathlib import Path
 
-        project_root = Path(__file__).parent.parent.parent
+        project_root = REPO_ROOT
 
         # Directories to search (explicitly avoid large cache/build directories)
         search_dirs = [
@@ -303,7 +633,7 @@ class TestVersionConsistency:
 
     def test_version_in_pyproject_toml(self):
         """Test that version is properly defined in pyproject.toml."""
-        pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+        pyproject_path = REPO_ROOT / "pyproject.toml"
 
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)
@@ -321,7 +651,7 @@ class TestVersionConsistency:
 
     def test_version_in_init_file(self):
         """Test that version is defined in __init__.py."""
-        init_path = Path(__file__).parent.parent.parent / "benchbox" / "__init__.py"
+        init_path = REPO_ROOT / "benchbox" / "__init__.py"
 
         with open(init_path, encoding="utf-8") as f:
             content = f.read()
@@ -331,13 +661,13 @@ class TestVersionConsistency:
     def test_version_consistency(self):
         """Test that version is consistent between pyproject.toml and __init__.py."""
         # Get version from pyproject.toml
-        pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+        pyproject_path = REPO_ROOT / "pyproject.toml"
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)
         pyproject_version = config["project"]["version"]
 
         # Get version from __init__.py
-        init_path = Path(__file__).parent.parent.parent / "benchbox" / "__init__.py"
+        init_path = REPO_ROOT / "benchbox" / "__init__.py"
         with open(init_path, encoding="utf-8") as f:
             content = f.read()
 
@@ -358,7 +688,7 @@ class TestReleaseWorkflowValidation:
 
     def test_workflows_are_valid_yaml(self):
         """Test that all workflow files are valid YAML."""
-        workflows_dir = Path(__file__).parent.parent.parent / ".github" / "workflows"
+        workflows_dir = REPO_ROOT / ".github" / "workflows"
 
         for workflow_file in workflows_dir.glob("*.yml"):
             with open(workflow_file, encoding="utf-8") as f:
@@ -369,7 +699,7 @@ class TestReleaseWorkflowValidation:
 
     def test_issue_templates_are_valid_yaml(self):
         """Test that issue templates are valid YAML."""
-        templates_dir = Path(__file__).parent.parent.parent / ".github" / "ISSUE_TEMPLATE"
+        templates_dir = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
 
         for template_file in templates_dir.glob("*.yml"):
             with open(template_file, encoding="utf-8") as f:
@@ -384,17 +714,17 @@ class TestPackageMetadata:
 
     def test_license_file_exists(self):
         """Test that LICENSE file exists."""
-        license_path = Path(__file__).parent.parent.parent / "LICENSE"
+        license_path = REPO_ROOT / "LICENSE"
         assert license_path.exists(), "LICENSE file must exist"
 
     def test_readme_file_exists(self):
         """Test that README.md exists."""
-        readme_path = Path(__file__).parent.parent.parent / "README.md"
+        readme_path = REPO_ROOT / "README.md"
         assert readme_path.exists(), "README.md file must exist"
 
     def test_pyproject_toml_build_config(self):
         """Test that pyproject.toml has proper build configuration."""
-        pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+        pyproject_path = REPO_ROOT / "pyproject.toml"
 
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)

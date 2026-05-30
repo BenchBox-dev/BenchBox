@@ -25,6 +25,7 @@ from benchbox.core.results.loader import find_latest_result
 from benchbox.core.validation.query_validation import QueryValidator
 from tests.e2e.utils import is_dataframe_available, is_gpu_available, is_platform_available
 from tests.integration._cli_e2e_utils import run_cli_command
+from tests.uat.matrix import LOCAL_SQL_PLATFORMS
 
 pytestmark = [
     pytest.mark.integration,
@@ -32,8 +33,6 @@ pytestmark = [
 ]
 
 
-# Local SQL platforms with in-process execution paths.
-LOCAL_SQL_PLATFORMS: tuple[str, ...] = ("duckdb", "sqlite", "datafusion")
 ALL_BENCHMARKS: tuple[str, ...] = tuple(list_benchmark_ids())
 DEFAULT_LOCAL_SQL_BENCHMARKS: tuple[str, ...] = ("tpch", "tpcds")
 LOCAL_SQL_STABLE_MATRIX: dict[str, set[str]] = {

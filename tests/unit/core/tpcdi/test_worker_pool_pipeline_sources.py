@@ -8,16 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import benchbox.utils.printing as printing
 from benchbox.core.tpcdi.etl.pipeline import TPCDIETLPipeline
 from benchbox.core.tpcdi.source_generators import TPCDISourceDataGenerator
-from benchbox.core.tpcdi.worker_pool_examples import (
-    SimpleWorkerPoolManager,
-    example_usage,
-    parallel_file_processing,
-    simple_parallel_processing,
-    streaming_parallel_processing,
-)
 
 pytestmark = [
     pytest.mark.unit,
@@ -73,63 +65,6 @@ class FakeConnection:
 
     def executemany(self, sql, records):
         self.executemany_calls.append((sql, len(records)))
-
-
-def test_simple_parallel_processing_modes_and_errors():
-    assert simple_parallel_processing([1, 2], lambda x: x * 2, enable_parallel=False) == [2, 4]
-    assert simple_parallel_processing([], lambda x: x, enable_parallel=True) == []
-    # parallel branch
-    out = simple_parallel_processing([1, 2, 3], lambda x: x + 1, max_workers=2, enable_parallel=True)
-    assert sorted(out) == [2, 3, 4]
-
-    def flaky(x):
-        if x == 2:
-            raise ValueError("boom")
-        return x
-
-    out = simple_parallel_processing([1, 2, 3], flaky, max_workers=2, enable_parallel=True)
-    assert sorted(out) == [1, 3]
-
-
-def test_parallel_file_processing_and_streaming():
-    def proc(path: Path):
-        if "bad" in path.name:
-            raise RuntimeError("bad")
-        return {"file_path": str(path), "record_count": 3}
-
-    seq = parallel_file_processing([Path("a"), Path("bad")], proc, enable_parallel=False)
-    assert seq["total_records"] == 3
-    assert len(seq["errors"]) == 1
-
-    par = parallel_file_processing([Path("a"), Path("b")], proc, max_workers=2, enable_parallel=True)
-    assert par["total_records"] == 6
-
-    stream = iter([1, 2, 3])
-    assert list(streaming_parallel_processing(stream, lambda x: x * 3, enable_parallel=False)) == [3, 6, 9]
-
-    stream2 = iter([1, 2, 3, 4])
-    out = list(streaming_parallel_processing(stream2, lambda x: x + 10, max_workers=2, enable_parallel=True))
-    assert sorted(out) == [11, 12, 13, 14]
-
-
-def test_worker_pool_manager_and_example_usage(monkeypatch, capsys):
-    monkeypatch.setattr(printing, "_QUIET", False)
-    monkeypatch.setattr(printing, "_STD_CONSOLE", None)
-    manager = SimpleWorkerPoolManager(max_workers=2, enable_parallel=False)
-    assert manager.process_batch([1, 2], lambda x: x * 2) == [2, 4]
-    assert manager.transform_tables({"a": 1}, lambda n, d: f"{n}-{d}") == {"a": "a-1"}
-
-    manager_p = SimpleWorkerPoolManager(max_workers=2, enable_parallel=True)
-    out = manager_p.process_batch([1, 2, 3], lambda x: x + 1)
-    assert sorted(out) == [2, 3, 4]
-    tables = manager_p.transform_tables({"x": 1, "y": 2}, lambda n, d: f"{n}:{d}")
-    assert set(tables) == {"x", "y"}
-
-    monkeypatch.setattr("benchbox.core.tpcdi.worker_pool_examples.time.sleep", lambda *_a, **_k: None)
-    example_usage()
-    printed = capsys.readouterr().out
-    assert "Sequential results:" in printed
-    assert "Parallel results:" in printed
 
 
 def test_pipeline_historical_incremental_and_helpers(monkeypatch):

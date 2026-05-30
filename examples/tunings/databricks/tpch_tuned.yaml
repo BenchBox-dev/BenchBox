@@ -47,6 +47,9 @@ table_tunings:
     - name: L_PARTKEY
       type: INTEGER
       order: 2
+    - name: L_SUPPKEY
+      type: INTEGER
+      order: 3
     distribution:
     - name: L_ORDERKEY
       type: INTEGER
@@ -62,6 +65,9 @@ table_tunings:
     - name: O_ORDERKEY
       type: INTEGER
       order: 1
+    - name: O_CUSTKEY
+      type: INTEGER
+      order: 2
     distribution:
     - name: O_ORDERKEY
       type: INTEGER
@@ -73,6 +79,12 @@ table_tunings:
     - name: P_PARTKEY
       type: INTEGER
       order: 1
+    - name: P_TYPE
+      type: VARCHAR
+      order: 2
+    - name: P_SIZE
+      type: INTEGER
+      order: 3
     distribution:
     - name: P_PARTKEY
       type: INTEGER
@@ -84,6 +96,9 @@ table_tunings:
     - name: S_SUPPKEY
       type: INTEGER
       order: 1
+    - name: S_NATIONKEY
+      type: INTEGER
+      order: 2
     distribution:
     - name: S_SUPPKEY
       type: INTEGER
@@ -95,6 +110,9 @@ table_tunings:
     - name: C_CUSTKEY
       type: INTEGER
       order: 1
+    - name: C_NATIONKEY
+      type: INTEGER
+      order: 2
     distribution:
     - name: C_CUSTKEY
       type: INTEGER

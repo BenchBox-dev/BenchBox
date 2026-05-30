@@ -13,9 +13,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 ROOT = Path(__file__).resolve().parents[2]
 
-if not (ROOT / "_project").exists() or not (ROOT / "results-explorer").exists():
-    pytest.skip("public site theme contract requires _project/ and results-explorer/", allow_module_level=True)
-
 
 def _read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")

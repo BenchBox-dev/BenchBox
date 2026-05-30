@@ -13,6 +13,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from datetime import date, timedelta
 from typing import Any
 
@@ -133,14 +134,13 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Filter to only minimum-cost suppliers
-    result = (
+    return (
         part_supplier.join(min_cost, left_on="p_partkey", right_on="p_partkey")
         .filter(col("ps_supplycost") == col("min_cost"))
         .select("s_acctbal", "s_name", "n_name", "p_partkey", "p_mfgr", "s_address", "s_phone", "s_comment")
         .sort([("s_acctbal", "desc"), ("n_name", "asc"), ("s_name", "asc"), ("p_partkey", "asc")])
         .limit(100)
     )
-    return result
 
 
 def q2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1036,10 +1036,9 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
     revenue_expr = col("l_extendedprice") * (lit(1) - col("l_discount"))
     promo_expr = ctx.when(col("p_type").str.starts_with("PROMO")).then(revenue_expr).otherwise(lit(0))
 
-    result = df.agg(
+    return df.agg(
         (promo_expr.sum() * lit(100.0) / revenue_expr.sum()).alias("promo_revenue"),
     )
-    return result
 
 
 def q14_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1093,14 +1092,13 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
 
     max_rev = ctx.scalar(revenue.agg(col("total_revenue").max().alias("max_rev")), "max_rev")
 
-    result = (
+    return (
         hs.join(ss, left_on="hk_supplier", right_on="hk_supplier")
         .join(revenue, left_on="hk_supplier", right_on="hk_supplier")
         .filter(col("total_revenue") == lit(max_rev))
         .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
-    return result
 
 
 def q15_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1212,12 +1210,11 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     # Average quantity per part
     avg_qty = df.group_by("hk_part").agg((col("l_quantity").mean() * lit(0.2)).alias("avg_qty"))
 
-    result = (
+    return (
         df.join(avg_qty, left_on="hk_part", right_on="hk_part")
         .filter(col("l_quantity") < col("avg_qty"))
         .agg((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
     )
-    return result
 
 
 def q17_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1366,10 +1363,9 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
         & deliver
     )
 
-    result = df.filter(cond1 | cond2 | cond3).agg(
+    return df.filter(cond1 | cond2 | cond3).agg(
         (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
     )
-    return result
 
 
 def q19_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1680,202 +1676,65 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registration
 # =============================================================================
 
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "AN": QueryCategory.ANALYTICAL,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "JO": QueryCategory.JOIN,
+    "MJ": QueryCategory.MULTI_JOIN,
+    "SO": QueryCategory.SORT,
+    "SQ": QueryCategory.SUBQUERY,
+}
+
+_QUERY_METADATA = """Q1|Pricing Summary Report|Pricing summary statistics for shipped lineitems (Data Vault)|AG,GB,FI|4
+Q2|Minimum Cost Supplier|Find supplier with minimum cost for parts in region (Data Vault)|MJ,SQ,SO|100
+Q3|Shipping Priority|Top 10 unshipped orders with highest value (Data Vault)|MJ,AG,SO|10
+Q4|Order Priority Checking|Orders by priority with late lineitems (Data Vault)|JO,AG,SQ|5
+Q5|Local Supplier Volume|Revenue from orders in same nation within region (Data Vault)|MJ,AG,FI|
+Q6|Forecasting Revenue Change|Revenue increase from eliminating discounts (Data Vault)|AG,FI|1
+Q7|Volume Shipping|Value of goods shipped between nations (Data Vault)|MJ,AG,FI|
+Q8|National Market Share|Market share of a nation within a region (Data Vault)|MJ,AG,AN|
+Q9|Product Type Profit Measure|Profit on a given line of parts (Data Vault)|MJ,AG,FI|
+Q10|Returned Item Reporting|Customers with returned parts and revenue impact (Data Vault)|MJ,AG,SO|20
+Q11|Important Stock Identification|Find most important stock in a nation (Data Vault)|JO,AG,SQ|
+Q12|Shipping Modes and Order Priority|Effect of shipping modes on order priority (Data Vault)|JO,AG,FI|2
+Q13|Customer Distribution|Distribution of customers by order count (Data Vault)|JO,AG,SQ|
+Q14|Promotion Effect|Effect of promotions on revenue (Data Vault)|JO,AG,FI|1
+Q15|Top Supplier|Determine top supplier based on revenue (Data Vault)|JO,AG,SQ|
+Q16|Parts/Supplier Relationship|Count suppliers per part, excluding complaints (Data Vault)|JO,AG,SQ|
+Q17|Small-Quantity-Order Revenue|Revenue from eliminating small quantity orders (Data Vault)|JO,AG,SQ|1
+Q18|Large Volume Customer|Customers with large orders (Data Vault)|MJ,AG,SQ|100
+Q19|Discounted Revenue|Revenue for parts with specific conditions (Data Vault)|JO,AG,FI|1
+Q20|Potential Part Promotion|Suppliers with excess inventory of parts (Data Vault)|MJ,SQ,FI|
+Q21|Suppliers Who Kept Orders Waiting|Suppliers who delayed orders they could fill (Data Vault)|MJ,AG,SQ|100
+Q22|Global Sales Opportunity|Identify customers likely to make purchases (Data Vault)|AG,SQ,FI|
+"""
+
+
+def _impl_for(query_id: str, family: str) -> Any:
+    return globals()[f"q{query_id[1:]}_{family}_impl"]
+
+
+def _expected_row_count(value: str) -> int | None:
+    return int(value) if value else None
+
 
 def _register_all_queries() -> None:
-    """Register all Data Vault DataFrame queries."""
-    queries = [
-        DataFrameQuery(
-            query_id="Q1",
-            query_name="Pricing Summary Report",
-            description="Pricing summary statistics for shipped lineitems (Data Vault)",
-            categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.FILTER],
-            expression_impl=q1_expression_impl,
-            pandas_impl=q1_pandas_impl,
-            expected_row_count=4,
-        ),
-        DataFrameQuery(
-            query_id="Q2",
-            query_name="Minimum Cost Supplier",
-            description="Find supplier with minimum cost for parts in region (Data Vault)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.SUBQUERY, QueryCategory.SORT],
-            expression_impl=q2_expression_impl,
-            pandas_impl=q2_pandas_impl,
-            expected_row_count=100,
-        ),
-        DataFrameQuery(
-            query_id="Q3",
-            query_name="Shipping Priority",
-            description="Top 10 unshipped orders with highest value (Data Vault)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.SORT],
-            expression_impl=q3_expression_impl,
-            pandas_impl=q3_pandas_impl,
-            expected_row_count=10,
-        ),
-        DataFrameQuery(
-            query_id="Q4",
-            query_name="Order Priority Checking",
-            description="Orders by priority with late lineitems (Data Vault)",
-            categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-            expression_impl=q4_expression_impl,
-            pandas_impl=q4_pandas_impl,
-            expected_row_count=5,
-        ),
-        DataFrameQuery(
-            query_id="Q5",
-            query_name="Local Supplier Volume",
-            description="Revenue from orders in same nation within region (Data Vault)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-            expression_impl=q5_expression_impl,
-            pandas_impl=q5_pandas_impl,
-        ),
-        DataFrameQuery(
-            query_id="Q6",
-            query_name="Forecasting Revenue Change",
-            description="Revenue increase from eliminating discounts (Data Vault)",
-            categories=[QueryCategory.AGGREGATE, QueryCategory.FILTER],
-            expression_impl=q6_expression_impl,
-            pandas_impl=q6_pandas_impl,
-            expected_row_count=1,
-        ),
-        DataFrameQuery(
-            query_id="Q7",
-            query_name="Volume Shipping",
-            description="Value of goods shipped between nations (Data Vault)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-            expression_impl=q7_expression_impl,
-            pandas_impl=q7_pandas_impl,
-        ),
-        DataFrameQuery(
-            query_id="Q8",
-            query_name="National Market Share",
-            description="Market share of a nation within a region (Data Vault)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.ANALYTICAL],
-            expression_impl=q8_expression_impl,
-            pandas_impl=q8_pandas_impl,
-        ),
-        DataFrameQuery(
-            query_id="Q9",
-            query_name="Product Type Profit Measure",
-            description="Profit on a given line of parts (Data Vault)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-            expression_impl=q9_expression_impl,
-            pandas_impl=q9_pandas_impl,
-        ),
-        DataFrameQuery(
-            query_id="Q10",
-            query_name="Returned Item Reporting",
-            description="Customers with returned parts and revenue impact (Data Vault)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.SORT],
-            expression_impl=q10_expression_impl,
-            pandas_impl=q10_pandas_impl,
-            expected_row_count=20,
-        ),
-        DataFrameQuery(
-            query_id="Q11",
-            query_name="Important Stock Identification",
-            description="Find most important stock in a nation (Data Vault)",
-            categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-            expression_impl=q11_expression_impl,
-            pandas_impl=q11_pandas_impl,
-        ),
-        DataFrameQuery(
-            query_id="Q12",
-            query_name="Shipping Modes and Order Priority",
-            description="Effect of shipping modes on order priority (Data Vault)",
-            categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-            expression_impl=q12_expression_impl,
-            pandas_impl=q12_pandas_impl,
-            expected_row_count=2,
-        ),
-        DataFrameQuery(
-            query_id="Q13",
-            query_name="Customer Distribution",
-            description="Distribution of customers by order count (Data Vault)",
-            categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-            expression_impl=q13_expression_impl,
-            pandas_impl=q13_pandas_impl,
-        ),
-        DataFrameQuery(
-            query_id="Q14",
-            query_name="Promotion Effect",
-            description="Effect of promotions on revenue (Data Vault)",
-            categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-            expression_impl=q14_expression_impl,
-            pandas_impl=q14_pandas_impl,
-            expected_row_count=1,
-        ),
-        DataFrameQuery(
-            query_id="Q15",
-            query_name="Top Supplier",
-            description="Determine top supplier based on revenue (Data Vault)",
-            categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-            expression_impl=q15_expression_impl,
-            pandas_impl=q15_pandas_impl,
-        ),
-        DataFrameQuery(
-            query_id="Q16",
-            query_name="Parts/Supplier Relationship",
-            description="Count suppliers per part, excluding complaints (Data Vault)",
-            categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-            expression_impl=q16_expression_impl,
-            pandas_impl=q16_pandas_impl,
-        ),
-        DataFrameQuery(
-            query_id="Q17",
-            query_name="Small-Quantity-Order Revenue",
-            description="Revenue from eliminating small quantity orders (Data Vault)",
-            categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-            expression_impl=q17_expression_impl,
-            pandas_impl=q17_pandas_impl,
-            expected_row_count=1,
-        ),
-        DataFrameQuery(
-            query_id="Q18",
-            query_name="Large Volume Customer",
-            description="Customers with large orders (Data Vault)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-            expression_impl=q18_expression_impl,
-            pandas_impl=q18_pandas_impl,
-            expected_row_count=100,
-        ),
-        DataFrameQuery(
-            query_id="Q19",
-            query_name="Discounted Revenue",
-            description="Revenue for parts with specific conditions (Data Vault)",
-            categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-            expression_impl=q19_expression_impl,
-            pandas_impl=q19_pandas_impl,
-            expected_row_count=1,
-        ),
-        DataFrameQuery(
-            query_id="Q20",
-            query_name="Potential Part Promotion",
-            description="Suppliers with excess inventory of parts (Data Vault)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.SUBQUERY, QueryCategory.FILTER],
-            expression_impl=q20_expression_impl,
-            pandas_impl=q20_pandas_impl,
-        ),
-        DataFrameQuery(
-            query_id="Q21",
-            query_name="Suppliers Who Kept Orders Waiting",
-            description="Suppliers who delayed orders they could fill (Data Vault)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-            expression_impl=q21_expression_impl,
-            pandas_impl=q21_pandas_impl,
-            expected_row_count=100,
-        ),
-        DataFrameQuery(
-            query_id="Q22",
-            query_name="Global Sales Opportunity",
-            description="Identify customers likely to make purchases (Data Vault)",
-            categories=[QueryCategory.AGGREGATE, QueryCategory.SUBQUERY, QueryCategory.FILTER],
-            expression_impl=q22_expression_impl,
-            pandas_impl=q22_pandas_impl,
-        ),
-    ]
-
-    for query in queries:
-        register_query(query)
+    for query_id, query_name, description, category_codes, expected_rows in reader(
+        _QUERY_METADATA.splitlines(), delimiter="|"
+    ):
+        register_query(
+            DataFrameQuery(
+                query_id=query_id,
+                query_name=query_name,
+                description=description,
+                categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+                expression_impl=_impl_for(query_id, "expression"),
+                pandas_impl=_impl_for(query_id, "pandas"),
+                expected_row_count=_expected_row_count(expected_rows),
+            )
+        )
 
 
 _register_all_queries()

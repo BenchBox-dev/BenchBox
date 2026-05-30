@@ -16,13 +16,13 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from benchbox.platforms.base.config_utils import make_registered_platform_config_builder
+from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
         TuningColumn,
         UnifiedTuningConfiguration,
     )
@@ -33,7 +33,7 @@ from benchbox.utils.printing import emit
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
 from .base import DriverIsolationCapability, PlatformAdapter
-from .base.data_loading import NO_BENCHMARK, DataSource, DataSourceResolver, resolve_csv_dialect
+from .base.data_loading import NO_BENCHMARK, DataSource, resolve_adapter_data_source, resolve_csv_dialect
 from .base.runtime_metadata import build_default_normalized_result_metadata
 
 try:
@@ -1126,16 +1126,7 @@ class BigQueryAdapter(PlatformAdapter):
 
     def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> Any:
         """Resolve benchmark data files from benchmark tables or manifest."""
-        resolver = DataSourceResolver(
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
-        )
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source
+        return resolve_adapter_data_source(self, benchmark, data_dir)
 
     @staticmethod
     def _ensure_file_list(file_paths: Any) -> list[Any]:
@@ -1772,26 +1763,7 @@ class BigQueryAdapter(PlatformAdapter):
             # Silently ignore transport cleanup errors
             pass
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if BigQuery supports a specific tuning type.
-
-        BigQuery supports:
-        - PARTITIONING: Via PARTITION BY clause (date/timestamp/integer columns)
-        - CLUSTERING: Via CLUSTER BY clause (up to 4 columns)
-
-        Args:
-            tuning_type: The type of tuning to check support for
-
-        Returns:
-            True if the tuning type is supported by BigQuery
-        """
-        # Import here to avoid circular imports
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {TuningType.PARTITIONING, TuningType.CLUSTERING}
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "CLUSTERING")
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate BigQuery-specific tuning clauses for CREATE TABLE statements.
@@ -1952,25 +1924,10 @@ class BigQueryAdapter(PlatformAdapter):
             raise ValueError(f"Failed to apply tunings to BigQuery table {table_name}: {e}") from e
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration to BigQuery.
+        """Apply unified tuning configuration to BigQuery."""
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        Args:
-            unified_config: Unified tuning configuration to apply
-            connection: BigQuery connection
-        """
-        if not unified_config:
-            return
-
-        # Apply constraint configurations
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        # Apply platform optimizations
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        # Apply table-level tunings
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
         """Apply BigQuery-specific platform optimizations.
@@ -1986,72 +1943,13 @@ class BigQueryAdapter(PlatformAdapter):
         # Store optimizations for use during query execution
         self.logger.info("BigQuery platform optimizations stored for query execution")
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to BigQuery.
-
-        Note: BigQuery has limited constraint support. Constraints are mainly for metadata/optimization.
-
-        Args:
-            primary_key_config: Primary key constraint configuration
-            foreign_key_config: Foreign key constraint configuration
-            connection: BigQuery connection
-        """
-        # BigQuery constraints are applied at table creation time
-        # This method is called after tables are created, so log the configurations
-
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info("Primary key constraints enabled for BigQuery (applied during table creation)")
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info("Foreign key constraints enabled for BigQuery (applied during table creation)")
-
-        # BigQuery doesn't support ALTER TABLE to add constraints after creation
-        # So there's no additional work to do here
-
-
-def _build_bigquery_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build BigQuery database configuration with credential loading.
-
-    This function loads saved credentials from the CredentialManager and
-    merges them with CLI options and runtime overrides.
-
-    Args:
-        platform: Platform name (should be 'bigquery')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded and platform-specific fields at top-level
-    """
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    config = build_platform_config(
-        platform_type="bigquery",
-        credential_key="bigquery",
-        default_display_name="Google BigQuery",
-        default_driver_package="google-cloud-bigquery",
-        platform_fields=[
-            "project_id",
-            "dataset_id",
-            "location",
-            "credentials_path",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints enabled for BigQuery (applied during table creation)",
+        "Foreign key constraints enabled for BigQuery (applied during table creation)",
     )
 
+
+def _apply_bigquery_config_fields(config: Any) -> None:
     staging_root = config.options.get("staging_root")
     if not staging_root:
         default_output = config.options.get("default_output_location")
@@ -2072,15 +1970,18 @@ def _build_bigquery_config(
     config.staging_root = staging_root
     config.storage_bucket = storage_bucket
     config.storage_prefix = storage_prefix
-    return config
 
 
-# Register the config builder with the platform hook registry
-# This must happen when the module is imported
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("bigquery", _build_bigquery_config)
-except ImportError:
-    # Platform hooks may not be available in all contexts (e.g., core-only usage)
-    pass
+_build_bigquery_config = make_registered_platform_config_builder(
+    "bigquery",
+    __name__,
+    "Google BigQuery",
+    "google-cloud-bigquery",
+    [
+        "project_id",
+        "dataset_id",
+        "location",
+        "credentials_path",
+    ],
+    postprocess=_apply_bigquery_config_fields,
+)

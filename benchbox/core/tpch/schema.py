@@ -1,18 +1,10 @@
-"""TPC-H schema definition.
-
-This module defines the schema for the TPC-H benchmark, including all tables,
-their columns, data types, and relationships.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-H specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+"""TPC-H schema definition."""
 
 from enum import Enum
-from typing import NamedTuple, Optional
+from pathlib import Path
+from typing import Any, NamedTuple, Optional
+
+import yaml
 
 from benchbox.core.schema_primitives import BaseSchemaTable
 from benchbox.core.tuning import BenchmarkTunings, TableTuning, TuningColumn
@@ -52,140 +44,39 @@ class Table(BaseSchemaTable):
         super().__init__(name, columns)
 
 
-# TPC-H Schema Definition
-# Based on the TPC-H spec version 3.0.0
+def _load_schema_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("schema_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
-# Region Table
-REGION = Table(
-    "region",
-    [
-        Column("r_regionkey", DataType.INTEGER, primary_key=True),
-        Column("r_name", DataType.CHAR, size=25),
-        Column("r_comment", DataType.VARCHAR, size=152, nullable=True),
-    ],
-)
 
-# Nation Table
-NATION = Table(
-    "nation",
-    [
-        Column("n_nationkey", DataType.INTEGER, primary_key=True),
-        Column("n_name", DataType.CHAR, size=25),
-        Column("n_regionkey", DataType.INTEGER, foreign_key=("region", "r_regionkey")),
-        Column("n_comment", DataType.VARCHAR, size=152, nullable=True),
-    ],
-)
+def _make_column(spec: dict[str, Any]) -> Column:
+    foreign_key = spec.get("foreign_key")
+    return Column(
+        spec["name"],
+        DataType[spec["data_type"]],
+        size=spec.get("size"),
+        nullable=spec.get("nullable", False),
+        primary_key=spec.get("primary_key", False),
+        foreign_key=tuple(foreign_key) if foreign_key else None,
+    )
 
-# Supplier Table
-SUPPLIER = Table(
-    "supplier",
-    [
-        Column("s_suppkey", DataType.INTEGER, primary_key=True),
-        Column("s_name", DataType.CHAR, size=25),
-        Column("s_address", DataType.VARCHAR, size=40),
-        Column("s_nationkey", DataType.INTEGER, foreign_key=("nation", "n_nationkey")),
-        Column("s_phone", DataType.CHAR, size=15),
-        Column("s_acctbal", DataType.DECIMAL),
-        Column("s_comment", DataType.VARCHAR, size=101),
-    ],
-)
 
-# Part Table
-PART = Table(
-    "part",
-    [
-        Column("p_partkey", DataType.INTEGER, primary_key=True),
-        Column("p_name", DataType.VARCHAR, size=55),
-        Column("p_mfgr", DataType.CHAR, size=25),
-        Column("p_brand", DataType.CHAR, size=10),
-        Column("p_type", DataType.VARCHAR, size=25),
-        Column("p_size", DataType.INTEGER),
-        Column("p_container", DataType.CHAR, size=10),
-        Column("p_retailprice", DataType.DECIMAL),
-        Column("p_comment", DataType.VARCHAR, size=23),
-    ],
-)
+def _make_table(spec: dict[str, Any]) -> Table:
+    return Table(spec["name"], [_make_column(column) for column in spec["columns"]])
 
-# PartSupp Table (Part/Supplier relationship)
-PARTSUPP = Table(
-    "partsupp",
-    [
-        Column(
-            "ps_partkey",
-            DataType.INTEGER,
-            foreign_key=("part", "p_partkey"),
-            primary_key=True,
-        ),
-        Column(
-            "ps_suppkey",
-            DataType.INTEGER,
-            foreign_key=("supplier", "s_suppkey"),
-            primary_key=True,
-        ),
-        Column("ps_availqty", DataType.INTEGER),
-        Column("ps_supplycost", DataType.DECIMAL),
-        Column("ps_comment", DataType.VARCHAR, size=199),
-    ],
-)
 
-# Customer Table
-CUSTOMER = Table(
-    "customer",
-    [
-        Column("c_custkey", DataType.INTEGER, primary_key=True),
-        Column("c_name", DataType.VARCHAR, size=25),
-        Column("c_address", DataType.VARCHAR, size=40),
-        Column("c_nationkey", DataType.INTEGER, foreign_key=("nation", "n_nationkey")),
-        Column("c_phone", DataType.CHAR, size=15),
-        Column("c_acctbal", DataType.DECIMAL),
-        Column("c_mktsegment", DataType.CHAR, size=10),
-        Column("c_comment", DataType.VARCHAR, size=117),
-    ],
-)
+_SCHEMA_SPECS = _load_schema_specs()
+_TABLE_DEFS = {entry["id"]: _make_table(entry) for entry in _SCHEMA_SPECS["tables"]}
 
-# Orders Table
-ORDERS = Table(
-    "orders",
-    [
-        Column("o_orderkey", DataType.INTEGER, primary_key=True),
-        Column("o_custkey", DataType.INTEGER, foreign_key=("customer", "c_custkey")),
-        Column("o_orderstatus", DataType.CHAR, size=1),
-        Column("o_totalprice", DataType.DECIMAL),
-        Column("o_orderdate", DataType.DATE),
-        Column("o_orderpriority", DataType.CHAR, size=15),
-        Column("o_clerk", DataType.CHAR, size=15),
-        Column("o_shippriority", DataType.INTEGER),
-        Column("o_comment", DataType.VARCHAR, size=79),
-    ],
-)
+REGION = _TABLE_DEFS["REGION"]
+NATION = _TABLE_DEFS["NATION"]
+SUPPLIER = _TABLE_DEFS["SUPPLIER"]
+PART = _TABLE_DEFS["PART"]
+PARTSUPP = _TABLE_DEFS["PARTSUPP"]
+CUSTOMER = _TABLE_DEFS["CUSTOMER"]
+ORDERS = _TABLE_DEFS["ORDERS"]
+LINEITEM = _TABLE_DEFS["LINEITEM"]
 
-# LineItem Table
-LINEITEM = Table(
-    "lineitem",
-    [
-        Column(
-            "l_orderkey",
-            DataType.INTEGER,
-            foreign_key=("orders", "o_orderkey"),
-            primary_key=True,
-        ),
-        Column("l_partkey", DataType.INTEGER, foreign_key=("part", "p_partkey")),
-        Column("l_suppkey", DataType.INTEGER, foreign_key=("supplier", "s_suppkey")),
-        Column("l_linenumber", DataType.INTEGER, primary_key=True),
-        Column("l_quantity", DataType.DECIMAL),
-        Column("l_extendedprice", DataType.DECIMAL),
-        Column("l_discount", DataType.DECIMAL),
-        Column("l_tax", DataType.DECIMAL),
-        Column("l_returnflag", DataType.CHAR, size=1),
-        Column("l_linestatus", DataType.CHAR, size=1),
-        Column("l_shipdate", DataType.DATE),
-        Column("l_commitdate", DataType.DATE),
-        Column("l_receiptdate", DataType.DATE),
-        Column("l_shipinstruct", DataType.CHAR, size=25),
-        Column("l_shipmode", DataType.CHAR, size=10),
-        Column("l_comment", DataType.VARCHAR, size=44),
-    ],
-)
 
 # Collection of all tables in the TPC-H schema
 TABLES = [

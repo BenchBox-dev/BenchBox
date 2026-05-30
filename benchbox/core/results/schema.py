@@ -23,91 +23,38 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import yaml
+
 from benchbox.core.results.builder import normalize_benchmark_id
 from benchbox.core.results.environment import (
     build_environment_payload,
     build_platform_metadata_payload,
 )
 from benchbox.core.results.query_normalizer import normalize_query_id
+from benchbox.core.results.schema_policy import CURRENT_SCHEMA_VERSION, RUNTIME_SCHEMA_POLICY
+from benchbox.validation.bundle import REQUIRED_TOP_KEYS
 
 if TYPE_CHECKING:
     from benchbox.core.results.models import BenchmarkResults
 
-SCHEMA_VERSION = "2.1"
+SCHEMA_VERSION = CURRENT_SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
-CANONICAL_KEY_ORDER = [
-    "version",
-    "run",
-    "benchmark",
-    "platform",
-    "config",
-    "summary",
-    "phases",
-    "queries",
-    "tables",
-    "validation",
-    "comparisons",
-    "cost",
-    "normalized_cost",
-    "execution",
-    "environment",
-    "export",
-    "errors",
-]
 
-QUERY_KEY_ORDER = ["id", "ms", "rows", "iter", "stream", "run_type", "status", "dataframe_skip_summary"]
-CONFIG_KEY_ORDER = [
-    "compression",
-    "seed",
-    "phases",
-    "query_subset",
-    "parallelism",
-    "tuning_mode",
-    "tuning_config",
-    "platform_options",
-    "platform_option_sources",
-    "table_mode",
-    "external_format",
-    "table_format",
-    "table_format_compression",
-    "table_format_partition_cols",
-    "mode",
-    "test_type",
-]
-PHASE_KEY_ORDER = [
-    "data_generation",
-    "schema_creation",
-    "data_loading",
-    "validation",
-    "migration",
-    "power_test",
-    "throughput_test",
-]
-DRIVER_METADATA_KEYS = (
-    "driver_package",
-    "driver_version_requested",
-    "driver_version_resolved",
-    "driver_version_actual",
-    "driver_runtime_strategy",
-    "driver_runtime_path",
-    "driver_runtime_python_executable",
-    "driver_auto_install_used",
-)
-ENGINE_VERSION_KEYS = (
-    "engine_version",
-    "engine_version_source",
-)
+def _load_schema_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("schema_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
-# Maps driver metadata source keys to their result JSON destination keys.
-_DRIVER_PLATFORM_KEYS = [
-    ("driver_package", "driver_package"),
-    ("driver_version_requested", "driver_requested_version"),
-    ("driver_version_resolved", "driver_resolved_version"),
-    ("driver_version_actual", "driver_actual_version"),
-    ("driver_runtime_strategy", "driver_runtime_strategy"),
-]
+
+_SCHEMA_SPECS = _load_schema_specs()
+CANONICAL_KEY_ORDER = list(_SCHEMA_SPECS["canonical_key_order"])
+QUERY_KEY_ORDER = list(_SCHEMA_SPECS["query_key_order"])
+CONFIG_KEY_ORDER = list(_SCHEMA_SPECS["config_key_order"])
+PHASE_KEY_ORDER = list(_SCHEMA_SPECS["phase_key_order"])
+DRIVER_METADATA_KEYS = tuple(_SCHEMA_SPECS["driver_metadata_keys"])
+ENGINE_VERSION_KEYS = tuple(_SCHEMA_SPECS["engine_version_keys"])
+_DRIVER_PLATFORM_KEYS = [tuple(item) for item in _SCHEMA_SPECS["driver_platform_keys"]]
 
 
 def order_dict(d: dict[str, Any], key_order: list[str]) -> dict[str, Any]:
@@ -184,7 +131,7 @@ class SchemaV2Validator:
     Optional keys: environment, tables, errors, cost, export
     """
 
-    REQUIRED_KEYS = ("version", "run", "benchmark", "platform", "summary", "queries")
+    REQUIRED_KEYS = REQUIRED_TOP_KEYS
     OPTIONAL_KEYS = (
         "environment",
         "tables",
@@ -196,6 +143,7 @@ class SchemaV2Validator:
         "execution",
         "config",
         "phases",
+        "comparisons",
     )
 
     RUN_REQUIRED = ("id", "timestamp", "total_duration_ms", "query_time_ms")
@@ -210,12 +158,10 @@ class SchemaV2Validator:
         if missing_top:
             raise SchemaV2ValidationError(f"schema v2.0 payload missing keys: {missing_top}")
 
-        # Validate version (accept 2.0 and 2.1 as valid)
-        valid_versions = ("2.0", "2.1")
-        if payload.get("version") not in valid_versions:
-            raise SchemaV2ValidationError(
-                f"invalid schema version {payload.get('version')} (expected one of {valid_versions})"
-            )
+        # Validate version using the named runtime policy.
+        version_decision = RUNTIME_SCHEMA_POLICY.evaluate(payload.get("version"))
+        if not version_decision.accepted:
+            raise SchemaV2ValidationError(version_decision.error_message())
 
         # Validate run block
         run = payload.get("run", {})
@@ -715,6 +661,7 @@ def _build_execution_from_context(result: BenchmarkResults, driver_metadata: dic
         if ctx.get(key):
             exec_block[key] = ctx[key]
 
+    _inject_translation_metadata(exec_block, result)
     return exec_block
 
 
@@ -729,6 +676,7 @@ def _build_execution_fallback(result: BenchmarkResults, driver_metadata: dict[st
     if mode_value:
         exec_block["mode"] = mode_value
     _inject_driver_metadata(exec_block, driver_metadata)
+    _inject_translation_metadata(exec_block, result)
     return exec_block
 
 
@@ -828,6 +776,15 @@ def _inject_driver_metadata(exec_block: dict[str, Any], driver_metadata: dict[st
         value = driver_metadata.get(key)
         if value:
             exec_block[key] = value
+
+
+def _inject_translation_metadata(exec_block: dict[str, Any], result: BenchmarkResults) -> None:
+    """Inject SQL translation outcome metadata into the execution block."""
+    if not isinstance(result.execution_metadata, Mapping):
+        return
+    translation = result.execution_metadata.get("translation")
+    if isinstance(translation, Mapping):
+        exec_block["translation"] = dict(translation)
 
 
 def _shorten_benchmark_name(name: str) -> str:
@@ -1140,6 +1097,10 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     if result.tuning_validation_status:
         payload["validation_status"] = result.tuning_validation_status.lower()
 
+    tuning_profile = _extract_tuning_profile_metadata(result)
+    if tuning_profile:
+        payload["logical_profile"] = tuning_profile
+
     # Clauses breakdown
     clauses: dict[str, Any] = {}
     if "indexes" in tuning_applied:
@@ -1268,7 +1229,30 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
     if clauses_count > 0:
         summary["clauses_applied"] = clauses_count
 
+    tuning_profile = _extract_tuning_profile_metadata(result)
+    if tuning_profile:
+        coverage = tuning_profile.get("logical_profile_coverage")
+        logical_profile = {
+            "id": tuning_profile.get("logical_tuning_profile_id"),
+            "version": tuning_profile.get("logical_tuning_profile_version"),
+            "template_hash": tuning_profile.get("tuning_template_hash"),
+            "physical_rendering_id": tuning_profile.get("physical_rendering_id"),
+            "physical_mechanisms": tuning_profile.get("platform_physical_tuning_mechanisms", []),
+        }
+        if coverage:
+            logical_profile["coverage"] = coverage
+        summary["logical_profile"] = {key: value for key, value in logical_profile.items() if value}
+
     return summary if summary else None
+
+
+def _extract_tuning_profile_metadata(result: BenchmarkResults) -> dict[str, Any] | None:
+    if not isinstance(result.execution_metadata, Mapping):
+        return None
+    tuning_profile = result.execution_metadata.get("tuning_profile")
+    if not isinstance(tuning_profile, Mapping):
+        return None
+    return dict(tuning_profile)
 
 
 def _build_environment_block(result: BenchmarkResults) -> dict[str, Any]:

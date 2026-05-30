@@ -13,12 +13,12 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q4_expression_impl as _q4_expr_base,
     q4_pandas_impl as _q4_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SUBQUERY, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -54,13 +54,12 @@ def q4_v2_expression_impl(ctx: DataFrameContext) -> Any:
     # Pre-filter lineitem
     late_orders = lineitem.filter(col("l_commitdate") < col("l_receiptdate")).select("l_orderkey").unique()
 
-    result = (
+    return (
         filtered_orders.join(late_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
         .group_by("o_orderpriority")
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority")
     )
-    return result
 
 
 def q4_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -112,7 +111,7 @@ def q4_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .unique()
     )
 
-    result = (
+    return (
         orders.select("o_orderkey", "o_orderdate", "o_orderpriority")
         .filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(late_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
@@ -120,7 +119,6 @@ def q4_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority")
     )
-    return result
 
 
 def q4_v3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -220,14 +218,13 @@ def q4_v5_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem_with_flag = lineitem.with_columns((col("l_commitdate") < col("l_receiptdate")).alias("is_late"))
     late_orders = lineitem_with_flag.filter(col("is_late")).select("l_orderkey").unique()
 
-    result = (
+    return (
         orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(late_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
         .group_by("o_orderpriority")
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority")
     )
-    return result
 
 
 def q4_v5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -299,7 +296,7 @@ def q4_v7_expression_impl(ctx: DataFrameContext) -> Any:
     # Use inner join + unique instead of semi-join (equivalent result)
     late_orders = lineitem.filter(col("l_commitdate") < col("l_receiptdate")).select("l_orderkey").unique()
 
-    result = (
+    return (
         orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(late_orders, left_on="o_orderkey", right_on="l_orderkey")
         .select("o_orderkey", "o_orderpriority")
@@ -308,7 +305,6 @@ def q4_v7_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority")
     )
-    return result
 
 
 def q4_v7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -350,14 +346,13 @@ def q4_v8_expression_impl(ctx: DataFrameContext) -> Any:
     late_orders = lineitem.filter(col("l_commitdate") < col("l_receiptdate")).select("l_orderkey").unique()
 
     date_filter = (col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date))
-    result = (
+    return (
         orders.filter(date_filter)
         .join(late_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
         .group_by("o_orderpriority")
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority")
     )
-    return result
 
 
 def q4_v8_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -398,14 +393,13 @@ def q4_v9_expression_impl(ctx: DataFrameContext) -> Any:
 
     late_orders = lineitem.filter(col("l_commitdate") < col("l_receiptdate")).select("l_orderkey").unique()
 
-    result = (
+    return (
         orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(late_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
         .group_by("o_orderpriority")
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority", descending=False)
     )
-    return result
 
 
 def q4_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -465,40 +459,4 @@ def q4_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q4_v1_expression_impl, q4_v1_pandas_impl),
-    (q4_v2_expression_impl, q4_v2_pandas_impl),
-    (q4_v3_expression_impl, q4_v3_pandas_impl),
-    (q4_v4_expression_impl, q4_v4_pandas_impl),
-    (q4_v5_expression_impl, q4_v5_pandas_impl),
-    (q4_v6_expression_impl, q4_v6_pandas_impl),
-    (q4_v7_expression_impl, q4_v7_pandas_impl),
-    (q4_v8_expression_impl, q4_v8_pandas_impl),
-    (q4_v9_expression_impl, q4_v9_pandas_impl),
-    (q4_v10_expression_impl, q4_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q4 implementation",
-    "Pre-filter: pre-filter orders and lineitem before semi-join",
-    "Column prune: select only needed columns before semi-join",
-    "Intermediate vars: named DataFrames for each step",
-    "Pre-compute derived: compute late flag column before filtering",
-    "Chained style: maximum method chaining",
-    "Join reorder: use inner join + unique instead of semi-join",
-    "Filter combination: combine date range into single predicate variable",
-    "Explicit sort: descending=False explicitly specified",
-    "Alternative formula: use size() instead of count() aggregation",
-]
-
-Q4_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q4v{v}",
-        query_name=f"TPC-H Q4 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q4_VARIANTS = build_yaml_variants(__file__, globals(), 4, JOIN_AGG_SUBQUERY)

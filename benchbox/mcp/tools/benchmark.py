@@ -21,8 +21,9 @@ from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import (
     get_all_benchmarks,
-    get_benchmark_class,
     get_benchmark_default_scale,
+    get_benchmark_surface,
+    get_public_benchmark_class,
 )
 from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.schema import build_result_payload
@@ -57,6 +58,17 @@ QUERY_DETAILS_ANNOTATIONS = ToolAnnotations(
     idempotentHint=True,
     openWorldHint=False,
 )
+
+
+def _build_query_details_benchmark_info(benchmark: str, meta: dict[str, Any]) -> dict[str, Any]:
+    """Return benchmark metadata safe for the query-details MCP surface."""
+    info = {
+        "display_name": meta.get("display_name", benchmark),
+        "category": meta.get("category", "unknown"),
+    }
+    if get_benchmark_surface(benchmark) == "public":
+        info["support_status"] = meta["support_status"]
+    return info
 
 
 def _get_platform_adapter(platform: str, mode: str | None = None, **config):
@@ -245,10 +257,7 @@ def register_benchmark_tools(mcp: FastMCP, *, results_dir: Path) -> None:
                 _populate_sql_query_details(response, benchmark_lower, normalized_id, platform)
 
             response["complexity_hints"] = _get_query_complexity_hints(benchmark_lower, normalized_id)
-            response["benchmark_info"] = {
-                "display_name": meta.get("display_name", benchmark_lower),
-                "category": meta.get("category", "unknown"),
-            }
+            response["benchmark_info"] = _build_query_details_benchmark_info(benchmark_lower, meta)
 
             return response
 
@@ -333,7 +342,7 @@ def _run_benchmark_impl(
                 make_not_found_error("benchmark", benchmark, available=list(all_benchmarks.keys())), execution_id
             )
 
-        benchmark_class = get_benchmark_class(benchmark_lower)
+        benchmark_class = get_public_benchmark_class(benchmark_lower)
         if benchmark_class is None:
             return _make_failed_response(
                 make_error(
@@ -791,7 +800,7 @@ def _populate_sql_query_details(
     platform: str | None,
 ) -> None:
     """Populate response dict with SQL query details."""
-    benchmark_class = get_benchmark_class(benchmark)
+    benchmark_class = get_public_benchmark_class(benchmark)
     if benchmark_class is None:
         response["error"] = f"Benchmark '{benchmark}' requires additional dependencies"
         return

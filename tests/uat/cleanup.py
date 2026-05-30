@@ -15,21 +15,11 @@ scale have completed.
 from __future__ import annotations
 
 import shutil
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-# Benchmark → benchmarks that consume its loaded databases. Used to
-# decide whether a per-platform mid-sweep prune is safe.
-SOURCE_REUSE_GRAPH: dict[str, tuple[str, ...]] = {
-    "tpch": (
-        "tpch",
-        "read_primitives",
-        "write_primitives",
-        "transaction_primitives",
-        "ai_primitives",
-    ),
-    "tpcds": ("tpcds", "tpcds_obt"),
-}
+from benchbox.core.benchmark_registry import BENCHMARK_METADATA
 
 
 @dataclass(frozen=True)
@@ -56,7 +46,7 @@ def remaining_consumers(
     scale: float,
 ) -> list[CellKey]:
     """Return pending cells (same platform, same scale) that consume `source_benchmark`."""
-    consumers = SOURCE_REUSE_GRAPH.get(source_benchmark, (source_benchmark,))
+    consumers = source_reuse_graph().get(source_benchmark, (source_benchmark,))
     out = []
     for cell in pending_cells:
         if cell.platform != platform:
@@ -66,6 +56,19 @@ def remaining_consumers(
         if cell.benchmark in consumers:
             out.append(cell)
     return out
+
+
+def source_reuse_graph() -> dict[str, tuple[str, ...]]:
+    """Return source benchmark → same-source consumers from registry metadata."""
+    consumers_by_source: defaultdict[str, list[str]] = defaultdict(list)
+    for benchmark_id, meta in BENCHMARK_METADATA.items():
+        data_source = meta.get("data_source")
+        if not isinstance(data_source, str):
+            continue
+        if data_source not in BENCHMARK_METADATA or data_source == benchmark_id:
+            continue
+        consumers_by_source[data_source].append(benchmark_id)
+    return {source: (source, *tuple(consumers)) for source, consumers in sorted(consumers_by_source.items())}
 
 
 def can_prune(

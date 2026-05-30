@@ -926,8 +926,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         """
         by_list = [by] if isinstance(by, str) else list(by)
         # Use size() then reset_index() with name parameter (works on Pandas)
-        result = df.groupby(by_list).size().reset_index(name=name)  # type: ignore[attr-defined]
-        return result  # type: ignore[return-value]
+        return df.groupby(by_list).size().reset_index(name=name)  # type: ignore[attr-defined, return-value]
 
     # =========================================================================
     # GroupBy Aggregation (Platform-Specific)
@@ -1334,7 +1333,9 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             Combined DataFrame
         """
         header = 0 if has_header else None
-        names = column_names if not has_header else None
+        # Headered CSVs still need schema names so adapter-specific readers can
+        # apply type converters for date/timestamp columns.
+        names = column_names
 
         if len(file_paths) == 1:
             return self.read_csv(

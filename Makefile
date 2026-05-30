@@ -39,7 +39,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -426,10 +426,10 @@ lint:
 	$(MAKE) lint-explorer-tokens
 	$(MAKE) lint-site-theme-tokens
 
-# Dependency audit - checks declarations against whole-tree import sites.
-# Fails on both unused declarations and undeclared third-party imports.
+# Dependency audit - checks that every declared dep has an import site or is allowlisted.
+# Fails if an unused dep is introduced. See _project/scripts/dependency_audit/.
 audit-deps:
-	uv run -- python scripts/check_dependency_audit.py
+	uv run -- python _project/scripts/dependency_audit/check_deps.py
 
 # Validate that an audit report records the develop SHA it describes.
 audit-sha-check:
@@ -474,6 +474,7 @@ SKILL_SYNC ?= /Users/joe/Developer/skill-sync/dist/cli/index.js
 
 skill-sync:
 	@if [ -f "$(SKILL_SYNC)" ]; then \
+		$(MAKE) -s agent-write-preflight; \
 		node "$(SKILL_SYNC)" sync; \
 	else \
 		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
@@ -531,7 +532,8 @@ ci-lint:
 
 # CI test check - exact match for test.yml workflow (fast tests with coverage)
 # Note: -p pytest_cov re-enables pytest-cov which is disabled by default in pytest.ini
-# Suite-wide coverage threshold set to 70%
+# Suite-wide coverage threshold set to 70%. tests/conftest.py emits a separate
+# non-failing advisory warning below 80%; 70 is the blocking CI floor.
 ci-test:
 	@echo "Running CI test suite..."
 	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
@@ -578,13 +580,22 @@ docstring-coverage:
 # Package build and install test - exact match for test.yml test-package job
 test-package:
 	@echo "Building and testing package installation..."
+	rm -rf dist/
 	uv build
 	uvx twine check dist/*
 	@echo "Testing package installation..."
-	@rm -rf test-venv
-	uv venv test-venv
-	. test-venv/bin/activate && uv pip install dist/*.whl && python -c "import benchbox; print('Package installation successful')" && benchbox --help > /dev/null
-	@rm -rf test-venv
+	@wheel_count=$$(find "$$PWD/dist" -maxdepth 1 -type f -name '*.whl' | wc -l | tr -d '[:space:]'); \
+	if [ "$$wheel_count" != "1" ]; then \
+		echo "Expected exactly one wheel, found $$wheel_count"; \
+		find "$$PWD/dist" -maxdepth 1 -type f -print; \
+		exit 1; \
+	fi; \
+	wheel=$$(find "$$PWD/dist" -maxdepth 1 -type f -name '*.whl' -print -quit); \
+	tmpdir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmpdir"' EXIT; \
+	cd "$$tmpdir"; \
+	uv run --isolated --no-project --with "$$wheel" -- python -c "import benchbox; print('Package installation successful')"; \
+	uv run --isolated --no-project --with "$$wheel" -- benchbox --help > /dev/null
 	@echo "✅ Package test passed"
 
 # Integration smoke tests - exact match for test.yml integration-smoke job
@@ -628,6 +639,10 @@ typecheck-uv: typecheck
 # Import validation
 validate-imports:
 	uv run -- python scripts/validate_imports.py
+
+# Field-level schema validation for migrated YAML catalogs (see benchbox/core/catalog_schema.py).
+catalog-schema-check:
+	uv run -- python -m benchbox.core.catalog_schema
 
 # Dependency matrix / validation
 dependency-check:
@@ -674,6 +689,9 @@ docs-validate:
 	@echo ""
 	@echo "Validating visualization screenshot sync..."
 	@uv run -- python scripts/validate_visualization_images.py
+	@echo ""
+	@echo "Checking repo-local doc relative links..."
+	@uv run -- python scripts/check_doc_relative_links.py
 
 # Refresh generated visualization screenshots and sync shared docs/blog copies
 docs-images:
@@ -712,11 +730,12 @@ parity-fixtures:
 
 # Regenerate sql_compat capability matrix and skip reference docs from the registry.
 compat-docs:
-	uv run scripts/generate_compat_docs.py
+	uv run -- python scripts/generate_compat_docs.py
 
-# Verify the committed compat docs match the registry. CI gate against drift.
+# Verify committed compat docs and DDL governance match the registry/source.
 compat-docs-check:
-	uv run scripts/generate_compat_docs.py --check
+	uv run -- python scripts/generate_compat_docs.py --check
+	uv run -- python -m benchbox.sql_compat.inventory --output /tmp/benchbox-compat-inventory.jsonl --check-ddl-drift
 
 # Verify fixtures match the current Python implementation without overwriting.
 # Fails if any fixture is out of date (drift detected).
@@ -752,12 +771,14 @@ run-test:
 #
 # See docs/operations/release-guide.md and _project/decisions/single-repo-migration.md.
 
+RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
+
 .PHONY: release-cut release-finalize
 
 # Cut a release branch from develop in one shot:
 #   1. Create v$(VERSION) branch off develop (develop is not modified).
 #   2. On v$(VERSION): bump version sources (scripts/update_version.py).
-#   3. On v$(VERSION): generate CHANGELOG.md entry.
+#   3. On v$(VERSION): generate CHANGELOG.md entry from origin/main..HEAD.
 #   4. $EDITOR opens CHANGELOG.md for hand-curation (skipped if EDITOR unset).
 #   5. Curate: git rm dev-only/deferred paths (per A3 in single-repo-migration.md).
 #   6. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).
@@ -772,7 +793,7 @@ release-cut:
 	git fetch origin
 	git checkout -b v$(VERSION) develop
 	uv run -- python scripts/update_version.py --version $(VERSION) --update-pyproject
-	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION)
+	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/main
 	@if [ -n "$$EDITOR" ]; then \
 		echo "==> Opening CHANGELOG.md in $$EDITOR for hand-curation"; \
 		$$EDITOR CHANGELOG.md; \
@@ -786,7 +807,7 @@ release-cut:
 	@# staged-for-add by a later git add.
 	@# Curation list: A3 of _project/decisions/single-repo-migration.md.
 	-git rm -rf _project _blog results-data results-explorer .claude .codex .gemini
-	-git rm -f .pre-commit-config.yaml _benchbox_pytest_xdist_safety.py todo.config.yaml skill-sync.yaml skill-sync.lock .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md
+	-git rm -f .pre-commit-config.yaml _benchbox_pytest_xdist_safety.py todo.config.yaml skill-sync.yaml skill-sync.lock .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
 	-git rm -f .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
 	@# Stage only the files update_version.py + generate_changelog_entry.py write.
 	@# Explicit list (not `git add -A`) to avoid staging build/cache artifacts.
@@ -803,17 +824,38 @@ release-cut:
 	@echo
 	@echo "Release PR opened. Next steps:"
 	@echo "  1. Review the PR diff; confirm CHANGELOG and curation are correct."
-	@echo "  2. Wait for CI green."
+	@echo "  2. Wait for the required release contexts: $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "  3. make release-finalize VERSION=$(VERSION)"
 
-# After release-cut's PR is approved and CI is green: squash-merge it,
-# tag main, push the tag (fires release.yml), and leave develop alone.
+# After release-cut's PR is approved and all required release contexts are
+# green: squash-merge it, tag main, push the tag (fires release.yml), and
+# leave develop alone.
 # Usage: make release-finalize VERSION=X.Y.Z
 release-finalize:
 	@test -n "$(VERSION)" || (echo "Usage: make release-finalize VERSION=X.Y.Z" && exit 1)
 	@PR=$$(gh pr list --base main --head v$(VERSION) --state open --json number --jq '.[0].number'); \
 	test -n "$$PR" || (echo "Error: no open PR found for v$(VERSION) → main" && exit 1); \
-	echo "==> Squash-merging PR #$$PR (ruleset main-release-only blocks merge if CI is not green)"; \
+	echo "==> Verifying required release contexts '$(RELEASE_REQUIRED_CONTEXTS)' for PR #$$PR"; \
+	for context in $(RELEASE_REQUIRED_CONTEXTS); do \
+		CHECK_BUCKET=$$(gh pr checks "$$PR" --required --json name,bucket,state --jq "map(select(.name == \"$$context\")) | if length == 1 then .[0].bucket elif length == 0 then \"missing\" else \"duplicate\" end"); \
+		CHECK_RC=$$?; \
+		if [ "$$CHECK_RC" = "8" ]; then \
+			echo "Error: required PR checks are pending. Wait for GitHub Actions, then rerun." >&2; \
+			exit 1; \
+		elif [ "$$CHECK_RC" != "0" ]; then \
+			echo "Error: gh pr checks failed while verifying $$context (exit $$CHECK_RC)" >&2; \
+			exit "$$CHECK_RC"; \
+		fi; \
+		case "$$CHECK_BUCKET" in \
+			pass) echo "==> $$context is green";; \
+			missing) echo "Error: required release context '$$context' is missing. Check main-release-only and release workflows." >&2; exit 1;; \
+			pending) echo "Error: required release context '$$context' is pending. Wait for GitHub Actions, then rerun." >&2; exit 1;; \
+			fail|cancel|skipping) echo "Error: required release context '$$context' is $$CHECK_BUCKET. Fix the release PR before finalizing." >&2; exit 1;; \
+			duplicate) echo "Error: multiple required contexts named '$$context' were returned. Fix workflow/ruleset drift." >&2; exit 1;; \
+			*) echo "Error: unexpected $$context status '$$CHECK_BUCKET'." >&2; exit 1;; \
+		esac; \
+	done; \
+	echo "==> Squash-merging PR #$$PR (required release contexts are green)"; \
 	gh pr merge --squash "$$PR"
 	git fetch origin --tags
 	git checkout main
@@ -822,6 +864,7 @@ release-finalize:
 	git push origin v$(VERSION)
 	@echo
 	@echo "Tag v$(VERSION) pushed; release.yml will publish to PyPI."
+	@echo "Push-to-main jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "develop is intentionally unchanged — dev-only paths persist on develop."
 
 # =============================================================================
@@ -831,11 +874,14 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics audit-sha-check worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
-# Mirror the CI gate locally before pushing. Catches ~all CI failures
-# without the network roundtrip. Delegates to ci-lint so the local
-# preflight surface stays in sync with lint.yml automatically.
+agent-write-preflight:
+	@sh scripts/agent_write_preflight.sh
+
+# Lightweight local gate before pushing. Mirrors CI lint and fast marker
+# selection, but not CI's coverage fail-under; run ci-test for the exact
+# coverage-enforced test workflow.
 pr-preflight:
 	@$(MAKE) ci-lint
 	@$(MAKE) pr-preflight-fast-tests
@@ -847,8 +893,8 @@ pr-preflight-fast-tests:
 	git fetch origin develop --quiet; \
 	uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
 	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
-		echo "==> fast tests"; \
-		uv run -- python -m pytest -m fast -q; \
+		echo "==> fast tests (CI marker selection; coverage remains CI-only)"; \
+		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q; \
 	else \
 		$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
 		echo "No code changes detected; skipping fast tests."; \
@@ -897,20 +943,36 @@ pr-content-guard:
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
 # before landing. Warn-only — does not block the push.
 pr-open:
+	@$(MAKE) -s agent-write-preflight
 	@CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
 		develop|main) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
 	esac; \
+	if [ -n "$(PR_BODY_FILE)" ] && [ ! -f "$(PR_BODY_FILE)" ]; then \
+		echo "PR_BODY_FILE does not exist: $(PR_BODY_FILE)" >&2; \
+		exit 1; \
+	fi; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" && \
 	URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
 	if [ -z "$$URL" ]; then \
-		URL=$$(gh pr create --base develop --fill --head "$$CURRENT"); \
+		if [ -n "$(PR_BODY_FILE)" ]; then \
+			URL=$$(gh pr create --base develop --fill --head "$$CURRENT" --body-file "$(PR_BODY_FILE)"); \
+		else \
+			URL=$$(gh pr create --base develop --fill --head "$$CURRENT"); \
+		fi; \
 	else \
 		echo "Reusing existing PR: $$URL"; \
+		if [ -n "$(PR_BODY_FILE)" ]; then \
+			gh pr edit "$$URL" --body-file "$(PR_BODY_FILE)"; \
+		fi; \
 	fi && \
 	echo "$$URL" && \
 	gh pr merge --auto --squash "$$URL"
+
+shrink-rollup:
+	@git fetch origin develop --quiet
+	@uv run --project _project/scripts -- python _project/scripts/shrink_rollup.py
 
 # Walk every worktree (except the main clone) and run `make pr-open` in each.
 # Use PR_FANOUT_JOBS to bound parallelism.
@@ -970,8 +1032,10 @@ pr-status:
 		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
 
 # Discover candidate bot/agent review comments on merged PRs without making changes.
-# Default --author filter is the chatgpt-codex-connector bot; override with --author
-# (or by editing DEFAULT_REVIEW_AUTHORS in the script) to add other reviewers.
+# Also reports merged PRs whose Codex review hit usage limits and still need a
+# fresh @codex review trigger. Default --author filter is the
+# chatgpt-codex-connector bot; override with --author (or by editing
+# DEFAULT_REVIEW_AUTHORS in the script) to add other reviewers.
 pr-review-followups-list:
 	@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \
 		--base "$(PR_REVIEW_BASE)" \
@@ -999,6 +1063,11 @@ pr-review-followups-list:
 #                                    the default, so the reply is posted.
 #   PR_REVIEW_SUBMIT=0               skip final pr-open. Same accepted values
 #                                    as PR_REVIEW_REPLY above.
+#   PR_REVIEW_USAGE_LIMIT_RETRY=0    skip the top-level Codex usage-limit
+#                                    retry step. By default, the routine posts
+#                                    @codex review on merged PRs with no later
+#                                    trigger and keeps later-triggered PRs
+#                                    visible until a review result appears.
 #   PR_REVIEW_RESUME=1               re-drive the routine on a branch that
 #                                    already carries per-comment commits from
 #                                    a prior crashed sweep. Implies
@@ -1563,21 +1632,6 @@ worktree-pool-disk-clean:
 	done; \
 	echo "Cleaned $$cleaned slot(s); freed $${freed_total}K total."
 
-# Path convention: ../BenchBox.<branch-with-slashes-as-dashes>/
-# After: cd into the path, work, run `make pr-open` from inside.
-worktree-add:
-	@test -n "$(BRANCH)" || { echo "Usage: make worktree-add BRANCH=<branch-name>"; exit 1; }
-	@echo "DEPRECATED: use \`make worktree-claim BRANCH=...\` instead. The pool model retains worktrees rather than creating new ones. \`worktree-add\` will be removed in the next release." >&2
-	@WTNAME=$$(echo "$(BRANCH)" | tr '/' '-'); \
-	WTPATH="../BenchBox.$$WTNAME"; \
-	test ! -e "$$WTPATH" || { echo "Path exists: $$WTPATH"; exit 1; }; \
-	git fetch origin develop --quiet && \
-	git worktree add -b "$(BRANCH)" "$$WTPATH" origin/develop && \
-	echo "" && \
-	echo "Worktree ready: $$WTPATH" && \
-	echo "Branch:        $(BRANCH) (based on origin/develop)" && \
-	echo "Next:          cd $$WTPATH && uv sync --group dev"
-
 worktree-list:
 	@git worktree list
 
@@ -1717,7 +1771,7 @@ uat-sweep:
 		$(if $(DRY_RUN),--dry-run,)
 
 # make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=] [CONFIG=]
-# Canned stress preset; feature parity with scripts/local_stress_test.sh.
+# Canned stress preset using the UAT framework matrix runner.
 uat-stress:
 	@uv run --no-sync -- python -m tests.uat._cli stress \
 		$(if $(CONFIG),--config "$(CONFIG)",) \
@@ -1759,7 +1813,7 @@ help:
 	@echo "  make test-dev        Fast development cycle testing"
 	@echo "  make test-smoke      Quick smoke testing"
 	@echo "  make test-local-matrix Run real local benchmark matrix (stress)"
-	@echo "  make test-ci         CI-optimized test suite"
+	@echo "  make test-ci         Maintained broad local CI profile"
 	@echo ""
 	@echo "Database-Specific Testing:"
 	@echo "  make test-duckdb     Run DuckDB-specific tests"
@@ -1775,7 +1829,7 @@ help:
 	@echo "  make test-window     Run window functions tests"
 	@echo ""
 	@echo "CI/CD Testing:"
-	@echo "  make test-ci         Run CI-optimized test suite"
+	@echo "  make test-ci         Run maintained broad local CI profile"
 	@echo ""
 	@echo "CI Local Equivalents (run before push):"
 	@echo "  make ci-local        Run ALL CI checks locally (lint+test+docs+package)"
@@ -1840,9 +1894,11 @@ help:
 	@echo "  make docs-check      Run all documentation checks (validate, linkcheck, build)"
 	@echo ""
 	@echo "PR Workflow & Worktrees:"
-	@echo "  make pr-preflight    Run lint + fast tests locally; mirrors CI gate"
-	@echo "  make pr-open         Push branch + open PR vs develop + enable auto-merge (idempotent; safe to rerun)"
+	@echo "  make agent-write-preflight  Refuse write work from the BenchBox primary clone unless explicitly overridden"
+	@echo "  make pr-preflight    Run lint + fast marker tests locally (coverage remains CI-only)"
+	@echo "  make pr-open [PR_BODY_FILE=path] Push branch + open PR vs develop + enable auto-merge"
 	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
+	@echo "  make shrink-rollup   Sum merged shrink ledger fragments from origin/develop"
 	@echo "  make pr-refresh      Merge origin/develop into current branch, push, and re-enable auto-merge"
 	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
 	@echo "  make pr-review-followups-list        List un-actioned bot/agent review comments on merged PRs"
@@ -1858,8 +1914,7 @@ help:
 	@echo "  make worktree-pool-disk-clean     Drop pytest/mypy/ruff/coverage caches from pool slots (preserves .venv)"
 	@echo "  make worktree-pool-reset POOL=NN  Manual escape hatch for stuck pool slots"
 	@echo ""
-	@echo "Legacy / non-pool worktree paths (deprecated, kept for one release):"
-	@echo "  make worktree-add BRANCH=name  Deprecated legacy worktree creator (prefer worktree-claim)"
+	@echo "Legacy / non-pool worktree utilities (pool path via worktree-claim is preferred):"
 	@echo "  make worktree-list             List active worktrees"
 	@echo "  make worktree-prune            Remove legacy non-pool worktrees whose branches are gone on origin"
 	@echo ""
@@ -1870,6 +1925,6 @@ help:
 	@echo ""
 	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
 	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs main"
-	@echo "  make release-finalize VERSION=X.Y.Z Squash-merge the release PR, tag main, push tag (fires release.yml)"
+	@echo "  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag main, push tag"
 	@echo ""
 	@echo "  make help            Show this help message"

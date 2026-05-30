@@ -11,8 +11,7 @@ a dependency is missing.
 ## Benchmark Registry
 
 All lazily loaded benchmarks are defined in `benchbox/__init__.py` via the
-`_BENCHMARK_SPECS` mapping and the shared `LazyLoader` utility. Each
-`LazyImportSpec` entry specifies:
+`_BENCHMARK_REGISTRY` mapping. Each `_BenchmarkSpec` entry specifies:
 
 - The module path (relative to `benchbox`)
 - The class name to load from that module
@@ -22,16 +21,16 @@ All lazily loaded benchmarks are defined in `benchbox/__init__.py` via the
 ### Adding a New Benchmark
 
 1. Implement the benchmark in `benchbox/<benchmark_name>.py`.
-2. Add a `LazyImportSpec` entry to `_BENCHMARK_SPECS` with the module name,
-   attribute, and any optional dependency extras.
+2. Add a `_BenchmarkSpec` entry to `_BENCHMARK_REGISTRY` with the module name,
+   class name, and any optional dependency extras.
 3. Export the class through `__all__` if it should be part of the public API.
 4. Add unit tests under `tests/unit/test_init.py` to confirm the lazy import and
    provide coverage for missing dependency messaging if appropriate.
 
-The shared `LazyLoader` centralises the import logic and logs successes or
-failures when `BENCHBOX_DEBUG_IMPORTS=1` is set. Tests can use `_clear_lazy_cache()`
-and patch the loader via `benchbox.utils.lazy_loader` helpers to simulate missing
-dependencies without touching the actual modules.
+`_load_benchmark_class()` centralizes the import logic and logs successes or
+failures through the benchmark module logger. Tests can use `_clear_lazy_cache()`
+and patch `benchbox._import_module` to simulate missing dependencies without
+touching the actual modules.
 
 ## Error Messaging
 
@@ -49,10 +48,9 @@ second time.
 
 Benchmarks that are required for internal bootstrapping (such as `TPCH`
 and `TPCDS`) can still be imported eagerly at module level. This keeps the core
-API available without increasing the complexity of the lazy loader. You can also
-mark individual `LazyImportSpec` entries with `eager=True` (used for lightweight
-benchmarks such as `ReadPrimitives` and `WritePrimitives`) when you want them cached up-front
-without surfacing hard failures.
+API available without increasing lazy-loading complexity. Other benchmarks should
+remain in `_BENCHMARK_REGISTRY` so optional dependencies are imported only when
+the matching benchmark is first accessed.
 
 ## Contributor Tips
 

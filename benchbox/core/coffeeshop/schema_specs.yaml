@@ -1,0 +1,84 @@
+tables:
+- id: DIM_LOCATIONS
+  key: dim_locations
+  schema:
+    name: dim_locations
+    description: Canonical list of reference store locations and regions.
+    row_count_formula: len(vendored dim_locations seed file)
+    columns:
+    - name: record_id
+      type: INTEGER
+      primary_key: true
+    - name: location_id
+      type: VARCHAR(16)
+    - name: city
+      type: VARCHAR(50)
+    - name: state
+      type: VARCHAR(10)
+    - name: country
+      type: VARCHAR(50)
+    - name: region
+      type: VARCHAR(20)
+- id: DIM_PRODUCTS
+  key: dim_products
+  schema:
+    name: dim_products
+    description: Reference product catalog with seasonal availability windows.
+    row_count_formula: len(vendored dim_products seed file)
+    columns:
+    - name: record_id
+      type: INTEGER
+      primary_key: true
+    - name: product_id
+      type: INTEGER
+    - name: name
+      type: VARCHAR(120)
+    - name: category
+      type: VARCHAR(30)
+    - name: subcategory
+      type: VARCHAR(30)
+    - name: standard_cost
+      type: DECIMAL(8,2)
+    - name: standard_price
+      type: DECIMAL(8,2)
+    - name: from_date
+      type: DATE
+    - name: to_date
+      type: DATE
+- id: ORDER_LINES
+  key: order_lines
+  schema:
+    name: order_lines
+    description: Exploded order lines fact table with 1-5 lines per order.
+    row_count_formula: 50_000_000 * scale_factor * 1.5 (average lines per order)
+    columns:
+    - name: order_id
+      type: BIGINT
+    - name: line_number
+      type: INTEGER
+    - name: location_record_id
+      type: INTEGER
+      foreign_key: dim_locations.record_id
+    - name: location_id
+      type: VARCHAR(16)
+    - name: product_record_id
+      type: INTEGER
+      foreign_key: dim_products.record_id
+    - name: product_id
+      type: INTEGER
+    - name: order_date
+      type: DATE
+    - name: order_time
+      type: TIME
+    - name: quantity
+      type: INTEGER
+    - name: unit_price
+      type: DECIMAL(8,2)
+    - name: total_price
+      type: DECIMAL(10,2)
+    - name: region
+      type: VARCHAR(20)
+table_order:
+- dim_locations
+- dim_products
+- order_lines

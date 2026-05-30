@@ -9,6 +9,7 @@ from pathlib import Path
 
 import duckdb
 import pytest
+
 from _project.scripts.explorer_pipeline.pipeline import (
     COMMUNITY_TRUST_LABEL,
     SUBMISSION_MANIFEST_FILENAME,
@@ -16,7 +17,6 @@ from _project.scripts.explorer_pipeline.pipeline import (
     _build_short_ids,
 )
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
-
 from tests.unit.core.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]

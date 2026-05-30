@@ -9,14 +9,20 @@ rewriting queries and DDL in adapter code, each intentional transformation is
 `compat_lint` walks the rule files at CI time and fails if any transformation
 is found in adapter code that has no matching registry entry.
 
-## Design: "register intent, implement locally"
+## Design: hybrid governance plus optional runtime dispatch
 
-The registry **documents** what an adapter does; `BaseDdlOptimizer` uses
-`transformer_id` as an adapter method name to dispatch calls.  Adapter methods
-remain in `benchbox/platforms/<platform>.py` because transformations are
-platform-specific (SHARD KEY syntax, DUPLICATE KEY injection, schema prefixes,
-etc.) and are tested alongside the adapter.  The registry makes those decisions
-discoverable, auditable, and enforceable without moving code.
+The registry is the authoritative governance catalogue for SQL compatibility
+decisions.  `BaseDdlOptimizer` is the runtime dispatch path for adapters that
+opt in; adapters that keep a local rewrite path must still register the behavior
+with `RewriteDDLPayload(governance_only=True)` unless the rewrite has an
+explicit drift exemption.
+
+Adapter methods remain in `benchbox/platforms/<platform>.py` when the
+transformation is tightly coupled to platform state, SDK load loops, or
+deployment settings (SHARD KEY syntax, EXTERNAL TABLE locations, schema
+prefixes, etc.) and are tested alongside the adapter.  The registry makes those
+decisions discoverable, auditable, and enforceable without forcing every
+platform through one runtime abstraction.
 
 ```
 Registry rule     →  declares transformer_id "myplatform_strip_fk"
@@ -26,12 +32,21 @@ compat_lint       →  verifies every regex/DDL-text branch in adapter code
                      maps to a registered rule_id
 ```
 
-> **Note:** Pre-W6 rule files in `rules/ddl_optimize/` contain the comment
-> "transformer_id is documentary only — no runtime dispatch."  That was true
-> before `BaseDdlOptimizer` existed.  When an adapter inherits
-> `BaseDdlOptimizer`, `transformer_id` *is* used for runtime dispatch.  The
-> comment in legacy rule files refers to the old direct-call pattern and can
-> be ignored for adapters that use the mixin.
+Decision rules:
+
+- Every detected adapter CREATE TABLE rewrite must be registered under
+  `Phase.DDL_OPTIMIZE`, runtime-dispatched by `BaseDdlOptimizer`, or explicitly
+  exempted with rationale.
+- `governance_only=True` is allowed for runtime behavior that remains in an
+  adapter-specific path; it means the rule is authoritative documentation and a
+  CI governance anchor, not a dispatch target.
+- Local rewrites outside `BaseDdlOptimizer` are allowed when they need adapter
+  state or SDK-specific load/create loops, but they must have representative
+  runtime tests and a governance rule.
+- `compat_lint CLEAN` means no source-detected CREATE TABLE rewrite is
+  unregistered or uninspectable. It does not mean every DDL rewrite is routed
+  through `BaseDdlOptimizer`, nor does it prove semantic equivalence of the
+  rewrite output.
 
 ## Phase.DDL_OPTIMIZE — adding a new platform
 
@@ -63,7 +78,9 @@ compat_lint       →  verifies every regex/DDL-text branch in adapter code
    )
    ```
 
-2. **Implement** the method in your adapter (inherit `BaseDdlOptimizer`):
+2. **Implement** the method in your adapter. Prefer `BaseDdlOptimizer` for new
+   platforms when the transform can be expressed as ordered statement-to-
+   statement functions:
 
    ```python
    from typing import ClassVar
@@ -80,10 +97,14 @@ compat_lint       →  verifies every regex/DDL-text branch in adapter code
        # automatically in registration order — no manual wiring needed.
    ```
 
+   If the adapter must keep a local create/load path instead, set
+   `governance_only=True` on the payload and name the local method in the rule
+   docstring/reason.
+
 3. **Confirm** `compat_lint` runs clean:
 
    ```bash
-   uv run -- python -m benchbox.sql_compat.inventory --platform myplatform
+   uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift
    ```
 
 ## BaseDdlOptimizer — automatic dispatch
@@ -130,6 +151,18 @@ of rules.
 
 ## compat_lint enforcement
 
-`benchbox/sql_compat/inventory.py` walks platform source files and flags every
-dialect branch or DDL regex that lacks a matching registry rule.  Add the
-`--check-ddl-drift` flag to fail CI on any unregistered transform.
+`benchbox/sql_compat/inventory.py` walks platform source files and flags DDL
+rewrite behavior that lacks a matching registry rule. The drift check reports
+detected behavior in five buckets:
+
+| Status | Meaning |
+|---|---|
+| `registered_runtime_behavior` | A registered `DDL_OPTIMIZE` rule dispatches at runtime through `BaseDdlOptimizer`. |
+| `registered_governance_only_intent` | The adapter performs the rewrite locally and the registry rule documents/enforces that intent. |
+| `explicit_exemption` | The local rewrite is intentionally outside the registry and carries an exemption rationale. |
+| `unregistered_detected_behavior` | Source inspection found CREATE TABLE rewrite behavior with no rule or exemption; CI fails. |
+| `unknown_uninspectable_behavior` | Source inspection could not safely inspect a platform file; CI fails rather than claiming clean. |
+
+`make compat-docs-check` runs the generated compatibility-doc drift check and
+`uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift`, and the
+PR workflow runs that target in the code lint job.

@@ -13,12 +13,12 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q3_expression_impl as _q3_expr_base,
     q3_pandas_impl as _q3_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SORT, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -54,7 +54,7 @@ def q3_v2_expression_impl(ctx: DataFrameContext) -> Any:
     filtered_orders = orders.filter(col("o_orderdate") < lit(order_date))
     filtered_lineitem = lineitem.filter(col("l_shipdate") > lit(order_date))
 
-    result = (
+    return (
         filtered_customer.join(filtered_orders, left_on="c_custkey", right_on="o_custkey")
         .join(filtered_lineitem, left_on="o_orderkey", right_on="l_orderkey")
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
@@ -62,7 +62,6 @@ def q3_v2_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -106,7 +105,7 @@ def q3_v3_expression_impl(ctx: DataFrameContext) -> Any:
     segment = params["segment"]
     order_date = params["order_date"]
 
-    result = (
+    return (
         customer.select("c_custkey", "c_mktsegment")
         .filter(col("c_mktsegment") == lit(segment))
         .join(
@@ -126,7 +125,6 @@ def q3_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -186,8 +184,7 @@ def q3_v4_expression_impl(ctx: DataFrameContext) -> Any:
         (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue")
     )
     # Step 5: sort and limit
-    result = aggregated.sort(["revenue", "o_orderdate"], descending=[True, False]).limit(10)
-    return result
+    return aggregated.sort(["revenue", "o_orderdate"], descending=[True, False]).limit(10)
 
 
 def q3_v4_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -227,7 +224,7 @@ def q3_v5_expression_impl(ctx: DataFrameContext) -> Any:
     segment = params["segment"]
     order_date = params["order_date"]
 
-    result = (
+    return (
         customer.filter(col("c_mktsegment") == lit(segment))
         .join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter(col("o_orderdate") < lit(order_date))
@@ -239,7 +236,6 @@ def q3_v5_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -312,7 +308,7 @@ def q3_v7_expression_impl(ctx: DataFrameContext) -> Any:
     orders_lineitem = orders.filter(col("o_orderdate") < lit(order_date)).join(
         lineitem.filter(col("l_shipdate") > lit(order_date)), left_on="o_orderkey", right_on="l_orderkey"
     )
-    result = (
+    return (
         customer.filter(col("c_mktsegment") == lit(segment))
         .join(orders_lineitem, left_on="c_custkey", right_on="o_custkey")
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
@@ -320,7 +316,6 @@ def q3_v7_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -366,7 +361,7 @@ def q3_v8_expression_impl(ctx: DataFrameContext) -> Any:
     segment = params["segment"]
     order_date = params["order_date"]
 
-    result = (
+    return (
         customer.filter(col("c_mktsegment") == lit(segment))
         .join(orders, left_on="c_custkey", right_on="o_custkey")
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
@@ -377,7 +372,6 @@ def q3_v8_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v8_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -410,28 +404,7 @@ def q3_v8_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q3_v9_expression_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(3)
-    segment = params["segment"]
-    order_date = params["order_date"]
-
-    result = (
-        customer.filter(col("c_mktsegment") == lit(segment))
-        .join(orders, left_on="c_custkey", right_on="o_custkey")
-        .filter(col("o_orderdate") < lit(order_date))
-        .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-        .filter(col("l_shipdate") > lit(order_date))
-        .group_by("o_orderkey", "o_orderdate", "o_shippriority")
-        .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
-        .sort(["revenue", "o_orderdate"], descending=[True, False])
-        .limit(10)
-    )
-    return result
+    return _q3_expr_base(ctx)
 
 
 def q3_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -476,7 +449,7 @@ def q3_v10_expression_impl(ctx: DataFrameContext) -> Any:
 
     revenue_alt = col("l_extendedprice") - col("l_extendedprice") * col("l_discount")
 
-    result = (
+    return (
         customer.filter(col("c_mktsegment") == lit(segment))
         .join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter(col("o_orderdate") < lit(order_date))
@@ -487,7 +460,6 @@ def q3_v10_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v10_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -519,40 +491,4 @@ def q3_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q3_v1_expression_impl, q3_v1_pandas_impl),
-    (q3_v2_expression_impl, q3_v2_pandas_impl),
-    (q3_v3_expression_impl, q3_v3_pandas_impl),
-    (q3_v4_expression_impl, q3_v4_pandas_impl),
-    (q3_v5_expression_impl, q3_v5_pandas_impl),
-    (q3_v6_expression_impl, q3_v6_pandas_impl),
-    (q3_v7_expression_impl, q3_v7_pandas_impl),
-    (q3_v8_expression_impl, q3_v8_pandas_impl),
-    (q3_v9_expression_impl, q3_v9_pandas_impl),
-    (q3_v10_expression_impl, q3_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q3 implementation",
-    "Pre-filter: filter customer, orders, lineitem before joining",
-    "Column prune: select only needed columns from each table",
-    "Intermediate vars: named DataFrames for each join and filter step",
-    "Pre-compute derived: add revenue column before groupby",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Join reorder: start from orders→lineitem, then join customer",
-    "Filter combination: combine order_date and shipdate predicates after all joins",
-    "Explicit sort: descending=[True, False] explicitly specified",
-    "Alternative formula: price - price*disc instead of price*(1-disc)",
-]
-
-Q3_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q3v{v}",
-        query_name=f"TPC-H Q3 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SORT],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q3_VARIANTS = build_yaml_variants(__file__, globals(), 3, JOIN_AGG_SORT)

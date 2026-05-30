@@ -137,7 +137,7 @@ Submissions that don't meet these criteria may be asked for revisions:
 2. **No synthetic data** - results must come from actual benchmark execution
 3. **Reasonable timings** - query durations should be plausible for the platform and scale factor
 4. **Valid metadata** - benchmark ID, platform name, and scale factor must match known values
-5. **Schema v2 format** - bundle's top-level `version` field must be the current schema version (currently `"2.1"`). To check your bundle: `uv run -- python -c "import json; print(json.load(open('bundle.json'))['version'])"`
+5. **Schema v2 format** - BenchBox currently writes top-level `version` `"2.1"`. Public submission validation accepts numeric `2.x` versions for forward-compatible schema-v2 bundles, but rejects missing or malformed values. To check your bundle: `uv run -- python -c "import json; print(json.load(open('bundle.json'))['version'])"`
 
 ## Running Validation Locally
 
@@ -161,6 +161,9 @@ checked automatically:
 ```bash
 pre-commit install
 ```
+
+If this clone installed hooks before BenchBox added its pre-push timing-policy
+stage, re-run `pre-commit install` once so the pre-push hook is installed too.
 
 ## Questions?
 

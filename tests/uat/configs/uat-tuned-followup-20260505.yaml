@@ -5,7 +5,6 @@ description: "Tuned multi-scale local UAT sweep for BenchBox submissions"
 
 phases:
   - preflight
-  - enumerate
   - execute
   - validate
   - package

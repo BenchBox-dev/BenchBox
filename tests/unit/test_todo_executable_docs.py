@@ -15,9 +15,6 @@ pytestmark = [
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-if not (REPO_ROOT / "_project").exists():
-    pytest.skip("TODO executable documentation checks require _project/", allow_module_level=True)
-
 
 def _load_yaml(path: Path) -> dict[str, Any]:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -52,6 +49,18 @@ def test_completed_codex_followup_validates_current_done_path() -> None:
 
     assert "_project/DONE/main/active/codex-pr-review-followups-week-2026-05-01.yaml" in text
     assert "_project/TODO/main/active/codex-pr-review-followups-week-2026-05-01.yaml" not in text
+
+
+def test_uat_methodology_note_points_to_completed_followup_record() -> None:
+    path = REPO_ROOT / "_project" / "specs" / "uat-methodology-blind-spot-remediation.md"
+    text = path.read_text(encoding="utf-8")
+
+    done_path = "_project/DONE/main/active/uat-framework-review-followups.yaml"
+    stale_todo_path = "_project/TODO/main/active/uat-framework-review-followups.yaml"
+
+    assert done_path in text
+    assert stale_todo_path not in text
+    assert (REPO_ROOT / done_path).exists()
 
 
 def test_step_3_ruleset_verification_resolves_develop_ruleset_dynamically() -> None:

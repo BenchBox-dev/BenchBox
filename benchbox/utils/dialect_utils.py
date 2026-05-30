@@ -5,7 +5,140 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import re
+from collections import Counter
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import asdict, dataclass
 from typing import Callable
+
+
+@dataclass(frozen=True)
+class SqlTranslationOutcome:
+    """Structured outcome for one SQL translation attempt."""
+
+    source_dialect: str
+    target_dialect: str
+    translator: str
+    status: str
+    strict_mode: bool
+    normalized_source_dialect: str | None = None
+    normalized_target_dialect: str | None = None
+    warning_category: str | None = None
+    error_category: str | None = None
+    message: str | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a compact JSON-ready representation."""
+        return {key: value for key, value in asdict(self).items() if value is not None}
+
+
+class SQLTranslationError(RuntimeError):
+    """Raised when strict SQL translation cannot produce target-dialect SQL."""
+
+    def __init__(self, message: str, outcome: SqlTranslationOutcome):
+        super().__init__(message)
+        self.outcome = outcome
+
+
+_SQL_TRANSLATION_STRICT: ContextVar[bool] = ContextVar("benchbox_sql_translation_strict", default=False)
+_SQL_TRANSLATION_OUTCOMES: ContextVar[list[SqlTranslationOutcome] | None] = ContextVar(
+    "benchbox_sql_translation_outcomes",
+    default=None,
+)
+
+
+@contextmanager
+def sql_translation_context(strict: bool = False) -> Iterator[list[SqlTranslationOutcome]]:
+    """Collect SQL translation outcomes and optionally make fallback fatal."""
+    outcomes: list[SqlTranslationOutcome] = []
+    strict_token = _SQL_TRANSLATION_STRICT.set(strict)
+    outcomes_token = _SQL_TRANSLATION_OUTCOMES.set(outcomes)
+    try:
+        yield outcomes
+    finally:
+        _SQL_TRANSLATION_OUTCOMES.reset(outcomes_token)
+        _SQL_TRANSLATION_STRICT.reset(strict_token)
+
+
+def current_sql_translation_strict_mode() -> bool:
+    """Return whether the active translation context is strict."""
+    return _SQL_TRANSLATION_STRICT.get()
+
+
+def record_sql_translation_outcome(outcome: SqlTranslationOutcome) -> None:
+    """Record a translation outcome when a collection context is active."""
+    outcomes = _SQL_TRANSLATION_OUTCOMES.get()
+    if outcomes is not None:
+        outcomes.append(outcome)
+
+
+def summarize_sql_translation_outcomes(
+    outcomes: Sequence[SqlTranslationOutcome],
+    *,
+    strict_mode: bool | None = None,
+) -> dict[str, object] | None:
+    """Summarize translation outcomes for result-bundle execution metadata."""
+    if not outcomes:
+        return None
+
+    counts = Counter(outcome.status for outcome in outcomes)
+    if counts.get("failed"):
+        status = "failed"
+    elif counts.get("fallback"):
+        status = "fallback"
+    else:
+        status = "success"
+
+    grouped: dict[tuple[object, ...], dict[str, object]] = {}
+    for outcome in outcomes:
+        key = (
+            outcome.source_dialect,
+            outcome.target_dialect,
+            outcome.normalized_source_dialect,
+            outcome.normalized_target_dialect,
+            outcome.translator,
+            outcome.status,
+            outcome.warning_category,
+            outcome.error_category,
+            outcome.strict_mode,
+        )
+        entry = grouped.get(key)
+        if entry is None:
+            entry = outcome.to_dict()
+            entry["count"] = 0
+            grouped[key] = entry
+        entry["count"] = int(entry["count"]) + 1
+
+    warning_categories = sorted({outcome.warning_category for outcome in outcomes if outcome.warning_category})
+    error_categories = sorted({outcome.error_category for outcome in outcomes if outcome.error_category})
+
+    summary: dict[str, object] = {
+        "status": status,
+        "strict_mode": bool(strict_mode) if strict_mode is not None else any(o.strict_mode for o in outcomes),
+        "attempt_count": len(outcomes),
+        "success_count": counts.get("success", 0),
+        "fallback_count": counts.get("fallback", 0),
+        "failed_count": counts.get("failed", 0),
+        "translators": sorted({outcome.translator for outcome in outcomes if outcome.translator}),
+        "source_dialects": sorted({outcome.source_dialect for outcome in outcomes if outcome.source_dialect}),
+        "target_dialects": sorted({outcome.target_dialect for outcome in outcomes if outcome.target_dialect}),
+        "outcomes": sorted(
+            grouped.values(),
+            key=lambda item: (
+                str(item.get("status", "")),
+                str(item.get("source_dialect", "")),
+                str(item.get("target_dialect", "")),
+                str(item.get("warning_category", "")),
+                str(item.get("error_category", "")),
+            ),
+        ),
+    }
+    if warning_categories:
+        summary["warning_categories"] = warning_categories
+    if error_categories:
+        summary["error_categories"] = error_categories
+    return summary
 
 
 def _query_has_group_or_order_by_all(query: str) -> bool:
@@ -112,6 +245,7 @@ def translate_sql_query(
     identify: bool = True,
     pre_processors: list[Callable[[str], str]] | None = None,
     post_processors: list[Callable[[str], str]] | None = None,
+    strict: bool | None = None,
 ) -> str:
     """Translate SQL query from source dialect to target dialect using SQLGlot.
 
@@ -130,6 +264,9 @@ def translate_sql_query(
         identify: Whether to quote identifiers to prevent reserved keyword conflicts (default: True)
         pre_processors: Optional list of functions to pre-process query before translation
         post_processors: Optional list of functions to post-process query after translation
+        strict: When True, raise SQLTranslationError instead of returning the
+            original query on translator import or translation failure. When
+            omitted, the active sql_translation_context policy is used.
 
     Returns:
         Translated SQL query text. Returns original query if translation fails.
@@ -149,10 +286,24 @@ def translate_sql_query(
     import logging
 
     logger = logging.getLogger(__name__)
+    strict_mode = current_sql_translation_strict_mode() if strict is None else strict
 
     try:
         import sqlglot
     except ImportError:
+        outcome = SqlTranslationOutcome(
+            source_dialect=source_dialect,
+            target_dialect=target_dialect,
+            translator="sqlglot",
+            status="failed" if strict_mode else "fallback",
+            strict_mode=strict_mode,
+            warning_category=None if strict_mode else "translator_unavailable",
+            error_category="translator_unavailable" if strict_mode else None,
+            message="SQLGlot not available",
+        )
+        record_sql_translation_outcome(outcome)
+        if strict_mode:
+            raise SQLTranslationError("SQLGlot not available for strict SQL translation", outcome) from None
         logger.warning("SQLGlot not available, returning original query")
         return query
 
@@ -188,9 +339,38 @@ def translate_sql_query(
             for post_proc in post_processors:
                 translated = post_proc(translated)
 
+        record_sql_translation_outcome(
+            SqlTranslationOutcome(
+                source_dialect=source_dialect,
+                target_dialect=target_dialect,
+                normalized_source_dialect=src,
+                normalized_target_dialect=tgt,
+                translator="sqlglot",
+                status="success",
+                strict_mode=strict_mode,
+            )
+        )
         return translated
 
     except Exception as e:
+        outcome = SqlTranslationOutcome(
+            source_dialect=source_dialect,
+            target_dialect=target_dialect,
+            normalized_source_dialect=normalize_dialect_for_sqlglot(source_dialect.lower()),
+            normalized_target_dialect=normalize_dialect_for_sqlglot(target_dialect.lower()),
+            translator="sqlglot",
+            status="failed" if strict_mode else "fallback",
+            strict_mode=strict_mode,
+            warning_category=None if strict_mode else "translation_failed",
+            error_category="translation_failed" if strict_mode else None,
+            message=str(e),
+        )
+        record_sql_translation_outcome(outcome)
+        if strict_mode:
+            raise SQLTranslationError(
+                f"SQLGlot translation failed from {source_dialect} to {target_dialect}: {e}",
+                outcome,
+            ) from e
         logger.warning(
             f"SQLGlot translation failed from {source_dialect} to {target_dialect}: {e}. Returning original query."
         )

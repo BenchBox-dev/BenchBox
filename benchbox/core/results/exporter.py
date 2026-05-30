@@ -46,12 +46,11 @@ from benchbox.core.results.schema import (
     build_result_payload,
     build_tuning_payload,
 )
+from benchbox.core.results.schema_policy import is_loader_supported_result_schema
 from benchbox.core.runtime_paths import resolve_results_dir
 from benchbox.utils.cloud_storage import create_path_handler, is_cloud_path
 
 logger = logging.getLogger(__name__)
-
-SIGNIFICANT_IMPROVEMENT_ASSESSMENT = "significant_improvement"
 
 ResultLike = BenchmarkResults
 QueryResultLike = "QueryResult | dict[str, Any]"
@@ -113,7 +112,7 @@ class ResultExporter:
         elif self.is_cloud_output and hasattr(file_path, "write_bytes"):
             file_path.write_bytes(content.encode("utf-8"))
         else:
-            with open(file_path, mode, encoding="utf-8", newline="\n") as handle:
+            with open(file_path, mode, encoding="utf-8") as handle:
                 handle.write(content)
 
     def _create_file_path(self, filename: str):
@@ -543,7 +542,7 @@ class ResultExporter:
                     data = json.load(handle)
 
                 version = data.get("version")
-                if version not in ("2.0", "2.1"):
+                if not is_loader_supported_result_schema(data):
                     continue
 
                 # Schema v2.x format
@@ -758,7 +757,7 @@ class ResultExporter:
         avg_change = sum(time_changes) / len(time_changes)
 
         if avg_change < -10:
-            return SIGNIFICANT_IMPROVEMENT_ASSESSMENT
+            return "significant_improvement"
         if avg_change < -5:
             return "improvement"
         if avg_change > 10:

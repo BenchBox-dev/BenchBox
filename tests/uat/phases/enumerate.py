@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable
 
 from tests.uat.compatibility import CompatibilityRule, compatibility_rule_for
+from tests.uat.config import UATConfig
 from tests.uat.matrix import (
     BenchmarkInfo,
     filter_scales_by_registry,
@@ -44,11 +44,11 @@ class EnumerationResult:
 
 
 def enumerate_cells(
-    raw: dict[str, Any],
+    config: UATConfig,
     *,
     benchmarks: dict[str, BenchmarkInfo] | None = None,
 ) -> list[Cell]:
-    """Build the cell list from a validated config's `raw:` payload.
+    """Build the cell list from a validated config.
 
     - Resolves platforms via groups/include/exclude.
     - Resolves benchmarks via groups/include/exclude.
@@ -57,52 +57,46 @@ def enumerate_cells(
       the registry's `scale_options`.
     - Honours `scales.override` (single scale per cell) over `scales.rungs`.
     """
-    return list(enumerate_cells_with_pruning(raw, benchmarks=benchmarks).cells)
+    return list(enumerate_cells_with_pruning(config, benchmarks=benchmarks).cells)
 
 
 def enumerate_cells_with_pruning(
-    raw: dict[str, Any],
+    config: UATConfig,
     *,
     benchmarks: dict[str, BenchmarkInfo] | None = None,
 ) -> EnumerationResult:
     """Build executable cells plus compatibility-pruned accounting rows."""
     benchmarks = benchmarks if benchmarks is not None else load_benchmarks()
-    platforms_cfg = raw.get("platforms") or {}
-    benchmarks_cfg = raw.get("benchmarks") or {}
-    scales_cfg = raw.get("scales") or {}
 
     # Default groups apply only when neither `groups` nor `include` is set.
     # Otherwise an explicit `include` would otherwise be unioned with the
     # default group, producing too-large matrices.
-    platform_groups_default = ["sql"] if "include" not in platforms_cfg else []
-    benchmark_groups_default = ["all"] if "include" not in benchmarks_cfg else []
+    platform_groups_default = ("sql",) if config.platforms.uses_implicit_group_default else ()
+    benchmark_groups_default = ("all",) if config.benchmarks.uses_implicit_group_default else ()
     platform_list = resolve_platforms(
-        groups=_as_list(platforms_cfg.get("groups", platform_groups_default)),
-        include=_as_list(platforms_cfg.get("include", [])),
-        exclude=_as_list(platforms_cfg.get("exclude", [])),
+        groups=config.platforms.groups if config.platforms.groups is not None else platform_groups_default,
+        include=config.platforms.include,
+        exclude=config.platforms.exclude,
     )
     benchmark_list = resolve_benchmarks(
-        groups=_as_list(benchmarks_cfg.get("groups", benchmark_groups_default)),
-        include=_as_list(benchmarks_cfg.get("include", [])),
-        exclude=_as_list(benchmarks_cfg.get("exclude", [])),
+        groups=config.benchmarks.groups if config.benchmarks.groups is not None else benchmark_groups_default,
+        include=config.benchmarks.include,
+        exclude=config.benchmarks.exclude,
         benchmarks=benchmarks,
     )
 
-    override = scales_cfg.get("override")
-    rungs = _as_list(scales_cfg.get("rungs", [0.01]))
-
     cells: list[Cell] = []
     compatibility_pruned: list[CompatibilityPrunedCell] = []
-    include_release_gate_runtime_envelopes = _release_gate_runtime_envelopes_enabled(raw)
+    include_release_gate_runtime_envelopes = config.compatibility.release_gate_runtime_envelopes
     for platform in platform_list:
         for benchmark in benchmark_list:
             info = benchmarks.get(benchmark)
             if info is None:
                 continue
-            if override is not None:
-                requested = [float(override)]
+            if config.scales.override is not None:
+                requested = [config.scales.override]
             else:
-                requested = [float(r) for r in rungs]
+                requested = list(config.scales.rungs)
             rule = compatibility_rule_for(
                 platform,
                 benchmark,
@@ -115,7 +109,7 @@ def enumerate_cells_with_pruning(
                 )
                 continue
             filtered = filter_scales_by_registry(benchmark, requested, info=info)
-            if not filtered and override is None and info.min_scale is not None:
+            if not filtered and config.scales.override is None and info.min_scale is not None:
                 filtered = [info.min_scale]
             for scale in filtered:
                 cells.append(Cell(platform=platform, benchmark=benchmark, scale=scale))
@@ -141,18 +135,3 @@ def _pruned_rows_for_rule(
         )
         for scale in requested
     ]
-
-
-def _as_list(value: Iterable | None) -> list:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        return [value]
-    return list(value)
-
-
-def _release_gate_runtime_envelopes_enabled(raw: dict[str, Any]) -> bool:
-    compatibility_cfg = raw.get("compatibility") or {}
-    if not isinstance(compatibility_cfg, dict):
-        return False
-    return compatibility_cfg.get("release_gate_runtime_envelopes") is True

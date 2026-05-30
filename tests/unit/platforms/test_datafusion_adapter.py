@@ -212,6 +212,27 @@ class TestDataFusionAdapter:
             assert len(table_schemas["customer"]["columns"]) == 2
             assert table_schemas["customer"]["columns"][0]["name"] == "id"
 
+    def test_get_benchmark_schema_accepts_column_mapping(self):
+        """Dict-of-columns schemas are normalized for CSV-to-Parquet loading."""
+        with patch("benchbox.platforms.datafusion.SessionContext"), tempfile.TemporaryDirectory() as tmpdir:
+            adapter = DataFusionAdapter(working_dir=tmpdir)
+            mock_benchmark = Mock()
+            mock_benchmark.get_schema.return_value = {
+                "trips": {
+                    "columns": {
+                        "pickup_datetime": {"type": "TIMESTAMP"},
+                        "total_amount": {"type": "DOUBLE"},
+                    }
+                }
+            }
+
+            table_schemas = adapter._get_benchmark_schema(mock_benchmark)
+
+            assert table_schemas["trips"]["columns"] == [
+                {"name": "pickup_datetime", "type": "TIMESTAMP"},
+                {"name": "total_amount", "type": "DOUBLE"},
+            ]
+
     def test_get_benchmark_schema_fallback(self):
         """Test fallback when benchmark doesn't have get_schema()."""
         with patch("benchbox.platforms.datafusion.SessionContext"), tempfile.TemporaryDirectory() as tmpdir:

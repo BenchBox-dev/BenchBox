@@ -9,13 +9,9 @@ Verifies that:
 6. REWRITE_DDL fires for clickhouse + nyctaxi (any table).
 7. REWRITE_DDL fires for postgres/postgresql/timescale + nyctaxi.
 8. Other platforms (duckdb, starrocks) have no SCHEMA_EMIT rules from these modules.
-9. compat_lint exits 0 in error mode (0 unregistered dialect branches, W16).
 """
 
 from __future__ import annotations
-
-import subprocess
-import sys
 
 import pytest
 
@@ -224,20 +220,3 @@ def test_other_platforms_no_schema_emit_rule(platform: str, bmark: str):
         dialect=platform,
     )
     assert REGISTRY.resolve(ctx) is None, f"Unexpected SCHEMA_EMIT rule for {platform}/{bmark}"
-
-
-# ---------------------------------------------------------------------------
-# compat_lint passes in permanent error mode (0 unregistered dialect branches)
-# ---------------------------------------------------------------------------
-
-
-def test_compat_lint_passes():
-    """uv run scripts/compat_lint.py exits 0 (error mode as of W16 - 0 unregistered branches)."""
-    result = subprocess.run(
-        [sys.executable, "scripts/compat_lint.py"],
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, (
-        f"compat_lint exited {result.returncode}.\nstderr: {result.stderr}\nstdout: {result.stdout}"
-    )

@@ -3,7 +3,6 @@ description: "Tiny UAT sweep that should time out one local DuckDB TPC-H cell"
 
 phases:
   - preflight
-  - enumerate
   - execute
   - report
 

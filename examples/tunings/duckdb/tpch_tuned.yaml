@@ -45,6 +45,12 @@ table_tunings:
     - name: L_LINENUMBER
       type: INTEGER
       order: 2
+    - name: L_PARTKEY
+      type: INTEGER
+      order: 3
+    - name: L_SUPPKEY
+      type: INTEGER
+      order: 4
 
   ORDERS:
     table_name: ORDERS
@@ -56,6 +62,9 @@ table_tunings:
     - name: O_ORDERKEY
       type: INTEGER
       order: 1
+    - name: O_CUSTKEY
+      type: INTEGER
+      order: 2
 
   PART:
     table_name: PART
@@ -63,6 +72,12 @@ table_tunings:
     - name: P_PARTKEY
       type: INTEGER
       order: 1
+    - name: P_TYPE
+      type: VARCHAR
+      order: 2
+    - name: P_SIZE
+      type: INTEGER
+      order: 3
 
   SUPPLIER:
     table_name: SUPPLIER
@@ -70,6 +85,9 @@ table_tunings:
     - name: S_SUPPKEY
       type: INTEGER
       order: 1
+    - name: S_NATIONKEY
+      type: INTEGER
+      order: 2
 
   CUSTOMER:
     table_name: CUSTOMER
@@ -77,6 +95,9 @@ table_tunings:
     - name: C_CUSTKEY
       type: INTEGER
       order: 1
+    - name: C_NATIONKEY
+      type: INTEGER
+      order: 2
 
   PARTSUPP:
     table_name: PARTSUPP

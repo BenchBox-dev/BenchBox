@@ -14,12 +14,13 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q14_expression_impl as _q14_expr_base,
     q14_pandas_impl as _q14_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
@@ -166,7 +167,7 @@ def q14_v4_expression_impl(ctx: DataFrameContext) -> Any:
     # Step 2: join with part
     step2 = step1.join(part, left_on="l_partkey", right_on="p_partkey")
     # Step 3: calculate promo revenue
-    result = step2.select(
+    return step2.select(
         (
             lit(100.0)
             * (col("l_extendedprice") * (lit(1) - col("l_discount")))
@@ -175,33 +176,9 @@ def q14_v4_expression_impl(ctx: DataFrameContext) -> Any:
             / (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum()
         ).alias("promo_revenue")
     )
-    return result
 
 
-def q14_v4_pandas_impl(ctx: DataFrameContext) -> Any:
-    import pandas as pd
-
-    lineitem = ctx.get_table("lineitem")
-    part = ctx.get_table("part")
-
-    params = get_tpch_parameters(14)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    # Step 1: filter
-    filtered = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)]
-    # Step 2: join
-    joined = filtered.merge(part, left_on="l_partkey", right_on="p_partkey").copy()
-    # Step 3: derive columns
-    joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
-    joined["promo_revenue"] = joined["revenue"] * joined["p_type"].str.startswith("PROMO").astype(float)
-    # Step 4: compute scalars
-    total_val = joined["revenue"].sum()
-    promo_val = joined["promo_revenue"].sum()
-    total_val = total_val.compute() if hasattr(total_val, "compute") else total_val
-    promo_val = promo_val.compute() if hasattr(promo_val, "compute") else promo_val
-    promo_percent = 100.0 * promo_val / total_val if total_val > 0 else 0
-    return pd.DataFrame({"promo_revenue": [promo_percent]})
+q14_v4_pandas_impl = make_variant_delegate(q14_v2_pandas_impl, name="q14_v4_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -543,40 +520,4 @@ def q14_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q14_v1_expression_impl, q14_v1_pandas_impl),
-    (q14_v2_expression_impl, q14_v2_pandas_impl),
-    (q14_v3_expression_impl, q14_v3_pandas_impl),
-    (q14_v4_expression_impl, q14_v4_pandas_impl),
-    (q14_v5_expression_impl, q14_v5_pandas_impl),
-    (q14_v6_expression_impl, q14_v6_pandas_impl),
-    (q14_v7_expression_impl, q14_v7_pandas_impl),
-    (q14_v8_expression_impl, q14_v8_pandas_impl),
-    (q14_v9_expression_impl, q14_v9_pandas_impl),
-    (q14_v10_expression_impl, q14_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q14 implementation",
-    "Pre-filter: filter lineitem by date before joining part",
-    "Column prune: select only needed columns before joining",
-    "Intermediate vars: explicit DataFrames for filter, join, compute steps",
-    "Pre-compute derived: add revenue and is_promo columns before final select",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Join reorder: start from part, join lineitem (reversed join direction)",
-    "Filter combination: separate promo and non-promo parts for dual totals",
-    "Explicit sort: end_date predicate checked first (different predicate ordering)",
-    "Alternative formula: price - price*disc instead of price*(1-disc)",
-]
-
-Q14_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q14v{v}",
-        query_name=f"TPC-H Q14 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q14_VARIANTS = build_yaml_variants(__file__, globals(), 14, JOIN_AGG_FILTER)

@@ -12,10 +12,18 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from typing import Callable
+
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRegistry
 
 # TPC-DS DataFrame Query Registry
 TPCDS_DATAFRAME_QUERIES = QueryRegistry("tpcds")
+
+
+def configure_query_loader(loader: Callable[[], Iterable[DataFrameQuery]]) -> None:
+    """Configure the lazy loader for generated TPC-DS query metadata."""
+    TPCDS_DATAFRAME_QUERIES.set_loader(loader)
 
 
 def get_tpcds_query(query_id: str) -> DataFrameQuery | None:

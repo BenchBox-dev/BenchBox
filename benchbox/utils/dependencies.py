@@ -11,8 +11,11 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import sys
 from collections.abc import Sequence
 from functools import lru_cache
+from importlib import resources
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
+
+import yaml
 
 
 @lru_cache(maxsize=1)
@@ -49,54 +52,8 @@ def is_uv_tool_environment() -> bool:
     return "/uv/tools/" in normalized_executable
 
 
-# Map platform names to their pyproject.toml extra names
-PLATFORM_TO_EXTRA: dict[str, str] = {
-    # DataFrame platforms - plain-name extras (dataframe-* aliases also exist)
-    "polars": "polars",
-    "polars-df": "polars",
-    "modin": "modin",
-    "modin-df": "modin",
-    "dask": "dask",
-    "dask-df": "dask",
-    "pandas": "pandas",
-    "pandas-df": "pandas",
-    "cudf": "cudf",
-    "cudf-df": "cudf",
-    "pyspark": "pyspark",
-    "pyspark-df": "pyspark",
-    "spark": "spark",
-    "lakesail": "lakesail",
-    "velox": "velox",
-    "gluten-velox": "velox",
-    "datafusion": "datafusion",
-    "datafusion-df": "datafusion",
-    # Cloud/SQL platforms
-    "athena": "athena",
-    "bigquery": "bigquery",
-    "snowflake": "snowflake",
-    "databricks": "databricks",
-    "databricks-connect": "databricks-connect",
-    "redshift": "redshift",
-    "synapse": "synapse",
-    "fabric": "fabric",
-    "fabric-lakehouse": "fabric",
-    "fabric_lakehouse": "fabric",
-    "fabric-spark": "fabric-spark",
-    "trino": "trino",
-    "presto": "presto",
-    "clickhouse": "clickhouse",
-    "clickhouse-local": "clickhouse-local",
-    "clickhouse-server": "clickhouse-server",
-    "clickhouse-cloud": "clickhouse-cloud",
-    "firebolt": "firebolt",
-    "databend": "databend",
-    "influxdb": "influxdb",
-    "doris": "doris",
-    "singlestore": "singlestore",
-    "postgresql": "postgresql",
-    "postgres": "postgresql",
-    "questdb": "questdb",
-}
+# Dependency catalog data is loaded after the lightweight value classes below.
+PLATFORM_TO_EXTRA: dict[str, str]
 
 
 def get_install_command(extra: str) -> str:
@@ -247,565 +204,51 @@ class InstallationScenario:
         return "pipx install benchbox"
 
 
-# Platform dependency information
-# DataFrame platform dependency information
+# Dependency catalog data is package metadata; Python keeps behavior and typed value objects.
+
+
+def _load_dependency_payload() -> dict[str, Any]:
+    with resources.files(__package__).joinpath("dependencies.yaml").open(encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise ValueError("dependencies.yaml must contain a mapping")
+    return payload
+
+
+def _dependency_info_from_payload(entry: dict[str, Any]) -> DependencyInfo:
+    return DependencyInfo(
+        name=str(entry["name"]),
+        description=str(entry["description"]),
+        packages=list(entry["packages"]),
+        install_command=str(entry["install_command"]),
+        use_cases=list(entry["use_cases"]),
+        platforms=list(entry["platforms"]),
+    )
+
+
+def _scenario_from_payload(entry: dict[str, Any]) -> InstallationScenario:
+    return InstallationScenario(
+        name=str(entry["name"]),
+        description=str(entry["description"]),
+        platforms=list(entry["platforms"]),
+        dependency_groups=list(entry["dependency_groups"]),
+        notes=str(entry.get("notes") or ""),
+    )
+
+
+_DEPENDENCY_PAYLOAD = _load_dependency_payload()
+PLATFORM_TO_EXTRA = dict(_DEPENDENCY_PAYLOAD["platform_to_extra"])
 DATAFRAME_DEPENDENCY_GROUPS: dict[str, DependencyInfo] = {
-    "pandas": DependencyInfo(
-        name="pandas",
-        description="Pandas DataFrame library for data analysis",
-        packages=["pandas"],
-        install_command="uv add benchbox --extra pandas",
-        use_cases=["Data analysis", "Data manipulation", "DataFrame benchmarking"],
-        platforms=["Pandas"],
-    ),
-    "modin": DependencyInfo(
-        name="modin",
-        description="Modin distributed Pandas replacement",
-        packages=["modin", "pandas"],
-        install_command="uv add benchbox --extra modin",
-        use_cases=["Distributed Pandas", "Large datasets", "Multi-core processing"],
-        platforms=["Modin (Ray backend)"],
-    ),
-    "dask": DependencyInfo(
-        name="dask",
-        description="Dask parallel computing library",
-        packages=["dask", "pandas"],
-        install_command="uv add benchbox --extra dask",
-        use_cases=["Parallel computing", "Out-of-core processing", "Large datasets"],
-        platforms=["Dask"],
-    ),
-    "pyspark": DependencyInfo(
-        name="pyspark",
-        description="Apache Spark Python interface",
-        packages=["pyspark"],
-        install_command="uv add benchbox --extra pyspark",
-        use_cases=["Distributed computing", "Big data processing", "Spark SQL"],
-        platforms=["Apache Spark (PySpark)"],
-    ),
-    "polars": DependencyInfo(
-        name="polars",
-        description="Polars high-performance DataFrame library",
-        packages=["polars"],
-        install_command="uv add benchbox --extra polars",
-        use_cases=["High-performance analytics", "Lazy evaluation", "Rust-powered DataFrame"],
-        platforms=["Polars"],
-    ),
-    "datafusion": DependencyInfo(
-        name="datafusion",
-        description="Apache DataFusion query engine",
-        packages=["datafusion"],
-        install_command="uv add benchbox --extra datafusion",
-        use_cases=["SQL on DataFrames", "Arrow-native processing", "Query optimization"],
-        platforms=["Apache DataFusion"],
-    ),
-    "dataframe-pandas-family": DependencyInfo(
-        name="dataframe-pandas-family",
-        description="All Pandas-family DataFrame platforms",
-        packages=["pandas", "modin", "dask"],
-        install_command="uv add benchbox --extra dataframe-pandas-family",
-        use_cases=["Pandas ecosystem benchmarking", "Pandas API comparison"],
-        platforms=["Pandas", "Modin", "Dask"],
-    ),
-    "dataframe-expression-family": DependencyInfo(
-        name="dataframe-expression-family",
-        description="All expression-based DataFrame platforms",
-        packages=["polars", "pyspark", "datafusion"],
-        install_command="uv add benchbox --extra dataframe-expression-family",
-        use_cases=["Expression API benchmarking", "Lazy evaluation comparison"],
-        platforms=["Polars", "PySpark", "DataFusion"],
-    ),
-    "dataframe-all": DependencyInfo(
-        name="dataframe-all",
-        description="All DataFrame platforms",
-        packages=["pandas", "modin", "dask", "polars", "pyspark", "datafusion"],
-        install_command="uv add benchbox --extra dataframe-all",
-        use_cases=["Complete DataFrame benchmarking", "Platform comparison"],
-        platforms=["Pandas", "Modin", "Dask", "Polars", "PySpark", "DataFusion"],
-    ),
+    name: _dependency_info_from_payload(entry)
+    for name, entry in _DEPENDENCY_PAYLOAD["dataframe_dependency_groups"].items()
 }
-
-# SQL platform dependency information
 DEPENDENCY_GROUPS: dict[str, DependencyInfo] = {
-    "clickhouse": DependencyInfo(
-        name="clickhouse",
-        description="ClickHouse server driver (clickhouse-driver TCP protocol)",
-        packages=["clickhouse-driver"],
-        install_command="uv add benchbox --extra clickhouse",
-        use_cases=["Columnar analytics", "High-performance aggregation", "Self-hosted ClickHouse"],
-        platforms=["ClickHouse Server (clickhouse-server)"],
-    ),
-    "clickhouse-local": DependencyInfo(
-        name="clickhouse-local",
-        description="Embedded ClickHouse via chDB (in-process, no server required)",
-        packages=["chdb"],
-        install_command="uv add benchbox --extra clickhouse-local",
-        use_cases=["Embedded ClickHouse", "Local analytics", "Zero-infrastructure benchmarking"],
-        platforms=["ClickHouse Local (clickhouse-local)"],
-    ),
-    "clickhouse-server": DependencyInfo(
-        name="clickhouse-server",
-        description="Self-hosted ClickHouse server driver (clickhouse-driver TCP protocol)",
-        packages=["clickhouse-driver"],
-        install_command="uv add benchbox --extra clickhouse-server",
-        use_cases=["Self-hosted ClickHouse", "Docker ClickHouse", "High-performance columnar analytics"],
-        platforms=["ClickHouse Server (clickhouse-server)"],
-    ),
-    "clickhouse-cloud": DependencyInfo(
-        name="clickhouse-cloud",
-        description="ClickHouse Cloud via HTTP connector (clickhouse-connect)",
-        packages=["clickhouse-connect"],
-        install_command="uv add benchbox --extra clickhouse-cloud",
-        use_cases=["Managed ClickHouse", "Serverless analytics", "Cloud OLAP"],
-        platforms=["ClickHouse Cloud (clickhouse-cloud)"],
-    ),
-    "databricks": DependencyInfo(
-        name="databricks",
-        description="Databricks SQL Warehouse connector with Unity Catalog",
-        packages=["databricks-sql-connector", "cloudpathlib"],
-        install_command="uv add benchbox --extra databricks",
-        use_cases=["Lakehouse analytics", "Delta Lake workloads", "Spark SQL"],
-        platforms=["Databricks SQL Warehouses", "Databricks Clusters"],
-    ),
-    "databricks-df": DependencyInfo(
-        name="databricks-df",
-        description="Databricks DataFrame mode with Databricks Connect",
-        packages=["databricks-sql-connector", "databricks-connect", "cloudpathlib"],
-        install_command="uv add benchbox --extra databricks-connect",
-        use_cases=["PySpark DataFrame API", "Interactive development", "DataFrame benchmarks"],
-        platforms=["Databricks Clusters (via Databricks Connect)"],
-    ),
-    "databricks-connect": DependencyInfo(
-        name="databricks-connect",
-        description="Databricks Connect for remote PySpark DataFrame execution",
-        packages=["databricks-sql-connector", "databricks-connect", "cloudpathlib"],
-        install_command="uv add benchbox --extra databricks-connect",
-        use_cases=["Remote Spark execution", "Local IDE development", "DataFrame API"],
-        platforms=["Databricks Clusters"],
-    ),
-    "cloud-spark": DependencyInfo(
-        name="cloud-spark",
-        description="All managed cloud Spark platforms with DataFrame support",
-        packages=["databricks-sql-connector", "databricks-connect", "cloudpathlib"],
-        install_command="uv add benchbox --extra cloud-spark",
-        use_cases=["Managed Spark platforms", "DataFrame benchmarks", "Cloud analytics"],
-        platforms=["Databricks", "EMR (future)", "Dataproc (future)", "Synapse Spark (future)"],
-    ),
-    "bigquery": DependencyInfo(
-        name="bigquery",
-        description="Google BigQuery and Cloud Storage integration",
-        packages=["google-cloud-bigquery", "google-cloud-storage", "cloudpathlib"],
-        install_command="uv add benchbox --extra bigquery",
-        use_cases=["Serverless analytics", "BigQuery datasets", "Google Cloud workflows"],
-        platforms=["Google BigQuery", "Google Cloud Storage"],
-    ),
-    "redshift": DependencyInfo(
-        name="redshift",
-        description="Amazon Redshift data warehouse connector",
-        packages=["redshift-connector", "boto3", "cloudpathlib"],
-        install_command="uv add benchbox --extra redshift",
-        use_cases=["Data warehouse analytics", "AWS analytics", "Redshift Spectrum"],
-        platforms=["Amazon Redshift", "Redshift Serverless"],
-    ),
-    "snowflake": DependencyInfo(
-        name="snowflake",
-        description="Snowflake cloud data platform connector",
-        packages=["snowflake-connector-python", "cloudpathlib"],
-        install_command="uv add benchbox --extra snowflake",
-        use_cases=["Cloud data warehouse", "Multi-cloud analytics", "Zero-maintenance DW"],
-        platforms=["Snowflake"],
-    ),
-    "trino": DependencyInfo(
-        name="trino",
-        description="Trino distributed SQL query engine connector (Trino only, not PrestoDB)",
-        packages=["trino", "cloudpathlib"],
-        install_command="uv add benchbox --extra trino",
-        use_cases=["Federated queries", "Data lake analytics", "Distributed SQL"],
-        platforms=["Trino", "Starburst Enterprise"],
-    ),
-    "presto": DependencyInfo(
-        name="presto",
-        description="PrestoDB distributed SQL query engine connector (Meta's Presto, not Trino)",
-        packages=["presto-python-client", "cloudpathlib"],
-        install_command="uv add benchbox --extra presto",
-        use_cases=["Federated queries", "Legacy PrestoDB clusters", "Distributed SQL"],
-        platforms=["PrestoDB"],
-    ),
-    "firebolt": DependencyInfo(
-        name="firebolt",
-        description="Firebolt vectorized analytics database (Core + Cloud)",
-        packages=["firebolt-sdk", "cloudpathlib"],
-        install_command="uv add benchbox --extra firebolt",
-        use_cases=["Vectorized analytics", "Cloud data warehouse", "Local development", "S3 staging"],
-        platforms=["Firebolt Core (local)", "Firebolt Cloud"],
-    ),
-    "databend": DependencyInfo(
-        name="databend",
-        description="Databend cloud-native OLAP data warehouse",
-        packages=["databend-driver"],
-        install_command="uv add benchbox --extra databend",
-        use_cases=["Cloud-native OLAP", "Snowflake-compatible analytics", "Object storage backend"],
-        platforms=["Databend Cloud", "Databend Self-Hosted"],
-    ),
-    "influxdb": DependencyInfo(
-        name="influxdb",
-        description="InfluxDB time series database with FlightSQL support",
-        packages=["influxdb3-python", "pyarrow"],
-        install_command="uv add benchbox --extra influxdb",
-        use_cases=["Time series analytics", "TSBS DevOps benchmarks", "FlightSQL queries"],
-        platforms=["InfluxDB Core (OSS)", "InfluxDB Cloud"],
-    ),
-    "starrocks": DependencyInfo(
-        name="starrocks",
-        description="StarRocks columnar analytics engine via MySQL protocol",
-        packages=["pymysql"],
-        install_command="uv add benchbox --extra starrocks",
-        use_cases=["Columnar analytics", "Fast OLAP queries", "Distributed MPP"],
-        platforms=["StarRocks"],
-    ),
-    "singlestore": DependencyInfo(
-        name="singlestore",
-        description="SingleStore distributed SQL database (Helios + self-managed)",
-        packages=["singlestoredb"],
-        install_command="uv add benchbox --extra singlestore",
-        use_cases=["Real-time analytics", "HTAP workloads", "Distributed OLAP", "MySQL-compatible analytics"],
-        platforms=["SingleStore Helios", "SingleStore Self-Managed"],
-    ),
-    "postgresql": DependencyInfo(
-        name="postgresql",
-        description="PostgreSQL open-source relational database connector",
-        packages=["psycopg"],
-        install_command="uv add benchbox --extra postgresql",
-        use_cases=["Row-store baseline", "OLTP benchmarks", "TimescaleDB time-series"],
-        platforms=["PostgreSQL", "TimescaleDB"],
-    ),
-    "questdb": DependencyInfo(
-        name="questdb",
-        description="QuestDB time-series database connector (via PostgreSQL wire protocol)",
-        packages=["psycopg", "requests"],
-        install_command="uv add benchbox --extra questdb",
-        use_cases=["Time-series analytics", "High-throughput ingestion", "Columnar OLAP"],
-        platforms=["QuestDB"],
-    ),
-    "synapse": DependencyInfo(
-        name="synapse",
-        description="Azure Synapse Analytics (Dedicated SQL Pool) connector",
-        packages=["pyodbc"],
-        install_command="uv add benchbox --extra synapse",
-        use_cases=["Cloud data warehouse", "Azure analytics", "Enterprise OLAP"],
-        platforms=["Azure Synapse Dedicated SQL Pool"],
-    ),
-    "fabric": DependencyInfo(
-        name="fabric",
-        description="Microsoft Fabric Data Warehouse connector with OneLake integration",
-        packages=["pyodbc", "azure-identity"],
-        install_command="uv add benchbox --extra fabric",
-        use_cases=["Cloud data warehouse", "Microsoft analytics", "OneLake storage", "Delta Lake"],
-        platforms=["Microsoft Fabric Warehouse"],
-    ),
-    "fabric-spark": DependencyInfo(
-        name="fabric-spark",
-        description="Microsoft Fabric Spark with Livy API and OneLake storage",
-        packages=["azure-identity", "azure-storage-file-datalake", "requests"],
-        install_command="uv add benchbox --extra fabric-spark",
-        use_cases=["SaaS Spark", "Microsoft analytics", "OneLake storage", "Livy API"],
-        platforms=["Microsoft Fabric Spark"],
-    ),
-    "synapse-spark": DependencyInfo(
-        name="synapse-spark",
-        description="Azure Synapse Spark with Livy API and ADLS Gen2 storage",
-        packages=["azure-identity", "azure-storage-file-datalake", "requests"],
-        install_command="uv add benchbox --extra synapse-spark",
-        use_cases=["Enterprise Spark", "Azure analytics", "ADLS Gen2 storage", "Livy API"],
-        platforms=["Azure Synapse Spark"],
-    ),
-    "athena": DependencyInfo(
-        name="athena",
-        description="AWS Athena serverless query-on-S3 connector",
-        packages=["pyathena", "boto3"],
-        install_command="uv add benchbox --extra athena",
-        use_cases=["Serverless analytics", "S3 data lake queries", "AWS analytics"],
-        platforms=["AWS Athena"],
-    ),
-    "glue": DependencyInfo(
-        name="glue",
-        description="AWS Glue managed Spark ETL service",
-        packages=["boto3"],
-        install_command="uv add benchbox --extra glue",
-        use_cases=["Serverless ETL", "Managed Spark", "AWS analytics", "Data pipeline"],
-        platforms=["AWS Glue"],
-    ),
-    "emr-serverless": DependencyInfo(
-        name="emr-serverless",
-        description="Amazon EMR Serverless managed Spark service",
-        packages=["boto3"],
-        install_command="uv add benchbox --extra emr-serverless",
-        use_cases=["Serverless Spark", "AWS analytics", "Auto-scaling", "Sub-second startup"],
-        platforms=["Amazon EMR Serverless"],
-    ),
-    "athena-spark": DependencyInfo(
-        name="athena-spark",
-        description="Amazon Athena for Apache Spark interactive sessions",
-        packages=["boto3"],
-        install_command="uv add benchbox --extra athena-spark",
-        use_cases=["Interactive Spark", "AWS analytics", "Session-based", "Sub-second startup"],
-        platforms=["Amazon Athena for Apache Spark"],
-    ),
-    "dataproc": DependencyInfo(
-        name="dataproc",
-        description="GCP Dataproc managed Spark service",
-        packages=["google-cloud-dataproc", "google-cloud-storage"],
-        install_command="uv add benchbox --extra dataproc",
-        use_cases=["Managed Spark", "GCP analytics", "Data pipeline", "Cluster computing"],
-        platforms=["GCP Dataproc"],
-    ),
-    "dataproc-serverless": DependencyInfo(
-        name="dataproc-serverless",
-        description="GCP Dataproc Serverless fully managed Spark",
-        packages=["google-cloud-dataproc", "google-cloud-storage"],
-        install_command="uv add benchbox --extra dataproc-serverless",
-        use_cases=["Serverless Spark", "GCP analytics", "Auto-scaling", "No cluster management"],
-        platforms=["GCP Dataproc Serverless"],
-    ),
-    "spark": DependencyInfo(
-        name="spark",
-        description="Apache Spark distributed SQL engine",
-        packages=["pyspark"],
-        install_command="uv add benchbox --extra spark",
-        use_cases=["Distributed SQL", "Big data processing", "Spark SQL"],
-        platforms=["Apache Spark", "Spark on YARN", "Spark on Kubernetes"],
-    ),
-    "lakesail": DependencyInfo(
-        name="lakesail",
-        description="LakeSail Sail Spark-compatible engine (uses PySpark Spark Connect client)",
-        packages=["pyspark", "grpcio", "grpcio-status"],
-        install_command="uv add benchbox --extra lakesail",
-        use_cases=["Spark-compatible SQL", "High-performance analytics", "DataFusion-based"],
-        platforms=["LakeSail Sail"],
-    ),
-    "velox": DependencyInfo(
-        name="velox",
-        description="Apache Gluten + Velox Spark acceleration (native C++ engine via Gluten plugin)",
-        packages=["pyspark", "grpcio", "grpcio-status"],
-        install_command="uv add benchbox --extra velox",
-        use_cases=[
-            "Spark-compatible SQL",
-            "Native C++ acceleration",
-            "TPC-H/TPC-DS benchmarking",
-            "Accelerated-Spark tier comparison",
-        ],
-        platforms=["Apache Gluten + Velox"],
-    ),
-    "snowpark-connect": DependencyInfo(
-        name="snowpark-connect",
-        description="Snowpark Connect PySpark-compatible API on Snowflake",
-        packages=["snowflake-snowpark-python"],
-        install_command="uv add benchbox --extra snowpark-connect",
-        use_cases=["PySpark API", "Snowflake DataFrame", "No cluster required", "Snowflake native"],
-        platforms=["Snowflake (via Snowpark)"],
-    ),
-    "cloudstorage": DependencyInfo(
-        name="cloudstorage",
-        description="Cloud storage helpers for remote paths (cloudpathlib)",
-        packages=["cloudpathlib"],
-        install_command="uv add benchbox --extra cloudstorage",
-        use_cases=["Remote output directories", "Cloud staging areas", "Unity Catalog volumes"],
-        platforms=["AWS S3", "Google Cloud Storage", "Azure Storage"],
-    ),
-    "cloud": DependencyInfo(
-        name="cloud",
-        description="All major cloud data platforms (excludes ClickHouse)",
-        packages=[
-            "databricks-sql-connector",
-            "firebolt-sdk",
-            "google-cloud-bigquery",
-            "google-cloud-dataproc",
-            "google-cloud-storage",
-            "redshift-connector",
-            "snowflake-connector-python",
-            "trino",
-            "pyathena",
-            "boto3",
-            "cloudpathlib",
-        ],
-        install_command="uv add benchbox --extra cloud",
-        use_cases=["Multi-cloud benchmarking", "Cloud platform comparison", "Enterprise analytics"],
-        platforms=[
-            "Databricks",
-            "BigQuery",
-            "Redshift",
-            "Snowflake",
-            "Trino",
-            "Athena",
-            "Firebolt",
-            "Dataproc",
-            "Glue",
-            "EMR Serverless",
-        ],
-    ),
-    "all": DependencyInfo(
-        name="all",
-        description="All supported database platforms and features",
-        packages=[
-            "clickhouse-driver",
-            "databricks-sql-connector",
-            "databricks-connect",  # Databricks DataFrame mode
-            "firebolt-sdk",
-            "google-cloud-bigquery",
-            "google-cloud-storage",
-            "google-cloud-dataproc",  # GCP Dataproc platforms
-            "redshift-connector",
-            "snowflake-connector-python",
-            "snowflake-snowpark-python",  # Snowpark Connect
-            "trino",
-            "presto-python-client",
-            "psycopg",
-            "pyodbc",
-            "pyathena",
-            "pyspark",
-            "grpcio",
-            "grpcio-status",
-            "boto3",
-            "cloudpathlib",
-            # Fabric Warehouse (Azure)
-            "azure-identity",
-            "azure-storage-file-datalake",
-            "requests",  # For Fabric/Synapse Spark Livy API
-            # InfluxDB 3.0
-            "influxdb3-python",
-            "pyarrow",  # For InfluxDB and DataFusion
-            # ClickHouse Local (chDB embedded) & Cloud (clickhouse-connect)
-            "chdb",
-            "clickhouse-connect",
-            # Databend
-            "databend-driver",
-            # MySQL-protocol platforms (StarRocks, Doris)
-            "pymysql",
-            # SingleStore
-            "singlestoredb",
-        ],
-        install_command="uv add benchbox --extra all",
-        use_cases=["Complete platform coverage", "Testing all adapters", "Maximum flexibility"],
-        platforms=["All supported platforms"],
-    ),
+    name: _dependency_info_from_payload(entry) for name, entry in _DEPENDENCY_PAYLOAD["dependency_groups"].items()
 }
-
-
-# Curated installation scenarios for documentation and CLI matrix
-INSTALLATION_SCENARIOS: tuple[InstallationScenario, ...] = (
-    InstallationScenario(
-        name="Local development (core)",
-        description="DuckDB + SQLite workflows without external services",
-        platforms=["DuckDB", "SQLite"],
-        dependency_groups=[],
-        notes="Includes embedded DuckDB engine and local file outputs.",
-    ),
-    InstallationScenario(
-        name="Cloud storage helpers",
-        description="Enable cloud path handling without database adapters",
-        platforms=["S3", "GCS", "Azure"],
-        dependency_groups=["cloudstorage"],
-        notes="Install when you need remote output directories or UC volume staging.",
-    ),
-    InstallationScenario(
-        name="Cloud platforms bundle",
-        description="All managed warehouses except ClickHouse",
-        platforms=["Databricks", "BigQuery", "Redshift", "Snowflake", "Trino", "Athena", "Firebolt"],
-        dependency_groups=["cloud"],
-        notes="Recommended starting point for cloud benchmarking.",
-    ),
-    InstallationScenario(
-        name="Full platform coverage",
-        description="Everything BenchBox supports",
-        platforms=["All platforms"],
-        dependency_groups=["all"],
-        notes="Installs every optional adapter including ClickHouse.",
-    ),
-    InstallationScenario(
-        name="Distributed SQL (Presto vs Trino)",
-        description="Compare PrestoDB and Trino/Starburst with native drivers",
-        platforms=["PrestoDB", "Trino"],
-        dependency_groups=["presto", "trino"],
-        notes="PrestoDB uses presto-python-client with X-Presto-* headers; Trino uses the trino package and X-Trino-* headers.",
-    ),
-    InstallationScenario(
-        name="Databricks Lakehouse",
-        description="Databricks SQL Warehouses and Unity Catalog",
-        platforms=["Databricks"],
-        dependency_groups=["databricks"],
-    ),
-    InstallationScenario(
-        name="Google BigQuery",
-        description="BigQuery analytics and Cloud Storage integration",
-        platforms=["BigQuery", "Cloud Storage"],
-        dependency_groups=["bigquery"],
-    ),
-    InstallationScenario(
-        name="Amazon Redshift",
-        description="Redshift data warehouse and S3 access",
-        platforms=["Redshift", "Amazon S3"],
-        dependency_groups=["redshift"],
-    ),
-    InstallationScenario(
-        name="AWS Athena",
-        description="Serverless query-on-S3 analytics",
-        platforms=["AWS Athena", "Amazon S3"],
-        dependency_groups=["athena"],
-        notes="Pay-per-query pricing based on data scanned ($5/TB). No infrastructure to manage.",
-    ),
-    InstallationScenario(
-        name="AWS Glue",
-        description="Managed Spark ETL service",
-        platforms=["AWS Glue", "Amazon S3"],
-        dependency_groups=["glue"],
-        notes="Pay-per-DPU pricing (~$0.44/DPU-hour). Serverless Spark with Glue Data Catalog.",
-    ),
-    InstallationScenario(
-        name="Snowflake Cloud",
-        description="Snowflake cloud data platform",
-        platforms=["Snowflake"],
-        dependency_groups=["snowflake"],
-    ),
-    InstallationScenario(
-        name="ClickHouse Analytics",
-        description="ClickHouse clusters or local server",
-        platforms=["ClickHouse"],
-        dependency_groups=["clickhouse"],
-    ),
-    InstallationScenario(
-        name="Firebolt Analytics",
-        description="Firebolt Core (local Docker) or Firebolt Cloud",
-        platforms=["Firebolt Core", "Firebolt Cloud"],
-        dependency_groups=["firebolt"],
-        notes="Firebolt Core is free and runs locally via Docker.",
-    ),
-    InstallationScenario(
-        name="Cloud + ClickHouse combo",
-        description="Multi-cloud benchmarks plus ClickHouse parity",
-        platforms=["Databricks", "BigQuery", "Redshift", "Snowflake", "ClickHouse"],
-        dependency_groups=["cloud", "clickhouse"],
-        notes="Combines managed warehouses with self-hosted ClickHouse.",
-    ),
+INSTALLATION_SCENARIOS: tuple[InstallationScenario, ...] = tuple(
+    _scenario_from_payload(entry) for entry in _DEPENDENCY_PAYLOAD["installation_scenarios"]
 )
-
-
-# Mapping from package names (as used in pyproject.toml) to their actual import names
-# This is needed because many packages have different names when installed vs imported
-PACKAGE_IMPORT_NAMES: dict[str, str] = {
-    "databricks-sql-connector": "databricks.sql",
-    "google-cloud-bigquery": "google.cloud.bigquery",
-    "google-cloud-storage": "google.cloud.storage",
-    "snowflake-connector-python": "snowflake.connector",
-    "snowflake-snowpark-python": "snowflake.snowpark",
-    "presto-python-client": "prestodb",
-    "grpcio": "grpc",
-    "grpcio-status": "grpc_status",
-    # These packages have import names that match the package name with hyphens replaced by underscores
-    # (documented here for completeness, but handled by fallback logic):
-    # "redshift-connector": "redshift_connector",
-    # "clickhouse-driver": "clickhouse_driver",
-    # "cloudpathlib": "cloudpathlib",
-    # "boto3": "boto3",
-}
+PACKAGE_IMPORT_NAMES: dict[str, str] = dict(_DEPENDENCY_PAYLOAD["package_import_names"])
 
 
 def check_platform_dependencies(platform: str, packages: Optional[Sequence[str]] = None) -> tuple[bool, list[str]]:

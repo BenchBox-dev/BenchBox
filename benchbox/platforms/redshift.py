@@ -16,13 +16,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from benchbox.core.sql_utils import normalize_table_name_in_sql
+from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
         TuningColumn,
         UnifiedTuningConfiguration,
     )
@@ -35,7 +34,14 @@ from ..utils.dependencies import (
 )
 from ..utils.file_format import detect_compression, is_parquet_format
 from .base import DriverIsolationCapability, PlatformAdapter
-from .base.data_loading import NO_BENCHMARK, DataSource, DataSourceResolver, FileFormatRegistry, resolve_csv_dialect
+from .base.config_utils import make_registered_platform_config_builder
+from .base.data_loading import (
+    NO_BENCHMARK,
+    DataSource,
+    FileFormatRegistry,
+    resolve_adapter_data_source,
+    resolve_csv_dialect,
+)
 from .base.runtime_metadata import build_default_normalized_result_metadata
 
 try:
@@ -234,61 +240,45 @@ class RedshiftAdapter(PlatformAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create Redshift adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-
-        # Generate proper database name using benchmark characteristics
-        # (unless explicitly overridden in config)
-        if "database" in config and config["database"]:
-            # User explicitly provided database name - use it
-            adapter_config["database"] = config["database"]
-        else:
-            # Generate configuration-aware database name
-            database_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                config,
                 platform="redshift",
-                tuning_config=config.get("tuning_config"),
+                fields=[
+                    "host",
+                    "port",
+                    "username",
+                    "password",
+                    "schema",
+                    "iam_role",
+                    "s3_bucket",
+                    "s3_prefix",
+                    "staging_root",
+                    "aws_access_key_id",
+                    "aws_secret_access_key",
+                    "aws_session_token",
+                    "aws_region",
+                    "cluster_identifier",
+                    "admin_database",
+                    "connect_timeout",
+                    "statement_timeout",
+                    "sslmode",
+                    "ssl_enabled",
+                    "ssl_insecure",
+                    "sslrootcert",
+                    "wlm_query_slot_count",
+                    "wlm_query_queue_name",
+                    "wlm_config",
+                    "compupdate",
+                    "auto_vacuum",
+                    "auto_analyze",
+                    "disable_result_cache",
+                    "strict_validation",
+                ],
             )
-            adapter_config["database"] = database_name
-
-        # Core connection parameters (database handled above)
-        for key in ["host", "port", "username", "password", "schema"]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        # Optional staging/optimization parameters
-        for key in [
-            "iam_role",
-            "s3_bucket",
-            "s3_prefix",
-            "staging_root",
-            "aws_access_key_id",
-            "aws_secret_access_key",
-            "aws_session_token",
-            "aws_region",
-            "cluster_identifier",
-            "admin_database",
-            "connect_timeout",
-            "statement_timeout",
-            "sslmode",
-            "ssl_enabled",
-            "ssl_insecure",
-            "sslrootcert",
-            "wlm_query_slot_count",
-            "wlm_query_queue_name",
-            "wlm_config",
-            "compupdate",
-            "auto_vacuum",
-            "auto_analyze",
-            "disable_result_cache",
-            "strict_validation",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
     def _detect_client_library_version(self) -> str | None:
         if redshift_connector:
@@ -1336,16 +1326,7 @@ class RedshiftAdapter(PlatformAdapter):
 
     def _resolve_data_files(self, benchmark, data_dir: Path) -> Any:
         """Resolve data files from benchmark tables or manifest fallback."""
-        resolver = DataSourceResolver(
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
-        )
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source
+        return resolve_adapter_data_source(self, benchmark, data_dir)
 
     def _create_s3_client(self):
         """Create S3 client with explicit error handling."""
@@ -2441,31 +2422,7 @@ class RedshiftAdapter(PlatformAdapter):
         except Exception as e:
             self.logger.warning(f"Error closing connection: {e}")
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if Redshift supports a specific tuning type.
-
-        Redshift supports:
-        - DISTRIBUTION: Via DISTSTYLE and DISTKEY clauses
-        - SORTING: Via SORTKEY clause (compound and interleaved)
-        - PARTITIONING: Through table design patterns and date partitioning
-
-        Args:
-            tuning_type: The type of tuning to check support for
-
-        Returns:
-            True if the tuning type is supported by Redshift
-        """
-        # Import here to avoid circular imports
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {
-                TuningType.DISTRIBUTION,
-                TuningType.SORTING,
-                TuningType.PARTITIONING,
-            }
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("DISTRIBUTION", "SORTING", "PARTITIONING")
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Redshift-specific tuning clauses for CREATE TABLE statements.
@@ -2664,19 +2621,9 @@ class RedshiftAdapter(PlatformAdapter):
             unified_config: Unified tuning configuration to apply
             connection: Redshift connection
         """
-        if not unified_config:
-            return
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        # Apply constraint configurations
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        # Apply platform optimizations
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        # Apply table-level tunings
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
         """Apply Redshift-specific platform optimizations.
@@ -2698,102 +2645,38 @@ class RedshiftAdapter(PlatformAdapter):
         # Store optimizations for use during query execution and maintenance operations
         self.logger.info("Redshift platform optimizations stored for session and workload management")
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to Redshift.
-
-        Note: Redshift supports PRIMARY KEY and FOREIGN KEY constraints for query optimization,
-        but they are informational only (not enforced). Constraints must be applied during
-        table creation time.
-
-        Args:
-            primary_key_config: Primary key constraint configuration
-            foreign_key_config: Foreign key constraint configuration
-            connection: Redshift connection
-        """
-        # Redshift constraints are applied at table creation time for query optimization
-        # This method is called after tables are created, so log the configurations
-
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info(
-                "Primary key constraints enabled for Redshift (informational only, applied during table creation)"
-            )
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info(
-                "Foreign key constraints enabled for Redshift (informational only, applied during table creation)"
-            )
-
-        # Redshift constraints are informational and used for query optimization
-        # No additional work to do here as they're applied during CREATE TABLE
-
-
-def _build_redshift_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build Redshift database configuration with credential loading.
-
-    This function loads saved credentials from the CredentialManager and
-    merges them with CLI options and runtime overrides.
-
-    Args:
-        platform: Platform name (should be 'redshift')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded
-    """
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="redshift",
-        credential_key="redshift",
-        default_display_name="Amazon Redshift",
-        default_driver_package="redshift-connector",
-        base_options={"admin_database": "dev"},
-        platform_fields=[
-            "host",
-            "port",
-            "username",
-            "password",
-            "schema",
-            "s3_bucket",
-            "s3_prefix",
-            "staging_root",
-            "iam_role",
-            "aws_access_key_id",
-            "aws_secret_access_key",
-            "aws_session_token",
-            "aws_region",
-            "cluster_identifier",
-            "admin_database",
-            "connect_timeout",
-            "statement_timeout",
-            "sslmode",
-            "disable_result_cache",
-            "strict_validation",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints enabled for Redshift (informational only, applied during table creation)",
+        "Foreign key constraints enabled for Redshift (informational only, applied during table creation)",
     )
 
 
-# Register the config builder with the platform hook registry
-# This must happen when the module is imported
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("redshift", _build_redshift_config)
-except ImportError:
-    # Platform hooks may not be available in all contexts (e.g., core-only usage)
-    pass
+_build_redshift_config = make_registered_platform_config_builder(
+    "redshift",
+    __name__,
+    "Amazon Redshift",
+    "redshift-connector",
+    [
+        "host",
+        "port",
+        "username",
+        "password",
+        "schema",
+        "s3_bucket",
+        "s3_prefix",
+        "staging_root",
+        "iam_role",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "aws_session_token",
+        "aws_region",
+        "cluster_identifier",
+        "admin_database",
+        "connect_timeout",
+        "statement_timeout",
+        "sslmode",
+        "disable_result_cache",
+        "strict_validation",
+    ],
+    base_options={"admin_database": "dev"},
+)

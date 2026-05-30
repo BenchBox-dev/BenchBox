@@ -36,6 +36,31 @@ class PsycopgConnectionMixin:
 
     _max_identifier_length: int = 63
 
+    def execute_query(
+        self,
+        connection: Any,
+        query: str,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Execute a single query through the shared SQL execution helper."""
+        from benchbox.platforms.base.sql_execution import execute_sql_query
+
+        return execute_sql_query(
+            connection,
+            query,
+            query_id,
+            log_verbose=self.log_verbose,
+            build_query_result_with_validation=self._build_query_result_with_validation,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
+
     def _validate_identifier(self, identifier: str) -> bool:
         """Validate a SQL identifier to prevent injection.
 

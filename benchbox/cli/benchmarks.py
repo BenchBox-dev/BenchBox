@@ -32,6 +32,15 @@ from benchbox.utils.verbosity import VerbositySettings
 logger = logging.getLogger(__name__)
 console = quiet_console
 
+_SUPPORT_STATUS_LABELS = {
+    "stable": "Stable",
+    "beta": "Beta",
+    "experimental": "Experimental",
+    "repo_only": "Repo-only",
+    "deprecated": "Deprecated",
+    "document_only": "Document-only",
+}
+
 
 class BenchmarkManager:
     """Benchmark selection and configuration management with intelligent guidance."""
@@ -72,6 +81,11 @@ class BenchmarkManager:
             if self._is_public_benchmark(bench_id, bench_info)
         }
 
+    def _support_status_label(self, benchmark_info: dict[str, Any]) -> str:
+        """Return the user-facing product support label for a benchmark."""
+        status = str(benchmark_info["support_status"])
+        return _SUPPORT_STATUS_LABELS.get(status, status.replace("_", "-"))
+
     def validate_scale_factor(self, benchmark_id: str, scale_factor: float) -> None:
         """Validate scale factor against benchmark requirements.
 
@@ -101,6 +115,7 @@ class BenchmarkManager:
             for bench_id, bench_info in benchmarks:
                 desc = bench_info["query_description"] if bench_info["num_queries"] > 0 else bench_info["description"]
                 bench_tree = category_tree.add(f"[green]{bench_info['display_name']}[/green] - {desc}")
+                bench_tree.add(f"Support: {self._support_status_label(bench_info)}")
                 bench_tree.add(f"Complexity: {bench_info['complexity']}")
                 bench_tree.add(
                     f"Estimated Time: {bench_info['estimated_time_range'][0]}-{bench_info['estimated_time_range'][1]} min"
@@ -168,6 +183,7 @@ class BenchmarkManager:
         table.add_column("ID", style="cyan bold", width=3, justify="right")
         table.add_column("Category", style="blue", width=14)
         table.add_column("Name", style="green bold", width=16)
+        table.add_column("Status", style="cyan", width=13)
         table.add_column("Queries", style="yellow", width=7, justify="right")
         table.add_column("Complexity", style="magenta", width=10)
         table.add_column("Description", style="white", width=50)
@@ -186,6 +202,7 @@ class BenchmarkManager:
                 str(i),
                 bench_info["category"],
                 bench_info["display_name"],
+                self._support_status_label(bench_info),
                 query_text,
                 bench_info["complexity"],
                 bench_info["description"],
@@ -231,6 +248,9 @@ class BenchmarkManager:
         # Category and classification
         preview_text.append("Category: ", style="cyan")
         preview_text.append(f"{benchmark_info['category']}\n", style="white")
+
+        preview_text.append("Support Status: ", style="cyan")
+        preview_text.append(f"{self._support_status_label(benchmark_info)}\n", style="white")
 
         preview_text.append("Complexity: ", style="cyan")
         preview_text.append(f"{benchmark_info['complexity']}\n", style="white")
@@ -320,9 +340,9 @@ class BenchmarkManager:
         """
         try:
             # Load benchmark to get queries
-            from benchbox.core.benchmark_loader import get_benchmark_class
+            from benchbox.core.benchmark_loader import get_core_benchmark_class
 
-            benchmark_class = get_benchmark_class(benchmark_id)
+            benchmark_class = get_core_benchmark_class(benchmark_id)
             default_scale = self.benchmarks.get(benchmark_id, {}).get("default_scale", 0.01)
             benchmark = benchmark_class(scale_factor=default_scale)
 
@@ -545,6 +565,7 @@ class BenchmarkManager:
         table = Table(title="Available Benchmarks")
         table.add_column("ID", style="cyan", width=3)
         table.add_column("Name", style="green")
+        table.add_column("Status", style="cyan")
         table.add_column("Queries", style="yellow")
         table.add_column("Complexity", style="blue")
         table.add_column("Est. Time", style="magenta")
@@ -558,6 +579,7 @@ class BenchmarkManager:
             table.add_row(
                 str(i + 1),
                 bench_info["display_name"],
+                self._support_status_label(bench_info),
                 query_text,
                 bench_info["complexity"],
                 f"{time_range[0]}-{time_range[1]} min",
@@ -801,52 +823,12 @@ class BenchmarkManager:
 
     def _estimate_memory_usage(self, benchmark_id: str, scale: float) -> float:
         """Estimate memory usage for a given benchmark and scale."""
-        base_memory = {
-            "tpch": 1.0,
-            "tpcds": 2.5,
-            "tpcdi": 1.5,
-            "ssb": 0.8,
-            "clickbench": 15.0,
-            "h2odb": 2.0,
-            "amplab": 1.2,
-            "read_primitives": 0.1,
-            "metadata_primitives": 0.01,  # No data generation, queries catalog metadata
-            "joinorder": 5.0,  # Canonical IMDb JOB: 74M rows across 21 Parquet tables
-            "joinorder_synthetic": 1.0,
-            "coffeeshop": 1.0,
-            "write_primitives": 1.0,  # Same as TPC-H since it reuses TPC-H data
-            "datavault": 3.0,  # ~3x TPC-H due to denormalization (21 tables from 8)
-            "tpcds_obt": 2.5,  # Similar to TPC-DS
-            "tpch_skew": 1.0,  # Same as TPC-H with skew transformation overhead
-            "tsbs_devops": 0.8,  # Time-series data with high row counts
-            "nyctaxi": 1.0,  # Large trip dataset with joins to zone table
-        }
-        base = base_memory.get(benchmark_id, 1.0)
+        base = float(self.benchmarks[benchmark_id]["base_memory_gb"])
         return base * scale
 
     def _estimate_execution_time(self, benchmark_id: str, scale: float) -> float:
         """Estimate execution time in minutes for full benchmark."""
-        time_ranges = {
-            "tpch": (2, 10),
-            "tpcds": (10, 60),
-            "tpcdi": (5, 30),
-            "ssb": (1, 5),
-            "clickbench": (5, 15),
-            "h2odb": (3, 15),
-            "amplab": (3, 15),
-            "read_primitives": (1, 3),
-            "metadata_primitives": (1, 2),  # Fast catalog queries, no data generation
-            "joinorder": (30, 90),  # Full canonical JOB data and 113-query suite
-            "joinorder_synthetic": (2, 10),
-            "coffeeshop": (2, 8),
-            "write_primitives": (2, 5),
-            "datavault": (5, 30),  # TPC-H generation + DuckDB transform + complex joins
-            "tpcds_obt": (5, 20),  # TPC-DS generation + OBT join
-            "tpch_skew": (2, 15),  # TPC-H + skew transformation
-            "tsbs_devops": (2, 10),  # Time-series data generation + queries
-            "nyctaxi": (5, 30),  # Data download/generation + 25 OLAP queries
-        }
-        low, high = time_ranges.get(benchmark_id, (2, 10))
+        low, high = self.benchmarks[benchmark_id]["estimated_time_range"]
         base_avg = (low + high) / 2
         return base_avg * (0.5 + 0.5 * scale)
 

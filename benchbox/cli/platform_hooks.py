@@ -8,12 +8,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
+from benchbox.core.platform_registry import PlatformInfo, PlatformRegistry
 from benchbox.core.schemas import DatabaseConfig
-
-if TYPE_CHECKING:
-    from benchbox.core.platform_registry import PlatformInfo
 
 
 class PlatformOptionError(ValueError):
@@ -153,8 +151,6 @@ class PlatformHookRegistry:
         options: dict[str, Any],
         runtime_overrides: dict[str, Any] | None = None,
     ) -> DatabaseConfig:
-        from benchbox.core.platform_registry import PlatformRegistry
-
         platform = platform.lower()
         overrides = runtime_overrides or {}
         info = PlatformRegistry.get_platform_info(platform)

@@ -14,7 +14,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from packaging.version import Version
 
 from scripts.check_dependency_bounds import (
     CappedDep,
@@ -63,33 +62,6 @@ class TestUpperBoundExtraction:
     def test_extracts_full_upper_bound(self, spec: str, expected: str | None) -> None:
         parsed = _extract_upper_bound(spec)
         assert (None if parsed is None else parsed[0]) == expected
-        if expected is not None:
-            assert parsed is not None
-            assert parsed[1] == Version(expected)
-
-    @pytest.mark.parametrize(
-        ("spec", "expected"),
-        [
-            (">=1.0.0,<1.4.0", "1.4.0"),
-            (">=1.0.0,<1.3.5", "1.3.5"),
-            (">=21.0.0,<25.0.0", "25.0.0"),
-        ],
-    )
-    def test_extracts_minor_and_patch_caps_without_major_truncation(self, spec: str, expected: str) -> None:
-        parsed = _extract_upper_bound(spec)
-        assert parsed == (expected, Version(expected))
-
-    @pytest.mark.parametrize(
-        "spec",
-        [
-            "<=1.4.0",
-            "!=1.4.0",
-            "~=1.4",
-            ">=1.0.0,<=1.4.0",
-        ],
-    )
-    def test_exotic_or_nonexclusive_specifiers_are_not_misparsed(self, spec: str) -> None:
-        assert _extract_upper_bound(spec) is None
 
 
 class TestRequirementSplit:
@@ -186,30 +158,7 @@ version = "1.3.2"
         assert len(deps) == 1
         assert deps[0].cap_major == 1
         assert deps[0].cap_text == "1.4.0"
-        assert deps[0].cap_version == Version("1.4.0")
         assert deps[0].cap_display == "1.4.0"
-
-    def test_collects_patch_cap_without_truncating_to_major_or_minor(self, tmp_path: Path) -> None:
-        py, lk = _write(
-            tmp_path,
-            """
-[project]
-name = "demo"
-version = "0.0.0"
-dependencies = ["duckdb>=1.0.0,<1.3.5"]
-""",
-            """
-[[package]]
-name = "duckdb"
-version = "1.3.4"
-""",
-        )
-        deps = collect_capped_deps(py, lk)
-        assert len(deps) == 1
-        assert deps[0].cap_major == 1
-        assert deps[0].cap_text == "1.3.5"
-        assert deps[0].cap_version == Version("1.3.5")
-        assert not deps[0].cap_reached
 
     def test_deduplicates_multiple_declarations(self, tmp_path: Path) -> None:
         py, lk = _write(
@@ -240,36 +189,8 @@ class TestSeverityFlags:
         assert dep.cap_reached
 
     def test_healthy_when_locked_version_below_minor_cap(self) -> None:
-        dep = CappedDep(
-            name="duckdb",
-            cap_major=1,
-            locked_version="1.3.2",
-            cap_version=Version("1.4.0"),
-            cap_text="1.4.0",
-        )
+        dep = CappedDep(name="duckdb", cap_major=1, locked_version="1.3.2", cap_text="1.4.0")
         assert not dep.cap_reached
-        assert not dep.ceiling_minus_one
-
-    def test_healthy_when_locked_version_below_patch_cap(self) -> None:
-        dep = CappedDep(
-            name="duckdb",
-            cap_major=1,
-            locked_version="1.3.4",
-            cap_version=Version("1.3.5"),
-            cap_text="1.3.5",
-        )
-        assert not dep.cap_reached
-        assert not dep.ceiling_minus_one
-
-    def test_major_cap_control_still_blocks_at_full_cap(self) -> None:
-        dep = CappedDep(
-            name="pyarrow",
-            cap_major=25,
-            locked_version="25.0.0",
-            cap_version=Version("25.0.0"),
-            cap_text="25.0.0",
-        )
-        assert dep.cap_reached
         assert not dep.ceiling_minus_one
 
     def test_ceiling_minus_one_when_locked_major_is_cap_minus_one(self) -> None:

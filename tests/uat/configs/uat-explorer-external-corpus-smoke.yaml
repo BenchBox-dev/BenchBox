@@ -3,7 +3,6 @@ description: "Small UAT run proving Explorer smoke derives routes from packaged 
 
 phases:
   - preflight
-  - enumerate
   - execute
   - validate
   - package

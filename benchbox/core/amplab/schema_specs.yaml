@@ -1,0 +1,50 @@
+tables:
+- id: RANKINGS
+  key: rankings
+  schema:
+    name: rankings
+    columns:
+    - name: pageURL
+      type: VARCHAR(300)
+      primary_key: true
+    - name: pageRank
+      type: INTEGER
+    - name: avgDuration
+      type: INTEGER
+- id: USERVISITS
+  key: uservisits
+  schema:
+    name: uservisits
+    columns:
+    - name: sourceIP
+      type: VARCHAR(15)
+    - name: destURL
+      type: VARCHAR(100)
+    - name: visitDate
+      type: DATE
+    - name: adRevenue
+      type: DECIMAL(8,2)
+    - name: userAgent
+      type: VARCHAR(256)
+    - name: countryCode
+      type: VARCHAR(3)
+    - name: languageCode
+      type: VARCHAR(6)
+    - name: searchWord
+      type: VARCHAR(32)
+    - name: duration
+      type: INTEGER
+- id: DOCUMENTS
+  key: documents
+  schema:
+    name: documents
+    columns:
+    - name: url
+      type: VARCHAR(300)
+      primary_key: true
+    - name: contents
+      type: TEXT
+table_order:
+- rankings
+- documents
+- uservisits

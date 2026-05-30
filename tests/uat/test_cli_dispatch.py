@@ -10,49 +10,44 @@ from types import SimpleNamespace
 import pytest
 
 from tests.uat import _cli
+from tests.uat.config import validate_config
 
 pytestmark = pytest.mark.fast
 
 
 def test_main_routes_subcommand(monkeypatch):
-    calls: list[tuple[str, list[str]]] = []
+    calls: list[tuple[str, str]] = []
 
-    def fake_execute_main(argv):
-        calls.append(("execute", argv))
+    def fake_execute(args):
+        calls.append((args.cmd, args.config))
         return 0
 
-    monkeypatch.setitem(_cli.SUBCOMMANDS, "execute", fake_execute_main)
+    monkeypatch.setattr(_cli, "_handle_execute", fake_execute)
     rc = _cli.main(["execute", "--config", "x.yaml"])
     assert rc == 0
-    assert calls == [("execute", ["--config", "x.yaml"])]
+    assert calls == [("execute", "x.yaml")]
 
 
-def test_main_no_args_routes_to_cell(monkeypatch):
-    calls: list[list[str]] = []
-
-    def fake_cell_main(argv):
-        calls.append(argv)
-        return 0
-
-    monkeypatch.setitem(_cli.SUBCOMMANDS, "cell", fake_cell_main)
-    monkeypatch.setattr(_cli, "cell_main", fake_cell_main)
+def test_main_no_args_uses_cell_parser(capsys):
     rc = _cli.main([])
-    assert rc == 0
-    assert calls == [[]]
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "cell" in err
+    assert "--platform" in err
 
 
 def test_main_bare_flags_route_to_cell(monkeypatch):
     """Backward-compat: `python -m tests.uat._cli --platform=...` is the uat-cell make target."""
-    calls: list[list[str]] = []
+    calls: list[tuple[str, str, float]] = []
 
-    def fake_cell_main(argv):
-        calls.append(argv)
+    def fake_cell(args):
+        calls.append((args.platform, args.benchmark, args.scale))
         return 0
 
-    monkeypatch.setattr(_cli, "cell_main", fake_cell_main)
+    monkeypatch.setattr(_cli, "_handle_cell", fake_cell)
     rc = _cli.main(["--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.01"])
     assert rc == 0
-    assert calls == [["--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.01"]]
+    assert calls == [("duckdb", "tpch", 0.01)]
 
 
 @pytest.mark.parametrize(("platform", "expected_local_managed"), [("pg-duckdb", True), ("duckdb", False)])
@@ -80,7 +75,7 @@ def test_cell_main_scopes_local_managed_platform_to_uat_docker_platforms(
 
     monkeypatch.setattr("tests.uat.runner.run_cell", fake_run_cell)
 
-    rc = _cli.cell_main(["--platform", platform, "--benchmark", "tpch", "--scale", "0.01"])
+    rc = _cli.main(["cell", "--platform", platform, "--benchmark", "tpch", "--scale", "0.01"])
 
     assert rc == 0
     assert captured["local_managed_platform"] is expected_local_managed
@@ -91,22 +86,25 @@ def test_main_unknown_subcommand_returns_2(capsys):
     rc = _cli.main(["nonsense"])
     assert rc == 2
     err = capsys.readouterr().err
-    assert "unknown subcommand" in err
+    assert "invalid choice" in err
 
 
 def test_main_help_returns_0(capsys):
     rc = _cli.main(["--help"])
     assert rc == 0
     out = capsys.readouterr().out
-    assert "subcommands" in out
+    assert "cell" in out
+    assert "preflight" in out
+    assert "replay-classify" in out
 
 
 def test_main_preflight_returns_2_when_preflight_aborts(tmp_path, monkeypatch, capsys):
-    config = SimpleNamespace(raw={"preflight": {"free_space_min_gib": 1000.0}})
+    config = validate_config({"name": "preflight-smoke", "preflight": {"free_space_min_gib": 1000.0}})
 
     def fake_run_preflight(**kwargs):
         return SimpleNamespace(
             disk_budget_summary="budget: high water mark 1 GiB",
+            free_space_report=("Free space: tmp 10.00 GiB (required 5.00 GiB) /tmp",),
             warnings=("disk nearly full",),
             aborted=True,
             abort_reason="free space 0.1 GiB < cutoff 1000.0 GiB",
@@ -121,12 +119,62 @@ def test_main_preflight_returns_2_when_preflight_aborts(tmp_path, monkeypatch, c
     captured = capsys.readouterr()
     assert rc == 2
     assert "budget: high water mark 1 GiB" in captured.out
+    assert "Free space: tmp 10.00 GiB (required 5.00 GiB) /tmp" in captured.out
     assert "[preflight warn] disk nearly full" in captured.err
     assert "[preflight] ABORT: free space 0.1 GiB < cutoff 1000.0 GiB" in captured.err
 
 
+def test_execute_and_sweep_use_same_preflight_kwargs(tmp_path, monkeypatch):
+    config_path = tmp_path / "uat.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                'name: "preflight-kwargs"',
+                "phases: [preflight, execute]",
+                "platforms:",
+                '  include: ["postgresql"]',
+                "preflight:",
+                "  free_space_min_gib: 12.5",
+                f'  free_space_path: "{tmp_path / "free-space"}"',
+                "  docker_required: true",
+                "  noisy_neighbor_warn_load: 3.5",
+                "  local_platforms_check: true",
+                "output:",
+                f'  benchmark_runs_dir_template: "{tmp_path / "runs"}"',
+                f'  logs_dir_template: "{tmp_path / "logs" / "{name}-{date}"}"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    calls: list[dict[str, object]] = []
+
+    def fake_run_preflight(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(
+            disk_budget_summary=None,
+            free_space_report=(),
+            warnings=(),
+            aborted=True,
+            abort_reason="stop after capturing preflight kwargs",
+            exit_code=lambda: 2,
+        )
+
+    monkeypatch.setattr("tests.uat.phases.preflight.run_preflight", fake_run_preflight)
+
+    execute_rc = _cli.main(["execute", "--config", str(config_path)])
+    sweep_rc = _cli.main(["sweep", "--config", str(config_path)])
+
+    assert execute_rc == 2
+    assert sweep_rc == 2
+    assert len(calls) == 2
+    execute_kwargs = {key: value for key, value in calls[0].items() if key != "disk_budget_config"}
+    sweep_kwargs = {key: value for key, value in calls[1].items() if key != "disk_budget_config"}
+    assert execute_kwargs == sweep_kwargs
+    assert calls[0]["disk_budget_config"] == calls[1]["disk_budget_config"]
+
+
 def test_subcommands_table_covers_all_make_targets():
-    """The dispatch table must cover every make uat-* target's subcommand."""
+    """The parser must cover every make uat-* target's subcommand."""
     expected = {
         "cell",
         "docker-cleanup",
@@ -139,7 +187,7 @@ def test_subcommands_table_covers_all_make_targets():
         "stress",
         "verify-tuning-matrix",
     }
-    assert set(_cli.SUBCOMMANDS) == expected
+    assert set(_cli.MAKE_TARGET_SUBCOMMANDS) == expected
 
 
 def test_sweep_main_forwards_dry_run_override(monkeypatch, capsys):
@@ -161,7 +209,7 @@ def test_sweep_main_forwards_dry_run_override(monkeypatch, capsys):
         return StubResult()
 
     monkeypatch.setattr("tests.uat.orchestrator.run_sweep_from_path", fake_run_sweep_from_path)
-    rc = _cli.sweep_main(["--config", "tests/uat/configs/uat-2026-05-02.yaml", "--dry-run"])
+    rc = _cli.main(["sweep", "--config", "tests/uat/configs/uat-2026-05-02.yaml", "--dry-run"])
 
     assert rc == 0
     assert calls == [(Path("tests/uat/configs/uat-2026-05-02.yaml"), True)]
@@ -279,11 +327,12 @@ def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeyp
                 "docker_events": (),
                 "aborted": False,
                 "abort_reason": None,
+                "exit_code": lambda self: 0,
             },
         )()
 
     monkeypatch.setattr("tests.uat.phases.execute.run_execute", fake_run_execute)
-    rc = _cli.execute_main(["--config", str(config_path)])
+    rc = _cli.main(["execute", "--config", str(config_path)])
 
     assert rc == 0
     assert captured == {

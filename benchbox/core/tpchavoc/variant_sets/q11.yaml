@@ -1,0 +1,333 @@
+variants:
+- id: 1
+  description: 'Scalar subqueries: Use scalar subqueries for threshold calculation'
+  sql: |2
+
+    select
+        ps_partkey,
+        sum(ps_supplycost * ps_availqty) as value
+    from
+        partsupp,
+        supplier,
+        nation
+    where
+        ps_suppkey = s_suppkey
+        and s_nationkey = n_nationkey
+        and n_name = 'GERMANY'
+        and (ps_supplycost * ps_availqty) > (
+            select avg(ps2.ps_supplycost * ps2.ps_availqty) * 0.0001
+            from partsupp ps2, supplier s2, nation n2
+            where ps2.ps_suppkey = s2.s_suppkey
+              and s2.s_nationkey = n2.n_nationkey
+              and n2.n_name = 'GERMANY'
+              and ps2.ps_partkey = ps_partkey
+        )
+    group by
+        ps_partkey
+    having
+        sum(ps_supplycost * ps_availqty) > (
+            select sum(ps3.ps_supplycost * ps3.ps_availqty) * 0.0001
+            from partsupp ps3, supplier s3, nation n3
+            where ps3.ps_suppkey = s3.s_suppkey
+              and s3.s_nationkey = n3.n_nationkey
+              and n3.n_name = 'GERMANY'
+        )
+    order by
+        value desc
+- id: 2
+  description: 'HAVING clause: Enhanced HAVING with multiple conditions'
+  sql: |2
+
+    select
+        ps_partkey,
+        sum(ps_supplycost * ps_availqty) as value
+    from
+        partsupp,
+        supplier,
+        nation
+    where
+        ps_suppkey = s_suppkey
+        and s_nationkey = n_nationkey
+        and n_name = 'GERMANY'
+    group by
+        ps_partkey
+    having
+        sum(ps_supplycost * ps_availqty) > (
+            select sum(ps_supplycost * ps_availqty) * 0.0001
+            from partsupp, supplier, nation
+            where ps_suppkey = s_suppkey
+              and s_nationkey = n_nationkey
+              and n_name = 'GERMANY'
+        )
+        and count(*) > 0
+        and avg(ps_supplycost) > 0
+    order by
+        value desc
+- id: 3
+  description: 'Explicit JOINs: Convert implicit joins to explicit JOIN syntax'
+  sql: |2
+
+    select
+        ps.ps_partkey,
+        sum(ps.ps_supplycost * ps.ps_availqty) as value
+    from
+        partsupp ps
+        inner join supplier s on ps.ps_suppkey = s.s_suppkey
+        inner join nation n on s.s_nationkey = n.n_nationkey
+    where
+        n.n_name = 'GERMANY'
+    group by
+        ps.ps_partkey
+    having
+        sum(ps.ps_supplycost * ps.ps_availqty) > (
+            select sum(ps2.ps_supplycost * ps2.ps_availqty) * 0.0001
+            from partsupp ps2
+            inner join supplier s2 on ps2.ps_suppkey = s2.s_suppkey
+            inner join nation n2 on s2.s_nationkey = n2.n_nationkey
+            where n2.n_name = 'GERMANY'
+        )
+    order by
+        value desc
+- id: 4
+  description: 'UNION ALL: Split by supplier groups'
+  sql: |2
+
+    select
+        ps_partkey,
+        sum(value) as value
+    from (
+        select
+            ps_partkey,
+            sum(ps_supplycost * ps_availqty) as value
+        from partsupp, supplier, nation
+        where ps_suppkey = s_suppkey
+          and s_nationkey = n_nationkey
+          and n_name = 'GERMANY'
+          and s_suppkey % 2 = 0
+        group by ps_partkey
+
+        union all
+
+        select
+            ps_partkey,
+            sum(ps_supplycost * ps_availqty) as value
+        from partsupp, supplier, nation
+        where ps_suppkey = s_suppkey
+          and s_nationkey = n_nationkey
+          and n_name = 'GERMANY'
+          and s_suppkey % 2 = 1
+        group by ps_partkey
+    ) combined
+    group by ps_partkey
+    having
+        sum(value) > (
+            select sum(ps_supplycost * ps_availqty) * 0.0001
+            from partsupp, supplier, nation
+            where ps_suppkey = s_suppkey
+              and s_nationkey = n_nationkey
+              and n_name = 'GERMANY'
+        )
+    order by
+        value desc
+- id: 5
+  description: 'Common Table Expression: Use CTEs to break down threshold calculation'
+  sql: |2
+
+    with german_suppliers as (
+        select s_suppkey
+        from supplier, nation
+        where s_nationkey = n_nationkey
+          and n_name = 'GERMANY'
+    ),
+    inventory_values as (
+        select ps_partkey, ps_supplycost * ps_availqty as part_value
+        from partsupp, german_suppliers
+        where ps_suppkey = s_suppkey
+    ),
+    total_threshold as (
+        select sum(part_value) * 0.0001 as threshold
+        from inventory_values
+    ),
+    part_totals as (
+        select ps_partkey, sum(part_value) as value
+        from inventory_values
+        group by ps_partkey
+    )
+    select
+        pt.ps_partkey,
+        pt.value
+    from part_totals pt, total_threshold tt
+    where pt.value > tt.threshold
+    order by pt.value desc
+- id: 6
+  description: 'Derived table: Wrap main query with derived table analysis'
+  sql: |2
+
+    select
+        partkey,
+        total_value
+    from (
+        select
+            ps_partkey as partkey,
+            sum(ps_supplycost * ps_availqty) as total_value
+        from
+            partsupp,
+            supplier,
+            nation
+        where
+            ps_suppkey = s_suppkey
+            and s_nationkey = n_nationkey
+            and n_name = 'GERMANY'
+        group by
+            ps_partkey
+        having
+            sum(ps_supplycost * ps_availqty) > (
+                select sum(ps_supplycost * ps_availqty) * 0.0001
+                from partsupp, supplier, nation
+                where ps_suppkey = s_suppkey
+                  and s_nationkey = n_nationkey
+                  and n_name = 'GERMANY'
+            )
+    ) inventory_summary
+    order by
+        total_value desc
+- id: 7
+  description: 'FILTER clause: Use FILTER for conditional aggregation (OLAP)'
+  sql: |2
+
+    select
+        ps_partkey,
+        sum(ps_supplycost * ps_availqty)
+            filter (where n_name = 'GERMANY') as value
+    from
+        partsupp,
+        supplier,
+        nation
+    where
+        ps_suppkey = s_suppkey
+        and s_nationkey = n_nationkey
+    group by
+        ps_partkey
+    having
+        sum(ps_supplycost * ps_availqty) filter (where n_name = 'GERMANY') > (
+            select sum(ps_supplycost * ps_availqty) * 0.0001
+            from partsupp, supplier, nation
+            where ps_suppkey = s_suppkey
+              and s_nationkey = n_nationkey
+              and n_name = 'GERMANY'
+        )
+        and value is not null
+    order by
+        value desc
+- id: 8
+  description: 'EXISTS pattern: Use EXISTS for nation filtering'
+  sql: |2
+
+    select
+        ps_partkey,
+        sum(ps_supplycost * ps_availqty) as value
+    from
+        partsupp,
+        supplier
+    where
+        ps_suppkey = s_suppkey
+        and exists (
+            select 1
+            from nation
+            where n_nationkey = s_nationkey
+              and n_name = 'GERMANY'
+        )
+    group by
+        ps_partkey
+    having
+        sum(ps_supplycost * ps_availqty) > (
+            select sum(ps_supplycost * ps_availqty) * 0.0001
+            from partsupp, supplier, nation
+            where ps_suppkey = s_suppkey
+              and s_nationkey = n_nationkey
+              and n_name = 'GERMANY'
+        )
+    order by
+        value desc
+- id: 9
+  description: 'Window functions: Use window functions for inventory analysis (OLAP)'
+  sql: |2
+
+    with inventory_values as (
+        select distinct
+            ps_partkey,
+            sum(ps_supplycost * ps_availqty) over (partition by ps_partkey) as value
+        from
+            partsupp,
+            supplier,
+            nation
+        where
+            ps_suppkey = s_suppkey
+            and s_nationkey = n_nationkey
+            and n_name = 'GERMANY'
+    ),
+    inventory_threshold as (
+        select
+            sum(ps_supplycost * ps_availqty) * 0.0001 as threshold
+        from partsupp, supplier, nation
+        where ps_suppkey = s_suppkey
+          and s_nationkey = n_nationkey
+          and n_name = 'GERMANY'
+    )
+    select
+        ps_partkey,
+        value,
+        rank() over (order by value desc) as value_rank
+    from
+        inventory_values,
+        inventory_threshold
+    where
+        value > threshold
+    order by
+        value desc
+- id: 10
+  description: 'CASE expressions: Add extensive CASE logic for inventory classification'
+  sql: |2
+
+    select
+        ps_partkey,
+        sum(
+            case
+                when ps_supplycost > 0 and ps_availqty > 0 then ps_supplycost * ps_availqty
+                when ps_supplycost = 0 then 0
+                when ps_availqty = 0 then 0
+                else ps_supplycost * ps_availqty
+            end
+        ) as value
+    from
+        partsupp,
+        supplier,
+        nation
+    where
+        ps_suppkey = s_suppkey
+        and s_nationkey = n_nationkey
+        and case
+            when n_name = 'GERMANY' then n_name
+            else null
+        end = 'GERMANY'
+    group by
+        ps_partkey
+    having
+        sum(
+            case
+                when ps_supplycost > 0 and ps_availqty > 0 then ps_supplycost * ps_availqty
+                else 0
+            end
+        ) > (
+            select
+                case
+                    when sum(ps_supplycost * ps_availqty) > 0 then sum(ps_supplycost * ps_availqty) * 0.0001
+                    else 0
+                end
+            from partsupp, supplier, nation
+            where ps_suppkey = s_suppkey
+              and s_nationkey = n_nationkey
+              and n_name = 'GERMANY'
+        )
+    order by
+        value desc

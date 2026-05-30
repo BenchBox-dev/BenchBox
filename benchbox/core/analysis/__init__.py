@@ -1,11 +1,9 @@
-"""Analysis module for benchmark comparison and insight generation.
+"""Analysis module for benchmark comparison.
 
 This module provides comprehensive tools for comparing benchmark results
 across multiple database platforms with:
 
 - Statistical significance testing (Welch's t-test, Mann-Whitney U)
-- Performance ranking algorithms (geometric mean, composite scoring)
-- Automated insight and recommendation generation
 - Cost vs performance analysis
 - Head-to-head platform comparisons
 
@@ -18,33 +16,19 @@ Example:
     >>>
     >>> # Get the winner
     >>> emit(f"Winner: {report.winner}")
-    >>>
-    >>> # Get detailed insights
-    >>> from benchbox.core.analysis import InsightGenerator
-    >>> generator = InsightGenerator()
-    >>> insights = generator.generate(report)
-    >>> emit(insights.to_markdown())
 
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-# Data models
 # Comparison engine
 from benchbox.core.analysis.comparison import (
     ComparisonConfig,
     PlatformComparison,
 )
 
-# Insight generation
-from benchbox.core.analysis.insights import (
-    InsightConfig,
-    InsightGenerator,
-    InsightReport,
-    generate_blog_snippet,
-    generate_comparison_narrative,
-)
+# Data models
 from benchbox.core.analysis.models import (
     ComparisonOutcome,
     ComparisonReport,
@@ -59,16 +43,6 @@ from benchbox.core.analysis.models import (
     StatisticalTest,
     ValidationResult,
     WinLossRecord,
-)
-
-# Ranking algorithms
-from benchbox.core.analysis.ranking import (
-    PlatformRanker,
-    RankingConfig,
-    RankingResult,
-    RankingStrategy,
-    RankingWeights,
-    rank_platforms,
 )
 
 # Statistical utilities
@@ -126,17 +100,4 @@ __all__ = [
     "mann_whitney_u_test",
     "recommend_sample_size",
     "welchs_t_test",
-    # Insights
-    "InsightConfig",
-    "InsightGenerator",
-    "InsightReport",
-    "generate_blog_snippet",
-    "generate_comparison_narrative",
-    # Ranking
-    "PlatformRanker",
-    "RankingConfig",
-    "RankingResult",
-    "RankingStrategy",
-    "RankingWeights",
-    "rank_platforms",
 ]

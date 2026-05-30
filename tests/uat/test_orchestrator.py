@@ -22,16 +22,16 @@ def test_dry_run_records_zero_per_phase(tmp_path: Path):
         {
             "name": "smoke",
             "dry_run": True,
-            "phases": ["preflight", "enumerate", "execute", "report"],
+            "phases": ["preflight", "execute", "report"],
         }
     )
     result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
     assert result.aborted_phase is None
     assert all(c == 0 for c in result.phase_exit_codes.values())
-    assert set(result.phase_exit_codes) == {"preflight", "enumerate", "execute", "report"}
+    assert set(result.phase_exit_codes) == {"preflight", "execute", "report"}
 
 
-def test_preflight_abort_short_circuits(tmp_path: Path):
+def test_preflight_abort_short_circuits(tmp_path: Path, capsys):
     cfg = validate_config(
         {
             "name": "smoke",
@@ -41,7 +41,14 @@ def test_preflight_abort_short_circuits(tmp_path: Path):
     fake_result = type(
         "Stub",
         (),
-        {"aborted": True, "abort_reason": "no disk", "warnings": ()},
+        {
+            "aborted": True,
+            "abort_reason": "no disk",
+            "warnings": ("disk budget gate has 1 unknown largest-scale cell(s); estimate may be low",),
+            "disk_budget_summary": "Disk budget estimate: 12.34 GiB peak",
+            "free_space_report": ("Free space: tmp 10.00 GiB (required 12.34 GiB) /tmp",),
+            "exit_code": lambda self: 2,
+        },
     )()
     with patch.object(
         orchestrator.preflight_phase,
@@ -52,6 +59,10 @@ def test_preflight_abort_short_circuits(tmp_path: Path):
     assert result.aborted_phase == "preflight"
     assert "execute" not in result.phase_exit_codes
     assert result.exit_code() == 2
+    captured = capsys.readouterr()
+    assert "Disk budget estimate: 12.34 GiB peak" in captured.err
+    assert "Free space: tmp 10.00 GiB (required 12.34 GiB) /tmp" in captured.err
+    assert "[preflight warn] disk budget gate has 1 unknown largest-scale cell(s); estimate may be low" in captured.err
 
 
 def test_stress_default_yaml_loads():
@@ -77,44 +88,18 @@ def test_stress_docker_managed_yaml_loads():
     assert cfg.preflight.docker_required is True
 
 
-def test_dry_run_still_runs_enumerate(tmp_path: Path):
-    """dry_run should NOT short-circuit enumerate; a malformed config must fail at PR time."""
+def test_enumerate_is_not_a_public_phase():
+    with pytest.raises(ValueError, match="Unknown phase"):
+        validate_config({"name": "smoke", "phases": ["enumerate", "execute"]})
+
+
+def test_dry_run_passes_without_public_enumerate(tmp_path: Path):
+    """A valid dry_run sweep no longer exposes enumerate as its own phase."""
     cfg = validate_config(
         {
             "name": "smoke",
             "dry_run": True,
-            "phases": ["enumerate", "execute"],
-            "platforms": {"groups": ["does-not-exist"]},
-        }
-    )
-    result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
-    assert result.aborted_phase == "enumerate"
-    assert result.phase_exit_codes["enumerate"] == 2
-
-
-def test_dry_run_enumerate_type_error_returns_structured_abort(tmp_path: Path):
-    """Malformed list-like fields should abort enumerate instead of escaping run_sweep."""
-    cfg = validate_config(
-        {
-            "name": "smoke",
-            "dry_run": True,
-            "phases": ["enumerate", "execute"],
-            "platforms": {"groups": 1},
-        }
-    )
-    result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
-    assert result.aborted_phase == "enumerate"
-    assert result.phase_exit_codes["enumerate"] == 2
-    assert result.exit_code() == 2
-
-
-def test_dry_run_passes_with_valid_enumerate(tmp_path: Path):
-    """A valid dry_run sweep should still pass through enumerate cleanly."""
-    cfg = validate_config(
-        {
-            "name": "smoke",
-            "dry_run": True,
-            "phases": ["enumerate", "execute", "report"],
+            "phases": ["execute", "report"],
             "platforms": {"include": ["duckdb"]},
             "benchmarks": {"include": ["tpch"]},
             "scales": {"rungs": [0.01]},
@@ -123,6 +108,7 @@ def test_dry_run_passes_with_valid_enumerate(tmp_path: Path):
     result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
     assert result.aborted_phase is None
     assert all(c == 0 for c in result.phase_exit_codes.values())
+    assert "enumerate" not in result.phase_exit_codes
 
 
 def test_explorer_smoke_uses_package_submissions_dir(tmp_path: Path):
@@ -147,12 +133,16 @@ def test_explorer_smoke_uses_package_submissions_dir(tmp_path: Path):
         log_path=tmp_path / "cell.log",
         result_path=tmp_path / "result.json",
     )
-    execute_outcome = type("ExecuteOutcome", (), {"results": (cell,), "aborted": False, "abort_reason": None})()
+    execute_outcome = type(
+        "ExecuteOutcome",
+        (),
+        {"results": (cell,), "aborted": False, "abort_reason": None, "exit_code": lambda self: 0},
+    )()
     captured: dict[str, Path] = {}
 
     def fake_package(config, *, result_paths, submissions_dir):
         captured["package_dir"] = submissions_dir
-        return type("PackageResult", (), {"exit_code": lambda self: 0})()
+        return type("PackageResult", (), {"aborted": False, "abort_reason": None, "exit_code": lambda self: 0})()
 
     def fake_explorer_smoke(**kwargs):
         captured["bundles_dir"] = kwargs["bundles_dir"]
@@ -182,11 +172,22 @@ def test_orchestrator_uses_output_root_for_preflight_execute_and_cleanup(tmp_pat
             "output": {"benchmark_runs_dir_template": str(root)},
         }
     )
-    fake_preflight = type("Preflight", (), {"aborted": False, "abort_reason": None, "warnings": ()})()
+    fake_preflight = type(
+        "Preflight",
+        (),
+        {"aborted": False, "abort_reason": None, "warnings": (), "free_space_report": (), "exit_code": lambda self: 0},
+    )()
     fake_execute = type(
         "ExecuteOutcome",
         (),
-        {"results": (), "pruned": (), "skipped_unreachable": (), "aborted": False, "abort_reason": None},
+        {
+            "results": (),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "aborted": False,
+            "abort_reason": None,
+            "exit_code": lambda self: 0,
+        },
     )()
     captured: dict[str, Path | str] = {}
 
@@ -225,6 +226,8 @@ def test_orchestrator_cells_jsonl_marks_timed_out_cells(tmp_path: Path):
             "scales": {"rungs": [0.01]},
         }
     )
+    cell_log = tmp_path / "cell.log"
+    cell_log.write_text("# benchbox run\nstderr tail line\n", encoding="utf-8")
     timed_out_cell = CellResult(
         platform="duckdb",
         benchmark="tpch",
@@ -232,7 +235,7 @@ def test_orchestrator_cells_jsonl_marks_timed_out_cells(tmp_path: Path):
         status="timed-out",
         exit_code=124,
         elapsed_s=1.0,
-        log_path=tmp_path / "cell.log",
+        log_path=cell_log,
         result_path=None,
     )
     fake_execute = type(
@@ -244,6 +247,7 @@ def test_orchestrator_cells_jsonl_marks_timed_out_cells(tmp_path: Path):
             "skipped_unreachable": (),
             "aborted": False,
             "abort_reason": None,
+            "exit_code": lambda self: 1,
         },
     )()
 
@@ -253,8 +257,13 @@ def test_orchestrator_cells_jsonl_marks_timed_out_cells(tmp_path: Path):
     assert result.phase_exit_codes["execute"] == 1
     cells = [json.loads(line) for line in (tmp_path / "logs" / "cells.jsonl").read_text().splitlines()]
     assert cells[0]["status"] == "timed-out"
+    assert cells[0]["terminal_state"] == "timeout"
     assert cells[0]["timed_out"] is True
     assert cells[0]["exit_code"] == 124
+    assert cells[0]["source_commit_sha"]
+    assert isinstance(cells[0]["source_dirty"], bool)
+    assert cells[0]["failure_tail"] == "stderr tail line"
+    assert "# UAT_TERMINAL_STATE terminal_state=timeout" in cell_log.read_text(encoding="utf-8")
 
 
 def test_orchestrator_writes_compatibility_pruned_jsonl_and_report_count(tmp_path: Path):
@@ -296,6 +305,7 @@ def test_orchestrator_writes_compatibility_pruned_jsonl_and_report_count(tmp_pat
             "compatibility_pruned": (pruned,),
             "aborted": False,
             "abort_reason": None,
+            "exit_code": lambda self: 0,
         },
     )()
 
@@ -334,7 +344,13 @@ def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
     fake_preflight = type(
         "Preflight",
         (),
-        {"aborted": False, "abort_reason": None, "warnings": (), "disk_budget_summary": None},
+        {
+            "aborted": False,
+            "abort_reason": None,
+            "warnings": (),
+            "disk_budget_summary": None,
+            "exit_code": lambda self: 0,
+        },
     )()
 
     with (
@@ -349,7 +365,15 @@ def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
     manifest = tmp_path / "logs" / "resume.json"
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     assert payload["aborted_phase"] == "execute"
+    assert payload["source"]["commit_sha"]
     assert payload["attempted"][0]["cell_key"] == "duckdb|tpch|0.01"
+    cells = [json.loads(line) for line in (tmp_path / "logs" / "cells.jsonl").read_text().splitlines()]
+    assert cells[0]["source_commit_sha"] == payload["source"]["commit_sha"]
+    partial_report = tmp_path / "logs" / "matrix_summary.partial.tsv"
+    assert partial_report.exists()
+    partial_text = partial_report.read_text(encoding="utf-8")
+    assert "# run_status=ABORTED" in partial_text
+    assert "abort_phase=execute" in partial_text
 
 
 def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
@@ -375,7 +399,13 @@ def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
     fake_preflight = type(
         "Preflight",
         (),
-        {"aborted": False, "abort_reason": None, "warnings": (), "disk_budget_summary": None},
+        {
+            "aborted": False,
+            "abort_reason": None,
+            "warnings": (),
+            "disk_budget_summary": None,
+            "exit_code": lambda self: 0,
+        },
     )()
     fake_execute = type(
         "ExecuteOutcome",
@@ -400,6 +430,7 @@ def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     assert payload["aborted_phase"] == "execute"
     assert payload["attempted"][0]["cell_key"] == "duckdb|tpch|0.01"
+    assert (tmp_path / "logs" / "matrix_summary.partial.tsv").exists()
 
 
 def test_manifest_runner_reuses_attempted_cells_and_runs_complement(tmp_path: Path):

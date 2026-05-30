@@ -1,0 +1,41 @@
+supported_platforms:
+- bigquery
+- databricks
+- snowflake
+unsupported_platforms:
+- clickhouse
+- datafusion
+- duckdb
+- fabric
+- postgresql
+- presto
+- redshift
+- sqlite
+- synapse
+- trino
+platform_pricing:
+  snowflake:
+    llama3-8b: 0.0003
+    llama3-70b: 0.001
+    mistral-large: 0.001
+    snowflake-arctic: 0.0005
+    sentiment: 0.0001
+    summarize: 0.0003
+    translate: 0.0002
+    embed-text-768: 0.0001
+    embed-text-1024: 0.00015
+    default: 0.0005
+  bigquery:
+    gemini-pro: 0.00025
+    palm-2: 0.0003
+    text-bison: 0.0003
+    embedding: 0.0001
+    default: 0.0003
+  databricks:
+    databricks-meta-llama-3-1-70b-instruct: 0.001
+    databricks-meta-llama-3-1-8b-instruct: 0.0003
+    databricks-bge-large-en: 0.0001
+    databricks-gte-large-en: 0.0001
+    default: 0.0005
+default_pricing:
+  default: 0.001

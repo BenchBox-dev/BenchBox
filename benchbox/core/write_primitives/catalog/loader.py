@@ -296,8 +296,8 @@ def _parse_operation_entry(index: int, entry: object, existing_ids: set[str]) ->
         validation_queries=_parse_validation_queries(operation_id, entry.get("validation_queries", [])),
         cleanup_sql=cleanup_sql,
         expected_rows_affected=expected_rows_affected,
-        file_dependencies=file_dependencies,
-        platform_overrides=platform_overrides,
+        file_dependencies=list(file_dependencies),
+        platform_overrides=dict(platform_overrides),
         requires_setup=requires_setup,
         aggregate_state=aggregate_state,
     )

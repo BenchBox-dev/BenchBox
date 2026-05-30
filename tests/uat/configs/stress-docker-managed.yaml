@@ -9,7 +9,6 @@ description: "Storage-constrained Docker stress preset with UAT-owned compose li
 
 phases:
   - preflight
-  - enumerate
   - execute
   - report
 

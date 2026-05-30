@@ -35,6 +35,11 @@ from ..utils.dependencies import (
 )
 from ..utils.file_format import get_data_extension
 from .base import DriverIsolationCapability, PlatformAdapter, PsycopgConnectionMixin
+from .base.config_utils import (
+    POSTGRES_FAMILY_BASE_OPTIONS,
+    POSTGRES_FAMILY_PLATFORM_FIELDS,
+    make_platform_config_builder,
+)
 from .base.data_loading import (
     CsvDialect,
     DataSourceResolver,
@@ -42,7 +47,6 @@ from .base.data_loading import (
     prepare_local_load_file,
     resolve_csv_dialect,
 )
-from .base.sql_execution import execute_sql_query
 
 # PostgreSQL dialect for SQLGlot
 POSTGRES_DIALECT = "postgres"
@@ -686,29 +690,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         connection.commit()
         cursor.close()
 
-    def execute_query(
-        self,
-        connection: Any,
-        query: str,
-        query_id: str,
-        benchmark_type: str | None = None,
-        scale_factor: float | None = None,
-        validate_row_count: bool = True,
-        stream_id: int | None = None,
-    ) -> dict[str, Any]:
-        """Execute a single query and return detailed results."""
-        return execute_sql_query(
-            connection,
-            query,
-            query_id,
-            log_verbose=self.log_verbose,
-            build_query_result_with_validation=self._build_query_result_with_validation,
-            benchmark_type=benchmark_type,
-            scale_factor=scale_factor,
-            validate_row_count=validate_row_count,
-            stream_id=stream_id,
-        )
-
     def get_query_plan(
         self,
         connection: Any,
@@ -1021,75 +1002,15 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             # Fallback if validation module not available
             return None
 
-    def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if PostgreSQL supports a specific tuning type."""
-        # Import here to avoid circular imports
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            supported = {
-                TuningType.PARTITIONING: True,  # PostgreSQL supports declarative partitioning
-                TuningType.SORTING: False,  # No native sort keys like columnar stores
-                TuningType.DISTRIBUTION: False,  # No distribution keys (not distributed)
-                TuningType.CLUSTERING: True,  # CLUSTER command available
-                TuningType.PRIMARY_KEYS: True,  # Full constraint support
-                TuningType.FOREIGN_KEYS: True,  # Full constraint support
-            }
-            return supported.get(tuning_type, False)
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "CLUSTERING", "PRIMARY_KEYS", "FOREIGN_KEYS")
 
 
-def _build_postgresql_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build PostgreSQL database configuration with credential loading.
-
-    This function is registered with PlatformHookRegistry to provide
-    PostgreSQL-specific configuration handling.
-    """
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
-
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("postgresql") or {}
-
-    explicit_options = overrides.get("_explicit_platform_options", {})
-
-    merged_options: dict[str, Any] = {"schema": "public"}
-    merged_options.update(options)  # registered defaults (lowest priority)
-    merged_options.update(saved_creds)  # saved credentials win over defaults
-    merged_options.update(explicit_options)  # explicit CLI flags win over credentials
-    merged_options.update(overrides)  # runtime overrides (highest priority)
-
-    name = info.display_name if info else "PostgreSQL"
-    driver_package = info.driver_package if info else "psycopg"
-
-    config_dict = {
-        "type": "postgresql",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        "host": merged_options.get("host", "localhost"),
-        "port": merged_options.get("port", 5432),
-        "username": merged_options.get("username", "postgres"),
-        "password": merged_options.get("password"),
-        "database": merged_options.get("database"),
-        "admin_database": merged_options.get("admin_database", "postgres"),
-        "sslmode": merged_options.get("sslmode", "prefer"),
-        "work_mem": merged_options.get("work_mem", "256MB"),
-        "maintenance_work_mem": merged_options.get("maintenance_work_mem", "512MB"),
-        "effective_cache_size": merged_options.get("effective_cache_size", "1GB"),
-        "max_parallel_workers_per_gather": merged_options.get("max_parallel_workers_per_gather", 2),
-        "enable_timescale": merged_options.get("enable_timescale", False),
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    return DatabaseConfig(**config_dict)
+_build_postgresql_config = make_platform_config_builder(
+    "postgresql",
+    __name__,
+    "PostgreSQL",
+    "psycopg",
+    POSTGRES_FAMILY_PLATFORM_FIELDS + ("enable_timescale",),
+    base_options={"schema": "public"},
+    field_defaults={**POSTGRES_FAMILY_BASE_OPTIONS, "enable_timescale": False},
+)

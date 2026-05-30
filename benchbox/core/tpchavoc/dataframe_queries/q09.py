@@ -13,12 +13,13 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q9_expression_impl as _q9_expr_base,
     q9_pandas_impl as _q9_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -54,7 +55,7 @@ def q9_v2_expression_impl(ctx: DataFrameContext) -> Any:
     # Pre-filter part by name
     filtered_part = part.filter(col("p_name").str.contains(color))
 
-    result = (
+    return (
         filtered_part.join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
         .join(partsupp, left_on=["l_suppkey", "p_partkey"], right_on=["ps_suppkey", "ps_partkey"])
@@ -70,7 +71,6 @@ def q9_v2_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("amount").sum().alias("sum_profit"))
         .sort(["nation", "o_year"], descending=[False, True])
     )
-    return result
 
 
 def q9_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -122,7 +122,7 @@ def q9_v3_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_tpch_parameters(9)
     color = params["color"]
 
-    result = (
+    return (
         part.select("p_partkey", "p_name")
         .filter(col("p_name").str.contains(color))
         .join(
@@ -148,7 +148,6 @@ def q9_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("amount").sum().alias("sum_profit"))
         .sort(["nation", "o_year"], descending=[False, True])
     )
-    return result
 
 
 def q9_v3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -275,68 +274,10 @@ def q9_v6_pandas_impl(ctx: DataFrameContext) -> Any:
 # ---------------------------------------------------------------------------
 
 
-def q9_v7_expression_impl(ctx: DataFrameContext) -> Any:
-    part = ctx.get_table("part")
-    supplier = ctx.get_table("supplier")
-    lineitem = ctx.get_table("lineitem")
-    partsupp = ctx.get_table("partsupp")
-    orders = ctx.get_table("orders")
-    nation = ctx.get_table("nation")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(9)
-    color = params["color"]
-
-    # Swapped: start from lineitem→part
-    result = (
-        lineitem.join(part.filter(col("p_name").str.contains(color)), left_on="l_partkey", right_on="p_partkey")
-        .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
-        .join(partsupp, left_on=["l_suppkey", "p_partkey"], right_on=["ps_suppkey", "ps_partkey"])
-        .join(orders, left_on="l_orderkey", right_on="o_orderkey")
-        .join(nation, left_on="s_nationkey", right_on="n_nationkey")
-        .with_columns(
-            col("o_orderdate").dt.year().alias("o_year"),
-            (col("l_extendedprice") * (lit(1) - col("l_discount")) - col("ps_supplycost") * col("l_quantity")).alias(
-                "amount"
-            ),
-        )
-        .group_by(col("n_name").alias("nation"), "o_year")
-        .agg(col("amount").sum().alias("sum_profit"))
-        .sort(["nation", "o_year"], descending=[False, True])
-    )
-    return result
+q9_v7_expression_impl = make_variant_delegate(_q9_expr_base, name="q9_v7_expression_impl", module=__name__)
 
 
-def q9_v7_pandas_impl(ctx: DataFrameContext) -> Any:
-    part = ctx.get_table("part")
-    supplier = ctx.get_table("supplier")
-    lineitem = ctx.get_table("lineitem")
-    partsupp = ctx.get_table("partsupp")
-    orders = ctx.get_table("orders")
-    nation = ctx.get_table("nation")
-
-    params = get_tpch_parameters(9)
-    color = params["color"]
-
-    filtered_parts = part[part["p_name"].str.contains(color, case=False, na=False)]
-    # Start from lineitem
-    joined = lineitem.merge(filtered_parts, left_on="l_partkey", right_on="p_partkey")
-    joined = joined.merge(supplier, left_on="l_suppkey", right_on="s_suppkey")
-    joined = joined.merge(partsupp, left_on=["l_suppkey", "p_partkey"], right_on=["ps_suppkey", "ps_partkey"])
-    joined = joined.merge(orders, left_on="l_orderkey", right_on="o_orderkey")
-    joined = joined.merge(nation, left_on="s_nationkey", right_on="n_nationkey").copy()
-    joined["o_year"] = joined["o_orderdate"].dt.year
-    joined["amount"] = (
-        joined["l_extendedprice"] * (1 - joined["l_discount"]) - joined["ps_supplycost"] * joined["l_quantity"]
-    )
-
-    return (
-        joined.groupby(["n_name", "o_year"], as_index=False)
-        .agg(sum_profit=("amount", "sum"))
-        .rename(columns={"n_name": "nation"})
-        .sort_values(["nation", "o_year"], ascending=[True, False])
-    )
+q9_v7_pandas_impl = make_variant_delegate(q9_v2_pandas_impl, name="q9_v7_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -348,35 +289,7 @@ def q9_v8_expression_impl(ctx: DataFrameContext) -> Any:
     return _q9_expr_base(ctx)
 
 
-def q9_v8_pandas_impl(ctx: DataFrameContext) -> Any:
-    part = ctx.get_table("part")
-    supplier = ctx.get_table("supplier")
-    lineitem = ctx.get_table("lineitem")
-    partsupp = ctx.get_table("partsupp")
-    orders = ctx.get_table("orders")
-    nation = ctx.get_table("nation")
-
-    params = get_tpch_parameters(9)
-    color = params["color"]
-
-    # Use regex=False for plain substring match
-    filtered_parts = part[part["p_name"].str.contains(color, regex=False, na=False)]
-    joined = filtered_parts.merge(lineitem, left_on="p_partkey", right_on="l_partkey")
-    joined = joined.merge(supplier, left_on="l_suppkey", right_on="s_suppkey")
-    joined = joined.merge(partsupp, left_on=["l_suppkey", "p_partkey"], right_on=["ps_suppkey", "ps_partkey"])
-    joined = joined.merge(orders, left_on="l_orderkey", right_on="o_orderkey")
-    joined = joined.merge(nation, left_on="s_nationkey", right_on="n_nationkey").copy()
-    joined["o_year"] = joined["o_orderdate"].dt.year
-    joined["amount"] = (
-        joined["l_extendedprice"] * (1 - joined["l_discount"]) - joined["ps_supplycost"] * joined["l_quantity"]
-    )
-
-    return (
-        joined.groupby(["n_name", "o_year"], as_index=False)
-        .agg(sum_profit=("amount", "sum"))
-        .rename(columns={"n_name": "nation"})
-        .sort_values(["nation", "o_year"], ascending=[True, False])
-    )
+q9_v8_pandas_impl = make_variant_delegate(q9_v2_pandas_impl, name="q9_v8_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -385,36 +298,7 @@ def q9_v8_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q9_v9_expression_impl(ctx: DataFrameContext) -> Any:
-    part = ctx.get_table("part")
-    supplier = ctx.get_table("supplier")
-    lineitem = ctx.get_table("lineitem")
-    partsupp = ctx.get_table("partsupp")
-    orders = ctx.get_table("orders")
-    nation = ctx.get_table("nation")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(9)
-    color = params["color"]
-
-    result = (
-        part.filter(col("p_name").str.contains(color))
-        .join(lineitem, left_on="p_partkey", right_on="l_partkey")
-        .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
-        .join(partsupp, left_on=["l_suppkey", "p_partkey"], right_on=["ps_suppkey", "ps_partkey"])
-        .join(orders, left_on="l_orderkey", right_on="o_orderkey")
-        .join(nation, left_on="s_nationkey", right_on="n_nationkey")
-        .with_columns(
-            col("o_orderdate").dt.year().alias("o_year"),
-            (col("l_extendedprice") * (lit(1) - col("l_discount")) - col("ps_supplycost") * col("l_quantity")).alias(
-                "amount"
-            ),
-        )
-        .group_by(col("n_name").alias("nation"), "o_year")
-        .agg(col("amount").sum().alias("sum_profit"))
-        .sort(["nation", "o_year"], descending=[False, True])
-    )
-    return result
+    return _q9_expr_base(ctx)
 
 
 def q9_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -443,7 +327,7 @@ def q9_v10_expression_impl(ctx: DataFrameContext) -> Any:
         "l_quantity"
     )
 
-    result = (
+    return (
         part.filter(col("p_name").str.contains(color))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
@@ -458,7 +342,6 @@ def q9_v10_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("amount").sum().alias("sum_profit"))
         .sort(["nation", "o_year"], descending=[False, True])
     )
-    return result
 
 
 def q9_v10_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -495,40 +378,4 @@ def q9_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q9_v1_expression_impl, q9_v1_pandas_impl),
-    (q9_v2_expression_impl, q9_v2_pandas_impl),
-    (q9_v3_expression_impl, q9_v3_pandas_impl),
-    (q9_v4_expression_impl, q9_v4_pandas_impl),
-    (q9_v5_expression_impl, q9_v5_pandas_impl),
-    (q9_v6_expression_impl, q9_v6_pandas_impl),
-    (q9_v7_expression_impl, q9_v7_pandas_impl),
-    (q9_v8_expression_impl, q9_v8_pandas_impl),
-    (q9_v9_expression_impl, q9_v9_pandas_impl),
-    (q9_v10_expression_impl, q9_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q9 implementation",
-    "Pre-filter: filter part by color before joining",
-    "Column prune: select only needed columns from each table",
-    "Intermediate vars: named DataFrames for each join step",
-    "Pre-compute derived: disc_price and supply_cost before amount computation",
-    "Chained style: maximum method chaining",
-    "Join reorder: start from lineitem→part instead of part→lineitem",
-    "Filter combination: use regex=False for plain substring match",
-    "Explicit sort: descending=[False, True] explicitly specified",
-    "Alternative formula: (price - price*disc) - supply_cost*qty",
-]
-
-Q9_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q9v{v}",
-        query_name=f"TPC-H Q9 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q9_VARIANTS = build_yaml_variants(__file__, globals(), 9, JOIN_AGG_FILTER)

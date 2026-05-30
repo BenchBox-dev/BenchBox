@@ -27,16 +27,17 @@ from urllib.parse import urlparse
 
 from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
 from benchbox.core.sql_utils import normalize_table_name_in_sql
+from benchbox.platforms.base.config_utils import make_registered_platform_config_builder
 from benchbox.platforms.base.runtime_metadata import build_default_normalized_result_metadata
+from benchbox.platforms.base.tuning import make_informational_constraint_applier
+from benchbox.platforms.presto_trino_utils import normalize_existing_files, show_tables_lower
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
         UnifiedTuningConfiguration,
     )
 
@@ -338,44 +339,32 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create Firebolt adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-
-        # Generate database name using benchmark characteristics
-        if "database" in config and config["database"]:
-            adapter_config["database"] = config["database"]
-        else:
-            database_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
-                platform="firebolt",
-                tuning_config=config.get("tuning_config"),
-            )
-            adapter_config["database"] = database_name
-
-        # Mode and connection parameters
-        for key in [
-            "url",
-            "client_id",
-            "client_secret",
-            "account_name",
-            "engine_name",
-            "api_endpoint",
-            "region",
-            "cloud_region",
-            "cloud_provider",
-            "engine_type",
-            "engine_size",
-            "compute_size",
-            "deployment_mode",
-            "s3_staging_url",
-            "s3_region",
-            "disable_result_cache",
-            "strict_validation",
-        ]:
-            if key in config and config[key] is not None:
-                adapter_config[key] = config[key]
+        adapter_config = build_adapter_config(
+            config,
+            platform="firebolt",
+            fields=[
+                "url",
+                "client_id",
+                "client_secret",
+                "account_name",
+                "engine_name",
+                "api_endpoint",
+                "region",
+                "cloud_region",
+                "cloud_provider",
+                "engine_type",
+                "engine_size",
+                "compute_size",
+                "deployment_mode",
+                "s3_staging_url",
+                "s3_region",
+                "disable_result_cache",
+                "strict_validation",
+            ],
+            include_none=False,
+        )
 
         # Handle mode override
         if config.get("deployment_mode"):
@@ -899,16 +888,7 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             return self._load_data_via_s3(benchmark, connection, data_dir)
         return self._load_data_via_insert(benchmark, connection, data_dir)
 
-    @staticmethod
-    def _normalize_existing_files(file_paths: Any) -> list[Path]:
-        """Normalize file inputs to existing, non-empty local paths."""
-        normalized_paths = file_paths if isinstance(file_paths, list) else [file_paths]
-        valid_files: list[Path] = []
-        for file_path in normalized_paths:
-            path = Path(file_path)
-            if path.exists() and path.stat().st_size > 0:
-                valid_files.append(path)
-        return valid_files
+    _normalize_existing_files = staticmethod(normalize_existing_files)
 
     def _resolve_data_files(self, benchmark, data_dir: Path) -> Any:
         """Resolve data files via DataSourceResolver.
@@ -1349,27 +1329,7 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             self.logger.debug(f"Connection test failed: {e}")
             return False
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if Firebolt supports a specific tuning type.
-
-        Firebolt supports:
-        - PARTITIONING: Via PARTITION BY clause
-        - DISTRIBUTION: Via PRIMARY INDEX clause (critical for Firebolt performance)
-        - Aggregating indexes (Firebolt-specific, not exposed via tuning interface)
-
-        Note: Primary/foreign key constraints are NOT enforced in Firebolt.
-        Firebolt's PRIMARY INDEX (mapped to DISTRIBUTION tuning type) controls
-        how data is distributed across nodes - this is different from PRIMARY KEY.
-        """
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {
-                TuningType.PARTITIONING,
-                TuningType.DISTRIBUTION,
-            }
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "DISTRIBUTION")
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Firebolt-specific tuning clauses.
@@ -1422,19 +1382,9 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to Firebolt."""
-        if not unified_config:
-            return
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        # Apply constraint configurations (informational only in Firebolt)
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        # Apply platform optimizations
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        # Apply table-level tunings
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
         """Apply Firebolt-specific platform optimizations.
@@ -1447,32 +1397,12 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         self.logger.info("Firebolt platform optimizations noted (engine pre-optimized for analytics)")
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to Firebolt.
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints enabled for Firebolt (informational only, not enforced)",
+        "Foreign key constraints enabled for Firebolt (informational only, not enforced)",
+    )
 
-        Note: Firebolt does not enforce constraints. They are informational only.
-        """
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info("Primary key constraints enabled for Firebolt (informational only, not enforced)")
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info("Foreign key constraints enabled for Firebolt (informational only, not enforced)")
-
-    def _get_existing_tables(self, connection: Any) -> list[str]:
-        """Get list of existing tables from Firebolt database."""
-        cursor = connection.cursor()
-        try:
-            cursor.execute("SHOW TABLES")
-            return [row[0].lower() for row in cursor.fetchall()]
-        except Exception:
-            return []
-        finally:
-            cursor.close()
+    _get_existing_tables = staticmethod(show_tables_lower)
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Run ANALYZE on table for query optimization.
@@ -1632,50 +1562,29 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return metadata
 
 
-def _build_firebolt_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="firebolt",
-        credential_key="firebolt",
-        default_display_name="Firebolt",
-        default_driver_package="firebolt-sdk",
-        platform_fields=[
-            "url",
-            "client_id",
-            "client_secret",
-            "account_name",
-            "engine_name",
-            "api_endpoint",
-            "database",
-            "region",
-            "cloud_region",
-            "cloud_provider",
-            "engine_type",
-            "engine_size",
-            "compute_size",
-            "deployment_mode",
-            "s3_staging_url",
-            "s3_region",
-            "disable_result_cache",
-            "strict_validation",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
-
-
-# Register the config builder with the platform hook registry
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("firebolt", _build_firebolt_config)
-except ImportError:
-    # Platform hooks may not be available in all contexts
-    pass
+_build_firebolt_config = make_registered_platform_config_builder(
+    "firebolt",
+    __name__,
+    "Firebolt",
+    "firebolt-sdk",
+    [
+        "url",
+        "client_id",
+        "client_secret",
+        "account_name",
+        "engine_name",
+        "api_endpoint",
+        "database",
+        "region",
+        "cloud_region",
+        "cloud_provider",
+        "engine_type",
+        "engine_size",
+        "compute_size",
+        "deployment_mode",
+        "s3_staging_url",
+        "s3_region",
+        "disable_result_cache",
+        "strict_validation",
+    ],
+)

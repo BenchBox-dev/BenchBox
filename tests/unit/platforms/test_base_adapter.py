@@ -20,6 +20,8 @@ from benchbox.platforms.base import (
     ConnectionConfig,
     PlatformAdapter,
 )
+from benchbox.platforms.base.execution import _power_query_result, _power_test_error_result
+from benchbox.utils.dialect_utils import SQLTranslationError, SqlTranslationOutcome
 from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
@@ -223,6 +225,98 @@ class BenchmarkWithVersionAwareQueries:
             }
         )
         return {"Q1": "SELECT 1"}
+
+
+class BenchmarkWithStrictTranslationFailure:
+    """Benchmark stub whose dialect-aware path raises the strict translation exception."""
+
+    def get_queries(self, dialect: str | None = None, base_dialect: str | None = None) -> dict[str, str]:
+        if dialect is None:
+            return {"Q1": "SELECT fallback"}
+        outcome = SqlTranslationOutcome(
+            source_dialect=base_dialect or "ansi",
+            target_dialect=dialect,
+            translator="test",
+            status="failed",
+            strict_mode=True,
+            error_category="translation_failed",
+        )
+        raise SQLTranslationError("strict translation failed", outcome)
+
+
+class TestPowerResultConversionHelpers:
+    def test_power_query_result_preserves_warmup_fields(self):
+        result = _power_query_result(
+            {
+                "query_id": "Q1",
+                "execution_time_seconds": 1.25,
+                "success": True,
+                "result_count": 10,
+                "stream_id": 3,
+                "position": 7,
+            },
+            stream_id=99,
+            iteration=0,
+            run_type="warmup",
+        )
+
+        assert result == {
+            "query_id": "Q1",
+            "execution_time_seconds": 1.25,
+            "status": "SUCCESS",
+            "rows_returned": 10,
+            "test_type": "power",
+            "stream_id": 3,
+            "position": 7,
+            "iteration": 0,
+            "run_type": "warmup",
+        }
+
+    def test_power_query_result_preserves_measurement_failure_fields(self):
+        result = _power_query_result(
+            {
+                "query_id": "Q2",
+                "execution_time_seconds": 0.0,
+                "success": False,
+                "error": "boom",
+            },
+            stream_id=5,
+            iteration=2,
+            run_type="measurement",
+        )
+
+        assert result == {
+            "query_id": "Q2",
+            "execution_time_seconds": 0.0,
+            "status": "FAILED",
+            "rows_returned": 0,
+            "test_type": "power",
+            "stream_id": 5,
+            "position": 0,
+            "iteration": 2,
+            "run_type": "measurement",
+            "error": "boom",
+        }
+
+    def test_power_error_sentinel_keeps_optional_iteration_context(self):
+        assert _power_test_error_result("factory failed", iteration=4, run_type="measurement") == {
+            "query_id": "power_test_error",
+            "execution_time_seconds": 0.0,
+            "status": "FAILED",
+            "rows_returned": 0,
+            "error": "factory failed",
+            "test_type": "power",
+            "iteration": 4,
+            "run_type": "measurement",
+        }
+        assert _power_test_error_result("init failed") == {
+            "query_id": "power_test_error",
+            "execution_time_seconds": 0.0,
+            "status": "FAILED",
+            "rows_returned": 0,
+            "error": "init failed",
+            "test_type": "power",
+        }
 
 
 class TestConnectionConfig:
@@ -3202,3 +3296,14 @@ class TestDialectQuerySelection:
 
         assert queries == {"Q1": "SELECT 1"}
         assert benchmark.calls == [{"dialect": "mock_dialect", "platform_version": "1.0.0"}]
+
+    def test_get_dialect_queries_preserves_strict_translation_failures(self):
+        adapter = MockPlatformAdapterWithDialect()
+        benchmark = BenchmarkWithStrictTranslationFailure()
+
+        with pytest.raises(SQLTranslationError):
+            adapter._get_dialect_queries(
+                benchmark,
+                benchmark_slug="tpch",
+                connection=Mock(name="strict_translation_connection"),
+            )

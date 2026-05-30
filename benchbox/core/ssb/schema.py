@@ -1,129 +1,24 @@
-"""Star Schema Benchmark (SSB) schema definitions.
+"""Star Schema Benchmark (SSB) schema definitions."""
 
-Copyright 2026 Joe Harris / BenchBox Project
+from pathlib import Path
+from typing import Any, cast
 
-This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-
-This module defines the schema for the Star Schema Benchmark, which is a simplified
-version of TPC-H designed for testing OLAP systems and data warehouses.
-
-The SSB schema consists of:
-- One fact table (LINEORDER)
-- Four dimension tables (CUSTOMER, SUPPLIER, PART, DATE)
-
-For more information, see:
-- Original paper: "Star Schema Benchmark" by O'Neil et al.
-- https://www.cs.umb.edu/~poneil/StarSchemaB.PDF
-"""
-
-from typing import cast
+import yaml
 
 from benchbox.core.tuning import BenchmarkTunings, TableTuning, TuningColumn
 
-# DATE dimension table
-DATE = {
-    "name": "date",
-    "columns": [
-        {"name": "d_datekey", "type": "INTEGER", "primary_key": True},
-        {"name": "d_date", "type": "VARCHAR(18)"},
-        {"name": "d_dayofweek", "type": "VARCHAR(9)"},
-        {"name": "d_month", "type": "VARCHAR(9)"},
-        {"name": "d_year", "type": "INTEGER"},
-        {"name": "d_yearmonthnum", "type": "INTEGER"},
-        {"name": "d_yearmonth", "type": "VARCHAR(7)"},
-        {"name": "d_daynuminweek", "type": "INTEGER"},
-        {"name": "d_daynuminmonth", "type": "INTEGER"},
-        {"name": "d_daynuminyear", "type": "INTEGER"},
-        {"name": "d_monthnuminyear", "type": "INTEGER"},
-        {"name": "d_weeknuminyear", "type": "INTEGER"},
-        {"name": "d_sellingseason", "type": "VARCHAR(12)"},
-        {"name": "d_lastdayinweekfl", "type": "INTEGER"},
-        {"name": "d_lastdayinmonthfl", "type": "INTEGER"},
-        {"name": "d_holidayfl", "type": "INTEGER"},
-        {"name": "d_weekdayfl", "type": "INTEGER"},
-    ],
-}
 
-# CUSTOMER dimension table
-CUSTOMER = {
-    "name": "customer",
-    "columns": [
-        {"name": "c_custkey", "type": "INTEGER", "primary_key": True},
-        {"name": "c_name", "type": "VARCHAR(25)"},
-        {"name": "c_address", "type": "VARCHAR(25)"},
-        {"name": "c_city", "type": "VARCHAR(10)"},
-        {"name": "c_nation", "type": "VARCHAR(15)"},
-        {"name": "c_region", "type": "VARCHAR(12)"},
-        {"name": "c_phone", "type": "VARCHAR(15)"},
-        {"name": "c_mktsegment", "type": "VARCHAR(10)"},
-    ],
-}
+def _load_schema_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("schema_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
-# SUPPLIER dimension table
-SUPPLIER = {
-    "name": "supplier",
-    "columns": [
-        {"name": "s_suppkey", "type": "INTEGER", "primary_key": True},
-        {"name": "s_name", "type": "VARCHAR(25)"},
-        {"name": "s_address", "type": "VARCHAR(25)"},
-        {"name": "s_city", "type": "VARCHAR(10)"},
-        {"name": "s_nation", "type": "VARCHAR(15)"},
-        {"name": "s_region", "type": "VARCHAR(12)"},
-        {"name": "s_phone", "type": "VARCHAR(15)"},
-    ],
-}
 
-# PART dimension table
-PART = {
-    "name": "part",
-    "columns": [
-        {"name": "p_partkey", "type": "INTEGER", "primary_key": True},
-        {"name": "p_name", "type": "VARCHAR(22)"},
-        {"name": "p_mfgr", "type": "VARCHAR(6)"},
-        {"name": "p_category", "type": "VARCHAR(7)"},
-        {"name": "p_brand1", "type": "VARCHAR(9)"},
-        {"name": "p_color", "type": "VARCHAR(11)"},
-        {"name": "p_type", "type": "VARCHAR(25)"},
-        {"name": "p_size", "type": "INTEGER"},
-        {"name": "p_container", "type": "VARCHAR(10)"},
-    ],
-}
+_SCHEMA_SPECS = _load_schema_specs()
+_TABLE_DEFS = {entry["id"]: entry for entry in _SCHEMA_SPECS["tables"]}
+globals().update({symbol: entry["schema"] for symbol, entry in _TABLE_DEFS.items()})
 
-# LINEORDER fact table
-LINEORDER = {
-    "name": "lineorder",
-    "columns": [
-        {"name": "lo_orderkey", "type": "INTEGER"},
-        {"name": "lo_linenumber", "type": "INTEGER"},
-        {"name": "lo_custkey", "type": "INTEGER", "foreign_key": "customer.c_custkey"},
-        {"name": "lo_partkey", "type": "INTEGER", "foreign_key": "part.p_partkey"},
-        {"name": "lo_suppkey", "type": "INTEGER", "foreign_key": "supplier.s_suppkey"},
-        {"name": "lo_orderdate", "type": "INTEGER", "foreign_key": "date.d_datekey"},
-        {"name": "lo_orderpriority", "type": "VARCHAR(15)"},
-        {"name": "lo_shippriority", "type": "INTEGER"},
-        {"name": "lo_quantity", "type": "INTEGER"},
-        {"name": "lo_extendedprice", "type": "INTEGER"},
-        {"name": "lo_ordtotalprice", "type": "INTEGER"},
-        {"name": "lo_discount", "type": "INTEGER"},
-        {"name": "lo_revenue", "type": "INTEGER"},
-        {"name": "lo_supplycost", "type": "INTEGER"},
-        {"name": "lo_tax", "type": "INTEGER"},
-        {"name": "lo_commitdate", "type": "INTEGER"},
-        {"name": "lo_shipmode", "type": "VARCHAR(10)"},
-    ],
-    "primary_key": ["lo_orderkey", "lo_linenumber"],
-}
-
-# All tables in the SSB schema
-TABLES = {
-    "date": DATE,
-    "customer": CUSTOMER,
-    "supplier": SUPPLIER,
-    "part": PART,
-    "lineorder": LINEORDER,
-}
+TABLES: dict[str, dict] = {entry["key"]: globals()[symbol] for symbol, entry in _TABLE_DEFS.items()}
+_TABLE_ORDER = list(_SCHEMA_SPECS["table_order"])
 
 
 def get_create_table_sql(
@@ -190,7 +85,7 @@ def get_all_create_table_sql(
     from benchbox.core.schema_utils import collect_create_table_sql
 
     return collect_create_table_sql(
-        ["date", "customer", "supplier", "part", "lineorder"],
+        _TABLE_ORDER,
         get_create_table_sql,
         dialect,
         enable_primary_keys=enable_primary_keys,

@@ -1,8 +1,7 @@
 """Single-cell `benchbox run` execution.
 
-Mirrors the bash `run_benchmark` function in
-scripts/local_stress_test.sh:433-493 — build the argv, capture output
-to a per-run log, extract the result-JSON path on success.
+Build the argv, capture output to a per-run log, and read the quiet
+result-JSON path on success.
 
 Sequential platform execution discipline (UAT W3 line 222 in
 _project/handoffs/results-explorer-uat-retrospective-20260502.md):
@@ -15,7 +14,7 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import os
-import re
+import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -25,14 +24,6 @@ from benchbox.core.results.status import result_failed_query_count, result_non_c
 from tests.uat.matrix import benchbox_run_argv
 from tests.uat.timeouts import TimeoutResult, run_with_timeout
 
-# Mirrors scripts/local_stress_test.sh:478 — match either an absolute or
-# relative result JSON path under a `results/` directory. The UAT runner
-# may override BENCHBOX_OUTPUT_DIR, so the runs root is not necessarily
-# named `benchmark_runs`. The `[^\s,;]+` is narrower than `[^\s]+` so a
-# comma- or semicolon-separated log line does not collapse two paths into
-# a single match.
-RESULT_PATH_RE = re.compile(r"(?:(?:[A-Za-z]:)?[\\/]?[^\s,;]*[\\/])?results[\\/][^\s,;]+\.json")
-WRAPPED_RESULT_PATH_RE = re.compile(r"((?:(?:[A-Za-z]:)?[\\/]?[^\s,;]*[\\/])?results[\\/][^\s,;]*)\n([^\s,;]*\.json)")
 UNOFFICIAL_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
 
 
@@ -61,18 +52,13 @@ class CellResult:
     submit_terminal_state: str = SubmitTerminalState.submittable.value
 
 
-def extract_result_path(log_text: str) -> str | None:
-    """Return the last `results/.../*.json` path mentioned in log_text.
-
-    Bash semantics: `grep -oE ... | tail -1`. The Python port matches the
-    last occurrence so log re-prints (e.g. summary tables) take precedence
-    over earlier diagnostic prints.
-    """
-    log_text = WRAPPED_RESULT_PATH_RE.sub(r"\1\2", log_text)
-    matches = RESULT_PATH_RE.findall(log_text)
-    if not matches:
-        return None
-    return matches[-1]
+def last_nonempty_output_line(log_text: str) -> str | None:
+    """Return the final subprocess output line from a UAT cell log."""
+    for line in reversed(log_text.splitlines()):
+        stripped = line.strip()
+        if stripped and not stripped.startswith("# "):
+            return stripped
+    return None
 
 
 def classify_for_submit(result_json: Path | str | None) -> SubmitTerminalState:
@@ -134,10 +120,7 @@ def run_cell(
     local_managed_platform: bool = False,
     now: _dt.datetime | None = None,
 ) -> CellResult:
-    """Run a single cell end-to-end and return the cell result.
-
-    Mirrors scripts/local_stress_test.sh:433-493.
-    """
+    """Run a single cell end-to-end and return the cell result."""
     now = now or _dt.datetime.now()
     log_dir = Path(log_dir) if log_dir is not None else _default_log_dir(now)
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -162,15 +145,17 @@ def run_cell(
         timeout_result = run_with_timeout(
             argv,
             timeout_s=timeout_s,
-            stdout=log_fh,
+            stdout=subprocess.PIPE,
             stderr=log_fh,
             env=env,
         )
+        stdout_text = _decode_process_output(timeout_result.stdout)
+        if stdout_text:
+            log_fh.write(stdout_text)
         if timeout_result.timed_out:
             log_fh.write(f"# UAT_TIMEOUT timeout_s={timeout_s} exit_code={timeout_result.exit_code}\n")
 
-    log_text = log_path.read_text(encoding="utf-8", errors="replace")
-    result_path_str = extract_result_path(log_text) if timeout_result.exit_code == 0 else None
+    result_path_str = last_nonempty_output_line(stdout_text) if timeout_result.exit_code == 0 else None
     result_path = _resolve_result_path(result_path_str, runs_dir) if result_path_str else None
     status = _classify(timeout_result)
     submit_state = (
@@ -200,6 +185,14 @@ def _resolve_result_path(result_path_str: str, runs_dir: Path) -> Path:
     if len(path.parts) >= 2 and path.parts[0] == "benchmark_runs":
         return runs_dir.parent / path
     return runs_dir / path
+
+
+def _decode_process_output(output: object) -> str:
+    if output is None:
+        return ""
+    if isinstance(output, bytes):
+        return output.decode("utf-8", errors="replace")
+    return str(output)
 
 
 def _classify(timeout_result: TimeoutResult) -> str:

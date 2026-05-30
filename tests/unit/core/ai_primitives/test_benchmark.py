@@ -55,6 +55,37 @@ class TestAIPrimitivesBenchmark:
         """Test data source is TPC-H."""
         assert ai_benchmark.get_data_source_benchmark() == "tpch"
 
+    def test_generate_data_preserves_sharded_tpch_table_mapping(self, monkeypatch, tmp_path):
+        """AI primitives must keep TPC-H table names when TPC-H returns sharded files."""
+
+        class FakeTPCHBenchmark:
+            def __init__(self, scale_factor, output_dir):
+                assert scale_factor == 0.01
+                assert output_dir == tmp_path
+                self.tables = {}
+
+            def generate_data(self):
+                self.tables = {
+                    "lineitem": [tmp_path / "lineitem.tbl.1", tmp_path / "lineitem.tbl.2"],
+                    "orders": tmp_path / "orders.tbl",
+                }
+                return list(self.tables.values())
+
+        monkeypatch.setattr("benchbox.core.tpch.benchmark.TPCHBenchmark", FakeTPCHBenchmark)
+        benchmark = AIPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
+
+        files = benchmark.generate_data()
+
+        assert benchmark.tables == {
+            "lineitem": [tmp_path / "lineitem.tbl.1", tmp_path / "lineitem.tbl.2"],
+            "orders": tmp_path / "orders.tbl",
+        }
+        assert files == [
+            tmp_path / "lineitem.tbl.1",
+            tmp_path / "lineitem.tbl.2",
+            tmp_path / "orders.tbl",
+        ]
+
     def test_is_platform_supported_true(self, ai_benchmark):
         """Test supported platforms are recognized."""
         for platform in SUPPORTED_PLATFORMS:

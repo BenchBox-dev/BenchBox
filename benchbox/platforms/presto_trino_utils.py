@@ -36,34 +36,6 @@ def escape_insert_value(value: str) -> str:
         return "'" + str(value).replace("'", "''") + "'"
 
 
-def resolve_data_files(
-    benchmark: Any,
-    data_dir: Path,
-    *,
-    platform_name: str,
-    table_mode: str,
-    platform_config: Any,
-    requested_format: Any,
-) -> dict[str, Any]:
-    """Resolve benchmark data files via DataSourceResolver.
-
-    Raises ``ValueError`` when no data files are resolved - consistent
-    with the per-adapter message both Presto and Trino used.
-    """
-    from benchbox.platforms.base.data_loading import DataSourceResolver
-
-    resolver = DataSourceResolver(
-        platform_name=platform_name,
-        table_mode=table_mode,
-        platform_config=platform_config,
-        requested_format=requested_format,
-    )
-    data_source = resolver.resolve(benchmark, data_dir)
-    if not data_source or not data_source.tables:
-        raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-    return data_source.tables
-
-
 def load_file_batches(cursor: Any, file_path: Path, qualified_table: str) -> int:
     """Load one file into a Presto/Trino table using batched INSERT VALUES."""
     from benchbox.platforms.base.data_loading import FileFormatRegistry
@@ -108,6 +80,18 @@ def normalize_existing_files(file_paths: Any) -> list[Path]:
         if path.exists() and path.stat().st_size > 0:
             valid_files.append(path)
     return valid_files
+
+
+def show_tables_lower(connection: Any) -> list[str]:
+    """Return lower-cased table names from a cursor-based SHOW TABLES result."""
+    cursor = connection.cursor()
+    try:
+        cursor.execute("SHOW TABLES")
+        return [row[0].lower() for row in cursor.fetchall()]
+    except Exception:
+        return []
+    finally:
+        cursor.close()
 
 
 def validate_catalog_exists(

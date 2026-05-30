@@ -45,7 +45,8 @@ import pytest
 
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.fast,
+    pytest.mark.slow,
+    pytest.mark.resource_heavy,
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -72,7 +73,7 @@ def _minimal_schema_v2_bundle() -> dict:
         },
         "benchmark": {"id": "tpch", "scale_factor": 0.01},
         "platform": {"name": "duckdb"},
-        "summary": {"queries": {"total": 22}},
+        "summary": {"validation": "passed", "queries": {"total": 22, "passed": 22, "failed": 0}},
         "queries": [{"id": "Q1", "ms": 100.0}],
     }
 

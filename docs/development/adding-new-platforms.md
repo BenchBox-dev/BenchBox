@@ -7,6 +7,8 @@
 
 This guide provides step-by-step instructions for implementing new platform adapters in BenchBox. Platform adapters enable BenchBox to run benchmarks on different database systems.
 
+Before opening a PR, run through the [New Platform Acceptance Checklist](new-platform-acceptance-checklist.md). It covers `support_status`, registry metadata, optional dependencies, SQL compatibility governance, docs, tests, and UAT scope.
+
 ## Overview
 
 Platform adapters in BenchBox follow a consistent architecture based on the `PlatformAdapter` base class. Each adapter provides:
@@ -56,6 +58,27 @@ class NewDatabaseAdapter(PlatformAdapter):
 
     # Implement required abstract methods...
 ```
+
+### Lifecycle and Run-Scoped State
+
+BenchBox treats `PlatformAdapter` instances as serial execution objects. Reusing
+one adapter instance for multiple benchmark runs is supported only
+sequentially; concurrent `run_benchmark()` calls on the same adapter instance
+are not supported.
+
+The base adapter resets its run-scoped caches at the start of each run,
+including database-reuse decisions, cached power/throughput phase results,
+sorted-ingestion metadata, plan-capture counters, and captured SQL buffers when
+explicit dry-run mode is active. Run-config plan-capture overrides
+(`capture_plans`, `strict_plan_capture`, and `plan_capture_timeout_seconds`)
+are restored after the run.
+
+Adapter authors should keep connection handles, phase-result caches,
+plan-capture counters, skipped-query tracking, and dry-run SQL capture out of
+class-level state. Store them on the adapter only when they are truly
+adapter-scoped and can be reset or overwritten before each run. If an adapter
+needs concurrent execution, design a per-run context first and update the public
+contract map before claiming support.
 
 ### Required Dependencies
 
@@ -660,38 +683,40 @@ def run_maintenance_test(self, benchmark, **kwargs) -> Dict[str, Any]:
 
 ### Step 1: Register the Adapter
 
-Add your adapter to `benchbox/platforms/__init__.py`:
+Register the adapter in the registry source of truth:
 
 ```python
-from .newdatabase import NewDatabaseAdapter
-
-__all__ = [
-    'PlatformAdapter',
-    'DuckDBAdapter',
-    'SQLiteAdapter',
+# benchbox/core/platform_registry.py
+_OPTIONAL_ADAPTERS = (
     # ... existing adapters
-    'NewDatabaseAdapter',  # Add your adapter
-]
+    ("newdatabase", "benchbox.platforms.newdatabase", "NewDatabaseAdapter"),
+)
+```
+
+Add metadata in `PlatformRegistry._build_platform_metadata()` and add exactly one `support_status` entry in `_PLATFORM_SUPPORT_STATUS`. `support_status` is product support classification, not local dependency availability.
+
+If the adapter should be importable from `benchbox.platforms`, add a lazy entry and `__all__` export in `benchbox/platforms/__init__.py`; keep optional SDK imports guarded so `import benchbox` does not load the platform dependency.
+
+Run the scaffold helper before implementation to inspect the expected file plan:
+
+```bash
+uv run -- python _project/scripts/platform_scaffold.py --name newdatabase --kind sql
 ```
 
 ### Step 2: Add SQL Dialect Support
 
-If your platform has a unique SQL dialect, add it to the SQL translation system in `benchbox/core/sql_translation.py`:
+If your platform has a unique SQL dialect, add SQL compatibility rules or an explicit exemption under the phase-aware SQL compatibility system. Do not hide CREATE TABLE rewrites inside the adapter without registering or exempting them in the DDL governance inventory.
 
 ```python
-# Add dialect-specific translation rules
-DIALECT_TRANSLATIONS = {
-    'newdatabase': {
-        'functions': {
-            'SUBSTRING': 'SUBSTR',  # Example translation
-            'LENGTH': 'CHAR_LENGTH',
-        },
-        'types': {
-            'INTEGER': 'INT',
-            'VARCHAR': 'TEXT',
-        }
-    }
-}
+from benchbox.sql_compat.actions import RewriteDdlAction
+from benchbox.sql_compat.context import Phase
+from benchbox.sql_compat.registry import REGISTRY
+
+REGISTRY.register(
+    RewriteDdlAction(...),
+    Phase.DDL_OPTIMIZE,
+    "newdatabase",
+)
 ```
 
 ### Step 3: Create Tests
@@ -886,10 +911,10 @@ Run unit tests to verify basic functionality:
 
 ```bash
 # Run adapter-specific tests
-pytest tests/unit/platforms/test_newdatabase_adapter.py -v
+uv run -- python -m pytest tests/unit/platforms/test_newdatabase_adapter.py -v
 
 # Run all platform tests
-pytest tests/unit/platforms/ -v
+uv run -- python -m pytest tests/unit/platforms/ -v
 ```
 
 ### Integration Tests
@@ -905,7 +930,7 @@ export NEWDATABASE_USERNAME=test
 export NEWDATABASE_PASSWORD=test
 
 # Run integration tests
-pytest tests/integration/ -k newdatabase -v
+uv run -- python -m pytest tests/integration/ -k newdatabase -v
 ```
 
 ### Benchmark Tests
@@ -1154,7 +1179,8 @@ Your contribution helps make BenchBox more comprehensive and valuable for the an
 
 - **Base Platform Adapter**: `benchbox/platforms/base/` package
 - **Existing Adapters**: `benchbox/platforms/` directory
-- **SQL Translation**: `benchbox/core/sql_translation.py`
+- **SQL Compatibility**: `benchbox/sql_compat/` and `docs/compat/`
 - **Test Examples**: `tests/unit/platforms/`
 - **Documentation Examples**: `docs/platforms/`
+- **Acceptance Checklist**: [new-platform-acceptance-checklist.md](new-platform-acceptance-checklist.md)
 - **BenchBox Architecture**: `docs/development/architecture.md`

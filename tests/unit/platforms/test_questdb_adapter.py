@@ -639,8 +639,10 @@ class TestQuestDBAdapter:
         adapter = QuestDBAdapter()
         adapter.benchmark = mock_benchmark
 
-        adapter.handle_existing_database()
+        with patch.object(adapter, "check_benchmark_tables_exist", wraps=adapter.check_benchmark_tables_exist) as hook:
+            adapter.handle_existing_database()
 
+        hook.assert_called_once()
         assert adapter.database_was_reused is True
         mock_conn.close.assert_called_once()
 
@@ -689,6 +691,7 @@ class TestQuestDBAdapter:
         adapter = QuestDBAdapter.__new__(QuestDBAdapter)
         adapter.dry_run = False
         adapter.force_recreate = False
+        adapter.skip_database_management = True
 
         with pytest.raises(ImportError, match="psycopg is required"):
             adapter.handle_existing_database()

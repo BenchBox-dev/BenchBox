@@ -50,7 +50,54 @@ from benchbox.platforms.base.connection_wrappers import (
     PlatformAdapterConnection,
     _make_stream_cursor,
 )
+from benchbox.utils.dialect_utils import SQLTranslationError
 from benchbox.utils.printing import quiet_console
+
+
+def _power_query_result(
+    query_result: dict[str, Any],
+    *,
+    stream_id: int,
+    iteration: int,
+    run_type: str,
+) -> dict[str, Any]:
+    """Convert a TPC power query result to the adapter result shape."""
+    platform_result = {
+        "query_id": query_result["query_id"],
+        "execution_time_seconds": query_result["execution_time_seconds"],
+        "status": "SUCCESS" if query_result["success"] else "FAILED",
+        "rows_returned": query_result.get("result_count", 0),
+        "test_type": "power",
+        "stream_id": query_result.get("stream_id", stream_id),
+        "position": query_result.get("position", 0),
+        "iteration": iteration,
+        "run_type": run_type,
+    }
+    if not query_result["success"]:
+        platform_result["error"] = query_result.get("error", "Unknown error")
+    return platform_result
+
+
+def _power_test_error_result(
+    error: str,
+    *,
+    iteration: int | None = None,
+    run_type: str | None = None,
+) -> dict[str, Any]:
+    """Build a failed power-test sentinel result."""
+    result: dict[str, Any] = {
+        "query_id": "power_test_error",
+        "execution_time_seconds": 0.0,
+        "status": "FAILED",
+        "rows_returned": 0,
+        "error": error,
+        "test_type": "power",
+    }
+    if iteration is not None:
+        result["iteration"] = iteration
+    if run_type is not None:
+        result["run_type"] = run_type
+    return result
 
 
 class TestDriversMixin:
@@ -123,20 +170,14 @@ class TestDriversMixin:
                 connection_adapter._validate_row_count = power_test.config.validation
                 power_test_result = power_test.run()
                 for query_result in power_test_result.query_results:
-                    platform_result = {
-                        "query_id": query_result["query_id"],
-                        "execution_time_seconds": query_result["execution_time_seconds"],
-                        "status": "SUCCESS" if query_result["success"] else "FAILED",
-                        "rows_returned": query_result.get("result_count", 0),
-                        "test_type": "power",
-                        "stream_id": query_result.get("stream_id", current_stream_id),
-                        "position": query_result.get("position", 0),
-                        "iteration": 0,
-                        "run_type": "warmup",
-                    }
-                    if not query_result["success"]:
-                        platform_result["error"] = query_result.get("error", "Unknown error")
-                    all_results.append(platform_result)
+                    all_results.append(
+                        _power_query_result(
+                            query_result,
+                            stream_id=current_stream_id,
+                            iteration=0,
+                            run_type="warmup",
+                        )
+                    )
 
             # Measurement runs
             for i in range(iterations):
@@ -183,20 +224,14 @@ class TestDriversMixin:
                 # Convert TPCHPowerTestResult to platform adapter format
                 query_results = []
                 for query_result in power_test_result.query_results:
-                    platform_result = {
-                        "query_id": query_result["query_id"],
-                        "execution_time_seconds": query_result["execution_time_seconds"],
-                        "status": "SUCCESS" if query_result["success"] else "FAILED",
-                        "rows_returned": query_result.get("result_count", 0),
-                        "test_type": "power",
-                        "stream_id": query_result.get("stream_id", current_stream_id),
-                        "position": query_result.get("position", 0),
-                        "iteration": i + 1,
-                        "run_type": "measurement",
-                    }
-                    if not query_result["success"]:
-                        platform_result["error"] = query_result.get("error", "Unknown error")
-                    query_results.append(platform_result)
+                    query_results.append(
+                        _power_query_result(
+                            query_result,
+                            stream_id=current_stream_id,
+                            iteration=i + 1,
+                            run_type="measurement",
+                        )
+                    )
                 all_results.extend(query_results)
 
                 # Abort remaining iterations if all queries failed (connection/infra issue)
@@ -208,18 +243,13 @@ class TestDriversMixin:
                         # so total_queries > 0 and the benchmark is marked FAILED, not PASSED.
                         if not query_results:
                             all_results.append(
-                                {
-                                    "query_id": "power_test_error",
-                                    "execution_time_seconds": 0.0,
-                                    "status": "FAILED",
-                                    "rows_returned": 0,
-                                    "error": "; ".join(power_test_result.errors)
+                                _power_test_error_result(
+                                    "; ".join(power_test_result.errors)
                                     if power_test_result.errors
                                     else "Power test failed",
-                                    "test_type": "power",
-                                    "iteration": i + 1,
-                                    "run_type": "measurement",
-                                }
+                                    iteration=i + 1,
+                                    run_type="measurement",
+                                )
                             )
                         break
                     if fail_fast:
@@ -232,16 +262,7 @@ class TestDriversMixin:
 
         except Exception as e:
             console.print(f"[red]❌ TPC-H Power Test failed: {e}[/red]")
-            return [
-                {
-                    "query_id": "power_test_error",
-                    "execution_time_seconds": 0.0,
-                    "status": "FAILED",
-                    "rows_returned": 0,
-                    "error": str(e),
-                    "test_type": "power",
-                }
-            ]
+            return [_power_test_error_result(str(e))]
 
     def _execute_generic_power_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Execute power test for non-TPC benchmarks with warmup + iterations.
@@ -393,20 +414,14 @@ class TestDriversMixin:
                 )
                 power_test_result = power_test.run()
                 for query_result in power_test_result.query_results:
-                    platform_result = {
-                        "query_id": query_result["query_id"],
-                        "execution_time_seconds": query_result["execution_time_seconds"],
-                        "status": "SUCCESS" if query_result["success"] else "FAILED",
-                        "rows_returned": query_result.get("result_count", 0),
-                        "test_type": "power",
-                        "stream_id": query_result.get("stream_id", current_stream_id),
-                        "position": query_result.get("position", 0),
-                        "iteration": 0,
-                        "run_type": "warmup",
-                    }
-                    if not query_result["success"]:
-                        platform_result["error"] = query_result.get("error", "Unknown error")
-                    all_results.append(platform_result)
+                    all_results.append(
+                        _power_query_result(
+                            query_result,
+                            stream_id=current_stream_id,
+                            iteration=0,
+                            run_type="warmup",
+                        )
+                    )
 
             # Measurement runs
             for i in range(iterations):
@@ -459,20 +474,14 @@ class TestDriversMixin:
                 # Convert TPCDSPowerTestResult to platform adapter format
                 query_results = []
                 for query_result in power_test_result.query_results:
-                    platform_result = {
-                        "query_id": query_result["query_id"],
-                        "execution_time_seconds": query_result["execution_time_seconds"],
-                        "status": "SUCCESS" if query_result["success"] else "FAILED",
-                        "rows_returned": query_result.get("result_count", 0),
-                        "test_type": "power",
-                        "stream_id": query_result.get("stream_id", current_stream_id),
-                        "position": query_result.get("position", 0),
-                        "iteration": i + 1,  # Add iteration tracking
-                        "run_type": "measurement",
-                    }
-                    if not query_result["success"]:
-                        platform_result["error"] = query_result.get("error", "Unknown error")
-                    query_results.append(platform_result)
+                    query_results.append(
+                        _power_query_result(
+                            query_result,
+                            stream_id=current_stream_id,
+                            iteration=i + 1,
+                            run_type="measurement",
+                        )
+                    )
                 all_results.extend(query_results)  # Accumulate results from all iterations
 
                 # Abort remaining iterations if all queries failed (connection/infra issue)
@@ -484,18 +493,13 @@ class TestDriversMixin:
                         # so total_queries > 0 and the benchmark is marked FAILED, not PASSED.
                         if not query_results:
                             all_results.append(
-                                {
-                                    "query_id": "power_test_error",
-                                    "execution_time_seconds": 0.0,
-                                    "status": "FAILED",
-                                    "rows_returned": 0,
-                                    "error": "; ".join(power_test_result.errors)
+                                _power_test_error_result(
+                                    "; ".join(power_test_result.errors)
                                     if power_test_result.errors
                                     else "Power test failed",
-                                    "test_type": "power",
-                                    "iteration": i + 1,
-                                    "run_type": "measurement",
-                                }
+                                    iteration=i + 1,
+                                    run_type="measurement",
+                                )
                             )
                         break
                     if fail_fast:
@@ -508,16 +512,7 @@ class TestDriversMixin:
 
         except Exception as e:
             console.print(f"[red]❌ TPC-DS Power Test failed: {e}[/red]")
-            return [
-                {
-                    "query_id": "power_test_error",
-                    "execution_time_seconds": 0.0,
-                    "status": "FAILED",
-                    "rows_returned": 0,
-                    "error": str(e),
-                    "test_type": "power",
-                }
-            ]
+            return [_power_test_error_result(str(e))]
 
     def _execute_tpcds_throughput_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Execute TPC-DS Throughput Test using production TPCDSThroughputTest implementation."""
@@ -1150,6 +1145,8 @@ class TestDriversMixin:
                     return benchmark.get_queries(**query_kwargs)
                 else:
                     return benchmark.get_queries()
+            except SQLTranslationError:
+                raise
             except Exception:
                 return benchmark.get_queries()
         return benchmark.get_queries()

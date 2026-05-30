@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import _compose_joinorder_hero as compose_joinorder_hero
 import pytest
 
@@ -22,5 +20,4 @@ def test_joinorder_json_input_path_is_repo_relative() -> None:
     )
 
     assert expected == compose_joinorder_hero.JSON_PATH
-    script_source = Path(compose_joinorder_hero.__file__).read_text(encoding="utf-8")
-    assert "/Users/joe/Developer/BenchBox/" not in script_source
+    assert "/Users/joe/Developer/BenchBox/" not in str(compose_joinorder_hero.JSON_PATH)

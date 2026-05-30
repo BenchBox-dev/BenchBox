@@ -1,0 +1,45 @@
+prices_per_tb_month:
+  snowflake:
+    us: 23.0
+    eu: 25.0
+    ap: 26.0
+    ca: 24.0
+    other: 27.0
+  bigquery:
+    us: 20.0
+    eu: 22.0
+    ap: 23.0
+    ca: 21.0
+    other: 24.0
+  redshift:
+    us: 24.0
+    eu: 26.0
+    ap: 27.0
+    ca: 25.0
+    other: 28.0
+  databricks:
+    us: 23.0
+    eu: 25.0
+    ap: 26.0
+    ca: 24.0
+    other: 27.0
+  duckdb:
+    us: 0.0
+    eu: 0.0
+    ap: 0.0
+    ca: 0.0
+    other: 0.0
+  clickhouse:
+    us: 0.0
+    eu: 0.0
+    ap: 0.0
+    ca: 0.0
+    other: 0.0
+notes:
+  snowflake: On-demand storage pricing. Time Travel and Fail-safe may incur additional
+    costs.
+  bigquery: Active storage pricing. Long-term storage (90+ days) costs $10/TB/month.
+  redshift: RA3 managed storage pricing. Dense node storage included in compute cost.
+  databricks: Delta Lake storage on underlying cloud provider (S3/ADLS/GCS).
+  duckdb: Local storage, no cloud costs.
+  clickhouse: Local storage, no cloud costs.
