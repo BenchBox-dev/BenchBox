@@ -277,6 +277,25 @@ parallel platforms contaminate timings. The framework hard-rejects
 `execute.parallel_platforms: true` at config load time; do not work
 around this.
 
+### Managed Docker startup failures are non-fatal
+
+A managed Docker compose-up failure (e.g. a heavy stack exceeding
+`cleanup.docker_start_timeout_s`) is treated as a per-platform
+infrastructure failure, not a sweep abort. The failure is recorded in
+`uat_lifecycle.log` (`action=up status=failed`), the platform's cells are
+recorded as skipped-unreachable, the half-started stack is torn down, and
+the sweep advances to the next stack — one stack at a time. Genuine global
+aborts (disk free-space, teardown failure, fixed `container_name` policy)
+still stop the sweep.
+
+Setting `docker_start_timeout_s` for a slow stack (e.g. LakeSail Spark
+Connect): **measure a healthy startup first, then set the timeout above it.**
+Bring the stack up in isolation (`make uat-bring-up PLATFORM=lakesail`),
+confirm the service becomes healthy, time it, and set
+`cleanup.docker_start_timeout_s` to a value comfortably above the observed
+healthy time. Do not raise it blindly — a longer timeout on a broken service
+just wastes the timeout window each attempt.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
@@ -285,7 +304,7 @@ around this.
 | Mid-sweep execute aborts on disk | free space fell below `preflight.free_space_min_gib` after a platform | inspect `uat_lifecycle.log`; increase space or reduce the matrix before resuming |
 | Skipped-unreachable platforms | local Docker / TCP services not running and Docker is externally managed | `docker compose up` for the relevant services, or set `execute.skip_unreachable: false` to surface as failures |
 | Docker daemon unavailable in managed mode | `cleanup.docker_manage_platforms: true` requires `docker ps` and `docker compose` | start Docker Desktop/daemon; preflight treats Docker as required in managed mode |
-| Compose stack startup timeout | image pull/build or healthcheck exceeded `cleanup.docker_start_timeout_s` | inspect the compose logs and raise the timeout only after confirming the service is healthy |
+| Compose stack startup timeout | image pull/build or healthcheck exceeded `cleanup.docker_start_timeout_s` | the sweep records the stack as failed and advances (see "Managed Docker startup failures are non-fatal"); inspect compose logs and raise the timeout only after measuring a healthy startup |
 | Cleanup command failed | UAT-owned `docker compose down ...` returned non-zero | inspect `uat_lifecycle.log`, then run the logged command manually if safe |
 | Fixed `container_name` collision | a compose file declares a global container name already in use | stop the conflicting developer stack or keep that platform external-only until the compose file is fixed |
 | Validator clean rate breaches floor | bundle quality regression | run `make uat-validate` standalone; it validates via `benchbox.validation.bundle` and writes the rollup TSV |
