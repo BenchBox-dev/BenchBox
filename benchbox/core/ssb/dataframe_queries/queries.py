@@ -5,8 +5,6 @@ from __future__ import annotations
 from csv import reader
 from typing import Any
 
-import pandas as pd
-
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 
@@ -134,6 +132,8 @@ def _make_expression_impl(spec: dict[str, str]) -> Any:
 
 def _make_pandas_impl(spec: dict[str, str]) -> Any:
     def impl(ctx: DataFrameContext) -> Any:
+        import pandas as pd
+
         filtered = _pandas_filter(_pandas_join(ctx, spec["joins"]), spec["filters"], _query_params(spec["id"]))
         if spec["metric"] == "scalar_revenue":
             revenue = (filtered["lo_extendedprice"] * filtered["lo_discount"]).sum()

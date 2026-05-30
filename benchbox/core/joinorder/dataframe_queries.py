@@ -28,15 +28,17 @@ from __future__ import annotations
 
 import re
 from csv import reader
-from typing import Any, NamedTuple, Protocol
+from typing import TYPE_CHECKING, Any, NamedTuple, Protocol
 
-import pandas as pd
 from sqlglot import exp, parse_one
 
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRegistry
 from benchbox.core.joinorder.queries import CANONICAL_JOINORDER_QUERIES, JoinOrderQueryManager
 from benchbox.core.joinorder.schema import JoinOrderSchema
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 class QueryImpl(Protocol):
@@ -344,6 +346,8 @@ def _pandas_sql_compare(left: Any, right: Any, operator: Any) -> Any:
 
 
 def _pandas_condition(frame: pd.DataFrame, node: exp.Expression) -> Any:
+    import pandas as pd
+
     if isinstance(node, exp.Paren):
         return _pandas_condition(frame, node.this)
     if isinstance(node, exp.And):
@@ -405,6 +409,8 @@ def _prefixed_pandas_frame(
 
 
 def _empty_safe_min(frame: Any, column: str) -> Any:
+    import pandas as pd
+
     value = frame[column].min()
     if hasattr(value, "compute"):
         value = value.compute()
@@ -412,6 +418,8 @@ def _empty_safe_min(frame: Any, column: str) -> Any:
 
 
 def _execute_joinorder_pandas_query(ctx: DataFrameContext, query_id: str) -> pd.DataFrame:
+    import pandas as pd
+
     tree = parse_one(_QUERY_MANAGER.get_query(query_id), read="duckdb")
     tables = _sql_tables(tree)
     predicates = _flatten_and(tree.args["where"].this)
