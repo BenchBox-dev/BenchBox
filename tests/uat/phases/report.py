@@ -9,6 +9,7 @@ Finding 1 scoping (default OFF; sweep authors enable explicitly).
 
 from __future__ import annotations
 
+import datetime as _dt
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -203,3 +204,70 @@ def write_report(
 
 def _footer_value(value: str) -> str:
     return value.replace("\t", " ").replace("\n", " ")
+
+
+# ---------------------------------------------------------------------------
+# Certification re-run ordering check.
+#
+# The certification contract (uat-certification-rerun-ordering-and-gate) runs
+# four stages — native SQL, then dataframe, then Docker non-OLTP, then Docker
+# OLTP — and requires that ALL native + dataframe platforms complete before any
+# Docker stack starts. The 2026-05-28/29 evidence was contaminated because a
+# Docker stack began before the dataframe sweep finished. Each sweep is a
+# separate invocation, so the cross-stage order is enforced by the runbook; this
+# helper provides the lightweight, machine-checkable proof from lifecycle logs.
+# ---------------------------------------------------------------------------
+
+
+def parse_docker_up_events(lifecycle_log_text: str) -> list[tuple[_dt.datetime, str]]:
+    """Extract ``(timestamp, platform)`` for each Docker ``action=up`` line.
+
+    Parses ``uat_lifecycle.log`` lines of the shape::
+
+        2026-05-30T01:02:03 [docker] platform=lakesail action=up status=ok ...
+
+    Lines without a Docker ``action=up`` marker, or with an unparseable leading
+    ISO timestamp, are skipped.
+    """
+    events: list[tuple[_dt.datetime, str]] = []
+    for raw in lifecycle_log_text.splitlines():
+        line = raw.strip()
+        if "[docker]" not in line or "action=up" not in line:
+            continue
+        timestamp_token = line.split(" ", 1)[0]
+        try:
+            timestamp = _dt.datetime.fromisoformat(timestamp_token)
+        except ValueError:
+            continue
+        platform = "unknown"
+        for token in line.split():
+            if token.startswith("platform="):
+                platform = token.split("=", 1)[1]
+                break
+        events.append((timestamp, platform))
+    return events
+
+
+def certification_ordering_violations(
+    docker_stage_lifecycle_logs: Iterable[str],
+    *,
+    native_stage_completed_at: _dt.datetime,
+) -> list[str]:
+    """Return ordering violations for a certification run-set.
+
+    Given the ``uat_lifecycle.log`` text of each Docker stage and the timestamp
+    at which the native + dataframe stage completed, return a human-readable
+    violation for every Docker ``action=up`` that started at or before that
+    boundary. An empty list means the four-stage ordering held: no Docker stack
+    came up before native + dataframe finished.
+    """
+    violations: list[str] = []
+    for log_text in docker_stage_lifecycle_logs:
+        for timestamp, platform in parse_docker_up_events(log_text):
+            if timestamp <= native_stage_completed_at:
+                violations.append(
+                    f"Docker stack '{platform}' started at {timestamp.isoformat()} "
+                    f"at/before native+dataframe stage completion "
+                    f"{native_stage_completed_at.isoformat()}"
+                )
+    return violations

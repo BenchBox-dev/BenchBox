@@ -300,3 +300,37 @@ def test_stress_override_scale_sets_override_without_mutating_rungs():
     overridden = replace(cfg, scales=replace(cfg.scales, override=0.1))
     assert overridden.scales.rungs == (0.01, 0.1, 1.0)
     assert overridden.scales.override == 0.1
+
+
+# ---------------------------------------------------------------------------
+# Certification re-run configs (uat-certification-rerun-ordering-and-gate).
+# ---------------------------------------------------------------------------
+
+_CERT_CONFIGS_DIR = Path(__file__).parent / "configs"
+
+
+def test_certification_configs_load_and_encode_stage_ordering():
+    """The three certification configs validate and encode the four-stage order."""
+    stage1 = config.load_config(_CERT_CONFIGS_DIR / "certification-01-native-dataframe.yaml")
+    stage2 = config.load_config(_CERT_CONFIGS_DIR / "certification-02-docker-nonoltp.yaml")
+    stage3 = config.load_config(_CERT_CONFIGS_DIR / "certification-03-docker-oltp.yaml")
+
+    # Stage 1 is native + dataframe only — no Docker management, so no `action=up`
+    # events can precede the Docker stages.
+    assert stage1.platforms.groups == ("sql", "dataframe")
+    assert stage1.cleanup.docker_manage_platforms is False
+    assert stage1.scales.rungs == (0.01, 0.1, 1.0)
+
+    # Stages 2 and 3 are the Docker tiers, managed lifecycle, serialized.
+    assert stage2.platforms.groups == ("docker-fast",)
+    assert stage3.platforms.groups == ("docker-slow",)
+    for stage in (stage2, stage3):
+        assert stage.cleanup.docker_manage_platforms is True
+        assert stage.execute.parallel_platforms is False
+    assert stage3.scales.rungs == (0.01,)  # OLTP at 0.01 only
+
+    # Every stage reaches the report phase and arms the cross-scale gate teeth.
+    for stage in (stage1, stage2, stage3):
+        assert "report" in stage.phases
+        assert stage.report.cross_scale_coverage_min_pairs is not None
+        assert stage.execute.parallel_platforms is False
