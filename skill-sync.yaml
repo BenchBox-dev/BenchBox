@@ -25,6 +25,7 @@ targets:
   claude: .claude/skills
   codex: .codex/skills
   gemini: .gemini/skills
+  antigravity: .antigravity/skills
 install_mode: mirror
 config:
   code:
