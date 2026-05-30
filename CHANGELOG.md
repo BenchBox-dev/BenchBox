@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-30
+
+### New
+
+- **Databricks Liquid Clustering** - Added TPC-H and TPC-DS tuning profiles that
+  apply Databricks Liquid Clustering for more representative runs.
+
+### Added
+
+- **Benchmark support-status diagnostics** - You can now check which benchmarks
+  and platforms are supported, and why a given combination is gated, from
+  registry-backed metadata instead of inferring it from docs.
+- **Safer prompt composer guidance** - The `/prompts/` page now flags
+  paid-platform runs, surfaces platform footguns, and adds provenance, MCP, and
+  CLI-hygiene guidance for agent-generated benchmark runs.
+
+### Fixed
+
+- **Clean install now imports** - `pip install benchbox` imports without
+  manually adding pandas; the runtime dependency is now declared. This resolves
+  the v0.3.0 clean-install failure.
+- **Trino table creation** - JoinOrder `CREATE TABLE` no longer emits
+  primary-key clauses that Trino rejects.
+- **JoinOrder across engines** - SQLite now indexes JoinOrder tables, Spark
+  disables broadcast joins for the fixed dataset, and Presto/Spark run paths
+  were corrected for more reliable JoinOrder runs.
+- **Spark warehouse location** - Spark now writes its warehouse to the run's
+  database directory instead of the current working directory.
+- **Chart rendering** - Power-run charts render for benchmarks without TPC
+  metrics, and JoinOrder chart labels are preserved.
+- **Light-mode readability** - Restored prompt-copy contrast on the landing and
+  prompt pages in light mode.
+
+### Changed
+
+- **Leaner, more maintainable codebase** - Completed a large quality pass that
+  removed dead code and consolidated duplicated internals across benchmarks and
+  platform adapters, with runtime behavior preserved by focused tests.
+- **Registry-derived platform lists** - Landing and prompt pages now derive
+  their platform and command examples from the live registry, so the lists stay
+  in sync with actually supported platforms.
+
 ## [0.3.0] - 2026-05-16
 
 ### New
