@@ -2,7 +2,8 @@ id: guard-todo-cleanup-direct-commits
 title: "Prevent accidental direct commits on develop/main branches by todo_cli cleanup"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-05-30"
 category: Code Quality and Technical Debt
 
 description: |
@@ -16,7 +17,7 @@ description: |
 work:
 - id: w1
   summary: "Add branch safety assertions in todo_cli.py cleanup"
-  status: pending
+  status: done
   notes: |
     Modify `cleanup` method in `_project/scripts/todo_cli.py` to:
       1. Detect the current branch name (using `git rev-parse --abbrev-ref HEAD`).
@@ -25,7 +26,7 @@ work:
 - id: w2
   summary: "Verify the safety gate locally"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Verify that:
       - Running cleanup with `--dry-run` on any branch still works correctly.
@@ -34,14 +35,17 @@ work:
 
 verification:
 - description: "Branch check blocks cleanup on develop/main"
-  command: "git checkout -b develop-test-gate && touch _project/TODO/main/active/test-dummy.yaml && uv run --project _project/scripts -- python _project/scripts/todo_cli.py cleanup; echo EXIT_CODE=$?"
+  command: "git checkout -b develop-test-gate && touch _project/TODO/main/active/test-dummy.yaml && uv run --project _project/scripts
+    -- python _project/scripts/todo_cli.py cleanup; echo EXIT_CODE=$?"
   expected_output: "EXIT_CODE=1"
 - description: "YAML schema is valid"
-  command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all"
+  command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts
+    -- python _project/scripts/validate_todo.py --all"
   expected_output: "exit 0"
 
 must_preserve:
-- Do not affect `--dry-run` behavior. Dry-running cleanup on any branch should always be allowed for read-only validation checks.
+- Do not affect `--dry-run` behavior. Dry-running cleanup on any branch should always be allowed for read-only
+  validation checks.
 - Keep output messages clear and helpful to instruct developers to claim a worktree.
 
 approach: |
