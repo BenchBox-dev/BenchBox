@@ -10,7 +10,8 @@ engine dependencies onto the base import surface.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import importlib
+from typing import TYPE_CHECKING, Any
 
 from benchbox.utils.dependencies import check_platform_dependencies, get_dependency_error_message
 
@@ -24,39 +25,40 @@ if TYPE_CHECKING:
     from .workload import ClickHouseWorkloadMixin
 
 # Lazy-loaded re-exports: attribute name -> submodule providing it.
-_LAZY_EXPORTS = {
-    "ClickHouseAdapter": ".adapter",
-    "ClickHouseLocalClient": ".client",
-    "ClickHouseDiagnosticsMixin": ".diagnostics",
-    "ClickHouseMetadataMixin": ".metadata",
-    "ClickHouseSetupMixin": ".setup",
-    "ClickHouseTuningMixin": ".tuning",
-    "ClickHouseWorkloadMixin": ".workload",
+_EXPORTS = {
+    "ClickHouseAdapter": "adapter",
+    "ClickHouseLocalClient": "client",
+    "ClickHouseDiagnosticsMixin": "diagnostics",
+    "ClickHouseMetadataMixin": "metadata",
+    "ClickHouseSetupMixin": "setup",
+    "ClickHouseTuningMixin": "tuning",
+    "ClickHouseWorkloadMixin": "workload",
 }
 
 __all__ = [
-    "ClickHouseAdapter",
-    "ClickHouseLocalClient",
-    "ClickHouseDiagnosticsMixin",
-    "ClickHouseMetadataMixin",
-    "ClickHouseSetupMixin",
-    "ClickHouseTuningMixin",
-    "ClickHouseWorkloadMixin",
+    *_EXPORTS,
     "check_platform_dependencies",
     "get_dependency_error_message",
 ]
 
 
-def __getattr__(name: str):
-    """Load re-exported symbols on first access (PEP 562)."""
-    module_path = _LAZY_EXPORTS.get(name)
-    if module_path is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from importlib import import_module
+def __getattr__(name: str) -> Any:
+    """Lazily expose ClickHouse re-exports and sibling submodules (PEP 562)."""
+    module_name = _EXPORTS.get(name)
+    if module_name is not None:
+        module = importlib.import_module(f"{__name__}.{module_name}")
+        value = getattr(module, name)
+        globals()[name] = value
+        return value
 
-    module = import_module(module_path, __name__)
-    return getattr(module, name)
+    try:
+        module = importlib.import_module(f"{__name__}.{name}")
+    except ModuleNotFoundError as exc:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
+
+    globals()[name] = module
+    return module
 
 
 def __dir__() -> list[str]:
-    return sorted(__all__)
+    return sorted(set(globals()) | set(__all__))

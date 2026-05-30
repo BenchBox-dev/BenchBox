@@ -302,7 +302,7 @@ jobs:
           # Minimal-surface gate: a clean core install must import benchbox AND
           # must not pull pandas (optional engine/DataFrame dep). This is the
           # contract whose absence let v0.3.0 ship a broken clean install.
-          uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util, sys; import benchbox; assert 'pandas' not in sys.modules, 'pandas must not load on the base import surface'; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
+          uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
           uv run --isolated --no-project --with "$wheel" -- benchbox --help
 
       - name: Upload build artifacts
