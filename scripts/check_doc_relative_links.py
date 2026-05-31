@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -104,27 +105,28 @@ def collect_broken() -> list[tuple[str, int, str]]:
     return broken
 
 
-def load_baseline() -> set[tuple[str, str]]:
-    """Known pre-existing broken links as a set of (rel_source, target)."""
+def load_baseline() -> Counter[tuple[str, str]]:
+    """Known pre-existing broken link occurrences keyed by (rel_source, target)."""
     if not BASELINE_PATH.exists():
-        return set()
-    pairs: set[tuple[str, str]] = set()
+        return Counter()
+    occurrences: Counter[tuple[str, str]] = Counter()
     for line in BASELINE_PATH.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         source, _, target = line.partition("\t")
         if target:
-            pairs.add((source, target))
-    return pairs
+            occurrences[(source, target)] += 1
+    return occurrences
 
 
 def write_baseline(broken: list[tuple[str, int, str]]) -> int:
     """Regenerate the baseline file from the current broken set."""
-    pairs = sorted({(source, target) for source, _, target in broken})
+    pairs = sorted((source, target) for source, _, target in broken)
     lines = [
-        "# Pre-existing broken repo-local relative links in docs/.",
+        "# Pre-existing broken repo-local relative link occurrences in docs/.",
         "# Format: <source-path-from-repo-root><TAB><link-target>",
+        "# Repeat rows intentionally represent multiple broken occurrences.",
         "# Regenerate: uv run -- python scripts/check_doc_relative_links.py --update-baseline",
         "# Burn this list down; do NOT add new entries to silence regressions.",
     ]
@@ -153,15 +155,21 @@ def main() -> int:
         return write_baseline(broken)
 
     baseline = load_baseline()
-    broken_pairs = {(source, target) for source, _, target in broken}
+    broken_counts = Counter((source, target) for source, _, target in broken)
 
-    new_breaks = [(source, line, target) for source, line, target in broken if (source, target) not in baseline]
-    stale_baseline = sorted(baseline - broken_pairs)
+    seen: Counter[tuple[str, str]] = Counter()
+    new_breaks = []
+    for source, line, target in broken:
+        pair = (source, target)
+        seen[pair] += 1
+        if seen[pair] > baseline[pair]:
+            new_breaks.append((source, line, target))
+    stale_baseline = sorted((baseline - broken_counts).elements())
 
     print("Checking repo-local relative links in docs/ ...")
     print(f"  scanned files : {len(iter_doc_files())}")
-    print(f"  baseline size : {len(baseline)}")
-    print(f"  broken total  : {len(broken_pairs)}")
+    print(f"  baseline size : {baseline.total()}")
+    print(f"  broken total  : {broken_counts.total()}")
 
     if new_breaks:
         print(f"\n❌ {len(new_breaks)} NEW broken relative link(s):")
