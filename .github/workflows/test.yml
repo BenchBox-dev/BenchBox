@@ -59,7 +59,7 @@ jobs:
 
   compat-test:
     name: compat-test (${{ matrix.os }}, ${{ matrix.python-version }})
-    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
+    if: ${{ (github.event_name != 'pull_request' || github.base_ref != 'develop') && (github.event_name != 'pull_request' || !startsWith(github.event.pull_request.title, 'Release v')) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -170,7 +170,7 @@ jobs:
   # Quick integration smoke tests - non-required on main/push; develop broad
   # validation runs through nightly/manual workflows.
   integration-smoke:
-    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
+    if: ${{ (github.event_name != 'pull_request' || github.base_ref != 'develop') && (github.event_name != 'pull_request' || !startsWith(github.event.pull_request.title, 'Release v')) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

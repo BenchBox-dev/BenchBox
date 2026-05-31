@@ -15,6 +15,10 @@ pytestmark = [
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+BASH_SNIPPET_TEST = pytest.mark.skipif(
+    os.name == "nt",
+    reason="ci-required-result aggregator is a Linux GitHub Actions bash snippet",
+)
 
 
 def _ci_required_result_script() -> str:
@@ -63,6 +67,7 @@ def test_pr_path_classifier_fetches_base_history_for_merge_base() -> None:
     assert workflow.count(base_fetch) == 3
 
 
+@BASH_SNIPPET_TEST
 def test_ci_required_result_preserves_content_guard_failure() -> None:
     result = _run_ci_required_result(
         CONTENT_GUARD_NEEDED="true",
@@ -74,6 +79,7 @@ def test_ci_required_result_preserves_content_guard_failure() -> None:
     assert "Content-only PR; skipped Python code CI." not in result.stdout
 
 
+@BASH_SNIPPET_TEST
 def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
     # When the explorer-tokens job fires (results-explorer/src changed) and
     # fails, the aggregator must fail the required result. Without this
@@ -91,6 +97,7 @@ def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
     assert "explorer-tokens=failure" in result.stdout
 
 
+@BASH_SNIPPET_TEST
 def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
     # Defensive: pin the `|| "skipped"` clause in the aggregator's
     # explorer-tokens check. The (NEEDS_CODE_CI="true",
@@ -116,6 +123,7 @@ def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
     assert "Code/infra PR; lint and fast tests passed." in result.stdout
 
 
+@BASH_SNIPPET_TEST
 def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
     # Sanity: when explorer-tokens runs and passes alongside lint+test
     # success, the aggregator returns success.

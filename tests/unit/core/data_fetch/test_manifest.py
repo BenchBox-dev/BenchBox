@@ -123,6 +123,17 @@ def test_manifest_hash_ignores_archive_sha256_transport_checksum(tmp_path: Path)
     assert load_manifest(p).archive_sha256 == _HEX_D
 
 
+def test_manifest_hash_normalizes_line_endings(tmp_path: Path) -> None:
+    p = _write(tmp_path, _MINIMAL)
+    original_body = p.read_text()
+    original_hash = compute_manifest_hash(p)
+
+    p.write_bytes(original_body.replace("\n", "\r\n").encode("utf-8"))
+
+    assert compute_manifest_hash(p) == original_hash
+    assert load_manifest(p).manifest_hash == original_hash
+
+
 def test_missing_table_field_raises(tmp_path: Path) -> None:
     bad = _MINIMAL.replace('file      = "t1.parquet"\n', "")
     p = _write(tmp_path, bad)
