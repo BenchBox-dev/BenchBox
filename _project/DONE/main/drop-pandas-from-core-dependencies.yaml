@@ -2,7 +2,7 @@ id: drop-pandas-from-core-dependencies
 title: "Drop pandas from core dependencies for v0.3.1 by fixing the eager import surface"
 worktree: main
 priority: Critical
-status: Not Started
+status: Completed
 category: Dependency Management
 
 deps:
@@ -46,7 +46,7 @@ description: |
 work:
 - id: w0
   summary: "Re-validate the import chain and measure the core dependency-size baseline"
-  status: pending
+  status: done
   notes: |
     Bind the evidence this TODO rests on before changing code, and capture the
     BEFORE baseline that the size success-metric is measured against. Re-run and
@@ -69,7 +69,7 @@ work:
 - id: w1
   summary: "Lazy-ize the one reachable eager pandas import in the ClickHouse client"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Move `import pandas as pd` out of module scope in
     `benchbox/platforms/clickhouse/client.py:11` into the function that uses it
@@ -81,7 +81,7 @@ work:
 - id: w2
   summary: "Break the ClickHouse package-init eager re-export that defeats lazy loading"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Structural root cause. `adapter_factory.py:17` imports the pure helper
     `clickhouse/deployment_mode.py` but executing `clickhouse/__init__.py:5-11`
@@ -94,7 +94,7 @@ work:
 - id: w3
   summary: "Convert the latent top-level pandas imports to in-function imports"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     BLIND SPOT: not reachable on the import surface today, but a future wiring
     of these benchmarks recreates the exact #681 failure. Convert top-level
@@ -107,7 +107,7 @@ work:
 - id: w4
   summary: "Replace the wrong-contract pandas test with a minimal-deps import test"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     BLIND SPOT: `tests/unit/test_release_infrastructure.py:99-107` asserts the
     STRING `pandas>=` is present in pyproject — it locks in the #681 patch and
@@ -120,7 +120,7 @@ work:
 - id: w5
   summary: "Make the core-only smoke gate prove a minimal import surface and gate the release"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     BLIND SPOT: a core-only clean-install smoke test exists
     (`.github/workflows/nightly.yml:235`, `test.yml:302`:
@@ -134,7 +134,7 @@ work:
 - id: w6
   summary: "Remove pandas from core dependencies and reconcile the extras/pin"
   needs: [w1, w2, w3, w4, w5]
-  status: pending
+  status: done
   notes: |
     Only after w1-w5 are green. Remove `pandas>=2.0.0` from
     `[project.dependencies]` (`pyproject.toml:52`). It remains in the `tpcdi`,
@@ -149,7 +149,7 @@ work:
 - id: w7
   summary: "Audit remaining eager heavy imports on the import surface"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     `pyarrow` and `numpy` are reached on `import benchbox` and are core. Verify
     that is intentional (results/Arrow handling is plausibly genuinely core) and
@@ -163,7 +163,8 @@ verification:
   command: "uv run -- python -c 'import sys; sys.modules[\"pandas\"]=None; import benchbox; print(benchbox.__version__)'"
   expected_output: "prints the version without ImportError"
 - description: "No top-level pandas import remains reachable from import benchbox"
-  command: "uv run -- python -c 'import benchbox, sys; assert \"pandas\" not in sys.modules, sorted(m for m in sys.modules if \"pandas\" in m)'"
+  command: "uv run -- python -c 'import benchbox, sys; assert \"pandas\" not in sys.modules, sorted(m for m in sys.modules
+    if \"pandas\" in m)'"
   expected_output: "exit 0 (pandas not imported)"
 - description: "pandas is not in the resolved core dependency set"
   command: "uv export --no-dev --no-emit-project 2>/dev/null | grep -c '^pandas==' || true"
@@ -192,10 +193,14 @@ approach: |
   test/gate changes (w4, w5) can ride along or in a sibling PR.
 
 anti_patterns:
-- "DO NOT keep pandas core and defer to v0.3.2 - because v0.3.1 is unreleased, so the correct minimal-core fix lands now at zero extra release cost."
-- "DO NOT remove pandas from core (w6) before the core-only-minus-pandas gate (w5) is green - because that gate is the only thing preventing a silent re-regression of the v0.3.0 failure."
-- "DO NOT keep the string-assert test (test_release_infrastructure.py:99-107) - because it tests the manifest text, not the import contract, and will both block w6 and fail to catch the real defect."
-- "DO NOT fix only client.py and leave the latent imports - because the user requires ALL blind spots addressed; w3 closes the next-failure vector."
+- "DO NOT keep pandas core and defer to v0.3.2 - because v0.3.1 is unreleased, so the correct minimal-core fix lands now at
+  zero extra release cost."
+- "DO NOT remove pandas from core (w6) before the core-only-minus-pandas gate (w5) is green - because that gate is the only
+  thing preventing a silent re-regression of the v0.3.0 failure."
+- "DO NOT keep the string-assert test (test_release_infrastructure.py:99-107) - because it tests the manifest text, not the
+  import contract, and will both block w6 and fail to catch the real defect."
+- "DO NOT fix only client.py and leave the latent imports - because the user requires ALL blind spots addressed; w3 closes
+  the next-failure vector."
 
 scope_limit:
   only_modify:
@@ -218,7 +223,8 @@ scope_limit:
 
 success_metrics:
 - "`import benchbox` succeeds on a core install with pandas not installed."
-- "`pandas` no longer appears in the resolved core dependency set; net install size drops by the w0-measured baseline (~49 MB) for SQL-only users."
+- "`pandas` no longer appears in the resolved core dependency set; net install size drops by the w0-measured baseline (~49
+  MB) for SQL-only users."
 - "A CI gate fails if any future change reintroduces a top-level heavy import on the `import benchbox` surface."
 - "pandas is declared in exactly one place per role (extras), with the version floor justified."
 - "v0.3.1 is cut from a develop that carries the minimal-core fix, not the #681 patch."
@@ -234,3 +240,5 @@ metadata:
   estimated_effort: "Medium"
   created_date: "2026-05-30"
   last_updated: "2026-05-30T00:00:00"
+  completed_date: "2026-05-30"
+  completed_by: "PR #709 (implementation), #707/#708 (TODO)"
