@@ -93,6 +93,27 @@ def docker_reachable() -> bool:
         return False
 
 
+def docker_data_root() -> Path | None:
+    """Return Docker's host-visible data root, when the engine reports one."""
+    try:
+        completed = subprocess.run(
+            ["docker", "info", "--format", "{{.DockerRootDir}}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+            check=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    value = completed.stdout.strip()
+    if not value:
+        return None
+    root = Path(value).expanduser()
+    return root if root.exists() else None
+
+
 def host_load_1m() -> float | None:
     """Return the 1-minute load average, or None on platforms without getloadavg."""
     try:
@@ -172,10 +193,12 @@ def run_preflight(
     benchmark_runs_root = (
         Path(benchmark_runs_dir).expanduser() if benchmark_runs_dir is not None else Path(free_space_path)
     )
+    docker_root = docker_data_root() if docker_manage_platforms and docker_ok else None
     disk_roots = collect_disk_roots(
         free_space_path=free_space_path,
         benchmark_runs_dir=benchmark_runs_root,
         docker_manage_platforms=docker_manage_platforms,
+        docker_data_root=docker_root,
     )
     free_space_entries = read_disk_root_free_space(disk_roots, free_space_reader=free_space_gib)
     if disk_budget_config is not None:
@@ -343,6 +366,7 @@ def collect_disk_roots(
     free_space_path: str | Path,
     benchmark_runs_dir: str | Path,
     docker_manage_platforms: bool = False,
+    docker_data_root: str | Path | None = None,
 ) -> tuple[tuple[str, Path], ...]:
     """Return labeled disk roots that UAT writes or depends on."""
     runs_root = Path(benchmark_runs_dir).expanduser()
@@ -354,8 +378,8 @@ def collect_disk_roots(
     configured_free_space = Path(free_space_path).expanduser()
     if configured_free_space != runs_root:
         roots.append(("configured-free-space", configured_free_space))
-    if docker_manage_platforms:
-        roots.append(("docker-data", runs_root))
+    if docker_manage_platforms and docker_data_root is not None:
+        roots.append(("docker-data", Path(docker_data_root).expanduser()))
     return tuple(roots)
 
 
