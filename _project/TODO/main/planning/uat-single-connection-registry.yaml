@@ -1,0 +1,133 @@
+id: uat-single-connection-registry
+title: "UAT boundary reset: single platform connection registry; stop hardcoding ports/creds in UAT"
+worktree: main
+priority: High
+status: "Not Started"
+category: Testing and Quality Assurance
+
+description: |
+  Outcome of a 4-round adversarial architecture review of the UAT layer
+  (tests/uat/). UAT maintains its own connection-truth table that duplicates
+  facts already owned by compose files and platform adapters, and the copies
+  can disagree silently.
+
+  - tests/uat/matrix.py:19-95 hardcodes PLATFORM_PORTS, PLATFORM_EXTRA_OPTS,
+    LOCAL_MANAGED_PLATFORM_EXTRA_OPTS, and credentials (e.g. password=benchbox).
+  - SingleStore alone has a THREE-way split:
+      * UAT hardcodes 13306 (matrix.py:21)
+      * compose maps ${SINGLESTORE_HOST_PORT:-13306}
+      * adapter credentials default to 3306 (benchbox/platforms/credentials/singlestore.py:30)
+  - tests/uat/docker_assets.py:75 is yet another separate registry from matrix.py.
+
+  Failure mode: set SINGLESTORE_HOST_PORT (or change a compose mapping) and UAT
+  silently probes the wrong port. A skipped-because-wrong-port platform looks
+  identical to a genuinely-down platform, so divergence quietly erodes the exact
+  coverage UAT exists to prove. This is the load-bearing fact a "lightweight
+  user-exercising" layer actually needs, and the one most certain to rot.
+
+work:
+  - id: w0
+    summary: "Re-validate the three-way SingleStore split and enumerate every hardcoded connection fact in UAT"
+    status: pending
+    notes: |
+      Confirm matrix.py:19-95 tables, docker_assets.py:75 registry, compose
+      ports: mappings, and adapter/credentials defaults. Produce the canonical
+      source for each fact (adapter default vs compose vs provisioning TSV).
+      Record a compact summary so the fix targets current code.
+
+  - id: w1
+    summary: "Define the single canonical connection/provisioning source UAT will read"
+    needs: [w0]
+    status: pending
+    notes: |
+      Decide the source of truth per the review's open question: compose `ports:`
+      + adapter defaults (+ provisioning TSV if one exists). Do NOT introduce a
+      brand-new fourth registry; derive from existing canonical surfaces.
+
+  - id: w2
+    summary: "Refactor matrix.py to derive ports/options/credentials from the canonical source"
+    needs: [w1]
+    status: pending
+    notes: |
+      Remove the hardcoded PLATFORM_PORTS / *_EXTRA_OPTS / credential literals;
+      resolve them at runtime from adapter defaults + compose. Resolve the
+      3306/13306 SingleStore split to a single value.
+
+  - id: w3
+    summary: "Collapse docker_assets.py registry into the single source"
+    needs: [w1]
+    status: pending
+    notes: |
+      docker_assets.py:75 must not be a separate registry from matrix.py.
+
+  - id: w4
+    summary: "Add a CI drift test diffing resolved connection facts against compose + adapter defaults"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      The test parses compose `ports:` mappings and adapter defaults and asserts
+      the UAT-resolved facts match, so divergence fails loudly in CI rather than
+      manifesting as a phantom-skipped platform. Consider sharing a
+      CI-contract-test harness with [[uat-shared-submit-classifier]].
+
+deferred:
+  - summary: "Auto-generate compose port mappings from adapter defaults"
+    reason: "Generating compose from adapters is a larger infra change; deriving the read path is the fix."
+
+metadata:
+  tags:
+    - uat-boundary-reset
+    - testing
+    - release-gate
+    - tech-debt
+    - docker
+  estimated_effort: "2-3 days"
+  created_date: "2026-05-31"
+  last_updated: "2026-05-31T00:00:00Z"
+
+impact:
+  technical_debt: |
+    Eliminates three-source connection-truth divergence. Prevents
+    phantom-skipped platforms that masquerade as down hosts and silently shrink
+    UAT coverage.
+
+must_preserve:
+  - "UAT continues to reach every platform it currently reaches (no new skips after the refactor)"
+  - "Externally-managed-platform path (docker_manage_platforms: false) still resolves connection facts correctly"
+
+approach: |
+  Treat compose `ports:` and adapter defaults as the canonical source. Replace
+  matrix.py / docker_assets.py literal tables with resolution against that
+  source. Reconcile SingleStore to one port. Lock it with a CI drift test that
+  re-derives the facts and asserts equality — the same shape as the
+  submit-classifier contract test.
+
+anti_patterns:
+  - "DO NOT add a fourth registry to 'unify' the three — derive from existing canonical surfaces (adapter defaults + compose)"
+  - "DO NOT leave matrix.py and docker_assets.py as two registries — collapse to one"
+  - "DO NOT hardcode the reconciled SingleStore port — read it so SINGLESTORE_HOST_PORT overrides flow through"
+
+verification:
+  - description: "No hardcoded port literals remain in matrix.py"
+    command: "grep -nE '1?3306|PLATFORM_PORTS' tests/uat/matrix.py || echo 'absent'"
+    expected_output: "no hardcoded port table (resolution happens from canonical source)"
+  - description: "Connection-drift contract test passes"
+    command: "uv run -- python -m pytest -k connection_registry_drift -q"
+    expected_output: "all cases pass; compose/adapter/UAT facts agree"
+  - description: "SingleStore reachability honored under overridden host port"
+    command: "SINGLESTORE_HOST_PORT=13306 uv run -- python -m pytest -k 'uat and singlestore' -q"
+    expected_output: "UAT resolves 13306, no phantom skip"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/matrix.py"
+    - "tests/uat/docker_assets.py"
+    - "tests/ (new drift test)"
+  do_not_modify:
+    - "benchbox/platforms/credentials/ (adapter defaults are canonical — read, don't change)"
+    - "docker/*/docker-compose.yml (compose mappings are canonical)"
+
+success_metrics:
+  - "One source of truth per port/credential; UAT reads it rather than redeclaring it"
+  - "Setting SINGLESTORE_HOST_PORT cannot cause UAT to probe the wrong port"
+  - "CI drift test fails if UAT connection facts diverge from compose/adapter"
