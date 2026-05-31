@@ -209,6 +209,17 @@ def _diff_name_status(source: Path, since_ref: str) -> list[tuple[str, str]]:
     return entries
 
 
+def _tree_entry_at(source: Path, ref: str, path: str) -> str | None:
+    result = _run_git(source, "ls-tree", "-z", ref, "--", path)
+    if result.returncode != 0:
+        return None
+    entry = result.stdout.split("\0", 1)[0]
+    if not entry:
+        return None
+    metadata, _separator, _entry_path = entry.partition("\t")
+    return metadata
+
+
 def _conventional_changelog_subject(subject: str) -> bool:
     if ":" not in subject:
         return False
@@ -255,19 +266,16 @@ def _patch_delta_commit_subjects(source: Path, since_ref: str) -> list[str] | No
         return []
 
     patch_commits: set[str] = set()
-    candidate_paths_by_commit: dict[str, set[str]] = {}
     for commit_hash, _subject in candidates:
         result = _run_git(source, "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", commit_hash)
         if result.returncode != 0:
             continue
-        candidate_paths_by_commit[commit_hash] = {part for part in result.stdout.split("\0") if part}
-
-    # This is intentionally file-level, not ancestry-level: a commit only feeds
-    # the draft if at least one file it touched is still different from main.
-    # That excludes old commits whose changes are already present on main via a
-    # squash release, while keeping release-cut fast on the curated main delta.
-    for commit_hash, paths in candidate_paths_by_commit.items():
-        if paths & patch_paths:
+        candidate_paths = {part for part in result.stdout.split("\0") if part}
+        relevant_paths = candidate_paths & patch_paths
+        if any(
+            _tree_entry_at(source, commit_hash, path) != _tree_entry_at(source, since_ref, path)
+            for path in relevant_paths
+        ):
             patch_commits.add(commit_hash)
 
     if not patch_commits:
