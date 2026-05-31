@@ -90,6 +90,11 @@ impact:
     A clean main checkout can run UAT without false-failing on absent explorer
     artifacts.
 
+prior_art:
+  - "tests/uat/phases/explorer_smoke.py — preserve the UAT phase wrapper but reduce it to corpus contract + delegation"
+  - ".github/workflows/results-explorer-browser.yml — reuse as the browser-test owner; UAT should not copy its npm/Playwright mechanics"
+  - "results-explorer/scripts/serve-browser-tests.mjs — reuse/extend only if a thin delegated entrypoint is needed when the explorer is present"
+
 must_preserve:
   - "When the explorer IS present, the full build + Playwright smoke still runs and gates as before"
   - "Packaged-bundle corpus contract is still validated on every run (minimal check)"

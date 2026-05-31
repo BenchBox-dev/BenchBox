@@ -64,6 +64,11 @@ impact:
     the "gate ships without contract" gap and preventing future baseline
     confusion about what was approved.
 
+prior_art:
+  - "_project/specs/uat-framework.md — extend/reuse as the canonical design contract when it is acceptable to ship the full charter"
+  - "docs/operations/uat-framework.md — reuse as the operator-facing pointer target; do not duplicate operational instructions in a stub"
+  - "tests/uat/README.md — extend only for a short developer-facing pointer if the full spec stays off main"
+
 approach: |
   Lightest option that makes the charter discoverable from main; bundle with the
   next UAT contract change rather than a standalone commit.

@@ -78,6 +78,11 @@ impact:
     Stops generated operational scratch from accumulating in a tracked reusable
     config directory; gives every config file a clear lifecycle class.
 
+prior_art:
+  - "_project/specs/uat-framework.md:646-688 — reuse/clarify the historical-vs-template policy instead of inventing a parallel taxonomy"
+  - "docs/operations/uat-framework.md historical config section — extend with generated scratch and runtime resume-state categories"
+  - "tests/uat/configs/uat-2026-05-02.yaml — preserve as historical evidence pattern, not as a scratch shard template"
+
 must_preserve:
   - "Any shard intentionally retained as evidence remains retrievable (relocated, not deleted, unless confirmed disposable)"
   - "resume.json runtime behavior per spec lines 268-277 is unchanged"
@@ -93,8 +98,8 @@ anti_patterns:
 
 verification:
   - description: "tests/uat/configs/ no longer mixes generated shards with reusable templates"
-    command: "ls tests/uat/configs/ | grep -c 'resume-.*20260505' || echo 0"
-    expected_output: "0 resume shards remain in the reusable config dir (relocated or gitignored)"
+    command: "find tests/uat/configs -maxdepth 1 -name '*resume-*20260505*.yaml' | wc -l | tr -d ' '"
+    expected_output: "0"
   - description: "Config-lifecycle policy documented"
     command: "grep -rni 'historical configs are evidence' docs/operations/uat-framework.md _project/specs/uat-framework.md"
     expected_output: "policy present and references the four config classes"

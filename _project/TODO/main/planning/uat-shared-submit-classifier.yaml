@@ -104,6 +104,12 @@ impact:
     between what UAT reports as submittable and what `benchbox submit` enforces.
     A divergence here corrupts release-gate evidence without any visible error.
 
+prior_art:
+  - "benchbox/core/results/status.py — reuse existing result_non_clean_reason/result_failed_query_count predicates; do not move or duplicate them"
+  - "benchbox/validation/bundle.py:CLI_REFUSED_COMPLIANCE_CLASSES — reuse the canonical refusal set instead of redefining literals"
+  - "benchbox/cli/commands/submit.py — preserve CLI message/exit behavior while moving pure policy out of the command"
+  - "tests/uat/runner.py:SubmitTerminalState — preserve the UAT-facing vocabulary as an adapter over the shared classifier"
+
 must_preserve:
   - "benchbox submit exit codes and user-facing refusal messages remain byte-identical for each terminal state"
   - "UAT terminal-state outputs (submittable/unofficial/query_failure/schema_violation/missing_manifest) remain unchanged for existing fixtures"
@@ -129,7 +135,7 @@ verification:
     command: "uv run -- python -m pytest -k submit_classifier_contract -q"
     expected_output: "all contract cases pass"
   - description: "Existing submit + UAT unit tests still pass"
-    command: "uv run -- python -m pytest tests/unit -k 'submit or uat' -q"
+    command: "uv run -- python -m pytest tests/unit/cli/test_submit_service.py tests/uat/test_runner.py tests/uat/test_package.py -q"
     expected_output: "0 failures"
 
 scope_limit:
