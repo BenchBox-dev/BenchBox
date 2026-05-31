@@ -56,9 +56,7 @@ except ImportError:
     pd = None  # type: ignore[assignment]
     PANDAS_AVAILABLE = False
 
-from benchbox.core.dataframe.profiling import QueryExecutionProfile
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
-from benchbox.platforms.dataframe._result_helpers import build_failure_result_dict
 from benchbox.platforms.dataframe.pandas_family import (
     PandasFamilyAdapter,
 )
@@ -91,8 +89,6 @@ _RESOURCE_ENVELOPE_PATTERNS = (
 _DEFAULT_LOCAL_MEMORY_LIMIT = "2GB"
 _DEFAULT_LOCAL_WORKER_CAP = 2
 _DEFAULT_LOCAL_THREADS_PER_WORKER_CAP = 2
-_GUARDED_TPCH_Q10_NAME = "returned item reporting"
-_RESOURCE_ENVELOPE_SKIP_QUERY_IDS = frozenset({"Q10"})
 
 
 class DaskResourceEnvelopeError(RuntimeError):
@@ -391,148 +387,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
     def platform_name(self) -> str:
         """Return the platform name."""
         return "Dask"
-
-    def execute_query(self, ctx: Any, query: Any, query_id: str | None = None) -> dict[str, Any]:
-        """Execute a query, guarding known parent-killing Dask graphs."""
-        qid = str(query_id or getattr(query, "query_id", "unknown"))
-        diagnostic = self._guarded_resource_query_diagnostic(query, qid)
-        if diagnostic is not None:
-            logger.error("Query %s failed: %s", qid, diagnostic)
-            return build_failure_result_dict(
-                query_id=qid,
-                execution_time_seconds=0.0,
-                error_message=diagnostic,
-            )
-
-        return super().execute_query(ctx, query, query_id=query_id)
-
-    def execute_query_profiled(
-        self,
-        ctx: Any,
-        query: Any,
-        query_id: str | None = None,
-        **kwargs: Any,
-    ) -> tuple[dict[str, Any], QueryExecutionProfile]:
-        """Execute a profiled query, guarding known parent-killing Dask graphs."""
-        qid = str(query_id or getattr(query, "query_id", "unknown"))
-        diagnostic = self._guarded_resource_query_diagnostic(query, qid)
-        if diagnostic is not None:
-            logger.error("Query %s failed: %s", qid, diagnostic)
-            return (
-                build_failure_result_dict(
-                    query_id=qid,
-                    execution_time_seconds=0.0,
-                    error_message=diagnostic,
-                ),
-                QueryExecutionProfile(
-                    query_id=qid,
-                    execution_time_ms=0.0,
-                    platform=self.platform_name,
-                    lazy_evaluation=True,
-                    metrics={"resource_envelope_guarded": True},
-                ),
-            )
-
-        return super().execute_query_profiled(ctx, query, query_id=query_id, **kwargs)
-
-    def _guarded_resource_query_diagnostic(self, query: Any, query_id: str) -> str | None:
-        """Return a diagnostic when a known Dask graph can kill the parent process."""
-        query_name = str(getattr(query, "query_name", "")).strip().lower()
-        if query_id.strip().upper() != "Q10" or query_name != _GUARDED_TPCH_Q10_NAME:
-            return None
-        if not self._is_local_envelope():
-            return None
-
-        return (
-            "Dask resource-envelope failure before query execution: TPC-H Q10 Returned Item Reporting "
-            "is guarded because this Pandas-family Dask graph has been observed to terminate the parent "
-            f"benchmark process with exit 137 on local runs. Envelope: {self._resource_envelope_settings()}. "
-            "The query was not executed to preserve process stability; use a query subset excluding Q10, "
-            "an external scheduler, explicit local Dask resource settings, or another DataFrame platform "
-            "when Q10 coverage is required."
-        )
-
-    def _collect_skip_query_ids(self, benchmark_instance: Any | None) -> set[str]:
-        """Add Dask resource-envelope skips to benchmark-provided skip lists.
-
-        The TPC-H Q10 OOM that motivated this guard is specific to the default
-        local single-machine distributed envelope. When the user provides an
-        external ``scheduler_address`` or explicit local resource settings, Q10
-        should run normally; skipping it for those runs would lose legitimate
-        full-suite coverage.
-        """
-        skip_query_ids = super()._collect_skip_query_ids(benchmark_instance)
-        self._resource_envelope_skip_query_ids: set[str] = set()
-        if self._is_tpch_benchmark(benchmark_instance) and self._is_local_envelope():
-            self._resource_envelope_skip_query_ids = set(_RESOURCE_ENVELOPE_SKIP_QUERY_IDS)
-            skip_query_ids |= self._resource_envelope_skip_query_ids
-            logger.warning(
-                "Skipping TPC-H Q10 for dask-df local envelope: %s. "
-                "Pass --platform-option scheduler_address=tcp://... or explicit local resource options "
-                "to run Q10 with provisioned resources.",
-                self._tpch_q10_resource_envelope_diagnostic(),
-            )
-        return skip_query_ids
-
-    def _is_local_envelope(self) -> bool:
-        """Return True only for the default constrained local distributed envelope.
-
-        External schedulers and explicitly provisioned local resources are
-        out-of-envelope: those runs have taken ownership of the resource budget
-        and must not lose Q10 coverage to the default local-OOM guard.
-        """
-        if getattr(self, "scheduler_address", None):
-            return False
-        if not getattr(self, "use_distributed", False):
-            return False
-        return not self._has_explicit_local_resource_settings()
-
-    def _has_explicit_local_resource_settings(self) -> bool:
-        """Return whether local Dask resource sizing came from user configuration."""
-        return any(
-            getattr(self, flag_name, False)
-            for flag_name in (
-                "_n_workers_configured",
-                "_threads_per_worker_configured",
-                "_memory_limit_configured",
-            )
-        )
-
-    def _build_skipped_results(self, filtered_skip_query_ids: set[str]) -> list[dict[str, Any]]:
-        """Build skipped results, preserving Dask resource-envelope skip reasons."""
-        results = super()._build_skipped_results(filtered_skip_query_ids)
-        resource_skip_query_ids = getattr(self, "_resource_envelope_skip_query_ids", set())
-        for result in results:
-            query_id = str(result.get("query_id", "")).strip().upper()
-            if query_id in resource_skip_query_ids:
-                result["error"] = self._tpch_q10_resource_envelope_diagnostic()
-                result["dask_resource_envelope_guarded"] = True
-        return results
-
-    @staticmethod
-    def _is_tpch_benchmark(benchmark_instance: Any | None) -> bool:
-        """Return whether a benchmark instance is the TPC-H benchmark."""
-        if benchmark_instance is None:
-            return False
-        benchmark_type = type(benchmark_instance)
-        benchmark_name = str(
-            getattr(benchmark_instance, "name", "") or getattr(benchmark_instance, "_name", "")
-        ).lower()
-        return (
-            benchmark_type.__name__ == "TPCHBenchmark"
-            or benchmark_type.__module__.startswith("benchbox.core.tpch")
-            or "tpc-h" in benchmark_name
-        )
-
-    def _tpch_q10_resource_envelope_diagnostic(self) -> str:
-        """Return the stable diagnostic for the guarded TPC-H Q10 path."""
-        return (
-            "Dask resource-envelope guard: TPC-H Q10 Returned Item Reporting is skipped because this "
-            "Pandas-family Dask graph has been observed to terminate the parent benchmark process with "
-            f"exit 137 on default local-envelope runs. Envelope: {self._resource_envelope_settings()}. "
-            "Use an external scheduler, explicitly provision local Dask resources, or another DataFrame "
-            "platform when Q10 coverage is required."
-        )
 
     # =========================================================================
     # Data Loading Methods
