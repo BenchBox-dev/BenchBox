@@ -265,7 +265,7 @@ def test_q10_not_preemptively_skipped_on_dask_local_envelope():
 
     Dask 2026.3.0 makes the dask-expr optimizer mandatory, so Q10's projection-
     pushed graph fits the default local envelope (validated at SF1 via parquet +
-    CSV: 37,967 groups, no OOM). Q10 must no longer be pre-emptively skipped, and
+    CSV: 37,967 groups, no OOM). Q10 must no longer be preemptively skipped, and
     the guard machinery must be gone — while the generic worker-death catch stays.
     """
     adapter = _make_adapter()
@@ -276,7 +276,7 @@ def test_q10_not_preemptively_skipped_on_dask_local_envelope():
     skip_query_ids = adapter._collect_skip_query_ids(benchmark)
     assert "Q10" not in skip_query_ids
 
-    # The pre-emptive Q10 guard machinery is removed...
+    # The preemptive Q10 guard machinery is removed...
     assert not hasattr(adapter, "_guarded_resource_query_diagnostic")
     assert not hasattr(adapter, "_tpch_q10_resource_envelope_diagnostic")
     # ...but the generic resource-envelope worker-death safety net remains.
