@@ -193,6 +193,12 @@ def test_benchbox_run_argv_includes_platform_extras():
     assert "port=19030" in argv
 
 
+def test_benchbox_run_argv_can_omit_quiet_for_diagnostics():
+    argv = matrix.benchbox_run_argv("duckdb", "tpch", 0.01, quiet=False)
+    assert "--quiet" not in argv
+    assert argv[argv.index("--phases") + 1] == "load,power"
+
+
 @pytest.mark.parametrize(
     "platform",
     ["pg-duckdb", "pg-mooncake", "timescaledb", "postgresql"],
