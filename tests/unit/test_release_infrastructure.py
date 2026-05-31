@@ -24,6 +24,10 @@ pytestmark = [
 REPO_ROOT = Path(__file__).parent.parent.parent
 CI_FAST_EXPRESSION = "fast and not (slow or stress or resource_heavy or live_integration)"
 RELEASE_INTEGRATION_EXPRESSION = "integration and not (slow or stress or resource_heavy or live_integration)"
+RELEASE_BOOTSTRAP_EXPRESSION = "(slow or resource_heavy) and not (stress or live_integration or e2e)"
+RELEASE_PR_BRANCH_SKIP = (
+    "(github.event_name != 'pull_request' || github.base_ref != 'main' || !startsWith(github.head_ref, 'v'))"
+)
 RELEASE_REQUIRED_CONTEXTS = ("validate-base", "release-required-result")
 
 
@@ -255,6 +259,11 @@ class TestReleaseInfrastructure:
         assert 'uv run --isolated --no-project --with "$wheel"' in test_package_run_text
         assert "benchbox --help" in test_package_run_text
 
+        for job_name in ["compat-test", "integration-smoke"]:
+            condition = jobs[job_name]["if"]
+            assert "github.event.pull_request.title" not in condition
+            assert RELEASE_PR_BRANCH_SKIP in condition
+
         make_test_package = _make_target_recipe("test-package")
         assert "test-venv" not in make_test_package
         assert "Expected exactly one wheel" in make_test_package
@@ -373,7 +382,8 @@ class TestReleaseInfrastructure:
         assert '--head-sha "${{ github.event.pull_request.head.sha }}"' in run_text
         assert "--bootstrap-on-missing-workflow" in run_text
         assert "bootstrap_required=true" in run_text
-        assert "(slow or resource_heavy) and not (stress or live_integration)" in run_text
+        assert run_text.count(RELEASE_BOOTSTRAP_EXPRESSION) == 2
+        assert run_text.count('-k "not TestFractionalScaleFactors"') == 2
         assert "scripts/ruleset_drift_check.py" in run_text
         assert "--require-bypass-actor-visibility" in run_text
 
