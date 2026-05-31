@@ -128,9 +128,12 @@ def test_preflight_disk_budget_table_error_is_advisory(tmp_path: Path, monkeypat
 
 
 def test_preflight_reports_all_required_disk_roots(tmp_path: Path, monkeypatch):
+    scratch_tmp = tmp_path / "scratch-tmp"
+
     monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
     monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
     monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight.tempfile, "gettempdir", lambda: str(scratch_tmp))
 
     result = preflight.run_preflight(
         free_space_path=tmp_path / "runs",
@@ -139,7 +142,7 @@ def test_preflight_reports_all_required_disk_roots(tmp_path: Path, monkeypatch):
     )
 
     assert result.aborted is False
-    assert any("tmp" in line and "/tmp" in line for line in result.free_space_report)
+    assert any("tmp" in line and str(scratch_tmp) in line for line in result.free_space_report)
     assert any("output" in line and str(tmp_path / "runs") in line for line in result.free_space_report)
     assert any(
         "benchmark-data" in line and str(tmp_path / "runs" / "datagen") in line for line in result.free_space_report
@@ -148,6 +151,7 @@ def test_preflight_reports_all_required_disk_roots(tmp_path: Path, monkeypatch):
 
 
 def test_preflight_disk_headroom_gate_aborts_short_root(tmp_path: Path, monkeypatch):
+    scratch_tmp = tmp_path / "scratch-tmp"
     table = tmp_path / "disk_budget.tsv"
     table.write_text(
         "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
@@ -164,12 +168,13 @@ def test_preflight_disk_headroom_gate_aborts_short_root(tmp_path: Path, monkeypa
     )
 
     def fake_free_space(path):
-        return 8.0 if Path(path) == Path("/tmp") else 20.0
+        return 8.0 if Path(path) == scratch_tmp else 20.0
 
     monkeypatch.setattr(preflight, "free_space_gib", fake_free_space)
     monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
     monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
     monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+    monkeypatch.setattr(preflight.tempfile, "gettempdir", lambda: str(scratch_tmp))
 
     result = preflight.run_preflight(
         free_space_path=tmp_path / "runs",
@@ -179,7 +184,7 @@ def test_preflight_disk_headroom_gate_aborts_short_root(tmp_path: Path, monkeypa
 
     assert result.aborted is True
     assert "disk headroom gate failed" in (result.abort_reason or "")
-    assert "tmp /tmp: 8.0 GiB free < 10.0 GiB required" in (result.abort_reason or "")
+    assert f"tmp {scratch_tmp}: 8.0 GiB free < 10.0 GiB required" in (result.abort_reason or "")
 
 
 def test_preflight_disk_headroom_gate_respects_zero_override(tmp_path: Path, monkeypatch):

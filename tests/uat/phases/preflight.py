@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import tempfile
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -346,7 +347,7 @@ def collect_disk_roots(
     """Return labeled disk roots that UAT writes or depends on."""
     runs_root = Path(benchmark_runs_dir).expanduser()
     roots: list[tuple[str, Path]] = [
-        ("tmp", Path("/tmp")),
+        ("tmp", Path(tempfile.gettempdir()).expanduser()),
         ("output", runs_root),
         ("benchmark-data", runs_root / "datagen"),
     ]
