@@ -162,8 +162,8 @@ dry_run: false                   # optional, bool, default false. When
 # Matrix ----------------------------------------------------------------
 platforms:
   groups: ["sql", "dataframe"]   # optional, list[str]. Subset of:
-                                 # sql, fast, slow, dataframe, docker,
-                                 # docker-fast, docker-slow, all.
+                                 # sql, native-sql, fast, slow, dataframe,
+                                 # docker, docker-fast, docker-slow, all.
   include: []                    # optional, list[str]. Specific platform
                                  # names to add beyond groups.
   exclude: []                    # optional, list[str]. Names to drop.

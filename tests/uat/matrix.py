@@ -173,6 +173,7 @@ DATAFRAME_PLATFORMS = _dataframe_selector_platforms()
 PLATFORM_GROUPS: dict[str, tuple[str, ...]] = {
     "fast": FAST_NATIVE_PLATFORMS + FAST_DOCKER_PLATFORMS,
     "slow": SLOW_NATIVE_PLATFORMS + SLOW_DOCKER_PLATFORMS,
+    "native-sql": FAST_NATIVE_PLATFORMS + SLOW_NATIVE_PLATFORMS,
     "sql": SQL_PLATFORMS,
     "dataframe": DATAFRAME_PLATFORMS,
     "docker": DOCKER_PLATFORMS,

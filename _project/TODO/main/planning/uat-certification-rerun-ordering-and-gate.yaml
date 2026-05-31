@@ -44,7 +44,7 @@ work:
     status: done
     notes: |
       Three stage-ordered configs cloned from uat-enabled-platforms-full.yaml:
-      certification-01-native-dataframe.yaml (groups sql+dataframe, 0.01/0.1/1),
+      certification-01-native-dataframe.yaml (groups native-sql+dataframe, 0.01/0.1/1),
       certification-02-docker-nonoltp.yaml (docker-fast, 0.01/0.1/1),
       certification-03-docker-oltp.yaml (docker-slow, 0.01). Numeric prefixes +
       runbook encode the run order. Fresh-root + recorded-seed are documented in
