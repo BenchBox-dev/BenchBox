@@ -23,7 +23,7 @@ phases:
   - report
 
 platforms:
-  groups: ["sql", "dataframe"]
+  groups: ["native-sql", "dataframe"]
 
 benchmarks:
   groups: ["all"]

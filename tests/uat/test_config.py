@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 import yaml
 
-from tests.uat import config
+from tests.uat import config, matrix
 
 pytestmark = pytest.mark.fast
 
@@ -317,7 +317,9 @@ def test_certification_configs_load_and_encode_stage_ordering():
 
     # Stage 1 is native + dataframe only — no Docker management, so no `action=up`
     # events can precede the Docker stages.
-    assert stage1.platforms.groups == ("sql", "dataframe")
+    assert stage1.platforms.groups == ("native-sql", "dataframe")
+    stage1_platforms = matrix.resolve_platforms(groups=stage1.platforms.groups or ())
+    assert set(stage1_platforms).isdisjoint(matrix.DOCKER_PLATFORMS)
     assert stage1.cleanup.docker_manage_platforms is False
     assert stage1.scales.rungs == (0.01, 0.1, 1.0)
 

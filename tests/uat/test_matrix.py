@@ -43,9 +43,12 @@ def test_resolve_platforms_unknown_group():
 
 def test_platform_groups_are_registry_backed():
     assert matrix.PLATFORM_GROUPS["sql"] == matrix.SQL_PLATFORMS
+    assert matrix.PLATFORM_GROUPS["native-sql"] == matrix.FAST_NATIVE_PLATFORMS + matrix.SLOW_NATIVE_PLATFORMS
     assert matrix.PLATFORM_GROUPS["docker"] == matrix.DOCKER_PLATFORMS
     assert matrix.PLATFORM_GROUPS["dataframe"] == matrix.DATAFRAME_PLATFORMS
     assert set(matrix.SQL_PLATFORMS).issubset(PlatformRegistry.get_sql_platforms())
+    assert set(matrix.PLATFORM_GROUPS["native-sql"]).issubset(PlatformRegistry.get_sql_platforms())
+    assert set(matrix.PLATFORM_GROUPS["native-sql"]).isdisjoint(matrix.DOCKER_PLATFORMS)
     assert set(matrix.DOCKER_PLATFORMS).issubset(PlatformRegistry.get_self_hosted_platforms())
     assert tuple(f"{platform}-df" for platform in matrix.UAT_DATAFRAME_PLATFORM_BASES) == matrix.DATAFRAME_PLATFORMS
 

@@ -128,9 +128,15 @@ def test_preflight_disk_budget_table_error_is_advisory(tmp_path: Path, monkeypat
 
 
 def test_preflight_reports_all_required_disk_roots(tmp_path: Path, monkeypatch):
+    scratch_tmp = tmp_path / "scratch-tmp"
+    docker_root = tmp_path / "docker-root"
+    docker_root.mkdir()
+
     monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
     monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "docker_data_root", lambda: docker_root)
     monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight.tempfile, "gettempdir", lambda: str(scratch_tmp))
 
     result = preflight.run_preflight(
         free_space_path=tmp_path / "runs",
@@ -139,15 +145,53 @@ def test_preflight_reports_all_required_disk_roots(tmp_path: Path, monkeypatch):
     )
 
     assert result.aborted is False
-    assert any("tmp" in line and "/tmp" in line for line in result.free_space_report)
+    assert any("tmp" in line and str(scratch_tmp) in line for line in result.free_space_report)
     assert any("output" in line and str(tmp_path / "runs") in line for line in result.free_space_report)
     assert any(
         "benchmark-data" in line and str(tmp_path / "runs" / "datagen") in line for line in result.free_space_report
     )
-    assert any("docker-data" in line and str(tmp_path / "runs") in line for line in result.free_space_report)
+    assert any("docker-data" in line and str(docker_root) in line for line in result.free_space_report)
+    assert not any("docker-data" in line and str(tmp_path / "runs") in line for line in result.free_space_report)
+
+
+def test_collect_disk_roots_omits_docker_data_without_engine_root(tmp_path: Path):
+    roots = preflight.collect_disk_roots(
+        free_space_path=tmp_path / "runs",
+        benchmark_runs_dir=tmp_path / "runs",
+        docker_manage_platforms=True,
+        docker_data_root=None,
+    )
+
+    assert ("docker-data", tmp_path / "runs") not in roots
+    assert not any(label == "docker-data" for label, _path in roots)
+
+
+def test_docker_data_root_reads_host_visible_engine_root(tmp_path: Path, monkeypatch):
+    docker_root = tmp_path / "docker-root"
+    docker_root.mkdir()
+
+    def fake_run(argv, **_kwargs):
+        assert argv == ["docker", "info", "--format", "{{.DockerRootDir}}"]
+        return subprocess.CompletedProcess(argv, 0, stdout=f"{docker_root}\n", stderr="")
+
+    monkeypatch.setattr(preflight.subprocess, "run", fake_run)
+
+    assert preflight.docker_data_root() == docker_root
+
+
+def test_docker_data_root_omits_non_host_visible_engine_root(tmp_path: Path, monkeypatch):
+    missing_root = tmp_path / "missing-docker-root"
+
+    def fake_run(argv, **_kwargs):
+        return subprocess.CompletedProcess(argv, 0, stdout=f"{missing_root}\n", stderr="")
+
+    monkeypatch.setattr(preflight.subprocess, "run", fake_run)
+
+    assert preflight.docker_data_root() is None
 
 
 def test_preflight_disk_headroom_gate_aborts_short_root(tmp_path: Path, monkeypatch):
+    scratch_tmp = tmp_path / "scratch-tmp"
     table = tmp_path / "disk_budget.tsv"
     table.write_text(
         "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
@@ -164,12 +208,13 @@ def test_preflight_disk_headroom_gate_aborts_short_root(tmp_path: Path, monkeypa
     )
 
     def fake_free_space(path):
-        return 8.0 if Path(path) == Path("/tmp") else 20.0
+        return 8.0 if Path(path) == scratch_tmp else 20.0
 
     monkeypatch.setattr(preflight, "free_space_gib", fake_free_space)
     monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
     monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
     monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+    monkeypatch.setattr(preflight.tempfile, "gettempdir", lambda: str(scratch_tmp))
 
     result = preflight.run_preflight(
         free_space_path=tmp_path / "runs",
@@ -179,7 +224,7 @@ def test_preflight_disk_headroom_gate_aborts_short_root(tmp_path: Path, monkeypa
 
     assert result.aborted is True
     assert "disk headroom gate failed" in (result.abort_reason or "")
-    assert "tmp /tmp: 8.0 GiB free < 10.0 GiB required" in (result.abort_reason or "")
+    assert f"tmp {scratch_tmp}: 8.0 GiB free < 10.0 GiB required" in (result.abort_reason or "")
 
 
 def test_preflight_disk_headroom_gate_respects_zero_override(tmp_path: Path, monkeypatch):

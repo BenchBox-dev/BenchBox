@@ -21,8 +21,6 @@ from csv import reader
 from datetime import date
 from typing import Any
 
-import pandas as pd
-
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRegistry
 
@@ -713,6 +711,12 @@ def _pandas_route_airports(ctx: DataFrameContext, df: Any, *, state: bool = Fals
     )
 
 
+def _pandas() -> Any:
+    import pandas as pd
+
+    return pd
+
+
 _DAY_NAMES = {1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday"}
 _MONTH_NAMES = dict(
     enumerate("January February March April May June July August September October November December".split(), 1)  # noqa: SIM905
@@ -720,6 +724,7 @@ _MONTH_NAMES = dict(
 
 
 def _bucket(series: Any, default: str, rules: tuple[tuple[str, float, str], ...]) -> Any:
+    pd = _pandas()
     values = pd.Series(default, index=series.index, dtype="object")
     for op, threshold, label in rules:
         values.loc[series.lt(threshold) if op == "lt" else series.le(threshold)] = label
@@ -727,6 +732,7 @@ def _bucket(series: Any, default: str, rules: tuple[tuple[str, float, str], ...]
 
 
 def _holiday_period(flights: Any) -> Any:
+    pd = _pandas()
     period = pd.Series("Regular Day", index=flights.index, dtype="object")
     for label, mask in (
         ("Labor Day", (flights["month"] == 9) & (flights["day_of_week"] == 1) & (flights["day_of_month"] <= 7)),
@@ -890,6 +896,7 @@ globals().update(
 
 
 def delay_causes_pandas_impl(ctx: DataFrameContext) -> Any:
+    pd = _pandas()
     filtered = _pandas_window(ctx, extra=_PANDAS_EXTRAS["delayed_arr"])
     row = {"total_delayed_flights": len(filtered)}
     for column, count_name, avg_name in (
