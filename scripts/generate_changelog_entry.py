@@ -9,6 +9,8 @@ Behaviour mirrors the legacy automate_release.py:_build_raw_changelog,
 _summarize_changelog_with_claude, and generate_changelog_entry helpers:
 - Parses commits since an explicit lower-bound ref, or since the most recent
   v* tag when no lower-bound ref is supplied.
+- For explicit refs, derives commit subjects from the actual tree patch so a
+  squash-merged release on `main` does not re-list already released commits.
 - Categorises conventional commits into Added (feat), Fixed (fix), and
   Changed (perf). Skips test/docs/chore/ci/build/refactor/style and
   non-conventional commits.
@@ -35,6 +37,16 @@ from datetime import date
 from pathlib import Path
 
 CLAUDE_TIMEOUT_SECONDS = 120
+
+
+def _run_git(source: Path, *args: str, check: bool = False) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=source,
+        capture_output=True,
+        text=True,
+        check=check,
+    )
 
 
 def _build_raw_changelog(
@@ -172,6 +184,98 @@ def _resolve_log_range(source: Path, since_ref: str | None, since_tag: str | Non
     return f"{since_tag}..HEAD"
 
 
+def _diff_name_status(source: Path, since_ref: str) -> list[tuple[str, str]]:
+    result = _run_git(source, "diff", "--name-status", "-z", since_ref, "HEAD", check=True)
+    parts = result.stdout.split("\0")
+    entries: list[tuple[str, str]] = []
+    idx = 0
+    while idx < len(parts) - 1:
+        status = parts[idx]
+        idx += 1
+        if not status:
+            continue
+        if status.startswith(("R", "C")):
+            if idx + 1 >= len(parts):
+                break
+            old_path = parts[idx]
+            new_path = parts[idx + 1]
+            idx += 2
+            entries.append((status[0], new_path or old_path))
+            continue
+        path = parts[idx]
+        idx += 1
+        if path:
+            entries.append((status[0], path))
+    return entries
+
+
+def _conventional_changelog_subject(subject: str) -> bool:
+    if ":" not in subject:
+        return False
+    prefix = subject.split(":", 1)[0].strip().lower()
+    bare_prefix = prefix.split("(", 1)[0].strip()
+    return bare_prefix in {"feat", "fix", "perf"}
+
+
+def _candidate_changelog_commits(source: Path, since_ref: str) -> list[tuple[str, str]] | None:
+    result = _run_git(source, "log", "--format=%H%x00%s%x00", f"{since_ref}..HEAD")
+    if result.returncode != 0:
+        print(f"  Error: Failed to get git log: {result.stderr}")
+        return None
+    parts = [part for part in result.stdout.split("\0") if part]
+    return [
+        (commit_hash.strip(), subject.strip())
+        for commit_hash, subject in zip(parts[0::2], parts[1::2], strict=False)
+        if commit_hash.strip() and _conventional_changelog_subject(subject)
+    ]
+
+
+def _patch_delta_commit_subjects(source: Path, since_ref: str) -> list[str] | None:
+    """Return subjects for commits that contribute to the current patch delta.
+
+    `since_ref..HEAD` is ancestry-based. After a squash release to `main`, old
+    develop commits are not ancestors of `main`, so ancestry would re-list them.
+    Filtering through the actual tree diff keeps the changelog tied to the
+    unreleased patch instead.
+    """
+    candidates = _candidate_changelog_commits(source, since_ref)
+    if candidates is None:
+        return None
+    if not candidates:
+        return []
+
+    try:
+        entries = _diff_name_status(source, since_ref)
+    except subprocess.CalledProcessError as exc:
+        print(f"  Error: Failed to diff {since_ref}..HEAD: {exc.stderr}")
+        return None
+
+    patch_paths = {path for _status, path in entries}
+    if not patch_paths:
+        return []
+
+    patch_commits: set[str] = set()
+    candidate_paths_by_commit: dict[str, set[str]] = {}
+    for commit_hash, _subject in candidates:
+        result = _run_git(source, "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", commit_hash)
+        if result.returncode != 0:
+            continue
+        candidate_paths_by_commit[commit_hash] = {part for part in result.stdout.split("\0") if part}
+
+    # This is intentionally file-level, not ancestry-level: a commit only feeds
+    # the draft if at least one file it touched is still different from main.
+    # That excludes old commits whose changes are already present on main via a
+    # squash release, while keeping release-cut fast on the curated main delta.
+    for commit_hash, paths in candidate_paths_by_commit.items():
+        if paths & patch_paths:
+            patch_commits.add(commit_hash)
+
+    if not patch_commits:
+        return []
+
+    return [subject for commit_hash, subject in candidates if commit_hash in patch_commits]
+
+
 def generate_changelog_entry(
     source: Path,
     version: str,
@@ -196,18 +300,19 @@ def generate_changelog_entry(
         True if changelog was updated, False otherwise.
     """
     print(f"\n  Auto-generating changelog entry for v{version}...")
-    log_range = _resolve_log_range(source, since_ref=since_ref, since_tag=since_tag) or "HEAD"
-    result = subprocess.run(
-        ["git", "log", "--format=%s", log_range],
-        cwd=source,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        print(f"  Error: Failed to get git log: {result.stderr}")
-        return False
+    if since_ref is not None:
+        print(f"  Since ref: {since_ref} (patch delta)")
+        commits = _patch_delta_commit_subjects(source, since_ref)
+        if commits is None:
+            return False
+    else:
+        log_range = _resolve_log_range(source, since_ref=since_ref, since_tag=since_tag) or "HEAD"
+        result = _run_git(source, "log", "--format=%s", log_range)
+        if result.returncode != 0:
+            print(f"  Error: Failed to get git log: {result.stderr}")
+            return False
+        commits = [line for line in result.stdout.strip().split("\n") if line.strip()]
 
-    commits = [line for line in result.stdout.strip().split("\n") if line.strip()]
     if not commits:
         print("  Warning: No commits found since last tag")
         return False

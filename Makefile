@@ -778,7 +778,7 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 # Cut a release branch from develop in one shot:
 #   1. Create v$(VERSION) branch off develop (develop is not modified).
 #   2. On v$(VERSION): bump version sources (scripts/update_version.py).
-#   3. On v$(VERSION): generate CHANGELOG.md entry from origin/main..HEAD.
+#   3. On v$(VERSION): generate CHANGELOG.md entry from the origin/main patch delta.
 #   4. $EDITOR opens CHANGELOG.md for hand-curation (skipped if EDITOR unset).
 #   5. Curate: git rm dev-only/deferred paths (per A3 in single-repo-migration.md).
 #   6. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).

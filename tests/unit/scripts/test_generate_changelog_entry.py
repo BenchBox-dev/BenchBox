@@ -69,3 +69,44 @@ def test_since_ref_limits_release_changelog_to_main_delta(tmp_path: Path, monkey
     assert "- add broad release feature" in changelog
     assert "- repair clean install" in changelog
     assert "main-only release hardening" not in changelog
+
+
+def test_since_ref_ignores_commits_already_present_via_squash_merge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A squash-merged release on main must not make old develop commits reappear."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test User")
+
+    (repo / "CHANGELOG.md").write_text("# Changelog\n\n## [Unreleased]\n\n", encoding="utf-8")
+    _git(repo, "add", "CHANGELOG.md")
+    _git(repo, "commit", "-m", "chore: initial")
+    _git(repo, "branch", "-M", "main")
+
+    _git(repo, "checkout", "-b", "develop")
+    _commit(repo, "feat: already released feature", "released_feature.txt", "feature\n")
+    _commit(repo, "fix: already released fix", "released_fix.txt", "fix\n")
+
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--squash", "develop")
+    _git(repo, "commit", "-m", "Release v0.3.1")
+
+    _git(repo, "checkout", "develop")
+    _commit(repo, "feat: add next release feature", "next_feature.txt", "next\n")
+
+    monkeypatch.setattr(generate_changelog_entry, "_summarize_changelog_with_claude", lambda *args: None)
+
+    assert generate_changelog_entry.generate_changelog_entry(
+        repo,
+        version="0.3.2",
+        release_date="2026-05-31",
+        since_ref="main",
+    )
+
+    changelog = (repo / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "- add next release feature" in changelog
+    assert "already released feature" not in changelog
+    assert "already released fix" not in changelog

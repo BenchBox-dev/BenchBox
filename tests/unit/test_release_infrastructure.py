@@ -478,15 +478,16 @@ class TestReleaseInfrastructure:
             assert "patch release or incident" in content
 
     def test_release_cut_generates_changelog_from_main_delta(self):
-        """The release branch changelog boundary is main..HEAD, not develop tag ancestry."""
+        """The release branch changelog boundary is the main patch delta, not tag ancestry."""
         recipe = _make_target_recipe("release-cut")
         release_guide = (REPO_ROOT / "docs" / "operations" / "release-guide.md").read_text(encoding="utf-8")
         release_template = (REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md").read_text(encoding="utf-8")
 
         assert "scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/main" in recipe
-        assert "origin/main..HEAD" in release_template
+        assert "`origin/main` patch delta" in release_template
+        assert "git log origin/main..HEAD" in release_guide
         assert "origin/main" in release_guide
-        assert "release-finalize` intentionally does not replay release commits onto" in release_guide
+        assert "intentionally does not replay release commits onto" in release_guide
 
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""
