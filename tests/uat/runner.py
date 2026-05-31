@@ -106,6 +106,38 @@ def _default_log_path(log_dir: Path, platform: str, benchmark: str, scale: float
     return log_dir / f"{platform}_{benchmark}_{scale}_{timestamp}.log"
 
 
+# Upper bound for the verbose diagnostic re-run triggered when a `--quiet`
+# cell exits non-zero without emitting any output. Failures surface fast, so a
+# tight cap keeps the re-run cheap while still capturing the real error.
+DIAGNOSTIC_RERUN_TIMEOUT_S = 180
+
+
+def _append_diagnostic_rerun(log_fh, argv: list[str], *, timeout_s: int, env: dict[str, str]) -> None:
+    """Re-run a failed cell verbosely and append its output to the log.
+
+    Invoked only when the original ``--quiet`` invocation exited non-zero
+    without emitting any output (``--quiet`` suppresses benchbox's own error
+    reporting). Output is written as plain lines so ``_cell_log_tail`` captures
+    it into ``failure_tail``. Best-effort: never raises into the caller.
+    """
+    log_fh.write("[uat] verbose diagnostic re-run (--quiet suppressed the original error):\n")
+    log_fh.flush()
+    try:
+        rerun = run_with_timeout(
+            argv,
+            timeout_s=timeout_s,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=env,
+        )
+        text = _decode_process_output(rerun.stdout)
+        if text:
+            log_fh.write(text if text.endswith("\n") else text + "\n")
+        log_fh.write(f"[uat] diagnostic re-run exit_code={rerun.exit_code} timed_out={rerun.timed_out}\n")
+    except Exception as exc:  # noqa: BLE001 - diagnostics must never mask the original failure
+        log_fh.write(f"[uat] diagnostic re-run error {type(exc).__name__}: {exc}\n")
+
+
 def run_cell(
     platform: str,
     benchmark: str,
@@ -154,6 +186,22 @@ def run_cell(
             log_fh.write(stdout_text)
         if timeout_result.timed_out:
             log_fh.write(f"# UAT_TIMEOUT timeout_s={timeout_s} exit_code={timeout_result.exit_code}\n")
+        elif timeout_result.exit_code != 0 and not stdout_text.strip():
+            _append_diagnostic_rerun(
+                log_fh,
+                benchbox_run_argv(
+                    platform,
+                    benchmark,
+                    scale,
+                    phases=phases,
+                    compression=compression,
+                    extra_args=("--output", str(runs_dir / "datagen"), *extra_args),
+                    local_managed_platform=local_managed_platform,
+                    quiet=False,
+                ),
+                timeout_s=min(timeout_s, DIAGNOSTIC_RERUN_TIMEOUT_S),
+                env=env,
+            )
 
     result_path_str = last_nonempty_output_line(stdout_text) if timeout_result.exit_code == 0 else None
     result_path = _resolve_result_path(result_path_str, runs_dir) if result_path_str else None
