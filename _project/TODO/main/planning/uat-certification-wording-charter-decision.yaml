@@ -1,0 +1,136 @@
+id: uat-certification-wording-charter-decision
+title: "UAT boundary reset: certification wording reset OR explicit charter decision"
+worktree: main
+priority: Medium
+status: "Not Started"
+category: Documentation
+
+description: |
+  Outcome of a 4-round adversarial architecture review of the UAT layer. The
+  review's narrowed, agreed finding distinguishes three things:
+
+    (a) Evidence/audit artifacts — CHARTERED. The spec names them by hand:
+        matrix-summary TSV, validator-clean-rate rollup, packaging with
+        explicit terminal-state, resume manifest, explorer smoke, and the
+        "historical configs are evidence" policy
+        (_project/specs/uat-framework.md:31,35-38,268,688). The spec also
+        self-describes as a "release-gate orchestration layer" (line 693).
+    (b) The WORD/PROCESS "certification" — NOT CHARTERED. The spec has ZERO
+        "certif" hits (verified). The "Certification re-run" section and the
+        certification-0{1,2,3}-*.yaml configs are develop-only retrofits using
+        vocabulary the charter never granted.
+    (c) The standing certification-OPERATIONS surface beyond the named
+        artifacts — NOT CHARTERED. This is the out-of-charter residue.
+
+  The critic withdrew its earlier "invented charter" overreach: evidence
+  orchestration WAS chartered. The surviving, narrower charge is the
+  vocabulary/scope mismatch in (b) and (c).
+
+  Decision required. Pick ONE:
+    (A) Rename the "Certification re-run" section + config vocabulary to the
+        spec's own term "release-gate orchestration" and drop the standing
+        cert-operations framing; OR
+    (B) Re-open _project/specs/uat-framework.md to explicitly charter
+        "certification" with scope + budget if the team wants the word/process.
+
+  Either way: no standing cert-operations surface beyond the named artifacts
+  until the spec is re-opened.
+
+  DIRECT COLLISION — there is already an in-progress TODO,
+  [[uat-certification-rerun-ordering-and-gate]] (Medium-High, In Progress),
+  that institutionalizes exactly the certification re-run runbook + approval
+  gate this item questions the charter of. The A-vs-B decision (w1) MUST be
+  reconciled with that item: path B legitimizes it (charter the term + its
+  operations); path A means its "certification" vocabulary should be reworded
+  to "release-gate orchestration." Do not let the two diverge — settle the
+  charter, then align that TODO's wording/scope to the outcome.
+
+work:
+  - id: w0
+    summary: "Re-validate: confirm zero 'certif' in the spec and inventory all certification-named surfaces"
+    status: pending
+    notes: |
+      grep -i certif on _project/specs/uat-framework.md (expect empty). Inventory
+      the "Certification re-run" doc section, certification-0{1,2,3}-*.yaml
+      configs, and any cert vocabulary in docs/operations/uat-framework.md.
+      Record a compact summary.
+
+  - id: w1
+    summary: "Decide path A (reword to release-gate) vs path B (charter certification in spec)"
+    needs: [w0]
+    status: pending
+    notes: |
+      This is a product/scope decision — see open_questions. It must be settled
+      before [[uat-loc-budget-reconciliation]] because chartered scope
+      determines the budget, AND it must be reconciled with the in-progress
+      [[uat-certification-rerun-ordering-and-gate]] (which builds the very
+      cert-operations surface in question).
+
+  - id: w2
+    summary: "Path A (if chosen): rename certification vocabulary to 'release-gate orchestration' across docs/configs"
+    needs: [w1]
+    status: pending
+    notes: |
+      MUTUALLY EXCLUSIVE with w3 — execute only the unit matching the w1 decision.
+      Path A: reword the "Certification re-run" section and cert-named configs;
+      drop standing cert-operations framing. Keep the named evidence artifacts
+      (they are chartered).
+
+  - id: w3
+    summary: "Path B (if chosen): re-open the spec to charter certification scope + budget"
+    needs: [w1]
+    status: pending
+    notes: |
+      MUTUALLY EXCLUSIVE with w2 — execute only the unit matching the w1 decision.
+      Path B: add an explicit certification charter section to
+      _project/specs/uat-framework.md defining scope and an LOC/operations
+      budget; reconcile with line 693's "release-gate orchestration layer"
+      framing.
+
+deferred:
+  - summary: "Define a formal certification SOP/runbook"
+    reason: "Only if path B is chosen and the team wants an operations process; out of scope for the wording reset."
+
+metadata:
+  tags:
+    - uat-boundary-reset
+    - documentation
+    - charter
+    - release-gate
+  estimated_effort: "Small"
+  created_date: "2026-05-31"
+  last_updated: "2026-05-31T00:00:00Z"
+
+impact:
+  technical_debt: |
+    Removes orphan vocabulary that lives only in develop-only docs/config names,
+    closing the gap between what was chartered (evidence orchestration) and what
+    the implementation calls itself (certification operations).
+
+approach: |
+  Settle the A-vs-B decision first; it gates the budget reconciliation. Then
+  either reword to the chartered term or formally charter the new term — do not
+  leave a third, undocumented state.
+
+verification:
+  - description: "No orphan certification vocabulary (path A) OR spec charters it (path B)"
+    command: "grep -rni certif _project/specs/uat-framework.md docs/operations/uat-framework.md tests/uat/configs/"
+    expected_output: "path A: zero hits in configs/docs; path B: hits only where the spec now charters the term"
+
+scope_limit:
+  only_modify:
+    - "_project/specs/uat-framework.md"
+    - "docs/operations/uat-framework.md"
+    - "tests/uat/configs/ (cert-named config renames, path A only)"
+  do_not_modify:
+    - "tests/uat/*.py (no behavior change in this item)"
+
+open_questions:
+  - "Does the team want 'certification' as a first-class chartered process (path B), or is it just imprecise wording for release-gate orchestration (path A)?"
+
+success_metrics:
+  - "Docs/config vocabulary matches the chartered term, OR the spec explicitly charters certification with scope+budget"
+  - "No standing cert-operations surface exists beyond the named evidence artifacts"
+
+deps:
+  needs: []
