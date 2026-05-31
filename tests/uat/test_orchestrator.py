@@ -266,6 +266,29 @@ def test_orchestrator_cells_jsonl_marks_timed_out_cells(tmp_path: Path):
     assert "# UAT_TERMINAL_STATE terminal_state=timeout" in cell_log.read_text(encoding="utf-8")
 
 
+def test_cells_jsonl_terminal_marker_is_idempotent_after_timeout_marker(tmp_path: Path):
+    cell_log = tmp_path / "cell.log"
+    cell_log.write_text("# benchbox run\nstderr tail line\n# UAT_TIMEOUT timeout_s=1 exit_code=124\n", encoding="utf-8")
+    timed_out_cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="timed-out",
+        exit_code=124,
+        elapsed_s=1.0,
+        log_path=cell_log,
+        result_path=None,
+    )
+    source_info = orchestrator.RunSourceInfo(commit_sha="abc123", commit_short_sha="abc123", dirty=False)
+
+    orchestrator._write_cells_jsonl(tmp_path / "cells.jsonl", (timed_out_cell,), source_info=source_info)
+    orchestrator._write_cells_jsonl(tmp_path / "cells.jsonl", (timed_out_cell,), source_info=source_info)
+
+    text = cell_log.read_text(encoding="utf-8")
+    assert text.count("# UAT_TERMINAL_STATE terminal_state=timeout") == 1
+    assert text.count("# UAT_FAILURE_TAIL_START") == 1
+
+
 def test_orchestrator_writes_compatibility_pruned_jsonl_and_report_count(tmp_path: Path):
     cfg = validate_config(
         {
