@@ -393,11 +393,16 @@ def benchbox_run_argv(
     compression: str | None = None,
     extra_args: Iterable[str] = (),
     local_managed_platform: bool = False,
+    quiet: bool = True,
 ) -> list[str]:
     """Build the full `uv run -- benchbox run ...` argv for a single cell.
 
     Combines uv extras, platform `--platform-option` blocks, platform CLI
     flags, and any caller-provided extra argv.
+
+    ``quiet`` defaults to ``True`` so the final stdout line is the result-JSON
+    path (parsed by the runner). Pass ``quiet=False`` to capture a full
+    diagnostic transcript when a cell exits non-zero with no captured output.
     """
     argv = uv_run_argv(platform)
     argv += [
@@ -410,7 +415,10 @@ def benchbox_run_argv(
         "--scale",
         str(scale),
         "--non-interactive",
-        "--quiet",
+    ]
+    if quiet:
+        argv += ["--quiet"]
+    argv += [
         "--phases",
         phases,
     ]
