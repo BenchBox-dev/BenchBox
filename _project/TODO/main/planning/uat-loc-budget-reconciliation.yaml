@@ -22,7 +22,9 @@ description: |
   This item is the deliberate reconciliation: do not leave a 4x gap between
   charter and reality unexplained. It depends on the charter decision in
   [[uat-certification-wording-charter-decision]] because the chartered scope
-  determines what the budget should be.
+  determines what the budget should be. The decision work produces one
+  reconciliation path; the unchosen path is recorded as deferred rather than as
+  a pending work unit that blocks TODO completion.
 
 work:
   - id: w0
@@ -46,28 +48,20 @@ work:
       docker_manage_platforms defaults false).
 
   - id: w2
-    summary: "Path A (if chosen): trim production code toward the lightweight intent"
+    summary: "Apply the selected reconciliation path and record the unchosen path as deferred"
     needs: [w1]
     status: pending
     notes: |
-      MUTUALLY EXCLUSIVE with w3 — execute only the unit matching the w1 decision.
-      Path A: reduce plumbing/discretionary subsystems; prefer consuming
-      canonical surfaces over UAT-local machinery (reinforced by
-      [[uat-shared-submit-classifier]] and [[uat-single-connection-registry]]).
-
-  - id: w3
-    summary: "Path B (if chosen): revise the spec LOC budget with documented rationale"
-    needs: [w1]
-    status: pending
-    notes: |
-      MUTUALLY EXCLUSIVE with w2 — execute only the unit matching the w1 decision.
-      Path B: update _project/specs/uat-framework.md:132 to a realistic
-      budget that accounts for the chartered evidence-orchestration scope, with
-      a written rationale per bucket so the number is defensible, not silent.
+      If w1 chooses path A, reduce plumbing/discretionary subsystems and defer
+      path B. If w1 chooses path B, update _project/specs/uat-framework.md:132
+      to a realistic budget with per-bucket rationale and defer path A. Favor
+      the "consume canonical surfaces" principle in either path.
 
 deferred:
   - summary: "Set a CI LOC-budget guard that fails when UAT exceeds the agreed budget"
     reason: "A budget guard only makes sense after the budget is reconciled."
+  - summary: "Execute the reconciliation path not selected in w1"
+    reason: "The cut-vs-revise decision is intentionally exclusive; the unchosen path must not remain pending work."
 
 metadata:
   tags:
@@ -83,6 +77,11 @@ impact:
     Closes the unexplained 4x gap between the spec's LOC budget and the
     implementation — either by trimming the core or by honestly revising the
     budget with per-bucket rationale.
+
+prior_art:
+  - "_project/specs/uat-framework.md:132 — reuse as the budget source of truth; revise only with rationale"
+  - "tests/uat/README.md layout section — reuse for module inventory when bucketing production LOC"
+  - "tests/uat/phases/report.py and tests/uat/orchestrator.py — treat source-SHA/report artifacts as chartered evidence before considering cuts"
 
 approach: |
   Measure and bucket first, settle the charter decision (it sets the target),

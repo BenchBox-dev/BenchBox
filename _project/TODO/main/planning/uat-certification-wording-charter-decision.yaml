@@ -34,7 +34,9 @@ description: |
         "certification" with scope + budget if the team wants the word/process.
 
   Either way: no standing cert-operations surface beyond the named artifacts
-  until the spec is re-opened.
+  until the spec is re-opened. The decision work unit produces exactly one
+  implementation path; the unchosen path is recorded as deferred, not left as a
+  pending work unit that blocks TODO completion.
 
   DIRECT COLLISION — there is already an in-progress TODO,
   [[uat-certification-rerun-ordering-and-gate]] (Medium-High, In Progress),
@@ -67,29 +69,22 @@ work:
       cert-operations surface in question).
 
   - id: w2
-    summary: "Path A (if chosen): rename certification vocabulary to 'release-gate orchestration' across docs/configs"
+    summary: "Implement the selected charter outcome and record the unchosen path as deferred"
     needs: [w1]
     status: pending
     notes: |
-      MUTUALLY EXCLUSIVE with w3 — execute only the unit matching the w1 decision.
-      Path A: reword the "Certification re-run" section and cert-named configs;
-      drop standing cert-operations framing. Keep the named evidence artifacts
-      (they are chartered).
-
-  - id: w3
-    summary: "Path B (if chosen): re-open the spec to charter certification scope + budget"
-    needs: [w1]
-    status: pending
-    notes: |
-      MUTUALLY EXCLUSIVE with w2 — execute only the unit matching the w1 decision.
-      Path B: add an explicit certification charter section to
-      _project/specs/uat-framework.md defining scope and an LOC/operations
-      budget; reconcile with line 693's "release-gate orchestration layer"
-      framing.
+      If w1 chooses path A, reword the "Certification re-run" section and
+      cert-named configs to the chartered "release-gate orchestration" language
+      and defer path B. If w1 chooses path B, add an explicit certification
+      charter section to _project/specs/uat-framework.md defining scope and an
+      LOC/operations budget, then defer path A. Keep the named evidence
+      artifacts either way.
 
 deferred:
   - summary: "Define a formal certification SOP/runbook"
     reason: "Only if path B is chosen and the team wants an operations process; out of scope for the wording reset."
+  - summary: "Execute the charter path not selected in w1"
+    reason: "The A-vs-B decision is intentionally exclusive; the unchosen path must not remain pending work."
 
 metadata:
   tags:
@@ -106,6 +101,11 @@ impact:
     Removes orphan vocabulary that lives only in develop-only docs/config names,
     closing the gap between what was chartered (evidence orchestration) and what
     the implementation calls itself (certification operations).
+
+prior_art:
+  - "_project/specs/uat-framework.md:691-696 — reuse the existing release-gate orchestration wording unless certification is explicitly chartered"
+  - "docs/operations/uat-framework.md Certification re-run section — reword or charter this current operations surface, do not create a third term"
+  - "_project/TODO/main/planning/uat-certification-rerun-ordering-and-gate.yaml — reconcile the existing in-progress certification runbook with the selected vocabulary"
 
 approach: |
   Settle the A-vs-B decision first; it gates the budget reconciliation. Then
