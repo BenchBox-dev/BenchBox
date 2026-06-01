@@ -33,6 +33,18 @@ description: |
   ANY of: missing manifests, missing commit SHA, DuckDB reference failures,
   a Docker zero-cell run, a hung platform, or a NO_JSON without error text.
 
+  CHARTER-VOCABULARY RECONCILIATION (decided 2026-05-31 by
+  [[uat-certification-wording-charter-decision]], Path A): "certification" is
+  NOT a chartered term in _project/specs/uat-framework.md (zero "certif" hits);
+  the chartered name is "release-gate orchestration". This work owns the
+  certification-named surface (tests/uat/configs/certification-0{1,2,3}-*.yaml,
+  tests/uat/phases/report.py:certification_ordering_violations,
+  tests/uat/test_config.py, and the docs "Certification re-run" section), so
+  the rename to release-gate-orchestration vocabulary must land WITH this change
+  rather than as a competing PR (which would break test_config.py and collide
+  here). Do not introduce a standing cert-operations surface beyond the named
+  evidence artifacts.
+
 prior_art:
   - "docs/operations/uat-framework.md 'Sequential platform execution' + 'Cross-scale coverage assertion (opt-in)' — reuse the report.cross_scale_coverage_min_pairs teeth; extend the doc with the ordering + approval-gate runbook"
   - "tests/uat/configs/ historical + template configs — clone a template for the certification config rather than authoring from scratch"
