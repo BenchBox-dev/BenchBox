@@ -14,7 +14,6 @@ tests/
 ├── fixtures/                 # Shared test fixtures
 ├── integration/              # Integration tests
 ├── performance/              # Performance tests
-├── specialized/              # Specialized functionality tests
 ├── unit/                     # Unit tests
 ├── utilities/                # Test utilities and helpers
 ├── conftest.py              # Global pytest configuration
@@ -38,12 +37,12 @@ Fast, isolated tests that verify individual components:
 
 ### E2E Tests (`e2e/`)
 End-to-end tests that validate complete CLI workflows:
-- **test_cli_options.py**: CLI option validation (27 tests)
-- **test_error_handling.py**: Error handling coverage (25 tests)
-- **test_result_validation.py**: Result schema validation (28 tests)
-- **test_local_platforms.py**: Local platform tests (14 tests)
-- **test_cloud_platforms.py**: Cloud platform dry-run tests (15 tests)
-- **test_dataframe_platforms.py**: DataFrame platform tests (16 tests)
+- CLI option validation
+- Error handling coverage
+- Result schema validation
+- Local platform execution
+- Cloud platform dry-run workflows
+- DataFrame platform workflows
 
 **Characteristics:**
 - Tests full CLI workflow from command to results
@@ -83,20 +82,29 @@ Tests focused on performance characteristics:
 - Statistical analysis
 - Baseline comparisons
 
-### Specialized Tests (`specialized/`)
-Tests for advanced or specialized functionality:
-- Advanced SQL features
-- OLAP operations
-- Complex benchmark workflows
-- Edge cases and error conditions
-
-**Characteristics:**
-- Variable execution time
-- Complex test scenarios
-- Advanced feature validation
-- Specialized tooling requirements
-
 ## Test Execution
+
+### Automated Gate Contract
+
+The standard gates are intentionally split by the risk they are meant to catch:
+
+- `make test-fast`: quick developer and develop-PR feedback for code-impacting
+  changes. This is the coverage-bearing lane in `.github/workflows/pr.yml`.
+- `make test-correctness-gate`: bounded develop-PR real-result gate. It runs the
+  DuckDB TPC-H matrix slice through generate, load, and execute with strict
+  stored expected-results row-count validation enabled for the configured
+  answer-backed query subset.
+- `make test-integration`: non-live, non-stress integration coverage for broader
+  local and main/release validation.
+- `make test-local-matrix`: opt-in stress matrix for the full local platform
+  benchmark sweep.
+- Release canary, live cloud, Docker, and UAT evidence remain separate release
+  signals until their cost, credential, and flake policies are suitable for
+  blocking routine PRs.
+
+Medium tests are an explicit local routing tier, not an implicit CI guarantee.
+Correctness-relevant medium tests must be promoted into `fast`, an integration
+workflow, or `test-correctness-gate` when they become product-critical.
 
 ### Quick Development Testing
 ```bash
@@ -148,7 +156,7 @@ uv run -- python -m pytest -n auto
 # Run integration tests
 make test-integration
 # or
-uv run -- python -m pytest -m "integration and not live_integration"
+uv run -- python -m pytest -m "integration and not live_integration and not stress"
 
 # Run performance tests
 uv run -- python -m pytest tests/performance/ -m performance
@@ -215,7 +223,6 @@ Tests are organized using pytest markers for selective execution:
 - `e2e_cloud`: Cloud platform E2E tests (dry-run)
 - `e2e_dataframe`: DataFrame platform E2E tests
 - `performance`: Performance tests
-- `specialized`: Specialized functionality tests
 
 ### Database Support
 - `sqlite`: Tests requiring SQLite

@@ -207,9 +207,9 @@ def _footer_value(value: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Certification re-run ordering check.
+# Release-gate re-run ordering check.
 #
-# The certification contract (uat-certification-rerun-ordering-and-gate) runs
+# The release-gate contract (uat-certification-rerun-ordering-and-gate) runs
 # four stages — native SQL, then dataframe, then Docker non-OLTP, then Docker
 # OLTP — and requires that ALL native + dataframe platforms complete before any
 # Docker stack starts. The 2026-05-28/29 evidence was contaminated because a
@@ -248,12 +248,12 @@ def parse_docker_up_events(lifecycle_log_text: str) -> list[tuple[_dt.datetime, 
     return events
 
 
-def certification_ordering_violations(
+def release_gate_ordering_violations(
     docker_stage_lifecycle_logs: Iterable[str],
     *,
     native_stage_completed_at: _dt.datetime,
 ) -> list[str]:
-    """Return ordering violations for a certification run-set.
+    """Return ordering violations for a release-gate run-set.
 
     Given the ``uat_lifecycle.log`` text of each Docker stage and the timestamp
     at which the native + dataframe stage completed, return a human-readable

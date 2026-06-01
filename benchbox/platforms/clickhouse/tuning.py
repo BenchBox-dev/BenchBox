@@ -60,14 +60,6 @@ class ClickHouseTuningMixin:
             "allow_experimental_correlated_subqueries": 1,
         }
 
-        # Apply server-wide memory limit override (server mode only - not supported in chdb)
-        if (
-            self.deployment_mode == "server"
-            and hasattr(self, "max_server_memory_usage_ratio")
-            and self.max_server_memory_usage_ratio
-        ):
-            settings["max_server_memory_usage_to_ram_ratio"] = self.max_server_memory_usage_ratio
-
         # Apply cache control settings for accurate benchmarking
         if self.disable_result_cache:
             settings.update(
@@ -104,15 +96,6 @@ class ClickHouseTuningMixin:
                 "join_algorithm": "grace_hash",
                 "grace_hash_join_initial_buckets": 8,
             }
-
-            # Include settings that may not exist in local ClickHouse
-            if self.deployment_mode != "local":
-                # These settings might not be available in local mode (server-only)
-                olap_settings.update(
-                    {
-                        "enable_multiple_joins_emulation": 1,
-                    }
-                )
 
             settings.update(olap_settings)
 
@@ -272,7 +255,8 @@ class ClickHouseTuningMixin:
             return False
 
         try:
-            connection.execute(f"SET {setting} = {value}")
+            setting_value = self._format_setting_value(value)
+            connection.execute(f"SET {setting} = {setting_value}")
             self.logger.debug(f"Set {setting} = {value}")
             return True
         except Exception as e:
@@ -282,6 +266,14 @@ class ClickHouseTuningMixin:
             else:
                 self.logger.warning(f"Failed to set {setting}: {e}")
             return False
+
+    def _format_setting_value(self, value: Any) -> Any:
+        """Format ClickHouse SET values, quoting string literals."""
+        if not isinstance(value, str):
+            return value
+        if len(value) >= 2 and value[0] in {"'", '"'} and value[-1] == value[0]:
+            return value
+        return "'" + value.replace("'", "''") + "'"
 
     _supported_tuning_type_names = ("PARTITIONING", "SORTING", "CLUSTERING", "DISTRIBUTION")
 

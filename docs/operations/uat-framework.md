@@ -256,13 +256,29 @@ and timed-out counts, followed by a run-status/source-provenance footer.
 Early-stop pruning is separate from compatibility pruning and must not be
 treated as a pass or a compatibility exclusion.
 
-## Historical vs editable configs
+## Config lifecycle (four classes)
 
-Files under `tests/uat/configs/` are either historical replay evidence
-(first line `# HISTORICAL`) or editable templates (first line
-`# TEMPLATE`). Historical configs are reviewed as evidence, but there is
-no hash ceremony or `.frozen-hashes.json` guard. New sweeps clone an
-existing config:
+Every file under `tests/uat/configs/` has one of four lifecycle classes. The
+class is signalled by the first-line header and, for generated shards, by
+location:
+
+1. **Editable template** (`# TEMPLATE`) — a reusable starting point. Clone it
+   for a new sweep; the original stays generic.
+2. **Historical evidence** (`# HISTORICAL`) — an immutable replay of a past
+   sweep, retained for provenance. Historical configs are evidence: reviewed,
+   not re-run as-is. There is no hash ceremony or `.frozen-hashes.json` guard.
+3. **Generated rerun shard** — operational scratch emitted by a single sweep's
+   resume/follow-up (often one file per platform). These are NOT reusable
+   templates. They live under `tests/uat/configs/generated-rerun-shards/` (see
+   that directory's README), not at the top level, so they cannot masquerade as
+   editable starting points.
+4. **Ephemeral resume state** — `resume.json`, written under the run's log dir
+   on a free-space-floor abort and consumed by `--resume <manifest>` (see
+   "Resume manifest" in `_project/specs/uat-framework.md`). It is runtime state,
+   not a config artifact, and is never a reusable file class. A "resume config"
+   is not a category — only the per-run `resume.json` is.
+
+New sweeps clone a template:
 
 ```bash
 cp tests/uat/configs/uat-2026-05-02.yaml tests/uat/configs/uat-<new>.yaml
@@ -310,27 +326,27 @@ just wastes the timeout window each attempt.
 | Validator clean rate breaches floor | bundle quality regression | run `make uat-validate` standalone; it validates via `benchbox.validation.bundle` and writes the rollup TSV |
 | Make target missing | new release not synced | `make worktree-pool-status` to check pool freshness |
 
-## Certification re-run
+## Release-gate re-run
 
-A certification sweep produces the sign-off evidence (a COMPLETED report per
+A release-gate sweep produces the sign-off evidence (a COMPLETED report per
 config with a commit SHA). It runs in four stages, in this order, so that all
 native and dataframe platforms finish before any Docker stack starts — the
 ordering the 2026-05-28/29 evidence violated.
 
 Stages (run each to completion before starting the next):
 
-1. **Native SQL + dataframe** — `tests/uat/configs/certification-01-native-dataframe.yaml` (scales 0.01/0.1/1)
-2. **Docker non-OLTP** — `tests/uat/configs/certification-02-docker-nonoltp.yaml` (scales 0.01/0.1/1)
-3. **Docker OLTP** — `tests/uat/configs/certification-03-docker-oltp.yaml` (scale 0.01)
+1. **Native SQL + dataframe** — `tests/uat/configs/release-gate-01-native-dataframe.yaml` (scales 0.01/0.1/1)
+2. **Docker non-OLTP** — `tests/uat/configs/release-gate-02-docker-nonoltp.yaml` (scales 0.01/0.1/1)
+3. **Docker OLTP** — `tests/uat/configs/release-gate-03-docker-oltp.yaml` (scale 0.01)
 
-(Stage 1 covers certification stages 1–2 of the contract — native SQL then
+(Stage 1 covers release-gate stages 1–2 of the contract — native SQL then
 dataframe — in a single Docker-free sweep; stages 2 and 3 are the Docker tiers.)
 
 Run rules:
 
 - Use a **fresh run root** under `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`;
   never resume into the failed 2026-05-28/29 dirs (they are non-evidentiary).
-- Record the run **seed** (`BENCHBOX_SEED`) in the certification log.
+- Record the run **seed** (`BENCHBOX_SEED`) in the release-gate log.
 - One platform / one Docker stack at a time (`execute.parallel_platforms` is
   hard-rejected). A single Docker stack's compose-up failure records FAIL and
   the sweep advances; it does not truncate the run.
@@ -343,8 +359,8 @@ last line of stage 1's `uat_lifecycle.log`, or the stage-1 run-dir completion
 time) and verify no Docker stack came up earlier:
 
 ```python
-from tests.uat.phases.report import certification_ordering_violations
-violations = certification_ordering_violations(
+from tests.uat.phases.report import release_gate_ordering_violations
+violations = release_gate_ordering_violations(
     [open(stage2_lifecycle_log).read(), open(stage3_lifecycle_log).read()],
     native_stage_completed_at=stage1_completed_at,
 )
@@ -353,7 +369,7 @@ assert not violations, violations
 
 `cross_scale_coverage_min_pairs` in each config is the report-phase teeth: a
 breach forces a non-zero report exit, so a partial or regressed sweep cannot be
-APPROVED. Tune the value to the certified pair count during bring-up.
+APPROVED. Tune the value to the approved pair count during bring-up.
 
 ### APPROVE / HOLD gate
 

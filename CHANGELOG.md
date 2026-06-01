@@ -7,22 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.1] - 2026-05-30
-
-### New
-
-- **Databricks Liquid Clustering** - Added TPC-H and TPC-DS tuning profiles that
-  apply Databricks Liquid Clustering for more representative runs.
+## [0.3.1] - 2026-06-01
 
 ### Added
 
-- **Release gate hardening** - Added stable main-release validation contexts,
-  pre-tag release-finalize checks, release canary freshness, ruleset drift
-  checks, dependency-bound reporting, and isolated package smoke gates so
-  release PRs have explicit pre-publish evidence before a public tag is pushed.
+- **Databricks Liquid Clustering** - Added TPC-H and TPC-DS tuning profiles that
+  apply Databricks Liquid Clustering for more representative runs.
 - **Benchmark support-status diagnostics** - You can now check which benchmarks
   and platforms are supported, and why a given combination is gated, from
   registry-backed metadata instead of inferring it from docs.
+- **Certification re-run infrastructure** - Added re-run configs, ordering
+  checks, and an approval gate for release certification cycles.
+- **YAML catalog schema validation** - Added schema validation for migrated SQL
+  catalogs stored as YAML block scalars, with lazy cached registry loading off
+  the import path.
 - **Safer prompt composer guidance** - The `/prompts/` page now flags
   paid-platform runs, surfaces platform footguns, and adds provenance, MCP, and
   CLI-hygiene guidance for agent-generated benchmark runs.
@@ -33,9 +31,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without pulling pandas. Optional engine and DataFrame imports (ClickHouse
   local, DataFrame mode) are now loaded lazily, so the base install stays
   minimal. This resolves the v0.3.0 clean-install failure.
-- **Release publication workflow** - Release finalization now waits for stable
-  pre-merge release contexts before tagging, avoiding post-publish failures on
-  immutable public artifacts.
+- **Release PR CI contracts** - Hardened release branch CI, release-readiness
+  checks, and version badge updates so `v0.3.1` can be cut from current
+  `develop` with stable required contexts.
+- **UAT diagnostic hardening** - Cell failures are captured when `--quiet` is
+  active; stderr-gated reruns avoid redundant diagnostics; Docker compose-up
+  failures record FAIL-and-advance instead of aborting the sweep.
+- **Dask stability** - Pinned FAIL-and-advance behavior on cluster death,
+  removed the obsolete Dask Q10 skip guard, and pruned incompatible native
+  DataFrame cells from UAT.
+- **DuckDB reference cells** - Greened reference cells across `tpchavoc` and
+  primitives benchmark suites.
+- **ClickHouse UAT** - Fixed UAT configuration to use the `clickhouse-server`
+  extra dependency.
+- **DataFrame registry integration** - Generated DataFrame query
+  implementations are now correctly typed and registered, and registry
+  DataFrame support flags drive UAT cell pruning.
 - **Trino table creation** - JoinOrder `CREATE TABLE` no longer emits
   primary-key clauses that Trino rejects.
 - **JoinOrder across engines** - SQLite now indexes JoinOrder tables, Spark
@@ -47,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metrics, and JoinOrder chart labels are preserved.
 - **Light-mode readability** - Restored prompt-copy contrast on the landing and
   prompt pages in light mode.
+- **Visualization contracts** - Hardened chart registry and global-header
+  visual parity checks through shared contract tests.
 
 ### Changed
 
@@ -56,6 +69,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Registry-derived platform lists** - Landing and prompt pages now derive
   their platform and command examples from the live registry, so the lists stay
   in sync with actually supported platforms.
+- **Safer local Spark defaults** - Spark now writes its warehouse under
+  `benchmark_runs/databases/` instead of the current working directory.
+- **Corpus-aware benchmark UI** - Benchmark switchers and corpus summary counts
+  now reflect registry state and suppress stale theme language.
 
 ## [0.3.0] - 2026-05-16
 
@@ -675,9 +692,7 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 - **Issues**: [Report bugs and request features](https://github.com/joeharris76/benchbox/issues)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
-[Unreleased]: https://github.com/joeharris76/benchbox/compare/v0.3.1...HEAD
-[0.3.1]: https://github.com/joeharris76/benchbox/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/joeharris76/benchbox/compare/v0.2.1...v0.3.0
+[Unreleased]: https://github.com/joeharris76/benchbox/compare/v0.2.1...HEAD
 [0.2.1]: https://github.com/joeharris76/benchbox/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/joeharris76/benchbox/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/joeharris76/benchbox/compare/v0.1.4...v0.1.5

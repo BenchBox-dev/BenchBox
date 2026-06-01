@@ -7,6 +7,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from datetime import date
 
 import pytest
@@ -89,6 +91,17 @@ class TestQueryRegistration:
         bm = FlightDataBenchmark(scale_factor=0.01)
         registry = bm.get_dataframe_queries()
         assert len(registry) == 20
+
+    def test_benchmark_exposes_registry_without_pandas_import(self):
+        code = (
+            "import sys; "
+            "sys.modules['pandas'] = None; "
+            "from benchbox.core.flightdata.benchmark import FlightDataBenchmark; "
+            "registry = FlightDataBenchmark(scale_factor=0.01).get_dataframe_queries(); "
+            "assert len(registry) == 20"
+        )
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+        assert result.returncode == 0, f"FlightData registry import required pandas:\n{result.stderr}"
 
 
 class TestParameterOverrides:

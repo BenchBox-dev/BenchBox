@@ -15,10 +15,6 @@ pytestmark = [
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-BASH_SNIPPET_TEST = pytest.mark.skipif(
-    os.name == "nt",
-    reason="ci-required-result aggregator is a Linux GitHub Actions bash snippet",
-)
 
 
 def _ci_required_result_script() -> str:
@@ -37,6 +33,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "CONTENT_RESULT": "skipped",
         "LINT_RESULT": "skipped",
         "TEST_RESULT": "skipped",
+        "CORRECTNESS_RESULT": "skipped",
         "EXPLORER_TOKENS_RESULT": "skipped",
         "AUDIT_SHA_RESULT": "skipped",
         "CONTENT_GUARD_NEEDED": "false",
@@ -67,7 +64,6 @@ def test_pr_path_classifier_fetches_base_history_for_merge_base() -> None:
     assert workflow.count(base_fetch) == 3
 
 
-@BASH_SNIPPET_TEST
 def test_ci_required_result_preserves_content_guard_failure() -> None:
     result = _run_ci_required_result(
         CONTENT_GUARD_NEEDED="true",
@@ -79,7 +75,6 @@ def test_ci_required_result_preserves_content_guard_failure() -> None:
     assert "Content-only PR; skipped Python code CI." not in result.stdout
 
 
-@BASH_SNIPPET_TEST
 def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
     # When the explorer-tokens job fires (results-explorer/src changed) and
     # fails, the aggregator must fail the required result. Without this
@@ -90,6 +85,7 @@ def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
         EXPLORER_TOKENS_RESULT="failure",
     )
 
@@ -97,7 +93,6 @@ def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
     assert "explorer-tokens=failure" in result.stdout
 
 
-@BASH_SNIPPET_TEST
 def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
     # Defensive: pin the `|| "skipped"` clause in the aggregator's
     # explorer-tokens check. The (NEEDS_CODE_CI="true",
@@ -116,14 +111,14 @@ def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
         EXPLORER_TOKENS_RESULT="skipped",
     )
 
     assert result.returncode == 0
-    assert "Code/infra PR; lint and fast tests passed." in result.stdout
+    assert "Code/infra PR; lint, fast tests, and correctness gate passed." in result.stdout
 
 
-@BASH_SNIPPET_TEST
 def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
     # Sanity: when explorer-tokens runs and passes alongside lint+test
     # success, the aggregator returns success.
@@ -132,14 +127,15 @@ def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
         EXPLORER_TOKENS_RESULT="success",
     )
 
     assert result.returncode == 0
-    assert "Code/infra PR; lint and fast tests passed." in result.stdout
+    assert "Code/infra PR; lint, fast tests, and correctness gate passed." in result.stdout
 
 
-def test_ci_required_result_explorer_tokens_in_needs() -> None:
+def test_ci_required_result_required_jobs_in_needs() -> None:
     # If a future cleanup drops `explorer-tokens` from the
     # `ci-required-result.needs:` list, the aggregator wouldn't observe its
     # status at all (always "" → handled as not-success in the bash logic).
@@ -147,3 +143,4 @@ def test_ci_required_result_explorer_tokens_in_needs() -> None:
     workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
     needs = workflow_yaml["jobs"]["ci-required-result"]["needs"]
     assert "explorer-tokens" in needs
+    assert "correctness-gate" in needs

@@ -43,9 +43,12 @@ def test_resolve_platforms_unknown_group():
 
 def test_platform_groups_are_registry_backed():
     assert matrix.PLATFORM_GROUPS["sql"] == matrix.SQL_PLATFORMS
+    assert matrix.PLATFORM_GROUPS["native-sql"] == matrix.FAST_NATIVE_PLATFORMS + matrix.SLOW_NATIVE_PLATFORMS
     assert matrix.PLATFORM_GROUPS["docker"] == matrix.DOCKER_PLATFORMS
     assert matrix.PLATFORM_GROUPS["dataframe"] == matrix.DATAFRAME_PLATFORMS
     assert set(matrix.SQL_PLATFORMS).issubset(PlatformRegistry.get_sql_platforms())
+    assert set(matrix.PLATFORM_GROUPS["native-sql"]).issubset(PlatformRegistry.get_sql_platforms())
+    assert set(matrix.PLATFORM_GROUPS["native-sql"]).isdisjoint(matrix.DOCKER_PLATFORMS)
     assert set(matrix.DOCKER_PLATFORMS).issubset(PlatformRegistry.get_self_hosted_platforms())
     assert tuple(f"{platform}-df" for platform in matrix.UAT_DATAFRAME_PLATFORM_BASES) == matrix.DATAFRAME_PLATFORMS
 
@@ -181,6 +184,16 @@ def test_uv_run_argv_extra_uses_extra_flag():
     ]
 
 
+def test_uv_run_argv_clickhouse_server_uses_canonical_extra():
+    assert matrix.uv_run_argv("clickhouse-server") == [
+        "uv",
+        "run",
+        "--extra",
+        "clickhouse-server",
+        "--",
+    ]
+
+
 def test_benchbox_run_argv_includes_platform_extras():
     argv = matrix.benchbox_run_argv("starrocks", "tpch", 0.01)
     assert "--quiet" in argv
@@ -188,6 +201,12 @@ def test_benchbox_run_argv_includes_platform_extras():
     assert "--platform-option" in argv
     # The starrocks-specific port=19030 must be there.
     assert "port=19030" in argv
+
+
+def test_benchbox_run_argv_can_omit_quiet_for_diagnostics():
+    argv = matrix.benchbox_run_argv("duckdb", "tpch", 0.01, quiet=False)
+    assert "--quiet" not in argv
+    assert argv[argv.index("--phases") + 1] == "load,power"
 
 
 @pytest.mark.parametrize(

@@ -9,6 +9,8 @@ Behaviour mirrors the legacy automate_release.py:_build_raw_changelog,
 _summarize_changelog_with_claude, and generate_changelog_entry helpers:
 - Parses commits since an explicit lower-bound ref, or since the most recent
   v* tag when no lower-bound ref is supplied.
+- For explicit refs, derives commit subjects from the actual tree patch so a
+  squash-merged release on `main` does not re-list already released commits.
 - Categorises conventional commits into Added (feat), Fixed (fix), and
   Changed (perf). Skips test/docs/chore/ci/build/refactor/style and
   non-conventional commits.
@@ -35,6 +37,16 @@ from datetime import date
 from pathlib import Path
 
 CLAUDE_TIMEOUT_SECONDS = 120
+
+
+def _run_git(source: Path, *args: str, check: bool = False) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=source,
+        capture_output=True,
+        text=True,
+        check=check,
+    )
 
 
 def _build_raw_changelog(
@@ -172,6 +184,130 @@ def _resolve_log_range(source: Path, since_ref: str | None, since_tag: str | Non
     return f"{since_tag}..HEAD"
 
 
+def _diff_name_status(source: Path, since_ref: str) -> list[tuple[str, str]]:
+    result = _run_git(source, "diff", "--name-status", "-z", since_ref, "HEAD", check=True)
+    parts = result.stdout.split("\0")
+    entries: list[tuple[str, str]] = []
+    idx = 0
+    while idx < len(parts) - 1:
+        status = parts[idx]
+        idx += 1
+        if not status:
+            continue
+        if status.startswith(("R", "C")):
+            if idx + 1 >= len(parts):
+                break
+            old_path = parts[idx]
+            new_path = parts[idx + 1]
+            idx += 2
+            entries.append((status[0], new_path or old_path))
+            continue
+        path = parts[idx]
+        idx += 1
+        if path:
+            entries.append((status[0], path))
+    return entries
+
+
+def _tree_entry_at(source: Path, ref: str, path: str) -> str | None:
+    result = _run_git(source, "ls-tree", "-z", ref, "--", path)
+    if result.returncode != 0:
+        return None
+    entry = result.stdout.split("\0", 1)[0]
+    if not entry:
+        return None
+    metadata, _separator, _entry_path = entry.partition("\t")
+    return metadata
+
+
+def _conventional_changelog_subject(subject: str) -> bool:
+    if ":" not in subject:
+        return False
+    prefix = subject.split(":", 1)[0].strip().lower()
+    bare_prefix = prefix.split("(", 1)[0].strip()
+    return bare_prefix in {"feat", "fix", "perf"}
+
+
+def _commits_since_ref(source: Path, since_ref: str) -> list[tuple[str, str]] | None:
+    result = _run_git(source, "log", "--format=%H%x00%s%x00", f"{since_ref}..HEAD")
+    if result.returncode != 0:
+        print(f"  Error: Failed to get git log: {result.stderr}")
+        return None
+    parts = [part for part in result.stdout.split("\0") if part]
+    return [
+        (commit_hash.strip(), subject.strip())
+        for commit_hash, subject in zip(parts[0::2], parts[1::2], strict=False)
+        if commit_hash.strip()
+    ]
+
+
+def _patch_delta_commit_subjects(source: Path, since_ref: str) -> list[str] | None:
+    """Return subjects for commits that contribute to the current patch delta.
+
+    `since_ref..HEAD` is ancestry-based. After a squash release to `main`, old
+    develop commits are not ancestors of `main`, so ancestry would re-list them.
+    Filtering through the actual tree diff keeps the changelog tied to the
+    unreleased patch instead.
+    """
+    commits = _commits_since_ref(source, since_ref)
+    if commits is None:
+        return None
+    if not commits:
+        return []
+
+    try:
+        entries = _diff_name_status(source, since_ref)
+    except subprocess.CalledProcessError as exc:
+        print(f"  Error: Failed to diff {since_ref}..HEAD: {exc.stderr}")
+        return None
+
+    patch_paths = {path for _status, path in entries}
+    if not patch_paths:
+        return []
+
+    tree_entry_cache: dict[tuple[str, str], str | None] = {}
+
+    def tree_entry(ref: str, path: str) -> str | None:
+        key = (ref, path)
+        if key not in tree_entry_cache:
+            tree_entry_cache[key] = _tree_entry_at(source, ref, path)
+        return tree_entry_cache[key]
+
+    target_entries = {path: tree_entry("HEAD", path) for path in patch_paths}
+    base_entries = {path: tree_entry(since_ref, path) for path in patch_paths}
+    unresolved_paths = {path for path in patch_paths if target_entries[path] != base_entries[path]}
+
+    patch_commits: set[str] = set()
+    for commit_hash, subject in commits:
+        if not unresolved_paths:
+            break
+        result = _run_git(source, "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", commit_hash)
+        if result.returncode != 0:
+            continue
+        candidate_paths = {part for part in result.stdout.split("\0") if part}
+        relevant_paths = candidate_paths & unresolved_paths
+        parent_ref = f"{commit_hash}^"
+        contributing_paths = [
+            path
+            for path in relevant_paths
+            if tree_entry(commit_hash, path) == target_entries[path]
+            and tree_entry(parent_ref, path) != target_entries[path]
+        ]
+        if not contributing_paths:
+            continue
+        if _conventional_changelog_subject(subject):
+            patch_commits.add(commit_hash)
+        for path in contributing_paths:
+            target_entries[path] = tree_entry(parent_ref, path)
+            if target_entries[path] == base_entries[path]:
+                unresolved_paths.remove(path)
+
+    if not patch_commits:
+        return []
+
+    return [subject for commit_hash, subject in commits if commit_hash in patch_commits]
+
+
 def generate_changelog_entry(
     source: Path,
     version: str,
@@ -196,18 +332,19 @@ def generate_changelog_entry(
         True if changelog was updated, False otherwise.
     """
     print(f"\n  Auto-generating changelog entry for v{version}...")
-    log_range = _resolve_log_range(source, since_ref=since_ref, since_tag=since_tag) or "HEAD"
-    result = subprocess.run(
-        ["git", "log", "--format=%s", log_range],
-        cwd=source,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        print(f"  Error: Failed to get git log: {result.stderr}")
-        return False
+    if since_ref is not None:
+        print(f"  Since ref: {since_ref} (patch delta)")
+        commits = _patch_delta_commit_subjects(source, since_ref)
+        if commits is None:
+            return False
+    else:
+        log_range = _resolve_log_range(source, since_ref=since_ref, since_tag=since_tag) or "HEAD"
+        result = _run_git(source, "log", "--format=%s", log_range)
+        if result.returncode != 0:
+            print(f"  Error: Failed to get git log: {result.stderr}")
+            return False
+        commits = [line for line in result.stdout.strip().split("\n") if line.strip()]
 
-    commits = [line for line in result.stdout.strip().split("\n") if line.strip()]
     if not commits:
         print("  Warning: No commits found since last tag")
         return False

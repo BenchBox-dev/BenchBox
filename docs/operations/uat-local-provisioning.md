@@ -26,7 +26,7 @@ make uat-bring-up PLATFORM=<platform>
 ```
 
 - `cedardb` — `localhost:5435`, compose file `docker/cedardb/docker-compose.yml`.
-- `clickhouse-server` — `localhost:9000`, compose file `docker/clickhouse/docker-compose.yml`.
+- `clickhouse-server` — `localhost:9000`, compose file `docker/clickhouse/docker-compose.yml`; local password is `benchbox`.
 - `databend` — `localhost:8000`, compose file `docker/databend/docker-compose.yml`.
 - `doris` — `localhost:19031`, compose file `docker/doris/docker-compose.yml`; keep the image-provided JDK path intact.
 - `influxdb` — `localhost:8181`, compose file `docker/influxdb/docker-compose.yml`.

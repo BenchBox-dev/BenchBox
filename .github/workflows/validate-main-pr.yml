@@ -51,12 +51,6 @@ jobs:
           git fetch --prune origin develop
           git fetch --prune origin \
             "+refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/origin/pr-${{ github.event.pull_request.number }}-head"
-          if [ ! -f scripts/release_readiness_check.py ] || [ ! -f scripts/ruleset_drift_check.py ]; then
-            echo "::warning::main does not yet have release-readiness scripts; bootstrapping them from the release PR head."
-            git checkout "refs/remotes/origin/pr-${{ github.event.pull_request.number }}-head" -- \
-              scripts/release_readiness_check.py \
-              scripts/ruleset_drift_check.py
-          fi
 
       - name: Check release canary freshness
         id: release-readiness
@@ -90,13 +84,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-canary-artifacts
-          # The first bootstrap runs against base main; skip stale slow coverage already corrected in the release branch.
           uv run -- python -m pytest \
             --collect-only \
             -q \
             -n 0 \
-            -m "(slow or resource_heavy) and not (stress or live_integration or e2e)" \
-            --ignore=tests/unit/test_fractional_scale_factors.py \
+            -m "(slow or resource_heavy) and not (stress or live_integration)" \
             | tee release-canary-artifacts/non-fast-collect.txt
           count=$(grep -Eo '^[0-9]+/[0-9]+ tests collected' release-canary-artifacts/non-fast-collect.txt | tail -1 | cut -d/ -f1)
           if [ -z "$count" ]; then
@@ -104,9 +96,8 @@ jobs:
             exit 1
           fi
           uv run -- python -m pytest \
-            -m "(slow or resource_heavy) and not (stress or live_integration or e2e)" \
+            -m "(slow or resource_heavy) and not (stress or live_integration)" \
             -n 0 \
-            --ignore=tests/unit/test_fractional_scale_factors.py \
             --tb=short \
             --maxfail=5
 

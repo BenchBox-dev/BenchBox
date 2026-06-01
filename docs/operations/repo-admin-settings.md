@@ -126,11 +126,12 @@ Required status checks:
 matching `vX.Y.Z` with an optional suffix.
 
 `release-required-result` is the umbrella job in `.github/workflows/test.yml`
-for release PR correctness. It aggregates the required fast lane,
-credential-free integration-not-slow suite, isolated exact-one-wheel package
-smoke, dependency upper-bound checks, and release-branch curation checks. It is
-the ruleset context maintainers should use instead of individual matrix job
-names such as `test-package (...)`.
+for release PR correctness. It aggregates the required fast lane, the bounded
+real-result correctness gate (`make test-correctness-gate`), credential-free
+integration-not-slow suite, isolated exact-one-wheel package smoke, dependency
+upper-bound checks, and release-branch curation checks. It is the ruleset
+context maintainers should use instead of individual matrix job names such as
+`test-package (...)`.
 
 Other ruleset properties to preserve:
 

@@ -24,6 +24,10 @@ pytestmark = [
 REPO_ROOT = Path(__file__).parent.parent.parent
 CI_FAST_EXPRESSION = "fast and not (slow or stress or resource_heavy or live_integration)"
 RELEASE_INTEGRATION_EXPRESSION = "integration and not (slow or stress or resource_heavy or live_integration)"
+RELEASE_CANARY_NON_FAST_EXPRESSION = "(slow or resource_heavy) and not (stress or live_integration)"
+RELEASE_PR_BRANCH_SKIP = (
+    "(github.event_name != 'pull_request' || github.base_ref != 'main' || !startsWith(github.head_ref, 'v'))"
+)
 RELEASE_REQUIRED_CONTEXTS = ("validate-base", "release-required-result")
 
 
@@ -255,6 +259,11 @@ class TestReleaseInfrastructure:
         assert 'uv run --isolated --no-project --with "$wheel"' in test_package_run_text
         assert "benchbox --help" in test_package_run_text
 
+        for job_name in ["compat-test", "integration-smoke"]:
+            condition = jobs[job_name]["if"]
+            assert "github.event.pull_request.title" not in condition
+            assert RELEASE_PR_BRANCH_SKIP in condition
+
         make_test_package = _make_target_recipe("test-package")
         assert "test-venv" not in make_test_package
         assert "Expected exactly one wheel" in make_test_package
@@ -272,12 +281,19 @@ class TestReleaseInfrastructure:
 
         result_job = jobs["release-required-result"]
         assert result_job["name"] == "release-required-result"
-        assert set(result_job["needs"]) == {"test", "integration", "test-package", "release-readiness"}
+        assert set(result_job["needs"]) == {
+            "test",
+            "integration",
+            "correctness-gate",
+            "test-package",
+            "release-readiness",
+        }
         assert result_job["if"] == "${{ always() && github.event_name == 'pull_request' && github.base_ref == 'main' }}"
         aggregate_run_text = _workflow_job_run_text("test.yml", "release-required-result")
         for expected in [
             "test (ubuntu-latest, 3.12)",
             "integration",
+            "correctness-gate",
             "test-package",
             "release-readiness",
             "Release-required checks passed.",
@@ -313,7 +329,7 @@ class TestReleaseInfrastructure:
         assert jobs["ruleset-drift"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
 
         non_fast_text = _workflow_job_run_text("release-canary.yml", "credential-free-non-fast")
-        assert "(slow or resource_heavy) and not (stress or live_integration)" in non_fast_text
+        assert RELEASE_CANARY_NON_FAST_EXPRESSION in non_fast_text
         assert "--collect-only" in non_fast_text
         assert "release-canary-artifacts/non-fast-summary.json" in non_fast_text
         assert '"checked_ref": "develop"' in non_fast_text
@@ -373,7 +389,11 @@ class TestReleaseInfrastructure:
         assert '--head-sha "${{ github.event.pull_request.head.sha }}"' in run_text
         assert "--bootstrap-on-missing-workflow" in run_text
         assert "bootstrap_required=true" in run_text
-        assert "(slow or resource_heavy) and not (stress or live_integration)" in run_text
+        canary_run_text = _workflow_job_run_text("release-canary.yml", "credential-free-non-fast")
+        assert run_text.count(RELEASE_CANARY_NON_FAST_EXPRESSION) == 2
+        assert RELEASE_CANARY_NON_FAST_EXPRESSION in canary_run_text
+        assert " or e2e" not in run_text
+        assert "TestFractionalScaleFactors" not in run_text
         assert "scripts/ruleset_drift_check.py" in run_text
         assert "--require-bypass-actor-visibility" in run_text
 
@@ -468,15 +488,16 @@ class TestReleaseInfrastructure:
             assert "patch release or incident" in content
 
     def test_release_cut_generates_changelog_from_main_delta(self):
-        """The release branch changelog boundary is main..HEAD, not develop tag ancestry."""
+        """The release branch changelog boundary is the main patch delta, not tag ancestry."""
         recipe = _make_target_recipe("release-cut")
         release_guide = (REPO_ROOT / "docs" / "operations" / "release-guide.md").read_text(encoding="utf-8")
         release_template = (REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md").read_text(encoding="utf-8")
 
         assert "scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/main" in recipe
-        assert "origin/main..HEAD" in release_template
+        assert "`origin/main` patch delta" in release_template
+        assert "git log origin/main..HEAD" in release_guide
         assert "origin/main" in release_guide
-        assert "release-finalize` intentionally does not replay release commits onto" in release_guide
+        assert "intentionally does not replay release commits onto" in release_guide
 
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""

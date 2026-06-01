@@ -12,29 +12,28 @@ must iterate sequentially.
 from __future__ import annotations
 
 import datetime as _dt
-import json
 import os
 import subprocess
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
-from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError, load_result_file
-from benchbox.core.results.status import result_failed_query_count, result_non_clean_reason
+from benchbox.core.results.submit_classification import (
+    SubmitTerminalState,
+    classify_result_path,
+)
 from tests.uat.matrix import benchbox_run_argv
 from tests.uat.timeouts import TimeoutResult, run_with_timeout
 
-UNOFFICIAL_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
-
-
-class SubmitTerminalState(str, Enum):
-    """UAT mirror of the `benchbox submit --output` refusal vocabulary."""
-
-    submittable = "submittable"
-    unofficial = "unofficial"
-    query_failure = "query_failure"
-    schema_violation = "schema_violation"
-    missing_manifest = "missing_manifest"
+# SubmitTerminalState is re-exported so existing UAT consumers
+# (tests/uat/_cli.py, phases/execute.py, phases/package.py) keep importing it
+# from tests.uat.runner. The classification *policy* now lives in
+# benchbox.core.results.submit_classification, shared with `benchbox submit`.
+__all__ = [
+    "CellResult",
+    "SubmitTerminalState",
+    "classify_for_submit",
+    "submit_state_is_cell_failure",
+]
 
 
 @dataclass(frozen=True)
@@ -62,33 +61,13 @@ def last_nonempty_output_line(log_text: str) -> str | None:
 
 
 def classify_for_submit(result_json: Path | str | None) -> SubmitTerminalState:
-    """Classify a result JSON using the same refusal predicates as `benchbox submit`.
+    """Classify a result JSON for submittability (thin adapter over shared policy).
 
-    Mirrors `benchbox/cli/commands/submit.py`: load failures are schema
-    problems, unofficial TPC-DS compliance classes remain successful but
-    non-submittable, and non-clean results are refused before packaging.
+    Delegates to ``benchbox.core.results.submit_classification`` so UAT and
+    ``benchbox submit`` apply identical refusal policy; this wrapper only
+    preserves the UAT-facing call site and vocabulary.
     """
-    if result_json is None:
-        return SubmitTerminalState.missing_manifest
-    path = Path(result_json).expanduser()
-    if not path.exists():
-        return SubmitTerminalState.missing_manifest
-    try:
-        result, _raw = load_result_file(path)
-    except FileNotFoundError:
-        return SubmitTerminalState.missing_manifest
-    except (json.JSONDecodeError, OSError, ResultLoadError, UnsupportedSchemaError):
-        return SubmitTerminalState.schema_violation
-
-    if getattr(result, "compliance_class", None) in UNOFFICIAL_COMPLIANCE_CLASSES:
-        return SubmitTerminalState.unofficial
-
-    non_clean_reason = result_non_clean_reason(result)
-    if non_clean_reason:
-        if result_failed_query_count(result):
-            return SubmitTerminalState.query_failure
-        return SubmitTerminalState.schema_violation
-    return SubmitTerminalState.submittable
+    return classify_result_path(result_json)
 
 
 def submit_state_is_cell_failure(state: SubmitTerminalState | str) -> bool:
@@ -104,6 +83,38 @@ def submit_state_is_cell_failure(state: SubmitTerminalState | str) -> bool:
 def _default_log_path(log_dir: Path, platform: str, benchmark: str, scale: float, now: _dt.datetime) -> Path:
     timestamp = now.strftime("%Y%m%d_%H%M%S")
     return log_dir / f"{platform}_{benchmark}_{scale}_{timestamp}.log"
+
+
+# Upper bound for the verbose diagnostic re-run triggered when a `--quiet`
+# cell exits non-zero without emitting any output. Failures surface fast, so a
+# tight cap keeps the re-run cheap while still capturing the real error.
+DIAGNOSTIC_RERUN_TIMEOUT_S = 180
+
+
+def _append_diagnostic_rerun(log_fh, argv: list[str], *, timeout_s: int, env: dict[str, str]) -> None:
+    """Re-run a failed cell verbosely and append its output to the log.
+
+    Invoked only when the original ``--quiet`` invocation exited non-zero
+    without emitting any output (``--quiet`` suppresses benchbox's own error
+    reporting). Output is written as plain lines so ``_cell_log_tail`` captures
+    it into ``failure_tail``. Best-effort: never raises into the caller.
+    """
+    log_fh.write("[uat] verbose diagnostic re-run (--quiet suppressed the original error):\n")
+    log_fh.flush()
+    try:
+        rerun = run_with_timeout(
+            argv,
+            timeout_s=timeout_s,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=env,
+        )
+        text = _decode_process_output(rerun.stdout)
+        if text:
+            log_fh.write(text if text.endswith("\n") else text + "\n")
+        log_fh.write(f"[uat] diagnostic re-run exit_code={rerun.exit_code} timed_out={rerun.timed_out}\n")
+    except Exception as exc:  # noqa: BLE001 - diagnostics must never mask the original failure
+        log_fh.write(f"[uat] diagnostic re-run error {type(exc).__name__}: {exc}\n")
 
 
 def run_cell(
@@ -142,6 +153,7 @@ def run_cell(
         env["BENCHBOX_OUTPUT_DIR"] = str(runs_dir)
         log_fh.write(f"# BENCHBOX_OUTPUT_DIR={runs_dir}\n")
         log_fh.flush()
+        stderr_start_size = log_path.stat().st_size
         timeout_result = run_with_timeout(
             argv,
             timeout_s=timeout_s,
@@ -149,11 +161,33 @@ def run_cell(
             stderr=log_fh,
             env=env,
         )
+        log_fh.flush()
+        stderr_has_content = _log_region_has_nonempty_content(log_path, stderr_start_size)
         stdout_text = _decode_process_output(timeout_result.stdout)
+        stderr_text = _decode_process_output(timeout_result.stderr)
+        if stderr_text:
+            log_fh.write(stderr_text)
+            stderr_has_content = stderr_has_content or bool(stderr_text.strip())
         if stdout_text:
             log_fh.write(stdout_text)
         if timeout_result.timed_out:
             log_fh.write(f"# UAT_TIMEOUT timeout_s={timeout_s} exit_code={timeout_result.exit_code}\n")
+        elif timeout_result.exit_code != 0 and not stdout_text.strip() and not stderr_has_content:
+            _append_diagnostic_rerun(
+                log_fh,
+                benchbox_run_argv(
+                    platform,
+                    benchmark,
+                    scale,
+                    phases=phases,
+                    compression=compression,
+                    extra_args=("--output", str(runs_dir / "datagen"), *extra_args),
+                    local_managed_platform=local_managed_platform,
+                    quiet=False,
+                ),
+                timeout_s=min(timeout_s, DIAGNOSTIC_RERUN_TIMEOUT_S),
+                env=env,
+            )
 
     result_path_str = last_nonempty_output_line(stdout_text) if timeout_result.exit_code == 0 else None
     result_path = _resolve_result_path(result_path_str, runs_dir) if result_path_str else None
@@ -193,6 +227,15 @@ def _decode_process_output(output: object) -> str:
     if isinstance(output, bytes):
         return output.decode("utf-8", errors="replace")
     return str(output)
+
+
+def _log_region_has_nonempty_content(path: Path, start_offset: int, *, chunk_size: int = 65536) -> bool:
+    with path.open("rb") as fh:
+        fh.seek(start_offset)
+        while chunk := fh.read(chunk_size):
+            if chunk.strip():
+                return True
+    return False
 
 
 def _classify(timeout_result: TimeoutResult) -> str:

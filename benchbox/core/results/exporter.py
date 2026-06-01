@@ -36,7 +36,7 @@ from benchbox.core.results.anonymization import (
     AnonymizationConfig,
     AnonymizationManager,
 )
-from benchbox.core.results.canonical_json import canonical_json_bytes
+from benchbox.core.results.canonical_json import canonical_json_text
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.normalizer import get_query_map, normalize_result_dict
 from benchbox.core.results.schema import (
@@ -112,17 +112,8 @@ class ResultExporter:
         elif self.is_cloud_output and hasattr(file_path, "write_bytes"):
             file_path.write_bytes(content.encode("utf-8"))
         else:
-            with open(file_path, mode, encoding="utf-8", newline="") as handle:
+            with open(file_path, mode, encoding="utf-8") as handle:
                 handle.write(content)
-
-    def _write_bytes_file(self, file_path: Path, content: bytes) -> None:
-        """Write byte-stable content to file, handling both local and cloud paths."""
-        if self.is_cloud_output and hasattr(file_path, "write_bytes"):
-            file_path.write_bytes(content)
-        elif self.is_cloud_output and hasattr(file_path, "write_text"):
-            file_path.write_text(content.decode("utf-8"), encoding="utf-8")
-        else:
-            file_path.write_bytes(content)
 
     def _create_file_path(self, filename: str):
         """Create file path, ensuring parent directory exists."""
@@ -250,8 +241,8 @@ class ResultExporter:
 
         # Write primary result file
         filepath = self._create_file_path(f"{filename_base}.json")
-        json_content = canonical_json_bytes(self._convert_datetimes_to_iso(payload))
-        self._write_bytes_file(filepath, json_content)
+        json_content = canonical_json_text(self._convert_datetimes_to_iso(payload))
+        self._write_file(filepath, json_content)
 
         # Write companion files
         self._write_companion_files(result, filename_base)
@@ -264,14 +255,14 @@ class ResultExporter:
         plans_payload = build_plans_payload(result)
         if plans_payload:
             plans_path = self._create_file_path(f"{filename_base}.plans.json")
-            self._write_bytes_file(plans_path, canonical_json_bytes(plans_payload))
+            self._write_file(plans_path, canonical_json_text(plans_payload))
             self.console.print(f"[dim]Exported plans: {plans_path}[/dim]")
 
         # Tuning companion file
         tuning_payload = build_tuning_payload(result)
         if tuning_payload:
             tuning_path = self._create_file_path(f"{filename_base}.tuning.json")
-            self._write_bytes_file(tuning_path, canonical_json_bytes(tuning_payload))
+            self._write_file(tuning_path, canonical_json_text(tuning_payload))
             self.console.print(f"[dim]Exported tuning: {tuning_path}[/dim]")
 
     def _apply_anonymization(self, payload: dict[str, Any]) -> None:

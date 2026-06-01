@@ -622,8 +622,6 @@ def _cell_log_has_marker(log_path: Path) -> bool:
         for line in fh:
             if line.startswith("# UAT_TERMINAL_STATE "):
                 return True
-            if line.startswith("# UAT_"):
-                break
     return False
 
 

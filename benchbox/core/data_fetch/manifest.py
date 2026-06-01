@@ -52,10 +52,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - exercised on Python 3.10 CI
-    import tomli as tomllib
+import tomllib
 
 from .errors import ManifestValidationError
 
@@ -73,7 +70,6 @@ _REQUIRED_TOP_KEYS = (
 def _manifest_hash_input(raw: bytes) -> bytes:
     """Return manifest bytes with top-level transport/bootstrap hashes removed."""
     excluded_top_level_keys = {b"archive_sha256", b"manifest_hash"}
-    raw = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
     lines: list[bytes] = []
     in_top_level = True
     for line in raw.splitlines(keepends=True):

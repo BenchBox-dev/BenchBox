@@ -1,10 +1,10 @@
-# Certification re-run — STAGE 3 of 3: Docker OLTP stacks.
+# Release-gate re-run — STAGE 3 of 3: Docker OLTP stacks.
 #
 # Start ONLY after stages 1 and 2 have fully completed. OLTP stacks run at
 # scale 0.01 only. PostgreSQL-family stacks share port 5432 and MUST stay
 # serialized (one Docker stack at a time; parallel_platforms is hard-rejected).
-name: "certification-03-docker-oltp"
-description: "Certification stage 3: Docker OLTP stacks, scale 0.01"
+name: "release-gate-03-docker-oltp"
+description: "Release-gate stage 3: Docker OLTP stacks, scale 0.01"
 
 phases:
   - preflight
@@ -41,7 +41,7 @@ cleanup:
   prune_databases: true
   docker_manage_platforms: true
   docker_platform_switch: "volumes"
-  docker_project_prefix: "benchbox-uat-cert"
+  docker_project_prefix: "benchbox-uat-gate"
   docker_start_timeout_s: 300
   docker_fixed_container_name_policy: "fail"
 
@@ -54,5 +54,5 @@ report:
 
 output:
   benchmark_runs_dir_template: "~/Developer/benchmark_runs"
-  logs_dir_template: "~/Developer/benchmark_runs/logs/certification_03_docker_oltp_{date}"
+  logs_dir_template: "~/Developer/benchmark_runs/logs/release_gate_03_docker_oltp_{date}"
   submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"

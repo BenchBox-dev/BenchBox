@@ -1448,6 +1448,24 @@ class TestTrinoTableDefinitionOptimization:
         else:
             assert "WITH" not in result_upper
 
+    @pytest.mark.parametrize(
+        ("table_format", "adds_format"),
+        [("memory", False), ("hive", True), ("iceberg", True), ("delta", False)],
+    )
+    def test_strips_named_table_level_primary_key_metadata(self, table_format, adds_format):
+        adapter = self._adapter(table_format=table_format)
+        sql = "CREATE TABLE customer (id BIGINT, CONSTRAINT pk_customer PRIMARY KEY (id))"
+        result = adapter._optimize_table_definition(sql)
+        result_upper = result.upper()
+
+        assert "PRIMARY KEY" not in result_upper
+        assert "CONSTRAINT" not in result_upper
+        assert "id BIGINT" in result
+        if adds_format:
+            assert "WITH (format = 'PARQUET')" in result
+        else:
+            assert "WITH" not in result_upper
+
 
 class TestTrinoConfigureForBenchmark:
     """Tests for configure_for_benchmark."""

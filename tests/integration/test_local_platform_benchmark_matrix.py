@@ -68,6 +68,7 @@ SERVICE_LOCAL_PLATFORMS: tuple[str, ...] = ("postgresql", "timescaledb", "trino"
 # 20 minutes per matrix case: enough for heavy SF=1 workloads in stress mode.
 MATRIX_CASE_TIMEOUT = 1200.0
 MAINTENANCE_TIMEOUT = 1500.0
+CORRECTNESS_GATE_QUERY_IDS_ENV = "BENCHBOX_CORRECTNESS_GATE_QUERY_IDS"
 
 
 def _select_scale(benchmark_name: str, platform_name: str | None = None) -> float:
@@ -98,6 +99,14 @@ def _load_result_payload(work_dir: Path, benchmark_name: str) -> tuple[Path, dic
 def _measurement_queries(payload: dict) -> list[dict]:
     queries = payload.get("queries", [])
     return [q for q in queries if q.get("run_type") == "measurement"]
+
+
+def _query_subset_from_env() -> tuple[str, ...]:
+    """Return a CLI query subset for the bounded correctness gate."""
+    raw = os.environ.get(CORRECTNESS_GATE_QUERY_IDS_ENV, "").strip()
+    if not raw:
+        return ()
+    return tuple(query_id.strip() for query_id in raw.split(",") if query_id.strip())
 
 
 def _service_matrix_enabled() -> bool:
@@ -240,7 +249,7 @@ def _validate_phase_coverage(payload: dict, requested_phases: list[str]) -> None
         assert status not in {"", "NOT_RUN"}, f"Phase '{requested}' was not executed (status={status})"
 
 
-def _validate_completion(payload: dict, benchmark_name: str) -> None:
+def _validate_completion(payload: dict, benchmark_name: str, expected_query_count: int | None = None) -> None:
     """Validate that all expected benchmark work completed."""
     summary = payload.get("summary", {})
     query_summary = summary.get("queries", {})
@@ -254,7 +263,7 @@ def _validate_completion(payload: dict, benchmark_name: str) -> None:
     assert passed == total, f"{benchmark_name}: not all queries passed ({passed}/{total})"
 
     metadata = get_benchmark_metadata(benchmark_name) or {}
-    expected_query_count = int(metadata.get("num_queries", 0))
+    expected_query_count = expected_query_count or int(metadata.get("num_queries", 0))
     measured = _measurement_queries(payload)
 
     def _canonical_query_id(raw_id: object) -> str:
@@ -277,13 +286,30 @@ def _validate_completion(payload: dict, benchmark_name: str) -> None:
         )
 
 
-def _validate_against_expected_results(payload: dict, benchmark_name: str, scale_factor: float) -> None:
+def _expected_result_queries(payload: dict, expected_query_ids: set[str] | None) -> list[dict]:
+    """Select result rows suitable for stored expected-results validation."""
+    if not expected_query_ids:
+        return _measurement_queries(payload)
+
+    return [
+        query
+        for query in payload.get("queries", [])
+        if str(query.get("id")) in expected_query_ids and int(query.get("stream", 0)) == 0
+    ]
+
+
+def _validate_against_expected_results(
+    payload: dict,
+    benchmark_name: str,
+    scale_factor: float,
+    expected_query_ids: set[str] | None = None,
+) -> None:
     """Validate query row counts against stored expected results where available."""
     validator = QueryValidator()
     checked = 0
     failures: list[str] = []
 
-    for query in _measurement_queries(payload):
+    for query in _expected_result_queries(payload, expected_query_ids):
         if query.get("status") != "SUCCESS":
             continue
         if query.get("rows") is None:
@@ -308,13 +334,19 @@ def _validate_against_expected_results(payload: dict, benchmark_name: str, scale
                 f"actual={validation.actual_row_count}, mode={validation.validation_mode.value}"
             )
 
-    # Optional strict mode: require at least one TPCH expected-results check.
+    # Optional strict mode: require expected-results checks for the bounded PR gate.
     if (
         benchmark_name == "tpch"
         and scale_factor >= 1.0
         and os.environ.get("BENCHBOX_STRICT_EXPECTED_RESULTS", "").strip().lower() in {"1", "true", "yes", "on"}
     ):
-        assert checked > 0, "TPC-H validation did not evaluate any query against stored expected results"
+        expected_checked = len(expected_query_ids or ())
+        if expected_checked:
+            assert checked == expected_checked, (
+                f"TPC-H validation evaluated {checked} query row counts, expected {expected_checked}"
+            )
+        else:
+            assert checked > 0, "TPC-H validation did not evaluate any query against stored expected results"
 
     assert not failures, "Row-count validation failures:\n" + "\n".join(failures)
 
@@ -342,25 +374,26 @@ def test_local_platform_benchmark_matrix(
 
     scale_factor = _select_scale(benchmark_name, platform_name)
     phases = _phases_for_benchmark(benchmark_name, platform_name)
+    query_subset = _query_subset_from_env()
     case_dir = tmp_path / f"{platform_name}_{benchmark_name}"
     case_dir.mkdir(parents=True, exist_ok=True)
 
-    result = run_cli_command(
-        [
-            "run",
-            "--platform",
-            platform_name,
-            "--benchmark",
-            benchmark_name,
-            "--scale",
-            str(scale_factor),
-            "--phases",
-            ",".join(phases),
-            "--non-interactive",
-        ],
-        cwd=case_dir,
-        timeout=MATRIX_CASE_TIMEOUT,
-    )
+    command = [
+        "run",
+        "--platform",
+        platform_name,
+        "--benchmark",
+        benchmark_name,
+        "--scale",
+        str(scale_factor),
+        "--phases",
+        ",".join(phases),
+        "--non-interactive",
+    ]
+    if query_subset:
+        command.extend(["--queries", ",".join(query_subset)])
+
+    result = run_cli_command(command, cwd=case_dir, timeout=MATRIX_CASE_TIMEOUT)
 
     assert result.returncode == 0, (
         f"CLI failed for {platform_name}/{benchmark_name} (sf={scale_factor})\n"
@@ -369,8 +402,13 @@ def test_local_platform_benchmark_matrix(
 
     _, payload = _load_result_payload(case_dir, benchmark_name)
     _validate_phase_coverage(payload, phases)
-    _validate_completion(payload, benchmark_name)
-    _validate_against_expected_results(payload, benchmark_name, scale_factor)
+    _validate_completion(payload, benchmark_name, expected_query_count=len(query_subset) or None)
+    _validate_against_expected_results(
+        payload,
+        benchmark_name,
+        scale_factor,
+        expected_query_ids=set(query_subset) or None,
+    )
 
 
 @pytest.mark.integration

@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 import yaml
 
-from tests.uat import config
+from tests.uat import config, matrix
 
 pytestmark = pytest.mark.fast
 
@@ -303,21 +303,23 @@ def test_stress_override_scale_sets_override_without_mutating_rungs():
 
 
 # ---------------------------------------------------------------------------
-# Certification re-run configs (uat-certification-rerun-ordering-and-gate).
+# Release-gate re-run configs (uat-certification-rerun-ordering-and-gate).
 # ---------------------------------------------------------------------------
 
-_CERT_CONFIGS_DIR = Path(__file__).parent / "configs"
+_RELEASE_GATE_CONFIGS_DIR = Path(__file__).parent / "configs"
 
 
-def test_certification_configs_load_and_encode_stage_ordering():
-    """The three certification configs validate and encode the four-stage order."""
-    stage1 = config.load_config(_CERT_CONFIGS_DIR / "certification-01-native-dataframe.yaml")
-    stage2 = config.load_config(_CERT_CONFIGS_DIR / "certification-02-docker-nonoltp.yaml")
-    stage3 = config.load_config(_CERT_CONFIGS_DIR / "certification-03-docker-oltp.yaml")
+def test_release_gate_configs_load_and_encode_stage_ordering():
+    """The three release-gate configs validate and encode the four-stage order."""
+    stage1 = config.load_config(_RELEASE_GATE_CONFIGS_DIR / "release-gate-01-native-dataframe.yaml")
+    stage2 = config.load_config(_RELEASE_GATE_CONFIGS_DIR / "release-gate-02-docker-nonoltp.yaml")
+    stage3 = config.load_config(_RELEASE_GATE_CONFIGS_DIR / "release-gate-03-docker-oltp.yaml")
 
     # Stage 1 is native + dataframe only — no Docker management, so no `action=up`
     # events can precede the Docker stages.
-    assert stage1.platforms.groups == ("sql", "dataframe")
+    assert stage1.platforms.groups == ("native-sql", "dataframe")
+    stage1_platforms = matrix.resolve_platforms(groups=stage1.platforms.groups or ())
+    assert set(stage1_platforms).isdisjoint(matrix.DOCKER_PLATFORMS)
     assert stage1.cleanup.docker_manage_platforms is False
     assert stage1.scales.rungs == (0.01, 0.1, 1.0)
 

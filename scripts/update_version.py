@@ -42,9 +42,13 @@ DOC_RELEASE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Pattern for version badge in landing page: class="badge badge-version">v0.1.1</a>
+# Pattern for the version badge in the landing page. The anchor is formatted
+# across several lines, so match the full tag instead of assuming compact HTML.
 LANDING_VERSION_PATTERN = re.compile(
-    r'(?P<prefix>class="badge badge-version">)v?(?P<version>\d+\.\d+\.\d+(?:-[\w\.]+)?)(?P<suffix></a>)'
+    r'(?P<prefix><a\b(?=[^>]*\bclass="[^"]*\bbadge-version\b[^"]*")[^>]*>\s*)'
+    r"v?(?P<version>\d+\.\d+\.\d+(?:-[\w\.]+)?)"
+    r"(?P<suffix>\s*</a\s*>)",
+    re.DOTALL,
 )
 
 

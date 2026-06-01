@@ -117,3 +117,15 @@ def test_local_managed_postgres_compose_password_matches_uat_argv(platform):
 
     assert "POSTGRES_PASSWORD: benchbox" in compose_text
     assert "password=benchbox" in argv
+
+
+def test_local_managed_clickhouse_compose_password_matches_uat_argv():
+    spec = docker_assets.docker_platform_spec("clickhouse-server")
+    compose_text = "\n".join(path.read_text() for path in spec.compose_files)
+    argv = matrix.benchbox_run_argv("clickhouse-server", "tpch", 0.01, local_managed_platform=True)
+
+    assert "CLICKHOUSE_DB: default" in compose_text
+    assert "CLICKHOUSE_PASSWORD: benchbox" in compose_text
+    assert 'CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"' in compose_text
+    assert "init-default-database.sql:/docker-entrypoint-initdb.d/init-default-database.sql:ro" in compose_text
+    assert "password=benchbox" in argv
