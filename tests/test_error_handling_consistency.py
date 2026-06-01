@@ -151,16 +151,6 @@ class TestErrorHandlingConsistency:
         with pytest.raises(ValueError, match="scale_factor must be positive"):
             tpcds.get_query(1, scale_factor=-1.0)
 
-    def test_invalid_queries_list_consistency(self):
-        """Test that both benchmarks validate query_ids list consistently."""
-        TPCH()
-        TPCDS()
-
-        # Note: run_benchmark requires a DatabaseConnection object, not a string
-        # This test is removed as the API doesn't validate query_ids parameter type directly
-        # Individual query validation happens when queries are executed
-        # The parameter name is 'query_ids' not 'queries'
-
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_valid_inputs_accepted_consistently(self, mock_dbgen_build):
         """Test that both benchmarks accept valid inputs without raising errors."""

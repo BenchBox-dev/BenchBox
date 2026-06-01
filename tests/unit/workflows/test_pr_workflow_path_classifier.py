@@ -33,6 +33,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "CONTENT_RESULT": "skipped",
         "LINT_RESULT": "skipped",
         "TEST_RESULT": "skipped",
+        "CORRECTNESS_RESULT": "skipped",
         "EXPLORER_TOKENS_RESULT": "skipped",
         "AUDIT_SHA_RESULT": "skipped",
         "CONTENT_GUARD_NEEDED": "false",
@@ -84,6 +85,7 @@ def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
         EXPLORER_TOKENS_RESULT="failure",
     )
 
@@ -109,11 +111,12 @@ def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
         EXPLORER_TOKENS_RESULT="skipped",
     )
 
     assert result.returncode == 0
-    assert "Code/infra PR; lint and fast tests passed." in result.stdout
+    assert "Code/infra PR; lint, fast tests, and correctness gate passed." in result.stdout
 
 
 def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
@@ -124,14 +127,15 @@ def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
         EXPLORER_TOKENS_RESULT="success",
     )
 
     assert result.returncode == 0
-    assert "Code/infra PR; lint and fast tests passed." in result.stdout
+    assert "Code/infra PR; lint, fast tests, and correctness gate passed." in result.stdout
 
 
-def test_ci_required_result_explorer_tokens_in_needs() -> None:
+def test_ci_required_result_required_jobs_in_needs() -> None:
     # If a future cleanup drops `explorer-tokens` from the
     # `ci-required-result.needs:` list, the aggregator wouldn't observe its
     # status at all (always "" → handled as not-success in the bash logic).
@@ -139,3 +143,4 @@ def test_ci_required_result_explorer_tokens_in_needs() -> None:
     workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
     needs = workflow_yaml["jobs"]["ci-required-result"]["needs"]
     assert "explorer-tokens" in needs
+    assert "correctness-gate" in needs

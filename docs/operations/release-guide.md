@@ -28,13 +28,17 @@ Before a release PR can merge, the `main-release-only` ruleset must require:
 `.github/workflows/test.yml`. A green result means the release PR branch passed:
 
 - the required fast lane, `test (ubuntu-latest, 3.12)`;
+- the bounded real-result correctness gate, `make test-correctness-gate`
+  (`DuckDB x TPC-H` through generate/load/execute with strict stored
+  expected-results row-count validation for the configured answer-backed query
+  subset);
 - the credential-free integration-not-slow suite:
   `tests/integration -m "integration and not (slow or stress or resource_heavy or live_integration)"`;
 - isolated exact-one-wheel package build/install smoke;
 - dependency upper-bound checks;
 - release-branch curation checks that confirm dev-only paths are absent.
 
-It does **not** guarantee live cloud credentials, stress suites, or
+It does **not** guarantee the full stress matrix, live cloud credentials, or
 long-running UAT. Slow/resource-heavy coverage is enforced through the
 freshness-based release canary below, not by rerunning that suite on every
 release PR.

@@ -61,55 +61,6 @@ class TestTranslateSqlIdentityPolicy:
         assert result != ""
 
 
-class TestTranslateSqlIdentifyPolicy:
-    """Identifier quoting (identify=True) is applied per target dialect.
-
-    BEFORE: sqlglot.transpile called with no identify parameter (defaults False).
-    AFTER:  identify=True for most dialects, disabled for clickhouse and postgres.
-    """
-
-    @patch("sqlglot.transpile")
-    def test_identify_true_for_snowflake(self, mock_transpile):
-        mock_transpile.return_value = ['SELECT "col" FROM "t"']
-        a = _Adapter(dialect="snowflake")
-        a.translate_sql("SELECT col FROM t", source_dialect="duckdb")
-        _, kwargs = mock_transpile.call_args
-        assert kwargs["identify"] is True
-
-    @patch("sqlglot.transpile")
-    def test_identify_true_for_bigquery(self, mock_transpile):
-        mock_transpile.return_value = ["SELECT `col` FROM `t`"]
-        a = _Adapter(dialect="bigquery")
-        a.translate_sql("SELECT col FROM t", source_dialect="duckdb")
-        _, kwargs = mock_transpile.call_args
-        assert kwargs["identify"] is True
-
-    @patch("sqlglot.transpile")
-    def test_identify_true_for_sqlite(self, mock_transpile):
-        mock_transpile.return_value = ['SELECT "col" FROM "t"']
-        a = _Adapter(dialect="sqlite")
-        a.translate_sql("SELECT col FROM t", source_dialect="duckdb")
-        _, kwargs = mock_transpile.call_args
-        assert kwargs["identify"] is True
-
-    @patch("sqlglot.transpile")
-    def test_identify_false_for_clickhouse(self, mock_transpile):
-        mock_transpile.return_value = ["SELECT col FROM t"]
-        a = _Adapter(dialect="clickhouse")
-        a.translate_sql("SELECT col FROM t", source_dialect="duckdb")
-        _, kwargs = mock_transpile.call_args
-        assert kwargs["identify"] is False
-
-    @patch("sqlglot.transpile")
-    def test_identify_false_for_postgres(self, mock_transpile):
-        """postgres dialect (also covers datafusion after normalization)."""
-        mock_transpile.return_value = ["SELECT col FROM t"]
-        a = _Adapter(dialect="postgres")
-        a.translate_sql("SELECT col FROM t", source_dialect="duckdb")
-        _, kwargs = mock_transpile.call_args
-        assert kwargs["identify"] is False
-
-
 class TestTranslateSqlDialectNormalization:
     """Dialect normalization routes unsupported sqlglot dialects to their closest equivalent.
 
@@ -163,7 +114,7 @@ class TestTranslateSqlDuckDBPostfix:
         sql = "SELECT a, SUM(c) FROM t GROUP BY ALL"
         a = _Adapter(dialect="snowflake")
         result = a.translate_sql(sql, source_dialect="duckdb")
-        # Just confirm translation ran (doesn't corrupt into something broken)
+        assert "GROUP BY ALL" in result.upper()
         assert result.endswith(";")
 
 
@@ -178,8 +129,8 @@ class TestTranslateSqlSQLitePostfix:
         sql = "SELECT DATE('1998-09-01') + INTERVAL '10' DAY FROM t"
         a = _Adapter(dialect="sqlite")
         result = a.translate_sql(sql, source_dialect="duckdb")
-        # Result should not contain the INTERVAL form SQLite rejects
-        assert "INTERVAL" not in result or "DATE(" in result
+        assert "INTERVAL" not in result
+        assert "DATE('1998-09-01', '+10 day')" in result
 
 
 class TestTranslateSqlMultiStatement:

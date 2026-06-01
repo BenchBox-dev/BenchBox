@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -16,35 +17,35 @@ pytestmark = [
 ]
 
 
-def _patch_parent_init(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _fake_parent_init(self, **config):
-        self.server_hostname = config.get("server_hostname")
-        self.http_path = config.get("http_path")
-        self.access_token = config.get("access_token")
-        self.catalog = config.get("catalog", "main")
-        self.schema = config.get("schema", "default")
-        self.logger = logging.getLogger("test.databricks.parent")
-        self.log_verbose = lambda *_a, **_k: None
-        self.log_very_verbose = lambda *_a, **_k: None
+def _fake_parent_init(self, **config):
+    self.server_hostname = config.get("server_hostname")
+    self.http_path = config.get("http_path")
+    self.access_token = config.get("access_token")
+    self.catalog = config.get("catalog", "main")
+    self.schema = config.get("schema", "default")
+    self.logger = logging.getLogger("test.databricks.parent")
+    self.log_verbose = lambda *_a, **_k: None
+    self.log_very_verbose = lambda *_a, **_k: None
 
+
+def _patch_parent_init(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(mod.DatabricksAdapter, "__init__", _fake_parent_init)
 
 
 def _new_adapter() -> mod.DatabricksDataFrameAdapter:
-    adapter = object.__new__(mod.DatabricksDataFrameAdapter)
-    adapter.server_hostname = "test.cloud.databricks.com"
-    adapter.access_token = "token"
-    adapter.catalog = "main"
-    adapter.schema = "bench"
-    adapter.cluster_id = "cluster-1"
-    adapter.execution_mode = "dataframe"
-    adapter._spark = None
-    adapter._spark_initialized = False
-    adapter.logger = logging.getLogger("test.databricks.adapter")
-    adapter.log_verbose = lambda *_a, **_k: None
-    adapter.log_very_verbose = lambda *_a, **_k: None
-    adapter._build_query_result_with_validation = lambda **kw: {"status": "OK", **kw}
-    return adapter
+    with (
+        patch.object(mod.DatabricksAdapter, "__init__", _fake_parent_init),
+        patch.object(mod, "DATABRICKS_CONNECT_AVAILABLE", True),
+    ):
+        return mod.DatabricksDataFrameAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/path",
+            access_token="token",
+            catalog="main",
+            schema="bench",
+            cluster_id="cluster-1",
+            execution_mode="dataframe",
+        )
 
 
 def test_init_falls_back_to_sql_when_connect_missing(monkeypatch: pytest.MonkeyPatch):
@@ -177,8 +178,8 @@ def test_execute_dataframe_query_success_and_failure(monkeypatch: pytest.MonkeyP
         tables={"lineitem": "unused"},
         validate_row_count=False,
     )
-    assert out["status"] == "OK"
-    assert out["actual_row_count"] == 2
+    assert out["status"] == "SUCCESS"
+    assert out["rows_returned"] == 2
     assert out["execution_mode"] == "dataframe"
 
     fail = adapter.execute_dataframe_query(
