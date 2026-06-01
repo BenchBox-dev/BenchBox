@@ -29,9 +29,10 @@ Before a release PR can merge, the `main-release-only` ruleset must require:
 
 - the required fast lane, `test (ubuntu-latest, 3.12)`;
 - the bounded real-result correctness gate, `make test-correctness-gate`
-  (`DuckDB x TPC-H` through generate/load/execute with strict stored
-  expected-results row-count validation for the configured answer-backed query
-  subset);
+  (`DuckDB x TPC-H` at SF=1 with the pinned reference qgen seed, through
+  generate/load/execute with EXACT stored answer-set row-count validation of the
+  18 answer-stable TPC-H queries; Q11/Q16/Q18/Q20 are excluded for answer-set
+  boundary sensitivity, and validation is cardinality-level, not value-level);
 - the credential-free integration-not-slow suite:
   `tests/integration -m "integration and not (slow or stress or resource_heavy or live_integration)"`;
 - isolated exact-one-wheel package build/install smoke;

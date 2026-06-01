@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -20,7 +21,7 @@ CI_FAST_EXPRESSION = "fast and not (slow or stress or resource_heavy or live_int
 CORRECTNESS_GATE_NODEID = (
     "tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]"
 )
-CORRECTNESS_GATE_QUERY_IDS = "6,14,15,17,19"
+CORRECTNESS_GATE_QUERY_IDS = "1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22"
 
 
 def _makefile_target_body(makefile_content: str, target_name: str) -> str:
@@ -286,6 +287,44 @@ class TestMakefileCommands:
         assert "-m stress" in gate_body
         assert "-n 0" in gate_body
         assert "--timeout=1200" in gate_body
+
+    def test_correctness_gate_nodeid_collects_under_stress(self):
+        """The gate node-id must actually resolve under ``-m stress``.
+
+        The string ratchet above only checks the Makefile spelling; a future
+        reorder/rename of the matrix parametrize would keep that string valid while
+        the node stops collecting (pytest exit 5). Collection is cheap (no benchmark
+        runs), so assert the exact node-id resolves to exactly one test.
+        """
+        proc = subprocess.run(
+            # -n 0 overrides the pytest.ini "-n auto" addopts so collection does not
+            # spawn xdist workers; SKIP_TEST_LOCK bypasses the parallel-run lock held
+            # by the parent run (safe: --collect-only executes no tests).
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "--collect-only",
+                "-q",
+                "-p",
+                "no:cacheprovider",
+                "-n",
+                "0",
+                "-m",
+                "stress",
+                CORRECTNESS_GATE_NODEID,
+            ],
+            cwd=Path.cwd(),
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env={**os.environ, "BENCHBOX_SKIP_TEST_LOCK": "1"},
+        )
+        assert proc.returncode == 0, (
+            f"Gate node-id failed to collect under -m stress (rc={proc.returncode}).\n"
+            f"stdout:\n{proc.stdout}\n\nstderr:\n{proc.stderr}"
+        )
+        assert CORRECTNESS_GATE_NODEID in proc.stdout, f"Gate node-id not present in collection output:\n{proc.stdout}"
 
     def test_develop_pr_invokes_bounded_correctness_gate(self):
         repo_root = Path.cwd()
