@@ -2,7 +2,8 @@ id: uat-single-connection-registry
 title: "UAT boundary reset: single platform connection registry; stop hardcoding ports/creds in UAT"
 worktree: main
 priority: High
-status: "Not Started"
+status: Completed
+completed_date: "2026-05-31"
 category: Testing and Quality Assurance
 
 description: |
@@ -27,66 +28,83 @@ description: |
   user-exercising" layer actually needs, and the one most certain to rot.
 
 work:
-  - id: w0
-    summary: "Re-validate the SingleStore host-port/service-port split and enumerate every hardcoded connection fact in UAT"
-    status: pending
-    notes: |
-      Confirm matrix.py:19-95 tables, docker_assets.py:75 registry, compose
-      ports: mappings, and adapter/credentials defaults. Produce the canonical
-      source and endpoint role for each fact (host reachability port vs
-      service/container port vs credentials vs CLI option). Record a compact
-      summary so the fix targets current code without conflating domains.
+- id: w0
+  summary: "Re-validate the SingleStore host-port/service-port split and enumerate every hardcoded connection fact in UAT"
+  status: done
+  notes: |
+    Confirm matrix.py:19-95 tables, docker_assets.py:75 registry, compose
+    ports: mappings, and adapter/credentials defaults. Produce the canonical
+    source and endpoint role for each fact (host reachability port vs
+    service/container port vs credentials vs CLI option). Record a compact
+    summary so the fix targets current code without conflating domains.
+    RE-VALIDATED 2026-05-31:
+      - matrix.py:20-78 held PLATFORM_PORTS / PLATFORM_EXTRA_OPTS /
+        LOCAL_MANAGED_PLATFORM_EXTRA_OPTS (hardcoded host:port, port=, password=benchbox).
+      - docker_assets.py:75-160 was a second registry reusing matrix.PLATFORM_PORTS.get() for tcp_probe_label.
+      - SingleStore split confirmed: matrix hardcoded localhost:13306; compose maps
+        "${SINGLESTORE_HOST_PORT:-13306}:3306"; adapter service port default 3306.
+      - Per-platform compose ports verified; naive "first port" is WRONG for databend
+        (MinIO 19000:9000 first, query endpoint 8000:8000) and questdb (19000:9000 first,
+        pg-wire 8812:8812) -> matched by CONTAINER service port instead.
+    SCOPE (user decision): ports + collapse; credential-literal derivation deferred.
+    Fix: docker_assets owns the single registry; host ports derived from compose by
+    matching PLATFORM_SERVICE_PORT (container) side; matrix consumes via functions.
 
-  - id: w1
-    summary: "Define the canonical connection/provisioning model UAT will read"
-    needs: [w0]
-    status: pending
-    notes: |
-      Decide the source of truth per endpoint role: compose `ports:` for local
-      host reachability, adapter defaults for service/container defaults, and
-      provisioning TSV/docs for operator-facing descriptions when needed. Do NOT
-      introduce a brand-new fourth registry; derive from existing canonical
-      surfaces.
+- id: w1
+  summary: "Define the canonical connection/provisioning model UAT will read"
+  needs: [w0]
+  status: done
+  notes: |
+    Decide the source of truth per endpoint role: compose `ports:` for local
+    host reachability, adapter defaults for service/container defaults, and
+    provisioning TSV/docs for operator-facing descriptions when needed. Do NOT
+    introduce a brand-new fourth registry; derive from existing canonical
+    surfaces.
 
-  - id: w2
-    summary: "Refactor matrix.py to derive ports/options/credentials from the canonical source"
-    needs: [w1]
-    status: pending
-    notes: |
-      Remove the hardcoded PLATFORM_PORTS / *_EXTRA_OPTS / credential literals;
-      resolve them at runtime from adapter defaults + compose, keeping host
-      reachability ports distinct from service/container defaults. For
-      SingleStore, SINGLESTORE_HOST_PORT should drive the host probe while 3306
-      remains the adapter's service default.
+- id: w2
+  summary: "Refactor matrix.py to derive ports/options/credentials from the canonical source"
+  needs: [w1]
+  status: done
+  notes: |
+    Remove the hardcoded PLATFORM_PORTS / *_EXTRA_OPTS / credential literals;
+    resolve them at runtime from adapter defaults + compose, keeping host
+    reachability ports distinct from service/container defaults. For
+    SingleStore, SINGLESTORE_HOST_PORT should drive the host probe while 3306
+    remains the adapter's service default.
 
-  - id: w3
-    summary: "Collapse docker_assets.py registry into the single source"
-    needs: [w1]
-    status: pending
-    notes: |
-      docker_assets.py:75 must not be a separate registry from matrix.py.
+- id: w3
+  summary: "Collapse docker_assets.py registry into the single source"
+  needs: [w1]
+  status: done
+  notes: |
+    docker_assets.py:75 must not be a separate registry from matrix.py.
 
-  - id: w4
-    summary: "Add a CI drift test diffing resolved connection facts against compose + adapter defaults"
-    needs: [w2, w3]
-    status: pending
-    notes: |
-      The test parses compose `ports:` mappings and adapter defaults and asserts
-      the UAT-resolved facts match, so divergence fails loudly in CI rather than
-      manifesting as a phantom-skipped platform. Consider sharing a
-      CI-contract-test harness with [[uat-shared-submit-classifier]].
+- id: w4
+  summary: "Add a CI drift test diffing resolved connection facts against compose + adapter defaults"
+  needs: [w2, w3]
+  status: done
+  notes: |
+    The test parses compose `ports:` mappings and adapter defaults and asserts
+    the UAT-resolved facts match, so divergence fails loudly in CI rather than
+    manifesting as a phantom-skipped platform. Consider sharing a
+    CI-contract-test harness with [[uat-shared-submit-classifier]].
 
 deferred:
-  - summary: "Auto-generate compose port mappings from adapter defaults"
-    reason: "Generating compose from adapters is a larger infra change; deriving the read path is the fix."
+- summary: "Auto-generate compose port mappings from adapter defaults"
+  reason: "Generating compose from adapters is a larger infra change; deriving the read path is the fix."
+- summary: "Derive credential/secondary-port literals (password=, http_port=, be_http_port=) from canonical sources"
+  reason: "Scoped out by decision (2026-05-31): host reachability + adapter port= now derive from compose; credential and
+    secondary-port literals were relocated into the single docker_assets registry but not yet derived. Env keys vary per platform
+    (ROOT_PASSWORD/POSTGRES_PASSWORD/...) and wrong derivation risks the must_preserve 'no new skips'. Tackle in a dedicated
+    pass."
 
 metadata:
   tags:
-    - uat-boundary-reset
-    - testing
-    - release-gate
-    - tech-debt
-    - docker
+  - uat-boundary-reset
+  - testing
+  - release-gate
+  - tech-debt
+  - docker
   estimated_effort: "2-3 days"
   created_date: "2026-05-31"
   last_updated: "2026-05-31T00:00:00Z"
@@ -98,14 +116,17 @@ impact:
     UAT coverage.
 
 prior_art:
-  - "docker/*/docker-compose.yml ports mappings — reuse as canonical local host reachability facts for Docker-managed platforms"
-  - "benchbox/platforms/credentials/*.py and platform adapters — reuse as canonical service/container defaults and credential keys"
-  - "docs/operations/local-platform-provisioning.tsv — extend/reuse for operator-facing provisioning descriptions, not as an untested runtime registry"
-  - "tests/uat/docker_assets.py — collapse existing compose mapping into the resolved connection model rather than maintaining a second registry"
+- "docker/*/docker-compose.yml ports mappings — reuse as canonical local host reachability facts for Docker-managed platforms"
+- "benchbox/platforms/credentials/*.py and platform adapters — reuse as canonical service/container defaults and credential
+  keys"
+- "docs/operations/local-platform-provisioning.tsv — extend/reuse for operator-facing provisioning descriptions, not as an
+  untested runtime registry"
+- "tests/uat/docker_assets.py — collapse existing compose mapping into the resolved connection model rather than maintaining
+  a second registry"
 
 must_preserve:
-  - "UAT continues to reach every platform it currently reaches (no new skips after the refactor)"
-  - "Externally-managed-platform path (docker_manage_platforms: false) still resolves connection facts correctly"
+- "UAT continues to reach every platform it currently reaches (no new skips after the refactor)"
+- "Externally-managed-platform path (docker_manage_platforms: false) still resolves connection facts correctly"
 
 approach: |
   Treat compose `ports:` as the canonical host reachability source and adapter
@@ -116,32 +137,32 @@ approach: |
   the submit-classifier contract test.
 
 anti_patterns:
-  - "DO NOT add a fourth registry to 'unify' the three — derive from existing canonical surfaces (adapter defaults + compose)"
-  - "DO NOT leave matrix.py and docker_assets.py as two registries — collapse to one"
-  - "DO NOT collapse SingleStore's host port and service/container port into one value — model the endpoint role explicitly"
-  - "DO NOT hardcode the resolved SingleStore host port — read it so SINGLESTORE_HOST_PORT overrides flow through"
+- "DO NOT add a fourth registry to 'unify' the three — derive from existing canonical surfaces (adapter defaults + compose)"
+- "DO NOT leave matrix.py and docker_assets.py as two registries — collapse to one"
+- "DO NOT collapse SingleStore's host port and service/container port into one value — model the endpoint role explicitly"
+- "DO NOT hardcode the resolved SingleStore host port — read it so SINGLESTORE_HOST_PORT overrides flow through"
 
 verification:
-  - description: "No UAT-local connection registry remains in matrix.py"
-    command: "grep -nE 'PLATFORM_PORTS|PLATFORM_EXTRA_OPTS|LOCAL_MANAGED_PLATFORM_EXTRA_OPTS' tests/uat/matrix.py || echo 'absent'"
-    expected_output: "absent (connection facts resolve from canonical sources)"
-  - description: "Connection-drift contract test passes"
-    command: "uv run -- python -m pytest -k connection_registry_drift -q"
-    expected_output: "all cases pass; compose/adapter/UAT facts agree"
-  - description: "SingleStore reachability honors overridden host port without changing adapter service default"
-    command: "SINGLESTORE_HOST_PORT=13307 uv run -- python -m pytest -k 'uat and singlestore' -q"
-    expected_output: "UAT resolves host port 13307 for reachability while preserving service/container default semantics"
+- description: "No UAT-local connection registry remains in matrix.py"
+  command: "grep -nE 'PLATFORM_PORTS|PLATFORM_EXTRA_OPTS|LOCAL_MANAGED_PLATFORM_EXTRA_OPTS' tests/uat/matrix.py || echo 'absent'"
+  expected_output: "absent (connection facts resolve from canonical sources)"
+- description: "Connection-drift contract test passes"
+  command: "uv run -- python -m pytest -k connection_registry_drift -q"
+  expected_output: "all cases pass; compose/adapter/UAT facts agree"
+- description: "SingleStore reachability honors overridden host port without changing adapter service default"
+  command: "SINGLESTORE_HOST_PORT=13307 uv run -- python -m pytest -k 'uat and singlestore' -q"
+  expected_output: "UAT resolves host port 13307 for reachability while preserving service/container default semantics"
 
 scope_limit:
   only_modify:
-    - "tests/uat/matrix.py"
-    - "tests/uat/docker_assets.py"
-    - "tests/ (new drift test)"
+  - "tests/uat/matrix.py"
+  - "tests/uat/docker_assets.py"
+  - "tests/ (new drift test)"
   do_not_modify:
-    - "benchbox/platforms/credentials/ (adapter defaults are canonical — read, don't change)"
-    - "docker/*/docker-compose.yml (compose mappings are canonical)"
+  - "benchbox/platforms/credentials/ (adapter defaults are canonical — read, don't change)"
+  - "docker/*/docker-compose.yml (compose mappings are canonical)"
 
 success_metrics:
-  - "One source of truth per endpoint role/credential; UAT reads it rather than redeclaring it"
-  - "Setting SINGLESTORE_HOST_PORT cannot cause UAT to probe the wrong host port"
-  - "CI drift test fails if UAT connection facts diverge from compose/adapter"
+- "One source of truth per endpoint role/credential; UAT reads it rather than redeclaring it"
+- "Setting SINGLESTORE_HOST_PORT cannot cause UAT to probe the wrong host port"
+- "CI drift test fails if UAT connection facts diverge from compose/adapter"
