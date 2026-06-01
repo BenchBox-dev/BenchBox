@@ -12,29 +12,28 @@ must iterate sequentially.
 from __future__ import annotations
 
 import datetime as _dt
-import json
 import os
 import subprocess
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
-from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError, load_result_file
-from benchbox.core.results.status import result_failed_query_count, result_non_clean_reason
+from benchbox.core.results.submit_classification import (
+    SubmitTerminalState,
+    classify_result_path,
+)
 from tests.uat.matrix import benchbox_run_argv
 from tests.uat.timeouts import TimeoutResult, run_with_timeout
 
-UNOFFICIAL_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
-
-
-class SubmitTerminalState(str, Enum):
-    """UAT mirror of the `benchbox submit --output` refusal vocabulary."""
-
-    submittable = "submittable"
-    unofficial = "unofficial"
-    query_failure = "query_failure"
-    schema_violation = "schema_violation"
-    missing_manifest = "missing_manifest"
+# SubmitTerminalState is re-exported so existing UAT consumers
+# (tests/uat/_cli.py, phases/execute.py, phases/package.py) keep importing it
+# from tests.uat.runner. The classification *policy* now lives in
+# benchbox.core.results.submit_classification, shared with `benchbox submit`.
+__all__ = [
+    "CellResult",
+    "SubmitTerminalState",
+    "classify_for_submit",
+    "submit_state_is_cell_failure",
+]
 
 
 @dataclass(frozen=True)
@@ -62,33 +61,13 @@ def last_nonempty_output_line(log_text: str) -> str | None:
 
 
 def classify_for_submit(result_json: Path | str | None) -> SubmitTerminalState:
-    """Classify a result JSON using the same refusal predicates as `benchbox submit`.
+    """Classify a result JSON for submittability (thin adapter over shared policy).
 
-    Mirrors `benchbox/cli/commands/submit.py`: load failures are schema
-    problems, unofficial TPC-DS compliance classes remain successful but
-    non-submittable, and non-clean results are refused before packaging.
+    Delegates to ``benchbox.core.results.submit_classification`` so UAT and
+    ``benchbox submit`` apply identical refusal policy; this wrapper only
+    preserves the UAT-facing call site and vocabulary.
     """
-    if result_json is None:
-        return SubmitTerminalState.missing_manifest
-    path = Path(result_json).expanduser()
-    if not path.exists():
-        return SubmitTerminalState.missing_manifest
-    try:
-        result, _raw = load_result_file(path)
-    except FileNotFoundError:
-        return SubmitTerminalState.missing_manifest
-    except (json.JSONDecodeError, OSError, ResultLoadError, UnsupportedSchemaError):
-        return SubmitTerminalState.schema_violation
-
-    if getattr(result, "compliance_class", None) in UNOFFICIAL_COMPLIANCE_CLASSES:
-        return SubmitTerminalState.unofficial
-
-    non_clean_reason = result_non_clean_reason(result)
-    if non_clean_reason:
-        if result_failed_query_count(result):
-            return SubmitTerminalState.query_failure
-        return SubmitTerminalState.schema_violation
-    return SubmitTerminalState.submittable
+    return classify_result_path(result_json)
 
 
 def submit_state_is_cell_failure(state: SubmitTerminalState | str) -> bool:

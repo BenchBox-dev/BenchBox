@@ -33,8 +33,11 @@ from benchbox.core.results.loader import (
 )
 from benchbox.core.results.status import result_non_clean_reason
 from benchbox.core.results.submission_history import record_hosted_submission
+from benchbox.core.results.submit_classification import (
+    SubmitTerminalState,
+    classify_loaded_result,
+)
 from benchbox.validation.bundle import (
-    CLI_REFUSED_COMPLIANCE_CLASSES,
     COMPANION_SUFFIXES,
     _hash_bytes,
     _hash_file,
@@ -581,11 +584,16 @@ def submit(
         ctx.exit(1)
         return
 
+    # Submit-classification policy is shared with UAT via
+    # benchbox.core.results.submit_classification so the two surfaces cannot
+    # drift. The CLI maps the terminal state to its own exit codes + messages.
+    submit_state = classify_loaded_result(result)
+
     # Compliance guardrail: refuse submission of unofficial results.
     # Unofficial TPC-DS runs (subscale or non-standard SF) must not be submitted
     # as they are not valid TPC-DS comparable results.
-    _compliance_class = getattr(result, "compliance_class", None)
-    if _compliance_class in CLI_REFUSED_COMPLIANCE_CLASSES:
+    if submit_state is SubmitTerminalState.unofficial:
+        _compliance_class = getattr(result, "compliance_class", None)
         console.print(
             f"\n[red]❌ Submission refused: compliance_class={_compliance_class}[/red]\n"
             "   This result was produced with an unofficial TPC-DS configuration and\n"
@@ -596,8 +604,8 @@ def submit(
         ctx.exit(1)
         return
 
-    non_clean_reason = result_non_clean_reason(result)
-    if non_clean_reason:
+    if submit_state is not SubmitTerminalState.submittable:
+        non_clean_reason = result_non_clean_reason(result)
         console.print(
             f"\n[red]❌ Submission refused: result is not a clean pass ({non_clean_reason})[/red]\n"
             "   Query-level failures remain visible in the result artifact, but\n"
