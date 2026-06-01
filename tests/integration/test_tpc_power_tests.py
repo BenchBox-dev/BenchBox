@@ -9,6 +9,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from benchbox.core.tpch.power_test import TPCHPowerTest
+from benchbox.platforms.base.connection_wrappers import PlatformAdapterCursor
 from benchbox.platforms.duckdb import DuckDBAdapter
 
 pytestmark = [
@@ -227,6 +229,35 @@ class TestTPCTestIntegration:
         mock.get_query = Mock(return_value="SELECT 1 as test_query")
         mock.get_queries = Mock(return_value={"1": "SELECT 1", "2": "SELECT 2"})
         return mock
+
+    def test_tpch_power_test_uses_adapter_reported_row_count(self, tpch_mock_benchmark):
+        """Preserve true cardinality when adapter validation exposes only ``first_row``."""
+        cursor = PlatformAdapterCursor(
+            {
+                "status": "SUCCESS",
+                "rows_returned": 42,
+                "first_row": ("sentinel",),
+            }
+        )
+        assert len(cursor.fetchall()) == 1
+
+        mock_connection = Mock()
+        mock_connection.execute.return_value = cursor
+
+        power_test = TPCHPowerTest(
+            benchmark=tpch_mock_benchmark,
+            connection=mock_connection,
+            scale_factor=1.0,
+            seed=1,
+            validation=False,
+            warm_up=False,
+            query_subset=["6"],
+        )
+
+        result = power_test.run()
+
+        assert result.success
+        assert result.query_results[0]["result_count"] == 42
 
     @patch("rich.console.Console")
     def test_tpch_power_test_execution_flow(self, mock_console, tpch_mock_benchmark):

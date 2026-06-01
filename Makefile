@@ -104,9 +104,13 @@ test-dev:
 test-smoke: test-quick
 
 # Bounded real-result correctness gate for develop PRs: one local benchmark case
-# through generate/load/execute with phase, cardinality, and stored row-count checks.
+# (DuckDB x TPC-H, SF=1, reference qgen seed) through generate/load/execute with
+# phase, cardinality, and EXACT stored answer-set row-count checks. The query subset
+# is the 18 TPC-H queries whose answer-set cardinalities are stable across dbgen
+# builds; Q11/Q16/Q18/Q20 are excluded because their HAVING/threshold boundaries make
+# the stored row count vary with the generated data (see tests/README.md).
 test-correctness-gate:
-	BENCHBOX_STRICT_EXPECTED_RESULTS=1 BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=6,14,15,17,19 uv run -- python -m pytest -m stress "tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]" -n 0 --tb=short --timeout=1200 -v
+	BENCHBOX_STRICT_EXPECTED_RESULTS=1 BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22 uv run -- python -m pytest -m stress "tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]" -n 0 --tb=short --timeout=1200 -v
 
 # Real benchmark matrix across local SQL platforms x all benchmarks (heavy, opt-in)
 test-local-matrix:

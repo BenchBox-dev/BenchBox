@@ -91,9 +91,14 @@ The standard gates are intentionally split by the risk they are meant to catch:
 - `make test-fast`: quick developer and develop-PR feedback for code-impacting
   changes. This is the coverage-bearing lane in `.github/workflows/pr.yml`.
 - `make test-correctness-gate`: bounded develop-PR real-result gate. It runs the
-  DuckDB TPC-H matrix slice through generate, load, and execute with strict
-  stored expected-results row-count validation enabled for the configured
-  answer-backed query subset.
+  DuckDB TPC-H matrix slice (SF=1, pinned reference qgen seed) through generate,
+  load, and execute, then validates the emitted stream-0 cardinalities against the
+  stored TPC-H answer files with EXACT row-count checking. The gated subset is the
+  18 TPC-H queries whose answer-set cardinalities are stable across dbgen builds;
+  Q11/Q16/Q18/Q20 are excluded because their HAVING/threshold boundaries make the
+  stored row count vary with the generated data. Note this validates result
+  *cardinality*, not result *values* — value-level answer comparison (the
+  `_sources/tpc-h/dbgen/answers` + `cmpq.pl` checksum path) remains future work.
 - `make test-integration`: non-live, non-stress integration coverage for broader
   local and main/release validation.
 - `make test-local-matrix`: opt-in stress matrix for the full local platform

@@ -22,6 +22,7 @@ from benchbox.core.benchmark_registry import get_benchmark_metadata, list_benchm
 from benchbox.core.expected_results.models import ValidationMode
 from benchbox.core.expected_results.registry import get_registry
 from benchbox.core.results.loader import find_latest_result
+from benchbox.core.tpch.benchmark import get_reference_seed
 from benchbox.core.validation.query_validation import QueryValidator
 from tests.e2e.utils import is_dataframe_available, is_gpu_available, is_platform_available
 from tests.integration._cli_e2e_utils import run_cli_command
@@ -287,14 +288,22 @@ def _validate_completion(payload: dict, benchmark_name: str, expected_query_coun
 
 
 def _expected_result_queries(payload: dict, expected_query_ids: set[str] | None) -> list[dict]:
-    """Select result rows suitable for stored expected-results validation."""
+    """Select result rows suitable for stored expected-results validation.
+
+    Stored answer sets exist for stream 0 only (the power run executed with the
+    reference qgen seed); streams > 0 use derived seeds and are timed but not
+    answer-validated (per the TPC-H spec). So for the bounded gate we validate the
+    stream-0 executions, not the throughput measurement rows counted by
+    ``_validate_completion`` -- both run the same queries, but only stream 0 is
+    answer-backed.
+    """
     if not expected_query_ids:
         return _measurement_queries(payload)
 
     return [
         query
         for query in payload.get("queries", [])
-        if str(query.get("id")) in expected_query_ids and int(query.get("stream", 0)) == 0
+        if str(query.get("id")) in expected_query_ids and int(query.get("stream") or 0) == 0
     ]
 
 
@@ -315,7 +324,7 @@ def _validate_against_expected_results(
         if query.get("rows") is None:
             continue
 
-        stream_id = int(query.get("stream", 0))
+        stream_id = int(query.get("stream") or 0)
         validation = validator.validate_query_result(
             benchmark_type=benchmark_name,
             query_id=str(query["id"]),
@@ -392,6 +401,14 @@ def test_local_platform_benchmark_matrix(
     ]
     if query_subset:
         command.extend(["--queries", ",".join(query_subset)])
+        # The bounded correctness gate validates emitted cardinalities against the
+        # stored TPC-H answer files. Those answers correspond to the reference qgen
+        # seed, so pin it to make stream-0 expected-results validation deterministic
+        # and EXACT. Without it, query parameters drift and only structurally-fixed
+        # (single-row) queries would coincidentally match.
+        gate_seed = get_reference_seed(scale_factor) if benchmark_name == "tpch" else None
+        if gate_seed is not None:
+            command.extend(["--seed", str(gate_seed)])
 
     result = run_cli_command(command, cwd=case_dir, timeout=MATRIX_CASE_TIMEOUT)
 

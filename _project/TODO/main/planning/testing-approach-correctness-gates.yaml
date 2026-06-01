@@ -86,6 +86,22 @@ work:
         - release workflow infrastructure ratchets now assert
           `release-required-result` observes the correctness job.
 
+      Follow-up (review of PR #737): the original `6,14,15,17,19` subset was a
+      false oracle. The emitted result JSON recorded `rows=1` for every query
+      because `PlatformAdapterCursor._extract_rows` collapses validated results to
+      the `first_row` sentinel, so `tpch/power_test.py` stored `len(rows)=1` rather
+      than the real cardinality; the only queries that "passed" were the five that
+      happen to expect exactly one row. Fixes landed:
+        - `tpch/power_test.py` now records `result_count` from the adapter-reported
+          `rows_returned`, so the JSON carries the true cardinality;
+        - the gate pins the reference qgen seed (`get_reference_seed`, previously
+          dead code) so stream-0 EXACT validation matches the stored answers;
+        - the subset is widened to the 18 answer-stable TPC-H queries
+          (`1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22`); Q11/Q16/Q18/Q20 are
+          excluded for documented answer-set boundary sensitivity;
+        - added a collectability ratchet and a develop-job `timeout-minutes`.
+      Verified: `make test-correctness-gate` validates 18/18 EXACT in 36.08s.
+
   - id: w2
     summary: "Make marker-strategy enforcement explicit in lint/preflight"
     needs: [w0]
@@ -207,6 +223,7 @@ scope_limit:
     - "Makefile"
     - "pytest.ini"
     - "pytest-ci.ini"
+    - "benchbox/core/tpch/power_test.py"
     - "tests/integration/test_local_platform_benchmark_matrix.py"
     - "tests/e2e/test_local_platforms.py"
     - "tests/integration/platforms/test_local_platforms_smoke.py"

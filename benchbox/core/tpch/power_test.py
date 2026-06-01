@@ -321,7 +321,7 @@ class TPCHPowerTest:
                         {
                             "execution_time_seconds": execution_time,
                             "success": True,
-                            "result_count": len(rows),
+                            "result_count": self._query_result_count(cursor, rows),
                         }
                     )
 
@@ -382,6 +382,16 @@ class TPCHPowerTest:
             if self.config.verbose:
                 self.logger.error(f"Power Test failed: {e}")
             return result
+
+    @staticmethod
+    def _query_result_count(cursor: Any, rows: list[Any]) -> int:
+        """Return the true result cardinality for adapter cursors when available."""
+        platform_result = getattr(cursor, "platform_result", None)
+        if isinstance(platform_result, dict):
+            reported = platform_result.get("rows_returned")
+            if isinstance(reported, int) and reported >= 0:
+                return reported
+        return len(rows)
 
     def get_all_queries(self) -> dict[str, str]:
         """Get all queries for the power test."""
