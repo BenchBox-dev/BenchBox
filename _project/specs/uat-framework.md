@@ -111,25 +111,52 @@ tests/uat/
 
 **Responsibility split.**
 
-| Module | Responsibility | Lines (est.) |
-|---|---|---|
-| `matrix.py` | Port maps, `--platform-option` tables, CLI flags, uv-extra map, TCP probe with cache, registry-driven benchmark enumeration | 250 |
-| `runner.py` | Build `benchbox run` argv per cell; capture stdout+stderr to per-run log; extract result-JSON path | 120 |
-| `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 |
-| `timeouts.py` | Signal-based timeout (POSIX process-group kill ladder) | 80 |
-| `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 |
-| `docker_assets.py` | Map Docker-backed UAT platforms to compose files; build safe project-scoped compose commands | 180 |
-| `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 |
-| `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 |
-| `phases/enumerate.py` | Resolve final cell list for execute given config filters and registry truth; honour min/max scale | 100 |
-| `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 |
-| `phases/validate.py` | Call `benchbox.validation.bundle` in-process; write validator TSV; compute clean-rate floor | 100 |
-| `phases/package.py` | Read `submit_terminal_state`; invoke `benchbox submit --output` or `--service`; for `draft-pr`/`merged-to-published-results`, open PR vs `published-results` (auto-merge per state) | 130 |
-| `phases/explorer_smoke.py` | `uv run -- python _project/scripts/explorer_publish.py build` + `node results-explorer/scripts/serve-browser-tests.mjs` | 60 |
-| `phases/report.py` | Read each phase's outputs; emit `matrix_summary.tsv`; cross-scale coverage check | 130 |
-| `orchestrator.py` | Walk YAML `phases:` list in order; surface phase failures; respect `dry_run:` toggle | 100 |
+| Module | Responsibility | Lines (est.) | Actual (2026-06-01) |
+|---|---|---|---|
+| `__init__.py` | UAT package marker and documentation string | — | 6 |
+| `matrix.py` | Registry-driven benchmark enumeration, platform grouping, compose-derived TCP reachability probe (connection facts now owned by `docker_assets`) | 250 | 384 |
+| `runner.py` | Build `benchbox run` argv per cell; capture stdout+stderr to per-run log; extract result-JSON path; submit classification via shared `benchbox.core.results.submit_classification` | 120 | 265 |
+| `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 | 578 |
+| `_cli.py` | UAT CLI entrypoint: argument parsing, sweep/execute/validate/report/package subcommands, output wiring | — | 556 |
+| `timeouts.py` | Signal-based timeout (POSIX process-group kill ladder) | 80 | 130 |
+| `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 | 121 |
+| `compatibility.py` | Platform/benchmark compatibility rules; record compatibility-pruned cells with rule metadata | — | 198 |
+| `docker_assets.py` | Single connection registry: compose-file map, compose-derived host ports + platform options, safe project-scoped compose commands | 180 | 504 |
+| `docker_cleanup.py` | Docker stack teardown at platform boundaries; project-scoped down/volume handling | — | 372 |
+| `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 | 83 |
+| `preflight_budget.py` | Disk free-space floor budgeting and resume-on-abort accounting | — | 216 |
+| `phases/__init__.py` | UAT phase package marker and phase contract documentation string | — | 17 |
+| `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 | 407 |
+| `phases/enumerate.py` | Resolve final cell list for execute given config filters and registry truth; honour min/max scale | 100 | 137 |
+| `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 | 751 |
+| `phases/validate.py` | Call `benchbox.validation.bundle` in-process; write validator TSV; compute clean-rate floor | 100 | 303 |
+| `phases/package.py` | Read `submit_terminal_state`; invoke `benchbox submit --output` or `--service`; for `draft-pr`/`merged-to-published-results`, open PR vs `published-results` (auto-merge per state) | 130 | 170 |
+| `phases/explorer_smoke.py` | Branch-presence-guarded explorer smoke: always-on corpus contract, delegates build+Playwright to the Results Explorer | 60 | 356 |
+| `phases/report.py` | Read each phase's outputs; emit `matrix_summary.tsv`; cross-scale coverage check | 130 | 273 |
+| `orchestrator.py` | Walk YAML `phases:` list in order; surface phase failures; respect `dry_run:` toggle | 100 | 649 |
 
-Total: ~1,500 LOC across 13 modules + tests.
+**Budget reconciliation (revised 2026-06-01, `uat-loc-budget-reconciliation`).**
+Original estimate: ~1,500 LOC across 13 modules. Measured actual: **~6,476
+production LOC across 21 modules** (+ ~5,730 test LOC, ~1,729 YAML). The ~4.3×
+gap is undercounting of chartered surface, not bloat — it has two causes:
+
+- **Unlisted modules (~1,342 LOC).** The original table omitted four real
+  modules entirely: `_cli.py` (556), `docker_cleanup.py` (372),
+  `preflight_budget.py` (216), `compatibility.py` (198).
+- **Under-estimated phases/plumbing.** The six-phase pipeline plus the
+  orchestration/config/CLI layer ran larger than the per-module guesses
+  (e.g. `execute.py` 220→751, `orchestrator.py` 100→649, `config.py` 180→578).
+
+Per-bucket actuals: plumbing (orchestrator/config/`_cli`) 1,783; core exercise
+(execute/matrix/runner/enumerate/cleanup/ladder) 1,741; preflight/compat/timeouts
+951; Docker lifecycle (default-OFF) 876; chartered evidence artifacts
+(validate/report/package) 746; explorer-prep 356; package init markers 23.
+The chartered scope is "release-gate orchestration" (§10) — evidence artifacts,
+the six phases, and the Docker lifecycle are all in-charter, so the
+load-bearing buckets are not discretionary cuts.
+
+Revised budget: **~6,500 production LOC across ~21 modules + tests**, reviewed
+per-bucket above rather than against a single aggregate number.
 
 ## 3. YAML config schema
 
