@@ -1,0 +1,129 @@
+id: uat-clickhouse-server-rc1-recovery
+title: "Recover ClickHouse-server UAT RC-1 after confirmed localhost:9000 refusal"
+worktree: main
+priority: High
+status: Identified
+category: Platform Expansion
+
+description: |
+  RC-1 is the clickhouse-server UAT wipeout: the 2026-05-31 retry artifacts
+  show 57/57 clickhouse-server cells failed with `terminal_state=no_json_nonzero`
+  and empty `failure_tail`, so the original run did not expose the actionable
+  error.
+
+  Re-run on 2026-06-01 after the stderr-visible diagnostic fix confirmed the
+  real failure for the smallest cell:
+
+    BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs \
+      LOG_DIR=~/Developer/benchmark_runs/logs/clickhouse-server-rc1-repro-20260601 \
+      TIMEOUT_S=90 make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpch SCALE=0.01
+
+  Result: failed in 33.96s, log
+  `~/Developer/benchmark_runs/logs/clickhouse-server-rc1-repro-20260601/clickhouse-server_tpch_0.01_20260601_103610.log`
+  captured `Code: 210. Connection refused (localhost:9000)`. `nc -vz
+  localhost 9000` and `localhost 8123` also returned connection refused.
+
+  The missing-extra hypothesis was checked and is not the observed failure in
+  this worktree: `clickhouse-driver` is installed and the diagnostic reached
+  the driver connection path. The UAT argv is still hardened separately so
+  clickhouse-server uses its canonical uv extra instead of relying on whatever
+  the current environment has installed.
+
+prior_art:
+  - "docs/operations/uat-local-provisioning.md: clickhouse-server is an automated Docker-backed platform at localhost:9000; use make uat-bring-up PLATFORM=clickhouse-server"
+  - "docs/operations/uat-framework.md: managed Docker sweeps start project-scoped compose stacks and tear them down with docker_manage_platforms=true"
+  - "tests/uat/docker_assets.py: clickhouse-server compose metadata and service port 9000 are already registered"
+  - "tests/uat/matrix.py: platform uv extras are centralized in PLATFORM_UV_EXTRA"
+  - "_project/TODO/main/planning/uat-docker-stack-recovery.yaml: broader Docker-stack recovery owns LakeSail/OLTP ordering and must not be duplicated"
+
+work:
+  - id: w0
+    summary: "Preserve the diagnostic evidence and classify the observed failure"
+    status: done
+    notes: |
+      Evidence points to an unavailable ClickHouse service on localhost:9000,
+      not a query/DDL/data-load bug and not a missing driver in the current
+      worktree. The diagnostic re-run also proved the stderr capture fix is
+      effective for this failure class.
+  - id: w1
+    summary: "Make clickhouse-server UAT invocations self-contained on the canonical uv extra"
+    status: done
+    notes: |
+      Update PLATFORM_UV_EXTRA so clickhouse-server cells run through
+      `uv run --extra clickhouse-server --`, matching the platform's public
+      installation contract and avoiding environment-dependent driver presence.
+  - id: w2
+    summary: "After Docker CLI is healthy, bring up the ClickHouse stack and rerun the smallest cell"
+    needs: [w1]
+    status: pending
+    notes: |
+      Current environment blocker: Docker CLI calls hang until killed, so
+      `make uat-bring-up PLATFORM=clickhouse-server` cannot be trusted in this
+      session. When Docker responds, run:
+
+        BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-bring-up PLATFORM=clickhouse-server
+        BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpch SCALE=0.01
+
+      The expected first success criterion is no connection-refused diagnostic
+      and a result JSON or a later ClickHouse-specific load/query error.
+  - id: w3
+    summary: "If the smallest cell passes, rerun the clickhouse-server fast Docker corpus into a fresh run root"
+    needs: [w2]
+    status: pending
+    notes: |
+      Use the repo's managed Docker lifecycle rather than an ad hoc server:
+      a config with `cleanup.docker_manage_platforms=true`,
+      `cleanup.docker_platform_switch=volumes`, platform include
+      `clickhouse-server`, and the fast non-OLTP benchmark/scale set. Verify
+      cells.jsonl is non-empty, lifecycle logs contain up/run/down for
+      clickhouse-server, and matrix_summary.tsv no longer shows a total
+      platform wipeout.
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Do not duplicate or undo uat-docker-stack-recovery's broader Docker lifecycle work."
+  - "Do not run unqualified Docker cleanup; use UAT-owned project-scoped cleanup only."
+  - "Keep ClickHouse server mode on native TCP port 9000 unless the compose mapping changes and the registry derives a new host port."
+
+approach: |
+  Treat this as a provisioning/lifecycle recovery, not a SQL compatibility
+  fix. The first gate is service reachability on localhost:9000. Only after a
+  healthy server-backed tpch SF=0.01 cell passes or fails later in the run
+  should any ClickHouse adapter/query changes be considered.
+
+anti_patterns:
+  - "DO NOT hide the connection-refused failure as generic no_json_nonzero again; keep the diagnostic tail in the evidence."
+  - "DO NOT mark RC-1 fixed from a clickhouse-local result; this TODO is specifically for clickhouse-server."
+  - "DO NOT restart or prune the Docker daemon while other UAT agents are active without coordination."
+
+verification:
+  - description: "UAT argv uses the canonical clickhouse-server extra"
+    command: "uv run -- python -m pytest tests/uat/test_matrix.py::test_uv_run_argv_clickhouse_server_uses_canonical_extra -q"
+    expected_output: "test passes"
+  - description: "ClickHouse server stack is reachable before rerunning the corpus"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-bring-up PLATFORM=clickhouse-server && nc -vz localhost 9000"
+    expected_output: "make succeeds and nc reports an open localhost:9000 endpoint"
+  - description: "Smallest server-backed cell no longer fails at connection setup"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpch SCALE=0.01"
+    expected_output: "cell passes or fails later than connection setup with a captured ClickHouse-specific tail"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/matrix.py"
+    - "tests/uat/test_matrix.py"
+    - "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml"
+    - "docs/operations/uat-local-provisioning.md"
+    - "tests/uat/configs/"
+
+success_metrics:
+  - "clickhouse-server UAT cells use `uv run --extra clickhouse-server --`."
+  - "A fresh clickhouse-server tpch SF=0.01 UAT cell reaches a running service instead of localhost:9000 connection refused."
+  - "The follow-up clickhouse-server corpus rerun produces non-empty cells.jsonl and no 57/57 platform wipeout."
+
+metadata:
+  tags: [clickhouse-server, docker, uat, rc1]
+  estimated_effort: "Medium"
+  created_date: "2026-06-01"
+  last_updated: "2026-06-01T10:45:00-04:00"

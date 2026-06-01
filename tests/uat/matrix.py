@@ -36,6 +36,7 @@ PLATFORM_CLI_FLAGS: dict[str, list[str]] = {
 # Platform -> uv extra name (`uv run --extra X`).
 PLATFORM_UV_EXTRA: dict[str, str] = {
     "clickhouse-local": "clickhouse-local",
+    "clickhouse-server": "clickhouse-server",
     "lakesail": "lakesail",
     "singlestore": "singlestore",
     "influxdb": "influxdb",
