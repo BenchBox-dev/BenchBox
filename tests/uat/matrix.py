@@ -15,68 +15,15 @@ from typing import Iterable
 
 from benchbox.core.benchmark_registry import CATEGORY_ORDER
 from benchbox.core.platform_registry import PlatformRegistry
+from tests.uat import docker_assets
 
-# Platform -> "host:port" for TCP reachability probes.
-PLATFORM_PORTS: dict[str, str] = {
-    "lakesail": "localhost:50051",
-    "singlestore": "localhost:13306",
-    "questdb": "localhost:8812",
-    "presto": "localhost:18081",
-    "trino": "localhost:18080",
-    "clickhouse-server": "localhost:9000",
-    "starrocks": "localhost:19030",
-    "cedardb": "localhost:5435",
-    "databend": "localhost:8000",
-    "doris": "localhost:19031",
-    "influxdb": "localhost:8181",
-    "pg-duckdb": "localhost:5432",
-    "pg-mooncake": "localhost:5432",
-    "timescaledb": "localhost:5432",
-    "postgresql": "localhost:5432",
-    "velox": "localhost:50051",
-}
-
-# Platform -> list of `--platform-option` argv to append.
-PLATFORM_EXTRA_OPTS: dict[str, list[str]] = {
-    "questdb": ["--platform-option", "http_port=19000"],
-    "starrocks": [
-        "--platform-option",
-        "port=19030",
-        "--platform-option",
-        "http_port=18040",
-    ],
-    "doris": [
-        "--platform-option",
-        "port=19031",
-        "--platform-option",
-        "http_port=18030",
-        "--platform-option",
-        "be_http_port=18040",
-    ],
-    "singlestore": [
-        "--platform-option",
-        "port=13306",
-        "--platform-option",
-        "password=benchbox",
-    ],
-    "velox": [
-        "--platform-option",
-        "deployment=remote",
-        "--platform-option",
-        "endpoint=sc://localhost:50051",
-    ],
-}
-
-# Platform → local managed Docker credentials appended only when the caller is
-# running a UAT-managed Docker stack. Keep this separate from
-# PLATFORM_EXTRA_OPTS because that mapping applies even when UAT probes
-# externally managed local platforms.
-LOCAL_MANAGED_PLATFORM_EXTRA_OPTS: dict[str, list[str]] = {
-    "pg-duckdb": ["--platform-option", "password=benchbox"],
-    "pg-mooncake": ["--platform-option", "password=benchbox"],
-    "timescaledb": ["--platform-option", "password=benchbox"],
-    "postgresql": ["--platform-option", "password=benchbox"],
-}
+# Connection facts (reachability host:port, platform-option ports/credentials)
+# are owned by tests.uat.docker_assets and derived from the docker-compose
+# `ports:` mappings rather than duplicated here. matrix consumes them via
+# docker_assets.host_reachability_endpoint / platform_extra_opts /
+# local_managed_platform_extra_opts so the two surfaces cannot drift and an env
+# override (e.g. SINGLESTORE_HOST_PORT) flows through to the probe and the
+# adapter `port=` option alike.
 
 # Platform -> extra benchbox CLI flags (not --platform-option).
 # velox: Docker Desktop's 11.7 GB ceiling cannot fit 3xSF=1 TPC-H passes
@@ -237,10 +184,15 @@ def tcp_probe(host: str, port: int, timeout_s: float = 2.0) -> bool:
 
 
 def platform_is_reachable(platform: str) -> bool:
-    """Return True iff `platform` has no port mapping or its port is open."""
+    """Return True iff `platform` has no port mapping or its port is open.
+
+    The reachability endpoint is re-resolved from the compose-derived facts on
+    each cache miss so an env override (e.g. SINGLESTORE_HOST_PORT) set before
+    the probe is honored.
+    """
     if platform in _REACHABILITY_CACHE:
         return _REACHABILITY_CACHE[platform]
-    addr = PLATFORM_PORTS.get(platform)
+    addr = docker_assets.host_reachability_endpoint(platform)
     if addr is None:
         # No probe configured -> assume reachable.
         _REACHABILITY_CACHE[platform] = True
@@ -425,8 +377,8 @@ def benchbox_run_argv(
     if compression is not None:
         argv += ["--compression", compression]
     argv += PLATFORM_CLI_FLAGS.get(platform, [])
-    argv += PLATFORM_EXTRA_OPTS.get(platform, [])
+    argv += docker_assets.platform_extra_opts(platform)
     if local_managed_platform:
-        argv += LOCAL_MANAGED_PLATFORM_EXTRA_OPTS.get(platform, [])
+        argv += docker_assets.local_managed_platform_extra_opts(platform)
     argv += list(extra_args)
     return argv

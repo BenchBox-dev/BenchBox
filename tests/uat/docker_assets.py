@@ -13,11 +13,9 @@ import os
 import re
 import shlex
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable
-
-from tests.uat import matrix
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -76,90 +74,247 @@ _DOCKER_PLATFORM_SPECS: dict[str, DockerPlatformSpec] = {
     "clickhouse-server": DockerPlatformSpec(
         platform="clickhouse-server",
         compose_files=(_repo_path("docker/clickhouse/docker-compose.yml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("clickhouse-server"),
     ),
     "cedardb": DockerPlatformSpec(
         platform="cedardb",
         compose_files=(_repo_path("docker/cedardb/docker-compose.yml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("cedardb"),
     ),
     "starrocks": DockerPlatformSpec(
         platform="starrocks",
         compose_files=(_repo_path("docker/starrocks/docker-compose.yml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("starrocks"),
     ),
     "postgresql": DockerPlatformSpec(
         platform="postgresql",
         compose_files=(_repo_path("docker/postgresql/docker-compose.yml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("postgresql"),
     ),
     "presto": DockerPlatformSpec(
         platform="presto",
         compose_files=(_repo_path("docker/presto/docker-compose.yml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("presto"),
     ),
     "trino": DockerPlatformSpec(
         platform="trino",
         compose_files=(_repo_path("docker/trino/docker-compose.yml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("trino"),
     ),
     "databend": DockerPlatformSpec(
         platform="databend",
         compose_files=(_repo_path("docker/databend/docker-compose.yml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("databend"),
     ),
     "doris": DockerPlatformSpec(
         platform="doris",
         compose_files=(_repo_path("docker/doris/docker-compose.yml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("doris"),
     ),
     "influxdb": DockerPlatformSpec(
         platform="influxdb",
         compose_files=(_repo_path("docker/influxdb/docker-compose.yml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("influxdb"),
     ),
     "lakesail": DockerPlatformSpec(
         platform="lakesail",
         compose_files=(_repo_path("docker/lakesail/docker-compose.yml"),),
         services=("lakesail-connect",),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("lakesail"),
         notes="Start only lakesail-connect for host-run UAT; BENCHBOX_DATA_DIR is set to the sweep output root.",
     ),
     "pg-duckdb": DockerPlatformSpec(
         platform="pg-duckdb",
         compose_files=(_repo_path("docker/postgres-extensions/docker-compose.pg-duckdb.yaml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("pg-duckdb"),
         notes="PostgreSQL-family stack on localhost:5432; run sequentially with other PG-family platforms.",
     ),
     "pg-mooncake": DockerPlatformSpec(
         platform="pg-mooncake",
         compose_files=(_repo_path("docker/postgres-extensions/docker-compose.pg-mooncake.yaml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("pg-mooncake"),
         notes="PostgreSQL-family stack on localhost:5432; run sequentially with other PG-family platforms.",
     ),
     "timescaledb": DockerPlatformSpec(
         platform="timescaledb",
         compose_files=(_repo_path("docker/postgres-extensions/docker-compose.timescaledb.yaml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("timescaledb"),
         notes="PostgreSQL-family stack on localhost:5432; run sequentially with other PG-family platforms.",
     ),
     "questdb": DockerPlatformSpec(
         platform="questdb",
         compose_files=(_repo_path("docker/questdb/docker-compose.yml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("questdb"),
     ),
     "singlestore": DockerPlatformSpec(
         platform="singlestore",
         compose_files=(_repo_path("docker/singlestore/docker-compose.yml"),),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("singlestore"),
     ),
     "velox": DockerPlatformSpec(
         platform="velox",
         compose_files=(_repo_path("docker/velox/docker-compose.yml"),),
         services=("velox-connect",),
-        tcp_probe_label=matrix.PLATFORM_PORTS.get("velox"),
         notes="Start only velox-connect for host-run UAT; BENCHBOX_DATA_DIR is set to the sweep output root.",
     ),
+}
+
+
+# ---------------------------------------------------------------------------
+# Single source of truth for platform connection facts.
+#
+# Host reachability ports are DERIVED from each platform's docker-compose
+# `ports:` mapping (honoring `${VAR:-default}` overrides), keyed by the
+# in-container service port the adapter connects to. This is the one fact a
+# "lightweight user-exercising" layer needs and the one most certain to rot;
+# deriving it means an override like SINGLESTORE_HOST_PORT flows through to both
+# the reachability probe and the adapter `port=` option without editing code.
+#
+# Endpoint roles are modeled explicitly: PLATFORM_SERVICE_PORT is the
+# container/service port (NOT the host port). Do not collapse the two.
+#
+# Credential and secondary-port literals (password=, http_port=, ...) are NOT
+# yet derived — that is the deferred follow-up. They live here as the single
+# connection registry so matrix.py no longer keeps a parallel copy.
+# ---------------------------------------------------------------------------
+
+# Platform -> in-container service port the adapter connects to. The host
+# reachability port is whatever the compose `ports:` mapping publishes for this
+# container port.
+PLATFORM_SERVICE_PORT: dict[str, int] = {
+    "clickhouse-server": 9000,
+    "cedardb": 5432,
+    "starrocks": 9030,
+    "postgresql": 5432,
+    "presto": 8080,
+    "trino": 8080,
+    "databend": 8000,
+    "doris": 9030,
+    "influxdb": 8181,
+    "lakesail": 50051,
+    "pg-duckdb": 5432,
+    "pg-mooncake": 5432,
+    "timescaledb": 5432,
+    "questdb": 8812,
+    "singlestore": 3306,
+    "velox": 50051,
+}
+
+# Static (non-derived) platform options, relocated from matrix.py. The
+# reachability `port=` option is injected separately from the compose-derived
+# host port (see platform_extra_opts) so an env override flows through.
+_PLATFORM_STATIC_OPTS: dict[str, list[str]] = {
+    "questdb": ["--platform-option", "http_port=19000"],
+    "starrocks": ["--platform-option", "http_port=18040"],
+    "doris": [
+        "--platform-option",
+        "http_port=18030",
+        "--platform-option",
+        "be_http_port=18040",
+    ],
+    "singlestore": ["--platform-option", "password=benchbox"],
+    "velox": [
+        "--platform-option",
+        "deployment=remote",
+        "--platform-option",
+        "endpoint=sc://localhost:50051",
+    ],
+}
+
+# Platforms that pass the resolved host reachability port to the adapter as the
+# `port=` platform-option (kept first to preserve existing argv order).
+_PLATFORM_INJECT_HOST_PORT_OPT: frozenset[str] = frozenset({"singlestore", "starrocks", "doris"})
+
+# Local managed-Docker credentials, appended only when UAT manages the stack
+# (kept separate because PLATFORM options apply even for externally managed
+# local platforms).
+_PLATFORM_LOCAL_MANAGED_OPTS: dict[str, list[str]] = {
+    "pg-duckdb": ["--platform-option", "password=benchbox"],
+    "pg-mooncake": ["--platform-option", "password=benchbox"],
+    "timescaledb": ["--platform-option", "password=benchbox"],
+    "postgresql": ["--platform-option", "password=benchbox"],
+}
+
+# A compose `ports:` entry: "[ip:]host:container", host may be ${VAR:-default}.
+_COMPOSE_PORT_MAPPING_RE = re.compile(r'^\s*-\s*"?(?P<mapping>[^"\s]+)"?\s*$')
+_ENV_DEFAULT_RE = re.compile(r"^\$\{(?P<var>[A-Za-z_][A-Za-z0-9_]*):-(?P<default>\d+)\}$")
+_ENV_BARE_RE = re.compile(r"^\$\{(?P<var>[A-Za-z_][A-Za-z0-9_]*)\}$")
+_HOST_CONTAINER_RE = re.compile(r"^(?P<host>.+):(?P<container>\d+)$")
+
+
+def _resolve_host_token(token: str, env: dict[str, str]) -> int | None:
+    """Resolve a compose published-port token to a concrete host port."""
+    token = token.strip().strip('"')
+    m = _ENV_DEFAULT_RE.match(token)
+    if m:
+        raw = env.get(m.group("var"), m.group("default"))
+        return int(raw) if str(raw).isdigit() else int(m.group("default"))
+    m = _ENV_BARE_RE.match(token)
+    if m:
+        raw = env.get(m.group("var"))
+        return int(raw) if raw and raw.isdigit() else None
+    if token.isdigit():
+        return int(token)
+    # ip:port form -> take the trailing published port.
+    if ":" in token and token.rsplit(":", 1)[-1].isdigit():
+        return int(token.rsplit(":", 1)[-1])
+    return None
+
+
+def _iter_compose_port_mappings(compose_file: Path) -> Iterable[tuple[str, int]]:
+    """Yield (host_token, container_port) for every `- "host:container"` entry."""
+    try:
+        text = compose_file.read_text(encoding="utf-8")
+    except OSError:
+        return
+    for line in text.splitlines():
+        entry = _COMPOSE_PORT_MAPPING_RE.match(line)
+        if not entry:
+            continue
+        hc = _HOST_CONTAINER_RE.match(entry.group("mapping"))
+        if not hc:
+            continue
+        yield hc.group("host"), int(hc.group("container"))
+
+
+def resolve_published_host_port(platform: str, *, env: dict[str, str] | None = None) -> int | None:
+    """Return the host port that compose publishes for `platform`'s service port.
+
+    Matches the compose `ports:` entry whose *container* side equals
+    PLATFORM_SERVICE_PORT[platform], disambiguating sidecar ports (e.g. databend
+    MinIO, questdb REST) from the reachability endpoint.
+    """
+    env = os.environ if env is None else env
+    service_port = PLATFORM_SERVICE_PORT.get(platform)
+    spec = _DOCKER_PLATFORM_SPECS.get(platform)
+    if service_port is None or spec is None:
+        return None
+    for compose_file in spec.compose_files:
+        for host_token, container in _iter_compose_port_mappings(compose_file):
+            if container == service_port:
+                resolved = _resolve_host_token(host_token, env)
+                if resolved is not None:
+                    return resolved
+    return None
+
+
+def host_reachability_endpoint(platform: str, *, env: dict[str, str] | None = None) -> str | None:
+    """Return ``"localhost:<host_port>"`` for `platform`, or None if not derivable."""
+    host_port = resolve_published_host_port(platform, env=env)
+    return None if host_port is None else f"localhost:{host_port}"
+
+
+def platform_extra_opts(platform: str, *, env: dict[str, str] | None = None) -> list[str]:
+    """Return the `--platform-option` argv for `platform`.
+
+    The reachability `port=` (for platforms that take one) is derived from the
+    compose-published host port; remaining options are static literals.
+    """
+    opts: list[str] = []
+    if platform in _PLATFORM_INJECT_HOST_PORT_OPT:
+        host_port = resolve_published_host_port(platform, env=env)
+        if host_port is not None:
+            opts += ["--platform-option", f"port={host_port}"]
+    opts += list(_PLATFORM_STATIC_OPTS.get(platform, []))
+    return opts
+
+
+def local_managed_platform_extra_opts(platform: str) -> list[str]:
+    """Return managed-Docker-only `--platform-option` argv (credentials)."""
+    return list(_PLATFORM_LOCAL_MANAGED_OPTS.get(platform, []))
+
+
+# Fill each spec's display probe label from the compose-derived endpoint (default
+# env). The live reachability probe re-resolves at call time so env overrides
+# (e.g. SINGLESTORE_HOST_PORT) still take effect after import.
+_DOCKER_PLATFORM_SPECS = {
+    platform: replace(spec, tcp_probe_label=host_reachability_endpoint(platform))
+    for platform, spec in _DOCKER_PLATFORM_SPECS.items()
 }
 
 
