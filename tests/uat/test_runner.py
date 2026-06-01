@@ -114,13 +114,12 @@ def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):
     def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
         captured["env"] = env
         captured["argv"] = argv
-        if stderr is not None:
-            stderr.write("[warning] ignored stderr after quiet stdout\n")
         return TimeoutResult(
             exit_code=0,
             timed_out=False,
             elapsed_s=0.1,
             stdout=f"{result_path}\n".encode(),
+            stderr=b"[warning] ignored stderr after quiet stdout\n",
         )
 
     def fake_benchbox_run_argv(*args, extra_args=(), **kwargs):
@@ -202,6 +201,89 @@ def test_run_cell_marks_failure(tmp_path: Path):
     assert result.status == "failed"
     assert result.exit_code == 2
     assert result.result_path is None
+
+
+def test_run_cell_diagnostic_rerun_fires_only_for_empty_output_failure(tmp_path: Path):
+    captured_quiet = []
+
+    def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
+        captured_quiet.append(quiet)
+        return [sys.executable, "-c", "unused"]
+
+    outcomes = [
+        TimeoutResult(exit_code=2, timed_out=False, elapsed_s=0.1, stdout=b"", stderr=b""),
+        TimeoutResult(exit_code=2, timed_out=False, elapsed_s=0.1, stdout=b"diagnostic detail\n", stderr=None),
+    ]
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        return outcomes.pop(0)
+
+    with (
+        patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert result.exit_code == 2
+    assert captured_quiet == [True, False]
+    log_text = result.log_path.read_text()
+    assert "verbose diagnostic re-run" in log_text
+    assert "diagnostic detail" in log_text
+
+
+def test_run_cell_skips_diagnostic_rerun_when_failure_has_stderr(tmp_path: Path):
+    captured_quiet = []
+
+    def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
+        captured_quiet.append(quiet)
+        return [sys.executable, "-c", "unused"]
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        return TimeoutResult(
+            exit_code=2,
+            timed_out=False,
+            elapsed_s=0.1,
+            stdout=b"",
+            stderr=b"already diagnostic stderr\n",
+        )
+
+    with (
+        patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert captured_quiet == [True]
+    log_text = result.log_path.read_text()
+    assert "already diagnostic stderr" in log_text
+    assert "verbose diagnostic re-run" not in log_text
+
+
+def test_run_cell_diagnostic_rerun_error_does_not_mask_original_failure(tmp_path: Path):
+    def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
+        return [sys.executable, "-c", "unused"]
+
+    calls = 0
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return TimeoutResult(exit_code=2, timed_out=False, elapsed_s=0.1, stdout=b"", stderr=b"")
+        raise RuntimeError("diagnostic boom")
+
+    with (
+        patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert result.exit_code == 2
+    assert calls == 2
+    assert "diagnostic re-run error RuntimeError: diagnostic boom" in result.log_path.read_text()
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX timeout semantics")

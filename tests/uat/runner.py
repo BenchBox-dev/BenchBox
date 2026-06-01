@@ -178,15 +178,18 @@ def run_cell(
             argv,
             timeout_s=timeout_s,
             stdout=subprocess.PIPE,
-            stderr=log_fh,
+            stderr=subprocess.PIPE,
             env=env,
         )
         stdout_text = _decode_process_output(timeout_result.stdout)
+        stderr_text = _decode_process_output(timeout_result.stderr)
+        if stderr_text:
+            log_fh.write(stderr_text)
         if stdout_text:
             log_fh.write(stdout_text)
         if timeout_result.timed_out:
             log_fh.write(f"# UAT_TIMEOUT timeout_s={timeout_s} exit_code={timeout_result.exit_code}\n")
-        elif timeout_result.exit_code != 0 and not stdout_text.strip():
+        elif timeout_result.exit_code != 0 and not stdout_text.strip() and not stderr_text.strip():
             _append_diagnostic_rerun(
                 log_fh,
                 benchbox_run_argv(
