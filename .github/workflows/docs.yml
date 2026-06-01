@@ -76,6 +76,11 @@ jobs:
       # --- Results Explorer ---
       # Steps gate on package.json as a sentinel so the workflow degrades
       # gracefully if the explorer directory is ever removed or renamed.
+      # This is also the intended dormancy on the release branch: results-explorer/
+      # and _project/scripts/explorer_publish.py ship on develop, not main, so on
+      # a main build hashFiles(...) is empty and every explorer step below is a
+      # deliberate no-op rather than accidental dead code (see
+      # tests/uat/phases/explorer_smoke.py:explorer_present).
       - name: Validate results-explorer lockfile
         if: hashFiles('results-explorer/package.json') != ''
         run: |

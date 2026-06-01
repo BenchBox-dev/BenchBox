@@ -22,7 +22,8 @@
     "test:e2e:install:chromium": "playwright install --with-deps chromium",
     "test:e2e:fixtures": "node scripts/generate-browser-fixtures.mjs && node scripts/verify-browser-fixtures.mjs",
     "test:e2e:serve": "node scripts/serve-browser-tests.mjs",
-    "test:e2e:webkit": "npm run test:e2e:fixtures && npm run build && playwright test --project=webkit --workers=1"
+    "test:e2e:webkit": "npm run test:e2e:fixtures && npm run build && playwright test --project=webkit --workers=1",
+    "uat-external-corpus-smoke": "npm run build && playwright test --grep @uat-external-corpus"
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "^1.29.0",
