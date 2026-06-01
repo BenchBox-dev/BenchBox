@@ -1,6 +1,6 @@
-# TEMPLATE — editable tuned follow-up UAT sweep config.
+# GENERATED rerun shard (frozen historical) from the 2026-05-05 tuned follow-up sweep — NOT an editable template; see README.md.
 
-name: "uat-tuned-followup-resume-databend-20260505"
+name: "uat-tuned-followup-resume-influxdb-20260505"
 description: "Resume tuned multi-scale local UAT sweep for BenchBox submissions"
 
 phases:
@@ -11,7 +11,7 @@ phases:
 dry_run: false
 
 platforms:
-  include: ["databend"]
+  include: ["influxdb"]
 
 benchmarks:
   groups: ["all"]
@@ -51,5 +51,5 @@ report:
 
 output:
   benchmark_runs_dir_template: "~/Developer/benchmark_runs"
-  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_tuned_followup_resume_databend_20260505_pool10"
+  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_tuned_followup_resume_influxdb_20260505_pool10"
   submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"

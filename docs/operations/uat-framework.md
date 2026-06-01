@@ -256,13 +256,29 @@ and timed-out counts, followed by a run-status/source-provenance footer.
 Early-stop pruning is separate from compatibility pruning and must not be
 treated as a pass or a compatibility exclusion.
 
-## Historical vs editable configs
+## Config lifecycle (four classes)
 
-Files under `tests/uat/configs/` are either historical replay evidence
-(first line `# HISTORICAL`) or editable templates (first line
-`# TEMPLATE`). Historical configs are reviewed as evidence, but there is
-no hash ceremony or `.frozen-hashes.json` guard. New sweeps clone an
-existing config:
+Every file under `tests/uat/configs/` has one of four lifecycle classes. The
+class is signalled by the first-line header and, for generated shards, by
+location:
+
+1. **Editable template** (`# TEMPLATE`) — a reusable starting point. Clone it
+   for a new sweep; the original stays generic.
+2. **Historical evidence** (`# HISTORICAL`) — an immutable replay of a past
+   sweep, retained for provenance. Historical configs are evidence: reviewed,
+   not re-run as-is. There is no hash ceremony or `.frozen-hashes.json` guard.
+3. **Generated rerun shard** — operational scratch emitted by a single sweep's
+   resume/follow-up (often one file per platform). These are NOT reusable
+   templates. They live under `tests/uat/configs/generated-rerun-shards/` (see
+   that directory's README), not at the top level, so they cannot masquerade as
+   editable starting points.
+4. **Ephemeral resume state** — `resume.json`, written under the run's log dir
+   on a free-space-floor abort and consumed by `--resume <manifest>` (see
+   "Resume manifest" in `_project/specs/uat-framework.md`). It is runtime state,
+   not a config artifact, and is never a reusable file class. A "resume config"
+   is not a category — only the per-run `resume.json` is.
+
+New sweeps clone a template:
 
 ```bash
 cp tests/uat/configs/uat-2026-05-02.yaml tests/uat/configs/uat-<new>.yaml
