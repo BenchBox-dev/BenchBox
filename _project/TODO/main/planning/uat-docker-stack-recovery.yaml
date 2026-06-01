@@ -73,25 +73,34 @@ work:
       failure-capture #691, but #691 did not make compose-up failure non-fatal).
       scope_limit expanded below with this justification.
   - id: w3
-    summary: "Re-run Docker-OLTP from scratch into a fresh run root with full lifecycle logs"
+    summary: "[VIA cert-rerun w5 — NOT standalone] Re-run Docker-OLTP from scratch into a fresh run root with full lifecycle logs"
     needs: [w0, w1, w2]
     status: pending
     notes: |
-      OPERATIONAL / live-environment step. Folded into the single release-gate
-      re-run (uat-certification-rerun-ordering-and-gate w5), which executes the
-      Docker OLTP stacks into a fresh run root rather than running the re-run
-      twice. Requires built/pulled Docker images (OLTP stacks) + the live Docker
-      daemon. The empty 2026-05-28 oltp dir is treated as non-evidentiary.
+      OPERATIONAL / live-environment step. NOT independently actionable and NOT
+      a standalone Docker-only rerun: it is executed ONLY inside the four-stage
+      release-gate sweep [[uat-certification-rerun-ordering-and-gate]] w5
+      (native -> dataframe -> docker non-OLTP -> docker OLTP), which runs the
+      Docker OLTP stacks into a fresh root rather than running the re-run twice.
+      Running just the Docker stacks here would reproduce the ordering
+      contamination that w5's anti-pattern forbids ("DO NOT start a Docker stack
+      before native + dataframe platforms finish"). Kept `status: pending`
+      (the schema allows only pending/in_progress/done) but the summary and these
+      notes mark it as cert-w5-owned so the ready queue is not mistaken for a
+      standalone task. Requires built/pulled Docker images (OLTP stacks) + the
+      live Docker daemon. The empty 2026-05-28 oltp dir is non-evidentiary.
   - id: w4
-    summary: "Re-run Docker-non-OLTP; verify per-platform up/run/down + non-empty cells.jsonl"
+    summary: "[VIA cert-rerun w5 — NOT standalone] Re-run Docker-non-OLTP; verify per-platform up/run/down + non-empty cells.jsonl"
     needs: [w0, w1, w2]
     status: pending
     notes: |
-      OPERATIONAL / live-environment step. Folded into the release-gate re-run
-      (uat-certification-rerun-ordering-and-gate w5) into a fresh root. The w2
-      fix here guarantees a single stack's startup failure no longer truncates
-      the non-OLTP sweep, which was the root cause of the empty 2026-05-28
-      cells.jsonl.
+      OPERATIONAL / live-environment step. Same folding as w3: executed ONLY
+      inside [[uat-certification-rerun-ordering-and-gate]] w5 into a fresh root,
+      after native + dataframe stages complete — not as a standalone Docker
+      sweep. Kept `status: pending` per schema; the summary carries the
+      cert-w5-owned guard. The w2 fix here guarantees a single stack's startup
+      failure no longer truncates the non-OLTP sweep, which was the root cause
+      of the empty 2026-05-28 cells.jsonl.
 
 deps:
   needs:
@@ -106,9 +115,12 @@ approach: |
   Split infra hardening from re-runs. First confirm daemon + disk (w0) and
   the real LakeSail startup time (w1). Then make a failed compose-up a
   recorded, non-fatal event so the sweep advances (w2, depends on the
-  failure-capture/abort-safe work). Only after that, re-run both Docker
-  configs into a fresh run root (w3, w4) and verify every run dir is
-  non-empty with up/run/down lifecycle lines.
+  failure-capture/abort-safe work). The code work (w0-w2) is complete; the
+  Docker re-runs (w3, w4) are deferred and executed ONLY as part of the
+  four-stage release-gate sweep [[uat-certification-rerun-ordering-and-gate]]
+  w5 (into a fresh root, after native + dataframe stages), not as a standalone
+  Docker sweep here. Both re-run dirs must be non-empty with up/run/down
+  lifecycle lines.
 
 anti_patterns:
   - "DO NOT raise docker_start_timeout_s until you have measured a healthy startup - a longer timeout on a broken service just wastes 5+ minutes per attempt."
