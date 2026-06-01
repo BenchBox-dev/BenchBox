@@ -35,8 +35,8 @@ git fetch origin develop pull/221/head:feat/uat-tuned-followup-20260505
 git checkout feat/uat-tuned-followup-20260505 && git rebase origin/develop
 git checkout chore/results-explorer-tuned-followup-resume-20260505 && git reset --hard feat/uat-tuned-followup-20260505
 uv run -- python -m pytest tests/uat -q -m fast -n 0
-uv run -- python -m tests.uat._cli sweep --config tests/uat/configs/uat-tuned-followup-resume-20260505.yaml
-make test-docker-up-clickhouse && uv run -- python -m tests.uat._cli sweep --config tests/uat/configs/uat-tuned-followup-resume-clickhouse-server-20260505.yaml; make test-docker-down-clickhouse
+uv run -- python -m tests.uat._cli sweep --config tests/uat/configs/generated-rerun-shards/uat-tuned-followup-resume-20260505.yaml
+make test-docker-up-clickhouse && uv run -- python -m tests.uat._cli sweep --config tests/uat/configs/generated-rerun-shards/uat-tuned-followup-resume-clickhouse-server-20260505.yaml; make test-docker-down-clickhouse
 # repeated start/sweep/down pattern for cedardb, starrocks, postgresql, presto, trino, databend, doris, influxdb, questdb
 uv run -- python -m tests.uat._cli validate --results-dir ~/Developer/benchmark_runs/submissions/uat-tuned-followup-resume-20260505/bundle --output-tsv ~/Developer/benchmark_runs/logs/uat_tuned_followup_resume_20260505_pool10/validator_rollup_final.tsv --floor 0.80
 uv run -- python -m tests.uat._cli explorer-smoke --bundles-dir ~/Developer/benchmark_runs/submissions/uat-tuned-followup-resume-20260505/bundle --output-dir ~/Developer/benchmark_runs/logs/uat_tuned_followup_resume_20260505_pool10/explorer_data_final --log-dir ~/Developer/benchmark_runs/logs/uat_tuned_followup_resume_20260505_pool10 --browsers chromium
