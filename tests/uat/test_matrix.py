@@ -184,6 +184,16 @@ def test_uv_run_argv_extra_uses_extra_flag():
     ]
 
 
+def test_uv_run_argv_clickhouse_server_uses_canonical_extra():
+    assert matrix.uv_run_argv("clickhouse-server") == [
+        "uv",
+        "run",
+        "--extra",
+        "clickhouse-server",
+        "--",
+    ]
+
+
 def test_benchbox_run_argv_includes_platform_extras():
     argv = matrix.benchbox_run_argv("starrocks", "tpch", 0.01)
     assert "--quiet" in argv
