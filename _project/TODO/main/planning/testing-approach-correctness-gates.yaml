@@ -1,0 +1,274 @@
+id: testing-approach-correctness-gates
+title: "Correct testing approach around real-result gates and test-quality debt"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  A testing-approach review correctly identified that BenchBox's strongest
+  real-result correctness oracle is not part of the develop PR gate:
+  `tests/integration/test_local_platform_benchmark_matrix.py` is marked
+  `integration + stress` and validates phase coverage, zero failed measurement
+  queries, benchmark query cardinality, and row counts against stored expected
+  results when available. The develop PR workflow runs only:
+  `fast and not (slow or stress or resource_heavy or live_integration)`.
+
+  The review overreached in several places. Main/release and nightly workflows
+  do run non-fast integration coverage, and the release canary is release-gate
+  evidence through freshness/checked-SHA policy. Mock usage is also not a
+  repo-wide defect by itself because many cloud/service adapters require SDK or
+  service doubles. Still, the rebuttal does not remove the central product risk:
+  a normal develop PR can merge without any small gated run proving that a real
+  local benchmark produces a complete, correct result payload.
+
+  This TODO synthesizes both positions into a correction plan:
+    - add a bounded develop-PR real-result correctness gate without turning the
+      fast lane into the full stress matrix;
+    - make marker-strategy enforcement explicit instead of incidental;
+    - decide what `medium` means in automated lanes;
+    - retire coverage-theater and stale tests where examples show low
+      behavioral value;
+    - keep release/UAT/live-cloud policy separate from routine PR gates.
+
+work:
+  - id: w0
+    summary: "Refresh the testing-gate evidence against the current branch"
+    status: pending
+    notes: |
+      Re-run the evidence capture before editing CI or tests. Commit only a
+      compact summary in this TODO or the PR body; keep raw command output under
+      `/tmp/testing-approach-correctness-gates/`.
+
+      Required checks:
+        - Confirm workflow marker expressions in `.github/workflows/pr.yml`,
+          `.github/workflows/test.yml`, `.github/workflows/nightly.yml`,
+          `.github/workflows/release-canary.yml`, and
+          `.github/workflows/validate-main-pr.yml`.
+        - Confirm `test_local_platform_benchmark_matrix.py` is still stress-only
+          and still contains the phase/completion/expected-results validations.
+        - Count files marked `medium`, `slow`, `resource_heavy`, and `stress`,
+          but treat counts as routing evidence only, not as quality proof.
+        - Identify whether any existing non-stress real local execution tests
+          already assert expected-result row counts. If yes, prefer extending
+          that surface over adding another CI lane.
+
+  - id: w1
+    summary: "Design and implement a bounded develop-PR real-result correctness lane"
+    needs: [w0]
+    status: pending
+    notes: |
+      Create the smallest deterministic CI slice that proves a real local
+      benchmark can generate, load, execute, and emit a correct result payload.
+
+      Required behavior:
+        - run in develop PRs for code-impacting changes;
+        - execute at least one local SQL platform/benchmark case end-to-end;
+        - assert requested phase coverage, zero failed measurement queries, and
+          expected benchmark query cardinality;
+        - preserve row-count validation against stored expected results when
+          the selected scale/platform has a real expected-results oracle.
+
+      Decision gate:
+        - Do not blindly use DuckDB TPC-H SF=0.01 if that loses the stored
+          expected-results oracle. If the gated slice uses SF=0.01 for runtime,
+          explicitly document it as completion/cardinality coverage and keep a
+          separate expected-results-backed case in a slower lane.
+        - Prefer moving a narrow parametrized subset of
+          `test_local_platform_benchmark_matrix.py` into a new marker or target
+          over duplicating its assertions.
+
+  - id: w2
+    summary: "Make marker-strategy enforcement explicit in lint/preflight"
+    needs: [w0]
+    status: pending
+    notes: |
+      `make lint-markers` currently relies on pytest collection and strict
+      marker registration. The real strategy policy lives in
+      `tests/unit/test_marker_strategy.py` and only runs because the file is
+      currently marked fast/unit.
+
+      Fix the enforcement contract:
+        - run `tests/unit/test_marker_strategy.py` explicitly from the lint or
+          preflight path;
+        - update the Makefile target name/comment if it still only validates
+          marker registration;
+        - add or extend a command-surface ratchet so this does not silently
+          drift back to collection-only behavior.
+
+  - id: w3
+    summary: "Decide the automated role of the medium tier"
+    needs: [w0]
+    status: pending
+    notes: |
+      The review found many `medium` files with no direct workflow expression.
+      The rebuttal showed that some medium integration tests can still be
+      selected by integration workflows, so the issue is not simply "medium
+      never runs." The real problem is that medium has no explicit policy.
+
+      Pick and encode one policy:
+        - promote cheap medium tests that protect CLI/result correctness into a
+          PR-gated integration or correctness lane;
+        - keep medium as local-only but rename/document the guarantee honestly;
+        - or retire `medium` by reclassifying tests into fast/slow/resource
+          lanes with explicit workflow coverage.
+
+      Add a ratchet test or docs check so new medium tests cannot appear without
+      an intentional routing decision.
+
+  - id: w4
+    summary: "Reduce coverage-theater tests and stale testing documentation"
+    needs: [w0]
+    status: pending
+    notes: |
+      Clean up the specific low-signal examples from the review, but avoid a
+      broad "delete all mocks" campaign.
+
+      Minimum cleanup targets:
+        - collapse or rewrite Databricks DataFrame `*_coverage*.py` tests that
+          use `object.__new__`, hand-set adapter internals, or stub the helper
+          being validated;
+        - delete or replace `tests/unit/test_adjective_cleanup.py` if it still
+          only asserts constructors/imports;
+        - remove the dead `.py.new` integration stubs if still present;
+        - update `tests/README.md` if it still documents nonexistent
+          directories or hand-maintained test counts;
+        - remove weak/redundant SQL translation or error-handling assertions
+          only when an existing behavioral/snapshot test already covers the
+          same observable contract.
+
+  - id: w5
+    summary: "Document the final testing contract and release boundary"
+    needs: [w1, w2, w3, w4]
+    status: pending
+    notes: |
+      Update the developer/release testing docs so the lanes have crisp
+      meanings:
+        - develop PR fast lane;
+        - develop PR correctness lane;
+        - main/release integration gate;
+        - release canary slow/resource-heavy evidence;
+        - manual stress, live cloud, and UAT evidence.
+
+      The docs must preserve the existing distinction that release canary
+      freshness is release evidence, while stress/live/UAT remain advisory until
+      their cost, flake, and credential policies are stable enough to block.
+
+deferred:
+  - summary: "Evaluate mutation testing on dialect/result-model core"
+    reason: "Useful after correctness lanes exist; not a prerequisite for closing the current CI routing gap."
+  - summary: "Make live cloud correctness release-blocking"
+    reason: "Requires credential, cost, and flake policy decisions outside this scoped testing-approach correction."
+
+prior_art:
+  - "tests/integration/test_local_platform_benchmark_matrix.py: reuse its real benchmark completion, phase, cardinality, and expected-results assertions"
+  - ".github/workflows/pr.yml: extend develop PR code-impacting gates rather than replacing the fast lane"
+  - ".github/workflows/test.yml: preserve main/release integration coverage semantics"
+  - ".github/workflows/release-canary.yml: preserve asynchronous slow/resource-heavy release evidence"
+  - "tests/unit/test_marker_strategy.py: reuse existing marker-policy assertions"
+  - "tests/unit/test_standardized_test_commands.py: extend existing Makefile/workflow command ratchets"
+  - "docs/operations/release-guide.md: preserve the documented release canary boundary"
+
+must_preserve:
+  - "Develop PR feedback remains bounded; do not run the full stress matrix on every routine PR."
+  - "The new correctness gate must fail on incomplete real benchmark execution, not only on CLI parsing or dry-run behavior."
+  - "Expected-results row-count validation must not be silently downgraded to mere nonzero-row smoke coverage."
+  - "Release canary freshness and checked-SHA evidence remain separate from routine develop PR attribution."
+  - "Live cloud, Docker service, and long-running UAT tests remain opt-in unless a separate policy TODO promotes them."
+  - "SDK/service doubles remain allowed when they test orchestration behavior; only low-signal constructor-bypass/coverage-padding tests are targeted."
+
+approach: |
+  Start with evidence refresh, because the prior review included both valid
+  findings and overstated conclusions. Then add the narrowest real-result
+  develop-PR gate that preserves the important oracle. After that, make marker
+  enforcement explicit and settle the medium-tier routing policy. Finish by
+  cleaning only the named low-signal tests/docs and documenting the resulting
+  lane contract.
+
+anti_patterns:
+  - "DO NOT promote the entire stress matrix into develop PR CI; the fix is a bounded correctness slice."
+  - "DO NOT use test-file counts or mock percentages as quality proof; inspect behavioral assertions and runtime contracts."
+  - "DO NOT choose a tiny scale if it removes expected-results validation without documenting the tradeoff."
+  - "DO NOT broaden scope into live cloud, Docker service orchestration, or UAT certification policy."
+  - "DO NOT delete mocked tests merely because they use mocks; delete or rewrite them when they validate implementation scaffolding instead of behavior."
+  - "DO NOT edit TODO indexes by hand; regenerate them with the project TODO CLI."
+
+verification:
+  - description: "TODO graph remains valid"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+    expected_output: "passes"
+  - description: "This TODO validates against the project schema"
+    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/testing-approach-correctness-gates.yaml"
+    expected_output: "passes"
+  - description: "Marker strategy enforcement stays green after routing changes"
+    command: "uv run -- python -m pytest tests/unit/test_marker_strategy.py -q"
+    expected_output: "all tests pass"
+  - description: "Command/workflow ratchets pass after CI target changes"
+    command: "uv run -- python -m pytest tests/unit/test_standardized_test_commands.py -q"
+    expected_output: "all tests pass"
+  - description: "New bounded correctness lane proves real-result execution"
+    command: "Run the new target added by w1"
+    expected_output: "passes and exercises real local benchmark execution"
+  - description: "Broad pre-PR gate passes before opening implementation PR"
+    command: "make pr-preflight"
+    expected_output: "passes"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/pr.yml"
+    - ".github/workflows/test.yml"
+    - ".github/workflows/nightly.yml"
+    - ".github/workflows/release-canary.yml"
+    - ".github/workflows/validate-main-pr.yml"
+    - "Makefile"
+    - "pytest.ini"
+    - "pytest-ci.ini"
+    - "tests/integration/test_local_platform_benchmark_matrix.py"
+    - "tests/e2e/test_local_platforms.py"
+    - "tests/integration/platforms/test_local_platforms_smoke.py"
+    - "tests/unit/test_marker_strategy.py"
+    - "tests/unit/test_standardized_test_commands.py"
+    - "tests/unit/platforms/databricks/test_databricks_df_adapter.py"
+    - "tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py"
+    - "tests/unit/platforms/databricks/test_databricks_df_adapter_coverage2.py"
+    - "tests/unit/sql_compat/test_translate_sql_delegation.py"
+    - "tests/test_error_handling_consistency.py"
+    - "tests/unit/test_adjective_cleanup.py"
+    - "tests/integration/test_benchmark_duckdb_execution.py.new"
+    - "tests/integration/test_duckdb_olap_features.py.new"
+    - "tests/README.md"
+    - "docs/operations/release-guide.md"
+    - "docs/operations/repo-admin-settings.md"
+    - "_project/TODO/main/planning/testing-approach-correctness-gates.yaml"
+  do_not_modify:
+    - "benchbox/platforms/"
+    - "benchbox/core/"
+    - "benchmark_runs/"
+
+success_metrics:
+  - "Develop PRs have at least one bounded real local benchmark correctness gate for code-impacting changes."
+  - "The new gate asserts completion, phase coverage, query cardinality, and expected-results row counts where the selected case supports them."
+  - "`make lint-markers` or its replacement explicitly runs the marker-strategy tests."
+  - "The repository has an explicit policy for medium tests, backed by a ratchet or documentation check."
+  - "Known low-signal coverage-padding and stale test-doc artifacts are removed or replaced with behavioral coverage."
+  - "Release docs clearly separate routine PR gates, release canary evidence, stress tests, live cloud tests, and UAT."
+
+open_questions:
+  - question: "Which local benchmark/platform pair provides the best PR-gated correctness oracle without unacceptable runtime?"
+    gating: true
+    affects: ["w1"]
+    default: "Prefer the smallest case that preserves stored expected-results row-count validation; use smaller smoke coverage only with an explicit tradeoff note."
+  - question: "Should `medium` become a first-class CI lane or be retired as a marker?"
+    gating: true
+    affects: ["w3"]
+    default: "Promote correctness-relevant medium tests into explicit lanes and stop treating medium as an implicit guarantee."
+
+metadata:
+  tags:
+    - testing
+    - ci
+    - correctness
+    - pytest
+    - review-followup
+  estimated_effort: "Large"
+  created_date: "2026-06-01"
