@@ -10,16 +10,17 @@ description: |
   finished and BenchBox produced result JSON with partial query failures, but
   UAT still classified the terminal state as `no_json_nonzero` because the
   process exited nonzero. These are not RC-1 platform wipeouts; they are query
-  compatibility failures plus a UAT result-capture fidelity gap.
+  dialect failures plus a UAT result-capture fidelity gap.
 
   Corpus evidence:
     - Matrix: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv`
     - Cells: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/cells.jsonl`
 
   Representative result JSON findings:
-    - read_primitives: 438 passed, 9 failed; first error says aggregate function `LAG` does not exist and suggests `lag`.
+    - read_primitives: 438 passed, 9 failed; first error says aggregate function `LAG` does not exist and suggests `lag`, pointing to ClickHouse's case-sensitive function naming for this path.
     - metadata_primitives: 150 passed, 3 failed; first error references unknown `admin_option` in `system.role_grants`.
     - tpchavoc: 591 passed, 69 failed; first error says correlated subqueries in ORDER BY are unsupported.
+    - tpchavoc SF=1 and flightdata SF=1 timed out at 1200s; retest after the loader and smaller-scale query fixes before treating them as pure performance issues.
 
   The UAT harness should preserve the discovered result path even when the
   child command exits with code 1 after recording query-level failures. That
@@ -32,6 +33,7 @@ prior_art:
   - "tests/uat/: UAT cell execution and terminal-state classification"
   - "benchbox/core/read_primitives/: read primitive query definitions and platform overrides"
   - "benchbox/core/metadata_primitives/: metadata primitive query definitions and platform overrides"
+  - "_project/TODO/main/planning/uat-clickhouse-server-loader-type-coverage.yaml: FlightData SF=1 timeout may be downstream of smaller-scale loader failures"
 
 work:
   - id: w1
@@ -42,12 +44,13 @@ work:
       a result JSON path. UAT should keep that path and classify the cell as a
       query/result failure, not as missing JSON.
   - id: w2
-    summary: "Classify read_primitives ClickHouse function-case compatibility"
+    summary: "Fix read_primitives ClickHouse function-case compatibility"
     status: pending
     notes: |
-      Determine whether the fix belongs in ClickHouse query overrides,
-      function rendering, or benchmark query text. Do not change base SQL if
-      other platforms already use it correctly.
+      Start with the LAG/LEAD/window-function casing class. Determine whether
+      the fix belongs in ClickHouse query overrides, function rendering, or
+      benchmark query text. Do not lower-case identifiers globally and do not
+      change base SQL if other platforms already use it correctly.
   - id: w3
     summary: "Classify metadata_primitives ClickHouse system-table differences"
     status: pending
@@ -62,6 +65,18 @@ work:
       Reuse or extend the existing TPCHavoc correlated-subquery TODO if it
       fully covers the failure. Otherwise add ClickHouse-specific rewrites or
       explicit unsupported-query classification.
+  - id: w5
+    summary: "Retest SF1 timeouts after loader/query fixes"
+    status: pending
+    notes: |
+      TPCHavoc SF=1 and FlightData SF=1 timed out in the corpus. FlightData
+      smaller scales fail in the loader path, and TPCHavoc smaller scales have
+      query failures, so retest after those prerequisite fixes before tuning
+      timeout behavior.
+
+deferred:
+  - summary: "JoinOrder SF=1 release-asset 404"
+    reason: "Data-hosting / shared data-fetch issue, not ClickHouse query dialect; tracked in the corpus tail TODO and existing JoinOrder planning."
 
 deps:
   needs:
@@ -71,17 +86,22 @@ must_preserve:
   - "Do not treat query-level failures as platform lifecycle failures once result JSON exists."
   - "Do not mutate shared benchmark SQL when platform-specific overrides are the established pattern."
   - "Keep query failures visible in result summaries; do not convert them to silent skips without platform-support rationale."
+  - "Do not lower-case identifiers globally; only platform-specific function names may be normalized."
 
 approach: |
   Split observability from query compatibility. First make UAT preserve
   nonzero-run result paths so future evidence is self-describing. Then route
   each query family through the existing platform override or unsupported-query
-  mechanisms, with focused live cells proving failed query counts improve.
+  mechanisms, with focused live cells proving failed query counts improve. Do
+  the LAG/LEAD function-casing class first, because it is a concrete
+  ClickHouse dialect mismatch. Leave SF1 timeout tuning until loader and
+  smaller-scale query failures are resolved.
 
 anti_patterns:
   - "DO NOT mark these cells fixed only because UAT now captures the result path; query failures still need routing."
   - "DO NOT hide ClickHouse metadata gaps behind generic exception swallowing."
   - "DO NOT duplicate the existing TPCHavoc correlated-subquery TODO if it already owns the same root cause."
+  - "DO NOT treat JoinOrder's release-asset 404 as ClickHouse query compatibility."
 
 verification:
   - description: "UAT preserves result JSON paths from nonzero child exits"
@@ -109,10 +129,11 @@ scope_limit:
 success_metrics:
   - "UAT result artifacts point directly to partial result JSON when query execution exits nonzero."
   - "Read primitives, metadata primitives, and TPCHavoc ClickHouse failures are no longer misclassified as missing JSON."
-  - "At least one representative query family shows fewer failed queries or an explicit unsupported-query classification."
+  - "Read primitives has zero failed queries at SF=0.01 or a documented unsupported-query classification for any remaining failures."
+  - "TPCHavoc SF=1 and FlightData SF=1 either complete after prerequisite fixes or have documented root causes."
 
 metadata:
   tags: [clickhouse-server, uat, query-compatibility, result-capture]
   estimated_effort: "Medium"
   created_date: "2026-06-01"
-  last_updated: "2026-06-01T14:07:26-04:00"
+  last_updated: "2026-06-01T16:15:33-04:00"

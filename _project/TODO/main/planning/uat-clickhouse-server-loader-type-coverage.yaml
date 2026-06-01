@@ -1,5 +1,5 @@
 id: uat-clickhouse-server-loader-type-coverage
-title: "Fix ClickHouse-server client-batch loader conversion gaps exposed by corpus UAT"
+title: "Fix ClickHouse-server client-insert type coverage exposed by corpus UAT"
 worktree: main
 priority: High
 status: Identified
@@ -9,7 +9,15 @@ description: |
   After PR #738 fixed the clickhouse-server provisioning/auth/database/load
   path, the 2026-06-01 corpus rerun no longer showed the original 57/57
   platform wipeout. The largest remaining failure cluster is server-mode
-  client-batch type conversion during load.
+  client-side INSERT type conversion during load, not generic ClickHouse
+  compatibility.
+
+  PR #738 introduced this path because Docker-backed ClickHouse server cannot
+  read arbitrary host files through server-side `file()`. The path is
+  BenchBox-side and gated to server deployment mode; clickhouse-local keeps the
+  faster `file()` load path. The review of the corpus found no silent
+  corruption: empty strings into String columns are preserved as empty strings,
+  and every observed type gap fails loudly during load.
 
   Corpus evidence:
     - Matrix: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv`
@@ -21,12 +29,15 @@ description: |
     - `clickhouse-server_vector_search_0.01_20260601_133631.log`: `ClickHouse file loading failed: could not convert string to float: '[0.0206561,...]'`.
     - `clickhouse-server_datavault_0.01_20260601_133545.log`: `ClickHouse file loading failed: argument of type 'Table' is not iterable`.
 
-  Observed impact from the corpus classifier: integer/nullability conversion
-  affects TPC-DS, NYC Taxi, and FlightData small/medium cells; DateTime
-  conversion affects ClickBench, H2O DB, and TSBS; vector array parsing affects
-  Vector Search; schema-object handling affects DataVault. These are not
-  platform lifecycle failures: Docker up/down succeeded and the corpus executed
-  all 57 cells.
+  Observed impact from the corpus classifier: roughly 22 of the 42 non-passing
+  cells are loader type coverage. Bucket A is nullable numeric/date handling
+  for empty fields into non-Nullable ClickHouse columns (TPC-DS, NYC Taxi,
+  FlightData, plus downstream TPC-DS OBT). Bucket B is DATETIME/TIMESTAMP
+  conversion, currently falling through as strings and producing the `tzinfo`
+  error (ClickBench, H2O DB, TSBS). Bucket C is array/vector parsing for
+  Vector Search. Bucket D is Arrow/Table-valued schema introspection for
+  DataVault. These are not platform lifecycle failures: Docker up/down
+  succeeded and the corpus executed all 57 cells.
 
 prior_art:
   - "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml: records the fixed platform wipeout and corpus artifact paths"
@@ -35,8 +46,19 @@ prior_art:
   - "benchbox/utils/compression_mixin.py: existing file handling patterns that should remain untouched"
 
 work:
+  - id: w0
+    summary: "Re-derive the four loader buckets against current develop and pin compact evidence"
+    status: pending
+    notes: |
+      Before changing code, drive the conversion/introspection helpers directly
+      where possible and preserve a compact command/result summary in this
+      TODO. Raw stdout belongs in `/tmp` or `BENCHBOX_OUTPUT_DIR`, not git.
+      Expected signatures to re-confirm: empty numeric/date handling, raw
+      DATETIME/TIMESTAMP string fallthrough, bracketed array/vector parsing,
+      and Table-valued schema introspection.
   - id: w1
     summary: "Add focused unit coverage for ClickHouse-server value conversion"
+    needs: [w0]
     status: pending
     notes: |
       Cover nullable integer fields with blank/null-like inputs, Date and
@@ -51,6 +73,9 @@ work:
       Keep server mode on client-side INSERT batches for Docker-host files;
       do not revert to server-side `file()` loading. Preserve shared ClickHouse
       SQL behavior while making type conversion explicit for server inserts.
+      Resolve the nullable-empty-field policy explicitly: prefer preserving
+      NULL when the benchmark schema permits it, and only use type defaults for
+      truly non-Nullable columns when that matches the source semantics.
   - id: w3
     summary: "Verify representative failing cells live against ClickHouse server"
     needs: [w2]
@@ -67,19 +92,26 @@ deps:
 must_preserve:
   - "Keep the PR #738 server-mode contract: Docker-host data files load through client-side batches, not server-side `file()` paths."
   - "Do not make clickhouse-local depend on clickhouse-driver server-only conversion behavior."
+  - "Empty strings into String columns must remain empty strings; do not turn them into NULL."
   - "Do not silently coerce invalid data to zero or empty strings; nullability and parse failures must stay visible."
+  - "The 15 passing corpus cells must keep passing: TPCH, SSB, AMPLab, AI primitives, and TPCH skew at all three scales."
 
 approach: |
-  Treat this as a typed ingestion problem. Use the corpus logs to select the
-  minimal set of conversion cases, add targeted tests around the conversion and
-  schema-introspection helpers, then prove with live representative cells. If a
-  benchmark has invalid source data rather than a loader gap, split that into a
+  Treat this as a typed ingestion problem in BenchBox's ClickHouse-server
+  client-insert path. Use the corpus logs to select the minimal set of
+  conversion cases, add targeted tests around the conversion and
+  schema-introspection helpers, then prove with live representative cells. Fix
+  DATETIME/TIMESTAMP ordering before DATE-prefix handling, add array parsing,
+  and harden schema introspection for non-dict schemas. If a benchmark has
+  invalid source data rather than a loader gap, split that into a
   benchmark-specific TODO instead of hiding it in the adapter.
 
 anti_patterns:
   - "DO NOT restore server-side `file()` loading for Docker-backed clickhouse-server; it cannot read arbitrary host paths."
   - "DO NOT fix only the first TPC-DS integer column; prove the conversion policy at the helper boundary."
   - "DO NOT paper over DataVault by special-casing a benchmark name if the bug is schema-object introspection."
+  - "DO NOT route DATETIME/TIMESTAMP through date-only parsing; preserve the time component."
+  - "DO NOT fabricate default numeric/date values for fields that are genuinely nullable."
 
 verification:
   - description: "Focused ClickHouse loader conversion tests pass"
@@ -108,10 +140,18 @@ scope_limit:
 success_metrics:
   - "Representative loader failures are covered by unit tests before the implementation fix."
   - "TPC-DS, a DateTime-heavy benchmark, DataVault, and Vector Search each progress past load on clickhouse-server."
+  - "NYC Taxi and FlightData progress past the nullable numeric/date load failures."
   - "No regression to the passing TPCH, SSB, AMPLab, AI primitives, and TPCH skew clickhouse-server cells."
+  - "No silent String corruption: empty String fields remain empty strings."
+
+open_questions:
+  - question: "For Bucket A, should empty numeric/date values drive Nullable(...) DDL or default coercion for non-Nullable columns?"
+    gating: true
+    affects: ["w2", "success_metrics"]
+    default: "Emit or preserve Nullable where benchmark schema marks a column nullable; only coerce to defaults for genuinely non-Nullable fields when source semantics require that."
 
 metadata:
   tags: [clickhouse-server, uat, loader, type-conversion]
   estimated_effort: "Large"
   created_date: "2026-06-01"
-  last_updated: "2026-06-01T14:07:26-04:00"
+  last_updated: "2026-06-01T16:15:33-04:00"
