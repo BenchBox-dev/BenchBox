@@ -1,0 +1,167 @@
+id: benchmark-runs-output-root-propagation
+title: "Propagate benchmark output roots before data generators are constructed"
+worktree: main
+priority: Critical
+status: Not Started
+category: Core Functionality
+
+description: |
+  BenchBox wrote duplicate generated benchmark data under worktree-local
+  `benchmark_runs/` directories even when UAT was invoked with
+  `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`.
+
+  Observed impact from the 2026-06-01 investigation:
+
+  - `/Users/joe/Developer/BenchBox/benchmark_runs` contained about 6.2G of
+    generated artifacts, mostly `datagen/`, with large SF1 benchmark data.
+  - `/Users/joe/Developer/BenchBox.pool-01/benchmark_runs` contained about
+    4.2G of similar generated artifacts written on 2026-06-01 while running
+    the ClickHouse server corpus from branch `verify/clickhouse-server-corpus`.
+  - The ClickHouse corpus command did set
+    `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`, so the failure is not
+    just missing environment configuration.
+
+  The root cause is lifecycle ordering. The CLI orchestrator constructs a
+  benchmark before the runner resolves the final output root. `BaseBenchmark`
+  defaults to `Path.cwd() / "benchmark_runs" / "datagen" / ...` when no
+  `output_dir` is supplied, and several benchmark classes construct nested
+  `data_generator` instances in `__init__` from that initial path. Later,
+  `_resolve_output_dir_handler` mutates only `benchmark.output_dir`; nested
+  generator paths can remain pointed at the worktree-local default. The MCP
+  benchmark path has the same pattern: it computes data paths after constructing
+  benchmark instances without an explicit output root.
+
+  Correct this at the architecture boundary so explicit CLI `--output` and
+  `BENCHBOX_OUTPUT_DIR` are resolved before benchmark construction wherever
+  possible, and ensure any post-construction output-dir mutation updates nested
+  generators for benchmark families that support generation.
+
+prior_art:
+  - "benchbox/utils/path_utils.py:resolve_benchmark_runs_dir — reuse as the canonical environment-aware benchmark-runs root resolver"
+  - "benchbox/core/runtime_paths.py:RuntimePaths.from_config — reuse the explicit > env > default precedence model"
+  - "benchbox/cli/config.py:get_datagen_path — reuse existing per-benchmark datagen path conventions instead of inventing a parallel root"
+  - "benchbox/core/write_primitives/benchmark.py:output_dir setter behavior covered by tests/unit/core/write_primitives/test_write_primitives_benchmark_coverage.py — extend this synchronization contract to affected generated-data benchmarks"
+  - "benchbox/core/read_primitives/benchmark.py, benchbox/core/transactional/benchmark_base.py, benchbox/core/tpcds/benchmark/runner.py — reuse existing generator/output-dir synchronization patterns where present"
+
+work:
+  - id: w0
+    summary: "Re-validate the current failure mode on a clean branch before editing"
+    status: pending
+    notes: |
+      Capture a compact, committed summary in the PR body or TODO notes:
+      checked SHA, command or unit probe, whether an explicit output root still
+      leaves a nested generator pointed at `Path.cwd()/benchmark_runs`, and the
+      affected benchmark classes. Raw stdout belongs in `/tmp` or the configured
+      output root, not in git.
+  - id: w1
+    summary: "Map every benchmark construction path that can call generate_data"
+    needs: [w0]
+    status: pending
+    notes: |
+      Include at least CLI orchestrator, runner helper resolution, MCP benchmark
+      tools, UAT runner, and direct benchmark constructors used in tests. Record
+      which paths can pass `output_dir` at construction time and which need a
+      synchronized setter for backward compatibility.
+  - id: w2
+    summary: "Pass the resolved output/datagen root into benchmark constructors before nested generators are created"
+    needs: [w1]
+    status: pending
+    notes: |
+      Prefer resolving the output root once at the call boundary and passing the
+      benchmark-specific datagen directory into the benchmark constructor.
+      Preserve CLI `--output` precedence over `BENCHBOX_OUTPUT_DIR`, and preserve
+      the current cwd-local default only when neither explicit option nor env is
+      set.
+  - id: w3
+    summary: "Add or standardize output_dir synchronization for benchmark classes with nested data_generator state"
+    needs: [w1]
+    status: pending
+    notes: |
+      Cover H2ODB, SSB, Vector Search, ClickBench, Nyctaxi, TPCH variants, and
+      any other generator-backed benchmark found in w1. Use a local helper or
+      base-class pattern only if it reduces real duplication without flattening
+      benchmark-specific behavior.
+  - id: w4
+    summary: "Fix the MCP benchmark path so generated data also honors explicit/env output roots"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      `benchbox/mcp/tools/benchmark.py` must not instantiate generator-backed
+      benchmarks with stale cwd-local defaults before computing the data root.
+      Add focused tests or extend existing MCP coverage where practical.
+  - id: w5
+    summary: "Add regression tests for explicit/env output roots across representative benchmark families"
+    needs: [w2, w3, w4]
+    status: pending
+    notes: |
+      Include both constructor-time and post-construction paths. At minimum,
+      prove that H2ODB, SSB, Vector Search, and one TPCH-family benchmark do not
+      create or reference `cwd/benchmark_runs` when `BENCHBOX_OUTPUT_DIR` or
+      an explicit CLI output root is set.
+
+must_preserve:
+  - "CLI `--output` remains the highest-precedence output root."
+  - "`BENCHBOX_OUTPUT_DIR` remains the shared-root mechanism for UAT and scripted runs."
+  - "When neither CLI `--output` nor `BENCHBOX_OUTPUT_DIR` is set, ordinary local runs may still default to `Path.cwd()/benchmark_runs`."
+  - "Existing benchmark-specific datagen subdirectory names and manifests remain compatible with reuse."
+  - "No live cloud or Docker UAT is run as part of the unit-level fix without explicit approval."
+
+approach: |
+  Start from the construction boundary, not from cleanup. Resolve the output
+  root using existing helpers before benchmark instances are created, then pass
+  the benchmark-specific datagen directory into constructors that support it.
+  For compatibility paths that must mutate `benchmark.output_dir` after
+  construction, make the setter or local synchronization helper update nested
+  generator state. Finish by adding regression tests that fail when an explicit
+  output root is ignored and `cwd/benchmark_runs` is touched.
+
+anti_patterns:
+  - "DO NOT treat deleting worktree-local `benchmark_runs` as the fix - the generation lifecycle will recreate the duplicate data."
+  - "DO NOT add another output-root environment variable - BenchBox already has `BENCHBOX_OUTPUT_DIR` and path resolver helpers."
+  - "DO NOT special-case only the observed large directories - the constructor/setter contract must cover every generator-backed benchmark path found in w1."
+  - "DO NOT globally remove the cwd-local default for ordinary ad hoc runs unless no explicit/env output root exists - preserve backward compatibility."
+  - "DO NOT write tests that only inspect `benchmark.output_dir` - assert nested generator output paths and absence of `cwd/benchmark_runs` references."
+
+verification:
+  - description: "Focused path-resolution and runner/orchestrator tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/test_runner_helpers.py tests/unit/cli/test_orchestrator_data_sharing.py tests/unit/utils/test_path_utils.py tests/unit/utils/test_output_path_normalization.py -q"
+    expected_output: "all tests pass"
+  - description: "New regression tests prove nested generators honor explicit/env output roots"
+    command: "uv run -- python -m pytest tests/unit/core/test_benchmark_output_root_propagation.py tests/unit/mcp/test_benchmark_output_root_propagation.py -q"
+    expected_output: "representative generator-backed benchmarks use the configured root and do not reference cwd/benchmark_runs"
+  - description: "Fast suite still passes before PR"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass"
+  - description: "PR preflight passes"
+    command: "make pr-preflight"
+    expected_output: "all preflight checks pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/base.py"
+    - "benchbox/cli/orchestrator.py"
+    - "benchbox/core/runner/"
+    - "benchbox/core/*/benchmark.py"
+    - "benchbox/core/*/runner.py"
+    - "benchbox/mcp/tools/benchmark.py"
+    - "benchbox/utils/path_utils.py"
+    - "benchbox/core/runtime_paths.py"
+    - "tests/unit/core/"
+    - "tests/unit/cli/"
+    - "tests/unit/utils/"
+    - "tests/unit/mcp/"
+    - "tests/uat/runner.py"
+  do_not_modify:
+    - "benchmark_runs/"
+    - "docs/operations/uat-framework.md"
+
+success_metrics:
+  - "A UAT invocation with `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs` cannot construct generator-backed benchmarks that point at a worktree-local `benchmark_runs/datagen` path."
+  - "Representative regression tests fail before the fix and pass after it."
+  - "No generated benchmark data is written under the active worktree during unit-level explicit/env output-root tests."
+
+metadata:
+  tags: [output-paths, datagen, uat, mcp, benchmark-runs]
+  estimated_effort: "Medium-Large"
+  created_date: "2026-06-01"
+  last_updated: "2026-06-01T14:52:17"
