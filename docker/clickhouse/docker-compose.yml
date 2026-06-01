@@ -12,18 +12,23 @@
 #
 # Default credentials:
 #   Username: default
-#   Password: (empty)
+#   Password: benchbox
 
 services:
   clickhouse:
     image: clickhouse/clickhouse-server:25.8
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_PASSWORD: benchbox
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     ports:
-      - "9000:9000"
-      - "8123:8123"
+      - "${CLICKHOUSE_HOST_PORT:-9000}:9000"
+      - "${CLICKHOUSE_HTTP_HOST_PORT:-8123}:8123"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
+      - ./init-default-database.sql:/docker-entrypoint-initdb.d/init-default-database.sql:ro
     healthcheck:
-      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      test: ["CMD", "clickhouse-client", "--password", "benchbox", "--query", "SELECT 1"]
       interval: 5s
       timeout: 5s
       retries: 10

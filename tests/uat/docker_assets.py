@@ -203,7 +203,7 @@ _PLATFORM_STATIC_OPTS: dict[str, list[str]] = {
 
 # Platforms that pass the resolved host reachability port to the adapter as the
 # `port=` platform-option (kept first to preserve existing argv order).
-_PLATFORM_INJECT_HOST_PORT_OPT: frozenset[str] = frozenset({"singlestore", "starrocks", "doris"})
+_PLATFORM_INJECT_HOST_PORT_OPT: frozenset[str] = frozenset({"clickhouse-server", "singlestore", "starrocks", "doris"})
 
 # Spark Connect platforms also need the adapter endpoint to follow the
 # compose-published host port. Otherwise an override such as SPARK_CONNECT_PORT
@@ -214,6 +214,7 @@ _PLATFORM_INJECT_SPARK_CONNECT_ENDPOINT_OPT: frozenset[str] = frozenset({"lakesa
 # (kept separate because PLATFORM options apply even for externally managed
 # local platforms).
 _PLATFORM_LOCAL_MANAGED_OPTS: dict[str, list[str]] = {
+    "clickhouse-server": ["--platform-option", "password=benchbox"],
     "pg-duckdb": ["--platform-option", "password=benchbox"],
     "pg-mooncake": ["--platform-option", "password=benchbox"],
     "timescaledb": ["--platform-option", "password=benchbox"],
