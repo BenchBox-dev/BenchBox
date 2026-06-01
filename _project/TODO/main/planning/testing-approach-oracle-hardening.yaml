@@ -1,0 +1,254 @@
+id: testing-approach-oracle-hardening
+title: "Harden the testing correctness gate and close review follow-ups"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Follow-up review of `testing-approach-correctness-gates` found that #737
+  added valuable CI plumbing but left important correctness gaps in the
+  bounded real-result gate. The rebuttal agrees with the architectural shape:
+  a single bounded DuckDB/TPC-H cell is acceptable for routine develop PRs,
+  and `medium` does not automatically need to become a full CI lane. The
+  valid defects are narrower and more actionable:
+
+    - the current gate validates only row counts, and the configured query
+      subset `6,14,15,17,19` has SF=1 expected cardinality of exactly one row
+      for every query, making it weak against wrong joins, filters, or
+      aggregate values that still emit one row;
+    - strict expected-result enforcement can still be silently disarmed by
+      scale/benchmark drift because the hard assertion is guarded by
+      `benchmark_name == "tpch" and scale_factor >= 1.0`;
+    - the Makefile target can pass if the selected pytest node is skipped;
+    - `tests/README.md` still references nonexistent `tests/specialized/`
+      files, while the prior TODO claims that reference was removed;
+    - the `medium` marker policy is documented, but the large medium-only
+      population needs an explicit product-risk triage rather than an
+      assumption that every medium test is either CI-worthy or irrelevant.
+
+  Correct the testing approach by keeping the bounded-gate design, making the
+  oracle materially discriminating, proving strict mode fails when disarmed,
+  adding a skip-as-failure guard for the selected node, repairing stale docs,
+  and converting the medium-marker debate into a concrete triage decision.
+
+work:
+  - id: w0
+    summary: "Refresh and pin the review evidence against current develop"
+    status: pending
+    notes: |
+      Re-run the compact evidence checks before editing code:
+        - confirm no testing files changed after #737 for the gate/doc paths
+          under review;
+        - record SF=1 TPC-H expected row counts for the current and proposed
+          gate query sets;
+        - collect `medium and not fast and not integration and not (slow or
+          stress or resource_heavy or live_integration)` count;
+        - prove a selected skipped matrix node exits 0 today;
+        - confirm the stale `tests/specialized/` README reference and the
+          mismatched completion note in the prior TODO.
+      Keep raw stdout in `/tmp` or CI artifacts and summarize only the command,
+      checked SHA, PASS/FAIL, and key counts in the PR body or TODO notes.
+
+  - id: w1
+    summary: "Replace the near-vacuous gate query subset with a discriminating row-count mix"
+    needs: [w0]
+    status: pending
+    notes: |
+      Update `BENCHBOX_CORRECTNESS_GATE_QUERY_IDS` to include multiple
+      answer-backed queries with high or mid cardinality at SF=1, such as
+      Q16=18314, Q11=1048, Q20=186, and Q9=175. It is acceptable to retain one
+      scalar aggregate for coverage variety, but the configured set must not
+      be dominated by one-row queries.
+
+      Add a ratchet in `tests/unit/test_standardized_test_commands.py` that
+      loads the expected TPC-H answer counts and fails if the gate query set
+      regresses to all one-row or otherwise low-discrimination coverage.
+
+  - id: w2
+    summary: "Make strict expected-results mode fail when configured checks are disarmed"
+    needs: [w1]
+    status: pending
+    notes: |
+      Hoist the strict zero-check failure out from behind the current
+      `tpch && scale_factor >= 1.0` branch. When strict mode is enabled and a
+      non-empty configured query subset exists, every configured query must
+      produce a non-SKIP validation result or the matrix test must fail with a
+      clear message.
+
+      Add focused unit or helper-level tests that demonstrate the guard fails
+      for unsupported scale/benchmark drift instead of silently passing. Keep
+      non-strict stress-matrix behavior unchanged for platforms or benchmarks
+      without stored answer files.
+
+  - id: w3
+    summary: "Fail the correctness-gate target when the selected node is skipped"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add an explicit ran-count/skip-count guard around `make
+      test-correctness-gate` so the target fails unless exactly the intended
+      parametrized node runs and zero selected nodes skip. Prefer a small,
+      repo-local parser over brittle stdout scraping if pytest output changes.
+
+      Add a ratchet that would fail if the gate node is removed from
+      `LOCAL_SQL_STABLE_MATRIX`, if the node id drifts, or if the target no
+      longer enforces the no-skip condition.
+
+  - id: w4
+    summary: "Triage medium-only tests into explicit automated routing decisions"
+    needs: [w0]
+    status: pending
+    notes: |
+      Treat the existing medium policy as a decision point, not as proof that
+      the population is harmless. Produce a compact inventory of medium-only
+      tests by directory/module and identify correctness-relevant clusters
+      that should be promoted to `fast`, an integration workflow, or the
+      correctness gate.
+
+      Do not promote all medium tests wholesale. The deliverable is a bounded
+      set of explicit promotions plus a documented rationale for clusters left
+      as local-only medium coverage.
+
+  - id: w5
+    summary: "Repair stale testing docs and the false prior completion claim"
+    needs: [w0]
+    status: pending
+    notes: |
+      Remove or correct the nonexistent `tests/specialized/` section in
+      `tests/README.md`. Update
+      `_project/TODO/main/planning/testing-approach-correctness-gates.yaml`
+      so w4 no longer claims the stale reference was removed when it was not.
+      Keep the Databricks coverage-theater fix and other genuinely completed
+      cleanup notes intact.
+
+  - id: w6
+    summary: "Document the corrected gate contract and residual oracle limits"
+    needs: [w2, w3, w4, w5]
+    status: pending
+    notes: |
+      Update the testing docs to say exactly what the gate proves: real
+      generate/load/power execution, completion/cardinality checks, and
+      answer-backed row-count validation for a discriminating subset. Also
+      document what it still does not prove: row-value correctness for scalar
+      aggregates or full result-set equality.
+
+      If value-level validation is needed, capture it as a deferred follow-up
+      rather than pretending higher-cardinality row counts solve that entire
+      class of bugs.
+
+deferred:
+  - summary: "Add value-level answer-set validation for selected TPC-H queries"
+    reason: "High-cardinality row counts are a cheap hardening step, but value-level comparison is a broader result-model change that needs its own design and runtime budget."
+  - summary: "Promote every medium test into CI"
+    reason: "The medium population is large and heterogeneous; promote correctness-relevant clusters explicitly instead of adding an expensive uncurated lane."
+  - summary: "Run the full local stress matrix on every develop PR"
+    reason: "The accepted architecture is a bounded real-result gate for routine PRs, with full stress/UAT evidence kept opt-in or release-scoped."
+
+prior_art:
+  - "tests/integration/test_local_platform_benchmark_matrix.py:_validate_against_expected_results - extend strict-mode failure behavior"
+  - "benchbox/core/expected_results/tpch_results.py:get_tpch_expected_results - reuse SF=1 answer-backed row counts for gate-query ratchets"
+  - "benchbox/core/validation/query_validation.py:QueryValidator.validate_query_result - preserve row-count validation semantics outside strict gate mode"
+  - "Makefile:test-correctness-gate - extend the existing bounded gate rather than adding a full stress lane"
+  - "tests/unit/test_standardized_test_commands.py - extend command/workflow ratchets for query quality, strict arming, and no-skip behavior"
+  - ".github/workflows/pr.yml:correctness-gate - preserve code-impacting develop PR aggregation"
+  - ".github/workflows/test.yml:correctness-gate - preserve main/release aggregation"
+  - "tests/README.md:Automated Gate Contract - update the documented contract after implementation"
+  - "_project/TODO/main/planning/testing-approach-correctness-gates.yaml - correct stale completion notes without rewriting unrelated history"
+
+must_preserve:
+  - "Develop PR feedback remains bounded; do not run the full stress matrix on every routine PR."
+  - "`make test-correctness-gate` still executes a real DuckDB/TPC-H benchmark through generate, load, and power phases."
+  - "Strict gate mode fails when configured expected-results checks do not actually evaluate."
+  - "Default non-strict stress matrix behavior continues to skip unsupported expected-results validation rather than failing unrelated opt-in matrix cases."
+  - "Main/release and develop workflow aggregators continue to require the correctness gate for code-impacting paths where they do today."
+  - "Databricks coverage-theater fixes from #737 remain intact; do not reintroduce constructor-bypass tests or `_build_query_result_with_validation` stubs."
+
+approach: |
+  Start with evidence refresh so the follow-up is tied to current `develop`,
+  not a stale review transcript. Then harden the current bounded gate in place:
+  choose a discriminating answer-backed query subset, make strict mode fail
+  when the subset does not validate, and make the Makefile target fail on a
+  selected skip. After the gate is sound, triage medium-only tests by product
+  risk and promote only the clusters that carry correctness obligations.
+  Finish by repairing stale documentation and recording the remaining
+  row-value-validation limit as deferred work.
+
+anti_patterns:
+  - "DO NOT frame a one-cell bounded gate as the defect - because bounded routine PR feedback is intentional - improve the oracle inside that cell instead."
+  - "DO NOT choose only scalar one-row aggregate queries - because row-count validation then cannot discriminate many wrong answers - include high-cardinality answer-backed queries."
+  - "DO NOT leave strict enforcement behind benchmark/scale assumptions - because future CI speedups can silently disarm the oracle - fail whenever a configured strict subset produces missing/SKIP validations."
+  - "DO NOT rely on pytest exit 0 for a selected node - because selected skips currently pass - add an explicit no-skip/ran-count guard."
+  - "DO NOT add all medium tests to CI as a bulk fix - because the marker is heterogeneous - inventory and promote correctness-relevant clusters explicitly."
+  - "DO NOT rewrite the prior TODO as if #737 never helped - preserve genuine wins and correct only the false or incomplete claims."
+
+verification:
+  - description: "TODO graph remains valid"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+    expected_output: "passes"
+  - description: "This TODO validates against the project schema"
+    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/testing-approach-oracle-hardening.yaml"
+    expected_output: "passes"
+  - description: "Command/workflow ratchets pass after gate hardening"
+    command: "uv run -- python -m pytest tests/unit/test_standardized_test_commands.py -q"
+    expected_output: "all tests pass"
+  - description: "Marker strategy remains explicit"
+    command: "uv run -- python -m pytest tests/unit/test_marker_strategy.py -q"
+    expected_output: "all tests pass"
+  - description: "The hardened bounded correctness gate proves real-result execution and fails on missing configured expected checks"
+    command: "make test-correctness-gate"
+    expected_output: "passes with exactly the intended node run and zero selected skips"
+  - description: "Broad pre-PR gate passes before publishing the implementation"
+    command: "make pr-preflight"
+    expected_output: "passes"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/pr.yml"
+    - ".github/workflows/test.yml"
+    - "Makefile"
+    - "tests/integration/test_local_platform_benchmark_matrix.py"
+    - "tests/unit/test_standardized_test_commands.py"
+    - "tests/unit/test_marker_strategy.py"
+    - "tests/README.md"
+    - "_project/TODO/main/planning/testing-approach-correctness-gates.yaml"
+    - "_project/TODO/main/planning/testing-approach-oracle-hardening.yaml"
+    - "_project/TODO/main/planning/"
+    - "_project/TODO/main/active/"
+    - "_project/DONE/"
+  do_not_modify:
+    - "benchbox/platforms/"
+    - "benchbox/core/runner/"
+    - "benchmark_runs/"
+
+success_metrics:
+  - "The correctness gate query subset includes at least two SF=1 TPC-H queries with expected row counts above 100 and at least one above 1000."
+  - "Strict configured expected-results mode fails if any configured query is skipped, unsupported, or not checked."
+  - "`make test-correctness-gate` fails when its selected node skips instead of treating skip as success."
+  - "The stale `tests/specialized/` README reference is gone or corrected, and the prior TODO no longer falsely claims it was removed."
+  - "Medium-only tests have a compact inventory and explicit routing decisions for correctness-relevant clusters."
+  - "Docs describe both the strengthened row-count oracle and the residual lack of value-level result comparison."
+
+open_questions:
+  - question: "Should the gate keep one scalar aggregate query for coverage variety after adding high-cardinality queries?"
+    gating: false
+    affects: ["w1"]
+    default: "Keep one only if runtime stays acceptable and the set still has at least two high-cardinality checks."
+  - question: "Which medium-only clusters are product-critical enough to promote now?"
+    gating: true
+    affects: ["w4"]
+    default: "Promote clusters that guard result correctness, CI workflow contracts, or release-gate behavior; leave broad validation/performance suites local-only."
+  - question: "Is value-level answer comparison required before closing this TODO?"
+    gating: false
+    affects: ["w6"]
+    default: "No; record it as deferred unless the row-count hardening exposes a concrete cheap path."
+
+metadata:
+  tags:
+    - testing
+    - ci
+    - correctness
+    - pytest
+    - review-followup
+  estimated_effort: "Large"
+  created_date: "2026-06-01"
