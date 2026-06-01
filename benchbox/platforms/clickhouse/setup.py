@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any
 
 """Setup and connection routines for ClickHouse."""
@@ -9,6 +10,8 @@ from ._dependencies import ClickHouseClient
 from .client import ClickHouseCloudClient, ClickHouseLocalClient
 
 logger = logging.getLogger(__name__)
+
+_CLICKHOUSE_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class ClickHouseSetupMixin:
@@ -20,7 +23,7 @@ class ClickHouseSetupMixin:
         self.host = config.get("host", "localhost")
         self.port = config.get("port", 9000)
         self.database = config.get("database", "default")
-        self.username = config.get("username", "default")
+        self.username = config.get("username", config.get("user", "default"))
         self.password = config.get("password", "")
         self.secure = config.get("secure", False)
         # Compression disabled by default due to clickhouse-cityhash Python 3.13+ compatibility issues
@@ -160,7 +163,7 @@ class ClickHouseSetupMixin:
         return {
             "host": connection_config.get("host", self.host),
             "port": connection_config.get("port", self.port),
-            "user": connection_config.get("username", self.username),
+            "user": connection_config.get("username", connection_config.get("user", self.username)),
             "password": connection_config.get("password", self.password),
             "secure": connection_config.get("secure", self.secure),
             "compression": connection_config.get("compression", self.compression),
@@ -178,6 +181,17 @@ class ClickHouseSetupMixin:
             send_receive_timeout=300,
             sync_request_timeout=300,
         )
+
+    def _quote_database_identifier(self, database: str) -> str:
+        """Quote a ClickHouse database identifier after conservative validation."""
+        if not isinstance(database, str) or not _CLICKHOUSE_IDENTIFIER_RE.fullmatch(database):
+            raise ValueError(f"Invalid database identifier: {database}")
+        return f"`{database}`"
+
+    def _ensure_server_database_exists(self, database: str, **connection_config) -> None:
+        """Create the server-mode database before opening a database-scoped client."""
+        admin_client = self._create_admin_client(**connection_config)
+        admin_client.execute(f"CREATE DATABASE IF NOT EXISTS {self._quote_database_identifier(database)}")
 
     def create_connection(self, **connection_config) -> Any:
         """Create ClickHouse connection based on mode."""
@@ -202,6 +216,7 @@ class ClickHouseSetupMixin:
         database = connection_config.get("database", self.database)
 
         try:
+            self._ensure_server_database_exists(database, **connection_config)
             client = ClickHouseClient(
                 **params,
                 database=database,

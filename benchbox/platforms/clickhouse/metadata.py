@@ -31,6 +31,10 @@ class ClickHouseMetadataMixin:
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create ClickHouse adapter from unified configuration."""
+        platform_options = config.get("options")
+        if isinstance(platform_options, dict):
+            config = {**platform_options, **config}
+
         deployment_mode = resolve_clickhouse_deployment_mode(config)
         adapter_config = {
             "deployment_mode": deployment_mode,
@@ -61,7 +65,18 @@ class ClickHouseMetadataMixin:
                 adapter_config["database_path"] = db_path
 
         # Pass through other relevant config
-        for key in ["tuning_config", "verbose_enabled", "very_verbose"]:
+        for key in [
+            "host",
+            "port",
+            "username",
+            "user",
+            "password",
+            "secure",
+            "compression",
+            "tuning_config",
+            "verbose_enabled",
+            "very_verbose",
+        ]:
             if key in config:
                 adapter_config[key] = config[key]
 

@@ -29,6 +29,24 @@ description: |
   clickhouse-server uses its canonical uv extra instead of relying on whatever
   the current environment has installed.
 
+  Follow-up live repro on 2026-06-01 found three additional server-specific
+  blockers after Docker was healthy: the local compose stack required an
+  explicit host-accessible password, the adapter selected `database=default`
+  before creating it, and ClickHouse server mode attempted to load Docker-host
+  paths through server-side `file()`, which is limited to
+  `/var/lib/clickhouse/user_files`. After those fixes plus removal of
+  session-resetting unsupported `SET` statements, the smallest live cell passed:
+
+    CLICKHOUSE_HOST_PORT=19000 CLICKHOUSE_HTTP_HOST_PORT=18123 \
+      BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs \
+      LOG_DIR=~/Developer/benchmark_runs/logs/clickhouse-server-rc1-repro-20260601 \
+      TIMEOUT_S=600 make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpch SCALE=0.01
+
+  Result: passed in 10.24s with `submit_terminal_state=submittable`, log
+  `~/Developer/benchmark_runs/logs/clickhouse-server-rc1-repro-20260601/clickhouse-server_tpch_0.01_20260601_114205.log`,
+  and result
+  `~/Developer/benchmark_runs/results/tpch_sf001_clickhouse_server_sql_20260601_114215_e1a77de5.json`.
+
 prior_art:
   - "docs/operations/uat-local-provisioning.md: clickhouse-server is an automated Docker-backed platform at localhost:9000; use make uat-bring-up PLATFORM=clickhouse-server"
   - "docs/operations/uat-framework.md: managed Docker sweeps start project-scoped compose stacks and tear them down with docker_manage_platforms=true"
@@ -55,17 +73,21 @@ work:
   - id: w2
     summary: "After Docker CLI is healthy, bring up the ClickHouse stack and rerun the smallest cell"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Current environment blocker: Docker CLI calls hang until killed, so
-      `make uat-bring-up PLATFORM=clickhouse-server` cannot be trusted in this
-      session. When Docker responds, run:
+      Docker recovered after launching Docker Desktop. A UAT-owned compose
+      project was run on alternate host ports (`19000/18123`) to avoid the
+      existing debug container on `9000/8123`. The smallest server-backed cell
+      now passes with a submittable manifest:
 
-        BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-bring-up PLATFORM=clickhouse-server
-        BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpch SCALE=0.01
+        ~/Developer/benchmark_runs/logs/clickhouse-server-rc1-repro-20260601/clickhouse-server_tpch_0.01_20260601_114205.log
+        ~/Developer/benchmark_runs/results/tpch_sf001_clickhouse_server_sql_20260601_114215_e1a77de5.json
 
-      The expected first success criterion is no connection-refused diagnostic
-      and a result JSON or a later ClickHouse-specific load/query error.
+      Root causes fixed in the live path: local compose auth/port propagation,
+      missing database bootstrap, host-local data loading for Docker-backed
+      server mode, type conversion for clickhouse-driver INSERT batches, and
+      legacy unsupported ClickHouse `SET` statements resetting session cache
+      controls before validation.
   - id: w3
     summary: "If the smallest cell passes, rerun the clickhouse-server fast Docker corpus into a fresh run root"
     needs: [w2]
@@ -111,19 +133,32 @@ verification:
 
 scope_limit:
   only_modify:
+    - "benchbox/platforms/base/data_loading.py"
+    - "benchbox/platforms/clickhouse/metadata.py"
+    - "benchbox/platforms/clickhouse/setup.py"
+    - "benchbox/platforms/clickhouse/tuning.py"
+    - "docker/clickhouse/docker-compose.yml"
+    - "docker/clickhouse/init-default-database.sql"
     - "tests/uat/matrix.py"
     - "tests/uat/test_matrix.py"
     - "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml"
     - "docs/operations/uat-local-provisioning.md"
+    - "docs/operations/local-platform-provisioning.tsv"
+    - "tests/uat/docker_assets.py"
     - "tests/uat/configs/"
+    - "tests/uat/test_connection_registry_drift.py"
+    - "tests/uat/test_docker_assets.py"
+    - "tests/unit/platforms/test_clickhouse_adapter.py"
+    - "tests/unit/platforms/test_clickhouse_platform_split.py"
 
 success_metrics:
   - "clickhouse-server UAT cells use `uv run --extra clickhouse-server --`."
   - "A fresh clickhouse-server tpch SF=0.01 UAT cell reaches a running service instead of localhost:9000 connection refused."
+  - "A fresh clickhouse-server tpch SF=0.01 UAT cell passes with `submit_terminal_state=submittable`."
   - "The follow-up clickhouse-server corpus rerun produces non-empty cells.jsonl and no 57/57 platform wipeout."
 
 metadata:
   tags: [clickhouse-server, docker, uat, rc1]
   estimated_effort: "Medium"
   created_date: "2026-06-01"
-  last_updated: "2026-06-01T10:45:00-04:00"
+  last_updated: "2026-06-01T11:42:00-04:00"

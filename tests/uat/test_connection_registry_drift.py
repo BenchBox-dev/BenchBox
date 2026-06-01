@@ -94,6 +94,19 @@ def test_uat_singlestore_host_port_override_flows_through(monkeypatch: pytest.Mo
     assert captured["port"] == 13307
 
 
+def test_uat_clickhouse_server_host_port_override_flows_through(monkeypatch: pytest.MonkeyPatch):
+    """CLICKHOUSE_HOST_PORT moves both the host probe and adapter port=."""
+    monkeypatch.delenv("CLICKHOUSE_HOST_PORT", raising=False)
+    assert docker_assets.host_reachability_endpoint("clickhouse-server") == "localhost:9000"
+    assert "port=9000" in docker_assets.platform_extra_opts("clickhouse-server")
+    assert docker_assets.PLATFORM_SERVICE_PORT["clickhouse-server"] == 9000
+
+    monkeypatch.setenv("CLICKHOUSE_HOST_PORT", "19000")
+    assert docker_assets.host_reachability_endpoint("clickhouse-server") == "localhost:19000"
+    assert "port=19000" in docker_assets.platform_extra_opts("clickhouse-server")
+    assert docker_assets.PLATFORM_SERVICE_PORT["clickhouse-server"] == 9000
+
+
 @pytest.mark.parametrize("platform", ["lakesail", "velox"])
 def test_uat_spark_connect_host_port_override_flows_through(
     platform: str,
