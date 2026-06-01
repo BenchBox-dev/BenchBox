@@ -203,7 +203,7 @@ def test_run_cell_marks_failure(tmp_path: Path):
     assert result.result_path is None
 
 
-def test_run_cell_diagnostic_rerun_fires_only_for_empty_output_failure(tmp_path: Path):
+def test_run_cell_diagnostic_rerun_fires_for_empty_stdout_failure(tmp_path: Path):
     captured_quiet = []
 
     def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
@@ -232,7 +232,42 @@ def test_run_cell_diagnostic_rerun_fires_only_for_empty_output_failure(tmp_path:
     assert "diagnostic detail" in log_text
 
 
-def test_run_cell_skips_diagnostic_rerun_when_failure_has_stderr(tmp_path: Path):
+def test_run_cell_diagnostic_rerun_fires_when_failure_has_only_stderr(tmp_path: Path):
+    captured_quiet = []
+
+    def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
+        captured_quiet.append(quiet)
+        return [sys.executable, "-c", "unused"]
+
+    outcomes = [
+        TimeoutResult(
+            exit_code=2,
+            timed_out=False,
+            elapsed_s=0.1,
+            stdout=b"",
+            stderr=b"uv run warning on stderr\n",
+        ),
+        TimeoutResult(exit_code=2, timed_out=False, elapsed_s=0.1, stdout=b"diagnostic detail\n", stderr=None),
+    ]
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        return outcomes.pop(0)
+
+    with (
+        patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert captured_quiet == [True, False]
+    log_text = result.log_path.read_text()
+    assert "uv run warning on stderr" in log_text
+    assert "verbose diagnostic re-run" in log_text
+    assert "diagnostic detail" in log_text
+
+
+def test_run_cell_skips_diagnostic_rerun_when_failure_has_stdout(tmp_path: Path):
     captured_quiet = []
 
     def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
@@ -244,8 +279,8 @@ def test_run_cell_skips_diagnostic_rerun_when_failure_has_stderr(tmp_path: Path)
             exit_code=2,
             timed_out=False,
             elapsed_s=0.1,
-            stdout=b"",
-            stderr=b"already diagnostic stderr\n",
+            stdout=b"already diagnostic stdout\n",
+            stderr=b"incidental stderr\n",
         )
 
     with (
@@ -257,7 +292,8 @@ def test_run_cell_skips_diagnostic_rerun_when_failure_has_stderr(tmp_path: Path)
     assert result.status == "failed"
     assert captured_quiet == [True]
     log_text = result.log_path.read_text()
-    assert "already diagnostic stderr" in log_text
+    assert "already diagnostic stdout" in log_text
+    assert "incidental stderr" in log_text
     assert "verbose diagnostic re-run" not in log_text
 
 
