@@ -22,7 +22,9 @@ description: |
 
   These failures need separate triage because one appears to be shared data
   availability rather than ClickHouse adapter behavior, and the two timeouts
-  may change after loader/query fixes reduce earlier failure modes.
+  may change after loader/query fixes reduce earlier failure modes. A follow-up
+  review confirmed JoinOrder should stay deferred here rather than folded into
+  ClickHouse query dialect work.
 
 prior_art:
   - "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml: records the corpus artifact paths and fixed lifecycle root cause"
@@ -109,4 +111,4 @@ metadata:
   tags: [clickhouse-server, uat, joinorder, timeout]
   estimated_effort: "Small"
   created_date: "2026-06-01"
-  last_updated: "2026-06-01T14:07:26-04:00"
+  last_updated: "2026-06-01T16:15:33-04:00"
