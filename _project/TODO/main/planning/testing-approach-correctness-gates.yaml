@@ -63,6 +63,8 @@ work:
 
       Required behavior:
         - run in develop PRs for code-impacting changes;
+        - add a stable local target named `make test-correctness-gate` and
+          have the workflow invoke that target or the exact same command;
         - execute at least one local SQL platform/benchmark case end-to-end;
         - assert requested phase coverage, zero failed measurement queries, and
           expected benchmark query cardinality;
@@ -207,7 +209,7 @@ verification:
     command: "uv run -- python -m pytest tests/unit/test_standardized_test_commands.py -q"
     expected_output: "all tests pass"
   - description: "New bounded correctness lane proves real-result execution"
-    command: "Run the new target added by w1"
+    command: "make test-correctness-gate"
     expected_output: "passes and exercises real local benchmark execution"
   - description: "Broad pre-PR gate passes before opening implementation PR"
     command: "make pr-preflight"
