@@ -39,7 +39,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -102,6 +102,11 @@ test-dev:
 
 # Smoke tests (alias for test-quick)
 test-smoke: test-quick
+
+# Bounded real-result correctness gate for develop PRs: one local benchmark case
+# through generate/load/execute with phase, cardinality, and stored row-count checks.
+test-correctness-gate:
+	BENCHBOX_STRICT_EXPECTED_RESULTS=1 BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=6,14,15,17,19 uv run -- python -m pytest -m stress "tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]" -n 0 --tb=short --timeout=1200 -v
 
 # Real benchmark matrix across local SQL platforms x all benchmarks (heavy, opt-in)
 test-local-matrix:
@@ -439,10 +444,10 @@ audit-sha-check:
 		$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \
 		"$(FILE)"
 
-# Validate test marker annotations - fails on speed-lane conflicts or fast-incompatible pairs.
-# Uses --collect-only so no tests run; the conflict-detection hook fires at collection time.
+# Validate marker registration and the explicit marker-strategy policy.
 lint-markers:
 	uv run -- python -m pytest --collect-only -q -p no:warnings
+	uv run -- python -m pytest tests/unit/test_marker_strategy.py -q
 
 # Token-scan gate for the Results Explorer retheme: fails when raw Tailwind
 # palette literals (text-/bg-/border-/...-{slate|gray|...}-{50..950}) appear
@@ -1812,6 +1817,7 @@ help:
 	@echo "  make test-slow       Run slow tests (> 10 sec)"
 	@echo "  make test-dev        Fast development cycle testing"
 	@echo "  make test-smoke      Quick smoke testing"
+	@echo "  make test-correctness-gate Run bounded real-result correctness gate"
 	@echo "  make test-local-matrix Run real local benchmark matrix (stress)"
 	@echo "  make test-ci         Maintained broad local CI profile"
 	@echo ""

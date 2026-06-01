@@ -281,12 +281,19 @@ class TestReleaseInfrastructure:
 
         result_job = jobs["release-required-result"]
         assert result_job["name"] == "release-required-result"
-        assert set(result_job["needs"]) == {"test", "integration", "test-package", "release-readiness"}
+        assert set(result_job["needs"]) == {
+            "test",
+            "integration",
+            "correctness-gate",
+            "test-package",
+            "release-readiness",
+        }
         assert result_job["if"] == "${{ always() && github.event_name == 'pull_request' && github.base_ref == 'main' }}"
         aggregate_run_text = _workflow_job_run_text("test.yml", "release-required-result")
         for expected in [
             "test (ubuntu-latest, 3.12)",
             "integration",
+            "correctness-gate",
             "test-package",
             "release-readiness",
             "Release-required checks passed.",

@@ -360,6 +360,34 @@ jobs:
           fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  correctness-gate:
+    name: correctness-gate
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run bounded real-result correctness gate
+        run: make test-correctness-gate
+
   explorer-tokens:
     name: explorer-tokens
     needs: ci-paths
@@ -432,7 +460,7 @@ jobs:
 
   ci-required-result:
     name: ci-required-result
-    needs: [ci-paths, content-guard, code-lint, code-test, explorer-tokens, audit-sha]
+    needs: [ci-paths, content-guard, code-lint, code-test, correctness-gate, explorer-tokens, audit-sha]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -442,6 +470,7 @@ jobs:
           CONTENT_RESULT: ${{ needs.content-guard.result }}
           LINT_RESULT: ${{ needs.code-lint.result }}
           TEST_RESULT: ${{ needs.code-test.result }}
+          CORRECTNESS_RESULT: ${{ needs.correctness-gate.result }}
           EXPLORER_TOKENS_RESULT: ${{ needs.explorer-tokens.result }}
           AUDIT_SHA_RESULT: ${{ needs.audit-sha.result }}
           CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
@@ -481,10 +510,12 @@ jobs:
             exit 1
           fi
 
-          if [ "$LINT_RESULT" = "success" ] && [ "$TEST_RESULT" = "success" ]; then
-            echo "Code/infra PR; lint and fast tests passed."
+          if [ "$LINT_RESULT" = "success" ] \
+              && [ "$TEST_RESULT" = "success" ] \
+              && [ "$CORRECTNESS_RESULT" = "success" ]; then
+            echo "Code/infra PR; lint, fast tests, and correctness gate passed."
             exit 0
           fi
 
-          echo "code-lint=$LINT_RESULT code-test=$TEST_RESULT"
+          echo "code-lint=$LINT_RESULT code-test=$TEST_RESULT correctness-gate=$CORRECTNESS_RESULT"
           exit 1

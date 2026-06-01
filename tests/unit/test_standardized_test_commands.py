@@ -17,6 +17,10 @@ pytestmark = [
 ]
 
 CI_FAST_EXPRESSION = "fast and not (slow or stress or resource_heavy or live_integration)"
+CORRECTNESS_GATE_NODEID = (
+    "tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]"
+)
+CORRECTNESS_GATE_QUERY_IDS = "6,14,15,17,19"
 
 
 def _makefile_target_body(makefile_content: str, target_name: str) -> str:
@@ -262,6 +266,64 @@ class TestMakefileCommands:
             '-m "medium and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=60 -n 5'
             in makefile_content
         )
+
+    def test_medium_marker_policy_is_documented_as_explicit_routing(self):
+        repo_root = Path.cwd()
+        readme_content = (repo_root / "tests" / "README.md").read_text()
+        makefile_content = (repo_root / "Makefile").read_text()
+
+        assert "Medium tests are an explicit local routing tier" in readme_content
+        assert "Correctness-relevant medium tests must be promoted" in readme_content
+        assert "test-medium:" in makefile_content
+
+    def test_makefile_correctness_gate_runs_expected_results_backed_matrix_slice(self):
+        makefile_content = (Path.cwd() / "Makefile").read_text()
+        gate_body = _makefile_target_body(makefile_content, "test-correctness-gate")
+
+        assert "BENCHBOX_STRICT_EXPECTED_RESULTS=1" in gate_body
+        assert f"BENCHBOX_CORRECTNESS_GATE_QUERY_IDS={CORRECTNESS_GATE_QUERY_IDS}" in gate_body
+        assert CORRECTNESS_GATE_NODEID in gate_body
+        assert "-m stress" in gate_body
+        assert "-n 0" in gate_body
+        assert "--timeout=1200" in gate_body
+
+    def test_develop_pr_invokes_bounded_correctness_gate(self):
+        repo_root = Path.cwd()
+        workflow = yaml.safe_load((repo_root / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+        job = workflow["jobs"]["correctness-gate"]
+        aggregate = workflow["jobs"]["ci-required-result"]
+
+        assert job["needs"] == "ci-paths"
+        assert "needs-code-ci == 'true'" in job["if"]
+        assert "make test-correctness-gate" in _workflow_job_run_text(
+            repo_root / ".github" / "workflows" / "pr.yml",
+            "correctness-gate",
+        )
+        assert "correctness-gate" in aggregate["needs"]
+        assert "CORRECTNESS_RESULT" in _workflow_job_run_text(
+            repo_root / ".github" / "workflows" / "pr.yml",
+            "ci-required-result",
+        )
+
+    def test_main_release_required_includes_bounded_correctness_gate(self):
+        repo_root = Path.cwd()
+        workflow = yaml.safe_load((repo_root / ".github" / "workflows" / "test.yml").read_text(encoding="utf-8"))
+        job = workflow["jobs"]["correctness-gate"]
+        aggregate = workflow["jobs"]["release-required-result"]
+
+        assert "github.base_ref == 'main'" in job["if"]
+        assert "make test-correctness-gate" in _workflow_job_run_text(
+            repo_root / ".github" / "workflows" / "test.yml",
+            "correctness-gate",
+        )
+        assert "correctness-gate" in aggregate["needs"]
+
+    def test_lint_markers_runs_marker_strategy_policy_explicitly(self):
+        makefile_content = (Path.cwd() / "Makefile").read_text()
+        lint_body = _makefile_target_body(makefile_content, "lint-markers")
+
+        assert "--collect-only" in lint_body
+        assert "tests/unit/test_marker_strategy.py -q" in lint_body
 
     def test_makefile_test_slow_runs_serially(self):
         makefile_content = (Path.cwd() / "Makefile").read_text()
