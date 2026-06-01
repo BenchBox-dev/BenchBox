@@ -28,7 +28,8 @@ tests/uat/
 │   └── report.py
 ├── configs/
 │   ├── stress-default.yaml        # TEMPLATE preset for `make uat-stress`
-│   └── uat-2026-05-02.yaml        # HISTORICAL replay of the sweep
+│   ├── uat-2026-05-02.yaml        # HISTORICAL replay of the sweep
+│   └── generated-rerun-shards/    # Generated frozen evidence, not templates
 ├── fixtures/
 │   └── uat-2026-05-02-matrix-summary-header.tsv
 ├── test_*.py                      # fast-test coverage (mark.fast)
@@ -121,19 +122,26 @@ starts with the UAT prefix (`benchbox-uat` by default). It also reports
 non-UAT Docker resources with creation time and a manual cleanup command,
 but it never deletes them automatically.
 
-## Historical configs
+## Config lifecycle
 
-Historical configs start with `# HISTORICAL` and are treated as evidence.
-Avoid editing them in place unless framework behavior changed and the
-same PR updates the relevant tests/docs. Prefer cloning to a dated
-successor for a new sweep:
+Files under `tests/uat/configs/` are classified by first-line header and,
+for generated shards, by location:
+
+- `# TEMPLATE`: editable starting points for new sweeps.
+- `# HISTORICAL`: evidence snapshots; avoid editing in place unless framework
+  behavior changed and the same PR updates the relevant tests/docs.
+- `generated-rerun-shards/`: generated frozen rerun evidence, not reusable
+  templates.
+- `resume.json`: ephemeral runtime state under a run log directory, not a
+  tracked config artifact.
+
+Clone a template for a new sweep:
 
 ```bash
-cp tests/uat/configs/uat-2026-05-02.yaml tests/uat/configs/uat-<new>.yaml
+cp tests/uat/configs/stress-default.yaml tests/uat/configs/uat-<new>.yaml
 ```
 
-Editable presets start with `# TEMPLATE` and may be changed through
-ordinary review. There is no frozen-hash file or hash-enforcement test.
+There is no frozen-hash file or hash-enforcement test.
 
 ## Dependencies
 

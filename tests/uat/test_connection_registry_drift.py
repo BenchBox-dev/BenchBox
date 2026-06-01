@@ -92,3 +92,29 @@ def test_uat_singlestore_host_port_override_flows_through(monkeypatch: pytest.Mo
     monkeypatch.setattr(matrix, "tcp_probe", fake_probe)
     assert matrix.platform_is_reachable("singlestore") is True
     assert captured["port"] == 13307
+
+
+@pytest.mark.parametrize("platform", ["lakesail", "velox"])
+def test_uat_spark_connect_host_port_override_flows_through(
+    platform: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """SPARK_CONNECT_PORT moves both the host probe and adapter endpoint."""
+    monkeypatch.delenv("SPARK_CONNECT_PORT", raising=False)
+    assert docker_assets.host_reachability_endpoint(platform) == "localhost:50051"
+    assert "endpoint=sc://localhost:50051" in docker_assets.platform_extra_opts(platform)
+
+    monkeypatch.setenv("SPARK_CONNECT_PORT", "50052")
+    assert docker_assets.host_reachability_endpoint(platform) == "localhost:50052"
+    assert "endpoint=sc://localhost:50052" in docker_assets.platform_extra_opts(platform)
+
+    matrix.invalidate_reachability_cache_after_lifecycle_change()
+    captured: dict[str, int] = {}
+
+    def fake_probe(host: str, port: int, timeout_s: float = 2.0) -> bool:
+        captured["port"] = port
+        return True
+
+    monkeypatch.setattr(matrix, "tcp_probe", fake_probe)
+    assert matrix.platform_is_reachable(platform) is True
+    assert captured["port"] == 50052

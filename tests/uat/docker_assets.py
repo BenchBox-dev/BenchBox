@@ -198,17 +198,17 @@ _PLATFORM_STATIC_OPTS: dict[str, list[str]] = {
         "be_http_port=18040",
     ],
     "singlestore": ["--platform-option", "password=benchbox"],
-    "velox": [
-        "--platform-option",
-        "deployment=remote",
-        "--platform-option",
-        "endpoint=sc://localhost:50051",
-    ],
+    "velox": ["--platform-option", "deployment=remote"],
 }
 
 # Platforms that pass the resolved host reachability port to the adapter as the
 # `port=` platform-option (kept first to preserve existing argv order).
 _PLATFORM_INJECT_HOST_PORT_OPT: frozenset[str] = frozenset({"singlestore", "starrocks", "doris"})
+
+# Spark Connect platforms also need the adapter endpoint to follow the
+# compose-published host port. Otherwise an override such as SPARK_CONNECT_PORT
+# moves the reachability probe while the run still connects to :50051.
+_PLATFORM_INJECT_SPARK_CONNECT_ENDPOINT_OPT: frozenset[str] = frozenset({"lakesail", "velox"})
 
 # Local managed-Docker credentials, appended only when UAT manages the stack
 # (kept separate because PLATFORM options apply even for externally managed
@@ -301,6 +301,10 @@ def platform_extra_opts(platform: str, *, env: dict[str, str] | None = None) -> 
         if host_port is not None:
             opts += ["--platform-option", f"port={host_port}"]
     opts += list(_PLATFORM_STATIC_OPTS.get(platform, []))
+    if platform in _PLATFORM_INJECT_SPARK_CONNECT_ENDPOINT_OPT:
+        host_port = resolve_published_host_port(platform, env=env)
+        if host_port is not None:
+            opts += ["--platform-option", f"endpoint=sc://localhost:{host_port}"]
     return opts
 
 

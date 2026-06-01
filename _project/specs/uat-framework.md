@@ -672,10 +672,26 @@ ran with implicit shared design; the retrospective is the cost.
 
 ## 9. `tests/uat/configs/` content policy
 
-The `tests/uat/configs/` directory holds two kinds of YAML files,
-distinguished by file-header comment:
+The `tests/uat/configs/` tree holds four lifecycle classes, distinguished by
+file-header comment and, for generated rerun shards, by location:
 
-### 9.1 Historical replay configs
+### 9.1 Editable templates
+
+```yaml
+# TEMPLATE — copy and edit for sweep-specific runs.
+name: "stress-default"
+...
+```
+
+- Mutable; PRs may edit them.
+- New sweep authors clone a template, for example `cp
+  tests/uat/configs/stress-default.yaml tests/uat/configs/uat-<new>.yaml`,
+  and edit the copy.
+- The canned `stress-default.yaml` is the canonical example; future
+  templates (e.g. a `tpch-only-fast-platforms.yaml`) follow the same
+  header convention.
+
+### 9.2 Historical replay configs
 
 ```yaml
 # HISTORICAL — record of the 2026-05-02 sweep. Do not edit; if behaviour
@@ -685,35 +701,35 @@ name: "uat-2026-05-02"
 ```
 
 - Historical evidence; avoid editing in place.
-- New sweep authors run `cp tests/uat/configs/uat-2026-05-02.yaml
-  tests/uat/configs/uat-<new>.yaml` and edit the copy.
 - There is no hash ceremony. Reviews should reject gratuitous edits,
   but the framework does not maintain a separate frozen-file guard.
 
-### 9.2 Editable templates
+### 9.3 Generated rerun shards
 
-```yaml
-# TEMPLATE — copy and edit for sweep-specific runs.
-name: "stress-default"
-...
-```
+Generated rerun shards are operational evidence emitted by a single sweep's
+resume/follow-up path. They live under
+`tests/uat/configs/generated-rerun-shards/`, carry a generated/frozen header,
+and must not be cloned as reusable starting points.
 
-- Mutable; PRs may edit them.
-- The canned `stress-default.yaml` is the canonical example; future
-  templates (e.g. a `tpch-only-fast-platforms.yaml`) follow the same
-  header convention.
+### 9.4 Ephemeral resume state
 
-### 9.3 PR conventions
+`resume.json` is runtime state written under the run log directory and consumed
+by `--resume <manifest>`. It is not a tracked config artifact and not a
+reusable file class.
+
+### 9.5 PR conventions
 
 | Action | Header | Reviewer expectation |
 |---|---|---|
-| Add a new historical replay (post-sweep snapshot) | `# HISTORICAL` | Verify the `name:` field encodes the sweep's date/identity. |
 | Add a new editable template | `# TEMPLATE` | Verify the template's `phases:` list and defaults match a real reuse case. |
-| Edit a `# HISTORICAL` file | (manual review) | Prefer a dated successor unless the framework contract itself drifted. |
 | Edit a `# TEMPLATE` file | `# TEMPLATE` | Standard review; no special protocol. |
+| Add a new historical replay (post-sweep snapshot) | `# HISTORICAL` | Verify the `name:` field encodes the sweep's date/identity. |
+| Edit a `# HISTORICAL` file | (manual review) | Prefer a dated successor unless the framework contract itself drifted. |
+| Add a generated rerun shard | Generated header under `generated-rerun-shards/` | Verify it is frozen evidence from a named sweep, not a template. |
+| Add resume runtime state | n/a | Reject; `resume.json` belongs under the run log directory. |
 
-The conceptual policy is "historical configs are evidence, editable
-templates are starting points."
+The conceptual policy is "templates are starting points; historical configs and
+generated rerun shards are evidence; resume state is runtime-only."
 
 ## 10. What UAT does NOT assert
 
