@@ -86,8 +86,8 @@ def _default_log_path(log_dir: Path, platform: str, benchmark: str, scale: float
 
 
 # Upper bound for the verbose diagnostic re-run triggered when a `--quiet`
-# cell exits non-zero without emitting stdout. Failures surface fast, so a tight
-# cap keeps the re-run cheap while still capturing the real error.
+# cell exits non-zero without emitting any output. Failures surface fast, so a
+# tight cap keeps the re-run cheap while still capturing the real error.
 DIAGNOSTIC_RERUN_TIMEOUT_S = 180
 
 
@@ -95,7 +95,7 @@ def _append_diagnostic_rerun(log_fh, argv: list[str], *, timeout_s: int, env: di
     """Re-run a failed cell verbosely and append its output to the log.
 
     Invoked only when the original ``--quiet`` invocation exited non-zero
-    without emitting stdout (``--quiet`` suppresses benchbox's own error
+    without emitting any output (``--quiet`` suppresses benchbox's own error
     reporting). Output is written as plain lines so ``_cell_log_tail`` captures
     it into ``failure_tail``. Best-effort: never raises into the caller.
     """
@@ -153,22 +153,26 @@ def run_cell(
         env["BENCHBOX_OUTPUT_DIR"] = str(runs_dir)
         log_fh.write(f"# BENCHBOX_OUTPUT_DIR={runs_dir}\n")
         log_fh.flush()
+        stderr_start_size = log_path.stat().st_size
         timeout_result = run_with_timeout(
             argv,
             timeout_s=timeout_s,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=log_fh,
             env=env,
         )
+        log_fh.flush()
+        stderr_has_content = _log_region_has_nonempty_content(log_path, stderr_start_size)
         stdout_text = _decode_process_output(timeout_result.stdout)
         stderr_text = _decode_process_output(timeout_result.stderr)
         if stderr_text:
             log_fh.write(stderr_text)
+            stderr_has_content = stderr_has_content or bool(stderr_text.strip())
         if stdout_text:
             log_fh.write(stdout_text)
         if timeout_result.timed_out:
             log_fh.write(f"# UAT_TIMEOUT timeout_s={timeout_s} exit_code={timeout_result.exit_code}\n")
-        elif timeout_result.exit_code != 0 and not stdout_text.strip():
+        elif timeout_result.exit_code != 0 and not stdout_text.strip() and not stderr_has_content:
             _append_diagnostic_rerun(
                 log_fh,
                 benchbox_run_argv(
@@ -223,6 +227,15 @@ def _decode_process_output(output: object) -> str:
     if isinstance(output, bytes):
         return output.decode("utf-8", errors="replace")
     return str(output)
+
+
+def _log_region_has_nonempty_content(path: Path, start_offset: int, *, chunk_size: int = 65536) -> bool:
+    with path.open("rb") as fh:
+        fh.seek(start_offset)
+        while chunk := fh.read(chunk_size):
+            if chunk.strip():
+                return True
+    return False
 
 
 def _classify(timeout_result: TimeoutResult) -> str:

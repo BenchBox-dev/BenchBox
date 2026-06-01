@@ -232,7 +232,60 @@ def test_run_cell_diagnostic_rerun_fires_for_empty_stdout_failure(tmp_path: Path
     assert "diagnostic detail" in log_text
 
 
-def test_run_cell_diagnostic_rerun_fires_when_failure_has_only_stderr(tmp_path: Path):
+def test_run_cell_skips_diagnostic_rerun_when_failure_has_stderr(tmp_path: Path):
+    captured_quiet = []
+
+    def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
+        captured_quiet.append(quiet)
+        return [sys.executable, "-c", "unused"]
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        if stderr is not None:
+            stderr.write("uv run warning on stderr\n")
+        return TimeoutResult(
+            exit_code=2,
+            timed_out=False,
+            elapsed_s=0.1,
+            stdout=b"",
+            stderr=None,
+        )
+
+    with (
+        patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert captured_quiet == [True]
+    log_text = result.log_path.read_text()
+    assert "uv run warning on stderr" in log_text
+    assert "verbose diagnostic re-run" not in log_text
+
+
+def test_run_cell_skips_diagnostic_rerun_for_real_stderr_only_failure(tmp_path: Path):
+    captured_quiet = []
+
+    def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
+        captured_quiet.append(quiet)
+        return [
+            sys.executable,
+            "-c",
+            "import sys; sys.stderr.write('stderr diagnostic\\n'); sys.exit(2)",
+        ]
+
+    with patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert result.exit_code == 2
+    assert captured_quiet == [True]
+    log_text = result.log_path.read_text()
+    assert "stderr diagnostic" in log_text
+    assert "verbose diagnostic re-run" not in log_text
+
+
+def test_run_cell_diagnostic_rerun_fires_when_failure_has_only_whitespace_stderr(tmp_path: Path):
     captured_quiet = []
 
     def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
@@ -240,13 +293,7 @@ def test_run_cell_diagnostic_rerun_fires_when_failure_has_only_stderr(tmp_path: 
         return [sys.executable, "-c", "unused"]
 
     outcomes = [
-        TimeoutResult(
-            exit_code=2,
-            timed_out=False,
-            elapsed_s=0.1,
-            stdout=b"",
-            stderr=b"uv run warning on stderr\n",
-        ),
+        TimeoutResult(exit_code=2, timed_out=False, elapsed_s=0.1, stdout=b"", stderr=b"\n"),
         TimeoutResult(exit_code=2, timed_out=False, elapsed_s=0.1, stdout=b"diagnostic detail\n", stderr=None),
     ]
 
@@ -261,10 +308,7 @@ def test_run_cell_diagnostic_rerun_fires_when_failure_has_only_stderr(tmp_path: 
 
     assert result.status == "failed"
     assert captured_quiet == [True, False]
-    log_text = result.log_path.read_text()
-    assert "uv run warning on stderr" in log_text
-    assert "verbose diagnostic re-run" in log_text
-    assert "diagnostic detail" in log_text
+    assert "diagnostic detail" in result.log_path.read_text()
 
 
 def test_run_cell_skips_diagnostic_rerun_when_failure_has_stdout(tmp_path: Path):
