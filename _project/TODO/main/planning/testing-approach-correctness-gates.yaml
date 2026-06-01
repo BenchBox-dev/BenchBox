@@ -191,7 +191,7 @@ anti_patterns:
   - "DO NOT promote the entire stress matrix into develop PR CI; the fix is a bounded correctness slice."
   - "DO NOT use test-file counts or mock percentages as quality proof; inspect behavioral assertions and runtime contracts."
   - "DO NOT choose a tiny scale if it removes expected-results validation without documenting the tradeoff."
-  - "DO NOT broaden scope into live cloud, Docker service orchestration, or UAT certification policy."
+  - "DO NOT broaden scope into live cloud, Docker service orchestration, or UAT release-gate policy."
   - "DO NOT delete mocked tests merely because they use mocks; delete or rewrite them when they validate implementation scaffolding instead of behavior."
   - "DO NOT edit TODO indexes by hand; regenerate them with the project TODO CLI."
 

@@ -1,12 +1,12 @@
 id: uat-certification-rerun-ordering-and-gate
-title: "UAT certification re-run: enforce ordering, fresh root, and an explicit approval gate"
+title: "UAT release-gate re-run: enforce ordering, fresh root, and an explicit approval gate"
 worktree: main
 priority: Medium-High
 status: In Progress
 category: Testing and Quality Assurance
 
 description: |
-  Once the framework and defect fixes land, a clean certification sweep must
+  Once the framework and defect fixes land, a clean release-gate sweep must
   be run — and its ordering and approval criteria must be explicit, because
   the 2026-05-28/29 evidence had two structural problems beyond cell
   failures:
@@ -14,11 +14,11 @@ description: |
   - Ordering: the docker non-OLTP run started 2026-05-28 23:14, but a
     native-execution dataframe sweep ran afterwards (2026-05-29 01:17-07:50).
     A Docker stack began before all native/dataframe platforms had completed,
-    so cross-run certification value is compromised.
+    so cross-run release-gate value is compromised.
   - Completeness: no run reached validate/package/explorer_smoke/report; no
     matrix_summary.tsv or validator_rollup.tsv exists for any run.
 
-  Certification re-run contract:
+  Release-gate re-run contract:
     1. native SQL platforms first
     2. dataframe (native-execution) platforms second
     3. Docker non-OLTP stacks third
@@ -35,30 +35,30 @@ description: |
 
   CHARTER-VOCABULARY RECONCILIATION (decided 2026-05-31 by
   [[uat-certification-wording-charter-decision]], Path A): "certification" is
-  NOT a chartered term in _project/specs/uat-framework.md (zero "certif" hits);
+  NOT a chartered term in _project/specs/uat-framework.md;
   the chartered name is "release-gate orchestration". This work owns the
-  certification-named surface (tests/uat/configs/certification-0{1,2,3}-*.yaml,
-  tests/uat/phases/report.py:certification_ordering_violations,
-  tests/uat/test_config.py, and the docs "Certification re-run" section), so
-  the rename to release-gate-orchestration vocabulary must land WITH this change
+  renamed release-gate surface (tests/uat/configs/release-gate-0{1,2,3}-*.yaml,
+  tests/uat/phases/report.py:release_gate_ordering_violations,
+  tests/uat/test_config.py, and the docs "Release-gate re-run" section), so
+  the rename to release-gate-orchestration vocabulary landed WITH this change
   rather than as a competing PR (which would break test_config.py and collide
   here). Do not introduce a standing cert-operations surface beyond the named
   evidence artifacts.
 
 prior_art:
   - "docs/operations/uat-framework.md 'Sequential platform execution' + 'Cross-scale coverage assertion (opt-in)' — reuse the report.cross_scale_coverage_min_pairs teeth; extend the doc with the ordering + approval-gate runbook"
-  - "tests/uat/configs/ historical + template configs — clone a template for the certification config rather than authoring from scratch"
+  - "tests/uat/configs/ historical + template configs — clone a template for the release-gate config rather than authoring from scratch"
   - "tests/uat/phases/report.py REPORT_HEADER / footer — the report-phase artifact the approval gate reads"
 
 work:
   - id: w1
-    summary: "Author/refresh the certification config(s) cloned from a template: scales 0.01/0.1/1 (non-OLTP), 0.01 (OLTP), recorded seed, fresh run root"
+    summary: "Author/refresh the release-gate config(s) cloned from a template: scales 0.01/0.1/1 (non-OLTP), 0.01 (OLTP), recorded seed, fresh run root"
     status: done
     notes: |
       Three stage-ordered configs cloned from uat-enabled-platforms-full.yaml:
-      certification-01-native-dataframe.yaml (groups native-sql+dataframe, 0.01/0.1/1),
-      certification-02-docker-nonoltp.yaml (docker-fast, 0.01/0.1/1),
-      certification-03-docker-oltp.yaml (docker-slow, 0.01). Numeric prefixes +
+      release-gate-01-native-dataframe.yaml (groups native-sql+dataframe, 0.01/0.1/1),
+      release-gate-02-docker-nonoltp.yaml (docker-fast, 0.01/0.1/1),
+      release-gate-03-docker-oltp.yaml (docker-slow, 0.01). Numeric prefixes +
       runbook encode the run order. Fresh-root + recorded-seed are documented in
       the configs and runbook (config schema has no seed field; the operator
       records BENCHBOX_SEED). Validated in tests/uat/test_config.py.
@@ -66,7 +66,7 @@ work:
     summary: "Add an ordering assertion/lint: native completes before any Docker stack starts, provable from lifecycle logs"
     status: done
     notes: |
-      report.parse_docker_up_events + report.certification_ordering_violations:
+      report.parse_docker_up_events + report.release_gate_ordering_violations:
       parse Docker action=up timestamps from each stage's uat_lifecycle.log and
       flag any that precede the native+dataframe completion boundary. Stage 1 is
       Docker-free (docker_manage_platforms=false), so it emits no action=up
@@ -81,15 +81,15 @@ work:
       teeth: a floor breach forces a non-zero report exit). APPROVE/HOLD
       checklist written in the runbook.
   - id: w4
-    summary: "Write the certification runbook section in docs/operations/uat-framework.md"
+    summary: "Write the release-gate runbook section in docs/operations/uat-framework.md"
     needs: [w1, w2, w3]
     status: done
     notes: |
-      "Certification re-run" section added: four-stage ordering, fresh root +
+      "Release-gate re-run" section added: four-stage ordering, fresh root +
       seed, one-stack-at-a-time, measure-then-set Docker timeout, the ordering-
       check snippet, the cross-scale teeth, and the APPROVE/HOLD gate checklist.
   - id: w5
-    summary: "Execute the full certification re-run into a fresh root and confirm every config reaches the report phase"
+    summary: "Execute the full release-gate re-run into a fresh root and confirm every config reaches the report phase"
     needs: [w4]
     status: pending
     notes: |
@@ -114,7 +114,7 @@ deps:
 
 must_preserve:
   - "execute.parallel_platforms stays hard-rejected; one platform / one Docker stack at a time."
-  - "The 2026-05-28/29 run dirs are retained as failed-evidence reference, not reused as the certification root."
+  - "The 2026-05-28/29 run dirs are retained as failed-evidence reference, not reused as the release-gate root."
   - "preserve_datagen:true; datagen reuse and reuse-aware pruning are unchanged."
 
 approach: |
@@ -135,8 +135,8 @@ verification:
   - description: "Config validation + report-teeth tests pass"
     command: "uv run -- python -m pytest tests/uat/test_config.py tests/uat/test_report.py -q"
     expected_output: "all pass; cross_scale_coverage teeth exercised"
-  - description: "Certification re-run reaches report phase for every config"
-    command: "make uat-sweep CONFIG=<certification-config.yaml>"
+  - description: "Release-gate re-run reaches report phase for every config"
+    command: "make uat-sweep CONFIG=<release-gate-config.yaml>"
     expected_output: "each run dir has matrix_summary.tsv + validator_rollup.tsv + a COMPLETED report footer with commit SHA"
 
 scope_limit:
@@ -149,11 +149,11 @@ scope_limit:
     - "docs/operations/uat-framework.md"
 
 success_metrics:
-  - "A full certification sweep runs in the required order from a fresh root, every config reaches the report phase, and the APPROVE/HOLD gate is evaluable from the artifacts alone."
+  - "A full release-gate sweep runs in the required order from a fresh root, every config reaches the report phase, and the APPROVE/HOLD gate is evaluable from the artifacts alone."
   - "Lifecycle logs prove native completion before any Docker stack starts."
 
 metadata:
-  tags: [uat, certification, ordering, approval-gate]
+  tags: [uat, release-gate, ordering, approval-gate]
   estimated_effort: "Medium"
   created_date: "2026-05-28"
   last_updated: "2026-05-28T00:00:00"
