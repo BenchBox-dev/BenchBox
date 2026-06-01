@@ -1,0 +1,118 @@
+id: uat-clickhouse-server-query-compatibility
+title: "Route ClickHouse-server query failures and preserve partial result JSON paths"
+worktree: main
+priority: Medium
+status: Identified
+category: Platform Expansion
+
+description: |
+  The 2026-06-01 clickhouse-server corpus rerun exposed cells where schema/load
+  finished and BenchBox produced result JSON with partial query failures, but
+  UAT still classified the terminal state as `no_json_nonzero` because the
+  process exited nonzero. These are not RC-1 platform wipeouts; they are query
+  compatibility failures plus a UAT result-capture fidelity gap.
+
+  Corpus evidence:
+    - Matrix: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv`
+    - Cells: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/cells.jsonl`
+
+  Representative result JSON findings:
+    - read_primitives: 438 passed, 9 failed; first error says aggregate function `LAG` does not exist and suggests `lag`.
+    - metadata_primitives: 150 passed, 3 failed; first error references unknown `admin_option` in `system.role_grants`.
+    - tpchavoc: 591 passed, 69 failed; first error says correlated subqueries in ORDER BY are unsupported.
+
+  The UAT harness should preserve the discovered result path even when the
+  child command exits with code 1 after recording query-level failures. That
+  makes future corpus triage direct instead of requiring manual stdout/log
+  inspection.
+
+prior_art:
+  - "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml: records corpus artifact paths and the fixed lifecycle root cause"
+  - "_project/TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml: existing TPCHavoc correlated-subquery context"
+  - "tests/uat/: UAT cell execution and terminal-state classification"
+  - "benchbox/core/read_primitives/: read primitive query definitions and platform overrides"
+  - "benchbox/core/metadata_primitives/: metadata primitive query definitions and platform overrides"
+
+work:
+  - id: w1
+    summary: "Teach UAT to preserve result_path from nonzero runs when JSON was emitted"
+    status: pending
+    notes: |
+      Add a regression where a child exits nonzero after printing or recording
+      a result JSON path. UAT should keep that path and classify the cell as a
+      query/result failure, not as missing JSON.
+  - id: w2
+    summary: "Classify read_primitives ClickHouse function-case compatibility"
+    status: pending
+    notes: |
+      Determine whether the fix belongs in ClickHouse query overrides,
+      function rendering, or benchmark query text. Do not change base SQL if
+      other platforms already use it correctly.
+  - id: w3
+    summary: "Classify metadata_primitives ClickHouse system-table differences"
+    status: pending
+    notes: |
+      ClickHouse system metadata varies from SQL-standard privilege metadata.
+      Implement platform-aware queries or skip/unsupported metadata assertions
+      only with explicit result semantics.
+  - id: w4
+    summary: "Route TPCHavoc ClickHouse correlated ORDER BY failures"
+    status: pending
+    notes: |
+      Reuse or extend the existing TPCHavoc correlated-subquery TODO if it
+      fully covers the failure. Otherwise add ClickHouse-specific rewrites or
+      explicit unsupported-query classification.
+
+deps:
+  needs:
+    - uat-clickhouse-server-rc1-recovery
+
+must_preserve:
+  - "Do not treat query-level failures as platform lifecycle failures once result JSON exists."
+  - "Do not mutate shared benchmark SQL when platform-specific overrides are the established pattern."
+  - "Keep query failures visible in result summaries; do not convert them to silent skips without platform-support rationale."
+
+approach: |
+  Split observability from query compatibility. First make UAT preserve
+  nonzero-run result paths so future evidence is self-describing. Then route
+  each query family through the existing platform override or unsupported-query
+  mechanisms, with focused live cells proving failed query counts improve.
+
+anti_patterns:
+  - "DO NOT mark these cells fixed only because UAT now captures the result path; query failures still need routing."
+  - "DO NOT hide ClickHouse metadata gaps behind generic exception swallowing."
+  - "DO NOT duplicate the existing TPCHavoc correlated-subquery TODO if it already owns the same root cause."
+
+verification:
+  - description: "UAT preserves result JSON paths from nonzero child exits"
+    command: "uv run -- python -m pytest tests/uat -q"
+    expected_output: "targeted UAT terminal-state regression passes"
+  - description: "Read primitives small cell has improved ClickHouse query compatibility"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=read_primitives SCALE=0.01"
+    expected_output: "result JSON is captured and failed query count is lower than the corpus baseline"
+  - description: "Metadata primitives representative cell has improved ClickHouse query compatibility"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=metadata_primitives SCALE=1.0"
+    expected_output: "result JSON is captured and failed query count is lower than the corpus baseline"
+  - description: "TPCHavoc small cell has routed correlated ORDER BY failures"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpchavoc SCALE=0.01"
+    expected_output: "result JSON is captured and correlated ORDER BY failures are fixed or explicitly classified"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/"
+    - "benchbox/core/read_primitives/"
+    - "benchbox/core/metadata_primitives/"
+    - "benchbox/core/tpchavoc/"
+    - "tests/unit/"
+    - "_project/TODO/main/planning/uat-clickhouse-server-query-compatibility.yaml"
+
+success_metrics:
+  - "UAT result artifacts point directly to partial result JSON when query execution exits nonzero."
+  - "Read primitives, metadata primitives, and TPCHavoc ClickHouse failures are no longer misclassified as missing JSON."
+  - "At least one representative query family shows fewer failed queries or an explicit unsupported-query classification."
+
+metadata:
+  tags: [clickhouse-server, uat, query-compatibility, result-capture]
+  estimated_effort: "Medium"
+  created_date: "2026-06-01"
+  last_updated: "2026-06-01T14:07:26-04:00"

@@ -1,0 +1,112 @@
+id: uat-clickhouse-server-data-and-timeout-tail
+title: "Triage ClickHouse-server corpus tail: JoinOrder data availability and SF1 timeouts"
+worktree: main
+priority: Low
+status: Identified
+category: Platform Expansion
+
+description: |
+  The 2026-06-01 clickhouse-server corpus rerun fixed the platform wipeout and
+  exposed a small tail that should not block the higher-impact loader, DDL, and
+  query-compatibility follow-ups.
+
+  Corpus evidence:
+    - Matrix: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv`
+    - Cells: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/cells.jsonl`
+
+  Tail failures:
+    - JoinOrder SF=1 failed before ClickHouse execution because the external data archive URL returned 404:
+      `https://github.com/joeharris76/BenchBox/releases/download/data%2Fjoinorder-imdb-2013-v1/joinorder-imdb-2013-v1.tar.zst`.
+    - TPCHavoc SF=1 timed out after 1200s with no subprocess output captured.
+    - FlightData SF=1 timed out after 1200s with no subprocess output captured.
+
+  These failures need separate triage because one appears to be shared data
+  availability rather than ClickHouse adapter behavior, and the two timeouts
+  may change after loader/query fixes reduce earlier failure modes.
+
+prior_art:
+  - "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml: records the corpus artifact paths and fixed lifecycle root cause"
+  - "_project/TODO/main/planning/joinorder-track2-groundwork.yaml: ongoing JoinOrder planning context"
+  - "_project/TODO/main/planning/data-fetch-concurrent-download-race.yaml: shared data-fetch infrastructure context"
+  - "_project/TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml: TPCHavoc query compatibility context"
+
+work:
+  - id: w1
+    summary: "Confirm whether JoinOrder archive 404 is shared data availability or corpus config drift"
+    status: pending
+    notes: |
+      Reproduce outside ClickHouse if needed. If the release asset is missing
+      or renamed, route to shared data-fetch / benchmark-data ownership rather
+      than the ClickHouse adapter.
+  - id: w2
+    summary: "Retest TPCHavoc SF1 after query-compatibility routing"
+    status: pending
+    notes: |
+      TPCHavoc has correlated ORDER BY failures at smaller scales and a timeout
+      at SF=1. Do not tune timeout behavior until query compatibility is better
+      understood.
+  - id: w3
+    summary: "Retest FlightData SF1 after loader conversion fixes"
+    status: pending
+    notes: |
+      FlightData SF=0.01/0.1 fail during loader conversion in the same corpus.
+      The SF=1 timeout may be a larger manifestation of the loader path rather
+      than a separate performance issue.
+  - id: w4
+    summary: "Add timeout diagnostics if SF1 cells still time out after upstream fixes"
+    status: pending
+    notes: |
+      If timeouts remain after loader/query fixes, capture phase-local progress
+      or query-level tails so future UAT summaries do not show a blank
+      subprocess section for 1200-second failures.
+
+deps:
+  needs:
+    - uat-clickhouse-server-rc1-recovery
+
+must_preserve:
+  - "Do not classify JoinOrder data 404 as a ClickHouse-server adapter failure without a cross-platform check."
+  - "Do not raise global UAT timeouts to hide long-running SF1 cells."
+  - "Do not start broad SF1 Docker sweeps until high-impact loader and query blockers are fixed."
+
+approach: |
+  Keep this as a tail-triage TODO. First separate shared data availability from
+  ClickHouse behavior. Then retest the two SF1 timeouts after the higher-impact
+  ClickHouse-server loader and query follow-ups land, adding diagnostics only
+  if the timeout remains opaque.
+
+anti_patterns:
+  - "DO NOT spend first effort on SF1 timeout tuning while smaller-scale loader and query failures are still active."
+  - "DO NOT globally prune JoinOrder from UAT because one release asset URL failed."
+  - "DO NOT use Docker prune or broad cleanup as part of timeout triage."
+
+verification:
+  - description: "JoinOrder data availability is classified outside ClickHouse"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=duckdb BENCHMARK=joinorder SCALE=1.0"
+    expected_output: "cell either reaches benchmark execution or reproduces a data-download failure that is clearly platform-independent"
+  - description: "TPCHavoc SF1 timeout is retested after query routing"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpchavoc SCALE=1.0"
+    expected_output: "cell completes or produces actionable phase/query-level diagnostics instead of a blank 1200-second timeout"
+  - description: "FlightData SF1 timeout is retested after loader fixes"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=flightdata SCALE=1.0"
+    expected_output: "cell completes or produces actionable phase/query-level diagnostics instead of a blank 1200-second timeout"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/joinorder/"
+    - "benchbox/core/flightdata/"
+    - "benchbox/core/tpchavoc/"
+    - "benchbox/core/data_fetch/"
+    - "tests/uat/"
+    - "_project/TODO/main/planning/uat-clickhouse-server-data-and-timeout-tail.yaml"
+
+success_metrics:
+  - "JoinOrder 404 is routed to the correct shared data or benchmark owner."
+  - "TPCHavoc and FlightData SF1 timeouts are either resolved by prerequisite fixes or produce actionable timeout diagnostics."
+  - "No broad Docker cleanup, timeout inflation, or corpus pruning is used as a substitute for diagnosis."
+
+metadata:
+  tags: [clickhouse-server, uat, joinorder, timeout]
+  estimated_effort: "Small"
+  created_date: "2026-06-01"
+  last_updated: "2026-06-01T14:07:26-04:00"

@@ -1,0 +1,124 @@
+id: uat-clickhouse-server-ddl-compatibility
+title: "Close ClickHouse-server DDL compatibility gaps for MergeTree and TIME schemas"
+worktree: main
+priority: High
+status: Identified
+category: Platform Expansion
+
+description: |
+  The post-PR #738 clickhouse-server corpus proves platform lifecycle is fixed,
+  but several cells fail before load/query execution because benchmark DDL is
+  not valid for a real ClickHouse server.
+
+  Corpus evidence:
+    - Matrix: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv`
+    - Cells: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/cells.jsonl`
+
+  Representative failures:
+    - `clickhouse-server_write_primitives_0.01_20260601_122913.log`: `Code: 42. DB::Exception: ORDER BY or PRIMARY KEY clause is missing... storage MergeTree requires ... ORDER BY expr`.
+    - `clickhouse-server_tpcdi_0.01_20260601_121925.log`: `Code: 44. DB::Exception: Cannot create column with type 'Time' because Time type is not allowed. Set setting enable_time_time64_type = 1`.
+
+  Observed impact from the corpus classifier:
+    - MergeTree ORDER BY / PRIMARY KEY missing: write_primitives and transaction_primitives at SF=0.01/0.1/1.0.
+    - TIME type disabled: TPC-DI and CoffeeShop at SF=0.01/0.1/1.0.
+
+prior_art:
+  - "benchbox/sql_compat/rules/ddl_optimize/: adapter DDL rewrite governance lives here"
+  - "benchbox/sql_compat/README.md: DDL optimizer and inventory drift expectations"
+  - "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml: records the corpus artifact paths and fixed lifecycle root cause"
+  - "_project/DONE/platform-expansion/planning/clickhouse-coffeeshop-dialect-overrides.yaml: prior query-level CoffeeShop ClickHouse override context"
+  - "_project/DONE/platform-expansion/planning/clickhouse-tpcdi-dialect-overrides.yaml: prior query-level TPC-DI ClickHouse override context"
+
+work:
+  - id: w1
+    summary: "Map the DDL path for affected benchmarks"
+    status: pending
+    notes: |
+      Determine whether write_primitives, transaction_primitives, TPC-DI, and
+      CoffeeShop go through the shared DDL optimizer or a local schema path.
+      The fix should be in the path each benchmark actually uses.
+  - id: w2
+    summary: "Add ClickHouse DDL rewrite or adapter setup for MergeTree ordering"
+    needs: [w1]
+    status: pending
+    notes: |
+      Real ClickHouse MergeTree tables need ORDER BY or PRIMARY KEY. Choose a
+      deterministic, low-cost ordering policy that preserves benchmark
+      semantics and does not assume every benchmark has an obvious primary key.
+  - id: w3
+    summary: "Resolve TIME schema support with explicit policy"
+    needs: [w1]
+    status: pending
+    notes: |
+      Decide from current ClickHouse behavior whether to enable
+      `enable_time_time64_type = 1` for DDL/load/query sessions or rewrite
+      TIME columns to a supported type. The choice must account for existing
+      CoffeeShop and TPC-DI query overrides that may wrap time values.
+  - id: w4
+    summary: "Verify affected DDL cells live against ClickHouse server"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Run one small cell for each affected family first, then expand if query
+      compatibility failures appear after DDL succeeds.
+
+deps:
+  needs:
+    - uat-clickhouse-server-rc1-recovery
+
+must_preserve:
+  - "Use existing SQL compatibility governance for CREATE TABLE rewrites when the affected path goes through DDL optimize."
+  - "Do not add benchmark-name-only DDL hacks where a platform-level ClickHouse rule is appropriate."
+  - "Do not break clickhouse-local or clickhouse-cloud by changing shared ClickHouse behavior without mode coverage."
+
+approach: |
+  Start by tracing the actual DDL generation paths for the four affected
+  benchmark families. Then implement the smallest platform-compatible policy:
+  MergeTree tables get deterministic ordering, and TIME columns are either
+  explicitly enabled or rewritten with matching load/query semantics. Validate
+  with unit DDL tests and live server cells.
+
+anti_patterns:
+  - "DO NOT bypass the DDL optimizer inventory drift checks when adding platform CREATE TABLE rules."
+  - "DO NOT make ORDER BY random or data-dependent; benchmark reproducibility matters."
+  - "DO NOT assume the TIME setting persists across sessions without proving load and query sessions inherit it."
+
+verification:
+  - description: "DDL compatibility unit tests and inventory checks pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -q && uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift"
+    expected_output: "tests and DDL inventory check pass"
+  - description: "Write primitives small cell creates MergeTree tables"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=write_primitives SCALE=0.01"
+    expected_output: "cell does not fail with missing ORDER BY or PRIMARY KEY during DDL"
+  - description: "Transaction primitives small cell creates MergeTree tables"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=transaction_primitives SCALE=0.01"
+    expected_output: "cell does not fail with missing ORDER BY or PRIMARY KEY during DDL"
+  - description: "TPC-DI small cell creates TIME-bearing schema"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpcdi SCALE=0.01"
+    expected_output: "cell does not fail with `Cannot create column with type 'Time'`"
+  - description: "CoffeeShop small cell creates TIME-bearing schema"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=coffeeshop SCALE=0.01"
+    expected_output: "cell does not fail with `Cannot create column with type 'Time'`"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/clickhouse/"
+    - "benchbox/sql_compat/rules/ddl_optimize/"
+    - "benchbox/core/write_primitives/"
+    - "benchbox/core/transaction_primitives/"
+    - "benchbox/core/tpcdi/"
+    - "benchbox/core/coffeeshop/"
+    - "tests/unit/platforms/test_clickhouse_adapter.py"
+    - "tests/unit/sql_compat/"
+    - "_project/TODO/main/planning/uat-clickhouse-server-ddl-compatibility.yaml"
+
+success_metrics:
+  - "The affected cells no longer fail during CREATE TABLE."
+  - "Any ClickHouse DDL rewrite is represented in the governed DDL compatibility inventory when applicable."
+  - "The fix is mode-aware and does not regress existing clickhouse-local coverage."
+
+metadata:
+  tags: [clickhouse-server, uat, ddl, mergetree, time]
+  estimated_effort: "Medium"
+  created_date: "2026-06-01"
+  last_updated: "2026-06-01T14:07:26-04:00"
