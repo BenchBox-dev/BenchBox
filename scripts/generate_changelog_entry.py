@@ -228,7 +228,7 @@ def _conventional_changelog_subject(subject: str) -> bool:
     return bare_prefix in {"feat", "fix", "perf"}
 
 
-def _candidate_changelog_commits(source: Path, since_ref: str) -> list[tuple[str, str]] | None:
+def _commits_since_ref(source: Path, since_ref: str) -> list[tuple[str, str]] | None:
     result = _run_git(source, "log", "--format=%H%x00%s%x00", f"{since_ref}..HEAD")
     if result.returncode != 0:
         print(f"  Error: Failed to get git log: {result.stderr}")
@@ -237,7 +237,7 @@ def _candidate_changelog_commits(source: Path, since_ref: str) -> list[tuple[str
     return [
         (commit_hash.strip(), subject.strip())
         for commit_hash, subject in zip(parts[0::2], parts[1::2], strict=False)
-        if commit_hash.strip() and _conventional_changelog_subject(subject)
+        if commit_hash.strip()
     ]
 
 
@@ -249,10 +249,10 @@ def _patch_delta_commit_subjects(source: Path, since_ref: str) -> list[str] | No
     Filtering through the actual tree diff keeps the changelog tied to the
     unreleased patch instead.
     """
-    candidates = _candidate_changelog_commits(source, since_ref)
-    if candidates is None:
+    commits = _commits_since_ref(source, since_ref)
+    if commits is None:
         return None
-    if not candidates:
+    if not commits:
         return []
 
     try:
@@ -265,23 +265,47 @@ def _patch_delta_commit_subjects(source: Path, since_ref: str) -> list[str] | No
     if not patch_paths:
         return []
 
+    tree_entry_cache: dict[tuple[str, str], str | None] = {}
+
+    def tree_entry(ref: str, path: str) -> str | None:
+        key = (ref, path)
+        if key not in tree_entry_cache:
+            tree_entry_cache[key] = _tree_entry_at(source, ref, path)
+        return tree_entry_cache[key]
+
+    target_entries = {path: tree_entry("HEAD", path) for path in patch_paths}
+    base_entries = {path: tree_entry(since_ref, path) for path in patch_paths}
+    unresolved_paths = {path for path in patch_paths if target_entries[path] != base_entries[path]}
+
     patch_commits: set[str] = set()
-    for commit_hash, _subject in candidates:
+    for commit_hash, subject in commits:
+        if not unresolved_paths:
+            break
         result = _run_git(source, "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", commit_hash)
         if result.returncode != 0:
             continue
         candidate_paths = {part for part in result.stdout.split("\0") if part}
-        relevant_paths = candidate_paths & patch_paths
-        if any(
-            _tree_entry_at(source, commit_hash, path) != _tree_entry_at(source, since_ref, path)
+        relevant_paths = candidate_paths & unresolved_paths
+        parent_ref = f"{commit_hash}^"
+        contributing_paths = [
+            path
             for path in relevant_paths
-        ):
+            if tree_entry(commit_hash, path) == target_entries[path]
+            and tree_entry(parent_ref, path) != target_entries[path]
+        ]
+        if not contributing_paths:
+            continue
+        if _conventional_changelog_subject(subject):
             patch_commits.add(commit_hash)
+        for path in contributing_paths:
+            target_entries[path] = tree_entry(parent_ref, path)
+            if target_entries[path] == base_entries[path]:
+                unresolved_paths.remove(path)
 
     if not patch_commits:
         return []
 
-    return [subject for commit_hash, subject in candidates if commit_hash in patch_commits]
+    return [subject for commit_hash, subject in commits if commit_hash in patch_commits]
 
 
 def generate_changelog_entry(

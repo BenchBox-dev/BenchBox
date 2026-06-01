@@ -149,3 +149,44 @@ def test_since_ref_ignores_squashed_commit_when_new_patch_touches_same_file(
     changelog = (repo / "CHANGELOG.md").read_text(encoding="utf-8")
     assert "- add next same-file patch" in changelog
     assert "already released same-file feature" not in changelog
+
+
+def test_since_ref_ignores_intermediate_squashed_same_file_commits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Intermediate same-file states from a squashed release must stay released."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test User")
+
+    (repo / "CHANGELOG.md").write_text("# Changelog\n\n## [Unreleased]\n\n", encoding="utf-8")
+    _git(repo, "add", "CHANGELOG.md")
+    _git(repo, "commit", "-m", "chore: initial")
+    _git(repo, "branch", "-M", "main")
+
+    _git(repo, "checkout", "-b", "develop")
+    _commit(repo, "feat: already released same-file feature", "f.txt", "A\n")
+    _commit(repo, "fix: already released same-file fix", "f.txt", "A\nB\n")
+
+    _git(repo, "checkout", "main")
+    _git(repo, "merge", "--squash", "develop")
+    _git(repo, "commit", "-m", "Release v0.3.1")
+
+    _git(repo, "checkout", "develop")
+    _commit(repo, "fix: add next same-file patch", "f.txt", "A\nB\nC\n")
+
+    monkeypatch.setattr(generate_changelog_entry, "_summarize_changelog_with_claude", lambda *args: None)
+
+    assert generate_changelog_entry.generate_changelog_entry(
+        repo,
+        version="0.3.2",
+        release_date="2026-05-31",
+        since_ref="main",
+    )
+
+    changelog = (repo / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "- add next same-file patch" in changelog
+    assert "already released same-file feature" not in changelog
+    assert "already released same-file fix" not in changelog
