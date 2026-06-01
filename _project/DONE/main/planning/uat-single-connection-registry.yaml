@@ -15,7 +15,7 @@ description: |
   - tests/uat/matrix.py:19-95 hardcodes PLATFORM_PORTS, PLATFORM_EXTRA_OPTS,
     LOCAL_MANAGED_PLATFORM_EXTRA_OPTS, and credentials (e.g. password=benchbox).
   - SingleStore alone shows why the model must distinguish endpoint roles:
-      * UAT hardcodes local Docker host reachability at 13306 (matrix.py:21)
+      * UAT hardcodes local Docker host reachability at 13306 (matrix.py:22)
       * compose maps ${SINGLESTORE_HOST_PORT:-13306} on the host to container port 3306
       * adapter credentials default to the service/container port 3306 (benchbox/platforms/credentials/singlestore.py:30)
   - tests/uat/docker_assets.py:75 is yet another separate registry from matrix.py.
