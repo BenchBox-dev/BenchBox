@@ -1,23 +1,20 @@
-# TEMPLATE — editable tuned follow-up UAT sweep config.
+# GENERATED rerun shard (frozen historical) from the 2026-05-05 tuned follow-up sweep — NOT an editable template; see README.md.
 
-name: "uat-tuned-followup-resume-clickhouse-tail-20260505"
+name: "uat-tuned-followup-resume-questdb-20260505"
 description: "Resume tuned multi-scale local UAT sweep for BenchBox submissions"
 
 phases:
   - preflight
   - execute
-  - validate
-  - package
-  - explorer_smoke
   - report
 
 dry_run: false
 
 platforms:
-  include: ["clickhouse-local"]
+  include: ["questdb"]
 
 benchmarks:
-  include: ["tsbs_devops", "nyctaxi", "flightdata", "datavault", "vector_search"]
+  groups: ["all"]
 
 scales:
   rungs: [0.01, 0.1, 1.0]
@@ -54,5 +51,5 @@ report:
 
 output:
   benchmark_runs_dir_template: "~/Developer/benchmark_runs"
-  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_tuned_followup_resume_clickhouse_tail_20260505_pool10"
+  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_tuned_followup_resume_questdb_20260505_pool10"
   submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"
