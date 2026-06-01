@@ -91,7 +91,7 @@ work:
   - id: w3
     summary: "If the smallest cell passes, rerun the clickhouse-server fast Docker corpus into a fresh run root"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Use the repo's managed Docker lifecycle rather than an ad hoc server:
       a config with `cleanup.docker_manage_platforms=true`,
@@ -100,6 +100,29 @@ work:
       cells.jsonl is non-empty, lifecycle logs contain up/run/down for
       clickhouse-server, and matrix_summary.tsv no longer shows a total
       platform wipeout.
+
+      DONE 2026-06-01. UAT-managed corpus, 57 executable cells, source
+      4fe9124c1 (source_dirty=false). Config
+      /tmp/uat-clickhouse-server-rc1-corpus-20260601.yaml; artifacts under
+      ~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601
+      (matrix_summary.tsv, cells.jsonl). Docker lifecycle clean: action=up
+      status=ok, action=down status=ok, UAT-owned project removed (only the
+      pre-existing uat-clickhouse-debug container remained).
+
+      Result: rows=57 candidates=57 executed=57 compatibility_pruned=0
+      early_stop_pruned=0 passed=15 failed=40 timed_out=2, run_status=COMPLETED.
+      The 57/57 wipeout is resolved - auth/port/database-bootstrap/host-path-load/
+      session-settings are all fixed. The 15 passing cells (tpch, ssb, amplab,
+      tpch_skew, ai_primitives x3 scales) are submittable.
+
+      Remaining 40 failures + 2 timeouts are NOT this recovery's lifecycle
+      scope; they are split into follow-up TODOs:
+        - clickhouse-server-client-insert-type-coverage (Bucket A/B/C/D/J, ~22
+          cells - the new client-insert path's type coverage; BenchBox-side)
+        - clickhouse-server-ddl-type-and-engine-gaps (Bucket E/F, 12 cells -
+          Time type, MergeTree ORDER BY/PK)
+        - clickhouse-server-query-dialect-partial-failures (Bucket G + timeouts,
+          ~7 cells - case-sensitive window fns; joinorder download deferred)
 
 deps:
   needs: []
@@ -161,4 +184,4 @@ metadata:
   tags: [clickhouse-server, docker, uat, rc1]
   estimated_effort: "Medium"
   created_date: "2026-06-01"
-  last_updated: "2026-06-01T11:42:00-04:00"
+  last_updated: "2026-06-01T14:30:00-04:00"

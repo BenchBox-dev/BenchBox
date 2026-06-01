@@ -1,0 +1,120 @@
+id: clickhouse-server-ddl-type-and-engine-gaps
+title: "Fix ClickHouse-server DDL gaps: Time type and MergeTree ORDER BY/PRIMARY KEY"
+worktree: main
+priority: Medium-High
+status: Identified
+category: Platform Expansion
+
+description: |
+  After the PR #738 infrastructure fixes (merged to develop as 4fe9124c1), the
+  clickhouse-server corpus rerun (57 cells, source 4fe9124c1, see
+  uat-clickhouse-server-rc1-recovery w3) surfaced two genuine ClickHouse DDL
+  gaps that fail at schema-creation time - distinct from the client-insert
+  type-coverage work (see clickhouse-server-client-insert-type-coverage):
+
+    Bucket E - `Time` column type rejected by ClickHouse 25.8.
+      `Code: 44. DB::Exception: Cannot create column with type 'Time' because
+      Time type is not allowed. Set setting enable_time_time64_type = 1 in order
+      to allow it.` The benchmark schemas emit a `Time` type that the generated
+      ClickHouse DDL passes through verbatim.
+      Cells: tpcdi (0.01/0.1/1.0), coffeeshop (0.01/0.1/1.0). 6 cells.
+
+    Bucket F - MergeTree table created without ORDER BY / PRIMARY KEY.
+      `Code: 42. DB::Exception: ORDER BY or PRIMARY KEY clause is missing.`
+      The ENGINE/ORDER BY injection that works for clickhouse-local (documented
+      in track-upstream-platform-workarounds, workload.py) is not producing a
+      valid ORDER BY for these benchmark schemas in server mode.
+      Cells: write_primitives (0.01/0.1/1.0), transaction_primitives
+      (0.01/0.1/1.0). 6 cells.
+
+  These are ClickHouse-DDL issues, not the client-insert path. They are
+  out of scope for the recovery TODO, which was scoped to provisioning/
+  lifecycle only.
+
+prior_art:
+  - "benchbox/platforms/clickhouse/workload.py:DDL pipeline (ENGINE/ORDER BY injection) — extend: ensure server mode emits a valid ORDER BY/PK for write_primitives & transaction_primitives"
+  - "_project/TODO/main/planning/track-upstream-platform-workarounds.yaml — reference: documents the clickhouse-local ORDER BY/PK injection workaround; keep server-mode fix consistent with it"
+  - "benchbox/platforms/clickhouse/tuning.py:configure_for_benchmark — reuse: where a server-mode enable_time_time64_type session setting could be applied if Time support is chosen over type remapping"
+
+work:
+  - id: w0
+    summary: "Re-confirm the Code: 44 (Time) and Code: 42 (ORDER BY/PK) signatures on develop"
+    status: pending
+    notes: |
+      Pinned to corpus run uat_clickhouse_server_rc1_corpus_20260601 @ 4fe9124c1
+      (tpcdi/coffeeshop -> Code: 44; write_primitives/transaction_primitives ->
+      Code: 42). Re-derive cheaply by generating the clickhouse-server DDL for
+      one affected benchmark (e.g. coffeeshop, write_primitives) and inspecting
+      it for `Time` and a missing ORDER BY; capture to /tmp and summarize here.
+
+  - id: w1
+    summary: "Bucket E: handle the Time column type for ClickHouse server"
+    needs: [w0]
+    status: pending
+    notes: |
+      Decide between (a) remapping Time -> a supported ClickHouse type in the
+      clickhouse dialect/DDL, or (b) enabling enable_time_time64_type=1 for
+      server mode. (a) is more portable; (b) opts into an experimental type.
+
+  - id: w2
+    summary: "Bucket F: ensure server-mode MergeTree DDL always has a valid ORDER BY/PRIMARY KEY"
+    needs: [w0]
+    status: pending
+    notes: |
+      Mirror the clickhouse-local injection; for schemas with no natural key,
+      fall back to ORDER BY tuple(). Keep consistent with
+      track-upstream-platform-workarounds so a future dialect-native DDL swap
+      does not regress.
+
+  - id: w3
+    summary: "Validate tpcdi, coffeeshop, write_primitives, transaction_primitives load at SF=0.01"
+    needs: [w1, w2]
+    status: pending
+
+deferred:
+  - summary: "Replace the ENGINE/ORDER BY injection with native dialect='clickhouse' DDL"
+    reason: "Tracked separately in track-upstream-platform-workarounds; do not duplicate that effort here."
+
+must_preserve:
+  - "clickhouse-local ORDER BY/PRIMARY KEY injection behavior is unchanged (track-upstream-platform-workarounds)."
+  - "Benchmarks that already create valid MergeTree DDL keep their existing ORDER BY."
+
+approach: |
+  Treat E and F independently. For E prefer a dialect-level type remap so the
+  fix is portable and avoids opting into an experimental ClickHouse type; only
+  fall back to enable_time_time64_type if remapping loses semantics. For F,
+  extend the existing workload.py injection rather than adding new DDL code, and
+  verify the local path is byte-for-byte unchanged.
+
+anti_patterns:
+  - "DO NOT globally swap to dialect='clickhouse' DDL here - it can silently regress tables that derive ORDER BY today - that swap is its own tracked TODO."
+  - "DO NOT enable experimental settings server-wide if a portable type remap works - keep the surface minimal."
+
+verification:
+  - description: "Affected schemas create cleanly on ClickHouse server"
+    command: "CLICKHOUSE_HOST_PORT=19000 CLICKHOUSE_HTTP_HOST_PORT=18123 make uat-cell PLATFORM=clickhouse-server BENCHMARK=coffeeshop SCALE=0.01"
+    expected_output: "no Code: 44 / Code: 42; schema + load succeed"
+  - description: "clickhouse-local DDL unchanged"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -k 'clickhouse and (ddl or workload)' -q"
+    expected_output: "local DDL/workload tests pass unchanged"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/clickhouse/workload.py"
+    - "benchbox/platforms/clickhouse/tuning.py"
+    - "tests/unit/platforms/test_clickhouse_adapter.py"
+    - "_project/TODO/main/planning/clickhouse-server-ddl-type-and-engine-gaps.yaml"
+
+deps:
+  needs: []
+
+success_metrics:
+  - "tpcdi and coffeeshop create their ClickHouse-server schema without Code: 44."
+  - "write_primitives and transaction_primitives create MergeTree tables without Code: 42."
+  - "No change to the clickhouse-local DDL/ORDER BY injection."
+
+metadata:
+  tags: [clickhouse-server, ddl, mergetree, uat, rc1]
+  estimated_effort: "Medium"
+  created_date: "2026-06-01"
+  last_updated: "2026-06-01T14:30:00-04:00"

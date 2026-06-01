@@ -1,0 +1,185 @@
+id: clickhouse-server-client-insert-type-coverage
+title: "Extend ClickHouse-server client-side insert type coverage (datetime, nullable-numeric, arrays, Arrow schemas)"
+worktree: main
+priority: High
+status: Identified
+category: Platform Expansion
+
+description: |
+  PR #738 (merged to develop as 4fe9124c1) gave clickhouse-server its own
+  client-side batch-insert load path because server-side `file()` is limited to
+  `/var/lib/clickhouse/user_files` and cannot read Docker-host data paths. The
+  new path lives in `benchbox/platforms/base/data_loading.py`
+  (`ClickHouseNativeHandler._load_delimited_via_client_insert`,
+  `_load_parquet_via_client_insert`, `_convert_field_for_clickhouse`) and is
+  gated to `deployment_mode == "server"` (`_uses_server_mode`). clickhouse-local
+  and cloud are unchanged and still use `file()`.
+
+  The conversion helper handles String / INT* / DECIMAL|NUMERIC / DOUBLE|FLOAT|REAL
+  / DATE only. The post-merge corpus rerun (57 cells, source 4fe9124c1, see
+  uat-clickhouse-server-rc1-recovery w3) proved the path is correct for clean
+  star-schemas (tpch, ssb, amplab, tpch_skew all pass) but has four type-coverage
+  gaps that cause hard LOAD failures (loud errors, not silent corruption) for
+  ~22 cells:
+
+    Bucket A - nullable numeric/date field into a non-Nullable column.
+      Empty fields map to None at data_loading.py:2119-2120; when the generated
+      ClickHouse DDL declares the column non-Nullable, clickhouse-driver rejects
+      None: `Code: 53 ... required argument is not an integer`.
+      Cells: tpcds (0.01/0.1/1.0 - ws_sold_date_sk, wr_returned_date_sk),
+      nyctaxi (0.01/0.1/1.0 - location_id, trip_id), flightdata (0.01/0.1; 1.0
+      times out at SF=1.0, same family). tpcds_obt 1.0 is downstream of tpcds
+      (`Table tpcds_sales_returns_obt is empty`, killed @631s).
+
+    Bucket B - datetime / timestamp columns are not converted at all.
+      `_convert_field_for_clickhouse` only handles `startswith("DATE")`; columns
+      typed TIMESTAMP/DATETIME fall through as raw strings and clickhouse-driver
+      raises `'str' object has no attribute 'tzinfo'`. (Latent: `startswith("DATE")`
+      also matches DATETIME and would mis-route to `date.fromisoformat`, dropping
+      time.) Cells: h2odb (3), tsbs_devops (3), clickbench (1.0).
+
+    Bucket C - array / vector columns.
+      Embedding/array columns serialized in delimited data are not parsed into
+      Python lists; `float(value)` is attempted on a non-scalar token:
+      `could not convert string to float:`. Cells: vector_search (3).
+
+    Bucket D - Arrow-backed benchmark schemas.
+      `_get_column_type_names` / `SchemaInspector.get_column_count` assume a dict
+      schema; datavault's `get_schema()` yields pyarrow Table values, so
+      `"columns" in table_schema` raises `argument of type 'Table' is not iterable`.
+      Cells: datavault (3).
+
+  This is BenchBox-side, fixable in data_loading.py - it is NOT a ClickHouse
+  compatibility limit. No silent corruption was found: empty strings into String
+  columns are preserved as "" (verified at data_loading.py:2119-2120), and every
+  gap fails loudly at load.
+
+prior_art:
+  - "benchbox/platforms/base/data_loading.py:_convert_field_for_clickhouse — extend: add DATETIME/TIMESTAMP and array handling, make nullability-aware"
+  - "benchbox/platforms/base/data_loading.py:DelimitedFileHandler.load_table — reuse: the generic per-row path uses the same RowBatchProcessor/SchemaInspector helpers"
+  - "benchbox/platforms/base/data_loading.py:_uses_server_mode (line 1935) — preserve: keeps local/cloud on the file() path"
+  - "benchbox/platforms/clickhouse/workload.py:DDL pipeline — reference: where column nullability/types are emitted; see track-upstream-platform-workarounds"
+
+work:
+  - id: w0
+    summary: "Re-derive each failure signature against current develop and pin the evidence"
+    status: pending
+    notes: |
+      Docker-free where possible: drive the conversion helper directly to
+      confirm the gaps still exist on HEAD, e.g.
+        uv run -- python -c "from benchbox.platforms.base.data_loading import ClickHouseNativeHandler as H; \
+          h=H.__new__(H); print(repr(h._convert_field_for_clickhouse('2016-01-01 12:00:00','TIMESTAMP'))); \
+          print(repr(h._convert_field_for_clickhouse('','INTEGER')))"
+      Expect the timestamp returned as a raw str (Bucket B) and '' -> None
+      (Bucket A). Capture to /tmp/clickhouse-server-insert-w0.log and record a
+      compact command/result summary here. Server-dependent signatures
+      (Code: 53, tzinfo) are pinned to corpus run
+      uat_clickhouse_server_rc1_corpus_20260601 @ source 4fe9124c1.
+
+  - id: w1
+    summary: "Bucket B: add DATETIME/TIMESTAMP conversion and fix the startswith('DATE') ordering"
+    needs: [w0]
+    status: pending
+    notes: |
+      Route DATETIME/DATETIME64/TIMESTAMP to datetime parsing and keep DATE on
+      date.fromisoformat; ensure DATETIME does not fall into the DATE branch.
+
+  - id: w2
+    summary: "Bucket A: make empty numeric/date handling column-nullability aware"
+    needs: [w0]
+    status: pending
+    notes: |
+      Resolve the open question first. Either emit Nullable(...) DDL where the
+      benchmark schema marks the column nullable, or coerce empty -> type
+      default for non-Nullable numeric/date columns to mirror the file()/
+      input_format_null_as_default behavior the local path relied on. Pick the
+      one that matches benchmark/data semantics; do not silently change values
+      for columns that genuinely allow NULL.
+
+  - id: w3
+    summary: "Bucket C: parse array/vector columns into Python lists before insert"
+    needs: [w0]
+    status: pending
+
+  - id: w4
+    summary: "Bucket D: harden schema introspection against non-dict (Arrow Table) schemas"
+    needs: [w0]
+    status: pending
+    notes: |
+      Guard `"columns" in table_schema` / `.get(...)` in
+      _get_column_type_names and SchemaInspector.get_column_count so a pyarrow
+      Table-valued schema does not raise; fall back to file-derived column count.
+
+  - id: w5
+    summary: "Regression-validate: clickhouse-local still uses file(); re-run affected server cells"
+    needs: [w1, w2, w3, w4]
+    status: pending
+    notes: |
+      Confirm the 15 currently-passing cells still pass and that affected cells
+      (tpcds, nyctaxi, h2odb, tsbs_devops, clickbench, vector_search, datavault)
+      now load. Do not re-run the whole 57-cell corpus; target the affected
+      benchmarks at SF=0.01/0.1.
+
+deferred:
+  - summary: "Parquet path materializes the whole table via to_pylist() (data_loading.py:2139-2145)"
+    reason: "Acceptable at UAT SF<=1; revisit only if large-SF server loads are needed (stream by row group)."
+  - summary: "Cloud mode still uses host file() (not gated by _uses_server_mode)"
+    reason: "Pre-existing; out of scope. Only relevant if ClickHouse Cloud is UAT'd against host-local data."
+
+must_preserve:
+  - "clickhouse-local and cloud retain the file() load path (data_loading.py:1989 gate on _uses_server_mode)."
+  - "Empty strings into String columns stay '' (no String -> None corruption)."
+  - "The 15 currently-passing corpus cells (tpch, ssb, amplab, tpch_skew, ai_primitives) keep passing."
+  - "load_table_bulk server override keeps delegating to the per-file base loop (data_loading.py:2156-2167)."
+
+approach: |
+  Centralize all type coercion in _convert_field_for_clickhouse and keep the
+  delimited and Parquet paths sharing it. Reuse RowBatchProcessor/SchemaInspector
+  rather than adding a parallel reader. Solve B and D first (pure conversion /
+  introspection fixes, no DDL change), then A (which may require a DDL or
+  nullability decision), then C. Validate against clickhouse-local after each
+  change to prove the file() path is untouched.
+
+anti_patterns:
+  - "DO NOT route DATETIME/TIMESTAMP through date.fromisoformat - it drops the time component or raises - parse to datetime."
+  - "DO NOT coerce empty -> default for columns that genuinely allow NULL - that silently fabricates data - decide per column nullability."
+  - "DO NOT add a second file reader for server mode - reuse the shared RowBatchProcessor/SchemaInspector helpers."
+
+verification:
+  - description: "Conversion helper handles datetime, nullable numeric, and arrays"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -q"
+    expected_output: "tests pass, including new datetime/array/nullable coverage"
+  - description: "clickhouse-local still uses file() (no regression)"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -k clickhouse -q"
+    expected_output: "local file() path tests pass unchanged"
+  - description: "Affected server cells load after the fix"
+    command: "CLICKHOUSE_HOST_PORT=19000 CLICKHOUSE_HTTP_HOST_PORT=18123 make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpcds SCALE=0.01"
+    expected_output: "load phase completes without Code: 53; cell passes or fails later than load"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/data_loading.py"
+    - "benchbox/platforms/clickhouse/workload.py"
+    - "benchbox/platforms/clickhouse/metadata.py"
+    - "tests/unit/platforms/test_clickhouse_adapter.py"
+    - "_project/TODO/main/planning/clickhouse-server-client-insert-type-coverage.yaml"
+
+deps:
+  needs: []
+
+success_metrics:
+  - "clickhouse-server loads tpcds, nyctaxi, h2odb, tsbs_devops, clickbench, vector_search, and datavault at SF=0.01 without a LOAD-phase failure."
+  - "No regression in the file() path for clickhouse-local or the 15 passing corpus cells."
+  - "Empty String fields remain '' and NULL-allowed numeric fields remain NULL (no fabricated values)."
+
+open_questions:
+  - question: "For Bucket A, is the correct fix Nullable(...) DDL or empty->type-default coercion?"
+    gating: true
+    affects: ["w2 success_metric: NULL-allowed numeric fields remain NULL"]
+    default: "Emit Nullable(...) where the benchmark schema marks the column nullable; only coerce empty->default for genuinely non-Nullable columns."
+
+metadata:
+  tags: [clickhouse-server, data-loading, uat, rc1, type-coverage]
+  estimated_effort: "Medium"
+  created_date: "2026-06-01"
+  last_updated: "2026-06-01T14:30:00-04:00"

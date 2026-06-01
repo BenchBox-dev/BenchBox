@@ -1,0 +1,105 @@
+id: clickhouse-server-query-dialect-partial-failures
+title: "Resolve ClickHouse-server query-dialect partial failures (case-sensitive window fns, timeouts)"
+worktree: main
+priority: Medium
+status: Identified
+category: Platform Expansion
+
+description: |
+  After the PR #738 infrastructure fixes (merged to develop as 4fe9124c1),
+  three benchmarks in the clickhouse-server corpus rerun (57 cells, source
+  4fe9124c1, see uat-clickhouse-server-rc1-recovery w3) LOAD successfully and
+  write a result JSON but exit non-zero because a minority of queries fail -
+  classified by UAT as `no_json_nonzero` with `validation: partial`. These are
+  SQL dialect-translation gaps, not load or infrastructure issues.
+
+    read_primitives (0.01/0.1): 438/447 queries pass, 9 fail. Representative:
+      `Code: 63. DB::Exception: Aggregate function with name 'LAG' does not
+      exist. Maybe you meant: ['lag']` - ClickHouse window function names are
+      lower-case; the emitted SQL uses upper-case LAG.
+    metadata_primitives (1.0): partial; result JSON written, exit 1.
+    tpchavoc (0.01/0.1): partial. tpchavoc 1.0 TIMES OUT at 1200s, and
+      flightdata 1.0 also times out - the SF=1.0 manifestations of the same
+      benchmarks; investigate whether the timeout is the same dialect/query
+      issue at scale or a genuine performance/query-plan problem.
+
+  Separately, joinorder 1.0 fails with `download failed after 3 attempts`
+  fetching the IMDB release asset - an infra/data-hosting issue unrelated to
+  ClickHouse; existing joinorder TODOs own that area.
+
+prior_art:
+  - "benchbox/platforms/clickhouse/ (SQL translation / dialect) — extend: lower-case window function emission (LAG/LEAD/etc.)"
+  - "tests/ dialect-translation tests — reference: where ClickHouse function-name casing is asserted"
+
+work:
+  - id: w0
+    summary: "Re-confirm the partial-failure query signatures on develop and enumerate the failing queries"
+    status: pending
+    notes: |
+      Pinned to corpus run uat_clickhouse_server_rc1_corpus_20260601 @ 4fe9124c1.
+      read_primitives result JSON shows summary.queries.failed=9 and an errors[]
+      entry for LAG. Re-derive by running read_primitives 0.01 against the
+      server and listing the failing query ids/messages; capture to /tmp and
+      summarize the distinct error classes here before fixing.
+
+  - id: w1
+    summary: "Fix case-sensitive window/aggregate function emission for ClickHouse (LAG/LEAD/etc.)"
+    needs: [w0]
+    status: pending
+
+  - id: w2
+    summary: "Triage the remaining read_primitives / metadata_primitives / tpchavoc failing queries"
+    needs: [w0]
+    status: pending
+    notes: "Bucket any beyond function-casing (unsupported functions, syntax) and fix or document as platform-unsupported."
+
+  - id: w3
+    summary: "Investigate tpchavoc 1.0 and flightdata 1.0 timeouts (same cause at scale vs perf)"
+    needs: [w0]
+    status: pending
+    notes: "flightdata 0.01/0.1 fail in the client-insert path (Code: 53); confirm whether the 1.0 timeout is the load path stalling or query execution."
+
+deferred:
+  - summary: "joinorder 1.0 IMDB release-asset download failure"
+    reason: "Infra/data-hosting, not ClickHouse; covered by existing joinorder TODOs (joinorder-scale-stress-decision-framework, joinorder-track2-groundwork)."
+
+must_preserve:
+  - "Query SQL for platforms other than ClickHouse is unaffected by any casing change."
+  - "The benchmarks that already pass all queries keep passing."
+
+approach: |
+  Start with the LAG/LEAD casing fix in the ClickHouse dialect, which likely
+  clears most of read_primitives' 9 failures, then re-run to see what remains.
+  Handle the timeouts last - they may resolve once the load-path (Code: 53) and
+  dialect fixes land, so coordinate with clickhouse-server-client-insert-type-coverage.
+
+anti_patterns:
+  - "DO NOT lower-case identifiers globally - only ClickHouse function names that are case-sensitive - other platforms and column names must be untouched."
+
+verification:
+  - description: "read_primitives passes all queries on ClickHouse server"
+    command: "CLICKHOUSE_HOST_PORT=19000 CLICKHOUSE_HTTP_HOST_PORT=18123 make uat-cell PLATFORM=clickhouse-server BENCHMARK=read_primitives SCALE=0.01"
+    expected_output: "validation full (no failed queries), cell passes"
+  - description: "Dialect translation tests cover ClickHouse function casing"
+    command: "uv run -- python -m pytest tests/ -k 'clickhouse and dialect' -q"
+    expected_output: "tests pass, including window-function casing"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/clickhouse/"
+    - "tests/"
+    - "_project/TODO/main/planning/clickhouse-server-query-dialect-partial-failures.yaml"
+
+deps:
+  needs: []
+
+success_metrics:
+  - "read_primitives clickhouse-server reaches validation: full (0 failed queries) at SF=0.01."
+  - "tpchavoc 1.0 and flightdata 1.0 either complete within the UAT timeout or have a documented root cause."
+  - "No SQL change affects non-ClickHouse platforms."
+
+metadata:
+  tags: [clickhouse-server, sql-dialect, uat, rc1]
+  estimated_effort: "Medium"
+  created_date: "2026-06-01"
+  last_updated: "2026-06-01T14:30:00-04:00"
