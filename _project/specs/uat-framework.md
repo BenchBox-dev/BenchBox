@@ -739,18 +739,14 @@ validated, packaged, reported, and cleaned up under the current operator
 workflow. It does not replace deeper benchmark-correctness suites.
 
 > **Vocabulary (charter decision, 2026-05-31).** "Release-gate orchestration"
-> is the chartered term for this layer. The word "certification" — which
-> appears only in develop-only docs and config/function names
-> (`docs/operations/uat-framework.md` "Certification re-run",
-> `tests/uat/configs/certification-0{1,2,3}-*.yaml`,
-> `tests/uat/phases/report.py:certification_ordering_violations`) — was never
-> chartered here (zero "certif" hits in this spec). Decision: Path A — rename
-> that surface to release-gate-orchestration vocabulary; do **not** charter a
-> standing "certification" operations surface beyond the named evidence
-> artifacts. The mechanical rename is owned by the in-progress
-> `uat-certification-rerun-ordering-and-gate` work, which holds those
-> `tests/uat/*.py` files, so the vocabulary lands with that change rather than
-> racing it here.
+> is the chartered term for this layer. The earlier develop-only "certification"
+> wording was never chartered here. Decision: Path A — use release-gate
+> vocabulary for the operations surface; do **not** charter a standing
+> cert-operations surface beyond the named evidence artifacts. The mechanical
+> rename landed in the UAT runbook, staged configs, ordering helper, and tests:
+> `docs/operations/uat-framework.md` "Release-gate re-run",
+> `tests/uat/configs/release-gate-0{1,2,3}-*.yaml`, and
+> `tests/uat/phases/report.py:release_gate_ordering_violations`.
 
 In particular, UAT does not assert query cardinality, per-query
 measurement coverage, or stored answer row-count invariants for every

@@ -57,12 +57,14 @@ uv run -- python -m pytest tests/uat -q -m fast
 uv run -- python -m pytest tests/uat -q -m "fast or slow"
 ```
 
-## Matrix Source Of Truth
+## Matrix And Connection Sources Of Truth
 
 `tests/uat/matrix.py` is the framework-owned source of truth for UAT
-platform groups, reachability probes, uv extras, platform options, and
-per-platform CLI flags. Keep updates in the same PR as the tests that
-exercise the affected matrix behavior.
+platform and benchmark groups, uv extras, and per-platform CLI flags.
+`tests/uat/docker_assets.py` owns Docker compose connection facts:
+reachability endpoints, compose-derived host ports, and platform options
+that must follow those ports. Keep updates in the same PR as the tests
+that exercise the affected matrix or connection behavior.
 
 ## Sequential platform execution
 

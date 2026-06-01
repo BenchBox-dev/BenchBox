@@ -162,18 +162,18 @@ def test_cross_scale_validator_status_normalizes_lookup_paths(tmp_path: Path, mo
 
 
 # ---------------------------------------------------------------------------
-# Certification re-run ordering check.
+# Release-gate re-run ordering check.
 # ---------------------------------------------------------------------------
 
 _NATIVE_LOG = """2026-05-30T01:00:00 [report] native+dataframe stage complete
 """
 
-_DOCKER_LOG_OK = """2026-05-30T02:00:00 [docker] platform=lakesail action=up status=ok project=benchbox-uat-cert-lakesail command=['docker'] message=started
-2026-05-30T02:30:00 [docker] platform=lakesail action=down status=ok project=benchbox-uat-cert-lakesail command=['docker'] message=removed
-2026-05-30T02:31:00 [docker] platform=clickhouse-server action=up status=ok project=benchbox-uat-cert-ch command=['docker'] message=started
+_DOCKER_LOG_OK = """2026-05-30T02:00:00 [docker] platform=lakesail action=up status=ok project=benchbox-uat-gate-lakesail command=['docker'] message=started
+2026-05-30T02:30:00 [docker] platform=lakesail action=down status=ok project=benchbox-uat-gate-lakesail command=['docker'] message=removed
+2026-05-30T02:31:00 [docker] platform=clickhouse-server action=up status=ok project=benchbox-uat-gate-ch command=['docker'] message=started
 """
 
-_DOCKER_LOG_EARLY = """2026-05-30T00:30:00 [docker] platform=cedardb action=up status=ok project=benchbox-uat-cert-cedardb command=['docker'] message=started
+_DOCKER_LOG_EARLY = """2026-05-30T00:30:00 [docker] platform=cedardb action=up status=ok project=benchbox-uat-gate-cedardb command=['docker'] message=started
 """
 
 
@@ -189,15 +189,15 @@ def test_parse_docker_up_events_ignores_non_docker_and_garbage_lines():
     assert report.parse_docker_up_events("not-a-timestamp [docker] action=up platform=x") == []
 
 
-def test_certification_ordering_no_violation_when_docker_starts_after_native():
+def test_release_gate_ordering_no_violation_when_docker_starts_after_native():
     boundary = _dt.datetime(2026, 5, 30, 1, 0, 0)
-    violations = report.certification_ordering_violations([_DOCKER_LOG_OK], native_stage_completed_at=boundary)
+    violations = report.release_gate_ordering_violations([_DOCKER_LOG_OK], native_stage_completed_at=boundary)
     assert violations == []
 
 
-def test_certification_ordering_flags_docker_up_before_native_completion():
+def test_release_gate_ordering_flags_docker_up_before_native_completion():
     boundary = _dt.datetime(2026, 5, 30, 1, 0, 0)
-    violations = report.certification_ordering_violations(
+    violations = report.release_gate_ordering_violations(
         [_DOCKER_LOG_EARLY, _DOCKER_LOG_OK], native_stage_completed_at=boundary
     )
     assert len(violations) == 1

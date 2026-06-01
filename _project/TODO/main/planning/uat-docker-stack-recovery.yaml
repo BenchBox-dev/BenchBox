@@ -6,7 +6,7 @@ status: In Progress
 category: Platform Expansion
 
 description: |
-  Neither Docker UAT run from 2026-05-28 produced usable certification
+  Neither Docker UAT run from 2026-05-28 produced usable release-gate
   evidence:
 
   - uat_complete_docker_non_oltp_20260528_20260528: cells.jsonl is EMPTY
@@ -51,9 +51,9 @@ work:
       then set cleanup.docker_start_timeout_s above the observed healthy time.
       Per the anti-pattern the global default is NOT raised blindly. The actual
       LakeSail value must be set from a measured healthy startup during the
-      certification bring-up (requires building the benchbox-lakesail Spark
+      release-gate bring-up (requires building the benchbox-lakesail Spark
       Connect image, which is the live-environment step folded into the
-      certification re-run; see uat-certification-rerun-ordering-and-gate w5).
+      release-gate re-run; see uat-certification-rerun-ordering-and-gate w5).
   - id: w2
     summary: "Ensure a single platform's compose-up failure does not end the sweep; remaining stacks still attempt"
     needs: [w0]
@@ -77,7 +77,7 @@ work:
     needs: [w0, w1, w2]
     status: pending
     notes: |
-      OPERATIONAL / live-environment step. Folded into the single certification
+      OPERATIONAL / live-environment step. Folded into the single release-gate
       re-run (uat-certification-rerun-ordering-and-gate w5), which executes the
       Docker OLTP stacks into a fresh run root rather than running the re-run
       twice. Requires built/pulled Docker images (OLTP stacks) + the live Docker
@@ -87,7 +87,7 @@ work:
     needs: [w0, w1, w2]
     status: pending
     notes: |
-      OPERATIONAL / live-environment step. Folded into the certification re-run
+      OPERATIONAL / live-environment step. Folded into the release-gate re-run
       (uat-certification-rerun-ordering-and-gate w5) into a fresh root. The w2
       fix here guarantees a single stack's startup failure no longer truncates
       the non-OLTP sweep, which was the root cause of the empty 2026-05-28
@@ -148,7 +148,7 @@ success_metrics:
   - "A single stack's compose-up failure no longer ends the sweep."
 
 metadata:
-  tags: [docker, lakesail, oltp, uat, certification]
+  tags: [docker, lakesail, oltp, uat, release-gate]
   estimated_effort: "Medium"
   created_date: "2026-05-28"
   last_updated: "2026-05-28T00:00:00"

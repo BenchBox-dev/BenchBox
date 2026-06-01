@@ -1,16 +1,16 @@
-# Certification re-run — STAGE 2 of 3: Docker non-OLTP stacks.
+# Release-gate re-run — STAGE 2 of 3: Docker non-OLTP stacks.
 #
-# Start ONLY after certification-01-native-dataframe.yaml has fully completed
-# (its report reached the COMPLETED footer). The certification ordering check
-# (tests/uat/phases/report.py::certification_ordering_violations) verifies that
+# Start ONLY after release-gate-01-native-dataframe.yaml has fully completed
+# (its report reached the COMPLETED footer). The release-gate ordering check
+# (tests/uat/phases/report.py::release_gate_ordering_violations) verifies that
 # no Docker `action=up` in this stage's uat_lifecycle.log precedes the stage-1
 # completion timestamp recorded in the runbook.
 #
 # UAT-managed Docker lifecycle: one stack at a time, project-scoped teardown
 # only. A single stack's compose-up failure records FAIL and the sweep advances
 # (see uat-docker-stack-recovery), so a slow/broken stack cannot empty the run.
-name: "certification-02-docker-nonoltp"
-description: "Certification stage 2: Docker non-OLTP stacks, scales 0.01/0.1/1"
+name: "release-gate-02-docker-nonoltp"
+description: "Release-gate stage 2: Docker non-OLTP stacks, scales 0.01/0.1/1"
 
 phases:
   - preflight
@@ -47,7 +47,7 @@ cleanup:
   prune_databases: true
   docker_manage_platforms: true
   docker_platform_switch: "volumes"
-  docker_project_prefix: "benchbox-uat-cert"
+  docker_project_prefix: "benchbox-uat-gate"
   # Provisional: set from a measured healthy startup during bring-up (see the
   # "measure-then-set" guidance), especially for the LakeSail Spark Connect
   # service which exceeded the prior 300s default.
@@ -63,5 +63,5 @@ report:
 
 output:
   benchmark_runs_dir_template: "~/Developer/benchmark_runs"
-  logs_dir_template: "~/Developer/benchmark_runs/logs/certification_02_docker_nonoltp_{date}"
+  logs_dir_template: "~/Developer/benchmark_runs/logs/release_gate_02_docker_nonoltp_{date}"
   submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"
