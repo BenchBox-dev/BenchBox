@@ -1,0 +1,117 @@
+id: uat-clickhouse-server-loader-type-coverage
+title: "Fix ClickHouse-server client-batch loader conversion gaps exposed by corpus UAT"
+worktree: main
+priority: High
+status: Identified
+category: Platform Expansion
+
+description: |
+  After PR #738 fixed the clickhouse-server provisioning/auth/database/load
+  path, the 2026-06-01 corpus rerun no longer showed the original 57/57
+  platform wipeout. The largest remaining failure cluster is server-mode
+  client-batch type conversion during load.
+
+  Corpus evidence:
+    - Matrix: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv`
+    - Cells: `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/cells.jsonl`
+
+  Representative failures:
+    - `clickhouse-server_tpcds_0.01_20260601_120433.log`: `Code: 53. Type mismatch in VALUES section... Column c_current_cdemo_sk: required argument is not an integer`; TPC-DS then reports many empty tables.
+    - `clickhouse-server_clickbench_1.0_20260601_122208.log`: `ClickHouse file loading failed: 'str' object has no attribute 'tzinfo'`.
+    - `clickhouse-server_vector_search_0.01_20260601_133631.log`: `ClickHouse file loading failed: could not convert string to float: '[0.0206561,...]'`.
+    - `clickhouse-server_datavault_0.01_20260601_133545.log`: `ClickHouse file loading failed: argument of type 'Table' is not iterable`.
+
+  Observed impact from the corpus classifier: integer/nullability conversion
+  affects TPC-DS, NYC Taxi, and FlightData small/medium cells; DateTime
+  conversion affects ClickBench, H2O DB, and TSBS; vector array parsing affects
+  Vector Search; schema-object handling affects DataVault. These are not
+  platform lifecycle failures: Docker up/down succeeded and the corpus executed
+  all 57 cells.
+
+prior_art:
+  - "_project/TODO/main/planning/uat-clickhouse-server-rc1-recovery.yaml: records the fixed platform wipeout and corpus artifact paths"
+  - "benchbox/platforms/base/data_loading.py: shared data-loading helpers and server-mode insertion path"
+  - "benchbox/platforms/clickhouse/: ClickHouse adapter, metadata, setup, and shared local/server behavior"
+  - "benchbox/utils/compression_mixin.py: existing file handling patterns that should remain untouched"
+
+work:
+  - id: w1
+    summary: "Add focused unit coverage for ClickHouse-server value conversion"
+    status: pending
+    notes: |
+      Cover nullable integer fields with blank/null-like inputs, Date and
+      DateTime/DateTime64 values supplied as strings, ClickHouse arrays such
+      as `Array(Float32)` from bracketed literals, and schemas represented by
+      benchmark `Table` objects instead of simple dicts.
+  - id: w2
+    summary: "Fix the client-batch conversion path without regressing clickhouse-local"
+    needs: [w1]
+    status: pending
+    notes: |
+      Keep server mode on client-side INSERT batches for Docker-host files;
+      do not revert to server-side `file()` loading. Preserve shared ClickHouse
+      SQL behavior while making type conversion explicit for server inserts.
+  - id: w3
+    summary: "Verify representative failing cells live against ClickHouse server"
+    needs: [w2]
+    status: pending
+    notes: |
+      Use UAT-managed Docker and the same benchmark output root. Representative
+      cells should include TPC-DS SF=0.01, one DateTime-heavy cell, DataVault
+      SF=0.01, and Vector Search SF=0.01 before broadening to the corpus.
+
+deps:
+  needs:
+    - uat-clickhouse-server-rc1-recovery
+
+must_preserve:
+  - "Keep the PR #738 server-mode contract: Docker-host data files load through client-side batches, not server-side `file()` paths."
+  - "Do not make clickhouse-local depend on clickhouse-driver server-only conversion behavior."
+  - "Do not silently coerce invalid data to zero or empty strings; nullability and parse failures must stay visible."
+
+approach: |
+  Treat this as a typed ingestion problem. Use the corpus logs to select the
+  minimal set of conversion cases, add targeted tests around the conversion and
+  schema-introspection helpers, then prove with live representative cells. If a
+  benchmark has invalid source data rather than a loader gap, split that into a
+  benchmark-specific TODO instead of hiding it in the adapter.
+
+anti_patterns:
+  - "DO NOT restore server-side `file()` loading for Docker-backed clickhouse-server; it cannot read arbitrary host paths."
+  - "DO NOT fix only the first TPC-DS integer column; prove the conversion policy at the helper boundary."
+  - "DO NOT paper over DataVault by special-casing a benchmark name if the bug is schema-object introspection."
+
+verification:
+  - description: "Focused ClickHouse loader conversion tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -q"
+    expected_output: "tests pass, including nullable integer, datetime, array, and Table-schema conversion cases"
+  - description: "TPC-DS small cell loads instead of failing on integer conversion"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=tpcds SCALE=0.01"
+    expected_output: "cell reaches query execution or passes; it must not fail with `required argument is not an integer` during load"
+  - description: "DateTime-heavy representative cell loads"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=h2odb SCALE=0.01"
+    expected_output: "cell does not fail with `'str' object has no attribute 'tzinfo'` during load"
+  - description: "Vector Search small cell parses vector arrays"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=vector_search SCALE=0.01"
+    expected_output: "cell does not fail converting bracketed vector values to scalar floats"
+  - description: "DataVault small cell handles benchmark Table schemas"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-cell PLATFORM=clickhouse-server BENCHMARK=datavault SCALE=0.01"
+    expected_output: "cell does not fail with `argument of type 'Table' is not iterable` during load"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/data_loading.py"
+    - "benchbox/platforms/clickhouse/"
+    - "tests/unit/platforms/test_clickhouse_adapter.py"
+    - "_project/TODO/main/planning/uat-clickhouse-server-loader-type-coverage.yaml"
+
+success_metrics:
+  - "Representative loader failures are covered by unit tests before the implementation fix."
+  - "TPC-DS, a DateTime-heavy benchmark, DataVault, and Vector Search each progress past load on clickhouse-server."
+  - "No regression to the passing TPCH, SSB, AMPLab, AI primitives, and TPCH skew clickhouse-server cells."
+
+metadata:
+  tags: [clickhouse-server, uat, loader, type-conversion]
+  estimated_effort: "Large"
+  created_date: "2026-06-01"
+  last_updated: "2026-06-01T14:07:26-04:00"

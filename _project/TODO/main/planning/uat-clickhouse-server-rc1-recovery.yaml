@@ -47,6 +47,27 @@ description: |
   and result
   `~/Developer/benchmark_runs/results/tpch_sf001_clickhouse_server_sql_20260601_114215_e1a77de5.json`.
 
+  Post-fix corpus verification on 2026-06-01 ran the original 57-cell
+  clickhouse-server non-OLTP surface under UAT-managed Docker lifecycle:
+
+    CLICKHOUSE_HOST_PORT=19000 CLICKHOUSE_HTTP_HOST_PORT=18123 \
+      BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs \
+      make uat-sweep CONFIG=/tmp/uat-clickhouse-server-rc1-corpus-20260601.yaml
+
+  Artifacts:
+    `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv`
+    `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/cells.jsonl`
+    `~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/uat_lifecycle.log`
+    `/tmp/uat-clickhouse-server-rc1-corpus-20260601.outer.log`
+
+  The corpus executed all 57 candidate cells with no compatibility or
+  early-stop pruning. Summary footer: `passed=15 failed=40 timed_out=2`,
+  `run_status=COMPLETED`, `source_dirty=false`. Docker lifecycle recorded
+  project-scoped clickhouse-server up/down success. The original RC-1 total
+  wipeout is therefore fixed; remaining failures are benchmark-specific
+  loader, DDL, query, data-availability, and timeout issues routed to
+  follow-up TODOs.
+
 prior_art:
   - "docs/operations/uat-local-provisioning.md: clickhouse-server is an automated Docker-backed platform at localhost:9000; use make uat-bring-up PLATFORM=clickhouse-server"
   - "docs/operations/uat-framework.md: managed Docker sweeps start project-scoped compose stacks and tear them down with docker_manage_platforms=true"
@@ -91,15 +112,31 @@ work:
   - id: w3
     summary: "If the smallest cell passes, rerun the clickhouse-server fast Docker corpus into a fresh run root"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
-      Use the repo's managed Docker lifecycle rather than an ad hoc server:
-      a config with `cleanup.docker_manage_platforms=true`,
-      `cleanup.docker_platform_switch=volumes`, platform include
-      `clickhouse-server`, and the fast non-OLTP benchmark/scale set. Verify
-      cells.jsonl is non-empty, lifecycle logs contain up/run/down for
-      clickhouse-server, and matrix_summary.tsv no longer shows a total
-      platform wipeout.
+      Completed on 2026-06-01 with a temporary corpus config at
+      `/tmp/uat-clickhouse-server-rc1-corpus-20260601.yaml`. The config used
+      UAT-managed Docker lifecycle, alternate host ports (`19000/18123`), the
+      `clickhouse-server` platform include, all non-OLTP benchmarks, scales
+      `0.01/0.1/1.0`, and `load,power` execution phases.
+
+      Evidence:
+
+        ~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/matrix_summary.tsv
+        ~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/cells.jsonl
+        ~/Developer/benchmark_runs/logs/uat_clickhouse_server_rc1_corpus_20260601/uat_lifecycle.log
+        /tmp/uat-clickhouse-server-rc1-corpus-20260601.outer.log
+
+      Matrix footer: 57 candidates, 57 executed, 15 passed, 40 failed,
+      2 timed out, 0 compatibility pruned, 0 early-stop pruned,
+      `run_status=COMPLETED`, `source_dirty=false`. Lifecycle logs show
+      clickhouse-server Docker up/down succeeded and no UAT compose project
+      remained after teardown. This satisfies the RC-1 metric: the platform no
+      longer has a 57/57 total wipeout. Follow-up failures are tracked in
+      `uat-clickhouse-server-loader-type-coverage`,
+      `uat-clickhouse-server-ddl-compatibility`,
+      `uat-clickhouse-server-query-compatibility`, and
+      `uat-clickhouse-server-data-and-timeout-tail`.
 
 deps:
   needs: []
@@ -161,4 +198,4 @@ metadata:
   tags: [clickhouse-server, docker, uat, rc1]
   estimated_effort: "Medium"
   created_date: "2026-06-01"
-  last_updated: "2026-06-01T11:42:00-04:00"
+  last_updated: "2026-06-01T14:07:26-04:00"
