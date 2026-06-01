@@ -96,7 +96,9 @@ work:
       OPERATIONAL / live-environment sign-off step (deferred; not runnable in the
       implementation sandbox). Requires all platforms incl. built/pulled Docker
       stacks (LakeSail Spark image etc.) and a long multi-stage sweep. This is
-      where uat-docker-stack-recovery w3/w4 (the Docker re-runs) are executed.
+      where [[uat-docker-stack-recovery]] w3/w4 (the Docker re-runs) are
+      executed; they are marked "VIA cert-rerun w5 — NOT standalone" there so
+      they are not picked up as an independent Docker-only sweep.
       Required terminal artifacts per run: cells.jsonl, compatibility_pruned.jsonl,
       resume.json (if aborted), matrix_summary.tsv, validator_rollup.tsv,
       uat_lifecycle.log, final report with COMPLETED footer + commit SHA. The
