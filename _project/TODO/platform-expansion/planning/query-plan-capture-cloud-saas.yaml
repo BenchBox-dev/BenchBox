@@ -69,22 +69,31 @@ prior_art:
 
 work:
   - id: w1
-    summary: "Collect EXPLAIN output samples for Snowflake, Azure Synapse, Firebolt, Fabric, and Lakesail"
+    summary: "Collect EXPLAIN output samples for each platform independently"
     status: pending
     notes: |
+      Each platform's fixture can be collected independently — as soon as a
+      single platform's fixture is available, that platform's parser work (w2-w7)
+      can begin without waiting for all other platforms. Collect in priority order:
+      Snowflake, Azure Synapse, Firebolt, Fabric Warehouse, Lakesail, BigQuery.
+
       For each available platform, run `EXPLAIN <simple_query>` and record:
         - Full EXPLAIN output text (or JSON)
         - Platform version / engine version
         - Any differences in syntax (e.g., `EXPLAIN USING TEXT` for Snowflake)
       Store as tests/fixtures/query_plans/{platform}_explain_sample.{txt|json}.
+
       BigQuery: instead of EXPLAIN, run a small query, then call
       `job.query_plan` on the completed QueryJob and record the JSON structure.
+      This requires a live BigQuery project — no EXPLAIN statement is available.
 
   - id: w2
     summary: "Implement SnowflakeQueryPlanParser and wire into SnowflakeAdapter"
     needs: [w1]
     status: pending
     notes: |
+      Requires: Snowflake fixture from w1.
+
       Snowflake EXPLAIN returns JSON (when using `EXPLAIN USING JSON`):
         {"GlobalStats": {...}, "Operations": [{"id": N, "operation": "...", ...}]}
       Parser maps Snowflake operation names to LogicalOperatorType:
@@ -104,6 +113,8 @@ work:
     needs: [w1]
     status: pending
     notes: |
+      Requires: BigQuery job.query_plan fixture from w1.
+
       BigQuery plans come from the Job Statistics API, not an EXPLAIN statement.
       This is an architectural mismatch with the base class:
         - Base class result_capture.py capture_query_plan() calls
@@ -144,6 +155,8 @@ work:
     needs: [w1]
     status: pending
     notes: |
+      Requires: Azure Synapse fixture from w1.
+
       Azure Synapse Dedicated Pool uses T-SQL-based EXPLAIN (XML format via
       `SET SHOWPLAN_XML ON`; or text via `SET SHOWPLAN_TEXT ON`). Serverless
       uses a different planner. Confirm which format get_query_plan() at
@@ -155,6 +168,8 @@ work:
     needs: [w1]
     status: pending
     notes: |
+      Requires: Firebolt fixture from w1.
+
       Firebolt's EXPLAIN returns a JSON structure with a tree of nodes.
       Implement FireboltQueryPlanParser mapping Firebolt operator names
       (TableScan, Projection, Aggregation, Join, etc.) to LogicalOperatorType.
@@ -165,6 +180,8 @@ work:
     needs: [w1, w4]
     status: pending
     notes: |
+      Requires: Fabric Warehouse fixture from w1 and AzureSynapseQueryPlanParser from w4.
+
       Fabric Warehouse (Synapse Serverless + Delta Lake) EXPLAIN format may
       differ from Synapse Dedicated. After collecting the Fabric fixture in w1
       and implementing AzureSynapseQueryPlanParser in w4:
@@ -187,6 +204,8 @@ work:
     needs: [w1]
     status: pending
     notes: |
+      Requires: Lakesail fixture from w1.
+
       Lakesail is a MySQL-wire-compatible engine. Collect EXPLAIN format in w1.
       Implement LakesailQueryPlanParser. Wire get_query_plan_parser() and
       the capture call in LakesailAdapter.execute_query().
@@ -220,20 +239,21 @@ must_preserve:
   - "Do not issue extra EXPLAIN queries that incur billing in BigQuery — use the job statistics from the already-executed query."
 
 approach: |
-  Start with fixture collection (w1) since all parsers depend on knowing the
-  actual output format. Parse work can proceed in parallel per platform once
-  fixtures are available. BigQuery requires the most architectural thought (w3)
-  since its plan source is fundamentally different from EXPLAIN-based platforms.
-  Implement parsers and wiring in priority order: Snowflake (most popular),
-  Azure Synapse, Firebolt, Fabric Warehouse, Lakesail, BigQuery (architectural
-  redesign last or in parallel). Unit tests can all be written from fixtures
-  without cloud credentials.
+  Fixture collection (w1) is per-platform and unblocks each platform's parser
+  work independently — do not wait for all six fixtures before starting. Collect
+  in priority order: Snowflake (most popular), Azure Synapse, Firebolt, Fabric
+  Warehouse, Lakesail, BigQuery (architectural redesign). As each fixture lands,
+  implement that platform's parser and wiring in parallel. BigQuery requires the
+  most architectural thought (w3) since its plan source is fundamentally different
+  from EXPLAIN-based platforms. Unit tests can all be written from fixtures
+  without cloud credentials once fixtures are collected.
 
 anti_patterns:
   - "DO NOT issue a second EXPLAIN query for BigQuery — the query plan is already available from the completed job object at no extra cost."
   - "DO NOT use synchronous EXPLAIN for BigQuery — there is no EXPLAIN statement; use the Job Statistics API."
   - "DO NOT add plan capture to BigQuery's get_query_plan() method without addressing its current incorrect return type (returns cost dict, not plan text)."
   - "DO NOT use SET SHOWPLAN_TEXT for Azure Synapse if SET SHOWPLAN_XML produces a richer parseable structure — prefer XML."
+  - "DO NOT block all platform work on complete fixture collection — each platform's fixture independently unblocks that platform's w2-w7 work."
 
 verification:
   - description: "All new parser unit tests pass"
@@ -286,4 +306,4 @@ metadata:
   tags: [query-plan, snowflake, bigquery, azure-synapse, firebolt, fabric-warehouse, lakesail, cloud-saas, new-parser]
   estimated_effort: "Large"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T00:00:00-04:00"
+  last_updated: "2026-06-02T12:00:00-04:00"

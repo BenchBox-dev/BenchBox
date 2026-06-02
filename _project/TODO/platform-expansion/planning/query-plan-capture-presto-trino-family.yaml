@@ -19,15 +19,20 @@ description: |
   `identifier`, `outputs`, `details`, and `children` fields. The parser
   must produce a `QueryPlanDAG` from that structure.
 
+  IMPORTANT: The current `get_query_plan_from_cursor()` implementation issues bare
+  `EXPLAIN {query}` — it does NOT include FORMAT JSON. Overriding `get_query_plan()`
+  to issue `EXPLAIN (FORMAT JSON)` is required; this override is definitive, not
+  conditional.
+
   Gap summary per adapter:
     - PrestoAdapter / PrestoTrinoAdapterBase (benchbox/platforms/presto_trino_adapter_base.py)
-        • get_query_plan(): ✅ line 632 — EXPLAIN via cursor
+        • get_query_plan(): ⚠️ line 632 — issues bare EXPLAIN (FORMAT JSON override required)
         • get_query_plan_parser(): ❌ no override
         • execute_query(): ❌ no capture_query_plan() call
     - StarburstAdapter (benchbox/platforms/starburst.py — inherits base)
         • Same as PrestoAdapter via inheritance
     - AthenaAdapter (benchbox/platforms/athena.py)
-        • get_query_plan(): ✅ line 1294 — EXPLAIN via cursor
+        • get_query_plan(): ⚠️ line 1294 — bare EXPLAIN (FORMAT JSON override required)
         • execute_query(): ✅ line 1179 — but no capture_query_plan() call
         • get_query_plan_parser(): ❌ no override
         • Athena uses the Presto engine; EXPLAIN output format is compatible
@@ -40,7 +45,7 @@ prerequisites:
   - "Running Presto ≥0.280 or Trino ≥400 instance for integration tests and EXPLAIN format verification"
   - "Starburst Galaxy or Enterprise instance for Starburst-specific EXPLAIN verification (optional — format should be identical to Trino)"
   - "AWS credentials with AmazonAthenaFullAccess + S3 output bucket for Athena integration tests (env: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, ATHENA_S3_OUTPUT, ATHENA_DATABASE)"
-  - "Unit tests (parser and wiring) can run without any credentials using recorded EXPLAIN fixtures"
+  - "Unit tests (parser and wiring) can run without any credentials using recorded EXPLAIN fixtures or synthetic fixtures based on the documented JSON schema"
 
 prior_art:
   - "benchbox/core/query_plans/parsers/datafusion.py — closest existing JSON-tree parser to replicate structurally"
@@ -48,7 +53,7 @@ prior_art:
   - "benchbox/core/query_plans/parsers/registry.py — version-aware parser registration to use"
   - "benchbox/platforms/duckdb.py:1069 — get_query_plan_parser() override pattern"
   - "benchbox/platforms/duckdb.py:969 — execute_query() capture integration pattern"
-  - "benchbox/platforms/presto_trino_adapter_base.py:632 — existing get_query_plan() implementation"
+  - "benchbox/platforms/presto_trino_adapter_base.py:632 — existing get_query_plan() (issues bare EXPLAIN; must be overridden)"
 
 work:
   - id: w1
@@ -61,6 +66,10 @@ work:
       as presto_explain_sample.json, trino_explain_sample.json,
       athena_explain_sample.json. These fixtures drive parser unit tests.
       Capture raw stdout to /tmp/presto-trino-explain-w1.log.
+
+      If live instances are not available, w2 and w3 can proceed with a synthetic
+      fixture based on the public Presto/Trino EXPLAIN FORMAT JSON schema —
+      document any assumptions in the fixture file header.
 
   - id: w2
     summary: "Implement PrestoTrinoQueryPlanParser in benchbox/core/query_plans/parsers/presto_trino.py"
@@ -91,18 +100,30 @@ work:
         - Parser registered correctly in registry for both dialects
 
   - id: w4
-    summary: "Override get_query_plan_parser() in PrestoTrinoAdapterBase"
+    summary: "Override get_query_plan() and get_query_plan_parser() in PrestoTrinoAdapterBase"
     needs: [w2]
     status: pending
     notes: |
-      In benchbox/platforms/presto_trino_adapter_base.py add:
-        def get_query_plan_parser(self):
-            from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
-            return PrestoTrinoQueryPlanParser()
-      PrestoAdapter and StarburstAdapter inherit this automatically.
-      Note: confirm EXPLAIN FORMAT JSON is supported by the cursor
-      in get_query_plan_from_cursor() — if not, override get_query_plan()
-      to use `EXPLAIN (FORMAT JSON)` explicitly.
+      In benchbox/platforms/presto_trino_adapter_base.py, BOTH overrides are required:
+
+      1. Override get_query_plan() to issue FORMAT JSON explicitly:
+           def get_query_plan(self, connection, query):
+               # The inherited get_query_plan_from_cursor() issues bare EXPLAIN;
+               # override here to get JSON for PrestoTrinoQueryPlanParser.
+               cursor = connection.cursor()
+               cursor.execute(f"EXPLAIN (FORMAT JSON) {query}")
+               rows = cursor.fetchall()
+               cursor.close()
+               return rows[0][0] if rows else None
+
+      2. Override get_query_plan_parser():
+           def get_query_plan_parser(self):
+               from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
+               return PrestoTrinoQueryPlanParser()
+
+      PrestoAdapter and StarburstAdapter inherit both automatically.
+      Verify the cursor API against w1 fixture collection — adjust row extraction
+      if needed.
 
   - id: w5
     summary: "Integrate capture_query_plan() into PrestoTrinoAdapterBase execute_query() path"
@@ -115,12 +136,13 @@ work:
       is identical to DuckDB's execute_query() (line 968-971).
 
   - id: w6
-    summary: "Override get_query_plan_parser() in AthenaAdapter; integrate capture in execute_query()"
+    summary: "Override get_query_plan() and get_query_plan_parser() in AthenaAdapter; integrate capture"
     needs: [w4]
     status: pending
     notes: |
-      AthenaAdapter has its own execute_query() (line 1179). Add get_query_plan_parser()
-      returning PrestoTrinoQueryPlanParser and add the capture call in execute_query().
+      AthenaAdapter has its own execute_query() (line 1179). Add get_query_plan()
+      returning `EXPLAIN (FORMAT JSON) {query}` output and get_query_plan_parser()
+      returning PrestoTrinoQueryPlanParser. Add the capture call in execute_query().
       Confirm Athena's EXPLAIN output via the fixture from w1 — Athena may strip
       the FORMAT JSON option and return a text plan. If so, create a separate
       AthenaQueryPlanParser or extend PrestoTrinoQueryPlanParser to handle both.
@@ -141,18 +163,21 @@ deps:
 must_preserve:
   - "PrestoAdapter, StarburstAdapter, and AthenaAdapter execute_query() result dict shape must not change for non-plan fields."
   - "Plan capture failure must be silent when strict_plan_capture=False — Athena queries are expensive; never fail a benchmark run for a plan capture error."
-  - "The base EXPLAIN call in get_query_plan_from_cursor() must not be changed if other adapters depend on it."
+  - "get_query_plan_from_cursor() in the base class must not be changed if other non-plan consumers depend on it — override get_query_plan() at the adapter level instead."
 
 approach: |
-  Begin with fixture collection (w1) since the parser cannot be written without
-  knowing the exact JSON structure. Then implement the parser (w2) and its tests
-  (w3). Wire the parser into the adapter base (w4+w5), then handle Athena's
-  potentially different format separately (w6). Finish with wiring unit tests (w7).
-  Do not block on cloud credentials for the parser work — use fixtures for all
-  unit tests.
+  Fixture collection (w1) is ideal but not blocking for parser work — the
+  Presto/Trino EXPLAIN FORMAT JSON schema is publicly documented and synthetic
+  fixtures can be written to unblock w2 and w3 without live instances. Then
+  wire the adapter base (w4+w5), noting that the get_query_plan() override is
+  required (not optional) because the inherited implementation issues bare EXPLAIN.
+  Handle Athena's potentially different format separately (w6). Finish with
+  wiring unit tests (w7). Do not block on cloud credentials for the parser
+  work — use fixtures for all unit tests.
 
 anti_patterns:
-  - "DO NOT write the parser against assumed JSON structure — use the actual w1 fixture samples to drive the field mapping."
+  - "DO NOT skip the get_query_plan() override in PrestoTrinoAdapterBase — the inherited get_query_plan_from_cursor() issues bare EXPLAIN, not FORMAT JSON, and PrestoTrinoQueryPlanParser cannot parse text output."
+  - "DO NOT write the parser against assumed JSON structure — use actual or synthetic w1 fixture samples to drive the field mapping."
   - "DO NOT use EXPLAIN ANALYZE for Athena — Athena does not run live queries during EXPLAIN; ANALYZE mode may not be supported."
   - "DO NOT add Presto/Trino/Athena-specific logic to PrestoTrinoAdapterBase if only Athena needs it — Athena overrides should live in AthenaAdapter."
 
@@ -192,4 +217,4 @@ metadata:
   tags: [query-plan, presto, trino, starburst, athena, new-parser]
   estimated_effort: "Medium"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T00:00:00-04:00"
+  last_updated: "2026-06-02T12:00:00-04:00"

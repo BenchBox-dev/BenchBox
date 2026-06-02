@@ -29,8 +29,10 @@ description: |
     - clickhouse-server: self-hosted TCP/HTTP connection
     - clickhouse-cloud: ClickHouse Cloud HTTP API
 
-  All three should share a common ClickHouseAdapter-level implementation of
-  get_query_plan() and a single ClickHouseQueryPlanParser.
+  The shared base class `ClickHouseAdapter` lives in
+  `benchbox/platforms/clickhouse/adapter.py`. All three modes should share a
+  base-level implementation of get_query_plan() and a single
+  ClickHouseQueryPlanParser.
 
 prerequisites:
   - "ClickHouse ≥20.6 for EXPLAIN PLAN support"
@@ -42,6 +44,7 @@ prerequisites:
 prior_art:
   - "benchbox/core/query_plans/parsers/duckdb.py — closest text-format parser; ClickHouse text plan is structurally similar"
   - "benchbox/core/query_plans/parsers/base.py — abstract interface to implement"
+  - "benchbox/platforms/clickhouse/adapter.py — ClickHouseAdapter base class (class ClickHouseAdapter)"
   - "benchbox/platforms/clickhouse_local.py:29 — ClickHouseLocalAdapter class"
   - "benchbox/platforms/clickhouse_server.py:33 — ClickHouseServerAdapter class"
   - "benchbox/platforms/duckdb.py:1038 — get_query_plan() implementation pattern"
@@ -107,9 +110,9 @@ work:
           returns a list of tuples.
         - clickhouse-cloud: uses clickhouse-connect over HTTP — different API.
 
-      After w1 confirms the actual connection type per mode, implement in the
-      shared ClickHouseAdapter base class (locate via grep for `class ClickHouseAdapter`).
-      If the connection API is uniform across modes (confirm first), use:
+      Implement in the shared ClickHouseAdapter base class at
+      benchbox/platforms/clickhouse/adapter.py (grep `class ClickHouseAdapter`).
+      If the connection API is uniform across modes (confirm in w1), use:
         def get_query_plan(self, connection, query):
             explain_query = f"EXPLAIN PLAN {query}"
             # Execute via the mode-appropriate connection API confirmed in w1
@@ -124,7 +127,8 @@ work:
     needs: [w2]
     status: pending
     notes: |
-      In the same ClickHouseAdapter base used in w4:
+      In benchbox/platforms/clickhouse/adapter.py (the same ClickHouseAdapter base
+      used in w4):
         def get_query_plan_parser(self):
             from benchbox.core.query_plans.parsers.clickhouse import ClickHouseQueryPlanParser
             return ClickHouseQueryPlanParser()
@@ -170,9 +174,9 @@ approach: |
   Start with fixture collection (w1) to understand the exact text format.
   Implement the parser (w2) modeled on the DuckDB text parser, then test it (w3).
   Add get_query_plan() and get_query_plan_parser() to the shared ClickHouseAdapter
-  base (w4+w5) so all three modes inherit them. Wire capture into execute_query()
-  (w6) and add wiring tests (w7). Do not require a live server for unit tests —
-  use fixtures throughout.
+  base at benchbox/platforms/clickhouse/adapter.py (w4+w5) so all three modes
+  inherit them. Wire capture into execute_query() (w6) and add wiring tests (w7).
+  Do not require a live server for unit tests — use fixtures throughout.
 
 anti_patterns:
   - "DO NOT use EXPLAIN PIPELINE as the default — pipeline output lacks logical operator names needed for cross-platform comparison."
@@ -194,6 +198,7 @@ verification:
 
 scope_limit:
   only_modify:
+    - "benchbox/platforms/clickhouse/adapter.py"
     - "benchbox/platforms/clickhouse_local.py"
     - "benchbox/platforms/clickhouse_server.py"
     - "benchbox/platforms/clickhouse_cloud.py"
@@ -217,4 +222,4 @@ metadata:
   tags: [query-plan, clickhouse, clickhouse-local, clickhouse-server, clickhouse-cloud, new-parser]
   estimated_effort: "Medium"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T00:00:00-04:00"
+  last_updated: "2026-06-02T12:00:00-04:00"
