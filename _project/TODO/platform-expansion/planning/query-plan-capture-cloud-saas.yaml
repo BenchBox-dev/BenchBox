@@ -1,0 +1,289 @@
+id: query-plan-capture-cloud-saas
+title: "Implement query plan capture for cloud SaaS platforms: Snowflake, BigQuery, Azure Synapse, Firebolt, Fabric Warehouse, and Lakesail"
+worktree: platform-expansion
+priority: Medium
+status: Not Started
+category: Platform Expansion
+
+description: |
+  Six cloud SaaS platforms need query plan capture work ranging from adding a new
+  parser to redesigning how the plan is fetched. Each has distinct EXPLAIN behavior
+  and all require cloud credentials for integration testing. The platforms are
+  grouped here because they share the pattern: need a new parser, need
+  execute_query() wiring, and each requires a cloud account.
+
+  Current state per platform:
+    1. SnowflakeAdapter (benchbox/platforms/snowflake.py)
+       - get_query_plan(): ❌ no override — Snowflake does not have a simple
+         EXPLAIN statement; instead it returns a query profile via
+         `EXPLAIN <query>` as JSON with LogicalPlanNode objects.
+       - No parser exists.
+       - Has execute_query() at line 1138.
+
+    2. BigQueryAdapter (benchbox/platforms/bigquery.py)
+       - get_query_plan(): ⚠️ exists at line 1714 but returns a dict with
+         `bytes_processed` and `job_id`, NOT a plan tree.
+         BigQuery's query plan is only available post-execution via the
+         Job Statistics API (`job.query_plan` on a completed QueryJob).
+       - No parser exists.
+       - Has execute_query() at line 1467.
+
+    3. AzureSynapseAdapter (benchbox/platforms/azure_synapse.py)
+       - get_query_plan(): ✅ line 1131 — EXPLAIN via cursor
+       - No parser exists.
+       - Has execute_query() at line 967.
+
+    4. FireboltAdapter (benchbox/platforms/firebolt.py)
+       - get_query_plan(): ✅ line 1296 — EXPLAIN via cursor
+       - No parser exists.
+
+    5. FabricWarehouseAdapter (benchbox/platforms/fabric_warehouse.py)
+       - get_query_plan(): ✅ line 1078
+       - No parser exists.
+       - Has execute_query() at line 638.
+
+    6. LakesailAdapter (benchbox/platforms/lakesail.py)
+       - get_query_plan(): ✅ line 552
+       - No parser exists.
+
+  BigQuery requires the most redesign: plans are not available from EXPLAIN but
+  from the post-execution Job statistics API. The `get_query_plan()` method must
+  be redesigned to accept a completed job reference rather than issuing a separate
+  EXPLAIN query.
+
+prerequisites:
+  - "Snowflake account + warehouse + database credentials (env: SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD, SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE)"
+  - "Google Cloud project with BigQuery API enabled + service account JSON key (env: GOOGLE_APPLICATION_CREDENTIALS, BIGQUERY_PROJECT)"
+  - "Azure subscription with Synapse Analytics workspace (env: AZURE_SYNAPSE_SERVER, AZURE_SYNAPSE_DATABASE, AZURE_SYNAPSE_USER, AZURE_SYNAPSE_PASSWORD)"
+  - "Firebolt account + engine endpoint (env: FIREBOLT_ACCOUNT, FIREBOLT_USER, FIREBOLT_PASSWORD, FIREBOLT_ENGINE)"
+  - "Microsoft Fabric workspace with Warehouse (env: FABRIC_SERVER, FABRIC_DATABASE, FABRIC_USER, FABRIC_PASSWORD)"
+  - "Lakesail account credentials (env: LAKESAIL_HOST, LAKESAIL_USER, LAKESAIL_PASSWORD)"
+  - "Unit tests for parsers can run without credentials using fixture EXPLAIN text samples"
+
+prior_art:
+  - "benchbox/core/query_plans/parsers/datafusion.py — JSON tree parser pattern (for Snowflake)"
+  - "benchbox/core/query_plans/parsers/postgresql.py — text-tree parser pattern (for Azure Synapse, Firebolt, Fabric)"
+  - "benchbox/core/query_plans/parsers/base.py — abstract interface"
+  - "benchbox/platforms/duckdb.py:969 — execute_query() capture integration pattern"
+  - "benchbox/platforms/bigquery.py:1467 — BigQuery execute_query() with completed QueryJob in scope"
+
+work:
+  - id: w1
+    summary: "Collect EXPLAIN output samples for Snowflake, Azure Synapse, Firebolt, Fabric, and Lakesail"
+    status: pending
+    notes: |
+      For each available platform, run `EXPLAIN <simple_query>` and record:
+        - Full EXPLAIN output text (or JSON)
+        - Platform version / engine version
+        - Any differences in syntax (e.g., `EXPLAIN USING TEXT` for Snowflake)
+      Store as tests/fixtures/query_plans/{platform}_explain_sample.{txt|json}.
+      BigQuery: instead of EXPLAIN, run a small query, then call
+      `job.query_plan` on the completed QueryJob and record the JSON structure.
+
+  - id: w2
+    summary: "Implement SnowflakeQueryPlanParser and wire into SnowflakeAdapter"
+    needs: [w1]
+    status: pending
+    notes: |
+      Snowflake EXPLAIN returns JSON (when using `EXPLAIN USING JSON`):
+        {"GlobalStats": {...}, "Operations": [{"id": N, "operation": "...", ...}]}
+      Parser maps Snowflake operation names to LogicalOperatorType:
+        TableScan / JoinFilter → SCAN
+        Filter → FILTER
+        Aggregate → AGGREGATE
+        Join / InnerJoin / LeftOuterJoin → JOIN
+        Sort → SORT
+        Result / WithReference → PROJECT
+      Wire in SnowflakeAdapter:
+        - Override get_query_plan() to use `EXPLAIN USING JSON <query>`
+        - Override get_query_plan_parser() returning SnowflakeQueryPlanParser
+        - Add capture_query_plan() call to execute_query()
+
+  - id: w3
+    summary: "Implement BigQueryQueryPlanParser and override capture_query_plan() in BigQueryAdapter"
+    needs: [w1]
+    status: pending
+    notes: |
+      BigQuery plans come from the Job Statistics API, not an EXPLAIN statement.
+      This is an architectural mismatch with the base class:
+        - Base class result_capture.py capture_query_plan() calls
+          self.get_query_plan(connection, query) BEFORE the query executes.
+        - BigQuery plans are only available AFTER execution via job.query_plan
+          on the completed google.cloud.bigquery.QueryJob object.
+
+      Required approach: override capture_query_plan() directly in BigQueryAdapter
+      to extract the plan from the already-completed QueryJob. Do NOT attempt
+      to use the get_query_plan() → parse() path for BigQuery; the QueryJob is
+      in scope inside execute_query() at line 1467 after job.result() returns.
+
+      Implementation:
+        1. Inside BigQueryAdapter.execute_query(), after job.result() completes,
+           call self._capture_bq_plan(job, query_id) instead of capture_query_plan().
+        2. Implement _capture_bq_plan(job, query_id) to:
+             a. Read job.query_plan — a list of QueryPlanEntry objects with
+                `name`, `substeps`, `records_read`, `records_written`, `status`.
+             b. Pass the JSON-serialized plan to BigQueryQueryPlanParser.parse().
+             c. Return (QueryPlanDAG, elapsed_ms).
+        3. Set plan_fingerprint from the returned DAG in the result dict.
+
+      Implement BigQueryQueryPlanParser:
+        - parse(raw_plan: str) -> QueryPlanDAG where raw_plan is JSON of
+          the job.query_plan structure.
+        - Each QueryPlanEntry.name maps to LogicalOperatorType:
+            INPUT → SCAN, FILTER → FILTER, AGGREGATE → AGGREGATE,
+            HASH_JOIN / BROADCAST_HASH_JOIN → JOIN, SORT → SORT,
+            OUTPUT → PROJECT (final projection/output step).
+        - entry.substeps provide operator detail strings.
+
+      Do NOT modify get_query_plan() in BigQueryAdapter for plan capture —
+      its current return (cost dict) may be used by other consumers; leave
+      it as-is and add the new _capture_bq_plan() method alongside it.
+
+  - id: w4
+    summary: "Implement AzureSynapseQueryPlanParser and wire into AzureSynapseAdapter"
+    needs: [w1]
+    status: pending
+    notes: |
+      Azure Synapse Dedicated Pool uses T-SQL-based EXPLAIN (XML format via
+      `SET SHOWPLAN_XML ON`; or text via `SET SHOWPLAN_TEXT ON`). Serverless
+      uses a different planner. Confirm which format get_query_plan() at
+      line 1131 currently retrieves. Implement a parser for that format.
+      Wire get_query_plan_parser() and the capture call in execute_query().
+
+  - id: w5
+    summary: "Implement FireboltQueryPlanParser and wire into FireboltAdapter"
+    needs: [w1]
+    status: pending
+    notes: |
+      Firebolt's EXPLAIN returns a JSON structure with a tree of nodes.
+      Implement FireboltQueryPlanParser mapping Firebolt operator names
+      (TableScan, Projection, Aggregation, Join, etc.) to LogicalOperatorType.
+      Wire get_query_plan_parser() and the capture call in FireboltAdapter.execute_query().
+
+  - id: w6
+    summary: "Wire FabricWarehouseAdapter plan capture; reuse AzureSynapseQueryPlanParser if format matches"
+    needs: [w1, w4]
+    status: pending
+    notes: |
+      Fabric Warehouse (Synapse Serverless + Delta Lake) EXPLAIN format may
+      differ from Synapse Dedicated. After collecting the Fabric fixture in w1
+      and implementing AzureSynapseQueryPlanParser in w4:
+
+      Decision gate (required before writing any Fabric parser code):
+        Compare the Fabric EXPLAIN fixture from w1 to the Azure Synapse fixture.
+        - If the T-SQL plan format is structurally identical:
+            Reuse AzureSynapseQueryPlanParser — do NOT implement a separate
+            FabricWarehouseQueryPlanParser. Wire FabricWarehouseAdapter to return
+            AzureSynapseQueryPlanParser from get_query_plan_parser().
+        - If the format differs (Synapse Serverless uses a different planner):
+            Implement a separate FabricWarehouseQueryPlanParser. Register under
+            dialect="fabric_warehouse" in the parser registry.
+
+      Wire get_query_plan_parser() and the capture call in execute_query()
+      regardless of which parser is chosen.
+
+  - id: w7
+    summary: "Implement LakesailQueryPlanParser and wire into LakesailAdapter"
+    needs: [w1]
+    status: pending
+    notes: |
+      Lakesail is a MySQL-wire-compatible engine. Collect EXPLAIN format in w1.
+      Implement LakesailQueryPlanParser. Wire get_query_plan_parser() and
+      the capture call in LakesailAdapter.execute_query().
+
+  - id: w8
+    summary: "Add unit tests for all new parsers and adapter wiring"
+    needs: [w2, w3, w4, w5, w6, w7]
+    status: pending
+    notes: |
+      Create tests/unit/query_plans/ tests for each new parser:
+        test_snowflake_parser.py, test_bigquery_parser.py,
+        test_azure_synapse_parser.py, test_firebolt_parser.py,
+        test_lakesail_parser.py
+        (FabricWarehouse parser test only if a new parser was required in w6;
+         skip if AzureSynapseQueryPlanParser is reused for Fabric)
+      For BigQuery, test _capture_bq_plan() directly with a mock QueryJob object
+      rather than testing get_query_plan_parser() — BigQuery bypasses that path.
+      Create tests/unit/platforms/test_cloud_saas_plan_capture.py with
+      parametrized cases for all six adapters:
+        - get_query_plan_parser() returns non-None
+        - execute_query() with capture_plans=True captures plan
+        - graceful degradation on capture failure
+
+deps:
+  needs: []
+
+must_preserve:
+  - "All six adapters' execute_query() result dict shape must not change for non-plan fields."
+  - "BigQuery execute_query() must not issue any additional API calls when capture_plans=False."
+  - "Plan capture failure must be silent when strict_plan_capture=False — cloud queries are expensive and billing-sensitive."
+  - "Do not issue extra EXPLAIN queries that incur billing in BigQuery — use the job statistics from the already-executed query."
+
+approach: |
+  Start with fixture collection (w1) since all parsers depend on knowing the
+  actual output format. Parse work can proceed in parallel per platform once
+  fixtures are available. BigQuery requires the most architectural thought (w3)
+  since its plan source is fundamentally different from EXPLAIN-based platforms.
+  Implement parsers and wiring in priority order: Snowflake (most popular),
+  Azure Synapse, Firebolt, Fabric Warehouse, Lakesail, BigQuery (architectural
+  redesign last or in parallel). Unit tests can all be written from fixtures
+  without cloud credentials.
+
+anti_patterns:
+  - "DO NOT issue a second EXPLAIN query for BigQuery — the query plan is already available from the completed job object at no extra cost."
+  - "DO NOT use synchronous EXPLAIN for BigQuery — there is no EXPLAIN statement; use the Job Statistics API."
+  - "DO NOT add plan capture to BigQuery's get_query_plan() method without addressing its current incorrect return type (returns cost dict, not plan text)."
+  - "DO NOT use SET SHOWPLAN_TEXT for Azure Synapse if SET SHOWPLAN_XML produces a richer parseable structure — prefer XML."
+
+verification:
+  - description: "All new parser unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/query_plans/test_snowflake_parser.py tests/unit/query_plans/test_bigquery_parser.py tests/unit/query_plans/test_azure_synapse_parser.py -v"
+    expected_output: "All tests pass, 0 failures"
+  - description: "Cloud SaaS adapter wiring tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_cloud_saas_plan_capture.py -v"
+    expected_output: "All tests pass, 0 failures"
+  - description: "Full unit suite passes"
+    command: "uv run -- python -m pytest tests/unit/ -q"
+    expected_output: "0 failures, 0 errors"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/snowflake.py"
+    - "benchbox/platforms/bigquery.py"
+    - "benchbox/platforms/azure_synapse.py"
+    - "benchbox/platforms/firebolt.py"
+    - "benchbox/platforms/fabric_warehouse.py"
+    - "benchbox/platforms/lakesail.py"
+    - "benchbox/core/query_plans/parsers/snowflake.py"
+    - "benchbox/core/query_plans/parsers/bigquery.py"
+    - "benchbox/core/query_plans/parsers/azure_synapse.py"
+    - "benchbox/core/query_plans/parsers/firebolt.py"
+    - "benchbox/core/query_plans/parsers/fabric_warehouse.py"
+    - "benchbox/core/query_plans/parsers/lakesail.py"
+    - "benchbox/core/query_plans/parsers/registry.py"
+    - "tests/unit/query_plans/"
+    - "tests/unit/platforms/test_cloud_saas_plan_capture.py"
+    - "tests/fixtures/query_plans/"
+    - "_project/TODO/platform-expansion/planning/query-plan-capture-cloud-saas.yaml"
+
+success_metrics:
+  - "All six adapters return a non-None parser from get_query_plan_parser()."
+  - "execute_query() with capture_plans=True stores QueryPlanDAG and plan_fingerprint for all six platforms."
+  - "BigQuery plan capture uses job statistics, not a separate EXPLAIN query."
+  - "All parser unit tests pass using fixture samples."
+
+open_questions:
+  - question: "Does Azure Synapse Serverless support EXPLAIN in the same format as Dedicated Pool?"
+    gating: true
+    affects: ["w4"]
+    default: "Implement separate parsers for Dedicated Pool (XML) and Serverless (text) if formats differ"
+  - question: "Does Fabric Warehouse share the Azure Synapse T-SQL plan format, or is it distinct?"
+    gating: true
+    affects: ["w6"]
+    default: "Collect fixture in w1 before implementing; reuse AzureSynapseParser if format matches"
+
+metadata:
+  tags: [query-plan, snowflake, bigquery, azure-synapse, firebolt, fabric-warehouse, lakesail, cloud-saas, new-parser]
+  estimated_effort: "Large"
+  created_date: "2026-06-02"
+  last_updated: "2026-06-02T00:00:00-04:00"
