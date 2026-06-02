@@ -19,18 +19,24 @@ description: |
         • get_query_plan(): ❌ no override — base returns None
         • get_query_plan_parser(): ❌ no override — base returns None
         • execute_query(): ❌ never calls capture_query_plan()
-        • DataFusion EXPLAIN format: JSON — `EXPLAIN FORMAT JSON <query>`
-          or `EXPLAIN ANALYZE FORMAT JSON <query>` (includes execution stats)
+        • DataFusion EXPLAIN format: text — `EXPLAIN <query>` or
+          `EXPLAIN ANALYZE <query>` (includes execution stats).
+          DataFusionQueryPlanParser is a text/indent parser that reads
+          logical_plan/physical_plan section headers; do NOT use FORMAT JSON.
     - SQLiteAdapter (benchbox/platforms/sqlite.py — or embedded in another file)
         • get_query_plan(): ❌ no override — base returns None
         • get_query_plan_parser(): ❌ no override — base returns None
         • execute_query(): ❌ never calls capture_query_plan()
         • SQLite EXPLAIN format: `EXPLAIN QUERY PLAN <query>` returns rows of
-          (id, parent, notused, detail) — text-based tree representation
+          (id, parent, notused, detail) — text-based tree representation.
+          Note: modern SQLite outputs `SCAN orders` / `SEARCH orders USING INDEX`
+          rather than `SCAN TABLE orders`; the parser may need _infer_operator_type()
+          fixes to classify these correctly.
 
   Both parsers already handle their respective formats and are covered by unit
   tests. The only work is adding the three-point integration:
-  get_query_plan() → get_query_plan_parser() → execute_query() capture call.
+  get_query_plan() → get_query_plan_parser() → execute_query() capture call,
+  plus any parser fixes required for modern SQLite output patterns.
 
 prerequisites:
   - "No cloud credentials required — DataFusion and SQLite run in-process"
@@ -40,19 +46,21 @@ prerequisites:
 prior_art:
   - "benchbox/platforms/duckdb.py:969 — canonical execute_query plan-capture integration pattern"
   - "benchbox/platforms/duckdb.py:1069 — get_query_plan_parser() override pattern"
-  - "benchbox/core/query_plans/parsers/datafusion.py — existing DataFusion JSON parser (20KB)"
+  - "benchbox/core/query_plans/parsers/datafusion.py — existing DataFusion text/indent parser"
   - "benchbox/core/query_plans/parsers/sqlite.py — existing SQLite text-tree parser"
   - "tests/unit/platforms/test_duckdb_plan_capture.py — unit test pattern to replicate"
 
 work:
   - id: w1
-    summary: "Confirm DataFusion EXPLAIN JSON syntax via live query and document in TODO"
+    summary: "Confirm DataFusion EXPLAIN text syntax via live query and document in TODO"
     status: pending
     notes: |
-      Run a trivial DataFusion query with EXPLAIN FORMAT JSON in the BenchBox
-      harness or a standalone script. Record the exact SQL syntax that works
-      with the installed datafusion version and confirm the output matches what
-      DataFusionQueryPlanParser expects. Capture to /tmp/datafusion-explain-w1.log.
+      Run a trivial DataFusion query with EXPLAIN (text format — not FORMAT JSON) in
+      the BenchBox harness or a standalone script. DataFusionQueryPlanParser is a
+      text/indent parser that reads logical_plan/physical_plan section headers, so
+      text output is required. Record the exact SQL syntax that works with the
+      installed datafusion version and confirm the section headers in the output match
+      what DataFusionQueryPlanParser expects. Capture to /tmp/datafusion-explain-w1.log.
 
   - id: w2
     summary: "Add get_query_plan() and get_query_plan_parser() to DataFusionAdapter"
@@ -62,14 +70,21 @@ work:
       In benchbox/platforms/datafusion.py add:
         def get_query_plan(self, connection, query):
             ctx = connection  # DataFusion uses a SessionContext
-            result = ctx.sql(f"EXPLAIN FORMAT JSON {query}")
-            return result.collect()[0][0].as_py()  # adjust to actual API
+            result = ctx.sql(f"EXPLAIN {query}")
+            # EXPLAIN returns a DataFrame with columns (type, plan);
+            # column 1 contains the plan text. Exact API confirmed in w1.
+            batches = result.collect()
+            lines = []
+            for batch in batches:
+                for i in range(batch.num_rows):
+                    lines.append(batch.column(1)[i].as_py())
+            return "\n".join(lines) if lines else None
 
         def get_query_plan_parser(self):
             from benchbox.core.query_plans.parsers.datafusion import DataFusionQueryPlanParser
             return DataFusionQueryPlanParser()
-      Adjust the exact RecordBatch extraction to match the DataFusion Python API
-      as confirmed in w1.
+      Adjust the exact RecordBatch column index/API to match the DataFusion Python
+      version as confirmed in w1.
 
   - id: w3
     summary: "Integrate capture_query_plan() into DataFusionAdapter.execute_query()"
@@ -107,8 +122,15 @@ work:
       SQLite returns (id, parent, notused, detail) tuples. Verify parser handles
       them correctly. Capture to /tmp/sqlite-explain-w5.log.
 
+      Also check whether `SQLiteQueryPlanParser._infer_operator_type()` handles
+      modern SQLite output. Recent SQLite versions (≥3.36) output `SCAN orders`
+      and `SEARCH orders USING INDEX` rather than `SCAN TABLE orders`. If
+      operator type inference is stale it will classify these as OTHER, producing
+      poor fingerprints. Fix `_infer_operator_type()` in w6 if needed —
+      `benchbox/core/query_plans/parsers/sqlite.py` is in scope.
+
   - id: w6
-    summary: "Add get_query_plan() and get_query_plan_parser() to SQLiteAdapter"
+    summary: "Add get_query_plan() and get_query_plan_parser() to SQLiteAdapter; fix parser if needed"
     needs: [w5]
     status: pending
     notes: |
@@ -116,15 +138,21 @@ work:
         def get_query_plan(self, connection, query):
             cursor = connection.cursor()
             cursor.execute(f"EXPLAIN QUERY PLAN {query}")
-            rows = cursor.fetchall()
+            rows = cursor.fetchall()  # returns (id, parent, notused, detail) tuples
             cursor.close()
-            # Format as text tree for the parser
-            return "\n".join(f"{r[0]}|{r[1]}|{r[2]}|{r[3]}" for r in rows)
+            # SQLiteQueryPlanParser expects indented text with |-- / `-- tree chars.
+            # The exact transformation from tuples to tree text must be confirmed in
+            # w5 against the actual parser input format. Do not assume the pipe-
+            # delimited raw tuple format works — verify first.
+            return <tree-formatted text confirmed in w5>
 
         def get_query_plan_parser(self):
             from benchbox.core.query_plans.parsers.sqlite import SQLiteQueryPlanParser
             return SQLiteQueryPlanParser()
-      Confirm the text format matches what SQLiteQueryPlanParser expects.
+
+      If w5 found that `_infer_operator_type()` misclassifies modern SQLite output
+      (`SCAN orders`, `SEARCH orders USING INDEX`, etc.), fix the method in
+      benchbox/core/query_plans/parsers/sqlite.py before wiring the adapter.
 
   - id: w7
     summary: "Integrate capture_query_plan() into SQLiteAdapter.execute_query()"
@@ -150,17 +178,18 @@ must_preserve:
   - "DataFusion EXPLAIN queries must not be issued when capture_plans=False — avoid performance overhead on every query."
 
 approach: |
-  Start with DataFusion (w1-w4): confirm the exact EXPLAIN JSON API against the
-  installed datafusion version, then wire the three integration points. The
-  parser already exists, so this is plumbing work. Then replicate for SQLite
-  (w5-w8), which uses a text-tree format rather than JSON. Both platforms are
-  locally runnable so all unit tests can use real in-process connections rather
-  than mocks if desired.
+  Start with DataFusion (w1-w4): confirm the exact EXPLAIN text API against the
+  installed datafusion version (text format, not FORMAT JSON), then wire the three
+  integration points. The parser already exists. Then replicate for SQLite (w5-w8),
+  verifying both the tuple-to-text format conversion and whether
+  _infer_operator_type() needs updating for modern SQLite output patterns.
 
 anti_patterns:
+  - "DO NOT use EXPLAIN FORMAT JSON for DataFusion — DataFusionQueryPlanParser is a text/indent parser that reads logical_plan/physical_plan section headers and cannot consume JSON output."
   - "DO NOT use EXPLAIN ANALYZE for SQLite — SQLite's EXPLAIN QUERY PLAN does not support ANALYZE and will raise an error."
   - "DO NOT import DataFusionQueryPlanParser at module level in datafusion.py — keep lazy to avoid import cost when DataFusion is not installed."
   - "DO NOT use ctx.sql().to_pandas() for EXPLAIN output — use collect() and extract the scalar text to avoid an unnecessary pandas dependency."
+  - "DO NOT assume the raw (id, parent, notused, detail) SQLite tuple format matches SQLiteQueryPlanParser input — confirm the expected text format in w5 before writing the get_query_plan() formatter."
 
 verification:
   - description: "DataFusion plan capture unit tests pass"
@@ -177,12 +206,12 @@ scope_limit:
   only_modify:
     - "benchbox/platforms/datafusion.py"
     - "benchbox/platforms/sqlite.py"
+    - "benchbox/core/query_plans/parsers/sqlite.py"
     - "tests/unit/platforms/test_datafusion_plan_capture.py"
     - "tests/unit/platforms/test_sqlite_plan_capture.py"
     - "_project/TODO/platform-expansion/planning/query-plan-capture-datafusion-sqlite.yaml"
   do_not_modify:
     - "benchbox/core/query_plans/parsers/datafusion.py"
-    - "benchbox/core/query_plans/parsers/sqlite.py"
 
 success_metrics:
   - "DataFusionAdapter.get_query_plan_parser() returns a non-None DataFusionQueryPlanParser instance."
@@ -194,4 +223,4 @@ metadata:
   tags: [query-plan, datafusion, sqlite, wiring, no-credentials]
   estimated_effort: "Small"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T00:00:00-04:00"
+  last_updated: "2026-06-02T12:00:00-04:00"

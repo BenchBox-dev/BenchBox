@@ -81,7 +81,8 @@ work:
             # Identical to DuckDBAdapter — EXPLAIN (ANALYZE, FORMAT JSON)
             explain_query = f"EXPLAIN (ANALYZE, FORMAT JSON) {query}"
             result = connection.execute(explain_query).fetchall()
-            return result[0][0] if result else None
+            # DuckDB EXPLAIN rows are (key, value) tuples; column 1 is the JSON value.
+            return result[0][1] if result else None
 
         def get_query_plan_parser(self):
             from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
@@ -188,14 +189,17 @@ work:
 
   - id: w9
     summary: "Add unit tests for all newly wired adapters"
-    needs: [w1, w2, w3, w4, w5, w6, w7]
+    needs: [w1, w2, w3, w4, w6, w7]
     status: pending
     notes: |
       Create tests/unit/platforms/test_misc_plan_capture.py with parametrized
-      cases for MotherDuck, Databend, QuestDB, Velox, Doris, SingleStore:
+      cases for MotherDuck, Databend, QuestDB, Doris, SingleStore:
         - get_query_plan_parser() returns non-None
         - execute_query() with capture_plans=True captures plan (mock connection)
         - graceful degradation on capture failure
+      Velox (w5) is excluded from this test unit's needs because w5 is blocked
+      on the Presto/Trino TODO. Add Velox wiring tests to this file as a
+      follow-on once w5 completes.
 
 deferred:
   - summary: "cuDF EXPLAIN-based plan capture"
@@ -219,12 +223,14 @@ approach: |
   because it runs locally. QuestDB (w4) is next since get_query_plan() already
   exists. Velox (w5) depends on the Presto/Trino TODO being done first. Doris and
   SingleStore (w6+w7) are lower priority since they require external cluster access.
-  cuDF (w8) is documentation only. Consolidate all wiring tests in w9.
+  cuDF (w8) is documentation only. Consolidate most wiring tests in w9; add Velox
+  test separately after w5 unblocks.
 
 anti_patterns:
   - "DO NOT implement a cuDF parser stub expecting it will be called — cuDF always returns None and should continue to do so until upstream support exists."
   - "DO NOT add Velox-specific operator name handling to PrestoTrinoAdapterBase — Velox extensions should be in VeloxAdapter."
   - "DO NOT require a GPU or cuDF install for any unit tests."
+  - "DO NOT return result[0][0] from MotherDuck EXPLAIN — DuckDB EXPLAIN (ANALYZE, FORMAT JSON) rows are (key, value) tuples; column 0 is the key string (e.g., 'analyzed_plan'), column 1 is the JSON value. Use result[0][1]."
 
 verification:
   - description: "MotherDuck plan capture wiring tests pass"
@@ -265,4 +271,4 @@ metadata:
   tags: [query-plan, questdb, velox, databend, motherduck, cudf, doris, singlestore, misc]
   estimated_effort: "Large"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T00:00:00-04:00"
+  last_updated: "2026-06-02T12:00:00-04:00"

@@ -9,7 +9,10 @@ description: |
   SparkAdapter has `get_query_plan()` implemented in
   `benchbox/platforms/base/spark_execution_mixin.py` (line 688), but no parser
   exists and `execute_query()` (line 470, via `_execute_query_spark`) never calls
-  `capture_query_plan()`. Databricks likely has a similar or inherited state.
+  `capture_query_plan()`. Databricks has a dedicated adapter at
+  `benchbox/platforms/databricks/adapter.py` that inherits `PlatformAdapter`
+  directly (NOT SparkAdapter or SparkQueryExecutionMixin), so it will not inherit
+  plan capture automatically — explicit wiring is always required.
 
   Spark's EXPLAIN output has multiple modes:
     - `df.explain()` / `EXPLAIN <query>` — text plan with three sections:
@@ -35,7 +38,7 @@ description: |
   `_execute_query_spark()` after the timed SQL block.
 
 prerequisites:
-  - "Apache Spark ≥3.0 cluster or local Spark session (PySpark) for integration and EXPLAIN format verification"
+  - "Apache Spark ≥3.0 cluster or local Spark session (PySpark local[*] mode) for integration and EXPLAIN format verification — no cluster required for w1 with local mode"
   - "Databricks workspace URL + personal access token for Databricks integration tests (env: DATABRICKS_HOST, DATABRICKS_TOKEN)"
   - "Unit tests (parser + wiring) can run without a live cluster using recorded EXPLAIN fixture text"
   - "pyspark Python package installed in the venv for unit test mocking"
@@ -55,7 +58,8 @@ work:
     notes: |
       Check what SQL string get_query_plan() in spark_execution_mixin.py currently
       issues (EXPLAIN? EXPLAIN EXTENDED? EXPLAIN FORMATTED?). Capture the output
-      from a live Spark session against a simple TPC-H query. Record:
+      from a live Spark session (PySpark local[*] mode works without a cluster)
+      against a simple TPC-H query. Record:
         - Exact SQL issued
         - Full text output (all plan sections)
         - Spark version
@@ -126,18 +130,27 @@ work:
       Propagate into the return dict.
 
   - id: w6
-    summary: "Assess Databricks adapter inheritance and wire or override as needed"
+    summary: "Wire Databricks adapter plan capture explicitly"
     needs: [w4, w5]
     status: pending
     notes: |
-      Inspect benchbox/platforms/databricks.py (if it exists). If Databricks
-      inherits SparkAdapter or SparkQueryExecutionMixin, it will inherit plan
-      capture automatically. If it has its own execute_query() or connection
-      model, add the capture call there. Databricks Connect uses the same
-      PySpark API but may return different EXPLAIN text for Unity Catalog queries.
-      Confirm with a w1-style EXPLAIN sample if a Databricks workspace is available.
-      If credentials are unavailable, defer Databricks live validation to a
-      follow-up UAT and note the deferred status here.
+      IMPORTANT: DatabricksAdapter (benchbox/platforms/databricks/adapter.py)
+      inherits PlatformAdapter directly — NOT SparkAdapter or SparkQueryExecutionMixin.
+      Plan capture is never inherited automatically; wiring is always required
+      regardless of the Spark mixin implementation.
+
+      Steps:
+        1. Inspect benchbox/platforms/databricks/adapter.py to locate execute_query()
+           and understand the connection model.
+        2. Override get_query_plan_parser() to return SparkQueryPlanParser (Databricks
+           uses the same PySpark EXPLAIN format).
+        3. Override get_query_plan() if needed for the Databricks connection model.
+        4. Add the capture_query_plan() call in execute_query() after the timed block.
+
+      Databricks Connect uses the same PySpark API but may return different EXPLAIN
+      text for Unity Catalog queries. Confirm with a w1-style EXPLAIN sample if a
+      Databricks workspace is available. If credentials are unavailable, defer
+      Databricks live validation to a follow-up UAT and note the deferred status.
 
   - id: w7
     summary: "Add wiring unit tests for SparkAdapter plan capture"
@@ -166,17 +179,19 @@ must_preserve:
 
 approach: |
   Start with fixture collection (w1) to confirm the exact SQL issued and output
-  format. Implement the parser (w2) targeting the physical plan section of EXPLAIN
-  EXTENDED or EXPLAIN (whichever get_query_plan() already uses). Test the parser (w3).
+  format — PySpark local[*] mode avoids needing a real cluster for this step.
+  Implement the parser (w2) targeting the physical plan section. Test the parser (w3).
   Wire get_query_plan_parser() into the mixin (w4) and add the capture call in
-  _execute_query_spark() (w5). Assess Databricks (w6) based on its inheritance chain.
+  _execute_query_spark() (w5). Then wire Databricks explicitly (w6) — it does not
+  inherit from SparkAdapter so the mixin work does not flow through automatically.
   Finish with wiring unit tests (w7).
 
 anti_patterns:
   - "DO NOT modify benchbox/core/dataframe/profiling.py — that is a separate DataFrame plan system."
   - "DO NOT issue EXPLAIN during execution when capture_plans=False."
   - "DO NOT parse all four plan sections (Parsed, Analyzed, Optimized, Physical) — parse only the physical plan for fingerprinting to reduce noise across Spark versions."
-  - "DO NOT add Databricks-specific logic to SparkQueryExecutionMixin if it only applies to Databricks Connect."
+  - "DO NOT assume Databricks inherits plan capture from SparkQueryExecutionMixin — DatabricksAdapter inherits PlatformAdapter directly and requires explicit wiring in benchbox/platforms/databricks/adapter.py."
+  - "DO NOT edit benchbox/platforms/databricks.py — that path does not exist; the adapter is at benchbox/platforms/databricks/adapter.py."
 
 verification:
   - description: "Spark parser unit tests pass"
@@ -193,7 +208,7 @@ scope_limit:
   only_modify:
     - "benchbox/platforms/spark.py"
     - "benchbox/platforms/base/spark_execution_mixin.py"
-    - "benchbox/platforms/databricks.py"
+    - "benchbox/platforms/databricks/adapter.py"
     - "benchbox/core/query_plans/parsers/spark.py"
     - "benchbox/core/query_plans/parsers/registry.py"
     - "tests/unit/query_plans/test_spark_parser.py"
@@ -214,4 +229,4 @@ metadata:
   tags: [query-plan, spark, databricks, pyspark, new-parser]
   estimated_effort: "Medium"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T00:00:00-04:00"
+  last_updated: "2026-06-02T12:00:00-04:00"
