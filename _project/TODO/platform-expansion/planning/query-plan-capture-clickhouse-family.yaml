@@ -1,0 +1,220 @@
+id: query-plan-capture-clickhouse-family
+title: "Implement query plan capture for ClickHouse local, server, and cloud adapters"
+worktree: platform-expansion
+priority: Medium-High
+status: Not Started
+category: Platform Expansion
+
+description: |
+  None of the three ClickHouse adapters (clickhouse-local, clickhouse-server,
+  clickhouse-cloud) implement `get_query_plan()`, `get_query_plan_parser()`, or
+  call `capture_query_plan()`. They all inherit from `ClickHouseAdapter` which
+  itself does not add plan support. No ClickHouse parser exists in
+  `benchbox/core/query_plans/parsers/`.
+
+  ClickHouse supports several EXPLAIN variants:
+    - `EXPLAIN PLAN <query>` — logical plan tree (text, terse nodes)
+    - `EXPLAIN PIPELINE <query>` — physical execution pipeline (text)
+    - `EXPLAIN PIPELINE graph=1 <query>` — Graphviz DOT format
+    - `EXPLAIN ESTIMATE <query>` — row/part estimates only
+
+  The most useful for cross-platform comparison is `EXPLAIN PLAN` for logical
+  structure and `EXPLAIN PIPELINE` for physical operators. The plan is returned
+  as plain text with indentation-based tree structure, similar in format to
+  DuckDB's text output mode.
+
+  ClickHouse version note: EXPLAIN was added in ClickHouse 20.6. The three BenchBox
+  ClickHouse modes use different connections:
+    - clickhouse-local: in-process, no server needed
+    - clickhouse-server: self-hosted TCP/HTTP connection
+    - clickhouse-cloud: ClickHouse Cloud HTTP API
+
+  All three should share a common ClickHouseAdapter-level implementation of
+  get_query_plan() and a single ClickHouseQueryPlanParser.
+
+prerequisites:
+  - "ClickHouse ≥20.6 for EXPLAIN PLAN support"
+  - "clickhouse-local binary (bundled in _binaries/ or installed) for clickhouse-local integration"
+  - "Running clickhouse-server instance at localhost:9000 (or configured host) for server integration tests"
+  - "ClickHouse Cloud account + service endpoint + credentials for cloud integration tests (env: CLICKHOUSE_CLOUD_HOST, CLICKHOUSE_CLOUD_USER, CLICKHOUSE_CLOUD_PASSWORD)"
+  - "Unit tests (parser + wiring) can run without any live server using fixture text samples"
+
+prior_art:
+  - "benchbox/core/query_plans/parsers/duckdb.py — closest text-format parser; ClickHouse text plan is structurally similar"
+  - "benchbox/core/query_plans/parsers/base.py — abstract interface to implement"
+  - "benchbox/platforms/clickhouse_local.py:29 — ClickHouseLocalAdapter class"
+  - "benchbox/platforms/clickhouse_server.py:33 — ClickHouseServerAdapter class"
+  - "benchbox/platforms/duckdb.py:1038 — get_query_plan() implementation pattern"
+  - "benchbox/platforms/duckdb.py:1069 — get_query_plan_parser() pattern"
+
+work:
+  - id: w1
+    summary: "Collect EXPLAIN PLAN and EXPLAIN PIPELINE text samples from ClickHouse"
+    status: pending
+    notes: |
+      Against a live ClickHouse instance (local or server), run:
+        EXPLAIN PLAN SELECT l_orderkey, sum(l_quantity) FROM lineitem GROUP BY l_orderkey
+        EXPLAIN PIPELINE SELECT l_orderkey, sum(l_quantity) FROM lineitem GROUP BY l_orderkey
+      Capture both outputs and record the exact indentation and node-name format.
+      Note the ClickHouse version (SELECT version()). Store as:
+        tests/fixtures/query_plans/clickhouse_explain_plan_sample.txt
+        tests/fixtures/query_plans/clickhouse_explain_pipeline_sample.txt
+      Raw output to /tmp/clickhouse-explain-w1.log.
+
+  - id: w2
+    summary: "Implement ClickHouseQueryPlanParser in benchbox/core/query_plans/parsers/clickhouse.py"
+    needs: [w1]
+    status: pending
+    notes: |
+      Implement the QueryPlanParser abstract interface:
+        - parse(raw_plan: str) -> QueryPlanDAG
+        - Parse EXPLAIN PLAN text output (indentation-based tree)
+        - Map ClickHouse operator names to LogicalOperatorType:
+            ReadFromMergeTree / ReadFromMemoryStorage → SCAN
+            Filter → FILTER
+            Aggregating / PartialAggregating → AGGREGATE
+            Join → JOIN
+            Sorting → SORT
+            Expression → EXPRESSION
+            Limit / LimitBy → LIMIT
+            Union → UNION
+        - Use the DuckDB text parser as the structural template since both
+          use indented text trees
+        - Register in parsers/registry.py under dialect="clickhouse"
+
+  - id: w3
+    summary: "Add unit tests for ClickHouseQueryPlanParser using fixture samples"
+    needs: [w2]
+    status: pending
+    notes: |
+      Create tests/unit/query_plans/test_clickhouse_parser.py. Cover:
+        - EXPLAIN PLAN parse produces valid QueryPlanDAG with correct operator types
+        - EXPLAIN PIPELINE parse (if applicable to the same parser)
+        - Operator normalization maps ClickHouse node names to LogicalOperatorType
+        - Malformed input triggers graceful error recovery
+        - Parser registered in registry under "clickhouse" dialect
+
+  - id: w4
+    summary: "Add get_query_plan() to ClickHouseAdapter base class"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      IMPORTANT: The connection object type differs across the three ClickHouse modes
+      and must be confirmed during w1 before writing this implementation:
+        - clickhouse-local: uses chdb (in-process) — connection is likely a
+          chdb.session or similar in-process context, NOT a TCP socket.
+        - clickhouse-server: uses clickhouse-driver over TCP — connection.execute()
+          returns a list of tuples.
+        - clickhouse-cloud: uses clickhouse-connect over HTTP — different API.
+
+      After w1 confirms the actual connection type per mode, implement in the
+      shared ClickHouseAdapter base class (locate via grep for `class ClickHouseAdapter`).
+      If the connection API is uniform across modes (confirm first), use:
+        def get_query_plan(self, connection, query):
+            explain_query = f"EXPLAIN PLAN {query}"
+            # Execute via the mode-appropriate connection API confirmed in w1
+            return <extracted text from result>
+      If connection APIs differ per mode, override get_query_plan() separately
+      in ClickHouseLocalAdapter, ClickHouseServerAdapter, ClickHouseCloudAdapter
+      rather than using a base-class implementation that makes wrong assumptions.
+      Use EXPLAIN PLAN (not PIPELINE) as the default for cross-platform comparison.
+
+  - id: w5
+    summary: "Add get_query_plan_parser() override to ClickHouseAdapter base class"
+    needs: [w2]
+    status: pending
+    notes: |
+      In the same ClickHouseAdapter base used in w4:
+        def get_query_plan_parser(self):
+            from benchbox.core.query_plans.parsers.clickhouse import ClickHouseQueryPlanParser
+            return ClickHouseQueryPlanParser()
+      All three adapters (local, server, cloud) inherit this automatically.
+
+  - id: w6
+    summary: "Integrate capture_query_plan() into ClickHouse execute_query() path"
+    needs: [w4, w5]
+    status: pending
+    notes: |
+      Locate each adapter's execute_query() — or the shared execute_query() if
+      ClickHouseAdapter has one. Add the capture guard after the timed SQL block:
+        if self.capture_plans:
+            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+            if query_plan:
+                plan_fingerprint = query_plan.plan_fingerprint
+      If clickhouse-local, clickhouse-server, and clickhouse-cloud have separate
+      execute_query() methods, patch each one. Prefer placing the call in the
+      shared base if execution flows through it.
+
+  - id: w7
+    summary: "Add unit tests for ClickHouse adapter plan capture wiring"
+    needs: [w6]
+    status: pending
+    notes: |
+      Create tests/unit/platforms/test_clickhouse_plan_capture.py. Cover:
+        - get_query_plan_parser() returns ClickHouseQueryPlanParser for all three modes
+        - execute_query() with capture_plans=True triggers capture (mock connection)
+        - execute_query() with capture_plans=False does not trigger capture
+        - plan_fingerprint present in result dict when capture succeeds
+        - graceful degradation when EXPLAIN returns empty (old ClickHouse versions)
+
+deps:
+  needs: []
+
+must_preserve:
+  - "clickhouse-local, clickhouse-server, and clickhouse-cloud execute_query() result dict shape must not change for non-plan fields."
+  - "Plan capture failure must be silent when strict_plan_capture=False."
+  - "EXPLAIN PLAN must not be issued when capture_plans=False — ClickHouse EXPLAIN can be expensive for complex queries."
+  - "Changes to the ClickHouseAdapter base class must not break the existing uat-clickhouse-server DDL fix work tracked separately."
+
+approach: |
+  Start with fixture collection (w1) to understand the exact text format.
+  Implement the parser (w2) modeled on the DuckDB text parser, then test it (w3).
+  Add get_query_plan() and get_query_plan_parser() to the shared ClickHouseAdapter
+  base (w4+w5) so all three modes inherit them. Wire capture into execute_query()
+  (w6) and add wiring tests (w7). Do not require a live server for unit tests —
+  use fixtures throughout.
+
+anti_patterns:
+  - "DO NOT use EXPLAIN PIPELINE as the default — pipeline output lacks logical operator names needed for cross-platform comparison."
+  - "DO NOT issue EXPLAIN PLAN during benchmarks when capture_plans=False — always guard with self.capture_plans check."
+  - "DO NOT assume the ClickHouse Python driver returns the same structure for local (chdb/in-process), server (clickhouse-driver/TCP), and cloud (clickhouse-connect/HTTP) connections — confirm each in w1 before writing the base-class implementation."
+  - "DO NOT add a single get_query_plan() to the base class if the connection API is different per mode — override per adapter instead."
+  - "DO NOT reuse or modify the existing DDL compatibility changes in clickhouse/setup.py as part of this TODO — keep plan capture and DDL fix orthogonal."
+
+verification:
+  - description: "ClickHouse parser unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/query_plans/test_clickhouse_parser.py -v"
+    expected_output: "All tests pass, 0 failures"
+  - description: "ClickHouse adapter wiring tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_plan_capture.py -v"
+    expected_output: "All tests pass, 0 failures"
+  - description: "Full unit suite passes"
+    command: "uv run -- python -m pytest tests/unit/ -q"
+    expected_output: "0 failures, 0 errors"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/clickhouse_local.py"
+    - "benchbox/platforms/clickhouse_server.py"
+    - "benchbox/platforms/clickhouse_cloud.py"
+    - "benchbox/core/query_plans/parsers/clickhouse.py"
+    - "benchbox/core/query_plans/parsers/registry.py"
+    - "tests/unit/query_plans/test_clickhouse_parser.py"
+    - "tests/unit/platforms/test_clickhouse_plan_capture.py"
+    - "tests/fixtures/query_plans/"
+    - "_project/TODO/platform-expansion/planning/query-plan-capture-clickhouse-family.yaml"
+  do_not_modify:
+    - "benchbox/platforms/clickhouse/setup.py"
+    - "benchbox/sql_compat/rules/ddl_optimize/"
+
+success_metrics:
+  - "ClickHouseQueryPlanParser parses EXPLAIN PLAN text from fixture samples into valid QueryPlanDAG objects."
+  - "All three ClickHouse adapters return a non-None parser from get_query_plan_parser()."
+  - "execute_query() with capture_plans=True stores QueryPlanDAG and plan_fingerprint in the result dict."
+  - "No regressions in existing ClickHouse UAT cells or DDL tests."
+
+metadata:
+  tags: [query-plan, clickhouse, clickhouse-local, clickhouse-server, clickhouse-cloud, new-parser]
+  estimated_effort: "Medium"
+  created_date: "2026-06-02"
+  last_updated: "2026-06-02T00:00:00-04:00"
