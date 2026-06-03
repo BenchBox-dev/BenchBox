@@ -12,7 +12,7 @@ pytestmark = [
 ]
 
 
-_STUB_CREDS = dict(host="localhost", username="test", password="test")
+_STUB_CREDS = {"host": "localhost", "username": "test", "password": "test"}
 
 
 @pytest.fixture()
