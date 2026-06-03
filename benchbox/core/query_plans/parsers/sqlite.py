@@ -147,9 +147,10 @@ class SQLiteQueryPlanParser(QueryPlanParser):
         """Infer operator type from line text."""
         upper = line.upper()
 
-        if "SCAN TABLE" in upper or "SCAN SUBQUERY" in upper:
+        # Handle both old ("SCAN TABLE name") and modern ("SCAN name") SQLite formats
+        if "SCAN TABLE" in upper or "SCAN SUBQUERY" in upper or upper.startswith("SCAN "):
             return "SCAN"
-        elif "SEARCH TABLE" in upper:
+        elif "SEARCH TABLE" in upper or upper.startswith("SEARCH "):
             return "INDEX_SCAN"
         elif "ORDER BY" in upper:
             return "SORT"
@@ -175,7 +176,8 @@ class SQLiteQueryPlanParser(QueryPlanParser):
         details: dict[str, Any] = {}
 
         # Extract table name from SCAN/SEARCH patterns
-        match = re.search(r"(?:SCAN|SEARCH) (?:TABLE|SUBQUERY) (\w+)", line, re.IGNORECASE)
+        # Handles both old ("SCAN TABLE name") and modern ("SCAN name") SQLite formats
+        match = re.search(r"(?:SCAN|SEARCH) (?:TABLE |SUBQUERY )?(\w+)", line, re.IGNORECASE)
         if match:
             details["table_name"] = match.group(1)
 

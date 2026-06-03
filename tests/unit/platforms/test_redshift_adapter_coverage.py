@@ -1889,7 +1889,7 @@ class TestGetQueryPlan:
         plan = adapter.get_query_plan(mock_conn, "SELECT * FROM lineitem")
         assert "XN Seq Scan" in plan
 
-    def test_returns_error_message_on_exception(self):
+    def test_returns_none_on_exception(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -1897,7 +1897,7 @@ class TestGetQueryPlan:
         mock_cursor.execute.side_effect = Exception("permission denied")
 
         plan = adapter.get_query_plan(mock_conn, "SELECT * FROM forbidden_table")
-        assert "Could not get query plan" in plan
+        assert plan is None
 
 
 # ---------------------------------------------------------------------------

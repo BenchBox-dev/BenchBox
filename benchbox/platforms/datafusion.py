@@ -1393,6 +1393,39 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         # Additional benchmark-specific settings can be added here
         self.log_verbose(f"DataFusion configured for {benchmark_type} benchmark")
 
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get DataFusion query execution plan using EXPLAIN.
+
+        DataFusion's EXPLAIN returns a DataFrame with columns (plan_type, plan).
+        We reconstruct the pipe-delimited text format expected by DataFusionQueryPlanParser.
+        """
+        try:
+            batches = connection.sql(f"EXPLAIN {query}").collect()
+            if not batches:
+                return None
+            parts = []
+            for batch in batches:
+                for i in range(batch.num_rows):
+                    plan_type = batch.column(0)[i].as_py()
+                    plan_text = batch.column(1)[i].as_py()
+                    if not plan_text:
+                        continue
+                    lines = plan_text.split("\n")
+                    prefix = " " * len(plan_type)
+                    parts.append(f"{plan_type} | {lines[0]}")
+                    for line in lines[1:]:
+                        parts.append(f"{prefix} | {line}")
+            return "\n".join(parts) if parts else None
+        except Exception as e:
+            self.logger.debug(f"Failed to get DataFusion query plan: {e}")
+            return None
+
+    def get_query_plan_parser(self):
+        """Get DataFusion query plan parser."""
+        from benchbox.core.query_plans.parsers.datafusion import DataFusionQueryPlanParser
+
+        return DataFusionQueryPlanParser()
+
     def execute_query(
         self,
         connection: Any,
@@ -1486,13 +1519,24 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                     )
 
             # Use centralized helper to build result with validation
-            return self._build_query_result_with_validation(
+            result = self._build_query_result_with_validation(
                 query_id=query_id,
                 execution_time=execution_time,
                 actual_row_count=actual_row_count,
                 first_row=first_row,
                 validation_result=validation_result,
             )
+
+            # Capture structured query plan if enabled
+            if self.capture_plans:
+                query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+                if query_plan:
+                    result["query_plan"] = query_plan
+                    result["plan_fingerprint"] = query_plan.plan_fingerprint
+                if plan_capture_time_ms is not None:
+                    result["plan_capture_time_ms"] = plan_capture_time_ms
+
+            return result
 
         except Exception as e:
             execution_time = elapsed_seconds(start_time)

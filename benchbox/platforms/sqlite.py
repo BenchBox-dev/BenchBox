@@ -475,6 +475,28 @@ class SQLiteAdapter(PlatformAdapter):
             # OLTP optimizations
             connection.execute("PRAGMA synchronous = FULL")
 
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get SQLite query execution plan using EXPLAIN QUERY PLAN.
+
+        Reconstructs the tree-formatted text that SQLiteQueryPlanParser expects
+        from the raw (id, parent, notused, detail) rows SQLite returns.
+        """
+        try:
+            cursor = connection.cursor()
+            cursor.execute(f"EXPLAIN QUERY PLAN {query}")
+            rows = cursor.fetchall()
+            cursor.close()
+            return _format_sqlite_query_plan(rows) if rows else None
+        except Exception as e:
+            self.logger.debug(f"Failed to get SQLite query plan: {e}")
+            return None
+
+    def get_query_plan_parser(self):
+        """Get SQLite query plan parser."""
+        from benchbox.core.query_plans.parsers.sqlite import SQLiteQueryPlanParser
+
+        return SQLiteQueryPlanParser()
+
     def execute_query(
         self,
         connection: Any,
@@ -534,6 +556,16 @@ class SQLiteAdapter(PlatformAdapter):
             )
             # Include full results for SQLite compatibility
             result["results"] = results
+
+            # Capture structured query plan if enabled
+            if self.capture_plans:
+                query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+                if query_plan:
+                    result["query_plan"] = query_plan
+                    result["plan_fingerprint"] = query_plan.plan_fingerprint
+                if plan_capture_time_ms is not None:
+                    result["plan_capture_time_ms"] = plan_capture_time_ms
+
             return result
 
         except Exception as e:
@@ -557,6 +589,41 @@ class SQLiteAdapter(PlatformAdapter):
     def run_maintenance_test(self, benchmark, **kwargs) -> dict[str, Any]:
         """Run TPC maintenance test (not implemented for SQLite)."""
         raise NotImplementedError("Maintenance test not implemented for SQLite adapter")
+
+
+def _format_sqlite_query_plan(rows: list) -> str | None:
+    """Format SQLite EXPLAIN QUERY PLAN rows into tree text for SQLiteQueryPlanParser.
+
+    SQLite returns rows of (id, parent, notused, detail). Reconstructs the
+    indented "|--" / "`--" tree format that SQLiteQueryPlanParser expects.
+    """
+    if not rows:
+        return None
+    node_text: dict[int, str] = {}
+    children: dict[int, list[int]] = {}
+    for row in rows:
+        node_id, parent_id, _unused, detail = int(row[0]), int(row[1]), row[2], str(row[3])
+        node_text[node_id] = detail
+        children.setdefault(parent_id, []).append(node_id)
+
+    roots = children.get(0, [])
+    if not roots:
+        return None
+
+    lines = ["QUERY PLAN"]
+
+    def _emit(node_id: int, prefix: str, is_last: bool) -> None:
+        marker = "`--" if is_last else "|--"
+        lines.append(f"{prefix}{marker}{node_text[node_id]}")
+        child_ids = children.get(node_id, [])
+        ext = "   " if is_last else "|  "
+        for i, cid in enumerate(child_ids):
+            _emit(cid, prefix + ext, i == len(child_ids) - 1)
+
+    for i, rid in enumerate(roots):
+        _emit(rid, "", i == len(roots) - 1)
+
+    return "\n".join(lines)
 
 
 def _is_tpch_benchmark(benchmark: Any) -> bool:
