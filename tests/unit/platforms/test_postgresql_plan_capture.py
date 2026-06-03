@@ -118,11 +118,14 @@ class TestPostgreSQLPlanCapture:
 class TestPostgreSQLSubclassInheritance:
     """Verify TimescaleDB, CedarDB, and pg_mooncake inherit the parser without overrides."""
 
-    @pytest.mark.parametrize("adapter_class_path,module_path", [
-        ("benchbox.platforms.timescaledb.TimescaleDBAdapter", "benchbox.platforms.timescaledb"),
-        ("benchbox.platforms.cedardb.CedarDBAdapter", "benchbox.platforms.cedardb"),
-        ("benchbox.platforms.pg_mooncake.PgMooncakeAdapter", "benchbox.platforms.pg_mooncake"),
-    ])
+    @pytest.mark.parametrize(
+        "adapter_class_path,module_path",
+        [
+            ("benchbox.platforms.timescaledb.TimescaleDBAdapter", "benchbox.platforms.timescaledb"),
+            ("benchbox.platforms.cedardb.CedarDBAdapter", "benchbox.platforms.cedardb"),
+            ("benchbox.platforms.pg_mooncake.PgMooncakeAdapter", "benchbox.platforms.pg_mooncake"),
+        ],
+    )
     def test_subclass_returns_postgresql_parser(self, adapter_class_path, module_path, monkeypatch):
         from benchbox.core.query_plans.parsers.postgresql import PostgreSQLQueryPlanParser
 
@@ -131,6 +134,7 @@ class TestPostgreSQLSubclassInheritance:
 
         try:
             import importlib
+
             module = importlib.import_module(module_name)
             # Stub out any extra dependencies the subclass may import
             cls = getattr(module, class_name)

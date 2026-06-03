@@ -73,6 +73,7 @@ class TestSQLitePlanCapture:
 
     def test_get_query_plan_returns_none_on_error(self, adapter):
         from unittest.mock import MagicMock
+
         bad_conn = MagicMock()
         bad_conn.cursor.return_value.execute.side_effect = Exception("error")
         assert adapter.get_query_plan(bad_conn, "SELECT 1") is None
@@ -144,6 +145,7 @@ class TestSQLiteParserModernFormat:
         cursor.close()
 
         from benchbox.platforms.sqlite import _format_sqlite_query_plan
+
         plan_text = _format_sqlite_query_plan(rows)
 
         if plan_text:

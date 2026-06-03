@@ -13,8 +13,7 @@ pytestmark = [
 
 # Minimal DataFusion EXPLAIN text output as the parser expects
 _EXPLAIN_TEXT = (
-    "logical_plan | TableScan: t1 projection=[id, val]\n"
-    "physical_plan | DataSourceExec: file_groups={1 group}"
+    "logical_plan | TableScan: t1 projection=[id, val]\nphysical_plan | DataSourceExec: file_groups={1 group}"
 )
 
 
@@ -78,9 +77,7 @@ class TestDataFusionPlanCapture:
         adapter.get_query_plan(conn, "SELECT 1")
 
         called_sql = conn.sql.call_args[0][0]
-        assert "FORMAT JSON" not in called_sql.upper(), (
-            "DataFusionQueryPlanParser expects text/indent format, not JSON"
-        )
+        assert "FORMAT JSON" not in called_sql.upper(), "DataFusionQueryPlanParser expects text/indent format, not JSON"
 
     def test_execute_query_with_capture_adds_plan_fields(self, adapter, monkeypatch):
         conn = MagicMock()
@@ -98,10 +95,14 @@ class TestDataFusionPlanCapture:
         fake_result.collect.return_value = []
         conn.sql.return_value = fake_result
 
-        with _patch.object(adapter, "_build_query_result_with_validation", return_value={
-            "query_id": "df_q1", "status": "SUCCESS", "rows_returned": 0
-        }):
-            result = adapter.execute_query(connection=conn, query="SELECT 1", query_id="df_q1", validate_row_count=False)
+        with _patch.object(
+            adapter,
+            "_build_query_result_with_validation",
+            return_value={"query_id": "df_q1", "status": "SUCCESS", "rows_returned": 0},
+        ):
+            result = adapter.execute_query(
+                connection=conn, query="SELECT 1", query_id="df_q1", validate_row_count=False
+            )
 
         assert result["query_plan"] is mock_plan
         assert result["plan_fingerprint"] == "df_fp"
@@ -113,9 +114,11 @@ class TestDataFusionPlanCapture:
         fake_result.collect.return_value = []
         conn.sql.return_value = fake_result
 
-        with patch.object(adapter_no_capture, "_build_query_result_with_validation", return_value={
-            "query_id": "df_q2", "status": "SUCCESS", "rows_returned": 0
-        }):
+        with patch.object(
+            adapter_no_capture,
+            "_build_query_result_with_validation",
+            return_value={"query_id": "df_q2", "status": "SUCCESS", "rows_returned": 0},
+        ):
             result = adapter_no_capture.execute_query(
                 connection=conn, query="SELECT 1", query_id="df_q2", validate_row_count=False
             )

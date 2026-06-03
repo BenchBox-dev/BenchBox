@@ -233,9 +233,7 @@ class MotherDuckAdapter(PlatformAdapter):
         analyze = getattr(self, "analyze_plans", True)
         explain_options = "ANALYZE, FORMAT JSON" if analyze else "FORMAT JSON"
         try:
-            rows = (connection or self.connection).execute(
-                f"EXPLAIN ({explain_options}) {query}"
-            ).fetchall()
+            rows = (connection or self.connection).execute(f"EXPLAIN ({explain_options}) {query}").fetchall()
             # column 0 is the key (e.g. "analyzed_plan"), column 1 is the JSON value
             parts = [str(row[1]) for row in rows if len(row) > 1]
             return "\n".join(parts) if parts else None
