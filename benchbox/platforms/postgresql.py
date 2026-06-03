@@ -695,17 +695,16 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         connection: Any,
         query: str,
         explain_options: dict[str, Any] | None = None,
-    ) -> str:
-        """Get query execution plan using EXPLAIN ANALYZE."""
+    ) -> str | None:
+        """Get query execution plan using EXPLAIN (ANALYZE, FORMAT JSON)."""
         cursor = connection.cursor()
 
-        # Build EXPLAIN options
-        options = ["ANALYZE", "BUFFERS", "FORMAT TEXT"]
+        # Use FORMAT JSON so PostgreSQLQueryPlanParser can parse the output.
+        # ANALYZE and BUFFERS give actual timing and I/O info.
+        options = ["ANALYZE", "BUFFERS", "FORMAT JSON"]
         if explain_options:
             if explain_options.get("verbose"):
                 options.append("VERBOSE")
-            if explain_options.get("costs", True):
-                options.append("COSTS")
 
         options_str = ", ".join(options)
         explain_query = f"EXPLAIN ({options_str}) {query}"
@@ -714,12 +713,48 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             cursor.execute(explain_query)
             plan_rows = cursor.fetchall()
             cursor.close()
-
-            return "\n".join(row[0] for row in plan_rows)
+            # PostgreSQL returns the full JSON as the first column of the first row
+            return plan_rows[0][0] if plan_rows else None
 
         except Exception as e:
             cursor.close()
-            return f"Failed to get query plan: {e}"
+            self.logger.debug(f"Failed to get query plan: {e}")
+            return None
+
+    def get_query_plan_parser(self):
+        """Get PostgreSQL query plan parser."""
+        from benchbox.core.query_plans.parsers.postgresql import PostgreSQLQueryPlanParser
+
+        return PostgreSQLQueryPlanParser()
+
+    def execute_query(
+        self,
+        connection: Any,
+        query: str,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Execute a query and optionally capture the structured query plan."""
+        result = super().execute_query(
+            connection=connection,
+            query=query,
+            query_id=query_id,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
+        if self.capture_plans and result.get("status") == "SUCCESS":
+            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+            if query_plan:
+                result["query_plan"] = query_plan
+                result["plan_fingerprint"] = query_plan.plan_fingerprint
+            if plan_capture_time_ms is not None:
+                result["plan_capture_time_ms"] = plan_capture_time_ms
+        return result
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Run ANALYZE on a table to update statistics."""

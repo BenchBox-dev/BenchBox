@@ -2970,7 +2970,7 @@ class TestQueryPlanGeneration:
         assert "Output: o_orderkey, o_custkey" in plan
         mock_cursor.close.assert_called_once()
 
-    def test_explain_failure_returns_error_message(self):
+    def test_explain_failure_returns_none(self):
         adapter = _make_adapter()
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -2978,8 +2978,7 @@ class TestQueryPlanGeneration:
         mock_cursor.execute.side_effect = Exception("permission denied")
 
         plan = adapter.get_query_plan(mock_conn, "SELECT 1")
-        assert "Could not get query plan" in plan
-        assert "permission denied" in plan
+        assert plan is None
         mock_cursor.close.assert_called_once()
 
 

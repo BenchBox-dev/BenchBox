@@ -2114,6 +2114,15 @@ class RedshiftAdapter(PlatformAdapter):
             # Map query_statistics to resource_usage for cost calculation
             result_dict["resource_usage"] = query_stats
 
+            # Capture structured query plan if enabled
+            if self.capture_plans:
+                query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+                if query_plan:
+                    result_dict["query_plan"] = query_plan
+                    result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
+                if plan_capture_time_ms is not None:
+                    result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+
             return result_dict
 
         except Exception as e:
@@ -2401,18 +2410,24 @@ class RedshiftAdapter(PlatformAdapter):
         finally:
             cursor.close()
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
         """Get query execution plan for analysis."""
         cursor = connection.cursor()
         try:
-            # Note: Query dialect translation is now handled automatically by the base adapter
             cursor.execute(f"EXPLAIN {query}")
             plan_rows = cursor.fetchall()
-            return "\n".join([row[0] for row in plan_rows])
+            return "\n".join([row[0] for row in plan_rows]) if plan_rows else None
         except Exception as e:
-            return f"Could not get query plan: {e}"
+            self.logger.debug(f"Could not get query plan: {e}")
+            return None
         finally:
             cursor.close()
+
+    def get_query_plan_parser(self):
+        """Get Redshift query plan parser."""
+        from benchbox.core.query_plans.parsers.redshift import RedshiftQueryPlanParser
+
+        return RedshiftQueryPlanParser()
 
     def close_connection(self, connection: Any) -> None:
         """Close Redshift connection."""
