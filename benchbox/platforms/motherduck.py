@@ -224,6 +224,29 @@ class MotherDuckAdapter(PlatformAdapter):
         if connection is None:
             self.connection = None
 
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get MotherDuck query execution plan using EXPLAIN (ANALYZE, FORMAT JSON).
+
+        MotherDuck uses DuckDB's SQL dialect; EXPLAIN format is identical.
+        DuckDB EXPLAIN rows are (explain_key, explain_value) tuples; column 1 is the JSON payload.
+        """
+        analyze = getattr(self, "analyze_plans", True)
+        explain_options = "ANALYZE, FORMAT JSON" if analyze else "FORMAT JSON"
+        try:
+            rows = (connection or self.connection).execute(f"EXPLAIN ({explain_options}) {query}").fetchall()
+            # column 0 is the key (e.g. "analyzed_plan"), column 1 is the JSON value
+            parts = [str(row[1]) for row in rows if len(row) > 1]
+            return "\n".join(parts) if parts else None
+        except Exception as e:
+            logger.debug(f"Failed to get MotherDuck query plan: {e}")
+            return None
+
+    def get_query_plan_parser(self):
+        """Get MotherDuck query plan parser (reuses DuckDB parser)."""
+        from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
+
+        return DuckDBQueryPlanParser()
+
     def execute_query(
         self,
         connection: Any,
@@ -258,7 +281,7 @@ class MotherDuckAdapter(PlatformAdapter):
             rows = result.fetchall()
             execution_time = elapsed_seconds(start_time)
             logger.debug(f"Query {query_id} completed in {execution_time:.3f}s, returned {len(rows)} rows")
-            return {
+            result_dict = {
                 "query_id": query_id,
                 "stream_id": stream_id,
                 "status": "SUCCESS",
@@ -267,6 +290,17 @@ class MotherDuckAdapter(PlatformAdapter):
                 "first_row": rows[0] if rows else None,
                 "error": None,
             }
+
+            # Capture structured query plan if enabled
+            if self.capture_plans:
+                query_plan, plan_capture_time_ms = self.capture_query_plan(conn, query, query_id)
+                if query_plan:
+                    result_dict["query_plan"] = query_plan
+                    result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
+                if plan_capture_time_ms is not None:
+                    result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+
+            return result_dict
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             logger.error(f"Query {query_id} failed after {execution_time:.2f}s: {e}")
