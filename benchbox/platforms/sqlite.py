@@ -481,15 +481,16 @@ class SQLiteAdapter(PlatformAdapter):
         Reconstructs the tree-formatted text that SQLiteQueryPlanParser expects
         from the raw (id, parent, notused, detail) rows SQLite returns.
         """
+        cursor = connection.cursor()
         try:
-            cursor = connection.cursor()
             cursor.execute(f"EXPLAIN QUERY PLAN {query}")
             rows = cursor.fetchall()
-            cursor.close()
             return _format_sqlite_query_plan(rows) if rows else None
         except Exception as e:
             self.logger.debug(f"Failed to get SQLite query plan: {e}")
             return None
+        finally:
+            cursor.close()
 
     def get_query_plan_parser(self):
         """Get SQLite query plan parser."""
