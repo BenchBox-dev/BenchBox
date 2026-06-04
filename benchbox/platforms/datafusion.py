@@ -1408,7 +1408,7 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                 for i in range(batch.num_rows):
                     plan_type = batch.column(0)[i].as_py()
                     plan_text = batch.column(1)[i].as_py()
-                    if not plan_text:
+                    if not plan_type or not plan_text:
                         continue
                     lines = plan_text.split("\n")
                     prefix = " " * len(plan_type)

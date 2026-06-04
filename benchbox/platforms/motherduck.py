@@ -230,12 +230,11 @@ class MotherDuckAdapter(PlatformAdapter):
         MotherDuck uses DuckDB's SQL dialect; EXPLAIN format is identical.
         DuckDB EXPLAIN rows are (explain_key, explain_value) tuples; column 1 is the JSON payload.
         """
-        analyze = getattr(self, "analyze_plans", True)
-        explain_options = "ANALYZE, FORMAT JSON" if analyze else "FORMAT JSON"
+        explain_options = "ANALYZE, FORMAT JSON" if self.analyze_plans else "FORMAT JSON"
         try:
             rows = (connection or self.connection).execute(f"EXPLAIN ({explain_options}) {query}").fetchall()
             # column 0 is the key (e.g. "analyzed_plan"), column 1 is the JSON value
-            parts = [str(row[1]) for row in rows if len(row) > 1]
+            parts = [str(row[1]) for row in rows]
             return "\n".join(parts) if parts else None
         except Exception as e:
             logger.debug(f"Failed to get MotherDuck query plan: {e}")
@@ -290,6 +289,9 @@ class MotherDuckAdapter(PlatformAdapter):
                 "first_row": rows[0] if rows else None,
                 "error": None,
             }
+
+            # Display plan in console when --show-query-plans is active
+            self.display_query_plan_if_enabled(conn, query, query_id)
 
             # Capture structured query plan if enabled
             if self.capture_plans:

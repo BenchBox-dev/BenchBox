@@ -2114,8 +2114,9 @@ class RedshiftAdapter(PlatformAdapter):
             # Map query_statistics to resource_usage for cost calculation
             result_dict["resource_usage"] = query_stats
 
-            # Capture structured query plan if enabled
-            if self.capture_plans:
+            # Capture structured query plan if enabled (only on SUCCESS to avoid
+            # wasteful EXPLAIN on validation-failed results)
+            if self.capture_plans and result_dict.get("status") == "SUCCESS":
                 query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
                 if query_plan:
                     result_dict["query_plan"] = query_plan
