@@ -41,8 +41,8 @@ branch-to-branch use; it is no longer a two-repo bridge but a `develop` →
 - **A1 — Branch name**: long-lived dev branch is `develop`.
 - **A2 — Default branch on GitHub**: stays `main`, so the canonical URL shows the release tree.
 - **A3 — Tree split**:
-  - **`main` only**: `benchbox/`, `tests/`, `docs/`, `examples/`, `_binaries/`, `_sources/`, `_chart_data/`, release-related contents of `scripts/`, `pyproject.toml`, `MANIFEST.in`, `Makefile`, `README.md`, `CHANGELOG.md`, `LICENSE`, `COPYRIGHT.md`, `DISCLAIMER.md`, `CONTRIBUTING.md`, `pytest.ini`, `pytest-ci.ini`, `uv.lock`, `.gitignore`, `.codespell-ignore.txt`, `landing/`, `.github/` (workflows + templates).
-  - **`develop` only** (in addition to everything on `main`): `_project/`, `_blog/`, `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.claude/`, `.codex/`, `.gemini/`, `.pre-commit-config.yaml`, `_benchbox_pytest_xdist_safety.py`, `todo.config.yaml`, `skill-sync.yaml`, `skill-sync.lock`, `.coveragerc_core`, `.dockerignore`, `.env.example`, `.mcp.json`, dev-only scripts.
+  - **`main` only**: `benchbox/`, `tests/`, `docs/`, `examples/`, `_binaries/`, `_sources/`, `_chart_data/`, release-related contents of `scripts/`, `pyproject.toml`, `MANIFEST.in`, `Makefile`, `README.md`, `CHANGELOG.md`, `LICENSE`, `COPYRIGHT.md`, `DISCLAIMER.md`, `CONTRIBUTING.md`, `pytest.ini`, `pytest-ci.ini`, `_benchbox_pytest_xdist_safety.py`, `uv.lock`, `.gitignore`, `.codespell-ignore.txt`, `landing/`, `.github/` (workflows + templates).
+  - **`develop` only** (in addition to everything on `main`): `_project/`, `_blog/`, `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.claude/`, `.codex/`, `.gemini/`, `.pre-commit-config.yaml`, `todo.config.yaml`, `skill-sync.yaml`, `skill-sync.lock`, `.coveragerc_core`, `.dockerignore`, `.env.example`, `.mcp.json`, dev-only scripts.
 - **A4 — Release flow** (post-migration, repeated each release):
 
   ```
