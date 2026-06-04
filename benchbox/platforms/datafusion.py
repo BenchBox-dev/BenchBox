@@ -31,6 +31,7 @@ except ImportError:
     RuntimeEnv = None  # type: ignore[assignment, misc]  # ty: ignore[conflicting-declarations]
 
 from benchbox.core.dataframe.schema_utils import extract_schema_columns
+from benchbox.core.errors import PlanCaptureError
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
 from benchbox.platforms.base.no_constraint_mixin import NoConstraintEnforcementMixin
@@ -1538,6 +1539,8 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
             return result
 
+        except PlanCaptureError:
+            raise
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             logger.error(

@@ -2111,6 +2111,11 @@ class ClickHouseNativeHandler(FileFormatHandler):
             return value
 
         type_upper = type_name.upper()
+
+        # Array types embed scalar type names (e.g. "ARRAY(FLOAT64)"); skip scalar conversion.
+        if "ARRAY" in type_upper:
+            return value
+
         needs_non_string_value = (
             "INT" in type_upper
             or any(token in type_upper for token in ("DECIMAL", "NUMERIC", "DOUBLE", "FLOAT", "REAL"))
