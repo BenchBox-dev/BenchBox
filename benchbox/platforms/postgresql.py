@@ -12,6 +12,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -713,8 +714,14 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             cursor.execute(explain_query)
             plan_rows = cursor.fetchall()
             cursor.close()
-            # PostgreSQL returns the full JSON as the first column of the first row
-            return plan_rows[0][0] if plan_rows else None
+            # PostgreSQL returns the full JSON as the first column of the first row.
+            # psycopg decodes FORMAT JSON output as a Python object; re-serialize
+            # to a string so PostgreSQLQueryPlanParser.parse_explain_output() receives
+            # the string it expects.
+            raw = plan_rows[0][0] if plan_rows else None
+            if raw is not None and not isinstance(raw, str):
+                raw = json.dumps(raw)
+            return raw
 
         except Exception as e:
             cursor.close()

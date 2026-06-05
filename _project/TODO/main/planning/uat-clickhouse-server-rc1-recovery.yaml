@@ -2,7 +2,7 @@ id: uat-clickhouse-server-rc1-recovery
 title: "Recover ClickHouse-server UAT RC-1 after confirmed localhost:9000 refusal"
 worktree: main
 priority: High
-status: Identified
+status: Completed
 category: Platform Expansion
 
 description: |
