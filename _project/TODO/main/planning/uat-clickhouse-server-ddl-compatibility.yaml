@@ -140,6 +140,7 @@ scope_limit:
     - "tests/unit/platforms/test_clickhouse_adapter.py"
     - "tests/unit/sql_compat/"
     - "_project/TODO/main/planning/uat-clickhouse-server-ddl-compatibility.yaml"
+    - "_project/compat/inventory.jsonl"
 
 success_metrics:
   - "The affected cells no longer fail during CREATE TABLE."
