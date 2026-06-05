@@ -6,6 +6,7 @@ and file formats, with support for compression and batch processing.
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import gzip
 import hashlib
@@ -2112,8 +2113,17 @@ class ClickHouseNativeHandler(FileFormatHandler):
 
         type_upper = type_name.upper()
 
-        # Array types embed scalar type names (e.g. "ARRAY(FLOAT64)"); skip scalar conversion.
+        # Array types: parse the CSV string representation into a Python list so
+        # clickhouse-driver receives a sequence rather than a raw string.
         if "ARRAY" in type_upper:
+            if not value or value.upper() in ("\\N", "NULL"):
+                return None
+            try:
+                parsed = ast.literal_eval(value)
+                if isinstance(parsed, (list, tuple)):
+                    return list(parsed)
+            except (ValueError, SyntaxError):
+                pass
             return value
 
         needs_non_string_value = (

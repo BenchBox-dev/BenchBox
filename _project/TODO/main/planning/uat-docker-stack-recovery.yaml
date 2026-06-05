@@ -105,7 +105,6 @@ work:
 deps:
   needs:
     - uat-artifact-integrity-and-failure-capture
-    - uat-certification-rerun-ordering-and-gate
 
 must_preserve:
   - "UAT never runs docker system/volume/image prune or unqualified compose down; only project-scoped benchbox-uat-* teardown."
