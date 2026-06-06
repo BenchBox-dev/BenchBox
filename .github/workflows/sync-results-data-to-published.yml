@@ -64,8 +64,11 @@ jobs:
         id: drift
         run: |
           # Fail loudly on a missing remote ref — silent fetch failure must
-          # not be misread as "no drift".
-          git fetch origin published-results
+          # not be misread as "no drift". Use an explicit refspec so the
+          # remote-tracking ref origin/published-results is created/updated
+          # in this single-branch clone; a bare `git fetch origin published-results`
+          # only populates FETCH_HEAD and leaves origin/published-results missing.
+          git fetch origin published-results:refs/remotes/origin/published-results
 
           # Direct two-tree compare (no dots): `published-results` is an
           # orphan branch (W2 of the parent TODO force-pushed it to a fresh
