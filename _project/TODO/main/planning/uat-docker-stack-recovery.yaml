@@ -1,7 +1,7 @@
 id: uat-docker-stack-recovery
 title: "Recover UAT Docker stacks: LakeSail startup timeout + empty Docker-OLTP run"
 worktree: main
-priority: Medium-High
+priority: High
 status: In Progress
 category: Platform Expansion
 

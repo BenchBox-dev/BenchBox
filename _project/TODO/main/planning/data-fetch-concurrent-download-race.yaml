@@ -1,7 +1,7 @@
 id: data-fetch-concurrent-download-race
 title: "Make real-data archive downloads safe under concurrent fetch_data callers"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Testing and Quality Assurance
 
