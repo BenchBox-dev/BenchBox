@@ -1,7 +1,7 @@
 id: joinorder-trino-primary-key-ddl
 title: "Strip JoinOrder primary-key constraints from Trino CREATE TABLE DDL"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Under Review
 category: Platform Compatibility
 

@@ -1,7 +1,7 @@
 id: uat-certification-rerun-ordering-and-gate
 title: "UAT release-gate re-run: enforce ordering, fresh root, and an explicit approval gate"
 worktree: main
-priority: Medium-High
+priority: High
 status: In Progress
 category: Testing and Quality Assurance
 
