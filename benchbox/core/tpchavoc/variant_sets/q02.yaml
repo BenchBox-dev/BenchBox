@@ -397,7 +397,7 @@ variants:
               and s2.s_nationkey = n2.n_nationkey
               and n2.n_regionkey = r2.r_regionkey
               and r2.r_name = 'EUROPE'
-              and ps2.ps_supplycost < ps_supplycost
+              and ps2.ps_supplycost < partsupp.ps_supplycost
         )
     order by
         s_acctbal desc,
