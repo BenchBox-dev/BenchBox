@@ -30,7 +30,7 @@ variants:
 - id: 8
   description: 'EXISTS pattern: Use EXISTS for membership testing'
   sql: |
-    select sum(l_extendedprice) / 7.0 as avg_yearly from lineitem, part where p_partkey = l_partkey and p_brand = 'Brand#23' and p_container = 'MED BOX' and exists (select 1 from (select l_partkey, 0.2 * avg(l_quantity) as threshold from lineitem group by l_partkey) avg_calc where avg_calc.l_partkey = l_partkey and l_quantity < avg_calc.threshold)
+    select sum(l_extendedprice) / 7.0 as avg_yearly from lineitem, part where p_partkey = l_partkey and p_brand = 'Brand#23' and p_container = 'MED BOX' and exists (select 1 from (select l_partkey, 0.2 * avg(l_quantity) as threshold from lineitem group by l_partkey) avg_calc where avg_calc.l_partkey = lineitem.l_partkey and lineitem.l_quantity < avg_calc.threshold)
 - id: 9
   description: 'Window functions (OLAP): Use window functions for ranking'
   sql: |
