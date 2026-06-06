@@ -2,7 +2,7 @@ id: approx-analytics-cloud-survey
 title: Approximate Analytics Cloud SQL Survey — read_primitives + SQL write_primitives at SF=0.1/1/10
 worktree: benchmark-expansion
 category: Benchmark Development
-priority: High
+priority: Medium-High
 status: Not Started
 description: |
   Survey approximate analytics support and performance across all major cloud SQL
