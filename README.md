@@ -106,7 +106,7 @@ BenchBox and [LakeBench](https://github.com/mwc360/LakeBench) are both Python-ba
 
 LakeBench focuses on **lakehouse compute engines** (Spark, Fabric, Synapse, HDInsight) and evaluates end-to-end ELT workflows - ingestion, transformation, maintenance, and queries - using Delta Lake tables. It offers 4 benchmarks including ELTBench, a custom workflow-oriented benchmark.
 
-BenchBox focuses on the **broad ecosystem of analytic platforms**-from single-node engines like DuckDB, to DataFrame libraries like Polars and Pandas, through to cloud data warehouses like Snowflake, BigQuery, and Redshift. It provides 22 benchmarks including TPC standards, academic workloads like SSB and JoinOrder, and BenchBox-original benchmarks like TPC-Havoc for optimizer stress testing.
+BenchBox focuses on the **broad ecosystem of analytic platforms**-from single-node engines like DuckDB, to DataFrame libraries like Polars and Pandas, through to cloud data warehouses like Snowflake, BigQuery, and Redshift. It provides 23 benchmarks including TPC standards, academic workloads like SSB and JoinOrder, and BenchBox-original benchmarks like TPC-Havoc for optimizer stress testing.
 
 Consider LakeBench when evaluating Spark-based lakehouse engines, testing complete ELT pipeline performance, or working primarily in Microsoft Fabric/Azure environments. Consider BenchBox when benchmarking across the analytic platform spectrum, needing benchmark variety beyond TPC standards, or comparing DataFrame libraries alongside SQL engines.
 
@@ -466,7 +466,7 @@ Same benchmark, same scale factor, different execution paradigm.
 - Use `benchbox run` CLI for full benchmark execution
 
 **For Advanced Usage:**
-- Explore all 22 benchmark suites: TPC-H, TPC-DS, TPC-DI, ClickBench, H2ODB, NYC Taxi, Flight Data, Vector Search, and more
+- Explore all 23 benchmark suites: TPC-H, TPC-DS, TPC-DI, ClickBench, H2ODB, NYC Taxi, Flight Data, Vector Search, and more
 - Scale up with larger datasets (scale factors 1.0, 10.0, 100.0+)
 - Compare performance across different platforms
 - See [examples/INDEX.md](examples/INDEX.md) for complete examples navigation
