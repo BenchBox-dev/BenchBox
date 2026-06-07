@@ -10,7 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.amplab.generator import AMPLabDataGenerator
 from benchbox.core.amplab.queries import AMPLabQueryManager
 from benchbox.core.amplab.schema import TABLES, get_all_create_table_sql
@@ -24,7 +24,9 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
 
-class AMPLabBenchmark(TranslatableQueryMixin, SimpleBenchmarkMixin, DataGenerationMixin, BaseBenchmark):
+class AMPLabBenchmark(
+    GeneratorOutputDirMixin, TranslatableQueryMixin, SimpleBenchmarkMixin, DataGenerationMixin, BaseBenchmark
+):
     """AMPLab Big Data Benchmark implementation.
 
     Tests big data processing systems using web analytics workloads.

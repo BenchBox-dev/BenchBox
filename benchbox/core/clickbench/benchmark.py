@@ -10,7 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.benchmark_mixins import DataGenerationMixin
 from benchbox.core.clickbench.generator import ClickBenchDataGenerator
 from benchbox.core.clickbench.queries import ClickBenchQueryManager
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
 
-class ClickBenchBenchmark(SimpleBenchmarkMixin, DataGenerationMixin, BaseBenchmark):
+class ClickBenchBenchmark(GeneratorOutputDirMixin, SimpleBenchmarkMixin, DataGenerationMixin, BaseBenchmark):
     """ClickBench (ClickHouse Analytics Benchmark) implementation.
 
     Tests analytical database performance using web analytics data.

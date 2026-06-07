@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.tsbs_devops.generator import TSBSDevOpsDataGenerator
 from benchbox.core.tsbs_devops.queries import TSBSDevOpsQueryManager
 from benchbox.core.tsbs_devops.schema import (
@@ -26,12 +26,13 @@ from benchbox.core.tsbs_devops.schema import (
     get_create_tables_sql,
 )
 from benchbox.utils.compression_mixin import extract_compression_kwargs
+from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 if TYPE_CHECKING:
     from benchbox.core.connection import DatabaseConnection
 
 
-class TSBSDevOpsBenchmark(BaseBenchmark):
+class TSBSDevOpsBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     """TSBS DevOps benchmark implementation.
 
     Implements Time Series Benchmark Suite for DevOps monitoring workloads:
@@ -101,10 +102,11 @@ class TSBSDevOpsBenchmark(BaseBenchmark):
             force_regenerate: Force data regeneration
             **kwargs: Additional options
         """
+        # Resolve through the shared helper so BENCHBOX_OUTPUT_DIR is honored at
+        # construction time (canonical tsbs_devops_sf<N> datagen name); falls
+        # back to Path.cwd()/benchmark_runs/datagen when no override is set.
         resolved_output_dir = (
-            Path(output_dir)
-            if output_dir
-            else Path.cwd() / "benchmark_runs" / "datagen" / f"tsbs_devops_{scale_factor}"
+            Path(output_dir) if output_dir else get_benchmark_runs_datagen_path("tsbs_devops", scale_factor)
         )
         super().__init__(
             scale_factor=scale_factor,

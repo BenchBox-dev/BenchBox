@@ -12,7 +12,7 @@ from benchbox.core.base_benchmark import BaseBenchmark
 from benchbox.core.tpcds.generator import TPCDSDataGenerator
 from benchbox.core.tpcds_obt.etl.transformer import SUPPORTED_CHANNELS, TPCDSOBTTransformer
 from benchbox.core.tpcds_obt.queries import TPCDSOBTQueryManager
-from benchbox.utils.scale_factor import format_scale_factor
+from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 logger = logging.getLogger(__name__)
 
@@ -167,21 +167,19 @@ class TPCDSOBTBenchmark(BaseBenchmark):
             "TPC-DS benchmark adapted to a single wide One Big Table with sales + returns merged across channels."
         )
 
-        # Determine standard paths using scale factor formatting
-        sf_str = format_scale_factor(scale_factor)
-        default_base = Path.cwd() / "benchmark_runs" / "datagen"
-
+        # Determine standard paths via the shared helper so BENCHBOX_OUTPUT_DIR is
+        # honored; falls back to Path.cwd()/benchmark_runs/datagen when unset.
         # OBT output directory (for transformed OBT table)
         if output_dir:
             self.output_dir = Path(output_dir)
         else:
-            self.output_dir = default_base / f"tpcds_obt_{sf_str}"
+            self.output_dir = get_benchmark_runs_datagen_path("tpcds_obt", scale_factor)
 
         # TPC-DS source directory (for base TPC-DS data)
         if tpcds_source_dir:
             self.tpcds_source_dir = Path(tpcds_source_dir)
         else:
-            self.tpcds_source_dir = default_base / f"tpcds_{sf_str}"
+            self.tpcds_source_dir = get_benchmark_runs_datagen_path("tpcds", scale_factor)
 
         self.parallel = parallel
         self.force_regenerate = force_regenerate
