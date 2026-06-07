@@ -10,7 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.benchmark_mixins import DataGenerationMixin
 from benchbox.core.h2odb.generator import H2ODataGenerator
 from benchbox.core.h2odb.queries import H2OQueryManager
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
 
-class H2OBenchmark(TranslatableQueryMixin, DataGenerationMixin, BaseBenchmark):
+class H2OBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, DataGenerationMixin, BaseBenchmark):
     """H2O DB benchmark implementation.
 
     Tests analytical database performance using synthetic taxi trip data

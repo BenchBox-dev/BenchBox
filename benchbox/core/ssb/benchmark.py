@@ -13,7 +13,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.benchmark_mixins import DataGenerationMixin
 from benchbox.core.query_catalog_base import TranslatableQueryMixin
 from benchbox.core.query_utils import get_queries_with_translation
@@ -28,7 +28,9 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
 
-class SSBBenchmark(TranslatableQueryMixin, SimpleBenchmarkMixin, DataGenerationMixin, BaseBenchmark):
+class SSBBenchmark(
+    GeneratorOutputDirMixin, TranslatableQueryMixin, SimpleBenchmarkMixin, DataGenerationMixin, BaseBenchmark
+):
     """Star Schema Benchmark implementation.
 
     This class provides a complete implementation of the Star Schema Benchmark,

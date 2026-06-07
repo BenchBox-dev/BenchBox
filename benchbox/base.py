@@ -14,7 +14,7 @@ from benchbox.core.benchmark_result_validation import BenchmarkResultValidationM
 from benchbox.core.connection import DatabaseConnection
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.cloud_storage import create_path_handler
-from benchbox.utils.scale_factor import format_scale_factor
+from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
 BENCHMARK_API_SURFACE = "beta-public"
@@ -29,6 +29,50 @@ else:
         import sqlglot
     except ImportError:
         sqlglot = None
+
+
+class GeneratorOutputDirMixin:
+    """Keep nested data-generator output paths in sync with ``output_dir``.
+
+    Several benchmarks construct a nested data/download generator in
+    ``__init__`` that captures ``output_dir`` at construction time. When the
+    runner or orchestrator later assigns a resolved output root to
+    ``benchmark.output_dir`` (for example from an explicit CLI ``--output`` or a
+    shared data source), those nested generators must follow so generated data
+    lands under the configured root instead of a stale ``cwd``-local default.
+
+    Classes opt in by mixing this in and listing the relevant attribute names in
+    :attr:`OUTPUT_DIR_GENERATOR_ATTRS`. The mixin must precede other bases so its
+    ``output_dir`` data descriptor governs assignment.
+    """
+
+    #: Instance attribute names holding nested generators to keep in sync.
+    OUTPUT_DIR_GENERATOR_ATTRS: tuple[str, ...] = ("data_generator",)
+
+    @property
+    def output_dir(self) -> Any:
+        """Return the resolved output directory handler."""
+        return getattr(self, "_output_dir", None)
+
+    @output_dir.setter
+    def output_dir(self, value: Union[str, Path]) -> None:
+        """Set the output directory and propagate it to nested generators."""
+        self._output_dir = create_path_handler(value)
+        self._sync_output_dir_to_generators(self._output_dir)
+
+    def _sync_output_dir_to_generators(self, path: Any) -> None:
+        """Point each opted-in nested generator at ``path`` when present."""
+        for attr in self.OUTPUT_DIR_GENERATOR_ATTRS:
+            # Only touch concrete instance attributes so lazily-constructed
+            # generator properties are not triggered prematurely.
+            generator = self.__dict__.get(attr)
+            if generator is None or not hasattr(generator, "output_dir"):
+                continue
+            generator.output_dir = path
+            # Benchmarks that reuse TPC-H data nest a second generator.
+            nested = getattr(generator, "tpch_generator", None)
+            if nested is not None and hasattr(nested, "output_dir"):
+                nested.output_dir = path
 
 
 class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
@@ -67,10 +111,13 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         self.scale_factor = scale_factor
 
         if output_dir is None:
-            # Use CLI-compatible default path: benchmark_runs/datagen/{benchmark}_{sf}
+            # Resolve the datagen root through the shared helper so an explicit
+            # BENCHBOX_OUTPUT_DIR is honored at construction time, before nested
+            # data generators capture the path. When no env override is set this
+            # falls back to Path.cwd()/benchmark_runs/datagen, preserving the
+            # historical default for ordinary local runs.
             benchmark_name = self._get_benchmark_name().lower()
-            sf_str = format_scale_factor(scale_factor)
-            self.output_dir = Path.cwd() / "benchmark_runs" / "datagen" / f"{benchmark_name}_{sf_str}"
+            self.output_dir = get_benchmark_runs_datagen_path(benchmark_name, scale_factor)
         else:
             # Support both local and cloud storage paths
             self.output_dir = create_path_handler(output_dir)
