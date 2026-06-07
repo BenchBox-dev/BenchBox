@@ -20,18 +20,19 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.flightdata.downloader import LAST_AVAILABLE_YEAR, FlightDataDownloader
 from benchbox.core.flightdata.queries import FlightDataQueryManager
 from benchbox.core.flightdata.schema import FLIGHT_SCHEMA, get_create_tables_sql
 from benchbox.utils.compression_mixin import extract_compression_kwargs
+from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 if TYPE_CHECKING:
     from benchbox.core.connection import DatabaseConnection
     from benchbox.core.dataframe.query import QueryRegistry
 
 
-class FlightDataBenchmark(BaseBenchmark):
+class FlightDataBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     """US Aviation On-Time Performance OLAP benchmark.
 
     Uses BTS On-Time Performance data for realistic aviation analytics:
@@ -56,6 +57,9 @@ class FlightDataBenchmark(BaseBenchmark):
         - carriers: Carrier comparison and ranking (3 queries)
     """
 
+    # Nested downloader that must track output_dir reassignment.
+    OUTPUT_DIR_GENERATOR_ATTRS = ("downloader",)
+
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -79,8 +83,11 @@ class FlightDataBenchmark(BaseBenchmark):
             force_regenerate: Force data regeneration
             **kwargs: Additional options
         """
+        # Resolve through the shared helper so BENCHBOX_OUTPUT_DIR is honored at
+        # construction time (canonical flightdata_sf<N> datagen name); falls back
+        # to Path.cwd()/benchmark_runs/datagen when no override is set.
         resolved_output_dir = (
-            Path(output_dir) if output_dir else Path.cwd() / "benchmark_runs" / "datagen" / f"flightdata_{scale_factor}"
+            Path(output_dir) if output_dir else get_benchmark_runs_datagen_path("flightdata", scale_factor)
         )
         super().__init__(
             scale_factor=scale_factor,
