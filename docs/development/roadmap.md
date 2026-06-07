@@ -107,10 +107,15 @@ DataFrame benchmarking is supported for 21 benchmarks across two API families:
 - TPC-H, TPC-DS, TPC-DS OBT, TPC-DI, TPC-H Skew, TPC-Havoc, DataVault
 - SSB, ClickBench, AMPLab, CoffeeShop, H2ODB, TSBS DevOps
 - NYC Taxi, Flight Data, JoinOrder, JoinOrder Synthetic
-- Read Primitives, Write Primitives, AI Primitives, Metadata Primitives, Transaction Primitives
+- Read Primitives, Write Primitives, AI Primitives, Metadata Primitives
 
 **Pandas Family** (Pandas, Modin, cuDF, Dask):
 - Full coverage matching the Expression Family above
+
+**Transaction Primitives** — restricted to ACID-capable table-format adapters only:
+Delta Lake (`delta-lake`, `delta`), PySpark-Delta (`pyspark-delta`), and Iceberg
+(`iceberg`). Polars, DataFusion, and all Pandas-family adapters (`pandas-df`, Modin,
+cuDF, Dask) are rejected at runtime because they do not support ACID transactions.
 
 ### Remaining Expansion
 
