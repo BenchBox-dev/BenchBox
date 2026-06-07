@@ -23,7 +23,7 @@ BenchBox's expansion roadmap focuses on three strategic areas:
 |----------|---------|---------|
 | SQL Platforms | 39 | +0 |
 | DataFrame Platforms | 9 | +0 |
-| Benchmarks | 22 | +4 |
+| Benchmarks | 23 | +4 |
 | DataFrame-enabled Benchmarks | 21 | +1 (Geospatial) |
 
 ---
