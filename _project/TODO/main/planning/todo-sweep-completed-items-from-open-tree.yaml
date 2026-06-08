@@ -1,0 +1,74 @@
+id: todo-sweep-completed-items-from-open-tree
+title: "Sweep planning/ directories for items with status: Completed and move them to DONE"
+worktree: main
+priority: Low
+status: Not Started
+category: Repository Maintenance
+
+description: |
+  The 2026-06-08 TODO prioritization pass discovered that
+  `uat-clickhouse-server-rc1-recovery` has `status: Completed` but still
+  lives in `TODO/main/planning/`. Subsequent PRs #756 and #759 landed fixes
+  for `tpchavoc-correlated-subquery-self-binding` and
+  `benchmark-runs-output-root-propagation` respectively — both items may now
+  be Completed as well. The w0 re-validate step must be run first to get the
+  current count before moving anything.
+
+  Items left in planning/ or active/ after completion bloat the open count,
+  distort priority distributions, and can mislead automated or human triage.
+  Sweep all planning/ and active/ directories for Completed items and move
+  them to the appropriate DONE tree.
+
+work:
+  - id: w0
+    summary: "Re-validate: confirm which items have status: Completed in the open tree"
+    status: pending
+    notes: |
+      Run: uv run --project _project/scripts -- python _project/scripts/todo_cli.py list --status=completed
+      Capture output. As of 2026-06-08 at authoring time: uat-clickhouse-server-rc1-recovery
+      was the only confirmed case, but PRs #756 (tpchavoc self-binding fix) and
+      #759 (output-root propagation) have since landed and may have added more.
+      Also check: tpchavoc-correlated-subquery-self-binding and
+      benchmark-runs-output-root-propagation.
+
+  - id: w1
+    summary: "Move each confirmed-Completed item to the DONE tree"
+    needs: [w0]
+    status: pending
+    notes: |
+      Check _project/DONE/ structure for the destination convention.
+      Add a completed_date to each moved file matching status-change evidence
+      where available.
+
+  - id: w2
+    summary: "Run validate_todo.py --all; regenerate indexes"
+    needs: [w1]
+    status: pending
+    notes: |
+      uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all
+      Then: make todo-reindex
+
+prior_art:
+  - "_project/DONE/: examine existing entries for the move-to-DONE convention"
+  - "todo_cli.py list --status=completed — use this to find any additional cases"
+
+must_preserve:
+  - "Cross-item deps.needs references that point to moved items must still resolve"
+  - "Moved files retain their original id field (the slug)"
+
+verification:
+  - description: "No Completed items remain in TODO/ directories"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py list --status=completed"
+    expected_output: "0 items"
+
+metadata:
+  created_date: "2026-06-08"
+  estimated_effort: "Small"
+  tags:
+    - housekeeping
+    - todo-system
+
+impact:
+  technical_debt: |
+    Completed items left in open directories cause the priority distribution
+    and open-count metrics to be inflated, making backlog triage less reliable.
