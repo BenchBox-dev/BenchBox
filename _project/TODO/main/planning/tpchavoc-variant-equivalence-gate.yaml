@@ -1,0 +1,164 @@
+id: tpchavoc-variant-equivalence-gate
+title: "Wire a bounded result-equivalence gate for TPC-Havoc variants and burn down the divergences it surfaces"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  TPC-Havoc's premise is that the 10 SQL (and DataFrame) variants of each
+  TPC-H query are structurally diverse but SEMANTICALLY EQUIVALENT to the
+  canonical TPC-H query. Nothing in the default run or in CI enforces that
+  equivalence: `benchbox run --benchmark tpchavoc` reports execution success
+  ("Success rate: 100%") while never comparing any variant to the canonical
+  answer, and the develop correctness gate validates TPC-H, not TPC-Havoc
+  variants. A fast-but-wrong variant therefore makes a platform look good for
+  executing the WRONG query, silently corrupting the performance comparison the
+  benchmark exists to produce.
+
+  benchbox already ships the comparison primitive:
+  `TPCHavocBenchmark.validate_variant_equivalence(...)`
+  (benchbox/core/tpchavoc/benchmark.py:242) delegates to
+  `ResultValidator.validate_results_exact` / `validate_results_checksum` /
+  `validate_query1_results`. But it is invoked only from unit tests with
+  synthetic inputs - no run path executes the canonical TPC-H query and feeds
+  `original_results` for a real variant. `--validate-results` is an opt-in flag
+  (default off) that routes through `ValidationConfig` without driving
+  per-variant equivalence for tpchavoc.
+
+  The cost of this gap is concrete and already realized. PR #756 fixed three
+  correlated-subquery self-binding defects (q2_v8, q11_v1, q17_v8) that were
+  silent for exactly this reason, and the same PR's verification surfaced a
+  fourth, different-class divergence: q2_v10 zeroes negative `s_acctbal` via a
+  CASE-wrapped projection (38 of 460 rows differ from canonical Q2 at SF=1). A
+  result-equivalence gate would have caught all four.
+
+  This TODO wires the EXISTING validator into a bounded, CI-affordable gate,
+  enumerates every current divergence, and (via the companion burndown TODO)
+  drives them to zero so the gate lands green. It is complementary to
+  `testing-approach-correctness-gates` (that gate checks TPC-H answers; this
+  one checks TPC-Havoc cross-variant equivalence) and should mirror its
+  bounded single-cell shape.
+
+prior_art:
+  - "benchbox/core/tpchavoc/benchmark.py:242 validate_variant_equivalence - REUSE as the comparator; do not write a new one"
+  - "benchbox/core/expected_results/loader.py - reuse stored canonical TPC-H answers where present instead of re-executing the base query"
+  - "tests/unit/core/tpchavoc/test_tpchavoc_dataframe_queries.py:212 test_q14v8_parity_with_q14v1 - existing ad-hoc per-variant parity test; generalize it rather than adding more one-offs"
+  - "_project/TODO/main/planning/testing-approach-correctness-gates.yaml - the bounded-gate design (single small-SF DuckDB cell, marker policy); mirror the shape, keep it complementary"
+  - "tests/integration/test_tpchavoc_duckdb.py - already creates the DuckDB schema and runs variants; extend here rather than starting a new harness"
+
+work:
+  - id: w0
+    summary: "Re-validate the evidence against current develop before building anything"
+    status: pending
+    notes: |
+      Confirm the gap and the known divergences are still true on the head SHA:
+        - grep that `validate_variant_equivalence` has no non-test caller in a
+          run/execute path;
+        - confirm `benchbox run --benchmark tpchavoc` default does not validate
+          equivalence (no canonical query executed);
+        - reproduce the four known divergences on a populated DuckDB SF=1 cell:
+          q2_v8/q11_v1/q17_v8 match canonical only post-#756, and q2_v10 still
+          differs from canonical Q2 by the 38 negative-acctbal rows.
+      Capture raw stdout to `/tmp/tpchavoc-equiv-w0.log` or CI artifacts and
+      record the command, checked SHA, PASS/FAIL, and row counts in the PR/TODO.
+
+  - id: w1
+    summary: "Build a parametrized equivalence harness (report mode) over all queries x 10 SQL variants"
+    needs: [w0]
+    status: pending
+    notes: |
+      Small SF on DuckDB. For each implemented query, execute the canonical
+      TPC-H query once and every variant, then compare via
+      validate_variant_equivalence. Run in REPORT mode first: emit the full set
+      of divergences (query, variant, kind, row-count delta) rather than
+      asserting. Encode INTENTIONAL non-equivalences (e.g. the q2 variant
+      family omits canonical Q2's `LIMIT 100`) as reviewable DATA, not inline
+      per-query special cases.
+
+  - id: w2
+    summary: "Drive all real divergences to zero, leaving only declared exceptions"
+    needs: [w1]
+    status: pending
+    notes: |
+      The known q2_v10 projection defect is owned by the companion burndown
+      TODO `tpchavoc-q2-v10-projection-faithfulness`. Any further divergences
+      w1 surfaces get fixed or, if genuinely intentional, added to the declared-
+      exception list with a one-line justification.
+
+  - id: w3
+    summary: "Promote the harness to a bounded CI gate that fails on reintroduced divergences"
+    needs: [w2]
+    status: pending
+    notes: |
+      One bounded small-SF DuckDB cell, marked per the existing correctness-gate
+      marker policy (not a stress matrix). Prove the gate fails when a
+      self-binding or projection divergence is deliberately reintroduced, and is
+      not silently disarmable by scale/benchmark drift.
+
+deferred:
+  - summary: "Extend the equivalence gate to the DataFrame variants"
+    reason: "DataFrame-surface correctness is owned by the cross-surface audit TODO; fold in only after the SQL gate is green."
+  - summary: "Run the equivalence harness on a second engine (Postgres/ClickHouse/DataFusion)"
+    reason: "Cross-dialect equivalence of shared SQL is an open question; keep the routine gate DuckDB-bounded and sample a second engine separately if w1 evidence warrants."
+
+must_preserve:
+  - "benchbox run --benchmark tpchavoc default (execution-only) behavior stays available; the gate is additive."
+  - "DuckDB tpchavoc stays 100% execution-green at SF 0.01 / 0.1 / 1.0."
+  - "ResultValidator tolerance and checksum semantics are unchanged."
+
+approach: |
+  Reuse validate_variant_equivalence and the expected_results loader; do not
+  add a new comparator or a second source of canonical answers. Build the
+  harness as a parametrized pytest over get_implemented_queries() x
+  get_all_variants(q), extending tests/integration/test_tpchavoc_duckdb.py's
+  existing schema/exec scaffolding. Land it in REPORT mode, fix everything it
+  finds (delegating the q2_v10 projection class to the burndown TODO), then
+  flip to a gating assertion and wire the bounded cell into CI mirroring
+  testing-approach-correctness-gates. Keep declared intentional differences
+  (Q2 LIMIT) in one reviewable structure.
+
+anti_patterns:
+  - "DO NOT write a new result comparator - because validate_variant_equivalence already exists - reuse it."
+  - "DO NOT turn the gate into a full stress matrix - because routine develop PRs must stay cheap - keep one bounded small-SF DuckDB cell like testing-approach-correctness-gates."
+  - "DO NOT hardcode per-query exceptions inline in the assert - because they rot invisibly - declare intentional non-equivalences (Q2 LIMIT) as reviewable data."
+  - "DO NOT assert exact equality where the variant family intentionally differs (Q2 LIMIT) - because the gate would be permanently red - model the exception explicitly."
+
+verification:
+  - description: "Report-mode harness flags q2_v10 and would flag the #756 variants if reverted"
+    command: "uv run -- python -m pytest tests/integration/test_tpchavoc_duckdb.py -k equivalence -q"
+    expected_output: "q2_v10 reported as divergent; reverting any #756 fix reproduces a divergence"
+  - description: "Bounded gate fails on a deliberately reintroduced self-binding"
+    command: "temporarily revert ps2.ps_partkey=partsupp.ps_partkey then run the gate"
+    expected_output: "gate FAILS (non-zero), naming the divergent query/variant"
+
+scope_limit:
+  only_modify:
+    - "tests/integration/test_tpchavoc_duckdb.py"
+    - "tests/unit/core/tpchavoc/"
+    - "benchbox/core/tpchavoc/"
+    - ".github/workflows/"
+    - "Makefile"
+
+open_questions:
+  - question: "How are intentional non-equivalences (e.g. the q2 family omitting canonical Q2's LIMIT 100) declared so the gate stays meaningful without per-query inline hacks?"
+    gating: true
+    affects: ["w1 success_metric: every variant equivalence-checked"]
+    default: "A single reviewable mapping of {query: exception-kind} consulted by the harness; LIMIT differences compared as set-equality against canonical-without-LIMIT."
+  - "Is the routine gate DuckDB-only sufficient, or must a second engine sample shared-SQL equivalence given variants run on all platforms?"
+  - "Should the gate also run the canonical query, or load stored expected results from expected_results/ to avoid double execution cost?"
+  - question: "Landing order vs the q2_v10 fix: w0/w1 (report harness) are independent and should run first to enumerate the full divergence set, but the w3 gate-flip will turn CI red unless tpchavoc-q2-v10-projection-faithfulness (and any other w1 finding) has landed. Sequence so the assertion flips only after the burndown."
+    gating: true
+    affects: ["w3 success_metric: gate green on develop"]
+    default: "Build/report (w0-w1) first; land the q2_v10 fix; only then flip w3 to a hard assertion. No hard inter-item dep, to avoid blocking discovery."
+
+success_metrics:
+  - "Every implemented TPC-Havoc SQL variant is result-equivalence-checked against canonical TPC-H in a bounded gate."
+  - "All current divergences are fixed or explicitly declared; the gate is green on develop."
+  - "Reintroducing a self-binding or projection-faithfulness divergence fails CI."
+
+metadata:
+  tags: [tpchavoc, testing, correctness, oracle, ci, equivalence]
+  estimated_effort: "Medium"
+  created_date: "2026-06-08"
+  last_updated: "2026-06-08T00:00:00"
