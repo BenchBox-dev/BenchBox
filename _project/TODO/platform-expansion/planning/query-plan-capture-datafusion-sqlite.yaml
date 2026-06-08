@@ -2,7 +2,7 @@ id: query-plan-capture-datafusion-sqlite
 title: "Wire query plan capture for DataFusion and SQLite (parsers exist, no credentials needed)"
 worktree: platform-expansion
 priority: High
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |
@@ -223,4 +223,6 @@ metadata:
   tags: [query-plan, datafusion, sqlite, wiring, no-credentials]
   estimated_effort: "Small"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T12:00:00-04:00"
+  last_updated: "2026-06-08T00:00:00-04:00"
+  completed_date: "2026-06-04"
+  completed_in_prs: ["#748", "#749"]

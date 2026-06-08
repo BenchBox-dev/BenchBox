@@ -1,0 +1,205 @@
+id: query-plan-capture-dml-double-execution
+title: "Guard plan capture against DML double-execution in DuckDB and MotherDuck"
+worktree: platform-expansion
+priority: Medium-High
+status: Not Started
+category: Platform Expansion
+
+description: |
+  DuckDB and MotherDuck both use `EXPLAIN (ANALYZE, FORMAT JSON) <query>` to
+  capture query plans. Unlike PostgreSQL where `EXPLAIN ANALYZE` is a
+  read-only introspection that re-runs the query in a separate executor context,
+  DuckDB's `EXPLAIN ANALYZE` physically executes the statement. For DML queries
+  (INSERT, UPDATE, DELETE, MERGE), this means any benchmark query that mutates
+  data will be executed TWICE when `capture_plans=True` is active:
+
+    1. Once by `conn.execute(query)` in `execute_query()`
+    2. Once by `EXPLAIN (ANALYZE, FORMAT JSON) {query}` inside `get_query_plan()`
+
+  This is a data integrity risk. TPC-DS maintenance streams, TPC-DI load phases,
+  and any custom write workloads would silently insert/update/delete rows twice
+  per captured query.
+
+  `capture_plans` defaults to `False`, so this is not triggered in normal usage.
+  But the risk is non-obvious to users who enable `capture_plans=True` for DML
+  benchmarks. There is no warning, no guard, and no documentation.
+
+  Scope: DuckDBAdapter and MotherDuckAdapter are the only adapters affected.
+  PostgreSQL's `EXPLAIN ANALYZE` also physically re-executes DML statements —
+  it is NOT rollback-safe for DML. However, BenchBox's PostgreSQL adapter uses
+  `EXPLAIN (FORMAT JSON)` without ANALYZE, so it does not re-execute queries
+  and is not affected by this issue. Redshift does not use EXPLAIN ANALYZE at
+  all. SQLite and DataFusion use plain EXPLAIN (no ANALYZE), so they do not
+  re-execute.
+
+  The fix has three options (ordered by preference):
+    A. **Detect DML prefix and skip ANALYZE** — check if query starts with
+       INSERT/UPDATE/DELETE/MERGE/COPY and switch `explain_options` to
+       `FORMAT JSON` (without ANALYZE). Safest: no re-execution, but loses
+       execution stats for DML plans.
+    B. **Skip capture entirely for DML queries** — if query is DML, return
+       `None` from `get_query_plan()` immediately. Zero risk, but no plan
+       for DML at all.
+    C. **Log a warning and document the behavior** — add a warning log when
+       `analyze_plans=True` and the query looks like DML, leave behavior
+       unchanged. Least invasive, highest documentation burden.
+
+  Option A is preferred: DML plan structure (table scans, indexes used) is
+  still captured without execution stats, which is the most useful outcome.
+
+prerequisites:
+  - "No credentials required — DuckDB is fully local."
+  - "MotherDuck requires MOTHERDUCK_TOKEN for live testing, but unit tests can mock the connection."
+
+prior_art:
+  - "benchbox/platforms/duckdb.py:1038 — get_query_plan() to add DML detection to"
+  - "benchbox/platforms/motherduck.py:227 — get_query_plan() to add DML detection to"
+  - "benchbox/platforms/datafusion.py:89 — DataFusionConnectionCompat._requires_eager_execution() — existing DML prefix detection pattern to reuse"
+  - "benchbox/platforms/base/result_capture.py:561 — capture_query_plan() — entry point that calls get_query_plan()"
+
+work:
+  - id: w1
+    summary: "Extract DML-detection helper into benchbox/platforms/base/result_capture.py or a shared utils module"
+    status: pending
+    notes: |
+      benchbox/platforms/datafusion.py already has DataFusionConnectionCompat._requires_eager_execution()
+      which checks for INSERT/UPDATE/DELETE/MERGE/CREATE/DROP/ALTER/TRUNCATE/COPY prefixes.
+      Extract a version of this as a module-level function — e.g.
+      `_is_dml_query(query: str) -> bool` — in a shared location so DuckDB and
+      MotherDuck can both call it. Suggested home: benchbox/platforms/base/result_capture.py
+      or benchbox/utils/sql_utils.py.
+
+      Implementation reference (from DataFusion):
+        def _is_dml_query(query: str) -> bool:
+            stmt = query.lstrip()
+            # skip leading comments
+            while stmt.startswith("--"):
+                nl = stmt.find("\n")
+                if nl == -1:
+                    return False
+                stmt = stmt[nl + 1:].lstrip()
+            upper = stmt.upper()
+            # Intentionally excludes CREATE/DROP/ALTER/TRUNCATE — DDL statements
+            # do not produce duplicate data mutations; only data-changing DML
+            # needs the ANALYZE guard. Do not expand to DDL when extracting
+            # from _requires_eager_execution().
+            return upper.startswith(("INSERT", "UPDATE", "DELETE", "MERGE", "COPY"))
+
+  - id: w2
+    summary: "DuckDB: skip ANALYZE for DML queries in get_query_plan()"
+    needs: [w1]
+    status: pending
+    notes: |
+      In benchbox/platforms/duckdb.py get_query_plan(), after the existing
+      `analyze = self.analyze_plans` check, add:
+        if analyze and _is_dml_query(query):
+            analyze = False  # EXPLAIN ANALYZE re-executes DML; use FORMAT JSON only
+      The rest of the method uses `analyze` to build explain_options, so the
+      change propagates automatically. The DML plan structure is still captured;
+      only execution statistics (rows affected, timing) are absent.
+
+  - id: w3
+    summary: "MotherDuck: same DML ANALYZE guard in get_query_plan()"
+    needs: [w1]
+    status: pending
+    notes: |
+      Same change as w2 but for benchbox/platforms/motherduck.py get_query_plan().
+      MotherDuck's get_query_plan() already uses self.analyze_plans; add the
+      same `if analyze and _is_dml_query(query): analyze = False` guard.
+
+  - id: w4
+    summary: "Add unit tests verifying DML queries use FORMAT JSON (not ANALYZE) for DuckDB and MotherDuck"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      In tests/unit/platforms/test_duckdb_plan_capture.py (if it exists) or
+      tests/unit/platforms/test_duckdb_adapter.py, add a parametrized test:
+        @pytest.mark.parametrize("dml", ["INSERT INTO t VALUES (1)", "UPDATE t SET x=1", "DELETE FROM t"])
+        def test_dml_query_does_not_use_analyze(adapter, dml):
+            ...
+            called_sql = conn.execute.call_args[0][0]
+            assert "ANALYZE" not in called_sql.upper()
+            assert "FORMAT JSON" in called_sql.upper()
+
+      Same test for MotherDuck in tests/unit/platforms/ (create
+      test_motherduck_plan_capture.py if it doesn't exist).
+
+  - id: w5
+    summary: "Document the behavior in the adapter docstrings and --help"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Add a note to DuckDBAdapter.get_query_plan() docstring:
+        "DML queries (INSERT/UPDATE/DELETE/MERGE/COPY) are explained without
+         ANALYZE to prevent double-execution, even when analyze_plans=True."
+      Same for MotherDuckAdapter.get_query_plan().
+
+deferred:
+  - summary: "Extend DML guard to PostgreSQL EXPLAIN ANALYZE"
+    reason: "BenchBox's PostgreSQL adapter already uses EXPLAIN (FORMAT JSON) without ANALYZE, so it is not currently affected. If PostgreSQL ANALYZE is ever added to the PostgreSQL adapter, a DML guard will be needed — PostgreSQL EXPLAIN ANALYZE also physically re-executes DML."
+
+must_preserve:
+  - "DuckDB SELECT/WITH/EXPLAIN queries must continue to use EXPLAIN (ANALYZE, FORMAT JSON) when analyze_plans=True."
+  - "Plan fingerprint must be populated for DML queries (FORMAT JSON without ANALYZE still produces a plan structure)."
+  - "capture_plans=False behavior must be unchanged — DML guard only applies when plan capture is active."
+
+approach: |
+  The DataFusion adapter already has exactly the DML prefix detection logic needed.
+  Extract it into a shared helper (w1) to avoid duplicating the regex. Then add the
+  guard in DuckDB (w2) and MotherDuck (w3) — each is a 3-line change. Write
+  parametrized tests (w4) to prevent regression. Update docstrings (w5).
+
+anti_patterns:
+  - "DO NOT add a new DML detection regex when DataFusion already has one — reuse _requires_eager_execution logic via a shared helper."
+  - "DO NOT skip capture entirely for DML (Option B from description) — FORMAT JSON without ANALYZE still produces useful plan structure."
+  - "DO NOT add the guard to the capture_query_plan() base class — the decision belongs in get_query_plan() where EXPLAIN options are built."
+
+verification:
+  - description: "DML INSERT query uses FORMAT JSON (no ANALYZE) in DuckDB get_query_plan()"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -k 'duckdb and dml' -v"
+    expected_output: "Parametrized DML tests pass; ANALYZE absent from EXPLAIN SQL"
+  - description: "SELECT query still uses EXPLAIN (ANALYZE, FORMAT JSON) when analyze_plans=True"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -k 'duckdb and plan' -v"
+    expected_output: "Existing plan capture tests pass unchanged"
+  - description: "Full unit suite green"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -q"
+    expected_output: "0 failures, 0 errors"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/duckdb.py"
+    - "benchbox/platforms/motherduck.py"
+    - "benchbox/platforms/base/result_capture.py"
+    - "benchbox/utils/sql_utils.py"
+    - "tests/unit/platforms/test_duckdb_plan_capture.py"
+    - "tests/unit/platforms/test_motherduck_plan_capture.py"
+  do_not_modify:
+    - "benchbox/platforms/datafusion.py"
+    - "benchbox/platforms/postgresql.py"
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/base/psycopg2_mixin.py"
+
+success_metrics:
+  - "DML queries never trigger EXPLAIN ANALYZE for DuckDB or MotherDuck regardless of analyze_plans setting."
+  - "SELECT query plan capture behavior is unchanged."
+  - "Plan fingerprint is still populated for DML queries (FORMAT JSON plan is captured)."
+  - "Unit tests verify the guard for INSERT, UPDATE, DELETE, and MERGE."
+
+files_affected:
+  modified:
+    - "benchbox/platforms/duckdb.py"
+    - "benchbox/platforms/motherduck.py"
+    - "benchbox/platforms/base/result_capture.py"  # or benchbox/utils/sql_utils.py — chosen during w1
+    - "tests/unit/platforms/test_duckdb_plan_capture.py"
+  added:
+    - "tests/unit/platforms/test_motherduck_plan_capture.py"
+
+open_questions:
+  - "Should COPY statements also be guarded? DuckDB COPY loads data and would double-load if EXPLAIN ANALYZE re-executes it."
+  - "Should the DML guard be opt-out (dml_safe_capture=True by default) rather than opt-in? This would change default behavior for existing users of capture_plans=True."
+
+metadata:
+  tags: [query-plan, duckdb, motherduck, dml, correctness, analyze]
+  estimated_effort: "Small"
+  created_date: "2026-06-08"
+  last_updated: "2026-06-08T00:00:00-04:00"

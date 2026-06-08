@@ -1,0 +1,185 @@
+id: query-plan-capture-missing-guards
+title: "Fix plan capture: missing SUCCESS guard and display_query_plan_if_enabled in DataFusion, SQLite, Redshift"
+worktree: platform-expansion
+priority: High
+status: Not Started
+category: Platform Expansion
+
+description: |
+  PR #748 wired plan capture for DataFusion, SQLite, Redshift, PostgreSQL, and
+  MotherDuck. A follow-up adversarial review (PR #749) fixed two issues in Redshift
+  but left the same defects in DataFusion and SQLite, and a third defect in all
+  three non-DuckDB adapters.
+
+  **Defect 1 — Missing status guard in DataFusion and SQLite**
+
+  DataFusion (`benchbox/platforms/datafusion.py:1531`) and SQLite
+  (`benchbox/platforms/sqlite.py:562`) both have:
+
+    if self.capture_plans:
+        query_plan, plan_capture_time_ms = self.capture_query_plan(...)
+
+  with no `result.get("status") == "SUCCESS"` guard. When
+  `_build_query_result_with_validation()` returns `status="FAILED"` (row-count
+  validation failure), plan capture still fires — wasting an EXPLAIN round-trip
+  and attaching plan metadata to a FAILED result. PostgreSQL and Redshift both
+  have the correct guard (added in #749). DataFusion and SQLite do not.
+
+  **Defect 2 — display_query_plan_if_enabled not called in SQLite, DataFusion, Redshift**
+
+  `--show-query-plans` (CLI flag) is implemented via
+  `ResultCaptureMixin.display_query_plan_if_enabled()` in
+  `benchbox/platforms/base/result_capture.py:477`. DuckDB calls it at line 962
+  of `duckdb.py` unconditionally. MotherDuck calls it conditionally at line 298
+  (`if not self.capture_plans:`) to avoid issuing EXPLAIN twice when both
+  `--show-query-plans` and `--capture-plans` are active. SQLite, DataFusion,
+  and Redshift do not call it at all, so `--show-query-plans` silently produces
+  no console output for those three platforms.
+
+  **Pattern decision for w3/w4/w5**: Use the MotherDuck conditional pattern
+  (`if not self.capture_plans: self.display_query_plan_if_enabled(...)`) rather
+  than the DuckDB unconditional pattern. The conditional avoids double EXPLAIN
+  when capture is active, which is the correct tradeoff for display-only use.
+
+prior_art:
+  - "benchbox/platforms/postgresql.py:750 — correct pattern: if self.capture_plans and result.get('status') == 'SUCCESS'"
+  - "benchbox/platforms/redshift.py:2119 — correct pattern added in PR #749"
+  - "benchbox/platforms/duckdb.py:962 — display_query_plan_if_enabled() unconditional call (fires even when capture_plans=True, causing double EXPLAIN)"
+  - "benchbox/platforms/motherduck.py:298 — display_query_plan_if_enabled() conditional call: if not self.capture_plans — preferred pattern; avoids double EXPLAIN"
+  - "benchbox/platforms/base/result_capture.py:477 — display_query_plan_if_enabled() implementation"
+  - "tests/unit/platforms/test_redshift_plan_capture.py:76 — test_execute_query_failed_status_skips_capture pattern to replicate"
+
+work:
+  - id: w1
+    summary: "DataFusion: add status=='SUCCESS' guard to capture block"
+    status: pending
+    notes: |
+      In benchbox/platforms/datafusion.py around line 1531, change:
+        if self.capture_plans:
+      to:
+        if self.capture_plans and result.get("status") == "SUCCESS":
+      The variable holding the result of _build_query_result_with_validation()
+      at that point is named `result`.
+
+  - id: w2
+    summary: "SQLite: add status=='SUCCESS' guard to capture block"
+    status: pending
+    notes: |
+      In benchbox/platforms/sqlite.py around line 562, change:
+        if self.capture_plans:
+      to:
+        if self.capture_plans and result.get("status") == "SUCCESS":
+      The variable holding the result of _build_query_result_with_validation()
+      at that point is named `result`.
+
+  - id: w3
+    summary: "DataFusion: add display_query_plan_if_enabled() call before capture block"
+    needs: [w1]
+    status: pending
+    notes: |
+      In DataFusionAdapter.execute_query(), after the timed execution block
+      completes and before the capture_plans guard, add the conditional pattern
+      (matches motherduck.py:298 — avoids double EXPLAIN when both flags are active):
+        if not self.capture_plans:
+            self.display_query_plan_if_enabled(connection, query, query_id)
+      Place it immediately before `if self.capture_plans and ...`.
+
+  - id: w4
+    summary: "SQLite: add display_query_plan_if_enabled() call before capture block"
+    needs: [w2]
+    status: pending
+    notes: |
+      Same as w3 but for SQLiteAdapter.execute_query() in benchbox/platforms/sqlite.py.
+      Use the conditional pattern (`if not self.capture_plans: ...`).
+
+  - id: w5
+    summary: "Redshift: add display_query_plan_if_enabled() call before capture block"
+    status: pending
+    notes: |
+      RedshiftAdapter.execute_query() (benchbox/platforms/redshift.py) already has
+      the correct status guard (added in PR #749) but is missing the display call.
+      Use the conditional pattern before the capture guard at line ~2119:
+        if not self.capture_plans:
+            self.display_query_plan_if_enabled(connection, query, query_id)
+      Note: Redshift's result variable is named `result_dict` (not `result` as in
+      DataFusion/SQLite) — do not confuse variable names when adding the guard.
+
+  - id: w6
+    summary: "Add tests: DataFusion FAILED-status skips capture; DataFusion/SQLite/Redshift display call"
+    needs: [w1, w2, w3, w4, w5]
+    status: pending
+    notes: |
+      In tests/unit/platforms/test_datafusion_plan_capture.py, add
+      test_execute_query_failed_status_skips_capture mirroring the Redshift test
+      in test_redshift_plan_capture.py:76.
+
+      In tests/unit/platforms/test_sqlite_plan_capture.py, add the same.
+
+      For display_query_plan_if_enabled: add a test that monkeypatches
+      display_query_plan_if_enabled and confirms it is called exactly once
+      per execute_query() call for DataFusion, SQLite, and Redshift. One
+      test per adapter is sufficient; can be in the existing plan-capture test files.
+
+must_preserve:
+  - "DataFusionAdapter.execute_query() result dict shape must not change for non-plan fields."
+  - "SQLiteAdapter.execute_query() result dict shape must not change for non-plan fields."
+  - "RedshiftAdapter.execute_query() result dict shape must not change for non-plan fields."
+  - "Plan capture failures must not raise exceptions when strict_plan_capture=False."
+
+approach: |
+  These are all small, surgical edits — single-line guard additions and one
+  method call per adapter. Start with the status guard fixes (w1+w2) since they
+  are correctness bugs. Then add display calls (w3+w4+w5). Finally add the
+  tests (w6) to lock in the invariants. Each change is 1-3 lines; the tests
+  are the bulk of the work.
+
+  Variable naming note: DataFusion and SQLite use `result` as the local result
+  variable; Redshift uses `result_dict`. The connection variable is named
+  `connection` in DataFusion and `conn` in SQLite and Redshift. Verify the
+  actual names in each file before editing to avoid NameError.
+
+anti_patterns:
+  - "DO NOT add the display call after the return statement — because --show-query-plans must work independently of capture_plans — place it immediately before the `if self.capture_plans` guard instead."
+  - "DO NOT use the DuckDB unconditional display pattern (duckdb.py:962) — because it causes double EXPLAIN when both --show-query-plans and --capture-plans are active — use the MotherDuck conditional pattern (`if not self.capture_plans:`) instead."
+  - "DO NOT change result dict key names or touch existing fields — because downstream consumers depend on stable dict shape — only add the guard condition and display call."
+
+verification:
+  - description: "DataFusion FAILED-status skips capture test passes"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_datafusion_plan_capture.py -v"
+    expected_output: "All tests pass including new test_execute_query_failed_status_skips_capture"
+  - description: "SQLite FAILED-status skips capture test passes"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_sqlite_plan_capture.py -v"
+    expected_output: "All tests pass including new test_execute_query_failed_status_skips_capture"
+  - description: "Full platform unit suite still green"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -q"
+    expected_output: "0 failures, 0 errors"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/datafusion.py"
+    - "benchbox/platforms/sqlite.py"
+    - "benchbox/platforms/redshift.py"
+    - "tests/unit/platforms/test_datafusion_plan_capture.py"
+    - "tests/unit/platforms/test_sqlite_plan_capture.py"
+    - "tests/unit/platforms/test_redshift_plan_capture.py"
+
+success_metrics:
+  - "DataFusion and SQLite capture blocks guard on status=='SUCCESS', matching PostgreSQL and Redshift."
+  - "--show-query-plans produces console output for DataFusion, SQLite, and Redshift."
+  - "New FAILED-status skip tests exist for DataFusion and SQLite."
+  - "0 regressions in the full unit suite."
+
+files_affected:
+  modified:
+    - "benchbox/platforms/datafusion.py"
+    - "benchbox/platforms/sqlite.py"
+    - "benchbox/platforms/redshift.py"
+    - "tests/unit/platforms/test_datafusion_plan_capture.py"
+    - "tests/unit/platforms/test_sqlite_plan_capture.py"
+    - "tests/unit/platforms/test_redshift_plan_capture.py"
+
+metadata:
+  tags: [query-plan, datafusion, sqlite, redshift, correctness, display]
+  estimated_effort: "Small"
+  created_date: "2026-06-08"
+  last_updated: "2026-06-08T00:00:00-04:00"

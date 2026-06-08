@@ -1,0 +1,248 @@
+id: query-plan-capture-fingerprint-contract
+title: "Define plan fingerprint stability contract, integration tests, and capture design decisions"
+worktree: platform-expansion
+priority: Medium
+status: Not Started
+category: Platform Expansion
+
+description: |
+  PRs #748 and #749 wired plan capture for five adapters and produced 46 unit
+  tests. However, all tests mock the database connection; no test exercises
+  plan capture against a real engine. Several design questions were also deferred
+  that need answers before plan fingerprints can be used reliably in regression
+  detection.
+
+  **1. Plan fingerprint stability contract (undefined)**
+
+  `query_plan.plan_fingerprint` is written to the result dict for every captured
+  query. No documentation defines what "stability" means for this field:
+    - Does the fingerprint survive a PostgreSQL minor version upgrade?
+    - Does it survive a VACUUM ANALYZE / stats refresh that changes row estimates?
+    - Does it survive adding a new index that wasn't used?
+    - Does it survive a DuckDB version bump?
+
+  Without a stability contract, callers cannot rely on fingerprint equality for
+  regression detection. The fingerprint may be meaningful for within-run
+  deduplication but unreliable for cross-run comparison.
+
+  **2. EXPLAIN timing: pre-execution vs. post-execution (unresolved)**
+
+  All adapters currently capture the plan AFTER the timed execution block.
+  This gives the "warm" post-execution plan (stats are current, caches are warm).
+  An alternative is to capture BEFORE execution:
+    - Pre-execution: gives the planner's decision before any stats changes.
+      More useful for regression detection ("did the plan change?").
+    - Post-execution (current): gives the actual plan used, with execution
+      stats (when ANALYZE is used). More useful for profiling.
+
+  The choice has implications for fingerprint stability. Pre-execution
+  fingerprints are more stable (stats-independent). Post-execution fingerprints
+  capture real behavior but may differ between runs due to stats changes.
+
+  **3. Multi-stream plan deduplication (undefined)**
+
+  When `stream_id` is set (concurrent benchmark streams), each stream captures
+  the same plan independently. Result bundles will contain N copies of
+  essentially the same fingerprint. Whether these should be deduplicated,
+  stored separately, or averaged is not defined.
+
+  **4. No integration tests (gap)**
+
+  All 46 plan capture tests use mocked connections. Bugs in the EXPLAIN format
+  parsing (wrong column index, format mismatch, encoding issue) would pass
+  all mocked tests and fail silently in production.
+
+  This TODO addresses all four concerns: define the fingerprint contract,
+  answer the timing question, decide on multi-stream handling, and add real
+  integration tests where possible (SQLite is already local; DuckDB is local;
+  PostgreSQL requires an instance but CI can provide one).
+
+prior_art:
+  - "benchbox/core/query_plans/plan_fingerprint.py — fingerprint implementation to document"
+  - "benchbox/platforms/base/result_capture.py:561 — capture_query_plan() — timing insertion point"
+  - "benchbox/platforms/duckdb.py:962 — display_query_plan_if_enabled() before capture — note pre/post ordering"
+  - "tests/unit/platforms/test_sqlite_plan_capture.py — real SQLite connection tests, use as template for integration tests"
+  - "tests/integration/ — existing integration test directory and patterns"
+
+work:
+  - id: w1
+    summary: "Document plan_fingerprint stability contract in plan_fingerprint.py"
+    status: pending
+    notes: |
+      Read benchbox/core/query_plans/plan_fingerprint.py to understand what the
+      fingerprint hashes. Document in the module docstring:
+        - Which plan fields are included in the hash (operator types, join order,
+          index names, table names, estimated rows — or just structural shape?)
+        - What changes are expected to produce a new fingerprint vs. the same one
+        - Recommended use: "stable for structural plan comparison within the same
+          engine version; may change across minor versions"
+        - What fingerprint equality does NOT guarantee
+
+      If the fingerprint implementation hashes fields that change with stats
+      (e.g., estimated rows), document that fingerprint equality is
+      "structural, not cost-based" or propose separating structural hash from
+      cost hash.
+
+  - id: w2
+    summary: "Decide and document pre- vs. post-execution capture timing"
+    status: pending
+    notes: |
+      Analyze the tradeoffs and pick a default. The current behavior (post-execution)
+      is fine for profiling. For regression detection, pre-execution is preferable.
+
+      Proposed resolution: capture post-execution (current behavior) but add a
+      `capture_plan_timing: pre | post` config option (default: post) that adapters
+      can respect in get_query_plan(). This is a config change, not a behavior change.
+
+      If no change is made, document the current behavior in ResultCaptureMixin
+      and result_capture.py.
+
+  - id: w3
+    summary: "Define multi-stream plan deduplication policy"
+    status: pending
+    notes: |
+      For `stream_id` != None cases, answer:
+        1. Are per-stream plans stored as separate records or collapsed?
+        2. Does the result bundle include one plan per (query_id, stream_id) or
+           one plan per query_id?
+        3. For fingerprint comparison, should all streams for the same query
+           have the same fingerprint (assertion) or may they differ (documented)?
+
+      Check existing result bundle schema in benchbox/core/result_bundle.py or
+      equivalent to understand where plan data lands. Document the policy in
+      result_capture.py.
+
+  - id: w4
+    summary: "Add SQLite integration tests using real in-memory connections"
+    status: pending
+    notes: |
+      tests/unit/platforms/test_sqlite_plan_capture.py already uses a real
+      sqlite3 in-memory connection. Extend it with integration-style assertions:
+        - Verify plan_fingerprint is non-None for a real SELECT query
+        - Verify plan_fingerprint is consistent across two calls with the same query
+          and same schema (idempotent fingerprint)
+        - Verify plan_fingerprint differs when adding an index (structural change)
+        - Verify EXPLAIN QUERY PLAN text is non-empty and contains expected keywords
+
+      These tests require no mocking — use the existing `conn` fixture.
+      Mark with @pytest.mark.integration or @pytest.mark.unit (SQLite is in-memory
+      so it qualifies as unit).
+
+  - id: w5
+    summary: "Add DuckDB integration tests using real DuckDB in-memory connection"
+    status: pending
+    notes: |
+      DuckDB has no credentials requirement for in-memory operation. Add tests in
+      tests/unit/platforms/test_duckdb_plan_capture.py (or create it):
+        - Verify DuckDBAdapter.get_query_plan() returns non-empty JSON for a
+          real SELECT on an in-memory table
+        - Verify DuckDBQueryPlanParser.parse_explain_output() produces a
+          non-None QueryPlanDAG from the real EXPLAIN output
+        - Verify plan_fingerprint is populated and consistent across two calls
+        - Verify plan_fingerprint changes after CREATE INDEX
+
+      Use duckdb.connect(":memory:") — no fixtures or credentials needed.
+
+  - id: w6
+    summary: "Add PostgreSQL integration test fixture (CI-gated, skipped locally without instance)"
+    needs: [w4, w5]
+    status: pending
+    notes: |
+      Add tests/integration/test_postgresql_plan_capture_integration.py with:
+        - A pytest.mark.live_integration marker
+        - Skip condition: pytest.skip() when POSTGRESQL_HOST env is absent
+        - Test: real EXPLAIN (FORMAT JSON) against a live PostgreSQL instance
+        - Assertions: plan JSON is non-None, parser produces QueryPlanDAG,
+          fingerprint is populated
+
+      This test can run in CI if a PostgreSQL service is available (GitHub Actions
+      has postgres service containers). It is skipped locally by default.
+
+      Note: this is the only work unit that requires a live PostgreSQL instance.
+      w4 (SQLite) and w5 (DuckDB) are fully local and can run in fast tests.
+
+      CI configuration: if a PostgreSQL service container needs to be added to
+      a GitHub Actions workflow (e.g., .github/workflows/ci.yml), that workflow
+      file modification is in scope for this work unit. If CI config is not
+      modified here, document in a follow-up infra TODO instead.
+
+deferred:
+  - summary: "Integration tests for Redshift, DataFusion, and MotherDuck plan capture"
+    reason: "Require live cloud instances (Redshift cluster, MotherDuck token). Defer until CI has those credentials or a dedicated UAT workflow is in place."
+
+must_preserve:
+  - "All existing plan capture unit tests must pass without modification."
+  - "plan_fingerprint field must continue to appear in result dicts when capture is enabled."
+  - "capture_plans=False must remain a true no-op — no EXPLAIN issued, no fingerprint in result."
+
+approach: |
+  Start with documentation (w1 + w2 + w3) — no code changes, just decisions.
+  Then add local integration tests (w4 + w5) since they need no infrastructure.
+  Finally add the PostgreSQL CI fixture (w6) which may require a GitHub Actions
+  service block in the CI config.
+
+  The fingerprint contract (w1) should be resolved before writing integration
+  tests that assert fingerprint values, so w4/w5 depend on w1 conceptually
+  (but can be written in parallel if the fingerprint implementation is clear
+  from reading the source).
+
+verification:
+  - description: "SQLite integration tests pass without any mocking"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_sqlite_plan_capture.py -v"
+    expected_output: "All tests pass including new fingerprint consistency tests"
+  - description: "DuckDB integration tests pass against real in-memory DuckDB"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_duckdb_plan_capture.py -v"
+    expected_output: "All tests pass including fingerprint consistency tests"
+  - description: "PostgreSQL integration tests skip gracefully when POSTGRESQL_HOST is absent"
+    command: "uv run -- python -m pytest tests/integration/test_postgresql_plan_capture_integration.py -v"
+    expected_output: "Tests skipped with 'live PostgreSQL not available' message"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/query_plans/plan_fingerprint.py"
+    - "benchbox/platforms/base/result_capture.py"
+    - "tests/unit/platforms/test_sqlite_plan_capture.py"
+    - "tests/unit/platforms/test_duckdb_plan_capture.py"
+  added:
+    - "tests/integration/test_postgresql_plan_capture_integration.py"
+  do_not_modify:
+    - "benchbox/platforms/duckdb.py"
+    - "benchbox/platforms/postgresql.py"
+    - "benchbox/core/query_plans/parsers/"
+
+success_metrics:
+  - "plan_fingerprint stability contract is documented in plan_fingerprint.py module docstring."
+  - "Pre- vs. post-execution timing decision is documented in result_capture.py."
+  - "Multi-stream deduplication policy is documented."
+  - "SQLite fingerprint consistency is verified by at least 2 real-connection tests."
+  - "DuckDB fingerprint consistency is verified by at least 2 real-connection tests."
+  - "PostgreSQL integration test exists and skips gracefully when instance is unavailable."
+
+open_questions:
+  - question: "Should plan_fingerprint hash estimated row counts or only structural plan shape?"
+    gating: true
+    affects: ["w1: determines what the stability contract can promise"]
+    default: "Exclude row estimates; hash only structural shape (operator types, join order, index names)"
+  - question: "Should capture_plan_timing be a per-adapter config or a global benchbox config?"
+    gating: false
+    affects: ["w2"]
+    default: "Global config, default post-execution (current behavior)"
+  - question: "Are concurrent stream plans expected to have identical fingerprints? If yes, should a mismatch be logged as a warning?"
+    gating: false
+    affects: ["w3: determines deduplication policy and whether mismatch logging is added"]
+    default: "TBD — resolve during w3 by checking result bundle schema"
+
+files_affected:
+  modified:
+    - "benchbox/core/query_plans/plan_fingerprint.py"
+    - "benchbox/platforms/base/result_capture.py"
+    - "tests/unit/platforms/test_sqlite_plan_capture.py"
+    - "tests/unit/platforms/test_duckdb_plan_capture.py"
+  added:
+    - "tests/integration/test_postgresql_plan_capture_integration.py"
+
+metadata:
+  tags: [query-plan, fingerprint, integration-tests, design, stability]
+  estimated_effort: "Medium"
+  created_date: "2026-06-08"
+  last_updated: "2026-06-08T00:00:00-04:00"

@@ -1,0 +1,197 @@
+id: query-plan-capture-base-class-refactor
+title: "Factor repeated plan capture block into a base-class helper"
+worktree: platform-expansion
+priority: Medium
+status: Not Started
+category: Platform Expansion
+
+description: |
+  The same 6-line plan capture block is copy-pasted verbatim into every adapter
+  that was wired in PRs #748 and #749. As of 2026-06-08, six adapters contain
+  near-identical code:
+
+    DuckDB      benchbox/platforms/duckdb.py:968
+    MotherDuck  benchbox/platforms/motherduck.py:297
+    PostgreSQL  benchbox/platforms/postgresql.py:751
+    Redshift    benchbox/platforms/redshift.py:2119
+    DataFusion  benchbox/platforms/datafusion.py:1531
+    SQLite      benchbox/platforms/sqlite.py:562
+
+  The block looks like:
+    if self.capture_plans [and result.get("status") == "SUCCESS"]:
+        query_plan, plan_capture_time_ms = self.capture_query_plan(conn, query, query_id)
+        if query_plan:
+            result["query_plan"] = query_plan
+            result["plan_fingerprint"] = query_plan.plan_fingerprint
+        if plan_capture_time_ms is not None:
+            result["plan_capture_time_ms"] = plan_capture_time_ms
+
+  Minor variations exist: DuckDB pre-declares variables before the block;
+  PostgreSQL and Redshift guard on status=="SUCCESS" while the other four do not
+  (a separate correctness bug tracked in query-plan-capture-missing-guards).
+
+  The correct fix is to add a helper method to ResultCaptureMixin in
+  benchbox/platforms/base/result_capture.py that encapsulates the pattern:
+
+    def _merge_plan_capture_into_result(
+        self,
+        result: dict,
+        connection: Any,
+        query: str,
+        query_id: str,
+    ) -> None:
+        """Capture query plan and merge fields into result in-place.
+
+        No-op when capture_plans is False or status is not SUCCESS.
+        """
+        if not self.capture_plans or result.get("status") != "SUCCESS":
+            return
+        query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+        if query_plan:
+            result["query_plan"] = query_plan
+            result["plan_fingerprint"] = query_plan.plan_fingerprint
+        if plan_capture_time_ms is not None:
+            result["plan_capture_time_ms"] = plan_capture_time_ms
+
+  This also bakes in the status guard universally, eliminating the inconsistency
+  that the missing-guards TODO addresses at the per-adapter level. If both TODOs
+  are worked in sequence, the missing-guards TODO can be skipped for DataFusion
+  and SQLite (the base helper fixes them implicitly).
+
+  DuckDB's execute_query() also pre-declares `query_plan = None` and
+  `plan_fingerprint = None` before `_build_query_result_with_validation()`.
+  These declarations become unnecessary once the helper moves the logic out.
+  The DuckDB path should be cleaned up as part of this TODO.
+
+prior_art:
+  - "benchbox/platforms/base/result_capture.py:561 — capture_query_plan() base implementation"
+  - "benchbox/platforms/base/result_capture.py:477 — display_query_plan_if_enabled() — existing helper method pattern to follow"
+  - "benchbox/platforms/duckdb.py:968 — canonical existing block; clean up pre-declarations when migrating"
+  - "benchbox/platforms/postgresql.py:750 — has status guard; use as correctness baseline for the new helper"
+
+work:
+  - id: w1
+    summary: "Add _merge_plan_capture_into_result() to ResultCaptureMixin in result_capture.py"
+    status: pending
+    notes: |
+      Add to benchbox/platforms/base/result_capture.py alongside capture_query_plan()
+      and display_query_plan_if_enabled(). The method signature:
+        def _merge_plan_capture_into_result(
+            self,
+            result: dict[str, Any],
+            connection: Any,
+            query: str,
+            query_id: str,
+        ) -> None:
+      The helper must include the status=="SUCCESS" guard so all callers benefit
+      automatically. It must be a no-op when capture_plans is False.
+
+  - id: w2
+    summary: "Replace inline capture blocks in all six adapters with calls to the new helper"
+    needs: [w1]
+    status: pending
+    notes: |
+      For each adapter, replace the inline block with:
+        self._merge_plan_capture_into_result(result_dict, conn, query, query_id)
+      Adapters: duckdb.py, motherduck.py, postgresql.py, redshift.py, datafusion.py, sqlite.py.
+
+      In DuckDB also remove the now-unused pre-declarations:
+        query_plan = None
+        plan_fingerprint = None
+        plan_capture_time_ms = None
+      and the existing `if self.capture_plans:` block that was building these.
+      The local `plan_fingerprint` variable is only used within the capture block
+      itself (line 971) — there is no separate result-dict assembly step that
+      references it. All three pre-declarations can be safely deleted once the
+      block is replaced by `_merge_plan_capture_into_result()`.
+
+  - id: w3
+    summary: "Update tests to cover the new helper and remove per-adapter duplication assertions"
+    needs: [w2]
+    status: pending
+    notes: |
+      The existing per-adapter tests (test_postgresql_plan_capture.py, etc.) already
+      cover the capture behavior via the adapters, so they remain valid. Add a
+      dedicated unit test for _merge_plan_capture_into_result() in
+      tests/unit/platforms/base/test_result_capture.py (or create the file if absent):
+        - Calling with capture_plans=False is a no-op
+        - Calling with status="FAILED" is a no-op (no capture)
+        - Calling with status="SUCCESS" and capture_plans=True merges fields
+        - When capture_query_plan() returns (None, 0.0), result is unchanged
+
+deferred:
+  - summary: "Consolidate display_query_plan_if_enabled + _merge_plan_capture_into_result into a single execute_query() template method"
+    reason: "More invasive refactor that requires changing the execute_query() base signature or adding a Template Method base implementation. Out of scope here; revisit when adding the next 3+ adapter families."
+
+must_preserve:
+  - "All six adapters must continue to populate query_plan, plan_fingerprint, and plan_capture_time_ms identically to today."
+  - "DuckDB execute_query() result dict must not drop any keys currently present."
+  - "capture_plans=False must remain a true no-op (no EXPLAIN issued)."
+  - "Existing plan capture unit tests must pass without modification."
+
+approach: |
+  Add the helper to the base class first (w1) and test it in isolation. Then
+  do a mechanical find-and-replace across the six adapters (w2) — each adapter
+  change is a deletion plus one line. Run the full unit suite after each adapter
+  to catch any variable-name mismatch (the connection variable is named `conn`
+  in some adapters and `connection` in others). Finally update tests (w3).
+
+anti_patterns:
+  - "DO NOT make _merge_plan_capture_into_result() return the result dict — in-place mutation matches the existing pattern and avoids callers having to reassign."
+  - "DO NOT remove the status guard from the helper to satisfy edge cases — every caller should benefit from the guard universally."
+  - "DO NOT land this refactor while some adapters still have un-guarded inline blocks — because that creates a partial state where guards are inconsistently applied — either complete missing-guards first or mark it superseded and land both in the same PR."
+
+verification:
+  - description: "All six adapter plan capture tests still pass after substitution"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_postgresql_plan_capture.py tests/unit/platforms/test_redshift_plan_capture.py tests/unit/platforms/test_datafusion_plan_capture.py tests/unit/platforms/test_sqlite_plan_capture.py tests/unit/platforms/test_duckdb_plan_capture.py -v"
+    expected_output: "All existing tests pass"
+  - description: "New base class helper tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/base/ -v"
+    expected_output: "New _merge_plan_capture_into_result tests pass"
+  - description: "Full unit suite green"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -q"
+    expected_output: "0 failures, 0 errors"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/result_capture.py"
+    - "benchbox/platforms/duckdb.py"
+    - "benchbox/platforms/motherduck.py"
+    - "benchbox/platforms/postgresql.py"
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/datafusion.py"
+    - "benchbox/platforms/sqlite.py"
+    - "tests/unit/platforms/base/test_result_capture.py"
+  do_not_modify:
+    - "benchbox/platforms/base/psycopg2_mixin.py"
+    - "benchbox/core/query_plans/"
+
+success_metrics:
+  - "The inline capture block exists in exactly ONE place (result_capture.py) instead of six."
+  - "All six adapters call _merge_plan_capture_into_result() instead of inlining the block."
+  - "status=='SUCCESS' guard is universally enforced for all adapters via the helper."
+  - "0 regressions in the full unit suite."
+
+files_affected:
+  modified:
+    - "benchbox/platforms/base/result_capture.py"
+    - "benchbox/platforms/duckdb.py"
+    - "benchbox/platforms/motherduck.py"
+    - "benchbox/platforms/postgresql.py"
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/datafusion.py"
+    - "benchbox/platforms/sqlite.py"
+  added:
+    - "tests/unit/platforms/base/test_result_capture.py"
+
+open_questions:
+  - question: "Should query-plan-capture-missing-guards be completed before this refactor, or should this refactor land first and missing-guards be closed as superseded for DataFusion/SQLite?"
+    gating: true
+    affects: ["w2: if refactor lands first, the per-adapter guard additions in missing-guards w1/w2 are redundant; the test additions in missing-guards w6 should be redirected to the base-class helper tests"]
+    default: "Land missing-guards first for the per-adapter test coverage; then refactor supersedes the inline blocks"
+
+metadata:
+  tags: [query-plan, refactor, base-class, result-capture, code-quality]
+  estimated_effort: "Small"
+  created_date: "2026-06-08"
+  last_updated: "2026-06-08T00:00:00-04:00"
