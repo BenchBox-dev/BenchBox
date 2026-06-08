@@ -1,0 +1,143 @@
+id: benchmark-output-root-resolve-at-construction-boundary
+title: "Resolve benchmark datagen root at the construction boundary to remove post-construction mutation"
+worktree: main
+priority: Medium
+status: "Not Started"
+category: Core Functionality
+
+description: |
+  PR #759 fixed the output-root propagation bug with two cooperating mechanisms:
+  an env-aware default in BaseBenchmark, and an opt-in GeneratorOutputDirMixin
+  whose setter re-syncs nested generators when output_dir is reassigned after
+  construction. This works, but it leaves the original architectural smell that
+  the TODO's w2 explicitly preferred to fix: the orchestrator still constructs
+  the benchmark BEFORE the final output root is resolved, then mutates
+  benchmark.output_dir afterward (orchestrator data-sharing redirect, runner
+  _resolve_output_dir_handler).
+
+  Consequences of keeping post-construction mutation as the contract:
+
+  - Footgun: any new generator-backed benchmark that builds its generator in
+    __init__ and forgets the mixin silently reintroduces the bug. The mixin is
+    opt-in, so correctness depends on author memory.
+  - Duplication: GeneratorOutputDirMixin now overlaps with the bespoke output_dir
+    setters in read_primitives/benchmark.py and transactional/benchmark_base.py.
+  - Residual gaps: benchmarks with lazy/derived layouts (tpcds, tpcdi) need the
+    separate explicit-override fix tracked in
+    benchmark-output-root-explicit-override-propagation.
+
+  Investigate resolving the benchmark-specific datagen directory once at the call
+  boundary and injecting it into the constructor, so generators capture the
+  correct root immediately and post-construction mutation (and the mixin) can be
+  retired or reduced to a thin compatibility shim. If adopted, this would subsume
+  the explicit-override item and let the duplicated setters collapse onto one
+  mechanism.
+
+prior_art:
+  - "benchbox/cli/orchestrator.py:_get_benchmark_instance / _resolve_output_root / _resolve_custom_output_root — the construction + resolution sites to reorder"
+  - "benchbox/core/benchmark_loader.py:instantiate_benchmark_class / constructor_accepts_argument — reuse to inject output_dir only where the constructor accepts it"
+  - "benchbox/core/runner/runner.py:_resolve_output_dir_handler — the post-construction mutation this item aims to retire or shrink"
+  - "benchbox/base.py:GeneratorOutputDirMixin and benchbox/core/read_primitives + transactional output_dir setters — candidates to dedupe once mutation is removed"
+  - "benchbox/utils/path_utils.py:get_benchmark_runs_datagen_path — reuse as the single resolver at the boundary"
+
+work:
+  - id: w0
+    summary: "Map every site that constructs a benchmark then mutates output_dir"
+    status: pending
+    notes: |
+      Enumerate orchestrator, runner, MCP, UAT runner, and direct test
+      constructors. For each, record whether the final root is knowable before
+      construction and what currently blocks passing it in (e.g. data-sharing
+      source resolution needing an instance).
+  - id: w1
+    summary: "Resolve the data-source root without a constructed instance"
+    needs: [w0]
+    status: pending
+    notes: |
+      get_data_source_benchmark() is currently an instance method, which forces
+      construct-then-redirect for read/write/transaction primitives. Evaluate a
+      class-level/registry lookup so the shared datagen dir is resolvable before
+      construction.
+  - id: w2
+    summary: "Inject the resolved datagen dir into constructors at the orchestrator/runner boundary"
+    needs: [w1]
+    status: pending
+    notes: |
+      Pass output_dir through instantiate_benchmark_class where accepted. Preserve
+      CLI --output precedence over BENCHBOX_OUTPUT_DIR and the cwd fallback when
+      neither is set.
+  - id: w3
+    summary: "Retire or shrink post-construction mutation and dedupe the output_dir setters"
+    needs: [w2]
+    status: pending
+    notes: |
+      Once construction receives the final root, reduce _resolve_output_dir_handler
+      to a no-op/compat shim and collapse GeneratorOutputDirMixin and the
+      read_primitives/transactional setters onto a single mechanism, keeping a
+      compatibility path for external callers that still assign output_dir.
+
+deferred:
+  - summary: "Cloud staging path (CloudStagingPath/DatabricksPath) construction-time injection edge cases"
+    reason: "Cloud roots resolve later via credentials in _apply_default_cloud_output_dir; needs its own analysis once the local-path boundary is settled."
+
+must_preserve:
+  - "CLI --output remains the highest-precedence output root."
+  - "BENCHBOX_OUTPUT_DIR remains the shared-root mechanism; cwd-local default preserved when neither is set."
+  - "External callers that still assign benchmark.output_dir after construction continue to work (compatibility shim)."
+  - "Data-sharing benchmarks (read/write/transaction primitives) keep reusing the source benchmark's datagen dir."
+
+approach: |
+  Treat this as an architecture-altitude change: prefer generalizing the
+  resolve-once-at-boundary mechanism over layering more per-class setters. Land
+  it behind the regression guard from benchmark-output-root-regression-guard so
+  any behavior drift is caught. Sequence: prove the data-source root is
+  resolvable pre-construction, inject at the boundary, then simplify the now-
+  redundant mutation/setters.
+
+anti_patterns:
+  - "DO NOT remove the output_dir setter compatibility path outright - because external/library callers assign it post-construction - keep a thin shim."
+  - "DO NOT add a third resolution helper - because get_benchmark_runs_datagen_path already exists - resolve through it at the boundary."
+
+verification:
+  - description: "Output-root regression guard passes after the refactor"
+    command: "uv run -- python -m pytest tests/unit/core/test_benchmark_output_root_propagation.py tests/unit/mcp/test_benchmark_output_root_propagation.py -q"
+    expected_output: "all propagation tests pass with no xfails remaining for generator-backed benchmarks"
+  - description: "Orchestrator/runner and data-sharing suites pass"
+    command: "uv run -- python -m pytest tests/unit/cli/test_orchestrator_data_sharing.py tests/unit/core/test_runner_helpers.py -q"
+    expected_output: "all tests pass"
+  - description: "Fast suite passes"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "no new failures"
+
+scope_limit:
+  only_modify:
+    - "benchbox/cli/orchestrator.py"
+    - "benchbox/core/benchmark_loader.py"
+    - "benchbox/core/runner/"
+    - "benchbox/base.py"
+    - "benchbox/core/read_primitives/benchmark.py"
+    - "tests/unit/"
+  do_not_modify:
+    - "benchmark_runs/"
+
+success_metrics:
+  - "Generator-backed benchmarks receive their final datagen root at construction; no nested generator depends on post-construction mutation for correctness."
+  - "GeneratorOutputDirMixin and the read_primitives/transactional setters are unified onto one mechanism (or the mixin becomes a thin shim)."
+  - "benchmark-output-root-explicit-override-propagation is rendered unnecessary (tpcds/tpcdi correct without a bespoke setter)."
+
+open_questions:
+  - question: "Can the data-source datagen root be resolved without constructing the benchmark (get_data_source_benchmark is currently an instance method)?"
+    gating: true
+    affects: ["w1", "w2"]
+    default: "Keep construct-then-redirect only for data-sharing benchmarks; inject at construction for all others."
+  - "Should the output_dir setter remain a supported public API for library users, or be deprecated with a migration window?"
+
+deps:
+  needs:
+    - "benchmark-output-root-regression-guard"
+
+metadata:
+  tags: [output-paths, datagen, architecture, orchestrator, benchmark-runs]
+  estimated_effort: "Large"
+  created_date: "2026-06-08"
+  last_updated: "2026-06-08T00:00:00"
