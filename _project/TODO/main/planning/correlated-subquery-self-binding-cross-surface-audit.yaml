@@ -1,0 +1,131 @@
+id: correlated-subquery-self-binding-cross-surface-audit
+title: "Audit DataFrame variants and other benchmarks for correlated-subquery self-binding, and add a durable detector"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  PR #756 fixed three TPC-Havoc SQL variants where a correlated subquery's
+  UNQUALIFIED correlation column silently bound to the INNER alias instead of
+  the outer table, degenerating the intended correlation into an uncorrelated
+  scan. That sweep covered the SQL variant_sets only, by hand. Two reachable
+  surfaces were never checked, and the manual sweep is not a durable guard.
+
+  Scope of this audit:
+
+  1. TPC-Havoc DataFrame variants (benchbox/core/tpchavoc/dataframe_queries/).
+     The DataFrame implementations of the correlated queries (Q2 min-cost,
+     Q11 threshold, Q17 per-part avg, Q20, Q21, Q22) must encode the SAME outer
+     correlation as the canonical query. DataFrame code does not "self-bind" the
+     same way, but the equivalent mistake - joining/filtering on the inner frame
+     instead of the outer row - is possible and equally silent.
+
+  2. Other SQL benchmarks with correlated subqueries: TPC-DS, SSB, join-order,
+     read-primitives (subquery category), and write-primitives
+     (update_with_subquery). Grep evidence already shows correlated patterns and
+     a "self-join pattern" comment in tpcds/dataframe_queries. Apply the same
+     qualify-the-outer-correlation audit.
+
+  3. A DURABLE detector so this class cannot silently reappear: a static check
+     (sqlglot-backed) that flags a correlated subquery whose correlation
+     predicate has an unqualified column also present in an inner aliased
+     relation. A binder-level check is hard to make exact, so a conservative
+     lint that surfaces candidates for human confirmation is acceptable.
+
+  Provenance question worth answering during the audit: how were these variants
+  authored? If LLM-generated or mechanically transformed, self-binding is likely
+  a SYSTEMATIC generation artifact, implying more instances and a generator that
+  needs a correctness contract rather than per-instance patches.
+
+prior_art:
+  - "_project/DONE/main/planning/tpchavoc-correlated-subquery-self-binding.yaml - the SQL-variant fix this audit extends; reuse its qualify-the-outer-table pattern"
+  - "benchbox/core/tpchavoc/dataframe_queries/_delegating_variants.py - notes that Q16-Q22 delegate the core correlated/anti-join shape; verify those delegations are faithful"
+  - "benchbox/core/tpcds/dataframe_queries/queries.py:3801 - existing 'correlated subquery ... self-join pattern' comment; an explicit audit target"
+  - "benchbox/sql_compat/rules/ and benchbox/platforms/*_query_transformer.py - existing places SQL is rewritten; a static check could live near these"
+
+work:
+  - id: w0
+    summary: "Re-confirm the audit surfaces still exist and enumerate correlated-subquery sites"
+    status: pending
+    notes: |
+      Enumerate correlated subqueries across the DataFrame variants and the
+      other SQL benchmarks (grep + read). Record the candidate list before
+      editing. Capture stdout to /tmp and summarize counts in the TODO/PR.
+
+  - id: w1
+    summary: "Audit TPC-Havoc DataFrame variants for outer-correlation faithfulness and fix any drift"
+    needs: [w0]
+    status: pending
+    notes: |
+      For each correlated DataFrame query, confirm the join/filter references
+      the OUTER row, not the inner aggregate frame. Cross-check results against
+      canonical TPC-H at small SF.
+
+  - id: w2
+    summary: "Audit other SQL benchmarks (TPC-DS, SSB, join-order, read/write-primitives) for the self-binding pattern and fix any found"
+    needs: [w0]
+    status: pending
+
+  - id: w3
+    summary: "Prototype a durable static detector for unqualified self-binding correlations"
+    needs: [w0]
+    status: pending
+    notes: |
+      sqlglot-backed candidate flagger: parse each query, find correlated
+      subqueries, flag predicates whose unqualified column also exists in an
+      inner aliased relation. Conservative (candidates for human review) is
+      acceptable; wire into the equivalence/lint tooling, not as a hard blocker
+      until precision is validated.
+
+deferred:
+  - summary: "Author a correctness contract for the variant generator"
+    reason: "Depends on the provenance finding in w0/w1; only worth it if the pattern proves systematic across surfaces."
+
+must_preserve:
+  - "Existing DataFrame and SQL benchmark results that are already correct are unchanged."
+  - "Each variant keeps its declared structural identity; only the correlation binding is corrected."
+
+approach: |
+  Reuse the qualify-the-outer-table discipline from the merged self-binding fix.
+  For DataFrame variants, the analogous fix is correlating on the outer frame's
+  key, not the inner aggregate. Confirm every fix against canonical TPC-H/TPC-DS
+  at small SF. Build the static detector last, informed by the concrete cases
+  found, so its heuristics match real instances.
+
+anti_patterns:
+  - "DO NOT restructure variant/query shapes - because identity is the shape - only correct the correlation binding."
+  - "DO NOT ship a noisy static check as a hard CI blocker - because false positives will erode trust - start as an advisory candidate list."
+
+verification:
+  - description: "Audited correlated DataFrame/SQL queries match canonical results at small SF"
+    command: "compare each audited query to its canonical benchmark answer on DuckDB small SF"
+    expected_output: "set-equal results (modulo declared exceptions)"
+  - description: "Static detector flags the known historical self-binding cases when reverted"
+    command: "run the detector over variant_sets with a #756 fix reverted"
+    expected_output: "the reverted variant is flagged"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpchavoc/dataframe_queries/"
+    - "benchbox/core/tpcds/"
+    - "benchbox/core/ssb/"
+    - "benchbox/core/joinorder/"
+    - "benchbox/core/read_primitives/"
+    - "benchbox/core/write_primitives/"
+    - "tests/"
+    - "_project/scripts/"
+
+open_questions:
+  - "Were the variants/queries authored by hand, LLM-generated, or mechanically transformed - i.e. is self-binding a systematic generation artifact?"
+  - "Can a sqlglot-based detector be made precise enough to gate, or does correct binding require a real catalog-aware binder?"
+
+success_metrics:
+  - "DataFrame variants and the surveyed SQL benchmarks are confirmed free of self-binding (or fixed)."
+  - "A documented, runnable detector flags the historical #756 cases when reintroduced."
+
+metadata:
+  tags: [tpchavoc, tpcds, dataframe, correctness, sql, audit, lint]
+  estimated_effort: "Medium"
+  created_date: "2026-06-08"
+  last_updated: "2026-06-08T00:00:00"
