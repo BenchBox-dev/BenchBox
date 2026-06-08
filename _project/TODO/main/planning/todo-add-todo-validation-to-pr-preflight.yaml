@@ -1,0 +1,84 @@
+id: todo-add-todo-validation-to-pr-preflight
+title: "Add a pre-commit hook for validate_todo.py to catch invalid TODO YAML at commit time"
+worktree: main
+priority: Medium
+status: Not Started
+category: Developer Tooling
+
+description: |
+  During the 2026-06-08 TODO prioritization pass, 6 priority fields were edited
+  and committed without running validate_todo.py first. The PR gate already
+  handles this: pr-content-guard runs validate_todo.py on each changed TODO path
+  when the diff routes to the content-only CI path. So PR merges are protected.
+
+  The gap is at commit time: an author can commit an invalid YAML locally (before
+  pushing or opening a PR) and only discover the error in CI. Adding a pre-commit
+  hook closes this gap by failing the commit immediately.
+
+  Separately, the current pr-content-guard validates only changed files. A mass
+  edit outside a PR (e.g. a direct push to a feature branch) could introduce
+  invalid YAML in unreviewed files. Belt-and-suspenders: add a validate --all
+  step to pr-preflight for the content-only code path as well.
+
+work:
+  - id: w1
+    summary: "Add validate_todo.py as a pre-commit hook for TODO/DONE YAML paths"
+    status: pending
+    notes: |
+      Check .pre-commit-config.yaml for the pattern used by other local hooks
+      (e.g. the existing check-yaml hook). Add an entry that runs:
+        uv run --project _project/scripts -- python _project/scripts/validate_todo.py {file}
+      scoped to files matching _project/TODO/**/*.yaml and _project/DONE/**/*.yaml.
+
+  - id: w2
+    summary: "Add validate_todo.py --all to pr-preflight content path as belt-and-suspenders"
+    needs: [w1]
+    status: pending
+    notes: |
+      pr-content-guard already validates changed files. Add --all to catch
+      any files outside the diff that may have been corrupted by a direct edit.
+      Insert after the existing todo.txt loop in pr-content-guard:
+        uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all
+
+  - id: w3
+    summary: "Verify: introduce a deliberate invalid priority value, confirm both gates fire"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      (a) Edit a TODO file locally, set priority to "Invalid", run git commit →
+          should fail at pre-commit hook.
+      (b) Skip the hook with --no-verify, push, open a PR → should fail in
+          pr-content-guard / pr-preflight.
+
+prior_art:
+  - ".pre-commit-config.yaml: existing local hooks pattern to follow"
+  - "Makefile:pr-content-guard — already validates changed TODO files; extend with --all"
+  - "_project/scripts/validate_todo.py: accepts single path or --all"
+
+must_preserve:
+  - "Existing pre-commit hooks continue to fire in the same order"
+  - "validate_todo.py --all exit code 0 when all current files are valid"
+  - "pr-content-guard continues to validate per-changed-file first (fail fast on the diff)"
+
+verification:
+  - description: "Commit with invalid priority value rejected by pre-commit hook"
+    command: "git commit -m 'test'"
+    expected_output: "pre-commit hook failure citing the invalid priority enum"
+  - description: "All current TODO files pass --all with no changes"
+    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all"
+    expected_output: "0 errors"
+
+metadata:
+  created_date: "2026-06-08"
+  estimated_effort: "Small"
+  tags:
+    - tooling
+    - ci
+    - pre-commit
+    - todo-system
+
+impact:
+  technical_debt: |
+    Without a pre-commit hook, schema violations are discovered in CI rather
+    than locally, adding a push-and-wait cycle to every TODO authoring mistake.
+    The PR gate already catches merges; this closes the earlier commit-time gap.

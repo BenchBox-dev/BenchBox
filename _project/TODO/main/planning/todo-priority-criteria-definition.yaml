@@ -1,0 +1,77 @@
+id: todo-priority-criteria-definition
+title: "Document concrete criteria for Critical vs High vs Medium-High priority levels"
+worktree: main
+priority: Low
+status: Not Started
+category: Process and Workflow
+
+description: |
+  The 2026-06-08 prioritization audit found no written criteria for the five
+  priority levels anywhere in the project docs. Without them, each author
+  applies the schema subjectively — items with similar impact land at different
+  tiers depending on who filed them, and automated agents cannot reason about
+  whether a given priority is correct.
+
+  Add a "Priority Definitions" section to TODO/README.md with a one-line
+  definition, a key distinguishing question, and 1-2 backlog examples for each
+  level (Critical / High / Medium-High / Medium / Low).
+
+work:
+  - id: w1
+    summary: "Survey the 2 Critical and top-5 High items to extract the implicit criteria"
+    status: pending
+    notes: |
+      Read: TODO/main/active/release-recovery-v0-3-1.yaml (Critical)
+            TODO/main/planning/benchmark-runs-output-root-propagation.yaml (Critical)
+      Read 5 representative High items. Identify what distinguishes Critical
+      from High (e.g., release-blocking? data-loss risk? production outage?).
+
+  - id: w2
+    summary: "Draft priority criteria table for README.md"
+    needs: [w1]
+    status: pending
+    notes: |
+      Proposed structure per level:
+        - One-line definition
+        - Key question to ask
+        - 1-2 examples from the actual backlog
+
+  - id: w3
+    summary: "Add an optional 'priority_rationale' comment to TODO_ENTRY_TEMPLATE.yaml"
+    needs: [w2]
+    status: pending
+    notes: |
+      A short inline comment above the priority field with a one-liner
+      reminder of what each level means, so authors see it at authoring time.
+
+  - id: w4
+    summary: "Update TODO/README.md with the Priority Definitions section"
+    needs: [w2]
+    status: pending
+
+prior_art:
+  - "_project/TODO/README.md: extend, do not replace"
+  - "_project/TODO_ENTRY_TEMPLATE.yaml: optional inline comment addition"
+
+must_preserve:
+  - "README.md existing sections remain intact"
+  - "TODO_ENTRY_TEMPLATE.yaml remains valid YAML after any inline comment additions"
+
+verification:
+  - description: "README.md contains a Priority Definitions section with criteria for all 5 levels"
+    command: "grep -A 30 'Priority Definitions' _project/TODO/README.md"
+    expected_output: "Definitions for Critical, High, Medium-High, Medium, Low each present"
+
+metadata:
+  created_date: "2026-06-08"
+  estimated_effort: "Small"
+  tags:
+    - documentation
+    - process
+    - todo-system
+
+impact:
+  technical_debt: |
+    Undocumented priority criteria mean future prioritization passes (by
+    humans or agents) will be inconsistent and require repeated discussion.
+    A one-page definition eliminates the ambiguity permanently.
