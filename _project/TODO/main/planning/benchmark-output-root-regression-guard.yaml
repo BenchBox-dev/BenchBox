@@ -1,0 +1,138 @@
+id: benchmark-output-root-regression-guard
+title: "Registry-wide regression guard for benchmark output-root propagation"
+worktree: main
+priority: High
+status: "Not Started"
+category: Testing and Quality Assurance
+
+description: |
+  PR #759 fixed the lifecycle-ordering bug where generator-backed benchmarks
+  ignored BENCHBOX_OUTPUT_DIR and wrote datagen output under a worktree-local
+  benchmark_runs/. The fix made BaseBenchmark's default datagen root env-aware
+  and added an opt-in GeneratorOutputDirMixin that propagates a resolved root to
+  nested generators. The accompanying tests
+  (tests/unit/core/test_benchmark_output_root_propagation.py,
+  tests/unit/mcp/test_benchmark_output_root_propagation.py) only assert a
+  hand-picked subset of benchmark families.
+
+  The footgun is structural: a new generator-backed benchmark that builds its
+  generator in __init__ and forgets the mixin (or hardcodes
+  Path.cwd()/"benchmark_runs") silently reintroduces the original bug, and no
+  test or lint catches it. A one-off manual probe across all 24 registered
+  benchmarks confirmed the contract currently holds, but that evidence is not
+  durable.
+
+  Convert that probe into a registry-driven regression guard so the contract is
+  enforced for every current and future benchmark, and add a cheap static guard
+  that fails when a benchmark constructor hardcodes a cwd-local benchmark_runs
+  default instead of the shared resolver.
+
+prior_art:
+  - "tests/unit/core/test_benchmark_output_root_propagation.py — extend the per-family assertions into a registry-parametrized form rather than adding a parallel test file"
+  - "benchbox/core/benchmark_registry.py:get_all_benchmarks / get_public_benchmark_class — reuse to enumerate every benchmark under test"
+  - "benchbox/utils/path_utils.py:get_benchmark_runs_datagen_path / resolve_benchmark_runs_dir — reuse as the canonical env-aware root for assertions"
+  - "benchbox/base.py:GeneratorOutputDirMixin (OUTPUT_DIR_GENERATOR_ATTRS) — reuse to discover the nested-generator attributes to assert against"
+  - "_project/TODO/main/planning/benchmark-runs-local-artifact-guardrails.yaml — align with the runtime guardrail effort; this item is the test/lint counterpart"
+
+work:
+  - id: w0
+    summary: "Re-validate that every registered benchmark currently honors the env output root"
+    status: pending
+    notes: |
+      Construct each id from get_all_benchmarks() with BENCHBOX_OUTPUT_DIR set to
+      a tmp path and assert output_dir plus any OUTPUT_DIR_GENERATOR_ATTRS
+      generator resolves under it. Capture stdout to /tmp/output-root-guard-w0.log
+      (do not commit) and record the pass count and any exceptions in the PR body.
+  - id: w1
+    summary: "Add a registry-parametrized test asserting env-root honoring at construction for all benchmarks"
+    needs: [w0]
+    status: pending
+    notes: |
+      Parametrize over get_all_benchmarks(). For each, construct via the public
+      class (mirroring the MCP/library entry point) with BENCHBOX_OUTPUT_DIR set;
+      assert output_dir and each present nested generator/downloader resolve under
+      the root and that Path.cwd() is not a parent. Resolve nested generators via
+      _impl when the public wrapper delegates.
+  - id: w2
+    summary: "Add a test asserting post-construction output_dir reassignment propagates to nested generators"
+    needs: [w1]
+    status: pending
+    notes: |
+      For benchmarks that build a generator in __init__, assign a fresh explicit
+      root after construction and assert the nested generator follows. Mark the
+      known non-mixin benchmarks (tpcds, tpcdi) xfail and reference
+      benchmark-output-root-explicit-override-propagation so the gap is tracked,
+      not hidden.
+  - id: w3
+    summary: "Add a static guard that fails on hardcoded cwd-local benchmark_runs defaults in constructors"
+    needs: [w0]
+    status: pending
+    notes: |
+      A unit test (or ruff/grep-based check wired into ci-lint) that scans
+      benchbox/core/**/benchmark.py for Path.cwd()/"benchmark_runs" defaults and
+      fails with guidance to use get_benchmark_runs_datagen_path instead. Allow a
+      documented exception list only for intentional non-datagen paths.
+  - id: w4
+    summary: "Extend coverage to a cloud/dbfs output root through at least one generator-backed benchmark"
+    needs: [w1]
+    status: pending
+    notes: |
+      Assert that a CloudStagingPath/DatabricksPath assigned as the output root
+      propagates to the nested generator without being re-wrapped or losing cloud
+      semantics. Use a mocked/staging path so no live cloud access is required.
+
+deferred:
+  - summary: "Clean up orphaned non-canonical datagen dirs (e.g. nyctaxi_1.0) left by direct library users before PR #759 canonicalized the names"
+    reason: "Cleanup of existing on-disk artifacts belongs to benchmark-runs-duplicate-artifact-cleanup, not this regression-guard item."
+  - summary: "Runtime/UAT guardrail that fails a run when worktree-local benchmark_runs writes appear despite an external output root"
+    reason: "That filesystem-at-runtime assertion is owned by benchmark-runs-local-artifact-guardrails; this item is the unit-test + static-source counterpart (construction contract and hardcoded-default lint)."
+
+must_preserve:
+  - "The existing per-family assertions in test_benchmark_output_root_propagation.py keep passing (extend, do not delete)."
+  - "tests remain in the fast lane and write nothing under the active worktree."
+
+approach: |
+  Build the guard on top of the registry so it auto-covers new benchmarks. Reuse
+  the helper functions already in the propagation test for resolving nested
+  generators. Prefer xfail with an explicit reason over skipping for the known
+  tpcds/tpcdi override gap, so the tracker shows the residual work.
+
+anti_patterns:
+  - "DO NOT hand-list benchmark ids - because the point is to auto-cover future benchmarks - enumerate via get_all_benchmarks() instead."
+  - "DO NOT assert only benchmark.output_dir - because the original bug lived in nested generators - assert the nested generator/downloader paths too."
+
+verification:
+  - description: "New registry-wide propagation tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/test_benchmark_output_root_propagation.py tests/unit/mcp/test_benchmark_output_root_propagation.py -q"
+    expected_output: "all tests pass; every registered benchmark is parametrized"
+  - description: "Static guard fails on a deliberately hardcoded cwd default"
+    command: "uv run -- python -m pytest tests/unit/core/test_benchmark_output_root_guard.py -q"
+    expected_output: "guard passes on current tree and fails when a benchmark hardcodes Path.cwd()/benchmark_runs"
+  - description: "Fast suite still passes"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "no new failures attributable to this change"
+
+scope_limit:
+  only_modify:
+    - "tests/unit/core/"
+    - "tests/unit/mcp/"
+    - "Makefile"
+    - ".github/workflows/lint.yml"
+  do_not_modify:
+    - "benchbox/base.py"
+    - "benchmark_runs/"
+
+success_metrics:
+  - "Every id returned by get_all_benchmarks() is exercised by the env-root construction test."
+  - "A deliberately reintroduced cwd-local default fails the static guard."
+  - "The tpcds/tpcdi override gap is visible as an xfail referencing its tracking TODO, not a silent skip."
+
+deps:
+  needs:
+    - benchmark-runs-output-root-propagation
+
+metadata:
+  tags: [output-paths, datagen, testing, regression-guard, benchmark-runs]
+  estimated_effort: "Small-Medium"
+  created_date: "2026-06-08"
+  last_updated: "2026-06-08T00:00:00"
