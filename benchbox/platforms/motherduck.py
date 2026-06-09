@@ -229,8 +229,21 @@ class MotherDuckAdapter(PlatformAdapter):
 
         MotherDuck uses DuckDB's SQL dialect; EXPLAIN format is identical.
         DuckDB EXPLAIN rows are (explain_key, explain_value) tuples; column 1 is the JSON payload.
+
+        DML queries (INSERT/UPDATE/DELETE/MERGE/COPY) are explained without ANALYZE
+        to prevent double-execution, even when analyze_plans=True: EXPLAIN ANALYZE
+        physically runs the statement, which would mutate data a second time. The
+        plan structure is still captured (FORMAT JSON only); execution statistics
+        are absent for these statements.
         """
-        explain_options = "ANALYZE, FORMAT JSON" if self.analyze_plans else "FORMAT JSON"
+        from benchbox.platforms.base.result_capture import is_dml_query
+
+        analyze = self.analyze_plans
+        # EXPLAIN ANALYZE re-executes the statement; for DML that would double-mutate
+        # data, so downgrade to FORMAT JSON (estimated plan, no execution stats).
+        if analyze and is_dml_query(query):
+            analyze = False
+        explain_options = "ANALYZE, FORMAT JSON" if analyze else "FORMAT JSON"
         try:
             rows = (connection or self.connection).execute(f"EXPLAIN ({explain_options}) {query}").fetchall()
             # column 0 is the key (e.g. "analyzed_plan"), column 1 is the JSON value

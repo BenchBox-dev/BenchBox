@@ -30,6 +30,7 @@ import math
 import os
 import platform
 import random
+import re
 import statistics
 import time
 from collections.abc import Mapping
@@ -65,6 +66,62 @@ try:
     from benchbox.core.validation import ValidationResult
 except ImportError:  # pragma: no cover - validation always present in real install
     ValidationResult = None  # type: ignore[assignment, misc]
+
+
+# A data-changing verb at the very start of the statement (word-bounded so an
+# identifier like ``COPYRIGHTS`` or ``MERGEABLE`` is not misread as DML).
+_DML_LEADING_RE = re.compile(r"^(?:INSERT|UPDATE|DELETE|MERGE|COPY)\b", re.IGNORECASE)
+# A data-modifying verb anywhere — used only after a leading WITH to catch
+# CTE-prefixed DML (``WITH cte AS (...) INSERT INTO ...``). COPY is excluded:
+# it cannot appear inside a CTE, and its leading form is already caught above.
+_DML_AFTER_CTE_RE = re.compile(r"\b(?:INSERT|UPDATE|DELETE|MERGE)\b", re.IGNORECASE)
+
+
+def _strip_leading_sql_comments(statement: str) -> str:
+    """Drop leading ``--`` line comments and ``/* */`` block comments + whitespace."""
+    statement = statement.lstrip()
+    while True:
+        if statement.startswith("--"):
+            newline_pos = statement.find("\n")
+            if newline_pos == -1:
+                return ""
+            statement = statement[newline_pos + 1 :].lstrip()
+        elif statement.startswith("/*"):
+            end = statement.find("*/")
+            if end == -1:
+                return ""
+            statement = statement[end + 2 :].lstrip()
+        else:
+            return statement
+
+
+def is_dml_query(query: str) -> bool:
+    """Return True for data-changing DML statements (INSERT/UPDATE/DELETE/MERGE/COPY).
+
+    Used to guard plan capture against double-execution: adapters that capture
+    plans via ``EXPLAIN ANALYZE`` (DuckDB, MotherDuck) physically re-run the
+    statement, so a DML query would mutate data twice. Callers downgrade to a
+    non-ANALYZE ``EXPLAIN`` for these statements.
+
+    Detection covers the data-modifying verbs INSERT/UPDATE/DELETE/MERGE/COPY,
+    including when they are preceded by a leading ``WITH`` CTE clause. DDL
+    (CREATE/DROP/ALTER/TRUNCATE) is intentionally excluded: DDL does not produce
+    duplicate data mutations, so it does not need the ANALYZE guard. Leading
+    line and block comments are stripped first so a commented preamble (e.g. a
+    ``/* query 12 */`` banner) does not mask the verb.
+    """
+    statement = _strip_leading_sql_comments(query)
+    if not statement:
+        return False
+    if _DML_LEADING_RE.match(statement):
+        return True
+    # CTE-prefixed DML: the data-modifying verb follows the CTE definitions, so a
+    # leading-verb check alone misses it. Conservatively treat a WITH-prefixed
+    # statement that contains a DML verb as DML — worst case a read-only CTE
+    # query loses ANALYZE stats, which is far cheaper than a double mutation.
+    if re.match(r"^WITH\b", statement, re.IGNORECASE) and _DML_AFTER_CTE_RE.search(statement):
+        return True
+    return False
 
 
 def _extract_result_field(result: Any, attr: str, default: Any = None) -> Any:

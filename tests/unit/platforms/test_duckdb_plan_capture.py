@@ -4,6 +4,8 @@ Tests for DuckDB query plan capture integration.
 Verifies that query plans are captured and parsed during query execution.
 """
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from benchbox.platforms.duckdb import DuckDBAdapter
@@ -12,6 +14,109 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+class TestIsDmlQueryHelper:
+    """Direct contract tests for the shared is_dml_query classifier."""
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "INSERT INTO t VALUES (1)",
+            "update t set x = 1",
+            "  DELETE FROM t",
+            "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = 1",
+            "COPY t FROM 'f.csv'",
+            "/* banner */ INSERT INTO t VALUES (1)",
+            "-- c\nUPDATE t SET x = 1",
+            "WITH s AS (SELECT 1) INSERT INTO t SELECT * FROM s",
+        ],
+    )
+    def test_dml_detected(self, query):
+        from benchbox.platforms.base.result_capture import is_dml_query
+
+        assert is_dml_query(query) is True
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "SELECT 1",
+            "WITH cte AS (SELECT 1) SELECT * FROM cte",
+            "SELECT copy_total, merge_flag FROM t",  # identifiers, not verbs (word boundary)
+            "CREATE TABLE t (id INT)",  # DDL is excluded
+            "EXPLAIN SELECT 1",
+            "",
+            "-- only a comment",
+        ],
+    )
+    def test_non_dml_not_detected(self, query):
+        from benchbox.platforms.base.result_capture import is_dml_query
+
+        assert is_dml_query(query) is False
+
+
+class TestDuckDBDMLPlanGuard:
+    """EXPLAIN ANALYZE re-executes statements; DML must downgrade to FORMAT JSON."""
+
+    @pytest.mark.parametrize(
+        "dml",
+        [
+            "INSERT INTO t VALUES (1)",
+            "UPDATE t SET x = 1",
+            "DELETE FROM t WHERE id = 1",
+            "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = 1",
+            "COPY t FROM 'data.csv'",
+        ],
+    )
+    def test_dml_query_does_not_use_analyze(self, dml):
+        adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = [("logical_plan", "{}")]
+
+        adapter.get_query_plan(conn, dml)
+
+        called_sql = conn.execute.call_args[0][0].upper()
+        assert "ANALYZE" not in called_sql, f"DML must not run EXPLAIN ANALYZE: {called_sql}"
+        assert "FORMAT JSON" in called_sql
+
+    @pytest.mark.parametrize(
+        "dml",
+        [
+            "-- leading comment\nINSERT INTO t VALUES (1)",
+            "  insert into t values (1)",
+            "/* query 12 */ INSERT INTO t VALUES (1)",
+            "/* a */ -- b\n  DELETE FROM t",
+            "WITH src AS (SELECT * FROM staging) INSERT INTO t SELECT * FROM src",
+            "WITH d AS (SELECT id FROM t) DELETE FROM t WHERE id IN (SELECT id FROM d)",
+        ],
+    )
+    def test_dml_guard_handles_comments_cte_and_whitespace(self, dml):
+        adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = [("logical_plan", "{}")]
+
+        adapter.get_query_plan(conn, dml)
+
+        assert "ANALYZE" not in conn.execute.call_args[0][0].upper(), f"DML must not run ANALYZE: {dml!r}"
+
+    @pytest.mark.parametrize(
+        "non_dml",
+        [
+            "SELECT * FROM t WHERE id = 1",
+            "WITH cte AS (SELECT 1) SELECT * FROM cte",
+            "SELECT copy_count, update_ts FROM t",  # column names starting with DML verbs
+        ],
+    )
+    def test_non_dml_query_still_uses_analyze(self, non_dml):
+        adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = [("analyzed_plan", "{}")]
+
+        adapter.get_query_plan(conn, non_dml)
+
+        called_sql = conn.execute.call_args[0][0].upper()
+        assert "ANALYZE" in called_sql, f"Non-DML must still use EXPLAIN ANALYZE: {non_dml!r}"
+        assert "FORMAT JSON" in called_sql
 
 
 class TestDuckDBPlanCapture:
