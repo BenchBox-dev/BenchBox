@@ -110,6 +110,35 @@ class TestSQLitePlanCapture:
         assert result["status"] == "SUCCESS"
         assert result["rows_returned"] == 2
 
+    def test_execute_query_failed_status_skips_capture(self, adapter, conn, monkeypatch):
+        capture_called = []
+        monkeypatch.setattr(adapter, "capture_query_plan", lambda *a, **k: capture_called.append(True) or (None, 0.0))
+        monkeypatch.setattr(
+            adapter,
+            "_build_query_result_with_validation",
+            lambda **kw: {"query_id": "sq_fail", "status": "FAILED", "rows_returned": 0},
+        )
+
+        adapter.execute_query(
+            connection=conn, query="SELECT * FROM orders", query_id="sq_fail", validate_row_count=False
+        )
+
+        assert not capture_called, "capture_query_plan must not be called on FAILED results"
+
+    def test_execute_query_calls_display_when_not_capturing(self, adapter_no_capture, conn, monkeypatch):
+        display_calls = []
+        monkeypatch.setattr(
+            adapter_no_capture,
+            "display_query_plan_if_enabled",
+            lambda *a, **k: display_calls.append(True),
+        )
+
+        adapter_no_capture.execute_query(
+            connection=conn, query="SELECT * FROM orders", query_id="sq_disp", validate_row_count=False
+        )
+
+        assert len(display_calls) == 1, "display_query_plan_if_enabled must be called exactly once"
+
 
 class TestSQLiteParserModernFormat:
     """Verify the parser handles modern SQLite output (no TABLE keyword)."""

@@ -124,3 +124,45 @@ class TestDataFusionPlanCapture:
             )
 
         assert "query_plan" not in result or result.get("query_plan") is None
+
+    def test_execute_query_failed_status_skips_capture(self, adapter, monkeypatch):
+        conn = MagicMock()
+        fake_result = MagicMock()
+        fake_result.collect.return_value = []
+        conn.sql.return_value = fake_result
+
+        capture_called = []
+        monkeypatch.setattr(adapter, "capture_query_plan", lambda *a, **k: capture_called.append(True) or (None, 0.0))
+        monkeypatch.setattr(
+            adapter,
+            "_build_query_result_with_validation",
+            lambda **kw: {"query_id": "df_fail", "status": "FAILED", "rows_returned": 0},
+        )
+
+        adapter.execute_query(connection=conn, query="SELECT 1", query_id="df_fail", validate_row_count=False)
+
+        assert not capture_called, "capture_query_plan must not be called on FAILED results"
+
+    def test_execute_query_calls_display_when_not_capturing(self, adapter_no_capture, monkeypatch):
+        conn = MagicMock()
+        fake_result = MagicMock()
+        fake_result.collect.return_value = []
+        conn.sql.return_value = fake_result
+
+        display_calls = []
+        monkeypatch.setattr(
+            adapter_no_capture,
+            "display_query_plan_if_enabled",
+            lambda *a, **k: display_calls.append(True),
+        )
+        monkeypatch.setattr(
+            adapter_no_capture,
+            "_build_query_result_with_validation",
+            lambda **kw: {"query_id": "df_disp", "status": "SUCCESS", "rows_returned": 0},
+        )
+
+        adapter_no_capture.execute_query(
+            connection=conn, query="SELECT 1", query_id="df_disp", validate_row_count=False
+        )
+
+        assert len(display_calls) == 1, "display_query_plan_if_enabled must be called exactly once"
