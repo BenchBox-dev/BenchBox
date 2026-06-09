@@ -2121,15 +2121,8 @@ class RedshiftAdapter(PlatformAdapter):
             if not self.capture_plans:
                 self.display_query_plan_if_enabled(connection, query, query_id)
 
-            # Capture structured query plan if enabled (only on SUCCESS to avoid
-            # wasteful EXPLAIN on validation-failed results)
-            if self.capture_plans and result_dict.get("status") == "SUCCESS":
-                query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
-                if query_plan:
-                    result_dict["query_plan"] = query_plan
-                    result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
-                if plan_capture_time_ms is not None:
-                    result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
+            self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
 
             return result_dict
 
