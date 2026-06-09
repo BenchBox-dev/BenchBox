@@ -69,9 +69,17 @@ work:
     status: pending
     notes: |
       A unit test (or ruff/grep-based check wired into ci-lint) that scans
-      benchbox/core/**/benchmark.py for Path.cwd()/"benchmark_runs" defaults and
-      fails with guidance to use get_benchmark_runs_datagen_path instead. Allow a
-      documented exception list only for intentional non-datagen paths.
+      registered benchmark class source files for Path.cwd()/"benchmark_runs"
+      defaults and fails with guidance to use get_benchmark_runs_datagen_path
+      instead. Allow a documented exception list only for intentional non-datagen
+      paths.
+
+      Scan target must cover ALL registered benchmark sources, not only files named
+      benchmark.py. For example, TPCDSBenchmark lives in
+      benchbox/core/tpcds/benchmark/runner.py, not benchmark.py. Derive scan
+      targets from the registered class __module__ paths (via get_all_benchmarks())
+      rather than a glob like benchbox/core/**/benchmark.py so future benchmarks
+      added in non-standard file names are automatically covered.
   - id: w4
     summary: "Extend coverage to a cloud/dbfs output root through at least one generator-backed benchmark"
     needs: [w1]

@@ -31,7 +31,7 @@ description: |
 prior_art:
   - "benchbox/core/tpchavoc/variant_sets/q02.yaml:455 q2_v10 - the CASE-wrapped s_acctbal/s_name/n_name/... projections are the locus"
   - "PR #756 / tests/integration/test_tpchavoc_duckdb.py - the canonical-vs-variant SF=1 comparison method that surfaced this; reuse it to confirm the fix"
-  - "_project/DONE/main/planning/tpchavoc-correlated-subquery-self-binding.yaml - sibling defect class; same 'fix the SQL, preserve the shape' discipline"
+  - "_project/TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml - sibling defect class; same 'fix the SQL, preserve the shape' discipline"
 
 work:
   - id: w0

@@ -72,6 +72,13 @@ work:
       Preserve CLI `--output` precedence over `BENCHBOX_OUTPUT_DIR`, and preserve
       the current cwd-local default only when neither explicit option nor env is
       set.
+
+      Residual gap: explicit CLI `--output` override does not yet propagate through
+      the post-construction setter for tpcds and tpcdi (lazy/derived layout
+      benchmarks). This gap is tracked and scoped in the follow-up TODO
+      `benchmark-output-root-explicit-override-propagation`; it does not block
+      closing this item because the env-root path (BENCHBOX_OUTPUT_DIR) is fully
+      correct and the explicit-override gap has a dedicated tracking item.
   - id: w3
     summary: "Add or standardize output_dir synchronization for benchmark classes with nested data_generator state"
     needs: [w1]

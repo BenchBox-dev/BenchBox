@@ -39,9 +39,9 @@ description: |
   needs a correctness contract rather than per-instance patches.
 
 prior_art:
-  - "_project/DONE/main/planning/tpchavoc-correlated-subquery-self-binding.yaml - the SQL-variant fix this audit extends; reuse its qualify-the-outer-table pattern"
+  - "_project/TODO/main/planning/tpchavoc-correlated-subquery-self-binding.yaml - the SQL-variant fix this audit extends; reuse its qualify-the-outer-table pattern"
   - "benchbox/core/tpchavoc/dataframe_queries/_delegating_variants.py - notes that Q16-Q22 delegate the core correlated/anti-join shape; verify those delegations are faithful"
-  - "benchbox/core/tpcds/dataframe_queries/queries.py:3801 - existing 'correlated subquery ... self-join pattern' comment; an explicit audit target"
+  - "benchbox/core/tpcds/dataframe_queries/queries.py:2814 - existing 'self-join pattern' comment for correlated subquery implementation; an explicit audit target"
   - "benchbox/sql_compat/rules/ and benchbox/platforms/*_query_transformer.py - existing places SQL is rewritten; a static check could live near these"
 
 work:
