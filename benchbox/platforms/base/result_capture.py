@@ -758,6 +758,39 @@ class ResultCaptureMixin:
         self.query_plans_captured += 1
         return plan, capture_time_ms
 
+    def _merge_plan_capture_into_result(
+        self,
+        result: dict[str, Any],
+        connection: Any,
+        query: str,
+        query_id: str,
+    ) -> None:
+        """Capture the query plan and merge the plan fields into ``result`` in place.
+
+        Encapsulates the per-adapter plan-capture block so it lives in exactly one
+        place. The SUCCESS guard is baked in universally: capture only runs when
+        ``capture_plans`` is enabled and the result succeeded, so a validation-
+        failed result never triggers a wasted EXPLAIN round-trip.
+
+        No-op when ``capture_plans`` is False or ``result["status"]`` is not
+        ``"SUCCESS"``. On success, sets ``query_plan`` and ``plan_fingerprint`` when
+        a plan was parsed, and always records ``plan_capture_time_ms`` when measured.
+
+        Args:
+            result: Result dict to mutate in place.
+            connection: Database connection.
+            query: SQL query text.
+            query_id: Query identifier.
+        """
+        if not self.capture_plans or result.get("status") != "SUCCESS":
+            return
+        query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+        if query_plan:
+            result["query_plan"] = query_plan
+            result["plan_fingerprint"] = query_plan.plan_fingerprint
+        if plan_capture_time_ms is not None:
+            result["plan_capture_time_ms"] = plan_capture_time_ms
+
     def validate_loaded_data(self, connection: Any, benchmark_type: str, scale_factor: float) -> ValidationResult:
         """Validate database state after data loading using platform-specific methods.
 

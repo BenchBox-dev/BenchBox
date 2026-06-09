@@ -310,14 +310,8 @@ class MotherDuckAdapter(PlatformAdapter):
             if not self.capture_plans:
                 self.display_query_plan_if_enabled(conn, query, query_id)
 
-            # Capture structured query plan if enabled
-            if self.capture_plans:
-                query_plan, plan_capture_time_ms = self.capture_query_plan(conn, query, query_id)
-                if query_plan:
-                    result_dict["query_plan"] = query_plan
-                    result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
-                if plan_capture_time_ms is not None:
-                    result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
+            self._merge_plan_capture_into_result(result_dict, conn, query, query_id)
 
             return result_dict
         except Exception as e:
