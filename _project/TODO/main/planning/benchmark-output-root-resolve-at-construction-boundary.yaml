@@ -116,6 +116,7 @@ scope_limit:
     - "benchbox/core/runner/"
     - "benchbox/base.py"
     - "benchbox/core/read_primitives/benchmark.py"
+    - "benchbox/core/transactional/benchmark_base.py"
     - "tests/unit/"
   do_not_modify:
     - "benchmark_runs/"
