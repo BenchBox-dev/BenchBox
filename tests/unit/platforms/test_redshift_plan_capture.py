@@ -97,6 +97,24 @@ class TestRedshiftPlanCapture:
 
         assert "query_plan" not in result or result.get("query_plan") is None
 
+    def test_execute_query_calls_display_when_not_capturing(self, adapter_no_capture, monkeypatch):
+        conn, cursor = _make_connection()
+        cursor.fetchall.return_value = [(0, "col1")]
+        monkeypatch.setattr(adapter_no_capture, "_get_query_statistics", lambda *a, **k: {})
+
+        display_calls = []
+        monkeypatch.setattr(
+            adapter_no_capture,
+            "display_query_plan_if_enabled",
+            lambda *a, **k: display_calls.append(True),
+        )
+
+        adapter_no_capture.execute_query(
+            connection=conn, query="SELECT 1", query_id="rq_disp", validate_row_count=False
+        )
+
+        assert len(display_calls) == 1, "display_query_plan_if_enabled must be called exactly once"
+
     def test_get_query_plan_does_not_use_analyze(self, adapter):
         cursor = MagicMock()
         cursor.fetchall.return_value = [("XN Seq Scan",)]

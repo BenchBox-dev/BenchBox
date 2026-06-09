@@ -558,8 +558,16 @@ class SQLiteAdapter(PlatformAdapter):
             # Include full results for SQLite compatibility
             result["results"] = results
 
-            # Capture structured query plan if enabled
-            if self.capture_plans:
+            # Display plan in console when --show-query-plans is active.
+            # Skip here when --capture-plans is also active: capture_query_plan below
+            # already calls get_query_plan (running EXPLAIN); calling
+            # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
+            if not self.capture_plans:
+                self.display_query_plan_if_enabled(connection, query, query_id)
+
+            # Capture structured query plan if enabled (only on SUCCESS to avoid
+            # wasteful EXPLAIN on validation-failed results)
+            if self.capture_plans and result.get("status") == "SUCCESS":
                 query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
                 if query_plan:
                     result["query_plan"] = query_plan

@@ -2114,6 +2114,13 @@ class RedshiftAdapter(PlatformAdapter):
             # Map query_statistics to resource_usage for cost calculation
             result_dict["resource_usage"] = query_stats
 
+            # Display plan in console when --show-query-plans is active.
+            # Skip here when --capture-plans is also active: capture_query_plan below
+            # already calls get_query_plan (running EXPLAIN); calling
+            # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
+            if not self.capture_plans:
+                self.display_query_plan_if_enabled(connection, query, query_id)
+
             # Capture structured query plan if enabled (only on SUCCESS to avoid
             # wasteful EXPLAIN on validation-failed results)
             if self.capture_plans and result_dict.get("status") == "SUCCESS":
