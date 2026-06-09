@@ -7,6 +7,71 @@ This module provides a two-tier DAG structure for query plans:
 
 The models support fingerprinting for fast comparison and JSON serialization
 for storage alongside benchmark results.
+
+Plan fingerprint stability contract
+------------------------------------
+``QueryPlanDAG.plan_fingerprint`` is a SHA256 hash of the *logical* operator
+tree's structural signature (see ``LogicalOperator.get_structural_signature``).
+It is the canonical answer to "did the shape of this plan change?" and its
+stability is defined as follows.
+
+What the fingerprint hashes (structural shape only):
+  - operator types and the recursive child structure (tree shape)
+  - table names (Scan), join types and join conditions
+  - filter expressions, aggregation functions, group-by / sort / projection
+    expressions, and LIMIT / OFFSET counts
+
+What the fingerprint deliberately EXCLUDES:
+  - costs, estimated/actual row counts, and timing (execution statistics)
+  - operator IDs and any other non-structural physical-operator properties
+
+Stability guarantees (what a stable fingerprint means):
+  - **Stats-independent — engine-dependent caveat.** The signature excludes the
+    dedicated cost / row-estimate fields (``estimated_cost``, ``estimated_rows``,
+    and the per-operator ``properties`` that hold cost/cardinality/timing). For a
+    plain table scan, and for engines whose EXPLAIN omits estimates from operator
+    detail (e.g. SQLite ``EXPLAIN QUERY PLAN``), a ``VACUUM``/``ANALYZE`` or other
+    statistics refresh that only changes row estimates does NOT change the
+    fingerprint. **However, this is not universal:** some platform parsers fold an
+    operator's raw EXPLAIN ``extra_info`` string into a signature-bearing field
+    (e.g. the DuckDB parser stores ``extra_info`` into ``join_conditions`` for
+    JOIN, ``aggregation_functions`` for AGGREGATE, ``filter_expressions`` for
+    FILTER, and ``sort_keys`` for SORT). On DuckDB that ``extra_info`` includes an
+    ``Estimated Cardinality``, so a JOIN/AGGREGATE/FILTER/SORT fingerprint CAN
+    change when cardinality estimates change (after a stats refresh, or simply at a
+    different table size). Treat full stats-independence as a property of
+    scan-shaped/leaf plans and of engines that keep estimates out of operator
+    detail — verify per engine before relying on it for non-trivial plans.
+  - **Logical, not physical.** The signature is built from the *logical*
+    operator tree, so the physical access method is NOT reflected: an index scan
+    and a sequential scan of the same table both normalize to a logical ``Scan``
+    and hash the same. Consequently, adding an index — even one the planner then
+    uses — does NOT change the fingerprint as long as the logical shape is
+    unchanged. Index choice is a physical/cost detail, deliberately excluded.
+  - **Logical-shape sensitive.** What DOES change the fingerprint is a change in
+    the logical tree: join order or join type, an added aggregation (GROUP BY),
+    sort, projection change, LIMIT/OFFSET, or filter predicates *where the
+    engine's EXPLAIN exposes them*. That logical-shape change is the intended
+    regression signal. Note that predicate sensitivity is engine-dependent: some
+    EXPLAIN formats (e.g. SQLite ``EXPLAIN QUERY PLAN``) do not surface filter
+    expressions, so two queries differing only in a WHERE constant may hash the
+    same on those engines.
+
+What fingerprint equality does NOT guarantee, and explicit non-guarantees:
+  - **Not stable across engine versions.** A minor/major engine upgrade
+    (PostgreSQL, DuckDB, etc.) can change EXPLAIN wording, operator naming, or
+    default plan shapes, which may change the fingerprint even for an unchanged
+    query. Cross-version fingerprint equality is therefore NOT promised — compare
+    fingerprints only within the same engine version.
+  - **Not cross-engine comparable.** Fingerprints from different platforms are
+    not comparable: normalization is best-effort and operator vocabularies differ.
+  - **Equality does not imply equal performance** (costs/timing are excluded),
+    and inequality does not imply a regression (it may be a benign shape change).
+
+Recommended use: stable for structural plan comparison and within-run
+deduplication on a single engine version. Suitable for "did the plan shape
+change?" regression detection when the engine version is held constant; not
+suitable as a cross-version or cross-engine equality key.
 """
 
 from __future__ import annotations
