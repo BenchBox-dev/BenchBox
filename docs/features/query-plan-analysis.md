@@ -79,6 +79,19 @@ In all cases:
 - Benchmark timing measurements are unaffected (plan capture runs after the timed execution)
 - Failed plan captures are logged but don't halt execution
 
+### Captured Fields
+
+Each query result includes three plan-related fields when `--capture-plans` is active:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `query_plan` | `QueryPlan \| None` | Parsed logical plan tree; `None` if capture failed or was skipped |
+| `plan_fingerprint` | `str \| None` | SHA256 of the plan's logical structure; `None` when `query_plan` is `None` |
+| `plan_capture_time_ms` | `float \| None` | Wall-clock milliseconds spent on plan capture (excludes query execution time) |
+
+`plan_fingerprint` is `None` when `query_plan` is `None`. Both are `None` when `--capture-plans` is
+not set or when the query was excluded by `--plan-config`.
+
 ## Viewing Plans
 
 ### Tree View (Default)
@@ -497,9 +510,30 @@ fi
 
 Plans are fingerprinted using SHA256 of the logical structure:
 - **Included**: Operator types, table names, join types, filter expressions, aggregations
-- **Excluded**: Operator IDs, costs, row estimates, physical operator details
+- **Excluded**: Operator IDs, costs, row estimates, timing, cardinality, physical operator details
 
-Identical fingerprints guarantee identical logical plans.
+#### Stability contract
+
+`plan_fingerprint` is designed for **structural comparison**, not cost comparison:
+
+| Change | Fingerprint effect |
+|--------|--------------------|
+| Same query, same schema, same engine version | **Same fingerprint** |
+| Stats refresh / `VACUUM ANALYZE` (no plan change) | **Same fingerprint** |
+| Adding an index that is not used by the query | **Same fingerprint** |
+| Adding an index the planner starts using | **Different fingerprint** (join/scan operator changes) |
+| Engine minor version upgrade with no plan change | **Usually same** — not guaranteed across major versions |
+| `analyze_plans=true` vs `analyze_plans=false` (DuckDB) | **Same fingerprint** — timing/cardinality excluded from hash |
+
+**What fingerprint equality does NOT guarantee:**
+- That query performance is the same (costs may differ with identical logical structure)
+- That the plan is optimal for the current data distribution
+- Stability across major engine version upgrades
+
+**Recommended use:**
+- Within a single run: deduplicate identical plans across concurrent streams
+- Cross-run regression detection: flag queries where the fingerprint changed between runs on the same engine version
+- Cross-platform comparison: use `compare-plans` for structural similarity; fingerprints will differ across platforms
 
 ### Comparison Algorithm
 
@@ -516,6 +550,8 @@ The comparison engine uses:
 - Captures logical and physical operators; parser handles both ANALYZE and estimated-plan schemas
 - Re-executes the query at capture time (~1× query cost); use
   `--platform-option analyze_plans=false` to opt out and capture estimated plans only
+- DML statements (INSERT/UPDATE/DELETE/MERGE/COPY) use `FORMAT JSON` without `ANALYZE` to
+  prevent double-execution side effects
 - Fingerprints exclude timing/cardinality - structural comparisons are unaffected by this setting
 
 **SQLite**:

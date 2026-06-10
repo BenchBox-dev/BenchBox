@@ -338,6 +338,9 @@ These flags control monitoring, progress display, memory handling, and caching b
 
 ## Query Plan Capture Options
 
+- `--capture-plans`: Capture the logical query plan for each executed query and embed it in results.
+  See [Query Plan Analysis](../../features/query-plan-analysis.md) for full details.
+
 - `--plan-config TEXT`: Fine-grained control over query plan capture
   - Format: comma-separated key:value pairs
   - Keys:
