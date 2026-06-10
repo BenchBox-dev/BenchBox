@@ -34,7 +34,7 @@ from benchbox.core.tpchavoc.equivalence import (
 
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.stress,
+    pytest.mark.medium,
     pytest.mark.duckdb,
     pytest.mark.tpchavoc,
 ]
