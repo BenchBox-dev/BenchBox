@@ -945,8 +945,8 @@ class DuckDBAdapter(PlatformAdapter):
         start_time = mono_time()
 
         try:
-            # Enable profiling only if query plans are requested
-            if self.show_query_plans:
+            # Enable profiling only if display is active (not when capture suppresses display)
+            if self.show_query_plans and not self.capture_plans:
                 connection.execute("PRAGMA enable_profiling = 'query_tree'")
                 logger.debug("DuckDB query profiling enabled for this query")
 
@@ -958,8 +958,10 @@ class DuckDBAdapter(PlatformAdapter):
             actual_row_count = len(rows)
             logger.debug(f"Query {query_id} completed in {execution_time:.3f}s, returned {actual_row_count} rows")
 
-            # Display query plan if enabled
-            self.display_query_plan_if_enabled(connection, query, query_id)
+            # Display query plan if enabled; skip when capture_plans is also active
+            # to avoid issuing EXPLAIN twice (display + capture would both call get_query_plan).
+            if not self.capture_plans:
+                self.display_query_plan_if_enabled(connection, query, query_id)
 
             # Validate row count if enabled and benchmark type is provided
             validation_result = None
@@ -1018,8 +1020,8 @@ class DuckDBAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
         finally:
-            # Disable profiling if it was enabled
-            if self.show_query_plans:
+            # Disable profiling if it was enabled (mirrors the enable condition)
+            if self.show_query_plans and not self.capture_plans:
                 connection.execute("PRAGMA disable_profiling")
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:

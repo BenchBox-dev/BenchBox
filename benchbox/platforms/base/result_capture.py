@@ -539,7 +539,7 @@ class ResultCaptureMixin:
             query: SQL query text
             query_id: Query identifier
         """
-        if not self.show_query_plans:
+        if not self.show_query_plans or self.capture_plans:
             return
 
         try:
