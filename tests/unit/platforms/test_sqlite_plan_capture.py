@@ -139,6 +139,22 @@ class TestSQLitePlanCapture:
 
         assert len(display_calls) == 1, "display_query_plan_if_enabled must be called exactly once"
 
+    def test_execute_query_calls_display_when_capturing(self, adapter, conn, monkeypatch):
+        """display_query_plan_if_enabled is called even when capture_plans=True."""
+        display_calls = []
+        monkeypatch.setattr(
+            adapter,
+            "display_query_plan_if_enabled",
+            lambda *a, **k: display_calls.append(True),
+        )
+        monkeypatch.setattr(adapter, "_merge_plan_capture_into_result", lambda *a, **k: None)
+
+        adapter.execute_query(
+            connection=conn, query="SELECT * FROM orders", query_id="sq_disp_cap", validate_row_count=False
+        )
+
+        assert len(display_calls) == 1, "display_query_plan_if_enabled must be called even when capture_plans=True"
+
 
 class TestSQLiteParserModernFormat:
     """Verify the parser handles modern SQLite output (no TABLE keyword)."""

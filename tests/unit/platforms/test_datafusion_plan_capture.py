@@ -166,3 +166,29 @@ class TestDataFusionPlanCapture:
         )
 
         assert len(display_calls) == 1, "display_query_plan_if_enabled must be called exactly once"
+
+    def test_execute_query_calls_display_when_capturing(self, adapter, monkeypatch):
+        """display_query_plan_if_enabled is called even when capture_plans=True."""
+        conn = MagicMock()
+        fake_result = MagicMock()
+        fake_result.collect.return_value = []
+        conn.sql.return_value = fake_result
+
+        display_calls = []
+        monkeypatch.setattr(
+            adapter,
+            "display_query_plan_if_enabled",
+            lambda *a, **k: display_calls.append(True),
+        )
+        monkeypatch.setattr(adapter, "_merge_plan_capture_into_result", lambda *a, **k: None)
+        monkeypatch.setattr(
+            adapter,
+            "_build_query_result_with_validation",
+            lambda **kw: {"query_id": "df_disp_cap", "status": "SUCCESS", "rows_returned": 0},
+        )
+
+        adapter.execute_query(
+            connection=conn, query="SELECT 1", query_id="df_disp_cap", validate_row_count=False
+        )
+
+        assert len(display_calls) == 1, "display_query_plan_if_enabled must be called even when capture_plans=True"
