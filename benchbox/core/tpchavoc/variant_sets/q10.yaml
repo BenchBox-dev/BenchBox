@@ -416,10 +416,7 @@ variants:
                 else 0
             end
         ) as revenue,
-        case
-            when c_acctbal > 0 then c_acctbal
-            else 0
-        end as c_acctbal,
+        c_acctbal,
         case
             when n_name is not null then n_name
             else 'UNKNOWN NATION'

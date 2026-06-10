@@ -2,7 +2,7 @@ id: tpchavoc-variant-equivalence-gate
 title: "Wire a bounded result-equivalence gate for TPC-Havoc variants and burn down the divergences it surfaces"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
