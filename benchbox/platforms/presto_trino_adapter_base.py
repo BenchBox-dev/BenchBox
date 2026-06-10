@@ -630,10 +630,58 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         return normalize_table_name_in_sql(sql)
 
     def get_query_plan(self, connection: Any, query: str) -> str:
-        """Get query execution plan for analysis."""
-        from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
+        """Get the query execution plan as ``EXPLAIN (FORMAT JSON)``.
 
-        return get_query_plan_from_cursor(connection, query)
+        The structured JSON form is required by PrestoTrinoQueryPlanParser; the
+        shared plain-text ``get_query_plan_from_cursor`` helper cannot be used
+        here because it omits the ``(FORMAT JSON)`` option.
+        """
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"EXPLAIN (FORMAT JSON) {query}")
+            plan_rows = cursor.fetchall()
+            return "\n".join(str(row[0]) for row in plan_rows)
+        except Exception as e:
+            self.logger.debug(f"Could not get query plan: {e}")
+            return f"Could not get query plan: {e}"
+        finally:
+            cursor.close()
+
+    def get_query_plan_parser(self):
+        """Return the Presto/Trino parser (inherited by Presto and Starburst)."""
+        from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
+
+        return PrestoTrinoQueryPlanParser()
+
+    def execute_query(
+        self,
+        connection: Any,
+        query: str,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Execute the query and capture its plan on success when enabled."""
+        result = super().execute_query(
+            connection=connection,
+            query=query,
+            query_id=query_id,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
+        # Capture only on SUCCESS to avoid a wasted EXPLAIN on validation-failed results.
+        if self.capture_plans and result.get("status") == "SUCCESS":
+            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+            if query_plan:
+                result["query_plan"] = query_plan
+                result["plan_fingerprint"] = query_plan.plan_fingerprint
+            if plan_capture_time_ms is not None:
+                result["plan_capture_time_ms"] = plan_capture_time_ms
+        return result
 
     def close_connection(self, connection: Any) -> None:
         """Close connection."""
