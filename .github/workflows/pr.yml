@@ -389,6 +389,49 @@ jobs:
       - name: Run bounded real-result correctness gate
         run: make test-correctness-gate
 
+  postgres-integration:
+    name: postgres-integration
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Non-blocking: service container startup can be flaky; failures surfaced as
+    # warnings rather than a gate block to avoid spurious PR failures.
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: benchbox
+          POSTGRES_PASSWORD: benchbox
+          POSTGRES_DB: benchbox_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run PostgreSQL live integration tests
+        run: |
+          uv run -- python -m pytest tests/integration/platforms/test_postgresql_live.py \
+            -m "live_postgresql" --tb=short -v
+
   explorer-tokens:
     name: explorer-tokens
     needs: ci-paths
