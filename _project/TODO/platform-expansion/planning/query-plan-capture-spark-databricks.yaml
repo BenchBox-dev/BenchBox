@@ -2,7 +2,7 @@ id: query-plan-capture-spark-databricks
 title: "Implement query plan parser and end-to-end capture for Spark and Databricks adapters"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |
@@ -51,7 +51,7 @@ prior_art:
 work:
   - id: w1
     summary: "Collect Spark EXPLAIN text samples and confirm format used by get_query_plan()"
-    status: pending
+    status: done
     notes: |
       Check what SQL string get_query_plan() in spark_execution_mixin.py currently
       issues (EXPLAIN? EXPLAIN EXTENDED? EXPLAIN FORMATTED?). Capture the output
@@ -67,7 +67,7 @@ work:
   - id: w2
     summary: "Implement SparkQueryPlanParser in benchbox/core/query_plans/parsers/spark.py"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Implement QueryPlanParser abstract interface:
         - parse(raw_plan: str) -> QueryPlanDAG
@@ -88,7 +88,7 @@ work:
   - id: w3
     summary: "Add unit tests for SparkQueryPlanParser using fixture samples"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Create tests/unit/query_plans/test_spark_parser.py. Cover:
         - Parse of fixture sample produces valid QueryPlanDAG
@@ -100,7 +100,7 @@ work:
   - id: w4
     summary: "Add get_query_plan_parser() override to SparkAdapter (or SparkQueryExecutionMixin)"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       In benchbox/platforms/spark.py or spark_execution_mixin.py (whichever is
       most appropriate for the mixin hierarchy):
@@ -113,7 +113,7 @@ work:
   - id: w5
     summary: "Integrate capture_query_plan() into _execute_query_spark()"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       In benchbox/platforms/base/spark_execution_mixin.py, inside
       _execute_query_spark() (line 491), after the timed SQL execution block:
@@ -128,7 +128,7 @@ work:
   - id: w6
     summary: "Assess Databricks adapter inheritance and wire or override as needed"
     needs: [w4, w5]
-    status: pending
+    status: done
     notes: |
       Inspect benchbox/platforms/databricks.py (if it exists). If Databricks
       inherits SparkAdapter or SparkQueryExecutionMixin, it will inherit plan
@@ -142,7 +142,7 @@ work:
   - id: w7
     summary: "Add wiring unit tests for SparkAdapter plan capture"
     needs: [w5, w6]
-    status: pending
+    status: done
     notes: |
       Create tests/unit/platforms/test_spark_plan_capture.py. Cover:
         - get_query_plan_parser() returns SparkQueryPlanParser
@@ -214,4 +214,4 @@ metadata:
   tags: [query-plan, spark, databricks, pyspark, new-parser]
   estimated_effort: "Medium"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T00:00:00-04:00"
+  last_updated: "2026-06-10T00:00:00-04:00"

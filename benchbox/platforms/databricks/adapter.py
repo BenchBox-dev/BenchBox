@@ -2011,8 +2011,6 @@ class DatabricksAdapter(PlatformAdapter):
                 "execution_time_seconds": execution_time,
             }
 
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
 
@@ -2026,6 +2024,47 @@ class DatabricksAdapter(PlatformAdapter):
             }
         finally:
             cursor.close()
+
+        # Capture the query plan outside the try so a strict-mode PlanCaptureError
+        # propagates instead of being swallowed and mislabeled as a failed query.
+        # Guarded by capture_plans, so EXPLAIN is never issued when capture is off.
+        # capture_query_plan opens its own cursor (the query cursor is already closed).
+        if getattr(self, "capture_plans", False) and result_dict.get("status") == "SUCCESS":
+            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+            if query_plan:
+                result_dict["query_plan"] = query_plan
+                result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
+            if plan_capture_time_ms is not None:
+                result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+
+        return result_dict
+
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get the Spark physical plan via ``EXPLAIN EXTENDED`` over the SQL cursor.
+
+        Databricks runs Spark SQL, so the plan text is parsed by
+        SparkQueryPlanParser. Returns ``None`` on any failure so capture degrades
+        gracefully.
+        """
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"EXPLAIN EXTENDED {query}")
+            plan_rows = cursor.fetchall()
+            if not plan_rows:
+                return None
+            text = "\n".join(str(row[0]) for row in plan_rows)
+            return text or None
+        except Exception as e:
+            self.logger.debug(f"Could not get Databricks query plan: {e}")
+            return None
+        finally:
+            cursor.close()
+
+    def get_query_plan_parser(self):
+        """Return the Spark plan parser (Databricks runs Spark SQL)."""
+        from benchbox.core.query_plans.parsers.spark import SparkQueryPlanParser
+
+        return SparkQueryPlanParser()
 
     def _fix_databricks_sql_syntax(self, sql: str) -> str:
         """Transform SQL syntax for Databricks compatibility.
