@@ -2,7 +2,7 @@ id: query-plan-capture-postgresql-family
 title: "Wire query plan capture end-to-end for PostgreSQL, Redshift, and derived adapters"
 worktree: platform-expansion
 priority: High
-status: Not Started
+status: In Progress
 category: Platform Expansion
 
 description: |
@@ -15,15 +15,16 @@ description: |
   TimescaleDB, CedarDB, and pg_mooncake — inherit `PostgreSQLAdapter` and will
   receive plan capture for free once the parent is wired.
 
-  Gap summary per adapter:
+  Gap summary per adapter (as of commit d06fe3e3):
     - PostgreSQLAdapter (benchbox/platforms/postgresql.py:693)
-        • get_query_plan(): ✅ issues EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
-        • get_query_plan_parser(): ❌ missing override → parser never instantiated
-        • execute_query(): ❌ never calls capture_query_plan()
-    - RedshiftAdapter (benchbox/platforms/redshift.py:2404)
-        • get_query_plan(): ✅ issues EXPLAIN
-        • get_query_plan_parser(): ❌ missing override
-        • execute_query(): ❌ never calls capture_query_plan()
+        • get_query_plan(): ✅ issues EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+        • get_query_plan_parser(): ✅ WIRED — returns PostgreSQLQueryPlanParser
+        • execute_query(): ✅ WIRED — calls capture_query_plan() when capture_plans=True
+        • DML guard: ❌ MISSING — EXPLAIN ANALYZE re-executes DML (see query-plan-capture-postgresql-dml-guard)
+    - RedshiftAdapter (benchbox/platforms/redshift.py)
+        • get_query_plan(): ✅ issues plain EXPLAIN (no ANALYZE — correct for Redshift)
+        • get_query_plan_parser(): ✅ WIRED — returns RedshiftQueryPlanParser
+        • execute_query(): ✅ WIRED — calls capture_query_plan() when capture_plans=True
     - TimescaleDBAdapter, CedarDBAdapter, PgMooncakeAdapter
         • All subclass PostgreSQLAdapter; will inherit fixed behavior once
           PostgreSQLAdapter is patched.
@@ -50,69 +51,53 @@ prior_art:
 work:
   - id: w1
     summary: "Add get_query_plan_parser() override to PostgreSQLAdapter returning PostgreSQLQueryPlanParser"
-    status: pending
+    status: done
     notes: |
-      Add to benchbox/platforms/postgresql.py:
-        def get_query_plan_parser(self):
-            from benchbox.core.query_plans.parsers.postgresql import PostgreSQLQueryPlanParser
-            return PostgreSQLQueryPlanParser()
-      Keep the import lazy to match DuckDB's pattern and avoid heavy import cost at startup.
+      COMPLETED in commit d06fe3e3. PostgreSQLAdapter.get_query_plan_parser() now
+      returns PostgreSQLQueryPlanParser with a lazy import.
 
   - id: w2
     summary: "Integrate capture_query_plan() call into PostgreSQLAdapter.execute_query()"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Locate the return-result assembly block in PostgreSQLAdapter.execute_query().
-      After the timed SQL block, add the same capture_plans guard as DuckDB (line 968-971):
-        if self.capture_plans:
-            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
-            if query_plan:
-                plan_fingerprint = query_plan.plan_fingerprint
-      Propagate query_plan and plan_fingerprint into the result dict.
+      COMPLETED in commit d06fe3e3. PostgreSQLAdapter.execute_query() calls
+      capture_query_plan() guarded by capture_plans. plan_fingerprint propagated
+      into the result dict.
+      OPEN ISSUE: No DML guard — EXPLAIN ANALYZE re-executes DML. Tracked in
+      query-plan-capture-postgresql-dml-guard.
 
   - id: w3
     summary: "Add unit tests for PostgreSQL plan capture wiring"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
-      Create tests/unit/platforms/test_postgresql_plan_capture.py. Cover:
-        - get_query_plan_parser() returns PostgreSQLQueryPlanParser instance
-        - execute_query() with capture_plans=True calls capture_query_plan()
-        - execute_query() with capture_plans=False does not call capture_query_plan()
-        - plan_fingerprint is set in result dict when plan is captured
-        - capture failure is graceful (plan=None, benchmark still succeeds)
-      Mock the connection using the pattern in test_duckdb_plan_capture.py.
+      COMPLETED in commit d06fe3e3. tests/unit/platforms/test_postgresql_plan_capture.py
+      covers get_query_plan_parser(), capture_plans guard, plan_fingerprint in result.
+      DML guard tests pending (see query-plan-capture-postgresql-dml-guard w3).
 
   - id: w4
     summary: "Add get_query_plan_parser() override to RedshiftAdapter returning RedshiftQueryPlanParser"
-    status: pending
+    status: done
     notes: |
-      Same pattern as w1 but for benchbox/platforms/redshift.py:
-        def get_query_plan_parser(self):
-            from benchbox.core.query_plans.parsers.redshift import RedshiftQueryPlanParser
-            return RedshiftQueryPlanParser()
-      Verify EXPLAIN format differences (Redshift uses text tree, not EXPLAIN ANALYZE BUFFERS).
-      Check whether RedshiftAdapter.get_query_plan() already strips the ANALYZE/BUFFERS
-      options for Redshift compatibility.
+      COMPLETED in commit d06fe3e3. RedshiftAdapter.get_query_plan_parser() returns
+      RedshiftQueryPlanParser. Redshift uses plain EXPLAIN (no ANALYZE) — confirmed correct.
 
   - id: w5
     summary: "Integrate capture_query_plan() call into RedshiftAdapter.execute_query()"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
-      Same pattern as w2 but for benchbox/platforms/redshift.py execute_query().
-      Redshift EXPLAIN runs in the same connection context but cannot use ANALYZE
-      on live prod tables without advisory locks — confirm the existing
-      get_query_plan() already uses plain EXPLAIN (without ANALYZE) for Redshift.
+      COMPLETED in commit d06fe3e3. RedshiftAdapter.execute_query() calls
+      capture_query_plan() guarded by capture_plans. Plain EXPLAIN (no ANALYZE) confirmed.
 
   - id: w6
     summary: "Add unit tests for Redshift plan capture wiring"
     needs: [w5]
-    status: pending
+    status: done
     notes: |
-      Create tests/unit/platforms/test_redshift_plan_capture.py. Same coverage
-      checklist as w3 but using RedshiftQueryPlanParser and mocking Redshift cursors.
+      COMPLETED in commit d06fe3e3. tests/unit/platforms/test_redshift_plan_capture.py
+      added with RedshiftQueryPlanParser and mocked cursors.
 
   - id: w7
     summary: "Verify TimescaleDB, CedarDB, and pg_mooncake inherit plan capture without changes"

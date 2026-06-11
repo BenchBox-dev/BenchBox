@@ -2,7 +2,7 @@ id: query-plan-capture-misc-platforms
 title: "Implement or resolve query plan capture for QuestDB, Velox, Databend, MotherDuck, cuDF, Doris, and SingleStore"
 worktree: platform-expansion
 priority: Low
-status: Not Started
+status: In Progress
 category: Platform Expansion
 
 description: |
@@ -34,10 +34,9 @@ description: |
        - No parser exists.
 
     4. MotherDuckAdapter (benchbox/platforms/motherduck.py:74)
-       - Inherits PlatformAdapter (not DuckDBAdapter). No plan support inherited.
-       - MotherDuck IS serverless DuckDB and uses the same DuckDB SQL dialect.
-       - Should override get_query_plan() and get_query_plan_parser() to reuse
-         DuckDBQueryPlanParser. The EXPLAIN output format is identical to DuckDB.
+       - ✅ WIRED (commit d06fe3e3): get_query_plan(), get_query_plan_parser() reusing
+         DuckDBQueryPlanParser, and capture call in execute_query() all implemented.
+       - Unit tests for MotherDuck plan capture are not yet added (w9 pending).
 
     5. cuDFAdapter (benchbox/platforms/cudf.py:594)
        - get_query_plan(): ✅ at line 594 — but always returns None.
@@ -74,29 +73,19 @@ prior_art:
 work:
   - id: w1
     summary: "MotherDuck: add get_query_plan() and get_query_plan_parser() reusing DuckDB components"
-    status: pending
+    status: done
     notes: |
-      MotherDuck uses DuckDB's SQL dialect. In benchbox/platforms/motherduck.py:
-        def get_query_plan(self, connection, query):
-            # Identical to DuckDBAdapter — EXPLAIN (ANALYZE, FORMAT JSON)
-            explain_query = f"EXPLAIN (ANALYZE, FORMAT JSON) {query}"
-            result = connection.execute(explain_query).fetchall()
-            return result[0][0] if result else None
-
-        def get_query_plan_parser(self):
-            from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
-            return DuckDBQueryPlanParser()
-      Then add the capture call to MotherDuckAdapter.execute_query() following
-      the DuckDB pattern. Verify EXPLAIN output is identical to DuckDB local.
-      Unit test: confirm get_query_plan_parser() returns DuckDBQueryPlanParser.
+      COMPLETED in commit d06fe3e3. MotherDuckAdapter.get_query_plan() issues
+      EXPLAIN (ANALYZE, FORMAT JSON) and get_query_plan_parser() returns
+      DuckDBQueryPlanParser. Wiring is live on the branch.
 
   - id: w2
     summary: "MotherDuck: integrate capture_query_plan() into execute_query()"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Add the same capture guard as DuckDB to MotherDuckAdapter.execute_query().
-      MotherDuck connections are DuckDB connections; no format differences expected.
+      COMPLETED in commit d06fe3e3. MotherDuckAdapter.execute_query() now calls
+      capture_query_plan() with the capture_plans guard.
 
   - id: w3
     summary: "Databend: collect EXPLAIN sample, implement DatabendQueryPlanParser"

@@ -1,0 +1,144 @@
+id: query-plan-capture-display-decouple
+title: "Decouple show_query_plans from capture_plans and remove dead display-during-capture path"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+
+description: |
+  benchbox/cli/commands/run.py:487 sets:
+    s.show_query_plans = s.capture_plans  # Show plans when capturing
+
+  This hardcodes show_query_plans to always equal capture_plans. The two concepts
+  are distinct: capture writes plans to the result bundle; display prints plans to
+  the console. After this assignment there is no way to enable one without the other.
+
+  Consequence in DuckDB: DuckDBAdapter.execute_query() calls
+  display_query_plan_if_enabled() at line 962 (guarded by show_query_plans) and
+  then capture_query_plan() at line 968 (guarded by capture_plans). Because
+  show_query_plans == capture_plans, when --capture-plans is active, both fire:
+    1. display_query_plan_if_enabled() calls get_query_plan() → EXPLAIN ANALYZE (re-executes)
+    2. capture_query_plan() calls get_query_plan() again → second EXPLAIN ANALYZE (re-executes)
+  For SELECT this doubles capture overhead. For DML (before the DML guard lands),
+  this causes triple execution: benchmark + display EXPLAIN + capture EXPLAIN.
+
+  The fix branch fix/duckdb-display-double-explain (commit 9fb1b334) guards the
+  display call with `if not self.capture_plans:` which prevents the double EXPLAIN
+  when capture is active. However, after this guard lands, display_query_plan_if_enabled
+  is unreachable in any configuration wired through `benchbox run`:
+    - If capture_plans=True: the guard skips display
+    - If capture_plans=False: show_query_plans is also False (from run.py:487)
+    → display_query_plan_if_enabled never fires
+
+  The underlying issue is the coupling in run.py:487. Fixing it cleanly requires:
+  Option A (decouple): add a --show-plans CLI flag that sets show_query_plans
+    independently. This restores the ability to display plans without capturing,
+    useful for debugging single queries interactively.
+  Option B (simplify): remove show_query_plans as a concept entirely.
+    display_query_plan_if_enabled() is only meaningful as an interactive debugging
+    aid; promote it to a dedicated debug subcommand or remove it. The adapter
+    constructor accepts show_query_plans from config but it is always False in
+    production since run.py sets it to capture_plans.
+
+  Recommended: Option A. Restore --show-plans as a separate flag while keeping
+  the display-suppressed-during-capture guard from the fix branch. This gives
+  users a debug pathway without coupling it to result-bundle capture.
+
+  Note: this TODO depends on the fix branch (fix/duckdb-display-double-explain,
+  PR in progress) landing first, since that branch adds the correct guard. This
+  TODO then decouples the CLI flags cleanly on top of the guarded code.
+
+prior_art:
+  - "benchbox/cli/commands/run.py:487 — the coupling assignment"
+  - "benchbox/platforms/base/result_capture.py:477 — display_query_plan_if_enabled()"
+  - "benchbox/platforms/base/adapter.py:123 — show_query_plans adapter config key"
+  - "benchbox/platforms/duckdb.py:962 — display call (to be guarded by fix branch)"
+  - "fix/duckdb-display-double-explain commit 9fb1b334 — the display guard"
+
+work:
+  - id: w1
+    summary: "Add --show-plans CLI flag to benchbox run, wired to show_query_plans independently"
+    status: pending
+    notes: |
+      In benchbox/cli/commands/run.py add a --show-plans boolean flag (default False).
+      Remove the coupling assignment:
+        s.show_query_plans = s.capture_plans  # delete this line
+      Replace with:
+        s.show_query_plans = s.show_plans  # the new flag
+      This restores independent control. When --show-plans is passed without
+      --capture-plans, plans are displayed but not persisted. When --capture-plans
+      is passed, plans are captured silently (display suppressed by the guard in
+      duckdb.py, which is a prerequisite of this TODO).
+
+  - id: w2
+    summary: "Update docs and --help to document --show-plans flag"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add --show-plans to docs/reference/cli/run.md under the plan capture options
+      section. Describe the distinction: --capture-plans persists to the result
+      bundle; --show-plans prints to console for interactive inspection.
+
+  - id: w3
+    summary: "Add test asserting display fires when show_query_plans=True and capture_plans=False"
+    needs: [w1]
+    status: pending
+    notes: |
+      Unit test: create DuckDBAdapter with show_query_plans=True, capture_plans=False.
+      Mock display_query_plan_if_enabled. Execute a SELECT. Assert the display
+      mock was called. Assert capture_query_plan was NOT called.
+      Second case: show_query_plans=False, capture_plans=True. Assert display NOT
+      called (the guard from the fix branch). Assert capture_query_plan called.
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Existing --capture-plans flag behavior (plans written to result bundle) must not change."
+  - "Adapters other than DuckDB that call display_query_plan_if_enabled() must remain unaffected."
+  - "show_query_plans=True in adapter config (used by DuckDB PRAGMA enable_profiling) must continue to gate profiling."
+
+approach: |
+  First ensure fix/duckdb-display-double-explain is merged to develop. Then remove
+  the coupling assignment in run.py:487 and add --show-plans. The display guard
+  in duckdb.py (if not self.capture_plans: ...) already prevents double EXPLAIN;
+  this TODO only adds the CLI flag to make show_query_plans settable independently.
+  Keep w2 and w3 brief — the core change is one line removal + one flag addition.
+
+anti_patterns:
+  - "DO NOT add --show-plans before fix/duckdb-display-double-explain is merged — without the guard, enabling show_query_plans with capture_plans causes double EXPLAIN."
+  - "DO NOT remove display_query_plan_if_enabled() from the base class — it is called by adapters other than DuckDB and removing it breaks those call sites."
+  - "DO NOT change the PRAGMA enable_profiling guard in duckdb.py — that is separate from the display call and governed by show_query_plans for a different reason."
+
+verification:
+  - description: "--show-plans displays plan without capturing"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -k 'show_plans' -v"
+    expected_output: "Display fires when show_query_plans=True, capture_plans=False"
+  - description: "--capture-plans does not trigger display"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -k 'capture_no_display' -v"
+    expected_output: "Display suppressed when capture_plans=True"
+  - description: "CLI --help shows --show-plans flag"
+    command: "uv run -- benchbox run --help"
+    expected_output: "--show-plans option visible in plan capture options section"
+
+scope_limit:
+  only_modify:
+    - "benchbox/cli/commands/run.py"
+    - "docs/reference/cli/run.md"
+    - "tests/unit/platforms/"
+    - "_project/TODO/main/planning/query-plan-capture-display-decouple.yaml"
+  do_not_modify:
+    - "benchbox/platforms/base/result_capture.py"
+    - "benchbox/platforms/duckdb.py"
+
+success_metrics:
+  - "show_query_plans and capture_plans can be set independently via CLI flags."
+  - "--show-plans displays plans to console without writing to result bundle."
+  - "--capture-plans persists plans without displaying to console (display suppressed)."
+  - "No double-EXPLAIN in any configuration."
+
+metadata:
+  tags: [query-plan, cli, display, decoupling, duckdb]
+  estimated_effort: "Small"
+  created_date: "2026-06-11"
+  last_updated: "2026-06-11T00:00:00-04:00"

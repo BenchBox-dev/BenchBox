@@ -1,0 +1,194 @@
+id: query-plan-capture-isolation-phase-design
+title: "Design and implement plan capture as an explicit isolated benchmark phase"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Plan capture is intended to run as a separate, isolated phase of the benchmark
+  — totally decoupled from the power/throughput measurement runs. The current
+  implementation does not match this intent: capture is wired inline inside each
+  adapter's execute_query() via the capture_plans flag, so EXPLAIN runs
+  interleaved with the timed measurement.
+
+  Two problems arise from inline capture:
+
+  1. Write isolation: even with a DML guard (see query-plan-capture-postgresql-dml-guard),
+     the capture EXPLAIN executes inside the same transaction as the benchmark query.
+     This exposes the measurement database state to a second round-trip, and for any
+     platform where EXPLAIN ANALYZE re-executes (PostgreSQL, DuckDB with analyze_plans=True),
+     the write runs twice unless actively guarded.
+
+  2. Measurement contamination: if capture EXPLAIN runs immediately after the timed
+     query, it holds the connection open and may delay the next measured query. This
+     affects throughput benchmarks with multiple concurrent streams.
+
+  The correct model: plan capture should be a separate benchmark phase that:
+    - Runs after all power/throughput iterations complete (measurement already stable)
+    - Uses a separate connection to avoid transaction interference
+    - Issues EXPLAIN-only (no ANALYZE re-execution needed — structure from static plan)
+    - Does not count toward any timing measurement
+
+  The phased model requires a dedicated "capture" phase hook in the run orchestrator
+  (benchbox/cli/commands/run.py) that is triggered by --capture-plans, distinct from
+  the --power and --throughput phases. The existing inline path can remain as a
+  compatibility layer for platforms that provide plans as a side effect of execution
+  (e.g., BigQuery job statistics, Spark event logs) where post-hoc capture is the
+  only option.
+
+  Secondary gap — thread safety of _plan_capture_iteration_counts:
+  benchbox/platforms/base/result_capture.py:323 initialises
+  `self._plan_capture_iteration_counts: dict[str, int] = {}` on the adapter instance.
+  Under concurrent stream execution (--streams > 1), multiple threads call
+  capture_query_plan() concurrently and mutate this dict without a lock. The dict
+  operations are CPython-GIL-protected for single-key reads/writes, but
+  plan_first_n filtering (lines 591-595) is a read-increment-write sequence that
+  can produce incorrect counts under preemption. This should be addressed as part
+  of the isolation architecture.
+
+prerequisites:
+  - "query-plan-capture-postgresql-dml-guard — DML double-execution must be fixed first to harden inline path during transition"
+  - "query-plan-capture-display-decouple — show_query_plans coupling resolved before redesigning capture flow"
+
+prior_art:
+  - "benchbox/cli/commands/run.py:487 — show_query_plans = capture_plans sets the current inline mode"
+  - "benchbox/platforms/base/result_capture.py:561 — capture_query_plan() implementation"
+  - "benchbox/platforms/base/result_capture.py:323 — _plan_capture_iteration_counts (not thread-safe)"
+  - "benchbox/cli/commands/run.py — power/throughput phase orchestration to reference for hook design"
+
+work:
+  - id: w1
+    summary: "Design the plan capture phase contract: inputs, outputs, timing, connection model"
+    status: pending
+    notes: |
+      Write a design note (inline in this TODO or as a brief ADR) covering:
+        - Where in the run lifecycle the capture phase fires (after last power/throughput iteration)
+        - Whether it uses the same adapter instance or a fresh connection
+        - EXPLAIN options for capture-only mode (no ANALYZE — static plan structure only)
+        - How results are merged back into the run metadata (plan_fingerprints dict)
+        - Backward-compat: platforms that already capture inline (BigQuery, Spark via job stats)
+          must continue to work; capture phase is additive, not a replacement
+
+  - id: w2
+    summary: "Fix _plan_capture_iteration_counts thread safety"
+    needs: [w1]
+    status: pending
+    notes: |
+      Replace the bare dict mutation at result_capture.py:591-595 with a
+      threading.Lock-protected increment. Options:
+        a) Per-instance threading.Lock added to __init__ alongside the dict
+        b) Replace dict with collections.Counter + lock
+        c) Use threading.local() if per-thread isolation is preferred
+      Option (a) is simplest and consistent with the existing adapter-instance model.
+      Add a concurrent-stream unit test that fires capture_query_plan() from N
+      threads and asserts plan_first_n is honoured per-query_id (not per-thread).
+
+  - id: w3
+    summary: "Add a run_plan_capture_phase() hook to the run orchestrator"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add a function to benchbox/cli/commands/run.py (or a new
+      benchbox/core/plan_capture_phase.py) that:
+        - Accepts the list of query IDs and their SQL
+        - Opens a fresh connection (to avoid contaminating measurement state)
+        - Calls adapter.capture_query_plan(conn, sql, qid) with analyze_plans=False
+          (structural plan only, no re-execution cost)
+        - Collects results into a dict[str, QueryPlanDAG] keyed by query_id
+        - Returns timing metadata (total capture time, per-query capture ms)
+      This is distinct from the inline capture path and is guarded by
+      --capture-plans + a "phase" flag (e.g., only fire when not in throughput
+      stream mode, or fire after all streams complete).
+
+  - id: w4
+    summary: "Update docs and --help to describe capture as a post-measurement phase"
+    needs: [w3]
+    status: pending
+    notes: |
+      Update docs/features/query-plan-analysis.md and docs/reference/cli/run.md:
+        - Describe that --capture-plans triggers a separate post-measurement phase
+        - Clarify that DML queries get estimated-plan capture (no ANALYZE re-execution)
+        - Note that BigQuery/Spark capture is always post-execution via platform
+          APIs regardless of the phase design
+
+  - id: w5
+    summary: "Add integration test verifying phase isolation"
+    needs: [w3, w4]
+    status: pending
+    notes: |
+      Add a test that:
+        - Runs a mock benchmark with capture_plans=True
+        - Asserts that the capture phase fires AFTER the timed measurement (not interleaved)
+        - For DML queries, asserts DML ran exactly once (not twice)
+        - Asserts plan_fingerprints are populated in the run metadata
+      This can use DuckDB (no external credentials) with a small in-memory table and
+      an INSERT query.
+
+deps:
+  needs:
+    - "query-plan-capture-postgresql-dml-guard"
+    - "query-plan-capture-display-decouple"
+
+must_preserve:
+  - "Platforms that capture plans as execution side effects (BigQuery job stats, Spark event logs) must continue to work — the inline path cannot be removed."
+  - "Existing --capture-plans behavior must remain backward-compatible for SELECT-only benchmarks."
+  - "plan_fingerprints field in run metadata must continue to be populated."
+  - "DuckDB analyze_plans=False option must remain available for the capture phase."
+
+approach: |
+  Design the phase contract first (w1) before writing any code. The phase model
+  must accommodate both the new post-measurement capture path (for PostgreSQL,
+  DuckDB, Redshift) and the existing inline/side-effect path (BigQuery, Spark).
+  Fix the thread-safety issue independently (w2) as it is a correctness bug
+  separate from the phase design. The orchestrator hook (w3) should be additive
+  — the inline capture in execute_query() can coexist until all adapters migrate.
+
+anti_patterns:
+  - "DO NOT remove the inline capture from execute_query() in one shot — BigQuery and Spark depend on it; migration is incremental."
+  - "DO NOT use threading.local() for _plan_capture_iteration_counts — plan_first_n is a global per-query-id counter, not per-thread."
+  - "DO NOT add ANALYZE to the capture-phase EXPLAIN call — the phase is structural-plan-only; re-execution cost belongs in the measurement phase."
+  - "DO NOT add the capture phase to the --throughput concurrent-stream path — stream isolation is a pre-condition, not a deliverable of this TODO."
+
+verification:
+  - description: "Thread-safety fix: plan_first_n counted correctly under concurrent capture"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -k 'plan_first_n or iteration_count' -v"
+    expected_output: "Thread-safe iteration count tests pass"
+  - description: "Phase hook fires after all power iterations in mock run"
+    command: "uv run -- python -m pytest tests/integration/ -k 'capture_phase' -v"
+    expected_output: "Capture phase fires post-measurement"
+  - description: "DML queries run exactly once in a mock benchmark"
+    command: "uv run -- python -m pytest tests/integration/ -k 'dml_single_execution' -v"
+    expected_output: "DML query executed once; plan captured from estimated EXPLAIN"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/result_capture.py"
+    - "benchbox/cli/commands/run.py"
+    - "docs/features/query-plan-analysis.md"
+    - "docs/reference/cli/run.md"
+    - "tests/unit/platforms/"
+    - "tests/integration/"
+    - "_project/TODO/main/planning/query-plan-capture-isolation-phase-design.yaml"
+
+success_metrics:
+  - "Plan capture phase runs after all measurement iterations complete, not interleaved."
+  - "_plan_capture_iteration_counts is thread-safe under concurrent stream execution."
+  - "DML queries in a benchmark run exactly once (write isolation guaranteed)."
+  - "BigQuery and Spark adapters continue to capture plans via their existing inline paths."
+
+open_questions:
+  - question: "Should the capture phase use a separate connection or reuse the measurement connection?"
+    gating: true
+    affects: ["w3"]
+    default: "Separate connection: avoids any transaction contamination and makes isolation explicit"
+  - question: "Should analyze_plans default to False in the capture phase, or remain configurable?"
+    gating: false
+    affects: ["w3", "w4"]
+    default: "False: capture phase is structural-plan-only; ANALYZE re-execution should require opt-in"
+
+metadata:
+  tags: [query-plan, architecture, isolation, thread-safety, write-isolation]
+  estimated_effort: "Medium"
+  created_date: "2026-06-11"
+  last_updated: "2026-06-11T00:00:00-04:00"
