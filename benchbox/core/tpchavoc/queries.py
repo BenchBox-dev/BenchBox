@@ -94,7 +94,6 @@ class TPCHavocQueryManager(TPCHQueries):
             variant_id: The variant ID (1-10)
             params: Optional parameter values to use
             scale_factor: Scale factor for scale-dependent substitution values
-                (used when ``params`` is not given)
 
         Returns:
             The variant query string
@@ -110,9 +109,10 @@ class TPCHavocQueryManager(TPCHQueries):
 
         variant_generator = self.variant_generators[query_id][variant_id]
         base_query = self.get_query(query_id)
-        if params is None:
-            params = self._variant_scale_params(query_id, scale_factor)
-        return variant_generator.generate(base_query, params)
+        # Scale-dependent substitutions are defaults, so explicit caller params
+        # can never suppress them and leak a raw {token} into the SQL.
+        merged = {**(self._variant_scale_params(query_id, scale_factor) or {}), **(params or {})}
+        return variant_generator.generate(base_query, merged or None)
 
     @staticmethod
     def _variant_scale_params(query_id: int, scale_factor: float) -> Optional[dict[str, Any]]:

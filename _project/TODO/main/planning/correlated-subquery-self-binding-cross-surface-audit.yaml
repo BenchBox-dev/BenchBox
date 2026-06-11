@@ -21,6 +21,14 @@ description: |
      same way, but the equivalent mistake - joining/filtering on the inner frame
      instead of the outer row - is possible and equally silent.
 
+     Review evidence (PR #770): the DataFrame variants are INDEPENDENT designs,
+     not mirrors of the SQL variants - e.g. DataFrame q9_v10 is an algebraic
+     reformulation while SQL q9_v10 had nation-bucketing/clamping defects. None
+     of the 24 SQL-side divergences PR #770 fixed has a mirrored DataFrame
+     analog, but the same variant ID means a DIFFERENT transformation per
+     surface, so the SQL equivalence gate proves nothing about this surface;
+     it needs its own result-equivalence check against canonical.
+
   2. Other SQL benchmarks with correlated subqueries: TPC-DS, SSB, join-order,
      read-primitives (subquery category), and write-primitives
      (update_with_subquery). Grep evidence already shows correlated patterns and
