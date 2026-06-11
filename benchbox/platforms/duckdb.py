@@ -757,8 +757,9 @@ class DuckDBAdapter(PlatformAdapter):
         self.log_very_verbose("DuckDB OLAP optimizations applied")
         # Note: enable_optimizer setting not available in current DuckDB versions
 
-        # Enable profiling only if requested
-        if self.show_query_plans:
+        # Enable profiling only when displaying plans; skip when capture_plans is active
+        # (EXPLAIN ANALYZE handles plan capture separately without requiring profiling).
+        if self.show_query_plans and not self.capture_plans:
             conn.execute("SET enable_profiling = 'query_tree_optimizer'")
             config_applied.append("query profiling")
             self.log_very_verbose("DuckDB query profiling enabled")
@@ -908,8 +909,8 @@ class DuckDBAdapter(PlatformAdapter):
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply DuckDB-specific optimizations based on benchmark type."""
-        # Only apply profiling when explicitly requested
-        if self.show_query_plans:
+        # Enable profiling only when displaying plans; skip when capture_plans is active.
+        if self.show_query_plans and not self.capture_plans:
             connection.execute("SET enable_profiling = 'query_tree'")
 
     def execute_query(
