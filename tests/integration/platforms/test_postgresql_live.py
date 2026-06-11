@@ -11,6 +11,8 @@ Setup:
 These tests require a running PostgreSQL instance accessible at localhost:5432.
 """
 
+import json
+
 import pytest
 
 from benchbox.platforms.postgresql import PostgreSQLAdapter
@@ -35,6 +37,22 @@ def postgresql_adapter():
         username="benchbox",
         password="benchbox",
         database="benchbox_test",
+    )
+    adapter.skip_database_management = True
+    yield adapter
+
+
+@pytest.fixture
+def postgresql_adapter_with_capture():
+    """Create a PostgreSQL adapter with query plan capture enabled."""
+    skip_unless_docker_service("localhost", 5432, platform="PostgreSQL")
+    adapter = PostgreSQLAdapter(
+        host="localhost",
+        port=5432,
+        username="benchbox",
+        password="benchbox",
+        database="benchbox_test",
+        capture_plans=True,
     )
     adapter.skip_database_management = True
     yield adapter
@@ -94,3 +112,58 @@ class TestLivePostgreSQLQueryExecution:
             assert result is not None
         finally:
             postgresql_adapter.close_connection(connection)
+
+
+class TestLivePostgreSQLQueryPlanCapture:
+    """Test query plan capture against a live PostgreSQL instance."""
+
+    def test_get_query_plan_returns_json(self, postgresql_adapter):
+        """get_query_plan should return a non-empty JSON string."""
+        connection = postgresql_adapter.create_connection()
+        try:
+            plan = postgresql_adapter.get_query_plan(connection, "SELECT 1")
+            assert plan is not None
+            assert len(plan) > 0
+            # PostgreSQL FORMAT JSON wraps the plan in a list
+            parsed = json.loads(plan)
+            assert isinstance(parsed, list)
+            assert len(parsed) > 0
+        finally:
+            postgresql_adapter.close_connection(connection)
+
+    def test_capture_query_plan_returns_dag(self, postgresql_adapter_with_capture):
+        """capture_query_plan should return a QueryPlanDAG for a simple SELECT."""
+        adapter = postgresql_adapter_with_capture
+        connection = adapter.create_connection()
+        try:
+            plan, capture_ms = adapter.capture_query_plan(connection, "SELECT 1", "q_test")
+            assert plan is not None, "Expected a QueryPlanDAG but got None"
+            assert capture_ms >= 0.0
+            assert plan.logical_root is not None
+        finally:
+            adapter.close_connection(connection)
+
+    def test_capture_query_plan_has_fingerprint(self, postgresql_adapter_with_capture):
+        """Captured plan must have a non-empty fingerprint."""
+        adapter = postgresql_adapter_with_capture
+        connection = adapter.create_connection()
+        try:
+            plan, _ = adapter.capture_query_plan(connection, "SELECT 1", "q_fp")
+            assert plan is not None
+            assert plan.plan_fingerprint
+            assert len(plan.plan_fingerprint) == 64  # SHA256 hex
+        finally:
+            adapter.close_connection(connection)
+
+    def test_capture_query_plan_fingerprint_stable(self, postgresql_adapter_with_capture):
+        """Same query executed twice must produce identical fingerprints."""
+        adapter = postgresql_adapter_with_capture
+        connection = adapter.create_connection()
+        try:
+            plan1, _ = adapter.capture_query_plan(connection, "SELECT 1", "q_fp_a")
+            plan2, _ = adapter.capture_query_plan(connection, "SELECT 1", "q_fp_b")
+            assert plan1 is not None
+            assert plan2 is not None
+            assert plan1.plan_fingerprint == plan2.plan_fingerprint
+        finally:
+            adapter.close_connection(connection)
