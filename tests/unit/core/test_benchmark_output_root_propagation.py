@@ -158,11 +158,11 @@ def test_tpch_variant_skew_inherits_propagation(tmp_path, monkeypatch):
 
 _ALL_BENCHMARK_IDS = sorted(get_all_benchmarks())
 
-#: Benchmarks whose output_dir reassignment is known not to reach the nested
-#: generator because they predate GeneratorOutputDirMixin. Tracked under
-#: benchmark-output-root-explicit-override-propagation — remove from this set
-#: (turning the xfail into a pass) when that item lands.
-_REASSIGNMENT_GAP_BIDS = frozenset({"tpcds", "tpcdi"})
+#: Benchmarks whose output_dir reassignment does not reach the nested
+#: generator. Empty since benchmark-output-root-explicit-override-propagation
+#: gave tpcds/tpcdi the mixin; add an id here (with a strict xfail reason and
+#: tracking TODO) only if a new benchmark ships with a known gap.
+_REASSIGNMENT_GAP_BIDS: frozenset[str] = frozenset()
 
 
 def _registry_construct(benchmark_id: str):
@@ -242,6 +242,29 @@ def test_registry_explicit_root_reassignment_propagates(benchmark_id, tmp_path, 
     assert str(core.output_dir) == str(explicit), (benchmark_id, core.output_dir)
     for gen in generators:
         assert str(gen.output_dir) == str(explicit), (benchmark_id, gen.output_dir)
+
+
+def test_tpcdi_explicit_override_rederives_etl_dirs(tmp_path, monkeypatch):
+    """A tpcdi output_dir reassignment re-derives config and ETL directories.
+
+    TPC-DI derives source/staging/warehouse and its data_generator path from
+    the config output root, so an explicit override must update all of them —
+    leaving none pointed at the construction-time default.
+    """
+    from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+
+    monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
+    benchmark = TPCDIBenchmark(scale_factor=0.01)
+
+    explicit = tmp_path / "custom_root"
+    benchmark.output_dir = explicit
+
+    assert Path(str(benchmark.output_dir)) == explicit
+    assert Path(str(benchmark.config.output_dir)) == explicit
+    assert benchmark.source_dir == explicit / "source"
+    assert benchmark.staging_dir == explicit / "staging"
+    assert benchmark.warehouse_dir == explicit / "warehouse"
+    assert Path(str(benchmark.data_generator.output_dir)) == explicit
 
 
 # ---------------------------------------------------------------------------
