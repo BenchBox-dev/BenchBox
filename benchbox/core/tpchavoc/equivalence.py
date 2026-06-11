@@ -1,43 +1,40 @@
-"""Result-equivalence oracle for TPC-Havoc SQL variants.
+"""Result-equivalence gate for TPC-Havoc SQL variants.
 
 TPC-Havoc's premise is that the ten SQL variants of each TPC-H query are
 structurally diverse but *semantically equivalent* to the canonical TPC-H
 query. benchbox ships :meth:`TPCHavocBenchmark.validate_variant_equivalence`,
-but nothing in the default run or in CI ever calls it for a real variant, so
-divergences are silent (see ``_project/TODO/main/planning/
+but nothing in the default run or in CI ever called it for a real variant, so
+divergences were silent (see ``_project/TODO/main/active/
 tpchavoc-variant-equivalence-gate.yaml``).
 
 This module wires that existing validator over a real, small-scale DuckDB
-dataset and reports every variant that diverges from canonical TPC-H. It is a
-**diagnostic**: ``python -m benchbox.core.tpchavoc.equivalence`` (or
-``make tpchavoc-equivalence-report``) prints a categorized report and always
-exits ``0``. A hard CI gate is deliberately deferred until the judgment-call
-divergence classes recorded in :data:`KNOWN_DIVERGENCES` are triaged.
+dataset: ``python -m benchbox.core.tpchavoc.equivalence`` (or
+``make tpchavoc-equivalence-report``) compares every variant of every
+implemented query to canonical TPC-H, prints a report, and **exits non-zero**
+if any variant diverges beyond the classified baseline in
+:data:`KNOWN_DIVERGENCES` (currently empty - every variant must match).
 
 Comparison is order-insensitive with float tolerance (the validator sorts both
 sides). Because canonical TPC-H queries carry a presentational ``ORDER BY ...
 LIMIT n`` top-N cut that the variant families treat inconsistently, the trailing
-``LIMIT`` is stripped from both sides before comparison; the one variant that
-relies on ``LIMIT`` for computation rather than presentation (``14_v9``) is
-recorded as a known divergence.
+``LIMIT`` is stripped from both sides before comparison.
 
-Known divergences observed at SF=0.1 on DuckDB fall into three classes:
+The gate's burndown (24 divergences at the first report) resolved every
+divergence class as a variant defect:
 
-* ``scale-threshold`` - the Q11 variants hardcode the ``0.0001`` value
-  threshold while canonical TPC-H scales it by ``1 / SF``; they are equivalent
-  only at SF=1.
-* ``extra-column`` - the "window function" variants add a ranking/helper
-  column, changing the output schema (an intended structural difference).
-* ``limit-semantics`` - ``14_v9`` uses ``LIMIT 1`` to collapse a window result
-  to a single row; the top-N normalization here removes it.
-
-A fourth ``suspected-defect`` class (``1_v8``, ``7_v5``, ``9_v10``) was triaged
-and fixed: each was a genuine correctness bug that silently distorted results -
-``1_v8`` aggregated over unfiltered ``lineitem`` (the shipdate predicate lived in
-``QUALIFY``, which filters output rows, not aggregation input); ``7_v5`` fanned a
-date-filtered-orders CTE back against the full ``lineitem`` table, inflating
-revenue ~4.5x; ``9_v10`` bucketed 22 nations into ``OTHER AMERICAS`` and clamped
-negative profit to ``0``.
+* value-distorting bugs: ``q2_v10``/``q10_v10`` clamped negative balances,
+  ``q1_v8`` filtered in ``QUALIFY`` instead of ``WHERE``, ``q7_v5`` fanned a
+  date-filtered-orders CTE against the full ``lineitem`` table (~4.5x revenue),
+  ``q9_v10`` bucketed nations and clamped negative profit.
+* ``scale-threshold``: the Q11 variants hardcoded the SF=1 ``0.0001`` value
+  threshold; they now carry a ``{q11_fraction}`` token rendered with
+  ``0.0001 / scale_factor`` exactly like canonical qgen.
+* ``extra-column``: eight "window function" variants projected a helper
+  ``rank()``/discriminator column; the window structure stays, the column no
+  longer leaks into the output schema.
+* ``limit-semantics``: ``14_v9`` needed ``LIMIT 1`` only because its helper
+  rank column defeated ``DISTINCT``; with the column gone, ``DISTINCT``
+  collapses to the canonical single row.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -66,21 +63,12 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # staying ~10x cheaper than SF=1.
 EQUIVALENCE_SCALE = 0.1
 
-# Variants known to diverge from canonical TPC-H at EQUIVALENCE_SCALE, with the
-# reason class. This is the burndown input for the deferred hard gate, not an
-# allow-list the diagnostic enforces. Keyed by "<query>_v<variant>".
-KNOWN_DIVERGENCES: dict[str, str] = {
-    "5_v9": "extra-column",
-    "7_v9": "extra-column",
-    "8_v9": "extra-column",
-    "9_v9": "extra-column",
-    "10_v9": "extra-column",
-    **{f"11_v{variant}": "scale-threshold" for variant in range(1, 11)},
-    "12_v9": "extra-column",
-    "13_v9": "extra-column",
-    "14_v9": "limit-semantics",
-    "15_v4": "extra-column",
-}
+# Variants tolerated to diverge from canonical TPC-H at EQUIVALENCE_SCALE, with
+# the reason class. Empty: the original 24-divergence burndown is complete and
+# every variant must match canonical. Add an entry (with a class and a tracking
+# TODO) only for a divergence that is deliberate, never to mute a regression.
+# Keyed by "<query>_v<variant>".
+KNOWN_DIVERGENCES: dict[str, str] = {}
 
 _TRAILING_LIMIT = re.compile(r"(?is)\s+limit\s+\d+\s*;?\s*$")
 
@@ -187,7 +175,8 @@ def build_duckdb_with_tpch(scale_factor: float, output_dir: str | Path) -> tuple
 def main() -> int:
     """Generate data, run the oracle, and print a categorized report.
 
-    Always returns ``0`` - this is a diagnostic, not a gate.
+    Returns non-zero if any variant diverges beyond :data:`KNOWN_DIVERGENCES` -
+    this is the TPC-Havoc semantic-equivalence gate.
     """
     import tempfile
 
@@ -217,12 +206,12 @@ def main() -> int:
         print()
 
     if new:
-        print(f"NEW (unclassified) divergences - triage needed: {new}")
+        print(f"GATE FAILURE - unclassified divergences from canonical TPC-H: {new}")
     if resolved:
         print(f"Previously-known divergences now equivalent - update KNOWN_DIVERGENCES: {resolved}")
     if not new and not resolved:
-        print("Divergence set matches KNOWN_DIVERGENCES.")
-    return 0
+        print("All variants equivalent to canonical TPC-H (modulo KNOWN_DIVERGENCES).")
+    return 1 if new else 0
 
 
 def _sort_key(key: str) -> tuple[int, int]:

@@ -389,8 +389,7 @@ variants:
         n_name,
         c_address,
         c_phone,
-        c_comment,
-        rank() over (order by revenue desc) as revenue_rank
+        c_comment
     from customer_revenue
     order by
         revenue desc

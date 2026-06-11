@@ -79,13 +79,22 @@ class TPCHavocQueryManager(TPCHQueries):
             22: Q22_VARIANTS,
         }
 
-    def get_query_variant(self, query_id: int, variant_id: int, params: Optional[dict[str, Any]] = None) -> str:
+    def get_query_variant(
+        self,
+        query_id: int,
+        variant_id: int,
+        params: Optional[dict[str, Any]] = None,
+        *,
+        scale_factor: float = 1.0,
+    ) -> str:
         """Get a specific query variant.
 
         Args:
             query_id: The query ID (1-22)
             variant_id: The variant ID (1-10)
             params: Optional parameter values to use
+            scale_factor: Scale factor for scale-dependent substitution values
+                (used when ``params`` is not given)
 
         Returns:
             The variant query string
@@ -101,13 +110,28 @@ class TPCHavocQueryManager(TPCHQueries):
 
         variant_generator = self.variant_generators[query_id][variant_id]
         base_query = self.get_query(query_id)
+        if params is None:
+            params = self._variant_scale_params(query_id, scale_factor)
         return variant_generator.generate(base_query, params)
 
-    def get_all_variants(self, query_id: int) -> dict[int, str]:
+    @staticmethod
+    def _variant_scale_params(query_id: int, scale_factor: float) -> Optional[dict[str, Any]]:
+        """Scale-dependent substitution values for variant SQL templates.
+
+        Canonical TPC-H Q11 divides the 0.0001 value-fraction threshold by the
+        scale factor (qgen renders it as a 10-decimal literal); the Q11 variants
+        carry a ``{q11_fraction}`` token so they scale the same way.
+        """
+        if query_id == 11:
+            return {"q11_fraction": f"{0.0001 / scale_factor:.10f}"}
+        return None
+
+    def get_all_variants(self, query_id: int, *, scale_factor: float = 1.0) -> dict[int, str]:
         """Get all variants for a specific query.
 
         Args:
             query_id: The query ID (1-22)
+            scale_factor: Scale factor for scale-dependent substitution values
 
         Returns:
             Dictionary mapping variant IDs to query strings
@@ -119,7 +143,8 @@ class TPCHavocQueryManager(TPCHQueries):
             raise ValueError(f"Query variants not implemented for query {query_id}")
 
         return {
-            variant_id: self.get_query_variant(query_id, variant_id) for variant_id in self.variant_generators[query_id]
+            variant_id: self.get_query_variant(query_id, variant_id, scale_factor=scale_factor)
+            for variant_id in self.variant_generators[query_id]
         }
 
     def get_variant_description(self, query_id: int, variant_id: int) -> str:
@@ -213,18 +238,20 @@ class TPCHavocQueryManager(TPCHQueries):
 
         Args:
             **kwargs: Additional arguments passed to query generation
+                (``scale_factor`` is used for scale-dependent substitution values)
 
         Returns:
             Dictionary mapping query IDs to query strings for all variants
         """
         all_queries = {}
+        scale_factor = kwargs.get("scale_factor", 1.0)
 
         # Add all variants as regular queries
         for query_id in self.variant_generators:
             for variant_id in self.variant_generators[query_id]:
                 query_key = f"{query_id}_v{variant_id}"
                 try:
-                    all_queries[query_key] = self.get_query_variant(query_id, variant_id)
+                    all_queries[query_key] = self.get_query_variant(query_id, variant_id, scale_factor=scale_factor)
                 except Exception:
                     # Skip variants that fail to generate
                     continue
@@ -268,7 +295,7 @@ class TPCHavocQueryManager(TPCHQueries):
 
                 # Generate parameters if needed
                 params = kwargs.get("params") or self._generate_random_params(base_query_id, seed, scale_factor)
-                return self.get_query_variant(base_query_id, variant_id, params)
+                return self.get_query_variant(base_query_id, variant_id, params, scale_factor=scale_factor)
             except (ValueError, IndexError) as e:
                 raise ValueError(f"Invalid variant query ID format: {query_id}") from e
 

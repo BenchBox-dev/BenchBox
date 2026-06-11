@@ -322,8 +322,7 @@ variants:
     select
         nation,
         o_year,
-        sum_profit,
-        rank() over (partition by o_year order by sum_profit desc) as profit_rank
+        sum_profit
     from yearly_profit
     order by
         nation,

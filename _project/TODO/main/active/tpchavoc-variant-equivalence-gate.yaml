@@ -2,7 +2,7 @@ id: tpchavoc-variant-equivalence-gate
 title: "Wire a bounded result-equivalence gate for TPC-Havoc variants and burn down the divergences it surfaces"
 worktree: main
 priority: High
-status: In Progress
+status: Under Review
 category: Testing and Quality Assurance
 
 description: |
@@ -50,7 +50,7 @@ prior_art:
 work:
   - id: w0
     summary: "Re-validate the evidence against current develop before building anything"
-    status: pending
+    status: done
     notes: |
       Confirm the gap and the known divergences are still true on the head SHA:
         - grep that `validate_variant_equivalence` has no non-test caller in a
@@ -66,7 +66,7 @@ work:
   - id: w1
     summary: "Build a parametrized equivalence harness (report mode) over all queries x 10 SQL variants"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Small SF on DuckDB. For each implemented query, execute the canonical
       TPC-H query once and every variant, then compare via
@@ -79,7 +79,7 @@ work:
   - id: w2
     summary: "Drive all real divergences to zero, leaving only declared exceptions"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       The known q2_v10 projection defect is owned by the companion burndown
       TODO `tpchavoc-q2-v10-projection-faithfulness`. Any further divergences
@@ -89,7 +89,7 @@ work:
   - id: w3
     summary: "Promote the harness to a bounded CI gate that fails on reintroduced divergences"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       One bounded small-SF DuckDB cell, marked per the existing correctness-gate
       marker policy (not a stress matrix). Prove the gate fails when a
@@ -161,4 +161,4 @@ metadata:
   tags: [tpchavoc, testing, correctness, oracle, ci, equivalence]
   estimated_effort: "Medium"
   created_date: "2026-06-08"
-  last_updated: "2026-06-08T00:00:00"
+  last_updated: "2026-06-11T00:00:00"

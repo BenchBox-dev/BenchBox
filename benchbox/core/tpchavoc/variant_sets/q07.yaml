@@ -376,8 +376,7 @@ variants:
         supp_nation,
         cust_nation,
         l_year,
-        revenue,
-        rank() over (partition by l_year order by revenue desc) as revenue_rank
+        revenue
     from shipping_revenue
     order by
         supp_nation,

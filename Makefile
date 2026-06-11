@@ -112,10 +112,9 @@ test-smoke: test-quick
 test-correctness-gate:
 	BENCHBOX_STRICT_EXPECTED_RESULTS=1 BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22 uv run -- python -m pytest -m stress "tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]" -n 0 --tb=short --timeout=1200 -v
 
-# Diagnostic (non-gating): compare every TPC-Havoc SQL variant to canonical TPC-H
-# on real SF=0.1 DuckDB data and print a categorized divergence report. A hard
-# gate is deferred until the judgment-call divergence classes are triaged
-# (see _project/TODO/main/planning/tpchavoc-variant-equivalence-gate.yaml).
+# Gate: compare every TPC-Havoc SQL variant to canonical TPC-H on real SF=0.1
+# DuckDB data; exits non-zero on any divergence beyond KNOWN_DIVERGENCES
+# (see benchbox/core/tpchavoc/equivalence.py).
 tpchavoc-equivalence-report:
 	uv run -- python -m benchbox.core.tpchavoc.equivalence
 
@@ -1829,7 +1828,7 @@ help:
 	@echo "  make test-dev        Fast development cycle testing"
 	@echo "  make test-smoke      Quick smoke testing"
 	@echo "  make test-correctness-gate Run bounded real-result correctness gate"
-	@echo "  make tpchavoc-equivalence-report Diagnostic: TPC-Havoc variant vs canonical TPC-H equivalence report"
+	@echo "  make tpchavoc-equivalence-report Gate: TPC-Havoc variant vs canonical TPC-H equivalence"
 	@echo "  make test-local-matrix Run real local benchmark matrix (stress)"
 	@echo "  make test-ci         Maintained broad local CI profile"
 	@echo ""

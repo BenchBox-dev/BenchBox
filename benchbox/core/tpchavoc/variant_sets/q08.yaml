@@ -328,8 +328,7 @@ variants:
     select distinct
         o_year,
         sum(case when nation = 'BRAZIL' then volume else 0 end) over (partition by o_year) /
-        sum(volume) over (partition by o_year) as mkt_share,
-        rank() over (order by o_year) as year_rank
+        sum(volume) over (partition by o_year) as mkt_share
     from (
         select
             extract(year from o_orderdate) as o_year,

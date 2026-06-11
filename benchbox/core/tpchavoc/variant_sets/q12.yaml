@@ -256,8 +256,7 @@ variants:
         sum(case when o_orderpriority = '1-URGENT' or o_orderpriority = '2-HIGH' then 1 else 0 end)
             over (partition by l_shipmode) as high_line_count,
         sum(case when o_orderpriority <> '1-URGENT' and o_orderpriority <> '2-HIGH' then 1 else 0 end)
-            over (partition by l_shipmode) as low_line_count,
-        rank() over (order by l_shipmode) as shipmode_rank
+            over (partition by l_shipmode) as low_line_count
     from
         orders,
         lineitem
