@@ -333,18 +333,9 @@ variants:
   sql: |2
 
     select
-        case
-            when nation in ('UNITED STATES', 'CANADA', 'BRAZIL') then nation
-            else 'OTHER AMERICAS'
-        end as nation,
+        nation,
         o_year,
-        sum(
-            case
-                when amount > 0 then amount
-                when amount < 0 then 0
-                else amount
-            end
-        ) as sum_profit
+        sum(amount) as sum_profit
     from (
         select
             case

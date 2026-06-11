@@ -21,7 +21,7 @@ LIMIT n`` top-N cut that the variant families treat inconsistently, the trailing
 relies on ``LIMIT`` for computation rather than presentation (``14_v9``) is
 recorded as a known divergence.
 
-Known divergences observed at SF=0.1 on DuckDB fall into four classes:
+Known divergences observed at SF=0.1 on DuckDB fall into three classes:
 
 * ``scale-threshold`` - the Q11 variants hardcode the ``0.0001`` value
   threshold while canonical TPC-H scales it by ``1 / SF``; they are equivalent
@@ -30,8 +30,14 @@ Known divergences observed at SF=0.1 on DuckDB fall into four classes:
   column, changing the output schema (an intended structural difference).
 * ``limit-semantics`` - ``14_v9`` uses ``LIMIT 1`` to collapse a window result
   to a single row; the top-N normalization here removes it.
-* ``suspected-defect`` - value/ordering mismatches that need triage and may be
-  genuine variant bugs (``1_v8``, ``7_v5``, ``9_v10``).
+
+A fourth ``suspected-defect`` class (``1_v8``, ``7_v5``, ``9_v10``) was triaged
+and fixed: each was a genuine correctness bug that silently distorted results -
+``1_v8`` aggregated over unfiltered ``lineitem`` (the shipdate predicate lived in
+``QUALIFY``, which filters output rows, not aggregation input); ``7_v5`` fanned a
+date-filtered-orders CTE back against the full ``lineitem`` table, inflating
+revenue ~4.5x; ``9_v10`` bucketed 22 nations into ``OTHER AMERICAS`` and clamped
+negative profit to ``0``.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -64,13 +70,10 @@ EQUIVALENCE_SCALE = 0.1
 # reason class. This is the burndown input for the deferred hard gate, not an
 # allow-list the diagnostic enforces. Keyed by "<query>_v<variant>".
 KNOWN_DIVERGENCES: dict[str, str] = {
-    "1_v8": "suspected-defect",
     "5_v9": "extra-column",
-    "7_v5": "suspected-defect",
     "7_v9": "extra-column",
     "8_v9": "extra-column",
     "9_v9": "extra-column",
-    "9_v10": "suspected-defect",
     "10_v9": "extra-column",
     **{f"11_v{variant}": "scale-threshold" for variant in range(1, 11)},
     "12_v9": "extra-column",

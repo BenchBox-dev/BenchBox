@@ -184,16 +184,14 @@ variants:
           and n_name in ('FRANCE', 'GERMANY')
     ),
     qualified_orders as (
-        select o_orderkey, o_custkey, extract(year from l_shipdate) as l_year
-        from orders, lineitem
-        where o_orderkey = l_orderkey
-          and l_shipdate between date '1995-01-01' and date '1996-12-31'
+        select o_orderkey, o_custkey
+        from orders
     ),
     shipping_base as (
         select
             qs.supp_nation,
             qc.cust_nation,
-            qo.l_year,
+            extract(year from l.l_shipdate) as l_year,
             l.l_extendedprice * (1 - l.l_discount) as volume
         from
             qualified_suppliers qs
@@ -201,8 +199,9 @@ variants:
             join qualified_orders qo on l.l_orderkey = qo.o_orderkey
             join qualified_customers qc on qo.o_custkey = qc.c_custkey
         where
-            ((qs.supp_nation = 'FRANCE' and qc.cust_nation = 'GERMANY')
-             or (qs.supp_nation = 'GERMANY' and qc.cust_nation = 'FRANCE'))
+            l.l_shipdate between date '1995-01-01' and date '1996-12-31'
+            and ((qs.supp_nation = 'FRANCE' and qc.cust_nation = 'GERMANY')
+                 or (qs.supp_nation = 'GERMANY' and qc.cust_nation = 'FRANCE'))
     )
     select
         supp_nation,
