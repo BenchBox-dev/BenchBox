@@ -197,6 +197,7 @@ def _create_default_registry() -> ParserRegistry:
     from benchbox.core.query_plans.parsers.postgresql import PostgreSQLQueryPlanParser
     from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
     from benchbox.core.query_plans.parsers.redshift import RedshiftQueryPlanParser
+    from benchbox.core.query_plans.parsers.spark import SparkQueryPlanParser
     from benchbox.core.query_plans.parsers.sqlite import SQLiteQueryPlanParser
 
     registry = ParserRegistry()
@@ -224,6 +225,10 @@ def _create_default_registry() -> ParserRegistry:
     registry.register("trino", "0.0.0", PrestoTrinoQueryPlanParser)
     registry.register("starburst", "0.0.0", PrestoTrinoQueryPlanParser)
     registry.register("athena", "0.0.0", PrestoTrinoQueryPlanParser)
+
+    # Register Spark parser (shared by Spark and Databricks, which runs Spark SQL).
+    registry.register("spark", "0.0.0", SparkQueryPlanParser)
+    registry.register("databricks", "0.0.0", SparkQueryPlanParser)
 
     return registry
 
