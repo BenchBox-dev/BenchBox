@@ -303,11 +303,17 @@ class MotherDuckAdapter(PlatformAdapter):
                 "error": None,
             }
 
-            # Display plan in console when --show-query-plans is active.
-            self.display_query_plan_if_enabled(conn, query, query_id)
-
-            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
+            # Capture and merge structured query plan (SUCCESS-guarded in the helper).
+            # Run capture first so display can reuse the result when capture is active.
             self._merge_plan_capture_into_result(result_dict, conn, query, query_id)
+
+            # Display plan in console when --show-query-plans is active.
+            # Skip when capture_plans is also active: MotherDuck's get_query_plan() uses
+            # EXPLAIN ANALYZE which physically re-executes the query. Capture already ran
+            # EXPLAIN ANALYZE above, so a second call here would execute the query a third
+            # time. Users can inspect the captured plan from result_dict["query_plan"].
+            if not self.capture_plans:
+                self.display_query_plan_if_enabled(conn, query, query_id)
 
             return result_dict
         except Exception as e:
