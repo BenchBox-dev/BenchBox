@@ -42,12 +42,20 @@ Stability guarantees (what a stable fingerprint means):
     different table size). Treat full stats-independence as a property of
     scan-shaped/leaf plans and of engines that keep estimates out of operator
     detail — verify per engine before relying on it for non-trivial plans.
-  - **Logical, not physical.** The signature is built from the *logical*
-    operator tree, so the physical access method is NOT reflected: an index scan
-    and a sequential scan of the same table both normalize to a logical ``Scan``
-    and hash the same. Consequently, adding an index — even one the planner then
-    uses — does NOT change the fingerprint as long as the logical shape is
-    unchanged. Index choice is a physical/cost detail, deliberately excluded.
+  - **Logical, not physical — with an engine-dependent caveat.** The signature is
+    built from the *logical* operator tree, so the physical access method is
+    generally NOT reflected: an index scan and a sequential scan of the same table
+    both normalize to a logical ``Scan``. On engines where the predicate is the
+    same regardless of access method, adding an index does NOT change the
+    fingerprint. **However, index-addition stability is not universal:** some
+    engines expose the predicate differently per access method, and the parser
+    captures only one form. On **PostgreSQL**, a sequential scan exposes the
+    predicate as ``Filter`` (which the parser records in ``filter_expressions`` —
+    structural and hashed) while an index scan exposes it as ``Index Cond`` (which
+    the parser does NOT record), so adding an index that flips ``Filter`` →
+    ``Index Cond`` for the same table/predicate *does* change the fingerprint, and
+    bitmap plans can add child nodes that further change it. Treat index-addition
+    stability as a property to verify per engine, not a guarantee.
   - **Logical-shape sensitive.** What DOES change the fingerprint is a change in
     the logical tree: join order or join type, an added aggregation (GROUP BY),
     sort, projection change, LIMIT/OFFSET, or filter predicates *where the

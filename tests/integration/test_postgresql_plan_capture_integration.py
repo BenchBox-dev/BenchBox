@@ -24,6 +24,7 @@ from benchbox.platforms.postgresql import PostgreSQLAdapter
 
 pytestmark = [
     pytest.mark.integration,
+    pytest.mark.medium,  # required speed marker; module still skips without POSTGRESQL_HOST
     pytest.mark.skipif(
         not os.environ.get("POSTGRESQL_HOST"),
         reason="live PostgreSQL not available (POSTGRESQL_HOST unset)",
