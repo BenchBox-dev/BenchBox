@@ -138,6 +138,27 @@ class TestPostgreSQLPlanCapture:
         assert "ANALYZE" not in call_args.upper(), f"EXPLAIN ANALYZE must not be used for DML query: {dml_query!r}"
         assert "FORMAT JSON" in call_args.upper()
 
+    @pytest.mark.parametrize(
+        "write_ddl",
+        [
+            "CREATE TABLE t2 AS SELECT * FROM t",
+            "CREATE MATERIALIZED VIEW mv AS SELECT * FROM t",
+            "SELECT * INTO t2 FROM t",
+        ],
+    )
+    def test_get_query_plan_ctas_omits_analyze(self, adapter, write_ddl):
+        """CTAS/CMV/SELECT-INTO materialize rows; EXPLAIN ANALYZE would write them twice."""
+        cursor = MagicMock()
+        cursor.fetchall.return_value = [('{"Plan":{}}',)]
+        conn = MagicMock()
+        conn.cursor.return_value = cursor
+
+        adapter.get_query_plan(conn, write_ddl)
+
+        call_args = cursor.execute.call_args[0][0]
+        assert "ANALYZE" not in call_args.upper(), f"EXPLAIN ANALYZE must not be used for write DDL: {write_ddl!r}"
+        assert "FORMAT JSON" in call_args.upper()
+
     def test_get_query_plan_select_uses_analyze(self, adapter):
         """SELECT queries must still use EXPLAIN ANALYZE for actual timing data."""
         cursor = MagicMock()

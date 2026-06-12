@@ -40,10 +40,42 @@ class TestIsDmlQueryHelper:
     @pytest.mark.parametrize(
         "query",
         [
+            "CREATE TABLE t AS SELECT * FROM s",
+            "create or replace table t as select 1",
+            "CREATE TEMP TABLE t AS SELECT 1",
+            "CREATE TEMPORARY TABLE t AS (SELECT 1)",
+            "CREATE UNLOGGED TABLE t AS SELECT 1",
+            "CREATE TABLE t (a, b) AS SELECT x, y FROM s",  # CTAS with column alias list
+            "CREATE TABLE t AS\nWITH cte AS (SELECT 1) SELECT * FROM cte",
+            "CREATE TABLE t AS VALUES (1), (2)",
+            "/* banner */ CREATE TABLE t AS SELECT 1",
+            "CREATE MATERIALIZED VIEW v AS SELECT 1",
+            "CREATE OR REPLACE MATERIALIZED VIEW v AS (SELECT * FROM t)",
+            "SELECT * INTO new_t FROM t",
+            "select x into archive_t from t where x > 1",
+        ],
+    )
+    def test_write_producing_ddl_detected(self, query):
+        from benchbox.platforms.base.result_capture import is_dml_query
+
+        assert is_dml_query(query) is True
+
+    @pytest.mark.parametrize(
+        "query",
+        [
             "SELECT 1",
             "WITH cte AS (SELECT 1) SELECT * FROM cte",
             "SELECT copy_total, merge_flag FROM t",  # identifiers, not verbs (word boundary)
-            "CREATE TABLE t (id INT)",  # DDL is excluded
+            "CREATE TABLE t (id INT)",  # column DDL writes no rows
+            "CREATE TABLE t (x INT GENERATED ALWAYS AS (x + 1) STORED)",  # generated column AS is not CTAS
+            "CREATE TABLE t (note TEXT DEFAULT 'AS SELECT')",  # literal inside column DDL is not CTAS
+            "CREATE INDEX idx ON t (id)",
+            "CREATE VIEW v AS SELECT 1",  # plain view stores no rows
+            "DROP TABLE t",
+            "ALTER TABLE t ADD COLUMN y INT",
+            "TRUNCATE TABLE t",
+            "SELECT * FROM t WHERE note = 'INTO the void'",  # INTO inside a string literal
+            "SELECT * FROM (SELECT 1 INTO_X) sub",  # parenthesized, not a top-level INTO
             "EXPLAIN SELECT 1",
             "",
             "-- only a comment",
@@ -100,11 +132,33 @@ class TestDuckDBDMLPlanGuard:
         assert "ANALYZE" not in conn.execute.call_args[0][0].upper(), f"DML must not run ANALYZE: {dml!r}"
 
     @pytest.mark.parametrize(
+        "write_ddl",
+        [
+            "CREATE TABLE t2 AS SELECT * FROM t",
+            "CREATE OR REPLACE TABLE t2 AS SELECT * FROM t",
+            "CREATE MATERIALIZED VIEW mv AS SELECT * FROM t",
+            "SELECT * INTO t2 FROM t",
+        ],
+    )
+    def test_ctas_query_does_not_use_analyze(self, write_ddl):
+        """CTAS/CMV/SELECT-INTO materialize rows; EXPLAIN ANALYZE would write them twice."""
+        adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = [("logical_plan", "{}")]
+
+        adapter.get_query_plan(conn, write_ddl)
+
+        called_sql = conn.execute.call_args[0][0].upper()
+        assert "ANALYZE" not in called_sql, f"Write DDL must not run EXPLAIN ANALYZE: {called_sql}"
+        assert "FORMAT JSON" in called_sql
+
+    @pytest.mark.parametrize(
         "non_dml",
         [
             "SELECT * FROM t WHERE id = 1",
             "WITH cte AS (SELECT 1) SELECT * FROM cte",
             "SELECT copy_count, update_ts FROM t",  # column names starting with DML verbs
+            "CREATE TABLE t (id INT)",  # column DDL writes no rows
         ],
     )
     def test_non_dml_query_still_uses_analyze(self, non_dml):
