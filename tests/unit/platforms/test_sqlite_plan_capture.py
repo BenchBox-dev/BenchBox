@@ -249,3 +249,47 @@ class TestSQLiteParserModernFormat:
             dag = parser.parse_explain_output("test_q", plan_text)
             assert dag is not None
             assert dag.logical_root is not None
+
+
+class TestSQLiteStrictPlanCapture:
+    """strict_plan_capture must propagate PlanCaptureError from execute_query.
+
+    The capture call sits OUTSIDE execute_query's broad except: a capture
+    failure on a successful query must surface as PlanCaptureError in strict
+    mode, not mislabel the query status=FAILED.
+    """
+
+    @staticmethod
+    def _break_plan_capture(adapter, monkeypatch):
+        def boom(connection, query, explain_options=None):
+            raise RuntimeError("EXPLAIN blew up")
+
+        monkeypatch.setattr(adapter, "get_query_plan", boom)
+
+    def test_strict_capture_failure_propagates(self, conn, monkeypatch):
+        from benchbox.core.errors import PlanCaptureError
+
+        adapter = SQLiteAdapter(capture_plans=True, strict_plan_capture=True)
+        self._break_plan_capture(adapter, monkeypatch)
+
+        with pytest.raises(PlanCaptureError):
+            adapter.execute_query(conn, "SELECT * FROM orders", "q_strict", validate_row_count=False)
+
+    def test_non_strict_capture_failure_is_silent(self, conn, monkeypatch):
+        adapter = SQLiteAdapter(capture_plans=True, strict_plan_capture=False)
+        self._break_plan_capture(adapter, monkeypatch)
+
+        result = adapter.execute_query(conn, "SELECT * FROM orders", "q_nonstrict", validate_row_count=False)
+
+        assert result["status"] == "SUCCESS"
+        assert "query_plan" not in result
+        assert result["rows_returned"] == 2
+
+    def test_strict_mode_does_not_mask_real_query_failure(self, conn):
+        """A genuine SQL error must still return status=FAILED, not raise."""
+        adapter = SQLiteAdapter(capture_plans=True, strict_plan_capture=True)
+
+        result = adapter.execute_query(conn, "SELECT * FROM no_such_table", "q_bad", validate_row_count=False)
+
+        assert result["status"] == "FAILED"
+        assert result["error"]
