@@ -284,11 +284,12 @@ def q15_v7_expression_impl(ctx: DataFrameContext) -> Any:
 
     max_revenue = ctx.scalar(revenue.select(col("total_revenue").max().alias("max_rev")))
 
-    # Reversed join: revenue → supplier
+    # Reversed join: revenue → supplier. The join keeps the left key
+    # (supplier_no) and drops s_suppkey, so alias it back for the projection.
     return (
         revenue.filter(col("total_revenue") == lit(max_revenue))
         .join(supplier, left_on="supplier_no", right_on="s_suppkey")
-        .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
+        .select(col("supplier_no").alias("s_suppkey"), "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
 

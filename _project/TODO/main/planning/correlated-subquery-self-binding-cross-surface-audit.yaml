@@ -21,6 +21,20 @@ description: |
      same way, but the equivalent mistake - joining/filtering on the inner frame
      instead of the outer row - is possible and equally silent.
 
+     Review evidence (PR #770): the DataFrame variants are INDEPENDENT designs,
+     not mirrors of the SQL variants - e.g. DataFrame q9_v10 is an algebraic
+     reformulation while SQL q9_v10 had nation-bucketing/clamping defects. None
+     of the 24 SQL-side divergences PR #770 fixed has a mirrored DataFrame
+     analog, but the same variant ID means a DIFFERENT transformation per
+     surface, so the SQL equivalence gate proves nothing about this surface.
+
+     NOTE: broad DataFrame result-equivalence vs canonical TPC-H is now owned by
+     its own work item, tpchavoc-dataframe-variant-equivalence-gate. THIS audit's
+     DataFrame scope is the narrower, targeted self-binding / inner-frame-
+     correlation check on the correlated queries (Q2, Q11, Q17, Q20, Q21, Q22);
+     run it alongside, or fold it into, that gate rather than duplicating the
+     harness.
+
   2. Other SQL benchmarks with correlated subqueries: TPC-DS, SSB, join-order,
      read-primitives (subquery category), and write-primitives
      (update_with_subquery). Grep evidence already shows correlated patterns and

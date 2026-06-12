@@ -97,7 +97,13 @@ variants:
   description: 'UNION ALL: Split query into parts and union'
   sql: |2
 
-    select * from (
+    select
+        s_suppkey,
+        s_name,
+        s_address,
+        s_phone,
+        total_revenue
+    from (
         select
             s_suppkey,
             s_name,

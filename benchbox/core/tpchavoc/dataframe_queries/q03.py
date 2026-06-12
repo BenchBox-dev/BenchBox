@@ -20,6 +20,12 @@ from benchbox.core.tpch.dataframe_queries import (
 )
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SORT, build_yaml_variants
 
+# TPC-H spec output order for Q3: (orderkey, revenue, o_orderdate, o_shippriority).
+# The expression-family joins keep the left key (o_orderkey); pandas merges keep
+# both keys and the impls group on l_orderkey - the values are identical.
+_EXPR_RESULT_COLUMNS = ("o_orderkey", "revenue", "o_orderdate", "o_shippriority")
+_PANDAS_RESULT_COLUMNS = ["l_orderkey", "revenue", "o_orderdate", "o_shippriority"]
+
 # ---------------------------------------------------------------------------
 # v1: baseline
 # ---------------------------------------------------------------------------
@@ -59,6 +65,7 @@ def q3_v2_expression_impl(ctx: DataFrameContext) -> Any:
         .join(filtered_lineitem, left_on="o_orderkey", right_on="l_orderkey")
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select(*_EXPR_RESULT_COLUMNS)
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
@@ -83,7 +90,7 @@ def q3_v2_pandas_impl(ctx: DataFrameContext) -> Any:
 
     return (
         joined.groupby(["l_orderkey", "o_orderdate", "o_shippriority"], as_index=False)
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[_PANDAS_RESULT_COLUMNS]
         .sort_values(["revenue", "o_orderdate"], ascending=[False, True])
         .head(10)
     )
@@ -122,6 +129,7 @@ def q3_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .filter(col("l_shipdate") > lit(order_date))
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select(*_EXPR_RESULT_COLUMNS)
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
@@ -149,7 +157,7 @@ def q3_v3_pandas_impl(ctx: DataFrameContext) -> Any:
 
     return (
         joined.groupby(["l_orderkey", "o_orderdate", "o_shippriority"], as_index=False)
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[_PANDAS_RESULT_COLUMNS]
         .sort_values(["revenue", "o_orderdate"], ascending=[False, True])
         .head(10)
     )
@@ -184,7 +192,7 @@ def q3_v4_expression_impl(ctx: DataFrameContext) -> Any:
         (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue")
     )
     # Step 5: sort and limit
-    return aggregated.sort(["revenue", "o_orderdate"], descending=[True, False]).limit(10)
+    return aggregated.select(*_EXPR_RESULT_COLUMNS).sort(["revenue", "o_orderdate"], descending=[True, False]).limit(10)
 
 
 def q3_v4_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -205,7 +213,7 @@ def q3_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     aggregated = after_cutoff.groupby(["l_orderkey", "o_orderdate", "o_shippriority"], as_index=False).agg(
         revenue=("revenue", "sum")
     )
-    return aggregated.sort_values(["revenue", "o_orderdate"], ascending=[False, True]).head(10)
+    return aggregated[_PANDAS_RESULT_COLUMNS].sort_values(["revenue", "o_orderdate"], ascending=[False, True]).head(10)
 
 
 # ---------------------------------------------------------------------------
@@ -233,6 +241,7 @@ def q3_v5_expression_impl(ctx: DataFrameContext) -> Any:
         .with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
         .agg(col("revenue").sum().alias("revenue"))
+        .select(*_EXPR_RESULT_COLUMNS)
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
@@ -255,7 +264,7 @@ def q3_v5_pandas_impl(ctx: DataFrameContext) -> Any:
 
     return (
         joined.groupby(["l_orderkey", "o_orderdate", "o_shippriority"], as_index=False)
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[_PANDAS_RESULT_COLUMNS]
         .sort_values(["revenue", "o_orderdate"], ascending=[False, True])
         .head(10)
     )
@@ -279,6 +288,7 @@ def q3_v6_expression_impl(ctx: DataFrameContext) -> Any:
         .filter(col("l_shipdate") > lit(p["order_date"]))
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select(*_EXPR_RESULT_COLUMNS)
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
@@ -313,6 +323,7 @@ def q3_v7_expression_impl(ctx: DataFrameContext) -> Any:
         .join(orders_lineitem, left_on="c_custkey", right_on="o_custkey")
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select(*_EXPR_RESULT_COLUMNS)
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
@@ -339,7 +350,7 @@ def q3_v7_pandas_impl(ctx: DataFrameContext) -> Any:
 
     return (
         joined.groupby(["l_orderkey", "o_orderdate", "o_shippriority"], as_index=False)
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[_PANDAS_RESULT_COLUMNS]
         .sort_values(["revenue", "o_orderdate"], ascending=[False, True])
         .head(10)
     )
@@ -369,6 +380,7 @@ def q3_v8_expression_impl(ctx: DataFrameContext) -> Any:
         .filter((col("o_orderdate") < lit(order_date)) & (col("l_shipdate") > lit(order_date)))
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select(*_EXPR_RESULT_COLUMNS)
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
@@ -392,7 +404,7 @@ def q3_v8_pandas_impl(ctx: DataFrameContext) -> Any:
 
     return (
         joined.groupby(["l_orderkey", "o_orderdate", "o_shippriority"], as_index=False)
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[_PANDAS_RESULT_COLUMNS]
         .sort_values(["revenue", "o_orderdate"], ascending=[False, True])
         .head(10)
     )
@@ -425,7 +437,7 @@ def q3_v9_pandas_impl(ctx: DataFrameContext) -> Any:
 
     return (
         joined.groupby(["l_orderkey", "o_orderdate", "o_shippriority"], as_index=False)
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[_PANDAS_RESULT_COLUMNS]
         .sort_values(["revenue", "o_orderdate"], ascending=[False, True])
         .head(10)
     )
@@ -457,6 +469,7 @@ def q3_v10_expression_impl(ctx: DataFrameContext) -> Any:
         .filter(col("l_shipdate") > lit(order_date))
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
         .agg(revenue_alt.sum().alias("revenue"))
+        .select(*_EXPR_RESULT_COLUMNS)
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
@@ -481,7 +494,7 @@ def q3_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 
     return (
         joined.groupby(["l_orderkey", "o_orderdate", "o_shippriority"], as_index=False)
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[_PANDAS_RESULT_COLUMNS]
         .sort_values(["revenue", "o_orderdate"], ascending=[False, True])
         .head(10)
     )

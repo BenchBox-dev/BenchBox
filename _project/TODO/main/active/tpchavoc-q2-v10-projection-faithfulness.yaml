@@ -2,7 +2,7 @@ id: tpchavoc-q2-v10-projection-faithfulness
 title: "Fix q2_v10 projection that zeroes negative s_acctbal, and sweep variants for the same projection-faithfulness class"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Under Review
 category: Testing and Quality Assurance
 
 description: |

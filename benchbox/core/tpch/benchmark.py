@@ -260,7 +260,10 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         """
         src = (base_dialect or "netezza").lower()
         tgt = (dialect or src).lower()
-        int_queries = self.query_manager.get_all_queries()
+        # Render scale-dependent parameters (e.g. Q11's 0.0001/SF value threshold)
+        # at the benchmark's actual scale factor, not the SF=1 default, so the
+        # run path stays scale-faithful for both TPC-H and TPC-Havoc variants.
+        int_queries = self.query_manager.get_all_queries(scale_factor=self.scale_factor)
         base_queries = {str(k): v for k, v in int_queries.items()}
         translated_queries = {}
         for query_id, query in base_queries.items():

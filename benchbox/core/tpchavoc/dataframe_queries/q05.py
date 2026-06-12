@@ -336,13 +336,15 @@ def q5_v7_expression_impl(ctx: DataFrameContext) -> Any:
         left_on="n_regionkey",
         right_on="r_regionkey",
     )
+    # customer is the left side here, so the join keeps c_nationkey and drops
+    # n_nationkey; c_nationkey carries the same value for the supplier match.
     asia_customers = customer.join(asia_nations, left_on="c_nationkey", right_on="n_nationkey")
     customer_orders = asia_customers.join(orders, left_on="c_custkey", right_on="o_custkey").filter(
         (col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date))
     )
     return (
         customer_orders.join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-        .join(supplier, left_on=["l_suppkey", "n_nationkey"], right_on=["s_suppkey", "s_nationkey"])
+        .join(supplier, left_on=["l_suppkey", "c_nationkey"], right_on=["s_suppkey", "s_nationkey"])
         .group_by("n_name")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
         .sort("revenue", descending=True)

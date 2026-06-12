@@ -456,7 +456,7 @@ variants:
   sql: |2
 
     select
-        case when s_acctbal > 0 then s_acctbal else 0 end as s_acctbal,
+        s_acctbal,
         case when s_name is not null then s_name else 'UNKNOWN' end as s_name,
         case when n_name is not null then n_name else 'UNKNOWN' end as n_name,
         p_partkey,
@@ -488,7 +488,7 @@ variants:
               and r_name = 'EUROPE'
         )
     order by
-        case when s_acctbal > 0 then s_acctbal else 0 end desc,
+        s_acctbal desc,
         case when n_name is not null then n_name else 'ZZZZZ' end,
         case when s_name is not null then s_name else 'ZZZZZ' end,
         p_partkey
