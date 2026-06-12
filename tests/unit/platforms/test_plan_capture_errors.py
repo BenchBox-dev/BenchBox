@@ -176,7 +176,7 @@ def test_capture_timeout_returns_promptly() -> None:
         release_explain.set()
 
     assert plan is None
-    assert elapsed < 10, f"capture_query_plan blocked for {elapsed:.1f}s after timeout - shutdown(wait=True) regression"
+    assert elapsed < 5, f"capture_query_plan blocked for {elapsed:.1f}s after timeout - blocking-shutdown regression"
     assert capture_time_ms >= 1000  # the timeout itself was still honored
     assert adapter.plan_capture_failures == 1
     assert adapter.plan_capture_errors[0]["reason"] == "timeout"
@@ -205,7 +205,7 @@ def test_capture_timeout_strict_mode_raises_promptly() -> None:
     finally:
         release_explain.set()
 
-    assert elapsed < 10, f"strict-mode timeout blocked for {elapsed:.1f}s - shutdown(wait=True) regression"
+    assert elapsed < 5, f"strict-mode timeout blocked for {elapsed:.1f}s - blocking-shutdown regression"
     assert adapter.plan_capture_errors[0]["reason"] == "timeout"
 
 

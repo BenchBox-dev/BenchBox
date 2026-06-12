@@ -24,7 +24,6 @@ Instance attributes these methods read (initialized on the host adapter):
 
 from __future__ import annotations
 
-import concurrent.futures
 import logging
 import math
 import os
@@ -55,6 +54,7 @@ from benchbox.platforms.base.runtime_metadata import build_default_normalized_re
 from benchbox.platforms.base.utils import is_non_interactive
 from benchbox.utils.clock import elapsed_seconds
 from benchbox.utils.printing import quiet_console
+from benchbox.utils.timeout_manager import run_with_timeout
 
 try:
     from benchbox.core.results.models import ExecutionPhases, QueryDefinition
@@ -780,22 +780,41 @@ class ResultCaptureMixin:
 
         start_time = time.perf_counter()
 
-        # Apply timeout protection for the EXPLAIN query. The executor is managed
-        # explicitly rather than via `with`: the context manager's __exit__ calls
-        # shutdown(wait=True), which blocks on the still-running EXPLAIN thread
-        # even after TimeoutError — making the timeout cosmetic. shutdown in the
-        # finally uses wait=False on every path, so a timed-out capture returns
-        # control promptly; the abandoned thread keeps running (holding the
-        # connection) until the database returns, which is acceptable because
-        # capture_query_plan does not reuse the connection afterwards.
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        # Apply timeout protection for the EXPLAIN query. run_with_timeout runs
+        # get_query_plan on a daemon thread and returns promptly when the timeout
+        # fires. (The previous `with ThreadPoolExecutor` implementation blocked in
+        # shutdown(wait=True) on exit even after TimeoutError, so the timeout was
+        # cosmetic: a runaway EXPLAIN still stalled the caller until the database
+        # returned.) Trade-off, accepted by design: after a timeout the abandoned
+        # EXPLAIN thread keeps running — holding the connection — until the
+        # database returns, so a subsequent query issued on the same connection
+        # may contend with it. The previous behavior (stalling the runner for the
+        # full EXPLAIN duration) was strictly worse; full isolation is tracked by
+        # query-plan-capture-isolation-phase-design.
         try:
-            future = executor.submit(self.get_query_plan, connection, query)
-            explain_output = future.result(timeout=self.plan_capture_timeout_seconds)
-        except concurrent.futures.TimeoutError:
+            explain_output, timed_out = run_with_timeout(
+                self.get_query_plan,
+                self.plan_capture_timeout_seconds,
+                f"plan capture EXPLAIN (query_id={query_id})",
+                connection,
+                query,
+            )
+        except PlanCaptureError:
+            raise
+        except Exception as exc:
+            capture_time_ms = (time.perf_counter() - start_time) * 1000
+            self._record_plan_capture_failure(
+                query_id,
+                reason="explain_failed",
+                message=str(exc),
+            )
+            return None, capture_time_ms
+
+        if timed_out:
             capture_time_ms = (time.perf_counter() - start_time) * 1000
             self.logger.warning(
-                "Query plan capture timed out for %s after %ds (%.2fms elapsed)",
+                "Query plan capture timed out for %s after %ds (%.2fms elapsed); "
+                "the EXPLAIN may still be running on the connection until the database returns",
                 query_id,
                 self.plan_capture_timeout_seconds,
                 capture_time_ms,
@@ -807,18 +826,6 @@ class ResultCaptureMixin:
                 log_warning=False,
             )
             return None, capture_time_ms
-        except PlanCaptureError:
-            raise
-        except Exception as exc:
-            capture_time_ms = (time.perf_counter() - start_time) * 1000
-            self._record_plan_capture_failure(
-                query_id,
-                reason="explain_failed",
-                message=str(exc),
-            )
-            return None, capture_time_ms
-        finally:
-            executor.shutdown(wait=False)
 
         if not explain_output:
             capture_time_ms = (time.perf_counter() - start_time) * 1000
