@@ -135,9 +135,7 @@ class TestPostgreSQLPlanCapture:
         adapter.get_query_plan(conn, dml_query)
 
         call_args = cursor.execute.call_args[0][0]
-        assert "ANALYZE" not in call_args.upper(), (
-            f"EXPLAIN ANALYZE must not be used for DML query: {dml_query!r}"
-        )
+        assert "ANALYZE" not in call_args.upper(), f"EXPLAIN ANALYZE must not be used for DML query: {dml_query!r}"
         assert "FORMAT JSON" in call_args.upper()
 
     def test_get_query_plan_select_uses_analyze(self, adapter):
