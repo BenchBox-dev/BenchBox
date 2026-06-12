@@ -1246,8 +1246,6 @@ class AthenaAdapter(PlatformAdapter):
                 "cost_usd": cost,
             }
 
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             return {
@@ -1260,6 +1258,22 @@ class AthenaAdapter(PlatformAdapter):
             }
         finally:
             cursor.close()
+
+        # Capture outside the try so that, in strict_plan_capture mode, a
+        # PlanCaptureError propagates (matching PrestoTrinoAdapterBase / PostgreSQL)
+        # rather than being swallowed by the broad `except` above and mislabeled
+        # as a failed query. Only runs on SUCCESS; capture_query_plan opens its own
+        # cursor (the query cursor is already closed by `finally`). When
+        # strict_plan_capture is False, capture_query_plan never raises.
+        if self.capture_plans and result_dict.get("status") == "SUCCESS":
+            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+            if query_plan:
+                result_dict["query_plan"] = query_plan
+                result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
+            if plan_capture_time_ms is not None:
+                result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+
+        return result_dict
 
     def get_cost_summary(self) -> dict[str, Any]:
         """Get cost summary for the benchmark run."""
@@ -1292,10 +1306,29 @@ class AthenaAdapter(PlatformAdapter):
         return normalize_table_name_in_sql(sql)
 
     def get_query_plan(self, connection: Any, query: str) -> str:
-        """Get query execution plan."""
-        from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
+        """Get the query execution plan as ``EXPLAIN (FORMAT JSON)``.
 
-        return get_query_plan_from_cursor(connection, query)
+        Athena runs the Presto engine, so its EXPLAIN JSON is parsed by
+        PrestoTrinoQueryPlanParser. EXPLAIN does not execute the query, so this
+        does not scan data or incur cost. If a given Athena engine version
+        returns a non-JSON plan, the parser degrades gracefully (returns None).
+        """
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"EXPLAIN (FORMAT JSON) {query}")
+            plan_rows = cursor.fetchall()
+            return "\n".join(str(row[0]) for row in plan_rows)
+        except Exception as e:
+            self.logger.debug(f"Could not get query plan: {e}")
+            return f"Could not get query plan: {e}"
+        finally:
+            cursor.close()
+
+    def get_query_plan_parser(self):
+        """Return the Presto/Trino parser (Athena uses the Presto engine)."""
+        from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
+
+        return PrestoTrinoQueryPlanParser()
 
     def close_connection(self, connection: Any) -> None:
         """Close Athena connection."""

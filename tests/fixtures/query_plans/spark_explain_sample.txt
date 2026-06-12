@@ -1,0 +1,35 @@
+== Parsed Logical Plan ==
+'Aggregate ['l_orderkey], ['l_orderkey, unresolvedalias('sum('l_quantity), None)]
++- 'Join Inner, ('l_orderkey = 'o_orderkey)
+   :- 'UnresolvedRelation [lineitem]
+   +- 'UnresolvedRelation [orders]
+
+== Analyzed Logical Plan ==
+l_orderkey: bigint, sum(l_quantity): double
+Aggregate [l_orderkey#0L], [l_orderkey#0L, sum(l_quantity#4) AS sum(l_quantity)#20]
++- Join Inner, (l_orderkey#0L = o_orderkey#10L)
+   :- SubqueryAlias lineitem
+   +- SubqueryAlias orders
+
+== Optimized Logical Plan ==
+Aggregate [l_orderkey#0L], [l_orderkey#0L, sum(l_quantity#4) AS sum(l_quantity)#20]
++- Project [l_orderkey#0L, l_quantity#4]
+   +- Join Inner, (l_orderkey#0L = o_orderkey#10L)
+      :- Filter isnotnull(l_orderkey#0L)
+      :  +- Relation default.lineitem[l_orderkey#0L,l_quantity#4] parquet
+      +- Filter isnotnull(o_orderkey#10L)
+         +- Relation default.orders[o_orderkey#10L] parquet
+
+== Physical Plan ==
+*(3) HashAggregate(keys=[l_orderkey#0L], functions=[sum(l_quantity#4)])
++- Exchange hashpartitioning(l_orderkey#0L, 200), ENSURE_REQUIREMENTS, [plan_id=42]
+   +- *(2) HashAggregate(keys=[l_orderkey#0L], functions=[partial_sum(l_quantity#4)])
+      +- *(2) Project [l_orderkey#0L, l_quantity#4]
+         +- *(2) BroadcastHashJoin [l_orderkey#0L], [o_orderkey#10L], Inner, BuildRight
+            :- *(2) Filter isnotnull(l_orderkey#0L)
+            :  +- *(2) ColumnarToRow
+            :     +- FileScan parquet default.lineitem[l_orderkey#0L,l_quantity#4] Batched: true
+            +- BroadcastExchange HashedRelationBroadcastMode(List(input[0, bigint, false])), [plan_id=37]
+               +- *(1) Filter isnotnull(o_orderkey#10L)
+                  +- *(1) ColumnarToRow
+                     +- FileScan parquet default.orders[o_orderkey#10L] Batched: true

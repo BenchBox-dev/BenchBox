@@ -1,0 +1,40 @@
+{
+  "id": "9",
+  "name": "Output",
+  "identifier": "[regionkey, _col1]",
+  "details": "",
+  "children": [
+    {
+      "id": "247",
+      "name": "Aggregate(FINAL)",
+      "identifier": "[regionkey]",
+      "details": "count := \"count\"(\"count_8\")",
+      "children": [
+        {
+          "id": "198",
+          "name": "InnerJoin",
+          "identifier": "[(\"regionkey\" = \"regionkey_4\")]",
+          "details": "Distribution: PARTITIONED",
+          "children": [
+            {
+              "id": "0",
+              "name": "TableScan",
+              "identifier": "[tpch:nation:sf1.0]",
+              "details": "table = tpch:nation\nregionkey := tpch:regionkey",
+              "children": []
+            },
+            {
+              "id": "1",
+              "name": "TableScan",
+              "identifier": "[tpch:region:sf1.0]",
+              "details": "table = tpch:region\nregionkey_4 := tpch:regionkey",
+              "children": []
+            }
+          ]
+        }
+      ],
+      "remoteSources": []
+    }
+  ],
+  "remoteSources": []
+}

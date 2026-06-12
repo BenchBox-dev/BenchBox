@@ -1,0 +1,59 @@
+{
+  "id": "6",
+  "name": "Output",
+  "descriptor": {"columnNames": "[regionkey, _col1]"},
+  "outputs": [
+    {"symbol": "regionkey", "type": "bigint"},
+    {"symbol": "count", "type": "bigint"}
+  ],
+  "details": [],
+  "estimates": [{"outputRowCount": 5.0, "outputSizeInBytes": 90.0}],
+  "children": [
+    {
+      "id": "200",
+      "name": "Limit",
+      "descriptor": {"count": "5", "withTies": "", "inputPreSortedBy": "[]"},
+      "details": [],
+      "children": [
+        {
+          "id": "100",
+          "name": "Aggregate",
+          "descriptor": {"type": "FINAL", "keys": "[regionkey]", "hash": "[]"},
+          "details": ["count := count(\"count_0\")"],
+          "children": [
+            {
+              "id": "150",
+              "name": "InnerJoin",
+              "descriptor": {"criteria": "(\"regionkey\" = \"regionkey_4\")", "hash": "[]"},
+              "details": ["Distribution: PARTITIONED"],
+              "children": [
+                {
+                  "id": "120",
+                  "name": "Filter",
+                  "descriptor": {"filterPredicate": "(\"nationkey\" > BIGINT '5')"},
+                  "details": [],
+                  "children": [
+                    {
+                      "id": "0",
+                      "name": "TableScan",
+                      "descriptor": {"table": "tpch:nation:sf1.0"},
+                      "details": ["regionkey := tpch:regionkey", "nationkey := tpch:nationkey"],
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "1",
+                  "name": "TableScan",
+                  "descriptor": {"table": "tpch:region:sf1.0"},
+                  "details": ["regionkey_4 := tpch:regionkey"],
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
