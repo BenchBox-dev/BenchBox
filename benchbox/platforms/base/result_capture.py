@@ -75,33 +75,43 @@ _DML_LEADING_RE = re.compile(r"^(?:INSERT|UPDATE|DELETE|MERGE|COPY)\b", re.IGNOR
 # CTE-prefixed DML (``WITH cte AS (...) INSERT INTO ...``). COPY is excluded:
 # it cannot appear inside a CTE, and its leading form is already caught above.
 _DML_AFTER_CTE_RE = re.compile(r"\b(?:INSERT|UPDATE|DELETE|MERGE)\b", re.IGNORECASE)
-# Write-producing DDL: CREATE TABLE ... AS <query> (CTAS) and
+# Write-producing DDL prefixes: CREATE TABLE ... AS <query> (CTAS) and
 # CREATE MATERIALIZED VIEW ... AS <query>. Both materialize the query's rows,
-# so EXPLAIN ANALYZE would write them a second time. Requiring ``AS`` to be
-# followed by a query keyword (optionally parenthesized) keeps plain column
-# DDL out: a generated column's ``GENERATED ALWAYS AS (expr)`` is followed by
-# an expression, not SELECT/WITH/VALUES/TABLE/FROM, so it does not match.
-_CTAS_RE = re.compile(
-    r"^CREATE\s+(?:OR\s+REPLACE\s+)?(?:GLOBAL\s+|LOCAL\s+)?(?:TEMP(?:ORARY)?\s+|UNLOGGED\s+)?TABLE\b"
-    r".*?\bAS\s*\(*\s*(?:SELECT|WITH|VALUES|TABLE|FROM)\b",
-    re.IGNORECASE | re.DOTALL,
+# so EXPLAIN ANALYZE would write them a second time. The prefix alone is not
+# enough — _has_top_level_keyword() must also find a paren-depth-0 ``AS``
+# introducing a query, which keeps plain column DDL out: a generated column's
+# ``GENERATED ALWAYS AS (expr)`` and any literal text like ``DEFAULT 'AS
+# SELECT'`` sit inside the column-definition parentheses, so they never match.
+_CREATE_TABLE_PREFIX_RE = re.compile(
+    r"^CREATE\s+(?:OR\s+REPLACE\s+)?(?:GLOBAL\s+|LOCAL\s+)?(?:TEMP(?:ORARY)?\s+|UNLOGGED\s+)?TABLE\b",
+    re.IGNORECASE,
 )
-_CREATE_MATERIALIZED_VIEW_RE = re.compile(
-    r"^CREATE\s+(?:OR\s+REPLACE\s+)?MATERIALIZED\s+VIEW\b.*?\bAS\s*\(*\s*(?:SELECT|WITH|VALUES|TABLE|FROM)\b",
-    re.IGNORECASE | re.DOTALL,
+_CREATE_MATERIALIZED_VIEW_PREFIX_RE = re.compile(
+    r"^CREATE\s+(?:OR\s+REPLACE\s+)?MATERIALIZED\s+VIEW\b",
+    re.IGNORECASE,
 )
+# ``AS`` introducing a query body: optionally parenthesized SELECT/WITH/VALUES/
+# TABLE/FROM (DuckDB allows ``CREATE TABLE t AS FROM s``; PostgreSQL allows
+# ``CREATE TABLE t2 AS TABLE t1``).
+_AS_QUERY_RE = re.compile(r"AS\s*\(*\s*(?:SELECT|WITH|VALUES|TABLE|FROM)\b", re.IGNORECASE)
 _SELECT_LEADING_RE = re.compile(r"^SELECT\b", re.IGNORECASE)
+_WITH_LEADING_RE = re.compile(r"^WITH\b", re.IGNORECASE)
 _WORD_CHARS_RE = re.compile(r"\w")
 
 
-def _select_has_top_level_into(statement: str) -> bool:
-    """Return True when a SELECT statement contains a paren-depth-0 ``INTO``.
+def _has_top_level_keyword(statement: str, keyword: str, followed_by: re.Pattern[str] | None = None) -> bool:
+    """Return True when ``keyword`` appears at paren depth 0 outside quotes.
 
-    ``SELECT ... INTO <table>`` writes rows into a new table, so it must be
-    treated as a write. The scan skips single-quoted string literals and
-    double-quoted identifiers, and ignores ``INTO`` inside parentheses so a
-    subquery's text (or a literal like ``'INTO'``) does not trigger a match.
+    Used to find the statement-level ``INTO`` of ``SELECT ... INTO <table>``
+    and the statement-level ``AS`` of CTAS / CREATE MATERIALIZED VIEW. The
+    scan skips single-quoted string literals (including ``''`` escapes) and
+    double-quoted identifiers, and ignores anything inside parentheses, so a
+    subquery's text, a literal like ``'INTO'``, or a generated-column ``AS``
+    in a column list never triggers a match. When ``followed_by`` is given,
+    the keyword only counts if that pattern matches at the keyword's position.
     """
+    keyword = keyword.upper()
+    klen = len(keyword)
     depth = 0
     i = 0
     n = len(statement)
@@ -124,10 +134,10 @@ def _select_has_top_level_into(statement: str) -> bool:
             depth += 1
         elif ch == ")":
             depth -= 1
-        elif depth == 0 and ch in "iI" and statement[i : i + 4].upper() == "INTO":
+        elif depth == 0 and ch.upper() == keyword[0] and statement[i : i + klen].upper() == keyword:
             before_ok = i == 0 or not _WORD_CHARS_RE.match(statement[i - 1])
-            after_ok = i + 4 >= n or not _WORD_CHARS_RE.match(statement[i + 4])
-            if before_ok and after_ok:
+            after_ok = i + klen >= n or not _WORD_CHARS_RE.match(statement[i + klen])
+            if before_ok and after_ok and (followed_by is None or followed_by.match(statement, i)):
                 return True
         i += 1
     return False
@@ -183,15 +193,17 @@ def is_dml_query(query: str) -> bool:
     # leading-verb check alone misses it. Conservatively treat a WITH-prefixed
     # statement that contains a DML verb as DML — worst case a read-only CTE
     # query loses ANALYZE stats, which is far cheaper than a double mutation.
-    if re.match(r"^WITH\b", statement, re.IGNORECASE) and _DML_AFTER_CTE_RE.search(statement):
+    if _WITH_LEADING_RE.match(statement) and _DML_AFTER_CTE_RE.search(statement):
         return True
     # Write-producing DDL: CTAS and CREATE MATERIALIZED VIEW ... AS materialize
     # the query's result rows, so EXPLAIN ANALYZE would write the data twice
     # (or fail on "table already exists" for the non-REPLACE form).
-    if _CTAS_RE.match(statement) or _CREATE_MATERIALIZED_VIEW_RE.match(statement):
+    if (
+        _CREATE_TABLE_PREFIX_RE.match(statement) or _CREATE_MATERIALIZED_VIEW_PREFIX_RE.match(statement)
+    ) and _has_top_level_keyword(statement, "AS", followed_by=_AS_QUERY_RE):
         return True
     # SELECT ... INTO <table> writes its result rows into a new table.
-    if _SELECT_LEADING_RE.match(statement) and _select_has_top_level_into(statement):
+    if _SELECT_LEADING_RE.match(statement) and _has_top_level_keyword(statement, "INTO"):
         return True
     return False
 

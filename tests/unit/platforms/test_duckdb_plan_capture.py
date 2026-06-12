@@ -68,6 +68,7 @@ class TestIsDmlQueryHelper:
             "SELECT copy_total, merge_flag FROM t",  # identifiers, not verbs (word boundary)
             "CREATE TABLE t (id INT)",  # column DDL writes no rows
             "CREATE TABLE t (x INT GENERATED ALWAYS AS (x + 1) STORED)",  # generated column AS is not CTAS
+            "CREATE TABLE t (note TEXT DEFAULT 'AS SELECT')",  # literal inside column DDL is not CTAS
             "CREATE INDEX idx ON t (id)",
             "CREATE VIEW v AS SELECT 1",  # plain view stores no rows
             "DROP TABLE t",
