@@ -2,7 +2,7 @@ id: query-plan-capture-strict-error-swallow
 title: "Fix strict-mode PlanCaptureError swallowing in SQLite and MotherDuck execute_query"
 worktree: platform-expansion
 priority: High
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |
@@ -36,7 +36,7 @@ prior_art:
 work:
   - id: w1
     summary: "SQLite: move _merge_plan_capture_into_result outside the execute_query try"
-    status: pending
+    status: done
     notes: |
       In benchbox/platforms/sqlite.py execute_query(), stop calling the merge helper at
       line 569 inside the try. Build/return result on the success path, then call
@@ -45,7 +45,7 @@ work:
       still short-circuit before the post-try capture.
   - id: w2
     summary: "MotherDuck: move _merge_plan_capture_into_result outside the execute_query try"
-    status: pending
+    status: done
     notes: |
       Same change in benchbox/platforms/motherduck.py: relocate the merge call at line 314
       to after the try/except so result_dict is captured outside the broad except. result_dict
@@ -53,7 +53,7 @@ work:
   - id: w3
     summary: "Add strict-mode propagation tests for SQLite and MotherDuck"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       In tests/unit/platforms/test_sqlite_plan_capture.py and test_motherduck_plan_capture.py,
       add a test that constructs the adapter with strict_plan_capture=True, monkeypatches
@@ -123,4 +123,4 @@ metadata:
   tags: [query-plan, sqlite, motherduck, correctness, strict-mode, error-handling]
   estimated_effort: "Small"
   created_date: "2026-06-11"
-  last_updated: "2026-06-11T00:00:00-04:00"
+  last_updated: "2026-06-12T00:00:00-04:00"
