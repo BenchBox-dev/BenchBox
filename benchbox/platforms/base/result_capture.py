@@ -627,7 +627,45 @@ class ResultCaptureMixin:
         for estimated-plan-only capture with no re-execution overhead.
 
         Plan fingerprints exclude timing/cardinality by design - structural comparisons
-        are unaffected by this setting.
+        are unaffected by this setting. See the plan fingerprint stability contract in
+        ``benchbox/core/results/query_plan_models.py`` for what fingerprint equality
+        does and does not guarantee.
+
+        Capture timing (pre- vs. post-execution) — design decision:
+            All adapters capture the plan AFTER the timed execution block (the
+            "post-execution" plan). This is intentional and is the supported
+            default:
+              - With ``analyze_plans=True`` it yields the *actual* plan that ran,
+                including real per-operator timing/cardinality (EXPLAIN ANALYZE) —
+                the most useful artifact for profiling.
+              - The structural fingerprint is unaffected by post- vs. pre-execution
+                timing, because it excludes costs and row estimates. A plan captured
+                before vs. after execution hashes to the same fingerprint as long as
+                the planner's chosen shape is identical.
+            A pre-execution capture mode (plan as decided before any stats change)
+            would be marginally more stable for cross-run regression detection, but
+            is NOT implemented: the fingerprint's stats-independence already provides
+            that stability, so a separate timing mode is unnecessary. If a true
+            pre-execution plan is ever required, add an opt-in
+            ``capture_plan_timing: pre | post`` config (default ``post``) here rather
+            than changing the default behavior.
+
+        Multi-stream behavior (stream_id):
+            Plan capture is per-query-execution. In a multi-stream (concurrent)
+            run, each stream executes and captures its own plan independently, so
+            the result set contains one plan record per (query_id, stream_id) — the
+            plans are NOT deduplicated or averaged, preserving per-stream provenance.
+            Because the fingerprint is structural, every stream running the same
+            query against the same schema on the same engine version is expected to
+            produce the SAME plan_fingerprint (with the engine-dependent caveat in
+            query_plan_models.py that some parsers, e.g. DuckDB, fold an estimated
+            cardinality into the signature — identical across streams as long as the
+            cardinality estimate is stable). Only the execution stats
+            (timing/per-operator cardinality) differ between streams. Consumers that
+            want a single representative plan per query should deduplicate by
+            ``plan_fingerprint``; a fingerprint mismatch across streams of the same
+            query indicates a genuine plan-shape (or estimate) divergence worth
+            investigating.
 
         Args:
             connection: Database connection
