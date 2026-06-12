@@ -58,8 +58,22 @@ def test_explicit_params_do_not_suppress_scale_substitution(manager: TPCHavocQue
 
 
 def test_no_unsubstituted_tokens_in_any_variant(manager: TPCHavocQueryManager):
-    """Every rendered variant must be free of unrendered {token} placeholders."""
+    """Every rendered variant must be free of unrendered {token} placeholders.
+
+    Covers both entry points - get_query_variant and the parameterized variant
+    path - since each merges the scale substitution independently.
+    """
     for query_id in manager.get_implemented_queries():
         for variant_id in range(1, 11):
-            sql = manager.get_query_variant(query_id, variant_id, scale_factor=0.1)
-            assert "{" not in sql and "}" not in sql, f"unsubstituted token in {query_id}_v{variant_id}"
+            for sql in (
+                manager.get_query_variant(query_id, variant_id, scale_factor=0.1),
+                manager.get_parameterized_query_variant(query_id, variant_id, scale_factor=0.1),
+            ):
+                assert "{" not in sql and "}" not in sql, f"unsubstituted token in {query_id}_v{variant_id}"
+
+
+def test_parameterized_variant_renders_scale_threshold(manager: TPCHavocQueryManager):
+    """get_parameterized_query_variant must also fill the Q11 scale token."""
+    sql = manager.get_parameterized_query_variant(11, 1, scale_factor=0.1)
+    assert "{q11_fraction}" not in sql
+    assert "0.0010000000" in sql

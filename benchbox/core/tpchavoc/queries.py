@@ -177,7 +177,7 @@ class TPCHavocQueryManager(TPCHQueries):
         return list(self.variant_generators.keys())
 
     def get_parameterized_query_variant(
-        self, query_id: int, variant_id: int, params: Optional[dict[str, Any]] = None
+        self, query_id: int, variant_id: int, params: Optional[dict[str, Any]] = None, *, scale_factor: float = 1.0
     ) -> str:
         """Get a parameterized TPC-Havoc query variant.
 
@@ -186,6 +186,7 @@ class TPCHavocQueryManager(TPCHQueries):
             variant_id: The variant ID (1-10)
             params: Optional parameter values to use
                    If None, random parameters will be generated
+            scale_factor: Scale factor for scale-dependent substitution values
 
         Returns:
             The parameterized variant query string
@@ -203,9 +204,13 @@ class TPCHavocQueryManager(TPCHQueries):
         if params is None:
             params = self._generate_random_params(query_id)
 
+        # Scale-dependent substitutions are defaults under caller/random params, so
+        # a Q11 {token} can never leak unrendered (mirrors get_query_variant).
+        merged = {**(self._variant_scale_params(query_id, scale_factor) or {}), **(params or {})}
+
         variant_generator = self.variant_generators[query_id][variant_id]
         base_query = self.get_query(query_id)
-        return variant_generator.generate(base_query, params)
+        return variant_generator.generate(base_query, merged or None)
 
     def get_all_variants_info(self, query_id: int) -> dict[int, dict[str, str | int]]:
         """Get information about all variants for a specific query.
