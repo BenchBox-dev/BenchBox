@@ -302,18 +302,6 @@ class MotherDuckAdapter(PlatformAdapter):
                 "first_row": rows[0] if rows else None,
                 "error": None,
             }
-
-            # Display plan in console when --show-query-plans is active.
-            # Skip here when --capture-plans is also active: capture_query_plan below
-            # already calls get_query_plan (running EXPLAIN ANALYZE); calling
-            # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
-            if not self.capture_plans:
-                self.display_query_plan_if_enabled(conn, query, query_id)
-
-            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
-            self._merge_plan_capture_into_result(result_dict, conn, query, query_id)
-
-            return result_dict
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             logger.error(f"Query {query_id} failed after {execution_time:.2f}s: {e}")
@@ -326,6 +314,21 @@ class MotherDuckAdapter(PlatformAdapter):
                 "error": str(e),
                 "error_type": type(e).__name__,
             }
+
+        # Display plan in console when --show-query-plans is active.
+        # Skip here when --capture-plans is also active: capture_query_plan below
+        # already calls get_query_plan (running EXPLAIN ANALYZE); calling
+        # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
+        if not self.capture_plans:
+            self.display_query_plan_if_enabled(conn, query, query_id)
+
+        # Capture and merge structured query plan (SUCCESS-guarded in the helper).
+        # Deliberately outside the try: with strict_plan_capture=True a capture
+        # failure raises PlanCaptureError, which must propagate instead of being
+        # swallowed by the broad except and mislabeling the successful query FAILED.
+        self._merge_plan_capture_into_result(result_dict, conn, query, query_id)
+
+        return result_dict
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get MotherDuck platform information for results traceability."""

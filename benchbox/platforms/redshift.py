@@ -2114,18 +2114,6 @@ class RedshiftAdapter(PlatformAdapter):
             # Map query_statistics to resource_usage for cost calculation
             result_dict["resource_usage"] = query_stats
 
-            # Display plan in console when --show-query-plans is active.
-            # Skip here when --capture-plans is also active: capture_query_plan below
-            # already calls get_query_plan (running EXPLAIN); calling
-            # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
-            if not self.capture_plans:
-                self.display_query_plan_if_enabled(connection, query, query_id)
-
-            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
-            self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
-
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             error_type = type(e).__name__
@@ -2143,6 +2131,21 @@ class RedshiftAdapter(PlatformAdapter):
             }
         finally:
             cursor.close()
+
+        # Display plan in console when --show-query-plans is active.
+        # Skip here when --capture-plans is also active: capture_query_plan below
+        # already calls get_query_plan (running EXPLAIN); calling
+        # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
+        if not self.capture_plans:
+            self.display_query_plan_if_enabled(connection, query, query_id)
+
+        # Capture and merge structured query plan (SUCCESS-guarded in the helper).
+        # Deliberately outside the try: with strict_plan_capture=True a capture
+        # failure raises PlanCaptureError, which must propagate instead of being
+        # swallowed by the broad except and mislabeling the successful query FAILED.
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
+
+        return result_dict
 
     def _extract_table_name(self, statement: str) -> str | None:
         """Extract table name from CREATE TABLE statement."""
