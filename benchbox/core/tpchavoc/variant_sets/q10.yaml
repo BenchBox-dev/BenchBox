@@ -389,8 +389,7 @@ variants:
         n_name,
         c_address,
         c_phone,
-        c_comment,
-        rank() over (order by revenue desc) as revenue_rank
+        c_comment
     from customer_revenue
     order by
         revenue desc
@@ -416,10 +415,7 @@ variants:
                 else 0
             end
         ) as revenue,
-        case
-            when c_acctbal > 0 then c_acctbal
-            else 0
-        end as c_acctbal,
+        c_acctbal,
         case
             when n_name is not null then n_name
             else 'UNKNOWN NATION'

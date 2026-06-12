@@ -15,7 +15,7 @@ variants:
         and s_nationkey = n_nationkey
         and n_name = 'GERMANY'
         and (ps_supplycost * ps_availqty) > (
-            select avg(ps2.ps_supplycost * ps2.ps_availqty) * 0.0001
+            select avg(ps2.ps_supplycost * ps2.ps_availqty) * {q11_fraction}
             from partsupp ps2, supplier s2, nation n2
             where ps2.ps_suppkey = s2.s_suppkey
               and s2.s_nationkey = n2.n_nationkey
@@ -26,7 +26,7 @@ variants:
         ps_partkey
     having
         sum(ps_supplycost * ps_availqty) > (
-            select sum(ps3.ps_supplycost * ps3.ps_availqty) * 0.0001
+            select sum(ps3.ps_supplycost * ps3.ps_availqty) * {q11_fraction}
             from partsupp ps3, supplier s3, nation n3
             where ps3.ps_suppkey = s3.s_suppkey
               and s3.s_nationkey = n3.n_nationkey
@@ -53,7 +53,7 @@ variants:
         ps_partkey
     having
         sum(ps_supplycost * ps_availqty) > (
-            select sum(ps_supplycost * ps_availqty) * 0.0001
+            select sum(ps_supplycost * ps_availqty) * {q11_fraction}
             from partsupp, supplier, nation
             where ps_suppkey = s_suppkey
               and s_nationkey = n_nationkey
@@ -80,7 +80,7 @@ variants:
         ps.ps_partkey
     having
         sum(ps.ps_supplycost * ps.ps_availqty) > (
-            select sum(ps2.ps_supplycost * ps2.ps_availqty) * 0.0001
+            select sum(ps2.ps_supplycost * ps2.ps_availqty) * {q11_fraction}
             from partsupp ps2
             inner join supplier s2 on ps2.ps_suppkey = s2.s_suppkey
             inner join nation n2 on s2.s_nationkey = n2.n_nationkey
@@ -121,7 +121,7 @@ variants:
     group by ps_partkey
     having
         sum(value) > (
-            select sum(ps_supplycost * ps_availqty) * 0.0001
+            select sum(ps_supplycost * ps_availqty) * {q11_fraction}
             from partsupp, supplier, nation
             where ps_suppkey = s_suppkey
               and s_nationkey = n_nationkey
@@ -145,7 +145,7 @@ variants:
         where ps_suppkey = s_suppkey
     ),
     total_threshold as (
-        select sum(part_value) * 0.0001 as threshold
+        select sum(part_value) * {q11_fraction} as threshold
         from inventory_values
     ),
     part_totals as (
@@ -182,7 +182,7 @@ variants:
             ps_partkey
         having
             sum(ps_supplycost * ps_availqty) > (
-                select sum(ps_supplycost * ps_availqty) * 0.0001
+                select sum(ps_supplycost * ps_availqty) * {q11_fraction}
                 from partsupp, supplier, nation
                 where ps_suppkey = s_suppkey
                   and s_nationkey = n_nationkey
@@ -210,7 +210,7 @@ variants:
         ps_partkey
     having
         sum(ps_supplycost * ps_availqty) filter (where n_name = 'GERMANY') > (
-            select sum(ps_supplycost * ps_availqty) * 0.0001
+            select sum(ps_supplycost * ps_availqty) * {q11_fraction}
             from partsupp, supplier, nation
             where ps_suppkey = s_suppkey
               and s_nationkey = n_nationkey
@@ -241,7 +241,7 @@ variants:
         ps_partkey
     having
         sum(ps_supplycost * ps_availqty) > (
-            select sum(ps_supplycost * ps_availqty) * 0.0001
+            select sum(ps_supplycost * ps_availqty) * {q11_fraction}
             from partsupp, supplier, nation
             where ps_suppkey = s_suppkey
               and s_nationkey = n_nationkey
@@ -268,7 +268,7 @@ variants:
     ),
     inventory_threshold as (
         select
-            sum(ps_supplycost * ps_availqty) * 0.0001 as threshold
+            sum(ps_supplycost * ps_availqty) * {q11_fraction} as threshold
         from partsupp, supplier, nation
         where ps_suppkey = s_suppkey
           and s_nationkey = n_nationkey
@@ -276,8 +276,7 @@ variants:
     )
     select
         ps_partkey,
-        value,
-        rank() over (order by value desc) as value_rank
+        value
     from
         inventory_values,
         inventory_threshold
@@ -321,7 +320,7 @@ variants:
         ) > (
             select
                 case
-                    when sum(ps_supplycost * ps_availqty) > 0 then sum(ps_supplycost * ps_availqty) * 0.0001
+                    when sum(ps_supplycost * ps_availqty) > 0 then sum(ps_supplycost * ps_availqty) * {q11_fraction}
                     else 0
                 end
             from partsupp, supplier, nation

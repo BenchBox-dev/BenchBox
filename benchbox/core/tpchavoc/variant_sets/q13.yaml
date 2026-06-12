@@ -224,8 +224,7 @@ variants:
     )
     select
         c_count,
-        custdist,
-        rank() over (order by custdist desc, c_count desc) as dist_rank
+        custdist
     from customer_distribution
     order by
         custdist desc,

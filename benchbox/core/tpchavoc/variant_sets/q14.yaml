@@ -174,8 +174,7 @@ variants:
     select distinct
         100.00 *
         sum(case when p_type like 'PROMO%' then l_extendedprice * (1 - l_discount) else 0 end) over () /
-        sum(l_extendedprice * (1 - l_discount)) over () as promo_revenue,
-        rank() over (order by l_partkey) as part_rank
+        sum(l_extendedprice * (1 - l_discount)) over () as promo_revenue
     from
         lineitem,
         part
@@ -183,7 +182,6 @@ variants:
         l_partkey = p_partkey
         and l_shipdate >= date '1995-09-01'
         and l_shipdate < date '1995-09-01' + interval '1' month
-    limit 1
 - id: 10
   description: 'CASE expressions: Add extensive CASE logic for promotion classification'
   sql: |2
