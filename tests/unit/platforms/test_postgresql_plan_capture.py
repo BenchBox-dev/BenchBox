@@ -114,6 +114,44 @@ class TestPostgreSQLPlanCapture:
         assert "FORMAT JSON" in call_args.upper()
         assert "FORMAT TEXT" not in call_args.upper()
 
+    @pytest.mark.parametrize(
+        "dml_query",
+        [
+            "INSERT INTO t VALUES (1)",
+            "UPDATE t SET a = 1 WHERE id = 2",
+            "DELETE FROM t WHERE id = 3",
+            "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET a = s.a",
+            "COPY t FROM '/tmp/data.csv'",
+            "  insert into t values (1)",  # leading whitespace + lowercase
+        ],
+    )
+    def test_get_query_plan_dml_omits_analyze(self, adapter, dml_query):
+        """DML queries must not include ANALYZE to prevent double-execution."""
+        cursor = MagicMock()
+        cursor.fetchall.return_value = [('{"Plan":{}}',)]
+        conn = MagicMock()
+        conn.cursor.return_value = cursor
+
+        adapter.get_query_plan(conn, dml_query)
+
+        call_args = cursor.execute.call_args[0][0]
+        assert "ANALYZE" not in call_args.upper(), f"EXPLAIN ANALYZE must not be used for DML query: {dml_query!r}"
+        assert "FORMAT JSON" in call_args.upper()
+
+    def test_get_query_plan_select_uses_analyze(self, adapter):
+        """SELECT queries must still use EXPLAIN ANALYZE for actual timing data."""
+        cursor = MagicMock()
+        cursor.fetchall.return_value = [('{"Plan":{}}',)]
+        conn = MagicMock()
+        conn.cursor.return_value = cursor
+
+        adapter.get_query_plan(conn, "SELECT count(*) FROM orders")
+
+        call_args = cursor.execute.call_args[0][0]
+        assert "ANALYZE" in call_args.upper()
+        assert "BUFFERS" in call_args.upper()
+        assert "FORMAT JSON" in call_args.upper()
+
 
 class TestPostgreSQLSubclassInheritance:
     """Verify TimescaleDB, CedarDB, and pg_mooncake inherit the parser without overrides."""

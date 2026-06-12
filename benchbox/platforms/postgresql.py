@@ -697,12 +697,25 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         query: str,
         explain_options: dict[str, Any] | None = None,
     ) -> str | None:
-        """Get query execution plan using EXPLAIN (ANALYZE, FORMAT JSON)."""
+        """Get query execution plan using EXPLAIN (FORMAT JSON).
+
+        SELECT queries include ANALYZE and BUFFERS for actual timing and I/O.
+        DML statements (INSERT/UPDATE/DELETE/MERGE/COPY) use FORMAT JSON only:
+        EXPLAIN ANALYZE physically re-executes the statement, which would mutate
+        data a second time. The plan structure is still captured; execution
+        statistics are absent for DML.
+        """
+        from benchbox.platforms.base.result_capture import is_dml_query
+
         cursor = connection.cursor()
 
         # Use FORMAT JSON so PostgreSQLQueryPlanParser can parse the output.
-        # ANALYZE and BUFFERS give actual timing and I/O info.
-        options = ["ANALYZE", "BUFFERS", "FORMAT JSON"]
+        # ANALYZE and BUFFERS give actual timing and I/O info for SELECT queries.
+        # DML queries are downgraded to FORMAT JSON only to prevent double-execution.
+        if is_dml_query(query):
+            options = ["FORMAT JSON"]
+        else:
+            options = ["ANALYZE", "BUFFERS", "FORMAT JSON"]
         if explain_options:
             if explain_options.get("verbose"):
                 options.append("VERBOSE")
