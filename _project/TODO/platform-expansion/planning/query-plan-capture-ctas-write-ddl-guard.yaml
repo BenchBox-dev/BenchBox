@@ -2,7 +2,7 @@ id: query-plan-capture-ctas-write-ddl-guard
 title: "Close the CTAS/CMV write-DDL blind spot in is_dml_query so capture does not re-execute writes"
 worktree: platform-expansion
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |
@@ -47,7 +47,7 @@ prior_art:
 work:
   - id: w1
     summary: "Extend the shared detector to recognize CTAS / CREATE MATERIALIZED VIEW AS / SELECT INTO as writes"
-    status: pending
+    status: done
     notes: |
       In benchbox/platforms/base/result_capture.py, add detection for:
         - ^CREATE (OR REPLACE )?(GLOBAL |LOCAL )?(TEMP(ORARY)? )?TABLE ... AS\b  (CTAS)
@@ -62,7 +62,7 @@ work:
   - id: w2
     summary: "Confirm DuckDB/MotherDuck get_query_plan now downgrade ANALYZE for CTAS/CMV"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       No adapter code change should be required if both call the shared helper, but
       verify that with the corrected helper, get_query_plan() uses FORMAT JSON
@@ -70,7 +70,7 @@ work:
   - id: w3
     summary: "Add unit tests for CTAS / CMV / SELECT INTO detection and the DuckDB/MotherDuck guard"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       Extend tests/unit/platforms/test_duckdb_plan_capture.py and the is_dml_query
       contract test: assert CTAS, CREATE OR REPLACE TABLE AS, CREATE MATERIALIZED
@@ -122,4 +122,4 @@ metadata:
   tags: [query-plan, duckdb, motherduck, postgresql, dml, ctas, correctness]
   estimated_effort: "Small"
   created_date: "2026-06-11"
-  last_updated: "2026-06-11T00:00:00-04:00"
+  last_updated: "2026-06-12T00:00:00-04:00"

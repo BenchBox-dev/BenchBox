@@ -50,6 +50,33 @@ class TestMotherDuckDMLPlanGuard:
         assert "ANALYZE" not in called_sql, f"DML must not run EXPLAIN ANALYZE: {called_sql}"
         assert "FORMAT JSON" in called_sql
 
+    @pytest.mark.parametrize(
+        "write_ddl",
+        [
+            "CREATE TABLE t2 AS SELECT * FROM t",
+            "CREATE OR REPLACE TABLE t2 AS SELECT * FROM t",
+            "CREATE MATERIALIZED VIEW mv AS SELECT * FROM t",
+            "SELECT * INTO t2 FROM t",
+        ],
+    )
+    def test_ctas_query_does_not_use_analyze(self, adapter, write_ddl):
+        """CTAS/CMV/SELECT-INTO materialize rows; EXPLAIN ANALYZE would write them twice."""
+        conn = _mock_conn()
+
+        adapter.get_query_plan(conn, write_ddl)
+
+        called_sql = conn.execute.call_args[0][0].upper()
+        assert "ANALYZE" not in called_sql, f"Write DDL must not run EXPLAIN ANALYZE: {called_sql}"
+        assert "FORMAT JSON" in called_sql
+
+    def test_plain_create_table_still_uses_analyze(self, adapter):
+        conn = _mock_conn()
+
+        adapter.get_query_plan(conn, "CREATE TABLE t (id INT)")
+
+        called_sql = conn.execute.call_args[0][0].upper()
+        assert "ANALYZE" in called_sql, "Column DDL writes no rows; ANALYZE must be kept"
+
     def test_select_query_still_uses_analyze(self, adapter):
         conn = _mock_conn()
 

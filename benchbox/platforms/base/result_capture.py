@@ -75,6 +75,62 @@ _DML_LEADING_RE = re.compile(r"^(?:INSERT|UPDATE|DELETE|MERGE|COPY)\b", re.IGNOR
 # CTE-prefixed DML (``WITH cte AS (...) INSERT INTO ...``). COPY is excluded:
 # it cannot appear inside a CTE, and its leading form is already caught above.
 _DML_AFTER_CTE_RE = re.compile(r"\b(?:INSERT|UPDATE|DELETE|MERGE)\b", re.IGNORECASE)
+# Write-producing DDL: CREATE TABLE ... AS <query> (CTAS) and
+# CREATE MATERIALIZED VIEW ... AS <query>. Both materialize the query's rows,
+# so EXPLAIN ANALYZE would write them a second time. Requiring ``AS`` to be
+# followed by a query keyword (optionally parenthesized) keeps plain column
+# DDL out: a generated column's ``GENERATED ALWAYS AS (expr)`` is followed by
+# an expression, not SELECT/WITH/VALUES/TABLE/FROM, so it does not match.
+_CTAS_RE = re.compile(
+    r"^CREATE\s+(?:OR\s+REPLACE\s+)?(?:GLOBAL\s+|LOCAL\s+)?(?:TEMP(?:ORARY)?\s+|UNLOGGED\s+)?TABLE\b"
+    r".*?\bAS\s*\(*\s*(?:SELECT|WITH|VALUES|TABLE|FROM)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+_CREATE_MATERIALIZED_VIEW_RE = re.compile(
+    r"^CREATE\s+(?:OR\s+REPLACE\s+)?MATERIALIZED\s+VIEW\b.*?\bAS\s*\(*\s*(?:SELECT|WITH|VALUES|TABLE|FROM)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+_SELECT_LEADING_RE = re.compile(r"^SELECT\b", re.IGNORECASE)
+_WORD_CHARS_RE = re.compile(r"\w")
+
+
+def _select_has_top_level_into(statement: str) -> bool:
+    """Return True when a SELECT statement contains a paren-depth-0 ``INTO``.
+
+    ``SELECT ... INTO <table>`` writes rows into a new table, so it must be
+    treated as a write. The scan skips single-quoted string literals and
+    double-quoted identifiers, and ignores ``INTO`` inside parentheses so a
+    subquery's text (or a literal like ``'INTO'``) does not trigger a match.
+    """
+    depth = 0
+    i = 0
+    n = len(statement)
+    while i < n:
+        ch = statement[i]
+        if ch == "'":
+            i += 1
+            while i < n:
+                if statement[i] == "'":
+                    if i + 1 < n and statement[i + 1] == "'":  # escaped '' inside literal
+                        i += 2
+                        continue
+                    break
+                i += 1
+        elif ch == '"':
+            i += 1
+            while i < n and statement[i] != '"':
+                i += 1
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif depth == 0 and ch in "iI" and statement[i : i + 4].upper() == "INTO":
+            before_ok = i == 0 or not _WORD_CHARS_RE.match(statement[i - 1])
+            after_ok = i + 4 >= n or not _WORD_CHARS_RE.match(statement[i + 4])
+            if before_ok and after_ok:
+                return True
+        i += 1
+    return False
 
 
 def _strip_leading_sql_comments(statement: str) -> str:
@@ -96,19 +152,27 @@ def _strip_leading_sql_comments(statement: str) -> str:
 
 
 def is_dml_query(query: str) -> bool:
-    """Return True for data-changing DML statements (INSERT/UPDATE/DELETE/MERGE/COPY).
+    """Return True for statements that write data when executed.
 
     Used to guard plan capture against double-execution: adapters that capture
-    plans via ``EXPLAIN ANALYZE`` (DuckDB, MotherDuck) physically re-run the
-    statement, so a DML query would mutate data twice. Callers downgrade to a
-    non-ANALYZE ``EXPLAIN`` for these statements.
+    plans via ``EXPLAIN ANALYZE`` (DuckDB, MotherDuck, PostgreSQL) physically
+    re-run the statement, so a data-writing query would mutate data twice.
+    Callers downgrade to a non-ANALYZE ``EXPLAIN`` for these statements.
 
-    Detection covers the data-modifying verbs INSERT/UPDATE/DELETE/MERGE/COPY,
-    including when they are preceded by a leading ``WITH`` CTE clause. DDL
-    (CREATE/DROP/ALTER/TRUNCATE) is intentionally excluded: DDL does not produce
-    duplicate data mutations, so it does not need the ANALYZE guard. Leading
-    line and block comments are stripped first so a commented preamble (e.g. a
-    ``/* query 12 */`` banner) does not mask the verb.
+    Detection covers the data-modifying verbs INSERT/UPDATE/DELETE/MERGE/COPY
+    (including when they are preceded by a leading ``WITH`` CTE clause) and the
+    write-producing DDL shapes that materialize a query's rows:
+
+    - ``CREATE [OR REPLACE] TABLE ... AS <query>`` (CTAS)
+    - ``CREATE [OR REPLACE] MATERIALIZED VIEW ... AS <query>``
+    - ``SELECT ... INTO <table>``
+
+    Non-writing DDL (plain ``CREATE TABLE`` with column definitions,
+    ``CREATE INDEX``, ``DROP``, ``ALTER``, ``TRUNCATE``) is intentionally
+    excluded: re-running its EXPLAIN writes no rows, so it keeps ANALYZE where
+    applicable. Leading line and block comments are stripped first so a
+    commented preamble (e.g. a ``/* query 12 */`` banner) does not mask the
+    verb.
     """
     statement = _strip_leading_sql_comments(query)
     if not statement:
@@ -120,6 +184,14 @@ def is_dml_query(query: str) -> bool:
     # statement that contains a DML verb as DML — worst case a read-only CTE
     # query loses ANALYZE stats, which is far cheaper than a double mutation.
     if re.match(r"^WITH\b", statement, re.IGNORECASE) and _DML_AFTER_CTE_RE.search(statement):
+        return True
+    # Write-producing DDL: CTAS and CREATE MATERIALIZED VIEW ... AS materialize
+    # the query's result rows, so EXPLAIN ANALYZE would write the data twice
+    # (or fail on "table already exists" for the non-REPLACE form).
+    if _CTAS_RE.match(statement) or _CREATE_MATERIALIZED_VIEW_RE.match(statement):
+        return True
+    # SELECT ... INTO <table> writes its result rows into a new table.
+    if _SELECT_LEADING_RE.match(statement) and _select_has_top_level_into(statement):
         return True
     return False
 
