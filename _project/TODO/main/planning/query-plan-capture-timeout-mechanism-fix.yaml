@@ -2,7 +2,7 @@ id: query-plan-capture-timeout-mechanism-fix
 title: "Fix plan capture timeout: ThreadPoolExecutor shutdown blocks despite TimeoutError"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Core Functionality
 
 description: |
@@ -56,7 +56,7 @@ prior_art:
 work:
   - id: w1
     summary: "Replace the with-block with explicit executor.shutdown(wait=False) on timeout"
-    status: pending
+    status: done
     notes: |
       Refactor result_capture.py:606-624:
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -79,7 +79,7 @@ work:
   - id: w2
     summary: "Add unit test asserting that a timed-out capture returns promptly"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Mock get_query_plan() to sleep for 10s. Set plan_capture_timeout_seconds=0.1.
       Assert capture_query_plan() returns (None, approx_0.1ms) in under 1 second
@@ -127,4 +127,4 @@ metadata:
   tags: [query-plan, timeout, concurrency, result_capture]
   estimated_effort: "Small"
   created_date: "2026-06-11"
-  last_updated: "2026-06-11T00:00:00-04:00"
+  last_updated: "2026-06-12T00:00:00-04:00"

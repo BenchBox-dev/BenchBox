@@ -780,27 +780,33 @@ class ResultCaptureMixin:
 
         start_time = time.perf_counter()
 
+        # Apply timeout protection for the EXPLAIN query. The executor is managed
+        # explicitly rather than via `with`: the context manager's __exit__ calls
+        # shutdown(wait=True), which blocks on the still-running EXPLAIN thread
+        # even after TimeoutError — making the timeout cosmetic. shutdown in the
+        # finally uses wait=False on every path, so a timed-out capture returns
+        # control promptly; the abandoned thread keeps running (holding the
+        # connection) until the database returns, which is acceptable because
+        # capture_query_plan does not reuse the connection afterwards.
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         try:
-            # Apply timeout protection for EXPLAIN query
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(self.get_query_plan, connection, query)
-                try:
-                    explain_output = future.result(timeout=self.plan_capture_timeout_seconds)
-                except concurrent.futures.TimeoutError:
-                    capture_time_ms = (time.perf_counter() - start_time) * 1000
-                    self.logger.warning(
-                        "Query plan capture timed out for %s after %ds (%.2fms elapsed)",
-                        query_id,
-                        self.plan_capture_timeout_seconds,
-                        capture_time_ms,
-                    )
-                    self._record_plan_capture_failure(
-                        query_id,
-                        reason="timeout",
-                        message=f"EXPLAIN query timed out after {self.plan_capture_timeout_seconds}s",
-                        log_warning=False,
-                    )
-                    return None, capture_time_ms
+            future = executor.submit(self.get_query_plan, connection, query)
+            explain_output = future.result(timeout=self.plan_capture_timeout_seconds)
+        except concurrent.futures.TimeoutError:
+            capture_time_ms = (time.perf_counter() - start_time) * 1000
+            self.logger.warning(
+                "Query plan capture timed out for %s after %ds (%.2fms elapsed)",
+                query_id,
+                self.plan_capture_timeout_seconds,
+                capture_time_ms,
+            )
+            self._record_plan_capture_failure(
+                query_id,
+                reason="timeout",
+                message=f"EXPLAIN query timed out after {self.plan_capture_timeout_seconds}s",
+                log_warning=False,
+            )
+            return None, capture_time_ms
         except PlanCaptureError:
             raise
         except Exception as exc:
@@ -811,6 +817,8 @@ class ResultCaptureMixin:
                 message=str(exc),
             )
             return None, capture_time_ms
+        finally:
+            executor.shutdown(wait=False)
 
         if not explain_output:
             capture_time_ms = (time.perf_counter() - start_time) * 1000

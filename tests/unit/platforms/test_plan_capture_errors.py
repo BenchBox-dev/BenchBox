@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Any
 
@@ -144,6 +145,68 @@ def test_plan_capture_timeout_records_failure(caplog: pytest.LogCaptureFixture) 
     assert adapter.plan_capture_errors[0]["reason"] == "timeout"
     assert "timed out" in adapter.plan_capture_errors[0]["message"]
     assert any("timed out" in record.message for record in caplog.records)
+
+
+def test_capture_timeout_returns_promptly() -> None:
+    """A timed-out capture must return control promptly, not block on the EXPLAIN thread.
+
+    The old implementation's `with ThreadPoolExecutor(...)` called
+    shutdown(wait=True) on exit, so even after TimeoutError the caller blocked
+    until the runaway EXPLAIN finished — the timeout was cosmetic. The EXPLAIN
+    here waits on an event that is only set AFTER capture_query_plan returns,
+    so the old code would block for the full 30s wait; the fixed code returns
+    in ~plan_capture_timeout_seconds.
+    """
+    release_explain = threading.Event()
+    adapter = DummyAdapter(capture_plans=True, plan_capture_timeout_seconds=1)
+
+    def hanging_explain(connection: Any, query: str) -> str:
+        release_explain.wait(timeout=30)
+        return "PLAN"
+
+    adapter.get_query_plan = hanging_explain  # type: ignore[method-assign]
+
+    start = time.monotonic()
+    try:
+        plan, capture_time_ms = adapter.capture_query_plan(None, "SELECT 1", "q_hang")
+        elapsed = time.monotonic() - start
+    finally:
+        # Unblock the abandoned EXPLAIN thread so it exits immediately and
+        # does not delay interpreter shutdown.
+        release_explain.set()
+
+    assert plan is None
+    assert elapsed < 10, f"capture_query_plan blocked for {elapsed:.1f}s after timeout - shutdown(wait=True) regression"
+    assert capture_time_ms >= 1000  # the timeout itself was still honored
+    assert adapter.plan_capture_failures == 1
+    assert adapter.plan_capture_errors[0]["reason"] == "timeout"
+
+
+def test_capture_timeout_strict_mode_raises_promptly() -> None:
+    """In strict mode the timeout's PlanCaptureError must also propagate promptly."""
+    release_explain = threading.Event()
+    adapter = DummyAdapter(
+        capture_plans=True,
+        plan_capture_timeout_seconds=1,
+        strict_plan_capture=True,
+    )
+
+    def hanging_explain(connection: Any, query: str) -> str:
+        release_explain.wait(timeout=30)
+        return "PLAN"
+
+    adapter.get_query_plan = hanging_explain  # type: ignore[method-assign]
+
+    start = time.monotonic()
+    try:
+        with pytest.raises(PlanCaptureError):
+            adapter.capture_query_plan(None, "SELECT 1", "q_hang_strict")
+        elapsed = time.monotonic() - start
+    finally:
+        release_explain.set()
+
+    assert elapsed < 10, f"strict-mode timeout blocked for {elapsed:.1f}s - shutdown(wait=True) regression"
+    assert adapter.plan_capture_errors[0]["reason"] == "timeout"
 
 
 def test_plan_capture_completes_within_timeout() -> None:
