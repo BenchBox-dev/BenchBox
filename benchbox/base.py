@@ -141,9 +141,9 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         return getattr(self, "_output_dir", None)
 
     @output_dir.setter
-    def output_dir(self, value: Union[str, Path]) -> None:
+    def output_dir(self, value: Union[str, Path, None]) -> None:
         """Set output directory and forward to _impl when acting as a wrapper."""
-        self._output_dir = create_path_handler(value)
+        self._output_dir = None if value is None else create_path_handler(value)
         impl = self.__dict__.get("_impl")
         if impl is not None and hasattr(impl, "output_dir"):
             impl.output_dir = value
