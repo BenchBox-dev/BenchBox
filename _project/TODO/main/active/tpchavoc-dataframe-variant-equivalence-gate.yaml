@@ -2,7 +2,7 @@ id: tpchavoc-dataframe-variant-equivalence-gate
 title: "Extend the TPC-Havoc result-equivalence gate to the DataFrame variants"
 worktree: main
 priority: High
-status: Not Started
+status: Under Review
 category: Testing and Quality Assurance
 
 description: |
@@ -48,7 +48,7 @@ prior_art:
 work:
   - id: w0
     summary: "Pin down how DataFrame variants execute and materialize to comparable rows"
-    status: pending
+    status: done
     notes: |
       Determine the execution entrypoint for a DataFrame variant on DuckDB-backed
       data (expression_impl vs pandas_impl; what context/engine get_dataframe_queries
@@ -58,10 +58,22 @@ work:
       or both. Capture a single worked example (e.g. q1_v1) end to end before
       generalizing.
 
+      RESOLVED: tables are exported once from the gate's DuckDB connection via
+      Arrow (DECIMAL cast to DOUBLE, mirroring the production loader's
+      DECIMAL->Float64 mapping) and registered into the Polars reference
+      context (expression family, lazy frames) and the Pandas reference
+      context (pandas family, ArrowDtype-backed frames as produced by the
+      production read_parquet(dtype_backend="pyarrow") path). Results
+      materialize through .native/.collect()/rows()/itertuples() with values
+      normalized to plain scalars (Decimal->float, midnight Timestamp->date,
+      NaN/NA/NaT->None). q1_v1 worked end to end on both backends before
+      generalizing. Decision on the gating question: BOTH backends are gated
+      (440 cells); runtime is a few minutes on the bounded cell.
+
   - id: w1
     summary: "Build the DataFrame equivalence oracle in report mode over all queries x 10 variants"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Reuse build_duckdb_with_tpch for the data, the canonical TPC-H SQL answer as
       the reference, and validate_variant_equivalence as the comparator. Emit the
@@ -69,10 +81,19 @@ work:
       asserting. Apply the same top-N / trailing-LIMIT normalization the SQL gate
       uses where the DataFrame variant mirrors canonical's presentational cut.
 
+      RESOLVED: benchbox/core/tpchavoc/dataframe_equivalence.py, reusing
+      build_duckdb_with_tpch and validate_variant_equivalence. Unlike the SQL
+      gate the canonical reference KEEPS its presentational LIMIT, because
+      every DataFrame implementation (canonical and variant) reproduces the
+      cut via limit()/head(); a missing or wrong-sized cut stays visible as a
+      row-count divergence. Q11's scale-dependent fraction is injected through
+      the public set_parameter_overrides seam (0.0001/SF), exactly as seeded
+      production runs do. First report: 42/440 cells divergent.
+
   - id: w2
     summary: "Drive every DataFrame divergence to zero (fix or declared exception)"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       For each divergence decide bug vs intentional structural difference, mirroring
       the SQL burndown taxonomy. Fix the bugs in the variant impls; record any
@@ -81,16 +102,38 @@ work:
       SQL burndown did - sibling-only checks are how the original degenerate forms
       hid.
 
+      RESOLVED - burndown taxonomy (42 -> 0, no declared exceptions):
+      * column-order (40 cells): Q3 and Q10, all 10 variants x both backends,
+        emitted group-by-keys-first column order instead of the TPC-H spec
+        output order; values identical. Root cause was the canonical TPC-H
+        DataFrame implementations themselves; fixed at the root (user-approved
+        scope extension to benchbox/core/tpch/dataframe_queries.py) plus spec
+        projections in the tpchavoc q03/q10 variants.
+      * dropped-join-key crash (3 cells): q5_v7/q10_v7/q15_v7 expression
+        impls referenced the right-side join key that Polars drops; these
+        join-reorder variants could never have executed on the expression
+        backend. Fixed by reusing the kept left key (aliased back where the
+        spec projection needs the canonical name).
+
   - id: w3
     summary: "Promote to a bounded CI gate and add the fast-lane regression"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Fail-non-zero on any unclassified DataFrame divergence, wired into the same
       correctness-gate CI job as the SQL gate (keep the cell bounded; do not add a
       stress matrix). Prove it fails when a value-clamp or dropped-column defect is
       deliberately introduced into a DataFrame variant. Add a default-lane pytest
       mirroring tests/integration/test_tpchavoc_variant_equivalence.py.
+
+      RESOLVED: make tpchavoc-dataframe-equivalence-report exits non-zero on
+      any cell beyond the empty KNOWN_DIVERGENCES; wired into the
+      correctness-gate CI job beside the SQL gate. Fail-proof verified: a
+      deliberate negative-c_acctbal clamp in Q10v10 (pandas) and a dropped
+      o_shippriority column in Q3v2 (expression) each fail the gate naming the
+      exact cell. Fast lane:
+      tests/integration/test_tpchavoc_dataframe_variant_equivalence.py
+      re-checks the fixed families (3, 5, 10, 15).
 
 must_preserve:
   - "The SQL equivalence gate and its empty KNOWN_DIVERGENCES stay green and unchanged."
@@ -146,4 +189,4 @@ metadata:
   tags: [tpchavoc, dataframe, testing, correctness, equivalence, ci]
   estimated_effort: "Medium"
   created_date: "2026-06-12"
-  last_updated: "2026-06-12T00:00:00"
+  last_updated: "2026-06-12T12:00:00"

@@ -392,6 +392,9 @@ jobs:
       - name: Run TPC-Havoc variant-equivalence gate
         run: make tpchavoc-equivalence-report
 
+      - name: Run TPC-Havoc DataFrame variant-equivalence gate
+        run: make tpchavoc-dataframe-equivalence-report
+
   postgres-integration:
     name: postgres-integration
     needs: ci-paths
