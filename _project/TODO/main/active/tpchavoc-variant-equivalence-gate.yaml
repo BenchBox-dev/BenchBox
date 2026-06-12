@@ -98,9 +98,9 @@ work:
 
 deferred:
   - summary: "Extend the equivalence gate to the DataFrame variants"
-    reason: "DataFrame-surface correctness is owned by the cross-surface audit TODO; fold in only after the SQL gate is green."
+    reason: "PROMOTED to its own work item: tpchavoc-dataframe-variant-equivalence-gate (SQL gate is green; DataFrame variants are independent designs needing their own gate against canonical, not the SQL variants)."
   - summary: "Run the equivalence harness on a second engine (Postgres/ClickHouse/DataFusion)"
-    reason: "Cross-dialect equivalence of shared SQL is an open question; keep the routine gate DuckDB-bounded and sample a second engine separately if w1 evidence warrants."
+    reason: "PROMOTED to its own work item: tpchavoc-cross-dialect-equivalence-sampling. Routine gate stays DuckDB-bounded; a second engine is sampled separately."
 
 must_preserve:
   - "benchbox run --benchmark tpchavoc default (execution-only) behavior stays available; the gate is additive."

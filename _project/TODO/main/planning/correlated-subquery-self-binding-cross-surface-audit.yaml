@@ -26,8 +26,14 @@ description: |
      reformulation while SQL q9_v10 had nation-bucketing/clamping defects. None
      of the 24 SQL-side divergences PR #770 fixed has a mirrored DataFrame
      analog, but the same variant ID means a DIFFERENT transformation per
-     surface, so the SQL equivalence gate proves nothing about this surface;
-     it needs its own result-equivalence check against canonical.
+     surface, so the SQL equivalence gate proves nothing about this surface.
+
+     NOTE: broad DataFrame result-equivalence vs canonical TPC-H is now owned by
+     its own work item, tpchavoc-dataframe-variant-equivalence-gate. THIS audit's
+     DataFrame scope is the narrower, targeted self-binding / inner-frame-
+     correlation check on the correlated queries (Q2, Q11, Q17, Q20, Q21, Q22);
+     run it alongside, or fold it into, that gate rather than duplicating the
+     harness.
 
   2. Other SQL benchmarks with correlated subqueries: TPC-DS, SSB, join-order,
      read-primitives (subquery category), and write-primitives
