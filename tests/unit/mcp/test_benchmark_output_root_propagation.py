@@ -13,7 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from benchbox.core.benchmark_registry import get_public_benchmark_class
+from benchbox.core.benchmark_registry import (
+    get_all_benchmarks,
+    get_benchmark_default_scale,
+    get_public_benchmark_class,
+)
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 pytestmark = [
@@ -71,3 +75,40 @@ def test_mcp_default_without_env_uses_cwd(monkeypatch):
     data_dir = get_benchmark_runs_datagen_path("tpch", 0.01)
 
     assert data_dir == Path.cwd() / "benchmark_runs" / "datagen" / "tpch_sf001"
+
+
+# ---------------------------------------------------------------------------
+# Registry-wide guard (benchmark-output-root-regression-guard)
+#
+# The hand-picked MCP_BENCHMARKS list above predates the registry-wide guard;
+# this test parametrizes the same MCP construction shape over every registered
+# benchmark so new benchmarks are covered automatically.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("benchmark_id", sorted(get_all_benchmarks()))
+def test_mcp_registry_construction_honors_env_output_root(benchmark_id, tmp_path, monkeypatch):
+    """Every registered benchmark honors BENCHBOX_OUTPUT_DIR via the MCP call shape."""
+    root = tmp_path / "mcp_runs"
+    monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(root))
+
+    benchmark_class = get_public_benchmark_class(benchmark_id)
+    assert benchmark_class is not None, f"{benchmark_id}: no public benchmark class"
+
+    # Same call shape MCP uses: scale_factor only, no explicit output_dir.
+    benchmark = benchmark_class(scale_factor=get_benchmark_default_scale(benchmark_id))
+
+    output_dir = Path(str(benchmark.output_dir))
+    assert output_dir.is_relative_to(root), (benchmark_id, output_dir)
+    assert Path.cwd() not in output_dir.parents, (benchmark_id, output_dir)
+
+    # Nested generators are owned by the core ``_impl`` when the public
+    # wrapper delegates; assert any opted-in generator follows the env root.
+    core = getattr(benchmark, "_impl", benchmark)
+    for attr in getattr(core, "OUTPUT_DIR_GENERATOR_ATTRS", ("data_generator",)):
+        generator = core.__dict__.get(attr)
+        if generator is None or not hasattr(generator, "output_dir"):
+            continue
+        gen_dir = Path(str(generator.output_dir))
+        assert gen_dir.is_relative_to(root), (benchmark_id, attr, gen_dir)
+        assert Path.cwd() not in gen_dir.parents, (benchmark_id, attr, gen_dir)

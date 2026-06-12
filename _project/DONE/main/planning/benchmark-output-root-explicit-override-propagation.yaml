@@ -1,0 +1,130 @@
+id: benchmark-output-root-explicit-override-propagation
+title: "Propagate explicit --output override to nested generators for tpcds and tpcdi"
+worktree: main
+priority: Medium
+status: "Completed"
+category: Core Functionality
+
+description: |
+  PR #759 made benchmark datagen roots honor BENCHBOX_OUTPUT_DIR at construction
+  and added GeneratorOutputDirMixin so a post-construction output_dir
+  reassignment propagates to nested generators. Several generator-backed
+  benchmarks (h2odb, ssb, tpch, nyctaxi, etc.) opted into the mixin; a few did
+  not because their generators are lazy or intentionally point elsewhere.
+
+  Two benchmarks build a generator (or derive directories) in __init__ but have
+  no synchronizing output_dir setter, so an explicit CLI --output root that
+  differs from the construction default does NOT reach them:
+
+  - tpcds: builds its data_generator in __init__ and has no output_dir setter, so
+    a post-construction reassignment (runner _resolve_output_dir_handler) leaves
+    the generator pointed at the construction-time path.
+  - tpcdi: derives source_dir/staging_dir/warehouse_dir and builds its
+    data_generator in __init__ from self.config.output_dir; a later output_dir
+    reassignment updates neither the ETL subdirs nor the generator.
+
+  This is a pre-existing residual gap, NOT a regression. The reported failure
+  mode (BENCHBOX_OUTPUT_DIR ignored) is already fixed for both: their
+  construction-time defaults resolve via the env-aware helper (tpcds via its
+  default path, tpcdi via TPCDIConfig.get_benchmark_runs_datagen_path), and in
+  the managed/env flow the runner's reassignment target equals the construction
+  default, so nothing diverges. Only an explicit `--output /custom` that differs
+  from the default exposes the gap.
+
+  Close it so an explicit override propagates correctly for these two
+  benchmarks, matching the contract the mixin already provides elsewhere. NOTE:
+  benchmark-output-root-resolve-at-construction-boundary proposes a deeper fix
+  (resolve the root before construction) that would subsume this item; this is
+  the tactical fix if that refactor is deferred.
+
+prior_art:
+- "benchbox/base.py:GeneratorOutputDirMixin — reuse/extend; tpcds can adopt it directly (its data_generator is a plain instance
+  attribute)"
+- "benchbox/core/read_primitives/benchmark.py + benchbox/core/transactional/benchmark_base.py — reuse the existing output_dir
+  setter pattern that re-derives nested state"
+- "benchbox/core/tpcdi/config.py:TPCDIConfig (output_dir + create_directories) — reuse for re-deriving source/staging/warehouse
+  on reassignment instead of duplicating path math"
+- "benchbox/core/runner/runner.py:_resolve_output_dir_handler — the post-construction assignment site this fix must satisfy"
+
+work:
+- id: w0
+  summary: "Confirm the override gap reproduces for tpcds and tpcdi on current develop"
+  status: done
+  notes: |
+    Construct each, then assign a distinct explicit output_dir and assert the
+    nested generator / ETL subdirs do NOT follow today. Capture the probe to
+    /tmp/override-gap-w0.log (do not commit) and record results in the PR body.
+- id: w1
+  summary: "Adopt GeneratorOutputDirMixin for tpcds so its data_generator tracks output_dir"
+  needs: [w0]
+  status: done
+  notes: |
+    tpcds builds data_generator as a plain attribute in __init__, so the mixin
+    applies cleanly. Verify the tpcds_obt source-dir behavior is unaffected
+    (its generator is lazy and intentionally writes to a separate dir).
+- id: w2
+  summary: "Add a tpcdi output_dir setter that re-derives ETL subdirs and syncs the generator"
+  needs: [w0]
+  status: done
+  notes: |
+    On reassignment, update source_dir/staging_dir/warehouse_dir and
+    data_generator.output_dir, keeping self.config.output_dir consistent. Guard
+    against running before config exists during __init__.
+- id: w3
+  summary: "Flip the tpcds/tpcdi xfail markers in the regression guard to passing"
+  needs: [w1, w2]
+  status: done
+  notes: |
+    Coordinate with benchmark-output-root-regression-guard, which marks these
+    two xfail; this work removes the xfail once propagation is fixed.
+
+must_preserve:
+- "Env/managed-flow behavior for tpcds and tpcdi remains unchanged (construction default already env-aware)."
+- "tpcds_obt and datavault lazy generators that intentionally write to a separate source dir are NOT force-synced."
+- "tpcdi data reuse: existing source/staging/warehouse layout names remain compatible."
+
+approach: |
+  Prefer reusing GeneratorOutputDirMixin where the generator is a plain instance
+  attribute (tpcds). For tpcdi, whose layout is config-driven and richer than a
+  single generator, add a focused property setter that re-derives the ETL
+  directories rather than shoehorning it into the mixin. Land tests first that
+  fail on the current tree.
+
+anti_patterns:
+- "DO NOT blanket-sync every generator attribute - because tpcds_obt/datavault intentionally diverge - only sync generators
+  that should follow the OBT/primary output root."
+- "DO NOT duplicate ETL path math in the tpcdi setter - because TPCDIConfig already owns it - delegate to the config helpers."
+
+verification:
+- description: "Explicit override now propagates for tpcds and tpcdi"
+  command: "uv run -- python -m pytest tests/unit/core/test_benchmark_output_root_propagation.py -q"
+  expected_output: "tpcds and tpcdi override cases pass (previously xfail)"
+- description: "tpcds and tpcdi unit suites still pass"
+  command: "uv run -- python -m pytest tests/unit/core/tpcds tests/unit/core/tpcdi -q"
+  expected_output: "all tests pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/tpcds/"
+  - "benchbox/core/tpcdi/"
+  - "tests/unit/core/"
+  do_not_modify:
+  - "benchbox/core/tpcds_obt/benchmark.py"
+  - "benchbox/core/datavault/benchmark.py"
+  - "benchmark_runs/"
+
+success_metrics:
+- "Constructing tpcds or tpcdi then assigning a distinct --output root leaves no nested generator or ETL subdir pointed at
+  the construction-time default."
+- "No change to env/managed-flow output locations for any benchmark."
+
+deps:
+  needs:
+  - benchmark-runs-output-root-propagation
+
+metadata:
+  tags: [output-paths, datagen, tpcds, tpcdi, benchmark-runs]
+  estimated_effort: "Medium"
+  created_date: "2026-06-08"
+  last_updated: "2026-06-11T00:00:00"
+completed_date: "2026-06-11"

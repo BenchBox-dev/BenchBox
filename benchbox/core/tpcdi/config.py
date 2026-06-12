@@ -122,14 +122,32 @@ class TPCDIConfig:
             "strict_mode": self.strict_validation,
         }
 
+    @property
+    def source_dir(self) -> Path:
+        """ETL source directory under the configured output root."""
+        assert self.output_dir is not None  # Set in __post_init__
+        return self.output_dir / "source"
+
+    @property
+    def staging_dir(self) -> Path:
+        """ETL staging directory under the configured output root."""
+        assert self.output_dir is not None  # Set in __post_init__
+        return self.output_dir / "staging"
+
+    @property
+    def warehouse_dir(self) -> Path:
+        """ETL warehouse directory under the configured output root."""
+        assert self.output_dir is not None  # Set in __post_init__
+        return self.output_dir / "warehouse"
+
     def create_directories(self) -> None:
         """Create necessary directories for TPC-DI processing."""
         assert self.output_dir is not None  # Set in __post_init__
         directories = [
             self.output_dir,
-            self.output_dir / "source",
-            self.output_dir / "staging",
-            self.output_dir / "warehouse",
+            self.source_dir,
+            self.staging_dir,
+            self.warehouse_dir,
             self.output_dir / "logs",
         ]
 

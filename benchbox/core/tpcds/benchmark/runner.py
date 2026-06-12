@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection as _DatabaseConnection
 from benchbox.core.validation import (
     DatabaseValidationEngine,
@@ -101,7 +101,7 @@ def _aggregate_stream_results(stream_results: list[dict[str, Any]], start_time: 
     }
 
 
-class TPCDSBenchmark(BaseBenchmark):
+class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     """TPC-DS benchmark implementation.
 
     This class provides a complete implementation of the TPC-DS benchmark,
