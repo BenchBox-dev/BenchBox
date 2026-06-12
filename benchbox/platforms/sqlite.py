@@ -513,8 +513,8 @@ class SQLiteAdapter(PlatformAdapter):
         self.log_verbose(f"Executing query {query_id}")
         self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
+        cursor = connection.cursor()
         try:
-            cursor = connection.cursor()
             cursor.execute(query)
             results = cursor.fetchall()
 
@@ -567,6 +567,8 @@ class SQLiteAdapter(PlatformAdapter):
                 "rows_returned": 0,
                 "error": str(e),
             }
+        finally:
+            cursor.close()
 
         # Display plan in console when --show-query-plans is active.
         # Skip here when --capture-plans is also active: capture_query_plan below

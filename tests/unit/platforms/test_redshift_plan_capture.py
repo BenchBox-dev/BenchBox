@@ -125,3 +125,57 @@ class TestRedshiftPlanCapture:
 
         call_args = cursor.execute.call_args[0][0].upper()
         assert "EXPLAIN ANALYZE" not in call_args, "Redshift does not support EXPLAIN ANALYZE"
+
+
+class TestRedshiftStrictPlanCapture:
+    """strict_plan_capture must propagate PlanCaptureError from execute_query.
+
+    The capture call sits OUTSIDE execute_query's broad except: a capture
+    failure on a successful query must surface as PlanCaptureError in strict
+    mode, not mislabel the query status=FAILED.
+    """
+
+    @staticmethod
+    def _make_adapter(monkeypatch, strict):
+        monkeypatch.setattr("benchbox.platforms.redshift.redshift_connector", MagicMock(), raising=False)
+        adapter = RedshiftAdapter(**_STUB_CREDS, capture_plans=True, strict_plan_capture=strict)
+        monkeypatch.setattr(adapter, "_get_query_statistics", lambda *a, **k: {})
+
+        def boom(connection, query, explain_options=None):
+            raise RuntimeError("EXPLAIN blew up")
+
+        monkeypatch.setattr(adapter, "get_query_plan", boom)
+        return adapter
+
+    def test_strict_capture_failure_propagates(self, monkeypatch):
+        from benchbox.core.errors import PlanCaptureError
+
+        adapter = self._make_adapter(monkeypatch, strict=True)
+        conn, cursor = _make_connection()
+        cursor.fetchall.return_value = [(0, "col1")]
+
+        with pytest.raises(PlanCaptureError):
+            adapter.execute_query(connection=conn, query="SELECT 1", query_id="rq_strict", validate_row_count=False)
+
+    def test_non_strict_capture_failure_is_silent(self, monkeypatch):
+        adapter = self._make_adapter(monkeypatch, strict=False)
+        conn, cursor = _make_connection()
+        cursor.fetchall.return_value = [(0, "col1")]
+
+        result = adapter.execute_query(
+            connection=conn, query="SELECT 1", query_id="rq_nonstrict", validate_row_count=False
+        )
+
+        assert result["status"] == "SUCCESS"
+        assert "query_plan" not in result
+
+    def test_strict_mode_does_not_mask_real_query_failure(self, monkeypatch):
+        """A genuine SQL error must still return status=FAILED, not raise."""
+        adapter = self._make_adapter(monkeypatch, strict=True)
+        conn = MagicMock()
+        conn.cursor.return_value.execute.side_effect = RuntimeError("no such table: t")
+
+        result = adapter.execute_query(connection=conn, query="SELECT 1", query_id="rq_bad", validate_row_count=False)
+
+        assert result["status"] == "FAILED"
+        assert "no such table" in result["error"]

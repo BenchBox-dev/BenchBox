@@ -116,8 +116,10 @@ files_affected:
   modified:
     - "benchbox/platforms/sqlite.py"
     - "benchbox/platforms/motherduck.py"
+    - "benchbox/platforms/redshift.py"
     - "tests/unit/platforms/test_sqlite_plan_capture.py"
     - "tests/unit/platforms/test_motherduck_plan_capture.py"
+    - "tests/unit/platforms/test_redshift_plan_capture.py"
 
 metadata:
   tags: [query-plan, sqlite, motherduck, correctness, strict-mode, error-handling]
