@@ -135,6 +135,19 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+    @property
+    def output_dir(self) -> Any:
+        """Return the resolved output directory handler."""
+        return getattr(self, "_output_dir", None)
+
+    @output_dir.setter
+    def output_dir(self, value: Union[str, Path]) -> None:
+        """Set output directory and forward to _impl when acting as a wrapper."""
+        self._output_dir = create_path_handler(value)
+        impl = self.__dict__.get("_impl")
+        if impl is not None and hasattr(impl, "output_dir"):
+            impl.output_dir = value
+
     def _validate_scale_factor_type(self, scale_factor: float) -> None:
         """Validate scale factor is a number (int or float).
 

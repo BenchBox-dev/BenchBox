@@ -237,7 +237,7 @@ def test_registry_explicit_root_reassignment_propagates(benchmark_id, tmp_path, 
         pytest.skip(f"{benchmark_id}: no nested generator constructed in __init__")
 
     explicit = tmp_path / "explicit_root" / "data"
-    core.output_dir = str(explicit)
+    benchmark.output_dir = str(explicit)
 
     assert str(core.output_dir) == str(explicit), (benchmark_id, core.output_dir)
     for gen in generators:
