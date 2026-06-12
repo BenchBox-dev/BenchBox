@@ -1,0 +1,115 @@
+id: query-plan-capture-fingerprint-estimate-leak
+title: "Stop cost/cardinality estimates leaking into plan fingerprints; add a cross-parser signature-hygiene invariant"
+worktree: platform-expansion
+priority: Medium-High
+status: Not Started
+category: Platform Expansion
+
+description: |
+  The plan fingerprint is documented (query_plan_models.py, added in #768) as a LOGICAL,
+  stats-INDEPENDENT structural hash: a VACUUM/ANALYZE or row-count change must NOT change it.
+  That contract is violated by at least one parser today.
+
+  The DuckDB parser (benchbox/core/query_plans/parsers/duckdb.py) folds an operator's raw
+  EXPLAIN `extra_info` — which includes an "Estimated Cardinality" — into signature-bearing
+  fields (join_conditions for JOIN, aggregation_functions for AGGREGATE, filter_expressions
+  for FILTER, sort_keys for SORT). Because get_structural_signature() hashes those fields,
+  a DuckDB JOIN/AGGREGATE/FILTER/SORT fingerprint CHANGES when the cardinality estimate
+  changes. This was confirmed empirically during #768: a GROUP BY fingerprint differed at
+  500 rows vs 5000 rows. The #768 contract was softened to "verify per engine" instead of
+  fixing the leak — this TODO fixes it and prevents regressions for the other six parsers.
+
+  Two-part fix:
+    1. Strip estimate/cost text (e.g. "Estimated Cardinality=...", "EC:", "rows=", "cost=")
+       from extra_info before storing it into signature-bearing fields, OR store the raw
+       extra_info only in physical_operator.platform_metadata (which is NOT hashed) and
+       extract only the structural predicate into the logical field.
+    2. Add a cross-parser invariant test asserting NO parser places cost/cardinality/estimate
+       text into any signature-bearing logical field, for every registered parser, driven by
+       fixtures that differ ONLY in row count / estimates.
+
+  This is distinct from query-plan-capture-fingerprint-literal-normalization: that TODO makes
+  FILTER LITERAL values opt-in-normalizable (a feature for cross-run seed differences); this
+  TODO removes ESTIMATE values that should never have been in the signature (a parser bug).
+
+prior_art:
+  - "benchbox/core/results/query_plan_models.py — get_structural_signature() and the stability contract docstring (#768)"
+  - "benchbox/core/query_plans/parsers/duckdb.py — folds extra_info incl. Estimated Cardinality into join_conditions/aggregation_functions/filter_expressions/sort_keys"
+  - "tests/unit/platforms/test_duckdb_plan_capture.py — index-stability tests added in #768 that the new invariant generalizes"
+
+work:
+  - id: w1
+    summary: "Quantify the leak: which parsers fold estimate/cost text into signature fields"
+    status: pending
+    notes: |
+      For each registered parser (duckdb, postgresql, redshift, datafusion, sqlite, presto,
+      trino, clickhouse, spark) capture two fixtures of the same query that differ only in
+      table size / estimates, and record which produce different fingerprints. DuckDB is the
+      known offender; confirm the full list before editing.
+  - id: w2
+    summary: "Strip estimate/cost tokens from signature-bearing fields in offending parsers"
+    needs: [w1]
+    status: pending
+    notes: |
+      In each offending parser, keep the raw EXPLAIN detail in physical_operator.platform_metadata
+      (not hashed) and place only the structural part (join keys, group keys, filter predicate
+      WITHOUT the cardinality) into the logical field. Prefer a shared helper, e.g.
+      strip_estimates(text), in the parsers base module so the rule lives in one place.
+  - id: w3
+    summary: "Add a cross-parser signature-hygiene invariant test"
+    needs: [w2]
+    status: pending
+    notes: |
+      Create tests/unit/query_plans/test_fingerprint_hygiene.py. For every parser in the
+      registry, parse two estimate-only-different fixtures and assert identical plan_fingerprint.
+      Also assert get_structural_signature() contains no digit-bearing 'cardinality'/'cost'/
+      'rows='/'EC:' token. This locks the contract for current and future parsers.
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Genuine logical-shape changes (join order/type, added aggregation, different predicate columns) must still change the fingerprint."
+  - "physical_operator.platform_metadata may keep the raw EXPLAIN detail including estimates for display/debugging."
+  - "Existing parser unit tests must pass with at most fixture-value updates."
+
+approach: |
+  Confirm the offenders empirically (w1) rather than assuming only DuckDB. Move the raw
+  estimate text out of the hashed path (w2) using a single shared strip helper. Lock it with
+  a registry-wide invariant test (w3) so the stats-independence promise becomes enforceable
+  rather than aspirational, and update the query_plan_models.py contract docstring to drop the
+  "verify per engine" caveat once the invariant holds.
+
+anti_patterns:
+  - "DO NOT solve this by removing the fields from get_structural_signature entirely - because join keys / group keys / predicates ARE structural and must stay in the hash - only strip the estimate/cost tokens."
+  - "DO NOT special-case DuckDB - because the leak can recur in any parser that folds extra_info - enforce the rule with a registry-wide invariant test."
+  - "DO NOT conflate this with literal normalization - because estimates are an accidental bug while literals are an intentional design choice - keep the two TODOs separate."
+
+verification:
+  - description: "DuckDB fingerprint is stable across row-count change"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_duckdb_plan_capture.py -k fingerprint -v"
+    expected_output: "GROUP BY/JOIN fingerprint identical at small vs large row counts"
+  - description: "Cross-parser signature-hygiene invariant passes"
+    command: "uv run -- python -m pytest tests/unit/query_plans/test_fingerprint_hygiene.py -v"
+    expected_output: "No registered parser leaks estimate/cost text into the signature"
+  - description: "Full query_plans suite green"
+    command: "uv run -- python -m pytest tests/unit/core/query_plans/ tests/unit/query_plans/ -q"
+    expected_output: "0 failures, 0 errors"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/query_plans/parsers/"
+    - "benchbox/core/results/query_plan_models.py"
+    - "tests/unit/query_plans/test_fingerprint_hygiene.py"
+    - "tests/unit/platforms/test_duckdb_plan_capture.py"
+
+success_metrics:
+  - "DuckDB JOIN/AGGREGATE/FILTER/SORT fingerprints are invariant to cardinality-estimate changes."
+  - "A registry-wide invariant test forbids estimate/cost text in signature-bearing fields."
+  - "The query_plan_models.py stability contract no longer needs the per-engine stats-independence caveat."
+
+metadata:
+  tags: [query-plan, fingerprint, duckdb, parsers, correctness, invariant]
+  estimated_effort: "Medium"
+  created_date: "2026-06-11"
+  last_updated: "2026-06-11T00:00:00-04:00"

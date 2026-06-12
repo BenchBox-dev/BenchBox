@@ -569,10 +569,27 @@ class SparkQueryExecutionMixin:
             result_dict["query_statistics"] = query_stats
             result_dict["resource_usage"] = query_stats
 
-            return result_dict
-
         except Exception as e:
             return self._build_query_failure_result(query_id, start_time, e)
+
+        # Capture the query plan outside the try so a strict-mode PlanCaptureError
+        # propagates instead of being swallowed and mislabeled as a failed query.
+        # Guarded by capture_plans, so EXPLAIN is never issued when capture is off.
+        if getattr(self, "capture_plans", False) and result_dict.get("status") == "SUCCESS":
+            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+            if query_plan:
+                result_dict["query_plan"] = query_plan
+                result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
+            if plan_capture_time_ms is not None:
+                result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+
+        return result_dict
+
+    def get_query_plan_parser(self):
+        """Return the Spark plan parser (inherited by SparkAdapter)."""
+        from benchbox.core.query_plans.parsers.spark import SparkQueryPlanParser
+
+        return SparkQueryPlanParser()
 
     def _validate_data_integrity(
         self, benchmark: Any, connection: Any, table_stats: dict[str, int]

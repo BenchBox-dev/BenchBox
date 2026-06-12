@@ -1,0 +1,70 @@
+{
+  "0": {
+    "id": "9",
+    "name": "Output",
+    "descriptor": {"columnNames": "[regionkey, _col1]"},
+    "details": [],
+    "children": [
+      {
+        "id": "100",
+        "name": "Aggregate",
+        "descriptor": {"type": "FINAL", "keys": "[regionkey]"},
+        "details": [],
+        "children": [
+          {
+            "id": "175",
+            "name": "RemoteSource",
+            "descriptor": {"sourceFragmentIds": "[1]"},
+            "details": ["Output layout: [regionkey, count_0]"],
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  "1": {
+    "id": "200",
+    "name": "Aggregate",
+    "descriptor": {"type": "PARTIAL", "keys": "[regionkey]"},
+    "details": [],
+    "children": [
+      {
+        "id": "150",
+        "name": "InnerJoin",
+        "descriptor": {"criteria": "(\"regionkey\" = \"regionkey_4\")"},
+        "details": [],
+        "children": [
+          {
+            "id": "120",
+            "name": "Filter",
+            "descriptor": {"filterPredicate": "(\"nationkey\" > BIGINT '5')"},
+            "details": [],
+            "children": [
+              {
+                "id": "0",
+                "name": "TableScan",
+                "descriptor": {"table": "tpch:nation:sf1.0"},
+                "details": [],
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "190",
+            "name": "RemoteSource",
+            "descriptor": {"sourceFragmentIds": "[2]"},
+            "details": [],
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  "2": {
+    "id": "1",
+    "name": "TableScan",
+    "descriptor": {"table": "tpch:region:sf1.0"},
+    "details": [],
+    "children": []
+  }
+}
