@@ -20,6 +20,10 @@ elsewhere.** Conversely, write work on a worktree ends at `make pr-open`,
 not at `git push` — `make pr-open` is in the pre-approved set.
 Default write-task close-out: implement → `code review` (fix every finding,
 incl. nits) → `make pr-open` (see AGENTS.md).
+**Dev PRs land via squash auto-merge once CI passes** — `make pr-open`
+enables it automatically; in remote/cloud sessions (no `make`/`gh`,
+PRs created via GitHub MCP), enable squash auto-merge right after
+opening the PR instead of waiting for a manual merge instruction.
 TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox.
 No `-o "addopts="` with pytest.
 **Efficiency**: long output → `/tmp/<slug>.log`, report summary + tail.
