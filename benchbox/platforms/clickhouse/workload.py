@@ -423,8 +423,6 @@ class ClickHouseWorkloadMixin:
                     row_count_validation["warning"] = validation_result.warning_message
                 result_dict["row_count_validation"] = row_count_validation
 
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             error_type = type(e).__name__
@@ -440,6 +438,24 @@ class ClickHouseWorkloadMixin:
                 "error": error_message,
                 "error_type": error_type,
             }
+
+        # Capture the query plan outside the try so a strict-mode PlanCaptureError
+        # propagates instead of being swallowed by the broad `except` above and
+        # mislabeled as a failed query. Guarded by capture_plans, so EXPLAIN PLAN
+        # is never issued when capture is disabled. When strict_plan_capture is
+        # False, capture_query_plan never raises.
+        if getattr(self, "capture_plans", False) and result_dict.get("status") == "SUCCESS":
+            # EXPLAIN the transformed query (the one that actually ran): the original
+            # may not parse under ClickHouse without the compatibility transforms, so
+            # EXPLAIN PLAN of it would fail for exactly the queries that needed them.
+            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, transformed_query, query_id)
+            if query_plan:
+                result_dict["query_plan"] = query_plan
+                result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
+            if plan_capture_time_ms is not None:
+                result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+
+        return result_dict
 
 
 __all__ = ["ClickHouseWorkloadMixin"]

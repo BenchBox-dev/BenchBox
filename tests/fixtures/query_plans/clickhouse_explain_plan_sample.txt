@@ -1,0 +1,11 @@
+Expression ((Projection + Before ORDER BY))
+  Sorting (Sorting for ORDER BY)
+    Expression (Before ORDER BY)
+      Aggregating
+        Expression (Before GROUP BY)
+          Filter (WHERE)
+            Join (JOIN FillRightFirst)
+              Expression (Before JOIN)
+                ReadFromMergeTree (default.lineitem)
+              Expression (Joined actions)
+                ReadFromMergeTree (default.orders)
