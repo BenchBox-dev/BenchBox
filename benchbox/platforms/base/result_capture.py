@@ -24,7 +24,6 @@ Instance attributes these methods read (initialized on the host adapter):
 
 from __future__ import annotations
 
-import concurrent.futures
 import logging
 import math
 import os
@@ -55,6 +54,7 @@ from benchbox.platforms.base.runtime_metadata import build_default_normalized_re
 from benchbox.platforms.base.utils import is_non_interactive
 from benchbox.utils.clock import elapsed_seconds
 from benchbox.utils.printing import quiet_console
+from benchbox.utils.timeout_manager import run_with_timeout
 
 try:
     from benchbox.core.results.models import ExecutionPhases, QueryDefinition
@@ -780,27 +780,25 @@ class ResultCaptureMixin:
 
         start_time = time.perf_counter()
 
+        # Apply timeout protection for the EXPLAIN query. run_with_timeout runs
+        # get_query_plan on a daemon thread and returns promptly when the timeout
+        # fires. (The previous `with ThreadPoolExecutor` implementation blocked in
+        # shutdown(wait=True) on exit even after TimeoutError, so the timeout was
+        # cosmetic: a runaway EXPLAIN still stalled the caller until the database
+        # returned.) Trade-off, accepted by design: after a timeout the abandoned
+        # EXPLAIN thread keeps running — holding the connection — until the
+        # database returns, so a subsequent query issued on the same connection
+        # may contend with it. The previous behavior (stalling the runner for the
+        # full EXPLAIN duration) was strictly worse; full isolation is tracked by
+        # query-plan-capture-isolation-phase-design.
         try:
-            # Apply timeout protection for EXPLAIN query
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(self.get_query_plan, connection, query)
-                try:
-                    explain_output = future.result(timeout=self.plan_capture_timeout_seconds)
-                except concurrent.futures.TimeoutError:
-                    capture_time_ms = (time.perf_counter() - start_time) * 1000
-                    self.logger.warning(
-                        "Query plan capture timed out for %s after %ds (%.2fms elapsed)",
-                        query_id,
-                        self.plan_capture_timeout_seconds,
-                        capture_time_ms,
-                    )
-                    self._record_plan_capture_failure(
-                        query_id,
-                        reason="timeout",
-                        message=f"EXPLAIN query timed out after {self.plan_capture_timeout_seconds}s",
-                        log_warning=False,
-                    )
-                    return None, capture_time_ms
+            explain_output, timed_out = run_with_timeout(
+                self.get_query_plan,
+                self.plan_capture_timeout_seconds,
+                f"plan capture EXPLAIN (query_id={query_id})",
+                connection,
+                query,
+            )
         except PlanCaptureError:
             raise
         except Exception as exc:
@@ -809,6 +807,23 @@ class ResultCaptureMixin:
                 query_id,
                 reason="explain_failed",
                 message=str(exc),
+            )
+            return None, capture_time_ms
+
+        if timed_out:
+            capture_time_ms = (time.perf_counter() - start_time) * 1000
+            self.logger.warning(
+                "Query plan capture timed out for %s after %ds (%.2fms elapsed); "
+                "the EXPLAIN may still be running on the connection until the database returns",
+                query_id,
+                self.plan_capture_timeout_seconds,
+                capture_time_ms,
+            )
+            self._record_plan_capture_failure(
+                query_id,
+                reason="timeout",
+                message=f"EXPLAIN query timed out after {self.plan_capture_timeout_seconds}s",
+                log_warning=False,
             )
             return None, capture_time_ms
 
