@@ -30,6 +30,7 @@ import math
 import os
 import platform
 import random
+import re
 import statistics
 import time
 from collections.abc import Mapping
@@ -65,6 +66,62 @@ try:
     from benchbox.core.validation import ValidationResult
 except ImportError:  # pragma: no cover - validation always present in real install
     ValidationResult = None  # type: ignore[assignment, misc]
+
+
+# A data-changing verb at the very start of the statement (word-bounded so an
+# identifier like ``COPYRIGHTS`` or ``MERGEABLE`` is not misread as DML).
+_DML_LEADING_RE = re.compile(r"^(?:INSERT|UPDATE|DELETE|MERGE|COPY)\b", re.IGNORECASE)
+# A data-modifying verb anywhere — used only after a leading WITH to catch
+# CTE-prefixed DML (``WITH cte AS (...) INSERT INTO ...``). COPY is excluded:
+# it cannot appear inside a CTE, and its leading form is already caught above.
+_DML_AFTER_CTE_RE = re.compile(r"\b(?:INSERT|UPDATE|DELETE|MERGE)\b", re.IGNORECASE)
+
+
+def _strip_leading_sql_comments(statement: str) -> str:
+    """Drop leading ``--`` line comments and ``/* */`` block comments + whitespace."""
+    statement = statement.lstrip()
+    while True:
+        if statement.startswith("--"):
+            newline_pos = statement.find("\n")
+            if newline_pos == -1:
+                return ""
+            statement = statement[newline_pos + 1 :].lstrip()
+        elif statement.startswith("/*"):
+            end = statement.find("*/")
+            if end == -1:
+                return ""
+            statement = statement[end + 2 :].lstrip()
+        else:
+            return statement
+
+
+def is_dml_query(query: str) -> bool:
+    """Return True for data-changing DML statements (INSERT/UPDATE/DELETE/MERGE/COPY).
+
+    Used to guard plan capture against double-execution: adapters that capture
+    plans via ``EXPLAIN ANALYZE`` (DuckDB, MotherDuck) physically re-run the
+    statement, so a DML query would mutate data twice. Callers downgrade to a
+    non-ANALYZE ``EXPLAIN`` for these statements.
+
+    Detection covers the data-modifying verbs INSERT/UPDATE/DELETE/MERGE/COPY,
+    including when they are preceded by a leading ``WITH`` CTE clause. DDL
+    (CREATE/DROP/ALTER/TRUNCATE) is intentionally excluded: DDL does not produce
+    duplicate data mutations, so it does not need the ANALYZE guard. Leading
+    line and block comments are stripped first so a commented preamble (e.g. a
+    ``/* query 12 */`` banner) does not mask the verb.
+    """
+    statement = _strip_leading_sql_comments(query)
+    if not statement:
+        return False
+    if _DML_LEADING_RE.match(statement):
+        return True
+    # CTE-prefixed DML: the data-modifying verb follows the CTE definitions, so a
+    # leading-verb check alone misses it. Conservatively treat a WITH-prefixed
+    # statement that contains a DML verb as DML — worst case a read-only CTE
+    # query loses ANALYZE stats, which is far cheaper than a double mutation.
+    if re.match(r"^WITH\b", statement, re.IGNORECASE) and _DML_AFTER_CTE_RE.search(statement):
+        return True
+    return False
 
 
 def _extract_result_field(result: Any, attr: str, default: Any = None) -> Any:
@@ -570,7 +627,45 @@ class ResultCaptureMixin:
         for estimated-plan-only capture with no re-execution overhead.
 
         Plan fingerprints exclude timing/cardinality by design - structural comparisons
-        are unaffected by this setting.
+        are unaffected by this setting. See the plan fingerprint stability contract in
+        ``benchbox/core/results/query_plan_models.py`` for what fingerprint equality
+        does and does not guarantee.
+
+        Capture timing (pre- vs. post-execution) — design decision:
+            All adapters capture the plan AFTER the timed execution block (the
+            "post-execution" plan). This is intentional and is the supported
+            default:
+              - With ``analyze_plans=True`` it yields the *actual* plan that ran,
+                including real per-operator timing/cardinality (EXPLAIN ANALYZE) —
+                the most useful artifact for profiling.
+              - The structural fingerprint is unaffected by post- vs. pre-execution
+                timing, because it excludes costs and row estimates. A plan captured
+                before vs. after execution hashes to the same fingerprint as long as
+                the planner's chosen shape is identical.
+            A pre-execution capture mode (plan as decided before any stats change)
+            would be marginally more stable for cross-run regression detection, but
+            is NOT implemented: the fingerprint's stats-independence already provides
+            that stability, so a separate timing mode is unnecessary. If a true
+            pre-execution plan is ever required, add an opt-in
+            ``capture_plan_timing: pre | post`` config (default ``post``) here rather
+            than changing the default behavior.
+
+        Multi-stream behavior (stream_id):
+            Plan capture is per-query-execution. In a multi-stream (concurrent)
+            run, each stream executes and captures its own plan independently, so
+            the result set contains one plan record per (query_id, stream_id) — the
+            plans are NOT deduplicated or averaged, preserving per-stream provenance.
+            Because the fingerprint is structural, every stream running the same
+            query against the same schema on the same engine version is expected to
+            produce the SAME plan_fingerprint (with the engine-dependent caveat in
+            query_plan_models.py that some parsers, e.g. DuckDB, fold an estimated
+            cardinality into the signature — identical across streams as long as the
+            cardinality estimate is stable). Only the execution stats
+            (timing/per-operator cardinality) differ between streams. Consumers that
+            want a single representative plan per query should deduplicate by
+            ``plan_fingerprint``; a fingerprint mismatch across streams of the same
+            query indicates a genuine plan-shape (or estimate) divergence worth
+            investigating.
 
         Args:
             connection: Database connection
@@ -700,6 +795,39 @@ class ResultCaptureMixin:
         capture_time_ms = (time.perf_counter() - start_time) * 1000
         self.query_plans_captured += 1
         return plan, capture_time_ms
+
+    def _merge_plan_capture_into_result(
+        self,
+        result: dict[str, Any],
+        connection: Any,
+        query: str,
+        query_id: str,
+    ) -> None:
+        """Capture the query plan and merge the plan fields into ``result`` in place.
+
+        Encapsulates the per-adapter plan-capture block so it lives in exactly one
+        place. The SUCCESS guard is baked in universally: capture only runs when
+        ``capture_plans`` is enabled and the result succeeded, so a validation-
+        failed result never triggers a wasted EXPLAIN round-trip.
+
+        No-op when ``capture_plans`` is False or ``result["status"]`` is not
+        ``"SUCCESS"``. On success, sets ``query_plan`` and ``plan_fingerprint`` when
+        a plan was parsed, and always records ``plan_capture_time_ms`` when measured.
+
+        Args:
+            result: Result dict to mutate in place.
+            connection: Database connection.
+            query: SQL query text.
+            query_id: Query identifier.
+        """
+        if not self.capture_plans or result.get("status") != "SUCCESS":
+            return
+        query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+        if query_plan:
+            result["query_plan"] = query_plan
+            result["plan_fingerprint"] = query_plan.plan_fingerprint
+        if plan_capture_time_ms is not None:
+            result["plan_capture_time_ms"] = plan_capture_time_ms
 
     def validate_loaded_data(self, connection: Any, benchmark_type: str, scale_factor: float) -> ValidationResult:
         """Validate database state after data loading using platform-specific methods.

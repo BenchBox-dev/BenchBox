@@ -229,13 +229,25 @@ class MotherDuckAdapter(PlatformAdapter):
 
         MotherDuck uses DuckDB's SQL dialect; EXPLAIN format is identical.
         DuckDB EXPLAIN rows are (explain_key, explain_value) tuples; column 1 is the JSON payload.
+
+        DML queries (INSERT/UPDATE/DELETE/MERGE/COPY) are explained without ANALYZE
+        to prevent double-execution, even when analyze_plans=True: EXPLAIN ANALYZE
+        physically runs the statement, which would mutate data a second time. The
+        plan structure is still captured (FORMAT JSON only); execution statistics
+        are absent for these statements.
         """
-        analyze = getattr(self, "analyze_plans", True)
+        from benchbox.platforms.base.result_capture import is_dml_query
+
+        analyze = self.analyze_plans
+        # EXPLAIN ANALYZE re-executes the statement; for DML that would double-mutate
+        # data, so downgrade to FORMAT JSON (estimated plan, no execution stats).
+        if analyze and is_dml_query(query):
+            analyze = False
         explain_options = "ANALYZE, FORMAT JSON" if analyze else "FORMAT JSON"
         try:
             rows = (connection or self.connection).execute(f"EXPLAIN ({explain_options}) {query}").fetchall()
             # column 0 is the key (e.g. "analyzed_plan"), column 1 is the JSON value
-            parts = [str(row[1]) for row in rows if len(row) > 1]
+            parts = [str(row[1]) for row in rows]
             return "\n".join(parts) if parts else None
         except Exception as e:
             logger.debug(f"Failed to get MotherDuck query plan: {e}")
@@ -291,14 +303,15 @@ class MotherDuckAdapter(PlatformAdapter):
                 "error": None,
             }
 
-            # Capture structured query plan if enabled
-            if self.capture_plans:
-                query_plan, plan_capture_time_ms = self.capture_query_plan(conn, query, query_id)
-                if query_plan:
-                    result_dict["query_plan"] = query_plan
-                    result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
-                if plan_capture_time_ms is not None:
-                    result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+            # Display plan in console when --show-query-plans is active.
+            # Skip here when --capture-plans is also active: capture_query_plan below
+            # already calls get_query_plan (running EXPLAIN ANALYZE); calling
+            # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
+            if not self.capture_plans:
+                self.display_query_plan_if_enabled(conn, query, query_id)
+
+            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
+            self._merge_plan_capture_into_result(result_dict, conn, query, query_id)
 
             return result_dict
         except Exception as e:

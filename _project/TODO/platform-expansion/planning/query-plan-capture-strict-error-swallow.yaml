@@ -1,0 +1,126 @@
+id: query-plan-capture-strict-error-swallow
+title: "Fix strict-mode PlanCaptureError swallowing in SQLite and MotherDuck execute_query"
+worktree: platform-expansion
+priority: High
+status: Not Started
+category: Platform Expansion
+
+description: |
+  PR #769 factored plan capture into ResultCaptureMixin._merge_plan_capture_into_result()
+  and capture_query_plan() re-raises PlanCaptureError when strict_plan_capture=True
+  (benchbox/platforms/base/result_capture.py:682, 720). DuckDB and the adapters wired in
+  PRs #773/#775/#778 are safe: they either have `except PlanCaptureError: raise` before
+  the general handler, or call the helper OUTSIDE the execute_query try block.
+
+  SQLite and MotherDuck are NOT safe. They call _merge_plan_capture_into_result() INSIDE
+  the execute_query try whose tail is a broad `except Exception`, with no PlanCaptureError
+  re-raise:
+    - SQLite      benchbox/platforms/sqlite.py:569  (merge), :573 (except Exception)
+    - MotherDuck  benchbox/platforms/motherduck.py:314 (merge), :317 (except Exception)
+
+  Consequently, when strict_plan_capture=True and plan capture fails (parser error,
+  EXPLAIN failure, timeout), the PlanCaptureError is caught by the broad except and the
+  query is reported as status=FAILED even though the SQL executed successfully. This both
+  hides the real (capture) error behind a misleading query failure and corrupts benchmark
+  results by marking a successful query as failed.
+
+  The fix mirrors the canonical pattern: move the capture call OUTSIDE the try (after the
+  except/finally) so a strict PlanCaptureError propagates, matching PostgreSQL,
+  PrestoTrinoAdapterBase, Athena, ClickHouse, Spark, and Databricks.
+
+prior_art:
+  - "benchbox/platforms/duckdb.py — `except PlanCaptureError: raise` before the general except (safe pattern)"
+  - "benchbox/platforms/athena.py — capture placed after try/except/finally so strict errors propagate"
+  - "benchbox/platforms/base/result_capture.py:682 — capture_query_plan re-raises PlanCaptureError in strict mode"
+
+work:
+  - id: w1
+    summary: "SQLite: move _merge_plan_capture_into_result outside the execute_query try"
+    status: pending
+    notes: |
+      In benchbox/platforms/sqlite.py execute_query(), stop calling the merge helper at
+      line 569 inside the try. Build/return result on the success path, then call
+      self._merge_plan_capture_into_result(result, connection, query, query_id) after the
+      try/except, returning result. The validation-failed early-return path (if any) must
+      still short-circuit before the post-try capture.
+  - id: w2
+    summary: "MotherDuck: move _merge_plan_capture_into_result outside the execute_query try"
+    status: pending
+    notes: |
+      Same change in benchbox/platforms/motherduck.py: relocate the merge call at line 314
+      to after the try/except so result_dict is captured outside the broad except. result_dict
+      status is SUCCESS at that point on the success path.
+  - id: w3
+    summary: "Add strict-mode propagation tests for SQLite and MotherDuck"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      In tests/unit/platforms/test_sqlite_plan_capture.py and test_motherduck_plan_capture.py,
+      add a test that constructs the adapter with strict_plan_capture=True, monkeypatches
+      capture_query_plan to raise PlanCaptureError, and asserts the error PROPAGATES from
+      execute_query (pytest.raises) rather than being swallowed into a status=FAILED dict.
+      Also assert that with strict_plan_capture=False the same failure is silent (status=SUCCESS).
+
+deps:
+  needs: []
+
+must_preserve:
+  - "With strict_plan_capture=False, plan capture failure must remain silent and the query must report SUCCESS."
+  - "execute_query result dict shape must not change for non-plan fields."
+  - "A genuine query-execution failure must still be caught and returned as status=FAILED."
+
+approach: |
+  This is the same restructure already applied to Athena/ClickHouse/Spark/Databricks in
+  PRs #775/#778: pull the capture call out of the try so PlanCaptureError propagates in
+  strict mode. Each adapter change is a small relocation plus one test.
+
+  NOTE: query-plan-capture-isolation-phase-design proposes moving plan capture into a
+  separate post-measurement phase entirely. If that lands first, the capture call leaves
+  execute_query and this bug disappears at the source — coordinate so this fix is not done
+  twice. See open_questions.
+
+anti_patterns:
+  - "DO NOT add `except PlanCaptureError: raise` as a second except clause when the simpler fix is to move capture outside the try - because the project's other adapters standardized on the outside-the-try placement - relocate the call instead."
+  - "DO NOT change the non-strict behavior - because benchmarks rely on capture being a silent best-effort by default - only the strict-mode propagation path changes."
+
+verification:
+  - description: "SQLite strict-mode capture failure propagates"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_sqlite_plan_capture.py -k strict -v"
+    expected_output: "PlanCaptureError propagates from execute_query; non-strict stays SUCCESS"
+  - description: "MotherDuck strict-mode capture failure propagates"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_motherduck_plan_capture.py -k strict -v"
+    expected_output: "PlanCaptureError propagates from execute_query; non-strict stays SUCCESS"
+  - description: "Full platform suite green"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -q"
+    expected_output: "0 failures, 0 errors"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/sqlite.py"
+    - "benchbox/platforms/motherduck.py"
+    - "tests/unit/platforms/test_sqlite_plan_capture.py"
+    - "tests/unit/platforms/test_motherduck_plan_capture.py"
+
+success_metrics:
+  - "SQLite and MotherDuck propagate PlanCaptureError from execute_query when strict_plan_capture=True."
+  - "Non-strict capture failure remains silent with status=SUCCESS for both adapters."
+  - "No adapter in the fleet captures inside a broad-except try without PlanCaptureError propagation."
+
+open_questions:
+  - question: "Should this point fix land now, or be absorbed into query-plan-capture-isolation-phase-design which moves capture out of execute_query entirely?"
+    gating: false
+    affects: ["w1", "w2"]
+    default: "Land the point fix now (small, removes a live strict-mode correctness bug); the isolation-phase redesign supersedes the placement later."
+
+files_affected:
+  modified:
+    - "benchbox/platforms/sqlite.py"
+    - "benchbox/platforms/motherduck.py"
+    - "tests/unit/platforms/test_sqlite_plan_capture.py"
+    - "tests/unit/platforms/test_motherduck_plan_capture.py"
+
+metadata:
+  tags: [query-plan, sqlite, motherduck, correctness, strict-mode, error-handling]
+  estimated_effort: "Small"
+  created_date: "2026-06-11"
+  last_updated: "2026-06-11T00:00:00-04:00"

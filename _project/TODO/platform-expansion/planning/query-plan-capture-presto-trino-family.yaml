@@ -2,7 +2,7 @@ id: query-plan-capture-presto-trino-family
 title: "Implement query plan parser and end-to-end capture for Presto, Trino, Starburst, and Athena"
 worktree: platform-expansion
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |
@@ -53,7 +53,7 @@ prior_art:
 work:
   - id: w1
     summary: "Collect representative EXPLAIN FORMAT JSON samples from Presto, Trino, and Athena"
-    status: pending
+    status: done
     notes: |
       Against live instances, run `EXPLAIN (FORMAT JSON) SELECT * FROM tpch.sf1.lineitem LIMIT 10`
       (or equivalent small query) and capture the full JSON output. Record one sample
@@ -65,7 +65,7 @@ work:
   - id: w2
     summary: "Implement PrestoTrinoQueryPlanParser in benchbox/core/query_plans/parsers/presto_trino.py"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Implement the abstract interface from base.py:
         - parse(raw_plan: str) -> QueryPlanDAG
@@ -81,7 +81,7 @@ work:
   - id: w3
     summary: "Add unit tests for PrestoTrinoQueryPlanParser using fixture samples"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Create tests/unit/query_plans/test_presto_trino_parser.py. Cover:
         - Basic parse of each fixture sample produces a valid QueryPlanDAG
@@ -93,7 +93,7 @@ work:
   - id: w4
     summary: "Override get_query_plan_parser() in PrestoTrinoAdapterBase"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       In benchbox/platforms/presto_trino_adapter_base.py add:
         def get_query_plan_parser(self):
@@ -107,7 +107,7 @@ work:
   - id: w5
     summary: "Integrate capture_query_plan() into PrestoTrinoAdapterBase execute_query() path"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       The base class may or may not have a shared execute_query(). If it does,
       add the capture guard there. If each adapter has its own execute_query(),
@@ -117,7 +117,7 @@ work:
   - id: w6
     summary: "Override get_query_plan_parser() in AthenaAdapter; integrate capture in execute_query()"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       AthenaAdapter has its own execute_query() (line 1179). Add get_query_plan_parser()
       returning PrestoTrinoQueryPlanParser and add the capture call in execute_query().
@@ -128,7 +128,7 @@ work:
   - id: w7
     summary: "Add wiring unit tests for Presto/Starburst/Athena adapters"
     needs: [w5, w6]
-    status: pending
+    status: done
     notes: |
       Create tests/unit/platforms/test_presto_trino_plan_capture.py. Cover
       get_query_plan_parser() returns non-None for Presto, Starburst, and Athena.
@@ -192,4 +192,4 @@ metadata:
   tags: [query-plan, presto, trino, starburst, athena, new-parser]
   estimated_effort: "Medium"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T00:00:00-04:00"
+  last_updated: "2026-06-10T00:00:00-04:00"

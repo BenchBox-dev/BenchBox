@@ -73,6 +73,19 @@ class TestRedshiftPlanCapture:
         assert result["plan_fingerprint"] == "rs_fingerprint"
         assert result["plan_capture_time_ms"] == 3.0
 
+    def test_execute_query_failed_status_skips_capture(self, adapter, monkeypatch):
+        conn, cursor = _make_connection()
+        cursor.fetchall.return_value = [(0, "col1")]
+
+        capture_called = []
+        monkeypatch.setattr(adapter, "capture_query_plan", lambda *a, **k: capture_called.append(True) or (None, 0.0))
+        monkeypatch.setattr(adapter, "_get_query_statistics", lambda *a, **k: {})
+        monkeypatch.setattr(adapter, "_build_query_result_with_validation", lambda **kw: {"status": "FAILED"})
+
+        adapter.execute_query(connection=conn, query="SELECT 1", query_id="rq_fail", validate_row_count=False)
+
+        assert not capture_called, "capture_query_plan must not be called on FAILED results"
+
     def test_execute_query_without_capture_has_no_plan(self, adapter_no_capture, monkeypatch):
         conn, cursor = _make_connection()
         cursor.fetchall.return_value = [(0, "col1")]
@@ -83,6 +96,24 @@ class TestRedshiftPlanCapture:
         )
 
         assert "query_plan" not in result or result.get("query_plan") is None
+
+    def test_execute_query_calls_display_when_not_capturing(self, adapter_no_capture, monkeypatch):
+        conn, cursor = _make_connection()
+        cursor.fetchall.return_value = [(0, "col1")]
+        monkeypatch.setattr(adapter_no_capture, "_get_query_statistics", lambda *a, **k: {})
+
+        display_calls = []
+        monkeypatch.setattr(
+            adapter_no_capture,
+            "display_query_plan_if_enabled",
+            lambda *a, **k: display_calls.append(True),
+        )
+
+        adapter_no_capture.execute_query(
+            connection=conn, query="SELECT 1", query_id="rq_disp", validate_row_count=False
+        )
+
+        assert len(display_calls) == 1, "display_query_plan_if_enabled must be called exactly once"
 
     def test_get_query_plan_does_not_use_analyze(self, adapter):
         cursor = MagicMock()

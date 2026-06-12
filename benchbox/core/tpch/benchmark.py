@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Union
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.tpch.generator import TPCHDataGenerator
 from benchbox.core.tpch.maintenance_test import TPCHMaintenanceTest
 from benchbox.core.tpch.queries import TPCHQueries
@@ -152,7 +152,7 @@ def _expand_sqlite_named_column_aliases(query: str) -> str:
     )
 
 
-class TPCHBenchmark(BaseBenchmark):
+class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     """TPC-H benchmark implementation.
 
     This class provides a complete implementation of the TPC-H benchmark,

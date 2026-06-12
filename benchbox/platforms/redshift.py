@@ -2114,14 +2114,15 @@ class RedshiftAdapter(PlatformAdapter):
             # Map query_statistics to resource_usage for cost calculation
             result_dict["resource_usage"] = query_stats
 
-            # Capture structured query plan if enabled
-            if self.capture_plans:
-                query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
-                if query_plan:
-                    result_dict["query_plan"] = query_plan
-                    result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
-                if plan_capture_time_ms is not None:
-                    result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+            # Display plan in console when --show-query-plans is active.
+            # Skip here when --capture-plans is also active: capture_query_plan below
+            # already calls get_query_plan (running EXPLAIN); calling
+            # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
+            if not self.capture_plans:
+                self.display_query_plan_if_enabled(connection, query, query_id)
+
+            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
+            self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
 
             return result_dict
 

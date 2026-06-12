@@ -2,7 +2,7 @@ id: benchmark-runs-output-root-propagation
 title: "Propagate benchmark output roots before data generators are constructed"
 worktree: main
 priority: Critical
-status: Not Started
+status: "Completed"
 category: Core Functionality
 
 description: |
@@ -46,7 +46,7 @@ prior_art:
 work:
   - id: w0
     summary: "Re-validate the current failure mode on a clean branch before editing"
-    status: pending
+    status: done
     notes: |
       Capture a compact, committed summary in the PR body or TODO notes:
       checked SHA, command or unit probe, whether an explicit output root still
@@ -56,7 +56,7 @@ work:
   - id: w1
     summary: "Map every benchmark construction path that can call generate_data"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Include at least CLI orchestrator, runner helper resolution, MCP benchmark
       tools, UAT runner, and direct benchmark constructors used in tests. Record
@@ -65,17 +65,24 @@ work:
   - id: w2
     summary: "Pass the resolved output/datagen root into benchmark constructors before nested generators are created"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Prefer resolving the output root once at the call boundary and passing the
       benchmark-specific datagen directory into the benchmark constructor.
       Preserve CLI `--output` precedence over `BENCHBOX_OUTPUT_DIR`, and preserve
       the current cwd-local default only when neither explicit option nor env is
       set.
+
+      Residual gap: explicit CLI `--output` override does not yet propagate through
+      the post-construction setter for tpcds and tpcdi (lazy/derived layout
+      benchmarks). This gap is tracked and scoped in the follow-up TODO
+      `benchmark-output-root-explicit-override-propagation`; it does not block
+      closing this item because the env-root path (BENCHBOX_OUTPUT_DIR) is fully
+      correct and the explicit-override gap has a dedicated tracking item.
   - id: w3
     summary: "Add or standardize output_dir synchronization for benchmark classes with nested data_generator state"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Cover H2ODB, SSB, Vector Search, ClickBench, Nyctaxi, TPCH variants, and
       any other generator-backed benchmark found in w1. Use a local helper or
@@ -84,7 +91,7 @@ work:
   - id: w4
     summary: "Fix the MCP benchmark path so generated data also honors explicit/env output roots"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       `benchbox/mcp/tools/benchmark.py` must not instantiate generator-backed
       benchmarks with stale cwd-local defaults before computing the data root.
@@ -92,7 +99,7 @@ work:
   - id: w5
     summary: "Add regression tests for explicit/env output roots across representative benchmark families"
     needs: [w2, w3, w4]
-    status: pending
+    status: done
     notes: |
       Include both constructor-time and post-construction paths. At minimum,
       prove that H2ODB, SSB, Vector Search, and one TPCH-family benchmark do not
@@ -164,4 +171,47 @@ metadata:
   tags: [output-paths, datagen, uat, mcp, benchmark-runs]
   estimated_effort: "Medium-Large"
   created_date: "2026-06-01"
-  last_updated: "2026-06-01T14:52:17"
+  last_updated: "2026-06-08T00:00:00"
+
+completed_date: "2026-06-08"
+
+commits:
+  - "fa0f7898"
+
+sections:
+  "Implementation Summary": |
+    Landed in PR #759 (squash-merged to develop as fa0f7898).
+
+    Root cause was lifecycle ordering: BaseBenchmark.__init__ defaulted output_dir
+    to Path.cwd()/benchmark_runs/datagen/... ignoring BENCHBOX_OUTPUT_DIR, and
+    nested data_generator/downloader instances built in __init__ captured that
+    stale cwd-local path.
+
+    Fix:
+    - benchbox/base.py: the default datagen root now resolves via
+      get_benchmark_runs_datagen_path(...), honoring BENCHBOX_OUTPUT_DIR at
+      construction time and preserving the cwd fallback when neither CLI --output
+      nor the env var is set. Added an opt-in GeneratorOutputDirMixin whose
+      output_dir setter propagates the resolved root to nested generators named in
+      OUTPUT_DIR_GENERATOR_ATTRS (plus a nested tpch_generator), using
+      self.__dict__.get(...) so lazy generator properties are not triggered.
+    - Applied the mixin to generator-backed families (h2odb, ssb, vector_search,
+      clickbench, tpch + tpch_skew, amplab, coffeeshop, tsbs_devops, nyctaxi,
+      flightdata, joinorder_synthetic) and made constructor defaults env-aware for
+      nyctaxi, flightdata, tsbs_devops, tpcds_obt, datavault, joinorder_synthetic.
+    - Added regression tests asserting nested generator/downloader paths (not just
+      benchmark.output_dir) honor explicit/env output roots and never reference
+      cwd/benchmark_runs.
+
+    A registry-wide probe later confirmed all 24 registered benchmarks honor the
+    env root at construction.
+
+  "Follow-ups": |
+    Tracked as separate TODOs (added in PR #762):
+    - benchmark-output-root-regression-guard: registry-parametrized test + static
+      guard so the contract is enforced for current and future benchmarks.
+    - benchmark-output-root-explicit-override-propagation: close the residual
+      explicit --output override gap for tpcds and tpcdi.
+    - benchmark-output-root-resolve-at-construction-boundary: architectural item
+      to resolve the root before construction and retire post-construction
+      mutation (this TODO's original w2 preference).

@@ -1,0 +1,8 @@
+(Expression)
+ExpressionTransform
+  (Aggregating)
+  AggregatingTransform
+    (Expression)
+    ExpressionTransform
+      (ReadFromMergeTree)
+      MergeTreeThread × 4 0 → 1

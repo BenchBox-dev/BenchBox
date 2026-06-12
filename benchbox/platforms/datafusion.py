@@ -31,6 +31,7 @@ except ImportError:
     RuntimeEnv = None  # type: ignore[assignment, misc]  # ty: ignore[conflicting-declarations]
 
 from benchbox.core.dataframe.schema_utils import extract_schema_columns
+from benchbox.core.errors import PlanCaptureError
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
 from benchbox.platforms.base.no_constraint_mixin import NoConstraintEnforcementMixin
@@ -1408,7 +1409,7 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                 for i in range(batch.num_rows):
                     plan_type = batch.column(0)[i].as_py()
                     plan_text = batch.column(1)[i].as_py()
-                    if not plan_text:
+                    if not plan_type or not plan_text:
                         continue
                     lines = plan_text.split("\n")
                     prefix = " " * len(plan_type)
@@ -1527,17 +1528,20 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                 validation_result=validation_result,
             )
 
-            # Capture structured query plan if enabled
-            if self.capture_plans:
-                query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
-                if query_plan:
-                    result["query_plan"] = query_plan
-                    result["plan_fingerprint"] = query_plan.plan_fingerprint
-                if plan_capture_time_ms is not None:
-                    result["plan_capture_time_ms"] = plan_capture_time_ms
+            # Display plan in console when --show-query-plans is active.
+            # Skip here when --capture-plans is also active: capture_query_plan below
+            # already calls get_query_plan (running EXPLAIN); calling
+            # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
+            if not self.capture_plans:
+                self.display_query_plan_if_enabled(connection, query, query_id)
+
+            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
+            self._merge_plan_capture_into_result(result, connection, query, query_id)
 
             return result
 
+        except PlanCaptureError:
+            raise
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             logger.error(

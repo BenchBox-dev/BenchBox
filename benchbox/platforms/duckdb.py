@@ -961,15 +961,6 @@ class DuckDBAdapter(PlatformAdapter):
             # Display query plan if enabled
             self.display_query_plan_if_enabled(connection, query, query_id)
 
-            # Capture structured query plan if enabled
-            query_plan = None
-            plan_fingerprint = None
-            plan_capture_time_ms = None
-            if self.capture_plans:
-                query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
-                if query_plan:
-                    plan_fingerprint = query_plan.plan_fingerprint
-
             # Validate row count if enabled and benchmark type is provided
             validation_result = None
             if validate_row_count and benchmark_type:
@@ -1004,12 +995,8 @@ class DuckDBAdapter(PlatformAdapter):
                 validation_result=validation_result,
             )
 
-            # Add query plan to result if captured
-            if query_plan:
-                result["query_plan"] = query_plan
-                result["plan_fingerprint"] = plan_fingerprint
-            if plan_capture_time_ms is not None:
-                result["plan_capture_time_ms"] = plan_capture_time_ms
+            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
+            self._merge_plan_capture_into_result(result, connection, query, query_id)
 
             return result
 
@@ -1051,8 +1038,20 @@ class DuckDBAdapter(PlatformAdapter):
         Note: EXPLAIN (ANALYZE, ...) re-executes the query, adding ~1× query cost to the
         capture step. Plan fingerprints are unaffected - compute_plan_fingerprint()
         excludes timing/cardinality by design.
+
+        DML queries (INSERT/UPDATE/DELETE/MERGE/COPY) are explained without ANALYZE
+        to prevent double-execution, even when analyze_plans=True: DuckDB's
+        EXPLAIN ANALYZE physically runs the statement, which would mutate data a
+        second time. The plan structure is still captured (FORMAT JSON only);
+        execution statistics are absent for these statements.
         """
+        from benchbox.platforms.base.result_capture import is_dml_query
+
         analyze = self.analyze_plans
+        # EXPLAIN ANALYZE re-executes the statement; for DML that would double-mutate
+        # data, so downgrade to FORMAT JSON (estimated plan, no execution stats).
+        if analyze and is_dml_query(query):
+            analyze = False
         # EXPLAIN (ANALYZE, FORMAT JSON) is the PostgreSQL-style combined syntax supported by DuckDB.
         # Plain EXPLAIN (FORMAT JSON) produces estimated plans only (no timing/cardinality data).
         explain_options = "ANALYZE, FORMAT JSON" if analyze else "FORMAT JSON"

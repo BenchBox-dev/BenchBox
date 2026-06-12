@@ -12,6 +12,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -696,12 +697,25 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         query: str,
         explain_options: dict[str, Any] | None = None,
     ) -> str | None:
-        """Get query execution plan using EXPLAIN (ANALYZE, FORMAT JSON)."""
+        """Get query execution plan using EXPLAIN (FORMAT JSON).
+
+        SELECT queries include ANALYZE and BUFFERS for actual timing and I/O.
+        DML statements (INSERT/UPDATE/DELETE/MERGE/COPY) use FORMAT JSON only:
+        EXPLAIN ANALYZE physically re-executes the statement, which would mutate
+        data a second time. The plan structure is still captured; execution
+        statistics are absent for DML.
+        """
+        from benchbox.platforms.base.result_capture import is_dml_query
+
         cursor = connection.cursor()
 
         # Use FORMAT JSON so PostgreSQLQueryPlanParser can parse the output.
-        # ANALYZE and BUFFERS give actual timing and I/O info.
-        options = ["ANALYZE", "BUFFERS", "FORMAT JSON"]
+        # ANALYZE and BUFFERS give actual timing and I/O info for SELECT queries.
+        # DML queries are downgraded to FORMAT JSON only to prevent double-execution.
+        if is_dml_query(query):
+            options = ["FORMAT JSON"]
+        else:
+            options = ["ANALYZE", "BUFFERS", "FORMAT JSON"]
         if explain_options:
             if explain_options.get("verbose"):
                 options.append("VERBOSE")
@@ -713,8 +727,14 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             cursor.execute(explain_query)
             plan_rows = cursor.fetchall()
             cursor.close()
-            # PostgreSQL returns the full JSON as the first column of the first row
-            return plan_rows[0][0] if plan_rows else None
+            # PostgreSQL returns the full JSON as the first column of the first row.
+            # psycopg decodes FORMAT JSON output as a Python object; re-serialize
+            # to a string so PostgreSQLQueryPlanParser.parse_explain_output() receives
+            # the string it expects.
+            raw = plan_rows[0][0] if plan_rows else None
+            if raw is not None and not isinstance(raw, str):
+                raw = json.dumps(raw)
+            return raw
 
         except Exception as e:
             cursor.close()
@@ -747,13 +767,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             validate_row_count=validate_row_count,
             stream_id=stream_id,
         )
-        if self.capture_plans and result.get("status") == "SUCCESS":
-            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
-            if query_plan:
-                result["query_plan"] = query_plan
-                result["plan_fingerprint"] = query_plan.plan_fingerprint
-            if plan_capture_time_ms is not None:
-                result["plan_capture_time_ms"] = plan_capture_time_ms
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
         return result
 
     def analyze_table(self, connection: Any, table_name: str) -> None:

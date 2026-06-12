@@ -41,6 +41,29 @@ jobs:
             | grep -v '\.manifest\.json$' \
             | grep -v 'submission-manifest\.json$' \
             || true)
+
+          # Detect changed manifest files separately. A manifest-only PR skips
+          # both validate_submission.py and the corpus inventory check because
+          # CHANGED stays empty — but manifests carry the bundle hash contract,
+          # so a bad manifest edit can merge without verifying the hash. For each
+          # changed manifest, derive its paired bundle path and add it to CHANGED
+          # so the existing validation step covers manifest-only PRs too.
+          CHANGED_MANIFESTS=$(git diff --name-only --diff-filter=ACMR \
+            ${{ github.event.pull_request.base.sha }}...HEAD -- \
+            'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
+            | grep '\.manifest\.json$' \
+            || true)
+          if [ -n "$CHANGED_MANIFESTS" ]; then
+            while IFS= read -r manifest; do
+              bundle="${manifest%.manifest.json}.json"
+              # Only add if the paired bundle exists and is not already in CHANGED.
+              if git cat-file -e "HEAD:${bundle}" 2>/dev/null \
+                  && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
+                CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"
+              fi
+            done <<< "$CHANGED_MANIFESTS"
+          fi
+
           if [ -z "$CHANGED" ]; then
             echo "No bundle files changed."
             echo "has_bundles=false" >> "$GITHUB_OUTPUT"

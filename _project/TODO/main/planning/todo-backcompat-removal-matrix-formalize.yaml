@@ -1,0 +1,80 @@
+id: todo-backcompat-removal-matrix-formalize
+title: "Decide fate of remove-alpha-backward-compatibility-surface-removal-matrix.md in main/active/"
+worktree: main
+priority: Low
+status: Not Started
+category: Repository Maintenance
+
+description: |
+  `_project/TODO/main/active/remove-alpha-backward-compatibility-surface-removal-matrix.md`
+  is a Markdown file with 88 tracked backward-compatibility removal entries
+  across 35 modules. It lives in the `active/` lifecycle directory, implying
+  it is in-progress work, but it is not a YAML file and is therefore invisible
+  to todo_cli.py, validate_todo.py, and the index system.
+
+  As a result:
+  - It has no priority, owner, status, or work breakdown tracked by tooling
+  - Its 88 entries cannot be queried, filtered, or linked via deps.needs
+  - It won't appear in `make pr-preflight` validation sweeps after
+    todo-add-todo-validation-to-pr-preflight lands
+
+  One of three outcomes is needed:
+  1. Convert to a YAML TODO with work units for each module cluster
+  2. Keep as .md but add a YAML companion TODO that tracks the sweep work
+     and explicitly cites the .md as its scope document
+  3. Explicitly move it out of the TODO tree (e.g. into _project/docs/ or
+     a tracking issue) with a note that it is managed outside the TODO system
+
+work:
+  - id: w1
+    summary: "Read the .md file and assess how much work remains vs. is already done"
+    status: pending
+    notes: |
+      File: _project/TODO/main/active/remove-alpha-backward-compatibility-surface-removal-matrix.md
+      Count entries by 'active' vs 'deprecate' status. Estimate remaining effort.
+
+  - id: w2
+    summary: "Choose one of the three formalization options and document the decision"
+    needs: [w1]
+    status: pending
+    notes: |
+      Decision rule based on w1 counts:
+        - If >70% of entries are 'deprecate' or already-removed: choose option 3
+          (move .md to _project/docs/backward-compat/ and close). The work is
+          essentially done and doesn't need ongoing TODO tracking.
+        - If 30-70% remain 'active' and fit in 1-2 sessions: choose option 2
+          (add a YAML companion TODO citing the .md as scope doc; keep .md as-is).
+        - If <30% done and work spans multiple sessions: choose option 1
+          (convert .md to YAML with one work unit per module cluster).
+
+  - id: w3
+    summary: "Execute the chosen option"
+    needs: [w2]
+    status: pending
+
+prior_art:
+  - "_project/TODO/main/active/: examine other active/ YAML items for companion-TODO convention"
+  - "_project/TODO_ENTRY_TEMPLATE.yaml: use for any new YAML wrapper"
+
+must_preserve:
+  - "The 88 removal entries themselves are not lost — only their container changes"
+  - "If converted to YAML, the individual file paths and removal actions remain traceable"
+
+verification:
+  - description: "No .md files remain directly under any TODO lifecycle directory"
+    command: "find _project/TODO -name '*.md' -not -name 'README.md'"
+    expected_output: "Empty (or only README.md files)"
+
+metadata:
+  created_date: "2026-06-08"
+  estimated_effort: "Small"
+  tags:
+    - housekeeping
+    - todo-system
+    - backward-compatibility
+
+impact:
+  technical_debt: |
+    An untracked .md in the active/ directory creates a hidden work item
+    that evades priority tracking, ownership, and CI validation. The longer
+    it stays invisible to tooling, the more likely it is to be forgotten.

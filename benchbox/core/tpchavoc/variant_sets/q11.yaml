@@ -20,7 +20,7 @@ variants:
             where ps2.ps_suppkey = s2.s_suppkey
               and s2.s_nationkey = n2.n_nationkey
               and n2.n_name = 'GERMANY'
-              and ps2.ps_partkey = ps_partkey
+              and ps2.ps_partkey = partsupp.ps_partkey
         )
     group by
         ps_partkey

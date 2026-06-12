@@ -1,7 +1,7 @@
 id: tpchavoc-correlated-subquery-self-binding
 title: "Fix tpchavoc variants whose correlated subqueries silently self-bind to the inner alias"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Testing and Quality Assurance
 

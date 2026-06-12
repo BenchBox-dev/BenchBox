@@ -170,6 +170,43 @@ jobs:
         run: |
           uv run -- python -m pytest -q tests/integration/core/data_organization/test_presorted_generation.py -m "requires_table_formats" --tb=short
 
+  postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: benchbox
+          POSTGRES_PASSWORD: benchbox
+          POSTGRES_DB: benchbox_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run PostgreSQL live integration tests
+        run: |
+          uv run -- python -m pytest tests/integration/platforms/test_postgresql_live.py \
+            -m "live_postgresql" --tb=short -v
+
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 20

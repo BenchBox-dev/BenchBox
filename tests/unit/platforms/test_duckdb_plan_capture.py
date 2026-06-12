@@ -4,6 +4,8 @@ Tests for DuckDB query plan capture integration.
 Verifies that query plans are captured and parsed during query execution.
 """
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from benchbox.platforms.duckdb import DuckDBAdapter
@@ -12,6 +14,109 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+class TestIsDmlQueryHelper:
+    """Direct contract tests for the shared is_dml_query classifier."""
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "INSERT INTO t VALUES (1)",
+            "update t set x = 1",
+            "  DELETE FROM t",
+            "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = 1",
+            "COPY t FROM 'f.csv'",
+            "/* banner */ INSERT INTO t VALUES (1)",
+            "-- c\nUPDATE t SET x = 1",
+            "WITH s AS (SELECT 1) INSERT INTO t SELECT * FROM s",
+        ],
+    )
+    def test_dml_detected(self, query):
+        from benchbox.platforms.base.result_capture import is_dml_query
+
+        assert is_dml_query(query) is True
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "SELECT 1",
+            "WITH cte AS (SELECT 1) SELECT * FROM cte",
+            "SELECT copy_total, merge_flag FROM t",  # identifiers, not verbs (word boundary)
+            "CREATE TABLE t (id INT)",  # DDL is excluded
+            "EXPLAIN SELECT 1",
+            "",
+            "-- only a comment",
+        ],
+    )
+    def test_non_dml_not_detected(self, query):
+        from benchbox.platforms.base.result_capture import is_dml_query
+
+        assert is_dml_query(query) is False
+
+
+class TestDuckDBDMLPlanGuard:
+    """EXPLAIN ANALYZE re-executes statements; DML must downgrade to FORMAT JSON."""
+
+    @pytest.mark.parametrize(
+        "dml",
+        [
+            "INSERT INTO t VALUES (1)",
+            "UPDATE t SET x = 1",
+            "DELETE FROM t WHERE id = 1",
+            "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = 1",
+            "COPY t FROM 'data.csv'",
+        ],
+    )
+    def test_dml_query_does_not_use_analyze(self, dml):
+        adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = [("logical_plan", "{}")]
+
+        adapter.get_query_plan(conn, dml)
+
+        called_sql = conn.execute.call_args[0][0].upper()
+        assert "ANALYZE" not in called_sql, f"DML must not run EXPLAIN ANALYZE: {called_sql}"
+        assert "FORMAT JSON" in called_sql
+
+    @pytest.mark.parametrize(
+        "dml",
+        [
+            "-- leading comment\nINSERT INTO t VALUES (1)",
+            "  insert into t values (1)",
+            "/* query 12 */ INSERT INTO t VALUES (1)",
+            "/* a */ -- b\n  DELETE FROM t",
+            "WITH src AS (SELECT * FROM staging) INSERT INTO t SELECT * FROM src",
+            "WITH d AS (SELECT id FROM t) DELETE FROM t WHERE id IN (SELECT id FROM d)",
+        ],
+    )
+    def test_dml_guard_handles_comments_cte_and_whitespace(self, dml):
+        adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = [("logical_plan", "{}")]
+
+        adapter.get_query_plan(conn, dml)
+
+        assert "ANALYZE" not in conn.execute.call_args[0][0].upper(), f"DML must not run ANALYZE: {dml!r}"
+
+    @pytest.mark.parametrize(
+        "non_dml",
+        [
+            "SELECT * FROM t WHERE id = 1",
+            "WITH cte AS (SELECT 1) SELECT * FROM cte",
+            "SELECT copy_count, update_ts FROM t",  # column names starting with DML verbs
+        ],
+    )
+    def test_non_dml_query_still_uses_analyze(self, non_dml):
+        adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = [("analyzed_plan", "{}")]
+
+        adapter.get_query_plan(conn, non_dml)
+
+        called_sql = conn.execute.call_args[0][0].upper()
+        assert "ANALYZE" in called_sql, f"Non-DML must still use EXPLAIN ANALYZE: {non_dml!r}"
+        assert "FORMAT JSON" in called_sql
 
 
 class TestDuckDBPlanCapture:
@@ -251,3 +356,69 @@ class TestDuckDBPlanCapture:
 
         finally:
             adapter.close_connection(connection)
+
+
+class TestDuckDBFingerprintIntegration:
+    """Integration tests against a real in-memory DuckDB connection (no mocking).
+
+    Exercises the full capture path (real EXPLAIN, real parser, real fingerprint)
+    and verifies the plan fingerprint stability contract documented in
+    query_plan_models.py. DuckDB in-memory needs no credentials.
+    """
+
+    @pytest.fixture
+    def adapter(self):
+        return DuckDBAdapter(capture_plans=True)
+
+    @pytest.fixture
+    def conn(self, adapter):
+        connection = adapter.create_connection()
+        connection.execute("CREATE TABLE orders (id INTEGER, amount DOUBLE)")
+        connection.executemany("INSERT INTO orders VALUES (?, ?)", [(i, float(i)) for i in range(1, 500)])
+        yield connection
+        adapter.close_connection(connection)
+
+    def test_get_query_plan_returns_non_empty_json(self, adapter, conn):
+        raw = adapter.get_query_plan(conn, "SELECT * FROM orders WHERE id = 1")
+        assert raw, "get_query_plan should return non-empty EXPLAIN output"
+        stripped = raw.strip()
+        assert stripped.startswith("{") or stripped.startswith("["), "Expected FORMAT JSON output"
+
+    def test_parser_produces_dag_from_real_explain(self, adapter, conn):
+        raw = adapter.get_query_plan(conn, "SELECT * FROM orders WHERE id = 1")
+        parser = adapter.get_query_plan_parser()
+        dag = parser.parse_explain_output("dq_dag", raw)
+        assert dag is not None
+        assert dag.logical_root is not None
+        assert dag.plan_fingerprint is not None
+
+    def test_fingerprint_is_idempotent_across_calls(self, adapter, conn):
+        query = "SELECT * FROM orders WHERE id = 1"
+        plan1, _ = adapter.capture_query_plan(conn, query, "dq_a")
+        plan2, _ = adapter.capture_query_plan(conn, query, "dq_b")
+        assert plan1 is not None and plan2 is not None
+        assert plan1.plan_fingerprint is not None
+        assert plan1.plan_fingerprint == plan2.plan_fingerprint
+
+    def test_fingerprint_stable_across_index_addition(self, adapter, conn):
+        # Logical fingerprint excludes the physical access method, so adding an
+        # index does not change it (physical-independence guarantee).
+        query = "SELECT * FROM orders WHERE amount = 250.0"
+        before, _ = adapter.capture_query_plan(conn, query, "dq_before_idx")
+        conn.execute("CREATE INDEX idx_orders_amount ON orders(amount)")
+        after, _ = adapter.capture_query_plan(conn, query, "dq_after_idx")
+        assert before is not None and after is not None
+        assert before.plan_fingerprint == after.plan_fingerprint, (
+            "Adding an index is a physical change; the logical fingerprint must be stable"
+        )
+
+    def test_fingerprint_differs_for_logically_distinct_plans(self, adapter, conn):
+        # A self-join adds a second table scan to the logical tree, so the
+        # signature differs by construction (two Scan nodes vs one), independent of
+        # indexes, stats, or planner access-method choices.
+        scan_plan, _ = adapter.capture_query_plan(conn, "SELECT * FROM orders", "dq_scan")
+        join_plan, _ = adapter.capture_query_plan(
+            conn, "SELECT o.id FROM orders o JOIN orders o2 ON o.id = o2.id", "dq_join"
+        )
+        assert scan_plan is not None and join_plan is not None
+        assert scan_plan.plan_fingerprint != join_plan.plan_fingerprint, "A join must change the logical plan shape"
