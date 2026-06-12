@@ -34,7 +34,7 @@ def fake_tpch_components(monkeypatch, tmp_path):
             return tables
 
     class FakeTPCHQueryManager:
-        def get_all_queries(self):
+        def get_all_queries(self, **_):
             return {1: "SELECT 1", 2: "SELECT 2"}
 
         def get_query(self, query_id, **_):
