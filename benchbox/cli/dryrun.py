@@ -44,6 +44,7 @@ def generate_cli_command(
     force: str | None = None,
     official: bool = False,
     capture_plans: bool = False,
+    show_plans: bool = False,
     strict_translation: bool = False,
     validation: str | None = None,
     verbose: int = 0,
@@ -142,6 +143,7 @@ def generate_cli_command(
     _BOOL_PARAMS = [
         (official, "--official"),
         (capture_plans, "--capture-plans"),
+        (show_plans, "--show-plans"),
         (strict_translation, "--strict-translation"),
         (global_cache, "--global-cache"),
         (publish, "--publish"),

@@ -26,6 +26,7 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/visualize.py",
     "benchbox/cli/config.py",
     "benchbox/cli/display.py",
+    "benchbox/cli/dryrun.py",
     "benchbox/cli/help.py",
     "benchbox/cli/orchestrator.py",
 }
@@ -34,6 +35,7 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     "benchbox/cli/commands/compare_dataframes.py",
     "benchbox/cli/commands/compare_plans.py",
     "benchbox/cli/commands/df_tuning.py",
+    "benchbox/cli/commands/run.py",
     "benchbox/cli/commands/run_official.py",
     "benchbox/cli/commands/tuning.py",
 }
