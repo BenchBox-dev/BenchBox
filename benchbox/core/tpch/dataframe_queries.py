@@ -92,6 +92,15 @@ TPCH_DEFAULT_PARAMS: dict[int, dict[str, Any]] = {
 # query execution, get_tpch_parameters() merges these into the defaults.
 _parameter_overrides: dict[int, dict[str, Any]] | None = None
 
+# Module-level scale factor for scale-dependent parameter defaults. Canonical
+# TPC-H Q11 renders its value threshold as 0.0001 / SF (qgen does this); the
+# value in TPCH_DEFAULT_PARAMS is the SF=1 rendering. get_tpch_parameters()
+# scales it by this factor so unseeded DataFrame runs stay scale-faithful at
+# every scale, mirroring the SQL run path's {q11_fraction} rendering. Set by the
+# dataframe_runner (and the TPC-Havoc equivalence gate) before execution;
+# defaults to 1.0 (the qgen SF=1 rendering).
+_scale_factor: float = 1.0
+
 
 def set_parameter_overrides(overrides: dict[int, dict[str, Any]] | None) -> None:
     """Set parameter overrides for the current benchmark run.
@@ -106,11 +115,36 @@ def set_parameter_overrides(overrides: dict[int, dict[str, Any]] | None) -> None
     _parameter_overrides = overrides
 
 
+def set_scale_factor(scale_factor: float | None) -> None:
+    """Set the scale factor used for scale-dependent parameter defaults.
+
+    Canonical TPC-H Q11 renders its value threshold as ``0.0001 / SF``. The
+    dataframe_runner calls this before query execution so unseeded runs derive
+    the scale-correct Q11 fraction (mirroring the SQL run path) instead of
+    always using the SF=1 default. Pass ``None`` (or ``1.0``) to reset to the
+    SF=1 rendering.
+
+    Seed-derived overrides (see :func:`set_parameter_overrides`) take precedence
+    over the scaled default, so seeded runs are unaffected.
+
+    Args:
+        scale_factor: The run's scale factor, or None to reset to 1.0.
+    """
+    global _scale_factor
+    _scale_factor = 1.0 if scale_factor is None else float(scale_factor)
+
+
 def get_tpch_parameters(query_id: int) -> dict[str, Any]:
     """Get parameters for a TPC-H query.
 
-    If parameter overrides are active (set via set_parameter_overrides),
-    override values are merged on top of the defaults for the given query.
+    Q11's value threshold is scale-dependent: canonical qgen renders it as
+    ``0.0001 / SF``. The default in TPCH_DEFAULT_PARAMS is the SF=1 value, so it
+    is scaled by the active scale factor (set via :func:`set_scale_factor`) to
+    keep unseeded DataFrame runs aligned with the SQL run path at every scale.
+
+    If parameter overrides are active (set via :func:`set_parameter_overrides`),
+    override values are merged on top, so seed-derived parameters win over the
+    scaled default.
 
     Args:
         query_id: Query number (1-22)
@@ -119,6 +153,12 @@ def get_tpch_parameters(query_id: int) -> dict[str, Any]:
         Dict of parameter values for this query.
     """
     params = dict(TPCH_DEFAULT_PARAMS.get(query_id, {}))
+    if query_id == 11 and "fraction" in params and _scale_factor > 0:
+        # Mirror canonical qgen's `0.0001 / SF` rendering exactly - including its
+        # 10-decimal literal - so the unseeded default matches both the SQL run
+        # path's {q11_fraction} token and the seeded extraction (which parses
+        # that same literal). TPCH_DEFAULT_PARAMS holds the SF=1 base value.
+        params["fraction"] = float(f"{params['fraction'] / _scale_factor:.10f}")
     if _parameter_overrides is not None and query_id in _parameter_overrides:
         params.update(_parameter_overrides[query_id])
     return params

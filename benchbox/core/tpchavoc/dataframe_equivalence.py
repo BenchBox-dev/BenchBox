@@ -41,13 +41,12 @@ surface:
 
 Q11's value threshold is scale-dependent (canonical qgen renders
 ``0.0001 / SF``). The DataFrame implementations read the fraction from
-``get_tpch_parameters``, whose static default is the SF=1 value; production
-runs inject the scale-correct value via seeded parameter extraction. The gate
-mirrors that run path through the same public
-``set_parameter_overrides`` seam so the canonical SQL reference and the
-DataFrame variants agree on the threshold. Making the *unseeded* product run
-path scale-aware (and dropping this injection) is tracked in
-``_project/TODO/main/planning/tpch-dataframe-unseeded-q11-scale-fraction.yaml``.
+``get_tpch_parameters``, whose default is now scale-aware: it scales the SF=1
+value by the scale factor declared via ``set_scale_factor``, exactly like the
+qgen rendering and the unseeded production run path. The gate declares its
+scale (``EQUIVALENCE_SCALE``) through that same product seam so the canonical
+SQL reference and the DataFrame variants agree on the threshold without any
+gate-local parameter override.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -202,17 +201,20 @@ def find_dataframe_divergences(
         :meth:`TPCHavocBenchmark.validate_variant_equivalence`.
     """
     from benchbox.core.tpch import dataframe_queries as tpch_dataframe_queries
-    from benchbox.core.tpch.dataframe_queries import TPCH_DEFAULT_PARAMS, set_parameter_overrides
+    from benchbox.core.tpch.dataframe_queries import set_parameter_overrides, set_scale_factor
 
     ids = query_ids if query_ids is not None else benchmark.get_implemented_queries()
     registry = benchmark.get_dataframe_queries()
     divergences: list[DataFrameDivergence] = []
-    # Align the DataFrame surface's Q11 threshold with canonical qgen's
-    # fraction/SF rendering, exactly as seeded production runs do; restore any
-    # ambient overrides afterwards rather than clearing them.
+    # Compare against the scale-aware defaults alone. The DataFrame Q11 default
+    # is now scale-aware (0.0001 / SF), exactly like canonical qgen and the
+    # unseeded production run path, so no gate-local fraction override is needed:
+    # clear any ambient parameter overrides and declare the gate's scale through
+    # the same product seam the run path uses. Restore both afterwards.
     previous_overrides = tpch_dataframe_queries._parameter_overrides
-    sf1_fraction = TPCH_DEFAULT_PARAMS[11]["fraction"]
-    set_parameter_overrides({11: {"fraction": sf1_fraction / benchmark.scale_factor}})
+    previous_scale_factor = tpch_dataframe_queries._scale_factor
+    set_parameter_overrides(None)
+    set_scale_factor(benchmark.scale_factor)
     try:
         for query_id in ids:
             try:
@@ -233,6 +235,7 @@ def find_dataframe_divergences(
                         divergences.append(DataFrameDivergence(query_id, variant_id, backend, f"error: {exc}"))
     finally:
         set_parameter_overrides(previous_overrides)
+        set_scale_factor(previous_scale_factor)
     return divergences
 
 
