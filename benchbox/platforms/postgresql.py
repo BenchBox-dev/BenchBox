@@ -704,18 +704,24 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         EXPLAIN ANALYZE physically re-executes the statement, which would mutate
         data a second time. The plan structure is still captured; execution
         statistics are absent for DML.
+
+        ANALYZE is also suppressed when ``self.analyze_plans`` is False (e.g. the
+        isolated capture phase or ``--platform-option analyze_plans=false``):
+        plain EXPLAIN (FORMAT JSON) captures the estimated plan structure without
+        re-executing the query, so a SELECT is not run a second time.
         """
         from benchbox.platforms.base.result_capture import is_dml_query
 
         cursor = connection.cursor()
 
         # Use FORMAT JSON so PostgreSQLQueryPlanParser can parse the output.
-        # ANALYZE and BUFFERS give actual timing and I/O info for SELECT queries.
-        # DML queries are downgraded to FORMAT JSON only to prevent double-execution.
-        if is_dml_query(query):
-            options = ["FORMAT JSON"]
-        else:
+        # ANALYZE and BUFFERS give actual timing and I/O info for SELECT queries,
+        # but they re-execute the statement. Skip them for DML (double-mutation
+        # guard) and whenever analyze_plans is disabled (estimated-plan-only).
+        if self.analyze_plans and not is_dml_query(query):
             options = ["ANALYZE", "BUFFERS", "FORMAT JSON"]
+        else:
+            options = ["FORMAT JSON"]
         if explain_options:
             if explain_options.get("verbose"):
                 options.append("VERBOSE")

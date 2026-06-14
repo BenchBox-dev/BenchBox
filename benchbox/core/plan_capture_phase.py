@@ -24,7 +24,10 @@ Key isolation properties:
 - **Structural-only**: ``analyze_plans`` is forced to ``False`` for the phase,
   so DML/CTAS queries are never re-executed and SELECT queries pay only the
   planning cost rather than ~1x execution time. The structural fingerprint is
-  unaffected (it excludes timing/cardinality by design).
+  unaffected (it excludes timing/cardinality by design). Adapters must honour
+  ``analyze_plans`` in ``get_query_plan()`` for this to hold — DuckDB/MotherDuck
+  and PostgreSQL do; an adapter that always issues EXPLAIN ANALYZE would still
+  re-execute SELECTs in this phase.
 - **Filter-independent**: the measurement-phase sampling filters
   (``plan_first_n``, ``plan_sampling_rate``) are bypassed so each requested
   query is captured exactly once; the explicit query list is the selection.
