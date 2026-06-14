@@ -122,6 +122,7 @@ def _resolve_output_dir_handler(benchmark: Any, output_root: str | None) -> Any 
     callers that pass output_root directly (including cloud staging handlers,
     which resolve only after platform config is known).
     """
+    from pathlib import Path
 
     existing = getattr(benchmark, "output_dir", None)
     target = output_root if output_root else existing
@@ -129,8 +130,15 @@ def _resolve_output_dir_handler(benchmark: Any, output_root: str | None) -> Any 
         return None
 
     handler = create_path_handler(target)
-    if handler is not existing and handler != existing:
-        benchmark.output_dir = handler
+    # Skip the redundant reassignment only for a plain local path already equal
+    # to the live one (the common case where the orchestrator injected the same
+    # managed root at construction). create_path_handler preserves cloud handler
+    # types that are not pathlib.Path subclasses (DatabricksPath, cloudpathlib
+    # CloudPath); their __eq__ to a plain Path ignores the cloud/dbfs target, so
+    # an equality-only skip would silently drop it — always assign those.
+    if isinstance(handler, Path) and handler == existing:
+        return handler
+    benchmark.output_dir = handler
     return handler
 
 

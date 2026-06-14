@@ -154,12 +154,13 @@ class BenchmarkOrchestrator:
 
         # Compatibility fallback: benchmarks that declare data sharing only via
         # the get_data_source_benchmark() instance method (no
-        # DATA_SOURCE_BENCHMARK class attribute) still need the
-        # post-construction redirect to the shared root.
-        data_source = getattr(benchmark_instance, "get_data_source_benchmark", lambda: None)()
-        if data_source and self.custom_output_dir is None:
-            shared_path = self.directory_manager.get_datagen_path(data_source.lower(), config.scale_factor)
-            if construction_output_dir is None or Path(construction_output_dir) != Path(shared_path):
+        # DATA_SOURCE_BENCHMARK class attribute) were not resolved at
+        # construction, so redirect them to the shared root now. Class-attr
+        # sharers were already constructed with it.
+        if getattr(benchmark_class, "DATA_SOURCE_BENCHMARK", None) is None:
+            data_source = getattr(benchmark_instance, "get_data_source_benchmark", lambda: None)()
+            if data_source and self.custom_output_dir is None:
+                shared_path = self.directory_manager.get_datagen_path(data_source.lower(), config.scale_factor)
                 benchmark_instance.output_dir = shared_path
 
         return benchmark_instance

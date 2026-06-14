@@ -60,6 +60,12 @@ class GeneratorOutputDirMixin:
         # None means "not configured yet"; _resolve_output_dir rejects it later.
         self._output_dir = None if value is None else create_path_handler(value)
         self._sync_output_dir_to_generators(self._output_dir)
+        # The mixin precedes BaseBenchmark in the MRO, so mirror BaseBenchmark's
+        # _impl forwarding here too: a class combining this mixin with the
+        # public wrapper pattern would otherwise leave its _impl unsynced.
+        impl = self.__dict__.get("_impl")
+        if impl is not None and hasattr(impl, "output_dir"):
+            impl.output_dir = value
 
     def _sync_output_dir_to_generators(self, path: Any) -> None:
         """Point each opted-in nested generator at ``path`` when present."""
