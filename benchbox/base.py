@@ -55,9 +55,10 @@ class GeneratorOutputDirMixin:
         return getattr(self, "_output_dir", None)
 
     @output_dir.setter
-    def output_dir(self, value: Union[str, Path]) -> None:
+    def output_dir(self, value: Optional[Union[str, Path]]) -> None:
         """Set the output directory and propagate it to nested generators."""
-        self._output_dir = create_path_handler(value)
+        # None means "not configured yet"; _resolve_output_dir rejects it later.
+        self._output_dir = None if value is None else create_path_handler(value)
         self._sync_output_dir_to_generators(self._output_dir)
 
     def _sync_output_dir_to_generators(self, path: Any) -> None:
@@ -134,6 +135,20 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         # Store remaining kwargs as attributes
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+    @property
+    def output_dir(self) -> Any:
+        """Return the resolved output directory handler."""
+        return getattr(self, "_output_dir", None)
+
+    @output_dir.setter
+    def output_dir(self, value: Optional[Union[str, Path]]) -> None:
+        """Set output directory and forward to _impl when acting as a wrapper."""
+        # None means "not configured yet"; _resolve_output_dir rejects it later.
+        self._output_dir = None if value is None else create_path_handler(value)
+        impl = self.__dict__.get("_impl")
+        if impl is not None and hasattr(impl, "output_dir"):
+            impl.output_dir = value
 
     def _validate_scale_factor_type(self, scale_factor: float) -> None:
         """Validate scale factor is a number (int or float).

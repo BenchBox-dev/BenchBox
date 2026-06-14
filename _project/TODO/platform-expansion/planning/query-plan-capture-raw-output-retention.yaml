@@ -1,0 +1,83 @@
+id: query-plan-capture-raw-output-retention
+title: "Define a retention/size policy for raw_explain_output stored on every captured plan"
+worktree: platform-expansion
+priority: Low
+status: Not Started
+category: Platform Expansion
+
+description: |
+  Every captured QueryPlanDAG retains raw_explain_output (query_plan_models.py). For verbose
+  formats this is large per query per stream — Spark EXPLAIN EXTENDED stores all four plan
+  sections (Parsed/Analyzed/Optimized/Physical), and a throughput run multiplies that by query
+  count times stream count. capture_query_plan() already warns when a serialized plan exceeds
+  ~100KB, but there is no policy controlling how much raw text is retained in the results
+  bundle, so bundle size can grow unbounded with no operator control.
+
+  This TODO defines and implements a retention policy: e.g. a config flag to drop or truncate
+  raw_explain_output once the structured DAG and fingerprint are computed (the structural data
+  is what downstream comparison needs; the raw text is for debugging/display), plus a documented
+  default and a size cap.
+
+prior_art:
+  - "benchbox/core/results/query_plan_models.py — raw_explain_output field and estimate_serialized_size()"
+  - "benchbox/platforms/base/result_capture.py — the ~100KB large-plan warning (capture_query_plan)"
+
+work:
+  - id: w1
+    summary: "Measure raw_explain_output contribution to bundle size across formats"
+    status: pending
+    notes: |
+      Quantify raw text size per captured query for the verbose formats (Spark EXPLAIN EXTENDED,
+      DuckDB EXPLAIN ANALYZE FORMAT JSON) at a representative query count and stream count.
+  - id: w2
+    summary: "Add a retain/truncate/drop policy for raw_explain_output with a documented default"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add a config option (e.g. plan_raw_output=full|truncated|none, default truncated with a
+      size cap) honored where the plan is serialized into the results bundle. Keep the structured
+      DAG and fingerprint regardless; only the raw text is governed.
+  - id: w3
+    summary: "Test the policy and document the default"
+    needs: [w2]
+    status: pending
+    notes: |
+      Unit-test that each policy value retains/truncates/drops raw_explain_output as specified and
+      that the structured DAG/fingerprint are unaffected. Document the default and trade-offs.
+
+deps:
+  needs: []
+
+must_preserve:
+  - "plan_fingerprint and the structured QueryPlanDAG must be retained regardless of the raw-output policy."
+  - "Default behavior change (if any) must be documented; existing bundles must remain readable."
+
+approach: |
+  Measure first (w1) to pick a sane default, then add a single policy knob (w2) at the
+  serialization boundary, then test/document (w3). Low priority but cheap insurance against
+  unbounded bundle growth on large throughput runs.
+
+anti_patterns:
+  - "DO NOT drop the structured DAG or fingerprint to save space - because those are the comparison artifacts - only govern the raw_explain_output text."
+  - "DO NOT make 'none' the default - because raw text is valuable for debugging capture/parse issues - default to a truncated form with a size cap."
+
+verification:
+  - description: "Raw-output retention policy behaves per setting"
+    command: "uv run -- python -m pytest tests/unit -k 'plan and raw_output' -v"
+    expected_output: "full/truncated/none retain/truncate/drop raw text; DAG+fingerprint unaffected"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/results/query_plan_models.py"
+    - "benchbox/platforms/base/result_capture.py"
+    - "tests/unit/"
+
+success_metrics:
+  - "A documented raw_explain_output retention policy exists with a size-capped default."
+  - "Structured DAG and fingerprint are retained under every policy value."
+
+metadata:
+  tags: [query-plan, storage, results-bundle, retention]
+  estimated_effort: "Small"
+  created_date: "2026-06-11"
+  last_updated: "2026-06-11T00:00:00-04:00"

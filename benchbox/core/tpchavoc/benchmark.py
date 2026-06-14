@@ -172,7 +172,7 @@ class TPCHavocBenchmark(TPCHBenchmark):
         Raises:
             ValueError: If the query_id or variant_id is invalid
         """
-        return self.query_manager.get_query_variant(query_id, variant_id, params)
+        return self.query_manager.get_query_variant(query_id, variant_id, params, scale_factor=self.scale_factor)
 
     def get_all_variants(self, query_id: int) -> dict[int, str]:
         """Get all variants for a specific query.
@@ -186,7 +186,7 @@ class TPCHavocBenchmark(TPCHBenchmark):
         Raises:
             ValueError: If the query_id is invalid or not implemented
         """
-        return self.query_manager.get_all_variants(query_id)
+        return self.query_manager.get_all_variants(query_id, scale_factor=self.scale_factor)
 
     def get_variant_description(self, query_id: int, variant_id: int) -> str:
         """Get description of a specific variant.

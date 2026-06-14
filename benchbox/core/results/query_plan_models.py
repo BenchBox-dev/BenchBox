@@ -42,17 +42,20 @@ Stability guarantees (what a stable fingerprint means):
     different table size). Treat full stats-independence as a property of
     scan-shaped/leaf plans and of engines that keep estimates out of operator
     detail — verify per engine before relying on it for non-trivial plans.
-  - **Logical, not physical — engine-dependent caveat.** For engines whose
-    parsers normalize physical access details into clean logical nodes (SQLite,
-    DataFusion, DuckDB), an index scan and a sequential scan of the same table
-    both normalize to a logical ``Scan`` and hash identically. **This does NOT
-    hold for PostgreSQL**: a Seq Scan exposes its predicate as a ``Filter`` node
-    (captured in ``filter_expressions``), but an Index Scan moves that predicate
-    to ``Index Cond`` (which the PostgreSQL parser does not capture), and a
-    Bitmap Scan can add an extra child node. Creating an index on PostgreSQL can
-    therefore change the structural signature even though only the physical access
-    path changed. Do not rely on fingerprint equality across index
-    additions/removals for PostgreSQL plans.
+  - **Logical, not physical — with an engine-dependent caveat.** The signature is
+    built from the *logical* operator tree, so the physical access method is
+    generally NOT reflected: an index scan and a sequential scan of the same table
+    both normalize to a logical ``Scan``. On engines where the predicate is the
+    same regardless of access method, adding an index does NOT change the
+    fingerprint. **However, index-addition stability is not universal:** some
+    engines expose the predicate differently per access method, and the parser
+    captures only one form. On **PostgreSQL**, a sequential scan exposes the
+    predicate as ``Filter`` (which the parser records in ``filter_expressions`` —
+    structural and hashed) while an index scan exposes it as ``Index Cond`` (which
+    the parser does NOT record), so adding an index that flips ``Filter`` →
+    ``Index Cond`` for the same table/predicate *does* change the fingerprint, and
+    bitmap plans can add child nodes that further change it. Treat index-addition
+    stability as a property to verify per engine, not a guarantee.
   - **Logical-shape sensitive.** What DOES change the fingerprint is a change in
     the logical tree: join order or join type, an added aggregation (GROUP BY),
     sort, projection change, LIMIT/OFFSET, or filter predicates *where the

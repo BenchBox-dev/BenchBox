@@ -1,0 +1,125 @@
+id: query-plan-capture-ctas-write-ddl-guard
+title: "Close the CTAS/CMV write-DDL blind spot in is_dml_query so capture does not re-execute writes"
+worktree: platform-expansion
+priority: Medium-High
+status: Completed
+category: Platform Expansion
+
+description: |
+  The shared DML detector is_dml_query() (benchbox/platforms/base/result_capture.py,
+  added in PR #767) is used to downgrade EXPLAIN ANALYZE to a non-ANALYZE EXPLAIN
+  so that data-changing statements are not physically re-executed during plan
+  capture. It detects INSERT/UPDATE/DELETE/MERGE/COPY (and WITH-prefixed forms),
+  but its docstring asserts "DDL (CREATE/DROP/ALTER/TRUNCATE) is intentionally
+  excluded: DDL does not produce duplicate data mutations." That assertion is
+  FALSE for the write-producing DDL forms:
+    - CREATE TABLE ... AS SELECT            (CTAS — writes rows)
+    - CREATE [OR REPLACE] MATERIALIZED VIEW ... AS SELECT
+    - SELECT ... INTO <table>               (writes rows)
+
+  Verified: is_dml_query("CREATE TABLE t AS SELECT * FROM s") returns False, and
+  is_dml_query("CREATE MATERIALIZED VIEW v AS SELECT 1") returns False.
+
+  Impact:
+    - DuckDB and MotherDuck (guarded in PR #767, MERGED): with capture_plans=True
+      and analyze_plans=True (the DuckDB default), `EXPLAIN ANALYZE CREATE TABLE t
+      AS SELECT ...` physically re-runs the CTAS. For CREATE OR REPLACE this
+      silently writes the table twice; for plain CREATE the second run errors
+      ("table already exists"), turning a successful query into a noisy/failed
+      capture. Neither is correct.
+    - The planned query-plan-capture-postgresql-dml-guard names CTAS in its
+      keyword list but its w1 first instruction is "reuse the shared helper if it
+      exists" — reusing is_dml_query() as-is would inherit this blind spot.
+
+  Fix: extend is_dml_query() (or add a sibling is_write_statement()) to also match
+  CTAS / CREATE MATERIALIZED VIEW ... AS / SELECT ... INTO as write statements, and
+  correct the docstring. This makes the shared helper safe for every caller —
+  DuckDB, MotherDuck, and the upcoming PostgreSQL guard — in one place.
+
+prerequisites:
+  - "Unit tests run without any live database — the helper is a pure string classifier."
+
+prior_art:
+  - "benchbox/platforms/base/result_capture.py — is_dml_query(), _DML_LEADING_RE, _DML_AFTER_CTE_RE (PR #767)"
+  - "benchbox/platforms/duckdb.py / motherduck.py — get_query_plan() DML guard that calls is_dml_query (PR #767)"
+  - "query-plan-capture-postgresql-dml-guard — planned PG guard whose w1 should reuse the corrected helper"
+
+work:
+  - id: w1
+    summary: "Extend the shared detector to recognize CTAS / CREATE MATERIALIZED VIEW AS / SELECT INTO as writes"
+    status: done
+    notes: |
+      In benchbox/platforms/base/result_capture.py, add detection for:
+        - ^CREATE (OR REPLACE )?(GLOBAL |LOCAL )?(TEMP(ORARY)? )?TABLE ... AS\b  (CTAS)
+        - ^CREATE (OR REPLACE )?MATERIALIZED VIEW ... AS\b
+        - a SELECT whose body contains a top-level `INTO <table>` (SELECT ... INTO)
+      Prefer matching the CTAS/CMV "... AS <subquery>" shape rather than any CREATE,
+      so plain CREATE TABLE (DDL with no data) and CREATE INDEX stay non-write.
+      Decide between extending is_dml_query() vs adding is_write_statement(); if the
+      name "DML" is kept, update the docstring to say it covers data-WRITING
+      statements including write-producing DDL. Correct the existing false docstring
+      line about DDL not producing duplicate mutations.
+  - id: w2
+    summary: "Confirm DuckDB/MotherDuck get_query_plan now downgrade ANALYZE for CTAS/CMV"
+    needs: [w1]
+    status: done
+    notes: |
+      No adapter code change should be required if both call the shared helper, but
+      verify that with the corrected helper, get_query_plan() uses FORMAT JSON
+      (no ANALYZE) for CTAS/CMV so the write is not re-executed.
+  - id: w3
+    summary: "Add unit tests for CTAS / CMV / SELECT INTO detection and the DuckDB/MotherDuck guard"
+    needs: [w1, w2]
+    status: done
+    notes: |
+      Extend tests/unit/platforms/test_duckdb_plan_capture.py and the is_dml_query
+      contract test: assert CTAS, CREATE OR REPLACE TABLE AS, CREATE MATERIALIZED
+      VIEW AS, and SELECT ... INTO are treated as writes (ANALYZE downgraded), while
+      plain CREATE TABLE (column DDL), CREATE INDEX, and SELECT are NOT. Add a
+      DuckDB get_query_plan assertion that a CTAS query does not issue ANALYZE.
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Plain non-writing DDL (CREATE TABLE <cols>, CREATE INDEX, DROP, ALTER, TRUNCATE) and plain SELECT must remain classified as non-write so their plans still capture with ANALYZE where applicable."
+  - "Existing INSERT/UPDATE/DELETE/MERGE/COPY and WITH-prefixed detection must keep working."
+  - "Capture failure must remain silent when strict_plan_capture=False."
+
+approach: |
+  Fix the blind spot in the single shared helper so all callers benefit, rather
+  than per-adapter. Match the CTAS/CMV "... AS <query>" shape (and SELECT ... INTO)
+  precisely to avoid sweeping in non-writing DDL. Coordinate with
+  query-plan-capture-postgresql-dml-guard so it reuses the corrected helper rather
+  than re-implementing a narrower check.
+
+anti_patterns:
+  - "DO NOT treat every CREATE as a write - because CREATE TABLE (column DDL) and CREATE INDEX write no rows and their plans are cheap to ANALYZE - match only the '... AS <subquery>' / SELECT INTO write shapes."
+  - "DO NOT fix this per adapter - because DuckDB, MotherDuck, and PostgreSQL all need the same rule - correct the shared helper once."
+  - "DO NOT silently keep the false docstring - because it actively misleads the next author into excluding CTAS - correct the comment about DDL not mutating data."
+
+verification:
+  - description: "CTAS / CMV / SELECT INTO are detected as writes; plain DDL and SELECT are not"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_duckdb_plan_capture.py -k 'dml or ctas or write' -v"
+    expected_output: "CTAS/CMV/SELECT-INTO downgrade ANALYZE; plain CREATE/SELECT do not"
+  - description: "Full platform suite green"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -q"
+    expected_output: "0 failures, 0 errors"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/result_capture.py"
+    - "tests/unit/platforms/test_duckdb_plan_capture.py"
+    - "tests/unit/platforms/test_motherduck_plan_capture.py"
+
+success_metrics:
+  - "is_dml_query (or a renamed write-statement detector) returns True for CTAS, CREATE MATERIALIZED VIEW AS, and SELECT ... INTO."
+  - "DuckDB and MotherDuck no longer issue EXPLAIN ANALYZE for CTAS/CMV, so the write is not re-executed."
+  - "The shared helper's docstring no longer claims DDL never mutates data."
+  - "query-plan-capture-postgresql-dml-guard can reuse the corrected helper without re-implementing detection."
+
+metadata:
+  tags: [query-plan, duckdb, motherduck, postgresql, dml, ctas, correctness]
+  estimated_effort: "Small"
+  created_date: "2026-06-11"
+  last_updated: "2026-06-12T00:00:00-04:00"

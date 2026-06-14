@@ -40,10 +40,42 @@ class TestIsDmlQueryHelper:
     @pytest.mark.parametrize(
         "query",
         [
+            "CREATE TABLE t AS SELECT * FROM s",
+            "create or replace table t as select 1",
+            "CREATE TEMP TABLE t AS SELECT 1",
+            "CREATE TEMPORARY TABLE t AS (SELECT 1)",
+            "CREATE UNLOGGED TABLE t AS SELECT 1",
+            "CREATE TABLE t (a, b) AS SELECT x, y FROM s",  # CTAS with column alias list
+            "CREATE TABLE t AS\nWITH cte AS (SELECT 1) SELECT * FROM cte",
+            "CREATE TABLE t AS VALUES (1), (2)",
+            "/* banner */ CREATE TABLE t AS SELECT 1",
+            "CREATE MATERIALIZED VIEW v AS SELECT 1",
+            "CREATE OR REPLACE MATERIALIZED VIEW v AS (SELECT * FROM t)",
+            "SELECT * INTO new_t FROM t",
+            "select x into archive_t from t where x > 1",
+        ],
+    )
+    def test_write_producing_ddl_detected(self, query):
+        from benchbox.platforms.base.result_capture import is_dml_query
+
+        assert is_dml_query(query) is True
+
+    @pytest.mark.parametrize(
+        "query",
+        [
             "SELECT 1",
             "WITH cte AS (SELECT 1) SELECT * FROM cte",
             "SELECT copy_total, merge_flag FROM t",  # identifiers, not verbs (word boundary)
-            "CREATE TABLE t (id INT)",  # DDL is excluded
+            "CREATE TABLE t (id INT)",  # column DDL writes no rows
+            "CREATE TABLE t (x INT GENERATED ALWAYS AS (x + 1) STORED)",  # generated column AS is not CTAS
+            "CREATE TABLE t (note TEXT DEFAULT 'AS SELECT')",  # literal inside column DDL is not CTAS
+            "CREATE INDEX idx ON t (id)",
+            "CREATE VIEW v AS SELECT 1",  # plain view stores no rows
+            "DROP TABLE t",
+            "ALTER TABLE t ADD COLUMN y INT",
+            "TRUNCATE TABLE t",
+            "SELECT * FROM t WHERE note = 'INTO the void'",  # INTO inside a string literal
+            "SELECT * FROM (SELECT 1 INTO_X) sub",  # parenthesized, not a top-level INTO
             "EXPLAIN SELECT 1",
             "",
             "-- only a comment",
@@ -100,11 +132,33 @@ class TestDuckDBDMLPlanGuard:
         assert "ANALYZE" not in conn.execute.call_args[0][0].upper(), f"DML must not run ANALYZE: {dml!r}"
 
     @pytest.mark.parametrize(
+        "write_ddl",
+        [
+            "CREATE TABLE t2 AS SELECT * FROM t",
+            "CREATE OR REPLACE TABLE t2 AS SELECT * FROM t",
+            "CREATE MATERIALIZED VIEW mv AS SELECT * FROM t",
+            "SELECT * INTO t2 FROM t",
+        ],
+    )
+    def test_ctas_query_does_not_use_analyze(self, write_ddl):
+        """CTAS/CMV/SELECT-INTO materialize rows; EXPLAIN ANALYZE would write them twice."""
+        adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = [("logical_plan", "{}")]
+
+        adapter.get_query_plan(conn, write_ddl)
+
+        called_sql = conn.execute.call_args[0][0].upper()
+        assert "ANALYZE" not in called_sql, f"Write DDL must not run EXPLAIN ANALYZE: {called_sql}"
+        assert "FORMAT JSON" in called_sql
+
+    @pytest.mark.parametrize(
         "non_dml",
         [
             "SELECT * FROM t WHERE id = 1",
             "WITH cte AS (SELECT 1) SELECT * FROM cte",
             "SELECT copy_count, update_ts FROM t",  # column names starting with DML verbs
+            "CREATE TABLE t (id INT)",  # column DDL writes no rows
         ],
     )
     def test_non_dml_query_still_uses_analyze(self, non_dml):
@@ -117,6 +171,46 @@ class TestDuckDBDMLPlanGuard:
         called_sql = conn.execute.call_args[0][0].upper()
         assert "ANALYZE" in called_sql, f"Non-DML must still use EXPLAIN ANALYZE: {non_dml!r}"
         assert "FORMAT JSON" in called_sql
+
+
+class TestDuckDBDisplayQueryPlan:
+    """display_query_plan_if_enabled must not be called when capture_plans is active."""
+
+    def _make_adapter(self, capture_plans: bool):
+        return DuckDBAdapter(capture_plans=capture_plans)
+
+    def _mock_execute(self, monkeypatch, adapter):
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = []
+        monkeypatch.setattr(
+            adapter,
+            "_build_query_result_with_validation",
+            lambda **kw: {"query_id": kw.get("query_id", "q"), "status": "SUCCESS", "rows_returned": 0},
+        )
+        monkeypatch.setattr(adapter, "_merge_plan_capture_into_result", lambda *a, **k: None)
+        return conn
+
+    def test_display_called_when_not_capturing(self, monkeypatch):
+        adapter = self._make_adapter(capture_plans=False)
+        conn = self._mock_execute(monkeypatch, adapter)
+        display_calls = []
+        monkeypatch.setattr(adapter, "display_query_plan_if_enabled", lambda *a, **k: display_calls.append(True))
+
+        adapter.execute_query(connection=conn, query="SELECT 1", query_id="q", validate_row_count=False)
+
+        assert len(display_calls) == 1, "display_query_plan_if_enabled should fire once when capture_plans=False"
+
+    def test_display_suppressed_when_capturing(self, monkeypatch):
+        adapter = self._make_adapter(capture_plans=True)
+        conn = self._mock_execute(monkeypatch, adapter)
+        display_calls = []
+        monkeypatch.setattr(adapter, "display_query_plan_if_enabled", lambda *a, **k: display_calls.append(True))
+
+        adapter.execute_query(connection=conn, query="SELECT 1", query_id="q", validate_row_count=False)
+
+        assert len(display_calls) == 0, (
+            "display_query_plan_if_enabled must not fire when capture_plans=True (avoids double EXPLAIN)"
+        )
 
 
 class TestDuckDBPlanCapture:
@@ -356,3 +450,69 @@ class TestDuckDBPlanCapture:
 
         finally:
             adapter.close_connection(connection)
+
+
+class TestDuckDBFingerprintIntegration:
+    """Integration tests against a real in-memory DuckDB connection (no mocking).
+
+    Exercises the full capture path (real EXPLAIN, real parser, real fingerprint)
+    and verifies the plan fingerprint stability contract documented in
+    query_plan_models.py. DuckDB in-memory needs no credentials.
+    """
+
+    @pytest.fixture
+    def adapter(self):
+        return DuckDBAdapter(capture_plans=True)
+
+    @pytest.fixture
+    def conn(self, adapter):
+        connection = adapter.create_connection()
+        connection.execute("CREATE TABLE orders (id INTEGER, amount DOUBLE)")
+        connection.executemany("INSERT INTO orders VALUES (?, ?)", [(i, float(i)) for i in range(1, 500)])
+        yield connection
+        adapter.close_connection(connection)
+
+    def test_get_query_plan_returns_non_empty_json(self, adapter, conn):
+        raw = adapter.get_query_plan(conn, "SELECT * FROM orders WHERE id = 1")
+        assert raw, "get_query_plan should return non-empty EXPLAIN output"
+        stripped = raw.strip()
+        assert stripped.startswith("{") or stripped.startswith("["), "Expected FORMAT JSON output"
+
+    def test_parser_produces_dag_from_real_explain(self, adapter, conn):
+        raw = adapter.get_query_plan(conn, "SELECT * FROM orders WHERE id = 1")
+        parser = adapter.get_query_plan_parser()
+        dag = parser.parse_explain_output("dq_dag", raw)
+        assert dag is not None
+        assert dag.logical_root is not None
+        assert dag.plan_fingerprint is not None
+
+    def test_fingerprint_is_idempotent_across_calls(self, adapter, conn):
+        query = "SELECT * FROM orders WHERE id = 1"
+        plan1, _ = adapter.capture_query_plan(conn, query, "dq_a")
+        plan2, _ = adapter.capture_query_plan(conn, query, "dq_b")
+        assert plan1 is not None and plan2 is not None
+        assert plan1.plan_fingerprint is not None
+        assert plan1.plan_fingerprint == plan2.plan_fingerprint
+
+    def test_fingerprint_stable_across_index_addition(self, adapter, conn):
+        # Logical fingerprint excludes the physical access method, so adding an
+        # index does not change it (physical-independence guarantee).
+        query = "SELECT * FROM orders WHERE amount = 250.0"
+        before, _ = adapter.capture_query_plan(conn, query, "dq_before_idx")
+        conn.execute("CREATE INDEX idx_orders_amount ON orders(amount)")
+        after, _ = adapter.capture_query_plan(conn, query, "dq_after_idx")
+        assert before is not None and after is not None
+        assert before.plan_fingerprint == after.plan_fingerprint, (
+            "Adding an index is a physical change; the logical fingerprint must be stable"
+        )
+
+    def test_fingerprint_differs_for_logically_distinct_plans(self, adapter, conn):
+        # A self-join adds a second table scan to the logical tree, so the
+        # signature differs by construction (two Scan nodes vs one), independent of
+        # indexes, stats, or planner access-method choices.
+        scan_plan, _ = adapter.capture_query_plan(conn, "SELECT * FROM orders", "dq_scan")
+        join_plan, _ = adapter.capture_query_plan(
+            conn, "SELECT o.id FROM orders o JOIN orders o2 ON o.id = o2.id", "dq_join"
+        )
+        assert scan_plan is not None and join_plan is not None
+        assert scan_plan.plan_fingerprint != join_plan.plan_fingerprint, "A join must change the logical plan shape"

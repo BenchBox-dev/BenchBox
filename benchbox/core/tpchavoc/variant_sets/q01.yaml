@@ -249,9 +249,10 @@ variants:
         count(*) over w as count_order
     from
         lineitem
+    where
+        l_shipdate <= date '1998-12-01' - interval '90' day
     window w as (partition by l_returnflag, l_linestatus)
     qualify count(*) over w > 0
-        and l_shipdate <= date '1998-12-01' - interval '90' day
     order by
         l_returnflag,
         l_linestatus

@@ -164,7 +164,7 @@ def test_get_query_variant_delegates(tmp_path, monkeypatch) -> None:
 
     result = bench.get_query_variant(2, 3)
 
-    mock_qm.get_query_variant.assert_called_once_with(2, 3, None)
+    mock_qm.get_query_variant.assert_called_once_with(2, 3, None, scale_factor=bench.scale_factor)
     assert result == "SELECT variant"
 
 
@@ -175,7 +175,7 @@ def test_get_all_variants_delegates(tmp_path, monkeypatch) -> None:
     result = bench.get_all_variants(1)
 
     assert result == {1: "SELECT a", 2: "SELECT b"}
-    mock_qm.get_all_variants.assert_called_once_with(1)
+    mock_qm.get_all_variants.assert_called_once_with(1, scale_factor=bench.scale_factor)
 
 
 def test_get_variant_description_delegates(tmp_path, monkeypatch) -> None:

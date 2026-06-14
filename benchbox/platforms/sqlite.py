@@ -513,8 +513,8 @@ class SQLiteAdapter(PlatformAdapter):
         self.log_verbose(f"Executing query {query_id}")
         self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
+        cursor = connection.cursor()
         try:
-            cursor = connection.cursor()
             cursor.execute(query)
             results = cursor.fetchall()
 
@@ -558,14 +558,6 @@ class SQLiteAdapter(PlatformAdapter):
             # Include full results for SQLite compatibility
             result["results"] = results
 
-            # Display plan in console when --show-query-plans is active.
-            self.display_query_plan_if_enabled(connection, query, query_id)
-
-            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
-            self._merge_plan_capture_into_result(result, connection, query, query_id)
-
-            return result
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             return {
@@ -575,6 +567,19 @@ class SQLiteAdapter(PlatformAdapter):
                 "rows_returned": 0,
                 "error": str(e),
             }
+        finally:
+            cursor.close()
+
+        # Display plan in console when --show-query-plans is active.
+        self.display_query_plan_if_enabled(connection, query, query_id)
+
+        # Capture and merge structured query plan (SUCCESS-guarded in the helper).
+        # Deliberately outside the try: with strict_plan_capture=True a capture
+        # failure raises PlanCaptureError, which must propagate instead of being
+        # swallowed by the broad except and mislabeling the successful query FAILED.
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
+
+        return result
 
     def run_power_test(self, benchmark, **kwargs) -> dict[str, Any]:
         """Run TPC power test (not implemented for SQLite)."""

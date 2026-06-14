@@ -186,6 +186,7 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
         .filter(col("l_shipdate") > lit(order_date))
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select("o_orderkey", "revenue", "o_orderdate", "o_shippriority")
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
@@ -317,6 +318,7 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
             "c_comment",
         )
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select("c_custkey", "c_name", "revenue", "c_acctbal", "n_name", "c_address", "c_phone", "c_comment")
         .sort("revenue", descending=True)
         .limit(20)
     )
@@ -1099,7 +1101,7 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
     # Aggregate
     return (
         joined.groupby(["l_orderkey", "o_orderdate", "o_shippriority"], as_index=False)
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[["l_orderkey", "revenue", "o_orderdate", "o_shippriority"]]
         .sort_values(["revenue", "o_orderdate"], ascending=[False, True])
         .head(10)
     )
@@ -1224,7 +1226,7 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
     with_detail = with_nation.merge(customer_detail, on="c_custkey")
 
     return (
-        with_detail[["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment", "revenue"]]
+        with_detail[["c_custkey", "c_name", "revenue", "c_acctbal", "n_name", "c_address", "c_phone", "c_comment"]]
         .sort_values("revenue", ascending=False)
         .head(20)
     )

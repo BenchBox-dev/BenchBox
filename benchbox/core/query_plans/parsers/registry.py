@@ -192,10 +192,13 @@ def get_parser_registry() -> ParserRegistry:
 
 def _create_default_registry() -> ParserRegistry:
     """Create and populate the default parser registry."""
+    from benchbox.core.query_plans.parsers.clickhouse import ClickHouseQueryPlanParser
     from benchbox.core.query_plans.parsers.datafusion import DataFusionQueryPlanParser
     from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
     from benchbox.core.query_plans.parsers.postgresql import PostgreSQLQueryPlanParser
+    from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
     from benchbox.core.query_plans.parsers.redshift import RedshiftQueryPlanParser
+    from benchbox.core.query_plans.parsers.spark import SparkQueryPlanParser
     from benchbox.core.query_plans.parsers.sqlite import SQLiteQueryPlanParser
 
     registry = ParserRegistry()
@@ -216,6 +219,20 @@ def _create_default_registry() -> ParserRegistry:
 
     # Register SQLite parser
     registry.register("sqlite", "0.0.0", SQLiteQueryPlanParser)
+
+    # Register ClickHouse parser (local, server, and cloud modes share it).
+    registry.register("clickhouse", "0.0.0", ClickHouseQueryPlanParser)
+
+    # Register Presto / Trino family parser (shared EXPLAIN FORMAT JSON dialect).
+    # Starburst is Trino-compatible; Athena uses the Presto engine.
+    registry.register("presto", "0.0.0", PrestoTrinoQueryPlanParser)
+    registry.register("trino", "0.0.0", PrestoTrinoQueryPlanParser)
+    registry.register("starburst", "0.0.0", PrestoTrinoQueryPlanParser)
+    registry.register("athena", "0.0.0", PrestoTrinoQueryPlanParser)
+
+    # Register Spark parser (shared by Spark and Databricks, which runs Spark SQL).
+    registry.register("spark", "0.0.0", SparkQueryPlanParser)
+    registry.register("databricks", "0.0.0", SparkQueryPlanParser)
 
     return registry
 

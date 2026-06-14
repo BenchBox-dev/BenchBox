@@ -2,7 +2,7 @@ id: query-plan-capture-clickhouse-family
 title: "Implement query plan capture for ClickHouse local, server, and cloud adapters"
 worktree: platform-expansion
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |
@@ -50,7 +50,7 @@ prior_art:
 work:
   - id: w1
     summary: "Collect EXPLAIN PLAN and EXPLAIN PIPELINE text samples from ClickHouse"
-    status: pending
+    status: done
     notes: |
       Against a live ClickHouse instance (local or server), run:
         EXPLAIN PLAN SELECT l_orderkey, sum(l_quantity) FROM lineitem GROUP BY l_orderkey
@@ -64,7 +64,7 @@ work:
   - id: w2
     summary: "Implement ClickHouseQueryPlanParser in benchbox/core/query_plans/parsers/clickhouse.py"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Implement the QueryPlanParser abstract interface:
         - parse(raw_plan: str) -> QueryPlanDAG
@@ -85,7 +85,7 @@ work:
   - id: w3
     summary: "Add unit tests for ClickHouseQueryPlanParser using fixture samples"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Create tests/unit/query_plans/test_clickhouse_parser.py. Cover:
         - EXPLAIN PLAN parse produces valid QueryPlanDAG with correct operator types
@@ -97,7 +97,7 @@ work:
   - id: w4
     summary: "Add get_query_plan() to ClickHouseAdapter base class"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       IMPORTANT: The connection object type differs across the three ClickHouse modes
       and must be confirmed during w1 before writing this implementation:
@@ -122,7 +122,7 @@ work:
   - id: w5
     summary: "Add get_query_plan_parser() override to ClickHouseAdapter base class"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       In the same ClickHouseAdapter base used in w4:
         def get_query_plan_parser(self):
@@ -133,7 +133,7 @@ work:
   - id: w6
     summary: "Integrate capture_query_plan() into ClickHouse execute_query() path"
     needs: [w4, w5]
-    status: pending
+    status: done
     notes: |
       Locate each adapter's execute_query() — or the shared execute_query() if
       ClickHouseAdapter has one. Add the capture guard after the timed SQL block:
@@ -148,7 +148,7 @@ work:
   - id: w7
     summary: "Add unit tests for ClickHouse adapter plan capture wiring"
     needs: [w6]
-    status: pending
+    status: done
     notes: |
       Create tests/unit/platforms/test_clickhouse_plan_capture.py. Cover:
         - get_query_plan_parser() returns ClickHouseQueryPlanParser for all three modes
@@ -217,4 +217,4 @@ metadata:
   tags: [query-plan, clickhouse, clickhouse-local, clickhouse-server, clickhouse-cloud, new-parser]
   estimated_effort: "Medium"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T00:00:00-04:00"
+  last_updated: "2026-06-10T00:00:00-04:00"

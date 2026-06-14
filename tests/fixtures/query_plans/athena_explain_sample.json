@@ -1,0 +1,16 @@
+{
+  "id": "7",
+  "name": "Output",
+  "identifier": "[nationkey, name]",
+  "details": "",
+  "children": [
+    {
+      "id": "120",
+      "name": "ScanFilterProject",
+      "identifier": "[awsdatacatalog:tpch.nation]",
+      "details": "table = awsdatacatalog:tpch.nation\nfilterPredicate = (\"nationkey\" < BIGINT '10')\nnationkey := nationkey\nname := name",
+      "children": []
+    }
+  ],
+  "remoteSources": []
+}

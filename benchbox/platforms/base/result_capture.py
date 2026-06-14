@@ -24,7 +24,6 @@ Instance attributes these methods read (initialized on the host adapter):
 
 from __future__ import annotations
 
-import concurrent.futures
 import logging
 import math
 import os
@@ -55,6 +54,7 @@ from benchbox.platforms.base.runtime_metadata import build_default_normalized_re
 from benchbox.platforms.base.utils import is_non_interactive
 from benchbox.utils.clock import elapsed_seconds
 from benchbox.utils.printing import quiet_console
+from benchbox.utils.timeout_manager import run_with_timeout
 
 try:
     from benchbox.core.results.models import ExecutionPhases, QueryDefinition
@@ -75,6 +75,72 @@ _DML_LEADING_RE = re.compile(r"^(?:INSERT|UPDATE|DELETE|MERGE|COPY)\b", re.IGNOR
 # CTE-prefixed DML (``WITH cte AS (...) INSERT INTO ...``). COPY is excluded:
 # it cannot appear inside a CTE, and its leading form is already caught above.
 _DML_AFTER_CTE_RE = re.compile(r"\b(?:INSERT|UPDATE|DELETE|MERGE)\b", re.IGNORECASE)
+# Write-producing DDL prefixes: CREATE TABLE ... AS <query> (CTAS) and
+# CREATE MATERIALIZED VIEW ... AS <query>. Both materialize the query's rows,
+# so EXPLAIN ANALYZE would write them a second time. The prefix alone is not
+# enough — _has_top_level_keyword() must also find a paren-depth-0 ``AS``
+# introducing a query, which keeps plain column DDL out: a generated column's
+# ``GENERATED ALWAYS AS (expr)`` and any literal text like ``DEFAULT 'AS
+# SELECT'`` sit inside the column-definition parentheses, so they never match.
+_CREATE_TABLE_PREFIX_RE = re.compile(
+    r"^CREATE\s+(?:OR\s+REPLACE\s+)?(?:GLOBAL\s+|LOCAL\s+)?(?:TEMP(?:ORARY)?\s+|UNLOGGED\s+)?TABLE\b",
+    re.IGNORECASE,
+)
+_CREATE_MATERIALIZED_VIEW_PREFIX_RE = re.compile(
+    r"^CREATE\s+(?:OR\s+REPLACE\s+)?MATERIALIZED\s+VIEW\b",
+    re.IGNORECASE,
+)
+# ``AS`` introducing a query body: optionally parenthesized SELECT/WITH/VALUES/
+# TABLE/FROM (DuckDB allows ``CREATE TABLE t AS FROM s``; PostgreSQL allows
+# ``CREATE TABLE t2 AS TABLE t1``).
+_AS_QUERY_RE = re.compile(r"AS\s*\(*\s*(?:SELECT|WITH|VALUES|TABLE|FROM)\b", re.IGNORECASE)
+_SELECT_LEADING_RE = re.compile(r"^SELECT\b", re.IGNORECASE)
+_WITH_LEADING_RE = re.compile(r"^WITH\b", re.IGNORECASE)
+_WORD_CHARS_RE = re.compile(r"\w")
+
+
+def _has_top_level_keyword(statement: str, keyword: str, followed_by: re.Pattern[str] | None = None) -> bool:
+    """Return True when ``keyword`` appears at paren depth 0 outside quotes.
+
+    Used to find the statement-level ``INTO`` of ``SELECT ... INTO <table>``
+    and the statement-level ``AS`` of CTAS / CREATE MATERIALIZED VIEW. The
+    scan skips single-quoted string literals (including ``''`` escapes) and
+    double-quoted identifiers, and ignores anything inside parentheses, so a
+    subquery's text, a literal like ``'INTO'``, or a generated-column ``AS``
+    in a column list never triggers a match. When ``followed_by`` is given,
+    the keyword only counts if that pattern matches at the keyword's position.
+    """
+    keyword = keyword.upper()
+    klen = len(keyword)
+    depth = 0
+    i = 0
+    n = len(statement)
+    while i < n:
+        ch = statement[i]
+        if ch == "'":
+            i += 1
+            while i < n:
+                if statement[i] == "'":
+                    if i + 1 < n and statement[i + 1] == "'":  # escaped '' inside literal
+                        i += 2
+                        continue
+                    break
+                i += 1
+        elif ch == '"':
+            i += 1
+            while i < n and statement[i] != '"':
+                i += 1
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif depth == 0 and ch.upper() == keyword[0] and statement[i : i + klen].upper() == keyword:
+            before_ok = i == 0 or not _WORD_CHARS_RE.match(statement[i - 1])
+            after_ok = i + klen >= n or not _WORD_CHARS_RE.match(statement[i + klen])
+            if before_ok and after_ok and (followed_by is None or followed_by.match(statement, i)):
+                return True
+        i += 1
+    return False
 
 
 def _strip_leading_sql_comments(statement: str) -> str:
@@ -96,19 +162,27 @@ def _strip_leading_sql_comments(statement: str) -> str:
 
 
 def is_dml_query(query: str) -> bool:
-    """Return True for data-changing DML statements (INSERT/UPDATE/DELETE/MERGE/COPY).
+    """Return True for statements that write data when executed.
 
     Used to guard plan capture against double-execution: adapters that capture
-    plans via ``EXPLAIN ANALYZE`` (DuckDB, MotherDuck) physically re-run the
-    statement, so a DML query would mutate data twice. Callers downgrade to a
-    non-ANALYZE ``EXPLAIN`` for these statements.
+    plans via ``EXPLAIN ANALYZE`` (DuckDB, MotherDuck, PostgreSQL) physically
+    re-run the statement, so a data-writing query would mutate data twice.
+    Callers downgrade to a non-ANALYZE ``EXPLAIN`` for these statements.
 
-    Detection covers the data-modifying verbs INSERT/UPDATE/DELETE/MERGE/COPY,
-    including when they are preceded by a leading ``WITH`` CTE clause. DDL
-    (CREATE/DROP/ALTER/TRUNCATE) is intentionally excluded: DDL does not produce
-    duplicate data mutations, so it does not need the ANALYZE guard. Leading
-    line and block comments are stripped first so a commented preamble (e.g. a
-    ``/* query 12 */`` banner) does not mask the verb.
+    Detection covers the data-modifying verbs INSERT/UPDATE/DELETE/MERGE/COPY
+    (including when they are preceded by a leading ``WITH`` CTE clause) and the
+    write-producing DDL shapes that materialize a query's rows:
+
+    - ``CREATE [OR REPLACE] TABLE ... AS <query>`` (CTAS)
+    - ``CREATE [OR REPLACE] MATERIALIZED VIEW ... AS <query>``
+    - ``SELECT ... INTO <table>``
+
+    Non-writing DDL (plain ``CREATE TABLE`` with column definitions,
+    ``CREATE INDEX``, ``DROP``, ``ALTER``, ``TRUNCATE``) is intentionally
+    excluded: re-running its EXPLAIN writes no rows, so it keeps ANALYZE where
+    applicable. Leading line and block comments are stripped first so a
+    commented preamble (e.g. a ``/* query 12 */`` banner) does not mask the
+    verb.
     """
     statement = _strip_leading_sql_comments(query)
     if not statement:
@@ -119,7 +193,17 @@ def is_dml_query(query: str) -> bool:
     # leading-verb check alone misses it. Conservatively treat a WITH-prefixed
     # statement that contains a DML verb as DML — worst case a read-only CTE
     # query loses ANALYZE stats, which is far cheaper than a double mutation.
-    if re.match(r"^WITH\b", statement, re.IGNORECASE) and _DML_AFTER_CTE_RE.search(statement):
+    if _WITH_LEADING_RE.match(statement) and _DML_AFTER_CTE_RE.search(statement):
+        return True
+    # Write-producing DDL: CTAS and CREATE MATERIALIZED VIEW ... AS materialize
+    # the query's result rows, so EXPLAIN ANALYZE would write the data twice
+    # (or fail on "table already exists" for the non-REPLACE form).
+    if (
+        _CREATE_TABLE_PREFIX_RE.match(statement) or _CREATE_MATERIALIZED_VIEW_PREFIX_RE.match(statement)
+    ) and _has_top_level_keyword(statement, "AS", followed_by=_AS_QUERY_RE):
+        return True
+    # SELECT ... INTO <table> writes its result rows into a new table.
+    if _SELECT_LEADING_RE.match(statement) and _has_top_level_keyword(statement, "INTO"):
         return True
     return False
 
@@ -627,7 +711,45 @@ class ResultCaptureMixin:
         for estimated-plan-only capture with no re-execution overhead.
 
         Plan fingerprints exclude timing/cardinality by design - structural comparisons
-        are unaffected by this setting.
+        are unaffected by this setting. See the plan fingerprint stability contract in
+        ``benchbox/core/results/query_plan_models.py`` for what fingerprint equality
+        does and does not guarantee.
+
+        Capture timing (pre- vs. post-execution) — design decision:
+            All adapters capture the plan AFTER the timed execution block (the
+            "post-execution" plan). This is intentional and is the supported
+            default:
+              - With ``analyze_plans=True`` it yields the *actual* plan that ran,
+                including real per-operator timing/cardinality (EXPLAIN ANALYZE) —
+                the most useful artifact for profiling.
+              - The structural fingerprint is unaffected by post- vs. pre-execution
+                timing, because it excludes costs and row estimates. A plan captured
+                before vs. after execution hashes to the same fingerprint as long as
+                the planner's chosen shape is identical.
+            A pre-execution capture mode (plan as decided before any stats change)
+            would be marginally more stable for cross-run regression detection, but
+            is NOT implemented: the fingerprint's stats-independence already provides
+            that stability, so a separate timing mode is unnecessary. If a true
+            pre-execution plan is ever required, add an opt-in
+            ``capture_plan_timing: pre | post`` config (default ``post``) here rather
+            than changing the default behavior.
+
+        Multi-stream behavior (stream_id):
+            Plan capture is per-query-execution. In a multi-stream (concurrent)
+            run, each stream executes and captures its own plan independently, so
+            the result set contains one plan record per (query_id, stream_id) — the
+            plans are NOT deduplicated or averaged, preserving per-stream provenance.
+            Because the fingerprint is structural, every stream running the same
+            query against the same schema on the same engine version is expected to
+            produce the SAME plan_fingerprint (with the engine-dependent caveat in
+            query_plan_models.py that some parsers, e.g. DuckDB, fold an estimated
+            cardinality into the signature — identical across streams as long as the
+            cardinality estimate is stable). Only the execution stats
+            (timing/per-operator cardinality) differ between streams. Consumers that
+            want a single representative plan per query should deduplicate by
+            ``plan_fingerprint``; a fingerprint mismatch across streams of the same
+            query indicates a genuine plan-shape (or estimate) divergence worth
+            investigating.
 
         Args:
             connection: Database connection
@@ -658,27 +780,25 @@ class ResultCaptureMixin:
 
         start_time = time.perf_counter()
 
+        # Apply timeout protection for the EXPLAIN query. run_with_timeout runs
+        # get_query_plan on a daemon thread and returns promptly when the timeout
+        # fires. (The previous `with ThreadPoolExecutor` implementation blocked in
+        # shutdown(wait=True) on exit even after TimeoutError, so the timeout was
+        # cosmetic: a runaway EXPLAIN still stalled the caller until the database
+        # returned.) Trade-off, accepted by design: after a timeout the abandoned
+        # EXPLAIN thread keeps running — holding the connection — until the
+        # database returns, so a subsequent query issued on the same connection
+        # may contend with it. The previous behavior (stalling the runner for the
+        # full EXPLAIN duration) was strictly worse; full isolation is tracked by
+        # query-plan-capture-isolation-phase-design.
         try:
-            # Apply timeout protection for EXPLAIN query
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(self.get_query_plan, connection, query)
-                try:
-                    explain_output = future.result(timeout=self.plan_capture_timeout_seconds)
-                except concurrent.futures.TimeoutError:
-                    capture_time_ms = (time.perf_counter() - start_time) * 1000
-                    self.logger.warning(
-                        "Query plan capture timed out for %s after %ds (%.2fms elapsed)",
-                        query_id,
-                        self.plan_capture_timeout_seconds,
-                        capture_time_ms,
-                    )
-                    self._record_plan_capture_failure(
-                        query_id,
-                        reason="timeout",
-                        message=f"EXPLAIN query timed out after {self.plan_capture_timeout_seconds}s",
-                        log_warning=False,
-                    )
-                    return None, capture_time_ms
+            explain_output, timed_out = run_with_timeout(
+                self.get_query_plan,
+                self.plan_capture_timeout_seconds,
+                f"plan capture EXPLAIN (query_id={query_id})",
+                connection,
+                query,
+            )
         except PlanCaptureError:
             raise
         except Exception as exc:
@@ -687,6 +807,23 @@ class ResultCaptureMixin:
                 query_id,
                 reason="explain_failed",
                 message=str(exc),
+            )
+            return None, capture_time_ms
+
+        if timed_out:
+            capture_time_ms = (time.perf_counter() - start_time) * 1000
+            self.logger.warning(
+                "Query plan capture timed out for %s after %ds (%.2fms elapsed); "
+                "the EXPLAIN may still be running on the connection until the database returns",
+                query_id,
+                self.plan_capture_timeout_seconds,
+                capture_time_ms,
+            )
+            self._record_plan_capture_failure(
+                query_id,
+                reason="timeout",
+                message=f"EXPLAIN query timed out after {self.plan_capture_timeout_seconds}s",
+                log_warning=False,
             )
             return None, capture_time_ms
 

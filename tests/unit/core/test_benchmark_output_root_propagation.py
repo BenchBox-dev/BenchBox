@@ -18,6 +18,11 @@ from pathlib import Path
 import pytest
 
 from benchbox.core.amplab.benchmark import AMPLabBenchmark
+from benchbox.core.benchmark_registry import (
+    get_all_benchmarks,
+    get_benchmark_default_scale,
+    get_public_benchmark_class,
+)
 from benchbox.core.clickbench.benchmark import ClickBenchBenchmark
 from benchbox.core.coffeeshop.benchmark import CoffeeShopBenchmark
 from benchbox.core.flightdata.benchmark import FlightDataBenchmark
@@ -141,3 +146,168 @@ def test_tpch_variant_skew_inherits_propagation(tmp_path, monkeypatch):
     assert str(benchmark.output_dir).startswith(str(root))
     assert str(benchmark.data_generator.output_dir).startswith(str(root))
     assert Path.cwd() not in Path(str(benchmark.data_generator.output_dir)).parents
+
+
+# ---------------------------------------------------------------------------
+# Registry-wide guards (benchmark-output-root-regression-guard)
+#
+# The per-family cases above cover representative benchmarks; the tests below
+# parametrize over the full registry so every current AND future benchmark is
+# held to the same contract automatically.
+# ---------------------------------------------------------------------------
+
+_ALL_BENCHMARK_IDS = sorted(get_all_benchmarks())
+
+#: Benchmarks whose output_dir reassignment does not reach the nested
+#: generator. Empty since benchmark-output-root-explicit-override-propagation
+#: gave tpcds/tpcdi the mixin; add an id here (with a strict xfail reason and
+#: tracking TODO) only if a new benchmark ships with a known gap.
+_REASSIGNMENT_GAP_BIDS: frozenset[str] = frozenset()
+
+
+def _registry_construct(benchmark_id: str):
+    """Construct a benchmark via its public class at its default scale."""
+    benchmark_class = get_public_benchmark_class(benchmark_id)
+    assert benchmark_class is not None, f"{benchmark_id}: no public benchmark class"
+    return benchmark_class(scale_factor=get_benchmark_default_scale(benchmark_id))
+
+
+def _core_object(benchmark):
+    """Return the core implementation when a public wrapper delegates."""
+    return getattr(benchmark, "_impl", benchmark)
+
+
+@pytest.mark.parametrize("benchmark_id", _ALL_BENCHMARK_IDS)
+def test_registry_env_output_root_honored_at_construction(benchmark_id, tmp_path, monkeypatch):
+    """Every registered benchmark honors BENCHBOX_OUTPUT_DIR at construction.
+
+    Asserts both ``benchmark.output_dir`` and every nested generator/downloader
+    declared via ``OUTPUT_DIR_GENERATOR_ATTRS`` resolve under the env root, with
+    ``Path.cwd()`` not an ancestor (the stale-default failure mode).
+    """
+    root = tmp_path / "shared_runs"
+    monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(root))
+
+    benchmark = _registry_construct(benchmark_id)
+
+    output_dir = Path(str(benchmark.output_dir))
+    assert output_dir.is_relative_to(root), (benchmark_id, output_dir)
+    assert Path.cwd() not in output_dir.parents, (benchmark_id, output_dir)
+
+    core = _core_object(benchmark)
+    for gen in _nested_generators(core):
+        gen_dir = Path(str(gen.output_dir))
+        assert gen_dir.is_relative_to(root), (benchmark_id, gen_dir)
+        assert Path.cwd() not in gen_dir.parents, (benchmark_id, gen_dir)
+
+
+def _reassignment_params():
+    for benchmark_id in _ALL_BENCHMARK_IDS:
+        marks = []
+        if benchmark_id in _REASSIGNMENT_GAP_BIDS:
+            marks.append(
+                pytest.mark.xfail(
+                    reason=(
+                        f"{benchmark_id} builds its data_generator in __init__ without "
+                        "GeneratorOutputDirMixin, so output_dir reassignment does not "
+                        "reach it. Tracked: benchmark-output-root-explicit-override-propagation"
+                    ),
+                    strict=True,
+                )
+            )
+        yield pytest.param(benchmark_id, marks=marks, id=benchmark_id)
+
+
+@pytest.mark.parametrize("benchmark_id", _reassignment_params())
+def test_registry_explicit_root_reassignment_propagates(benchmark_id, tmp_path, monkeypatch):
+    """Reassigning output_dir after construction reaches nested generators.
+
+    Mirrors the runner/orchestrator path that resolves an explicit CLI
+    ``--output`` root after the benchmark (and its generators) already exist.
+    Benchmarks without a nested generator built in ``__init__`` are skipped —
+    there is nothing to keep in sync.
+    """
+    monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
+
+    benchmark = _registry_construct(benchmark_id)
+    core = _core_object(benchmark)
+
+    generators = _nested_generators(core)
+    if not generators:
+        pytest.skip(f"{benchmark_id}: no nested generator constructed in __init__")
+
+    explicit = tmp_path / "explicit_root" / "data"
+    benchmark.output_dir = str(explicit)
+
+    assert str(core.output_dir) == str(explicit), (benchmark_id, core.output_dir)
+    for gen in generators:
+        assert str(gen.output_dir) == str(explicit), (benchmark_id, gen.output_dir)
+
+
+def test_tpcdi_explicit_override_rederives_etl_dirs(tmp_path, monkeypatch):
+    """A tpcdi output_dir reassignment re-derives config and ETL directories.
+
+    TPC-DI derives source/staging/warehouse and its data_generator path from
+    the config output root, so an explicit override must update all of them —
+    leaving none pointed at the construction-time default.
+    """
+    from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+
+    monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
+    benchmark = TPCDIBenchmark(scale_factor=0.01)
+
+    explicit = tmp_path / "custom_root"
+    benchmark.output_dir = explicit
+
+    assert Path(str(benchmark.output_dir)) == explicit
+    assert Path(str(benchmark.config.output_dir)) == explicit
+    assert benchmark.source_dir == explicit / "source"
+    assert benchmark.staging_dir == explicit / "staging"
+    assert benchmark.warehouse_dir == explicit / "warehouse"
+    assert Path(str(benchmark.data_generator.output_dir)) == explicit
+
+
+# ---------------------------------------------------------------------------
+# Cloud output roots (w4): cloud-wrapped paths must survive propagation
+# ---------------------------------------------------------------------------
+
+
+def test_databricks_output_root_propagates_without_rewrap(tmp_path):
+    """A DatabricksPath output root reaches the nested generator unchanged.
+
+    ``create_path_handler`` passes existing DatabricksPath instances through
+    as-is, so the exact object (and its dbfs target) must survive the
+    benchmark -> generator propagation chain.
+    """
+    from benchbox.core.tpch.benchmark import TPCHBenchmark
+    from benchbox.utils.cloud_storage import DatabricksPath
+
+    staging = DatabricksPath(str(tmp_path / "staging"), "dbfs:/Volumes/cat/schema/vol")
+    benchmark = TPCHBenchmark(scale_factor=0.01)
+
+    benchmark.output_dir = staging
+
+    assert benchmark.output_dir is staging, benchmark.output_dir
+    assert benchmark.data_generator.output_dir is staging, benchmark.data_generator.output_dir
+    assert benchmark.data_generator.output_dir.dbfs_target == "dbfs:/Volumes/cat/schema/vol"
+
+
+def test_cloud_staging_output_root_preserves_local_staging_root(tmp_path):
+    """A CloudStagingPath output root keeps generators on its local staging dir.
+
+    ``create_path_handler`` resolves a CloudStagingPath to its local staging
+    path (the cloud upload is owned by the platform adapter), so the nested
+    generator must land exactly on that staging directory — not on a stale
+    cwd-local default and not re-wrapped with a different root.
+    """
+    from benchbox.core.ssb.benchmark import SSBBenchmark
+    from benchbox.utils.cloud_storage import CloudStagingPath
+
+    local_stage = tmp_path / "local_stage"
+    staging = CloudStagingPath(local_stage, "gs://bucket/benchbox/ssb")
+    benchmark = SSBBenchmark(scale_factor=0.01)
+
+    benchmark.output_dir = staging
+
+    assert Path(str(benchmark.output_dir)) == local_stage, benchmark.output_dir
+    assert Path(str(benchmark.data_generator.output_dir)) == local_stage, benchmark.data_generator.output_dir
