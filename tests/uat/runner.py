@@ -21,6 +21,11 @@ from benchbox.core.results.submit_classification import (
     SubmitTerminalState,
     classify_result_path,
 )
+from tests.uat.artifact_hygiene import (
+    assert_no_local_growth,
+    configured_external_root,
+    snapshot_local_runs,
+)
 from tests.uat.matrix import benchbox_run_argv
 from tests.uat.timeouts import TimeoutResult, run_with_timeout
 
@@ -137,6 +142,12 @@ def run_cell(
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = _default_log_path(log_dir, platform, benchmark, scale, now)
     runs_dir = _default_benchmark_runs_dir() if benchmark_runs_dir is None else Path(benchmark_runs_dir).expanduser()
+    # Pre-run artifact hygiene snapshot. When the run is configured for an
+    # external root (runs_dir resolves outside cwd), the worktree-local
+    # benchmark_runs/ must not grow — see tests.uat.artifact_hygiene and the
+    # 2026-06-01 datagen-leak incident. Default local runs leave this None.
+    external_root = configured_external_root(output=runs_dir)
+    local_snapshot = snapshot_local_runs() if external_root is not None else None
     argv = benchbox_run_argv(
         platform,
         benchmark,
@@ -188,6 +199,10 @@ def run_cell(
                 timeout_s=min(timeout_s, DIAGNOSTIC_RERUN_TIMEOUT_S),
                 env=env,
             )
+
+    if external_root is not None and local_snapshot is not None:
+        # Fail loudly if datagen (or anything else) leaked into the local tree.
+        assert_no_local_growth(local_snapshot, external_root)
 
     result_path_str = last_nonempty_output_line(stdout_text) if timeout_result.exit_code == 0 else None
     result_path = _resolve_result_path(result_path_str, runs_dir) if result_path_str else None

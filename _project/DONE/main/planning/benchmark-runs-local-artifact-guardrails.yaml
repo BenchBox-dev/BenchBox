@@ -1,0 +1,141 @@
+id: benchmark-runs-local-artifact-guardrails
+title: "Add guardrails that fail UAT when worktree-local benchmark_runs artifacts appear"
+worktree: main
+priority: High
+status: Completed
+category: Testing and Quality Assurance
+
+description: |
+  After `benchmark-runs-output-root-propagation` fixes the lifecycle bug,
+  BenchBox needs regression guardrails so long UAT and corpus runs cannot
+  silently fill pool worktrees with duplicate generated data again.
+
+  The 2026-06-01 evidence showed the problematic shape clearly:
+
+  - The corpus was launched from `/Users/joe/Developer/BenchBox.pool-01` with
+    `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`.
+  - Despite that, `/Users/joe/Developer/BenchBox.pool-01/benchmark_runs`
+    accumulated about 4.2G of generated artifacts, mostly `datagen/`.
+  - A similar stale/generated tree already existed in the primary clone under
+    `/Users/joe/Developer/BenchBox/benchmark_runs`.
+
+  This TODO adds test and operational guardrails that treat unexpected
+  worktree-local `benchmark_runs` writes as a failure when an external output
+  root is configured. The guardrails must be precise enough to avoid breaking
+  ordinary ad hoc runs that intentionally use the cwd-local default.
+
+deps:
+  needs:
+  - benchmark-runs-output-root-propagation
+
+prior_art:
+- "docs/operations/uat-framework.md:Long-Running UAT — extend the existing shared-root requirement instead of adding a competing
+  run-root policy"
+- "tests/uat/runner.py — extend the runner that already sets `BENCHBOX_OUTPUT_DIR` and passes `--output`"
+- "make agent-write-preflight and make pr-preflight — reuse existing guard-command flow for repository hygiene checks"
+- "benchbox/utils/path_utils.py:resolve_benchmark_runs_dir — reuse the environment-aware root decision"
+
+work:
+- id: w0
+  summary: "Re-validate the guardrail target after output-root propagation lands"
+  status: done
+  notes: |
+    Confirm the fixed code no longer creates worktree-local datagen artifacts
+    during a representative external-root run. Record checked SHA, command,
+    run root, and before/after worktree-local path state in the PR body or
+    TODO notes.
+- id: w1
+  summary: "Add a targeted unit or integration guard for explicit/env output roots"
+  needs: [w0]
+  status: done
+  notes: |
+    The test should create an isolated cwd with a configured external root,
+    run a lightweight representative generation path, and fail if
+    `cwd/benchmark_runs` exists or any nested generator path points there.
+- id: w2
+  summary: "Add a UAT-level pre/post artifact hygiene check for external-root runs"
+  needs: [w1]
+  status: done
+  notes: |
+    When `BENCHBOX_OUTPUT_DIR` or UAT `--output` points outside the current
+    worktree, capture the initial state of `cwd/benchmark_runs` and fail the
+    run if new files or size growth appear there. The failure message must
+    name both the expected root and the unexpected local path.
+- id: w3
+  summary: "Document the external-root invariant and emergency triage command"
+  needs: [w2]
+  status: done
+  notes: |
+    Update operations docs with the invariant: long-running UAT writes under
+    `~/Developer/benchmark_runs`, never under a clone or pool worktree. Include
+    compact audit commands for `du`, recent writes, and large-file summaries.
+- id: w4
+  summary: "Wire the hygiene check into the appropriate local gate without making ordinary local runs noisy"
+  needs: [w2]
+  status: done
+  notes: |
+    Prefer UAT/preflight-scoped enforcement over a global prohibition on
+    `benchmark_runs/`. If adding to `make pr-preflight`, gate only unexpected
+    growth or explicit external-root scenarios so developers can still run
+    small local ad hoc benchmarks.
+
+must_preserve:
+- "Ordinary ad hoc runs with no `BENCHBOX_OUTPUT_DIR` and no explicit `--output` can still use cwd-local `benchmark_runs`."
+- "Long-running UAT continues to use `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs` as the canonical shared root."
+- "Guardrail failures are actionable: they print the unexpected local path and expected configured root."
+- "No guardrail deletes or moves generated data automatically."
+
+approach: |
+  Add detection after the root-cause fix, not before. Start with a small
+  regression test that proves external-root runs leave the worktree clean.
+  Then add a UAT hygiene check that snapshots the worktree-local
+  `benchmark_runs` path before a run and compares after each run or at teardown.
+  Document the invariant and wire enforcement only where an external root is
+  configured, so default local usage remains compatible.
+
+anti_patterns:
+- "DO NOT ban every `benchmark_runs/` directory globally - BenchBox still supports cwd-local output for explicit local/default
+  runs."
+- "DO NOT auto-delete unexpected artifacts - detection and reporting come first; cleanup is handled separately."
+- "DO NOT make a broad disk scan mandatory for every unit test - keep expensive size checks in UAT/preflight paths."
+- "DO NOT rely on documentation alone - add executable checks that fail when the invariant is broken."
+
+verification:
+- description: "External-root artifact hygiene regression passes"
+  command: "uv run -- python -m pytest tests/uat/test_output_root_hygiene.py -q"
+  expected_output: "test fails on unexpected cwd/benchmark_runs writes and passes when no local artifacts are created"
+- description: "UAT runner tests still pass"
+  command: "uv run -- python -m pytest tests/uat/test_runner.py -q"
+  expected_output: "all tests pass"
+- description: "Focused path tests from the root-cause TODO still pass"
+  command: "uv run -- python -m pytest tests/unit/core/test_runner_helpers.py tests/unit/cli/test_orchestrator_data_sharing.py
+    tests/unit/utils/test_path_utils.py -q"
+  expected_output: "all tests pass"
+- description: "PR preflight passes"
+  command: "make pr-preflight"
+  expected_output: "all preflight checks pass"
+
+scope_limit:
+  only_modify:
+  - "tests/uat/runner.py"
+  - "tests/uat/"
+  - "docs/operations/uat-framework.md"
+  - "Makefile"
+  - "_project/scripts/"
+  - "tests/unit/"
+  do_not_modify:
+  - "benchmark_runs/"
+  - "benchbox/core/*/benchmark.py"
+  - "benchbox/mcp/tools/benchmark.py"
+
+success_metrics:
+- "A long-running UAT with an external output root fails loudly if new files appear under the worktree-local `benchmark_runs`
+  path."
+- "The failure message identifies the unexpected local path and configured shared root."
+- "No ordinary default local run is blocked solely because it writes to cwd-local `benchmark_runs`."
+
+metadata:
+  tags: [uat, output-paths, artifact-hygiene, preflight]
+  estimated_effort: "Medium"
+  created_date: "2026-06-01"
+  last_updated: "2026-06-01T14:52:17"
