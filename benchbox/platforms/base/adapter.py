@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import math
+import threading
 import uuid
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -135,8 +136,12 @@ class PlatformAdapter(
         self.plan_query_filter: set[str] | None = (
             {q.strip() for q in plan_queries_str.split(",") if q.strip()} if plan_queries_str else None
         )
-        # Track iteration counts for plan_first_n
+        # Track iteration counts for plan_first_n. Under concurrent stream
+        # execution (--streams > 1) multiple threads call capture_query_plan()
+        # and run a read-increment-write against this dict, so the increment is
+        # guarded by a lock to keep plan_first_n a correct per-query-id counter.
         self._plan_capture_iteration_counts: dict[str, int] = {}
+        self._plan_capture_lock = threading.Lock()
         self.tuning_enabled = config.get("tuning_enabled", False)
         # Driver runtime contract metadata (set by adapter factory / runtime resolution).
         self.driver_package = config.get("driver_package")

@@ -2,8 +2,17 @@ id: query-plan-capture-docs-overhead-correction
 title: "Correct query-plan-analysis.md: PostgreSQL EXPLAIN ANALYZE overhead and DML note"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Documentation
+
+# UPDATE (2026-06-14): Corrections applied to docs/features/query-plan-analysis.md.
+# Note: the PostgreSQL DML guard described as "pending" in this TODO has since
+# LANDED via #784 (PostgreSQL guard) and #786 (shared is_dml_query covering
+# CTAS/CMV/SELECT-INTO). The docs were therefore corrected to describe the guard
+# as present (not pending): PostgreSQL SELECT capture costs ~1x query time
+# (EXPLAIN ANALYZE, BUFFERS) and DML/write-DDL is downgraded to non-ANALYZE
+# EXPLAIN. The blanket "Other platforms: ~10-50ms" claim was replaced with a
+# per-platform overhead table distinguishing ANALYZE vs static-EXPLAIN paths.
 
 description: |
   docs/features/query-plan-analysis.md contains two inaccuracies added by PR #776:
@@ -40,7 +49,7 @@ prior_art:
 work:
   - id: w1
     summary: "Correct the performance overhead table for PostgreSQL"
-    status: pending
+    status: done
     notes: |
       In the Performance Impact section, revise the "Other platforms" row to
       distinguish ANALYZE and non-ANALYZE paths:
@@ -59,7 +68,7 @@ work:
   - id: w2
     summary: "Correct the DML note in the PostgreSQL platform section"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       The DML note currently says: "DML statements use FORMAT JSON without ANALYZE
       to prevent double-execution side effects." Replace with:
