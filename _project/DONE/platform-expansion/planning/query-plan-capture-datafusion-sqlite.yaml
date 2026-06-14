@@ -2,7 +2,7 @@ id: query-plan-capture-datafusion-sqlite
 title: "Wire query plan capture for DataFusion and SQLite (parsers exist, no credentials needed)"
 worktree: platform-expansion
 priority: High
-status: Not Started
+status: "Completed"
 category: Platform Expansion
 
 description: |
@@ -47,7 +47,7 @@ prior_art:
 work:
   - id: w1
     summary: "Confirm DataFusion EXPLAIN JSON syntax via live query and document in TODO"
-    status: pending
+    status: done
     notes: |
       Run a trivial DataFusion query with EXPLAIN FORMAT JSON in the BenchBox
       harness or a standalone script. Record the exact SQL syntax that works
@@ -57,7 +57,7 @@ work:
   - id: w2
     summary: "Add get_query_plan() and get_query_plan_parser() to DataFusionAdapter"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       In benchbox/platforms/datafusion.py add:
         def get_query_plan(self, connection, query):
@@ -74,7 +74,7 @@ work:
   - id: w3
     summary: "Integrate capture_query_plan() into DataFusionAdapter.execute_query()"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Locate the result-assembly block in DataFusionAdapter.execute_query(). After
       the timed execution block, add the same capture_plans guard as DuckDB:
@@ -87,7 +87,7 @@ work:
   - id: w4
     summary: "Add unit tests for DataFusion plan capture wiring"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       Create tests/unit/platforms/test_datafusion_plan_capture.py. Cover:
         - get_query_plan_parser() returns DataFusionQueryPlanParser
@@ -100,7 +100,7 @@ work:
 
   - id: w5
     summary: "Confirm SQLite EXPLAIN QUERY PLAN syntax and parser compatibility"
-    status: pending
+    status: done
     notes: |
       Run `EXPLAIN QUERY PLAN <simple_query>` against an in-memory SQLite database
       and compare the raw rows to what SQLiteQueryPlanParser expects.
@@ -110,7 +110,7 @@ work:
   - id: w6
     summary: "Add get_query_plan() and get_query_plan_parser() to SQLiteAdapter"
     needs: [w5]
-    status: pending
+    status: done
     notes: |
       In benchbox/platforms/sqlite.py (or wherever SQLiteAdapter lives) add:
         def get_query_plan(self, connection, query):
@@ -129,14 +129,14 @@ work:
   - id: w7
     summary: "Integrate capture_query_plan() into SQLiteAdapter.execute_query()"
     needs: [w6]
-    status: pending
+    status: done
     notes: |
       Same pattern as w3 but for SQLiteAdapter.
 
   - id: w8
     summary: "Add unit tests for SQLite plan capture wiring"
     needs: [w7]
-    status: pending
+    status: done
     notes: |
       Create tests/unit/platforms/test_sqlite_plan_capture.py. Same coverage as
       w4 but using SQLiteQueryPlanParser and Python's stdlib sqlite3 connections.
@@ -194,4 +194,35 @@ metadata:
   tags: [query-plan, datafusion, sqlite, wiring, no-credentials]
   estimated_effort: "Small"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T00:00:00-04:00"
+  last_updated: "2026-06-14T00:00:00-04:00"
+
+completed_date: "2026-06-03"
+
+commits:
+  - "e9999563"
+
+sections:
+  "Implementation Summary": |
+    Landed in PR #748 (squash-merged to develop as e9999563), confirmed during the
+    post-748 TODO status audit by reading the merged diff.
+
+    DataFusion (benchbox/platforms/datafusion.py):
+    - get_query_plan() issues plain `EXPLAIN {query}` and reconstructs the
+      pipe-delimited "plan_type | line" text that DataFusionQueryPlanParser expects.
+      NOTE: the original w1/w2 hypothesis of `EXPLAIN FORMAT JSON` was not used —
+      the parser consumes DataFusion's text/indent format, and a wiring test asserts
+      FORMAT JSON is never issued.
+    - get_query_plan_parser() returns DataFusionQueryPlanParser (lazy import).
+    - execute_query() captures the plan and sets query_plan / plan_fingerprint /
+      plan_capture_time_ms when capture_plans is enabled.
+    - tests/unit/platforms/test_datafusion_plan_capture.py added.
+
+    SQLite (benchbox/platforms/sqlite.py):
+    - get_query_plan() issues `EXPLAIN QUERY PLAN`; a new _format_sqlite_query_plan()
+      helper rebuilds the indented "|--"/"`--" tree text for SQLiteQueryPlanParser.
+    - get_query_plan_parser() returns SQLiteQueryPlanParser (lazy import); capture
+      wired into execute_query().
+    - benchbox/core/query_plans/parsers/sqlite.py updated to also accept modern
+      ("SCAN name" / "SEARCH name") SQLite EXPLAIN output, not just legacy
+      ("SCAN TABLE name").
+    - tests/unit/platforms/test_sqlite_plan_capture.py added.
