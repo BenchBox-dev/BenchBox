@@ -22,6 +22,7 @@ from benchbox.core.runner.dataframe_runner import (
     _clear_parameter_overrides,
     _execute_dataframe_queries,
     _setup_parameter_overrides,
+    _setup_parameter_overrides_for_stream,
 )
 from benchbox.core.tpcds.dataframe_queries.parameters import (
     TPCDS_DEFAULT_PARAMS,
@@ -32,6 +33,7 @@ from benchbox.core.tpch.dataframe_queries import (
     TPCH_DEFAULT_PARAMS,
     get_tpch_parameters,
     set_parameter_overrides as tpch_set_overrides,
+    set_scale_factor as tpch_set_scale_factor,
 )
 from benchbox.core.tpch.parameter_extractor import (
     clear_cache as tpch_clear_cache,
@@ -549,3 +551,73 @@ class TestQueryFunctionsCentralized:
         tpcds_set_overrides(None)
         params = get_parameters(96)
         assert params.get("hours") == [(8, 9)]
+
+
+# =============================================================================
+# Unseeded Q11 Scale-Fraction Regression
+# =============================================================================
+
+
+class TestUnseededQ11ScaleFraction:
+    """Unseeded DataFrame runs must render Q11's fraction as 0.0001 / SF.
+
+    Canonical TPC-H qgen renders the Q11 value threshold as 0.0001 / SF, and the
+    SQL run path mirrors that via the {q11_fraction} token. Without a seed, the
+    DataFrame surface used to fall back to the static SF=1 value at every scale;
+    these tests pin the scale-aware default so the product run path stays
+    scale-faithful (regression for tpch-dataframe-unseeded-q11-scale-fraction).
+    """
+
+    def setup_method(self):
+        tpch_set_overrides(None)
+        tpch_set_scale_factor(None)
+
+    def teardown_method(self):
+        tpch_set_overrides(None)
+        tpch_set_scale_factor(None)
+
+    @pytest.mark.parametrize(
+        "scale_factor, expected_fraction",
+        [(0.1, 0.001), (1.0, 0.0001), (10.0, 0.00001)],
+    )
+    def test_unseeded_runner_setup_scales_q11_fraction(self, scale_factor, expected_fraction):
+        """The unseeded runner seam derives Q11's fraction from the scale factor."""
+        _setup_parameter_overrides_for_stream(
+            benchmark_id="tpch",
+            seed=None,
+            scale_factor=scale_factor,
+            stream_id=0,
+            applied_contexts=set(),
+        )
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(expected_fraction)
+
+    @pytest.mark.parametrize("benchmark_id", ["tpch", "tpch_skew", "tpchavoc"])
+    def test_tpch_family_unseeded_setup_scales_q11_fraction(self, benchmark_id):
+        """Every TPC-H-family benchmark shares the parameter seam and scales alike.
+
+        TPC-H Skew re-registers the canonical TPC-H DataFrame queries verbatim and
+        TPC-Havoc's variants read the same seam, so all three must derive Q11's
+        fraction from the run's scale factor on the unseeded path.
+        """
+        _setup_parameter_overrides_for_stream(
+            benchmark_id=benchmark_id,
+            seed=None,
+            scale_factor=0.1,
+            stream_id=0,
+            applied_contexts=set(),
+        )
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.001)
+
+    def test_seeded_override_takes_precedence_over_scaled_default(self):
+        """A seed-derived Q11 fraction override wins over the scaled default."""
+        tpch_set_scale_factor(0.1)  # scaled default would be 0.001
+        tpch_set_overrides({11: {"fraction": 0.00002}})
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.00002)
+
+    def test_clear_resets_scale_factor_to_sf1(self):
+        """Clearing overrides resets the Q11 fraction to the SF=1 rendering."""
+        tpch_set_scale_factor(0.1)
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.001)
+
+        _clear_parameter_overrides("tpch")
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.0001)

@@ -2,7 +2,7 @@ id: tpch-dataframe-unseeded-q11-scale-fraction
 title: "Unseeded TPC-H DataFrame runs use the SF=1 Q11 fraction at every scale"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: Under Review
 category: Bug Fixes
 
 description: |
@@ -40,7 +40,7 @@ prior_art:
 work:
   - id: w0
     summary: "Make the unseeded DataFrame Q11 fraction scale-aware at the runner seam"
-    status: pending
+    status: done
     notes: |
       When seed is None and benchmark_id is tpch (or a TPC-H-derived benchmark
       such as tpchavoc), inject {11: {"fraction": 0.0001 / scale_factor}} via
@@ -50,7 +50,7 @@ work:
   - id: w1
     summary: "Remove the gate-local Q11 override and re-verify the DataFrame gate"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Drop the set_parameter_overrides injection in
       find_dataframe_divergences; make tpchavoc-dataframe-equivalence-report
@@ -70,4 +70,4 @@ metadata:
   tags: [tpch, dataframe, correctness, parameters, q11]
   estimated_effort: "Small"
   created_date: "2026-06-12"
-  last_updated: "2026-06-12T12:00:00"
+  last_updated: "2026-06-14T14:16:31"
