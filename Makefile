@@ -906,6 +906,7 @@ agent-write-preflight:
 pr-preflight:
 	@$(MAKE) ci-lint
 	@$(MAKE) pr-preflight-fast-tests
+	@$(MAKE) -s uat-artifact-hygiene
 
 pr-preflight-fast-tests:
 	@DECISION=$$(mktemp); \
@@ -1698,7 +1699,18 @@ blind-spots-sweep: blind-spots-report
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-docker-cleanup
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-docker-cleanup uat-artifact-hygiene
+
+# Local-artifact hygiene gate. No-op unless an external output root is
+# configured (BENCHBOX_OUTPUT_DIR or OUTPUT=); when it is, fails if the
+# worktree-local benchmark_runs/datagen holds artifacts that should have
+# landed under the external root (the 2026-06-01 datagen-leak incident).
+# Report-only: never deletes or moves artifacts.
+#   make uat-artifact-hygiene [OUTPUT=<root>] [THRESHOLD_BYTES=N]
+uat-artifact-hygiene:
+	@uv run --no-sync -- python -m tests.uat.artifact_hygiene \
+		$(if $(OUTPUT),--output "$(OUTPUT)",) \
+		$(if $(THRESHOLD_BYTES),--threshold-bytes "$(THRESHOLD_BYTES)",)
 
 # make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
 uat-cell:

@@ -11,6 +11,7 @@ from unittest.mock import patch
 import pytest
 
 from tests.uat import runner
+from tests.uat.artifact_hygiene import LocalArtifactGrowthError
 from tests.uat.timeouts import TimeoutResult
 
 pytestmark = pytest.mark.fast
@@ -374,6 +375,78 @@ def test_run_cell_marks_timeout(tmp_path: Path):
     assert result.status == "timed-out"
     assert result.exit_code == 124  # EXIT_TIMEOUT
     assert "UAT_TIMEOUT timeout_s=1 exit_code=124" in result.log_path.read_text()
+
+
+def test_run_cell_flags_local_datagen_leak_under_external_root(monkeypatch, tmp_path: Path):
+    """run_cell fails loudly when a subprocess leaks datagen into cwd/benchmark_runs."""
+    worktree = tmp_path / "wt"
+    worktree.mkdir()
+    external = tmp_path / "ext"
+    external.mkdir()
+    monkeypatch.chdir(worktree)
+
+    leaked_dir = worktree / "benchmark_runs" / "datagen" / "tpch_sf001"
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        leaked_dir.mkdir(parents=True, exist_ok=True)
+        (leaked_dir / "lineitem.tbl").write_bytes(b"x" * 4096)
+        return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1)
+
+    fake_argv = [sys.executable, "-c", "print('unused')"]
+    with (
+        patch.object(runner, "benchbox_run_argv", return_value=fake_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+        pytest.raises(LocalArtifactGrowthError) as excinfo,
+    ):
+        runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path / "logs",
+            benchmark_runs_dir=external,
+            now=_dt.datetime(2026, 6, 1, 12, 0, 0),
+        )
+
+    message = str(excinfo.value)
+    assert str(external) in message
+    assert str(worktree / "benchmark_runs") in message
+    # Report-only: the leaked artifact is left untouched.
+    assert (leaked_dir / "lineitem.tbl").exists()
+
+
+def test_run_cell_local_root_run_is_not_guarded(monkeypatch, tmp_path: Path):
+    """A run whose output root is inside cwd is a local run; the guard stays off."""
+    worktree = tmp_path / "wt"
+    worktree.mkdir()
+    monkeypatch.chdir(worktree)
+    local_runs = worktree / "benchmark_runs"
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        target = local_runs / "datagen" / "tpch_sf001"
+        target.mkdir(parents=True, exist_ok=True)
+        (target / "lineitem.tbl").write_bytes(b"x" * 4096)
+        return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1)
+
+    fake_argv = [sys.executable, "-c", "print('unused')"]
+    with (
+        patch.object(runner, "benchbox_run_argv", return_value=fake_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        # Output root inside the worktree => local run => no LocalArtifactGrowthError.
+        # (Reaching this point without an exception is the assertion.)
+        result = runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path / "logs",
+            benchmark_runs_dir=local_runs,
+            now=_dt.datetime(2026, 6, 1, 12, 0, 0),
+        )
+    assert isinstance(result, runner.CellResult)
+    # The local write is left untouched — the guard is off, not silently cleaning.
+    assert (local_runs / "datagen" / "tpch_sf001" / "lineitem.tbl").exists()
 
 
 def test_default_log_dir_honours_benchbox_output_dir(monkeypatch, tmp_path: Path):
