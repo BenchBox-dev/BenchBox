@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from benchbox.core.errors import PlanCaptureError
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
@@ -569,6 +570,8 @@ class SQLiteAdapter(PlatformAdapter):
 
             return result
 
+        except PlanCaptureError:
+            raise
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             return {

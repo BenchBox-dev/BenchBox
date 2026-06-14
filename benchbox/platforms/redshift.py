@@ -26,6 +26,7 @@ if TYPE_CHECKING:
         UnifiedTuningConfiguration,
     )
 
+from ..core.errors import PlanCaptureError
 from ..core.exceptions import ConfigurationError
 from ..utils.dependencies import (
     check_platform_dependencies,
@@ -2126,6 +2127,8 @@ class RedshiftAdapter(PlatformAdapter):
 
             return result_dict
 
+        except PlanCaptureError:
+            raise
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             error_type = type(e).__name__
