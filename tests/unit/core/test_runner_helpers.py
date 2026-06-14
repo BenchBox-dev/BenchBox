@@ -73,7 +73,74 @@ class TestResolveManifestAllowedNames:
         assert "Unexpected alias type" in caplog.text
 
 
+class _OutputDirTrackingBenchmark:
+    """Stub recording how many times output_dir is assigned post-construction."""
+
+    def __init__(self, value):
+        self._output_dir = value
+        self.set_count = 0
+
+    @property
+    def output_dir(self):
+        return self._output_dir
+
+    @output_dir.setter
+    def output_dir(self, value):
+        self._output_dir = value
+        self.set_count += 1
+
+
 class TestOutputDirResolution:
+    def test_resolve_output_dir_handler_skips_reassignment_when_already_resolved(self):
+        benchmark = _OutputDirTrackingBenchmark(Path("/tmp/resolved"))
+
+        result = _resolve_output_dir_handler(benchmark, "/tmp/resolved")
+
+        assert result == Path("/tmp/resolved")
+        assert benchmark.set_count == 0
+
+    def test_resolve_output_dir_handler_assigns_when_root_differs(self):
+        benchmark = _OutputDirTrackingBenchmark(Path("/tmp/original"))
+
+        result = _resolve_output_dir_handler(benchmark, "/tmp/override")
+
+        assert result == Path("/tmp/override")
+        assert benchmark.output_dir == Path("/tmp/override")
+        assert benchmark.set_count == 1
+
+    def test_resolve_output_dir_handler_normalizes_existing_string(self):
+        benchmark = _OutputDirTrackingBenchmark("/tmp/existing")
+
+        result = _resolve_output_dir_handler(benchmark, None)
+
+        assert result == Path("/tmp/existing")
+        assert benchmark.output_dir == Path("/tmp/existing")
+        assert benchmark.set_count == 1
+
+    def test_resolve_output_dir_handler_assigns_databricks_handler_with_matching_local_cache(self):
+        """A DatabricksPath handler must be assigned even when its local cache
+        path equals the benchmark's existing local default.
+
+        ``create_path_handler`` preserves a DatabricksPath by identity, and its
+        ``__eq__`` compares only the local path (ignoring ``dbfs_target``). An
+        equality-only skip would therefore drop the dbfs target, leaving the
+        benchmark on a plain local path and never uploading to dbfs. The handler
+        must always reach the benchmark.
+        """
+        from benchbox.utils.cloud_storage import DatabricksPath
+
+        local_cache = Path("/tmp/datagen/tpch_sf1")
+        benchmark = _OutputDirTrackingBenchmark(local_cache)
+        handler = DatabricksPath(str(local_cache), "dbfs:/Volumes/cat/schema/vol")
+        assert handler == local_cache  # equal by local path alone
+
+        result = _resolve_output_dir_handler(benchmark, handler)
+
+        assert result is handler
+        assert benchmark.output_dir is handler
+        assert benchmark.output_dir.dbfs_target == "dbfs:/Volumes/cat/schema/vol"
+        assert benchmark.set_count == 1
+
     def test_resolve_output_dir_handler_prefers_output_root(self):
         benchmark = SimpleNamespace(output_dir=Path("/tmp/original"))
 

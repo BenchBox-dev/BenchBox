@@ -311,3 +311,30 @@ def test_cloud_staging_output_root_preserves_local_staging_root(tmp_path):
 
     assert Path(str(benchmark.output_dir)) == local_stage, benchmark.output_dir
     assert Path(str(benchmark.data_generator.output_dir)) == local_stage, benchmark.data_generator.output_dir
+
+
+def test_generator_output_dir_mixin_forwards_to_impl():
+    """A class combining GeneratorOutputDirMixin with the _impl wrapper pattern
+    forwards output_dir to _impl.
+
+    The mixin precedes BaseBenchmark in the MRO, so its setter governs. It must
+    still mirror BaseBenchmark's _impl forwarding, otherwise a wrapper's inner
+    _impl keeps generating under a stale path while the wrapper reports the new
+    root.
+    """
+    from benchbox.base import GeneratorOutputDirMixin
+
+    class _Impl:
+        def __init__(self):
+            self.output_dir = None
+
+    class _Wrapper(GeneratorOutputDirMixin):
+        def __init__(self):
+            self._impl = _Impl()
+            self.output_dir = "/tmp/initial"
+
+    wrapper = _Wrapper()
+    assert str(wrapper._impl.output_dir) == "/tmp/initial"
+
+    wrapper.output_dir = "/tmp/reassigned"
+    assert str(wrapper._impl.output_dir) == "/tmp/reassigned"

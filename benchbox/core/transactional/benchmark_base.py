@@ -12,20 +12,13 @@ from __future__ import annotations
 import re
 from abc import abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar, Union
+from typing import Any, Generic, Optional, TypeVar, Union
 
-if TYPE_CHECKING:
-    from cloudpathlib import CloudPath
-
-    from benchbox.utils.cloud_storage import DatabricksPath
-
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection
 from benchbox.core.operations import OperationExecutor
 from benchbox.core.transactional.operations_registry_base import OperationsRegistryBase
-from benchbox.utils.cloud_storage import create_path_handler
 
-PathLike = Union[Path, "CloudPath", "DatabricksPath"]
 ResultT = TypeVar("ResultT")
 _POSTGRES_SERIES_DIALECTS = frozenset({"postgres", "postgresql"})
 _UNNEST_GENERATE_SERIES_RE = re.compile(r"unnest\(\s*generate_series\((?P<args>[^()]*)\)\s*\)", re.IGNORECASE)
@@ -36,7 +29,7 @@ _SET_THEN_BEGIN_ISOLATION_RE = re.compile(
 )
 
 
-class TransactionalBenchmarkBase(BaseBenchmark, OperationExecutor, Generic[ResultT]):
+class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, OperationExecutor, Generic[ResultT]):
     """Base class shared by transaction_primitives and write_primitives families.
 
     Provides the shared property/data-generation/catalog/query API.  Subclasses
@@ -82,27 +75,10 @@ class TransactionalBenchmarkBase(BaseBenchmark, OperationExecutor, Generic[Resul
     # Data source
     # ------------------------------------------------------------------
 
-    def get_data_source_benchmark(self) -> Optional[str]:
-        """Both transactional families reuse TPC-H data."""
-        return "tpch"
-
-    # ------------------------------------------------------------------
-    # output_dir property (identical across both families)
-    # ------------------------------------------------------------------
-
-    @property
-    def output_dir(self) -> PathLike:
-        """Return the output directory path."""
-        return self._output_dir
-
-    @output_dir.setter
-    def output_dir(self, value: Union[str, Path]) -> None:
-        """Set the output directory and propagate to the data generator."""
-        self._output_dir = create_path_handler(value)
-        if hasattr(self, "data_generator"):
-            self.data_generator.output_dir = self._output_dir
-            if hasattr(self.data_generator, "tpch_generator"):
-                self.data_generator.tpch_generator.output_dir = self._output_dir
+    # Both transactional families reuse TPC-H data; GeneratorOutputDirMixin
+    # keeps data_generator (and its nested tpch_generator) in sync with
+    # output_dir.
+    DATA_SOURCE_BENCHMARK = "tpch"
 
     # ------------------------------------------------------------------
     # Data generation (identical modulo the label string)

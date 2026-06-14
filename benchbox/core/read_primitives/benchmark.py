@@ -13,31 +13,24 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.benchmark_mixins import DataGenerationMixin
 from benchbox.core.query_catalog_base import QuerySkippedError, TranslatableQueryMixin
 
 if TYPE_CHECKING:
-    from cloudpathlib import CloudPath
-
     from benchbox.core.dataframe.query import QueryRegistry
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
-    from benchbox.utils.cloud_storage import DatabricksPath
 
 from benchbox.core.connection import DatabaseConnection
 from benchbox.core.read_primitives.generator import ReadPrimitivesDataGenerator
 from benchbox.core.read_primitives.queries import ReadPrimitivesQueryManager
 from benchbox.core.read_primitives.schema import TABLES, get_all_create_table_sql
 from benchbox.core.utils.tuning import extract_constraint_flags
-from benchbox.utils.cloud_storage import create_path_handler
 from benchbox.utils.file_format import get_delimiter_for_file, is_tpc_format
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
-# Type alias for paths that could be local or cloud
-PathLike = Union[Path, "CloudPath", "DatabricksPath"]
 
-
-class ReadPrimitivesBenchmark(TranslatableQueryMixin, DataGenerationMixin, BaseBenchmark):
+class ReadPrimitivesBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, DataGenerationMixin, BaseBenchmark):
     """Read Primitives benchmark implementation.
 
     Uses TPC-H schema with 8 tables and 80+ primitive read queries.
@@ -89,29 +82,13 @@ class ReadPrimitivesBenchmark(TranslatableQueryMixin, DataGenerationMixin, BaseB
         # Data files mapping
         self.tables = {}
 
-    def get_data_source_benchmark(self) -> Optional[str]:
-        """Read Primitives benchmark shares TPC-H data."""
-        return "tpch"
+    # Read Primitives shares TPC-H data; GeneratorOutputDirMixin keeps
+    # data_generator (and its nested tpch_generator) in sync with output_dir.
+    DATA_SOURCE_BENCHMARK = "tpch"
 
     def supports_dataframe_mode(self) -> bool:
         """Read Primitives supports DataFrame execution mode."""
         return True
-
-    @property
-    def output_dir(self) -> PathLike:
-        """Get the output directory."""
-        return self._output_dir
-
-    @output_dir.setter
-    def output_dir(self, value: Union[str, Path]) -> None:
-        """Set the output directory and update data generator."""
-        self._output_dir = create_path_handler(value)
-        # Configure data generator with new path
-        if hasattr(self, "data_generator"):
-            self.data_generator.output_dir = self._output_dir
-            # Also update the underlying TPC-H generator
-            if hasattr(self.data_generator, "tpch_generator"):
-                self.data_generator.tpch_generator.output_dir = self._output_dir
 
     def _get_table_schema(self) -> dict[str, dict]:
         """Provide schema mapping for shared data generation/loading mixin."""

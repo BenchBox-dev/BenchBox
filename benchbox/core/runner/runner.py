@@ -113,18 +113,31 @@ def _resolve_manifest_allowed_names(benchmark: Any, config: BenchmarkConfig) -> 
 
 
 def _resolve_output_dir_handler(benchmark: Any, output_root: str | None) -> Any | None:
-    """Resolve and cache the benchmark output directory handler if available."""
+    """Resolve the benchmark output directory handler (compatibility shim).
 
-    if output_root:
-        handler = create_path_handler(output_root)
-        benchmark.output_dir = handler
-        return handler
+    The orchestrator resolves the final datagen root before construction and
+    injects it into the constructor (_resolve_construction_output_dir), so for
+    that path the benchmark already holds the right handler and no assignment
+    happens here. The shim remains for externally constructed instances and
+    callers that pass output_root directly (including cloud staging handlers,
+    which resolve only after platform config is known).
+    """
+    from pathlib import Path
 
     existing = getattr(benchmark, "output_dir", None)
-    if existing is None:
+    target = output_root if output_root else existing
+    if target is None:
         return None
 
-    handler = create_path_handler(existing)
+    handler = create_path_handler(target)
+    # Skip the redundant reassignment only for a plain local path already equal
+    # to the live one (the common case where the orchestrator injected the same
+    # managed root at construction). create_path_handler preserves cloud handler
+    # types that are not pathlib.Path subclasses (DatabricksPath, cloudpathlib
+    # CloudPath); their __eq__ to a plain Path ignores the cloud/dbfs target, so
+    # an equality-only skip would silently drop it — always assign those.
+    if isinstance(handler, Path) and handler == existing:
+        return handler
     benchmark.output_dir = handler
     return handler
 

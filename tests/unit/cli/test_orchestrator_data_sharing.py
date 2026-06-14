@@ -9,11 +9,14 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 from pathlib import Path
+from typing import Optional
 from unittest.mock import Mock, patch
 
 import pytest
 
+from benchbox.base import BaseBenchmark
 from benchbox.cli.orchestrator import BenchmarkOrchestrator
+from benchbox.core.benchmark_loader import instantiate_benchmark_class
 from benchbox.core.schemas import BenchmarkConfig
 from benchbox.utils.scale_factor import format_scale_factor
 
@@ -175,3 +178,111 @@ class TestOrchestratorDataSharing:
             benchmark = orchestrator._get_benchmark_instance(config, None)
 
             _assert_tpch_default_path(Path(benchmark.output_dir), scale_factor)
+
+
+class _MethodOnlySharingBenchmark(BaseBenchmark):
+    """Stub declaring data sharing only via the instance method (no class attr)."""
+
+    def __init__(self, scale_factor: float = 1.0, output_dir=None, **kwargs):
+        super().__init__(scale_factor=scale_factor, output_dir=output_dir, **kwargs)
+        self._name = "Method Only Sharing"
+
+    def get_data_source_benchmark(self) -> Optional[str]:
+        return "tpch"
+
+    def generate_data(self):
+        return []
+
+    def get_queries(self):
+        return {}
+
+    def get_query(self, query_id, *, params=None):
+        raise ValueError(f"Query {query_id} not found")
+
+
+@pytest.mark.unit
+class TestConstructionBoundaryInjection:
+    """The orchestrator resolves the final datagen root BEFORE construction.
+
+    Generators must capture the correct root in __init__; no benchmark in the
+    orchestrator flow may depend on post-construction output_dir mutation.
+    """
+
+    def _construct_with_spy(self, orchestrator, config):
+        """Construct via the orchestrator, capturing the constructor kwargs and
+        the output_dir handler as it existed the moment construction finished."""
+        captured = {}
+
+        def _spy(benchmark_class, required_kwargs, optional_kwargs):
+            instance = instantiate_benchmark_class(benchmark_class, required_kwargs, optional_kwargs)
+            captured["optional_kwargs"] = optional_kwargs
+            captured["handler_at_construction"] = instance.output_dir
+            return instance
+
+        with patch("benchbox.cli.orchestrator.instantiate_benchmark_class", side_effect=_spy):
+            benchmark = orchestrator._get_benchmark_instance(config, None)
+        return benchmark, captured
+
+    def test_own_data_benchmark_constructed_with_managed_root(self):
+        orchestrator = BenchmarkOrchestrator()
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=1.0, compress_data=False)
+
+        benchmark, captured = self._construct_with_spy(orchestrator, config)
+
+        expected = orchestrator.directory_manager.get_datagen_path("tpch", 1.0)
+        assert Path(str(captured["optional_kwargs"]["output_dir"])) == Path(str(expected))
+        assert Path(str(benchmark.output_dir)) == Path(str(expected))
+        # The handler captured at construction is still the live one: nothing
+        # reassigned output_dir after the constructor returned.
+        assert benchmark.output_dir is captured["handler_at_construction"]
+
+    def test_data_sharing_benchmark_constructed_with_shared_root(self):
+        orchestrator = BenchmarkOrchestrator()
+        config = BenchmarkConfig(
+            name="read_primitives", display_name="Primitives", scale_factor=1.0, compress_data=False
+        )
+
+        benchmark, captured = self._construct_with_spy(orchestrator, config)
+
+        expected = orchestrator.directory_manager.get_datagen_path("tpch", 1.0)
+        assert Path(str(captured["optional_kwargs"]["output_dir"])) == Path(str(expected))
+        assert benchmark.output_dir is captured["handler_at_construction"]
+        # Nested generators captured the shared root during __init__.
+        assert Path(str(benchmark.data_generator.output_dir)) == Path(str(expected))
+        assert Path(str(benchmark.data_generator.tpch_generator.output_dir)) == Path(str(expected))
+
+    def test_method_only_data_sharing_falls_back_to_redirect(self):
+        orchestrator = BenchmarkOrchestrator()
+        config = BenchmarkConfig(name="tpch", display_name="Stub", scale_factor=1.0, compress_data=False)
+
+        with patch.object(orchestrator, "_get_benchmark_class", return_value=_MethodOnlySharingBenchmark):
+            benchmark = orchestrator._get_benchmark_instance(config, None)
+
+        expected = orchestrator.directory_manager.get_datagen_path("tpch", 1.0)
+        assert Path(str(benchmark.output_dir)) == Path(str(expected))
+
+    def test_cloud_custom_output_defers_resolution(self):
+        orchestrator = BenchmarkOrchestrator()
+        orchestrator.set_custom_output_dir("s3://bucket/prefix")
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=1.0, compress_data=False)
+
+        benchmark, captured = self._construct_with_spy(orchestrator, config)
+
+        # Cloud roots resolve post-construction (need platform config), so no
+        # output_dir is injected and the benchmark keeps its own default.
+        assert "output_dir" not in captured["optional_kwargs"]
+        assert benchmark.output_dir is not None
+
+    def test_local_custom_output_injected_at_construction(self, tmp_path):
+        orchestrator = BenchmarkOrchestrator()
+        orchestrator.set_custom_output_dir(str(tmp_path / "custom-root"))
+        config = BenchmarkConfig(
+            name="read_primitives", display_name="Primitives", scale_factor=1.0, compress_data=False
+        )
+
+        benchmark, captured = self._construct_with_spy(orchestrator, config)
+
+        # CLI --output wins over the shared data-source root, at construction.
+        assert Path(str(captured["optional_kwargs"]["output_dir"])) == tmp_path / "custom-root"
+        assert Path(str(benchmark.output_dir)) == tmp_path / "custom-root"
+        assert benchmark.output_dir is captured["handler_at_construction"]
