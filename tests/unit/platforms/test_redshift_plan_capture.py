@@ -129,9 +129,7 @@ class TestRedshiftPlanCapture:
         )
         monkeypatch.setattr(adapter, "_merge_plan_capture_into_result", lambda *a, **k: None)
 
-        adapter.execute_query(
-            connection=conn, query="SELECT 1", query_id="rq_disp_cap", validate_row_count=False
-        )
+        adapter.execute_query(connection=conn, query="SELECT 1", query_id="rq_disp_cap", validate_row_count=False)
 
         assert len(display_calls) == 1, "display_query_plan_if_enabled must be called even when capture_plans=True"
 
