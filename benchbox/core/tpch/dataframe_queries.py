@@ -134,6 +134,32 @@ def set_scale_factor(scale_factor: float | None) -> None:
     _scale_factor = 1.0 if scale_factor is None else float(scale_factor)
 
 
+# Benchmark ids whose DataFrame queries reuse this module's parameter seam
+# (get_tpch_parameters / the scale-dependent Q11 default). TPC-H Skew
+# re-registers the TPC-H DataFrame queries verbatim and TPC-Havoc's variants
+# read the same seam, so all three derive Q11's 0.0001/SF threshold from the
+# run's scale factor the same way.
+TPCH_FAMILY_DATAFRAME_IDS = frozenset({"tpch", "tpch_skew", "tpchavoc"})
+
+
+def set_scale_factor_for_benchmark(benchmark_id: str, scale_factor: float | None) -> None:
+    """Apply :func:`set_scale_factor` for TPC-H-family DataFrame benchmarks.
+
+    A no-op for any benchmark whose DataFrame queries do not share this module's
+    parameter seam (see :data:`TPCH_FAMILY_DATAFRAME_IDS`). Pass
+    ``scale_factor=None`` to reset to the SF=1 rendering. Both the production
+    DataFrame execution path (``BenchmarkExecutionMixin``) and the compatibility
+    runner call this so unseeded runs derive Q11's 0.0001/SF threshold at every
+    scale.
+
+    Args:
+        benchmark_id: Normalized benchmark id (e.g. from normalize_benchmark_id).
+        scale_factor: The run's scale factor, or None to reset to 1.0.
+    """
+    if benchmark_id in TPCH_FAMILY_DATAFRAME_IDS:
+        set_scale_factor(scale_factor)
+
+
 def get_tpch_parameters(query_id: int) -> dict[str, Any]:
     """Get parameters for a TPC-H query.
 

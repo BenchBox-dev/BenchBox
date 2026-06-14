@@ -69,14 +69,6 @@ logger = logging.getLogger(__name__)
 
 console = quiet_console
 
-# Benchmark ids that share the TPC-H DataFrame parameter seam
-# (benchbox.core.tpch.dataframe_queries): canonical TPC-H plus the benchmarks
-# whose DataFrame queries reuse the same query impls and get_tpch_parameters().
-# TPC-H Skew re-registers the TPC-H DataFrame queries verbatim, and TPC-Havoc's
-# variants read the same parameter seam, so all three need the scale-dependent
-# Q11 default (0.0001/SF) set and cleared together.
-_TPCH_FAMILY_DATAFRAME_IDS = ("tpch", "tpch_skew", "tpchavoc")
-
 DATAFRAME_RUNNER_API_SURFACE = "deprecated"
 DATAFRAME_RUNNER_LIFECYCLE = "deprecated-internal-compatibility-runner"
 DATAFRAME_PRODUCTION_EXECUTION_PATH = "adapter.run_benchmark+BenchmarkExecutionMixin"
@@ -597,17 +589,16 @@ def _setup_scale_dependent_defaults(benchmark_id: str, scale_factor: float) -> N
 
     Canonical TPC-H Q11 renders its value threshold as ``0.0001 / SF``. Unseeded
     DataFrame runs would otherwise read the SF=1 default at every scale; setting
-    the scale factor here keeps them aligned with the SQL run path. TPC-H Skew
-    and TPC-Havoc reuse the same TPC-H DataFrame parameter seam, so they are
-    handled the same way (see :data:`_TPCH_FAMILY_DATAFRAME_IDS`).
+    the scale factor here keeps them aligned with the SQL run path. The shared
+    seam (:func:`set_scale_factor_for_benchmark`) is a no-op for benchmarks
+    outside the TPC-H family.
     """
-    if benchmark_id in _TPCH_FAMILY_DATAFRAME_IDS:
-        try:
-            from benchbox.core.tpch.dataframe_queries import set_scale_factor
+    try:
+        from benchbox.core.tpch.dataframe_queries import set_scale_factor_for_benchmark
 
-            set_scale_factor(scale_factor)
-        except Exception:  # pragma: no cover - defensive; never block execution
-            logger.debug("Failed to set TPC-H DataFrame scale factor", exc_info=True)
+        set_scale_factor_for_benchmark(benchmark_id, scale_factor)
+    except Exception:  # pragma: no cover - defensive; never block execution
+        logger.debug("Failed to set TPC-H DataFrame scale factor", exc_info=True)
 
 
 def _setup_parameter_overrides(
@@ -673,16 +664,21 @@ def _setup_parameter_overrides(
 
 def _clear_parameter_overrides(benchmark_id: str) -> None:
     """Clear parameter overrides after execution."""
-    if benchmark_id in _TPCH_FAMILY_DATAFRAME_IDS:
-        try:
-            from benchbox.core.tpch.dataframe_queries import set_parameter_overrides, set_scale_factor
+    try:
+        from benchbox.core.tpch.dataframe_queries import (
+            TPCH_FAMILY_DATAFRAME_IDS,
+            set_parameter_overrides,
+            set_scale_factor_for_benchmark,
+        )
 
+        if benchmark_id in TPCH_FAMILY_DATAFRAME_IDS:
             set_parameter_overrides(None)
             # Reset the scale-dependent defaults to the SF=1 rendering.
-            set_scale_factor(None)
-        except Exception:
-            pass
-    elif benchmark_id == "tpcds":
+            set_scale_factor_for_benchmark(benchmark_id, None)
+            return
+    except Exception:
+        pass
+    if benchmark_id == "tpcds":
         try:
             from benchbox.core.tpcds.dataframe_queries.parameters import set_parameter_overrides
 
