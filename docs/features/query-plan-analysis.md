@@ -59,7 +59,7 @@ Currently supported platforms for query plan capture:
 |-------------|---------------|-----------------------------------------|----------------------------------------------------------|
 | DuckDB      | ✓ Stable      | JSON (`EXPLAIN (ANALYZE, FORMAT JSON)`) | Actual per-operator timing; ~1× query cost overhead      |
 | SQLite      | ✓ Stable      | Text (tree)                             | Simple tree format                                       |
-| PostgreSQL  | ✓ Stable      | JSON                                    | Requires `EXPLAIN (FORMAT JSON)`                         |
+| PostgreSQL  | ✓ Stable      | JSON                                    | SELECT: `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`; DML: `EXPLAIN (FORMAT JSON)` only |
 | Redshift    | ✓ Beta        | Text                                    | Supports XN prefixed operators                           |
 | DataFusion  | ✓ Beta        | Text (indent)                           | Physical plan operators                                  |
 
@@ -71,9 +71,13 @@ Plan capture overhead depends on the platform:
 
 - **DuckDB** (default): uses `EXPLAIN (ANALYZE, FORMAT JSON)`, which re-executes the query to collect
   actual per-operator timing and cardinality. Overhead is approximately **1× query cost** per captured
-  plan - a 2-second query costs ~2 extra seconds. Disable re-execution with
-  `--platform-option analyze_plans=false` to use estimated plans only (~10-50 ms overhead).
-- **Other platforms**: estimated plans only, adds ~10-50 ms per query.
+  plan — a 2-second query costs ~2 extra seconds. Disable re-execution with
+  `--platform-option analyze_plans=false` to use estimated plans only (~1-5 ms overhead).
+- **PostgreSQL** (SELECT queries): uses `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`, which also
+  re-executes the query. Overhead is approximately **1× query cost** per captured plan.
+- **PostgreSQL** (DML — INSERT/UPDATE/DELETE/MERGE/COPY): uses `EXPLAIN (FORMAT JSON)` without
+  ANALYZE to prevent double-execution of writes. Overhead is low (~1-5 ms, estimated plan only).
+- **Redshift, DataFusion, SQLite**: estimated plans only (no ANALYZE), adds ~1-5 ms per query.
 
 In all cases:
 - Benchmark timing measurements are unaffected (plan capture runs after the timed execution)
@@ -423,13 +427,19 @@ benchbox platforms
 
 **Expected Impact**:
 - DuckDB (default): ~1× query cost per plan (re-executes via `EXPLAIN (ANALYZE, FORMAT JSON)`)
-- Other platforms: 10-50 ms per query
+- PostgreSQL SELECT queries: ~1× query cost per plan (re-executes via `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`)
+- PostgreSQL DML queries: ~1-5 ms (no re-execution; uses `EXPLAIN (FORMAT JSON)` only)
+- Redshift, DataFusion, SQLite: ~1-5 ms per query (estimated plans, no re-execution)
 
 **If DuckDB overhead is too high**:
-1. Use `--platform-option analyze_plans=false` to switch to estimated plans (~10-50 ms, no re-execution)
+1. Use `--platform-option analyze_plans=false` to switch to estimated plans (~1-5 ms, no re-execution)
 2. Use `--queries` to capture plans for a subset of queries during development
 
-**If overhead exceeds 100ms per query on non-DuckDB platforms**:
+**If PostgreSQL overhead is too high**:
+1. PostgreSQL SELECT capture re-executes each query; consider capturing a subset with `--queries`
+2. DML queries are already low-overhead by design (no ANALYZE)
+
+**If overhead exceeds 10ms per query on Redshift/DataFusion/SQLite**:
 1. Check if disk I/O is bottleneck (plan serialization)
 2. Verify platform EXPLAIN performance
 
@@ -560,10 +570,16 @@ The comparison engine uses:
 - Limited cost information
 
 **PostgreSQL**:
-- Uses `EXPLAIN (FORMAT JSON)` for machine-readable output
+- SELECT queries use `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` — re-executes the query to collect
+  actual timing and I/O statistics (~1× query cost overhead)
+- DML queries (INSERT, UPDATE, DELETE, MERGE, COPY) use `EXPLAIN (FORMAT JSON)` without ANALYZE
+  to prevent writing data twice (~1-5 ms overhead, estimated plan only)
 - Provides detailed cost estimates, row counts, and operator properties
 - Supports all PostgreSQL node types (Seq Scan, Index Scan, Hash Join, etc.)
 - Requires PostgreSQL 12+ for full JSON format support
+- Note: adding an index can change the fingerprint for PostgreSQL plans (Seq Scan uses
+  `Filter` nodes captured in the signature; Index Scan uses `Index Cond` which is not
+  captured). Do not compare fingerprints across index additions on PostgreSQL.
 
 **Redshift**:
 - Uses text-based `EXPLAIN` output
