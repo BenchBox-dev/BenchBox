@@ -113,19 +113,24 @@ def _resolve_manifest_allowed_names(benchmark: Any, config: BenchmarkConfig) -> 
 
 
 def _resolve_output_dir_handler(benchmark: Any, output_root: str | None) -> Any | None:
-    """Resolve and cache the benchmark output directory handler if available."""
+    """Resolve the benchmark output directory handler (compatibility shim).
 
-    if output_root:
-        handler = create_path_handler(output_root)
-        benchmark.output_dir = handler
-        return handler
+    The orchestrator resolves the final datagen root before construction and
+    injects it into the constructor (_resolve_construction_output_dir), so for
+    that path the benchmark already holds the right handler and no assignment
+    happens here. The shim remains for externally constructed instances and
+    callers that pass output_root directly (including cloud staging handlers,
+    which resolve only after platform config is known).
+    """
 
     existing = getattr(benchmark, "output_dir", None)
-    if existing is None:
+    target = output_root if output_root else existing
+    if target is None:
         return None
 
-    handler = create_path_handler(existing)
-    benchmark.output_dir = handler
+    handler = create_path_handler(target)
+    if handler is not existing and handler != existing:
+        benchmark.output_dir = handler
     return handler
 
 

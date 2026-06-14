@@ -7,7 +7,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 if TYPE_CHECKING:
     from benchbox.base import BaseBenchmark
@@ -141,14 +142,49 @@ class BenchmarkOrchestrator:
 
         kwargs.update(benchmark_options)
 
-        benchmark_instance = instantiate_benchmark_class(benchmark_class, kwargs, {"parallel": cpu_cores})
+        # Resolve the final datagen root BEFORE construction so nested
+        # generators capture it immediately, instead of constructing first and
+        # mutating output_dir afterward.
+        optional_kwargs: dict[str, Any] = {"parallel": cpu_cores}
+        construction_output_dir = self._resolve_construction_output_dir(config, benchmark_class)
+        if construction_output_dir is not None:
+            optional_kwargs["output_dir"] = construction_output_dir
 
+        benchmark_instance = instantiate_benchmark_class(benchmark_class, kwargs, optional_kwargs)
+
+        # Compatibility fallback: benchmarks that declare data sharing only via
+        # the get_data_source_benchmark() instance method (no
+        # DATA_SOURCE_BENCHMARK class attribute) still need the
+        # post-construction redirect to the shared root.
         data_source = getattr(benchmark_instance, "get_data_source_benchmark", lambda: None)()
         if data_source and self.custom_output_dir is None:
             shared_path = self.directory_manager.get_datagen_path(data_source.lower(), config.scale_factor)
-            benchmark_instance.output_dir = shared_path
+            if construction_output_dir is None or Path(construction_output_dir) != Path(shared_path):
+                benchmark_instance.output_dir = shared_path
 
         return benchmark_instance
+
+    def _resolve_construction_output_dir(self, config: BenchmarkConfig, benchmark_class) -> Optional[Union[str, Path]]:
+        """Resolve the local datagen root before the benchmark is constructed.
+
+        Precedence matches the post-construction resolution it replaces:
+        CLI --output (custom_output_dir) wins, then the shared data-source
+        root for data-sharing benchmarks, then the managed per-benchmark path.
+        Returns None when the root is not knowable yet — cloud --output paths
+        resolve later via _resolve_custom_output_root, which needs platform
+        config; the runner's compatibility shim applies that handler
+        post-construction.
+        """
+        if self.custom_output_dir:
+            from benchbox.utils.cloud_storage import is_cloud_path
+
+            if is_cloud_path(self.custom_output_dir):
+                return None
+            return self.custom_output_dir
+
+        data_source = getattr(benchmark_class, "DATA_SOURCE_BENCHMARK", None)
+        source_name = (data_source or config.name).lower()
+        return self.directory_manager.get_datagen_path(source_name, config.scale_factor)
 
     def _get_platform_config(
         self,
