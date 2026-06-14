@@ -558,11 +558,16 @@ class SQLiteAdapter(PlatformAdapter):
             # Include full results for SQLite compatibility
             result["results"] = results
 
-            # Display plan in console when --show-query-plans is active.
-            self.display_query_plan_if_enabled(connection, query, query_id)
-
-            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
+            # Capture and merge structured query plan (SUCCESS-guarded in the helper).
+            # Run before display so capture gates (plan_query_filter, plan_first_n,
+            # plan_sampling_rate, plan_capture_timeout_seconds) are applied consistently.
             self._merge_plan_capture_into_result(result, connection, query, query_id)
+
+            # Display plan in console when --show-query-plans is active.
+            # Skip when capture_plans is also active to avoid a second EXPLAIN and to
+            # honour capture gates — the capture call above already ran EXPLAIN if needed.
+            if not self.capture_plans:
+                self.display_query_plan_if_enabled(connection, query, query_id)
 
             return result
 
