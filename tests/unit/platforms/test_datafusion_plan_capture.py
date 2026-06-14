@@ -167,8 +167,14 @@ class TestDataFusionPlanCapture:
 
         assert len(display_calls) == 1, "display_query_plan_if_enabled must be called exactly once"
 
-    def test_execute_query_calls_display_when_capturing(self, adapter, monkeypatch):
-        """display_query_plan_if_enabled is called even when capture_plans=True."""
+    def test_execute_query_suppresses_display_when_capturing(self, adapter, monkeypatch):
+        """display_query_plan_if_enabled is suppressed when capture_plans=True.
+
+        When capture is active, EXPLAIN runs via _merge_plan_capture_into_result
+        which applies all capture gates (plan_query_filter, plan_first_n,
+        plan_sampling_rate, timeout). A separate display call would bypass those
+        gates and issue an extra EXPLAIN unconditionally.
+        """
         conn = MagicMock()
         fake_result = MagicMock()
         fake_result.collect.return_value = []
@@ -189,4 +195,4 @@ class TestDataFusionPlanCapture:
 
         adapter.execute_query(connection=conn, query="SELECT 1", query_id="df_disp_cap", validate_row_count=False)
 
-        assert len(display_calls) == 1, "display_query_plan_if_enabled must be called even when capture_plans=True"
+        assert len(display_calls) == 0, "display_query_plan_if_enabled must be suppressed when capture_plans=True to honour capture gates"
