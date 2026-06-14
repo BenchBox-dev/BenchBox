@@ -2588,8 +2588,10 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--show-plans",
     is_flag=True,
     help=(
-        "Print captured query plans to the console after each query. "
-        "Use with --capture-plans. Has no effect without --capture-plans."
+        "Display query plans in the console after each query. "
+        "Use for interactive inspection without --capture-plans. "
+        "Suppressed when --capture-plans is active (capture already runs EXPLAIN; "
+        "use benchbox show-plan to inspect captured plans afterwards)."
     ),
 )
 @advanced_option(
