@@ -154,7 +154,9 @@ class TestDuckDBDisplayQueryPlan:
 
         adapter.execute_query(connection=conn, query="SELECT 1", query_id="q", validate_row_count=False)
 
-        assert len(display_calls) == 0, "display_query_plan_if_enabled must not fire when capture_plans=True (avoids double EXPLAIN)"
+        assert len(display_calls) == 0, (
+            "display_query_plan_if_enabled must not fire when capture_plans=True (avoids double EXPLAIN)"
+        )
 
 
 class TestDuckDBPlanCapture:
