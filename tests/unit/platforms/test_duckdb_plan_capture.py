@@ -173,6 +173,46 @@ class TestDuckDBDMLPlanGuard:
         assert "FORMAT JSON" in called_sql
 
 
+class TestDuckDBDisplayQueryPlan:
+    """display_query_plan_if_enabled must not be called when capture_plans is active."""
+
+    def _make_adapter(self, capture_plans: bool):
+        return DuckDBAdapter(capture_plans=capture_plans)
+
+    def _mock_execute(self, monkeypatch, adapter):
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = []
+        monkeypatch.setattr(
+            adapter,
+            "_build_query_result_with_validation",
+            lambda **kw: {"query_id": kw.get("query_id", "q"), "status": "SUCCESS", "rows_returned": 0},
+        )
+        monkeypatch.setattr(adapter, "_merge_plan_capture_into_result", lambda *a, **k: None)
+        return conn
+
+    def test_display_called_when_not_capturing(self, monkeypatch):
+        adapter = self._make_adapter(capture_plans=False)
+        conn = self._mock_execute(monkeypatch, adapter)
+        display_calls = []
+        monkeypatch.setattr(adapter, "display_query_plan_if_enabled", lambda *a, **k: display_calls.append(True))
+
+        adapter.execute_query(connection=conn, query="SELECT 1", query_id="q", validate_row_count=False)
+
+        assert len(display_calls) == 1, "display_query_plan_if_enabled should fire once when capture_plans=False"
+
+    def test_display_suppressed_when_capturing(self, monkeypatch):
+        adapter = self._make_adapter(capture_plans=True)
+        conn = self._mock_execute(monkeypatch, adapter)
+        display_calls = []
+        monkeypatch.setattr(adapter, "display_query_plan_if_enabled", lambda *a, **k: display_calls.append(True))
+
+        adapter.execute_query(connection=conn, query="SELECT 1", query_id="q", validate_row_count=False)
+
+        assert len(display_calls) == 0, (
+            "display_query_plan_if_enabled must not fire when capture_plans=True (avoids double EXPLAIN)"
+        )
+
+
 class TestDuckDBPlanCapture:
     """Test query plan capture in DuckDB adapter."""
 
