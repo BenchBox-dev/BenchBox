@@ -1,0 +1,183 @@
+id: query-plan-capture-canonical-isolation
+title: "Canonical plan-capture isolation: one isolated phase for all engines, analyze_plans the only knob"
+worktree: main
+priority: High
+category: Core Functionality
+status: Not Started
+
+description: |
+  TARGET ARCHITECTURE (supersedes the additive design of
+  query-plan-capture-isolation-phase-design):
+
+  Query plan capture is, and must be, a FULLY SEPARATE and FULLY ISOLATED concern
+  from measurement runs. There is exactly one capture path: a post-measurement
+  isolated phase that runs after all timed queries complete, on a connection that
+  cannot perturb the measured run. The ONLY user-facing capture option is
+  analyze_plans: ANALYZE (re-run each query once, post-measurement, for full
+  execution detail) vs. estimated (a static EXPLAIN, no re-execution). Capture is
+  NOT interleaved with measurement for any engine, and there is no per-adapter
+  "is this engine allowed to use the phase" opt-in.
+
+  CURRENT STATE (develop, verified 2026-06-15) — how far we are:
+    - The isolated phase exists (benchbox/core/plan_capture_phase.py) and is wired
+      into ONE execution path (execution.py:_execute_all_queries / power+standard)
+      behind an opt-in capability flag (PlatformAdapter.plan_capture_phase_eligible),
+      enabled on only 6 adapters: DuckDB, MotherDuck, PostgreSQL, Redshift, SQLite,
+      DataFusion.
+    - Inline capture (capture inside execute_query) is STILL PRESENT in ~16
+      adapters and is NOT removed; for the 6 eligible adapters it is merely
+      suppressed in the power/standard path and left active everywhere else.
+    - Consequence A (dual path): the same eligible adapter captures via the
+      ISOLATED phase in power/standard mode but via the INLINE path in throughput,
+      maintenance, and combined modes (the phase logic lives only in
+      _execute_all_queries; throughput drivers do not suppress inline or run the
+      phase). Capture semantics depend on (adapter x test-type) — incoherent.
+    - Consequence B (dead knob): the phase calls run_plan_capture_phase WITHOUT
+      analyze_plans, so it is hard-coded structural-only and ignores the adapter's
+      analyze_plans. `--capture-plans` on eligible adapters silently lost ANALYZE
+      timing — a regression and the deletion of the one knob that should exist.
+      (Fixed by query-plan-capture-phase-respect-analyze.)
+    - Consequence C (wrong exclusions): Spark and Databricks are excluded from the
+      phase on the premise that they "depend on inline / side-effect capture", but
+      both use EXPLAIN EXTENDED and are FULLY isolatable with no loss. Only
+      BigQuery-class engines (plan/stats are a true side effect of the executed
+      job) are a genuine exception, and BigQuery is not wired for capture at all.
+
+  This TODO is the umbrella for reaching the target. It depends on the analyze
+  knob fix landing first, coordinates the side-effect exception policy, and tracks
+  the remaining structural work: universal eligibility, all-test-type coverage,
+  removal of the inline path, knob-surface collapse, and the post-measurement
+  divergence decision.
+
+design_note: |
+  Capture phase contract (canonical):
+    - Position: strictly after the last timed query of every test type (power,
+      throughput, maintenance, combined). Never inside the timed loop, never inside
+      a concurrent stream.
+    - Selection: each distinct executed query is captured exactly once. There is no
+      per-iteration or per-stream re-capture; the plan is a property of (query,
+      schema, engine), not of an execution. This removes the need for the inline-era
+      sampling machinery (plan_first_n / plan_sampling_rate) and its concurrency lock.
+    - Knob: analyze_plans only. True => EXPLAIN (ANALYZE) post-measurement (full
+      execution detail; each query re-run once, outside the measured window; writes
+      stay on non-ANALYZE EXPLAIN via the is_dml_query guard). False => static EXPLAIN.
+    - Eligibility: default ON for every EXPLAIN-based engine. A small, explicit
+      EXCEPTION list covers engines whose plan is only obtainable as a side effect of
+      the measured job (BigQuery; assess Snowflake) — see
+      query-plan-capture-sideeffect-engine-policy.
+    - Connection: reuse the measurement connection (so embedded :memory: engines see
+      the loaded data); isolation comes from running post-measurement, not from a
+      second connection.
+    - Divergence: when the workload mutates data mid-run (TPC-H RF1/RF2, TPC-DS
+      maintenance, combined mode, any DML query) a post-measurement capture reflects
+      POST-mutation cardinalities, which can differ from the plan that actually ran.
+      Resolution is tracked in query-plan-capture-post-measurement-divergence.
+
+work:
+  - id: w1
+    summary: "Ratify the canonical contract and update isolation-phase-design as superseded"
+    status: pending
+    notes: |
+      Record the contract above as the single source of truth. Add a superseded note
+      + pointer on query-plan-capture-isolation-phase-design (its additive cutover is
+      an intermediate step, not the destination); narrow its anti-patterns that
+      enshrine permanent inline coexistence to the true exception (BigQuery-class).
+  - id: w2
+    summary: "Default phase eligibility ON for all EXPLAIN-based engines (incl. Spark/Databricks)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Invert plan_capture_phase_eligible from opt-in to default-True, with an explicit
+      exception list for genuine side-effect engines. Enable Spark/Databricks and the
+      inline-only EXPLAIN engines (athena, doris, questdb, singlestore, presto/trino,
+      clickhouse, databend). Verify each produces a parseable plan via the phase.
+  - id: w3
+    summary: "Run the capture phase for ALL test types, not just power/standard"
+    needs: [w1]
+    status: pending
+    notes: |
+      Move the suppress-inline + post-measurement-capture logic out of
+      _execute_all_queries into a shared place that throughput, maintenance, and
+      combined drivers all reach, so capture fires once per run after the last timed
+      query regardless of test type. Do NOT capture inside concurrent streams.
+  - id: w4
+    summary: "Remove the inline capture path from EXPLAIN-based adapters and its dead complexity"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Delete the inline capture calls from execute_query in the EXPLAIN-based adapters
+      (the _merge_plan_capture_into_result / capture_query_plan blocks), leaving only
+      get_query_plan + get_query_plan_parser. Retire the now-moot sampling machinery
+      (plan_first_n/plan_sampling_rate) and the _plan_capture_iteration_counts lock
+      (added only for the concurrent inline path). Keep inline ONLY for the genuine
+      side-effect exception engines.
+  - id: w5
+    summary: "Collapse the capture knob surface to analyze_plans"
+    needs: [w4]
+    status: pending
+    notes: |
+      Reduce the user-facing surface to: --capture-plans (run the phase) and
+      analyze_plans (the one mode knob, promoted from a buried --platform-option to a
+      first-class option). Reconcile show_query_plans (display) as an orthogonal
+      concern (see query-plan-capture-display-decouple), not coupled to capture.
+  - id: w6
+    summary: "Docs + end-to-end test for the canonical model"
+    needs: [w4, w5]
+    status: pending
+    notes: |
+      Document capture as a single isolated post-measurement phase with analyze_plans
+      as the only knob; add an integration test asserting capture fires after every
+      test type, inline never fires for EXPLAIN engines, and plan_fingerprints land in
+      results identically to today.
+
+deps:
+  needs: []
+
+must_preserve:
+  - "plan_fingerprints / query_plan / plan_capture_time_ms continue to land on query_results and aggregate stats exactly as today (compute_plan_capture_stats stays valid)."
+  - "Measured timing (per-query, power, throughput) stays free of capture cost."
+  - "Genuine side-effect engines (BigQuery) keep a working capture path defined by the side-effect-policy TODO."
+  - "DML/write-DDL is never executed twice by capture."
+
+anti_patterns:
+  - "DO NOT keep capture as a per-adapter opt-in - because it produces a dual path and per-test-type inconsistency - make the isolated phase the default for all EXPLAIN engines."
+  - "DO NOT leave inline capture in EXPLAIN-based adapters as a permanent fallback - because two live capture paths drift and contradict - remove it once the phase covers all test types."
+  - "DO NOT add knobs beyond analyze_plans - because the contract is ANALYZE-vs-estimated only - retire sampling/first_n and keep display as a separate concern."
+  - "DO NOT capture inside concurrent throughput streams - because that re-contends on stream connections - capture once after all streams finish."
+
+verification:
+  - description: "Inline capture never fires for EXPLAIN engines across all test types"
+    command: "uv run -- python -m pytest tests/integration/ -k 'capture_phase and (throughput or maintenance or combined)' -v"
+    expected_output: "capture happens only in the post-measurement phase for every test type"
+  - description: "Full platform suite green after inline removal"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -q"
+    expected_output: "0 failures, 0 errors"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/execution.py"
+    - "benchbox/platforms/base/result_capture.py"
+    - "benchbox/platforms/base/adapter.py"
+    - "benchbox/core/plan_capture_phase.py"
+    - "benchbox/platforms/"
+    - "benchbox/cli/commands/run.py"
+    - "docs/features/query-plan-analysis.md"
+    - "tests/"
+
+success_metrics:
+  - "Exactly one capture path (the isolated phase) for every EXPLAIN-based engine, across every test type."
+  - "Inline capture code is removed from EXPLAIN-based adapters; only get_query_plan/get_query_plan_parser remain."
+  - "analyze_plans is the only capture knob; sampling/first_n machinery and its lock are gone."
+  - "Spark and Databricks capture via the phase; only documented side-effect engines remain on a special path."
+
+open_questions:
+  - question: "Promote analyze_plans to a first-class --analyze-plans/--no-analyze-plans flag, or keep it as --platform-option?"
+    gating: false
+    affects: ["w5"]
+    default: "Promote to a first-class capture option since it is now the sole knob."
+
+metadata:
+  tags: [query-plan, capture, isolation-phase, architecture, refactor]
+  estimated_effort: "Large"
+  created_date: "2026-06-15"
+  last_updated: "2026-06-15T00:00:00-04:00"

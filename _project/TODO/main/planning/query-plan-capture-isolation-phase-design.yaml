@@ -4,6 +4,22 @@ worktree: main
 priority: High
 status: Completed
 category: Core Functionality
+superseded_by: query-plan-capture-canonical-isolation
+
+# SUPERSEDED (2026-06-15): The cutover this item delivered is an ADDITIVE,
+# opt-in-per-adapter intermediate step, NOT the destination. It (a) makes the
+# isolated phase opt-in via plan_capture_phase_eligible on only 6 adapters while
+# leaving inline capture present in ~16 adapters, (b) only runs in the
+# power/standard path (throughput/maintenance/combined still capture inline, so an
+# eligible adapter behaves differently by test type), and (c) hard-codes the phase
+# to structural-only, silently dropping ANALYZE timing and killing the
+# analyze_plans knob. The canonical target — ONE isolated phase for ALL EXPLAIN
+# engines, across ALL test types, with analyze_plans as the only knob and inline
+# capture REMOVED — is tracked by query-plan-capture-canonical-isolation (and its
+# siblings: -phase-respect-analyze, -sideeffect-engine-policy,
+# -post-measurement-divergence). The anti-patterns below that enshrine permanent
+# inline coexistence apply ONLY to genuine side-effect engines (BigQuery), not to
+# EXPLAIN-based engines.
 
 # PROGRESS:
 #   2026-06-14 (PR #798): w1 (design note) DONE; w2 (thread safety) DONE; phase
