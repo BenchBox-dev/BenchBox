@@ -47,6 +47,50 @@ worktree. Override the root with `output.benchmark_runs_dir_template`;
 override only logs or staged submissions with `output.logs_dir_template`
 and `output.submissions_dir_template`.
 
+## Local-artifact hygiene (external-root invariant)
+
+**Invariant:** when an external output root is configured — `BENCHBOX_OUTPUT_DIR`
+set (or `--output` pointing outside the worktree) — the worktree-local
+`benchmark_runs/` must **not** grow. Datagen, databases, and result JSONs all
+belong under the external root. This guards the 2026-06-01 incident, where a
+corpus sweep launched from a pool worktree with
+`BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs` still accumulated ~4.2 GB
+under the worktree-local `benchmark_runs/datagen/`.
+
+The guardrails are **report-only** — they detect and name the offending paths
+but never delete or move artifacts.
+
+* The UAT runner (`tests/uat/runner.py`) snapshots `cwd/benchmark_runs` before
+  each external-root cell and fails loudly if it grows, naming both the
+  unexpected local path and the configured external root.
+* `make uat-artifact-hygiene` audits the live worktree (no-op unless an
+  external root is configured) and is wired into `make pr-preflight`. Ordinary
+  default local runs (no `BENCHBOX_OUTPUT_DIR`) are never blocked.
+
+  ```bash
+  # Audit the current worktree (skips silently with no external root):
+  make uat-artifact-hygiene
+  # Or target an explicit root / raise the byte budget:
+  make uat-artifact-hygiene OUTPUT=~/Developer/benchmark_runs THRESHOLD_BYTES=0
+  ```
+
+### Compact audit commands
+
+If a sweep is configured for an external root, confirm nothing leaked into the
+worktree-local tree:
+
+```bash
+# Total size of the local tree (should be ~empty under an external root):
+du -sh benchmark_runs 2>/dev/null || echo "no local benchmark_runs"
+du -sh benchmark_runs/datagen 2>/dev/null
+
+# Files written under the local tree in the last day (recent leak detector):
+find benchmark_runs -type f -mtime -1 2>/dev/null
+
+# Largest local artifacts, top 20 (find the heavy offenders):
+find benchmark_runs -type f -printf '%s\t%p\n' 2>/dev/null | sort -rn | head -20
+```
+
 ## Docker storage cleanup
 
 Loaded databases under `benchmark_runs/databases/` are pruned at safe

@@ -713,6 +713,38 @@ class BenchmarkExecutionMixin:
         monitor: Any | None,
         run_options: DataFrameRunOptions | None = None,
     ) -> list[dict[str, Any]]:
+        """Execute DataFrame queries, scoping scale-dependent parameter defaults.
+
+        Canonical TPC-H Q11 renders its value threshold as ``0.0001 / SF``.
+        Unseeded DataFrame runs read the SF=1 default unless the scale factor is
+        declared, so set it for TPC-H-family benchmarks for the duration of query
+        execution (mirroring the SQL run path's ``{q11_fraction}`` rendering) and
+        reset it afterwards on every path.
+        """
+        from benchbox.core.tpch.dataframe_queries import set_scale_factor_for_benchmark
+
+        benchmark_id = normalize_benchmark_id(benchmark_config.name)
+        scale_factor = getattr(benchmark_config, "scale_factor", 1.0)
+        set_scale_factor_for_benchmark(benchmark_id, scale_factor)
+        try:
+            return self._run_query_iterations(
+                ctx=ctx,
+                benchmark_config=benchmark_config,
+                benchmark_instance=benchmark_instance,
+                monitor=monitor,
+                run_options=run_options,
+            )
+        finally:
+            set_scale_factor_for_benchmark(benchmark_id, None)
+
+    def _run_query_iterations(
+        self,
+        ctx: Any,
+        benchmark_config: BenchmarkConfig,
+        benchmark_instance: Any | None,
+        monitor: Any | None,
+        run_options: DataFrameRunOptions | None = None,
+    ) -> list[dict[str, Any]]:
         """Execute DataFrame queries with warmup and measurement iterations.
 
         Follows TPC power test methodology:

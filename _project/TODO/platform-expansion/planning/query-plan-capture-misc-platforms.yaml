@@ -75,17 +75,20 @@ work:
     summary: "MotherDuck: add get_query_plan() and get_query_plan_parser() reusing DuckDB components"
     status: done
     notes: |
-      COMPLETED in commit d06fe3e3. MotherDuckAdapter.get_query_plan() issues
+      COMPLETED in PR #748 (develop commit e9999563; originally d06fe3e3 on the
+      feature branch). MotherDuckAdapter.get_query_plan() issues
       EXPLAIN (ANALYZE, FORMAT JSON) and get_query_plan_parser() returns
-      DuckDBQueryPlanParser. Wiring is live on the branch.
+      DuckDBQueryPlanParser. Confirmed against the merged diff during the post-748
+      audit. Dedicated MotherDuck wiring unit tests remain part of w9 (pending).
 
   - id: w2
     summary: "MotherDuck: integrate capture_query_plan() into execute_query()"
     needs: [w1]
     status: done
     notes: |
-      COMPLETED in commit d06fe3e3. MotherDuckAdapter.execute_query() now calls
-      capture_query_plan() with the capture_plans guard.
+      COMPLETED in PR #748 (develop commit e9999563). MotherDuckAdapter.execute_query()
+      now calls capture_query_plan() with the capture_plans guard and propagates
+      query_plan / plan_fingerprint / plan_capture_time_ms into the result dict.
 
   - id: w3
     summary: "Databend: collect EXPLAIN sample, implement DatabendQueryPlanParser"

@@ -560,6 +560,13 @@ def _setup_parameter_overrides_for_stream(
     applied_contexts: set[tuple[int, float, int | None]],
 ) -> None:
     """Apply parameter overrides once per unique seed/SF(/stream) context."""
+    # Scale-dependent parameter defaults (e.g. Q11's 0.0001/SF value threshold)
+    # apply with or without a seed, so set the scale factor on every call. This
+    # keeps the unseeded DataFrame run path scale-faithful, mirroring the SQL
+    # side's {q11_fraction} rendering. Seed-derived overrides below still take
+    # precedence over the scaled default.
+    _setup_scale_dependent_defaults(benchmark_id, scale_factor)
+
     if seed is None:
         return
 
@@ -575,6 +582,23 @@ def _setup_parameter_overrides_for_stream(
 
     _setup_parameter_overrides(benchmark_id, seed, scale_factor, stream_id=stream_id)
     applied_contexts.add(context_key)
+
+
+def _setup_scale_dependent_defaults(benchmark_id: str, scale_factor: float) -> None:
+    """Align scale-dependent parameter defaults with the run's scale factor.
+
+    Canonical TPC-H Q11 renders its value threshold as ``0.0001 / SF``. Unseeded
+    DataFrame runs would otherwise read the SF=1 default at every scale; setting
+    the scale factor here keeps them aligned with the SQL run path. The shared
+    seam (:func:`set_scale_factor_for_benchmark`) is a no-op for benchmarks
+    outside the TPC-H family.
+    """
+    try:
+        from benchbox.core.tpch.dataframe_queries import set_scale_factor_for_benchmark
+
+        set_scale_factor_for_benchmark(benchmark_id, scale_factor)
+    except Exception:  # pragma: no cover - defensive; never block execution
+        logger.debug("Failed to set TPC-H DataFrame scale factor", exc_info=True)
 
 
 def _setup_parameter_overrides(
@@ -640,14 +664,21 @@ def _setup_parameter_overrides(
 
 def _clear_parameter_overrides(benchmark_id: str) -> None:
     """Clear parameter overrides after execution."""
-    if benchmark_id == "tpch":
-        try:
-            from benchbox.core.tpch.dataframe_queries import set_parameter_overrides
+    try:
+        from benchbox.core.tpch.dataframe_queries import (
+            TPCH_FAMILY_DATAFRAME_IDS,
+            set_parameter_overrides,
+            set_scale_factor_for_benchmark,
+        )
 
+        if benchmark_id in TPCH_FAMILY_DATAFRAME_IDS:
             set_parameter_overrides(None)
-        except Exception:
-            pass
-    elif benchmark_id == "tpcds":
+            # Reset the scale-dependent defaults to the SF=1 rendering.
+            set_scale_factor_for_benchmark(benchmark_id, None)
+            return
+    except Exception:
+        pass
+    if benchmark_id == "tpcds":
         try:
             from benchbox.core.tpcds.dataframe_queries.parameters import set_parameter_overrides
 

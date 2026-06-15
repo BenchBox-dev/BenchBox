@@ -279,14 +279,23 @@ class TestOrchestrator:
         # Mock the benchmark instance
         mock_benchmark_instance = MagicMock()
         mock_benchmark_class.return_value = mock_benchmark_instance
+        # SSB generates its own data (no shared source). Give the mocked class
+        # the real class attribute so the orchestrator resolves the managed
+        # datagen root, and make the instance report no data sharing so the
+        # post-construction redirect stays inactive.
+        mock_benchmark_class.DATA_SOURCE_BENCHMARK = None
+        mock_benchmark_instance.get_data_source_benchmark.return_value = None
 
         # This would call _get_benchmark_instance internally
         result = orchestrator._get_benchmark_instance(config, mock_system_profile)
 
-        # Verify benchmark was called with compression parameters
-        # Orchestrator also passes verbose and quiet flags
+        # Verify benchmark was called with compression parameters. The
+        # orchestrator now resolves the datagen root before construction and
+        # injects it as output_dir (alongside verbose/quiet flags).
+        expected_output_dir = orchestrator.directory_manager.get_datagen_path("ssb", 0.01)
         mock_benchmark_class.assert_called_once_with(
             parallel=4,
+            output_dir=expected_output_dir,
             scale_factor=0.01,
             compress_data=True,
             compression_type="gzip",

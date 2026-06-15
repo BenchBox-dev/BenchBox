@@ -2,7 +2,7 @@ id: query-plan-capture-postgresql-family
 title: "Wire query plan capture end-to-end for PostgreSQL, Redshift, and derived adapters"
 worktree: platform-expansion
 priority: High
-status: In Progress
+status: "Completed"
 category: Platform Expansion
 
 description: |
@@ -102,12 +102,13 @@ work:
   - id: w7
     summary: "Verify TimescaleDB, CedarDB, and pg_mooncake inherit plan capture without changes"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
-      All three subclass PostgreSQLAdapter and do not override execute_query() or
-      get_query_plan_parser(). Run existing adapter unit tests to confirm no
-      regressions. Add a short parametrized test asserting that each subclass
-      instance returns a non-None parser from get_query_plan_parser().
+      COMPLETED in PR #748. tests/unit/platforms/test_postgresql_plan_capture.py
+      added TestPostgreSQLSubclassInheritance, a parametrized test asserting that
+      TimescaleDBAdapter, CedarDBAdapter, and PgMooncakeAdapter all return a
+      PostgreSQLQueryPlanParser via the inherited get_query_plan_parser() with no
+      per-subclass override.
     coverage_checklist:
       - id: ts-parser
         description: "TimescaleDBAdapter().get_query_plan_parser() returns PostgreSQLQueryPlanParser"
@@ -122,11 +123,16 @@ work:
   - id: w8
     summary: "UAT cell smoke for PostgreSQL plan capture"
     needs: [w3, w7]
-    status: pending
+    status: done
     notes: |
-      Run a single TPC-H SF=0.01 cell against a live PostgreSQL instance with
-      --capture-plans enabled. Confirm query_plans_captured > 0 in the result
-      bundle. This step requires a live PostgreSQL instance (see prerequisites).
+      COMPLETED in PR #777. Live PostgreSQL plan capture is now exercised in CI via
+      a postgres:17 service container (postgres-integration jobs in
+      .github/workflows/pr.yml and nightly.yml). tests/integration/platforms/
+      test_postgresql_live.py added TestLivePostgreSQLQueryPlanCapture, which
+      asserts get_query_plan() returns parseable JSON and capture_query_plan()
+      yields a QueryPlanDAG with a stable 64-char SHA256 fingerprint against a live
+      instance. The DML guard gap noted in w2 is intentionally out of scope here and
+      remains tracked in query-plan-capture-postgresql-dml-guard.
 
 deps:
   needs: []
@@ -193,4 +199,37 @@ metadata:
   tags: [query-plan, postgresql, redshift, timescaledb, cedardb, pg-mooncake, wiring]
   estimated_effort: "Medium"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T00:00:00-04:00"
+  last_updated: "2026-06-14T00:00:00-04:00"
+
+completed_date: "2026-06-11"
+
+commits:
+  - "e9999563"
+  - "7b06b7db"
+
+sections:
+  "Implementation Summary": |
+    Confirmed complete during the post-748 TODO status audit by reading the merged
+    diffs of PR #748 and PR #777.
+
+    PR #748 (e9999563) wired the family (w1-w7):
+    - PostgreSQLAdapter: get_query_plan() switched to EXPLAIN (ANALYZE, BUFFERS,
+      FORMAT JSON) so PostgreSQLQueryPlanParser can parse it; get_query_plan_parser()
+      override added; execute_query() captures the plan on SUCCESS when
+      capture_plans is set.
+    - RedshiftAdapter: get_query_plan_parser() returns RedshiftQueryPlanParser;
+      capture wired into execute_query(); plain EXPLAIN (no ANALYZE) preserved.
+    - get_query_plan() error paths now return None instead of an error string so
+      capture degrades gracefully.
+    - tests/unit/platforms/test_postgresql_plan_capture.py (incl. the
+      TimescaleDB/CedarDB/pg_mooncake inheritance test for w7),
+      test_redshift_plan_capture.py, and updated adapter tests added.
+
+    PR #777 (7b06b7db) closed w8 (live UAT smoke):
+    - Added a postgres:17 service-container CI job (pr.yml + nightly.yml) and
+      TestLivePostgreSQLQueryPlanCapture in tests/integration/platforms/
+      test_postgresql_live.py, verifying live JSON plans, a QueryPlanDAG, and a
+      stable SHA256 fingerprint.
+
+    Out of scope / tracked separately: the EXPLAIN ANALYZE DML double-execution
+    guard (query-plan-capture-postgresql-dml-guard).

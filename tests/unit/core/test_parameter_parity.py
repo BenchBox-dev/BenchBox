@@ -22,6 +22,7 @@ from benchbox.core.runner.dataframe_runner import (
     _clear_parameter_overrides,
     _execute_dataframe_queries,
     _setup_parameter_overrides,
+    _setup_parameter_overrides_for_stream,
 )
 from benchbox.core.tpcds.dataframe_queries.parameters import (
     TPCDS_DEFAULT_PARAMS,
@@ -32,6 +33,7 @@ from benchbox.core.tpch.dataframe_queries import (
     TPCH_DEFAULT_PARAMS,
     get_tpch_parameters,
     set_parameter_overrides as tpch_set_overrides,
+    set_scale_factor as tpch_set_scale_factor,
 )
 from benchbox.core.tpch.parameter_extractor import (
     clear_cache as tpch_clear_cache,
@@ -549,3 +551,179 @@ class TestQueryFunctionsCentralized:
         tpcds_set_overrides(None)
         params = get_parameters(96)
         assert params.get("hours") == [(8, 9)]
+
+
+# =============================================================================
+# Unseeded Q11 Scale-Fraction Regression
+# =============================================================================
+
+
+class TestUnseededQ11ScaleFraction:
+    """Unseeded DataFrame runs must render Q11's fraction as 0.0001 / SF.
+
+    Canonical TPC-H qgen renders the Q11 value threshold as 0.0001 / SF, and the
+    SQL run path mirrors that via the {q11_fraction} token. Without a seed, the
+    DataFrame surface used to fall back to the static SF=1 value at every scale;
+    these tests pin the scale-aware default so the product run path stays
+    scale-faithful (regression for tpch-dataframe-unseeded-q11-scale-fraction).
+    """
+
+    def setup_method(self):
+        tpch_set_overrides(None)
+        tpch_set_scale_factor(None)
+
+    def teardown_method(self):
+        tpch_set_overrides(None)
+        tpch_set_scale_factor(None)
+
+    @pytest.mark.parametrize(
+        "scale_factor, expected_fraction",
+        [(0.1, 0.001), (1.0, 0.0001), (10.0, 0.00001)],
+    )
+    def test_unseeded_runner_setup_scales_q11_fraction(self, scale_factor, expected_fraction):
+        """The unseeded runner seam derives Q11's fraction from the scale factor."""
+        _setup_parameter_overrides_for_stream(
+            benchmark_id="tpch",
+            seed=None,
+            scale_factor=scale_factor,
+            stream_id=0,
+            applied_contexts=set(),
+        )
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(expected_fraction)
+
+    @pytest.mark.parametrize("benchmark_id", ["tpch", "tpch_skew", "tpchavoc"])
+    def test_tpch_family_unseeded_setup_scales_q11_fraction(self, benchmark_id):
+        """Every TPC-H-family benchmark shares the parameter seam and scales alike.
+
+        TPC-H Skew re-registers the canonical TPC-H DataFrame queries verbatim and
+        TPC-Havoc's variants read the same seam, so all three must derive Q11's
+        fraction from the run's scale factor on the unseeded path.
+        """
+        _setup_parameter_overrides_for_stream(
+            benchmark_id=benchmark_id,
+            seed=None,
+            scale_factor=0.1,
+            stream_id=0,
+            applied_contexts=set(),
+        )
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.001)
+
+    def test_seeded_override_takes_precedence_over_scaled_default(self):
+        """A seed-derived Q11 fraction override wins over the scaled default."""
+        tpch_set_scale_factor(0.1)  # scaled default would be 0.001
+        tpch_set_overrides({11: {"fraction": 0.00002}})
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.00002)
+
+    def test_clear_resets_scale_factor_to_sf1(self):
+        """Clearing overrides resets the Q11 fraction to the SF=1 rendering."""
+        tpch_set_scale_factor(0.1)
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.001)
+
+        _clear_parameter_overrides("tpch")
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.0001)
+
+
+# =============================================================================
+# Production DataFrame Path (BenchmarkExecutionMixin) Q11 Scale-Fraction
+# =============================================================================
+
+
+class TestMixinUnseededQ11ScaleFraction:
+    """The production DataFrame execution path must scope Q11's scaled fraction.
+
+    Real polars-df/pandas-df runs execute via BenchmarkExecutionMixin (not the
+    deprecated compatibility runner), so the mixin must set the scale factor for
+    the duration of query execution and reset it afterwards. Regression for the
+    follow-up to tpch-dataframe-unseeded-q11-scale-fraction.
+    """
+
+    def setup_method(self):
+        tpch_set_overrides(None)
+        tpch_set_scale_factor(None)
+
+    def teardown_method(self):
+        tpch_set_overrides(None)
+        tpch_set_scale_factor(None)
+
+    @staticmethod
+    def _make_probe_adapter():
+        """A minimal mixin subclass that records the active Q11 fraction."""
+        from benchbox.platforms.dataframe.benchmark_mixin import BenchmarkExecutionMixin
+
+        class _ScaleProbeAdapter(BenchmarkExecutionMixin):
+            def __init__(self):
+                self.observed_fraction = None
+
+            def _run_query_iterations(self, *, ctx, benchmark_config, benchmark_instance, monitor, run_options=None):
+                self.observed_fraction = get_tpch_parameters(11)["fraction"]
+                return []
+
+        return _ScaleProbeAdapter()
+
+    @pytest.mark.parametrize("benchmark_name", ["tpch", "tpch_skew", "tpchavoc"])
+    def test_mixin_scopes_q11_scale_for_tpch_family(self, benchmark_name):
+        """The mixin scales Q11 during execution and resets afterwards."""
+        adapter = self._make_probe_adapter()
+        config = MagicMock()
+        config.name = benchmark_name
+        config.scale_factor = 0.1
+
+        adapter._execute_queries_phase(ctx=MagicMock(), benchmark_config=config, benchmark_instance=None, monitor=None)
+
+        # Scale was active during execution ...
+        assert adapter.observed_fraction == pytest.approx(0.001)
+        # ... and reset to the SF=1 rendering once execution finished.
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.0001)
+
+    def test_mixin_is_noop_for_non_tpch_family(self):
+        """A non-TPC-H-family benchmark leaves the Q11 default untouched."""
+        adapter = self._make_probe_adapter()
+        config = MagicMock()
+        config.name = "tpcds"
+        config.scale_factor = 0.1
+
+        adapter._execute_queries_phase(ctx=MagicMock(), benchmark_config=config, benchmark_instance=None, monitor=None)
+
+        assert adapter.observed_fraction == pytest.approx(0.0001)
+
+    def test_mixin_resets_scale_on_exception(self):
+        """The scale factor is reset even when execution raises."""
+        from benchbox.platforms.dataframe.benchmark_mixin import BenchmarkExecutionMixin
+
+        class _BoomAdapter(BenchmarkExecutionMixin):
+            def _run_query_iterations(self, **kwargs):
+                raise RuntimeError("boom")
+
+        config = MagicMock()
+        config.name = "tpch"
+        config.scale_factor = 0.1
+
+        with pytest.raises(RuntimeError, match="boom"):
+            _BoomAdapter()._execute_queries_phase(
+                ctx=MagicMock(), benchmark_config=config, benchmark_instance=None, monitor=None
+            )
+
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.0001)
+
+
+class TestSetScaleFactorForBenchmark:
+    """Direct coverage for the shared scale-seam helper."""
+
+    def setup_method(self):
+        tpch_set_scale_factor(None)
+
+    def teardown_method(self):
+        tpch_set_scale_factor(None)
+
+    @pytest.mark.parametrize("benchmark_id", ["tpch", "tpch_skew", "tpchavoc"])
+    def test_applies_for_tpch_family(self, benchmark_id):
+        from benchbox.core.tpch.dataframe_queries import set_scale_factor_for_benchmark
+
+        set_scale_factor_for_benchmark(benchmark_id, 0.1)
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.001)
+
+    def test_noop_for_other_benchmarks(self):
+        from benchbox.core.tpch.dataframe_queries import set_scale_factor_for_benchmark
+
+        set_scale_factor_for_benchmark("tpcds", 0.1)
+        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.0001)
