@@ -5,14 +5,15 @@ priority: Medium
 status: Completed
 category: Documentation
 
-# UPDATE (2026-06-14): Corrections applied to docs/features/query-plan-analysis.md.
-# Note: the PostgreSQL DML guard described as "pending" in this TODO has since
-# LANDED via #784 (PostgreSQL guard) and #786 (shared is_dml_query covering
-# CTAS/CMV/SELECT-INTO). The docs were therefore corrected to describe the guard
-# as present (not pending): PostgreSQL SELECT capture costs ~1x query time
-# (EXPLAIN ANALYZE, BUFFERS) and DML/write-DDL is downgraded to non-ANALYZE
-# EXPLAIN. The blanket "Other platforms: ~10-50ms" claim was replaced with a
-# per-platform overhead table distinguishing ANALYZE vs static-EXPLAIN paths.
+# UPDATE (2026-06-15): Already resolved on develop by PR #793
+# ("docs(plan-capture): correct overhead claims and PostgreSQL section"), which
+# landed concurrently with this branch. #793 replaced the blanket
+# "Other platforms: ~10-50ms" claim with a per-platform breakdown and corrected
+# the PostgreSQL section (SELECT ~1x via EXPLAIN ANALYZE/BUFFERS; DML downgraded
+# to non-ANALYZE EXPLAIN). The DML guard described as "pending" in this TODO had
+# itself already LANDED via #784 (PostgreSQL guard) + #786 (shared is_dml_query
+# covering CTAS/CMV/SELECT-INTO). This branch's duplicate doc edits were dropped
+# during rebase to defer to #793; closing this TODO as Completed (work done by #793).
 
 description: |
   docs/features/query-plan-analysis.md contains two inaccuracies added by PR #776:
