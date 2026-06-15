@@ -1093,11 +1093,20 @@ class FabricWarehouseAdapter(PlatformAdapter):
         """
         cursor = connection.cursor()
         try:
-            # Enable plan capture
+            # Enable plan capture. SHOWPLAN_TEXT is a session-level setting, so it
+            # MUST be turned off even if the EXPLAINed query fails — otherwise the
+            # connection stays in SHOWPLAN mode and subsequent benchmark statements
+            # return plans instead of executing, corrupting the rest of the run.
             cursor.execute("SET SHOWPLAN_TEXT ON")
-            cursor.execute(query)
-            plan_rows = cursor.fetchall()
-            cursor.execute("SET SHOWPLAN_TEXT OFF")
+            try:
+                cursor.execute(query)
+                plan_rows = cursor.fetchall()
+            finally:
+                # Best-effort reset; never let the OFF mask the original failure.
+                try:
+                    cursor.execute("SET SHOWPLAN_TEXT OFF")
+                except Exception:
+                    pass
             return "\n".join([str(row[0]) for row in plan_rows])
         except Exception as e:
             return f"Failed to get query plan: {e}"

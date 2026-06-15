@@ -91,11 +91,14 @@ class BigQueryQueryPlanParser(QueryPlanParser):
         if not isinstance(stages, list) or not stages:
             raise ValueError("BigQuery query plan must be a non-empty list of stages")
 
-        by_id: dict[Any, dict[str, Any]] = {}
+        by_id: dict[str, dict[str, Any]] = {}
         for index, stage in enumerate(stages):
             if not isinstance(stage, dict):
                 continue
-            stage_id = stage.get("id", index)
+            # Normalize ids to str: real google-cloud-bigquery returns the stage
+            # ``id`` as a string while ``input_stages`` are ints, so keying/looking
+            # up by raw value would never match and collapse the tree.
+            stage_id = str(stage.get("id", index))
             by_id[stage_id] = stage
 
         if not by_id:
@@ -201,13 +204,14 @@ class BigQueryQueryPlanParser(QueryPlanParser):
         return None
 
     @staticmethod
-    def _input_ids(stage: dict[str, Any]) -> list[Any]:
+    def _input_ids(stage: dict[str, Any]) -> list[str]:
         inputs = stage.get("input_stages")
         if inputs is None:
             return []
         if not isinstance(inputs, list):
             inputs = [inputs]
-        return list(inputs)
+        # Normalize to str to match the str-keyed by_id (see _parse_impl).
+        return [str(x) for x in inputs]
 
     @staticmethod
     def _sort_key(stage_id: Any) -> tuple[int, str]:

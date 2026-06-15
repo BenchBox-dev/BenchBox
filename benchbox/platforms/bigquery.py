@@ -1683,14 +1683,16 @@ class BigQueryAdapter(PlatformAdapter):
             stage_id = getattr(entry, "entry_id", None)
             if stage_id is None:
                 stage_id = index
+            # Normalize ids/inputs to str so the parser can match them: real
+            # QueryPlanEntry returns entry_id as a string but input_stages as ints.
             stages.append(
                 {
-                    "id": stage_id,
+                    "id": str(stage_id),
                     "name": getattr(entry, "name", None),
                     "status": getattr(entry, "status", None),
                     "records_read": getattr(entry, "records_read", None),
                     "records_written": getattr(entry, "records_written", None),
-                    "input_stages": list(getattr(entry, "input_stages", None) or []),
+                    "input_stages": [str(s) for s in (getattr(entry, "input_stages", None) or [])],
                     "steps": steps,
                 }
             )

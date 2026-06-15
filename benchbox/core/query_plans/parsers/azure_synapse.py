@@ -149,11 +149,7 @@ class AzureSynapseQueryPlanParser(QueryPlanParser):
             child = op_el.find(tag)
             if child is not None:
                 if tag == "sql_operations":
-                    stmts = [
-                        (s.text or "").strip()
-                        for s in child.findall("sql_operation")
-                        if (s.text or "").strip()
-                    ]
+                    stmts = [(s.text or "").strip() for s in child.findall("sql_operation") if (s.text or "").strip()]
                     sql_text = " | ".join(stmts) if stmts else None
                 else:
                     sql_text = (child.text or "").strip() or None

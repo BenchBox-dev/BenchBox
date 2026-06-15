@@ -67,6 +67,33 @@ class TestBigQueryPlan:
     def test_registered_for_bigquery(self):
         assert isinstance(get_parser_for_platform("bigquery"), BigQueryQueryPlanParser)
 
+    def test_mixed_id_types_do_not_collapse_tree(self, parser):
+        # Real google-cloud-bigquery returns stage ``id`` as a string but
+        # ``input_stages`` as ints; the parser must normalize both so children
+        # still attach (otherwise the plan collapses to the output node alone).
+        import json
+
+        stages = [
+            {
+                "id": "0",
+                "name": "S00: Input",
+                "input_stages": [],
+                "records_written": 10,
+                "steps": [{"kind": "READ", "substeps": ["FROM tpch.lineitem"]}],
+            },
+            {
+                "id": "1",
+                "name": "S01: Output",
+                "input_stages": [0],
+                "records_written": 10,
+                "steps": [{"kind": "READ", "substeps": []}, {"kind": "WRITE", "substeps": []}],
+            },
+        ]
+        dag = parser.parse_explain_output("q1", json.dumps(stages))
+        nodes = _collect(dag.logical_root)
+        assert len(nodes) == 2  # output -> input, not a lone output node
+        assert any(n.operator_type == LogicalOperatorType.SCAN for n in nodes)
+
 
 class TestBigQueryStageMapping:
     @pytest.mark.parametrize(

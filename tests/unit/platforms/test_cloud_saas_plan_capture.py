@@ -247,6 +247,22 @@ class TestFabricWarehouseCapture:
             assert result["status"] == "SUCCESS"
             assert "query_plan" not in result
 
+    def test_showplan_turned_off_when_explain_query_fails(self):
+        # SHOWPLAN_TEXT is session-scoped: a failure after SET ... ON must still
+        # issue SET ... OFF, or later statements return plans instead of running.
+        with _fabric_adapter() as adapter:
+            cursor = Mock()
+            cursor.execute.side_effect = (
+                lambda sql: (_ for _ in ()).throw(RuntimeError("boom")) if sql == "BAD" else None
+            )
+            connection = Mock()
+            connection.cursor.return_value = cursor
+            plan = adapter.get_query_plan(connection, "BAD")
+            assert plan.startswith("Failed to get query plan")
+            executed = [c.args[0] for c in cursor.execute.call_args_list]
+            assert "SET SHOWPLAN_TEXT ON" in executed
+            assert "SET SHOWPLAN_TEXT OFF" in executed  # reset ran despite failure
+
 
 # ---------------------------------------------------------------------------
 # BigQuery: post-execution job-statistics capture (no EXPLAIN)
