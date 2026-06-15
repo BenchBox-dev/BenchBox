@@ -84,3 +84,21 @@ def test_skipped_variants_are_excluded_never_marked_equivalent(datafusion_diverg
     assert reported.isdisjoint(set(DATAFUSION_TPCHAVOC_SKIPS)), (
         "Un-executable (skip-list) variants must be excluded, not evaluated"
     )
+
+
+def test_datafusion_skip_list_wiring_and_lakesail_subset():
+    """The skip-list is wired to the 'datafusion' platform and stays a Sail subset.
+
+    No database needed: this pins the get_platform_skip_queries mapping (so real
+    DataFusion benchmark runs exclude exactly the un-executable variants) and the
+    documented claim that DataFusion's planning gaps are a strict subset of
+    LakeSail's (Apache Sail is DataFusion-based), which corroborates that these
+    are genuine engine limitations rather than translation artifacts.
+    """
+    from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
+    from benchbox.sql_compat.rules.execution_filter.lakesail_tpchavoc import LAKESAIL_TPCHAVOC_SKIPS
+
+    benchmark = TPCHavocBenchmark(scale_factor=EQUIVALENCE_SCALE)
+    assert set(benchmark.get_platform_skip_queries("datafusion")) == set(DATAFUSION_TPCHAVOC_SKIPS)
+    assert benchmark.get_platform_skip_queries("duckdb") == []
+    assert set(DATAFUSION_TPCHAVOC_SKIPS) <= set(LAKESAIL_TPCHAVOC_SKIPS)

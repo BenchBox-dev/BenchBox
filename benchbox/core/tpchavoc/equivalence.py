@@ -603,7 +603,10 @@ def build_datafusion_with_tpch(scale_factor: float, output_dir: str | Path) -> t
             arrow_table = pacsv.read_csv(
                 tbl_path,
                 read_options=pacsv.ReadOptions(column_names=read_names),
-                parse_options=pacsv.ParseOptions(delimiter="|"),
+                # Raw TPC-H .tbl is pipe-delimited with NO quoting; disable PyArrow's
+                # default quote_char so a literal `"` in a text field cannot be parsed
+                # as a quote and mis-split the row.
+                parse_options=pacsv.ParseOptions(delimiter="|", quote_char=False),
                 convert_options=pacsv.ConvertOptions(
                     column_types=column_types, null_values=[""], strings_can_be_null=True
                 ),
