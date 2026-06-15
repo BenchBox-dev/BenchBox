@@ -339,7 +339,14 @@ These flags control monitoring, progress display, memory handling, and caching b
 ## Query Plan Capture Options
 
 - `--capture-plans`: Capture the logical query plan for each executed query and embed it in results.
+  Plans are persisted to the results bundle for later comparison or regression detection.
+  Display is not affected — plans are captured silently.
   See [Query Plan Analysis](../../features/query-plan-analysis.md) for full details.
+
+- `--show-plans`: Display query plans in the console after each query executes.
+  Use for interactive inspection **without** `--capture-plans`. When `--capture-plans`
+  is also active, display is suppressed to avoid running EXPLAIN twice; use
+  `benchbox show-plan` to inspect plans already captured to the results bundle.
 
 - `--plan-config TEXT`: Fine-grained control over query plan capture
   - Format: comma-separated key:value pairs

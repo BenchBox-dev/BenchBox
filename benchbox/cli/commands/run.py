@@ -484,7 +484,7 @@ def _apply_cli_adapter(s: types.SimpleNamespace) -> None:
     s.plan_sampling_rate = plan_cfg.sample_rate
     s.plan_first_n = plan_cfg.first_n
     s.plan_queries_str = ",".join(plan_cfg.queries) if plan_cfg.queries else None
-    s.show_query_plans = s.capture_plans  # Show plans when capturing
+    s.show_query_plans = s.show_plans
 
     # Table format config -> legacy variables
     s.table_format_value = s.table_format.format if s.table_format else None
@@ -2585,6 +2585,16 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     ),
 )
 @advanced_option(
+    "--show-plans",
+    is_flag=True,
+    help=(
+        "Display query plans in the console after each query. "
+        "Use for interactive inspection without --capture-plans. "
+        "Suppressed when --capture-plans is active (capture already runs EXPLAIN; "
+        "use benchbox show-plan to inspect captured plans afterwards)."
+    ),
+)
+@advanced_option(
     "--plan-config",
     type=PLAN_CONFIG,
     default=None,
@@ -2712,6 +2722,7 @@ def run(
     non_interactive: bool,
     official: bool,
     capture_plans: bool,
+    show_plans: bool,
     strict_translation: bool,
     plan_config: PlanCaptureConfig | None,
     compression: CompressionConfig | None,
@@ -2769,6 +2780,7 @@ def run(
         non_interactive=non_interactive,
         official=official,
         capture_plans=capture_plans,
+        show_plans=show_plans,
         strict_translation=strict_translation,
         plan_config=plan_config,
         compression=compression,
