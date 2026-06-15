@@ -83,6 +83,30 @@ In all cases:
 - Benchmark timing measurements are unaffected (plan capture runs after the timed execution)
 - Failed plan captures are logged but don't halt execution
 
+### Capture Isolation (post-measurement phase)
+
+For EXPLAIN-based engines (DuckDB, MotherDuck, SQLite, DataFusion, PostgreSQL, Redshift),
+`--capture-plans` runs as a **separate post-measurement phase** rather than inline with each
+timed query. After all power iterations complete, BenchBox issues a single `EXPLAIN` pass over
+the successfully-executed queries on the measurement connection and merges the resulting
+`plan_fingerprint` / `query_plan` back into each query result. This means:
+
+- **No EXPLAIN on the measurement path.** Plan capture never interleaves with a timed query or
+  holds the connection between measured queries.
+- **Structural-only capture.** The phase always uses non-`ANALYZE` `EXPLAIN`, so capture adds no
+  re-execution cost and the structural `plan_fingerprint` is unchanged. Captured plans therefore
+  carry estimated (not actual) operator cardinality/timing; the measured execution times in the
+  result bundle are the authoritative timings.
+- **DML runs exactly once.** Because the phase never uses `ANALYZE`, an
+  INSERT/UPDATE/DELETE/MERGE/COPY (or CTAS / `SELECT ... INTO`) query is captured without being
+  re-executed.
+- **Sampling honoured.** `--plan-queries`, `--plan-first-n`, and `--plan-sampling-rate` apply to
+  the phase exactly as before.
+
+Platforms that obtain plans as a side effect of execution (BigQuery job statistics, Spark/event-log
+based adapters) continue to capture **inline** during execution — the isolated phase is opt-in per
+adapter via the `plan_capture_phase_eligible` capability flag and is not used for those platforms.
+
 ### Captured Fields
 
 Each query result includes three plan-related fields when `--capture-plans` is active:

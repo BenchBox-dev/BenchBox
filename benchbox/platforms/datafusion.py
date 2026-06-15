@@ -129,6 +129,7 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.SUPPORTED
     supports_external_tables = True
+    plan_capture_phase_eligible = True
 
     # Process-wide lock bookkeeping keyed by working-dir lock file path.
     # This ensures ownership/reentrancy is shared across adapter instances.

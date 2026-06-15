@@ -2,29 +2,38 @@ id: query-plan-capture-isolation-phase-design
 title: "Design and implement plan capture as an explicit isolated benchmark phase"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Core Functionality
 
-# PROGRESS (2026-06-14):
-#   - w1 (design note): DONE — see design_note below.
-#   - w2 (thread safety): DONE — _plan_capture_iteration_counts read-increment-write
-#     is now guarded by self._plan_capture_lock (threading.Lock created in
-#     PlatformAdapter.__init__). Concurrent-stream tests added in
-#     tests/unit/platforms/test_plan_capture_iteration_count.py.
-#   - w3 (phase hook): PARTIAL — the additive phase function lives in the new
-#     benchbox/core/plan_capture_phase.py (run_plan_capture_phase). It opens a
-#     fresh connection by default, forces analyze_plans=False (structural only),
-#     bypasses the measurement-phase sampling filters, and returns plans +
-#     fingerprints + per-query timing. NOT YET wired into benchbox/cli/commands/run.py
-#     as a --capture-plans phase toggle — the inline path remains the default
-#     (deliberately additive; see anti_patterns). CLI cutover is the remaining work.
-#   - w4 (user-facing CLI/phase docs): DEFERRED until the CLI wiring lands, so the
-#     docs do not claim a phase that --capture-plans does not yet trigger. The
-#     overhead/DML doc corrections (separate TODO) are complete.
-#   - w5 (phase isolation tests): PARTIAL — module-level isolation tests added in
-#     tests/integration/test_plan_capture_phase.py (DML single-execution, fingerprint
-#     population, config restoration, supplied-connection reuse). A full end-to-end
-#     CLI run assertion follows the w3 CLI cutover.
+# PROGRESS:
+#   2026-06-14 (PR #798): w1 (design note) DONE; w2 (thread safety) DONE; phase
+#     building block benchbox/core/plan_capture_phase.py added (run_plan_capture_phase).
+#   2026-06-15 (this PR): CLI/orchestrator cutover completed.
+#   - w3 (phase hook): DONE — the generic query pipeline (_execute_all_queries in
+#     benchbox/platforms/base/execution.py) now suppresses inline capture during the
+#     timed loop for phase-eligible adapters and runs run_plan_capture_phase() once
+#     post-measurement (_capture_plans_post_measurement), merging query_plan /
+#     plan_fingerprint / plan_capture_time_ms into the result dicts. The phase reuses
+#     the measurement connection (so embedded in-memory engines still see loaded data)
+#     and is structural-only. Eligibility is an opt-in capability flag
+#     (PlatformAdapter.plan_capture_phase_eligible) enabled on DuckDB, MotherDuck,
+#     SQLite, DataFusion, PostgreSQL, Redshift. Side-effect-capture platforms
+#     (BigQuery, Spark/Databricks and other cloud adapters) keep inline capture
+#     unchanged (flag stays False) — the inline path was NOT removed.
+#   - w4 (docs): DONE — docs/features/query-plan-analysis.md "Capture Isolation
+#     (post-measurement phase)" section describes the behavior, the structural-only
+#     trade-off, DML-once guarantee, and the eligibility flag.
+#   - w5 (phase isolation tests): DONE — tests/integration/test_plan_capture_phase.py
+#     TestIntegratedCapturePhase drives _execute_all_queries and asserts inline is
+#     suppressed during measurement, plans are populated by the post-measurement phase,
+#     and DML executes exactly once.
+#
+# NOTE: opt-in (vs opt-out) eligibility was chosen deliberately — it keeps every
+# cloud/Spark/BigQuery measurement path on its proven inline capture (zero blast
+# radius) per the "do not remove inline in one shot" anti-pattern. Extending the
+# phase to remote EXPLAIN engines (Athena, Trino/Presto, ClickHouse, Doris,
+# QuestDB, SingleStore) and to the TPC-H/TPC-DS power drivers (which currently do
+# not persist plans at all — _power_query_result drops plan fields) is follow-up.
 
 design_note: |
   Plan capture phase contract (w1)
@@ -147,7 +156,7 @@ work:
   - id: w3
     summary: "Add a run_plan_capture_phase() hook to the run orchestrator"
     needs: [w1]
-    status: in_progress  # phase function in benchbox/core/plan_capture_phase.py; CLI cutover pending
+    status: done  # wired into _execute_all_queries via _capture_plans_post_measurement (opt-in flag)
     notes: |
       Add a function to benchbox/cli/commands/run.py (or a new
       benchbox/core/plan_capture_phase.py) that:
@@ -164,7 +173,7 @@ work:
   - id: w4
     summary: "Update docs and --help to describe capture as a post-measurement phase"
     needs: [w3]
-    status: pending  # gated on w3 CLI cutover; docs must not claim a phase --capture-plans does not yet trigger
+    status: done  # docs/features/query-plan-analysis.md "Capture Isolation (post-measurement phase)"
     notes: |
       Update docs/features/query-plan-analysis.md and docs/reference/cli/run.md:
         - Describe that --capture-plans triggers a separate post-measurement phase
@@ -175,7 +184,7 @@ work:
   - id: w5
     summary: "Add integration test verifying phase isolation"
     needs: [w3, w4]
-    status: in_progress  # tests/integration/test_plan_capture_phase.py covers phase isolation; full CLI-run assertion follows w3 cutover
+    status: done  # TestIntegratedCapturePhase drives _execute_all_queries (suppression + post-measurement merge + DML-once)
     notes: |
       Add a test that:
         - Runs a mock benchmark with capture_plans=True
