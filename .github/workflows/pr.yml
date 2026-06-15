@@ -482,15 +482,18 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      # Third-engine equivalence SAMPLE. Both canonical and variants are
-      # translated to the datafusion dialect and compared on the same in-process
-      # session (shared translation cancels out). DATAFUSION_TPCHAVOC_SKIPS
-      # variants are excluded, never marked equivalent.
-      - name: Run TPC-Havoc DataFusion variant-equivalence sample
+      # Third-engine equivalence SAMPLE plus the DataFusion .tbl trailing-delimiter
+      # load regression. Both canonical and variants are translated to the
+      # datafusion dialect and compared on the same in-process session (shared
+      # translation cancels out); DATAFUSION_TPCHAVOC_SKIPS variants are excluded,
+      # never marked equivalent. Both files are slow-marked, so -m "slow" selects
+      # them (overriding the default fast-lane deselect).
+      - name: Run TPC-Havoc DataFusion variant-equivalence sample and .tbl load regression
         run: |
           uv run -- python -m pytest \
             tests/integration/platforms/test_tpchavoc_datafusion_equivalence.py \
-            -m "tpchavoc" -n 0 --tb=short -v
+            tests/integration/platforms/test_datafusion_tbl_load.py \
+            -m "slow" -n 0 --tb=short -v
 
   explorer-tokens:
     name: explorer-tokens

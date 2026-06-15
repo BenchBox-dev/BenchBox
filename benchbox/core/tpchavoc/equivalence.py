@@ -549,73 +549,29 @@ def build_datafusion_with_tpch(scale_factor: float, output_dir: str | Path) -> t
     """Generate TPC-H data and return a populated in-process DataFusion connection.
 
     Mirrors :func:`build_duckdb_with_tpch`/:func:`build_postgres_with_tpch` for the
-    third engine. DataFusion is in-process, so there is no service container and no
-    per-statement transaction to isolate: ``ctx.sql(...)`` failures raise per query
-    and are caught by :func:`find_divergences` without poisoning the sweep.
-
-    The generated TPC-H ``.tbl`` files carry a field-terminating trailing pipe.
-    Both of ``DataFusionAdapter.load_data``'s CSV paths reject it (the
-    CREATE EXTERNAL TABLE path has no trailing-delimiter option, and the
-    CSV->Parquet path reads with the bare schema column count and errors on the
-    extra field), and the adapter is outside this change's scope. So this helper
-    loads each table via PyArrow directly - handling the trailing delimiter with
-    the shared file-format helpers - and registers Arrow batches into the session,
-    reusing the adapter's session setup and its own type mapping for fidelity.
-    DECIMAL columns map to float64 exactly as the adapter's Parquet path does; the
-    comparator is float-tolerant and both sides run on this same instance, so this
-    never changes results. Each table's row count is verified (>0) so a partial
-    load cannot produce a FALSE green by comparing empty-vs-empty.
+    third engine, reusing ``DataFusionAdapter.load_data`` (which now ingests the
+    field-terminating trailing delimiter in raw TPC-H ``.tbl`` files). DataFusion is
+    in-process, so there is no service container and no per-statement transaction to
+    isolate: ``ctx.sql(...)`` failures raise per query and are caught by
+    :func:`find_divergences` without poisoning the sweep. Each table's row count is
+    verified (>0) so a partial load cannot produce a FALSE green by comparing
+    empty-vs-empty (the adapter's loader raises on its own load errors).
 
     Returns:
         ``(connection, tpchavoc_benchmark, tpch_benchmark)``.
     """
-    import pyarrow as pa
-    import pyarrow.csv as pacsv
-
     from benchbox.platforms.datafusion import DataFusionAdapter
-    from benchbox.utils.file_format import (
-        TRAILING_DUMMY_COLUMN,
-        get_column_names_with_trailing,
-        has_trailing_delimiter,
-    )
 
     data_dir, tpchavoc, tpch = _generate_tpch(scale_factor, Path(output_dir))
 
     adapter = DataFusionAdapter(working_dir=str(Path(output_dir) / "datafusion_working"))
     connection = adapter.create_connection()
     try:
-        schema = tpchavoc.get_schema()
-        for table in _TPCH_TABLES:
-            columns = schema[table]["columns"]
-            column_names = [column["name"].lower() for column in columns]
-            column_types: dict[str, Any] = {}
-            for column in columns:
-                arrow_type = DataFusionAdapter._map_schema_type_to_pyarrow(column["type"].upper(), pa)
-                if arrow_type is not None:
-                    column_types[column["name"].lower()] = arrow_type
-
-            tbl_path = data_dir / f"{table}.tbl"
-            if not tbl_path.exists():
-                raise RuntimeError(f"DataFusion TPC-H load failed - missing data file {tbl_path}")
-
-            trailing = has_trailing_delimiter(tbl_path, "|", column_names)
-            read_names = get_column_names_with_trailing(column_names, trailing)
-            arrow_table = pacsv.read_csv(
-                tbl_path,
-                read_options=pacsv.ReadOptions(column_names=read_names),
-                # Raw TPC-H .tbl is pipe-delimited with NO quoting; disable PyArrow's
-                # default quote_char so a literal `"` in a text field cannot be parsed
-                # as a quote and mis-split the row.
-                parse_options=pacsv.ParseOptions(delimiter="|", quote_char=False),
-                convert_options=pacsv.ConvertOptions(
-                    column_types=column_types, null_values=[""], strings_can_be_null=True
-                ),
-            )
-            if trailing:
-                arrow_table = arrow_table.drop_columns([TRAILING_DUMMY_COLUMN])
-            if arrow_table.num_rows <= 0:
-                raise RuntimeError(f"DataFusion TPC-H load failed - no rows in {table} ({tbl_path})")
-            connection.register_record_batches(table, [arrow_table.to_batches()])
+        adapter.create_schema(tpchavoc, connection)
+        table_stats, _, _ = adapter.load_data(tpchavoc, connection, data_dir)
+        empty = [table for table in _TPCH_TABLES if table_stats.get(table, 0) <= 0]
+        if empty:
+            raise RuntimeError(f"DataFusion TPC-H load failed - no rows in {empty} (stats={table_stats})")
     except Exception:
         _close_quietly(connection)
         raise
