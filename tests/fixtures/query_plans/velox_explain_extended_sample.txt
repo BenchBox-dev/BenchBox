@@ -1,0 +1,18 @@
+# Velox native execution: YES (VeloxColumnar nodes present)
+
+== Parsed Logical Plan ==
+'Aggregate ['l_orderkey], ['l_orderkey, unresolvedalias('sum('l_quantity), None)]
++- 'Join Inner, ('l_orderkey = 'o_orderkey)
+   :- 'UnresolvedRelation [lineitem]
+   +- 'UnresolvedRelation [orders]
+
+== Physical Plan ==
+VeloxColumnarToRowExec
++- HashAggregateTransformer(keys=[l_orderkey#0L], functions=[sum(l_quantity#4)])
+   +- ColumnarExchange hashpartitioning(l_orderkey#0L, 200), ENSURE_REQUIREMENTS, [plan_id=42]
+      +- HashAggregateTransformer(keys=[l_orderkey#0L], functions=[partial_sum(l_quantity#4)])
+         +- ProjectExecTransformer [l_orderkey#0L, l_quantity#4]
+            +- ShuffledHashJoinExecTransformer [l_orderkey#0L], [o_orderkey#10L], Inner, BuildRight
+               :- FilterExecTransformer isnotnull(l_orderkey#0L)
+               :  +- BatchScanTransformer default.lineitem[l_orderkey#0L,l_quantity#4]
+               +- BatchScanTransformer default.orders[o_orderkey#10L]

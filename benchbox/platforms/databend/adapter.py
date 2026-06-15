@@ -563,8 +563,6 @@ class DatabendAdapter(PlatformAdapter):
             result_dict["query_statistics"] = query_stats
             result_dict["resource_usage"] = query_stats
 
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             return {
@@ -576,14 +574,33 @@ class DatabendAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
-        """Get query execution plan for analysis."""
+        # Capture and merge the structured query plan (SUCCESS-guarded in the
+        # helper). Kept outside the try so a strict_plan_capture PlanCaptureError
+        # propagates instead of being swallowed and mislabeling the query FAILED.
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
+
+        return result_dict
+
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get query execution plan for analysis.
+
+        Databend ``EXPLAIN <query>`` returns a box-drawing text tree (one plan
+        line per row). Returns None on failure so plan capture degrades silently.
+        """
         try:
             rows = connection.query_iter(f"EXPLAIN {query}")
             plan_rows = list(rows)
-            return "\n".join([str(row.values()[0]) if hasattr(row, "values") else str(row) for row in plan_rows])
+            text = "\n".join([str(row.values()[0]) if hasattr(row, "values") else str(row) for row in plan_rows])
+            return text or None
         except Exception as e:
-            return f"Could not get query plan: {e}"
+            self.logger.debug(f"Failed to get Databend query plan: {e}")
+            return None
+
+    def get_query_plan_parser(self):
+        """Get the Databend query plan parser."""
+        from benchbox.core.query_plans.parsers.databend import DatabendQueryPlanParser
+
+        return DatabendQueryPlanParser()
 
     def close_connection(self, connection: Any) -> None:
         """Close Databend connection."""

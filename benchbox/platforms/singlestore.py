@@ -371,6 +371,50 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
         finally:
             cursor.close()
 
+    def _format_query_plan_rows(self, rows: Any) -> str:
+        """Join the first column of each EXPLAIN row into the plan text.
+
+        SingleStore ``EXPLAIN`` returns the plan tree as single-column rows; take
+        column 0 so ``SingleStoreQueryPlanParser`` receives clean tree text rather
+        than the ``str(tuple)`` repr the default mixin formatter would produce.
+        """
+        return "\n".join(str(row[0]) if isinstance(row, (tuple, list)) else str(row) for row in rows)
+
+    def get_query_plan_parser(self):
+        """Get the SingleStore query plan parser."""
+        from benchbox.core.query_plans.parsers.singlestore import SingleStoreQueryPlanParser
+
+        return SingleStoreQueryPlanParser()
+
+    def execute_query(
+        self,
+        connection: Any,
+        query: str,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Execute a query and capture its structured plan when enabled.
+
+        Delegates execution to the shared MySQL-wire path, then merges plan
+        capture (SUCCESS-guarded; no EXPLAIN issued when capture_plans is off).
+        Kept outside the execution path so a strict_plan_capture PlanCaptureError
+        propagates rather than being mislabeled as a failed query.
+        """
+        result = super().execute_query(
+            connection,
+            query,
+            query_id,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
+        return result
+
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get SingleStore platform information."""
         platform_info: dict[str, Any] = {

@@ -1,0 +1,8 @@
+Project [l_orderkey, revenue]
+Gather partitions:all est_rows:10 alias:remote_0
+Project [remote_0.l_orderkey, remote_0.revenue]
+TopSort limit:[10] [revenue DESC]
+HashGroupBy [SUM(lineitem.l_extendedprice) AS revenue] groups:[lineitem.l_orderkey]
+HashJoin [INNER] ON lineitem.l_orderkey = orders.o_orderkey
+|---ColumnStoreScan db.orders, KEY (o_orderkey) table_type:reference est_table_rows:1500
+ColumnStoreScan db.lineitem, KEY (l_orderkey) table_type:sharded est_table_rows:6000
