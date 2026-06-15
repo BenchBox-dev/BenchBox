@@ -2,8 +2,18 @@ id: query-plan-capture-postgresql-dml-guard
 title: "Add DML guard to PostgreSQLAdapter.get_query_plan() to prevent double-execution of writes"
 worktree: platform-expansion
 priority: High
-status: Not Started
+status: Completed
 category: Platform Expansion
+
+# STATUS CORRECTION (2026-06-15): This was mis-marked Not Started. The guard
+# SHIPPED: PostgreSQLAdapter.get_query_plan() now calls the shared is_dml_query()
+# (benchbox/platforms/base/result_capture.py) and downgrades DML to non-ANALYZE
+# EXPLAIN (PR #784), and #786 extended is_dml_query to cover write-DDL
+# (CTAS / CREATE MATERIALIZED VIEW / SELECT ... INTO) for PostgreSQL, DuckDB and
+# MotherDuck. The guard REMAINS LOAD-BEARING under the isolated-capture redesign:
+# once query-plan-capture-phase-respect-analyze restores ANALYZE in the phase, the
+# post-measurement re-run would re-execute writes without this downgrade. A later
+# TODO sweep should move this file to _project/DONE/.
 
 description: |
   PostgreSQLAdapter.get_query_plan() at benchbox/platforms/postgresql.py:704 always
