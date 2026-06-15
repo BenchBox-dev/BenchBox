@@ -60,9 +60,7 @@ def postgres_divergences(tmp_path_factory):
     config = postgres_connection_config()
     skip_unless_docker_service(config["host"], config["port"], platform="PostgreSQL")
     output_dir = tmp_path_factory.mktemp("tpchavoc_pg_equivalence")
-    connection, tpchavoc, tpch = build_postgres_with_tpch(
-        EQUIVALENCE_SCALE, output_dir, connection_config=config
-    )
+    connection, tpchavoc, tpch = build_postgres_with_tpch(EQUIVALENCE_SCALE, output_dir, connection_config=config)
     try:
         yield find_postgres_divergences(connection, tpchavoc, tpch)
     finally:

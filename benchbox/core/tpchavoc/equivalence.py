@@ -467,6 +467,8 @@ def run_postgres_sample() -> int:
     """
     import tempfile
 
+    import psycopg
+
     from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
 
     try:
@@ -476,8 +478,12 @@ def run_postgres_sample() -> int:
                 divergences = find_postgres_divergences(connection, tpchavoc, tpch)
             finally:
                 connection.close()
-    except Exception as exc:  # noqa: BLE001 - infra (no server) must not look like a divergence
-        print(f"PostgreSQL equivalence sample SKIPPED - could not run against PostgreSQL: {exc}")
+    except psycopg.OperationalError as exc:
+        # ONLY an unreachable / unusable server is a skip. Schema, load (incl. the
+        # row-count guard), translation, and sweep failures must propagate as real
+        # failures - otherwise this report could not catch the regressions it exists
+        # to surface.
+        print(f"PostgreSQL equivalence sample SKIPPED - could not connect to PostgreSQL: {exc}")
         return 0
 
     # Exclude un-executable variants from the denominator too: they are bounded

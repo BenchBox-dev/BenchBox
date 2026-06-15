@@ -25,6 +25,7 @@ from benchbox.core.tpchavoc.equivalence import find_divergences
 
 pytestmark = [
     pytest.mark.integration,
+    pytest.mark.fast,
     pytest.mark.tpchavoc,
 ]
 

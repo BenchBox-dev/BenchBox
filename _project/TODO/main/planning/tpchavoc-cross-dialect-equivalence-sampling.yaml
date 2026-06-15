@@ -2,7 +2,7 @@ id: tpchavoc-cross-dialect-equivalence-sampling
 title: "Sample TPC-Havoc variant equivalence on a second SQL engine beyond DuckDB"
 worktree: main
 priority: Medium
-status: Done
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
