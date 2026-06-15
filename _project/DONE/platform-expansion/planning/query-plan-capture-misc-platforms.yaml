@@ -242,7 +242,10 @@ deferred:
       box-drawing property keys, QuestDB's scan sub-operator names, Doris's
       EXPLAIN SHAPE PLAN availability on the deployed version, and SingleStore's
       "|---" connector spacing). The error-sentinel guard already prevents a
-      mismatched/failed EXPLAIN from producing a bogus plan."
+      mismatched/failed EXPLAIN from producing a bogus plan.
+      TRACKED in its own item: query-plan-capture-misc-parser-live-validation
+      (sibling of query-plan-capture-parser-live-validation, which covers the
+      Presto/Trino, ClickHouse, and Spark synthetic-fixture parsers)."
 
 deps:
   needs: []
