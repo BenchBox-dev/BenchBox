@@ -24,6 +24,7 @@ from benchbox.platforms.duckdb import DuckDBAdapter
 
 pytestmark = [
     pytest.mark.integration,
+    pytest.mark.medium,  # required speed marker: real (file-based) DuckDB I/O
 ]
 
 

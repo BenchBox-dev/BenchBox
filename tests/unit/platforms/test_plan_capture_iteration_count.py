@@ -81,9 +81,7 @@ def test_plan_first_n_counts_are_per_query_id(monkeypatch):
         barrier.wait()
         adapter.capture_query_plan(connection=object(), query="SELECT 1", query_id=query_id)
 
-    threads = [
-        threading.Thread(target=worker, args=(qid,)) for qid in query_ids for _ in range(per_query_threads)
-    ]
+    threads = [threading.Thread(target=worker, args=(qid,)) for qid in query_ids for _ in range(per_query_threads)]
     for thread in threads:
         thread.start()
     for thread in threads:

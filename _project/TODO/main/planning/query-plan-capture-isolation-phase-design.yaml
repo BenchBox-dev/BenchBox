@@ -147,7 +147,7 @@ work:
   - id: w3
     summary: "Add a run_plan_capture_phase() hook to the run orchestrator"
     needs: [w1]
-    status: partial  # phase function in benchbox/core/plan_capture_phase.py; CLI cutover pending
+    status: in_progress  # phase function in benchbox/core/plan_capture_phase.py; CLI cutover pending
     notes: |
       Add a function to benchbox/cli/commands/run.py (or a new
       benchbox/core/plan_capture_phase.py) that:
@@ -164,7 +164,7 @@ work:
   - id: w4
     summary: "Update docs and --help to describe capture as a post-measurement phase"
     needs: [w3]
-    status: deferred  # gated on w3 CLI cutover; docs must not claim a phase --capture-plans does not yet trigger
+    status: pending  # gated on w3 CLI cutover; docs must not claim a phase --capture-plans does not yet trigger
     notes: |
       Update docs/features/query-plan-analysis.md and docs/reference/cli/run.md:
         - Describe that --capture-plans triggers a separate post-measurement phase
@@ -175,7 +175,7 @@ work:
   - id: w5
     summary: "Add integration test verifying phase isolation"
     needs: [w3, w4]
-    status: partial  # tests/integration/test_plan_capture_phase.py covers phase isolation; full CLI-run assertion follows w3 cutover
+    status: in_progress  # tests/integration/test_plan_capture_phase.py covers phase isolation; full CLI-run assertion follows w3 cutover
     notes: |
       Add a test that:
         - Runs a mock benchmark with capture_plans=True
