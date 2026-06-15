@@ -4,13 +4,32 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 246
+**Total rules:** 260
 
 **Platforms with rules:** 18
 
 ## Will not run
 
 Queries or benchmarks that are **omitted from the result set** - either because the benchmark is refused at preflight (BLOCKED) or a specific query is excluded from execution (SKIPPED_QUERY). Users see these as missing entries in result counts.
+
+### datafusion
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| SKIPPED_QUERY | benchmark=tpchavoc, query=12_v1 | execution_filter | DataFusion `scalar_subquery_to_join` optimizer rule reports an ambiguous `count(*)` for this variant. | `execution_filter.datafusion.tpchavoc.12_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=14_v2 | execution_filter | DataFusion rejects the generated empty-tuple sub-query (`Empty tuple not supported yet`). | `execution_filter.datafusion.tpchavoc.14_v2` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=14_v8 | execution_filter | DataFusion physical planning does not support EXISTS in this variant shape. | `execution_filter.datafusion.tpchavoc.14_v8` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=16_v10 | execution_filter | DataFusion physical planning does not support the IN sub-query in this variant shape. | `execution_filter.datafusion.tpchavoc.16_v10` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=16_v7 | execution_filter | DataFusion physical planning does not support the IN sub-query in this variant shape. | `execution_filter.datafusion.tpchavoc.16_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=17_v10 | execution_filter | DataFusion physical planning does not support the scalar sub-query in this variant shape. | `execution_filter.datafusion.tpchavoc.17_v10` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=17_v7 | execution_filter | DataFusion physical planning does not support the scalar sub-query in this variant shape. | `execution_filter.datafusion.tpchavoc.17_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | DataFusion has no `LIST` aggregate used by this variant (`Invalid function 'list'`). | `execution_filter.datafusion.tpchavoc.1_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=4_v10 | execution_filter | DataFusion physical planning does not support EXISTS in this variant shape. | `execution_filter.datafusion.tpchavoc.4_v10` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=4_v7 | execution_filter | DataFusion physical planning does not support EXISTS in this variant shape. | `execution_filter.datafusion.tpchavoc.4_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=6_v2 | execution_filter | DataFusion rejects the generated empty-tuple sub-query (`Empty tuple not supported yet`). | `execution_filter.datafusion.tpchavoc.6_v2` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=7_v1 | execution_filter | DataFusion physical planning does not support the scalar sub-query in this variant shape. | `execution_filter.datafusion.tpchavoc.7_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=8_v1 | execution_filter | DataFusion `scalar_subquery_to_join` optimizer rule fails to resolve a sub-query field for this variant. | `execution_filter.datafusion.tpchavoc.8_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=9_v1 | execution_filter | DataFusion physical planning does not support the scalar sub-query in this variant shape. | `execution_filter.datafusion.tpchavoc.9_v1` |
 
 ### duckdb
 

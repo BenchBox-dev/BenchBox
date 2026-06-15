@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 339
+**Total registered rules:** 353
 
 **Platforms covered:** 30
 
@@ -17,7 +17,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | clickhouse | - | 13 | 3 | 4 | 1 | - | 21 |
 | databend | - | - | - | - | 1 | - | 1 |
 | databricks | - | - | - | 2 | 1 | - | 3 |
-| datafusion | - | - | 4 | 2 | - | - | 6 |
+| datafusion | - | - | 4 | 2 | - | 14 | 20 |
 | doris | - | 7 | - | 2 | 1 | - | 10 |
 | duckdb | - | - | - | - | - | 6 | 6 |
 | fabric_dw | - | - | - | - | 1 | - | 1 |
@@ -109,6 +109,20 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_adapter | benchmark=tpch, query=20 | rewrite_query | REWRITTEN | SILENT_CORRUPTION | `query_adapter.datafusion.tpch.q20_correlated_to_cte` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | SKIPPED_DDL_FRAGMENT | SYNTAX_ERROR | `schema_emit.datafusion.transaction_primitives.pk_lock_table_unsupported` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | SKIPPED_DDL_FRAGMENT | SYNTAX_ERROR | `schema_emit.datafusion.write_primitives.pk_lock_table_unsupported` |
+| execution_filter | benchmark=tpchavoc, query=12_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.12_v1` |
+| execution_filter | benchmark=tpchavoc, query=14_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.14_v2` |
+| execution_filter | benchmark=tpchavoc, query=14_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.14_v8` |
+| execution_filter | benchmark=tpchavoc, query=16_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.16_v10` |
+| execution_filter | benchmark=tpchavoc, query=16_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.16_v7` |
+| execution_filter | benchmark=tpchavoc, query=17_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.17_v10` |
+| execution_filter | benchmark=tpchavoc, query=17_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.17_v7` |
+| execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.1_v7` |
+| execution_filter | benchmark=tpchavoc, query=4_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.4_v10` |
+| execution_filter | benchmark=tpchavoc, query=4_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.4_v7` |
+| execution_filter | benchmark=tpchavoc, query=6_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.6_v2` |
+| execution_filter | benchmark=tpchavoc, query=7_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.7_v1` |
+| execution_filter | benchmark=tpchavoc, query=8_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.8_v1` |
+| execution_filter | benchmark=tpchavoc, query=9_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.9_v1` |
 
 ### doris
 

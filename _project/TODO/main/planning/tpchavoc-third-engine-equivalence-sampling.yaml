@@ -1,0 +1,196 @@
+id: tpchavoc-third-engine-equivalence-sampling
+title: "Sample TPC-Havoc variant equivalence on a third SQL engine (DataFusion)"
+worktree: main
+priority: Medium
+status: Completed
+category: Testing and Quality Assurance
+
+description: |
+  The TPC-Havoc cross-dialect equivalence oracle already samples two engines: the
+  DuckDB SQL gate (PR #770, the hard blocker, KNOWN_DIVERGENCES empty) and a bounded
+  PostgreSQL sample (PR #803, POSTGRES_KNOWN_DIVERGENCES empty, 203/203 executable
+  variants equivalent). That two-engine signal said the dialect-translation seam was
+  faithful - but on engines whose gaps are SIMILAR (both PostgreSQL-family). The
+  `deferred` item of tpchavoc-cross-dialect-equivalence-sampling asked whether that
+  fidelity is systematic or Postgres-specific.
+
+  This TODO is that sequenced follow-on: a THIRD engine with a DIFFERENT gap profile.
+  A variant is written once and run, after dialect translation, on ~20 platforms;
+  "equivalent on DuckDB" does not imply "equivalent everywhere" (translation can shift
+  NULL ordering, integer-vs-float division, DISTINCT/window/QUALIFY/aggregate-FILTER
+  semantics, implicit casts, date arithmetic). A third engine whose limitations differ
+  from Postgres tests whether the zero-divergence result generalizes.
+
+  Engine choice: DataFusion. It (a) has an existing BenchBox adapter, (b) is in-process
+  (no service container - the cheapest possible CI cost), and (c) has a DIFFERENT gap
+  profile from Postgres: its limitations are in PHYSICAL PLANNING of correlated
+  EXISTS/IN/scalar sub-queries (plus a missing LIST aggregate and an empty-tuple parser
+  gap), whereas Postgres's are select-list-alias-in-HAVING/WHERE and aggregate-in-window.
+  This is still a SAMPLE, not a 20-engine matrix; the DuckDB gate stays the hard blocker.
+
+prior_art:
+  - "benchbox/core/tpchavoc/equivalence.py - the engine-agnostic oracle (find_divergences + the shared _report); reuse it, do NOT fork. Mirror build_postgres_with_tpch / find_postgres_divergences / run_postgres_sample / POSTGRES_KNOWN_DIVERGENCES."
+  - "benchbox/sql_compat/rules/execution_filter/postgres_tpchavoc.py POSTGRES_TPCHAVOC_SKIPS - the per-variant execution skips pattern; un-executable variants are excluded, never marked equivalent."
+  - "benchbox/sql_compat/rules/execution_filter/lakesail_tpchavoc.py - LakeSail (Apache Sail) is DataFusion-based; its TPC-Havoc skip set is a SUPERSET of DataFusion's, corroborating that the DataFusion failures are genuine engine limitations."
+  - "benchbox/utils/dialect_utils.py normalize_dialect_for_sqlglot - maps 'datafusion' -> 'postgres' for SQLGlot, so both canonical and variants go through the same translation seam."
+  - "_project/TODO/main/planning/tpchavoc-cross-dialect-equivalence-sampling.yaml - the Completed two-engine TODO whose `deferred` item this implements."
+
+work:
+  - id: w0
+    summary: "Wire DataFusion build + sample path, reusing find_divergences and _report"
+    status: done
+    notes: |
+      Added build_datafusion_with_tpch (in-process SessionContext via DataFusionAdapter;
+      TPC-H .tbl loaded through PyArrow with the shared trailing-delimiter helpers because
+      the adapter's own CSV path does not strip the field-terminating pipe; per-table
+      row-count guard so a partial load cannot produce a false green), find_datafusion_
+      divergences (canonical via tpch.get_query(q, dialect="datafusion"); variants via
+      translate_query_text(sql, "netezza", "datafusion"); both normalize to postgres so
+      shared translation cancels out), and run_datafusion_sample. main() gained
+      `--engine datafusion`. The comparator and _report are reused verbatim - no per-engine
+      fork. DataFusion is in-process so per-query errors isolate naturally (no autocommit
+      needed) and there is no service to be unreachable; the only clean SKIP is DataFusion
+      not being installed.
+
+  - id: w1
+    summary: "Run the oracle on DataFusion in report mode and classify divergences"
+    needs: [w0]
+    status: done
+    notes: |
+      Ran `python -m benchbox.core.tpchavoc.equivalence --engine datafusion` at SF=0.1.
+      Raw sweep (no skip-list) surfaced 14 divergences - ALL of them DataFusion EXECUTION
+      failures, none result mismatches:
+        - 1_v7: missing LIST aggregate ("Invalid function 'list'").
+        - 4_v7, 4_v10, 14_v8: EXISTS not supported in physical plan for the variant shape.
+        - 16_v7, 16_v10: IN sub-query not supported in physical plan.
+        - 7_v1, 9_v1, 17_v7, 17_v10: scalar sub-query not supported in physical plan.
+        - 8_v1, 12_v1: scalar_subquery_to_join optimizer rule fails (field resolution / ambiguous count(*)).
+        - 6_v2, 14_v2: generated empty-tuple sub-query ("Empty tuple not supported yet").
+      The same SQL passes the DuckDB gate, so these are genuine DataFusion engine
+      limitations, NOT translation bugs and NOT variant defects. Classification: all 14 are
+      "engine cannot execute" -> excluded via DATAFUSION_TPCHAVOC_SKIPS (the execution-filter
+      analog of POSTGRES_TPCHAVOC_SKIPS), never marked equivalent. Corroboration: all 14 are
+      a strict subset of LAKESAIL_TPCHAVOC_SKIPS (Sail is DataFusion-based). After excluding
+      them, 206/206 executable variants are result-equivalent - ZERO result divergences.
+
+  - id: w2
+    summary: "Fix translation/variant bugs; declare true engine exceptions"
+    needs: [w1]
+    status: done
+    notes: |
+      Nothing to drive down: w1's result-divergence surface was already empty, so there were
+      no translation-layer bugs to fix at the seam (translate_query_text / translate_sql_query)
+      and no per-variant hacks were added. DATAFUSION_KNOWN_DIVERGENCES is the engine-keyed
+      result-equivalence exception table (mirrors POSTGRES_KNOWN_DIVERGENCES) and stays EMPTY:
+      no irreducible engine-semantic RESULT difference needed declaring. The only DataFusion-
+      specific surface is executability, captured in DATAFUSION_TPCHAVOC_SKIPS (14 variants,
+      registered for the "datafusion" platform and wired into get_platform_skip_queries).
+
+  - id: w3
+    summary: "Decide the routine-CI posture for the third engine and wire it"
+    needs: [w2]
+    status: done
+    notes: |
+      DECISION: option (a) - a bounded check in a non-blocking CI job. Added a new
+      `datafusion-integration` job in .github/workflows/pr.yml (continue-on-error: true)
+      running tests/integration/platforms/test_tpchavoc_datafusion_equivalence.py.
+
+      RATIONALE: the residual result-divergence surface is empty and the run is green and
+      fast (~15s end-to-end, in-process, no service container), so option (b)'s trigger
+      ("surface dominated by declared engine differences" or "too slow/flaky") does not
+      apply. Unlike Postgres there is no pre-existing service container to reuse, but
+      DataFusion is in-process so a dedicated job is still cheap; a dedicated NON-blocking
+      job keeps the sample's semantics explicit at the job level and keeps the hard
+      correctness-gate job clean. continue-on-error keeps it a SAMPLE: the DuckDB SQL gate
+      (correctness-gate job, KNOWN_DIVERGENCES empty) remains the only hard blocker. We
+      deliberately do NOT gate the other ~17 platforms in routine CI (anti-pattern #1).
+      Also added the Makefile target `tpchavoc-equivalence-report-datafusion`.
+
+  - id: w4
+    summary: "Synthesize the three-engine signal"
+    needs: [w3]
+    status: done
+    notes: |
+      CONCLUSION: translation divergence is SYSTEMATIC-ZERO, not engine-specific. Across
+      three engines with materially different feature sets - DuckDB (220/220), PostgreSQL
+      (203/203 executable), and now DataFusion (206/206 executable) - every variant that
+      the engine can execute is result-equivalent to canonical TPC-H run through the SAME
+      translation on the SAME instance. Crucially, DataFusion's gap profile DIFFERS from
+      Postgres's (physical-planning of correlated sub-queries vs HAVING/WHERE alias and
+      aggregate-in-window limits), and the skip sets barely overlap (only 1_v7 and 4_v7),
+      yet the equivalence result is identical: zero result divergences, empty
+      <ENGINE>_KNOWN_DIVERGENCES. The differences between engines live entirely in WHICH
+      variants execute (bounded by the per-engine skip-lists), never in the RESULTS of the
+      ones that do. The dialect-translation seam is faithful for these families.
+
+      Is a fourth engine worth sequencing? Not urgently. Three engines spanning columnar
+      (DuckDB), PostgreSQL-family (Postgres), and Arrow/DataFusion-family now agree. The
+      highest-information next contrast would be an engine that differs SEMANTICALLY on
+      results (NULL ordering, integer division, implicit casts) rather than on
+      executability - e.g. ClickHouse or a Spark dialect - but that costs a service
+      container and should only be sequenced if a concrete translation concern motivates
+      it. Recorded in `deferred` below, gated on such evidence.
+
+deferred:
+  - summary: "Sample a fourth engine that contrasts on RESULT semantics (e.g. ClickHouse or Spark), not just executability"
+    reason: "Three engines agree on zero result divergence; a fourth adds information only if it differs on result semantics (NULL ordering, integer division, implicit casts). That costs a service container - sequence it only when a concrete translation concern motivates it, not as a reflexive fan-out."
+
+must_preserve:
+  - "The DuckDB SQL equivalence gate stays the hard, blocking gate with empty KNOWN_DIVERGENCES (still 220/220, exit 0)."
+  - "The PostgreSQL sample stays green; POSTGRES_KNOWN_DIVERGENCES and POSTGRES_TPCHAVOC_SKIPS semantics are unchanged (still 203/203)."
+  - "Reuse validate_variant_equivalence, find_divergences, and _report; do not fork the comparator/oracle per engine."
+  - "DATAFUSION_TPCHAVOC_SKIPS entries are excluded, never marked equivalent; only DataFusion-not-installed is a clean SKIP - schema/load/translation/sweep failures propagate."
+
+approach: |
+  Mirror the PostgreSQL second-engine pattern for DataFusion: a build helper, a
+  find_<engine>_divergences, a run_<engine>_sample, an engine-keyed KNOWN_DIVERGENCES,
+  and an execution-filter skip module for the variants the engine genuinely cannot run
+  (w0). Run the oracle in report mode and classify every divergence (w1), fix any
+  translation bug at the seam and declare only irreducible engine RESULT differences as
+  exceptions (w2), wire a bounded non-blocking CI posture from the evidence (w3), and
+  synthesize the three-engine signal (w4). DuckDB stays the hard gate.
+
+anti_patterns:
+  - "DO NOT gate all ~20 platforms in routine CI - one more engine, decided from evidence."
+  - "DO NOT treat a DATAFUSION_TPCHAVOC_SKIPS entry as an equivalence pass - those variants don't execute; exclude them, never mark them equivalent."
+  - "DO NOT patch individual variants for what is a translation-layer bug - fix the translation seam so the fix generalizes across variants and engines."
+  - "DO NOT compare a DataFusion variant result to a DuckDB or Postgres canonical - run canonical on the SAME engine, same dialect, both sides."
+
+verification:
+  - description: "DataFusion report-mode oracle enumerates divergences excluding un-executable variants"
+    command: "make tpchavoc-equivalence-report-datafusion"
+    expected_output: "checked 206 variants - 0 divergent, 206 equivalent; exit 0"
+  - description: "DuckDB hard gate and live DataFusion sample both green"
+    command: "make tpchavoc-equivalence-report"
+    expected_output: "checked 220 variants - 0 divergent, 220 equivalent; exit 0"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpchavoc/"
+    - "benchbox/sql_compat/"
+    - "tests/integration/"
+    - ".github/workflows/"
+    - "Makefile"
+    - "_project/TODO/"
+
+open_questions:
+  - question: "Third engine: DataFusion (in-process, gaps differ from Postgres) vs ClickHouse/Spark (harder contrast, service container)?"
+    gating: true
+    affects: ["w0 engine choice"]
+    default: "DataFusion - cheapest setup (in-process, no container) with a genuinely different gap profile from Postgres, so the sample adds information about whether translation divergence generalizes."
+  - question: "Reference: run canonical TPC-H on the same engine/dialect as the variants?"
+    gating: false
+    affects: ["w1 reference choice"]
+    default: "Yes - canonical and variants both translated to the datafusion dialect and compared on the same session, so shared translation cancels out and only genuine variant-vs-canonical differences surface."
+
+success_metrics:
+  - "The equivalence oracle runs on a third SQL engine (DataFusion) and reports variant divergences from canonical TPC-H."
+  - "Translation-induced divergences are fixed at the seam; irreducible engine RESULT differences are classified and justified (none needed - DATAFUSION_KNOWN_DIVERGENCES empty)."
+  - "A documented CI-posture decision exists (non-blocking datafusion-integration job) with the DuckDB gate remaining the hard blocker."
+  - "A three-engine conclusion is recorded: translation divergence is systematic-zero, not engine-specific."
+
+metadata:
+  tags: [tpchavoc, cross-dialect, equivalence, correctness, datafusion, ci]
+  estimated_effort: "Medium"
+  created_date: "2026-06-15"
+  last_updated: "2026-06-15T00:00:00"
