@@ -2,7 +2,7 @@ id: tpchavoc-cross-dialect-equivalence-sampling
 title: "Sample TPC-Havoc variant equivalence on a second SQL engine beyond DuckDB"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -43,7 +43,7 @@ prior_art:
 work:
   - id: w0
     summary: "Make the equivalence oracle engine-agnostic"
-    status: pending
+    status: done
     notes: |
       Factor find_divergences so the connection/engine and the dialect used to
       render both canonical and variants are injected, not hardcoded to DuckDB.
@@ -51,10 +51,21 @@ work:
       dialect before comparison. Keep DuckDB as the default; add the engine as a
       parameter. No behavior change to the existing DuckDB gate.
 
+      RESOLVED: find_divergences now takes `translate_variant` (renders each
+      variant into the target dialect; default identity = DuckDB-native) and
+      `skip_variants` (excluded, never run, never counted). Canonical dialect is
+      injected via the caller's canonical_query (tpch.get_query(q, dialect=...)),
+      so both sides land in the same dialect through the same translate_sql_query
+      seam. The comparator (validate_variant_equivalence) is reused verbatim - no
+      per-engine fork. DuckDB path is byte-for-byte unchanged (220/220 equivalent,
+      exit 0). New report helper _report() is shared by both engines; main() gained
+      `--engine {duckdb,postgres}`. Fast no-DB plumbing test:
+      tests/integration/test_tpchavoc_equivalence_engine_agnostic.py.
+
   - id: w1
     summary: "Run the oracle on PostgreSQL in report mode and classify divergences"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Use the existing Postgres service container. Exclude variants in
       POSTGRES_TPCHAVOC_SKIPS (un-executable, not a divergence). For the rest,
@@ -64,26 +75,61 @@ work:
       exception with justification), or a real variant defect the DuckDB gate
       missed.
 
+      RESOLVED: Ran `python -m benchbox.core.tpchavoc.equivalence --engine postgres`
+      against a live Postgres at SF=0.1 (canonical + variants both translated
+      netezza->postgres through translate_query_text; the 17 POSTGRES_TPCHAVOC_SKIPS
+      excluded). Result: 203/203 executable variants equivalent - ZERO divergences.
+      No translation-layer bugs, no genuine engine-semantic differences, no variant
+      defects the DuckDB gate missed. Classification surface is empty: the dialect
+      translation seam is faithful for these families on PostgreSQL.
+
+      Setup notes (perf, not semantics): the generated DDL carries no keys/indexes
+      (it targets columnar engines), so correlated-subquery variants planned as
+      O(n*m) nested loops on Postgres; the build helper adds the standard TPC-H
+      PK/FK indexes + ANALYZE and a per-statement timeout. These change run time
+      only, never results.
+
   - id: w2
     summary: "Fix translation/variant bugs; declare true engine exceptions"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Drive w1's divergences down. Prefer fixing the translation layer over
       per-variant hacks (a translation bug likely affects many variants/engines).
       Record irreducible engine-semantic differences as classified, justified
       exceptions keyed by (engine, variant).
 
+      RESOLVED: Nothing to drive down - w1's divergence surface was already empty,
+      so there were no translation-layer bugs to fix and no per-variant hacks were
+      added. POSTGRES_KNOWN_DIVERGENCES is the engine-keyed exception table
+      (mirrors KNOWN_DIVERGENCES) and stays EMPTY: no irreducible engine-semantic
+      difference needed declaring. POSTGRES_TPCHAVOC_SKIPS semantics unchanged.
+
   - id: w3
     summary: "Decide the routine-CI posture for the second engine and wire it"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Based on w1-w2 evidence, choose: (a) a bounded Postgres equivalence gate in
       the existing non-blocking postgres-integration job, or (b) a periodic/opt-in
       check if the divergence surface is dominated by declared engine differences.
       Whichever, the DuckDB gate stays the hard blocker; the second engine is a
       sample, not a 20-engine matrix. Record the decision and the rationale.
+
+      RESOLVED - DECISION: option (a). Wired the Postgres equivalence sample into
+      the EXISTING non-blocking postgres-integration job in .github/workflows/pr.yml
+      (continue-on-error: true) as a new pytest step over
+      tests/integration/platforms/test_tpchavoc_postgres_equivalence.py.
+
+      RATIONALE: the divergence surface is empty and the run is green and fast
+      (~40s over the already-running Postgres service container, far inside the
+      job's 15-min budget), so it is NOT "dominated by declared engine differences"
+      - option (b)'s trigger does not apply. A bounded check that is green today
+      turns any future translation regression on Postgres into immediate signal,
+      while continue-on-error keeps it a SAMPLE: the DuckDB SQL gate (correctness-gate
+      job, KNOWN_DIVERGENCES empty) remains the only hard blocker. We deliberately
+      do NOT gate the other ~18 platforms in routine CI (anti-pattern #1); the third
+      engine is sequenced in `deferred` once the two-engine signal warrants it.
 
 deferred:
   - summary: "Extend cross-engine equivalence sampling to a third engine (ClickHouse/DataFusion/Spark)"
