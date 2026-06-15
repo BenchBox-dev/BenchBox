@@ -438,6 +438,23 @@ jobs:
           uv run -- python -m pytest tests/integration/platforms/test_postgresql_live.py \
             -m "live_postgresql" --tb=short -v
 
+      # Second-engine equivalence SAMPLE (non-blocking, see continue-on-error
+      # above). The DuckDB SQL gate (correctness-gate job) stays the hard
+      # blocker; this samples TPC-Havoc variant equivalence one engine over to
+      # catch translation-induced divergence. Both canonical and variants are
+      # translated to the postgres dialect and compared on this same instance.
+      - name: Run TPC-Havoc PostgreSQL variant-equivalence sample
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: benchbox
+          PGPASSWORD: benchbox
+          PGDATABASE: benchbox_test
+        run: |
+          uv run -- python -m pytest \
+            tests/integration/platforms/test_tpchavoc_postgres_equivalence.py \
+            -m "live_postgresql" -n 0 --tb=short -v
+
   explorer-tokens:
     name: explorer-tokens
     needs: ci-paths
