@@ -27,6 +27,16 @@ PostgreSQL cannot execute (POSTGRES_TPCHAVOC_SKIPS), and classifies any residue
 against :data:`POSTGRES_KNOWN_DIVERGENCES`. It catches the largest class of
 translation-induced divergence one engine over without gating all ~20 platforms.
 
+``--engine datafusion`` adds a bounded *third-engine sample* on the in-process
+DataFusion engine (no service container). Its execution gaps DIFFER from
+Postgres's - correlated EXISTS/IN/scalar sub-query physical planning rather than
+HAVING/WHERE alias and aggregate-in-window limits - so it tests whether the
+translation fidelity is systematic or Postgres-specific. Variants DataFusion
+cannot plan are excluded via DATAFUSION_TPCHAVOC_SKIPS; any residue is classified
+against :data:`DATAFUSION_KNOWN_DIVERGENCES`. Across DuckDB, PostgreSQL, and
+DataFusion every executable variant is result-equivalent: translation divergence
+is systematic-zero, not engine-specific.
+
 Comparison is order-insensitive with float tolerance (the validator sorts both
 sides). Because canonical TPC-H queries carry a presentational ``ORDER BY ...
 LIMIT n`` top-N cut that the variant families treat inconsistently, the trailing
@@ -102,6 +112,21 @@ KNOWN_DIVERGENCES: dict[str, str] = {}
 # 203 executable variants - the translation layer is faithful and no variant is
 # silently wrong on PostgreSQL while green on DuckDB.
 POSTGRES_KNOWN_DIVERGENCES: dict[str, str] = {}
+
+# Per-engine equivalence exceptions for the *third-engine sample* (DataFusion),
+# keyed by "<query>_v<variant>". Same contract as POSTGRES_KNOWN_DIVERGENCES: an
+# entry records an irreducible engine-semantic *result* difference, never a
+# translation bug (fixed in the dialect seam) and never a variant DataFusion
+# cannot execute (those are excluded via DATAFUSION_TPCHAVOC_SKIPS).
+#
+# Empty: the DataFusion sample (SF=0.1, both canonical and variants translated to
+# the datafusion dialect - which the seam normalizes to postgres - through the
+# same path) found zero *result* divergences over the 206 executable variants.
+# DataFusion's gaps are confined to which variants it can plan at all (the 14
+# DATAFUSION_TPCHAVOC_SKIPS), a DIFFERENT gap profile from PostgreSQL's; on the
+# variants it does execute the translation layer is just as faithful. Three
+# engines now agree: translation divergence is systematic-zero, not engine-specific.
+DATAFUSION_KNOWN_DIVERGENCES: dict[str, str] = {}
 
 _TRAILING_LIMIT = re.compile(r"(?is)\s+limit\s+\d+\s*;?\s*$")
 
@@ -498,25 +523,198 @@ def run_postgres_sample() -> int:
     )
 
 
+# The third engine sampled beyond DuckDB and PostgreSQL. DataFusion is the
+# cheapest contrast: it is in-process (no service container), and its execution
+# gaps DIFFER from PostgreSQL's (correlated EXISTS/IN/scalar sub-query physical
+# planning rather than HAVING/WHERE alias and aggregate-in-window limits), so the
+# sample adds information about whether translation divergence is systematic or
+# engine-specific. The seam normalizes "datafusion" to the postgres dialect, so
+# both sides go through the same translation and shared translation cancels out.
+DATAFUSION_TARGET_DIALECT = "datafusion"
+
+
+def _close_quietly(connection: Any) -> None:
+    """Close a connection if it exposes ``close()``.
+
+    DataFusion's in-process session has no ``close()`` (it is GC'd), so callers
+    that mirror the DB-API ``finally: connection.close()`` shape stay uniform
+    across engines without special-casing DataFusion at every call site.
+    """
+    close = getattr(connection, "close", None)
+    if callable(close):
+        close()
+
+
+def build_datafusion_with_tpch(scale_factor: float, output_dir: str | Path) -> tuple[Any, TPCHavocBenchmark, TPCH]:
+    """Generate TPC-H data and return a populated in-process DataFusion connection.
+
+    Mirrors :func:`build_duckdb_with_tpch`/:func:`build_postgres_with_tpch` for the
+    third engine. DataFusion is in-process, so there is no service container and no
+    per-statement transaction to isolate: ``ctx.sql(...)`` failures raise per query
+    and are caught by :func:`find_divergences` without poisoning the sweep.
+
+    The generated TPC-H ``.tbl`` files carry a field-terminating trailing pipe.
+    Both of ``DataFusionAdapter.load_data``'s CSV paths reject it (the
+    CREATE EXTERNAL TABLE path has no trailing-delimiter option, and the
+    CSV->Parquet path reads with the bare schema column count and errors on the
+    extra field), and the adapter is outside this change's scope. So this helper
+    loads each table via PyArrow directly - handling the trailing delimiter with
+    the shared file-format helpers - and registers Arrow batches into the session,
+    reusing the adapter's session setup and its own type mapping for fidelity.
+    DECIMAL columns map to float64 exactly as the adapter's Parquet path does; the
+    comparator is float-tolerant and both sides run on this same instance, so this
+    never changes results. Each table's row count is verified (>0) so a partial
+    load cannot produce a FALSE green by comparing empty-vs-empty.
+
+    Returns:
+        ``(connection, tpchavoc_benchmark, tpch_benchmark)``.
+    """
+    import pyarrow as pa
+    import pyarrow.csv as pacsv
+
+    from benchbox.platforms.datafusion import DataFusionAdapter
+    from benchbox.utils.file_format import (
+        TRAILING_DUMMY_COLUMN,
+        get_column_names_with_trailing,
+        has_trailing_delimiter,
+    )
+
+    data_dir, tpchavoc, tpch = _generate_tpch(scale_factor, Path(output_dir))
+
+    adapter = DataFusionAdapter(working_dir=str(Path(output_dir) / "datafusion_working"))
+    connection = adapter.create_connection()
+    try:
+        schema = tpchavoc.get_schema()
+        for table in _TPCH_TABLES:
+            columns = schema[table]["columns"]
+            column_names = [column["name"].lower() for column in columns]
+            column_types: dict[str, Any] = {}
+            for column in columns:
+                arrow_type = DataFusionAdapter._map_schema_type_to_pyarrow(column["type"].upper(), pa)
+                if arrow_type is not None:
+                    column_types[column["name"].lower()] = arrow_type
+
+            tbl_path = data_dir / f"{table}.tbl"
+            if not tbl_path.exists():
+                raise RuntimeError(f"DataFusion TPC-H load failed - missing data file {tbl_path}")
+
+            trailing = has_trailing_delimiter(tbl_path, "|", column_names)
+            read_names = get_column_names_with_trailing(column_names, trailing)
+            arrow_table = pacsv.read_csv(
+                tbl_path,
+                read_options=pacsv.ReadOptions(column_names=read_names),
+                parse_options=pacsv.ParseOptions(delimiter="|"),
+                convert_options=pacsv.ConvertOptions(
+                    column_types=column_types, null_values=[""], strings_can_be_null=True
+                ),
+            )
+            if trailing:
+                arrow_table = arrow_table.drop_columns([TRAILING_DUMMY_COLUMN])
+            if arrow_table.num_rows <= 0:
+                raise RuntimeError(f"DataFusion TPC-H load failed - no rows in {table} ({tbl_path})")
+            connection.register_record_batches(table, [arrow_table.to_batches()])
+    except Exception:
+        _close_quietly(connection)
+        raise
+    return connection, tpchavoc, tpch
+
+
+def find_datafusion_divergences(
+    connection: Any,
+    tpchavoc: TPCHavocBenchmark,
+    tpch: TPCH,
+    *,
+    query_ids: list[int] | None = None,
+) -> list[Divergence]:
+    """Run the DataFusion equivalence sweep with the canonical DataFusion wiring.
+
+    Single source of truth for *how* the DataFusion sample is run - both the CLI
+    (:func:`run_datafusion_sample`) and the integration test call this so they
+    cannot drift. Canonical and variants are both translated to the datafusion
+    dialect through the SAME seam (the seam normalizes datafusion -> postgres for
+    SQLGlot), and DATAFUSION_TPCHAVOC_SKIPS variants are excluded (never marked
+    equivalent).
+    """
+    from benchbox.sql_compat.rules.execution_filter.datafusion_tpchavoc import DATAFUSION_TPCHAVOC_SKIPS
+
+    return find_divergences(
+        connection,
+        tpchavoc,
+        lambda q: tpch.get_query(q, dialect=DATAFUSION_TARGET_DIALECT),
+        query_ids=query_ids,
+        translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", DATAFUSION_TARGET_DIALECT),
+        skip_variants=set(DATAFUSION_TPCHAVOC_SKIPS),
+    )
+
+
+def run_datafusion_sample() -> int:
+    """Run the third-engine (DataFusion) equivalence sample.
+
+    Both canonical TPC-H and every variant are translated to the datafusion
+    dialect through the SAME seam, then compared on the SAME in-process DataFusion
+    session, so shared translation cancels out (anti-pattern: never compare a
+    DataFusion variant to a DuckDB or Postgres canonical). Variants DataFusion
+    cannot execute are excluded via DATAFUSION_TPCHAVOC_SKIPS - they are never
+    marked equivalent. A divergence is classified against DATAFUSION_KNOWN_DIVERGENCES;
+    an unclassified one returns non-zero, but this is a *sample* run - the DuckDB
+    gate remains the hard blocker.
+
+    DataFusion is in-process, so the only "engine unusable" case is the library
+    not being installed; that alone is a clean skip (mirroring the Postgres
+    sample's connect-only skip). Schema, load (incl. the row-count guard),
+    translation, and sweep failures all propagate as real failures.
+    """
+    import tempfile
+
+    from benchbox.sql_compat.rules.execution_filter.datafusion_tpchavoc import DATAFUSION_TPCHAVOC_SKIPS
+
+    try:
+        import datafusion  # noqa: F401
+    except ImportError as exc:
+        print(f"DataFusion equivalence sample SKIPPED - DataFusion not installed: {exc}")
+        return 0
+
+    with tempfile.TemporaryDirectory() as tmp:
+        connection, tpchavoc, tpch = build_datafusion_with_tpch(EQUIVALENCE_SCALE, tmp)
+        try:
+            divergences = find_datafusion_divergences(connection, tpchavoc, tpch)
+        finally:
+            _close_quietly(connection)
+
+    # Exclude un-executable variants from the denominator too: they are bounded
+    # out of scope, not failures.
+    total = len(tpchavoc.get_implemented_queries()) * 10 - len(DATAFUSION_TPCHAVOC_SKIPS)
+    return _report(
+        divergences,
+        total,
+        DATAFUSION_KNOWN_DIVERGENCES,
+        engine_label="DataFusion",
+        baseline_name="DATAFUSION_KNOWN_DIVERGENCES",
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Generate data, run the oracle for the chosen engine, and print a report.
 
     ``--engine duckdb`` (default) is the hard, blocking gate. ``--engine
-    postgres`` runs the bounded second-engine sample described in
-    :func:`run_postgres_sample`.
+    postgres`` and ``--engine datafusion`` run the bounded second- and
+    third-engine samples described in :func:`run_postgres_sample` and
+    :func:`run_datafusion_sample`.
     """
     import argparse
 
     parser = argparse.ArgumentParser(description="TPC-Havoc variant-equivalence oracle.")
     parser.add_argument(
         "--engine",
-        choices=("duckdb", "postgres"),
+        choices=("duckdb", "postgres", "datafusion"),
         default="duckdb",
         help="SQL engine to sample (default: duckdb, the hard gate).",
     )
     args = parser.parse_args(argv)
     if args.engine == "postgres":
         return run_postgres_sample()
+    if args.engine == "datafusion":
+        return run_datafusion_sample()
     return run_duckdb_gate()
 
 
