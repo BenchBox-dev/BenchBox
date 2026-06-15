@@ -1,0 +1,145 @@
+id: query-plan-capture-phase-analyze-opt-in
+title: "Add an opt-in to capture ANALYZE plans in the post-measurement phase"
+worktree: main
+priority: Low
+status: Not Started
+category: Core Functionality
+
+description: |
+  As of #805, plan capture for phase-eligible engines (DuckDB, MotherDuck,
+  SQLite, DataFusion, PostgreSQL, Redshift) runs in an isolated post-measurement
+  phase that is STRUCTURAL-ONLY: `_capture_plans_post_measurement` calls
+  `run_plan_capture_phase(..., analyze_plans=False)` unconditionally. This is the
+  intended default (no re-execution cost, DML runs exactly once), and the
+  structural `plan_fingerprint` is unaffected.
+
+  The trade-off: captured `query_plan` objects for these engines no longer carry
+  ACTUAL per-operator timing/cardinality (the `EXPLAIN ANALYZE` stats). Before
+  #805, `benchbox run --platform duckdb --capture-plans` (with the default
+  `analyze_plans=true`) produced ANALYZE plans inline. `--platform-option
+  analyze_plans=true` is now effectively ignored by the phase, so there is no way
+  to get actual-stats plans for eligible engines.
+
+  This TODO adds an explicit opt-in that re-enables ANALYZE capture IN THE PHASE,
+  while preserving the structural-only default and the DML-exactly-once guarantee
+  (the shared `is_dml_query` guard already downgrades writes to non-ANALYZE
+  EXPLAIN even when ANALYZE is requested, so DML is never re-executed). ANALYZE
+  in the phase re-executes SELECTs once post-measurement — off the timed path —
+  so it costs roughly 1x query time per captured SELECT, paid only when opted in.
+
+prior_art:
+  - "benchbox/platforms/base/execution.py:_capture_plans_post_measurement (~line 1457) — calls run_plan_capture_phase(analyze_plans=False); the single place to thread the opt-in"
+  - "benchbox/core/plan_capture_phase.py:run_plan_capture_phase — already accepts analyze_plans=<bool>; no signature change needed"
+  - "benchbox/platforms/base/result_capture.py:is_dml_query — downgrades DML/write-DDL to non-ANALYZE even when analyze=True, preserving DML-once"
+  - "benchbox/platforms/base/adapter.py:138 — self.analyze_plans = config.get('analyze_plans', True); existing platform-option already parsed"
+  - "benchbox/cli/commands/run.py:2584 — existing --platform-option analyze_plans help text; CLI surface to extend or reuse"
+
+work:
+  - id: w1
+    summary: "Decide the opt-in surface (resolve the gating open_question)"
+    status: pending
+    notes: |
+      Choose between (a) a new dedicated setting `plan_capture_analyze` (default
+      False) decoupled from `analyze_plans`, or (b) reusing the existing
+      `analyze_plans` platform-option to drive the phase. Recommendation: (a) — a
+      new flag keeps the #805 structural-only DEFAULT intact (analyze_plans
+      defaults to True, so reusing it would silently revert #805 to ~1x-cost
+      capture by default). Document the chosen semantics.
+
+  - id: w2
+    summary: "Thread the opt-in through _capture_plans_post_measurement"
+    needs: [w1]
+    status: pending
+    notes: |
+      Pass analyze_plans=<opt-in value> (default False) into run_plan_capture_phase
+      from _capture_plans_post_measurement. No change to run_plan_capture_phase
+      itself (it already supports analyze_plans). Update the helper docstring.
+
+  - id: w3
+    summary: "Wire the opt-in from CLI/config onto the adapter"
+    needs: [w2]
+    status: pending
+    notes: |
+      Register the chosen flag (CLI flag or --platform-option key) in
+      benchbox/cli/commands/run.py and store it on the adapter (alongside the
+      existing plan-capture settings in PlatformAdapter.__init__). Default off.
+
+  - id: w4
+    summary: "Tests: opt-in yields ANALYZE plans; default stays structural; DML still once"
+    needs: [w3]
+    status: pending
+    notes: |
+      DuckDB file-based (extend tests/integration/test_plan_capture_phase.py):
+        - opt-in ON: captured plan for a SELECT carries actual operator
+          timing/cardinality (ANALYZE fields present in the parsed DAG).
+        - opt-in OFF (default): plan is structural-only (no ANALYZE fields) —
+          guards the #805 default.
+        - DML query with opt-in ON: row count unchanged (is_dml_query still
+          downgrades to non-ANALYZE → executed exactly once).
+
+  - id: w5
+    summary: "Docs: document the ANALYZE opt-in and its cost/DML-safety"
+    needs: [w4]
+    status: pending
+    notes: |
+      Update docs/features/query-plan-analysis.md "Capture Isolation
+      (post-measurement phase)" to describe the opt-in: structural-only by
+      default; opt-in re-enables ANALYZE (≈1x query cost per SELECT, paid
+      post-measurement); DML always runs once regardless.
+
+deps:
+  needs:
+    - "query-plan-capture-isolation-phase-design"
+
+must_preserve:
+  - "Structural-only remains the DEFAULT for the phase (the #805 behavior) — the opt-in must be off unless explicitly requested."
+  - "DML/write-DDL runs exactly once even with ANALYZE opted in (is_dml_query downgrade)."
+  - "plan_fingerprint values are unchanged whether or not ANALYZE is used (fingerprint excludes timing/cardinality)."
+  - "Measurement timings are unaffected — ANALYZE re-execution happens only in the post-measurement phase, never on the timed path."
+
+approach: |
+  Smallest viable change: run_plan_capture_phase already accepts analyze_plans, so
+  the work is (1) pick the opt-in surface (prefer a new plan_capture_analyze flag
+  to avoid disturbing the structural-only default), (2) pass it through
+  _capture_plans_post_measurement, (3) parse/store it from the CLI. Lean on the
+  existing is_dml_query guard for DML safety rather than adding new write
+  detection.
+
+anti_patterns:
+  - "DO NOT reuse analyze_plans (default True) as the phase opt-in without care — it would silently revert the #805 structural-only default to ~1x-cost capture for every eligible engine."
+  - "DO NOT add a second DML guard — is_dml_query already downgrades writes even under ANALYZE; reuse it."
+  - "DO NOT move ANALYZE re-execution onto the measurement path — it belongs strictly in the post-measurement phase."
+
+verification:
+  - description: "Opt-in captures ANALYZE stats; default stays structural"
+    command: "uv run -- python -m pytest tests/integration/test_plan_capture_phase.py -k analyze -v"
+    expected_output: "opt-in run shows actual operator timing/cardinality; default run does not; DML row count unchanged"
+  - description: "Existing plan-capture suite still passes"
+    command: "uv run -- python -m pytest tests/integration/test_plan_capture_phase.py tests/integration/test_plan_capture_e2e.py -v"
+    expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/execution.py"
+    - "benchbox/platforms/base/adapter.py"
+    - "benchbox/cli/commands/run.py"
+    - "docs/features/query-plan-analysis.md"
+    - "tests/integration/"
+    - "_project/TODO/main/planning/query-plan-capture-phase-analyze-opt-in.yaml"
+
+success_metrics:
+  - "An explicit opt-in produces ANALYZE plans (actual operator timing/cardinality) for eligible engines via --capture-plans."
+  - "Without the opt-in, the phase remains structural-only (the #805 default)."
+  - "DML queries run exactly once with the opt-in enabled."
+
+open_questions:
+  - question: "Reuse the existing analyze_plans platform-option, or add a dedicated plan_capture_analyze flag?"
+    gating: true
+    affects: ["w1", "w3"]
+    default: "Add a dedicated plan_capture_analyze flag (default False); leaves analyze_plans (default True, used for inline/non-eligible platforms and display) untouched and preserves the #805 structural-only default for the phase."
+
+metadata:
+  tags: [query-plan, capture, analyze, opt-in, ergonomics]
+  estimated_effort: "Small"
+  created_date: "2026-06-15"
+  last_updated: "2026-06-15T00:00:00-04:00"
