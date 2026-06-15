@@ -2,7 +2,7 @@ id: datafusion-tbl-trailing-delimiter-load
 title: "Fix DataFusion adapter ingest of trailing-delimiter TPC .tbl/.dat files"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |
@@ -52,55 +52,67 @@ prior_art:
 work:
   - id: w0
     summary: "Fix the parquet conversion path to handle a trailing delimiter"
-    status: pending
+    status: done
     notes: |
-      In _convert_and_register_parquet / _build_pyarrow_columns / _write_csv_file_to_parquet:
-      detect the trailing delimiter per file with has_trailing_delimiter(path,
-      delimiter, schema_column_names), append TRAILING_DUMMY_COLUMN to the
-      read_options column_names via get_column_names_with_trailing when present, and
-      drop that named column from the Arrow table BEFORE writing Parquet (drop by
-      the named sentinel, never by positional index). Real columns' names, order,
-      types, and row counts must be byte-for-byte unchanged for non-trailing files.
-      Keep the existing streaming (>256 MB) path working - the dummy column must be
-      dropped in both the streaming and read_csv branches.
+      RESOLVED: in _convert_and_register_parquet, detect the trailing delimiter on
+      file_paths[0] with has_trailing_delimiter(path, delimiter, schema_column_names).
+      When present, read with TRAILING_DUMMY_COLUMN appended (via
+      get_column_names_with_trailing) AND set ConvertOptions.include_columns to the
+      real columns - so PyArrow parses the N+1 fields but the output Table contains
+      only the N real columns. Using include_columns (rather than a post-hoc
+      drop_columns) works uniformly for both the read_csv and streaming open_csv
+      branches and needs no PyArrow-version-specific RecordBatch.drop. Non-trailing
+      files use include_columns=[] ("all columns"), so they are unchanged; detection
+      is field-count aware, so TPC-DS .dat with a complete row count is untouched.
+      The trailing branch also disables PyArrow quoting/escaping (quote_char=False),
+      because raw TPC dbgen/dsdgen output is never quoted - so a text field that
+      begins with `"` (or contains a backslash) cannot be parsed as a quote/escape
+      and mis-split the row. Genuinely quoted CSV benchmarks have no trailing
+      delimiter and keep the standard quote_char='"'/escape_char handling. This
+      generalizes the defense the equivalence helper previously applied locally.
 
   - id: w1
     summary: "Fix or explicitly handle the CSV external-table path"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      DataFusion CREATE EXTERNAL TABLE cannot drop a column after the fact, so pick
-      ONE: (a) declare the trailing dummy column in the external-table schema (only
-      when has_trailing_delimiter is true) and expose the table through a view that
-      projects away the dummy, mirroring the existing _create_external_table_union
-      view trick; or (b) route trailing-delimiter .tbl/.dat through the parquet
-      conversion path. Whichever, query results and row counts must be identical to
-      the parquet path. If neither is cleanly feasible, at minimum raise a clear,
-      actionable error instead of silently mis-parsing.
+      RESOLVED: chose option (b). In _load_table_csv, once the schema is known,
+      detect a trailing delimiter (has_trailing_delimiter over the schema column
+      names) and, when present, delegate to _load_table_parquet (which routes to the
+      now-fixed _convert_and_register_parquet). This reuses w0's correct read+project
+      logic instead of duplicating a declare-then-project-away view across both the
+      direct and union CSV sub-paths. Results and row counts are identical; only the
+      storage form (Parquet in the working dir) differs. Well-formed CSVs (no
+      trailing delimiter) keep the CREATE EXTERNAL TABLE path unchanged.
 
   - id: w2
     summary: "Add an integration test loading real TPC-H .tbl via the adapter"
     needs: [w0, w1]
-    status: pending
+    status: done
     notes: |
-      Generate real TPC-H at a tiny SF and load through DataFusionAdapter.load_data
-      for BOTH data_format="parquet" and data_format="csv"; assert per-table row
-      counts match the generator and that the dummy column never appears in a
-      SELECT * schema or in COUNT(*) (no leaked/extra column, no row miscount). This
-      is the regression guard that the bug stays fixed.
+      RESOLVED: tests/integration/platforms/test_datafusion_tbl_load.py generates
+      real TPC-H .tbl at SF=0.01 once (module fixture) and loads via
+      DataFusionAdapter.load_data parametrized over data_format in {parquet, csv}.
+      Asserts every table has >0 rows, that TRAILING_DUMMY_COLUMN never appears in
+      lineitem's information_schema columns, that the real column count is exact
+      (16), and that COUNT(*) matches the reported load stats. Marked slow (it
+      generates data), so it runs in the non-blocking datafusion-integration CI job
+      alongside the equivalence sample (selected via -m "slow").
 
   - id: w3
     summary: "Simplify the third-engine equivalence helper to reuse the adapter"
     needs: [w0, w1, w2]
-    status: pending
+    status: done
     notes: |
-      Replace the hand-rolled PyArrow load in
-      benchbox/core/tpchavoc/equivalence.py:build_datafusion_with_tpch with a call
-      to adapter.load_data (mirroring build_duckdb_with_tpch / build_postgres_with_tpch),
-      removing the private _map_schema_type_to_pyarrow access and the duplicated
-      trailing-delimiter handling. Keep the per-table row-count guard (>0) so a
-      partial load still cannot produce a false green, and keep the DataFusion
-      equivalence sample green (206/206 executable variants, exit 0).
+      RESOLVED: build_datafusion_with_tpch now calls adapter.create_schema +
+      adapter.load_data (mirroring build_duckdb_with_tpch / build_postgres_with_tpch),
+      removing the hand-rolled PyArrow read, the duplicated trailing-delimiter
+      handling, and the private _map_schema_type_to_pyarrow access flagged in the
+      PR #806 review. The deliberate quote_char=False defense the helper applied
+      locally is preserved - it now lives in the adapter's trailing branch (w0), so
+      it covers every TPC load, not just this sample. The per-table row-count guard
+      (>0) is preserved. The DataFusion equivalence sample stays green: 206/206
+      executable variants, exit 0.
 
 must_preserve:
   - "Query results and row counts are unchanged: the trailing dummy column never leaks into a result schema, COUNT(*), or row total."

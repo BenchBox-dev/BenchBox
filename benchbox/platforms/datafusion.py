@@ -36,6 +36,11 @@ from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
 from benchbox.platforms.base.no_constraint_mixin import NoConstraintEnforcementMixin
 from benchbox.utils.clock import elapsed_seconds, mono_time
+from benchbox.utils.file_format import (
+    TRAILING_DUMMY_COLUMN,
+    get_column_names_with_trailing,
+    has_trailing_delimiter,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -878,6 +883,29 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         schema_info = self._table_schemas.get(table_name, {})
         columns = schema_info.get("columns", [])
 
+        # Raw TPC .tbl/.dat files use a field-TERMINATING delimiter (a row of N
+        # values ends with a trailing delimiter, splitting into N+1 fields).
+        # DataFusion's CSV reader has no "ignore trailing delimiter" option and a
+        # fixed CREATE EXTERNAL TABLE schema cannot drop the extra field, so route
+        # such files through the Parquet conversion path, which reads them with a
+        # dummy column and projects it away. Results and row counts are identical;
+        # only the storage form (Parquet in the working dir) differs. Detection is
+        # field-count aware, so well-formed CSVs keep the external-table path.
+        if columns and has_trailing_delimiter(file_paths[0], delimiter, [col["name"] for col in columns]):
+            self.log_verbose(
+                f"{table_name}: trailing-delimiter source detected; loading via Parquet conversion "
+                "(DataFusion CSV external tables cannot drop the extra trailing field)"
+            )
+            return self._load_table_parquet(
+                connection,
+                table_name,
+                file_paths,
+                data_dir,
+                csv_format=csv_format,
+                data_source=data_source,
+                benchmark=benchmark,
+            )
+
         # Build column schema for CREATE EXTERNAL TABLE
         if columns:
             # Use actual column names and types from schema
@@ -1364,13 +1392,46 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
         self.log_very_verbose(f"Converting {len(file_paths)} CSV file(s) to Parquet for {table_name}")
 
+        # Raw TPC .tbl/.dat files use a field-TERMINATING delimiter: a row of N
+        # values ends with a trailing delimiter and so splits into N+1 fields.
+        # When that happens, read with an extra dummy column so PyArrow does not
+        # error on the extra field, and project the output back to just the real
+        # columns via include_columns. Detection is field-count aware (it skips
+        # files like TPC-DS time_dim whose row already has exactly N fields), so a
+        # well-formed file is read unchanged. include_columns=[] means "all
+        # columns", the correct default for the non-trailing case.
+        read_column_names = column_names
+        include_columns: list[str] = []
+        is_trailing = column_names is not None and has_trailing_delimiter(file_paths[0], delimiter, column_names)
+        if is_trailing:
+            read_column_names = get_column_names_with_trailing(column_names, True)
+            include_columns = column_names
+            self.log_very_verbose(
+                f"Detected trailing delimiter for {table_name}; reading with a dummy "
+                f"'{TRAILING_DUMMY_COLUMN}' column and projecting it away"
+            )
+
         read_opts = csv.ReadOptions(
-            column_names=column_names,
-            autogenerate_column_names=(column_names is None and not dialect.has_header),
+            column_names=read_column_names,
+            autogenerate_column_names=(read_column_names is None and not dialect.has_header),
             skip_rows=1 if column_names is not None and dialect.has_header else 0,
         )
-        parse_opts = csv.ParseOptions(delimiter=delimiter, quote_char='"', escape_char="\\")
-        conv_opts = csv.ConvertOptions(null_values=[""], strings_can_be_null=True, column_types=column_types)
+        # A field-terminating trailing delimiter is characteristic of raw TPC
+        # dbgen/dsdgen output, which is NOT quoted or escaped. Disable quoting and
+        # escaping for that case so a text field that legitimately begins with `"`
+        # (or contains a backslash) cannot be parsed as a quote/escape and mis-split
+        # the row. Genuinely quoted CSV benchmarks have no trailing delimiter and so
+        # keep the standard quote_char='"' / escape_char='\\' handling.
+        if is_trailing:
+            parse_opts = csv.ParseOptions(delimiter=delimiter, quote_char=False)
+        else:
+            parse_opts = csv.ParseOptions(delimiter=delimiter, quote_char='"', escape_char="\\")
+        conv_opts = csv.ConvertOptions(
+            null_values=[""],
+            strings_can_be_null=True,
+            column_types=column_types,
+            include_columns=include_columns,
+        )
 
         # writer_ref is a single-slot list so the helper can lazily open the shared writer
         writer_ref: list[Any] = [None]
