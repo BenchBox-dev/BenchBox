@@ -1,0 +1,7 @@
+SELECT l_orderkey, SUM(l_quantity) FROM lineitem JOIN orders ON l_orderkey = o_orderkey GROUP BY l_orderkey ORDER BY l_orderkey
+  |--Sort(ORDER BY:([tpch].[dbo].[lineitem].[l_orderkey] ASC))
+       |--Compute Scalar(DEFINE:([Expr1004]=CONVERT_IMPLICIT(bigint,[Expr1003],0)))
+            |--Hash Match(Aggregate, HASH:([tpch].[dbo].[lineitem].[l_orderkey]) DEFINE:([Expr1003]=SUM([tpch].[dbo].[lineitem].[l_quantity])))
+                 |--Hash Match(Inner Join, HASH:([tpch].[dbo].[lineitem].[l_orderkey])=([tpch].[dbo].[orders].[o_orderkey]))
+                      |--Clustered Index Scan(OBJECT:([tpch].[dbo].[lineitem].[cci_lineitem]))
+                      |--Clustered Index Scan(OBJECT:([tpch].[dbo].[orders].[cci_orders]))

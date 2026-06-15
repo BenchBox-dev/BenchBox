@@ -1,0 +1,53 @@
+[
+  {
+    "id": 0,
+    "name": "S00: Input",
+    "status": "COMPLETE",
+    "records_read": 6001215,
+    "records_written": 6001215,
+    "input_stages": [],
+    "steps": [
+      {"kind": "READ", "substeps": ["$1:l_orderkey, $2:l_quantity", "FROM tpch.lineitem"]},
+      {"kind": "WRITE", "substeps": ["$1, $2", "TO __stage00_output"]}
+    ]
+  },
+  {
+    "id": 1,
+    "name": "S01: Input",
+    "status": "COMPLETE",
+    "records_read": 1500000,
+    "records_written": 1500000,
+    "input_stages": [],
+    "steps": [
+      {"kind": "READ", "substeps": ["$10:o_orderkey", "FROM tpch.orders"]},
+      {"kind": "WRITE", "substeps": ["$10", "TO __stage01_output"]}
+    ]
+  },
+  {
+    "id": 2,
+    "name": "S02: Join+",
+    "status": "COMPLETE",
+    "records_read": 7501215,
+    "records_written": 1500000,
+    "input_stages": [0, 1],
+    "steps": [
+      {"kind": "READ", "substeps": ["$1, $2", "FROM __stage00_output"]},
+      {"kind": "JOIN", "substeps": ["INNER HASH JOIN EACH ON $1 = $10"]},
+      {"kind": "AGGREGATE", "substeps": ["GROUP BY $20 := $1", "$21 := SUM($2)"]},
+      {"kind": "WRITE", "substeps": ["$20, $21", "TO __stage02_output"]}
+    ]
+  },
+  {
+    "id": 3,
+    "name": "S03: Output",
+    "status": "COMPLETE",
+    "records_read": 1500000,
+    "records_written": 1500000,
+    "input_stages": [2],
+    "steps": [
+      {"kind": "READ", "substeps": ["$20, $21", "FROM __stage02_output"]},
+      {"kind": "SORT", "substeps": ["$20 ASC"]},
+      {"kind": "WRITE", "substeps": ["$20, $21", "TO __output"]}
+    ]
+  }
+]

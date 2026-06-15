@@ -192,12 +192,16 @@ def get_parser_registry() -> ParserRegistry:
 
 def _create_default_registry() -> ParserRegistry:
     """Create and populate the default parser registry."""
+    from benchbox.core.query_plans.parsers.azure_synapse import AzureSynapseQueryPlanParser
+    from benchbox.core.query_plans.parsers.bigquery import BigQueryQueryPlanParser
     from benchbox.core.query_plans.parsers.clickhouse import ClickHouseQueryPlanParser
     from benchbox.core.query_plans.parsers.datafusion import DataFusionQueryPlanParser
     from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
+    from benchbox.core.query_plans.parsers.fabric_warehouse import FabricWarehouseQueryPlanParser
     from benchbox.core.query_plans.parsers.postgresql import PostgreSQLQueryPlanParser
     from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
     from benchbox.core.query_plans.parsers.redshift import RedshiftQueryPlanParser
+    from benchbox.core.query_plans.parsers.snowflake import SnowflakeQueryPlanParser
     from benchbox.core.query_plans.parsers.spark import SparkQueryPlanParser
     from benchbox.core.query_plans.parsers.sqlite import SQLiteQueryPlanParser
 
@@ -233,6 +237,23 @@ def _create_default_registry() -> ParserRegistry:
     # Register Spark parser (shared by Spark and Databricks, which runs Spark SQL).
     registry.register("spark", "0.0.0", SparkQueryPlanParser)
     registry.register("databricks", "0.0.0", SparkQueryPlanParser)
+    # LakeSail (Sail) speaks Spark Connect and emits Spark EXPLAIN plans, so it
+    # reuses the Spark parser (see LakeSailAdapter.get_query_plan).
+    registry.register("lakesail", "0.0.0", SparkQueryPlanParser)
+
+    # Register cloud SaaS warehouse parsers.
+    # Snowflake: EXPLAIN USING JSON (GlobalStats + Operations JSON).
+    registry.register("snowflake", "0.0.0", SnowflakeQueryPlanParser)
+    # BigQuery: plan from the completed job's queryPlan statistics (no EXPLAIN);
+    # captured via BigQueryAdapter._capture_bq_plan and parsed from JSON.
+    registry.register("bigquery", "0.0.0", BigQueryQueryPlanParser)
+    # Azure Synapse Dedicated Pool: EXPLAIN -> distributed dsql XML.
+    registry.register("azure_synapse", "0.0.0", AzureSynapseQueryPlanParser)
+    registry.register("synapse", "0.0.0", AzureSynapseQueryPlanParser)  # alias
+    # Fabric Warehouse: SET SHOWPLAN_TEXT -> SQL Server text showplan. Distinct
+    # from Synapse's dsql XML, so it gets its own parser (w6 decision gate).
+    registry.register("fabric_warehouse", "0.0.0", FabricWarehouseQueryPlanParser)
+    registry.register("fabric", "0.0.0", FabricWarehouseQueryPlanParser)  # alias
 
     return registry
 

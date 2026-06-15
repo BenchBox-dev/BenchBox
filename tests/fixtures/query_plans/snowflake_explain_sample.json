@@ -1,0 +1,52 @@
+{
+  "GlobalStats": {
+    "partitionsTotal": 12,
+    "partitionsAssigned": 12,
+    "bytesAssigned": 154386432
+  },
+  "Operations": [
+    [
+      {
+        "id": 0,
+        "operation": "Result",
+        "expressions": ["LINEITEM.L_ORDERKEY", "SUM(LINEITEM.L_QUANTITY)"]
+      },
+      {
+        "id": 1,
+        "parentOperators": [0],
+        "operation": "Sort",
+        "expressions": ["sortKeys: [LINEITEM.L_ORDERKEY ASC NULLS LAST]"]
+      },
+      {
+        "id": 2,
+        "parentOperators": [1],
+        "operation": "Aggregate",
+        "expressions": ["aggExprs: [SUM(LINEITEM.L_QUANTITY)]", "groupKeys: [LINEITEM.L_ORDERKEY]"]
+      },
+      {
+        "id": 3,
+        "parentOperators": [2],
+        "operation": "InnerJoin",
+        "expressions": ["joinKey: (ORDERS.O_ORDERKEY = LINEITEM.L_ORDERKEY)"]
+      },
+      {
+        "id": 4,
+        "parentOperators": [3],
+        "operation": "TableScan",
+        "objects": ["TPCH_SF1.PUBLIC.LINEITEM"],
+        "expressions": ["L_ORDERKEY", "L_QUANTITY"],
+        "partitionsAssigned": 10,
+        "partitionsTotal": 10
+      },
+      {
+        "id": 5,
+        "parentOperators": [3],
+        "operation": "TableScan",
+        "objects": ["TPCH_SF1.PUBLIC.ORDERS"],
+        "expressions": ["O_ORDERKEY"],
+        "partitionsAssigned": 2,
+        "partitionsTotal": 2
+      }
+    ]
+  ]
+}

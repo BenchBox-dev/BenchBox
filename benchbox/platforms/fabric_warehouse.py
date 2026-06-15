@@ -667,7 +667,7 @@ class FabricWarehouseAdapter(PlatformAdapter):
 
             execution_time = elapsed_seconds(start_time)
 
-            return {
+            result_dict = {
                 "query_id": query_id,
                 "stream_id": stream_id,
                 "iteration": iteration,
@@ -690,6 +690,12 @@ class FabricWarehouseAdapter(PlatformAdapter):
             }
         finally:
             cursor.close()
+
+        # Capture the structured query plan outside the try/except so a strict-mode
+        # PlanCaptureError propagates instead of being mislabeled as a failed query.
+        # No-op (no SHOWPLAN issued) when capture_plans is False.
+        self._merge_plan_capture_into_result(result_dict, connection, query, str(query_id))
+        return result_dict
 
     def get_existing_tables(self, connection: Any) -> list[str]:
         """Get list of existing tables in the schema.
@@ -1097,6 +1103,18 @@ class FabricWarehouseAdapter(PlatformAdapter):
             return f"Failed to get query plan: {e}"
         finally:
             cursor.close()
+
+    def get_query_plan_parser(self):
+        """Return the Fabric Warehouse (SQL Server SHOWPLAN_TEXT) query plan parser.
+
+        Fabric Warehouse retrieves its plan via ``SET SHOWPLAN_TEXT`` (text
+        showplan), a different format from Azure Synapse Dedicated Pool's
+        distributed dsql XML, so it uses a dedicated parser rather than reusing
+        AzureSynapseQueryPlanParser (see the w6 decision gate).
+        """
+        from benchbox.core.query_plans.parsers.fabric_warehouse import FabricWarehouseQueryPlanParser
+
+        return FabricWarehouseQueryPlanParser()
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Update table statistics.

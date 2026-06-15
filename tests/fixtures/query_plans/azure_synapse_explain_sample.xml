@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<dsql_query number_nodes="1" number_distributions="60" number_distributions_per_node="60">
+  <sql>SELECT l_orderkey, SUM(l_quantity) FROM lineitem JOIN orders ON l_orderkey = o_orderkey GROUP BY l_orderkey ORDER BY l_orderkey</sql>
+  <dsql_operations total_cost="2.345" total_number_operations="4">
+    <dsql_operation operation_type="RND_ID">
+      <identifier>TEMP_ID_42</identifier>
+    </dsql_operation>
+    <dsql_operation operation_type="ON">
+      <location permanent="false" distribution="AllDistributions" />
+      <sql_operations>
+        <sql_operation type="statement">CREATE TABLE [tempdb].[dbo].[TEMP_ID_42] WITH (DISTRIBUTION = HASH([l_orderkey]), HEAP) AS SELECT [l_orderkey], [l_quantity] FROM [tpch].[dbo].[lineitem]</sql_operation>
+      </sql_operations>
+    </dsql_operation>
+    <dsql_operation operation_type="SHUFFLE_MOVE">
+      <operation_cost cost="2.0" accumulative_cost="2.0" average_rowsize="16" output_rows="1500000" />
+      <location distribution="AllDistributions" />
+      <source_statement>SELECT [l_orderkey], [l_quantity] FROM [tpch].[dbo].[lineitem]</source_statement>
+      <destination_table>TEMP_ID_42</destination_table>
+      <shuffle_columns>l_orderkey;</shuffle_columns>
+    </dsql_operation>
+    <dsql_operation operation_type="RETURN">
+      <location distribution="AllDistributions" />
+      <select>SELECT [l_orderkey], SUM([l_quantity]) FROM [tempdb].[dbo].[TEMP_ID_42] GROUP BY [l_orderkey] ORDER BY [l_orderkey]</select>
+    </dsql_operation>
+  </dsql_operations>
+</dsql_query>

@@ -1217,8 +1217,6 @@ class SnowflakeAdapter(PlatformAdapter):
                 self.log_verbose(f"Query {query_id} completed: {actual_row_count} rows in {execution_time:.3f}s")
                 self.log_operation_complete("Snowflake query execution", query_id, f"returned {actual_row_count} rows")
 
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             self.log_verbose(f"Query {query_id} failed after {execution_time:.3f}s: {e}")
@@ -1234,6 +1232,40 @@ class SnowflakeAdapter(PlatformAdapter):
             }
         finally:
             cursor.close()
+
+        # Capture the structured query plan outside the try/except so a strict-mode
+        # PlanCaptureError propagates instead of being mislabeled as a failed query.
+        # The helper is a no-op when capture_plans is False (no extra EXPLAIN issued).
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
+        return result_dict
+
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Return the Snowflake query plan as JSON via ``EXPLAIN USING JSON``.
+
+        Snowflake has no plain text EXPLAIN suitable for structured parsing;
+        ``EXPLAIN USING JSON`` returns a single-cell JSON document describing the
+        plan (``GlobalStats`` + ``Operations``) which SnowflakeQueryPlanParser
+        consumes. Returns None on failure so capture degrades gracefully.
+        """
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"EXPLAIN USING JSON {query}")
+            rows = cursor.fetchall()
+            if not rows or not rows[0]:
+                return None
+            # The JSON document is returned in the first column of the first row.
+            return str(rows[0][0])
+        except Exception as e:
+            self.logger.debug(f"Failed to get Snowflake query plan: {e}")
+            return None
+        finally:
+            cursor.close()
+
+    def get_query_plan_parser(self):
+        """Return the Snowflake query plan parser."""
+        from benchbox.core.query_plans.parsers.snowflake import SnowflakeQueryPlanParser
+
+        return SnowflakeQueryPlanParser()
 
     def _optimize_table_definition(self, statement: str) -> str:
         """Optimize table definition for Snowflake.

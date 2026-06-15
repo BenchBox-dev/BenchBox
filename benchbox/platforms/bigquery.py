@@ -11,11 +11,15 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import argparse
+import json
 import logging
+import random
+import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from benchbox.core.errors import PlanCaptureError
 from benchbox.platforms.base.config_utils import make_registered_platform_config_builder
 from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -1552,8 +1556,24 @@ class BigQueryAdapter(PlatformAdapter):
             # Map job_statistics to resource_usage for cost calculation
             result_dict["resource_usage"] = job_stats
 
+            # Capture the structured query plan from the already-completed job's
+            # statistics (no extra API call / EXPLAIN, no extra billing). This is
+            # the BigQuery-specific path: plans are not available pre-execution, so
+            # the base EXPLAIN-driven capture_query_plan() is bypassed entirely.
+            if self.capture_plans and result_dict.get("status") == "SUCCESS":
+                query_plan, plan_capture_time_ms = self._capture_bq_plan(query_job, query_id)
+                if query_plan:
+                    result_dict["query_plan"] = query_plan
+                    result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
+                if plan_capture_time_ms is not None:
+                    result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+
             return result_dict
 
+        except PlanCaptureError:
+            # Strict-mode plan-capture failure must propagate, not be mislabeled
+            # as a failed query.
+            raise
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
 
@@ -1565,6 +1585,119 @@ class BigQueryAdapter(PlatformAdapter):
                 "error": str(e),
                 "error_type": type(e).__name__,
             }
+
+    def _capture_bq_plan(self, job: Any, query_id: str) -> tuple[Any, float]:
+        """Build a QueryPlanDAG from a completed BigQuery job's plan statistics.
+
+        BigQuery exposes no EXPLAIN statement; the query plan is only available
+        after execution via ``job.query_plan`` (the queryPlan job statistics),
+        which is already resident on the completed ``QueryJob`` — reading it
+        incurs no additional API call and no additional billing.
+
+        Honors the same capture gating as the base ``capture_query_plan`` (query
+        filter, first-N, sampling) and records failures via
+        ``_record_plan_capture_failure`` so capture stays silent when
+        ``strict_plan_capture`` is False and raises ``PlanCaptureError`` when it
+        is True.
+
+        Args:
+            job: Completed ``google.cloud.bigquery.QueryJob``.
+            query_id: Query identifier.
+
+        Returns:
+            Tuple of (QueryPlanDAG | None, capture_time_ms).
+        """
+        # Apply the same query/sampling filters as the base capture path.
+        if self.plan_query_filter and query_id not in self.plan_query_filter:
+            return None, 0.0
+        if self.plan_first_n is not None:
+            iteration = self._plan_capture_iteration_counts.get(query_id, 0)
+            self._plan_capture_iteration_counts[query_id] = iteration + 1
+            if iteration >= self.plan_first_n:
+                return None, 0.0
+        if self.plan_sampling_rate is not None and random.random() > self.plan_sampling_rate:
+            return None, 0.0
+
+        start_time = time.perf_counter()
+
+        raw_plan = self._serialize_bq_query_plan(job)
+        if not raw_plan:
+            capture_time_ms = (time.perf_counter() - start_time) * 1000
+            self._record_plan_capture_failure(
+                query_id,
+                reason="explain_failed",
+                message="Completed job exposed no query_plan statistics",
+            )
+            return None, capture_time_ms
+
+        parser = self.get_query_plan_parser()
+        if not parser:
+            capture_time_ms = (time.perf_counter() - start_time) * 1000
+            self._record_plan_capture_failure(
+                query_id,
+                reason="parser_unavailable",
+                message="No parser available for bigquery",
+                log_warning=False,
+            )
+            return None, capture_time_ms
+
+        try:
+            plan = parser.parse_explain_output(query_id, raw_plan)
+        except PlanCaptureError:
+            raise
+        except Exception as exc:
+            capture_time_ms = (time.perf_counter() - start_time) * 1000
+            self._record_plan_capture_failure(query_id, reason="parse_error", message=str(exc))
+            return None, capture_time_ms
+
+        if plan is None:
+            capture_time_ms = (time.perf_counter() - start_time) * 1000
+            self._record_plan_capture_failure(query_id, reason="parse_error", message="Parser returned no plan")
+            return None, capture_time_ms
+
+        capture_time_ms = (time.perf_counter() - start_time) * 1000
+        self.query_plans_captured += 1
+        return plan, capture_time_ms
+
+    @staticmethod
+    def _serialize_bq_query_plan(job: Any) -> str | None:
+        """Serialize ``job.query_plan`` (list of QueryPlanEntry) to a JSON string.
+
+        Returns None when the job carries no plan stages. Reads only attributes
+        already present on the completed job object; issues no API call.
+        """
+        entries = getattr(job, "query_plan", None)
+        if not entries:
+            return None
+
+        stages: list[dict[str, Any]] = []
+        for index, entry in enumerate(entries):
+            steps = []
+            for step in getattr(entry, "steps", None) or []:
+                steps.append(
+                    {
+                        "kind": getattr(step, "kind", None),
+                        "substeps": list(getattr(step, "substeps", None) or []),
+                    }
+                )
+            stage_id = getattr(entry, "entry_id", None)
+            if stage_id is None:
+                stage_id = index
+            stages.append(
+                {
+                    "id": stage_id,
+                    "name": getattr(entry, "name", None),
+                    "status": getattr(entry, "status", None),
+                    "records_read": getattr(entry, "records_read", None),
+                    "records_written": getattr(entry, "records_written", None),
+                    "input_stages": list(getattr(entry, "input_stages", None) or []),
+                    "steps": steps,
+                }
+            )
+
+        if not stages:
+            return None
+        return json.dumps(stages)
 
     def _convert_to_bigquery_table(self, statement: str) -> str:
         """Convert CREATE TABLE statement to BigQuery format.
@@ -1730,6 +1863,18 @@ class BigQueryAdapter(PlatformAdapter):
 
         except Exception as e:
             return {"error": str(e)}
+
+    def get_query_plan_parser(self):
+        """Return the BigQuery query plan parser.
+
+        Note: BigQuery's plan capture does NOT use the base EXPLAIN-driven
+        ``capture_query_plan()`` path (there is no EXPLAIN statement). The plan is
+        captured from the completed job by ``_capture_bq_plan()``, which calls this
+        parser directly with the JSON-serialized ``job.query_plan`` statistics.
+        """
+        from benchbox.core.query_plans.parsers.bigquery import BigQueryQueryPlanParser
+
+        return BigQueryQueryPlanParser()
 
     def close_connection(self, connection: Any) -> None:
         """Close BigQuery connection.
