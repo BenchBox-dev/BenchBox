@@ -65,9 +65,8 @@ class PlanCapturePhaseResult:
 
 def _normalize_queries(queries: Mapping[str, str] | Iterable[tuple[str, str]]) -> list[tuple[str, str]]:
     """Coerce the queries argument into an ordered list of ``(query_id, sql)``."""
-    if isinstance(queries, Mapping):
-        return list(queries.items())
-    return [(str(qid), sql) for qid, sql in queries]
+    pairs: Iterable[tuple[str, str]] = queries.items() if isinstance(queries, Mapping) else queries
+    return [(str(query_id), str(sql)) for query_id, sql in pairs]
 
 
 def run_plan_capture_phase(
@@ -78,6 +77,7 @@ def run_plan_capture_phase(
     connection_config: Mapping[str, Any] | None = None,
     analyze_plans: bool = False,
     close_connection: bool | None = None,
+    respect_sampling_filters: bool = False,
 ) -> PlanCapturePhaseResult:
     """Capture query plans in an isolated phase, decoupled from measurement.
 
@@ -93,7 +93,9 @@ def run_plan_capture_phase(
         connection: An existing connection to capture against. When ``None``
             (default), a fresh connection is opened via
             ``adapter.create_connection(**connection_config)`` — the isolation
-            default that avoids contaminating measurement state.
+            default that avoids contaminating measurement state. The integrated
+            run orchestrator passes the measurement connection here instead, so
+            embedded in-memory engines still see the loaded data.
         connection_config: kwargs forwarded to ``create_connection()`` when a
             fresh connection is opened. Ignored if ``connection`` is provided.
         analyze_plans: Whether the phase should run ANALYZE-based EXPLAIN.
@@ -102,6 +104,12 @@ def run_plan_capture_phase(
         close_connection: Whether to close the connection when done. Defaults to
             ``True`` when this function opened the connection and ``False`` when
             the caller supplied one.
+        respect_sampling_filters: When ``False`` (default) the explicit query
+            list is treated as the selection and the measurement-phase sampling
+            filters (``plan_first_n``, ``plan_sampling_rate``) are bypassed so
+            each query is captured exactly once. When ``True`` those filters are
+            left in place — used by the integrated per-iteration run path so
+            ``--plan-first-n`` / ``--plan-sampling-rate`` keep their meaning.
 
     Returns:
         A :class:`PlanCapturePhaseResult` with plans, fingerprints, and timing.
@@ -129,10 +137,11 @@ def run_plan_capture_phase(
 
         adapter.analyze_plans = analyze_plans
         adapter.capture_plans = True
-        # The explicit query list is the selection for this phase; bypass the
-        # measurement-phase sampling filters so each query is captured once.
-        adapter.plan_first_n = None
-        adapter.plan_sampling_rate = None
+        if not respect_sampling_filters:
+            # The explicit query list is the selection for this phase; bypass the
+            # measurement-phase sampling filters so each query is captured once.
+            adapter.plan_first_n = None
+            adapter.plan_sampling_rate = None
 
         for query_id, sql in items:
             plan, capture_ms = adapter.capture_query_plan(connection, sql, query_id)

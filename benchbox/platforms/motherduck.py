@@ -88,6 +88,7 @@ class MotherDuckAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
+    plan_capture_phase_eligible = True
 
     def __init__(self, **config):
         """Initialize MotherDuck adapter.

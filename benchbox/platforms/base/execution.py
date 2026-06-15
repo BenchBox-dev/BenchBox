@@ -1376,6 +1376,20 @@ class TestDriversMixin:
         if hasattr(signal, "SIGTERM"):
             original_sigterm = signal.signal(signal.SIGTERM, signal_handler)
 
+        # Isolated plan-capture phase: for eligible EXPLAIN-based engines, suppress
+        # inline capture during the timed loop and capture all plans in a single
+        # post-measurement pass (see _capture_plans_post_measurement). This keeps
+        # EXPLAIN off the measurement path entirely. Side-effect-capture platforms
+        # (BigQuery/Spark) keep inline capture (plan_capture_phase_eligible=False).
+        phase_eligible = (
+            bool(getattr(self, "capture_plans", False))
+            and getattr(self, "plan_capture_phase_eligible", False)
+            and not getattr(self, "dry_run_mode", False)
+        )
+        saved_capture_plans = getattr(self, "capture_plans", False)
+        if phase_eligible:
+            self.capture_plans = False
+
         try:
             console.print(
                 f"[cyan]Running {total_queries} {benchmark_name} queries. Press Ctrl+C to cancel (will stop after current query).[/cyan]"
@@ -1422,10 +1436,61 @@ class TestDriversMixin:
             signal.signal(signal.SIGINT, original_sigint)
             if hasattr(signal, "SIGTERM") and original_sigterm is not None:
                 signal.signal(signal.SIGTERM, original_sigterm)
+            if phase_eligible:
+                self.capture_plans = saved_capture_plans
+
+        if phase_eligible:
+            self._capture_plans_post_measurement(connection, queries, results)
 
         self._log_execution_summary(results, total_queries, cancelled)
 
         return results
+
+    def _capture_plans_post_measurement(
+        self,
+        connection: Any,
+        queries: dict[str, str],
+        results: list[dict[str, Any]],
+    ) -> None:
+        """Capture query plans in an isolated pass after the timed loop.
+
+        Runs ``run_plan_capture_phase`` for the successfully-executed queries on
+        the *measurement* connection, strictly after all timed queries have run,
+        then merges ``query_plan`` / ``plan_fingerprint`` / ``plan_capture_time_ms``
+        into the matching result dicts.
+
+        The measurement connection is reused (rather than a fresh one) so embedded
+        in-memory engines still see the loaded data; isolation comes from running
+        post-measurement, not from a separate connection. Capture is structural
+        only (``analyze_plans=False``), so DML is never re-executed. The
+        measurement-phase sampling filters (``plan_first_n`` /
+        ``plan_sampling_rate`` / ``plan_query_filter``) are still honoured.
+        """
+        from benchbox.core.plan_capture_phase import run_plan_capture_phase
+
+        success_queries = {
+            result["query_id"]: queries[result["query_id"]]
+            for result in results
+            if result.get("status") == "SUCCESS" and result.get("query_id") in queries
+        }
+        if not success_queries:
+            return
+
+        phase = run_plan_capture_phase(
+            self,
+            success_queries,
+            connection=connection,
+            respect_sampling_filters=True,
+        )
+
+        for result in results:
+            query_id = result.get("query_id")
+            plan = phase.plans.get(query_id)
+            if plan is not None:
+                result["query_plan"] = plan
+                result["plan_fingerprint"] = phase.fingerprints.get(query_id)
+            if query_id in phase.per_query_capture_ms:
+                result["plan_capture_time_ms"] = phase.per_query_capture_ms[query_id]
 
     # -------------------------------------------------------------------------
     # Dry-run and SQL capture helpers (extracted w9)

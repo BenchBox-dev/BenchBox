@@ -115,6 +115,7 @@ class SQLiteAdapter(PlatformAdapter):
     """SQLite platform adapter for testing and lightweight usage."""
 
     driver_isolation_capability = DriverIsolationCapability.NOT_APPLICABLE
+    plan_capture_phase_eligible = True
 
     @property
     def platform_name(self) -> str:

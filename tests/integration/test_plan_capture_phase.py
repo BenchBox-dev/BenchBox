@@ -122,3 +122,88 @@ def test_capture_phase_reuses_supplied_connection(file_adapter):
         assert conn.execute("SELECT COUNT(*) FROM t").fetchall()[0][0] == 3
     finally:
         conn.close()
+
+
+class _FakeBenchmark:
+    """Minimal benchmark exposing get_queries() for _execute_all_queries."""
+
+    scale_factor = 1.0
+
+    def __init__(self, queries: dict[str, str]):
+        self._queries = queries
+
+    def get_queries(self) -> dict[str, str]:
+        return dict(self._queries)
+
+
+class TestIntegratedCapturePhase:
+    """The generic run pipeline (_execute_all_queries) drives the isolated phase.
+
+    These exercise the wiring end-to-end: inline capture is suppressed during the
+    timed loop for phase-eligible adapters, and plans are captured in a single
+    post-measurement pass and merged into the result dicts.
+    """
+
+    def test_eligible_adapter_populates_fingerprints_via_phase(self, file_adapter):
+        _seed_table(file_adapter)
+        conn = file_adapter.create_connection()
+        try:
+            benchmark = _FakeBenchmark(
+                {
+                    "q_select": "SELECT id, val FROM t ORDER BY id",
+                    "q_agg": "SELECT SUM(val) FROM t",
+                }
+            )
+            results = file_adapter._execute_all_queries(benchmark, conn, {"benchmark_name": "generic"})
+
+            assert {r["query_id"] for r in results} == {"q_select", "q_agg"}
+            for result in results:
+                assert result["status"] == "SUCCESS"
+                assert result.get("plan_fingerprint"), f"no fingerprint for {result['query_id']}"
+                assert "plan_capture_time_ms" in result
+            # The suppression toggle must be restored after the run.
+            assert file_adapter.capture_plans is True
+        finally:
+            conn.close()
+
+    def test_inline_capture_suppressed_during_measurement(self, file_adapter, monkeypatch):
+        """Inline capture must be OFF during the timed loop; the phase fills plans after."""
+        _seed_table(file_adapter)
+        conn = file_adapter.create_connection()
+
+        seen_capture_plans: list[bool] = []
+        original = file_adapter._merge_plan_capture_into_result
+
+        def _spy(result, connection, query, query_id):
+            # Record the flag the inline path checks at call time.
+            seen_capture_plans.append(file_adapter.capture_plans)
+            return original(result, connection, query, query_id)
+
+        monkeypatch.setattr(file_adapter, "_merge_plan_capture_into_result", _spy)
+
+        try:
+            benchmark = _FakeBenchmark({"q_select": "SELECT * FROM t"})
+            results = file_adapter._execute_all_queries(benchmark, conn, {"benchmark_name": "generic"})
+
+            # Inline path saw capture_plans=False for every timed query (suppressed)...
+            assert seen_capture_plans == [False]
+            # ...yet the plan was still captured by the post-measurement phase.
+            assert results[0].get("plan_fingerprint")
+        finally:
+            conn.close()
+
+    def test_dml_executed_exactly_once(self, file_adapter):
+        """A DML query runs once during measurement; the phase must not re-execute it."""
+        _seed_table(file_adapter)
+        conn = file_adapter.create_connection()
+        try:
+            before = conn.execute("SELECT COUNT(*) FROM t").fetchall()[0][0]
+            benchmark = _FakeBenchmark({"q_insert": "INSERT INTO t VALUES (4, 40)"})
+            results = file_adapter._execute_all_queries(benchmark, conn, {"benchmark_name": "generic"})
+
+            after = conn.execute("SELECT COUNT(*) FROM t").fetchall()[0][0]
+            assert after == before + 1, "DML must run exactly once (phase must not re-execute it)"
+            # The structural plan is still captured for the DML statement.
+            assert results[0].get("plan_fingerprint")
+        finally:
+            conn.close()

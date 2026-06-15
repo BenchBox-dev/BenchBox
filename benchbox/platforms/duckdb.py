@@ -480,6 +480,7 @@ class DuckDBAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.SUPPORTED
     supports_external_tables = True
+    plan_capture_phase_eligible = True
 
     @property
     def platform_name(self) -> str:

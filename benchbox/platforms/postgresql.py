@@ -253,6 +253,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
     """
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
+    plan_capture_phase_eligible = True
 
     @property
     def platform_name(self) -> str:
