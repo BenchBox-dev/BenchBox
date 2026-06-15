@@ -1,0 +1,141 @@
+id: datafusion-tbl-trailing-delimiter-load
+title: "Fix DataFusion adapter ingest of trailing-delimiter TPC .tbl/.dat files"
+worktree: main
+priority: Medium
+status: Not Started
+category: Platform Expansion
+
+description: |
+  DataFusionAdapter.load_data cannot ingest raw TPC-H .tbl (or TPC-DS .dat) data
+  files that carry a field-TERMINATING trailing delimiter - the format dbgen/dsdgen
+  emit by default, where a row of N values ends with a trailing `|` and so splits
+  into N+1 fields. BOTH of the adapter's load paths fail on it:
+
+    - Parquet path (the default, data_format="parquet"): _build_pyarrow_columns
+      returns the N schema column names; _write_csv_file_to_parquet then calls
+      pyarrow.csv.read_csv with column_names=<N names>, and the trailing pipe makes
+      PyArrow see N+1 fields, raising `ArrowInvalid: CSV parse error: Expected N
+      columns, got N+1` (observed on customer.tbl: "Expected 8 columns, got 9").
+    - CSV external-table path (data_format="csv"): _load_table_csv builds a
+      CREATE EXTERNAL TABLE with an N-column schema and relies on DataFusion's CSV
+      reader, which "doesn't have a direct 'ignore trailing delimiter' option"
+      (the adapter's own comment, ~benchbox/platforms/datafusion.py:923), so the
+      extra field shifts/!breaks parsing.
+
+  This was hit directly while building the third-engine TPC-Havoc equivalence
+  sample (PR #806). Because the adapter was out of that change's scope, the sample
+  had to HAND-ROLL a PyArrow load in
+  benchbox/core/tpchavoc/equivalence.py:build_datafusion_with_tpch (reading the
+  .tbl with the shared trailing-delimiter helpers, dropping the dummy column, and
+  registering Arrow batches) and reach into the private
+  DataFusionAdapter._map_schema_type_to_pyarrow - a workaround the PR review
+  flagged (reuse / private-access / load-fidelity-drift). Fixing the adapter lets
+  that workaround be removed and lets ANY real DataFusion .tbl/.dat ingest work.
+
+  The correct fix already exists and is used by the OTHER adapters: the shared
+  helpers benchbox/utils/file_format.has_trailing_delimiter +
+  get_column_names_with_trailing + the TRAILING_DUMMY_COLUMN sentinel. The
+  COPY/CTAS loaders in benchbox/platforms/base/data_loading.py (~lines 1083 and
+  1168) detect the trailing delimiter per file and append a dummy column for the
+  extra field; the DataFusion adapter is the one that skips this step. Critically,
+  has_trailing_delimiter is field-count-aware (it returns False for TPC-DS
+  time_dim where dsdgen emits exactly N values with a terminating delimiter), so
+  the fix must NOT blindly append a dummy column to every file.
+
+prior_art:
+  - "benchbox/platforms/datafusion.py:_build_pyarrow_columns (~1257), _convert_and_register_parquet (~1331), _write_csv_file_to_parquet (~1276) - the parquet path that reads CSV with the bare schema column count and errors on the trailing field."
+  - "benchbox/platforms/datafusion.py:_load_table_csv (~845) and its comment (~923) - the CREATE EXTERNAL TABLE path with no ignore-trailing-delimiter handling."
+  - "benchbox/utils/file_format.py:has_trailing_delimiter (404), get_column_names_with_trailing (468), TRAILING_DUMMY_COLUMN (401) - the field-count-aware detection + dummy-column helpers to reuse."
+  - "benchbox/platforms/base/data_loading.py (~1083, ~1168) - the reference pattern: other adapters detect trailing delimiter per file and add the dummy column."
+  - "benchbox/core/tpchavoc/equivalence.py:build_datafusion_with_tpch - the in-scope hand-rolled workaround (PR #806) to delete once the adapter is fixed; it is the canonical example of the correct read+drop sequence."
+
+work:
+  - id: w0
+    summary: "Fix the parquet conversion path to handle a trailing delimiter"
+    status: pending
+    notes: |
+      In _convert_and_register_parquet / _build_pyarrow_columns / _write_csv_file_to_parquet:
+      detect the trailing delimiter per file with has_trailing_delimiter(path,
+      delimiter, schema_column_names), append TRAILING_DUMMY_COLUMN to the
+      read_options column_names via get_column_names_with_trailing when present, and
+      drop that named column from the Arrow table BEFORE writing Parquet (drop by
+      the named sentinel, never by positional index). Real columns' names, order,
+      types, and row counts must be byte-for-byte unchanged for non-trailing files.
+      Keep the existing streaming (>256 MB) path working - the dummy column must be
+      dropped in both the streaming and read_csv branches.
+
+  - id: w1
+    summary: "Fix or explicitly handle the CSV external-table path"
+    needs: [w0]
+    status: pending
+    notes: |
+      DataFusion CREATE EXTERNAL TABLE cannot drop a column after the fact, so pick
+      ONE: (a) declare the trailing dummy column in the external-table schema (only
+      when has_trailing_delimiter is true) and expose the table through a view that
+      projects away the dummy, mirroring the existing _create_external_table_union
+      view trick; or (b) route trailing-delimiter .tbl/.dat through the parquet
+      conversion path. Whichever, query results and row counts must be identical to
+      the parquet path. If neither is cleanly feasible, at minimum raise a clear,
+      actionable error instead of silently mis-parsing.
+
+  - id: w2
+    summary: "Add an integration test loading real TPC-H .tbl via the adapter"
+    needs: [w0, w1]
+    status: pending
+    notes: |
+      Generate real TPC-H at a tiny SF and load through DataFusionAdapter.load_data
+      for BOTH data_format="parquet" and data_format="csv"; assert per-table row
+      counts match the generator and that the dummy column never appears in a
+      SELECT * schema or in COUNT(*) (no leaked/extra column, no row miscount). This
+      is the regression guard that the bug stays fixed.
+
+  - id: w3
+    summary: "Simplify the third-engine equivalence helper to reuse the adapter"
+    needs: [w0, w1, w2]
+    status: pending
+    notes: |
+      Replace the hand-rolled PyArrow load in
+      benchbox/core/tpchavoc/equivalence.py:build_datafusion_with_tpch with a call
+      to adapter.load_data (mirroring build_duckdb_with_tpch / build_postgres_with_tpch),
+      removing the private _map_schema_type_to_pyarrow access and the duplicated
+      trailing-delimiter handling. Keep the per-table row-count guard (>0) so a
+      partial load still cannot produce a false green, and keep the DataFusion
+      equivalence sample green (206/206 executable variants, exit 0).
+
+must_preserve:
+  - "Query results and row counts are unchanged: the trailing dummy column never leaks into a result schema, COUNT(*), or row total."
+  - "Non-trailing files (e.g. TPC-DS time_dim, where field count already equals the schema) are not regressed - rely on has_trailing_delimiter's field-count awareness, never a blind append."
+  - "The DataFusion TPC-Havoc equivalence sample stays green (206/206, DATAFUSION_KNOWN_DIVERGENCES empty)."
+  - "No on-disk rewriting of source data files; handle the trailing delimiter at read time only."
+
+anti_patterns:
+  - "DO NOT strip the trailing delimiter by rewriting the .tbl/.dat files on disk - handle it at read/registration time."
+  - "DO NOT blindly append a dummy column to every file - use has_trailing_delimiter (field-count aware) so TPC-DS .dat with a terminating-but-complete row count is untouched."
+  - "DO NOT drop the dummy column by positional index - drop it by the named TRAILING_DUMMY_COLUMN sentinel so a schema/order change cannot drop a real column."
+  - "DO NOT fork yet another trailing-delimiter implementation - reuse benchbox/utils/file_format helpers like the other adapters do."
+
+verification:
+  - description: "Real TPC-H .tbl loads through the adapter on both formats with correct row counts"
+    command: "uv run -- python -m pytest tests/integration -k datafusion_tbl_load -n 0"
+    expected_output: "row counts match the generator; no dummy column in result schemas; passes for parquet and csv"
+  - description: "The third-engine equivalence sample still passes after the helper is simplified to reuse the adapter"
+    command: "make tpchavoc-equivalence-report-datafusion"
+    expected_output: "checked 206 variants - 0 divergent, 206 equivalent; exit 0"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/datafusion.py"
+    - "benchbox/core/tpchavoc/"
+    - "tests/integration/"
+    - "_project/TODO/"
+
+success_metrics:
+  - "DataFusionAdapter.load_data ingests raw trailing-delimiter TPC-H .tbl (and TPC-DS .dat) files for both data_format=parquet and data_format=csv."
+  - "A regression test asserts correct row counts and no leaked dummy column."
+  - "benchbox/core/tpchavoc/equivalence.py:build_datafusion_with_tpch reuses adapter.load_data with the hand-rolled PyArrow load and private-method access removed, and the equivalence sample stays 206/206."
+
+metadata:
+  tags: [datafusion, data-loading, tpch, tpcds, platform, tech-debt]
+  estimated_effort: "Small"
+  created_date: "2026-06-15"
+  last_updated: "2026-06-15T00:00:00"
