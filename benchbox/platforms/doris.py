@@ -947,10 +947,48 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
 
     def _explain_query_prefix(self, explain_options: dict[str, Any] | None = None) -> str:
         verbose = explain_options.get("verbose", False) if explain_options else False
-        return "EXPLAIN VERBOSE" if verbose else "EXPLAIN"
+        # SHAPE PLAN (Nereids planner) emits a stable dash-indented Physical*
+        # operator tree that DorisQueryPlanParser consumes; it is preferred over
+        # the fragment-oriented default EXPLAIN for structured plan capture.
+        return "EXPLAIN VERBOSE" if verbose else "EXPLAIN SHAPE PLAN"
 
     def _format_query_plan_rows(self, rows: Any) -> str:
         return "\n".join(str(row[0]) for row in rows)
+
+    def get_query_plan_parser(self):
+        """Get the Doris query plan parser."""
+        from benchbox.core.query_plans.parsers.doris import DorisQueryPlanParser
+
+        return DorisQueryPlanParser()
+
+    def execute_query(
+        self,
+        connection: Any,
+        query: str,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Execute a query and capture its structured plan when enabled.
+
+        Delegates execution to the shared MySQL-wire path, then merges plan
+        capture (SUCCESS-guarded; no EXPLAIN issued when capture_plans is off).
+        Kept outside the execution path so a strict_plan_capture PlanCaptureError
+        propagates rather than being mislabeled as a failed query.
+        """
+        result = super().execute_query(
+            connection,
+            query,
+            query_id,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
+        return result
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get Doris platform information."""

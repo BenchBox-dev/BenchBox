@@ -1204,7 +1204,7 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
     ) -> dict[str, Any]:
         """Execute a single query and return detailed results."""
         query = _rewriter_rewrite(query)
-        return execute_sql_query(
+        result = execute_sql_query(
             connection,
             query,
             query_id,
@@ -1216,6 +1216,13 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
             stream_id=stream_id,
         )
 
+        # Capture and merge the structured query plan (SUCCESS-guarded in the
+        # helper; no EXPLAIN issued when capture_plans is off). The rewriter is
+        # idempotent, so re-rewriting inside get_query_plan is safe.
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
+
+        return result
+
     def get_query_plan(
         self,
         connection: Any,
@@ -1225,7 +1232,10 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         """Get query execution plan using EXPLAIN.
 
         QuestDB supports EXPLAIN for query plans but with fewer options
-        than standard PostgreSQL.
+        than standard PostgreSQL. The plan is returned as a ``QUERY PLAN`` text
+        column (one row per line). On failure returns an error string (which the
+        plan-capture parser rejects via its error-sentinel guard, so capture
+        degrades silently rather than fabricating a plan).
         """
         query = _rewriter_rewrite(query)
         cursor = connection.cursor()
@@ -1237,11 +1247,17 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
             plan_rows = cursor.fetchall()
             cursor.close()
 
-            return "\n".join(row[0] for row in plan_rows)
+            return "\n".join(str(row[0]) for row in plan_rows)
 
         except Exception as e:
             cursor.close()
             return f"Failed to get query plan: {e}"
+
+    def get_query_plan_parser(self):
+        """Get the QuestDB query plan parser."""
+        from benchbox.core.query_plans.parsers.questdb import QuestDBQueryPlanParser
+
+        return QuestDBQueryPlanParser()
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get QuestDB platform information."""
