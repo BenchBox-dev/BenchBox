@@ -173,6 +173,21 @@ class TestPostgreSQLPlanCapture:
         assert "BUFFERS" in call_args.upper()
         assert "FORMAT JSON" in call_args.upper()
 
+    def test_get_query_plan_select_omits_analyze_when_disabled(self, monkeypatch):
+        """analyze_plans=False makes SELECT capture structural-only (no re-execution)."""
+        monkeypatch.setattr("benchbox.platforms.postgresql.psycopg", MagicMock())
+        adapter = PostgreSQLAdapter(capture_plans=True, analyze_plans=False)
+        cursor = MagicMock()
+        cursor.fetchall.return_value = [('{"Plan":{}}',)]
+        conn = MagicMock()
+        conn.cursor.return_value = cursor
+
+        adapter.get_query_plan(conn, "SELECT count(*) FROM orders")
+
+        call_args = cursor.execute.call_args[0][0]
+        assert "ANALYZE" not in call_args.upper(), "analyze_plans=False must not re-execute the SELECT"
+        assert "FORMAT JSON" in call_args.upper()
+
 
 class TestPostgreSQLSubclassInheritance:
     """Verify TimescaleDB, CedarDB, and pg_mooncake inherit the parser without overrides."""

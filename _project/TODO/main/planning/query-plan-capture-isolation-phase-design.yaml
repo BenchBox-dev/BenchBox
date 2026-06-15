@@ -2,8 +2,68 @@ id: query-plan-capture-isolation-phase-design
 title: "Design and implement plan capture as an explicit isolated benchmark phase"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
+
+# PROGRESS (2026-06-14):
+#   - w1 (design note): DONE — see design_note below.
+#   - w2 (thread safety): DONE — _plan_capture_iteration_counts read-increment-write
+#     is now guarded by self._plan_capture_lock (threading.Lock created in
+#     PlatformAdapter.__init__). Concurrent-stream tests added in
+#     tests/unit/platforms/test_plan_capture_iteration_count.py.
+#   - w3 (phase hook): PARTIAL — the additive phase function lives in the new
+#     benchbox/core/plan_capture_phase.py (run_plan_capture_phase). It opens a
+#     fresh connection by default, forces analyze_plans=False (structural only),
+#     bypasses the measurement-phase sampling filters, and returns plans +
+#     fingerprints + per-query timing. NOT YET wired into benchbox/cli/commands/run.py
+#     as a --capture-plans phase toggle — the inline path remains the default
+#     (deliberately additive; see anti_patterns). CLI cutover is the remaining work.
+#   - w4 (user-facing CLI/phase docs): DEFERRED until the CLI wiring lands, so the
+#     docs do not claim a phase that --capture-plans does not yet trigger. The
+#     overhead/DML doc corrections (separate TODO) are complete.
+#   - w5 (phase isolation tests): PARTIAL — module-level isolation tests added in
+#     tests/integration/test_plan_capture_phase.py (DML single-execution, fingerprint
+#     population, config restoration, supplied-connection reuse). A full end-to-end
+#     CLI run assertion follows the w3 CLI cutover.
+
+design_note: |
+  Plan capture phase contract (w1)
+  --------------------------------
+  Lifecycle position: the capture phase runs AFTER all power/throughput
+  iterations complete, when measurement is already stable. It never executes
+  while a timed query is in flight, so EXPLAIN can no longer delay a measured
+  query or contend on the measurement connection (the accepted trade-off in the
+  timeout PR, #789).
+
+  Connection model (resolves the gating open_question): SEPARATE connection by
+  default. run_plan_capture_phase() opens a fresh connection via
+  adapter.create_connection() and closes it when done, so the phase cannot
+  contaminate measurement transaction state. Callers may pass connection=<conn>
+  to reuse an existing one (e.g. embedded :memory: engines where a second
+  connection would not see loaded data); in that case the caller owns closing it.
+
+  EXPLAIN mode: structural-only. The phase forces analyze_plans=False, so:
+    - DML/write-DDL is never re-executed (the shared is_dml_query guard already
+      downgrades these, and analyze_plans=False makes SELECT capture cheap too).
+    - SELECT capture pays planning cost only, not ~1x execution time.
+  Fingerprints are unaffected (they exclude timing/cardinality), so structural
+  regression detection is unchanged. ANALYZE remains opt-in via the analyze_plans
+  argument for callers that explicitly want actual-plan stats.
+
+  Filter semantics: the phase receives an explicit query list, which IS the
+  selection. It bypasses the measurement-phase sampling filters (plan_first_n,
+  plan_sampling_rate) so each requested query is captured exactly once, and
+  restores all overridden adapter attributes in a finally block.
+
+  Result contract: PlanCapturePhaseResult carries plans (query_id -> DAG),
+  fingerprints (query_id -> str), per_query_capture_ms, total_capture_ms, and
+  captured/failed counts — ready to merge into run metadata (plan_fingerprints).
+
+  Backward compatibility: this is ADDITIVE. The inline execute_query() capture
+  path is untouched, so platforms that surface plans as an execution side effect
+  (BigQuery job stats, Spark event logs) keep working. The CLI cutover that makes
+  --capture-plans drive the phase for EXPLAIN-based platforms is the remaining
+  incremental step.
 
 description: |
   Plan capture is intended to run as a separate, isolated phase of the benchmark
@@ -60,7 +120,7 @@ prior_art:
 work:
   - id: w1
     summary: "Design the plan capture phase contract: inputs, outputs, timing, connection model"
-    status: pending
+    status: done
     notes: |
       Write a design note (inline in this TODO or as a brief ADR) covering:
         - Where in the run lifecycle the capture phase fires (after last power/throughput iteration)
@@ -73,7 +133,7 @@ work:
   - id: w2
     summary: "Fix _plan_capture_iteration_counts thread safety"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Replace the bare dict mutation at result_capture.py:591-595 with a
       threading.Lock-protected increment. Options:
@@ -87,7 +147,7 @@ work:
   - id: w3
     summary: "Add a run_plan_capture_phase() hook to the run orchestrator"
     needs: [w1]
-    status: pending
+    status: in_progress  # phase function in benchbox/core/plan_capture_phase.py; CLI cutover pending
     notes: |
       Add a function to benchbox/cli/commands/run.py (or a new
       benchbox/core/plan_capture_phase.py) that:
@@ -104,7 +164,7 @@ work:
   - id: w4
     summary: "Update docs and --help to describe capture as a post-measurement phase"
     needs: [w3]
-    status: pending
+    status: pending  # gated on w3 CLI cutover; docs must not claim a phase --capture-plans does not yet trigger
     notes: |
       Update docs/features/query-plan-analysis.md and docs/reference/cli/run.md:
         - Describe that --capture-plans triggers a separate post-measurement phase
@@ -115,7 +175,7 @@ work:
   - id: w5
     summary: "Add integration test verifying phase isolation"
     needs: [w3, w4]
-    status: pending
+    status: in_progress  # tests/integration/test_plan_capture_phase.py covers phase isolation; full CLI-run assertion follows w3 cutover
     notes: |
       Add a test that:
         - Runs a mock benchmark with capture_plans=True

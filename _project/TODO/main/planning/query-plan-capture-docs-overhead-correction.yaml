@@ -2,8 +2,18 @@ id: query-plan-capture-docs-overhead-correction
 title: "Correct query-plan-analysis.md: PostgreSQL EXPLAIN ANALYZE overhead and DML note"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Documentation
+
+# UPDATE (2026-06-15): Already resolved on develop by PR #793
+# ("docs(plan-capture): correct overhead claims and PostgreSQL section"), which
+# landed concurrently with this branch. #793 replaced the blanket
+# "Other platforms: ~10-50ms" claim with a per-platform breakdown and corrected
+# the PostgreSQL section (SELECT ~1x via EXPLAIN ANALYZE/BUFFERS; DML downgraded
+# to non-ANALYZE EXPLAIN). The DML guard described as "pending" in this TODO had
+# itself already LANDED via #784 (PostgreSQL guard) + #786 (shared is_dml_query
+# covering CTAS/CMV/SELECT-INTO). This branch's duplicate doc edits were dropped
+# during rebase to defer to #793; closing this TODO as Completed (work done by #793).
 
 description: |
   docs/features/query-plan-analysis.md contains two inaccuracies added by PR #776:
@@ -40,7 +50,7 @@ prior_art:
 work:
   - id: w1
     summary: "Correct the performance overhead table for PostgreSQL"
-    status: pending
+    status: done
     notes: |
       In the Performance Impact section, revise the "Other platforms" row to
       distinguish ANALYZE and non-ANALYZE paths:
@@ -59,7 +69,7 @@ work:
   - id: w2
     summary: "Correct the DML note in the PostgreSQL platform section"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       The DML note currently says: "DML statements use FORMAT JSON without ANALYZE
       to prevent double-execution side effects." Replace with:

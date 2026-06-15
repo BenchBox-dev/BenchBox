@@ -31,6 +31,7 @@ import platform
 import random
 import re
 import statistics
+import threading
 import time
 from collections.abc import Mapping
 from datetime import datetime
@@ -462,6 +463,12 @@ class ResultCaptureMixin:
         self.plan_capture_failures = 0
         self.plan_capture_errors: list[dict[str, Any]] = []
         self._plan_capture_iteration_counts: dict[str, int] = {}
+        # The lock is created in PlatformAdapter.__init__; create it defensively
+        # for hosts that reset stats without going through __init__ (e.g. tests
+        # that mix in this class directly). Reset runs before any worker threads
+        # spawn, so installing the lock here is safe.
+        if not hasattr(self, "_plan_capture_lock"):
+            self._plan_capture_lock = threading.Lock()
 
     def get_normalized_result_metadata(
         self,
@@ -766,10 +773,13 @@ class ResultCaptureMixin:
         if self.plan_query_filter and query_id not in self.plan_query_filter:
             return None, 0.0
 
-        # Apply first-N iterations filter if specified
+        # Apply first-N iterations filter if specified. The read-increment-write
+        # is guarded so concurrent streams (--streams > 1) cannot interleave and
+        # capture more (or fewer) than plan_first_n plans per query_id.
         if self.plan_first_n is not None:
-            iteration = self._plan_capture_iteration_counts.get(query_id, 0)
-            self._plan_capture_iteration_counts[query_id] = iteration + 1
+            with self._plan_capture_lock:
+                iteration = self._plan_capture_iteration_counts.get(query_id, 0)
+                self._plan_capture_iteration_counts[query_id] = iteration + 1
             if iteration >= self.plan_first_n:
                 return None, 0.0
 
