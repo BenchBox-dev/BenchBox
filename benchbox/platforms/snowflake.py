@@ -1217,8 +1217,6 @@ class SnowflakeAdapter(PlatformAdapter):
                 self.log_verbose(f"Query {query_id} completed: {actual_row_count} rows in {execution_time:.3f}s")
                 self.log_operation_complete("Snowflake query execution", query_id, f"returned {actual_row_count} rows")
 
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             self.log_verbose(f"Query {query_id} failed after {execution_time:.3f}s: {e}")
@@ -1234,6 +1232,39 @@ class SnowflakeAdapter(PlatformAdapter):
             }
         finally:
             cursor.close()
+
+        # Capture and merge the structured query plan (SUCCESS-guarded in the
+        # helper). Deliberately outside the try: with strict_plan_capture=True a
+        # capture failure raises PlanCaptureError, which must propagate instead
+        # of being swallowed by the broad except and mislabeling the query FAILED.
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
+
+        return result_dict
+
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Return the Snowflake plan as JSON via ``EXPLAIN USING JSON``.
+
+        Snowflake has no plain ``EXPLAIN`` that yields a parseable tree; the
+        JSON form returns a single VARIANT cell describing the operator graph.
+        """
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"EXPLAIN USING JSON {query}")
+            row = cursor.fetchone()
+            if not row or row[0] is None:
+                return None
+            return str(row[0])
+        except Exception as e:
+            self.logger.debug(f"Could not get query plan: {e}")
+            return None
+        finally:
+            cursor.close()
+
+    def get_query_plan_parser(self):
+        """Get Snowflake query plan parser."""
+        from benchbox.core.query_plans.parsers.snowflake import SnowflakeQueryPlanParser
+
+        return SnowflakeQueryPlanParser()
 
     def _optimize_table_definition(self, statement: str) -> str:
         """Optimize table definition for Snowflake.

@@ -1299,6 +1299,40 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         return get_query_plan_from_cursor(connection, query)
 
+    def get_query_plan_parser(self):
+        """Get Firebolt query plan parser."""
+        from benchbox.core.query_plans.parsers.firebolt import FireboltQueryPlanParser
+
+        return FireboltQueryPlanParser()
+
+    def execute_query(
+        self,
+        connection: Any,
+        query: str,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Execute a query, then capture the structured plan.
+
+        The shared cursor-execution mixin does not capture plans, so this
+        override delegates to it and then merges plan fields into the result
+        (a no-op unless ``capture_plans`` is on and the query succeeded).
+        """
+        result = super().execute_query(
+            connection,
+            query,
+            query_id,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
+        return result
+
     def close_connection(self, connection: Any) -> None:
         """Close Firebolt connection."""
         try:

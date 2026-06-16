@@ -667,7 +667,7 @@ class FabricWarehouseAdapter(PlatformAdapter):
 
             execution_time = elapsed_seconds(start_time)
 
-            return {
+            result_dict = {
                 "query_id": query_id,
                 "stream_id": stream_id,
                 "iteration": iteration,
@@ -690,6 +690,13 @@ class FabricWarehouseAdapter(PlatformAdapter):
             }
         finally:
             cursor.close()
+
+        # Capture and merge the structured query plan (SUCCESS-guarded in the
+        # helper). Outside the try so a strict-mode PlanCaptureError propagates
+        # rather than being masked as a query failure.
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
+
+        return result_dict
 
     def get_existing_tables(self, connection: Any) -> list[str]:
         """Get list of existing tables in the schema.
@@ -1097,6 +1104,12 @@ class FabricWarehouseAdapter(PlatformAdapter):
             return f"Failed to get query plan: {e}"
         finally:
             cursor.close()
+
+    def get_query_plan_parser(self):
+        """Get Fabric Warehouse query plan parser."""
+        from benchbox.core.query_plans.parsers.fabric_warehouse import FabricWarehouseQueryPlanParser
+
+        return FabricWarehouseQueryPlanParser()
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Update table statistics.

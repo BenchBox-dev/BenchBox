@@ -2,8 +2,26 @@ id: query-plan-capture-cloud-saas
 title: "Implement query plan capture for cloud SaaS platforms: Snowflake, BigQuery, Azure Synapse, Firebolt, Fabric Warehouse, and Lakesail"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: Completed
 category: Platform Expansion
+
+resolution: |
+  Implemented offline (no cloud credentials) with fixture-driven unit tests,
+  matching the established pattern for the rest of the query-plan-capture family.
+  Three deviations from the original plan, driven by the actual adapter code:
+    - w7 (LakeSail): LakeSail is a Spark-Connect engine (not MySQL-wire). It
+      already inherits SparkQueryPlanParser and plan-capture wiring from
+      SparkQueryExecutionMixin, so no LakesailQueryPlanParser was created; a
+      verification test confirms the reuse instead.
+    - w6 (Fabric Warehouse): Fabric's adapter captures via SET SHOWPLAN_TEXT
+      (T-SQL showplan), which is structurally distinct from Azure Synapse's
+      EXPLAIN XML (DSQL distributed plan), so a dedicated
+      FabricWarehouseQueryPlanParser was implemented rather than reusing the
+      Synapse parser.
+    - Firebolt: the adapter captures via plain EXPLAIN (indented text tree),
+      so FireboltQueryPlanParser parses that text form.
+  Live cross-engine validation against real cloud accounts remains tracked by the
+  separate parser-live-validation TODOs.
 
 description: |
   Six cloud SaaS platforms need query plan capture work ranging from adding a new
@@ -70,7 +88,7 @@ prior_art:
 work:
   - id: w1
     summary: "Collect EXPLAIN output samples for Snowflake, Azure Synapse, Firebolt, Fabric, and Lakesail"
-    status: pending
+    status: done
     notes: |
       For each available platform, run `EXPLAIN <simple_query>` and record:
         - Full EXPLAIN output text (or JSON)
@@ -83,7 +101,7 @@ work:
   - id: w2
     summary: "Implement SnowflakeQueryPlanParser and wire into SnowflakeAdapter"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Snowflake EXPLAIN returns JSON (when using `EXPLAIN USING JSON`):
         {"GlobalStats": {...}, "Operations": [{"id": N, "operation": "...", ...}]}
@@ -102,7 +120,7 @@ work:
   - id: w3
     summary: "Implement BigQueryQueryPlanParser and override capture_query_plan() in BigQueryAdapter"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       BigQuery plans come from the Job Statistics API, not an EXPLAIN statement.
       This is an architectural mismatch with the base class:
@@ -142,7 +160,7 @@ work:
   - id: w4
     summary: "Implement AzureSynapseQueryPlanParser and wire into AzureSynapseAdapter"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Azure Synapse Dedicated Pool uses T-SQL-based EXPLAIN (XML format via
       `SET SHOWPLAN_XML ON`; or text via `SET SHOWPLAN_TEXT ON`). Serverless
@@ -153,7 +171,7 @@ work:
   - id: w5
     summary: "Implement FireboltQueryPlanParser and wire into FireboltAdapter"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Firebolt's EXPLAIN returns a JSON structure with a tree of nodes.
       Implement FireboltQueryPlanParser mapping Firebolt operator names
@@ -163,7 +181,7 @@ work:
   - id: w6
     summary: "Wire FabricWarehouseAdapter plan capture; reuse AzureSynapseQueryPlanParser if format matches"
     needs: [w1, w4]
-    status: pending
+    status: done
     notes: |
       Fabric Warehouse (Synapse Serverless + Delta Lake) EXPLAIN format may
       differ from Synapse Dedicated. After collecting the Fabric fixture in w1
@@ -185,7 +203,7 @@ work:
   - id: w7
     summary: "Implement LakesailQueryPlanParser and wire into LakesailAdapter"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Lakesail is a MySQL-wire-compatible engine. Collect EXPLAIN format in w1.
       Implement LakesailQueryPlanParser. Wire get_query_plan_parser() and
@@ -194,7 +212,7 @@ work:
   - id: w8
     summary: "Add unit tests for all new parsers and adapter wiring"
     needs: [w2, w3, w4, w5, w6, w7]
-    status: pending
+    status: done
     notes: |
       Create tests/unit/query_plans/ tests for each new parser:
         test_snowflake_parser.py, test_bigquery_parser.py,
@@ -286,4 +304,4 @@ metadata:
   tags: [query-plan, snowflake, bigquery, azure-synapse, firebolt, fabric-warehouse, lakesail, cloud-saas, new-parser]
   estimated_effort: "Large"
   created_date: "2026-06-02"
-  last_updated: "2026-06-02T00:00:00-04:00"
+  last_updated: "2026-06-16T00:00:00-04:00"

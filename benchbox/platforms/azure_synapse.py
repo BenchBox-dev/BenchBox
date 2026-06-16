@@ -1013,8 +1013,6 @@ class AzureSynapseAdapter(PlatformAdapter):
             self.log_verbose(f"Query {query_id} completed: {actual_row_count} rows in {execution_time:.3f}s")
             self.log_operation_complete("Azure Synapse query execution", query_id, f"returned {actual_row_count} rows")
 
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             self.log_verbose(f"Query {query_id} failed after {execution_time:.3f}s: {e}")
@@ -1029,6 +1027,14 @@ class AzureSynapseAdapter(PlatformAdapter):
             }
         finally:
             cursor.close()
+
+        # Capture and merge the structured query plan (SUCCESS-guarded in the
+        # helper). Deliberately outside the try: with strict_plan_capture=True a
+        # capture failure raises PlanCaptureError, which must propagate instead
+        # of being swallowed by the broad except and mislabeling the query FAILED.
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
+
+        return result_dict
 
     def _extract_table_name(self, statement: str) -> str | None:
         """Extract table name from CREATE TABLE statement."""
@@ -1129,10 +1135,20 @@ class AzureSynapseAdapter(PlatformAdapter):
         return platform_info
 
     def get_query_plan(self, connection: Any, query: str) -> str:
-        """Get query execution plan for analysis."""
+        """Get query execution plan for analysis.
+
+        Azure Synapse Dedicated SQL pool ``EXPLAIN`` returns the distributed
+        query plan as a single XML cell.
+        """
         from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
 
         return get_query_plan_from_cursor(connection, query)
+
+    def get_query_plan_parser(self):
+        """Get Azure Synapse query plan parser."""
+        from benchbox.core.query_plans.parsers.azure_synapse import AzureSynapseQueryPlanParser
+
+        return AzureSynapseQueryPlanParser()
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Update statistics for query optimization."""
