@@ -2,7 +2,7 @@ id: correlated-subquery-self-binding-cross-surface-audit
 title: "Audit DataFrame variants and other benchmarks for correlated-subquery self-binding, and add a durable detector"
 worktree: main
 priority: Medium
-status: Not Started
+status: Under Review
 category: Testing and Quality Assurance
 
 description: |
@@ -61,36 +61,57 @@ prior_art:
 work:
   - id: w0
     summary: "Re-confirm the audit surfaces still exist and enumerate correlated-subquery sites"
-    status: pending
+    status: done
     notes: |
-      Enumerate correlated subqueries across the DataFrame variants and the
-      other SQL benchmarks (grep + read). Record the candidate list before
-      editing. Capture stdout to /tmp and summarize counts in the TODO/PR.
+      Done via the detector (w3) used as an enumerator. SQL surfaces swept at
+      SF=1, DuckDB dialect: TPC-Havoc 220 variants, TPC-DS 99, SSB 13,
+      read-primitives 153, write-primitives 109, join-order 113. Only TPC-DS
+      flagged anything (2, both false positives - see w2).
 
   - id: w1
     summary: "Audit TPC-Havoc DataFrame variants for outer-correlation faithfulness and fix any drift"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      For each correlated DataFrame query, confirm the join/filter references
-      the OUTER row, not the inner aggregate frame. Cross-check results against
-      canonical TPC-H at small SF.
+      Covered by the merged DataFrame equivalence gate (PR #785,
+      benchbox/core/tpchavoc/dataframe_equivalence.py): it compares every
+      DataFrame variant to canonical TPC-H at SF=0.1 and is green (0 divergent).
+      An inner-frame-correlation self-bind would change results and therefore
+      surface as a divergence there, so the DataFrame surface is guarded against
+      this class without a separate per-variant check. No DataFrame drift found.
 
   - id: w2
     summary: "Audit other SQL benchmarks (TPC-DS, SSB, join-order, read/write-primitives) for the self-binding pattern and fix any found"
     needs: [w0]
-    status: pending
+    status: done
+    notes: |
+      Swept with the detector. SSB, join-order, read-primitives, write-primitives:
+      0 candidates. The detector analyzes UPDATE/DELETE subqueries (the DML
+      target/USING tables are treated as the outer correlation source), so the
+      write-primitives "clean" result is verified, not a skipped-DML blind spot.
+      TPC-DS: 2 candidates (q14, q54), both HUMAN-CONFIRMED FALSE
+      POSITIVES - they are derived-table column aliases that reuse a base-table
+      column name (q14 `item.i_item_sk AS ss_item_sk`; q54
+      `ws_bill_customer_sk AS customer_sk`), so the bare column binds correctly.
+      These are official TPC-DS spec queries and were NOT modified (conformance).
+      No real self-binds found outside the already-fixed #756 TPC-Havoc cases.
 
   - id: w3
-    summary: "Prototype a durable static detector for unqualified self-binding correlations"
+    summary: "Durable static detector for unqualified self-binding correlations"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      sqlglot-backed candidate flagger: parse each query, find correlated
-      subqueries, flag predicates whose unqualified column also exists in an
-      inner aliased relation. Conservative (candidates for human review) is
-      acceptable; wire into the equivalence/lint tooling, not as a hard blocker
-      until precision is validated.
+      Implemented: _project/scripts/detect_self_binding.py (sqlglot-backed,
+      catalog-aware via the benchmark's own CREATE TABLE DDL). Flags a bare
+      column in a subquery comparison only when (a) the other operand is a column
+      qualified by an inner source alias (correlation shape), and (b) the bare
+      column is provided by both an inner and an outer source (ambiguous bind).
+      Recognizes derived-table/CTE output columns, so CTE correlation targets
+      (the #756 Q17 case) are covered. Locked in by
+      tests/unit/test_self_binding_detector.py: it flags all three #756 cases
+      when reverted, stays clean on the fixed variants and all 220 shipped
+      variants, and ignores plain filters / fully-qualified correlations.
+      Advisory only (not a hard CI blocker), per the anti-pattern guidance.
 
 deferred:
   - summary: "Author a correctness contract for the variant generator"
