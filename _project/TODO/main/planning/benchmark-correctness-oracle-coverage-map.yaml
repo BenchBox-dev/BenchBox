@@ -1,0 +1,150 @@
+id: benchmark-correctness-oracle-coverage-map
+title: "Map correctness-oracle coverage across all benchmarks and close the unguarded ones"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  The TPC-Havoc equivalence work established that a benchmark can have a real
+  correctness oracle without a hand-maintained answer key (variant-vs-canonical
+  and SQL-vs-DataFrame, compared live on a bounded DuckDB cell). Applying that
+  lens across the suite exposes how little of it is actually guarded:
+
+  - Stored expected results exist for ONLY tpch and tpcds
+    (benchbox/core/expected_results/tpch_results.py, tpcds_results.py).
+  - Live equivalence gates exist for ONLY tpchavoc (SQL variant + DataFrame),
+    plus cross-engine sampling for tpchavoc (PRs #803/#806).
+  - Every other benchmark - ssb, clickbench, amplab, coffeeshop, datavault,
+    flightdata, joinorder, joinorder_synthetic, nyctaxi, tsbs_devops, tpcds_obt,
+    tpch_skew, and the primitive suites (read/write/transaction/metadata/ai),
+    tpcdi - executes "green" with NO automated check that any result is correct.
+
+  Two complementary mechanisms cover most of this gap. The cross-surface
+  SQL<->DataFrame gate (owned by benchmark-cross-surface-equivalence-gate)
+  handles dual-surface benchmarks. THIS item owns (a) the coverage map itself -
+  a single authoritative matrix of which oracle, if any, guards each shipped
+  benchmark - and (b) the benchmarks that cross-surface cannot reach: single-
+  surface benchmarks (one of SQL or DataFrame only) and benchmarks whose two
+  surfaces are not result-comparable. Those need a different oracle: a
+  differential check against a second engine on the same SQL, a small curated
+  expected-results subset, or a documented structural invariant - chosen per
+  benchmark from evidence.
+
+  The end state is a policy: every shipped benchmark declares its correctness
+  oracle, and a benchmark with "none" is visible (and ideally flagged), so the
+  suite cannot quietly grow more unverified surfaces.
+
+prior_art:
+  - "benchbox/core/expected_results/registry.py - register_benchmark_provider / list of registered providers; the place a coverage check would read 'has expected results'."
+  - "benchbox/core/tpchavoc/equivalence.py and dataframe_equivalence.py - the live-oracle exemplars (variant + cross-surface)."
+  - "_project/TODO/main/planning/benchmark-cross-surface-equivalence-gate.yaml - the dual-surface mechanism this map dispatches to; do not duplicate it."
+  - "_project/TODO/main/planning/tpchavoc-cross-dialect-equivalence-sampling.yaml and tpchavoc-third-engine-equivalence-sampling.yaml - the cross-engine/differential exemplars for the single-surface fallback."
+  - "_project/TODO/main/planning/testing-approach-correctness-gates.yaml - the existing real-result gate / test-quality work; this map is complementary (coverage inventory + ungated-benchmark campaign), not a re-do of it."
+  - "benchbox/core/benchmark_registry.py - the authoritative list of shipped benchmarks to enumerate the map against."
+
+work:
+  - id: w0
+    summary: "Build the authoritative correctness-oracle coverage matrix for every shipped benchmark"
+    status: pending
+    notes: |
+      Enumerate benchmarks from the registry. For each, record: surfaces shipped
+      (SQL / DataFrame / both); has stored expected results?; has a live
+      equivalence gate?; is cross-surface applicable?; resulting current-oracle =
+      {expected-results | variant-equivalence | cross-surface | cross-engine |
+      NONE}. Land the matrix as a checked-in artifact (and ideally a generated
+      check), not a one-off doc, so it stays current.
+
+  - id: w1
+    summary: "Dispatch dual-surface, no-oracle benchmarks to the cross-surface gate"
+    needs: [w0]
+    status: pending
+    notes: |
+      For benchmarks the matrix shows as dual-surface with oracle=NONE, the fix is
+      benchmark-cross-surface-equivalence-gate. Cross-reference rather than
+      re-implement; this item only tracks that they get covered there.
+
+  - id: w2
+    summary: "Choose and apply a fallback oracle for single-surface, no-oracle benchmarks"
+    needs: [w0]
+    status: pending
+    notes: |
+      For benchmarks with only one comparable surface (or non-comparable
+      surfaces), pick the cheapest credible oracle per benchmark: differential
+      vs a second engine on the same SQL (reuse the cross-dialect harness), a
+      small curated expected-results subset via the existing registry, or a
+      documented structural invariant where results are nondeterministic.
+      Prioritize the canonical/most-used benchmarks. Verify each against an
+      independent reference, never against the surface under test alone.
+
+  - id: w3
+    summary: "Make 'no oracle' visible and prevent silent regressions in coverage"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      Document the policy that every shipped benchmark declares a correctness
+      oracle, and add a lightweight check (advisory first) that lists benchmarks
+      with oracle=NONE so a newly-added benchmark without one is surfaced in CI
+      rather than discovered later.
+
+deferred:
+  - summary: "Backfill full expected-results answer keys for every benchmark"
+    reason: "Expensive and brittle to maintain; live oracles (cross-surface / differential) cover most of the value at a fraction of the upkeep. Only curate expected-results where no live oracle is feasible."
+
+must_preserve:
+  - "Existing oracles (tpch/tpcds expected results, tpchavoc gates) are unchanged and remain authoritative for their benchmarks."
+  - "benchbox run default behavior is unchanged for every benchmark; coverage work is additive."
+  - "No new hard CI gate lands noisy/flaky; advisory-first, promote to blocking only once stable."
+
+approach: |
+  Inventory first (w0): a single, ideally generated, coverage matrix is the
+  artifact that makes the gap legible and dispatchable. Then route dual-surface
+  gaps to the cross-surface gate (w1) and solve single-surface gaps with the
+  cheapest credible per-benchmark oracle (w2), reusing existing harnesses
+  (cross-surface, cross-dialect, expected-results registry) rather than new
+  machinery. Close with a policy + advisory check (w3) so coverage cannot
+  silently erode.
+
+anti_patterns:
+  - "DO NOT duplicate the cross-surface gate here - because it has its own item - dispatch to it for dual-surface benchmarks."
+  - "DO NOT mandate full expected-results answer keys everywhere - because the maintenance cost is why coverage is thin today - prefer live oracles."
+  - "DO NOT verify a benchmark against the surface under test - because that is circular - use an independent reference (other surface, other engine, or curated key)."
+  - "DO NOT land the coverage check as a hard blocker first - because a noisy gate erodes trust - advisory until proven."
+
+verification:
+  - description: "Coverage matrix enumerates every registered benchmark with its current oracle"
+    command: "run the coverage map generator; diff against the registry"
+    expected_output: "every shipped benchmark appears with an oracle classification (including NONE)"
+  - description: "A single-surface benchmark gains an independent oracle that catches a planted defect"
+    command: "pick one w2 benchmark, plant a wrong result, run its new oracle"
+    expected_output: "the oracle flags the defect"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/"
+    - "tests/"
+    - "_project/"
+    - ".github/workflows/"
+    - "Makefile"
+    - "docs/"
+
+open_questions:
+  - question: "Where should the coverage matrix live so it stays current - a generated artifact derived from the registry + gate presence, or a curated doc reviewed in CI?"
+    gating: true
+    affects: ["w0 deliverable shape"]
+    default: "Generated from the registry plus detection of expected-results providers and equivalence gates, emitted as a checked-in artifact with an advisory CI check; curated notes only for the per-benchmark oracle CHOICE rationale."
+  - question: "For nondeterministic or write-path benchmarks (write/transaction primitives, tpcdi), is result-equivalence even the right oracle, or should they assert structural invariants instead?"
+    gating: false
+    affects: ["w2 oracle choice"]
+    default: "Use structural/invariant oracles (row counts, post-state assertions) for write/nondeterministic paths; reserve result-equivalence for deterministic read queries."
+
+success_metrics:
+  - "A current, authoritative coverage matrix classifies every shipped benchmark's correctness oracle."
+  - "Every benchmark that had oracle=NONE either gains one (cross-surface, differential, or curated) or has a documented, accepted reason it cannot."
+  - "A new benchmark shipped without a correctness oracle is surfaced by an advisory CI check."
+
+metadata:
+  tags: [correctness, equivalence, coverage, governance, ci, benchmarks]
+  estimated_effort: "Large"
+  created_date: "2026-06-16"
+  last_updated: "2026-06-16T00:00:00"
