@@ -1,0 +1,165 @@
+id: benchmark-cross-surface-equivalence-gate
+title: "Generalize the result-equivalence harness and gate SQL<->DataFrame equivalence for dual-surface benchmarks"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  TPC-Havoc now ships two result-equivalence gates that proved a discipline:
+  execute a candidate query and a trusted reference over the SAME bounded
+  small-SF DuckDB dataset and compare results live (order-insensitive, float-
+  tolerant), with no hand-maintained expected answers. The SQL gate
+  (benchbox/core/tpchavoc/equivalence.py) compares each SQL variant to canonical
+  TPC-H; the DataFrame gate (benchbox/core/tpchavoc/dataframe_equivalence.py)
+  compares each DataFrame variant to canonical TPC-H SQL. Together they found and
+  fixed ~42 silent correctness defects.
+
+  That discipline is currently TPC-Havoc-only, by construction. But ~14
+  benchmarks ship a DataFrame query surface (amplab, clickbench, coffeeshop,
+  datavault, flightdata, joinorder, nyctaxi, read_primitives, ssb, tpcds,
+  tpcds_obt, tpch, tpch_skew, tsbs_devops) in ADDITION to their SQL surface, and
+  nothing checks that the two surfaces agree. Worse, stored expected results
+  exist for ONLY tpch and tpcds (benchbox/core/expected_results/tpch_results.py,
+  tpcds_results.py) - so for every other dual-surface benchmark there is NO
+  correctness oracle of any kind: SQL and DataFrame implementations both execute
+  "green" while their results are unverified and may silently disagree.
+
+  Cross-surface equivalence is the cheap, maintenance-free oracle for exactly
+  this gap: SQL and DataFrame are independent implementations of the same logical
+  query, so a divergence proves at least one is wrong - without needing a
+  hand-curated answer key. This work generalizes the TPC-Havoc DataFrame-gate
+  harness into a shared, benchmark-agnostic helper, then rolls out a bounded
+  SQL<->DataFrame equivalence gate to the dual-surface benchmarks, SQL as the
+  reference for its own DataFrame surface.
+
+  Note: for tpch/tpcds the expected-results registry already validates each
+  surface against a stored answer key (transitive equivalence), so they are
+  lower priority here; the highest value is the dual-surface benchmarks with NO
+  oracle today (ssb first - canonical and small - then clickbench, joinorder,
+  coffeeshop, etc.).
+
+prior_art:
+  - "benchbox/core/tpchavoc/dataframe_equivalence.py - build_dataframe_contexts, materialize_rows, fetch_canonical_rows, find_dataframe_divergences, main; the template to generalize (it already compares a DataFrame result to a SQL reference on DuckDB)."
+  - "benchbox/core/tpchavoc/equivalence.py - build_duckdb_with_tpch, find_divergences, strip_top_n, KNOWN_DIVERGENCES, main; the SQL-side harness and the empty-baseline fail-on-divergence pattern."
+  - "tests/integration/test_tpchavoc_variant_equivalence.py - the fast default-lane regression companion; mirror it per gated benchmark."
+  - "benchbox/core/expected_results/ (registry.py, tpch_results.py, tpcds_results.py) - the only existing correctness oracles; documents that coverage stops at tpch/tpcds."
+  - "benchbox/core/runner/dataframe_runner.py and benchbox/platforms/dataframe/benchmark_mixin.py - how DataFrame queries actually execute and materialize; the gate must use the same execution path, not a bespoke one."
+  - "benchbox/core/<bench>/dataframe_queries(.py or package) and <bench>/queries.py (or get_queries) for each dual-surface benchmark - the two surfaces to compare (note: some, e.g. ssb/tpcds/clickbench, ship dataframe_queries as a package directory rather than a single module)."
+
+work:
+  - id: w0
+    summary: "Extract a benchmark-agnostic cross-surface equivalence harness from the TPC-Havoc DataFrame gate"
+    status: pending
+    notes: |
+      Factor the data-build + run-SQL + run-DataFrame + compare loop out of
+      tpchavoc/dataframe_equivalence.py into a shared core helper parameterized by
+      benchmark (DDL/data builder, SQL query accessor, DataFrame query accessor,
+      validator). Re-express the existing TPC-Havoc DataFrame gate on top of it
+      with NO behavior change (its gate must stay green and byte-equivalent in
+      result). Reuse validate_variant_equivalence / the result validator and the
+      DuckDB data builder; do not fork them.
+
+  - id: w1
+    summary: "Inventory dual-surface benchmarks and confirm SQL<->DataFrame query-id correspondence"
+    needs: [w0]
+    status: pending
+    notes: |
+      For each benchmark with both surfaces, confirm the SQL and DataFrame query
+      sets cover the same logical queries (matching ids/keys) and can run on a
+      shared DuckDB cell. Record which are in scope, which are single-surface
+      (out of scope here - owned by benchmark-correctness-oracle-coverage-map),
+      and any that need per-benchmark normalization (top-N/LIMIT, column order).
+
+  - id: w2
+    summary: "Run the cross-surface gate in report mode over the ungated dual-surface benchmarks and enumerate divergences"
+    needs: [w1]
+    status: pending
+    notes: |
+      Prioritize benchmarks with NO expected-results oracle: ssb, clickbench,
+      joinorder, coffeeshop, amplab, nyctaxi, flightdata, tsbs_devops, tpcds_obt,
+      tpch_skew, read_primitives. Report (benchmark, query, kind, deltas) without
+      asserting. Capture stdout to /tmp and summarize counts in the PR/TODO.
+
+  - id: w3
+    summary: "Burn down divergences (fix the wrong surface) or declare intentional ones"
+    needs: [w2]
+    status: pending
+    notes: |
+      For each divergence, determine which surface is wrong and fix it; verify the
+      fix makes the two surfaces agree. Where a difference is intentional and
+      defensible (e.g. a surface deliberately omits a presentational LIMIT),
+      record it as a classified, justified known-divergence entry, mirroring the
+      TPC-Havoc baseline discipline (default: empty baseline, every query matches).
+
+  - id: w4
+    summary: "Promote to bounded CI gates and add fast-lane regressions"
+    needs: [w3]
+    status: pending
+    notes: |
+      One bounded small-SF DuckDB cell per gated benchmark, wired into the
+      correctness-gate CI job and a Make target, mirroring
+      tpchavoc-(dataframe-)equivalence-report. Add a medium-marker pytest per
+      benchmark like tests/integration/test_tpchavoc_variant_equivalence.py.
+      Prove each gate fails when a deliberate divergence is introduced into one
+      surface.
+
+deferred:
+  - summary: "Cross-surface equivalence on a second engine"
+    reason: "Cross-engine sampling is its own discipline (see tpchavoc-cross-dialect-equivalence-sampling); keep these gates DuckDB-bounded first."
+  - summary: "Benchmarks that ship only one surface"
+    reason: "Cross-surface cannot apply; their oracle gap is owned by benchmark-correctness-oracle-coverage-map."
+
+must_preserve:
+  - "The TPC-Havoc SQL and DataFrame gates stay green with empty KNOWN_DIVERGENCES and unchanged behavior."
+  - "benchbox run default (execution-only) behavior is unchanged for every benchmark; the gates are additive."
+  - "ResultValidator tolerance/checksum semantics are unchanged; reuse, do not fork, the comparator and the DuckDB data builder."
+
+approach: |
+  Generalize the proven TPC-Havoc DataFrame gate rather than inventing a new
+  comparator: extract a shared harness (w0), inventory applicability (w1), land
+  report-mode across the ungated dual-surface benchmarks (w2), burn down (w3),
+  then flip bounded CI gates with fast-lane companions (w4). SQL is the live
+  reference for its own DataFrame surface; no hand-maintained answer keys.
+
+anti_patterns:
+  - "DO NOT write a new result comparator or data builder - because the TPC-Havoc harness already does this - generalize and reuse it."
+  - "DO NOT execute DataFrame queries via a bespoke path - because the gate must reflect the real product run path - use the DataFrame runner/mixin."
+  - "DO NOT gate a full platform matrix - because routine PRs must stay cheap - one bounded small-SF DuckDB cell per benchmark."
+  - "DO NOT silence a real divergence by adding it to the baseline - because the baseline is for intentional differences only - fix the wrong surface."
+
+verification:
+  - description: "Generalized harness reproduces the existing TPC-Havoc DataFrame gate result"
+    command: "make tpchavoc-dataframe-equivalence-report"
+    expected_output: "still 0 divergent (re-expressed on the shared harness, unchanged)"
+  - description: "A new dual-surface gate fails when one surface is deliberately broken"
+    command: "introduce a wrong projection in one SSB DataFrame query, run the SSB cross-surface gate"
+    expected_output: "gate FAILS (non-zero), naming the divergent query"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/"
+    - "tests/"
+    - ".github/workflows/"
+    - "Makefile"
+
+open_questions:
+  - question: "Should the shared harness live in a new benchbox/core module (e.g. core/equivalence/) with TPC-Havoc re-exporting from it, or stay under tpchavoc with others importing it?"
+    gating: true
+    affects: ["w0 placement"]
+    default: "New core/equivalence/ module owning the benchmark-agnostic harness; tpchavoc equivalence.py / dataframe_equivalence.py become thin benchmark-specific wrappers re-exporting it, so their public entry points and gates are unchanged."
+  - question: "For benchmarks whose DataFrame and SQL surfaces intentionally differ in presentation (e.g. LIMIT/top-N or column aliasing), is set-equality after the existing top-N normalization sufficient, or do some need per-benchmark normalization?"
+    gating: false
+    affects: ["w1 normalization", "w3 classification"]
+    default: "Reuse the TPC-Havoc strip_top_n / validator normalization; add per-benchmark normalization only where w2 evidence shows an intentional, defensible presentational difference."
+
+success_metrics:
+  - "A single shared harness backs both the TPC-Havoc gates and the new cross-surface gates; no duplicated comparator/data-builder."
+  - "Every dual-surface benchmark with no expected-results oracle has a bounded SQL<->DataFrame equivalence gate that is green on develop."
+  - "Introducing a divergence into either surface of a gated benchmark fails CI."
+
+metadata:
+  tags: [equivalence, correctness, dataframe, sql, ci, tpch, tpcds, ssb]
+  estimated_effort: "Large"
+  created_date: "2026-06-16"
+  last_updated: "2026-06-16T00:00:00"
