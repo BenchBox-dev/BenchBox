@@ -192,16 +192,21 @@ def get_parser_registry() -> ParserRegistry:
 
 def _create_default_registry() -> ParserRegistry:
     """Create and populate the default parser registry."""
+    from benchbox.core.query_plans.parsers.azure_synapse import AzureSynapseQueryPlanParser
+    from benchbox.core.query_plans.parsers.bigquery import BigQueryQueryPlanParser
     from benchbox.core.query_plans.parsers.clickhouse import ClickHouseQueryPlanParser
     from benchbox.core.query_plans.parsers.databend import DatabendQueryPlanParser
     from benchbox.core.query_plans.parsers.datafusion import DataFusionQueryPlanParser
     from benchbox.core.query_plans.parsers.doris import DorisQueryPlanParser
     from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
+    from benchbox.core.query_plans.parsers.fabric_warehouse import FabricWarehouseQueryPlanParser
+    from benchbox.core.query_plans.parsers.firebolt import FireboltQueryPlanParser
     from benchbox.core.query_plans.parsers.postgresql import PostgreSQLQueryPlanParser
     from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
     from benchbox.core.query_plans.parsers.questdb import QuestDBQueryPlanParser
     from benchbox.core.query_plans.parsers.redshift import RedshiftQueryPlanParser
     from benchbox.core.query_plans.parsers.singlestore import SingleStoreQueryPlanParser
+    from benchbox.core.query_plans.parsers.snowflake import SnowflakeQueryPlanParser
     from benchbox.core.query_plans.parsers.spark import SparkQueryPlanParser
     from benchbox.core.query_plans.parsers.sqlite import SQLiteQueryPlanParser
 
@@ -257,6 +262,22 @@ def _create_default_registry() -> ParserRegistry:
     # rather than a single shared MySQL-compatible parser.
     registry.register("doris", "0.0.0", DorisQueryPlanParser)
     registry.register("singlestore", "0.0.0", SingleStoreQueryPlanParser)
+
+    # Register cloud SaaS parsers.
+    # Snowflake EXPLAIN USING JSON, Firebolt indented EXPLAIN text, Azure Synapse
+    # Dedicated SQL pool EXPLAIN XML (DSQL distributed plan), and Fabric Warehouse
+    # SHOWPLAN_TEXT each use a distinct format, so they get dedicated parsers.
+    registry.register("snowflake", "0.0.0", SnowflakeQueryPlanParser)
+    registry.register("firebolt", "0.0.0", FireboltQueryPlanParser)
+    registry.register("azure_synapse", "0.0.0", AzureSynapseQueryPlanParser)
+    registry.register("fabric_warehouse", "0.0.0", FabricWarehouseQueryPlanParser)
+    # BigQuery has no EXPLAIN; plans come from job statistics (job.query_plan) and
+    # are captured via BigQueryAdapter._capture_bq_plan, but the parser is also
+    # registered for symmetry and direct lookup.
+    registry.register("bigquery", "0.0.0", BigQueryQueryPlanParser)
+    # LakeSail is a Spark-Connect engine and emits Spark's EXPLAIN EXTENDED text,
+    # so it reuses the Spark parser (matching Databricks / Velox).
+    registry.register("lakesail", "0.0.0", SparkQueryPlanParser)
 
     return registry
 

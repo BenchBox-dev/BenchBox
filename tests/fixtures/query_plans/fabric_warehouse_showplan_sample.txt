@@ -1,0 +1,7 @@
+SELECT o.o_orderkey, SUM(l.l_extendedprice) AS revenue FROM orders o JOIN lineitem l ON o.o_orderkey = l.l_orderkey GROUP BY o.o_orderkey ORDER BY revenue DESC
+  |--Sort(ORDER BY:([revenue] DESC))
+       |--Compute Scalar(DEFINE:([revenue]=[Expr1004]))
+            |--Hash Match(Aggregate, HASH:([o].[o_orderkey]), DEFINE:([Expr1004]=SUM([l].[l_extendedprice])))
+                 |--Nested Loops(Inner Join, OUTER REFERENCES:([o].[o_orderkey]))
+                      |--Clustered Index Scan(OBJECT:([tpch].[dbo].[orders].[PK_orders] AS [o]))
+                      |--Index Seek(OBJECT:([tpch].[dbo].[lineitem].[IX_l_orderkey] AS [l]), SEEK:([l].[l_orderkey]=[o].[o_orderkey]))

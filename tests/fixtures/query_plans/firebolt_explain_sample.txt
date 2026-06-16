@@ -1,0 +1,6 @@
+[0] Projection [o_orderkey, revenue]
+ \_[1] Sort [revenue DESC]
+    \_[2] Aggregate [groupBy: o_orderkey] [aggs: sum(l_extendedprice)]
+       \_[3] Join [type=inner] [condition: o_orderkey = l_orderkey]
+          \_[4] TableScan [table: orders]
+          \_[5] TableScan [table: lineitem]
