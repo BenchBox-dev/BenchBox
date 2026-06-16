@@ -130,6 +130,25 @@ def _comparison_predicates(scope: Scope) -> Iterable[exp.Binary]:
     return predicates
 
 
+def _dml_outer_columns(tree: exp.Expression, column_index: dict[str, set[str]]) -> set[str]:
+    """Columns exposed by an UPDATE/DELETE target (and USING/FROM) tables.
+
+    These tables are the outermost correlation source for a subquery inside the
+    DML statement, but they are not modeled as a parent scope, so they are
+    collected directly. Tables nested inside a subquery (which have a SELECT
+    ancestor) are excluded - those are inner sources, not the DML outer.
+    """
+    if not isinstance(tree, (exp.Update, exp.Delete)):
+        return set()
+    outer_tables: set[str] = set()
+    for table in tree.find_all(exp.Table):
+        if table.find_ancestor(exp.Select) is None:
+            outer_tables.add(table.name.lower())
+    if not outer_tables:
+        return set()
+    return {col for col, tables in column_index.items() if tables & outer_tables}
+
+
 def find_self_binding_candidates(
     sql: str, column_index: dict[str, set[str]], *, dialect: str = "duckdb"
 ) -> list[SelfBindingCandidate]:
@@ -150,16 +169,24 @@ def find_self_binding_candidates(
     if root is None:
         return []
 
+    # For UPDATE/DELETE the target (and USING/FROM) tables are the outermost
+    # correlation source, but sqlglot does not expose them as a parent scope of
+    # the subquery, so collect their columns explicitly. Otherwise a correlated
+    # subquery in DML would never see an "outer" relation and self-binds there
+    # would be silently missed.
+    dml_outer_provided = _dml_outer_columns(tree, column_index)
+
     candidates: list[SelfBindingCandidate] = []
     seen: set[tuple[str, str]] = set()
     for scope in root.traverse():
-        if scope.parent is None:
-            continue  # top-level scope cannot self-bind to an outer relation
         inner_aliases = {alias.lower() for alias in scope.sources}
         inner_provided = _provided_columns(scope, column_index)
         if not inner_provided:
             continue
-        outer_provided: set[str] = set()
+        # A column must be providable by an OUTER relation to be a self-bind; the
+        # top-level query scope has no outer source, so it never flags (no explicit
+        # parentless skip needed).
+        outer_provided: set[str] = set(dml_outer_provided)
         ancestor = scope.parent
         while ancestor is not None:
             outer_provided |= _provided_columns(ancestor, column_index)

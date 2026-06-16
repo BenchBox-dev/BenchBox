@@ -103,3 +103,28 @@ def test_fully_qualified_correlation_is_not_flagged(tpch_index):
         )
     """
     assert find_self_binding_candidates(sql, tpch_index) == []
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        # correlated DELETE: bare o_custkey should be the target orders, binds inner o2
+        "delete from orders where o_totalprice < ("
+        "select avg(o2.o_totalprice) from orders o2 where o2.o_custkey = o_custkey)",
+        # correlated UPDATE: bare o_orderkey should be the target orders, binds inner o2
+        "update orders set o_comment = 'x' where o_totalprice > ("
+        "select avg(o2.o_totalprice) from orders o2 where o2.o_orderkey = o_orderkey)",
+    ],
+)
+def test_dml_correlated_self_bind_is_flagged(sql, tpch_index):
+    """Self-binds inside UPDATE/DELETE subqueries must not be skipped (DML coverage)."""
+    assert find_self_binding_candidates(sql, tpch_index), "DML correlated self-bind was not flagged"
+
+
+def test_dml_correlation_qualified_to_target_is_clean(tpch_index):
+    """A DML subquery correlation qualified to the target table is correct."""
+    sql = (
+        "delete from orders where o_totalprice < ("
+        "select avg(o2.o_totalprice) from orders o2 where o2.o_custkey = orders.o_custkey)"
+    )
+    assert find_self_binding_candidates(sql, tpch_index) == []

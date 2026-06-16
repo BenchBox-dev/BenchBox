@@ -86,7 +86,10 @@ work:
     status: done
     notes: |
       Swept with the detector. SSB, join-order, read-primitives, write-primitives:
-      0 candidates. TPC-DS: 2 candidates (q14, q54), both HUMAN-CONFIRMED FALSE
+      0 candidates. The detector analyzes UPDATE/DELETE subqueries (the DML
+      target/USING tables are treated as the outer correlation source), so the
+      write-primitives "clean" result is verified, not a skipped-DML blind spot.
+      TPC-DS: 2 candidates (q14, q54), both HUMAN-CONFIRMED FALSE
       POSITIVES - they are derived-table column aliases that reuse a base-table
       column name (q14 `item.i_item_sk AS ss_item_sk`; q54
       `ws_bill_customer_sk AS customer_sk`), so the bare column binds correctly.
