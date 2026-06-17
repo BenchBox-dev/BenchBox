@@ -74,7 +74,7 @@ work:
   - id: w1
     summary: "Inventory dual-surface benchmarks and confirm SQL<->DataFrame query-id correspondence"
     needs: [w0]
-    status: pending
+    status: in_progress
     notes: |
       For each benchmark with both surfaces, confirm the SQL and DataFrame query
       sets cover the same logical queries (matching ids/keys) and can run on a
@@ -82,20 +82,42 @@ work:
       (out of scope here - owned by benchmark-correctness-oracle-coverage-map),
       and any that need per-benchmark normalization (top-N/LIMIT, column order).
 
+      IN PROGRESS. Surface scan (dataframe_queries module OR package) confirms a
+      DataFrame surface for: amplab, clickbench, coffeeshop, datavault,
+      flightdata, joinorder, joinorder_synthetic, nyctaxi, read_primitives, ssb,
+      tpcds, tpcds_obt, tpch, tpch_skew, tsbs_devops, h2odb (+ tpchavoc). The
+      ungated, no-expected-results dual-surface targets per the TODO are: ssb,
+      clickbench, joinorder, coffeeshop, amplab, nyctaxi, flightdata, tsbs_devops,
+      tpcds_obt, tpch_skew, read_primitives.
+
+      Confirmed and gated: ssb - SQL get_queries() and the SSB_DATAFRAME_QUERIES
+      registry both key by identical ids Q1.1..Q4.3 (13 queries, 1:1). Per-
+      benchmark normalization finding: schema shape is heterogeneous - TPC-H/
+      tpchavoc expose typed Table/Column objects, but ssb/amplab/coffeeshop/etc.
+      expose dict-shaped TABLES. The shared harness now offers
+      build_dataframe_contexts_from_specs((name, [(col, sql_type)])) so both
+      shapes reuse one DuckDB->Arrow->register loop. Remaining benchmarks'
+      id-correspondence to be confirmed as each gate is built (w4).
+
   - id: w2
     summary: "Run the cross-surface gate in report mode over the ungated dual-surface benchmarks and enumerate divergences"
     needs: [w1]
-    status: pending
+    status: in_progress
     notes: |
       Prioritize benchmarks with NO expected-results oracle: ssb, clickbench,
       joinorder, coffeeshop, amplab, nyctaxi, flightdata, tsbs_devops, tpcds_obt,
       tpch_skew, read_primitives. Report (benchmark, query, kind, deltas) without
       asserting. Capture stdout to /tmp and summarize counts in the PR/TODO.
 
+      IN PROGRESS. ssb done: report mode over 26 query-backend cells (13 queries
+      x 2 backends) at SF=0.1 on DuckDB reported 0 divergent, 26 equivalent - the
+      SQL and DataFrame surfaces already agree, no burndown needed. Remaining
+      ungated benchmarks to be reported as each gate is built.
+
   - id: w3
     summary: "Burn down divergences (fix the wrong surface) or declare intentional ones"
     needs: [w2]
-    status: pending
+    status: in_progress
     notes: |
       For each divergence, determine which surface is wrong and fix it; verify the
       fix makes the two surfaces agree. Where a difference is intentional and
@@ -103,10 +125,12 @@ work:
       record it as a classified, justified known-divergence entry, mirroring the
       TPC-Havoc baseline discipline (default: empty baseline, every query matches).
 
+      IN PROGRESS. ssb: no burndown required (0 divergences); baseline empty.
+
   - id: w4
     summary: "Promote to bounded CI gates and add fast-lane regressions"
     needs: [w3]
-    status: pending
+    status: in_progress
     notes: |
       One bounded small-SF DuckDB cell per gated benchmark, wired into the
       correctness-gate CI job and a Make target, mirroring
@@ -114,6 +138,19 @@ work:
       benchmark like tests/integration/test_tpchavoc_variant_equivalence.py.
       Prove each gate fails when a deliberate divergence is introduced into one
       surface.
+
+      IN PROGRESS. Generic cross-surface gate landed at
+      benchbox/core/equivalence/cross_surface.py (find_cross_surface_divergences,
+      CrossSurfaceGate, GATES registry) reusing the shared harness +
+      ResultValidator; the DataFrame side executes through the real
+      DataFrameQuery.get_impl_for_family dispatch. First gated benchmark: ssb -
+      `make ssb-cross-surface-equivalence-report` (added to the correctness-gate
+      CI job in pr.yml), fast-lane tests/integration/test_ssb_cross_surface_equivalence.py
+      (medium marker), and unit coverage tests/unit/core/equivalence/test_cross_surface.py.
+      Verified the gate FAILS on a planted SSB defect (only Q1.1_expression
+      diverges, no collateral). Remaining ungated benchmarks: clickbench,
+      joinorder, coffeeshop, amplab, nyctaxi, flightdata, tsbs_devops, tpcds_obt,
+      tpch_skew, read_primitives - one focused gate PR each.
 
 deferred:
   - summary: "Cross-surface equivalence on a second engine"

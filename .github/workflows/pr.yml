@@ -395,6 +395,9 @@ jobs:
       - name: Run TPC-Havoc DataFrame variant-equivalence gate
         run: make tpchavoc-dataframe-equivalence-report
 
+      - name: Run SSB cross-surface SQL<->DataFrame equivalence gate
+        run: make ssb-cross-surface-equivalence-report
+
   postgres-integration:
     name: postgres-integration
     needs: ci-paths

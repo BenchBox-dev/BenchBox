@@ -71,8 +71,17 @@ class SurfaceDivergence:
         return f"{self.query_id}_{self.cell}" if self.cell else f"{self.query_id}"
 
 
-def build_dataframe_contexts(connection: Any, tables: Iterable[Any]) -> dict[str, Any]:
-    """Materialize ``tables`` on ``connection`` into both DataFrame backend contexts.
+def build_dataframe_contexts_from_specs(
+    connection: Any,
+    table_specs: Iterable[tuple[str, Iterable[tuple[str, str]]]],
+) -> dict[str, Any]:
+    """Materialize tables described by ``(name, [(column, sql_type), ...])`` specs.
+
+    The benchmark-agnostic core of :func:`build_dataframe_contexts`: it takes a
+    normalized ``(table_name, columns)`` description - where ``columns`` is an
+    iterable of ``(column_name, sql_type_string)`` pairs - so it works for any
+    benchmark regardless of whether its schema is exposed as typed objects
+    (TPC-H ``Table``/``Column``) or plain dicts (SSB/amplab/etc.).
 
     Tables are exported once through Arrow with ``DECIMAL`` columns cast to
     ``DOUBLE``, mirroring the production DataFrame loader's schema mapping
@@ -87,9 +96,8 @@ def build_dataframe_contexts(connection: Any, tables: Iterable[Any]) -> dict[str
     Args:
         connection: A DuckDB connection already populated with the benchmark's
             data.
-        tables: The benchmark's table schemas; each must expose ``.name`` and a
-            ``.columns`` iterable of columns exposing ``.name`` and a
-            ``.data_type`` whose ``.value`` is the SQL type string.
+        table_specs: Iterable of ``(table_name, columns)`` where ``columns`` is
+            an iterable of ``(column_name, sql_type_string)`` pairs.
 
     Returns:
         Mapping of backend name (see :data:`DATAFRAME_BACKENDS`) to a context
@@ -103,20 +111,42 @@ def build_dataframe_contexts(connection: Any, tables: Iterable[Any]) -> dict[str
 
     expression_ctx = PolarsDataFrameAdapter().create_context()
     pandas_ctx = PandasDataFrameAdapter().create_context()
-    for table in tables:
+    for table_name, columns in table_specs:
         projections = [
-            f"CAST({column.name} AS DOUBLE) AS {column.name}"
-            if column.data_type.value.startswith("DECIMAL")
-            else column.name
-            for column in table.columns
+            f"CAST({column} AS DOUBLE) AS {column}" if str(sql_type).upper().startswith("DECIMAL") else column
+            for column, sql_type in columns
         ]
         # fetch_arrow_table() (not .arrow()) so the result is a materialized
         # pyarrow.Table on every DuckDB version, including >=1.4 where
         # .arrow() returns a RecordBatchReader.
-        arrow = connection.execute(f"SELECT {', '.join(projections)} FROM {table.name.lower()}").fetch_arrow_table()
-        expression_ctx.register_table(table.name, pl.from_arrow(arrow).lazy())
-        pandas_ctx.register_table(table.name, arrow.to_pandas(types_mapper=pd.ArrowDtype))
+        arrow = connection.execute(f"SELECT {', '.join(projections)} FROM {table_name.lower()}").fetch_arrow_table()
+        expression_ctx.register_table(table_name, pl.from_arrow(arrow).lazy())
+        pandas_ctx.register_table(table_name, arrow.to_pandas(types_mapper=pd.ArrowDtype))
     return {"expression": expression_ctx, "pandas": pandas_ctx}
+
+
+def build_dataframe_contexts(connection: Any, tables: Iterable[Any]) -> dict[str, Any]:
+    """Materialize typed-object ``tables`` into both DataFrame backend contexts.
+
+    Convenience wrapper over :func:`build_dataframe_contexts_from_specs` for
+    benchmarks whose schema is exposed as typed objects (TPC-H ``Table`` whose
+    ``.columns`` expose ``.name`` and a ``.data_type`` with a ``.value`` SQL type
+    string). Benchmarks with dict-shaped schemas call
+    :func:`build_dataframe_contexts_from_specs` directly with normalized specs.
+
+    Args:
+        connection: A DuckDB connection already populated with the benchmark's
+            data.
+        tables: The benchmark's table schemas; each must expose ``.name`` and a
+            ``.columns`` iterable of columns exposing ``.name`` and a
+            ``.data_type`` whose ``.value`` is the SQL type string.
+
+    Returns:
+        Mapping of backend name (see :data:`DATAFRAME_BACKENDS`) to a context
+        with all of the benchmark's tables registered.
+    """
+    specs = ((table.name, [(column.name, column.data_type.value) for column in table.columns]) for table in tables)
+    return build_dataframe_contexts_from_specs(connection, specs)
 
 
 def materialize_rows(result: Any) -> list[tuple[Any, ...]]:
