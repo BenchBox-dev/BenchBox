@@ -2,7 +2,7 @@ id: benchmark-cross-surface-equivalence-gate
 title: "Generalize the result-equivalence harness and gate SQL<->DataFrame equivalence for dual-surface benchmarks"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
@@ -50,7 +50,7 @@ prior_art:
 work:
   - id: w0
     summary: "Extract a benchmark-agnostic cross-surface equivalence harness from the TPC-Havoc DataFrame gate"
-    status: pending
+    status: done
     notes: |
       Factor the data-build + run-SQL + run-DataFrame + compare loop out of
       tpchavoc/dataframe_equivalence.py into a shared core helper parameterized by
@@ -59,6 +59,17 @@ work:
       with NO behavior change (its gate must stay green and byte-equivalent in
       result). Reuse validate_variant_equivalence / the result validator and the
       DuckDB data builder; do not fork them.
+
+      DONE: shared harness landed at benchbox/core/equivalence/dataframe_surface.py
+      (build_dataframe_contexts, materialize_rows, fetch_reference_rows,
+      find_surface_divergences, SurfaceDivergence, _normalize_value). The TPC-Havoc
+      DataFrame gate (benchbox/core/tpchavoc/dataframe_equivalence.py) is now a thin
+      wrapper over it: it injects the canonical-TPC-H reference, the variant/backend
+      cell enumeration, and the reused validate_variant_equivalence comparator +
+      build_duckdb_with_tpch data builder. Gate re-verified byte-equivalent:
+      "checked 440 variant-backend cells - 0 divergent, 440 equivalent". Fast-lane
+      tests/integration/test_tpchavoc_dataframe_variant_equivalence.py still passes;
+      new fast-lane unit coverage at tests/unit/core/equivalence/.
 
   - id: w1
     summary: "Inventory dual-surface benchmarks and confirm SQL<->DataFrame query-id correspondence"

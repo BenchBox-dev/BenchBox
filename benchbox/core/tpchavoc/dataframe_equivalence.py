@@ -19,11 +19,19 @@ DuckDB (never to the variant's SQL namesake and never to a sibling DataFrame
 variant), and **exits non-zero** if any variant/backend cell diverges beyond
 :data:`KNOWN_DIVERGENCES` (currently empty - every cell must match).
 
-It deliberately reuses the SQL gate's data builder
-(:func:`~benchbox.core.tpchavoc.equivalence.build_duckdb_with_tpch`) and the
-existing comparator (:meth:`TPCHavocBenchmark.validate_variant_equivalence`);
-the only new logic is materializing tables into DataFrame contexts and variant
-results into ordered row tuples.
+It is a thin benchmark-specific wrapper over the shared, benchmark-agnostic
+harness in :mod:`benchbox.core.equivalence.dataframe_surface`: it reuses that
+harness's DataFrame materialization
+(:func:`~benchbox.core.equivalence.dataframe_surface.materialize_rows`,
+:func:`~benchbox.core.equivalence.dataframe_surface.build_dataframe_contexts`,
+:func:`~benchbox.core.equivalence.dataframe_surface.fetch_reference_rows`) and
+its compare loop
+(:func:`~benchbox.core.equivalence.dataframe_surface.find_surface_divergences`),
+the SQL gate's data builder
+(:func:`~benchbox.core.tpchavoc.equivalence.build_duckdb_with_tpch`), and the
+existing comparator (:meth:`TPCHavocBenchmark.validate_variant_equivalence`).
+The only TPC-Havoc-specific logic here is the canonical reference accessor, the
+variant/backend cell enumeration, and the Q11 scale-aware parameter wiring.
 
 Two normalization choices differ from the SQL gate, both forced by the
 surface:
@@ -58,21 +66,32 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass
-from datetime import date, datetime, time
-from decimal import Decimal
-from typing import Any, Callable
+from collections.abc import Callable, Iterable
+from typing import Any
 
+from benchbox.core.equivalence.dataframe_surface import (
+    DATAFRAME_BACKENDS,
+    SurfaceDivergence,
+    build_dataframe_contexts as _build_dataframe_contexts,
+    fetch_reference_rows,
+    find_surface_divergences,
+    materialize_rows,
+)
 from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
 from benchbox.core.tpchavoc.equivalence import EQUIVALENCE_SCALE, build_duckdb_with_tpch
 from benchbox.core.tpchavoc.validation import ValidationError
 
-# Both shipped DataFrame backends are gated: they are independent
-# implementations (expression_impl vs pandas_impl) and can diverge
-# independently. The reference adapters are Polars (expression family) and
-# Pandas (pandas family).
-DATAFRAME_BACKENDS = ("expression", "pandas")
+# Re-exported from the shared harness so existing imports of these names from
+# this module keep working; the comparator/data-builder are never forked.
+__all__ = [
+    "DATAFRAME_BACKENDS",
+    "KNOWN_DIVERGENCES",
+    "build_dataframe_contexts",
+    "fetch_canonical_rows",
+    "find_dataframe_divergences",
+    "main",
+    "materialize_rows",
+]
 
 # Variant/backend cells tolerated to diverge from canonical TPC-H at
 # EQUIVALENCE_SCALE, with the reason class. Empty: every DataFrame variant must
@@ -81,36 +100,17 @@ DATAFRAME_BACKENDS = ("expression", "pandas")
 # Keyed by "<query>_v<variant>:<backend>".
 KNOWN_DIVERGENCES: dict[str, str] = {}
 
-_MIDNIGHT = time(0, 0, 0)
-
-
-@dataclass(frozen=True)
-class DataFrameDivergence:
-    """A variant/backend cell whose result differs from canonical TPC-H."""
-
-    query_id: int
-    variant_id: int
-    backend: str
-    detail: str
-
-    @property
-    def key(self) -> str:
-        """Stable ``<query>_v<variant>:<backend>`` identifier."""
-        return f"{self.query_id}_v{self.variant_id}:{self.backend}"
+# Canonical TPC-H SQL reference rows are normalized the same way as the
+# DataFrame side; re-exported under the historical name for callers/tests.
+fetch_canonical_rows = fetch_reference_rows
 
 
 def build_dataframe_contexts(connection: Any) -> dict[str, Any]:
     """Materialize the TPC-H tables on ``connection`` into both DataFrame contexts.
 
-    Tables are exported once through Arrow with ``DECIMAL`` columns cast to
-    ``DOUBLE``, mirroring the production DataFrame loader's schema mapping
-    (``DECIMAL(15,2) -> Float64`` / ``double``), then registered with the
-    reference adapter context of each backend: Polars lazy frames for the
-    expression family and Arrow-backed Pandas frames (production loads Parquet
-    with ``dtype_backend="pyarrow"``) for the pandas family.
-
-    Platform imports are deferred so importing this module does not pull
-    Polars or Pandas into the core import graph.
+    Thin TPC-H-specific wrapper over
+    :func:`benchbox.core.equivalence.dataframe_surface.build_dataframe_contexts`,
+    supplying the TPC-H table schema.
 
     Args:
         connection: A DuckDB connection already populated with TPC-H data.
@@ -119,61 +119,9 @@ def build_dataframe_contexts(connection: Any) -> dict[str, Any]:
         Mapping of backend name (see :data:`DATAFRAME_BACKENDS`) to a context
         with all eight TPC-H tables registered.
     """
-    import pandas as pd
-    import polars as pl
-
     from benchbox.core.tpch.schema import TABLES
-    from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
-    from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
 
-    expression_ctx = PolarsDataFrameAdapter().create_context()
-    pandas_ctx = PandasDataFrameAdapter().create_context()
-    for table in TABLES:
-        projections = [
-            f"CAST({column.name} AS DOUBLE) AS {column.name}"
-            if column.data_type.value.startswith("DECIMAL")
-            else column.name
-            for column in table.columns
-        ]
-        # fetch_arrow_table() (not .arrow()) so the result is a materialized
-        # pyarrow.Table on every DuckDB version, including >=1.4 where
-        # .arrow() returns a RecordBatchReader.
-        arrow = connection.execute(f"SELECT {', '.join(projections)} FROM {table.name.lower()}").fetch_arrow_table()
-        expression_ctx.register_table(table.name, pl.from_arrow(arrow).lazy())
-        pandas_ctx.register_table(table.name, arrow.to_pandas(types_mapper=pd.ArrowDtype))
-    return {"expression": expression_ctx, "pandas": pandas_ctx}
-
-
-def materialize_rows(result: Any) -> list[tuple[Any, ...]]:
-    """Materialize a DataFrame query result to normalized row tuples.
-
-    Accepts whatever a variant implementation returns on either backend - a
-    ``UnifiedLazyFrame``/``UnifiedPandasFrame`` wrapper, a Polars lazy or eager
-    frame, or a Pandas frame - and produces plain row tuples in the frame's
-    column order with values normalized via :func:`_normalize_value`.
-    """
-    native = getattr(result, "native", result)
-    if hasattr(native, "collect"):
-        native = native.collect()
-    if hasattr(native, "rows"):
-        raw_rows = native.rows()
-    elif hasattr(native, "itertuples"):
-        raw_rows = native.itertuples(index=False, name=None)
-    else:
-        raise TypeError(f"cannot materialize result of type {type(native).__name__}")
-    return [tuple(_normalize_value(value) for value in row) for row in raw_rows]
-
-
-def fetch_canonical_rows(connection: Any, canonical_sql: str) -> list[tuple[Any, ...]]:
-    """Execute canonical TPC-H SQL and return normalized row tuples.
-
-    The query is executed as-is - including its presentational top-N ``LIMIT``
-    - because the DataFrame implementations reproduce that cut (see module
-    docstring). Values pass through the same normalization as the DataFrame
-    side so the comparator sees one scalar vocabulary.
-    """
-    rows = connection.execute(canonical_sql).fetchall()
-    return [tuple(_normalize_value(value) for value in row) for row in rows]
+    return _build_dataframe_contexts(connection, TABLES)
 
 
 def find_dataframe_divergences(
@@ -184,7 +132,7 @@ def find_dataframe_divergences(
     *,
     query_ids: list[int] | None = None,
     backends: tuple[str, ...] = DATAFRAME_BACKENDS,
-) -> list[DataFrameDivergence]:
+) -> list[SurfaceDivergence]:
     """Compare every DataFrame variant of each query to canonical TPC-H.
 
     Args:
@@ -199,16 +147,40 @@ def find_dataframe_divergences(
         backends: Backends to gate; defaults to both shipped backends.
 
     Returns:
-        One :class:`DataFrameDivergence` per variant/backend cell whose result
-        is not equivalent to canonical TPC-H. Reuses
-        :meth:`TPCHavocBenchmark.validate_variant_equivalence`.
+        One :class:`SurfaceDivergence` per variant/backend cell whose result is
+        not equivalent to canonical TPC-H (cell label ``v<variant>:<backend>``).
+        Reuses :meth:`TPCHavocBenchmark.validate_variant_equivalence` and the
+        shared :func:`find_surface_divergences` loop.
     """
     from benchbox.core.tpch import dataframe_queries as tpch_dataframe_queries
     from benchbox.core.tpch.dataframe_queries import set_parameter_overrides, set_scale_factor
 
     ids = query_ids if query_ids is not None else benchmark.get_implemented_queries()
     registry = benchmark.get_dataframe_queries()
-    divergences: list[DataFrameDivergence] = []
+
+    def reference_rows(query_id: int) -> list[tuple[Any, ...]]:
+        return fetch_canonical_rows(connection, canonical_query(query_id))
+
+    def candidate_cells(
+        query_id: int,
+    ) -> Iterable[tuple[str, Callable[[list[tuple[Any, ...]]], None]]]:
+        for variant_id in range(1, 11):
+            query = registry.get_or_raise(f"Q{query_id}v{variant_id}")
+            for backend in backends:
+                impl = query.expression_impl if backend == "expression" else query.pandas_impl
+
+                def check(
+                    reference: list[tuple[Any, ...]],
+                    *,
+                    impl: Any = impl,
+                    backend: str = backend,
+                    variant_id: int = variant_id,
+                ) -> None:
+                    candidate = materialize_rows(impl(contexts[backend]))
+                    benchmark.validate_variant_equivalence(query_id, variant_id, reference, candidate)
+
+                yield f"v{variant_id}:{backend}", check
+
     # Compare against the scale-aware defaults alone. The DataFrame Q11 default
     # is now scale-aware (0.0001 / SF), exactly like canonical qgen and the
     # unseeded production run path, so no gate-local fraction override is needed:
@@ -219,27 +191,16 @@ def find_dataframe_divergences(
     set_parameter_overrides(None)
     set_scale_factor(benchmark.scale_factor)
     try:
-        for query_id in ids:
-            try:
-                canonical_rows = fetch_canonical_rows(connection, canonical_query(query_id))
-            except Exception as exc:  # noqa: BLE001 - a diagnostic must report, not crash, on a bad query
-                divergences.append(DataFrameDivergence(query_id, 0, "canonical", f"canonical query failed: {exc}"))
-                continue
-            for variant_id in range(1, 11):
-                query = registry.get_or_raise(f"Q{query_id}v{variant_id}")
-                for backend in backends:
-                    impl = query.expression_impl if backend == "expression" else query.pandas_impl
-                    try:
-                        variant_rows = materialize_rows(impl(contexts[backend]))
-                        benchmark.validate_variant_equivalence(query_id, variant_id, canonical_rows, variant_rows)
-                    except ValidationError as exc:
-                        divergences.append(DataFrameDivergence(query_id, variant_id, backend, str(exc)))
-                    except Exception as exc:  # noqa: BLE001 - surface execution errors as divergences
-                        divergences.append(DataFrameDivergence(query_id, variant_id, backend, f"error: {exc}"))
+        return find_surface_divergences(
+            ids,
+            reference_rows=reference_rows,
+            candidate_cells=candidate_cells,
+            validation_error=ValidationError,
+            reference_failure_cell="v0:canonical",
+        )
     finally:
         set_parameter_overrides(previous_overrides)
         set_scale_factor(previous_scale_factor)
-    return divergences
 
 
 def main() -> int:
@@ -270,7 +231,7 @@ def main() -> int:
         f"{len(divergences)} divergent, {total - len(divergences)} equivalent\n"
     )
 
-    by_class: dict[str, list[DataFrameDivergence]] = {}
+    by_class: dict[str, list[SurfaceDivergence]] = {}
     for divergence in sorted(divergences, key=lambda d: _sort_key(d.key)):
         klass = KNOWN_DIVERGENCES.get(divergence.key, "UNCLASSIFIED")
         by_class.setdefault(klass, []).append(divergence)
@@ -287,33 +248,6 @@ def main() -> int:
     if not new and not resolved:
         print("All DataFrame variants equivalent to canonical TPC-H (modulo KNOWN_DIVERGENCES).")
     return 1 if new else 0
-
-
-def _normalize_value(value: Any) -> Any:
-    """Normalize one result value to a plain Python scalar.
-
-    Maps DuckDB ``Decimal`` to float (the DataFrame surface computes in
-    float64), midnight timestamps to dates (Pandas materializes DATE columns
-    as midnight ``Timestamp``), missing values (``None``/``NaN``/Pandas
-    ``NA``/``NaT``) to ``None``, and unwraps NumPy/Arrow scalars via
-    ``.item()``.
-    """
-    if value is None:
-        return None
-    if isinstance(value, Decimal):
-        return float(value)
-    if isinstance(value, datetime):  # before date: datetime subclasses date
-        return value.date() if value.time() == _MIDNIGHT else value
-    if isinstance(value, float):  # before .item(): NumPy floats subclass float
-        return None if math.isnan(value) else float(value)
-    if isinstance(value, (str, bytes, int, date)):
-        return value
-    if type(value).__name__ in ("NAType", "NaTType"):  # pandas.NA / pandas.NaT without importing pandas
-        return None
-    item = getattr(value, "item", None)  # NumPy / Arrow scalar wrappers
-    if callable(item):
-        return _normalize_value(item())
-    return value
 
 
 def _sort_key(key: str) -> tuple[int, int, str]:
