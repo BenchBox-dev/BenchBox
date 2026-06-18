@@ -52,6 +52,7 @@ class _PandasStub(PandasFamilyAdapter[dict]):
         header: int | None = 0,
         names: list[str] | None = None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,
     ) -> dict:
         self.calls.append({"path": path, "delimiter": delimiter, "null_marker": null_marker})
         return {"rows": 0, "_columns": names or []}

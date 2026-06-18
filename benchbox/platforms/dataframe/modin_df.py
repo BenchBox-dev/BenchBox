@@ -271,6 +271,7 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
         header: int | None = 0,
         names: list[str] | None = None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,  # noqa: ARG002 - accepted for signature parity; Modin infers types
     ) -> ModinDF:
         """Read a CSV file into a Modin DataFrame.
 

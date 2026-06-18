@@ -209,6 +209,7 @@ class CuDFDataFrameAdapter(PandasFamilyAdapter[CuDFDF]):
         header: int | None = 0,
         names: list[str] | None = None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,  # noqa: ARG002 - accepted for signature parity; cuDF infers types
     ) -> CuDFDF:
         """Read a CSV file into a cuDF DataFrame.
 

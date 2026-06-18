@@ -59,16 +59,45 @@ def _parse_date_value(value: Any) -> Any:
     return pd.to_datetime(value).date()
 
 
-def _pandas_parse_date_columns(names: list[str] | None) -> tuple[list[str], list[str]]:
-    """Infer date and timestamp columns for raw CSV/TBL loads with explicit schemas."""
+# SQL type prefixes that are numeric, not temporal. A column named like a date
+# but declared with one of these (e.g. SSB's INTEGER ``lo_orderdate`` YYYYMMDD
+# datekeys) is a key, not a date, and must never be coerced to a date dtype.
+_NUMERIC_SQL_TYPE_PREFIXES = ("INT", "BIGINT", "SMALLINT", "TINYINT", "DECIMAL", "NUMERIC", "FLOAT", "DOUBLE", "REAL")
+
+
+def _is_numeric_sql_type(sql_type: str | None) -> bool:
+    """True if ``sql_type`` is a numeric SQL type (so a date-named column is a key)."""
+    if not sql_type:
+        return False
+    upper = sql_type.upper()
+    return any(upper.startswith(prefix) for prefix in _NUMERIC_SQL_TYPE_PREFIXES)
+
+
+def _pandas_parse_date_columns(
+    names: list[str] | None,
+    column_types: list[str] | None = None,
+) -> tuple[list[str], list[str]]:
+    """Infer date and timestamp columns for raw CSV/TBL loads with explicit schemas.
+
+    When ``column_types`` (parallel to ``names``) is supplied, a column whose
+    declared SQL type is numeric is never treated as a date/timestamp even if its
+    name ends in ``date``/``time`` - this keeps integer datekey columns (e.g. SSB
+    ``lo_orderdate``) from being mis-parsed as dates.
+    """
     if not names:
         return [], []
+
+    types_by_name: dict[str, str] = {}
+    if column_types and len(column_types) == len(names):
+        types_by_name = {name.lower(): sql_type for name, sql_type in zip(names, column_types)}
 
     date_columns: list[str] = []
     datetime_columns: list[str] = []
     for name in names:
         lower_name = name.lower()
         if lower_name.endswith("_sk"):
+            continue
+        if _is_numeric_sql_type(types_by_name.get(lower_name)):
             continue
         if lower_name.endswith(("datetime", "_datetime", "timestamp", "_timestamp", "_dts")):
             datetime_columns.append(name)
@@ -246,6 +275,7 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
         header: int | None = 0,
         names: list[str] | None = None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,
     ) -> PandasDF:
         """Read a CSV file into a Pandas DataFrame.
 
@@ -255,6 +285,9 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
             header: Row to use as header (None for no header)
             names: Column names (if header is None)
             null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
+            column_types: Optional SQL types parallel to ``names``; used to keep
+                numeric columns named like dates (e.g. integer datekeys) from
+                being parsed as dates.
 
         Returns:
             Pandas DataFrame with the file contents
@@ -269,7 +302,7 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
         # Add column names if provided
         if names:
             read_kwargs["names"] = names
-            date_columns, datetime_columns = _pandas_parse_date_columns(names)
+            date_columns, datetime_columns = _pandas_parse_date_columns(names, column_types)
             if date_columns:
                 read_kwargs["converters"] = dict.fromkeys(date_columns, _parse_date_value)
             if datetime_columns:

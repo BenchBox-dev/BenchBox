@@ -38,7 +38,7 @@ class DummyAdapter(BenchmarkExecutionMixin):
     def create_context(self):
         return SimpleNamespace()
 
-    def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None):
+    def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None, benchmark=None, **kwargs):
         self.loaded_paths[table_name] = file_paths
         return 1
 
@@ -79,7 +79,7 @@ class DummyPandasProfiledAdapter(DummyAdapter):
 
 
 class FailingLoadAdapter(DummyAdapter):
-    def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None):
+    def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None, benchmark=None, **kwargs):
         raise RuntimeError("load failed")
 
 
