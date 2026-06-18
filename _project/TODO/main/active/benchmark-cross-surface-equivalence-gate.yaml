@@ -74,7 +74,7 @@ work:
   - id: w1
     summary: "Inventory dual-surface benchmarks and confirm SQL<->DataFrame query-id correspondence"
     needs: [w0]
-    status: in_progress
+    status: done
     notes: |
       For each benchmark with both surfaces, confirm the SQL and DataFrame query
       sets cover the same logical queries (matching ids/keys) and can run on a
@@ -96,8 +96,33 @@ work:
       tpchavoc expose typed Table/Column objects, but ssb/amplab/coffeeshop/etc.
       expose dict-shaped TABLES. The shared harness now offers
       build_dataframe_contexts_from_specs((name, [(col, sql_type)])) so both
-      shapes reuse one DuckDB->Arrow->register loop. Remaining benchmarks'
-      id-correspondence to be confirmed as each gate is built (w4).
+      shapes reuse one DuckDB->Arrow->register loop.
+
+      VERIFIED id-correspondence + feasibility map for the ungated targets
+      (probed SQL get_queries() vs each DataFrame registry's get_query_ids()):
+        - ssb            13 ids, 1:1 (Q1.1..Q4.3)              GATED (#815).
+        - coffeeshop     11 ids, 1:1                           ready; but DuckDB
+            ->Arrow date32 contexts break its pandas impls (date-vs-string
+            compare) -> needs the data-path decision below before gating.
+        - flightdata     20 ids, 1:1 (friendly names)          ready; NOTE no
+            synthetic generator module (uses real downloaded data) - confirm a
+            bounded data source before gating.
+        - read_primitives 157 SQL vs 152 DF                    gate the 152-id
+            intersection (5 SQL-only ids have no DF impl).
+        - amplab          8 ids, count matches; DF ids are Q-prefixed ('1'->'Q1')
+            -> mechanical id normalization in the spec.
+        - tpch_skew      22 ids, same; DF Q-prefixed ('1'->'Q1') -> same.
+        - nyctaxi        25 ids; SQL friendly-names vs DF 'Q1'..'Q25'  -> AMBIGUOUS
+            ordering map; needs independent verification of which SQL id == which
+            Qn before asserting (do NOT guess).
+        - tsbs_devops    18 ids; same friendly-name vs 'Qn' ambiguity as nyctaxi.
+        - joinorder      113 ids, 1:1 string keys BUT scale_factor=1.0-only
+            (canonical IMDb) -> does NOT fit the SF=0.1 bounded cell; use SF=1 or
+            joinorder_synthetic, a separate decision.
+        - clickbench     43 DF ids; benchmark construction differs (abstract base)
+            -> confirm SQL id set + construction before gating.
+        - tpcds_obt      (per source TODO) DF is a 3-query stub vs ~89 SQL - gate
+            only the implemented intersection or defer.
 
   - id: w2
     summary: "Run the cross-surface gate in report mode over the ungated dual-surface benchmarks and enumerate divergences"
@@ -200,6 +225,37 @@ open_questions:
     gating: false
     affects: ["w1 normalization", "w3 classification"]
     default: "Reuse the TPC-Havoc strip_top_n / validator normalization; add per-benchmark normalization only where w2 evidence shows an intentional, defensible presentational difference."
+    resolution: |
+      RESOLVED (2026-06-18, user decision): COLUMN ORDER/ALIASING differences ->
+      align the surfaces (make the two surfaces project the same column order),
+      rather than reorder in the comparator. The comparison stays positional
+      (validate_results_exact), which keeps it able to catch value-misplacement
+      bugs. First instance: SSB Q2.x SQL was reprojected to
+      (d_year, p_brand1, sum(lo_revenue) as revenue) to match the DataFrame
+      surface's natural group-keys-first order (#815). Evidence that drove this:
+      Codex flagged Q2 as a positional mismatch; the SF=0.1 gate had only passed
+      because Q2 returns 0 rows at that scale (a vacuous pass), so the divergence
+      was latent. For each future benchmark, confirm column order aligns (or align
+      one surface to the other, presentation-only) before gating.
+
+  - question: "How should the gate materialize DataFrame inputs - via DuckDB->Arrow (the TPC-Havoc template) or via the production DataFrame loader - given the impls' dtype expectations differ per benchmark?"
+    gating: true
+    affects: ["data-path for all gates beyond ssb"]
+    default: "Use DuckDB->Arrow (the proven TPC-Havoc template path); it is in-scope and shipped ssb."
+    resolution: |
+      RESOLVED (2026-06-18, user decision + scope evidence). The production
+      DataFrame loader was considered for dtype fidelity but is NOT viable here:
+      it lives in benchbox/platforms/dataframe/, OUTSIDE this TODO's scope_limit,
+      and it errors on ssb itself (its pandas date-name heuristic mis-parses
+      ssb's INTEGER lo_orderdate/lo_commitdate datekeys). The DataFrame impls also
+      have inconsistent dtype contracts (e.g. coffeeshop pandas impls compare a
+      date column to a STRING literal and break on a typed date32 column).
+      DECISION: keep the in-scope DuckDB->Arrow path; where an impl needs a
+      specific dtype, NORMALIZE that column in the gate's context builder TO MATCH
+      what the benchmark's production DataFrame run actually loads - first confirm
+      production's dtype for that column, then cast to match. NEVER cast just to
+      make a failing impl pass: if an impl genuinely fails under the dtype its
+      production run uses, report it as a real divergence/bug, do not mask it.
 
 success_metrics:
   - "A single shared harness backs both the TPC-Havoc gates and the new cross-surface gates; no duplicated comparator/data-builder."
