@@ -1,0 +1,187 @@
+id: tpchavoc-fourth-engine-equivalence-sampling
+title: "Sample TPC-Havoc variant equivalence on a fourth SQL engine (ClickHouse)"
+worktree: main
+priority: Low
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  The TPC-Havoc cross-dialect equivalence oracle now samples THREE engines: the
+  DuckDB SQL gate (PR #770, the hard blocker, KNOWN_DIVERGENCES empty), the
+  PostgreSQL sample (PR #803, 203/203 executable, POSTGRES_KNOWN_DIVERGENCES
+  empty), and the DataFusion sample (PR #806, 206/206 executable,
+  DATAFUSION_KNOWN_DIVERGENCES empty). The three-engine conclusion (PR #806 w4)
+  was that translation divergence is SYSTEMATIC-ZERO: every variant an engine can
+  execute is result-equivalent to canonical TPC-H run through the SAME translation
+  on the SAME instance; cross-engine differences live only in WHICH variants
+  execute (bounded by per-engine skip-lists), never in the RESULTS of the ones
+  that do.
+
+  But there is a confound: all three engines translate through a PostgreSQL-shaped
+  seam. SQLGlot normalizes "datafusion" -> "postgres"
+  (benchbox/utils/dialect_utils.py:normalize_dialect_for_sqlglot), and "netezza"
+  (the TPC-H source dialect) -> "postgres" too, so DuckDB, Postgres, and DataFusion
+  all receive SQL that is essentially Postgres-family. The systematic-zero result
+  may therefore reflect that the seam emits one dialect family faithfully - NOT
+  that it is faithful to an engine with genuinely different result semantics.
+
+  This TODO closes that gap with a FOURTH engine that translates through a NATIVE,
+  non-Postgres SQLGlot dialect and has known result-semantic differences:
+  ClickHouse. Unlike DataFusion, "clickhouse" is a first-class SQLGlot write
+  dialect (normalize_dialect_for_sqlglot("clickhouse") == "clickhouse"), so the
+  variants and canonical are rendered through a DIFFERENT code path in the seam.
+  ClickHouse also differs on exactly the result-semantic axes the earlier TODOs
+  flagged as the highest-information contrast: integer vs float division, NULL
+  ordering/placement, implicit casts, and Decimal-vs-Float aggregation. If the
+  systematic-zero result holds here, it is strong evidence the seam is faithful
+  across dialect FAMILIES; if it breaks, the divergences localize precisely the
+  result-semantic gaps a Postgres-shaped sample structurally cannot see.
+
+  This is the `deferred` follow-on recorded in BOTH
+  tpchavoc-cross-dialect-equivalence-sampling.yaml and
+  tpchavoc-third-engine-equivalence-sampling.yaml. It remains a SAMPLE: the DuckDB
+  gate stays the hard blocker; this does NOT gate all ~20 platforms.
+
+prior_art:
+  - "benchbox/core/tpchavoc/equivalence.py - the engine-agnostic oracle (find_divergences + the shared _report). Mirror build_postgres_with_tpch / build_datafusion_with_tpch, find_<engine>_divergences, run_<engine>_sample, and the engine-keyed <ENGINE>_KNOWN_DIVERGENCES. Do NOT fork the comparator."
+  - "benchbox/sql_compat/rules/execution_filter/postgres_tpchavoc.py and datafusion_tpchavoc.py - the per-engine execution-filter skip pattern (excluded, never marked equivalent), registered for the platform and wired into TPCHavocBenchmark.get_platform_skip_queries."
+  - "benchbox/utils/dialect_utils.py:normalize_dialect_for_sqlglot - 'clickhouse' is a NATIVE SQLGlot dialect (not normalized to postgres), which is the whole point: it exercises a different translation path than the three Postgres-family engines sampled so far."
+  - "benchbox/platforms/clickhouse* (clickhouse/, clickhouse_local.py, clickhouse_server.py, clickhouse_cloud.py) - existing ClickHouse adapters; clickhouse-local/chDB may allow an in-process or single-binary run that is cheaper than a server container."
+  - "tests/integration/platforms/test_tpchavoc_postgres_equivalence.py and test_tpchavoc_datafusion_equivalence.py - the live-sample test pattern (module-scoped fixture, sweep once, clean skip when the engine is unreachable)."
+  - ".github/workflows/pr.yml postgres-integration (service container) and datafusion-integration (in-process) jobs - the two non-blocking CI-posture templates to choose between."
+
+work:
+  - id: w0
+    summary: "Wire the ClickHouse build helper + sample path, reusing find_divergences and _report"
+    status: pending
+    notes: |
+      Add build_clickhouse_with_tpch, find_clickhouse_divergences, run_clickhouse_sample,
+      CLICKHOUSE_TARGET_DIALECT = "clickhouse", and an empty CLICKHOUSE_KNOWN_DIVERGENCES;
+      extend main()'s --engine. Canonical via tpch.get_query(q, dialect="clickhouse"),
+      variants via tpchavoc.translate_query_text(sql, "netezza", "clickhouse") - both
+      through the SAME native-clickhouse seam so shared translation cancels out. Decide
+      in-process (clickhouse-local / chDB) vs a server container; prefer the cheapest
+      path that still gives a real ClickHouse engine. The connection must expose
+      execute(sql).fetchall() (wrap if needed) and isolate per-query errors so one bad
+      variant cannot poison the sweep. Any indexes/ORDER BY/ANALYZE-equivalents are
+      PERFORMANCE setup only and must never change results. Verify each table loaded
+      rows (>0) so a partial load cannot produce a false green.
+
+  - id: w1
+    summary: "Run the oracle on ClickHouse in report mode and classify divergences"
+    needs: [w0]
+    status: pending
+    notes: |
+      Run `python -m benchbox.core.tpchavoc.equivalence --engine clickhouse` at
+      EQUIVALENCE_SCALE. Exclude only genuinely un-executable variants via a
+      CLICKHOUSE_TPCHAVOC_SKIPS execution-filter. For the rest, classify EVERY
+      divergence as one of: (a) translation-layer bug (fixable at the seam), (b)
+      irreducible engine-semantic RESULT difference (e.g. integer vs float division,
+      NULL ordering/placement, implicit cast, Decimal-vs-Float rounding) - the class
+      this engine is chosen to surface, or (c) a real variant defect the DuckDB gate
+      missed. Capture the full divergence list as w1 evidence before finalizing.
+
+  - id: w2
+    summary: "Drive divergences down; declare true engine-semantic exceptions"
+    needs: [w1]
+    status: pending
+    notes: |
+      Prefer fixing the translation seam (translate_query_text / translate_sql_query)
+      over per-variant hacks - a translation bug likely spans many variants/engines.
+      Record ONLY irreducible engine-semantic RESULT differences as classified,
+      justified entries in the engine-keyed CLICKHOUSE_KNOWN_DIVERGENCES (with a class
+      and rationale). Un-executable variants stay in CLICKHOUSE_TPCHAVOC_SKIPS, never
+      marked equivalent. If the comparator's float tolerance is too tight/loose for a
+      legitimate ClickHouse numeric representation, adjust comparison tolerance rather
+      than muting a real divergence - and document why.
+
+  - id: w3
+    summary: "Decide the routine-CI posture for the fourth engine and wire it"
+    needs: [w2]
+    status: pending
+    notes: |
+      From w1-w2 evidence choose: (a) a bounded check in a non-blocking CI job (a
+      ClickHouse service container, or an in-process clickhouse-local step like the
+      datafusion-integration job), or (b) periodic/opt-in if the surface is dominated
+      by declared engine differences or the run is too slow/flaky for routine CI.
+      Either way the DuckDB gate stays the hard blocker. Add a Makefile target
+      (tpchavoc-equivalence-report-clickhouse) and record the decision + rationale.
+
+  - id: w4
+    summary: "Synthesize the four-engine signal and update the cross-engine conclusion"
+    needs: [w3]
+    status: pending
+    notes: |
+      State whether the systematic-zero result survives a native-dialect engine. If it
+      holds, the seam is faithful across dialect FAMILIES (not just Postgres-shaped
+      ones) - a materially stronger claim than the three-engine result. If it breaks,
+      the divergences pinpoint the result-semantic gaps (division, NULL ordering,
+      casts) that a Postgres-shaped sample cannot see, and CLICKHOUSE_KNOWN_DIVERGENCES
+      documents them. Record whether a fifth engine is worth sequencing (it likely is
+      NOT, once both a Postgres-family and a non-Postgres-family engine agree).
+
+must_preserve:
+  - "The DuckDB SQL equivalence gate stays the hard, blocking gate with empty KNOWN_DIVERGENCES (220/220, exit 0)."
+  - "The PostgreSQL and DataFusion samples stay green; POSTGRES_/DATAFUSION_KNOWN_DIVERGENCES and their TPCHAVOC_SKIPS semantics are unchanged."
+  - "Reuse find_divergences, validate_variant_equivalence, and _report; no per-engine fork of the comparator/oracle."
+  - "Only an unreachable/unusable engine is a SKIP (mirror run_postgres_sample's connect-only skip); schema/load/translation/sweep failures must propagate."
+
+approach: |
+  Mirror the second/third-engine pattern for ClickHouse - a build helper, a
+  find_clickhouse_divergences, a run_clickhouse_sample, an engine-keyed
+  CLICKHOUSE_KNOWN_DIVERGENCES, and (only if needed) a CLICKHOUSE_TPCHAVOC_SKIPS
+  execution-filter (w0). Run the oracle in report mode and classify divergences,
+  expecting the first real result-semantic differences because ClickHouse uses a
+  NATIVE non-Postgres dialect (w1). Fix translation bugs at the seam and declare
+  irreducible engine-semantic result differences as justified exceptions (w2),
+  pick a bounded routine-CI posture from evidence (w3), and update the cross-engine
+  conclusion to a dialect-FAMILY claim (w4). DuckDB stays the hard gate.
+
+anti_patterns:
+  - "DO NOT gate all ~20 platforms in routine CI - one more engine, decided from evidence."
+  - "DO NOT treat a CLICKHOUSE_TPCHAVOC_SKIPS entry as an equivalence pass - exclude un-executable variants, never mark them equivalent."
+  - "DO NOT patch individual variants for what is a translation-layer bug - fix the seam so the fix generalizes across variants and engines."
+  - "DO NOT compare a ClickHouse variant result to a DuckDB/Postgres/DataFusion canonical - run canonical on the SAME engine, same dialect, both sides."
+
+verification:
+  - description: "ClickHouse report-mode oracle enumerates divergences excluding un-executable variants"
+    command: "make tpchavoc-equivalence-report-clickhouse  # report mode"
+    expected_output: "categorized divergence list over ClickHouse-executable variants; skip-list variants excluded"
+  - description: "DuckDB hard gate stays green and blocking after the fourth engine is added"
+    command: "make tpchavoc-equivalence-report"
+    expected_output: "checked 220 variants - 0 divergent, 220 equivalent; exit 0"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpchavoc/"
+    - "benchbox/sql_compat/"
+    - "tests/integration/"
+    - ".github/workflows/"
+    - "Makefile"
+    - "_project/TODO/"
+
+open_questions:
+  - question: "Fourth engine: ClickHouse (native SQLGlot dialect, result-semantic contrast) vs a Spark dialect?"
+    gating: true
+    affects: ["w0 engine choice"]
+    default: "ClickHouse - it translates through a NATIVE non-Postgres SQLGlot dialect (Spark also would, but ClickHouse has the sharpest, best-documented result-semantic differences: integer/float division, NULL ordering, implicit casts) and an existing adapter. Spark is a viable alternative if a Spark container is already cheaper to stand up."
+  - question: "CI cost: ClickHouse service container vs in-process clickhouse-local / chDB?"
+    gating: true
+    affects: ["w0 run mode", "w3 CI posture"]
+    default: "Prefer in-process clickhouse-local / chDB if it gives a faithful engine cheaply (like the datafusion-integration job); fall back to a service container (like postgres-integration) otherwise. Decide in w0 from what actually runs the variants correctly."
+  - question: "Reference: run canonical TPC-H on the same engine/dialect as the variants?"
+    gating: false
+    affects: ["w1 reference choice"]
+    default: "Yes - canonical and variants both translated to the clickhouse dialect and compared on the same instance, so shared translation cancels out and only genuine variant-vs-canonical (and engine-semantic) differences surface."
+
+success_metrics:
+  - "The equivalence oracle runs on a fourth SQL engine (ClickHouse) through a NATIVE non-Postgres dialect and reports variant divergences from canonical TPC-H."
+  - "Translation-induced divergences are fixed at the seam; irreducible engine-semantic RESULT differences are classified and justified in CLICKHOUSE_KNOWN_DIVERGENCES."
+  - "A documented routine-CI posture decision exists, with the DuckDB gate remaining the hard blocker."
+  - "A four-engine conclusion is recorded: whether translation fidelity holds across dialect FAMILIES, not just Postgres-shaped engines."
+
+metadata:
+  tags: [tpchavoc, cross-dialect, equivalence, correctness, clickhouse, ci]
+  estimated_effort: "Medium"
+  created_date: "2026-06-15"
+  last_updated: "2026-06-15T00:00:00"
