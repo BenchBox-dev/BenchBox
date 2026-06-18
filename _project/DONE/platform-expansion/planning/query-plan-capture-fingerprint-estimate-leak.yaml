@@ -2,8 +2,36 @@ id: query-plan-capture-fingerprint-estimate-leak
 title: "Stop cost/cardinality estimates leaking into plan fingerprints; add a cross-parser signature-hygiene invariant"
 worktree: platform-expansion
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Platform Expansion
+
+resolution: |
+  w1 (quantify the leak): confirmed empirically against live engines. Two parsers
+  fold estimate-bearing EXPLAIN detail into signature fields: DuckDB (FORMAT JSON
+  `extra_info` dict carries `Estimated Cardinality`, folded into
+  join_conditions/aggregation_functions/filter_expressions/sort_keys) and
+  DataFusion (EXPLAIN ANALYZE appends a `metrics=[output_rows=..]` block that the
+  filter detail captured). PostgreSQL and Redshift route cost/rows into dedicated,
+  non-hashed `properties`, so they were already clean; all other recorded fixtures
+  were verified clean.
+  w2 (strip estimates): added shared helpers `strip_estimates(text)` and
+  `strip_estimate_keys(mapping)` in parsers/base.py as the single place the rule
+  lives. DuckDB now strips estimate keys from the dict (raw kept in
+  platform_metadata); DataFusion strips the metrics block from the detail before
+  structural extraction. The strip is anchored to unambiguous estimate wording
+  (`Estimated Cardinality`, `EC:`, `metrics=[...]`, `(cost=N..N rows=N width=N)`)
+  so a genuine predicate on a column named cost/rows/num_rows/cardinality/ec is
+  never corrupted.
+  w3 (invariant): added tests/unit/query_plans/test_fingerprint_hygiene.py — a
+  registry-wide test that (a) asserts every registered parser's signature carries
+  no estimate token, with a coverage guard so a new parser must add a fixture, and
+  (b) asserts estimate-only-different fixtures produce identical fingerprints.
+  Updated the query_plan_models.py stability contract to drop the per-engine
+  stats-independence caveat now that the invariant enforces it.
+  Known impact: fingerprint VALUES for DuckDB/DataFusion JOIN/FILTER/AGGREGATE/SORT
+  plans change vs pre-fix captures (the intended correction). This is consistent
+  with the documented "not comparable across engine versions" property; stored
+  history/baseline fingerprints from before this change are recomputed on next run.
 
 description: |
   The plan fingerprint is documented (query_plan_models.py, added in #768) as a LOGICAL,
@@ -40,7 +68,7 @@ prior_art:
 work:
   - id: w1
     summary: "Quantify the leak: which parsers fold estimate/cost text into signature fields"
-    status: pending
+    status: done
     notes: |
       For each registered parser (duckdb, postgresql, redshift, datafusion, sqlite, presto,
       trino, clickhouse, spark) capture two fixtures of the same query that differ only in
@@ -49,7 +77,7 @@ work:
   - id: w2
     summary: "Strip estimate/cost tokens from signature-bearing fields in offending parsers"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       In each offending parser, keep the raw EXPLAIN detail in physical_operator.platform_metadata
       (not hashed) and place only the structural part (join keys, group keys, filter predicate
@@ -58,7 +86,7 @@ work:
   - id: w3
     summary: "Add a cross-parser signature-hygiene invariant test"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Create tests/unit/query_plans/test_fingerprint_hygiene.py. For every parser in the
       registry, parse two estimate-only-different fixtures and assert identical plan_fingerprint.

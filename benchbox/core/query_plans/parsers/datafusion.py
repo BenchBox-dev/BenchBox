@@ -26,7 +26,7 @@ import logging
 import re
 from typing import Any
 
-from benchbox.core.query_plans.parsers.base import QueryPlanParser
+from benchbox.core.query_plans.parsers.base import QueryPlanParser, strip_estimates
 from benchbox.core.results.query_plan_models import (
     JoinType,
     LogicalOperator,
@@ -336,7 +336,12 @@ class DataFusionQueryPlanParser(QueryPlanParser):
         Args:
             node: Operator node dictionary (modified in place)
         """
-        details = node.get("details", "")
+        # EXPLAIN ANALYZE appends a ``metrics=[output_rows=.., selectivity=..]`` block
+        # (and other estimates) to the detail line. Strip it before extracting the
+        # structural fields so cardinality estimates never reach a signature-bearing
+        # field. The raw detail (with metrics) is preserved in platform_metadata via
+        # node["details"], which is not hashed.
+        details = strip_estimates(node.get("details", ""))
         operator = node.get("operator", "").lower()
 
         if "scan" in operator or "datasource" in operator or "parquet" in operator:
