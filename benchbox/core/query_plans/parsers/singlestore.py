@@ -120,6 +120,12 @@ class SingleStoreQueryPlanParser(QueryPlanParser):
                 continue  # table-border separator row
             if line.strip() in ("EXPLAIN", "QUERY PLAN"):
                 continue
+            # Normalize SingleStore "| " (pipe + one space) branch-continuation
+            # prefix to the 4-char "|   " unit the depth formula (len // 4)
+            # expects. "|---" branch connectors are left unchanged (no space
+            # after "|---"). Without this, rows like "| HashTableBuild" that
+            # follow a "|---Join" connector are skipped because rest[0] == "|".
+            line = re.sub(r"\| (?!-)", "|   ", line)
             prefix, rest = self._PREFIX_RE.match(line).groups()
             rest = rest.strip()
             if not rest or not rest[0].isalpha():

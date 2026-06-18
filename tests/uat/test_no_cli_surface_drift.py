@@ -35,7 +35,6 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     "benchbox/cli/commands/compare_dataframes.py",
     "benchbox/cli/commands/compare_plans.py",
     "benchbox/cli/commands/df_tuning.py",
-    "benchbox/cli/commands/run.py",
     "benchbox/cli/commands/run_official.py",
     "benchbox/cli/commands/tuning.py",
 }

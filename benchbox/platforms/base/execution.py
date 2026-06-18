@@ -1387,8 +1387,15 @@ class TestDriversMixin:
             and not getattr(self, "dry_run_mode", False)
         )
         saved_capture_plans = getattr(self, "capture_plans", False)
+        saved_show_query_plans = getattr(self, "show_query_plans", False)
         if phase_eligible:
             self.capture_plans = False
+            # Suppress show_query_plans too: adapters guard display behind
+            # `if not self.capture_plans`, which setting capture_plans=False
+            # would re-enable. Suppressing both keeps EXPLAIN off the
+            # measurement path even when --show-plans and --capture-plans
+            # are both active.
+            self.show_query_plans = False
 
         try:
             console.print(
@@ -1438,6 +1445,7 @@ class TestDriversMixin:
                 signal.signal(signal.SIGTERM, original_sigterm)
             if phase_eligible:
                 self.capture_plans = saved_capture_plans
+                self.show_query_plans = saved_show_query_plans
 
         if phase_eligible:
             self._capture_plans_post_measurement(connection, queries, results)

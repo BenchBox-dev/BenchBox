@@ -159,7 +159,7 @@ work:
       results identically to today.
 
 deps:
-  needs: []
+  needs: [query-plan-capture-phase-respect-analyze]
 
 must_preserve:
   - "plan_fingerprints / query_plan / plan_capture_time_ms continue to land on query_results and aggregate stats exactly as today (compute_plan_capture_stats stays valid)."

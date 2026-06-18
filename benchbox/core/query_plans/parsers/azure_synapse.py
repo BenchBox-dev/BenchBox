@@ -91,10 +91,14 @@ class AzureSynapseQueryPlanParser(QueryPlanParser):
             raise ValueError("No dsql_operation elements found in EXPLAIN XML")
 
         # Build a linear pipeline: execution order leaf -> root, so RETURN is the
-        # root. The first operation becomes the deepest child.
+        # root. The first operation becomes the deepest child. Stop at RETURN:
+        # post-RETURN cleanup ops (ON/DROP TABLE temp tables) are not part of the
+        # logical plan and would corrupt the DAG root if included.
         child: LogicalOperator | None = None
         for op in operations:
             child = self._build_operator(op, child)
+            if (op.get("operation_type") or "").strip().upper() == "RETURN":
+                break
 
         assert child is not None  # guaranteed: operations is non-empty
         return QueryPlanDAG(

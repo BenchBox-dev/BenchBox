@@ -613,12 +613,19 @@ def find_datafusion_divergences(
     SQLGlot), and DATAFUSION_TPCHAVOC_SKIPS variants are excluded (never marked
     equivalent).
     """
+    from benchbox.platforms.datafusion_query_transformer import DataFusionQueryTransformer
     from benchbox.sql_compat.rules.execution_filter.datafusion_tpchavoc import DATAFUSION_TPCHAVOC_SKIPS
+
+    transformer = DataFusionQueryTransformer(verbose=False)
+
+    def _canonical_sql(query_id: int) -> str:
+        sql = tpch.get_query(query_id, dialect=DATAFUSION_TARGET_DIALECT)
+        return transformer.transform(sql, query_id=query_id)
 
     return find_divergences(
         connection,
         tpchavoc,
-        lambda q: tpch.get_query(q, dialect=DATAFUSION_TARGET_DIALECT),
+        _canonical_sql,
         query_ids=query_ids,
         translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", DATAFUSION_TARGET_DIALECT),
         skip_variants=set(DATAFUSION_TPCHAVOC_SKIPS),

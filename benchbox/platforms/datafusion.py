@@ -1402,7 +1402,12 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         # columns", the correct default for the non-trailing case.
         read_column_names = column_names
         include_columns: list[str] = []
-        is_trailing = column_names is not None and has_trailing_delimiter(file_paths[0], delimiter, column_names)
+        # Restrict the trailing-delimiter probe to raw TPC .tbl/.dat files.
+        # `has_trailing_delimiter` uses a raw split() which returns true for any
+        # line whose last quoted field happens to contain the delimiter character.
+        # Quoted CSVs (non-TPC sources) must use the standard quoted-parsing path.
+        _is_tpc_raw = Path(file_paths[0]).suffix.lower() in {".tbl", ".dat"}
+        is_trailing = column_names is not None and _is_tpc_raw and has_trailing_delimiter(file_paths[0], delimiter, column_names)
         if is_trailing:
             read_column_names = get_column_names_with_trailing(column_names, True)
             include_columns = column_names
