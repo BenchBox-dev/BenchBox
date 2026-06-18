@@ -10,7 +10,8 @@ from __future__ import annotations
 import logging
 import re
 from abc import ABC, abstractmethod
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, TypeVar
 
 from benchbox.core.errors import PlanParseError
 from benchbox.core.results.query_plan_models import (
@@ -23,6 +24,136 @@ from benchbox.core.results.query_plan_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Signature hygiene: keeping cost/cardinality estimates out of the fingerprint
+# ---------------------------------------------------------------------------
+#
+# The plan fingerprint is a LOGICAL, stats-independent structural hash (see the
+# stability contract in ``query_plan_models.py``). A parser that folds an
+# operator's raw EXPLAIN detail into a signature-bearing logical field
+# (join_conditions, filter_expressions, aggregation_functions, sort_keys, ...)
+# leaks any cost/cardinality estimate carried in that text into the hash, so a
+# stats refresh or a different table size silently changes the fingerprint.
+#
+# The helpers below are the single place that strips estimate/cost tokens before
+# such text reaches a signature-bearing field. Raw detail (including estimates)
+# may still be retained in ``physical_operator.platform_metadata``, which is not
+# hashed. A registry-wide invariant test enforces that no parser leaks these
+# tokens (tests/unit/query_plans/test_fingerprint_hygiene.py).
+
+# Substrings that mark a structured (dict) EXPLAIN key as estimate-bearing.
+# Matched case-insensitively against the lower-cased key name. Deliberately
+# avoids short ambiguous fragments (e.g. "ec") that collide with structural keys
+# such as "Projections".
+_ESTIMATE_KEY_SUBSTRINGS: tuple[str, ...] = (
+    "cardinality",
+    "estimated",
+    "cost",
+    "selectivity",
+)
+
+# Exact (normalized) key names that hold estimates without matching the
+# substrings above. Deliberately omits schema-dependent names (e.g. "width")
+# that could be a genuine structural field rather than a statistic.
+_ESTIMATE_KEY_EXACT: frozenset[str] = frozenset(
+    {
+        "rows",
+        "ec",
+        "output_rows",
+        "row_count",
+        "num_rows",
+        "plan_rows",
+        "output_bytes",
+        "output_batches",
+    }
+)
+
+# DataFusion EXPLAIN ANALYZE appends a ``metrics=[...]`` block (output_rows,
+# elapsed_compute, selectivity, ...) at the END of operator detail lines. The
+# inner value list can itself contain brackets (e.g. ``partitioning=[Hash([a],4)]``),
+# so match greedily to the final ``]`` rather than the first inner one.
+_METRICS_BLOCK_RE = re.compile(r",?\s*metrics=\[.*\]", re.IGNORECASE)
+
+# PostgreSQL / Redshift style cost parenthetical: ``(cost=1.0..2.0 rows=5 width=4)``.
+# Anchored to the ``cost=N..N`` range form so a genuine predicate that merely
+# starts with a column named ``cost`` (e.g. ``(cost=5 AND x=1)``) is NOT removed.
+_COST_PAREN_RE = re.compile(
+    r"\s*\(\s*cost=[\d.]+\.\.[\d.]+(?:\s+rows=\d+)?(?:\s+width=\d+)?\s*\)",
+    re.IGNORECASE,
+)
+
+# Inline estimate tokens with an explicit estimate phrasing followed by a number.
+# Restricted to unambiguous estimate wording (``Estimated Cardinality``, ``EC:``)
+# so genuine predicates are never corrupted -- a column literally named ``cost``,
+# ``rows``, ``num_rows``, ``cardinality`` or ``ec`` (e.g. ``ec = 7``) is left
+# intact. DataFusion's ``output_rows``/``selectivity`` estimates only ever appear
+# inside the ``metrics=[...]`` block removed above, and DuckDB's structured
+# estimate keys are removed by ``strip_estimate_keys``.
+_INLINE_ESTIMATE_RE = re.compile(
+    r"""
+    (?:
+        (?:estimated\s+cardinality | estimated\s+cost | estimated\s+rows)
+        \s*[:=]\s*\d[\d.,]*%?
+        | \bEC:\s*\d[\d.,]*%?
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+T = TypeVar("T")
+
+
+def _key_is_estimate(key: str) -> bool:
+    """Return True if a structured EXPLAIN key holds a cost/cardinality estimate."""
+    normalized = str(key).strip().lower()
+    if normalized in _ESTIMATE_KEY_EXACT:
+        return True
+    return any(token in normalized for token in _ESTIMATE_KEY_SUBSTRINGS)
+
+
+def strip_estimate_keys(mapping: Mapping[str, T]) -> dict[str, T]:
+    """
+    Drop estimate-bearing keys from a structured EXPLAIN ``extra_info`` dict.
+
+    Used by parsers (e.g. DuckDB FORMAT JSON) whose ``extra_info`` is a dict that
+    mixes structural fields (``Conditions``, ``Groups``, ``Aggregates``) with
+    estimate fields (``Estimated Cardinality``). Only the structural keys should
+    reach a signature-bearing logical field; the estimate keys are removed here.
+
+    The input mapping is not mutated; a new dict is returned.
+    """
+    return {key: value for key, value in mapping.items() if not _key_is_estimate(key)}
+
+
+def strip_estimates(text: str) -> str:
+    """
+    Remove cost/cardinality/estimate tokens from a free-text EXPLAIN detail string.
+
+    This is the single rule for keeping estimates out of signature-bearing fields
+    in text-format parsers. It removes:
+
+    - DataFusion ``metrics=[...]`` blocks (``output_rows``, ``selectivity``, ...)
+    - PostgreSQL/Redshift ``(cost=N..N rows=N width=N)`` cost parentheticals
+    - inline ``Estimated Cardinality: N`` / ``EC: N`` tokens
+
+    Genuine predicate text is preserved: removal is anchored to explicit estimate
+    wording, so a predicate on a column literally named ``cost``, ``rows`` or
+    ``num_rows`` (e.g. ``(cost=5 AND x=1)`` or ``num_rows = 5``) is left intact.
+    Returns the cleaned, whitespace-normalized string.
+    """
+    if not text:
+        return text
+    cleaned = _METRICS_BLOCK_RE.sub("", text)
+    cleaned = _COST_PAREN_RE.sub("", cleaned)
+    cleaned = _INLINE_ESTIMATE_RE.sub("", cleaned)
+    # Tidy separators left behind by removals (trailing commas, empty brackets).
+    cleaned = re.sub(r"\[\s*\]", "", cleaned)
+    cleaned = re.sub(r"\s*,\s*(?=,|$)", "", cleaned)
+    cleaned = re.sub(r",\s*$", "", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    return cleaned.strip().strip(",").strip()
 
 
 class QueryPlanParser(ABC):
