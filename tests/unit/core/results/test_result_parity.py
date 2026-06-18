@@ -219,8 +219,10 @@ class ExportParityDataFrameAdapter(BenchmarkExecutionMixin):
         file_paths: list[Any],
         column_names: list[str] | None = None,
         delimiter: str | None = None,
+        benchmark: Any | None = None,
+        **kwargs: Any,
     ) -> int:
-        _ = (ctx, table_name, file_paths, column_names, delimiter)
+        _ = (ctx, table_name, file_paths, column_names, delimiter, benchmark)
         return 1
 
     def execute_query(
