@@ -100,6 +100,61 @@ _logged_unknown_operator_types: set[str] = set()
 _logged_unknown_join_types: set[str] = set()
 
 
+# ---------------------------------------------------------------------------
+# raw_explain_output retention policy
+# ---------------------------------------------------------------------------
+#
+# Every captured plan retains ``raw_explain_output``, the verbatim EXPLAIN text.
+# For verbose formats (Spark EXPLAIN EXTENDED emits four plan sections; DuckDB
+# EXPLAIN ANALYZE FORMAT JSON is large) this dominates the results-bundle size and
+# grows with query_count x stream_count on throughput runs. The structured DAG and
+# fingerprint are what downstream comparison needs; the raw text is for
+# debugging/display only, so its retention is governed by a policy:
+#
+#   - "full"      keep the raw text verbatim (no cap)
+#   - "truncated" keep the first ``max_bytes`` of raw text (DEFAULT), with a marker
+#   - "none"      drop the raw text entirely
+#
+# The structured DAG and ``plan_fingerprint`` are retained under EVERY policy; only
+# ``raw_explain_output`` is affected. Default is "truncated" rather than "none"
+# because the raw text is valuable for diagnosing capture/parse issues.
+RAW_OUTPUT_FULL = "full"
+RAW_OUTPUT_TRUNCATED = "truncated"
+RAW_OUTPUT_NONE = "none"
+
+RAW_OUTPUT_POLICIES = frozenset({RAW_OUTPUT_FULL, RAW_OUTPUT_TRUNCATED, RAW_OUTPUT_NONE})
+
+# Default retention policy and truncation cap (bytes of UTF-8 raw text retained
+# under the "truncated" policy). 16 KiB keeps the raw text well under the ~100 KB
+# serialized-plan warning threshold while preserving enough of the plan head to be
+# useful for debugging.
+DEFAULT_RAW_OUTPUT_POLICY = RAW_OUTPUT_TRUNCATED
+DEFAULT_RAW_OUTPUT_MAX_BYTES = 16 * 1024
+
+
+def normalize_raw_output_policy(policy: str | None) -> str:
+    """Return a valid raw-output policy, falling back to the default for unknown values.
+
+    Args:
+        policy: Requested policy string (case-insensitive) or None.
+
+    Returns:
+        One of RAW_OUTPUT_FULL / RAW_OUTPUT_TRUNCATED / RAW_OUTPUT_NONE.
+    """
+    if policy is None:
+        return DEFAULT_RAW_OUTPUT_POLICY
+    normalized = str(policy).strip().lower()
+    if normalized in RAW_OUTPUT_POLICIES:
+        return normalized
+    logger.warning(
+        "Unknown raw_explain_output policy %r; falling back to %r. Valid values: %s",
+        policy,
+        DEFAULT_RAW_OUTPUT_POLICY,
+        ", ".join(sorted(RAW_OUTPUT_POLICIES)),
+    )
+    return DEFAULT_RAW_OUTPUT_POLICY
+
+
 class LogicalOperatorType(str, Enum):
     """Normalized logical operator types across all platforms."""
 
@@ -475,6 +530,56 @@ class QueryPlanDAG:
         """
         self.plan_fingerprint = self.compute_plan_fingerprint()
         self.fingerprint_integrity = FingerprintIntegrity.VERIFIED
+
+    def apply_raw_output_policy(
+        self,
+        policy: str | None = DEFAULT_RAW_OUTPUT_POLICY,
+        max_bytes: int = DEFAULT_RAW_OUTPUT_MAX_BYTES,
+    ) -> None:
+        """Apply the raw_explain_output retention policy in place.
+
+        Governs only ``raw_explain_output``; the structured ``logical_root`` and the
+        already-computed ``plan_fingerprint`` are never touched, so structural
+        comparison and fingerprint equality are unaffected by the policy.
+
+        - ``full``: leave the raw text unchanged.
+        - ``truncated``: if the UTF-8 encoding exceeds ``max_bytes``, keep the first
+          ``max_bytes`` bytes (decoded on a char boundary) plus a marker recording how
+          many bytes were retained vs. the original.
+        - ``none``: drop the raw text (set to None).
+
+        Unknown policy values fall back to the default with a warning.
+
+        Args:
+            policy: Retention policy (full / truncated / none).
+            max_bytes: Byte cap retained under the truncated policy (must be > 0).
+        """
+        resolved = normalize_raw_output_policy(policy)
+
+        if resolved == RAW_OUTPUT_FULL or self.raw_explain_output is None:
+            return
+
+        if resolved == RAW_OUTPUT_NONE:
+            self.raw_explain_output = None
+            return
+
+        # Truncated policy.
+        if max_bytes <= 0:
+            self.raw_explain_output = None
+            return
+
+        encoded = self.raw_explain_output.encode("utf-8")
+        original_bytes = len(encoded)
+        if original_bytes <= max_bytes:
+            return
+
+        # Decode on a valid char boundary (drop a trailing partial multibyte char).
+        kept = encoded[:max_bytes].decode("utf-8", errors="ignore")
+        retained_bytes = len(kept.encode("utf-8"))
+        self.raw_explain_output = (
+            f"{kept}\n...[raw_explain_output truncated: retained {retained_bytes} "
+            f"of {original_bytes} bytes under '{RAW_OUTPUT_TRUNCATED}' policy]"
+        )
 
     def to_dict(self, max_depth: int | None = 50) -> dict[str, Any]:
         """Convert to JSON-serializable dictionary with depth protection."""

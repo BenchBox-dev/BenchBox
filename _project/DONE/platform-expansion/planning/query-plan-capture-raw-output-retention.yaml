@@ -2,8 +2,31 @@ id: query-plan-capture-raw-output-retention
 title: "Define a retention/size policy for raw_explain_output stored on every captured plan"
 worktree: platform-expansion
 priority: Low
-status: Not Started
+status: Completed
 category: Platform Expansion
+
+resolution: |
+  w1 (measure): for a small DuckDB EXPLAIN ANALYZE FORMAT JSON GROUP BY plan,
+  raw_explain_output was ~11.5 KB = ~67% of the serialized bundle, confirming raw
+  text dominates bundle size (verbose Spark EXPLAIN EXTENDED with four plan
+  sections is larger still, multiplied by query x stream count on throughput runs).
+  w2 (policy): added a retention policy in query_plan_models.py —
+  `plan_raw_output` = full | truncated | none (default `truncated`) with a
+  `plan_raw_output_max_bytes` cap (default 16 KiB, well under the ~100 KB
+  serialized-plan warning). New constants, `normalize_raw_output_policy()`, and
+  `QueryPlanDAG.apply_raw_output_policy()` (mutates only raw_explain_output; the
+  logical DAG and plan_fingerprint are always retained). result_capture.py reads
+  the policy from `platform_config` and applies it in capture_query_plan before the
+  size guard (so the warning reflects retained size); a non-positive/invalid cap
+  falls back to the default with a warning rather than silently nulling the text.
+  w3 (test + docs): tests/unit cover every policy value (retain/truncate/drop),
+  UTF-8 multibyte-boundary truncation, byte accounting in the marker, fingerprint/
+  DAG invariance, and the capture-path config wiring (`pytest -k 'plan and
+  raw_output'` -> 24 passing). The policy and its default are documented in the
+  query_plan_models.py module/constant docstrings and the result_capture.py header.
+  Deviation: the config is read from `platform_config` inside the result-capture
+  layer (not promoted to a named adapter attribute) because adapter.py was outside
+  this TODO's scope_limit; CLI/config plumbing of the knob is a small follow-up.
 
 description: |
   Every captured QueryPlanDAG retains raw_explain_output (query_plan_models.py). For verbose
@@ -25,14 +48,14 @@ prior_art:
 work:
   - id: w1
     summary: "Measure raw_explain_output contribution to bundle size across formats"
-    status: pending
+    status: done
     notes: |
       Quantify raw text size per captured query for the verbose formats (Spark EXPLAIN EXTENDED,
       DuckDB EXPLAIN ANALYZE FORMAT JSON) at a representative query count and stream count.
   - id: w2
     summary: "Add a retain/truncate/drop policy for raw_explain_output with a documented default"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Add a config option (e.g. plan_raw_output=full|truncated|none, default truncated with a
       size cap) honored where the plan is serialized into the results bundle. Keep the structured
@@ -40,7 +63,7 @@ work:
   - id: w3
     summary: "Test the policy and document the default"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Unit-test that each policy value retains/truncates/drops raw_explain_output as specified and
       that the structured DAG/fingerprint are unaffected. Document the default and trade-offs.
