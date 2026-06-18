@@ -69,7 +69,7 @@ WHERE lo_orderdate = d_datekey
 
         # Flight 2: Drill-down queries with joins
         queries["Q2.1"] = """
-SELECT sum(lo_revenue), d_year, p_brand1
+SELECT d_year, p_brand1, sum(lo_revenue) as revenue
 FROM lineorder, date, part, supplier
 WHERE lo_orderdate = d_datekey
   AND lo_partkey = p_partkey
@@ -81,7 +81,7 @@ ORDER BY d_year, p_brand1;
 """
 
         queries["Q2.2"] = """
-SELECT sum(lo_revenue), d_year, p_brand1
+SELECT d_year, p_brand1, sum(lo_revenue) as revenue
 FROM lineorder, date, part, supplier
 WHERE lo_orderdate = d_datekey
   AND lo_partkey = p_partkey
@@ -93,7 +93,7 @@ ORDER BY d_year, p_brand1;
 """
 
         queries["Q2.3"] = """
-SELECT sum(lo_revenue), d_year, p_brand1
+SELECT d_year, p_brand1, sum(lo_revenue) as revenue
 FROM lineorder, date, part, supplier
 WHERE lo_orderdate = d_datekey
   AND lo_partkey = p_partkey
