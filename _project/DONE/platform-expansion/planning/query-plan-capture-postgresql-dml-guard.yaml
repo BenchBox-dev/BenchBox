@@ -15,6 +15,23 @@ category: Platform Expansion
 # post-measurement re-run would re-execute writes without this downgrade. A later
 # TODO sweep should move this file to _project/DONE/.
 
+resolution: |
+  Already implemented and merged; this change is the deferred file relocation
+  requested by the STATUS CORRECTION note above (no code changes).
+  - w1/w2: PostgreSQLAdapter.get_query_plan() (benchbox/platforms/postgresql.py)
+    reuses the shared is_dml_query() and emits EXPLAIN (FORMAT JSON) for DML/write-DDL
+    (no ANALYZE/BUFFERS, avoiding double-execution) while keeping
+    EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) for SELECT (PR #784/#786).
+  - w3: tests/unit/platforms/test_postgresql_plan_capture.py covers
+    test_get_query_plan_dml_omits_analyze (parametrized INSERT/UPDATE/DELETE/MERGE/COPY),
+    test_get_query_plan_ctas_omits_analyze, test_get_query_plan_select_uses_analyze,
+    and the analyze_plans=False SELECT path.
+  - w4: test_subclass_returns_postgresql_parser confirms TimescaleDB / CedarDB /
+    pg_mooncake subclass PostgreSQLAdapter without overriding get_query_plan(), so
+    they inherit the guard with zero code changes.
+  Verified green: pytest tests/unit/platforms/test_postgresql_plan_capture.py
+  tests/unit/platforms/test_postgresql_adapter.py -> 74 passed.
+
 description: |
   PostgreSQLAdapter.get_query_plan() at benchbox/platforms/postgresql.py:704 always
   issues EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON). PostgreSQL's EXPLAIN ANALYZE
@@ -57,7 +74,7 @@ prior_art:
 work:
   - id: w1
     summary: "Add _is_dml_query() helper or reuse DuckDB's existing DML detection pattern"
-    status: pending
+    status: done
     notes: |
       Check whether a shared DML detection helper exists in
       benchbox/platforms/base/ or benchbox/utils/. If it does, reuse it.
@@ -71,7 +88,7 @@ work:
   - id: w2
     summary: "Guard get_query_plan() to fall back to EXPLAIN (FORMAT JSON) for DML"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       In benchbox/platforms/postgresql.py get_query_plan():
         if self._is_dml_query(query):
@@ -85,7 +102,7 @@ work:
   - id: w3
     summary: "Add unit tests covering DML guard behavior"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Extend tests/unit/platforms/test_postgresql_plan_capture.py:
         - test_get_query_plan_dml_uses_no_analyze: mock cursor; assert
@@ -100,7 +117,7 @@ work:
   - id: w4
     summary: "Verify subclass adapters (TimescaleDB, CedarDB, pg_mooncake) inherit the guard"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       All three subclass PostgreSQLAdapter and do not override get_query_plan().
       Add a short parametrized test confirming that instantiating each subclass
