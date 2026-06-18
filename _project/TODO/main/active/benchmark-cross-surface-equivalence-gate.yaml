@@ -124,9 +124,73 @@ work:
         - tpcds_obt      (per source TODO) DF is a 3-query stub vs ~89 SQL - gate
             only the implemented intersection or defer.
 
+  # --- Production-loader substrate (added 2026-06-18 after the user expanded
+  # scope to pursue dtype-faithful DataFrame loading; see the data-path
+  # open_question resolution). These precede the report/burndown/gate roll-out so
+  # every benchmark is gated on the SAME data path its production DataFrame run
+  # uses, not the DuckDB->Arrow shortcut. ssb (#815) currently uses DuckDB->Arrow
+  # and is re-based in w7. ---
+  - id: w5
+    summary: "Build a production-faithful DataFrame-context substrate for the gate (reuse the real loader)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Replace the gate's bespoke DuckDB->Arrow context-build
+      (build_dataframe_contexts_from_specs) with one that loads each backend's
+      DataFrame context via the REAL production loader, so the gate exercises the
+      same data path (and dtypes) a production DataFrame run uses - honoring the
+      "use the real runner/mixin path, not a bespoke one" anti-pattern for DATA
+      LOADING as well as query execution.
+
+      Reuse, do not fork: the reference adapters' load path
+      (benchbox/platforms/dataframe/{polars_df,pandas_df}.py load_table /
+      load_tables_from_data_source / _load_tables_into_context) and
+      benchbox/core/dataframe/data_loader.py DataFrameDataLoader. Drive it with
+      the benchmark's schema_info (column names/types) and the correct
+      delimiter/trailing-delimiter/parquet handling that a bare
+      load_tables_from_data_source call skips (this was the cause of the SSB
+      mis-load). Generate data once; the SQL reference (DuckDB) and BOTH DataFrame
+      backends must read the SAME generated data so "same bounded cell" still holds.
+      Keep the comparator and the DuckDB SQL-reference builder reused (unchanged).
+
+  - id: w6
+    summary: "Fix production-loader correctness bugs surfaced by real benchmarks (now in-scope: benchbox/platforms/dataframe/)"
+    needs: [w5]
+    status: pending
+    notes: |
+      Driving the real loader over real benchmark data exposes loader defects the
+      gate must not paper over. Known, reproduced:
+        * Pandas adapter date heuristic: _pandas_parse_date_columns
+          (benchbox/platforms/dataframe/pandas_df.py:62) infers date columns by
+          NAME suffix only ("*date"/"*_date") with no type check, then
+          _coerce_date_columns casts them to date32. SSB's lo_orderdate /
+          lo_commitdate are INTEGER YYYYMMDD datekeys, so the loader tries to
+          date-parse integers and raises ("month must be in 1..12"). Fix: gate
+          date-coercion on the column's SCHEMA TYPE (thread schema_info types
+          through), never the name alone, so integer datekeys load as integers.
+      For each benchmark, confirm its impls run under the loader's production
+      dtypes; where an impl genuinely fails under the dtype its production run
+      uses (e.g. coffeeshop pandas impls compare a date column to a STRING
+      literal), that is a REAL divergence/bug to report and burn down in w3 - do
+      NOT add a gate-local cast to mask it. Only fix loader code where the LOADER
+      is wrong (e.g. the type-blind date heuristic), not to accommodate a wrong impl.
+
+  - id: w7
+    summary: "Re-base the SSB gate (and the shared harness) onto the production-loader substrate; re-verify"
+    needs: [w5, w6]
+    status: pending
+    notes: |
+      Switch the merged SSB gate (#815) from DuckDB->Arrow to the w5 substrate and
+      re-verify it stays green (26/26) under production dtypes; this is the
+      reference example every later benchmark follows. Re-confirm the TPC-Havoc
+      SQL + DataFrame gates are unchanged (the tpchavoc DataFrame gate may keep its
+      own DuckDB->Arrow path - decide whether to migrate it too or leave it, since
+      it is a variant-vs-canonical gate, not cross-surface). Update the fast-lane
+      tests accordingly. Re-prove the planted-defect failure on the new substrate.
+
   - id: w2
     summary: "Run the cross-surface gate in report mode over the ungated dual-surface benchmarks and enumerate divergences"
-    needs: [w1]
+    needs: [w5, w6, w7]
     status: in_progress
     notes: |
       Prioritize benchmarks with NO expected-results oracle: ssb, clickbench,
@@ -134,10 +198,11 @@ work:
       tpch_skew, read_primitives. Report (benchmark, query, kind, deltas) without
       asserting. Capture stdout to /tmp and summarize counts in the PR/TODO.
 
-      IN PROGRESS. ssb done: report mode over 26 query-backend cells (13 queries
-      x 2 backends) at SF=0.1 on DuckDB reported 0 divergent, 26 equivalent - the
-      SQL and DataFrame surfaces already agree, no burndown needed. Remaining
-      ungated benchmarks to be reported as each gate is built.
+      IN PROGRESS. ssb reported clean on the INTERIM DuckDB->Arrow substrate (#815):
+      26 query-backend cells (13 queries x 2 backends) at SF=0.1, 0 divergent. This
+      re-runs on the production-loader substrate (w5-w7); ssb is expected to stay
+      clean but is re-confirmed there. Remaining ungated benchmarks are reported on
+      the production substrate as each gate is built (now needs w5/w6/w7).
 
   - id: w3
     summary: "Burn down divergences (fix the wrong surface) or declare intentional ones"
@@ -186,18 +251,22 @@ deferred:
 must_preserve:
   - "The TPC-Havoc SQL and DataFrame gates stay green with empty KNOWN_DIVERGENCES and unchanged behavior."
   - "benchbox run default (execution-only) behavior is unchanged for every benchmark; the gates are additive."
-  - "ResultValidator tolerance/checksum semantics are unchanged; reuse, do not fork, the comparator and the DuckDB data builder."
+  - "ResultValidator tolerance/checksum semantics are unchanged; reuse, do not fork, the comparator and the DuckDB SQL-reference data builder."
+  - "The production DataFrame loader/adapters are reused, not forked; any change there (w6) is a genuine loader bug fix that keeps the real DataFrame run path working (re-verify the DataFrame benchmark run), never gate-only special-casing."
 
 approach: |
   Generalize the proven TPC-Havoc DataFrame gate rather than inventing a new
-  comparator: extract a shared harness (w0), inventory applicability (w1), land
-  report-mode across the ungated dual-surface benchmarks (w2), burn down (w3),
-  then flip bounded CI gates with fast-lane companions (w4). SQL is the live
-  reference for its own DataFrame surface; no hand-maintained answer keys.
+  comparator: extract a shared harness (w0), inventory applicability (w1), stand
+  up a production-faithful DataFrame-loading substrate (w5) and fix the loader
+  bugs it surfaces (w6), re-base ssb onto it (w7), then land report-mode across
+  the ungated dual-surface benchmarks (w2), burn down (w3), and flip bounded CI
+  gates with fast-lane companions (w4). SQL is the live reference for its own
+  DataFrame surface; no hand-maintained answer keys; the DataFrame surface runs
+  on its real production data path so divergences are real, not dtype artifacts.
 
 anti_patterns:
   - "DO NOT write a new result comparator or data builder - because the TPC-Havoc harness already does this - generalize and reuse it."
-  - "DO NOT execute DataFrame queries via a bespoke path - because the gate must reflect the real product run path - use the DataFrame runner/mixin."
+  - "DO NOT execute DataFrame queries OR load their data via a bespoke path - because the gate must reflect the real product run path - use the DataFrame runner/mixin for query dispatch AND the production loader/adapters for data loading (w5)."
   - "DO NOT gate a full platform matrix - because routine PRs must stay cheap - one bounded small-SF DuckDB cell per benchmark."
   - "DO NOT silence a real divergence by adding it to the baseline - because the baseline is for intentional differences only - fix the wrong surface."
 
@@ -212,6 +281,11 @@ verification:
 scope_limit:
   only_modify:
     - "benchbox/core/"
+    - "benchbox/platforms/dataframe/"  # added 2026-06-18: the gate now loads
+      # DataFrame contexts via the real production loader (the reference adapters
+      # live here), and w6 fixes loader correctness bugs it surfaces. Edit the
+      # SHARED loader/adapters only for genuine bugs (e.g. the type-blind date
+      # heuristic); keep changes additive and re-verify the DataFrame run path.
     - "tests/"
     - ".github/workflows/"
     - "Makefile"
@@ -243,19 +317,26 @@ open_questions:
     affects: ["data-path for all gates beyond ssb"]
     default: "Use DuckDB->Arrow (the proven TPC-Havoc template path); it is in-scope and shipped ssb."
     resolution: |
-      RESOLVED (2026-06-18, user decision + scope evidence). The production
-      DataFrame loader was considered for dtype fidelity but is NOT viable here:
-      it lives in benchbox/platforms/dataframe/, OUTSIDE this TODO's scope_limit,
-      and it errors on ssb itself (its pandas date-name heuristic mis-parses
-      ssb's INTEGER lo_orderdate/lo_commitdate datekeys). The DataFrame impls also
-      have inconsistent dtype contracts (e.g. coffeeshop pandas impls compare a
-      date column to a STRING literal and break on a typed date32 column).
-      DECISION: keep the in-scope DuckDB->Arrow path; where an impl needs a
-      specific dtype, NORMALIZE that column in the gate's context builder TO MATCH
-      what the benchmark's production DataFrame run actually loads - first confirm
-      production's dtype for that column, then cast to match. NEVER cast just to
-      make a failing impl pass: if an impl genuinely fails under the dtype its
-      production run uses, report it as a real divergence/bug, do not mask it.
+      RESOLVED (2026-06-18, FINAL - supersedes the interim decision below).
+      Use the PRODUCTION DataFrame loader for dtype fidelity, and EXPAND
+      scope_limit to include benchbox/platforms/dataframe/ so the loader's bugs
+      can be fixed rather than worked around. Rationale: the gate's value is
+      catching real SQL<->DataFrame divergences, and that requires the DataFrame
+      surface to run on the SAME dtypes its production run uses; a DuckDB->Arrow
+      shortcut with per-benchmark casts risks masking real impl bugs. Concrete
+      plan added as work items w5 (production-loader substrate), w6 (fix loader
+      correctness bugs it surfaces - first the type-blind pandas date heuristic
+      that mis-parses ssb's INTEGER datekeys), w7 (re-base the ssb gate + harness
+      onto it and re-verify). Discipline preserved: where an impl genuinely fails
+      under its production dtypes (e.g. coffeeshop's date-vs-string compare),
+      report it as a real divergence and fix the impl (w3) - only fix LOADER code
+      where the loader itself is wrong, never to accommodate a wrong impl.
+
+      INTERIM (2026-06-18, SUPERSEDED): had decided to keep the in-scope
+      DuckDB->Arrow path and cast dtypes per benchmark to match production,
+      because the production loader was then out of scope and errored on ssb.
+      The user subsequently expanded scope to pursue the production loader
+      directly; that interim approach is no longer in effect.
 
 success_metrics:
   - "A single shared harness backs both the TPC-Havoc gates and the new cross-surface gates; no duplicated comparator/data-builder."
