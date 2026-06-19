@@ -12,6 +12,11 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.integration.test_local_platform_benchmark_matrix import (
+    LOCAL_SQL_STABLE_MATRIX,
+    _validate_against_expected_results,
+)
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.medium,
@@ -382,3 +387,128 @@ class TestMakefileCommands:
         assert len(test_lines) > 5, "Should have multiple pytest-based commands"
         for line in test_lines:
             assert line.startswith("\tuv run -- python -m pytest"), f"Line should use pytest: {line}"
+
+
+def _gate_query_ids() -> list[str]:
+    """Configured correctness-gate query ids.
+
+    Derived from the ``CORRECTNESS_GATE_QUERY_IDS`` constant, which
+    ``test_makefile_correctness_gate_runs_expected_results_backed_matrix_slice``
+    already pins to the actual Makefile target, so this stays a single source of truth.
+    """
+    return [q for q in CORRECTNESS_GATE_QUERY_IDS.split(",") if q]
+
+
+class TestCorrectnessGateOracle:
+    """Ratchets and behavioral guards that keep the bounded correctness gate discriminating.
+
+    These guard the *oracle* (query-set discrimination, strict-mode arming, no-skip), not
+    just the command spelling. They stay in the module-default ``unit``/``medium`` tier:
+    the correctness gate itself runs as a dedicated required CI job (``correctness-gate`` in
+    ``.github/workflows/pr.yml``) on every code-impacting PR, so these meta-guards do not
+    also need the fast lane -- they prevent local config regression and run via the medium
+    lane and the explicit gate verification command.
+    """
+
+    # TPC-H queries whose SF=1 answer-set cardinality varies across dbgen builds because
+    # their HAVING/threshold boundaries are data-sensitive. #744 deliberately excluded them
+    # from the gate even with the reference seed pinned; keep them out (see Makefile note).
+    DBGEN_UNSTABLE_QUERY_IDS = {"11", "16", "18", "20"}
+
+    def test_gate_query_set_is_answer_backed_and_discriminating(self):
+        """The gate subset must stay answer-backed and not regress to all/mostly one-row.
+
+        #737 originally gated ``6,14,15,17,19`` -- every one of which returns exactly one
+        row at SF=1, so row-count validation could not catch wrong joins, filters, or
+        aggregate values that still emit a single row. This ratchet fails if the set drifts
+        back toward that near-vacuous shape.
+        """
+        from benchbox.core.expected_results.tpch_results import load_tpch_expected_results
+
+        ids = _gate_query_ids()
+        row_counts = load_tpch_expected_results(scale_factor=1.0)
+
+        missing = [q for q in ids if q not in row_counts]
+        assert not missing, f"gate queries lack stored SF=1 answer cardinalities: {missing}"
+
+        one_row = [q for q in ids if row_counts[q] == 1]
+        multi_row = [q for q in ids if row_counts[q] > 1]
+        high_card = [q for q in ids if row_counts[q] >= 100]
+
+        assert len(multi_row) > len(one_row), (
+            f"correctness gate is dominated by one-row queries "
+            f"({len(one_row)} one-row vs {len(multi_row)} multi-row); add answer-backed "
+            f"high/mid-cardinality queries so wrong single-row answers are detectable"
+        )
+        assert len(high_card) >= 2, (
+            f"correctness gate needs at least two answer-backed queries with SF=1 cardinality "
+            f">=100 for discrimination; have {sorted(high_card, key=int)}"
+        )
+
+    def test_gate_excludes_dbgen_unstable_threshold_queries(self):
+        """The dbgen-build-unstable threshold queries must stay out of the gate."""
+        included = self.DBGEN_UNSTABLE_QUERY_IDS.intersection(_gate_query_ids())
+        assert not included, (
+            f"correctness gate must exclude dbgen-build-unstable threshold queries "
+            f"{sorted(included, key=int)}; their HAVING/threshold cardinality varies across "
+            f"dbgen builds (see #744 and the test-correctness-gate Makefile note)"
+        )
+
+    def test_gate_target_enforces_no_skip(self):
+        """The gate target must fail if its selected node skips or does not run exactly once.
+
+        ``pytest`` exits 0 when a *selected* node SKIPs (e.g. duckdb unavailable, or the case
+        is excluded from the stable matrix), which would let ``make test-correctness-gate``
+        pass without running anything. The target must emit a JUnit report and assert exactly
+        one test ran with zero skips/errors/failures.
+        """
+        gate_body = _makefile_target_body((Path.cwd() / "Makefile").read_text(), "test-correctness-gate")
+        assert "--junitxml=" in gate_body, "gate must emit a JUnit report to verify the node actually ran"
+        # The guard parses that report (no brittle stdout scraping) and must assert the exact
+        # ran/skip condition. Pin the condition tokens so a disarmed guard (e.g. relaxing to
+        # `skipped >= 0`, or dropping the exit) is caught, not just the presence of "skipped".
+        assert "tests == 1" in gate_body, "gate guard must require exactly one node to run"
+        assert "skipped == 0" in gate_body, "gate guard must require zero selected skips"
+        assert "PYTEST_STATUS" in gate_body, "gate must also propagate the pytest exit status"
+
+    def test_gate_node_is_in_stable_matrix(self):
+        """The (duckdb, tpch) node the gate targets must remain in the stable matrix.
+
+        If it is dropped/renamed, the parametrized node would skip and -- absent the no-skip
+        guard above -- the gate would pass vacuously.
+        """
+        assert "tpch" in LOCAL_SQL_STABLE_MATRIX.get("duckdb", set()), (
+            "gate node tpch-duckdb is no longer in LOCAL_SQL_STABLE_MATRIX; the gate would skip"
+        )
+
+    def test_strict_mode_fails_on_scale_drift(self, monkeypatch):
+        """Strict expected-results mode must fail when configured checks SKIP under scale drift.
+
+        Regression guard for the previously ``scale_factor >= 1.0``-gated strict block: a gate
+        retargeted to SF<1 would SKIP every stored-answer check, silently disarming the oracle
+        while still exiting 0. SF=0.1 has no stored TPC-H answer file, so validation SKIPs and
+        ``checked`` stays 0 -- under strict mode that is now a hard failure.
+        """
+        monkeypatch.setenv("BENCHBOX_STRICT_EXPECTED_RESULTS", "1")
+        payload = {"queries": [{"id": "9", "stream": 0, "status": "SUCCESS", "rows": 175}]}
+        with pytest.raises(AssertionError, match="strict expected-results"):
+            _validate_against_expected_results(payload, "tpch", 0.1, expected_query_ids={"9"})
+
+    def test_strict_mode_fails_on_benchmark_drift(self, monkeypatch):
+        """Strict mode must fail when a configured benchmark has no stored answers."""
+        monkeypatch.setenv("BENCHBOX_STRICT_EXPECTED_RESULTS", "1")
+        payload = {"queries": [{"id": "1", "stream": 0, "status": "SUCCESS", "rows": 5}]}
+        with pytest.raises(AssertionError, match="strict expected-results"):
+            _validate_against_expected_results(payload, "tpch_future_variant", 1.0, expected_query_ids={"1"})
+
+    def test_strict_mode_passes_when_all_configured_queries_evaluate(self, monkeypatch):
+        """Strict mode passes when every configured query evaluates against stored answers."""
+        monkeypatch.setenv("BENCHBOX_STRICT_EXPECTED_RESULTS", "1")
+        payload = {"queries": [{"id": "9", "stream": 0, "status": "SUCCESS", "rows": 175}]}
+        _validate_against_expected_results(payload, "tpch", 1.0, expected_query_ids={"9"})
+
+    def test_non_strict_mode_tolerates_unsupported_validation(self, monkeypatch):
+        """Default (non-strict) matrix behavior must still skip unsupported validation, not fail."""
+        monkeypatch.delenv("BENCHBOX_STRICT_EXPECTED_RESULTS", raising=False)
+        payload = {"queries": [{"id": "9", "stream": 0, "status": "SUCCESS", "rows": 175}]}
+        _validate_against_expected_results(payload, "tpch", 0.1, expected_query_ids={"9"})
