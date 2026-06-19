@@ -202,7 +202,7 @@ class ResultValidator:
         below. ClickHouse, for instance, returns ``Decimal`` for a
         ``SUM(decimal)/COUNT`` average where canonical ``AVG`` returns ``Float64``;
         without coercion the comparator would crash instead of reporting a clean
-        value (mis)match. This is engine-agnostic robustness, not an engine-specific
+        match or mismatch. This is engine-agnostic robustness, not an engine-specific
         path.
         """
         val1_missing = val1 is None or (isinstance(val1, float) and math.isnan(val1))
