@@ -167,28 +167,41 @@ class TestIntegratedCapturePhase:
             conn.close()
 
     def test_inline_capture_suppressed_during_measurement(self, file_adapter, monkeypatch):
-        """Inline capture must be OFF during the timed loop; the phase fills plans after."""
+        """Inline EXPLAIN must NOT run during the timed loop; the phase fills plans after.
+
+        The query is executed through the full dispatch so the central isolation
+        wrapper is active. During the timed run the inline chokepoint records the
+        query (phase-active) instead of running EXPLAIN; capture_query_plan must only
+        be invoked by the post-measurement phase.
+        """
         _seed_table(file_adapter)
         conn = file_adapter.create_connection()
 
-        seen_capture_plans: list[bool] = []
-        original = file_adapter._merge_plan_capture_into_result
+        # Spy on the actual inline EXPLAIN entry point and record whether the
+        # isolation flag was active at each call.
+        phase_active_at_call: list[bool] = []
+        original_capture = file_adapter.capture_query_plan
 
-        def _spy(result, connection, query, query_id):
-            # Record the flag the inline path checks at call time.
-            seen_capture_plans.append(file_adapter.capture_plans)
-            return original(result, connection, query, query_id)
+        def _capture_spy(connection, query, query_id):
+            phase_active_at_call.append(file_adapter._plan_capture_phase_active)
+            return original_capture(connection, query, query_id)
 
-        monkeypatch.setattr(file_adapter, "_merge_plan_capture_into_result", _spy)
+        monkeypatch.setattr(file_adapter, "capture_query_plan", _capture_spy)
 
         try:
             benchmark = _FakeBenchmark({"q_select": "SELECT * FROM t"})
-            results = file_adapter._execute_all_queries(benchmark, conn, {"benchmark_name": "generic"})
+            results = file_adapter._execute_queries_by_type(
+                benchmark, conn, {"benchmark_name": "generic", "test_execution_type": "standard"}
+            )
 
-            # Inline path saw capture_plans=False for every timed query (suppressed)...
-            assert seen_capture_plans == [False]
-            # ...yet the plan was still captured by the post-measurement phase.
+            # capture_query_plan ran exactly once (the post-measurement phase), and
+            # never while the timed loop's isolation flag was active.
+            assert len(phase_active_at_call) == 1
+            assert phase_active_at_call == [False], "EXPLAIN must run only in the post-measurement phase"
+            # The plan still landed via the phase.
             assert results[0].get("plan_fingerprint")
+            # The isolation flag is cleared after the run.
+            assert file_adapter._plan_capture_phase_active is False
         finally:
             conn.close()
 
@@ -230,6 +243,74 @@ class TestIntegratedCapturePhase:
             phys = plan.logical_root.physical_operator
             timing = phys.properties.get("timing") if phys else None
             assert timing is None or timing == 0, "analyze_plans=False must not run ANALYZE"
+        finally:
+            conn.close()
+
+    def test_phase_runs_for_non_power_test_types(self, file_adapter, monkeypatch):
+        """Capture must be isolated for every test type, not just power/standard.
+
+        Drives the dispatch with test_execution_type='throughput'; the central
+        isolation wrapper must record during the timed run and capture in the
+        post-measurement phase (EXPLAIN never runs inline during measurement).
+        """
+        _seed_table(file_adapter)
+        conn = file_adapter.create_connection()
+
+        phase_active_at_call: list[bool] = []
+        original_capture = file_adapter.capture_query_plan
+
+        def _capture_spy(connection, query, query_id):
+            phase_active_at_call.append(file_adapter._plan_capture_phase_active)
+            return original_capture(connection, query, query_id)
+
+        monkeypatch.setattr(file_adapter, "capture_query_plan", _capture_spy)
+        try:
+            benchmark = _FakeBenchmark({"q": "SELECT id, val FROM t"})
+            # Non-TPC benchmark falls back to _execute_all_queries under the wrapper.
+            results = file_adapter._execute_queries_by_type(
+                benchmark, conn, {"benchmark_name": "generic", "test_execution_type": "throughput"}
+            )
+            assert results[0].get("plan_fingerprint"), "plan must land for throughput type"
+            assert phase_active_at_call == [False], "EXPLAIN must run only post-measurement"
+        finally:
+            conn.close()
+
+    def test_plans_attach_to_all_rows_sharing_query_id(self, file_adapter):
+        """Throughput produces one row per stream for a query; all must get the plan."""
+        _seed_table(file_adapter)
+        conn = file_adapter.create_connection()
+        try:
+            # Two result rows for the same query_id, as concurrent streams produce.
+            results = [
+                {"query_id": "q", "status": "SUCCESS", "stream_id": 0},
+                {"query_id": "q", "status": "SUCCESS", "stream_id": 1},
+            ]
+            file_adapter._capture_plans_post_measurement(conn, {"q": "SELECT * FROM t"}, results)
+
+            for row in results:
+                assert row.get("plan_fingerprint"), f"row stream {row['stream_id']} missing plan"
+                assert row.get("query_plan") is not None
+            # Same query captured once: both rows share the identical fingerprint.
+            assert results[0]["plan_fingerprint"] == results[1]["plan_fingerprint"]
+        finally:
+            conn.close()
+
+    def test_plans_land_for_integer_query_ids(self, file_adapter):
+        """TPC-H power/throughput rows carry an INTEGER query_id; plans must still land.
+
+        Regression test: the recorded buffer is str-keyed, so an int query_id on the
+        result row would never match the merge unless both sides are coerced to str.
+        """
+        _seed_table(file_adapter)
+        conn = file_adapter.create_connection()
+        try:
+            # Buffer recorded under str keys (as the inline chokepoint stores them);
+            # result rows carry the raw integer query id (as TPC-H builds them).
+            results = [{"query_id": 6, "status": "SUCCESS", "stream_id": 0}]
+            file_adapter._capture_plans_post_measurement(conn, {"6": "SELECT * FROM t"}, results)
+
+            assert results[0].get("plan_fingerprint"), "plan must land for an integer query_id"
+            assert results[0].get("query_plan") is not None
         finally:
             conn.close()
 

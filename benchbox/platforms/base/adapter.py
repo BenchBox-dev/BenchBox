@@ -151,6 +151,15 @@ class PlatformAdapter(
         # guarded by a lock to keep plan_first_n a correct per-query-id counter.
         self._plan_capture_iteration_counts: dict[str, int] = {}
         self._plan_capture_lock = threading.Lock()
+        # Isolated-phase plan capture (see TestDriversMixin._execute_queries_by_type).
+        # When ``_plan_capture_phase_active`` is True, the inline capture chokepoint
+        # (_merge_plan_capture_into_result) records each executed query into
+        # ``_phase_recorded_queries`` instead of running EXPLAIN inline, so capture is
+        # fully isolated from the timed run for every test type. The plans are captured
+        # once, post-measurement, by the isolated phase. The buffer is written from
+        # concurrent throughput streams, so writes are guarded by _plan_capture_lock.
+        self._plan_capture_phase_active: bool = False
+        self._phase_recorded_queries: dict[str, str] = {}
         self.tuning_enabled = config.get("tuning_enabled", False)
         # Driver runtime contract metadata (set by adapter factory / runtime resolution).
         self.driver_package = config.get("driver_package")
