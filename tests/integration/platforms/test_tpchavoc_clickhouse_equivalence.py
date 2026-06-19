@@ -120,7 +120,11 @@ def test_clickhouse_skip_list_wiring():
 
     benchmark = TPCHavocBenchmark(scale_factor=EQUIVALENCE_SCALE)
     selectors = ("clickhouse-local", "clickhouse-server", "clickhouse-cloud")
-    display_names = ("ClickHouse Local", "ClickHouse Server", "ClickHouse Cloud")
-    for platform in (*selectors, *display_names):
+    # First-class adapter display names ("ClickHouse Local") and the base
+    # ClickHouseAdapter display names ("ClickHouse (Local)") - the live runner
+    # passes whichever the active adapter exposes, so all must map to the skips.
+    first_class_display = ("ClickHouse Local", "ClickHouse Server", "ClickHouse Cloud")
+    base_display = ("ClickHouse (Local)", "ClickHouse (Server)", "ClickHouse (Cloud)")
+    for platform in (*selectors, *first_class_display, *base_display):
         assert set(benchmark.get_platform_skip_queries(platform)) == set(CLICKHOUSE_TPCHAVOC_SKIPS), platform
     assert benchmark.get_platform_skip_queries("duckdb") == []

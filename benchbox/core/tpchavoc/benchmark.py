@@ -13,6 +13,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import contextlib
+import re
 from pathlib import Path
 from typing import Any, Union
 
@@ -122,11 +123,14 @@ class TPCHavocBenchmark(TPCHBenchmark):
         """Return platform-specific TPC-Havoc variants excluded by compatibility policy.
 
         Accepts either a platform SELECTOR (e.g. ``"clickhouse-local"``) or an
-        adapter's DISPLAY ``platform_name`` (e.g. ``"ClickHouse Local"``, which is
-        what the live runner at platforms/base/execution.py passes), normalizing
-        spaces and underscores to hyphens so both forms map to the same key.
+        adapter's DISPLAY ``platform_name`` (which is what the live runner at
+        platforms/base/execution.py passes). The first-class adapters render
+        ``"ClickHouse Local"`` while the base ``ClickHouseAdapter`` renders
+        ``"ClickHouse (Local)"``, so any non-alphanumeric run (spaces,
+        underscores, parentheses) is collapsed to a single hyphen and trimmed,
+        mapping all of those forms to the same ``clickhouse-local`` key.
         """
-        platform = platform_name.lower().replace("_", "-").replace(" ", "-")
+        platform = re.sub(r"[^a-z0-9]+", "-", platform_name.lower()).strip("-")
         if platform == "lakesail":
             return list(LAKESAIL_TPCHAVOC_SKIPS)
         if platform == "datafusion":
