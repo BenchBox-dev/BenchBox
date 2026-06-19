@@ -133,8 +133,18 @@ work:
   - id: w5
     summary: "Build a production-faithful DataFrame-context substrate for the gate (reuse the real loader)"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
+      DONE. Added build_production_contexts() in core/equivalence/cross_surface.py:
+      per backend it instantiates the real adapter and calls the new public
+      BenchmarkExecutionMixin.load_benchmark_into_context() - the exact data path
+      run_benchmark uses (_extract_benchmark_config + _load_data_phase, prefer_parquet
+      default), stopping short of query execution. CrossSurfaceData now carries the
+      benchmark instance + data_dir (not table_specs); the DuckDB SQL reference and
+      both DataFrame backends read the SAME generated files. The comparator and the
+      DuckDB SQL-reference builder are unchanged. (No new fork of the loader: the
+      gate calls the production mixin.) Original plan below.
+
       Replace the gate's bespoke DuckDB->Arrow context-build
       (build_dataframe_contexts_from_specs) with one that loads each backend's
       DataFrame context via the REAL production loader, so the gate exercises the
@@ -156,8 +166,20 @@ work:
   - id: w6
     summary: "Fix production-loader correctness bugs surfaced by real benchmarks (now in-scope: benchbox/platforms/dataframe/)"
     needs: [w5]
-    status: pending
+    status: done
     notes: |
+      DONE (#821). Made the Pandas loader's date-column inference TYPE-AWARE:
+      _pandas_parse_date_columns now takes the schema column types and never
+      treats a numeric-typed column as a date even if its name ends in date/time,
+      so SSB's INTEGER lo_orderdate/lo_commitdate load as integers (real string
+      dates like d_date VARCHAR still parse). Behavior is unchanged when types are
+      absent. Threaded benchmark -> load_table -> _load_csv_files -> read_csv ->
+      _pandas_parse_date_columns; abstract load_table signature made honest. SSB
+      now loads via the production loader (gate 26/26). Routing coffeeshop through
+      the real loader surfaced GENUINE divergences (date32-vs-string impl bugs,
+      value mismatches, a KeyError) - logged for w2/w3 burndown, NOT masked.
+      Original plan + diagnosis below.
+
       Driving the real loader over real benchmark data exposes loader defects the
       gate must not paper over. Known, reproduced:
         * Pandas adapter date heuristic: _pandas_parse_date_columns
@@ -178,8 +200,18 @@ work:
   - id: w7
     summary: "Re-base the SSB gate (and the shared harness) onto the production-loader substrate; re-verify"
     needs: [w5, w6]
-    status: pending
+    status: done
     notes: |
+      DONE. The SSB gate + its fast-lane test now build DataFrame contexts via
+      build_production_contexts (w5); re-verified 26/26, 0 divergent at SF=0.1 and
+      re-proved the planted-defect failure (corrupting Q1.1's expression impl
+      flags exactly Q1.1_expression, no collateral) on the new substrate. The
+      tpchavoc DataFrame gate is LEFT on its DuckDB->Arrow path (it is a
+      variant-vs-canonical gate, not cross-surface) and re-confirmed green. The
+      DuckDB->Arrow builder (build_dataframe_contexts_from_specs) remains in
+      dataframe_surface for tpchavoc; only the cross-surface gate moved. Original
+      plan below.
+
       Switch the merged SSB gate (#815) from DuckDB->Arrow to the w5 substrate and
       re-verify it stays green (26/26) under production dtypes; this is the
       reference example every later benchmark follows. Re-confirm the TPC-Havoc

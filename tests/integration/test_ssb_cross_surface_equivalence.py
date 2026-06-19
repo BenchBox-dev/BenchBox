@@ -26,7 +26,7 @@ pytest.importorskip("duckdb", reason="DuckDB not installed")
 from benchbox.core.equivalence.cross_surface import (
     EQUIVALENCE_SCALE,
     GATES,
-    build_dataframe_contexts_from_specs,
+    build_production_contexts,
     count_executed_cells,
     find_cross_surface_divergences,
 )
@@ -45,7 +45,7 @@ def test_ssb_dataframe_surface_equivalent_to_sql(tmp_path):
     data = gate.build(EQUIVALENCE_SCALE, tmp_path)
     connection = data.connection
     try:
-        contexts = build_dataframe_contexts_from_specs(connection, data.table_specs)
+        contexts = build_production_contexts(data.benchmark, data.data_dir, backends=gate.backends)
         divergences = find_cross_surface_divergences(
             connection,
             query_ids=data.query_ids,
