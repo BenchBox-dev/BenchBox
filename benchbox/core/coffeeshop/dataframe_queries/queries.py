@@ -83,8 +83,13 @@ def sa1_pandas_impl(ctx: DataFrameContext) -> Any:
 
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)]
-    merged = filtered.merge(dl, left_on="location_record_id", right_on="record_id")
+    filtered = ol[(ol["order_date"] >= _parse_date(start_date)) & (ol["order_date"] <= _parse_date(end_date))]
+    # order_lines is denormalized (carries its own location_id/region); drop those
+    # before the join so the grouped/filtered columns come from dim_locations, as
+    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
+    merged = filtered.drop(columns=["location_id", "region"]).merge(
+        dl, left_on="location_record_id", right_on="record_id"
+    )
     grouped = merged.groupby(["order_date", "region"], as_index=False).agg(
         order_count=("order_id", "nunique"),
         gross_revenue=("total_price", "sum"),
@@ -115,7 +120,7 @@ def sa2_expression_impl(ctx: DataFrameContext) -> Any:
         ol.with_columns(col("order_date").dt.year().alias("year"))
         .filter(col("year") == lit(year))
         .join(dp, left_on="product_record_id", right_on="record_id")
-        .group_by("subcategory", "product_name")
+        .group_by("subcategory", "name")
         .agg(
             col("quantity").sum().alias("total_quantity"),
             col("total_price").sum().alias("total_revenue"),
@@ -134,7 +139,10 @@ def sa2_pandas_impl(ctx: DataFrameContext) -> Any:
     ol = ctx.get_table("order_lines")
     dp = ctx.get_table("dim_products")
     filtered = ol[ol["order_date"].dt.year == year]
-    merged = filtered.merge(dp, left_on="product_record_id", right_on="record_id")
+    # Drop order_lines' denormalized product_id before the join so dim_products'
+    # columns (product_id/name/subcategory/validity) are used unambiguously, as
+    # the SQL does, rather than pandas suffixing the product_id collision.
+    merged = filtered.drop(columns=["product_id"]).merge(dp, left_on="product_record_id", right_on="record_id")
     return (
         merged.groupby(["subcategory", "name"], as_index=False)
         .agg(total_quantity=("quantity", "sum"), total_revenue=("total_price", "sum"))
@@ -248,8 +256,13 @@ def sa4_pandas_impl(ctx: DataFrameContext) -> Any:
 
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)]
-    merged = filtered.merge(dl, left_on="location_record_id", right_on="record_id")
+    filtered = ol[(ol["order_date"] >= _parse_date(start_date)) & (ol["order_date"] <= _parse_date(end_date))]
+    # order_lines is denormalized (carries its own location_id/region); drop those
+    # before the join so the grouped/filtered columns come from dim_locations, as
+    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
+    merged = filtered.drop(columns=["location_id", "region"]).merge(
+        dl, left_on="location_record_id", right_on="record_id"
+    )
     grouped = merged.groupby(["region"], as_index=False).agg(
         orders=("order_id", "nunique"),
         revenue=("total_price", "sum"),
@@ -301,8 +314,13 @@ def sa5_pandas_impl(ctx: DataFrameContext) -> Any:
 
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)]
-    merged = filtered.merge(dl, left_on="location_record_id", right_on="record_id")
+    filtered = ol[(ol["order_date"] >= _parse_date(start_date)) & (ol["order_date"] <= _parse_date(end_date))]
+    # order_lines is denormalized (carries its own location_id/region); drop those
+    # before the join so the grouped/filtered columns come from dim_locations, as
+    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
+    merged = filtered.drop(columns=["location_id", "region"]).merge(
+        dl, left_on="location_record_id", right_on="record_id"
+    )
     return (
         merged.groupby(["location_id", "city", "state", "region"], as_index=False)
         .agg(orders=("order_id", "nunique"), revenue=("total_price", "sum"), avg_line_value=("total_price", "mean"))
@@ -351,8 +369,11 @@ def pr1_pandas_impl(ctx: DataFrameContext) -> Any:
 
     ol = ctx.get_table("order_lines")
     dp = ctx.get_table("dim_products")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)]
-    merged = filtered.merge(dp, left_on="product_record_id", right_on="record_id")
+    filtered = ol[(ol["order_date"] >= _parse_date(start_date)) & (ol["order_date"] <= _parse_date(end_date))]
+    # Drop order_lines' denormalized product_id before the join so dim_products'
+    # columns (product_id/name/subcategory/validity) are used unambiguously, as
+    # the SQL does, rather than pandas suffixing the product_id collision.
+    merged = filtered.drop(columns=["product_id"]).merge(dp, left_on="product_record_id", right_on="record_id")
     merged = merged[(merged["order_date"] >= merged["from_date"]) & (merged["order_date"] <= merged["to_date"])]
     return (
         merged.groupby(["subcategory"], as_index=False)
@@ -410,7 +431,7 @@ def pr2_pandas_impl(ctx: DataFrameContext) -> Any:
     end_date = params.get("end_date", "2024-12-31")
 
     ol = ctx.get_table("order_lines")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)].copy()
+    filtered = ol[(ol["order_date"] >= _parse_date(start_date)) & (ol["order_date"] <= _parse_date(end_date))].copy()
     conditions = [
         filtered["unit_price"] < 4,
         filtered["unit_price"] < 6,
@@ -536,8 +557,13 @@ def tm1_pandas_impl(ctx: DataFrameContext) -> Any:
 
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)]
-    merged = filtered.merge(dl, left_on="location_record_id", right_on="record_id")
+    filtered = ol[(ol["order_date"] >= _parse_date(start_date)) & (ol["order_date"] <= _parse_date(end_date))]
+    # order_lines is denormalized (carries its own location_id/region); drop those
+    # before the join so the grouped/filtered columns come from dim_locations, as
+    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
+    merged = filtered.drop(columns=["location_id", "region"]).merge(
+        dl, left_on="location_record_id", right_on="record_id"
+    )
     merged = merged[merged["region"] == region].copy()
     merged["hour"] = merged["order_time"].dt.hour
     conditions = [
@@ -595,7 +621,7 @@ def qc1_pandas_impl(ctx: DataFrameContext) -> Any:
     end_date = params.get("end_date", "2024-12-31")
 
     ol = ctx.get_table("order_lines")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)]
+    filtered = ol[(ol["order_date"] >= _parse_date(start_date)) & (ol["order_date"] <= _parse_date(end_date))]
     total_lines = len(filtered)
     unique_orders = filtered["order_id"].nunique()
     total_items = filtered["quantity"].sum()
@@ -660,7 +686,12 @@ def qc2_pandas_impl(ctx: DataFrameContext) -> Any:
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
     filtered = ol[(ol["order_date"].dt.year >= start_year) & (ol["order_date"].dt.year <= end_year)].copy()
-    merged = filtered.merge(dl, left_on="location_record_id", right_on="record_id")
+    # order_lines is denormalized (carries its own location_id/region); drop those
+    # before the join so the grouped/filtered columns come from dim_locations, as
+    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
+    merged = filtered.drop(columns=["location_id", "region"]).merge(
+        dl, left_on="location_record_id", right_on="record_id"
+    )
     month = merged["order_date"].dt.month
     conditions = [
         month.isin([12, 1, 2]),
