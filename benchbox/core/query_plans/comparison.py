@@ -18,6 +18,7 @@ from typing import Any
 
 from benchbox.core.results.query_plan_models import (
     LogicalOperator,
+    LogicalOperatorType,
     QueryPlanDAG,
     get_join_type_str,
     get_operator_type_str,
@@ -25,6 +26,160 @@ from benchbox.core.results.query_plan_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Cross-engine comparable subset (wrapper-stripped structural backbone)
+# ---------------------------------------------------------------------------
+#
+# The raw plan_fingerprint is a PER-ENGINE within-version key and is deliberately
+# NOT comparable across engines (see the stability contract in
+# query_plan_models.py): engines emit different wrapper/exchange/codegen operators
+# and harmonize names differently (ClickHouse Expression -> Project, Presto Output
+# -> Project, Spark Exchange -> Other), so the same logical query hashes differently
+# on each engine.
+#
+# This projection provides the SEPARATE, opt-in cross-engine view: it reduces a
+# harmonized DAG to its structural backbone — the relational skeleton of base
+# scans, joins, aggregates and set operations — by
+#   1. dropping engine-variable wrapper nodes (Project/Filter/CTE/Subquery/Other),
+#      which carry no cross-engine-stable structural meaning, and
+#   2. collapsing a parent->child run of the SAME backbone type into one node, so a
+#      partial+final aggregate (Spark/Databend) or a multi-stage sort (Doris) counts
+#      once — the single logical operation it represents.
+#
+# The result is a multiset of backbone operator types that IS comparable across
+# engines for the same logical query. It is intentionally kept separate from the
+# raw fingerprint, which remains unchanged for within-engine regression detection.
+
+# Operator types that form the cross-engine structural backbone. Everything else
+# (Project / Filter / CTE / Subquery / Other) is treated as engine-variable wrapper
+# noise and dropped from the comparable subset.
+BACKBONE_OPERATOR_TYPES: frozenset[str] = frozenset(
+    {
+        LogicalOperatorType.SCAN.value,
+        LogicalOperatorType.JOIN.value,
+        LogicalOperatorType.AGGREGATE.value,
+        LogicalOperatorType.SORT.value,
+        LogicalOperatorType.LIMIT.value,
+        LogicalOperatorType.UNION.value,
+        LogicalOperatorType.INTERSECT.value,
+        LogicalOperatorType.EXCEPT.value,
+        LogicalOperatorType.WINDOW.value,
+    }
+)
+
+# Backbone operators that engines split into a parent->child run of the SAME type as
+# stages of ONE logical operation: a partial+final aggregate (Spark/Databend) or a
+# multi-stage / merge sort (Doris). Only these collapse. JOIN, SCAN and the set
+# operators are NOT collapsed: a parent Join over a child Join is a multi-table join
+# (two distinct joins), and a Scan over a Scan is two distinct base scans — collapsing
+# those would undercount the relational skeleton the projection exists to measure.
+COLLAPSIBLE_OPERATOR_TYPES: frozenset[str] = frozenset(
+    {
+        LogicalOperatorType.AGGREGATE.value,
+        LogicalOperatorType.SORT.value,
+    }
+)
+
+
+def _backbone_type(node: LogicalOperator) -> str | None:
+    """Return the backbone operator-type string for a node, or None if it is wrapper noise."""
+    type_str = get_operator_type_str(node.operator_type, warn_unknown=False)
+    return type_str if type_str in BACKBONE_OPERATOR_TYPES else None
+
+
+def structural_backbone_counts(
+    root: LogicalOperator,
+    *,
+    only: set[str] | frozenset[str] | None = None,
+) -> dict[str, int]:
+    """Reduce a harmonized DAG to a cross-engine comparable multiset of backbone operators.
+
+    Wrapper/engine-variable nodes (Project/Filter/CTE/Subquery/Other) are dropped. A
+    parent->child run of the same *collapsible* backbone type
+    (``COLLAPSIBLE_OPERATOR_TYPES`` — aggregate, sort) is collapsed to a single node,
+    so a partial+final aggregate or a multi-stage sort counts once. The collapse looks
+    through dropped wrapper nodes, so ``Aggregate -> Exchange -> Aggregate`` still
+    counts as one aggregate. Non-collapsible backbone operators (joins, scans, set
+    operators) are always counted per node, so a left-deep 3-table join correctly
+    reports two joins.
+
+    Args:
+        root: Root of the harmonized logical operator tree.
+        only: Optional set of backbone operator-type strings to restrict the result to
+            (keys not present are reported as 0). Use to compare a declared invariant
+            subset (e.g. {"Scan", "Join", "Aggregate"}) across engines. Must be
+            non-empty when provided.
+
+    Returns:
+        Mapping of backbone operator-type string -> count.
+    """
+    if only is not None and not only:
+        raise ValueError("`only` must be a non-empty set of operator types, or None to include all")
+
+    counts: dict[str, int] = {}
+
+    def walk(node: LogicalOperator, collapsing_type: str | None) -> None:
+        backbone = _backbone_type(node)
+        if backbone is None:
+            # Wrapper node: drop it but keep the collapse context so a run of the same
+            # collapsible backbone type separated by wrappers still collapses.
+            for child in node.children:
+                walk(child, collapsing_type)
+            return
+        # Count the node unless it continues a collapsible same-type run.
+        if not (backbone in COLLAPSIBLE_OPERATOR_TYPES and backbone == collapsing_type):
+            counts[backbone] = counts.get(backbone, 0) + 1
+        # Only propagate a collapse context for collapsible types; otherwise reset it so
+        # an unrelated descendant of the same type is still counted.
+        next_collapsing = backbone if backbone in COLLAPSIBLE_OPERATOR_TYPES else None
+        for child in node.children:
+            walk(child, next_collapsing)
+
+    walk(root, None)
+
+    if only is not None:
+        return {key: counts.get(key, 0) for key in only}
+    return counts
+
+
+def comparable_subset_signature(
+    root: LogicalOperator,
+    *,
+    only: set[str] | frozenset[str] | None = None,
+) -> str:
+    """Deterministic string signature of the cross-engine structural backbone.
+
+    Unlike ``QueryPlanDAG.plan_fingerprint`` (per-engine, not cross-engine comparable),
+    this signature is stable across engines for the same logical query because it is
+    built from the wrapper-stripped, collapsed backbone. Two plans from different
+    engines that share a backbone produce the same signature.
+
+    Args:
+        root: Root of the harmonized logical operator tree.
+        only: Optional restriction set (see ``structural_backbone_counts``).
+
+    Returns:
+        Signature like ``"Aggregate:1|Join:1|Scan:2"`` (sorted by operator type).
+    """
+    counts = structural_backbone_counts(root, only=only)
+    return "|".join(f"{op_type}:{counts[op_type]}" for op_type in sorted(counts))
+
+
+def structural_backbones_match(
+    left: LogicalOperator,
+    right: LogicalOperator,
+    *,
+    only: set[str] | frozenset[str] | None = None,
+) -> bool:
+    """Return True if two plans share the same cross-engine structural backbone.
+
+    This is the cross-engine equivalent of ``plan_fingerprint`` equality: it compares
+    the wrapper-stripped backbone multisets, so it is meaningful across engines for the
+    same logical query (whereas raw fingerprint equality is not).
+    """
+    return structural_backbone_counts(left, only=only) == structural_backbone_counts(right, only=only)
 
 
 @dataclass
