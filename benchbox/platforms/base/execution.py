@@ -300,20 +300,32 @@ class TestDriversMixin:
 
         all_measurement_results = []
 
+        # Defer the isolated plan-capture pass to a single run after all iterations:
+        # _execute_all_queries otherwise captures (and, with analyze_plans, re-runs
+        # EXPLAIN ANALYZE for) every query at the end of each warmup/measurement
+        # iteration. last_capture_results tracks the run we attach the captured plans to.
+        defer_post_capture = self._plan_capture_phase_active()
+        last_capture_results: list[dict[str, Any]] | None = None
+
         # Warm-up runs (results captured)
         for i in range(warm_up_iterations):
             console.print(f"[cyan]--- Warm-up Run {i + 1}/{warm_up_iterations} ---[/cyan]")
-            warmup_results = self._execute_all_queries(benchmark, connection, run_config)
+            warmup_results = self._execute_all_queries(
+                benchmark, connection, run_config, defer_post_capture=defer_post_capture
+            )
             for result in warmup_results:
                 result["iteration"] = 0
                 result["stream_id"] = 0
                 result["run_type"] = "warmup"
                 all_measurement_results.append(result)
+            last_capture_results = warmup_results
 
         # Measurement runs (results collected)
         for i in range(iterations):
             console.print(f"[cyan]--- Measurement Run {i + 1}/{iterations} ---[/cyan]")
-            iteration_results = self._execute_all_queries(benchmark, connection, run_config)
+            iteration_results = self._execute_all_queries(
+                benchmark, connection, run_config, defer_post_capture=defer_post_capture
+            )
 
             # Tag each result with iteration number and run type
             for result in iteration_results:
@@ -322,6 +334,8 @@ class TestDriversMixin:
                 result["run_type"] = "measurement"
 
             all_measurement_results.extend(iteration_results)
+            if iteration_results:
+                last_capture_results = iteration_results
 
             # Abort remaining iterations if all queries failed (connection/infra issue)
             # or if fail_fast is enabled and any query failed
@@ -334,6 +348,18 @@ class TestDriversMixin:
                     "[yellow]⚠️  Query failures detected (fail_fast enabled) - aborting remaining runs[/yellow]"
                 )
                 break
+
+        # Single deferred plan-capture pass over the last completed run, strictly after
+        # every iteration has finished, so EXPLAIN ANALYZE runs once per query rather than
+        # once per iteration and never perturbs a later measured iteration.
+        if defer_post_capture and last_capture_results:
+            captured_queries = self._filter_queries(
+                self._get_dialect_queries(benchmark, benchmark_slug=benchmark_name, connection=connection),
+                benchmark,
+                benchmark_name,
+                run_config,
+            )
+            self._capture_plans_post_measurement(connection, captured_queries, last_capture_results)
 
         # Display summary
         if all_measurement_results:
@@ -1345,8 +1371,17 @@ class TestDriversMixin:
         else:
             console.print(f"[green]Completed all {total_queries} queries.[/green]")
 
-    def _execute_all_queries(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
-        """Execute all benchmark queries and collect results."""
+    def _execute_all_queries(
+        self, benchmark, connection: Any, run_config: dict, *, defer_post_capture: bool = False
+    ) -> list[dict[str, Any]]:
+        """Execute all benchmark queries and collect results.
+
+        When ``defer_post_capture`` is True the isolated post-measurement plan-capture
+        pass is skipped here; a multi-iteration caller (the generic power test) runs it
+        once after all iterations instead, so plan capture — and its EXPLAIN ANALYZE
+        re-execution when ``analyze_plans`` is on — is not repeated per iteration.
+        Inline-capture suppression during the timed loop still applies every iteration.
+        """
 
         console = quiet_console
 
@@ -1381,11 +1416,7 @@ class TestDriversMixin:
         # post-measurement pass (see _capture_plans_post_measurement). This keeps
         # EXPLAIN off the measurement path entirely. Side-effect-capture platforms
         # (BigQuery/Spark) keep inline capture (plan_capture_phase_eligible=False).
-        phase_eligible = (
-            bool(getattr(self, "capture_plans", False))
-            and getattr(self, "plan_capture_phase_eligible", False)
-            and not getattr(self, "dry_run_mode", False)
-        )
+        phase_eligible = self._plan_capture_phase_active()
         saved_capture_plans = getattr(self, "capture_plans", False)
         if phase_eligible:
             self.capture_plans = False
@@ -1439,12 +1470,26 @@ class TestDriversMixin:
             if phase_eligible:
                 self.capture_plans = saved_capture_plans
 
-        if phase_eligible:
+        if phase_eligible and not defer_post_capture:
             self._capture_plans_post_measurement(connection, queries, results)
 
         self._log_execution_summary(results, total_queries, cancelled)
 
         return results
+
+    def _plan_capture_phase_active(self) -> bool:
+        """True when the isolated post-measurement plan-capture pass should run.
+
+        Eligible EXPLAIN-based engines suppress inline capture on the timed path and
+        capture in a single post-measurement pass; side-effect-capture platforms
+        (BigQuery/Spark) set ``plan_capture_phase_eligible=False`` and keep inline
+        capture. Dry-run mode never captures.
+        """
+        return (
+            bool(getattr(self, "capture_plans", False))
+            and getattr(self, "plan_capture_phase_eligible", False)
+            and not getattr(self, "dry_run_mode", False)
+        )
 
     def _capture_plans_post_measurement(
         self,

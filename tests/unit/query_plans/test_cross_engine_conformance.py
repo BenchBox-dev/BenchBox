@@ -144,6 +144,25 @@ class TestComparableSubsetProjection:
         )
         assert structural_backbone_counts(tree)[LogicalOperatorType.AGGREGATE.value] == 1
 
+    @pytest.mark.parametrize(
+        "boundary",
+        [
+            LogicalOperatorType.FILTER,
+            LogicalOperatorType.PROJECT,
+            LogicalOperatorType.SUBQUERY,
+            LogicalOperatorType.CTE,
+        ],
+    )
+    def test_semantic_boundary_resets_collapse(self, boundary):
+        # A real relational boundary (Filter/Project/Subquery/CTE) between two aggregates
+        # is NOT a transparent exchange: the collapse context resets across it so a grouped
+        # subquery filtered before an outer aggregate correctly counts two aggregations.
+        tree = _op(
+            LogicalOperatorType.AGGREGATE,
+            [_op(boundary, [_op(LogicalOperatorType.AGGREGATE, [_op(LogicalOperatorType.SCAN)])])],
+        )
+        assert structural_backbone_counts(tree)[LogicalOperatorType.AGGREGATE.value] == 2
+
     def test_stacked_joins_are_not_collapsed(self):
         # A left-deep 3-table join (Join over Join over scans) is TWO distinct joins;
         # joins are not collapsible, so they must both be counted.

@@ -74,8 +74,13 @@ work:
   - id: w1
     summary: "Inventory dual-surface benchmarks and confirm SQL<->DataFrame query-id correspondence"
     needs: [w0]
-    status: done
+    status: in_progress
     notes: |
+      NOT YET COMPLETE — kept open so downstream work units that `needs: [w1]` are not
+      unblocked with unverified query mappings: nyctaxi and tsbs still need independent
+      mapping verification, and clickbench's SQL id set / construction is unconfirmed.
+      Flip to done only once those three are verified.
+
       For each benchmark with both surfaces, confirm the SQL and DataFrame query
       sets cover the same logical queries (matching ids/keys) and can run on a
       shared DuckDB cell. Record which are in scope, which are single-surface
