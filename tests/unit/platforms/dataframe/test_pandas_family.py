@@ -681,3 +681,24 @@ class TestPandasFamilyContextHelpers:
         result = ctx.filter_gt(sample_df, "value", 0)
 
         assert isinstance(result, UnifiedPandasFrame)
+
+
+class TestLoadBenchmarkIntoContextGuard:
+    """load_benchmark_into_context must refuse benchmark-managed loading.
+
+    A benchmark that owns its DataFrame loading (skip_dataframe_data_loading)
+    interleaves loading with execution and has no discrete preloaded context;
+    the helper must fail loudly rather than invoke the generic loader and return
+    a wrong/empty context (regression for PR #826 review feedback).
+    """
+
+    def test_raises_for_benchmark_managed_loading(self, tmp_path):
+        class ManagedBenchmark:
+            name = "managed"
+
+            def skip_dataframe_data_loading(self) -> bool:
+                return True
+
+        adapter = MockPandasAdapter()
+        with pytest.raises(ValueError, match="manages its own DataFrame loading"):
+            adapter.load_benchmark_into_context(ManagedBenchmark(), tmp_path)

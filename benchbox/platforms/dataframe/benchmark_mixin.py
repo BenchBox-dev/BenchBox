@@ -433,7 +433,21 @@ class BenchmarkExecutionMixin:
         DataFrame context yet drive query execution themselves - e.g. the
         cross-surface SQL<->DataFrame equivalence gates, which must compare each
         backend's real loaded dtypes against the SQL reference.
+
+        Only benchmarks whose data loads in a discrete phase are supported. A
+        benchmark that manages its own loading (``skip_dataframe_data_loading()``,
+        e.g. write/transaction-style benchmarks) interleaves loading with its
+        ``execute_dataframe_workload`` and has no standalone preloaded context, so
+        :meth:`run_benchmark` skips ``_load_data_phase`` for it; calling the
+        generic loader here would fail or preload a wrong context. Raise loudly
+        instead of returning a silently-empty one.
         """
+        if _benchmark_manages_dataframe_loading(benchmark):
+            raise ValueError(
+                f"{type(benchmark).__name__} manages its own DataFrame loading "
+                "(skip_dataframe_data_loading); load_benchmark_into_context loads data in a "
+                "discrete phase and does not apply - drive such a benchmark through run_benchmark."
+            )
         ctx = self.create_context()
         run_config: dict[str, Any] = {}
         if scale_factor is not None:
