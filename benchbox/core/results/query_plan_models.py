@@ -73,10 +73,34 @@ What fingerprint equality does NOT guarantee, and explicit non-guarantees:
   - **Equality does not imply equal performance** (costs/timing are excluded),
     and inequality does not imply a regression (it may be a benign shape change).
 
+Decision — the fingerprint is a PER-ENGINE within-version key (not cross-engine):
+  The raw fingerprint's intended and only supported purpose is per-engine,
+  within-version structural regression detection and within-run deduplication.
+  Cross-engine equality is explicitly OUT OF SCOPE for the raw fingerprint, because
+  engines emit different wrapper/exchange/codegen operators and harmonize operator
+  names differently (ClickHouse ``Expression`` -> Project, Presto ``Output`` ->
+  Project, Spark ``Exchange`` -> Other), so the same logical query legitimately
+  hashes differently on each engine. Forcing cross-engine equality onto the raw
+  fingerprint would require lossy normalization that would weaken its within-engine
+  regression signal.
+
+  When a cross-engine STRUCTURAL comparison is wanted, use the separate, opt-in
+  *comparable subset* projection in ``benchbox/core/query_plans/comparison.py``
+  (``structural_backbone_counts`` / ``comparable_subset_signature`` /
+  ``structural_backbones_match``). It reduces a harmonized DAG to its relational
+  backbone (base scans, joins, aggregates, set operations) by dropping
+  engine-variable wrapper nodes and collapsing partial+final / multi-stage runs of
+  the same operator, yielding a multiset that IS comparable across engines for the
+  same logical query. A cross-engine conformance corpus
+  (``tests/unit/query_plans/test_cross_engine_conformance.py``) asserts that
+  canonical queries meet declared backbone invariants on every engine while their
+  raw fingerprints remain distinct.
+
 Recommended use: stable for structural plan comparison and within-run
 deduplication on a single engine version. Suitable for "did the plan shape
 change?" regression detection when the engine version is held constant; not
-suitable as a cross-version or cross-engine equality key.
+suitable as a cross-version or cross-engine equality key — for cross-engine
+structural comparison use the comparable-subset projection above.
 """
 
 from __future__ import annotations
