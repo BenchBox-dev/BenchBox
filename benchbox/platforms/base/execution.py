@@ -1461,9 +1461,20 @@ class TestDriversMixin:
 
         The measurement connection is reused (rather than a fresh one) so embedded
         in-memory engines still see the loaded data; isolation comes from running
-        post-measurement, not from a separate connection. Capture is structural
-        only (``analyze_plans=False``), so DML is never re-executed. The
-        measurement-phase sampling filters (``plan_first_n`` /
+        post-measurement, not from a separate connection.
+
+        The phase honours the adapter's ``analyze_plans`` (the canonical, and only,
+        capture knob): with ``analyze_plans=True`` (the default) each SELECT is
+        re-run once with EXPLAIN ANALYZE for full execution detail — strictly after
+        the timed loop, so measured timing is unaffected — while DML/write-DDL is
+        downgraded to a non-ANALYZE EXPLAIN by the ``is_dml_query`` guard in
+        ``get_query_plan`` and is therefore never re-executed. With
+        ``analyze_plans=False`` the phase captures the static (structural) plan
+        only. Previously the phase hard-coded structural-only and silently dropped
+        ANALYZE timing for ``--capture-plans``; honouring ``analyze_plans`` restores
+        the one knob the canonical contract defines.
+
+        The measurement-phase sampling filters (``plan_first_n`` /
         ``plan_sampling_rate`` / ``plan_query_filter``) are still honoured.
         """
         from benchbox.core.plan_capture_phase import run_plan_capture_phase
@@ -1480,6 +1491,7 @@ class TestDriversMixin:
             self,
             success_queries,
             connection=connection,
+            analyze_plans=getattr(self, "analyze_plans", True),
             respect_sampling_filters=True,
         )
 

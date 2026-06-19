@@ -192,6 +192,47 @@ class TestIntegratedCapturePhase:
         finally:
             conn.close()
 
+    def test_phase_honors_analyze_plans_true(self, file_adapter):
+        """analyze_plans=True (the canonical knob) must run EXPLAIN ANALYZE in the phase.
+
+        Regression test for the dead-knob defect: the post-measurement phase used to
+        hard-code structural-only capture, so --capture-plans silently lost ANALYZE
+        timing. It must now honour the adapter's analyze_plans.
+        """
+        _seed_table(file_adapter)
+        assert file_adapter.analyze_plans is True  # DuckDB default
+        conn = file_adapter.create_connection()
+        try:
+            benchmark = _FakeBenchmark({"q": "SELECT id, SUM(val) FROM t GROUP BY id"})
+            results = file_adapter._execute_all_queries(benchmark, conn, {"benchmark_name": "generic"})
+
+            plan = results[0].get("query_plan")
+            assert plan is not None
+            phys = plan.logical_root.physical_operator
+            assert phys is not None
+            # EXPLAIN ANALYZE populates per-operator timing; structural-only would not.
+            assert phys.properties.get("timing") is not None, "phase must run ANALYZE when analyze_plans=True"
+        finally:
+            conn.close()
+
+    def test_phase_structural_only_when_analyze_disabled(self, file_adapter):
+        """analyze_plans=False keeps the phase structural-only (no re-execution timing)."""
+        _seed_table(file_adapter)
+        file_adapter.analyze_plans = False
+        conn = file_adapter.create_connection()
+        try:
+            benchmark = _FakeBenchmark({"q": "SELECT id, SUM(val) FROM t GROUP BY id"})
+            results = file_adapter._execute_all_queries(benchmark, conn, {"benchmark_name": "generic"})
+
+            plan = results[0].get("query_plan")
+            assert plan is not None
+            assert results[0].get("plan_fingerprint"), "structural fingerprint still captured"
+            phys = plan.logical_root.physical_operator
+            timing = phys.properties.get("timing") if phys else None
+            assert timing is None or timing == 0, "analyze_plans=False must not run ANALYZE"
+        finally:
+            conn.close()
+
     def test_dml_executed_exactly_once(self, file_adapter):
         """A DML query runs once during measurement; the phase must not re-execute it."""
         _seed_table(file_adapter)

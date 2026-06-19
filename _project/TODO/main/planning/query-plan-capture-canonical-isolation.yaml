@@ -3,7 +3,35 @@ title: "Canonical plan-capture isolation: one isolated phase for all engines, an
 worktree: main
 priority: High
 category: Core Functionality
-status: Not Started
+status: In Progress
+
+progress_note: |
+  PARTIAL (2026-06-19): the dependency-ordered first increment landed; this remains
+  the open umbrella for the broad structural refactor.
+  Done:
+    - w1 (ratify contract): the canonical capture contract is now the authoritative
+      module docstring in benchbox/core/plan_capture_phase.py (one isolated
+      post-measurement path; analyze_plans the only knob; capture-once-per-query;
+      default-ON eligibility for EXPLAIN engines with a BigQuery-class exception;
+      connection reuse), and the execution.py phase docstring matches it.
+    - Consequence B (dead knob) FIXED: _capture_plans_post_measurement now passes
+      analyze_plans through to run_plan_capture_phase, so --capture-plans honours
+      ANALYZE again (full execution detail, post-measurement; DML stays on
+      non-ANALYZE EXPLAIN via the is_dml_query guard, never re-executed). Restored
+      ANALYZE timing for the eligible adapters. Tests:
+      tests/integration/test_plan_capture_phase.py (phase honours analyze_plans
+      true/false; DML executed exactly once) -> 9 passing.
+  Deferred to follow-up PRs (Large, cross-adapter, needs live/cloud-engine
+  validation — not attempted blind in a sandbox):
+    - w2: invert plan_capture_phase_eligible to default-ON for all EXPLAIN engines
+      with an explicit side-effect exception list (BigQuery; assess Snowflake);
+      enable Spark/Databricks and the inline-only EXPLAIN engines.
+    - w3: run the phase for ALL test types (throughput/maintenance/combined), not
+      just power/standard, without capturing inside concurrent streams.
+    - w4: remove the inline capture path from the ~16 EXPLAIN-based adapters and
+      retire the sampling machinery (plan_first_n / plan_sampling_rate) + lock.
+    - w5: collapse the knob surface to analyze_plans (+ first-class --analyze-plans).
+    - w6: docs + end-to-end test across every test type.
 
 description: |
   TARGET ARCHITECTURE (supersedes the additive design of
@@ -76,7 +104,7 @@ design_note: |
 work:
   - id: w1
     summary: "Ratify the canonical contract and update isolation-phase-design as superseded"
-    status: pending
+    status: done
     notes: |
       Record the contract above as the single source of truth. Add a superseded note
       + pointer on query-plan-capture-isolation-phase-design (its additive cutover is

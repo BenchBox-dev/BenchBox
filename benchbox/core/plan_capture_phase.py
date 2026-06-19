@@ -1,33 +1,56 @@
 """Isolated, post-measurement query-plan capture phase.
 
-Plan capture is intended to be a *separate* phase of a benchmark run, decoupled
-from the timed power/throughput measurement. The legacy path captures plans
-inline inside each adapter's ``execute_query()`` (guarded by ``capture_plans``),
-which interleaves EXPLAIN with the timed query and — for ANALYZE-based adapters
-(DuckDB, MotherDuck, PostgreSQL) — contends on the same connection.
+Canonical capture contract (single source of truth)
+---------------------------------------------------
+Query plan capture is a FULLY SEPARATE and FULLY ISOLATED concern from the timed
+measurement run. The target architecture (see
+``_project/TODO/main/planning/query-plan-capture-canonical-isolation.yaml``, which
+supersedes the additive ``query-plan-capture-isolation-phase-design``) is:
 
-This module provides the additive building block for the phased model:
-``run_plan_capture_phase()`` captures plans *after* measurement is complete,
-using a fresh connection and structural-only EXPLAIN (no ANALYZE re-execution).
-It is intentionally additive — the inline path stays in place so platforms that
-surface plans as an execution side effect (BigQuery job stats, Spark event logs)
-keep working. See ``_project/TODO/main/planning/
-query-plan-capture-isolation-phase-design.yaml`` for the full design note.
+- **One capture path.** A single post-measurement isolated phase runs after all
+  timed queries of every test type (power, throughput, maintenance, combined)
+  complete. Capture is never interleaved with measurement and never runs inside a
+  concurrent throughput stream.
+- **One knob: ``analyze_plans``.** ``True`` re-runs each query once *after*
+  measurement with EXPLAIN ANALYZE for full execution detail (writes stay on a
+  non-ANALYZE EXPLAIN via the ``is_dml_query`` guard, so DML/CTAS is never
+  re-executed); ``False`` captures the static (structural) EXPLAIN with no
+  re-execution. There are no other capture knobs.
+- **Capture once per query.** Each distinct executed query is captured exactly
+  once — a plan is a property of ``(query, schema, engine)``, not of an execution
+  — so the inline-era per-iteration / per-stream sampling machinery
+  (``plan_first_n`` / ``plan_sampling_rate``) is not needed by this path.
+- **Default eligibility ON for EXPLAIN-based engines.** Only engines whose plan is
+  obtainable solely as a side effect of the measured job (BigQuery-class) are a
+  genuine exception and keep a special path.
+- **Connection reuse.** The measurement connection is reused so embedded
+  ``:memory:`` engines still see the loaded data; isolation comes from running
+  *post-measurement*, not from a second connection.
 
-Key isolation properties:
+``run_plan_capture_phase()`` is the implementation of this phase.
+
+Migration status (this is an umbrella in progress — see the canonical TODO):
+the phase is the capture path for the EXPLAIN-based ``plan_capture_phase_eligible``
+adapters in the power/standard path, and now honours ``analyze_plans`` (previously
+it hard-coded structural-only, silently dropping ANALYZE timing for
+``--capture-plans``). Remaining work tracked on the canonical TODO: default
+eligibility ON for all EXPLAIN engines, running the phase for every test type,
+removing the inline ``execute_query()`` capture path and the sampling machinery,
+and collapsing the knob surface to ``analyze_plans``.
+
+Key isolation properties of ``run_plan_capture_phase``:
 
 - **Post-measurement**: the caller runs this after all power/throughput
   iterations, so EXPLAIN never delays a timed query.
-- **Separate connection** (default): a fresh connection is opened via
-  ``adapter.create_connection()`` so the phase cannot contaminate measurement
-  transaction state. Callers may pass an existing ``connection`` to opt out.
-- **Structural-only**: ``analyze_plans`` is forced to ``False`` for the phase,
-  so DML/CTAS queries are never re-executed and SELECT queries pay only the
-  planning cost rather than ~1x execution time. The structural fingerprint is
-  unaffected (it excludes timing/cardinality by design). Adapters must honour
-  ``analyze_plans`` in ``get_query_plan()`` for this to hold — DuckDB/MotherDuck
-  and PostgreSQL do; an adapter that always issues EXPLAIN ANALYZE would still
-  re-execute SELECTs in this phase.
+- **Connection**: a fresh connection is opened via ``adapter.create_connection()``
+  by default (so the phase cannot contaminate measurement transaction state);
+  the integrated run path passes the measurement connection instead so embedded
+  in-memory engines still see the loaded data.
+- **Honours ``analyze_plans``**: the caller selects ANALYZE (full execution
+  detail) vs. structural-only. With ANALYZE, adapters must downgrade DML to a
+  non-ANALYZE EXPLAIN in ``get_query_plan()`` (DuckDB/MotherDuck/PostgreSQL do via
+  ``is_dml_query``) so writes are never re-executed. The structural fingerprint is
+  unaffected either way (it excludes timing/cardinality by design).
 - **Filter-independent**: the measurement-phase sampling filters
   (``plan_first_n``, ``plan_sampling_rate``) are bypassed so each requested
   query is captured exactly once; the explicit query list is the selection.
