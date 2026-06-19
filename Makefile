@@ -39,7 +39,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -137,6 +137,21 @@ tpchavoc-equivalence-report-postgres:
 # non-blocking sample with a DIFFERENT gap profile from Postgres (see equivalence.py).
 tpchavoc-equivalence-report-datafusion:
 	uv run -- python -m benchbox.core.tpchavoc.equivalence --engine datafusion
+
+# Fourth-engine SAMPLE: compare every ClickHouse-executable TPC-Havoc SQL variant
+# to canonical TPC-H on the SAME in-process ClickHouse instance (chDB /
+# clickhouse-local), both translated to the NATIVE clickhouse dialect (NOT
+# normalized to postgres - this is the first sampled engine on a non-Postgres
+# dialect). Excludes CLICKHOUSE_TPCHAVOC_SKIPS (variants ClickHouse cannot execute)
+# and runs with SQL-standard NULL semantics (join_use_nulls=1). Unlike the other
+# three engines this is NOT systematic-zero: CLICKHOUSE_KNOWN_DIVERGENCES records
+# the irreducible engine-semantic result differences (Decimal-vs-Float division,
+# SUM of an empty group = 0, partial correlated-subquery decorrelation). ClickHouse
+# is in-process (no service container); skips cleanly (exit 0) only if chDB is not
+# installed. The DuckDB gate above stays the hard blocker; this is a non-blocking
+# sample (see equivalence.py).
+tpchavoc-equivalence-report-clickhouse:
+	uv run -- python -m benchbox.core.tpchavoc.equivalence --engine clickhouse
 
 # Gate: compare every TPC-Havoc DataFrame variant (both backends) to canonical
 # TPC-H on real SF=0.1 DuckDB-backed data; exits non-zero on any divergence
@@ -1876,6 +1891,8 @@ help:
 	@echo "  make test-correctness-gate Run bounded real-result correctness gate"
 	@echo "  make tpchavoc-equivalence-report Gate: TPC-Havoc variant vs canonical TPC-H equivalence (DuckDB)"
 	@echo "  make tpchavoc-equivalence-report-postgres Sample: TPC-Havoc variant equivalence on PostgreSQL"
+	@echo "  make tpchavoc-equivalence-report-datafusion Sample: TPC-Havoc variant equivalence on DataFusion"
+	@echo "  make tpchavoc-equivalence-report-clickhouse Sample: TPC-Havoc variant equivalence on ClickHouse"
 	@echo "  make tpchavoc-dataframe-equivalence-report Gate: TPC-Havoc DataFrame variants vs canonical TPC-H"
 	@echo "  make ssb-cross-surface-equivalence-report Gate: SSB DataFrame surface vs its own SQL surface"
 	@echo "  make test-local-matrix Run real local benchmark matrix (stress)"

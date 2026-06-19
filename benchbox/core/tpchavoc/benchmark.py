@@ -13,12 +13,14 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import contextlib
+import re
 from pathlib import Path
 from typing import Any, Union
 
 from benchbox.core.tpch.benchmark import TPCHBenchmark
 from benchbox.core.tpchavoc.queries import TPCHavocQueryManager
 from benchbox.core.tpchavoc.validation import ResultValidator, ValidationReport
+from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
 from benchbox.sql_compat.rules.execution_filter.datafusion_tpchavoc import DATAFUSION_TPCHAVOC_SKIPS
 from benchbox.sql_compat.rules.execution_filter.lakesail_tpchavoc import LAKESAIL_TPCHAVOC_SKIPS
 from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
@@ -118,12 +120,23 @@ class TPCHavocBenchmark(TPCHBenchmark):
         self.validation_report = ValidationReport()
 
     def get_platform_skip_queries(self, platform_name: str) -> list[str]:
-        """Return platform-specific TPC-Havoc variants excluded by compatibility policy."""
-        platform = platform_name.lower().replace("_", "-")
+        """Return platform-specific TPC-Havoc variants excluded by compatibility policy.
+
+        Accepts either a platform SELECTOR (e.g. ``"clickhouse-local"``) or an
+        adapter's DISPLAY ``platform_name`` (which is what the live runner at
+        platforms/base/execution.py passes). The first-class adapters render
+        ``"ClickHouse Local"`` while the base ``ClickHouseAdapter`` renders
+        ``"ClickHouse (Local)"``, so any non-alphanumeric run (spaces,
+        underscores, parentheses) is collapsed to a single hyphen and trimmed,
+        mapping all of those forms to the same ``clickhouse-local`` key.
+        """
+        platform = re.sub(r"[^a-z0-9]+", "-", platform_name.lower()).strip("-")
         if platform == "lakesail":
             return list(LAKESAIL_TPCHAVOC_SKIPS)
         if platform == "datafusion":
             return list(DATAFUSION_TPCHAVOC_SKIPS)
+        if platform in {"clickhouse-local", "clickhouse-server", "clickhouse-cloud"}:
+            return list(CLICKHOUSE_TPCHAVOC_SKIPS)
         if platform in {"pg-duckdb", "pg-mooncake", "timescaledb"}:
             return list(POSTGRES_TPCHAVOC_SKIPS)
         return []
