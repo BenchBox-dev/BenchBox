@@ -498,6 +498,49 @@ jobs:
             tests/integration/platforms/test_datafusion_tbl_load.py \
             -m "slow" -n 0 --tb=short -v
 
+  clickhouse-integration:
+    name: clickhouse-integration
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Non-blocking: this is the FOURTH-engine equivalence SAMPLE, not a gate.
+    # The DuckDB SQL gate (correctness-gate job) stays the hard blocker.
+    # ClickHouse runs in-process via chDB (clickhouse-local), no service container,
+    # and is the first sampled engine on a NATIVE non-Postgres SQLGlot dialect, so
+    # this samples translation-induced divergence through a different seam path.
+    # Unlike the other three engines it is NOT systematic-zero - it surfaces real
+    # engine-semantic result differences classified in CLICKHOUSE_KNOWN_DIVERGENCES.
+    # continue-on-error keeps it a sample, not a blocker.
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      # Fourth-engine equivalence SAMPLE. Both canonical and variants are
+      # translated to the NATIVE clickhouse dialect and compared on the same
+      # in-process chDB instance (shared translation cancels out);
+      # CLICKHOUSE_TPCHAVOC_SKIPS variants are excluded, never marked equivalent,
+      # and the residue is classified against CLICKHOUSE_KNOWN_DIVERGENCES. The
+      # live sweep is tpchavoc + slow-marked; `-m "tpchavoc"` with a pinned path
+      # selects it (overriding the default fast-lane deselect).
+      - name: Run TPC-Havoc ClickHouse variant-equivalence sample
+        run: |
+          uv run -- python -m pytest \
+            tests/integration/platforms/test_tpchavoc_clickhouse_equivalence.py \
+            -m "tpchavoc" -n 0 --tb=short -v
+
   explorer-tokens:
     name: explorer-tokens
     needs: ci-paths

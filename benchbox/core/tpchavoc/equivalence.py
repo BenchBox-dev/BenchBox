@@ -37,6 +37,25 @@ against :data:`DATAFUSION_KNOWN_DIVERGENCES`. Across DuckDB, PostgreSQL, and
 DataFusion every executable variant is result-equivalent: translation divergence
 is systematic-zero, not engine-specific.
 
+``--engine clickhouse`` adds a bounded *fourth-engine sample* on the in-process
+ClickHouse engine (chDB / ``clickhouse-local``). It is the first sampled engine
+that translates through a NATIVE, non-Postgres SQLGlot dialect
+(``normalize_dialect_for_sqlglot("clickhouse") == "clickhouse"``), so the seam
+renders both canonical and variants through a DIFFERENT code path than the three
+Postgres-family engines. ClickHouse also differs on the result-semantic axes the
+prior TODOs flagged, and unlike the first three engines it does NOT yield
+systematic-zero: after excluding the variants it cannot execute
+(CLICKHOUSE_TPCHAVOC_SKIPS) and running with the engine's production TPC-H session
+configuration (SQL-standard NULL semantics via ``join_use_nulls=1``), a small
+residue of irreducible
+engine-semantic RESULT differences remains, classified in
+:data:`CLICKHOUSE_KNOWN_DIVERGENCES` (Decimal-vs-Float division truncation,
+``SUM`` of an empty group returning 0 instead of NULL, and partial
+correlated-subquery decorrelation). The seam is still faithful - every divergence
+is an engine-semantic result difference or an executability gap, never a
+translation bug - but the four-engine signal is "faithful across dialect
+FAMILIES, modulo documented engine result-semantics", not systematic-zero.
+
 Comparison is order-insensitive with float tolerance (the validator sorts both
 sides). Because canonical TPC-H queries carry a presentational ``ORDER BY ...
 LIMIT n`` top-N cut that the variant families treat inconsistently, the trailing
@@ -652,20 +671,204 @@ def run_datafusion_sample() -> int:
     )
 
 
+# The fourth engine sampled beyond DuckDB, PostgreSQL, and DataFusion. ClickHouse
+# is the first sampled engine whose SQLGlot dialect is NOT normalized to postgres
+# (normalize_dialect_for_sqlglot("clickhouse") == "clickhouse"), so both canonical
+# and variants are rendered through a DIFFERENT seam code path than the three
+# Postgres-family engines - the whole point of the choice. It runs in-process via
+# chDB (clickhouse-local), so like DataFusion there is no service container.
+CLICKHOUSE_TARGET_DIALECT = "clickhouse"
+
+# Benchmark type passed to ClickHouseTuningMixin.configure_for_benchmark so the
+# sample runs ClickHouse with the SAME session configuration the real TPC-H /
+# TPC-Havoc ClickHouse benchmark uses (rather than a hand-rolled subset that could
+# drift). Two of those settings are load-bearing for this oracle:
+#   * join_use_nulls=1: ClickHouse's DEFAULT join_use_nulls=0 fills unmatched
+#     LEFT/RIGHT JOIN rows with column-type DEFAULTS (0, '') instead of NULL - a
+#     documented departure from SQL-standard outer-join semantics that NO other
+#     sampled engine has. Canonical TPC-H and the variants are written for standard
+#     NULL semantics (they pass the DuckDB/Postgres/DataFusion samples, all of which
+#     use them), so the anti-join variants (`LEFT JOIN ... WHERE x IS NULL`) would
+#     otherwise diverge purely from this config default. join_use_nulls=1 configures
+#     ClickHouse to the standard semantics the benchmark assumes, isolating
+#     translation fidelity and the deeper result-semantic differences. This is NOT
+#     used to mute a divergence: the residual CLICKHOUSE_KNOWN_DIVERGENCES are still
+#     reported, and the JOIN-NULL default is itself recorded as an engine-semantic
+#     difference in the four-engine conclusion.
+#   * allow_experimental_correlated_subqueries=1: lets ClickHouse plan the
+#     correlated-subquery variants it can (the rest raise NOT_IMPLEMENTED and are in
+#     CLICKHOUSE_TPCHAVOC_SKIPS), matching production so the skip-list and divergence
+#     classification reflect the real engine configuration.
+# Verified: configure_for_benchmark and a hand-applied {join_use_nulls:1} produce an
+# IDENTICAL divergence/skip surface at SF=0.1, so reusing it adds production fidelity
+# (and validated SET application) without changing the classification.
+CLICKHOUSE_BENCHMARK_TYPE = "tpch"
+
+# Per-engine equivalence exceptions for the *fourth-engine sample* (ClickHouse),
+# keyed by "<query>_v<variant>". Same contract as POSTGRES_/DATAFUSION_KNOWN_
+# DIVERGENCES: an entry records an irreducible engine-semantic *result* difference
+# - ClickHouse executes the variant but computes a different answer than canonical
+# TPC-H run on ClickHouse, and the difference cannot be reconciled in the
+# translation layer (which is faithful). It is NEVER a translation bug (those are
+# fixed in the dialect seam) and NEVER a variant ClickHouse cannot execute (those
+# are excluded via CLICKHOUSE_TPCHAVOC_SKIPS, never marked equivalent).
+#
+# Unlike the three Postgres-family engines (all empty), ClickHouse - the first
+# sampled engine on a NATIVE non-Postgres dialect - is NOT systematic-zero. The
+# residue is three documented ClickHouse result-semantic classes:
+#   * decimal-division-truncation: ClickHouse `SUM(decimal)/COUNT` keeps the
+#     operand's Decimal scale, truncating an average that the variant computes as
+#     SUM/COUNT, whereas canonical `AVG(...)` returns full Float64 precision.
+#   * sum-empty-group-zero: ClickHouse `SUM`/`sumIf` over an all-filtered group
+#     returns 0, not NULL, so variants that emulate a WHERE filter with
+#     `SUM(...) FILTER(...)` + `HAVING <agg> IS NOT NULL` never drop the empty
+#     groups canonical's WHERE removes (extra rows).
+#   * correlated-subquery-decorrelation: ClickHouse's (partial, experimental)
+#     correlated-subquery decorrelation computes a different result than the
+#     standard-SQL semantics for these shapes (a correlated scalar COUNT returns
+#     NULL for an empty correlation; a doubly-correlated NOT EXISTS returns a
+#     different row set).
+CLICKHOUSE_KNOWN_DIVERGENCES: dict[str, str] = {
+    "1_v4": "decimal-division-truncation",
+    "2_v8": "correlated-subquery-decorrelation",
+    "3_v7": "sum-empty-group-zero",
+    "7_v7": "sum-empty-group-zero",
+    "10_v7": "sum-empty-group-zero",
+    "10_v8": "sum-empty-group-zero",
+    "13_v1": "correlated-subquery-decorrelation",
+}
+
+
+def build_clickhouse_with_tpch(scale_factor: float, output_dir: str | Path) -> tuple[Any, TPCHavocBenchmark, TPCH]:
+    """Generate TPC-H data and return a populated in-process ClickHouse connection.
+
+    Mirrors :func:`build_datafusion_with_tpch` for the fourth engine, reusing
+    ``ClickHouseLocalAdapter`` (embedded chDB) and its ``load_data`` (which ingests
+    the raw TPC-H ``.tbl`` files via ClickHouse's native CSV reader). The chDB
+    client exposes ``execute(sql).fetchall()`` and raises per query, so the
+    per-query error isolation in :func:`find_divergences` works without an
+    autocommit transaction. The adapter's own ``configure_for_benchmark`` is
+    applied with :data:`CLICKHOUSE_BENCHMARK_TYPE` so the sample runs with the SAME
+    validated session configuration as the real ClickHouse TPC-H benchmark (notably
+    SQL-standard ``join_use_nulls=1`` and ``allow_experimental_correlated_subqueries``).
+    Each table's row count is verified (>0) so a partial load cannot produce a
+    FALSE green by comparing empty-vs-empty. MergeTree ``ORDER BY`` (derived from
+    the PK by the adapter) is physical layout only and never changes results.
+
+    Returns:
+        ``(connection, tpchavoc_benchmark, tpch_benchmark)``.
+    """
+    from benchbox.platforms.clickhouse_local import ClickHouseLocalAdapter
+
+    data_dir, tpchavoc, tpch = _generate_tpch(scale_factor, Path(output_dir))
+
+    adapter = ClickHouseLocalAdapter(database_path=str(Path(output_dir) / "clickhouse_store"))
+    # Core/programmatic use: do not let the adapter try to manage (drop/create) a
+    # database; we create the schema directly on the fresh embedded store.
+    adapter.skip_database_management = True
+    connection = adapter.create_connection()
+    try:
+        adapter.create_schema(tpchavoc, connection)
+        table_stats, _, _ = adapter.load_data(tpchavoc, connection, data_dir)
+        empty = [table for table in _TPCH_TABLES if table_stats.get(table, 0) <= 0]
+        if empty:
+            raise RuntimeError(f"ClickHouse TPC-H load failed - no rows in {empty} (stats={table_stats})")
+        adapter.configure_for_benchmark(connection, CLICKHOUSE_BENCHMARK_TYPE)
+    except Exception:
+        _close_quietly(connection)
+        raise
+    return connection, tpchavoc, tpch
+
+
+def find_clickhouse_divergences(
+    connection: Any,
+    tpchavoc: TPCHavocBenchmark,
+    tpch: TPCH,
+    *,
+    query_ids: list[int] | None = None,
+) -> list[Divergence]:
+    """Run the ClickHouse equivalence sweep with the canonical ClickHouse wiring.
+
+    Single source of truth for *how* the ClickHouse sample is run - both the CLI
+    (:func:`run_clickhouse_sample`) and the integration test call this so they
+    cannot drift. Canonical and variants are both translated to the NATIVE
+    clickhouse dialect through the SAME seam (NOT normalized to postgres), and
+    CLICKHOUSE_TPCHAVOC_SKIPS variants are excluded (never marked equivalent).
+    """
+    from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
+
+    return find_divergences(
+        connection,
+        tpchavoc,
+        lambda q: tpch.get_query(q, dialect=CLICKHOUSE_TARGET_DIALECT),
+        query_ids=query_ids,
+        translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", CLICKHOUSE_TARGET_DIALECT),
+        skip_variants=set(CLICKHOUSE_TPCHAVOC_SKIPS),
+    )
+
+
+def run_clickhouse_sample() -> int:
+    """Run the fourth-engine (ClickHouse) equivalence sample.
+
+    Both canonical TPC-H and every variant are translated to the NATIVE clickhouse
+    dialect through the SAME seam, then compared on the SAME in-process chDB
+    instance, so shared translation cancels out (anti-pattern: never compare a
+    ClickHouse variant to a DuckDB/Postgres/DataFusion canonical). Variants
+    ClickHouse cannot execute are excluded via CLICKHOUSE_TPCHAVOC_SKIPS - they are
+    never marked equivalent. A divergence is classified against
+    CLICKHOUSE_KNOWN_DIVERGENCES (non-empty: ClickHouse's native dialect surfaces
+    real engine-semantic result differences); an unclassified one returns
+    non-zero, but this is a *sample* run - the DuckDB gate remains the hard blocker.
+
+    ClickHouse runs in-process via chDB, so the only "engine unusable" case is chDB
+    not being installed; that alone is a clean skip (mirroring the DataFusion
+    sample). Schema, load (incl. the row-count guard), translation, and sweep
+    failures all propagate as real failures.
+    """
+    import tempfile
+
+    from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
+
+    try:
+        import chdb  # noqa: F401
+    except ImportError as exc:
+        print(f"ClickHouse equivalence sample SKIPPED - chDB (clickhouse-local) not installed: {exc}")
+        return 0
+
+    with tempfile.TemporaryDirectory() as tmp:
+        connection, tpchavoc, tpch = build_clickhouse_with_tpch(EQUIVALENCE_SCALE, tmp)
+        try:
+            divergences = find_clickhouse_divergences(connection, tpchavoc, tpch)
+        finally:
+            _close_quietly(connection)
+
+    # Exclude un-executable variants from the denominator too: they are bounded
+    # out of scope, not failures.
+    total = len(tpchavoc.get_implemented_queries()) * 10 - len(CLICKHOUSE_TPCHAVOC_SKIPS)
+    return _report(
+        divergences,
+        total,
+        CLICKHOUSE_KNOWN_DIVERGENCES,
+        engine_label="ClickHouse",
+        baseline_name="CLICKHOUSE_KNOWN_DIVERGENCES",
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Generate data, run the oracle for the chosen engine, and print a report.
 
     ``--engine duckdb`` (default) is the hard, blocking gate. ``--engine
-    postgres`` and ``--engine datafusion`` run the bounded second- and
-    third-engine samples described in :func:`run_postgres_sample` and
-    :func:`run_datafusion_sample`.
+    postgres``, ``--engine datafusion``, and ``--engine clickhouse`` run the
+    bounded second-, third-, and fourth-engine samples described in
+    :func:`run_postgres_sample`, :func:`run_datafusion_sample`, and
+    :func:`run_clickhouse_sample`.
     """
     import argparse
 
     parser = argparse.ArgumentParser(description="TPC-Havoc variant-equivalence oracle.")
     parser.add_argument(
         "--engine",
-        choices=("duckdb", "postgres", "datafusion"),
+        choices=("duckdb", "postgres", "datafusion", "clickhouse"),
         default="duckdb",
         help="SQL engine to sample (default: duckdb, the hard gate).",
     )
@@ -674,6 +877,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_postgres_sample()
     if args.engine == "datafusion":
         return run_datafusion_sample()
+    if args.engine == "clickhouse":
+        return run_clickhouse_sample()
     return run_duckdb_gate()
 
 

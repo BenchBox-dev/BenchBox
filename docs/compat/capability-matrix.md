@@ -4,9 +4,9 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 353
+**Total registered rules:** 407
 
-**Platforms covered:** 30
+**Platforms covered:** 33
 
 ## Phase coverage by platform
 
@@ -15,6 +15,9 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | athena | - | - | - | - | 1 | - | 1 |
 | bigquery | - | - | - | 2 | 1 | - | 3 |
 | clickhouse | - | 13 | 3 | 4 | 1 | - | 21 |
+| clickhouse-cloud | - | - | - | - | - | 18 | 18 |
+| clickhouse-local | - | - | - | - | - | 18 | 18 |
+| clickhouse-server | - | - | - | - | - | 18 | 18 |
 | databend | - | - | - | - | 1 | - | 1 |
 | databricks | - | - | - | 2 | 1 | - | 3 |
 | datafusion | - | - | 4 | 2 | - | 14 | 20 |
@@ -84,6 +87,75 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | schema_emit | benchmark=tsbs_devops | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `schema_emit.clickhouse.tsbs_devops.all.mergetree_ddl` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | REWRITTEN | UNSUPPORTED_FEATURE | `schema_emit.clickhouse.write_primitives.pk_lock_table_unsupported` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.clickhouse.all.optimize_table_definition` |
+
+### clickhouse-cloud
+
+| phase | scope | action | support | failure mode | rule_id |
+|---|---|---|---|---|---|
+| execution_filter | benchmark=tpchavoc, query=10_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.10_v1` |
+| execution_filter | benchmark=tpchavoc, query=11_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.11_v4` |
+| execution_filter | benchmark=tpchavoc, query=13_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.13_v8` |
+| execution_filter | benchmark=tpchavoc, query=14_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.14_v8` |
+| execution_filter | benchmark=tpchavoc, query=16_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.16_v1` |
+| execution_filter | benchmark=tpchavoc, query=16_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.16_v4` |
+| execution_filter | benchmark=tpchavoc, query=17_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.17_v10` |
+| execution_filter | benchmark=tpchavoc, query=17_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.17_v7` |
+| execution_filter | benchmark=tpchavoc, query=1_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.1_v10` |
+| execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.1_v7` |
+| execution_filter | benchmark=tpchavoc, query=3_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.3_v1` |
+| execution_filter | benchmark=tpchavoc, query=3_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.3_v10` |
+| execution_filter | benchmark=tpchavoc, query=3_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.3_v9` |
+| execution_filter | benchmark=tpchavoc, query=4_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.4_v10` |
+| execution_filter | benchmark=tpchavoc, query=4_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.4_v7` |
+| execution_filter | benchmark=tpchavoc, query=5_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.5_v1` |
+| execution_filter | benchmark=tpchavoc, query=5_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.5_v10` |
+| execution_filter | benchmark=tpchavoc, query=5_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.5_v4` |
+
+### clickhouse-local
+
+| phase | scope | action | support | failure mode | rule_id |
+|---|---|---|---|---|---|
+| execution_filter | benchmark=tpchavoc, query=10_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.10_v1` |
+| execution_filter | benchmark=tpchavoc, query=11_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.11_v4` |
+| execution_filter | benchmark=tpchavoc, query=13_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.13_v8` |
+| execution_filter | benchmark=tpchavoc, query=14_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.14_v8` |
+| execution_filter | benchmark=tpchavoc, query=16_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.16_v1` |
+| execution_filter | benchmark=tpchavoc, query=16_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.16_v4` |
+| execution_filter | benchmark=tpchavoc, query=17_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.17_v10` |
+| execution_filter | benchmark=tpchavoc, query=17_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.17_v7` |
+| execution_filter | benchmark=tpchavoc, query=1_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.1_v10` |
+| execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.1_v7` |
+| execution_filter | benchmark=tpchavoc, query=3_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.3_v1` |
+| execution_filter | benchmark=tpchavoc, query=3_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.3_v10` |
+| execution_filter | benchmark=tpchavoc, query=3_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.3_v9` |
+| execution_filter | benchmark=tpchavoc, query=4_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.4_v10` |
+| execution_filter | benchmark=tpchavoc, query=4_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.4_v7` |
+| execution_filter | benchmark=tpchavoc, query=5_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.5_v1` |
+| execution_filter | benchmark=tpchavoc, query=5_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.5_v10` |
+| execution_filter | benchmark=tpchavoc, query=5_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.5_v4` |
+
+### clickhouse-server
+
+| phase | scope | action | support | failure mode | rule_id |
+|---|---|---|---|---|---|
+| execution_filter | benchmark=tpchavoc, query=10_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.10_v1` |
+| execution_filter | benchmark=tpchavoc, query=11_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.11_v4` |
+| execution_filter | benchmark=tpchavoc, query=13_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.13_v8` |
+| execution_filter | benchmark=tpchavoc, query=14_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.14_v8` |
+| execution_filter | benchmark=tpchavoc, query=16_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.16_v1` |
+| execution_filter | benchmark=tpchavoc, query=16_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.16_v4` |
+| execution_filter | benchmark=tpchavoc, query=17_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.17_v10` |
+| execution_filter | benchmark=tpchavoc, query=17_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.17_v7` |
+| execution_filter | benchmark=tpchavoc, query=1_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.1_v10` |
+| execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.1_v7` |
+| execution_filter | benchmark=tpchavoc, query=3_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.3_v1` |
+| execution_filter | benchmark=tpchavoc, query=3_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.3_v10` |
+| execution_filter | benchmark=tpchavoc, query=3_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.3_v9` |
+| execution_filter | benchmark=tpchavoc, query=4_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.4_v10` |
+| execution_filter | benchmark=tpchavoc, query=4_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.4_v7` |
+| execution_filter | benchmark=tpchavoc, query=5_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.5_v1` |
+| execution_filter | benchmark=tpchavoc, query=5_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.5_v10` |
+| execution_filter | benchmark=tpchavoc, query=5_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.5_v4` |
 
 ### databend
 
