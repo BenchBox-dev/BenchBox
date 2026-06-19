@@ -417,6 +417,31 @@ class BenchmarkExecutionMixin:
             builder.mark_completed()
             return builder.build()
 
+    def load_benchmark_into_context(
+        self,
+        benchmark: Any,
+        data_dir: Path,
+        *,
+        scale_factor: float | None = None,
+        options: DataFrameRunOptions | None = None,
+    ) -> Any:
+        """Create a context and load a benchmark's data into it, then return it.
+
+        This uses the exact production data path :meth:`run_benchmark` uses
+        (``_extract_benchmark_config`` + ``_load_data_phase``) but stops short of
+        executing any query. It is for callers that need a production-faithful
+        DataFrame context yet drive query execution themselves - e.g. the
+        cross-surface SQL<->DataFrame equivalence gates, which must compare each
+        backend's real loaded dtypes against the SQL reference.
+        """
+        ctx = self.create_context()
+        run_config: dict[str, Any] = {}
+        if scale_factor is not None:
+            run_config["scale_factor"] = scale_factor
+        config = self._extract_benchmark_config(benchmark, run_config)
+        self._load_data_phase(ctx, config, benchmark, Path(data_dir), options or DataFrameRunOptions())
+        return ctx
+
     def _extract_benchmark_config(self, benchmark: Any, run_config: dict[str, Any]) -> BenchmarkConfig:
         """Extract BenchmarkConfig from benchmark instance or run_config."""
         # Check if benchmark has config attribute
