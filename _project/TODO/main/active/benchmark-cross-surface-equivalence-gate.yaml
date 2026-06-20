@@ -236,6 +236,30 @@ work:
       clean but is re-confirmed there. Remaining ungated benchmarks are reported on
       the production substrate as each gate is built (now needs w5/w6/w7).
 
+      APPLICABILITY SWEEP (new): before running gates, a sweep
+      (_project/scripts/cross_surface_applicability_sweep.py ->
+      _project/analysis/cross-surface-applicability.md, locked by
+      tests/unit/test_cross_surface_applicability.py) found that the coverage map's
+      cross-surface candidate set is a LOADING-based UPPER BOUND. Of the 17
+      dual-surface UNGUARDED benchmarks, only TWO actually ship comparable
+      DataFrame queries (authoritative production resolver):
+        - clickbench (43 sql / 43 df) and joinorder_synthetic (13/13) -> GATEABLE.
+      The other 15 (amplab, coffeeshop, datavault, flightdata, h2odb, joinorder,
+      metadata_primitives, nyctaxi, read_primitives, tpcdi, tpcds_obt, tpch_skew,
+      transaction_primitives, tsbs_devops, write_primitives) resolve 0 DataFrame
+      queries: `supports_dataframe=True` means DataFrame LOADING, not shipped
+      DataFrame query implementations. They are NOT cross-surface-gateable and are
+      dispatched to w2-of-the-coverage-map (fallback oracle: differential
+      second-engine or curated expected-results), NOT this gate.
+
+      So this gate's burn-down is bounded to clickbench + joinorder_synthetic.
+      CAVEAT proven during the sweep: a GENERIC build is not load-faithful (it
+      loads DataFrame contexts without the schema/headers the production loader
+      applies, yielding spurious "column not found" divergences), so enumerating
+      REAL divergence counts requires a load-faithful per-benchmark builder like
+      build_ssb_duckdb. That builder work is w3 (start with clickbench, then
+      joinorder_synthetic).
+
   - id: w3
     summary: "Burn down divergences (fix the wrong surface) or declare intentional ones"
     needs: [w2]
