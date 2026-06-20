@@ -343,3 +343,24 @@ class TestStripHelpers:
 
     def test_strip_estimates_handles_empty(self):
         assert strip_estimates("") == ""
+
+    @pytest.mark.parametrize(
+        "predicate",
+        [
+            "arr = []",
+            "col IN []",
+            "list_filter(tags, x -> x IN [])",
+        ],
+    )
+    def test_strip_estimates_preserves_genuine_empty_list(self, predicate):
+        # Regression: a real empty-list literal must survive when no estimate token was
+        # stripped — the empty-bracket tidy-up only runs after an actual removal, so it no
+        # longer corrupts predicates such as ``arr = []`` (DuckDB/DataFusion signatures).
+        assert strip_estimates(predicate) == predicate
+
+    def test_strip_estimates_still_tidies_emptied_brackets_after_removal(self):
+        # When an estimate token vacated its enclosing brackets, the now-empty ``[]`` is
+        # still tidied — the guard only skips tidy-up when nothing was removed.
+        out = strip_estimates("part=[Estimated Cardinality: 5], key=a")
+        assert "[]" not in out
+        assert "5" not in out and "key=a" in out

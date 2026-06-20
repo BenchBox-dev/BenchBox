@@ -90,6 +90,35 @@ def test_assert_no_local_growth_flags_a_simulated_leak(monkeypatch, tmp_path):
     assert leaked.exists()
 
 
+def test_assert_no_local_growth_flags_same_size_rewrite(monkeypatch, tmp_path):
+    """A same-size in-place rewrite of a local file is flagged, not just byte growth."""
+    import os
+
+    worktree, external = _isolated_roots(tmp_path)
+    monkeypatch.chdir(worktree)
+    monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(external))
+
+    leaked = local_runs_root(worktree) / "datagen" / "coffeeshop_sf00001" / "order_lines.csv"
+    leaked.parent.mkdir(parents=True)
+    leaked.write_bytes(b"a" * 4096)
+
+    # Snapshot after the file already exists: a same-size rewrite leaves total_bytes flat.
+    before = snapshot_local_runs(worktree)
+    assert before.total_bytes == 4096
+
+    # Re-emit the same path at the same size (truncate + recreate), as a deterministic
+    # generator would. The byte delta is 0; only the file identity (mtime/inode) changed.
+    leaked.unlink()
+    leaked.write_bytes(b"b" * 4096)
+    st = leaked.stat()
+    os.utime(leaked, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000_000))
+
+    with pytest.raises(LocalArtifactGrowthError) as excinfo:
+        assert_no_local_growth(before, external, cwd=worktree)
+    assert str(local_runs_root(worktree)) in str(excinfo.value)
+    assert leaked.exists()
+
+
 def test_configured_external_root_skips_default_local_runs(monkeypatch, tmp_path):
     """No env/flag, or an output root inside the worktree, is treated as a local run."""
     worktree, _external = _isolated_roots(tmp_path)

@@ -40,7 +40,7 @@ description: |
 
 prerequisites:
   - "Databend: running Databend server or Databend Cloud (DATABEND_HOST, DATABEND_USER, DATABEND_PASSWORD)"
-  - "QuestDB: running QuestDB 7.x+ instance (QUESTDB_HOST, QUESTDB_PORT)"
+  - "QuestDB: running QuestDB 7.x+ instance (QUESTDB_HOST, QUESTDB_PG_PORT) — the adapter reads QUESTDB_PG_PORT for the pgwire SQL/EXPLAIN connection, not QUESTDB_PORT"
   - "Doris: running Apache Doris 2.0+ cluster with the Nereids planner (DORIS_HOST, DORIS_USER, DORIS_PASSWORD)"
   - "SingleStore: SingleStore Managed Service / Helios (SINGLESTORE_HOST, SINGLESTORE_USER, SINGLESTORE_PASSWORD)"
 

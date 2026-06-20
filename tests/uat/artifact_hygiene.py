@@ -100,30 +100,53 @@ class LocalRunsSnapshot:
     root: Path
     total_bytes: int
     file_sizes: dict[str, int]
+    # Per-file identity ``(mtime_ns, inode)`` so a same-size rewrite is still detected:
+    # a generator that truncates and recreates a deterministic file to the same length,
+    # or a stale local leak re-emitted byte-for-byte, leaves the size unchanged but
+    # still represents a local write that the external-root run must not perform.
+    file_fingerprints: dict[str, tuple[int, int]]
 
 
 def snapshot_local_runs(cwd: Path | str | None = None) -> LocalRunsSnapshot:
-    """Capture per-file sizes under ``cwd/benchmark_runs`` for later comparison."""
+    """Capture per-file size and identity under ``cwd/benchmark_runs`` for later comparison."""
     root = local_runs_root(cwd)
     file_sizes: dict[str, int] = {}
+    file_fingerprints: dict[str, tuple[int, int]] = {}
     if root.exists():
         for child in root.rglob("*"):
             try:
                 if child.is_file() and not child.is_symlink():
-                    file_sizes[str(child)] = child.stat().st_size
+                    stat = child.stat()
+                    file_sizes[str(child)] = stat.st_size
+                    file_fingerprints[str(child)] = (stat.st_mtime_ns, stat.st_ino)
             except OSError:
                 continue
-    return LocalRunsSnapshot(root=root, total_bytes=sum(file_sizes.values()), file_sizes=file_sizes)
+    return LocalRunsSnapshot(
+        root=root,
+        total_bytes=sum(file_sizes.values()),
+        file_sizes=file_sizes,
+        file_fingerprints=file_fingerprints,
+    )
 
 
-def _grown_entries(before: LocalRunsSnapshot, after: LocalRunsSnapshot) -> dict[str, int]:
-    """Return paths whose byte count increased between snapshots (new or grown)."""
-    grown: dict[str, int] = {}
+def _changed_entries(before: LocalRunsSnapshot, after: LocalRunsSnapshot) -> dict[str, int]:
+    """Return paths written during the run, mapped to their byte delta.
+
+    A path is reported when it is new, when its size changed (grew or shrank), or when it
+    was rewritten at the same size (mtime or inode differs). Same-size rewrites carry a
+    delta of 0 but are still violations: any local write under an external-root run is a
+    propagation regression, so this no longer reports only files that grew.
+    """
+    changed: dict[str, int] = {}
     for path, size in after.file_sizes.items():
-        delta = size - before.file_sizes.get(path, 0)
-        if delta > 0:
-            grown[path] = delta
-    return grown
+        before_size = before.file_sizes.get(path)
+        if before_size is None:
+            changed[path] = size  # new file
+        elif size != before_size:
+            changed[path] = size - before_size  # grew or shrank
+        elif after.file_fingerprints.get(path) != before.file_fingerprints.get(path):
+            changed[path] = 0  # same-size rewrite
+    return changed
 
 
 def _format_violation(
@@ -135,10 +158,10 @@ def _format_violation(
 ) -> str:
     """Build a failure message naming the local path AND the external root."""
     lines = [
-        "Local benchmark_runs/ grew during an external-root run (output-root propagation regression — see PR #780).",
+        "Local benchmark_runs/ was written during an external-root run (output-root propagation regression — see PR #780).",
         f"  unexpected local path: {local_root}",
         f"  configured external root: {external_root}",
-        f"  growth: {grew_by} bytes across {len(grown)} file(s)",
+        f"  change: {grew_by} bytes across {len(grown)} file(s) (includes same-size rewrites)",
     ]
     # Surface the largest offenders so the operator can locate the leak fast;
     # datagen is the historical culprit so it tends to dominate this list.
@@ -155,23 +178,24 @@ def assert_no_local_growth(
     *,
     cwd: Path | str | None = None,
 ) -> None:
-    """Raise :class:`LocalArtifactGrowthError` if local ``benchmark_runs`` grew.
+    """Raise :class:`LocalArtifactGrowthError` if local ``benchmark_runs`` was written.
 
     Compares ``before`` against a fresh snapshot of the same root. When an
-    external root is configured, *any* growth under the worktree-local
-    ``benchmark_runs/`` is a violation — the writes should have gone to
-    ``external_root`` instead.
+    external root is configured, *any* write under the worktree-local
+    ``benchmark_runs/`` is a violation — whether it grows a file, adds one, or
+    rewrites one in place at the same size — because the writes should have gone
+    to ``external_root`` instead.
     """
     after = snapshot_local_runs(cwd if cwd is not None else before.root.parent)
-    grown = _grown_entries(before, after)
+    changed = _changed_entries(before, after)
     grew_by = after.total_bytes - before.total_bytes
-    if grown or grew_by > 0:
+    if changed or grew_by > 0:
         raise LocalArtifactGrowthError(
             _format_violation(
                 local_root=before.root,
                 external_root=external_root,
-                grew_by=max(grew_by, sum(grown.values())),
-                grown=grown,
+                grew_by=max(grew_by, sum(changed.values())),
+                grown=changed,
             )
         )
 
