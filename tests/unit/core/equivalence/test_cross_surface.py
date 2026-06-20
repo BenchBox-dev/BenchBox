@@ -162,3 +162,21 @@ def test_reference_failure_records_one_cell_and_skips_candidates():
     assert divergences[0].cell == "reference"
     assert divergences[0].key == "Q1.1_reference"
     assert "no such table" in divergences[0].detail
+
+
+def test_clickbench_is_staged_not_enforced():
+    """ClickBench is wired as a STAGED gate (report mode) but NOT an enforced GATES entry.
+
+    It still has open SQL<->DataFrame divergences (see
+    _project/analysis/clickbench-cross-surface-divergences.md), so it must stay out
+    of GATES - the oracle coverage map reads GATES to mark a benchmark "guarded",
+    and registering a red gate there would be coverage theater. `get_gate` must
+    still resolve it for report-mode runs.
+    """
+    from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES, get_gate
+
+    assert "clickbench" in STAGED_GATES
+    assert "clickbench" not in GATES
+    assert get_gate("clickbench").name == "clickbench"
+    # ssb stays the enforced precedent.
+    assert "ssb" in GATES
