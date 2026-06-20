@@ -249,6 +249,23 @@ work:
 
       IN PROGRESS. ssb: no burndown required (0 divergences); baseline empty.
 
+      clickbench: load-faithful gate now WIRED (build_clickbench_duckdb) and
+      runnable in report mode (`make clickbench-cross-surface-equivalence-report`).
+      Registered in STAGED_GATES (NOT GATES) so the coverage map does not
+      prematurely mark it guarded. Enumeration at SF=0.1: 32 of 86 cells divergent
+      (full categorized list: _project/analysis/clickbench-cross-surface-divergences.md):
+        - 10 DataFrame engine/abstraction gaps (highest priority, fix at the engine
+          layer): UnifiedLazyFrame.slice missing (Q39-42), UnifiedStrExpr.replace
+          missing (Q29), date-vs-string compare (Q37/38/43 expression), str-vs-None
+          compare (Q25/27 pandas).
+        - 22 value divergences needing per-query triage; several are clearly real
+          logic bugs (Q32/Q33 pandas return ~full row count -> dropped
+          filter/DISTINCT), plus empty-string-vs-None null-handling (Q17/Q24).
+      Burn-down (engine gaps first, then per-query) is the remaining w3 work for
+      clickbench; once clean, promote STAGED_GATES->GATES and add a blocking
+      pr.yml step + fast-lane regression (w4). joinorder_synthetic (the other
+      gateable benchmark per the applicability sweep) is the next gate to wire.
+
   - id: w4
     summary: "Promote to bounded CI gates and add fast-lane regressions"
     needs: [w3]

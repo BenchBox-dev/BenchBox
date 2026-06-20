@@ -278,11 +278,76 @@ def build_ssb_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
     )
 
 
-# Registry of gated benchmarks. Add a benchmark by registering its build
-# function (and any classified known divergences) here.
+def build_clickbench_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
+    """Generate ClickBench data, load it into in-memory DuckDB, and wire both surfaces.
+
+    Mirrors :func:`build_ssb_duckdb`. ClickBench is a single wide table (``hits``);
+    the SQL surface (ids ``Q1``..``Q43``) and the DataFrame registry key by the same
+    ids 1:1. Imports are deferred so importing this module stays cheap.
+    """
+    import duckdb
+
+    from benchbox.core.clickbench.benchmark import ClickBenchBenchmark
+    from benchbox.core.clickbench.dataframe_queries import CLICKBENCH_DATAFRAME_QUERIES
+    from benchbox.core.clickbench.generator import ClickBenchDataGenerator
+    from benchbox.core.clickbench.schema import TABLES
+    from benchbox.platforms.duckdb import DuckDBAdapter
+
+    output_dir = Path(output_dir)
+    ClickBenchDataGenerator(scale_factor=scale_factor, output_dir=output_dir).generate_data()
+    benchmark = ClickBenchBenchmark(scale_factor=scale_factor, output_dir=output_dir)
+
+    connection = duckdb.connect(":memory:")
+    try:
+        for statement in benchmark.get_create_tables_sql(dialect="duckdb").strip().split(";"):
+            if statement.strip():
+                connection.execute(statement.strip())
+        table_stats, _, _ = DuckDBAdapter(database=":memory:").load_data(benchmark, connection, output_dir)
+
+        # A silent empty/partial load would compare empty-vs-empty and report a
+        # FALSE green, so verify the table loaded.
+        table_names = [table["name"] for table in TABLES.values()]
+        stats_lower = {str(name).lower(): rows for name, rows in table_stats.items()}
+        empty = [name for name in table_names if stats_lower.get(name.lower(), 0) <= 0]
+        if empty:
+            raise RuntimeError(f"ClickBench load failed - no rows in {empty} (stats={table_stats})")
+    except Exception:
+        connection.close()
+        raise
+
+    return CrossSurfaceData(
+        connection=connection,
+        query_ids=list(benchmark.get_queries().keys()),
+        reference_sql=lambda query_id: benchmark.get_query(query_id),
+        dataframe_query=lambda query_id: CLICKBENCH_DATAFRAME_QUERIES.get_or_raise(query_id),
+        benchmark=benchmark,
+        data_dir=output_dir,
+    )
+
+
+# Registry of ENFORCED gated benchmarks: clean, blocking cross-surface gates whose
+# DataFrame surface matches its SQL surface. The oracle coverage map reads this set
+# to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
+# belong here (registering a red gate here would be coverage theater).
 GATES: dict[str, CrossSurfaceGate] = {
     "ssb": CrossSurfaceGate(name="ssb", build=build_ssb_duckdb),
 }
+
+# Staged gates: the load-faithful builder is wired and runnable in report mode, but
+# the benchmark still has open cross-surface divergences to burn down before it can
+# be promoted into GATES (and made a blocking CI gate). Kept OUT of GATES so the
+# coverage map does not prematurely mark these benchmarks "guarded". See
+# `make <name>-cross-surface-equivalence-report` to enumerate their divergences.
+STAGED_GATES: dict[str, CrossSurfaceGate] = {
+    "clickbench": CrossSurfaceGate(name="clickbench", build=build_clickbench_duckdb),
+}
+
+
+def get_gate(name: str) -> CrossSurfaceGate:
+    """Resolve a gate by name from the enforced or staged registries."""
+    if name in GATES:
+        return GATES[name]
+    return STAGED_GATES[name]
 
 
 def run_gate(gate: CrossSurfaceGate) -> int:
@@ -367,12 +432,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Cross-surface SQL<->DataFrame equivalence gate.")
     parser.add_argument(
         "--benchmark",
-        choices=sorted(GATES),
+        choices=sorted({**GATES, **STAGED_GATES}),
         default="ssb",
-        help="Benchmark to gate (default: ssb).",
+        help="Benchmark to gate (default: ssb). Staged gates run in report mode but may diverge.",
     )
     args = parser.parse_args(argv)
-    return run_gate(GATES[args.benchmark])
+    return run_gate(get_gate(args.benchmark))
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
