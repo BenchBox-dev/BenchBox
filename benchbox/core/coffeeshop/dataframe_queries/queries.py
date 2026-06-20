@@ -520,7 +520,10 @@ def tm1_expression_impl(ctx: DataFrameContext) -> Any:
         .join(dl, left_on="location_record_id", right_on="record_id")
         .filter(col("region") == lit(region))
     )
-    with_hour = joined.with_columns(col("order_time").dt.hour().alias("hour"))
+    # order_time is loaded as an "HH:MM:SS" string (TIME has no reliable DataFrame
+    # dtype), so parse the hour from the leading two characters rather than via a
+    # datetime accessor, matching the SQL's hour(order_time).
+    with_hour = joined.with_columns(col("order_time").str.slice(0, 2).cast_int().alias("hour"))
     with_part = with_hour.with_columns(
         ctx.when((col("hour") >= lit(5)) & (col("hour") <= lit(10)))
         .then(lit("Morning"))
