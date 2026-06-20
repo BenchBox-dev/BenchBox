@@ -99,9 +99,13 @@ work:
     notes: |
       Delivered ahead of w1/w2 (the visibility guard is independent of building
       the oracles). `make oracle-coverage-map-check` (and the generator's
-      `--check`) fail when the checked-in map is stale; wired into `ci-lint`
-      alongside the other generated-artifact freshness checks, and covered by the
-      fast unit test `tests/unit/test_oracle_coverage_map.py`. Mechanism: adding a
+      `--check`) fail when the checked-in map is stale. CI surfacing on develop
+      PRs is via TWO paths: the fast unit test
+      `tests/unit/test_oracle_coverage_map.py::test_checked_in_artifacts_are_current`
+      runs in the pr.yml `code-test` job (`-m fast`), and an explicit
+      `make oracle-coverage-map-check` step sits in the pr.yml `code-lint` job
+      next to `compat-docs-check`. It is also in the `ci-lint` aggregate
+      (post-merge / local `make pr-preflight` parity). Mechanism: adding a
       benchmark changes the generated map -> the drift check fails -> the author
       must regenerate and commit, which surfaces the new benchmark's UNGUARDED
       classification in review rather than letting it slip in silently. The map's

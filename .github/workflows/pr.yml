@@ -267,6 +267,9 @@ jobs:
       - name: Compatibility governance drift check
         run: make compat-docs-check
 
+      - name: Oracle coverage map drift check
+        run: make oracle-coverage-map-check
+
       - name: Public contract drift check
         run: |
           uv run -- python - <<'PY'
