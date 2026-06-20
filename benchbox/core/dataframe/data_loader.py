@@ -167,6 +167,10 @@ class SchemaMapper:
         "CHAR": "Utf8",
         "DATE": "Date",
         "TIMESTAMP": "Datetime",
+        # TIME has no reliable DataFrame dtype across backends (pyarrow->Parquet->Polars
+        # yields an all-null Time column; pandas has no time-only dtype), so load it as a
+        # string and let query impls parse the components, matching the SQL hour(time).
+        "TIME": "Utf8",
     }
 
     # Mapping from TPC DataType enum values to Pandas types
@@ -177,6 +181,7 @@ class SchemaMapper:
         "CHAR": "object",
         "DATE": "datetime64[ns]",
         "TIMESTAMP": "datetime64[ns]",
+        "TIME": "object",
     }
 
     # Mapping for PyArrow types (used in Parquet conversion)
@@ -187,6 +192,7 @@ class SchemaMapper:
         "CHAR": "string",
         "DATE": "date32",
         "TIMESTAMP": "timestamp[us]",
+        "TIME": "string",
     }
 
     @classmethod
