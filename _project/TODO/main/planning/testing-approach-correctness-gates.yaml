@@ -135,8 +135,10 @@ work:
           `_build_query_result_with_validation`;
         - deleted the stale `tests/unit/test_adjective_cleanup.py` smoke file;
         - deleted the two committed `.py.new` integration stubs;
-        - removed the nonexistent `specialized/` directory and hand-maintained
-          E2E test counts from `tests/README.md`;
+        - removed hand-maintained E2E test counts from `tests/README.md`
+          (NOTE: the stale `specialized/` directory reference was NOT actually
+          removed here despite the original wording; it was corrected later
+          under testing-approach-oracle-hardening w5);
         - removed the mock-the-`identify` SQL translation tests now covered by
           the real sqlglot snapshot test, and strengthened two weak observable
           SQL assertions;

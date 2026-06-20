@@ -280,9 +280,32 @@ class ClickHouseQueryTransformer:
             end += 1
 
         if end < len(text) and text[end] == "(":
-            return cls._find_matching_parenthesis(text, end) + 1
+            call_end = cls._find_matching_parenthesis(text, end) + 1
+            # A window function ``agg(...) OVER (...)`` is a single operand: include the
+            # trailing OVER clause so safe_division wraps the whole window expression
+            # (``NULLIF(SUM(x) OVER (...), 0)``) rather than splitting it into the invalid
+            # ``NULLIF(SUM(x), 0) OVER (...)``.
+            return cls._extend_over_clause(text, call_end)
 
         return end
+
+    @classmethod
+    def _extend_over_clause(cls, text: str, index: int) -> int:
+        """Return the index past a window ``OVER (...)`` clause following *index*, if any."""
+        probe = index
+        while probe < len(text) and text[probe].isspace():
+            probe += 1
+        # Match OVER only as a standalone keyword (not an identifier prefix like ``overage``).
+        if text[probe : probe + 4].upper() != "OVER":
+            return index
+        after_kw = probe + 4
+        if after_kw < len(text) and (text[after_kw].isalnum() or text[after_kw] == "_"):
+            return index
+        while after_kw < len(text) and text[after_kw].isspace():
+            after_kw += 1
+        if after_kw < len(text) and text[after_kw] == "(":
+            return cls._find_matching_parenthesis(text, after_kw) + 1
+        return index
 
     @classmethod
     def _strip_outer_parentheses(cls, expression: str) -> str:
