@@ -75,8 +75,9 @@ Plan capture overhead depends on the platform:
   `--platform-option analyze_plans=false` to use estimated plans only (~1-5 ms overhead).
 - **PostgreSQL** (SELECT queries): uses `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`, which also
   re-executes the query. Overhead is approximately **1× query cost** per captured plan.
-- **PostgreSQL** (DML — INSERT/UPDATE/DELETE/MERGE/COPY): uses `EXPLAIN (FORMAT JSON)` without
+- **PostgreSQL** (DML — INSERT/UPDATE/DELETE/MERGE): uses `EXPLAIN (FORMAT JSON)` without
   ANALYZE to prevent double-execution of writes. Overhead is low (~1-5 ms, estimated plan only).
+  Note: PostgreSQL `EXPLAIN` does not accept `COPY`, so COPY statements are not plan-captured.
 - **Redshift, DataFusion, SQLite**: estimated plans only (no ANALYZE), adds ~1-5 ms per query.
 
 In all cases:
@@ -596,8 +597,9 @@ The comparison engine uses:
 **PostgreSQL**:
 - SELECT queries use `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` — re-executes the query to collect
   actual timing and I/O statistics (~1× query cost overhead)
-- DML queries (INSERT, UPDATE, DELETE, MERGE, COPY) use `EXPLAIN (FORMAT JSON)` without ANALYZE
-  to prevent writing data twice (~1-5 ms overhead, estimated plan only)
+- DML queries (INSERT, UPDATE, DELETE, MERGE) use `EXPLAIN (FORMAT JSON)` without ANALYZE
+  to prevent writing data twice (~1-5 ms overhead, estimated plan only). `COPY` is not
+  plan-captured: PostgreSQL `EXPLAIN` does not accept `COPY` statements.
 - Provides detailed cost estimates, row counts, and operator properties
 - Supports all PostgreSQL node types (Seq Scan, Index Scan, Hash Join, etc.)
 - Requires PostgreSQL 12+ for full JSON format support
