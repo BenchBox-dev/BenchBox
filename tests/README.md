@@ -96,9 +96,25 @@ The standard gates are intentionally split by the risk they are meant to catch:
   stored TPC-H answer files with EXACT row-count checking. The gated subset is the
   18 TPC-H queries whose answer-set cardinalities are stable across dbgen builds;
   Q11/Q16/Q18/Q20 are excluded because their HAVING/threshold boundaries make the
-  stored row count vary with the generated data. Note this validates result
-  *cardinality*, not result *values* — value-level answer comparison (the
-  `_sources/tpc-h/dbgen/answers` + `cmpq.pl` checksum path) remains future work.
+  stored row count vary with the generated data. The subset is deliberately
+  *discriminating* — it is not dominated by one-row queries and includes multiple
+  high-cardinality answer-backed queries (e.g. Q9=175, Q2/Q21=100) — so a wrong
+  join/filter/aggregate that still emits one row is caught. The subset shape is
+  ratcheted in `tests/unit/test_standardized_test_commands.py`
+  (`TestCorrectnessGateOracle`). What the gate proves and what it does not:
+  - **Strict arming**: with `BENCHBOX_STRICT_EXPECTED_RESULTS=1`, every configured
+    query *must* produce a non-SKIP row-count validation or the run fails. This is
+    not gated on benchmark name or scale, so a future CI speedup that retargets the
+    gate (a different benchmark, or SF<1 where no answer files exist) cannot
+    silently disarm the oracle.
+  - **No-skip guard**: the Makefile target emits a JUnit report and fails unless
+    exactly one node ran with zero skips. `pytest` exits 0 when a *selected* node
+    SKIPs (e.g. duckdb unavailable, or the case dropped from the stable matrix),
+    which would otherwise pass the gate without executing anything.
+  - **Cardinality, not values**: this validates result *cardinality*, not result
+    *values* — value-level answer comparison (the `_sources/tpc-h/dbgen/answers` +
+    `cmpq.pl` checksum path) remains future work, as do the high-cardinality
+    threshold queries (Q11/Q16) excluded above for dbgen-build stability.
 - `make test-integration`: non-live, non-stress integration coverage for broader
   local and main/release validation.
 - `make test-local-matrix`: opt-in stress matrix for the full local platform
@@ -530,10 +546,6 @@ The test suite includes several unified utilities for efficient testing:
 - `utilities/test_runner.py`: Enhanced test runner with caching capabilities
 
 These utilities provide a modern, efficient approach to testing and validation.
-
-**Note**: Minimal tests have been moved to the `specialized/` directory:
-- `specialized/test_tpch_minimal.py`: Minimal tests for TPC-H that don't require data generation
-- `specialized/test_tpcds_minimal.py`: Minimal tests for TPC-DS that don't require data generation
 
 ## Support
 

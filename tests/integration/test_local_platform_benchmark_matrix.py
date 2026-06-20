@@ -343,19 +343,30 @@ def _validate_against_expected_results(
                 f"actual={validation.actual_row_count}, mode={validation.validation_mode.value}"
             )
 
-    # Optional strict mode: require expected-results checks for the bounded PR gate.
-    if (
-        benchmark_name == "tpch"
-        and scale_factor >= 1.0
-        and os.environ.get("BENCHBOX_STRICT_EXPECTED_RESULTS", "").strip().lower() in {"1", "true", "yes", "on"}
-    ):
-        expected_checked = len(expected_query_ids or ())
-        if expected_checked:
-            assert checked == expected_checked, (
-                f"TPC-H validation evaluated {checked} query row counts, expected {expected_checked}"
+    # Strict mode: when enabled, every configured expected-results check must
+    # actually evaluate (non-SKIP). This is deliberately NOT gated on benchmark
+    # name or scale factor. The previous `benchmark_name == "tpch" and
+    # scale_factor >= 1.0` guard meant a future CI speedup that retargeted the
+    # gate (a different benchmark, or SF<1) would silently disarm the oracle:
+    # every configured query would SKIP, `checked` would be 0, and the assertion
+    # was never reached. Now strict mode fails whenever a configured subset does
+    # not fully evaluate, regardless of benchmark/scale. The default non-strict
+    # matrix still skips unsupported expected-results validation (see callers).
+    strict = os.environ.get("BENCHBOX_STRICT_EXPECTED_RESULTS", "").strip().lower() in {"1", "true", "yes", "on"}
+    if strict:
+        configured = set(expected_query_ids or ())
+        if configured:
+            assert checked == len(configured), (
+                f"strict expected-results: evaluated {checked} of {len(configured)} configured "
+                f"{benchmark_name} queries (sf={scale_factor}); every configured query must produce a "
+                f"non-SKIP row-count validation. Unevaluated queries indicate missing answer files, a "
+                f"skipped/failed query, or scale/benchmark drift that disarmed the gate."
             )
         else:
-            assert checked > 0, "TPC-H validation did not evaluate any query against stored expected results"
+            assert checked > 0, (
+                f"strict expected-results: no {benchmark_name} queries (sf={scale_factor}) were validated "
+                f"against stored expected results"
+            )
 
     assert not failures, "Row-count validation failures:\n" + "\n".join(failures)
 
