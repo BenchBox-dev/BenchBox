@@ -1076,22 +1076,39 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         else:
             # CSV or TBL
             actual_delimiter = delimiter if delimiter is not None else ("|" if format_type == "tbl" else ",")
-            has_header = format_type == "csv"
 
-            # Resolve null_marker for trailing-delimiter probing via the resolver when a
+            # Resolve the CSV dialect (has_header + null_marker) via the resolver when a
             # DataSource is available (manifest path).  Without one, derive from format_type
             # so .tbl files (format_type=="tbl") keep their existing trailing-delimiter behaviour.
             # When benchmark=None, NO_BENCHMARK is used: path (a) wins when table_metadata is
             # present; otherwise path (c) of resolve_csv_dialect derives null_marker from the
             # file extension (.tbl/.dat → "", everything else → None), which is correct.
+            #
+            # has_header MUST come from the dialect, not the file extension: the SQL loaders
+            # (e.g. DuckDB) honor csv_has_header and default to headerless, so assuming every
+            # .csv carries a header here silently drops the first data row of headerless .csv
+            # benchmarks (e.g. CoffeeShop), diverging the DataFrame surface from SQL.
             if data_source is not None:
                 from benchbox.platforms.base.data_loading import NO_BENCHMARK, resolve_csv_dialect
 
                 bm = benchmark if benchmark is not None else NO_BENCHMARK
                 _dialect = resolve_csv_dialect(data_source, table_name, first_file, bm)
                 null_marker: str | None = _dialect.null_marker
-            else:
+                has_header = _dialect.has_header
+            elif benchmark is not None:
                 null_marker = "" if format_type == "tbl" else None
+                # No DataSource, but a known benchmark (e.g. the cross-surface gate loads
+                # straight from a benchmark instance): honor its declared csv_has_header,
+                # defaulting to headerless - matching resolve_csv_dialect's default and
+                # DuckDB's header=false - rather than assuming every .csv has a header,
+                # which silently drops the first data row of headerless benchmark .csv.
+                bench_header = getattr(benchmark, "csv_has_header", None)
+                has_header = bool(bench_header) if bench_header is not None else False
+            else:
+                # Ad-hoc load with no benchmark/DataSource: keep the file-extension
+                # heuristic that treats a bare .csv as headered.
+                null_marker = "" if format_type == "tbl" else None
+                has_header = format_type == "csv"
 
             # Pull this table's declared SQL types (parallel to column_names) from
             # the benchmark schema so numeric columns named like dates (e.g. SSB's
