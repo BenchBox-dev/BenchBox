@@ -1407,7 +1407,9 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         # line whose last quoted field happens to contain the delimiter character.
         # Quoted CSVs (non-TPC sources) must use the standard quoted-parsing path.
         _is_tpc_raw = Path(file_paths[0]).suffix.lower() in {".tbl", ".dat"}
-        is_trailing = column_names is not None and _is_tpc_raw and has_trailing_delimiter(file_paths[0], delimiter, column_names)
+        is_trailing = (
+            column_names is not None and _is_tpc_raw and has_trailing_delimiter(file_paths[0], delimiter, column_names)
+        )
         if is_trailing:
             read_column_names = get_column_names_with_trailing(column_names, True)
             include_columns = column_names
