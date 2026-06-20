@@ -565,7 +565,9 @@ def tm1_pandas_impl(ctx: DataFrameContext) -> Any:
         dl, left_on="location_record_id", right_on="record_id"
     )
     merged = merged[merged["region"] == region].copy()
-    merged["hour"] = merged["order_time"].dt.hour
+    # order_time is loaded as an "HH:MM:SS" string; parse the hour from the leading
+    # two characters rather than via .dt (matching the SQL's hour(order_time)).
+    merged["hour"] = merged["order_time"].astype("string").str[:2].astype("int64")
     conditions = [
         (merged["hour"] >= 5) & (merged["hour"] <= 10),
         (merged["hour"] >= 11) & (merged["hour"] <= 14),
