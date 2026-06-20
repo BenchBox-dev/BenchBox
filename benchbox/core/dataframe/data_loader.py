@@ -70,7 +70,10 @@ logger = logging.getLogger(__name__)
 # Relative cache directory suffix (resolved against runtime CWD).
 # Unified with SQL datagen under benchmark_runs/datagen/ for data reuse.
 DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
-DATAFRAME_CACHE_VERSION = "v2"
+# Bump when schema/type-conversion rules change so stale cached Parquet is not
+# silently reused on rerun. v3: TIME columns now load as strings (previously an
+# all-null Time column), so pre-v3 caches must be regenerated to pick up values.
+DATAFRAME_CACHE_VERSION = "v3"
 
 # Format subdirectory names that belong to the DataFrame cache layer.
 # Used by clear_cache() to selectively remove cached conversions without
@@ -518,7 +521,7 @@ class DataCache:
         """Get the cache path for a benchmark/SF/format combination.
 
         The cache is nested inside the canonical flat datagen directory
-        (e.g. ``tpch_sf001/parquet/v2/``), reusing the same naming
+        (e.g. ``tpch_sf001/parquet/v3/``), reusing the same naming
         convention as SQL generators via :func:`get_benchmark_runs_datagen_path`.
 
         Args:
