@@ -37,11 +37,13 @@
     },
     {
       "benchmark": "coffeeshop",
-      "cross_surface_applicable": true,
+      "cross_surface_applicable": false,
       "dual_surface": true,
-      "guarded": false,
-      "oracles": [],
-      "primary_oracle": "NONE",
+      "guarded": true,
+      "oracles": [
+        "cross-surface"
+      ],
+      "primary_oracle": "cross-surface",
       "surfaces": [
         "sql",
         "dataframe"
