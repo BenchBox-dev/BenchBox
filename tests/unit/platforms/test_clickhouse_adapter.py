@@ -1428,3 +1428,18 @@ class TestClickHouseQueryTransformerSafeDivision:
         result = t.safe_division(sql)
         assert "'a/b'" in result
         assert "x / NULLIF(y, 0)" in result
+
+    def test_windowed_divisor_wraps_whole_window_expression(self):
+        """A windowed divisor ``SUM(x) OVER (...)`` must wrap as a single operand.
+
+        Regression: the operand scanner stopped at ``SUM(volume)`` and left the
+        trailing ``OVER (...)`` outside the NULLIF, producing the invalid
+        ``NULLIF(SUM(volume), 0) OVER (...)`` (ClickHouse: 'NULLIF ... OVER' is not a
+        window function). The whole window expression is one operand.
+        """
+        t = self._transformer()
+        sql = "SELECT mkt / SUM(volume) OVER (PARTITION BY o_year) FROM t"
+        result = t.safe_division(sql)
+        assert "mkt / NULLIF(SUM(volume) OVER (PARTITION BY o_year), 0)" in result
+        # The OVER clause must NOT be stranded outside the NULLIF.
+        assert "NULLIF(SUM(volume), 0) OVER" not in result
