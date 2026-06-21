@@ -241,34 +241,36 @@ work:
       clean but is re-confirmed there. Remaining ungated benchmarks are reported on
       the production substrate as each gate is built (now needs w5/w6/w7).
 
-      APPLICABILITY SWEEP (new): before running gates, a sweep
+      APPLICABILITY SWEEP: a reproducible sweep
       (_project/scripts/cross_surface_applicability_sweep.py ->
       _project/analysis/cross-surface-applicability.md, locked by
-      tests/unit/test_cross_surface_applicability.py) found that the coverage map's
-      cross-surface candidate set is a LOADING-based UPPER BOUND. Of the 17
-      dual-surface UNGUARDED benchmarks, the production resolver
-      (get_dataframe_queries_for_benchmark) surfaces DataFrame queries for only:
-        - clickbench (43 sql / 43 df) and joinorder_synthetic (13/13) -> GATEABLE.
-      `supports_dataframe=True` means DataFrame LOADING, not shipped DataFrame query
-      implementations, so it over-counts gate candidates.
+      tests/unit/test_cross_surface_applicability.py) classifies the dual-surface
+      UNGUARDED benchmarks by whether they ship a DataFrame query `QueryRegistry`
+      (the registry the cross-surface gate builders consume directly) - the
+      authoritative gate-applicability signal. `supports_dataframe` over-counts
+      (it is a LOADING flag); the production query *resolver* under-counts (it
+      misses per-benchmark `<BENCH>_DATAFRAME_QUERIES` registries - e.g. it
+      returned 0 for coffeeshop, which #842 nonetheless gated). Registry detection
+      fixes both.
 
-      CORRECTION (post #842): the resolver signal also UNDER-counts. coffeeshop was
-      gated by #842 using a COFFEESHOP_DATAFRAME_QUERIES registry that the production
-      resolver does NOT surface (it returned 0 for coffeeshop in this sweep). So the
-      resolver is the wrong applicability signal: benchmarks expose DataFrame queries
-      via per-benchmark `<BENCH>_DATAFRAME_QUERIES` registries the resolver doesn't
-      wire up. FOLLOW-UP: change the applicability sweep to detect those registries
-      (importable) rather than the resolver count, then re-run to find the true
-      gateable set (likely > 2; amplab/datavault/etc. may have registries too). The
-      benchmarks still dispatched to a w2 fallback oracle are only those with NO
-      DataFrame query registry at all.
+      RESULT (16 unguarded candidates; coffeeshop already gated/excluded):
+        - GATEABLE, ids overlap as-is (6): clickbench, flightdata, h2odb,
+          joinorder, joinorder_synthetic, read_primitives (152/157 ids).
+        - GATEABLE, needs id normalization first (6): amplab, datavault, nyctaxi,
+          tpch_skew, tsbs_devops (ids Q-prefixed/friendly vs SQL ids), tpcds_obt
+          (only 3 DF queries vs 89 SQL - partial).
+        - w2 FALLBACK, NO DataFrame query registry (4): metadata_primitives,
+          tpcdi, transaction_primitives, write_primitives. Only these four need a
+          differential second-engine or curated expected-results oracle.
+      So the cross-surface gate burn-down is ~12 benchmarks, not 2 (the earlier
+      resolver-based "only 2" was wrong).
 
       CAVEAT proven during the sweep: a GENERIC build is not load-faithful (it
       loads DataFrame contexts without the schema/headers the production loader
       applies, yielding spurious "column not found" divergences), so enumerating
       REAL divergence counts requires a load-faithful per-benchmark builder like
-      build_ssb_duckdb. That builder work is w3 (clickbench done; joinorder_synthetic
-      and any newly-found gateable benchmarks next).
+      build_ssb_duckdb. That builder work is w3 (clickbench done; the other 11
+      gateable benchmarks next, normalizing ids where the sweep flags it).
 
   - id: w3
     summary: "Burn down divergences (fix the wrong surface) or declare intentional ones"
