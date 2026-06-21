@@ -30,6 +30,3 @@ https://selectdb\.com
 
 # Okabe-Ito color palette page intermittently returns 500
 https://jfly\.uni-koeln\.de/.*
-
-# NO_COLOR spec host intermittently fails DNS resolution from CI runners
-https://no-color\.org/.*
