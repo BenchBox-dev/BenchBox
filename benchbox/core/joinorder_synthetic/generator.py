@@ -129,6 +129,11 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
     def _generate_data_local(self, output_dir: Path) -> dict[str, Path]:
         """Generate data locally (original implementation)."""
+        # Seed for reproducible data (mirrors SSB/ClickBench generators). Without
+        # this the `random.*` synthetic rows differ every run, which makes
+        # top-N/tie-sensitive consumers (e.g. the cross-surface equivalence gate)
+        # non-deterministic.
+        random.seed(42)
         # Temporarily modify instance output_dir to use provided output_dir
         original_output_dir = self.output_dir
         self.output_dir = output_dir
