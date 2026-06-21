@@ -401,6 +401,9 @@ jobs:
       - name: Run SSB cross-surface SQL<->DataFrame equivalence gate
         run: make ssb-cross-surface-equivalence-report
 
+      - name: Run AMPLab cross-surface SQL<->DataFrame equivalence gate
+        run: make amplab-cross-surface-equivalence-report
+
       - name: Run CoffeeShop cross-surface SQL<->DataFrame equivalence gate
         run: make coffeeshop-cross-surface-equivalence-report
 

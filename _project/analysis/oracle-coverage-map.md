@@ -2,12 +2,12 @@
 
 **Generated** by `_project/scripts/generate_oracle_coverage_map.py` from the benchmark registry, the expected-results provider registry, and the equivalence-gate registries. Do not edit by hand — run the generator and commit. `tests/unit/test_oracle_coverage_map.py` fails if this drifts.
 
-**Summary:** 23 shipped benchmarks — 5 guarded, 18 UNGUARDED (16 reachable by the cross-surface gate, 2 single-surface needing a fallback oracle).
+**Summary:** 23 shipped benchmarks — 6 guarded, 17 UNGUARDED (15 reachable by the cross-surface gate, 2 single-surface needing a fallback oracle).
 
 | Benchmark | Surfaces | Oracle | Notes |
 | --- | --- | --- | --- |
 | ai_primitives | sql | NONE | single-surface → needs fallback oracle (w2) |
-| amplab | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
+| amplab | sql+dataframe | cross-surface | cross-surface |
 | clickbench | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
 | coffeeshop | sql+dataframe | cross-surface | cross-surface |
 | datavault | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
@@ -36,5 +36,5 @@ These ship with no automated correctness oracle today. Dual-surface ones are dis
 
 > Caveat (w2 oracle choice): write/DML/nondeterministic benchmarks (`write_primitives`, `transaction_primitives`, `metadata_primitives`, `tpcdi`) are listed as dual-surface, but their two surfaces may not be result-comparable; prefer structural-invariant oracles (row counts, post-state assertions) over cross-surface equality for those.
 
-- Dual-surface (cross-surface candidates): amplab, clickbench, datavault, flightdata, h2odb, joinorder, joinorder_synthetic, metadata_primitives, nyctaxi, read_primitives, tpcdi, tpcds_obt, tpch_skew, transaction_primitives, tsbs_devops, write_primitives
+- Dual-surface (cross-surface candidates): clickbench, datavault, flightdata, h2odb, joinorder, joinorder_synthetic, metadata_primitives, nyctaxi, read_primitives, tpcdi, tpcds_obt, tpch_skew, transaction_primitives, tsbs_devops, write_primitives
 - Single-surface (fallback-oracle needed): ai_primitives, vector_search

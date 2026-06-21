@@ -29,8 +29,10 @@ queries via :meth:`DataFrameQuery.get_impl_for_family` (the same accessor
 the comparator is reused from the shared harness, never forked.
 
 Currently gated: ssb (canonical and small; SQL and DataFrame ids correspond 1:1
-as ``Q1.1`` .. ``Q4.3``). Additional dual-surface benchmarks are added by
-registering a :class:`CrossSurfaceGate` in :data:`GATES`.
+as ``Q1.1`` .. ``Q4.3``) and amplab (8 queries; the SQL ids ``"1"``, ``"1a"``,
+``"2"`` .. ``"5"`` map 1:1 to the DataFrame ids by a mechanical ``Q`` prefix:
+``"Q1"``, ``"Q1a"``, ``"Q2"`` .. ``"Q5"``). Additional dual-surface benchmarks
+are added by registering a :class:`CrossSurfaceGate` in :data:`GATES`.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -233,46 +235,87 @@ def build_production_contexts(
     return contexts
 
 
-def build_ssb_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate SSB data, load it into in-memory DuckDB, and wire both surfaces.
+def _load_duckdb_cell(benchmark: Any, output_dir: Path, table_names: Sequence[str], *, label: str) -> Any:
+    """Create an in-memory DuckDB, build the schema, load the data, and verify it.
 
-    Platform/generator imports are deferred so importing this module stays cheap.
+    Shared by every benchmark's ``build`` function: it runs the benchmark's
+    create-table DDL, loads the generated files via the real
+    :class:`~benchbox.platforms.duckdb.DuckDBAdapter`, and asserts each expected
+    table got rows. A silent empty/partial load would make every query compare
+    empty-vs-empty and report a FALSE green, so an empty table fails loudly here.
+    Returns the populated connection (closed by the caller on any later error).
+    ``duckdb``/adapter imports are deferred so importing this module stays cheap.
     """
     import duckdb
 
-    from benchbox.core.ssb.benchmark import SSBBenchmark
-    from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
-    from benchbox.core.ssb.generator import SSBDataGenerator
-    from benchbox.core.ssb.schema import TABLES
     from benchbox.platforms.duckdb import DuckDBAdapter
-
-    output_dir = Path(output_dir)
-    SSBDataGenerator(scale_factor=scale_factor, output_dir=output_dir).generate_data()
-    benchmark = SSBBenchmark(scale_factor=scale_factor, output_dir=output_dir)
 
     connection = duckdb.connect(":memory:")
     try:
         for statement in benchmark.get_create_tables_sql(dialect="duckdb").strip().split(";"):
             if statement.strip():
                 connection.execute(statement.strip())
-        table_stats, _, _ = DuckDBAdapter(database=":memory:").load_data(benchmark, connection, output_dir)
+        table_stats, _, _ = DuckDBAdapter(database=":memory:").load_data(benchmark, connection, Path(output_dir))
 
-        # A silent empty/partial load would make every query compare
-        # empty-vs-empty and report a FALSE green, so verify each table loaded.
-        table_names = [table["name"] for table in TABLES.values()]
         stats_lower = {str(name).lower(): rows for name, rows in table_stats.items()}
         empty = [name for name in table_names if stats_lower.get(name.lower(), 0) <= 0]
         if empty:
-            raise RuntimeError(f"SSB load failed - no rows in {empty} (stats={table_stats})")
+            raise RuntimeError(f"{label} load failed - no rows in {empty} (stats={table_stats})")
     except Exception:
         connection.close()
         raise
+    return connection
 
+
+def build_ssb_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
+    """Generate SSB data, load it into in-memory DuckDB, and wire both surfaces.
+
+    Platform/generator imports are deferred so importing this module stays cheap.
+    """
+    from benchbox.core.ssb.benchmark import SSBBenchmark
+    from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
+    from benchbox.core.ssb.generator import SSBDataGenerator
+    from benchbox.core.ssb.schema import TABLES
+
+    output_dir = Path(output_dir)
+    SSBDataGenerator(scale_factor=scale_factor, output_dir=output_dir).generate_data()
+    benchmark = SSBBenchmark(scale_factor=scale_factor, output_dir=output_dir)
+
+    connection = _load_duckdb_cell(benchmark, output_dir, [table["name"] for table in TABLES.values()], label="SSB")
     return CrossSurfaceData(
         connection=connection,
         query_ids=list(benchmark.get_queries().keys()),
         reference_sql=lambda query_id: benchmark.get_query(query_id),
         dataframe_query=lambda query_id: SSB_DATAFRAME_QUERIES.get_or_raise(query_id),
+        benchmark=benchmark,
+        data_dir=output_dir,
+    )
+
+
+def build_amplab_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
+    """Generate AMPLab data, load it into in-memory DuckDB, and wire both surfaces.
+
+    The SQL surface keys queries by ``"1"``, ``"1a"``, ``"2"`` .. ``"5"`` (8 ids)
+    while the DataFrame registry keys the SAME logical queries by the ``Q``-prefixed
+    ``"Q1"``, ``"Q1a"``, ``"Q2"`` .. ``"Q5"`` (1:1, mechanical prefix), so the
+    DataFrame accessor maps the SQL id across. Platform/generator imports are
+    deferred so importing this module stays cheap.
+    """
+    from benchbox.core.amplab.benchmark import AMPLabBenchmark
+    from benchbox.core.amplab.dataframe_queries import AMPLAB_DATAFRAME_QUERIES
+    from benchbox.core.amplab.generator import AMPLabDataGenerator
+    from benchbox.core.amplab.schema import TABLES
+
+    output_dir = Path(output_dir)
+    AMPLabDataGenerator(scale_factor=scale_factor, output_dir=output_dir).generate_data()
+    benchmark = AMPLabBenchmark(scale_factor=scale_factor, output_dir=output_dir)
+
+    connection = _load_duckdb_cell(benchmark, output_dir, [table["name"] for table in TABLES.values()], label="AMPLab")
+    return CrossSurfaceData(
+        connection=connection,
+        query_ids=list(benchmark.get_queries().keys()),
+        reference_sql=lambda query_id: benchmark.get_query(query_id),
+        dataframe_query=lambda query_id: AMPLAB_DATAFRAME_QUERIES.get_or_raise(f"Q{query_id}"),
         benchmark=benchmark,
         data_dir=output_dir,
     )
@@ -421,6 +464,7 @@ def build_joinorder_synthetic_duckdb(scale_factor: float, output_dir: Path) -> C
 # belong here (registering a red gate here would be coverage theater).
 GATES: dict[str, CrossSurfaceGate] = {
     "ssb": CrossSurfaceGate(name="ssb", build=build_ssb_duckdb),
+    "amplab": CrossSurfaceGate(name="amplab", build=build_amplab_duckdb),
     "coffeeshop": CrossSurfaceGate(name="coffeeshop", build=build_coffeeshop_duckdb),
 }
 

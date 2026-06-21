@@ -62,8 +62,10 @@ def test_registry_bearing_benchmarks_are_gateable(rows):
     """clickbench (direct) and a known id-mapping case are classified gateable."""
     by_id = {r["benchmark"]: r["status"] for r in rows}
     assert by_id.get("clickbench") == GATEABLE
-    # amplab ships a registry but its ids are Q-prefixed vs the SQL ids -> needs mapping.
-    assert by_id.get("amplab") == GATEABLE_NEEDS_ID_MAPPING
+    # datavault ships a registry but its ids are friendly/Q-prefixed vs the SQL ids
+    # -> needs mapping. (amplab was previously the example here; it is now an
+    # enforced cross-surface gate, so it no longer appears among unguarded candidates.)
+    assert by_id.get("datavault") == GATEABLE_NEEDS_ID_MAPPING
 
 
 def test_no_candidate_is_silently_dropped(rows):
