@@ -181,6 +181,35 @@ class UnifiedStrExpr:
             return UnifiedExpr(df_f.regexp_like(self._expr, pattern))
         return UnifiedExpr(self._expr.str.contains(pattern))
 
+    def replace(self, pattern: Any, value: Any) -> UnifiedExpr:
+        """Regex-replace matches of ``pattern`` with ``value`` (capture groups via ``$1``).
+
+        Mirrors SQL ``REGEXP_REPLACE``. ``pattern``/``value`` may be plain strings or
+        wrapped literal expressions. Polars replaces only the first match; for the
+        anchored whole-string patterns this is used for that is equivalent to a full
+        replace.
+
+        Args:
+            pattern: Regex pattern to match.
+            value: Replacement string (may reference capture groups, e.g. ``$1``).
+
+        Returns:
+            UnifiedExpr with the replaced string.
+        """
+        pattern = _unwrap_unified_expr(pattern)
+        value = _unwrap_unified_expr(value)
+        if self._is_pyspark:
+            from pyspark.sql.functions import regexp_replace
+
+            return UnifiedExpr(regexp_replace(self._expr, pattern, value))
+        if self._is_datafusion:
+            from datafusion import functions as df_f, lit as df_lit
+
+            pattern = pattern if _is_datafusion_expr(pattern) else df_lit(pattern)
+            value = value if _is_datafusion_expr(value) else df_lit(value)
+            return UnifiedExpr(df_f.regexp_replace(self._expr, pattern, value))
+        return UnifiedExpr(self._expr.str.replace(pattern, value))
+
     def slice(self, offset: int, length: int | None = None) -> UnifiedExpr:
         """Extract substring.
 
@@ -3899,6 +3928,32 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
     def head(self, n: int = 10) -> UnifiedLazyFrame:
         """Get first n rows (alias for limit)."""
         return self.limit(n)
+
+    def slice(self, offset: int, length: int | None = None) -> UnifiedLazyFrame:
+        """Return ``length`` rows starting at ``offset`` (SQL ``LIMIT length OFFSET offset``).
+
+        Args:
+            offset: Zero-based start row.
+            length: Number of rows to return; ``None`` means all rows from ``offset``.
+
+        Returns:
+            UnifiedLazyFrame with the sliced rows.
+        """
+        if _is_polars_df(self._df):
+            result = self._df.slice(offset, length)
+        elif _is_datafusion_df(self._df):
+            # DataFusion has no .slice(); it offsets via limit(count, offset=).
+            if length is None:
+                raise NotImplementedError("UnifiedLazyFrame.slice without a length is not supported for DataFusion")
+            result = self._df.limit(length, offset=offset)
+        elif _is_pyspark_df(self._df):
+            # PySpark has no native offset slice (it would need a row_number window);
+            # not exercised by the current cross-surface gates.
+            raise NotImplementedError("UnifiedLazyFrame.slice is not implemented for PySpark")
+        else:
+            # Fallback: rely on a native polars-style slice if present.
+            result = self._df.slice(offset, length)
+        return UnifiedLazyFrame(result, self._adapter)
 
     # =========================================================================
     # Rename Operations
