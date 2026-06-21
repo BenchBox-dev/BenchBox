@@ -21,6 +21,10 @@ if str(_REPO_ROOT) not in sys.path:
 
 from _project.scripts.cross_surface_applicability_sweep import (  # noqa: E402
     ARTIFACT,
+    BLOCKED,
+    GATEABLE,
+    GATEABLE_NEEDS_ID_MAPPING,
+    NO_DF_QUERY_SURFACE,
     build_applicability_sweep,
     render_markdown,
 )
@@ -30,27 +34,43 @@ pytestmark = [
     pytest.mark.medium,
 ]
 
+# Benchmarks that ship NO DataFrame query registry, so the cross-surface gate
+# cannot reach them - they need a w2 fallback oracle (differential second-engine
+# or curated expected-results). This is the stable, meaningful invariant: if a
+# benchmark gains a DataFrame query registry it should drop off this list (and
+# become gateable), and a new benchmark without one should be added deliberately.
+_W2_FALLBACK_BENCHMARKS = {"metadata_primitives", "tpcdi", "transaction_primitives", "write_primitives"}
+
 
 @pytest.fixture(scope="module")
 def rows() -> list[dict]:
     return build_applicability_sweep()
 
 
-def test_only_clickbench_and_joinorder_synthetic_are_gateable(rows):
-    """Exactly the two benchmarks that ship DataFrame queries are cross-surface gateable.
+def test_w2_fallback_set_is_exactly_the_registry_less_benchmarks(rows):
+    """Only benchmarks with no DataFrame query registry are dispatched to a w2 fallback.
 
-    If this set changes (a benchmark gains/loses a DataFrame query surface), update
-    the sweep artifact and the cross-surface gate dispatch deliberately.
+    Registry detection (not the production resolver) is the gate-applicability
+    signal: e.g. coffeeshop ships a registry and was gated in #842, even though the
+    resolver returned zero for it.
     """
-    gateable = {r["benchmark"] for r in rows if r["status"] == "gateable"}
-    assert gateable == {"clickbench", "joinorder_synthetic"}, f"cross-surface gateable set changed: {sorted(gateable)}"
+    no_surface = {r["benchmark"] for r in rows if r["status"] == NO_DF_QUERY_SURFACE}
+    assert no_surface == _W2_FALLBACK_BENCHMARKS, f"w2-fallback set changed: {sorted(no_surface)}"
+
+
+def test_registry_bearing_benchmarks_are_gateable(rows):
+    """clickbench (direct) and a known id-mapping case are classified gateable."""
+    by_id = {r["benchmark"]: r["status"] for r in rows}
+    assert by_id.get("clickbench") == GATEABLE
+    # amplab ships a registry but its ids are Q-prefixed vs the SQL ids -> needs mapping.
+    assert by_id.get("amplab") == GATEABLE_NEEDS_ID_MAPPING
 
 
 def test_no_candidate_is_silently_dropped(rows):
-    """Every candidate is classified (gateable / no-df-query-surface / blocked)."""
+    """Every candidate is classified into a known status."""
     assert rows, "applicability sweep produced no candidates"
     for r in rows:
-        assert r["status"] in {"gateable", "no-df-query-surface", "blocked"}, r
+        assert r["status"] in {GATEABLE, GATEABLE_NEEDS_ID_MAPPING, NO_DF_QUERY_SURFACE, BLOCKED}, r
 
 
 def test_committed_artifact_is_current(rows):
