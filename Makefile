@@ -39,7 +39,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -174,12 +174,38 @@ tpchavoc-dataframe-equivalence-report:
 # its OWN SQL surface on real SF=0.1 DuckDB-backed data; exits non-zero on any
 # divergence beyond the benchmark's baseline. SQL is the reference for its own
 # DataFrame surface, so no hand-curated answer key is needed (see
-# benchbox/core/equivalence/cross_surface.py). Currently gates ssb and amplab.
+# benchbox/core/equivalence/cross_surface.py). Currently gates ssb, amplab, and coffeeshop.
 ssb-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark ssb
 
 amplab-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark amplab
+
+coffeeshop-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark coffeeshop
+
+# Report-mode (STAGED gate): enumerate clickbench SQL<->DataFrame divergences.
+# Not a blocking CI gate yet - clickbench has open divergences to burn down (see
+# _project/analysis/clickbench-cross-surface-divergences.md) before promotion.
+clickbench-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark clickbench
+
+# Regenerate the benchmark correctness-oracle coverage map (which oracle, if any,
+# guards each shipped benchmark). Derived from the registry + provider/gate
+# registries; commit the refreshed _project/analysis/ artifacts.
+oracle-coverage-map:
+	uv run -- python _project/scripts/generate_oracle_coverage_map.py
+
+# Advisory CI guard: fail if the checked-in coverage map is stale (e.g. a new
+# benchmark was added without regenerating, hiding an UNGUARDED surface).
+oracle-coverage-map-check:
+	uv run -- python _project/scripts/generate_oracle_coverage_map.py --check
+
+# Cross-surface applicability drill-down (report mode): which dual-surface
+# unguarded benchmarks actually ship comparable DataFrame queries (cross-surface
+# gateable) vs which only support DataFrame loading (need a w2 fallback oracle).
+cross-surface-applicability-report:
+	uv run -- python _project/scripts/cross_surface_applicability_sweep.py
 
 # Real benchmark matrix across local SQL platforms x all benchmarks (heavy, opt-in)
 test-local-matrix:
@@ -605,6 +631,7 @@ ci-lint:
 	$(MAKE) skill-sync-check
 	uv run -- python _project/scripts/timing_policy_check.py --strict
 	$(MAKE) compat-docs-check
+	$(MAKE) oracle-coverage-map-check
 	$(MAKE) audit-deps
 	@echo "✅ CI lint checks passed"
 
@@ -1910,6 +1937,7 @@ help:
 	@echo "  make tpchavoc-dataframe-equivalence-report Gate: TPC-Havoc DataFrame variants vs canonical TPC-H"
 	@echo "  make ssb-cross-surface-equivalence-report Gate: SSB DataFrame surface vs its own SQL surface"
 	@echo "  make amplab-cross-surface-equivalence-report Gate: AMPLab DataFrame surface vs its own SQL surface"
+	@echo "  make coffeeshop-cross-surface-equivalence-report Gate: CoffeeShop DataFrame surface vs its own SQL surface"
 	@echo "  make test-local-matrix Run real local benchmark matrix (stress)"
 	@echo "  make test-ci         Maintained broad local CI profile"
 	@echo ""

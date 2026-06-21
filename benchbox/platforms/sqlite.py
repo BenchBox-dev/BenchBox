@@ -514,8 +514,12 @@ class SQLiteAdapter(PlatformAdapter):
         self.log_verbose(f"Executing query {query_id}")
         self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
-        cursor = connection.cursor()
+        cursor = None
         try:
+            # Acquire the cursor inside the try: a broken/closed connection raises here,
+            # and that setup failure must be recorded as a FAILED query result (below)
+            # rather than aborting the whole benchmark run.
+            cursor = connection.cursor()
             cursor.execute(query)
             results = cursor.fetchall()
 
@@ -569,7 +573,8 @@ class SQLiteAdapter(PlatformAdapter):
                 "error": str(e),
             }
         finally:
-            cursor.close()
+            if cursor is not None:
+                cursor.close()
 
         # Display plan in console when --show-query-plans is active.
         # Skip here when --capture-plans is also active: capture_query_plan below

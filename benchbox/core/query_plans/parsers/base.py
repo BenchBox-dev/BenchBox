@@ -140,7 +140,9 @@ def strip_estimates(text: str) -> str:
 
     Genuine predicate text is preserved: removal is anchored to explicit estimate
     wording, so a predicate on a column literally named ``cost``, ``rows`` or
-    ``num_rows`` (e.g. ``(cost=5 AND x=1)`` or ``num_rows = 5``) is left intact.
+    ``num_rows`` (e.g. ``(cost=5 AND x=1)`` or ``num_rows = 5``) is left intact. A
+    genuine empty-list literal (e.g. ``arr = []``) is also preserved: the empty-bracket
+    tidy-up only runs when a removal actually happened.
     Returns the cleaned, whitespace-normalized string.
     """
     if not text:
@@ -148,10 +150,14 @@ def strip_estimates(text: str) -> str:
     cleaned = _METRICS_BLOCK_RE.sub("", text)
     cleaned = _COST_PAREN_RE.sub("", cleaned)
     cleaned = _INLINE_ESTIMATE_RE.sub("", cleaned)
-    # Tidy separators left behind by removals (trailing commas, empty brackets).
-    cleaned = re.sub(r"\[\s*\]", "", cleaned)
-    cleaned = re.sub(r"\s*,\s*(?=,|$)", "", cleaned)
-    cleaned = re.sub(r",\s*$", "", cleaned)
+    if cleaned != text:
+        # Tidy separators left behind by a removal (trailing commas, and the now-empty
+        # ``[]`` an estimate token vacated). Guarding on an actual removal keeps a
+        # genuine empty-list predicate such as ``arr = []`` intact when no estimate
+        # text was stripped — previously every empty bracket pair was deleted.
+        cleaned = re.sub(r"\[\s*\]", "", cleaned)
+        cleaned = re.sub(r"\s*,\s*(?=,|$)", "", cleaned)
+        cleaned = re.sub(r",\s*$", "", cleaned)
     cleaned = re.sub(r"\s{2,}", " ", cleaned)
     return cleaned.strip().strip(",").strip()
 

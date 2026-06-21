@@ -2,8 +2,28 @@ id: tpchavoc-q2-v10-projection-faithfulness
 title: "Fix q2_v10 projection that zeroes negative s_acctbal, and sweep variants for the same projection-faithfulness class"
 worktree: main
 priority: Medium-High
-status: Under Review
+status: Completed
 category: Testing and Quality Assurance
+
+resolution: |
+  ALREADY RESOLVED on current develop (verified, no new code change required).
+  PR #785 ("feat(tpchavoc): DataFrame variant-equivalence hard gate + fix all 42
+  divergences from canonical TPC-H") removed the value-altering
+  `case when s_acctbal > 0 then s_acctbal else 0 end as s_acctbal` wrapper from
+  q2_v10; the current `variant_sets/q02.yaml` id:10 projects plain `s_acctbal`
+  (the CASE identity survives only in the NULL-substitution wrappers on
+  always-non-null join columns and in the predicate/order-by, which do not alter
+  values).
+
+  Evidence:
+    - w0/w1 (SF=1 DuckDB, focused check): canonical Q2 (minus LIMIT) = 460 rows
+      with 38 negative-acctbal suppliers; q2_v10 = 460 rows with the SAME 38
+      negative balances (identical negative-acctbal sets, not zeroed);
+      `validate_variant_equivalence(2, 10, ...)` reports EQUIVALENT.
+    - w2 (sweep): `make tpchavoc-equivalence-report` (SF=0.1 DuckDB gate) checks
+      220 variants, 0 divergent — the projection-faithfulness class is already
+      gated across all variants, so no other variant substitutes projected values
+      vs canonical. The hard gate makes this durable going forward.
 
 description: |
   While verifying PR #756 (correlated-subquery self-binding fixes), a SECOND,
@@ -36,7 +56,7 @@ prior_art:
 work:
   - id: w0
     summary: "Reproduce the q2_v10 divergence and quantify it against canonical Q2 at SF=1"
-    status: pending
+    status: done
     notes: |
       On a populated DuckDB SF=1 cell, confirm q2_v10 differs from canonical Q2
       (without its LIMIT 100) on exactly the negative-acctbal rows (38 at SF=1),
@@ -46,7 +66,7 @@ work:
   - id: w1
     summary: "Fix q2_v10 projections to be value-faithful to canonical Q2"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Project the real s_acctbal (and any other CASE/COALESCE-wrapped output
       columns that substitute values) without altering the variant's
@@ -56,7 +76,7 @@ work:
   - id: w2
     summary: "Sweep all variant_sets for projection-faithfulness drift and fix any others"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Audit every variant's SELECT list for value-altering wrappers (CASE
       default substitution, COALESCE-to-0 on nullable measures, rounding casts)

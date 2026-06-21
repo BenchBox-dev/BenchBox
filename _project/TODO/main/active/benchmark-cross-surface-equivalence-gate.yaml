@@ -74,8 +74,13 @@ work:
   - id: w1
     summary: "Inventory dual-surface benchmarks and confirm SQL<->DataFrame query-id correspondence"
     needs: [w0]
-    status: done
+    status: in_progress
     notes: |
+      NOT YET COMPLETE — kept open so downstream work units that `needs: [w1]` are not
+      unblocked with unverified query mappings: nyctaxi and tsbs still need independent
+      mapping verification, and clickbench's SQL id set / construction is unconfirmed.
+      Flip to done only once those three are verified.
+
       For each benchmark with both surfaces, confirm the SQL and DataFrame query
       sets cover the same logical queries (matching ids/keys) and can run on a
       shared DuckDB cell. Record which are in scope, which are single-surface
@@ -243,6 +248,37 @@ work:
       raising "cannot compare date to a string value" under the production loader's
       dtypes. Burned down in w3 (see below); amplab now reports 0/16 divergent.
 
+      APPLICABILITY SWEEP: a reproducible sweep
+      (_project/scripts/cross_surface_applicability_sweep.py ->
+      _project/analysis/cross-surface-applicability.md, locked by
+      tests/unit/test_cross_surface_applicability.py) classifies the dual-surface
+      UNGUARDED benchmarks by whether they ship a DataFrame query `QueryRegistry`
+      (the registry the cross-surface gate builders consume directly) - the
+      authoritative gate-applicability signal. `supports_dataframe` over-counts
+      (it is a LOADING flag); the production query *resolver* under-counts (it
+      misses per-benchmark `<BENCH>_DATAFRAME_QUERIES` registries - e.g. it
+      returned 0 for coffeeshop, which #842 nonetheless gated). Registry detection
+      fixes both.
+
+      RESULT (16 unguarded candidates; coffeeshop already gated/excluded):
+        - GATEABLE, ids overlap as-is (6): clickbench, flightdata, h2odb,
+          joinorder, joinorder_synthetic, read_primitives (152/157 ids).
+        - GATEABLE, needs id normalization first (6): amplab, datavault, nyctaxi,
+          tpch_skew, tsbs_devops (ids Q-prefixed/friendly vs SQL ids), tpcds_obt
+          (only 3 DF queries vs 89 SQL - partial).
+        - w2 FALLBACK, NO DataFrame query registry (4): metadata_primitives,
+          tpcdi, transaction_primitives, write_primitives. Only these four need a
+          differential second-engine or curated expected-results oracle.
+      So the cross-surface gate burn-down is ~12 benchmarks, not 2 (the earlier
+      resolver-based "only 2" was wrong).
+
+      CAVEAT proven during the sweep: a GENERIC build is not load-faithful (it
+      loads DataFrame contexts without the schema/headers the production loader
+      applies, yielding spurious "column not found" divergences), so enumerating
+      REAL divergence counts requires a load-faithful per-benchmark builder like
+      build_ssb_duckdb. That builder work is w3 (clickbench done; the other 11
+      gateable benchmarks next, normalizing ids where the sweep flags it).
+
   - id: w3
     summary: "Burn down divergences (fix the wrong surface) or declare intentional ones"
     needs: [w2]
@@ -268,6 +304,29 @@ work:
       no baseline entry. Verified against CANONICAL SQL (the gate), not a sibling
       DataFrame impl: 0/16 divergent, with Q2 (70 rows), Q2a (6), Q4 (100)
       meaningfully exercising the date filter+join (non-vacuous). baseline empty.
+
+      clickbench: load-faithful gate WIRED (build_clickbench_duckdb), STAGED_GATES
+      (NOT GATES), runnable via `make clickbench-cross-surface-equivalence-report`.
+
+      BURN-DOWN PROGRESS (full detail:
+      _project/analysis/clickbench-cross-surface-divergences.md):
+        - DETERMINISM FIX (prerequisite): the ClickBench generator was UNSEEDED, so
+          every run produced different data and top-N/tie-sensitive cells flipped
+          divergence run-to-run (the gate was flaky). Added random.seed(42) in
+          _generate_data_local (mirrors SSBDataGenerator); the gate is now
+          deterministic (verified: two runs report the identical divergence set).
+        - ALL 10 engine/error-category cells FIXED: added UnifiedStrExpr.replace
+          (Q29) and UnifiedLazyFrame.slice (Q39-42) to the shared abstraction;
+          compared EventDate to native date literals not strings (Q37-43); pandas
+          `<> ''` filters now exclude NULL via .notna() to match SQL/Polars
+          (Q25/27). 1129 dataframe/clickbench unit tests still pass.
+        - REMAINING: 27 stable value-divergence cells across 14 queries (identical across 3 runs) (Q6, Q9,
+          Q10, Q15-19, Q24, Q31-33, Q36, Q38) - per-query triage: empty-vs-None
+          null materialization (Q17/Q24), large aggregate diffs (Q16/18/32/33/36 -
+          dropped predicate/DISTINCT), and top-N tie-break ordering (Q9/10/38/15/31).
+      Once those 26 are clean, promote STAGED_GATES->GATES + a blocking pr.yml step
+      + fast-lane regression (w4). joinorder_synthetic and the other registry-bearing
+      benchmarks (per the corrected applicability sweep) are the next gates to wire.
 
   - id: w4
     summary: "Promote to bounded CI gates and add fast-lane regressions"

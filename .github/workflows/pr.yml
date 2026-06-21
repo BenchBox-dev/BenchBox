@@ -267,6 +267,9 @@ jobs:
       - name: Compatibility governance drift check
         run: make compat-docs-check
 
+      - name: Oracle coverage map drift check
+        run: make oracle-coverage-map-check
+
       - name: Public contract drift check
         run: |
           uv run -- python - <<'PY'
@@ -400,6 +403,9 @@ jobs:
 
       - name: Run AMPLab cross-surface SQL<->DataFrame equivalence gate
         run: make amplab-cross-surface-equivalence-report
+
+      - name: Run CoffeeShop cross-surface SQL<->DataFrame equivalence gate
+        run: make coffeeshop-cross-surface-equivalence-report
 
   postgres-integration:
     name: postgres-integration
