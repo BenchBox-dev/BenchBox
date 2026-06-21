@@ -2,7 +2,7 @@ id: cross-surface-oracle-remediation
 title: "Remediate the cross-surface equivalence oracle: fix the bugs it found-and-dismissed, make it deterministic, order-aware, non-vacuous, and honest"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
@@ -77,7 +77,7 @@ prior_art:
 work:
   - id: w1
     summary: "Fix the empty-string/null conflation in the DataFrame load path (C1: Q6, Q17, Q18, Q24 are REAL bugs)"
-    status: pending
+    status: done
     addresses: [C1, "review:CRITICAL C1", "#848 false conclusion"]
     notes: |
       The DataFrame surface conflates SQL '' with None, which changes results, not
@@ -187,9 +187,22 @@ work:
 
   - id: w5
     summary: "Re-triage ClickBench with the fixed loader+comparator and correct the #848 record (C1 closeout)"
-    status: pending
+    status: in_progress
     needs: [w1, w2, w3]
     addresses: [C1, "#848", "review:C1"]
+    progress: |
+      DONE (w1-enabled): corrected the #848 record in
+      _project/analysis/clickbench-cross-surface-divergences.md - the "~no genuine
+      DataFrame logic bugs" conclusion was false; Q6/Q17/Q18/Q24 were real
+      null-handling bugs, now fixed at the loader (w1). Verified post-w1: Q6 == 18 on
+      all three surfaces and gone from the divergence set; Q17/Q18 full GROUP BY
+      covers all rows on every surface. The doc also corrects the false "seeded /
+      stable" claim (the gate is nondeterministic at the engine tie-ordering level).
+      BLOCKED on w2 (tie-aware comparator) + w3 (determinism) for the rest: the
+      residual divergences (Q9/Q10/Q15/Q16/Q19/Q31/Q32/Q33/Q36/Q38) are the
+      tie-ambiguous/nondeterminism class and cannot be cleanly re-triaged or driven
+      to a deterministic empty baseline until those land. ClickBench remains in
+      STAGED_GATES (not promoted) per the anti-pattern.
     notes: |
       After w1 (null fix), w2 (tie-aware), w3 (determinism): re-run the ClickBench
       gate. Expectation: the genuine ties (Q9, Q15, Q16, Q31, Q32, Q33, Q38) become
@@ -215,6 +228,13 @@ work:
         - Add a gate cell/mode that loads each gated benchmark through the REAL
           DataFrameDataLoader (CSV->parquet->read_parquet) and compares both dtypes
           and values to the SQL reference, so loader corruption is observable.
+        - Carry the w1 empty-string->'' contract to the remaining raw-CSV adapters.
+          w1 fixed the Parquet path (strings_can_be_null=False) and the pandas CSV
+          path; Polars scan_csv / modin / dask / cudf still map an empty string
+          field to null on their raw-CSV read, so prefer_parquet=False (or a
+          CSV-recommending adapter) reintroduces the Q6/Q17/Q18 divergence on those
+          surfaces. Thread declared column types into each adapter's read_csv and
+          preserve '' for string columns, mirroring pandas_df.read_csv.
         - Harden schema_utils.column_name/column_sql_type (schema_utils.py:29-51):
           replace the naive column.split() with a paren-aware, quote-aware DDL
           column parser that handles DECIMAL(10, 2) (space after comma), quoted/

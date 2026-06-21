@@ -194,6 +194,62 @@ class TestPandasDataLoading:
         assert df["flight_date"].dt.year.iloc[0] == 2018
         assert pd.api.types.is_datetime64_any_dtype(df["EventTime"])
 
+    def test_read_csv_empty_string_column_stays_empty_not_null(self, tmp_path):
+        """Empty fields in a declared string column load as '' (DuckDB parity), not NaN.
+
+        pandas read_csv maps '' to NaN via its default na_values; left unfixed this
+        silently drops the value from COUNT(DISTINCT)/GROUP BY and diverges the
+        DataFrame surface from the SQL reference (the cross-surface Q6/Q17/Q18 bug).
+        """
+        adapter = PandasDataFrameAdapter()
+
+        csv_path = tmp_path / "hits.tbl"
+        # row 2 has an empty search_phrase; row 3 has an empty numeric amount.
+        csv_path.write_text("1|apple|10\n2||20\n3|pear|\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "search_phrase", "amount"],
+            null_marker="",
+            column_types=["INTEGER", "VARCHAR", "INTEGER"],
+        )
+
+        # Declared string column: empty field is '' (counted as a distinct value),
+        # never NaN.
+        assert df["search_phrase"].isna().sum() == 0
+        assert (df["search_phrase"] == "").sum() == 1
+        assert df["search_phrase"].nunique() == 3  # 'apple', '', 'pear'
+        # Numeric column: an empty field is still null (no valid '' value there).
+        assert df["amount"].isna().sum() == 1
+
+    def test_read_csv_all_digit_string_column_stays_text(self, tmp_path):
+        """An all-digit declared string column keeps its values as text, not numbers.
+
+        Without forcing the declared string dtype, pandas infers an all-digit
+        VARCHAR (e.g. a zip/id code) as float64, so '10' becomes 10.0 and diverges
+        from the SQL reference that stores the literal string.
+        """
+        adapter = PandasDataFrameAdapter()
+
+        csv_path = tmp_path / "codes.tbl"
+        csv_path.write_text("1|007|x\n2|10|y\n3||z\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "code", "tag"],
+            null_marker="",
+            column_types=["INTEGER", "VARCHAR", "VARCHAR"],
+        )
+
+        # Leading zero preserved, value is the string '10' not the number 10, and
+        # the empty field is '' (not NaN).
+        assert list(df["code"]) == ["007", "10", ""]
+        assert df["code"].dtype == object
+
     def test_read_parquet(self, tmp_path):
         """Test reading a Parquet file."""
         adapter = PandasDataFrameAdapter()
