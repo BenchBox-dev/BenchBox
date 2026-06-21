@@ -1,0 +1,140 @@
+id: cross-surface-gate-rollout-followups
+title: "Cross-surface gate follow-ups: schema-type-faithful DataFrame loader + remaining gate rollout"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Follow-up backlog spun out of benchmark-cross-surface-equivalence-gate once the
+  first wave of gates shipped: ssb and coffeeshop are enforced on develop, amplab
+  is landing via #835, and clickbench and joinorder_synthetic are wired in
+  STAGED_GATES (report mode). It compiles the remaining, independently-actionable
+  findings so the parent campaign's w2/w3/w4 are not a single sprawling work item.
+
+  The headline finding is a SHARED, load-faithfulness gap in the production
+  DataFrame loader, re-confirmed on current develop (branch tip ad05c5b7) by
+  re-running `make joinorder-synthetic-cross-surface-equivalence-report`:
+
+    13 queries x 2 backends = 26 cells; 10 divergent, 16 passing.
+
+  After #846 fixed column NAME extraction for DDL-string schemas
+  (benchbox/core/dataframe/schema_utils.py: column_name/column_sql_type), the
+  loader applies column names but still TYPE-INFERS dtypes from the sampled data
+  instead of applying the schema's declared SQL types. At a bounded SF the
+  inference is wrong in two ways, both of which the gate caught (all 10 remaining
+  joinorder_synthetic cells):
+
+    - Class A - all-null nullable string column inferred as `null` dtype, so a
+      string op fails ("expected String type, got: null"). 6 cells, Polars
+      expression backend: 1a, 1b, 5a, 8a, 9a, 10a (e.g. movie_companies.note,
+      declared TEXT, entirely NULL in the SF=0.1 sample).
+    - Class B - a column declared TEXT but holding numeric-looking values inferred
+      as `float64`, so a comparison to a string literal fails ("cannot compare
+      string with numeric type (f64)" / "Invalid comparison between dtype=float64
+      and str"). 4 cells, BOTH backends: 4a, 12a.
+
+  This is NOT a joinorder_synthetic quirk: the DuckDB SQL reference gets correct
+  types from CREATE TABLE, so any benchmark with sparse-nullable or
+  numeric-looking string columns will diverge once gated, and a real
+  Polars/Pandas run at bounded scale hits the same fragility. Both classes are
+  fixed by ONE loader-layer change: apply the declared schema dtypes on DataFrame
+  load (types are already available via column_sql_type). It is the gating
+  blocker for promoting joinorder_synthetic (and likely future benchmarks) from
+  STAGED_GATES to enforced GATES.
+
+prior_art:
+  - "_project/TODO/main/active/benchmark-cross-surface-equivalence-gate.yaml - the parent campaign (w0-w7); this file is its rollout-phase follow-up backlog."
+  - "_project/analysis/joinorder-synthetic-cross-surface-divergences.md - the 10-cell symptom table + root cause + fix direction; re-confirmed accurate on current code."
+  - "_project/analysis/clickbench-cross-surface-divergences.md - clickbench staged-gate burndown detail (value divergences, distinct from the dtype gap here)."
+  - "_project/analysis/cross-surface-applicability.md - which dual-surface benchmarks are gateable as-is, need id normalization, or need a w2 fallback oracle."
+  - "benchbox/core/dataframe/schema_utils.py - column_name/column_sql_type (the DDL-string parse landed in #846); the schema-type-application fix builds on column_sql_type."
+  - "benchbox/core/dataframe/data_loader.py - _get_schema_info / the headerless-CSV column_names path; where inferred dtypes are applied today and where schema types must be applied instead."
+  - "benchbox/core/equivalence/cross_surface.py - GATES (ssb, coffeeshop, amplab) and STAGED_GATES (clickbench, joinorder_synthetic); promotion target."
+
+work:
+  - id: w0
+    summary: "Make the production DataFrame loader apply declared schema column TYPES instead of inferring dtypes"
+    status: pending
+    notes: |
+      The single root-cause fix. When loading a benchmark's DataFrame contexts,
+      map each column's declared SQL type (column_sql_type) to the corresponding
+      Arrow/Polars/Pandas dtype and apply it, so a VARCHAR/TEXT column loads as
+      string (even if all-null or numeric-looking in the sample) and INTEGER loads
+      as int, instead of relying on per-file inference. Mirror how the DuckDB SQL
+      reference gets types from CREATE TABLE - the schema is the source of truth.
+
+      ACCEPTANCE: `make joinorder-synthetic-cross-surface-equivalence-report`
+      reports 0 divergent (was 10); no regression in the existing dataframe /
+      equivalence unit suites or the already-green ssb/coffeeshop/amplab/clickbench
+      gates. Verify both error classes are gone (Class A all-null String; Class B
+      numeric-looking TEXT). Keep it a loader-layer change - no per-query casts,
+      no gate-local workarounds.
+
+  - id: w1
+    summary: "Promote joinorder_synthetic from STAGED_GATES to enforced GATES"
+    needs: [w0]
+    status: pending
+    notes: |
+      Once w0 makes the gate clean: move joinorder_synthetic from STAGED_GATES to
+      GATES in cross_surface.py, add the blocking pr.yml correctness-gate step
+      (make joinorder-synthetic-cross-surface-equivalence-report) and a
+      medium-marker fast-lane regression (mirror
+      tests/integration/test_amplab_cross_surface_equivalence.py). Prove the gate
+      fails on a planted single-cell defect. Update the parent campaign w3/w4 and
+      the analysis doc Status section.
+
+  - id: w2
+    summary: "Burn down the clickbench staged gate and promote to enforced GATES"
+    status: pending
+    notes: |
+      clickbench is wired in STAGED_GATES with ~27 stable value-divergence cells
+      across ~14 queries (detail: _project/analysis/clickbench-cross-surface-
+      divergences.md): empty-vs-None null materialization (Q17/Q24), large
+      aggregate diffs from a dropped predicate/DISTINCT (Q16/18/32/33/36), and
+      top-N tie-break ordering (Q9/10/38/15/31). These are NOT the w0 dtype class -
+      triage each (fix the wrong surface, or classify a defensible presentational
+      divergence) until the baseline is clean, then STAGED_GATES -> GATES + a
+      blocking pr.yml step + fast-lane regression.
+
+  - id: w3
+    summary: "Wire cross-surface gates for the remaining gateable dual-surface benchmarks"
+    status: pending
+    notes: |
+      Per _project/analysis/cross-surface-applicability.md (the authoritative
+      registry-detection sweep), the gateable benchmarks NOT yet wired (excluding
+      ssb/coffeeshop/amplab already gated and clickbench/joinorder_synthetic
+      already staged - those are w1/w2 here). One focused gate PR each, reusing the
+      build_<bench>_duckdb + GATES pattern:
+        - ids overlap as-is (4): flightdata (20), h2odb (10), joinorder (113),
+          read_primitives (157 SQL vs 152 DF - gate the overlapping 152). NOTE
+          flightdata and joinorder use real/downloaded data (no synthetic
+          generator), so confirm a bounded, stable data source before gating.
+        - need id normalization first (5): datavault (22), nyctaxi (25),
+          tsbs_devops (18) - DataFrame registry ids differ from SQL ids by a
+          naming convention (e.g. `1` vs `Q1`), normalize in the builder;
+          tpcds_obt (only 3 DF queries vs 89 SQL - partial); tpch_skew (22, low
+          value - TPC-H-derived, gate only if cheap).
+      Does NOT hard-depend on w0: a benchmark whose columns avoid the Class A/B
+      dtype symptom can be gated independently, but any that hit "expected String
+      type"/"compare string with numeric" are blocked on w0's loader fix. Each
+      builder must be load-faithful (real production loader) and the generator
+      seeded/stable, or the gate is flaky (see the seeding audit:
+      _project/analysis/gateable-generator-seeding-audit.md).
+
+  - id: w4
+    summary: "Provide a w2 fallback oracle for the single-surface (no DataFrame registry) benchmarks"
+    status: pending
+    notes: |
+      Four dual-loadable benchmarks ship NO DataFrame query registry, so
+      cross-surface equivalence does not apply: metadata_primitives, tpcdi,
+      transaction_primitives, write_primitives. These need a different
+      maintenance-light oracle - a differential second-engine comparison or a
+      curated bounded expected-results set - tracked here so the coverage map does
+      not silently leave them UNGUARDED. Lowest priority of this backlog.
+
+deferred:
+  - summary: "Cross-surface equivalence on a second engine (beyond DuckDB-backed cells)"
+    reason: "DuckDB-backed SF=0.1 cells are sufficient as the reference oracle for now; a second engine is extra coverage, not a correctness gap."
+  - summary: "Auto-deriving the SQL<->DataFrame id correspondence instead of per-benchmark mapping"
+    reason: "Per-benchmark id mapping is small and explicit; auto-derivation is a convenience optimization deferred until the mappings prove burdensome."
