@@ -320,13 +320,23 @@ work:
           compared EventDate to native date literals not strings (Q37-43); pandas
           `<> ''` filters now exclude NULL via .notna() to match SQL/Polars
           (Q25/27). 1129 dataframe/clickbench unit tests still pass.
-        - REMAINING: 27 stable value-divergence cells across 14 queries (identical across 3 runs) (Q6, Q9,
-          Q10, Q15-19, Q24, Q31-33, Q36, Q38) - per-query triage: empty-vs-None
-          null materialization (Q17/Q24), large aggregate diffs (Q16/18/32/33/36 -
-          dropped predicate/DISTINCT), and top-N tie-break ordering (Q9/10/38/15/31).
-      Once those 26 are clean, promote STAGED_GATES->GATES + a blocking pr.yml step
-      + fast-lane regression (w4). joinorder_synthetic and the other registry-bearing
-      benchmarks (per the corrected applicability sweep) are the next gates to wire.
+        - REMAINING: 27 stable value-divergence cells across 14 queries. TRIAGE
+          (verified by direct SQL-vs-DataFrame set/count comparison): these are
+          mostly NOT logic bugs. The DataFrame computes CORRECT aggregates; the
+          divergences are the gate's order-sensitive row-by-row comparison of
+          tie-ambiguous top-N (`ORDER BY col ... LIMIT N` with ties spanning the
+          cutoff). E.g. Q32/Q33 top-10 are all count=1 (thousands of count-1
+          groups, LIMIT keeps an arbitrary 10); Q16 count distribution is IDENTICAL
+          on both surfaces (only tied rows reorder). So the fix is GATE-LEVEL
+          (deterministic total-order tie-breaker on both surfaces, OR a tie-aware
+          validator, OR classify tie-ambiguous queries), NOT per-query ClickBench
+          fixes. Exception: Q17/Q24 empty-string-vs-None is the deferred loader
+          null/dtype materialization issue (see joinorder_synthetic). Detail:
+          _project/analysis/clickbench-cross-surface-divergences.md.
+      So ClickBench has ~no genuine DataFrame logic bugs; promote STAGED_GATES->GATES
+      once the gate handles tie-ambiguity + the loader dtype fix lands (w4).
+      joinorder_synthetic and the other registry-bearing benchmarks (per the
+      corrected applicability sweep) are the next gates to wire.
 
       GENERATOR SEEDING AUDIT (_project/analysis/gateable-generator-seeding-audit.md):
       an unseeded generator makes any cross-surface gate flaky (as ClickBench was).

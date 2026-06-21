@@ -31,10 +31,33 @@ is null-heavy) get the wrong dtype and the query's comparisons fail:
 | `expected String type` (Polars) | 1a, 1b, 5a, 8a, 9a, 10a (expression) |
 | `cannot compare string with numeric type` / `Invalid comparison float64 vs str` | 4a, 12a (both backends) |
 
-Fix direction (follow-up): apply the schema column **types** when loading the
-DataFrame surface (the types are now available from `column_sql_type`), so a
-column declared `VARCHAR`/`TEXT` loads as string and `INTEGER` as int, instead of
-relying on per-file dtype inference. This is a loader-layer fix, not per-query.
+### Root cause (diagnosed) and where the fix belongs
+
+The DataFrame load path is **CSV → parquet → `read_parquet`**, not direct CSV
+read. `_load_data_phase` runs the production `DataFrameDataLoader`, which converts
+the generated CSVs to parquet (cache) and the adapter then calls `read_parquet`
+(confirmed by instrumenting both `read_csv` and `read_parquet`: only
+`read_parquet` fires for `movie_companies`). During that conversion, a declared
+text column that is **all-empty/NULL or numeric-looking** (e.g.
+`movie_companies.note`, all NULL at SF=0.1) is inferred as Polars `Null`/numeric
+instead of `String`, so a query doing `note NOT LIKE '%...'` raises
+`expected String type`.
+
+Consequence: applying dtypes at the **CSV read layer** (`read_csv`
+`schema_overrides`) does **not** work — that code never runs. A correct fix must
+apply schema column types at one of:
+  - the **CSV→parquet conversion** in `DataFrameDataLoader` (write parquet with the
+    declared dtypes), or
+  - a **post-load cast** in each family's `load_table` (cast declared-text columns
+    to the string dtype after the frame is loaded, regardless of source format).
+
+Both touch the shared loader that feeds the **enforced** SSB/CoffeeShop gates, so
+the change needs a per-backend cast (Polars expression family + Pandas family) and
+full regression verification of all gates. The schema column **types** are already
+available via `get_benchmark_schema_columns` / `column_sql_type` (helper
+`string_column_names` sketched during diagnosis). This is a bounded but
+multi-backend loader task, deliberately deferred from this report rather than
+rushed.
 
 ## Status
 
