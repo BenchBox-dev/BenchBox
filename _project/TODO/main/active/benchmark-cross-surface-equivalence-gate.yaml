@@ -348,7 +348,7 @@ work:
 
   - id: w4
     summary: "Promote to bounded CI gates and add fast-lane regressions"
-    needs: [w3]
+    needs: [w3, w8, w9]
     status: in_progress
     notes: |
       One bounded small-SF DuckDB cell per gated benchmark, wired into the
@@ -370,6 +370,86 @@ work:
       diverges, no collateral). Remaining ungated benchmarks: clickbench,
       joinorder, coffeeshop, amplab, nyctaxi, flightdata, tsbs_devops, tpcds_obt,
       tpch_skew, read_primitives - one focused gate PR each.
+
+      BLOCKED-ON for the two STAGED gates: clickbench and joinorder_synthetic are
+      WIRED in STAGED_GATES (report mode) but cannot promote to GATES until the two
+      cross-cutting prerequisite fixes land - w8 (tie-aware top-N comparator, clears
+      ClickBench's 27 tie-ambiguous cells) and w9 (loader dtype-from-schema, clears
+      joinorder_synthetic's 10 cells + ClickBench Q17/Q24). Hence w4 now needs
+      [w3, w8, w9]. ssb/amplab/coffeeshop were already promoted under this item and
+      are unaffected by w8/w9.
+
+  - id: w8
+    summary: "Make the cross-surface comparator tie-aware for top-N queries (clears ClickBench's 27 tie-ambiguous cells)"
+    needs: [w3]
+    status: pending
+    notes: |
+      PREREQUISITE for promoting ClickBench STAGED_GATES->GATES (w4). Surfaced and
+      triaged during w3 ClickBench burn-down (PR #848; detail in
+      _project/analysis/clickbench-cross-surface-divergences.md).
+
+      ROOT CAUSE (verified by direct SQL-vs-DataFrame set/count comparison): the 27
+      remaining ClickBench divergences are NOT logic bugs. The DataFrame computes
+      CORRECT aggregates; the gate's comparator (ResultValidator.validate_results_exact
+      in benchbox/core/tpchavoc/validation.py) sorts both sides then compares
+      row-by-row, so for `ORDER BY <col> ... LIMIT N` queries whose ties span the
+      LIMIT cutoff it reports a false divergence: SQL and the DataFrame each keep a
+      different (equally valid) subset of the tied rows. E.g. Q32/Q33 top-10 are all
+      count=1 (thousands of count-1 groups; LIMIT 10 keeps an arbitrary 10); Q16's
+      count distribution 4,4,4,4,4,4,3,3,3,3 is IDENTICAL on both surfaces, only the
+      tied rows reorder/swap at the boundary.
+
+      FIX (gate/validator-level, NOT 27 per-query ClickBench changes - pick one):
+        (a) append a deterministic total-order tie-breaker (remaining columns / a
+            stable key) to the ORDER BY on BOTH surfaces before comparison, or
+        (b) make the comparator tie-aware: compare the MULTISET of rows sharing the
+            boundary order-key value instead of position-by-position, or
+        (c) classify genuinely tie-ambiguous queries as accepted/justified
+            divergences (last resort - prefer a real total order).
+      Reuse, do not fork, ResultValidator; keep it able to catch genuine
+      value-misplacement bugs (do not weaken to set-equality across all columns).
+
+      VERIFY: after the fix, `make clickbench-cross-surface-equivalence-report` drops
+      from 27 divergent cells to only the w9 loader-dtype residue (Q17/Q24), and a
+      planted real ClickBench defect still fails the gate (no masking).
+
+  - id: w9
+    summary: "Apply schema column TYPES (not just names) when loading the DataFrame surface (clears joinorder_synthetic's 10 dtype cells)"
+    needs: [w5, w6]
+    status: pending
+    notes: |
+      PREREQUISITE for promoting joinorder_synthetic STAGED_GATES->GATES (w4) and for
+      ClickBench Q17/Q24 (empty-string-vs-None). DEFERRED by user decision
+      (2026-06-21) to keep that session focused; it remains REQUIRED for w4 and is
+      tracked here so it is not lost. Detail:
+      _project/analysis/joinorder-synthetic-cross-surface-divergences.md and the
+      Q17/Q24 exception in clickbench-cross-surface-divergences.md.
+
+      ROOT CAUSE: the production DataFrame loader applies column NAMES from the schema
+      (get_benchmark_schema_columns, fixed in #846 to parse DDL-string columns) but
+      then TYPE-INFERS dtypes per file rather than applying the schema's declared
+      column TYPES. So columns whose content looks numeric, or is null-heavy, get the
+      wrong dtype and the query's comparisons fail. joinorder_synthetic: 10 cells -
+      "expected String type" (Polars) on 1a/1b/5a/8a/9a/10a; "string vs numeric" on
+      4a/12a. ClickBench: SQL emits "" where the DataFrame emits None (Q17 col 1,
+      Q24 col 14) - same null/dtype materialization issue. NOTE the divergence
+      reproduces on the read_parquet path (the loader converts CSV->parquet via
+      DataFrameDataLoader, then read_parquet), NOT read_csv - an earlier CSV-layer
+      schema_overrides attempt was on the wrong layer and was reverted (#847); the
+      fix must apply schema types on the parquet/materialization path the loader
+      actually uses.
+
+      FIX (loader-layer, not per-query): apply the schema column TYPES when loading
+      the DataFrame surface (types are available from
+      benchbox/core/dataframe/schema_utils.py column_sql_type), so a column declared
+      VARCHAR/TEXT loads as string and INTEGER as int instead of relying on per-file
+      dtype inference. Reuse the production loader/adapters (benchbox/platforms/
+      dataframe/, benchbox/core/dataframe/data_loader.py); keep the change additive
+      and re-verify the normal DataFrame benchmark run path (must_preserve).
+
+      VERIFY: `make joinorder-synthetic-cross-surface-equivalence-report` reaches
+      26/26 (from 16/26); ClickBench Q17/Q24 clear; dataframe/equivalence unit tests
+      stay green.
 
 deferred:
   - summary: "Cross-surface equivalence on a second engine"
@@ -476,4 +556,4 @@ metadata:
   tags: [equivalence, correctness, dataframe, sql, ci, tpch, tpcds, ssb]
   estimated_effort: "Large"
   created_date: "2026-06-16"
-  last_updated: "2026-06-16T00:00:00"
+  last_updated: "2026-06-21T00:00:00"
