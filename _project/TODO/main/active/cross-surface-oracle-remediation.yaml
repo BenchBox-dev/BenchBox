@@ -77,7 +77,7 @@ prior_art:
 work:
   - id: w1
     summary: "Fix the empty-string/null conflation in the DataFrame load path (C1: Q6, Q17, Q18, Q24 are REAL bugs)"
-    status: not_started
+    status: pending
     addresses: [C1, "review:CRITICAL C1", "#848 false conclusion"]
     notes: |
       The DataFrame surface conflates SQL '' with None, which changes results, not
@@ -111,7 +111,7 @@ work:
 
   - id: w2
     summary: "Make the comparator order-aware and tie-aware; fix the None/NaN sort crash (BS2)"
-    status: not_started
+    status: pending
     addresses: [BS2, "review:Blind Spot 2", "review:DEMO1/2/3"]
     notes: |
       validate_results_exact (validation.py:54-79) sorts full rows then compares
@@ -146,7 +146,7 @@ work:
 
   - id: w3
     summary: "Eliminate engine nondeterminism at the gate boundary (H1)"
-    status: not_started
+    status: pending
     addresses: [H1, "review:HIGH H1", "claim 5"]
     notes: |
       The wobble is engine tie-ordering, not data. Pin it at the gate:
@@ -164,7 +164,7 @@ work:
 
   - id: w4
     summary: "Fail (not silently pass) on vacuous empty-vs-empty cells; make every gated query discriminating (BS3)"
-    status: not_started
+    status: pending
     addresses: [BS3, "review:Blind Spot 3", "claim 4"]
     notes: |
       6/13 SSB queries return 0 rows at SF=0.1, so 12/26 cells pass empty-vs-empty.
@@ -187,7 +187,7 @@ work:
 
   - id: w5
     summary: "Re-triage ClickBench with the fixed loader+comparator and correct the #848 record (C1 closeout)"
-    status: not_started
+    status: pending
     needs: [w1, w2, w3]
     addresses: [C1, "#848", "review:C1"]
     notes: |
@@ -207,7 +207,7 @@ work:
 
   - id: w6
     summary: "Add a production-loader-path gate cell + harden the DDL parser and type maps (M4, L1, L2)"
-    status: not_started
+    status: pending
     addresses: [M4, L1, L2, "review:MEDIUM M4", "review:LOW L1/L2"]
     notes: |
       The gate's loader bypass (dataframe_surface.py:74-125 materializes from typed
@@ -234,7 +234,7 @@ work:
 
   - id: w7
     summary: "Stop overclaiming independence; document what the oracle actually proves (BS1)"
-    status: not_started
+    status: pending
     addresses: [BS1, "review:Blind Spot 1", "claim 1"]
     notes: |
       Correct the docstrings that assert "two independent implementations"
@@ -255,7 +255,7 @@ work:
 
   - id: w8
     summary: "Run staged gates in CI and add a promotion forcing-function (M3)"
-    status: not_started
+    status: pending
     addresses: [M3, "review:MEDIUM M3", "claim 10"]
     notes: |
       STAGED_GATES (clickbench, joinorder_synthetic) are not run in CI (pr.yml runs
@@ -274,7 +274,7 @@ work:
 
   - id: w9
     summary: "Tighten coverage-map / applicability honesty (M1, M2)"
-    status: not_started
+    status: pending
     addresses: [M1, M2, "review:MEDIUM M1/M2", "claims 6,7"]
     notes: |
       - generate_oracle_coverage_map.py derives 'guarded' from GATES dict membership
@@ -294,7 +294,7 @@ work:
 
   - id: w10
     summary: "Mutation-test the oracle to measure SENSITIVITY, not just specificity (C2 - the central question)"
-    status: not_started
+    status: pending
     needs: [w2, w4]
     addresses: [C2, "review:CRITICAL C2", "deeper-question 2", "claim 9"]
     notes: |
