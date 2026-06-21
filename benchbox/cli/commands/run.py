@@ -2274,6 +2274,7 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
         s.database_config.options = {}
     s.database_config.options["tuning_enabled"] = s.tuning_enabled
     s.database_config.tuning_enabled = s.tuning_enabled
+    s.database_config.show_query_plans = s.show_query_plans
     s.database_config.unified_tuning_configuration = s.loaded_unified_config
 
     s.benchmark_config.options["unified_tuning_configuration"] = s.loaded_unified_config
