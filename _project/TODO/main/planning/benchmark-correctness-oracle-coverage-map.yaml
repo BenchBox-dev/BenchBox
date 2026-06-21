@@ -79,6 +79,15 @@ work:
       result-comparable across surfaces and likely belong in w2 (invariant
       oracle) rather than the cross-surface gate.
 
+      STATUS SYNC (2026-06-21) from benchmark-cross-surface-equivalence-gate: ssb,
+      amplab (#835, PR open), coffeeshop are GATED; clickbench and joinorder_synthetic
+      are WIRED in report mode (STAGED_GATES) and promote to enforced GATES once that
+      campaign's w8 (tie-aware top-N comparator) and w9 (loader dtype-from-schema)
+      land. Remaining dual-surface dispatch targets: datavault, flightdata, h2odb,
+      joinorder (SF=1-only - use joinorder_synthetic), nyctaxi, read_primitives,
+      tpcds_obt, tpch_skew, tsbs_devops (several need id normalization first). This
+      item only tracks coverage; the gates themselves are owned there.
+
   - id: w2
     summary: "Choose and apply a fallback oracle for single-surface, no-oracle benchmarks"
     needs: [w0]
@@ -175,4 +184,4 @@ metadata:
   tags: [correctness, equivalence, coverage, governance, ci, benchmarks]
   estimated_effort: "Large"
   created_date: "2026-06-16"
-  last_updated: "2026-06-16T00:00:00"
+  last_updated: "2026-06-21T00:00:00"
