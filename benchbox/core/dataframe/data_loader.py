@@ -73,7 +73,9 @@ DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
 # Bump when schema/type-conversion rules change so stale cached Parquet is not
 # silently reused on rerun. v3: TIME columns now load as strings (previously an
 # all-null Time column), so pre-v3 caches must be regenerated to pick up values.
-DATAFRAME_CACHE_VERSION = "v3"
+# v4: empty fields in declared string columns now load as '' instead of null
+# (strings_can_be_null=False), so pre-v4 caches must be regenerated.
+DATAFRAME_CACHE_VERSION = "v4"
 
 # Format subdirectory names that belong to the DataFrame cache layer.
 # Used by clear_cache() to selectively remove cached conversions without
@@ -326,7 +328,14 @@ class FormatConverter:
 
             convert_options = pv.ConvertOptions(
                 auto_dict_encode=True,
-                strings_can_be_null=True,
+                # Keep empty fields in declared string columns as '' rather than
+                # null. PyArrow's default null_values list contains '', so
+                # strings_can_be_null=True would coerce every empty VARCHAR/TEXT
+                # field to null - which silently changes COUNT(DISTINCT) and
+                # GROUP BY membership (the SQL reference, DuckDB, keeps ''). This
+                # only affects string-typed columns; empty fields in numeric/date
+                # columns still become null because '' is not a valid value there.
+                strings_can_be_null=False,
                 column_types=arrow_column_types,
             )
 

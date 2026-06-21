@@ -126,6 +126,37 @@ class TestFormatConverter:
             assert row_count == 2
             assert parquet_path.exists()
 
+    def test_convert_empty_string_column_stays_empty_not_null(self):
+        """Empty fields in a declared string column convert to '' (DuckDB parity), not null.
+
+        PyArrow's default null_values includes '', so strings_can_be_null=True would
+        coerce every empty VARCHAR field to null - silently changing COUNT(DISTINCT)
+        and GROUP BY membership on the Parquet load path (the cross-surface Q6 bug).
+        """
+        import pyarrow.parquet as pq
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            tbl_path = tmpdir / "hits.tbl"
+            # row 2: empty search_phrase (string); row 3: empty amount (numeric).
+            tbl_path.write_text("1|apple|10\n2||20\n3|pear|\n")
+
+            parquet_path = tmpdir / "hits.parquet"
+            status, row_count = FormatConverter.convert_csv_to_parquet(
+                source_path=tbl_path,
+                target_path=parquet_path,
+                column_names=["id", "search_phrase", "amount"],
+                delimiter="|",
+                column_types={"search_phrase": "string"},
+            )
+
+            assert status == ConversionStatus.SUCCESS
+            assert row_count == 3
+            column = pq.read_table(parquet_path).column("search_phrase").to_pylist()
+            # The empty field is '' (a distinct value), never null.
+            assert column == ["apple", "", "pear"]
+            assert None not in column
+
     def test_convert_tbl_file(self):
         """Test TBL file conversion with pipe delimiter."""
         with tempfile.TemporaryDirectory() as tmpdir:

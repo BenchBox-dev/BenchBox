@@ -73,6 +73,28 @@ def _is_numeric_sql_type(sql_type: str | None) -> bool:
     return any(upper.startswith(prefix) for prefix in _NUMERIC_SQL_TYPE_PREFIXES)
 
 
+# SQL type prefixes that denote a string/character column. An empty field in one
+# of these must load as '' (matching DuckDB and the Polars/Parquet path), not as
+# NaN - pandas read_csv's default na_values maps '' to NaN, which silently drops
+# the value from COUNT(DISTINCT) and GROUP BY membership.
+_STRING_SQL_TYPE_PREFIXES = ("VARCHAR", "CHAR", "TEXT", "STRING", "CLOB", "NVARCHAR", "NCHAR")
+
+
+def _is_string_sql_type(sql_type: str | None) -> bool:
+    """True if ``sql_type`` is a string/character SQL type."""
+    if not sql_type:
+        return False
+    upper = sql_type.upper()
+    return any(upper.startswith(prefix) for prefix in _STRING_SQL_TYPE_PREFIXES)
+
+
+def _string_column_names(names: list[str] | None, column_types: list[str] | None) -> list[str]:
+    """Names of declared string columns, parallel to ``column_types``."""
+    if not names or not column_types or len(names) != len(column_types):
+        return []
+    return [name for name, sql_type in zip(names, column_types) if _is_string_sql_type(sql_type)]
+
+
 def _pandas_parse_date_columns(
     names: list[str] | None,
     column_types: list[str] | None = None,
@@ -298,6 +320,7 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
             "on_bad_lines": "skip",
         }
         date_columns: list[str] = []
+        string_columns: list[str] = []
 
         # Add column names if provided
         if names:
@@ -307,6 +330,16 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
                 read_kwargs["converters"] = dict.fromkeys(date_columns, _parse_date_value)
             if datetime_columns:
                 read_kwargs["parse_dates"] = datetime_columns
+            # Read declared string columns as text so an all-digit VARCHAR (e.g. a
+            # zip/id code) keeps '007' / '10' verbatim instead of being inferred as
+            # a number - which would diverge from the SQL reference that stores the
+            # literal string. Exclude any column already parsed as a date/datetime
+            # (a date-named string column) so its converter/parser is not shadowed
+            # by a str dtype and fillna('') is never applied to a temporal column.
+            temporal = set(date_columns) | set(datetime_columns)
+            string_columns = [c for c in _string_column_names(names, column_types) if c not in temporal]
+            if string_columns:
+                read_kwargs["dtype"] = dict.fromkeys(string_columns, str)
 
         # Trailing-delimiter probing only for TPC-style sources (null_marker is not None).
         if null_marker is not None and names and has_trailing_delimiter(path, delimiter, names):
@@ -315,6 +348,14 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
 
         df = pd.read_csv(path, **read_kwargs)
         df = _coerce_date_columns(df, date_columns)
+
+        # Restore the empty-field -> '' contract for declared string columns:
+        # pandas read_csv maps '' to NaN via its default na_values, which would
+        # diverge from DuckDB (keeps '') and silently change COUNT(DISTINCT) /
+        # GROUP BY results. Empty fields in numeric/date columns are left as NaN.
+        for column in string_columns:
+            if column in df.columns:
+                df[column] = df[column].fillna("")
 
         # Drop trailing column if present
         if TRAILING_DUMMY_COLUMN in df.columns:
