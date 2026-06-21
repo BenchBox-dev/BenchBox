@@ -323,11 +323,57 @@ def build_coffeeshop_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfa
     )
 
 
+def build_clickbench_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
+    """Generate ClickBench data, load it into in-memory DuckDB, and wire both surfaces.
+
+    Platform/generator imports are deferred so importing this module stays cheap.
+    """
+    import duckdb
+
+    from benchbox.core.clickbench.benchmark import ClickBenchBenchmark
+    from benchbox.core.clickbench.dataframe_queries import CLICKBENCH_DATAFRAME_QUERIES
+    from benchbox.core.clickbench.generator import ClickBenchDataGenerator
+    from benchbox.core.clickbench.schema import TABLES
+    from benchbox.platforms.duckdb import DuckDBAdapter
+
+    output_dir = Path(output_dir)
+    ClickBenchDataGenerator(scale_factor=scale_factor, output_dir=output_dir).generate_data()
+    benchmark = ClickBenchBenchmark(scale_factor=scale_factor, output_dir=output_dir)
+
+    connection = duckdb.connect(":memory:")
+    try:
+        for statement in benchmark.get_create_tables_sql(dialect="duckdb").strip().split(";"):
+            if statement.strip():
+                connection.execute(statement.strip())
+        table_stats, _, _ = DuckDBAdapter(database=":memory:").load_data(benchmark, connection, output_dir)
+
+        # A silent empty/partial load would make every query compare
+        # empty-vs-empty and report a FALSE green, so verify each table loaded.
+        table_names = [table["name"] for table in TABLES.values()]
+        stats_lower = {str(name).lower(): rows for name, rows in table_stats.items()}
+        empty = [name for name in table_names if stats_lower.get(name.lower(), 0) <= 0]
+        if empty:
+            raise RuntimeError(f"ClickBench load failed - no rows in {empty} (stats={table_stats})")
+    except Exception:
+        connection.close()
+        raise
+
+    return CrossSurfaceData(
+        connection=connection,
+        query_ids=list(benchmark.get_queries().keys()),
+        reference_sql=lambda query_id: benchmark.get_query(query_id),
+        dataframe_query=lambda query_id: CLICKBENCH_DATAFRAME_QUERIES.get_or_raise(query_id),
+        benchmark=benchmark,
+        data_dir=output_dir,
+    )
+
+
 # Registry of gated benchmarks. Add a benchmark by registering its build
 # function (and any classified known divergences) here.
 GATES: dict[str, CrossSurfaceGate] = {
     "ssb": CrossSurfaceGate(name="ssb", build=build_ssb_duckdb),
     "coffeeshop": CrossSurfaceGate(name="coffeeshop", build=build_coffeeshop_duckdb),
+    "clickbench": CrossSurfaceGate(name="clickbench", build=build_clickbench_duckdb),
 }
 
 

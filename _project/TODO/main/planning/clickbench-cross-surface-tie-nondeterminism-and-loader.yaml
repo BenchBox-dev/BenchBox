@@ -1,0 +1,259 @@
+id: clickbench-cross-surface-tie-nondeterminism-and-loader
+title: "ClickBench cross-surface gate: empty-string loader fidelity, expr impl bugs, and irreducible ORDER BY/LIMIT tie non-determinism"
+worktree: main
+priority: High
+status: Identified
+category: Testing and Quality Assurance
+
+description: |
+  Follow-up from the cross-surface equivalence gate campaign
+  (benchmark-cross-surface-equivalence-gate, w2/w3). ClickBench is one of the
+  two benchmarks the applicability sweep marked GATEABLE (clickbench 43/43,
+  joinorder_synthetic 13/13). Running the cross-surface gate in REPORT mode over
+  ClickBench at SF=0.1 on the production-loader substrate produced
+  35 divergent cells across 86 (43 queries x 2 backends: polars expression +
+  pandas). A careful re-evaluation (running each divergent query's SQL reference
+  vs each DataFrame impl on the SAME generated data, inspecting full result rows
+  and column dtypes) splits those 35 cells into FOUR root causes - three are
+  genuine, fixable bugs; the fourth is irreducible and reframes whether ClickBench
+  can be exact-gated at all.
+
+  EVIDENCE (report run, SF=0.1, 86 cells, 35 divergent):
+    GATE FAILURE - 23 distinct queries:
+      Q6, Q9, Q10, Q15, Q16, Q17, Q18, Q19, Q24, Q25, Q27, Q29, Q31, Q32, Q33,
+      Q36, Q37, Q38, Q39, Q40, Q41, Q42, Q43.
+
+  KEY DTYPE FINDING (re-verified): the integer/date/time columns load FAITHFULLY
+  across all three surfaces - UserID/WatchID/ClientIP/URLHash/RefererHash are
+  BIGINT -> Int64 -> int64 with IDENTICAL n_unique (e.g. UserID 95073 on DuckDB,
+  expression, AND pandas), so the earlier "big-int loaded as float64 -> precision
+  loss" hypothesis is FALSE. EventDate is DATE -> pl.Date -> date32, EventTime is
+  TIMESTAMP -> Datetime(us) -> datetime64[ns]. The only column that loads
+  DIFFERENTLY is SearchPhrase (a VARCHAR): DuckDB keeps the empty string '' as a
+  value (n_unique 18), but the DataFrame .tbl loaders read an empty field as
+  null/NaN - pandas drops it from nunique (17), expression preserves a null that
+  is NOT equal to '' (shows as None in output rows). This empty-string -> null
+  divergence is the single highest-leverage real bug here and would affect EVERY
+  benchmark that loads VARCHAR columns with empty fields from .tbl/.csv.
+
+  ROOT-CAUSE BREAKDOWN of the 35 cells:
+
+  (A) REAL BUG - empty-string -> null/NaN on .tbl/.csv load (HIGH VALUE, affects
+      all benchmarks). DuckDB reads an empty delimited field in a VARCHAR column
+      as '', the DataFrame loaders read it as null (polars/expression) / NaN
+      (pandas). Confirmed manifestations:
+        - Q6_pandas   : COUNT(DISTINCT SearchPhrase) = 17 vs SQL 18 (NaN dropped
+                        by Series.nunique, which excludes NaN by default).
+        - Q25_pandas, : WHERE SearchPhrase <> '' ... ORDER BY EventTime[,SearchPhrase]
+          Q27_pandas    LIMIT 10 -> "'<' not supported between instances of 'str'
+                        and 'NoneType'" - the null-ified empty strings collide
+                        with real strings during the sort.
+        - Compounds Q15/Q18/Q19/Q24/Q31/Q32 (WHERE SearchPhrase<>'' semantics and
+          '' vs None in output rows), though those are ALSO tie-affected (D).
+      Loader read sites: benchbox/platforms/dataframe/pandas_family.py:554
+      (read_csv) and expression_family.py:930 (read_csv). Fix at the loader so a
+      VARCHAR/string-typed column keeps '' rather than null when the source field
+      is empty (pandas: na_filter/keep_default_na off for string columns or
+      post-read fillna(''); polars: missing_utf8_is_empty_string / equivalent),
+      gated on the SCHEMA TYPE being string (mirror the type-aware date-heuristic
+      discipline from w6 - never infer from the column name alone). Re-verify the
+      real DataFrame run path after the change; do NOT special-case the gate.
+
+  (B) REAL BUG - expression date-column compared to a STRING literal. The shared
+      mask helper benchbox/core/clickbench/dataframe_queries/queries.py:31
+      (_expr_july_mask) builds `col("EventDate") >= lit(start)` with start a raw
+      ISO string ("2013-07-01"). EventDate loads as pl.Date, so polars raises
+      "cannot compare 'date/datetime/time' to a string value". The PANDAS twin
+      (_pandas_july_mask, :86) already parses via date.fromisoformat - the
+      expression helper must do the same (lit(date.fromisoformat(start))).
+      Cells: Q37_expression, Q38_expression, Q43_expression (and latent under (C)
+      for Q39-42, whose .slice error is raised at plan-BUILD time before the
+      collect-time date error surfaces).
+
+  (C) REAL BUG - missing wrapper methods used by the generic query builders.
+        - UnifiedLazyFrame has no `.slice` (unified_frame.py:2917). The OFFSET
+          path in _make_group_expression (queries.py:260) calls
+          `result.slice(offset, limit)`. Cells: Q39/Q40/Q41/Q42_expression
+          (the only queries with LIMIT ... OFFSET). Fix: add a `.slice(offset,
+          length)` passthrough to UnifiedLazyFrame (polars LazyFrame.slice
+          exists) OR rework the builder; prefer adding the wrapper method.
+        - UnifiedStrExpr has no `.replace` (unified_frame.py:104). Q29's domain
+          regex (queries.py:350) calls `col("Referer").str.replace(...)`. Cell:
+          Q29_expression. Fix: add a `.replace(pattern, value)` passthrough
+          (polars Expr.str.replace) to UnifiedStrExpr. NOTE the pandas twin
+          (:364) already uses `$1`->`\1` capture-group syntax differences -
+          confirm both backends produce the same capture-group substitution.
+
+  (D) NOT A BUG - irreducible ORDER BY / LIMIT tie non-determinism (the DOMINANT
+      category; persists after A-C are fixed). ClickBench's queries are largely
+      `... ORDER BY <aggregate> [DESC] LIMIT N` where the aggregate is heavily
+      TIED, or `... LIMIT N` with NO ORDER BY at all. When ties straddle the LIMIT
+      boundary, DuckDB, polars, and pandas each return a DIFFERENT but equally
+      VALID row-set / tie order. Verified directly (values match, selection/order
+      differs), e.g.:
+        - Q9  ORDER BY COUNT(DISTINCT UserID) DESC LIMIT 10: values
+              (141,131,128,128,127,125) identical across surfaces; the two rows
+              tied at 128 (RegionID 984 vs 18) come back in different order.
+        - Q16 GROUP BY UserID ORDER BY COUNT(*) DESC LIMIT 10: dozens of UserIDs
+              tie at count 4/3; each surface picks a different 10.
+        - Q18 GROUP BY UserID, SearchPhrase LIMIT 10: NO ORDER BY - purely
+              arbitrary rows per engine.
+        - Q31/Q32/Q33 GROUP BY <near-unique keys> ORDER BY c DESC: c=1 for almost
+              every group -> the LIMIT 10 is an arbitrary draw.
+        - Q36 ORDER BY c DESC: row 0 (count 2) matches everywhere; rows 1+ tie at
+              count 1 and reorder.
+      These return different VALID results, so an exact, positional row-by-row
+      comparator (validate_results_exact) cannot pass them, and there is no
+      surface to "fix" - it is a property of the benchmark's query set.
+      Tie/LIMIT-affected cells (after A-C fixed):
+        Q9, Q10, Q15, Q16, Q17, Q18, Q19, Q24, Q31, Q32, Q33, Q36, and the
+        post-fix Q37/Q38/Q39/Q40/Q41/Q42 (ORDER BY PageViews DESC LIMIT/OFFSET).
+        Q43 (ORDER BY DATE_TRUNC('minute', EventTime)) may be deterministic once
+        (B) is fixed - re-check after the date fix before classifying.
+
+  CONSEQUENCE / why this reframes the gate: even after fixing every genuine bug
+  (A, B, C), ClickBench CANNOT pass an exact cross-surface gate, because ~15 of
+  its 43 queries are inherently non-deterministic at the LIMIT boundary. Forcing
+  it green would require classifying ~15 queries as permanent known_divergences,
+  which guts the gate's value for ClickBench. This was not knowable at
+  applicability-sweep time (the sweep only counts shipped DataFrame queries 1:1
+  with SQL; it does not execute them). The campaign's w3 burndown for ClickBench
+  must therefore make an explicit SCOPING decision (see w3 below) rather than a
+  mechanical "fix the wrong surface" pass.
+
+  RECOMMENDATION (for the campaign owner to ratify in w3): land (A) as a
+  standalone loader-fidelity fix (it benefits ssb/coffeeshop and every future
+  gate, not just clickbench) and land (B)+(C) as ClickBench expression-impl fixes
+  (they are unambiguously wrong code); then do NOT force an exact ClickBench gate
+  - instead stand up the clean exact gate on joinorder_synthetic (the other
+  GATEABLE target, 13/13) and either (i) classify ClickBench's tie/LIMIT queries
+  as documented, justified known_divergences with a one-line reason each, or
+  (ii) descope ClickBench from exact gating and note it needs a tie-tolerant
+  oracle (top-N-membership rather than positional equality) if it is ever gated.
+
+prior_art:
+  - "_project/TODO/main/active/benchmark-cross-surface-equivalence-gate.yaml - the parent campaign; this follow-up feeds its w2 (report) findings and w3 (burndown/classification) decision for clickbench, and unblocks w4 (CI gate) for joinorder_synthetic."
+  - "_project/analysis/cross-surface-applicability.md - marks clickbench + joinorder_synthetic as the two GATEABLE targets; should be annotated with the tie/LIMIT caveat (clickbench is shipped-DataFrame-complete but not exact-gateable)."
+  - "benchbox/core/clickbench/dataframe_queries/queries.py - the spec-driven impls; bugs at :31 (_expr_july_mask date-vs-string), :260 (.slice OFFSET path), :350 (str.replace). The generic builders (_make_group_expression/_make_group_pandas, _make_scalar_*, _make_select_*) mean a single helper fix corrects many queries."
+  - "benchbox/platforms/dataframe/unified_frame.py - UnifiedStrExpr (:104) needs .replace; UnifiedLazyFrame (:2917) needs .slice."
+  - "benchbox/platforms/dataframe/{pandas_family.py:554, expression_family.py:930} read_csv - the .tbl/.csv read sites where an empty VARCHAR field becomes null/NaN instead of ''."
+  - "d37396cb / e8125abe / 4a08ed3d - the coffeeshop precedent: route through the real loader, fix impl bugs the gate surfaces, fix LOADER bugs only where the loader is wrong (type-aware date heuristic, w6)."
+
+work:
+  - id: w0
+    summary: "Re-validate the report-mode evidence and the A/B/C/D breakdown on a fresh build"
+    status: pending
+    notes: |
+      ClickBench data is generated randomly per build, so absolute aggregate
+      values differ run to run - the gate compares SQL vs DataFrame within ONE
+      build, which stays valid. Re-run the cross-surface gate in report mode for
+      clickbench at SF=0.1 (GATES["clickbench"], build_production_contexts,
+      find_cross_surface_divergences) and capture stdout to /tmp/clickbench_gate.log.
+      Assert: 86 cells compared, ~35 divergent, and the divergent set still
+      partitions into (A) empty-string/null [Q6_pandas, Q25_pandas, Q27_pandas],
+      (B) date-vs-string [Q37/Q38/Q43_expression], (C) .slice [Q39-42_expression]
+      + .replace [Q29_expression], (D) tie/LIMIT [the remainder]. Confirm the
+      dtype parity (UserID n_unique identical across DuckDB/expression/pandas;
+      SearchPhrase n_unique 18/18/17). Record the replayable command + counts.
+
+  - id: w1
+    summary: "(A) Fix empty-string -> null/NaN loader fidelity (type-aware, all benchmarks)"
+    needs: [w0]
+    status: pending
+    notes: |
+      In the pandas and expression read_csv paths, keep an empty source field as
+      '' (not null/NaN) for SCHEMA-string columns, mirroring DuckDB. Gate the
+      behavior on the column's schema TYPE (never the name), like the w6 date
+      heuristic. Re-verify a real DataFrame benchmark run still works, then
+      re-run the clickbench report: Q6_pandas (nunique 18), Q25_pandas/Q27_pandas
+      (sort no longer raises) should clear. Re-check ssb + coffeeshop gates stay
+      green (no regression from the loader change). This is independently
+      shippable and is the highest-value item.
+
+  - id: w2
+    summary: "(B)+(C) Fix the ClickBench expression impl bugs surfaced by the gate"
+    needs: [w0]
+    status: pending
+    notes: |
+      (B) _expr_july_mask (queries.py:31): wrap the start/end ISO strings in
+          date.fromisoformat before lit(), matching _pandas_july_mask (:86).
+      (C) Add UnifiedLazyFrame.slice(offset, length) (unified_frame.py:2917,
+          passthrough to polars LazyFrame.slice) and UnifiedStrExpr.replace(
+          pattern, value) (unified_frame.py:104, passthrough to Expr.str.replace);
+          confirm Q29's capture-group substitution matches the pandas twin
+          ('$1' vs r'\1'). After: Q37/Q38/Q43 (date), Q39-42 (OFFSET), Q29
+          (regex) should no longer ERROR. Some will then fall into (D) tie
+          mismatches - that is expected and handled by w3, not by further impl
+          edits. Add a fast-lane unit test per wrapper method.
+
+  - id: w3
+    summary: "(D) Scoping decision: classify tie/LIMIT queries as known_divergences OR descope ClickBench; gate joinorder_synthetic cleanly"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      DECISION REQUIRED (campaign owner). After w1+w2, the residual ClickBench
+      divergences are irreducible ORDER BY/LIMIT tie non-determinism. Options:
+        (i)  Classify each tie/LIMIT query as a justified known_divergence
+             (one-line reason: "ORDER BY <agg> [DESC] LIMIT N non-deterministic
+             under ties; surfaces return distinct valid row-sets"), and gate the
+             deterministic remainder. Re-check Q43 after the date fix - it may be
+             deterministic and gateable.
+        (ii) Descope ClickBench from EXACT cross-surface gating; note it would
+             need a tie-tolerant oracle (top-N membership rather than positional
+             equality) to gate meaningfully.
+      Recommended: take (ii) for ClickBench and instead stand up the clean exact
+      gate on joinorder_synthetic (13/13, the other GATEABLE target) to satisfy
+      the campaign's w4 "one bounded gate per gateable benchmark" - it is far more
+      likely deterministic. Update cross-surface-applicability.md with the
+      ClickBench tie/LIMIT caveat either way.
+
+  - id: w4
+    summary: "Promote the chosen ClickBench/joinorder_synthetic gate(s) to CI with a fast-lane regression"
+    needs: [w3]
+    status: pending
+    notes: |
+      Wire whichever gate w3 selects into the correctness-gate CI job + a Make
+      target (mirror ssb-cross-surface-equivalence-report) with a medium-marker
+      pytest, and prove it FAILS on a planted single-surface defect with no
+      collateral. Fold the outcome back into the parent campaign's w3/w4.
+
+deferred:
+  - summary: "A tie-tolerant cross-surface comparator (top-N membership / boundary-aware equality)"
+    reason: "Would let ClickBench's ORDER BY/LIMIT-with-ties queries be gated, but it is a comparator redesign (the campaign deliberately reuses validate_results_exact); only pursue if exact gating of these queries is explicitly required."
+
+must_preserve:
+  - "Loader changes (w1) are genuine fidelity fixes that keep the real DataFrame run path working - re-verify a benchmark run; never gate-only special-casing. Re-confirm ssb + coffeeshop cross-surface gates stay green."
+  - "ClickBench tie/LIMIT queries are NOT silenced into a baseline as if they were bugs - any known_divergence entry carries an explicit non-determinism justification."
+  - "benchbox run default (execution-only) behavior is unchanged; expression/pandas impl fixes (w2) keep both real DataFrame runs working."
+
+anti_patterns:
+  - "DO NOT add a gate-local dtype cast or string-normalization to paper over the empty-string/null divergence - fix the loader (w1) at the schema-type-aware read path."
+  - "DO NOT 'fix' a tie/LIMIT query by adding a secondary sort key to only the DataFrame surface - it cannot match DuckDB's arbitrary tie order; classify or descope (w3)."
+  - "DO NOT force ClickBench green by mass-classifying tie queries without the explicit per-query non-determinism reason."
+
+verification:
+  - description: "Report mode reproduces the A/B/C/D breakdown"
+    command: "run GATES['clickbench'] in report mode at SF=0.1; capture to /tmp/clickbench_gate.log"
+    expected_output: "~35 divergent cells partitioning into empty-string(A)/date(B)/slice+replace(C)/tie(D)"
+  - description: "Loader fix clears the empty-string cells without breaking shipped gates"
+    command: "re-run clickbench report after w1; re-run ssb + coffeeshop gates"
+    expected_output: "Q6_pandas/Q25_pandas/Q27_pandas cleared; ssb + coffeeshop still 0 divergent"
+  - description: "expr impl fixes clear the error cells"
+    command: "re-run clickbench report after w2"
+    expected_output: "Q29/Q37/Q38/Q39/Q40/Q41/Q42/Q43_expression no longer ERROR (may become tie mismatches, handled in w3)"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/clickbench/"
+    - "benchbox/platforms/dataframe/"
+    - "benchbox/core/equivalence/"
+    - "tests/"
+    - ".github/workflows/"
+    - "Makefile"
+    - "_project/analysis/cross-surface-applicability.md"
+
+metadata:
+  tags: [equivalence, correctness, dataframe, sql, ci, clickbench, joinorder, loader]
+  estimated_effort: "Medium"
+  created_date: "2026-06-21"
+  last_updated: "2026-06-21T00:00:00"
