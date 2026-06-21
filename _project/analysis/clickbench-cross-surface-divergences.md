@@ -99,6 +99,21 @@ the determinism layer, not per-query:
 Until w2 + w3 land, ClickBench cannot be deterministically green and its residual
 cells cannot be cleanly re-triaged; w5's full closeout depends on them.
 
+### w9 update (2026-06-21): empty-string/None and TIMESTAMP dtype resolved
+
+The Q17 col-1 / Q24 `"" → None` divergence is resolved at the loader. The root
+cause was the per-benchmark CSV `null_marker`, not dtype: DuckDB resolves
+`nullstr` via `resolve_csv_dialect` (ClickBench `null_marker=None` ⇒ empty kept
+`""`), while the DataFrame path previously always nulled empty fields. The
+resolved `null_marker` is now threaded into both surfaces (Parquet
+`strings_can_be_null`, pandas `""` restore on declared string columns), so empty
+stays `""` for ClickBench **and** stays NULL for `null_marker=""` datasets (e.g.
+joinorder_synthetic — this conditioning is what w9 adds over w1's unconditional
+fix). Q24 also surfaced `ClientEventTime` (declared `TIMESTAMP`) read as a string
+in pandas — fixed by making pandas date parsing TYPE-aware. Q24 fully clears;
+Q17's remaining divergence is the tie-ambiguous top-N above (w2/w3), not the
+loader issue. See `joinorder-synthetic-cross-surface-divergences.md`.
+
 ## Status
 
 ClickBench stays in `STAGED_GATES` (report mode), **not** `GATES`. Per the

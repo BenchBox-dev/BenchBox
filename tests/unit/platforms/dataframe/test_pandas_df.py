@@ -173,6 +173,78 @@ class TestPandasDataLoading:
         assert not pd.api.types.is_datetime64_any_dtype(df["d_date_sk"])
         assert pd.api.types.is_datetime64_any_dtype(df["EventTime"])
 
+    def test_read_csv_type_aware_date_parsing_by_declared_type(self, tmp_path):
+        """A declared TIMESTAMP column parses even when its name misses the suffix heuristic (w9).
+
+        ClickBench's ClientEventTime is TIMESTAMP but does not end in
+        date/timestamp, so the name-only heuristic read it as a raw string while
+        the SQL surface returned a datetime. Declared types are now authoritative.
+        """
+        adapter = PandasDataFrameAdapter()
+        csv_path = tmp_path / "hits.csv"
+        csv_path.write_text("1|2013-07-01 00:01:34\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "ClientEventTime"],
+            null_marker=None,
+            column_types=["INTEGER", "TIMESTAMP"],
+        )
+        assert pd.api.types.is_datetime64_any_dtype(df["ClientEventTime"])
+
+    def test_read_csv_declared_text_column_not_inferred_numeric(self, tmp_path):
+        """A declared TEXT column with numeric-looking values stays string (w9).
+
+        join-order movie_info_idx.info holds rating strings like "8.0"; pandas
+        would infer float64 and diverge from the VARCHAR SQL surface.
+        """
+        adapter = PandasDataFrameAdapter()
+        csv_path = tmp_path / "info.csv"
+        csv_path.write_text("1|8.0\n2|10.0\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "info"],
+            null_marker="",
+            column_types=["INTEGER", "TEXT"],
+        )
+        assert not pd.api.types.is_numeric_dtype(df["info"])
+        assert df["info"].iloc[0] == "8.0"
+
+    def test_read_csv_empty_string_handling_follows_null_marker(self, tmp_path):
+        """Empty text fields stay "" when null_marker is None, NaN when "" (w9).
+
+        Matches the SQL surface per the benchmark's resolved CSV dialect:
+        ClickBench (null_marker=None) keeps ""; JoinOrder (null_marker="") nulls.
+        """
+        adapter = PandasDataFrameAdapter()
+        csv_path = tmp_path / "t.csv"
+        csv_path.write_text("1|\n2|hello\n")
+
+        kept = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "note"],
+            null_marker=None,
+            column_types=["INTEGER", "TEXT"],
+        )
+        assert kept["note"].iloc[0] == ""
+
+        nulled = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "note"],
+            null_marker="",
+            column_types=["INTEGER", "TEXT"],
+        )
+        assert pd.isna(nulled["note"].iloc[0])
+
     def test_load_headered_csv_with_column_names_parses_dates(self, tmp_path):
         """Headered CSV loads still use schema names for pandas date converters."""
         adapter = PandasDataFrameAdapter()
@@ -194,36 +266,6 @@ class TestPandasDataLoading:
         assert df["flight_date"].dt.year.iloc[0] == 2018
         assert pd.api.types.is_datetime64_any_dtype(df["EventTime"])
 
-    def test_read_csv_empty_string_column_stays_empty_not_null(self, tmp_path):
-        """Empty fields in a declared string column load as '' (DuckDB parity), not NaN.
-
-        pandas read_csv maps '' to NaN via its default na_values; left unfixed this
-        silently drops the value from COUNT(DISTINCT)/GROUP BY and diverges the
-        DataFrame surface from the SQL reference (the cross-surface Q6/Q17/Q18 bug).
-        """
-        adapter = PandasDataFrameAdapter()
-
-        csv_path = tmp_path / "hits.tbl"
-        # row 2 has an empty search_phrase; row 3 has an empty numeric amount.
-        csv_path.write_text("1|apple|10\n2||20\n3|pear|\n")
-
-        df = adapter.read_csv(
-            csv_path,
-            delimiter="|",
-            header=None,
-            names=["id", "search_phrase", "amount"],
-            null_marker="",
-            column_types=["INTEGER", "VARCHAR", "INTEGER"],
-        )
-
-        # Declared string column: empty field is '' (counted as a distinct value),
-        # never NaN.
-        assert df["search_phrase"].isna().sum() == 0
-        assert (df["search_phrase"] == "").sum() == 1
-        assert df["search_phrase"].nunique() == 3  # 'apple', '', 'pear'
-        # Numeric column: an empty field is still null (no valid '' value there).
-        assert df["amount"].isna().sum() == 1
-
     def test_read_csv_all_digit_string_column_stays_text(self, tmp_path):
         """An all-digit declared string column keeps its values as text, not numbers.
 
@@ -236,17 +278,20 @@ class TestPandasDataLoading:
         csv_path = tmp_path / "codes.tbl"
         csv_path.write_text("1|007|x\n2|10|y\n3||z\n")
 
+        # null_marker=None (keep-empty dialect, e.g. ClickBench): an empty declared
+        # string field stays '' rather than NULL, so the all-digit-text contract can
+        # be asserted alongside the empty-field handling.
         df = adapter.read_csv(
             csv_path,
             delimiter="|",
             header=None,
             names=["id", "code", "tag"],
-            null_marker="",
+            null_marker=None,
             column_types=["INTEGER", "VARCHAR", "VARCHAR"],
         )
 
         # Leading zero preserved, value is the string '10' not the number 10, and
-        # the empty field is '' (not NaN).
+        # the empty field is '' (not NaN) under the keep-empty dialect.
         assert list(df["code"]) == ["007", "10", ""]
         assert df["code"].dtype == object
 

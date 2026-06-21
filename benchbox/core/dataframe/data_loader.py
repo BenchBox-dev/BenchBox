@@ -73,8 +73,11 @@ DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
 # Bump when schema/type-conversion rules change so stale cached Parquet is not
 # silently reused on rerun. v3: TIME columns now load as strings (previously an
 # all-null Time column), so pre-v3 caches must be regenerated to pick up values.
-# v4: empty fields in declared string columns now load as '' instead of null
-# (strings_can_be_null=False), so pre-v4 caches must be regenerated.
+# v4: declared text columns (TEXT/STRING/CHAR families) are now written as string
+# even when all-NULL or numeric-looking, instead of being left to PyArrow
+# inference; and empty fields in declared string columns load as '' instead of
+# null when the SQL dialect keeps '' (null_marker is None). Pre-v4 caches must be
+# regenerated to pick up the declared dtypes and the empty-string contract.
 DATAFRAME_CACHE_VERSION = "v4"
 
 # Format subdirectory names that belong to the DataFrame cache layer.
@@ -200,6 +203,87 @@ class SchemaMapper:
         "TIME": "string",
     }
 
+    # SQL type *families* (matched on the base token after stripping any
+    # ``(precision[,scale])`` suffix) that the per-type maps above do not list
+    # verbatim. Benchmarks declare schemas with many spellings (e.g. ssb uses
+    # ``INTEGER``/``VARCHAR``, joinorder_synthetic uses raw DDL strings like
+    # ``"note TEXT"`` / ``"info TEXT NOT NULL"``), so a declared text column whose
+    # data is all-NULL or looks numeric must still be written as a string rather
+    # than left to PyArrow inference. Keyed by base token -> PyArrow type string.
+    _ARROW_TYPE_FAMILIES: dict[str, str] = {
+        # Character/text families -> string
+        "TEXT": "string",
+        "STRING": "string",
+        "CHARACTER": "string",
+        "NCHAR": "string",
+        "NVARCHAR": "string",
+        "CLOB": "string",
+        "UUID": "string",
+        "JSON": "string",
+        "JSONB": "string",
+        "ENUM": "string",
+        # Integer families -> int64
+        "INT": "int64",
+        "INT2": "int64",
+        "INT4": "int64",
+        "INT8": "int64",
+        "TINYINT": "int64",
+        "SMALLINT": "int64",
+        "MEDIUMINT": "int64",
+        "BIGINT": "int64",
+        "SERIAL": "int64",
+        "BIGSERIAL": "int64",
+        # Real/decimal families -> float64
+        "DECIMAL": "float64",
+        "NUMERIC": "float64",
+        "NUMBER": "float64",
+        "DOUBLE": "float64",
+        "REAL": "float64",
+        "FLOAT": "float64",
+        "FLOAT4": "float64",
+        "FLOAT8": "float64",
+        "MONEY": "float64",
+    }
+
+    @classmethod
+    def sql_type_to_pyarrow(cls, sql_type: str) -> str | None:
+        """Resolve a SQL type spelling to a PyArrow type string for parquet typing.
+
+        Tries the exact and base-token entries in :data:`PYARROW_TYPE_MAP` first
+        (so ``VARCHAR(12)`` -> ``VARCHAR`` -> ``string`` and ``DECIMAL(15,2)``
+        keep their existing behavior), then falls back to the SQL type *families*
+        in :data:`_ARROW_TYPE_FAMILIES` and a couple of prefix rules. Returns
+        ``None`` for genuinely unrecognized types, leaving them to PyArrow
+        inference (unchanged from before this helper existed).
+        """
+        normalized = sql_type.strip().upper()
+        # Base token: drop any ``(precision[,scale])`` and trailing constraint
+        # words (e.g. ``"VARCHAR(12) NOT NULL"`` / ``"TEXT NOT NULL"`` -> ``VARCHAR``
+        # / ``TEXT``). Multi-word real types (``CHARACTER VARYING``, ``DOUBLE
+        # PRECISION``, ``TIMESTAMP WITH TIME ZONE``) resolve via their first token.
+        pre_paren = normalized.split("(", 1)[0].strip()
+        base = pre_paren.split()[0] if pre_paren.split() else pre_paren
+
+        mapped = cls.PYARROW_TYPE_MAP.get(normalized) or cls.PYARROW_TYPE_MAP.get(base)
+        if mapped:
+            return mapped
+
+        family = cls._ARROW_TYPE_FAMILIES.get(base)
+        if family:
+            return family
+
+        # First-token spellings the family map misses, e.g. "CHARACTER VARYING"
+        # (CHARACTER), a bare "DOUBLE", or "TIMESTAMP"/"DATETIME"/"TIME" variants.
+        if "CHAR" in base:
+            return "string"
+        if base.startswith("DOUBLE"):
+            return "float64"
+        if base.startswith("TIMESTAMP") or base.startswith("DATETIME"):
+            return "timestamp[us]"
+        if base.startswith("TIME"):
+            return "string"
+        return None
+
     @classmethod
     def get_column_names(cls, table: Table) -> list[str]:
         """Extract column names from a Table schema.
@@ -280,6 +364,7 @@ class FormatConverter:
         compression: str = "zstd",
         write_config: DataFrameWriteConfiguration | None = None,
         column_types: dict[str, str] | None = None,
+        null_marker: str | None = "",
     ) -> tuple[ConversionStatus, int]:
         """Convert CSV/TBL file to Parquet format.
 
@@ -297,6 +382,12 @@ class FormatConverter:
                 strings (e.g. {"l_shipdate": "date32"}) for explicit typing.
                 Without this, PyArrow infers types and date columns may be
                 read as strings.
+            null_marker: CSV null marker matching the SQL loader's resolved
+                dialect. ``""`` (default) converts empty string fields to NULL,
+                preserving prior behavior; ``None`` keeps empty fields as empty
+                strings so a string column materializes the same way the DuckDB
+                SQL reference does (its ``nullstr`` sentinel never matches an
+                empty field), instead of emitting NULL where SQL emits "".
 
         Returns:
             Tuple of (conversion status, row count)
@@ -326,16 +417,12 @@ class FormatConverter:
             parse_options = pv.ParseOptions(delimiter=delimiter)
             arrow_column_types = FormatConverter._resolve_arrow_types(column_types)
 
+            # When the SQL loader's dialect keeps empty fields as empty strings
+            # (null_marker is None), do the same here so the DataFrame surface
+            # does not emit NULL where the SQL surface emits "".
             convert_options = pv.ConvertOptions(
                 auto_dict_encode=True,
-                # Keep empty fields in declared string columns as '' rather than
-                # null. PyArrow's default null_values list contains '', so
-                # strings_can_be_null=True would coerce every empty VARCHAR/TEXT
-                # field to null - which silently changes COUNT(DISTINCT) and
-                # GROUP BY membership (the SQL reference, DuckDB, keeps ''). This
-                # only affects string-typed columns; empty fields in numeric/date
-                # columns still become null because '' is not a valid value there.
-                strings_can_be_null=False,
+                strings_can_be_null=null_marker is not None,
                 column_types=arrow_column_types,
             )
 
@@ -1145,6 +1232,7 @@ class DataFrameDataLoader:
         # Get schema info for column names and types
         schema_info = self._get_schema_info(benchmark)
         pyarrow_types = self._get_pyarrow_types(benchmark)
+        null_markers = self._get_null_markers(benchmark, source_files)
 
         converted_files: dict[str, Path | list[Path]] = {}
         table_metadata: dict[str, dict[str, Any]] = {}
@@ -1158,7 +1246,14 @@ class DataFrameDataLoader:
             table_write_config = self._get_table_write_config(write_config, table_name, column_names)
 
             converted_list, table_entries = self._convert_table_files(
-                table_name, source_list, column_names, column_types, table_write_config, benchmark_delimiter, cache_path
+                table_name,
+                source_list,
+                column_names,
+                column_types,
+                table_write_config,
+                benchmark_delimiter,
+                cache_path,
+                null_marker=null_markers.get(table_name, ""),
             )
 
             if len(converted_list) == 1:
@@ -1203,6 +1298,8 @@ class DataFrameDataLoader:
         table_write_config: DataFrameWriteConfiguration | None,
         benchmark_delimiter: str | None,
         cache_path: Path,
+        *,
+        null_marker: str | None = "",
     ) -> tuple[list[Path], list[dict[str, Any]]]:
         """Convert a single table's source files to Parquet."""
         converted_list: list[Path] = []
@@ -1229,6 +1326,7 @@ class DataFrameDataLoader:
                 delimiter=delimiter,
                 write_config=table_write_config,
                 column_types=column_types,
+                null_marker=null_marker,
             )
 
             if status == ConversionStatus.SUCCESS:
@@ -1310,6 +1408,29 @@ class DataFrameDataLoader:
             skip_dictionary_columns=filtered_skip_dict_cols,
         )
 
+    def _get_null_markers(self, benchmark: Any, source_files: dict[str, Path | list[Path]]) -> dict[str, str | None]:
+        """Resolve each table's CSV null marker the same way the SQL loader does.
+
+        Returns a per-table marker: ``None`` means empty fields are kept as empty
+        strings (no NULL conversion, e.g. ClickBench), ``""`` means an empty field
+        becomes NULL (e.g. JoinOrder, TPC ``.tbl``). Threading this into the
+        Parquet conversion makes the DataFrame surface materialize empty strings
+        the same way its DuckDB SQL reference does. On any resolution failure the
+        marker defaults to ``""`` (prior behavior: empty -> NULL).
+        """
+        from benchbox.platforms.base.data_loading import DataSource, resolve_csv_dialect
+
+        markers: dict[str, str | None] = {}
+        source = DataSource(source_type="benchmark_instance", tables={})
+        for table_name, paths in source_files.items():
+            first = paths[0] if isinstance(paths, list) else paths
+            try:
+                dialect = resolve_csv_dialect(source, table_name, Path(first), benchmark)
+                markers[table_name] = dialect.null_marker
+            except Exception:
+                markers[table_name] = ""
+        return markers
+
     def _get_schema_info(self, benchmark: Any) -> dict[str, list[str]]:
         """Extract column names from benchmark schema.
 
@@ -1383,9 +1504,7 @@ class DataFrameDataLoader:
         """Extract supported Arrow types from a schema column iterable."""
         col_types: dict[str, str] = {}
         for column in columns:
-            sql_type = str(get_sql_type(column)).upper()
-            base_type = sql_type.split("(", 1)[0]
-            arrow_type = SchemaMapper.PYARROW_TYPE_MAP.get(sql_type) or SchemaMapper.PYARROW_TYPE_MAP.get(base_type)
+            arrow_type = SchemaMapper.sql_type_to_pyarrow(str(get_sql_type(column)))
             if arrow_type:
                 col_types[get_name(column)] = arrow_type
         return col_types
