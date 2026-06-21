@@ -27,16 +27,28 @@ def iter_schema_columns(table_schema: Any) -> list[Any]:
 
 
 def column_name(column: Any) -> str | None:
-    """Return a schema column's name, if present."""
+    """Return a schema column's name, if present.
+
+    Handles dict columns, object columns, and DDL-string columns of the form
+    ``"name TYPE [constraints...]"`` (e.g. ``"id INTEGER PRIMARY KEY"``), used by
+    benchmarks like joinorder_synthetic whose schema lists raw column definitions.
+    """
     if isinstance(column, dict):
         name = column.get("name")
+    elif isinstance(column, str):
+        parts = column.split()
+        name = parts[0] if parts else None
     else:
         name = getattr(column, "name", None)
     return str(name) if name else None
 
 
 def column_sql_type(column: Any, default: str = "VARCHAR") -> str:
-    """Return a schema column's SQL type across dict and object schemas."""
+    """Return a schema column's SQL type across dict, object, and DDL-string schemas."""
+    if isinstance(column, str):
+        # "name TYPE [constraints...]" -> the token after the name is the type.
+        parts = column.split()
+        return parts[1] if len(parts) > 1 else default
     candidates: list[Any] = []
     if isinstance(column, dict):
         candidates.append(column.get("type") or column.get("data_type"))

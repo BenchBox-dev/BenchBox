@@ -1238,19 +1238,24 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         degrades silently rather than fabricating a plan).
         """
         query = _rewriter_rewrite(query)
-        cursor = connection.cursor()
+        # In TPC-DS streaming paths a per-stream cursor is passed as
+        # `connection`; detect by checking for a callable .cursor() method.
+        _owns_cursor = callable(getattr(connection, "cursor", None))
+        cursor = connection.cursor() if _owns_cursor else connection
 
         explain_query = f"EXPLAIN {query}"
 
         try:
             cursor.execute(explain_query)
             plan_rows = cursor.fetchall()
-            cursor.close()
+            if _owns_cursor:
+                cursor.close()
 
             return "\n".join(str(row[0]) for row in plan_rows)
 
         except Exception as e:
-            cursor.close()
+            if _owns_cursor:
+                cursor.close()
             return f"Failed to get query plan: {e}"
 
     def get_query_plan_parser(self):

@@ -29,6 +29,9 @@ class _StubPlan:
     def estimate_serialized_size(self) -> int:
         return 16
 
+    def apply_raw_output_policy(self, policy: str | None = None, max_bytes: int = 0) -> None:
+        """No-op: capture_query_plan applies the raw-output retention policy in place."""
+
 
 class _StubParser:
     def parse_explain_output(self, query_id: str, explain_output: str) -> _StubPlan:

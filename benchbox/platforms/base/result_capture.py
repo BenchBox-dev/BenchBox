@@ -20,6 +20,11 @@ Instance attributes these methods read (initialized on the host adapter):
   `strict_plan_capture`, `_plan_capture_iteration_counts`
 - `show_query_plans`, `enable_validation`
 - `platform_name` (property), `logger`
+- `platform_config` (raw config dict). Read for the raw_explain_output retention
+  policy via the optional ``plan_raw_output`` (full|truncated|none, default
+  truncated) and ``plan_raw_output_max_bytes`` (default 16 KiB) keys. The policy
+  governs only the verbatim EXPLAIN text retained on each captured plan; the
+  structured DAG and ``plan_fingerprint`` are always retained.
 """
 
 from __future__ import annotations
@@ -44,6 +49,10 @@ from benchbox.core.results.builder import (
     normalize_benchmark_id,
 )
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT
+from benchbox.core.results.query_plan_models import (
+    DEFAULT_RAW_OUTPUT_MAX_BYTES,
+    DEFAULT_RAW_OUTPUT_POLICY,
+)
 from benchbox.platforms.base.models import (
     PowerTestPhase,
     QueryExecution,
@@ -711,6 +720,37 @@ class ResultCaptureMixin:
                 details=message,
             )
 
+    def _resolve_raw_output_policy(self, query_id: str) -> tuple[str, int]:
+        """Resolve the raw_explain_output retention policy from ``platform_config``.
+
+        Read from ``platform_config`` (rather than a promoted ``self.<attr>``) so the
+        policy stays within the plan-serialization layer. A non-positive or
+        non-integer ``plan_raw_output_max_bytes`` is treated as misconfiguration and
+        falls back to the default cap with a warning, rather than silently nulling all
+        raw text (which a non-positive cap under the truncated policy would do).
+
+        Returns:
+            Tuple of (policy, max_bytes). Unknown policy values are normalized to the
+            default by ``apply_raw_output_policy``.
+        """
+        plan_config = getattr(self, "platform_config", None) or {}
+        policy = plan_config.get("plan_raw_output", DEFAULT_RAW_OUTPUT_POLICY)
+        configured_max_bytes = plan_config.get("plan_raw_output_max_bytes", DEFAULT_RAW_OUTPUT_MAX_BYTES)
+        try:
+            parsed_max_bytes = int(configured_max_bytes)
+        except (TypeError, ValueError):
+            parsed_max_bytes = None
+        if parsed_max_bytes is not None and parsed_max_bytes > 0:
+            return policy, parsed_max_bytes
+        if configured_max_bytes != DEFAULT_RAW_OUTPUT_MAX_BYTES:
+            self.logger.warning(
+                "Invalid plan_raw_output_max_bytes %r for %s; using default %d bytes.",
+                configured_max_bytes,
+                query_id,
+                DEFAULT_RAW_OUTPUT_MAX_BYTES,
+            )
+        return policy, DEFAULT_RAW_OUTPUT_MAX_BYTES
+
     def capture_query_plan(self, connection: Any, query: str, query_id: str) -> tuple[Any, float]:
         """Capture structured query plan using platform-specific parser.
 
@@ -889,14 +929,23 @@ class ResultCaptureMixin:
             )
             return None, capture_time_ms
 
+        # Apply the raw_explain_output retention policy before measuring bundle size,
+        # so the size guard reflects what is actually retained. The structured DAG and
+        # fingerprint are untouched; only the verbatim EXPLAIN text is governed.
+        raw_output_policy, raw_output_max_bytes = self._resolve_raw_output_policy(query_id)
+        plan.apply_raw_output_policy(raw_output_policy, raw_output_max_bytes)
+
         try:
             size_kb = plan.estimate_serialized_size() / 1024
             if size_kb > 100:
-                self.logger.warning(
-                    "Large query plan for %s: %.1f KB. Consider using external plan storage.",
-                    query_id,
-                    size_kb,
+                # Only suggest a stricter raw-output policy when raw text is still
+                # retained; if it is already dropped the bloat is the structured DAG.
+                hint = (
+                    " Consider a stricter plan_raw_output policy (full|truncated|none) or external plan storage."
+                    if plan.raw_explain_output
+                    else " The structured plan tree itself is large; consider external plan storage."
                 )
+                self.logger.warning("Large query plan for %s: %.1f KB.%s", query_id, size_kb, hint)
         except SerializationError as exc:
             capture_time_ms = (time.perf_counter() - start_time) * 1000
             self._record_plan_capture_failure(

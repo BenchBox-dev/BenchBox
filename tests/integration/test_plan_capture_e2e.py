@@ -14,7 +14,7 @@ import pytest
 
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.medium,
+    pytest.mark.fast,
     pytest.mark.duckdb,
 ]
 

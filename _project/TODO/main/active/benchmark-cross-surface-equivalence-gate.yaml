@@ -328,6 +328,34 @@ work:
       + fast-lane regression (w4). joinorder_synthetic and the other registry-bearing
       benchmarks (per the corrected applicability sweep) are the next gates to wire.
 
+      GENERATOR SEEDING AUDIT (_project/analysis/gateable-generator-seeding-audit.md):
+      an unseeded generator makes any cross-surface gate flaky (as ClickBench was).
+      Audited every gateable benchmark's generator. Most are seeded (ssb, amplab,
+      h2odb, tpch_skew, tsbs_devops, clickbench) or RNG-free (coffeeshop static
+      seed-data, read_primitives). FIX: joinorder_synthetic used unseeded random
+      and is the next gate to wire - added random.seed(42) in its
+      _generate_data_local; verified its data tables are now byte-identical across
+      runs (the only residual file-byte diff is the manifest timestamp, which the
+      gate does not read). The five external/derived-data benchmarks (datavault,
+      flightdata, joinorder, nyctaxi, tpcds_obt) have no synthetic RNG; confirm
+      their bounded data source is stable when wiring each.
+
+      joinorder_synthetic: gate WIRED (build_joinorder_synthetic_duckdb, STAGED_GATES,
+      `make joinorder-synthetic-cross-surface-equivalence-report`; 13 queries x 2
+      backends). Wiring surfaced a SHARED DataFrame-loader bug: the production loader
+      applies column names from get_benchmark_schema_columns, but that extractor did
+      not understand joinorder_synthetic's schema shape (columns are raw DDL strings
+      like "id INTEGER PRIMARY KEY") -> returned no columns -> every table loaded
+      HEADERLESS, all 26 cells errored. Fixed schema_utils.py (column_name/
+      column_sql_type) to parse DDL-string columns - a general fix benefiting any
+      string-schema benchmark - dropping divergences 26 -> 10 (16 cells now pass;
+      791 dataframe/equivalence unit tests still pass). REMAINING 10 cells are
+      dtype-mismatch errors (loader applies column names but type-INFERS dtypes
+      instead of applying schema types: "expected String type" on 1a/1b/5a/8a/9a/10a;
+      "string vs numeric" on 4a/12a). Follow-up: apply schema column TYPES when
+      loading the DataFrame surface (types now available from column_sql_type). Detail:
+      _project/analysis/joinorder-synthetic-cross-surface-divergences.md.
+
   - id: w4
     summary: "Promote to bounded CI gates and add fast-lane regressions"
     needs: [w3]

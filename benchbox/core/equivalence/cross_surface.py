@@ -417,6 +417,51 @@ def build_coffeeshop_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfa
     )
 
 
+def build_joinorder_synthetic_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
+    """Generate synthetic Join Order data, load into DuckDB, and wire both surfaces.
+
+    Mirrors :func:`build_clickbench_duckdb`. The SQL surface and the
+    ``JOINORDER_DATAFRAME_QUERIES`` registry key by the same 13 ids (e.g. ``1a``,
+    ``2a``). The generator is seeded, so the bounded cell is reproducible.
+    """
+    import duckdb
+
+    from benchbox.core.joinorder_synthetic.benchmark import JoinOrderSyntheticBenchmark
+    from benchbox.core.joinorder_synthetic.dataframe_queries import JOINORDER_DATAFRAME_QUERIES
+    from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
+    from benchbox.platforms.duckdb import DuckDBAdapter
+
+    output_dir = Path(output_dir)
+    JoinOrderGenerator(scale_factor=scale_factor, output_dir=output_dir).generate_data()
+    benchmark = JoinOrderSyntheticBenchmark(scale_factor=scale_factor, output_dir=output_dir)
+
+    connection = duckdb.connect(":memory:")
+    try:
+        for statement in benchmark.get_create_tables_sql(dialect="duckdb").strip().split(";"):
+            if statement.strip():
+                connection.execute(statement.strip())
+        table_stats, _, _ = DuckDBAdapter(database=":memory:").load_data(benchmark, connection, output_dir)
+
+        # A silent empty/partial load would compare empty-vs-empty and report a
+        # FALSE green, so verify each table loaded.
+        stats_lower = {str(name).lower(): rows for name, rows in table_stats.items()}
+        empty = [name for name in benchmark.get_table_names() if stats_lower.get(name.lower(), 0) <= 0]
+        if empty:
+            raise RuntimeError(f"JoinOrder synthetic load failed - no rows in {empty} (stats={table_stats})")
+    except Exception:
+        connection.close()
+        raise
+
+    return CrossSurfaceData(
+        connection=connection,
+        query_ids=list(benchmark.get_queries().keys()),
+        reference_sql=lambda query_id: benchmark.get_query(query_id),
+        dataframe_query=lambda query_id: JOINORDER_DATAFRAME_QUERIES.get_or_raise(query_id),
+        benchmark=benchmark,
+        data_dir=output_dir,
+    )
+
+
 # Registry of ENFORCED gated benchmarks: clean, blocking cross-surface gates whose
 # DataFrame surface matches its SQL surface. The oracle coverage map reads this set
 # to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
@@ -434,6 +479,7 @@ GATES: dict[str, CrossSurfaceGate] = {
 # `make <name>-cross-surface-equivalence-report` to enumerate their divergences.
 STAGED_GATES: dict[str, CrossSurfaceGate] = {
     "clickbench": CrossSurfaceGate(name="clickbench", build=build_clickbench_duckdb),
+    "joinorder_synthetic": CrossSurfaceGate(name="joinorder_synthetic", build=build_joinorder_synthetic_duckdb),
 }
 
 

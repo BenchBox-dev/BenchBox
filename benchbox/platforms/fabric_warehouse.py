@@ -1094,12 +1094,18 @@ class FabricWarehouseAdapter(PlatformAdapter):
         """
         cursor = connection.cursor()
         try:
-            # Enable plan capture
             cursor.execute("SET SHOWPLAN_TEXT ON")
-            cursor.execute(query)
-            plan_rows = cursor.fetchall()
-            cursor.execute("SET SHOWPLAN_TEXT OFF")
-            return "\n".join([str(row[0]) for row in plan_rows])
+            try:
+                cursor.execute(query)
+                plan_rows = cursor.fetchall()
+                return "\n".join([str(row[0]) for row in plan_rows])
+            finally:
+                # Always turn SHOWPLAN off, even on failure, so subsequent
+                # benchmark statements execute normally rather than returning plans.
+                try:
+                    cursor.execute("SET SHOWPLAN_TEXT OFF")
+                except Exception:
+                    pass
         except Exception as e:
             return f"Failed to get query plan: {e}"
         finally:
