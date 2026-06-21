@@ -472,6 +472,11 @@ class ResultCaptureMixin:
         self.plan_capture_failures = 0
         self.plan_capture_errors: list[dict[str, Any]] = []
         self._plan_capture_iteration_counts: dict[str, int] = {}
+        # Isolated-phase recording buffer (see _execute_queries_by_type): cleared per
+        # run for symmetry with the other plan-capture state, so a prior run's
+        # recorded queries can never leak into the next.
+        self._plan_capture_phase_active = False
+        self._phase_recorded_queries: dict[str, str] = {}
         # The lock is created in PlatformAdapter.__init__; create it defensively
         # for hosts that reset stats without going through __init__ (e.g. tests
         # that mix in this class directly). Reset runs before any worker threads
@@ -979,6 +984,16 @@ class ResultCaptureMixin:
             query_id: Query identifier.
         """
         if not self.capture_plans or result.get("status") != "SUCCESS":
+            return
+        if getattr(self, "_plan_capture_phase_active", False):
+            # Isolated-phase mode: do NOT run EXPLAIN inline (that would interleave
+            # capture with the timed query). Record the executed query so the
+            # post-measurement phase captures it exactly once. Written from concurrent
+            # throughput streams, so guard the buffer with the shared lock.
+            recorded_id = result.get("query_id") or query_id
+            if recorded_id is not None:
+                with self._plan_capture_lock:
+                    self._phase_recorded_queries.setdefault(str(recorded_id), query)
             return
         query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
         if query_plan:

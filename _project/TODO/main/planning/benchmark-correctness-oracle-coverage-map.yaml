@@ -2,7 +2,7 @@ id: benchmark-correctness-oracle-coverage-map
 title: "Map correctness-oracle coverage across all benchmarks and close the unguarded ones"
 worktree: main
 priority: Medium
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
@@ -46,14 +46,20 @@ prior_art:
 work:
   - id: w0
     summary: "Build the authoritative correctness-oracle coverage matrix for every shipped benchmark"
-    status: pending
+    status: done
     notes: |
-      Enumerate benchmarks from the registry. For each, record: surfaces shipped
-      (SQL / DataFrame / both); has stored expected results?; has a live
-      equivalence gate?; is cross-surface applicable?; resulting current-oracle =
-      {expected-results | variant-equivalence | cross-surface | cross-engine |
-      NONE}. Land the matrix as a checked-in artifact (and ideally a generated
-      check), not a one-off doc, so it stays current.
+      Implemented `_project/scripts/generate_oracle_coverage_map.py` (per the
+      gating open_question default: GENERATED from live sources, not a curated
+      doc). It reads the benchmark registry (surfaces via `num_queries` /
+      `supports_dataframe`), the expected-results provider registry, the
+      cross-surface `GATES` registry, and TPC-Havoc gate-module presence, and
+      emits checked-in artifacts `_project/analysis/oracle-coverage-map.{md,json}`.
+
+      Current state (23 benchmarks): 4 GUARDED — tpch/tpcds (expected-results),
+      tpchavoc (variant-equivalence + cross-surface-variant), ssb (cross-surface)
+      — and 19 UNGUARDED. Of the 19: 17 are dual-surface (cross-surface gate
+      candidates, w1) and 2 are single-surface SQL-only (ai_primitives,
+      vector_search) needing a fallback oracle (w2).
 
   - id: w1
     summary: "Dispatch dual-surface, no-oracle benchmarks to the cross-surface gate"
@@ -63,6 +69,15 @@ work:
       For benchmarks the matrix shows as dual-surface with oracle=NONE, the fix is
       benchmark-cross-surface-equivalence-gate. Cross-reference rather than
       re-implement; this item only tracks that they get covered there.
+
+      Dispatch list from the w0 map (17 dual-surface UNGUARDED): amplab,
+      clickbench, coffeeshop, datavault, flightdata, h2odb, joinorder,
+      joinorder_synthetic, metadata_primitives, nyctaxi, read_primitives, tpcdi,
+      tpcds_obt, tpch_skew, transaction_primitives, tsbs_devops, write_primitives.
+      CAVEAT (see map): write/DML/nondeterministic ones (write_primitives,
+      transaction_primitives, metadata_primitives, tpcdi) may not be
+      result-comparable across surfaces and likely belong in w2 (invariant
+      oracle) rather than the cross-surface gate.
 
   - id: w2
     summary: "Choose and apply a fallback oracle for single-surface, no-oracle benchmarks"
@@ -80,12 +95,25 @@ work:
   - id: w3
     summary: "Make 'no oracle' visible and prevent silent regressions in coverage"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
-      Document the policy that every shipped benchmark declares a correctness
-      oracle, and add a lightweight check (advisory first) that lists benchmarks
-      with oracle=NONE so a newly-added benchmark without one is surfaced in CI
-      rather than discovered later.
+      Delivered ahead of w1/w2 (the visibility guard is independent of building
+      the oracles). `make oracle-coverage-map-check` (and the generator's
+      `--check`) fail when the checked-in map is stale. CI surfacing on develop
+      PRs is via TWO paths: the fast unit test
+      `tests/unit/test_oracle_coverage_map.py::test_checked_in_artifacts_are_current`
+      runs in the pr.yml `code-test` job (`-m fast`), and an explicit
+      `make oracle-coverage-map-check` step sits in the pr.yml `code-lint` job
+      next to `compat-docs-check`. It is also in the `ci-lint` aggregate
+      (post-merge / local `make pr-preflight` parity). Mechanism: adding a
+      benchmark changes the generated map -> the drift check fails -> the author
+      must regenerate and commit, which surfaces the new benchmark's UNGUARDED
+      classification in review rather than letting it slip in silently. The map's
+      UNGUARDED list is the always-current "no oracle" inventory. Advisory in the
+      sense that UNGUARDED is allowed-and-visible; only staleness is blocked.
+
+      w1/w2 (actually building oracles for the 19 UNGUARDED benchmarks) remain the
+      open campaign; the w0 map makes them dispatchable.
 
 deferred:
   - summary: "Backfill full expected-results answer keys for every benchmark"

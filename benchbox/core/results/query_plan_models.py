@@ -26,22 +26,19 @@ What the fingerprint deliberately EXCLUDES:
   - operator IDs and any other non-structural physical-operator properties
 
 Stability guarantees (what a stable fingerprint means):
-  - **Stats-independent — engine-dependent caveat.** The signature excludes the
-    dedicated cost / row-estimate fields (``estimated_cost``, ``estimated_rows``,
-    and the per-operator ``properties`` that hold cost/cardinality/timing). For a
-    plain table scan, and for engines whose EXPLAIN omits estimates from operator
-    detail (e.g. SQLite ``EXPLAIN QUERY PLAN``), a ``VACUUM``/``ANALYZE`` or other
-    statistics refresh that only changes row estimates does NOT change the
-    fingerprint. **However, this is not universal:** some platform parsers fold an
-    operator's raw EXPLAIN ``extra_info`` string into a signature-bearing field
-    (e.g. the DuckDB parser stores ``extra_info`` into ``join_conditions`` for
-    JOIN, ``aggregation_functions`` for AGGREGATE, ``filter_expressions`` for
-    FILTER, and ``sort_keys`` for SORT). On DuckDB that ``extra_info`` includes an
-    ``Estimated Cardinality``, so a JOIN/AGGREGATE/FILTER/SORT fingerprint CAN
-    change when cardinality estimates change (after a stats refresh, or simply at a
-    different table size). Treat full stats-independence as a property of
-    scan-shaped/leaf plans and of engines that keep estimates out of operator
-    detail — verify per engine before relying on it for non-trivial plans.
+  - **Stats-independent.** The signature excludes the dedicated cost / row-estimate
+    fields (``estimated_cost``, ``estimated_rows``, and the per-operator
+    ``properties`` that hold cost/cardinality/timing). A ``VACUUM``/``ANALYZE`` or
+    other statistics refresh that only changes row estimates does NOT change the
+    fingerprint. Parsers that fold an operator's raw EXPLAIN detail into a
+    signature-bearing field (e.g. the DuckDB FORMAT JSON ``extra_info`` dict, which
+    carries an ``Estimated Cardinality``) strip the cost/cardinality tokens before
+    the text reaches the hashed field, via the shared helpers in
+    ``benchbox/core/query_plans/parsers/base.py`` (``strip_estimates`` /
+    ``strip_estimate_keys``). A registry-wide invariant
+    (``tests/unit/query_plans/test_fingerprint_hygiene.py``) enforces that no
+    parser leaks estimate text into the signature, so this guarantee holds for
+    every registered engine rather than needing per-engine verification.
   - **Logical, not physical — with an engine-dependent caveat.** The signature is
     built from the *logical* operator tree, so the physical access method is
     generally NOT reflected: an index scan and a sequential scan of the same table
@@ -76,10 +73,34 @@ What fingerprint equality does NOT guarantee, and explicit non-guarantees:
   - **Equality does not imply equal performance** (costs/timing are excluded),
     and inequality does not imply a regression (it may be a benign shape change).
 
+Decision — the fingerprint is a PER-ENGINE within-version key (not cross-engine):
+  The raw fingerprint's intended and only supported purpose is per-engine,
+  within-version structural regression detection and within-run deduplication.
+  Cross-engine equality is explicitly OUT OF SCOPE for the raw fingerprint, because
+  engines emit different wrapper/exchange/codegen operators and harmonize operator
+  names differently (ClickHouse ``Expression`` -> Project, Presto ``Output`` ->
+  Project, Spark ``Exchange`` -> Other), so the same logical query legitimately
+  hashes differently on each engine. Forcing cross-engine equality onto the raw
+  fingerprint would require lossy normalization that would weaken its within-engine
+  regression signal.
+
+  When a cross-engine STRUCTURAL comparison is wanted, use the separate, opt-in
+  *comparable subset* projection in ``benchbox/core/query_plans/comparison.py``
+  (``structural_backbone_counts`` / ``comparable_subset_signature`` /
+  ``structural_backbones_match``). It reduces a harmonized DAG to its relational
+  backbone (base scans, joins, aggregates, set operations) by dropping
+  engine-variable wrapper nodes and collapsing partial+final / multi-stage runs of
+  the same operator, yielding a multiset that IS comparable across engines for the
+  same logical query. A cross-engine conformance corpus
+  (``tests/unit/query_plans/test_cross_engine_conformance.py``) asserts that
+  canonical queries meet declared backbone invariants on every engine while their
+  raw fingerprints remain distinct.
+
 Recommended use: stable for structural plan comparison and within-run
 deduplication on a single engine version. Suitable for "did the plan shape
 change?" regression detection when the engine version is held constant; not
-suitable as a cross-version or cross-engine equality key.
+suitable as a cross-version or cross-engine equality key — for cross-engine
+structural comparison use the comparable-subset projection above.
 """
 
 from __future__ import annotations

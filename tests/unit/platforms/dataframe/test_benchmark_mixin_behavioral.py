@@ -50,7 +50,7 @@ class StubAdapter(BenchmarkExecutionMixin):
     def create_context(self) -> SimpleNamespace:
         return SimpleNamespace()
 
-    def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None):
+    def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None, benchmark=None, **kwargs):
         self.loaded_tables[table_name] = file_paths
         return 10
 
@@ -92,7 +92,7 @@ class ExceptionQueryAdapter(StubAdapter):
 class FailingLoadAdapter(StubAdapter):
     """Adapter where load_table always raises."""
 
-    def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None):
+    def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None, benchmark=None, **kwargs):
         raise RuntimeError("disk read error")
 
 

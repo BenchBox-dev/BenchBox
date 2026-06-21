@@ -713,7 +713,13 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         """
         from benchbox.platforms.base.result_capture import is_dml_query
 
-        cursor = connection.cursor()
+        # In TPC-DS power/throughput streaming paths a per-stream cursor is passed as
+        # `connection` (see _make_stream_cursor / PlatformAdapterConnection); a real
+        # connection exposes a callable `.cursor()`, a cursor does not. Detect which we
+        # were given so cursor-backed streams capture plans instead of silently failing,
+        # and only close a cursor we created (never the caller's stream cursor).
+        _owns_cursor = callable(getattr(connection, "cursor", None))
+        cursor = connection.cursor() if _owns_cursor else connection
 
         # Use FORMAT JSON so PostgreSQLQueryPlanParser can parse the output.
         # ANALYZE and BUFFERS give actual timing and I/O info for SELECT queries,
@@ -733,7 +739,8 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         try:
             cursor.execute(explain_query)
             plan_rows = cursor.fetchall()
-            cursor.close()
+            if _owns_cursor:
+                cursor.close()
             # PostgreSQL returns the full JSON as the first column of the first row.
             # psycopg decodes FORMAT JSON output as a Python object; re-serialize
             # to a string so PostgreSQLQueryPlanParser.parse_explain_output() receives
@@ -744,7 +751,8 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             return raw
 
         except Exception as e:
-            cursor.close()
+            if _owns_cursor:
+                cursor.close()
             self.logger.debug(f"Failed to get query plan: {e}")
             return None
 

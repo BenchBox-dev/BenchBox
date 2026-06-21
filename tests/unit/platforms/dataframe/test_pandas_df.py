@@ -716,3 +716,74 @@ class TestPandasNotAvailable:
 
         # This just tests that the flag exists and is boolean
         assert isinstance(PANDAS_AVAILABLE, bool)
+
+
+class TestTypeAwareDateColumnInference:
+    """The CSV date heuristic must use schema types, not just column names.
+
+    Regression for SSB: ``lo_orderdate`` / ``lo_commitdate`` are INTEGER YYYYMMDD
+    datekeys whose names end in ``date``; the name-only heuristic tried to
+    date-parse them and crashed the pandas loader.
+    """
+
+    def test_numeric_date_named_column_is_not_a_date(self):
+        from benchbox.platforms.dataframe.pandas_df import _pandas_parse_date_columns
+
+        names = ["lo_orderkey", "lo_orderdate", "lo_commitdate", "lo_revenue"]
+        types = ["INTEGER", "INTEGER", "INTEGER", "INTEGER"]
+        date_cols, datetime_cols = _pandas_parse_date_columns(names, types)
+        assert date_cols == []
+        assert datetime_cols == []
+
+    def test_string_date_named_column_is_still_a_date(self):
+        from benchbox.platforms.dataframe.pandas_df import _pandas_parse_date_columns
+
+        # SSB d_date is VARCHAR; a real string date must still be parsed.
+        names = ["d_datekey", "d_date"]
+        types = ["INTEGER", "VARCHAR(18)"]
+        date_cols, _ = _pandas_parse_date_columns(names, types)
+        assert date_cols == ["d_date"]
+
+    def test_without_types_falls_back_to_name_heuristic(self):
+        from benchbox.platforms.dataframe.pandas_df import _pandas_parse_date_columns
+
+        # No types supplied -> unchanged legacy behavior (name-only).
+        names = ["o_orderdate", "o_custkey"]
+        date_cols, _ = _pandas_parse_date_columns(names, None)
+        assert date_cols == ["o_orderdate"]
+
+    def test_mismatched_types_length_is_ignored(self):
+        from benchbox.platforms.dataframe.pandas_df import _pandas_parse_date_columns
+
+        # A types list that does not align with names is ignored (safe fallback).
+        names = ["o_orderdate", "o_custkey"]
+        date_cols, _ = _pandas_parse_date_columns(names, ["INTEGER"])  # wrong length
+        assert date_cols == ["o_orderdate"]
+
+    def test_is_numeric_sql_type(self):
+        from benchbox.platforms.dataframe.pandas_df import _is_numeric_sql_type
+
+        assert _is_numeric_sql_type("INTEGER")
+        assert _is_numeric_sql_type("integer")
+        assert _is_numeric_sql_type("BIGINT")
+        assert _is_numeric_sql_type("DECIMAL(15,2)")
+        assert not _is_numeric_sql_type("VARCHAR(18)")
+        assert not _is_numeric_sql_type("DATE")
+        assert not _is_numeric_sql_type(None)
+
+    def test_read_csv_does_not_date_parse_integer_datekeys(self, tmp_path):
+        """End-to-end: read_csv with an integer datekey column must not crash or coerce."""
+        from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
+
+        csv = tmp_path / "lineorder.tbl"
+        csv.write_text("1|19920101|100\n2|19980815|200\n")
+        adapter = PandasDataFrameAdapter()
+        df = adapter.read_csv(
+            csv,
+            delimiter="|",
+            header=None,
+            names=["lo_orderkey", "lo_orderdate", "lo_revenue"],
+            column_types=["INTEGER", "INTEGER", "INTEGER"],
+        )
+        # lo_orderdate stays an integer datekey (not a date) and loads cleanly.
+        assert df["lo_orderdate"].tolist() == [19920101, 19980815]

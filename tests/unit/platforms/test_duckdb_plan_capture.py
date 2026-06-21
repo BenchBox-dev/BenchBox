@@ -556,6 +556,37 @@ class TestDuckDBFingerprintIntegration:
             "Adding an index is a physical change; the logical fingerprint must be stable"
         )
 
+    def test_fingerprint_stable_across_row_count_change(self, adapter):
+        """A GROUP BY fingerprint must not change with table size.
+
+        Regression test for the estimate leak: DuckDB's FORMAT JSON ``extra_info``
+        carries an ``Estimated Cardinality`` that previously folded into the
+        AGGREGATE/SCAN signature fields, so the same query hashed differently at
+        500 vs 5000 rows. The fingerprint must be stats-independent.
+        """
+        query = "SELECT grp, sum(amount) AS s FROM sized GROUP BY grp ORDER BY grp"
+
+        def fingerprint_for(row_count: int) -> str:
+            connection = adapter.create_connection()
+            try:
+                connection.execute("CREATE TABLE sized (id INTEGER, amount DOUBLE, grp INTEGER)")
+                connection.executemany(
+                    "INSERT INTO sized VALUES (?, ?, ?)",
+                    [(i, float(i), i % 5) for i in range(1, row_count)],
+                )
+                plan, _ = adapter.capture_query_plan(connection, query, f"grp_{row_count}")
+                assert plan is not None
+                return plan.plan_fingerprint
+            finally:
+                adapter.close_connection(connection)
+
+        small = fingerprint_for(500)
+        large = fingerprint_for(5000)
+        assert small == large, (
+            "GROUP BY fingerprint changed with row count; cardinality estimates must "
+            "not leak into the structural signature"
+        )
+
     def test_fingerprint_differs_for_logically_distinct_plans(self, adapter, conn):
         # A self-join adds a second table scan to the logical tree, so the
         # signature differs by construction (two Scan nodes vs one), independent of

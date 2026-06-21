@@ -1,0 +1,289 @@
+{
+  "benchmarks": [
+    {
+      "benchmark": "ai_primitives",
+      "cross_surface_applicable": false,
+      "dual_surface": false,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql"
+      ]
+    },
+    {
+      "benchmark": "amplab",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "clickbench",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "coffeeshop",
+      "cross_surface_applicable": false,
+      "dual_surface": true,
+      "guarded": true,
+      "oracles": [
+        "cross-surface"
+      ],
+      "primary_oracle": "cross-surface",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "datavault",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "flightdata",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "h2odb",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "joinorder",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "joinorder_synthetic",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "metadata_primitives",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "nyctaxi",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "read_primitives",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "ssb",
+      "cross_surface_applicable": false,
+      "dual_surface": true,
+      "guarded": true,
+      "oracles": [
+        "cross-surface"
+      ],
+      "primary_oracle": "cross-surface",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "tpcdi",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "tpcds",
+      "cross_surface_applicable": false,
+      "dual_surface": true,
+      "guarded": true,
+      "oracles": [
+        "expected-results"
+      ],
+      "primary_oracle": "expected-results",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "tpcds_obt",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "tpch",
+      "cross_surface_applicable": false,
+      "dual_surface": true,
+      "guarded": true,
+      "oracles": [
+        "expected-results"
+      ],
+      "primary_oracle": "expected-results",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "tpch_skew",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "tpchavoc",
+      "cross_surface_applicable": false,
+      "dual_surface": true,
+      "guarded": true,
+      "oracles": [
+        "variant-equivalence",
+        "cross-surface-variant"
+      ],
+      "primary_oracle": "variant-equivalence",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "transaction_primitives",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "tsbs_devops",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    },
+    {
+      "benchmark": "vector_search",
+      "cross_surface_applicable": false,
+      "dual_surface": false,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql"
+      ]
+    },
+    {
+      "benchmark": "write_primitives",
+      "cross_surface_applicable": true,
+      "dual_surface": true,
+      "guarded": false,
+      "oracles": [],
+      "primary_oracle": "NONE",
+      "surfaces": [
+        "sql",
+        "dataframe"
+      ]
+    }
+  ]
+}

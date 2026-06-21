@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import hashlib
+import math
 from typing import Any, Optional, Union
 
 
@@ -186,7 +187,31 @@ class ResultValidator:
         return val1 == val2
 
     def _numeric_values_equal(self, val1: Union[int, float], val2: Union[int, float]) -> bool:
-        """Check if two numeric values are equal within tolerance."""
+        """Check if two numeric values are equal within tolerance.
+
+        Normalizes "missing" operands first: SQL ``NULL`` arrives as ``None`` from
+        most engines but as ``float('nan')`` from ClickHouse's Arrow/pandas decode.
+        Two missing values compare equal and a missing-vs-present pair does not, so
+        a both-NULL aggregate is not reported as a spurious divergence and a
+        NULL-vs-number stays a real one (this also keeps ``float(...)`` below from
+        ever seeing ``None``/``NaN``).
+
+        Then coerces both operands to ``float`` so a mixed-type comparison (e.g. a
+        ``decimal.Decimal`` from one engine vs a ``float`` from another) is compared
+        on a common type rather than raising ``TypeError`` on the ``val1 - val2``
+        below. ClickHouse, for instance, returns ``Decimal`` for a
+        ``SUM(decimal)/COUNT`` average where canonical ``AVG`` returns ``Float64``;
+        without coercion the comparator would crash instead of reporting a clean
+        match or mismatch. This is engine-agnostic robustness, not an engine-specific
+        path.
+        """
+        val1_missing = val1 is None or (isinstance(val1, float) and math.isnan(val1))
+        val2_missing = val2 is None or (isinstance(val2, float) and math.isnan(val2))
+        if val1_missing or val2_missing:
+            return val1_missing and val2_missing
+
+        val1 = float(val1)
+        val2 = float(val2)
         if val1 == val2:
             return True
 

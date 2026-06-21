@@ -66,7 +66,11 @@ import logging
 import re
 from typing import Any
 
-from benchbox.core.query_plans.parsers.base import QueryPlanParser
+from benchbox.core.query_plans.parsers.base import (
+    QueryPlanParser,
+    strip_estimate_keys,
+    strip_estimates,
+)
 from benchbox.core.results.query_plan_models import (
     LogicalOperator,
     LogicalOperatorType,
@@ -263,8 +267,17 @@ class DuckDBQueryPlanParser(QueryPlanParser):
         # Extract operator-specific information
         kwargs: dict[str, Any] = {}
         raw_extra = node.get("extra_info", "")
-        # DuckDB returns extra_info as a dict in FORMAT JSON responses; normalise to string
-        extra_info = raw_extra if isinstance(raw_extra, str) else json.dumps(raw_extra)
+        # DuckDB returns extra_info as a dict in FORMAT JSON responses; normalise to string.
+        # `extra_info` keeps the raw detail (incl. estimates) for platform_metadata / table
+        # extraction; `logical_extra` is the estimate-stripped form for signature-bearing
+        # fields so the fingerprint stays stats-independent (see strip_estimates docstring).
+        if isinstance(raw_extra, dict):
+            extra_info = json.dumps(raw_extra)
+            stripped_extra = strip_estimate_keys(raw_extra)
+            logical_extra = json.dumps(stripped_extra) if stripped_extra else ""
+        else:
+            extra_info = raw_extra
+            logical_extra = strip_estimates(raw_extra)
 
         if operator_type == LogicalOperatorType.SCAN:
             # Try to extract table name from extra_info
@@ -273,21 +286,21 @@ class DuckDBQueryPlanParser(QueryPlanParser):
                 kwargs["table_name"] = table_name
 
         elif operator_type == LogicalOperatorType.FILTER:
-            if extra_info:
-                kwargs["filter_expressions"] = [extra_info]
+            if logical_extra:
+                kwargs["filter_expressions"] = [logical_extra]
 
         elif operator_type == LogicalOperatorType.JOIN:
             kwargs["join_type"] = self._extract_join_type_from_operator(operator_name)
-            if extra_info:
-                kwargs["join_conditions"] = [extra_info]
+            if logical_extra:
+                kwargs["join_conditions"] = [logical_extra]
 
         elif operator_type == LogicalOperatorType.AGGREGATE:
-            if extra_info:
-                kwargs["aggregation_functions"] = [extra_info]
+            if logical_extra:
+                kwargs["aggregation_functions"] = [logical_extra]
 
         elif operator_type == LogicalOperatorType.SORT:
-            if extra_info:
-                kwargs["sort_keys"] = [{"expr": extra_info, "direction": "ASC"}]
+            if logical_extra:
+                kwargs["sort_keys"] = [{"expr": logical_extra, "direction": "ASC"}]
 
         # Create physical operator with DuckDB-specific details.
         # EXPLAIN (ANALYZE, FORMAT JSON) uses operator_timing/operator_cardinality;

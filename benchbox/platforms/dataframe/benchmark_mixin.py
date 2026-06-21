@@ -189,8 +189,18 @@ class BenchmarkExecutionMixin:
         table_name: str,
         file_paths: list[Path],
         column_names: list[str] | None = None,
+        delimiter: str | None = None,
+        format_hint: str | None = None,
+        *,
+        data_source: Any | None = None,
+        benchmark: Any | None = None,
     ) -> int:
-        """Load a table into context."""
+        """Load a table into context.
+
+        ``benchmark`` (when provided) lets adapters consult the schema's column
+        types - e.g. to avoid date-parsing an integer datekey column named like a
+        date.
+        """
 
     @abstractmethod
     def execute_query(
@@ -407,6 +417,45 @@ class BenchmarkExecutionMixin:
             builder.mark_completed()
             return builder.build()
 
+    def load_benchmark_into_context(
+        self,
+        benchmark: Any,
+        data_dir: Path,
+        *,
+        scale_factor: float | None = None,
+        options: DataFrameRunOptions | None = None,
+    ) -> Any:
+        """Create a context and load a benchmark's data into it, then return it.
+
+        This uses the exact production data path :meth:`run_benchmark` uses
+        (``_extract_benchmark_config`` + ``_load_data_phase``) but stops short of
+        executing any query. It is for callers that need a production-faithful
+        DataFrame context yet drive query execution themselves - e.g. the
+        cross-surface SQL<->DataFrame equivalence gates, which must compare each
+        backend's real loaded dtypes against the SQL reference.
+
+        Only benchmarks whose data loads in a discrete phase are supported. A
+        benchmark that manages its own loading (``skip_dataframe_data_loading()``,
+        e.g. write/transaction-style benchmarks) interleaves loading with its
+        ``execute_dataframe_workload`` and has no standalone preloaded context, so
+        :meth:`run_benchmark` skips ``_load_data_phase`` for it; calling the
+        generic loader here would fail or preload a wrong context. Raise loudly
+        instead of returning a silently-empty one.
+        """
+        if _benchmark_manages_dataframe_loading(benchmark):
+            raise ValueError(
+                f"{type(benchmark).__name__} manages its own DataFrame loading "
+                "(skip_dataframe_data_loading); load_benchmark_into_context loads data in a "
+                "discrete phase and does not apply - drive such a benchmark through run_benchmark."
+            )
+        ctx = self.create_context()
+        run_config: dict[str, Any] = {}
+        if scale_factor is not None:
+            run_config["scale_factor"] = scale_factor
+        config = self._extract_benchmark_config(benchmark, run_config)
+        self._load_data_phase(ctx, config, benchmark, Path(data_dir), options or DataFrameRunOptions())
+        return ctx
+
     def _extract_benchmark_config(self, benchmark: Any, run_config: dict[str, Any]) -> BenchmarkConfig:
         """Extract BenchmarkConfig from benchmark instance or run_config."""
         # Check if benchmark has config attribute
@@ -582,8 +631,13 @@ class BenchmarkExecutionMixin:
         data_paths: dict[str, Path | list[Path]],
         column_names_map: dict[str, list[str]],
         csv_delimiter: str | None,
+        benchmark: Any | None = None,
     ) -> tuple[dict[str, int], dict[str, TableLoadingStats]]:
         """Load all tables into the execution context.
+
+        ``benchmark`` (when provided) is passed through to ``load_table`` so
+        adapters can consult the schema's column types - e.g. to avoid parsing an
+        integer datekey column named like a date as a date.
 
         Returns:
             Tuple of (table_stats, per_table_loading_stats)
@@ -600,7 +654,12 @@ class BenchmarkExecutionMixin:
                 column_names = column_names_map.get(table_name.lower())
                 file_paths = [file_path] if not isinstance(file_path, list) else file_path
                 row_count = self.load_table(
-                    ctx, table_name.lower(), file_paths, column_names=column_names, delimiter=csv_delimiter
+                    ctx,
+                    table_name.lower(),
+                    file_paths,
+                    column_names=column_names,
+                    delimiter=csv_delimiter,
+                    benchmark=benchmark,
                 )
                 load_time_ms = int((elapsed_seconds(load_start)) * 1000)
 
@@ -703,7 +762,9 @@ class BenchmarkExecutionMixin:
         column_names_map, csv_delimiter = self._resolve_column_names_and_delimiter(benchmark_config, benchmark_instance)
 
         # Load tables into context
-        return self._load_tables_into_context(ctx, data_paths, column_names_map, csv_delimiter)
+        return self._load_tables_into_context(
+            ctx, data_paths, column_names_map, csv_delimiter, benchmark=benchmark_instance
+        )
 
     def _execute_queries_phase(
         self,

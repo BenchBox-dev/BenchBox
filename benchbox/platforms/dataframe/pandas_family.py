@@ -60,6 +60,38 @@ logger = logging.getLogger(__name__)
 DF = TypeVar("DF")  # DataFrame type (e.g., pd.DataFrame)
 
 
+def _schema_column_types(
+    benchmark: Any,
+    table_name: str,
+    column_names: list[str] | None,
+) -> list[str | None] | None:
+    """Return the SQL types parallel to ``column_names`` from the benchmark schema.
+
+    Returns ``None`` (so the caller falls back to name-only heuristics) when the
+    benchmark, its schema, or this table's columns are unavailable. Per-column
+    entries are ``None`` when a type is unknown; only columns with a known
+    numeric type are excluded from date parsing downstream.
+    """
+    if benchmark is None or not column_names:
+        return None
+    try:
+        from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
+
+        schema = get_benchmark_schema_columns(benchmark)
+    except Exception:  # noqa: BLE001 - a schema lookup must never break data loading
+        return None
+    if not schema:
+        return None
+    columns = schema.get(table_name)
+    if columns is None:
+        lowered = {key.lower(): value for key, value in schema.items()}
+        columns = lowered.get(table_name.lower())
+    if not columns:
+        return None
+    type_by_name = {column.get("name", "").lower(): column.get("type") for column in columns}
+    return [type_by_name.get(name.lower()) for name in column_names]
+
+
 class PandasFamilyContext(DataFrameContextImpl[DF], Generic[DF]):
     """Context implementation for Pandas-family adapters.
 
@@ -527,6 +559,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         header: int | None = 0,
         names: list[str] | None = None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,
     ) -> DF:
         """Read a CSV file into a DataFrame.
 
@@ -536,6 +569,8 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             header: Row to use as header (None for no header)
             names: Column names (if header is None)
             null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
+            column_types: Optional SQL types parallel to ``names``, used to keep
+                numeric columns named like dates from being parsed as dates.
 
         Returns:
             DataFrame with the file contents
@@ -1041,22 +1076,44 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         else:
             # CSV or TBL
             actual_delimiter = delimiter if delimiter is not None else ("|" if format_type == "tbl" else ",")
-            has_header = format_type == "csv"
 
-            # Resolve null_marker for trailing-delimiter probing via the resolver when a
+            # Resolve the CSV dialect (has_header + null_marker) via the resolver when a
             # DataSource is available (manifest path).  Without one, derive from format_type
             # so .tbl files (format_type=="tbl") keep their existing trailing-delimiter behaviour.
             # When benchmark=None, NO_BENCHMARK is used: path (a) wins when table_metadata is
             # present; otherwise path (c) of resolve_csv_dialect derives null_marker from the
             # file extension (.tbl/.dat → "", everything else → None), which is correct.
+            #
+            # has_header MUST come from the dialect, not the file extension: the SQL loaders
+            # (e.g. DuckDB) honor csv_has_header and default to headerless, so assuming every
+            # .csv carries a header here silently drops the first data row of headerless .csv
+            # benchmarks (e.g. CoffeeShop), diverging the DataFrame surface from SQL.
             if data_source is not None:
                 from benchbox.platforms.base.data_loading import NO_BENCHMARK, resolve_csv_dialect
 
                 bm = benchmark if benchmark is not None else NO_BENCHMARK
                 _dialect = resolve_csv_dialect(data_source, table_name, first_file, bm)
                 null_marker: str | None = _dialect.null_marker
-            else:
+                has_header = _dialect.has_header
+            elif benchmark is not None:
                 null_marker = "" if format_type == "tbl" else None
+                # No DataSource, but a known benchmark (e.g. the cross-surface gate loads
+                # straight from a benchmark instance): honor its declared csv_has_header,
+                # defaulting to headerless - matching resolve_csv_dialect's default and
+                # DuckDB's header=false - rather than assuming every .csv has a header,
+                # which silently drops the first data row of headerless benchmark .csv.
+                bench_header = getattr(benchmark, "csv_has_header", None)
+                has_header = bool(bench_header) if bench_header is not None else False
+            else:
+                # Ad-hoc load with no benchmark/DataSource: keep the file-extension
+                # heuristic that treats a bare .csv as headered.
+                null_marker = "" if format_type == "tbl" else None
+                has_header = format_type == "csv"
+
+            # Pull this table's declared SQL types (parallel to column_names) from
+            # the benchmark schema so numeric columns named like dates (e.g. SSB's
+            # INTEGER lo_orderdate datekeys) are not mis-parsed as dates.
+            column_types = _schema_column_types(benchmark, table_name, column_names)
 
             df = self._load_csv_files(
                 file_paths,
@@ -1064,6 +1121,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
                 has_header=has_header,
                 column_names=column_names,
                 null_marker=null_marker,
+                column_types=column_types,
             )
 
         # Register table
@@ -1319,6 +1377,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         has_header: bool,
         column_names: list[str] | None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,
     ) -> DF:
         """Load CSV/TBL files.
 
@@ -1328,6 +1387,8 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             has_header: Whether files have headers
             column_names: Optional column names
             null_marker: Passed through to read_csv for trailing-delimiter probing.
+            column_types: Optional SQL types parallel to ``column_names``, passed
+                through so numeric columns named like dates are not date-parsed.
 
         Returns:
             Combined DataFrame
@@ -1344,6 +1405,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
                 header=header,
                 names=names,
                 null_marker=null_marker,
+                column_types=column_types,
             )
 
         # Multiple files - load and concatenate
@@ -1354,6 +1416,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
                 header=header,
                 names=names,
                 null_marker=null_marker,
+                column_types=column_types,
             )
             for f in file_paths
         ]

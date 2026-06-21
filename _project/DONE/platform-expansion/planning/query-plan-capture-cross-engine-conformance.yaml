@@ -2,8 +2,31 @@ id: query-plan-capture-cross-engine-conformance
 title: "Define a cross-engine plan-DAG conformance corpus and decide whether fingerprints are comparable across engines"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: Completed
 category: Platform Expansion
+
+resolution: |
+  w1 (decision): documented in query_plan_models.py that the raw plan_fingerprint
+  is a PER-ENGINE within-version key and is explicitly NOT cross-engine comparable
+  (engines emit different wrapper/exchange/codegen operators and harmonize names
+  differently), per the gating open_question default. Cross-engine STRUCTURAL
+  comparison is provided as a separate, opt-in projection rather than by forcing
+  equality onto the raw fingerprint.
+  w2 (corpus): tests/unit/query_plans/test_cross_engine_conformance.py defines a
+  golden corpus over the recorded EXPLAIN fixtures (no live engines) for the
+  canonical "aggregate over a join of two base tables" shape. It asserts that all
+  ten engines (clickhouse/trino/presto/spark/snowflake/databend/doris/singlestore/
+  firebolt/duckdb) meet the declared backbone invariant (exactly 2 base scans, 1
+  join, 1 aggregate), that the comparable-subset signature is identical across
+  engines, and that the raw per-engine fingerprints remain distinct.
+  w3 (comparable subset): comparison.py gains structural_backbone_counts(),
+  comparable_subset_signature() and structural_backbones_match(). They drop
+  engine-variable wrapper nodes (Project/Filter/CTE/Subquery/Other) and collapse a
+  parent->child run of a MULTI-STAGE operator (aggregate/sort, e.g. partial+final
+  aggregate or merge sort) to one node, while counting joins/scans per node so
+  left-deep multi-table joins are not undercounted. Kept entirely separate from the
+  raw fingerprint, which is unchanged. Verified: pytest tests/unit/query_plans -k
+  conformance -> 23 passing; full query_plans suites green.
 
 description: |
   Operator-name harmonization was decided ad hoc in each parser with no shared conformance
@@ -32,7 +55,7 @@ prior_art:
 work:
   - id: w1
     summary: "Decide the fingerprint's purpose: per-engine regression vs cross-engine comparison (or both)"
-    status: pending
+    status: done
     notes: |
       Document the intended use in query_plan_models.py. This gates everything: if cross-engine
       comparison is out of scope, close w2/w3 as not-needed and instead document that fingerprints
@@ -40,7 +63,7 @@ work:
   - id: w2
     summary: "Build a cross-engine conformance corpus of canonical queries with expected DAG invariants"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       For a small set of canonical queries (e.g. TPC-H Q1/Q3/Q5), record expected counts/shape of
       the harmonized DAG (number of JOINs, base SCANs, AGGREGATEs) that every engine must satisfy.
@@ -49,7 +72,7 @@ work:
   - id: w3
     summary: "Add a 'comparable subset' projection so wrapper noise does not break cross-engine equality"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       If cross-engine comparison is wanted, add a normalization that drops OTHER/exchange/codegen
       wrapper nodes before comparison, so the structural backbone (scans, joins, aggregates, sorts)

@@ -2,7 +2,7 @@ id: correlated-subquery-self-binding-cross-surface-audit
 title: "Audit DataFrame variants and other benchmarks for correlated-subquery self-binding, and add a durable detector"
 worktree: main
 priority: Medium
-status: Under Review
+status: Completed
 category: Testing and Quality Assurance
 
 description: |

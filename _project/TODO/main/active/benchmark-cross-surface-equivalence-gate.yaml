@@ -74,8 +74,13 @@ work:
   - id: w1
     summary: "Inventory dual-surface benchmarks and confirm SQL<->DataFrame query-id correspondence"
     needs: [w0]
-    status: done
+    status: in_progress
     notes: |
+      NOT YET COMPLETE — kept open so downstream work units that `needs: [w1]` are not
+      unblocked with unverified query mappings: nyctaxi and tsbs still need independent
+      mapping verification, and clickbench's SQL id set / construction is unconfirmed.
+      Flip to done only once those three are verified.
+
       For each benchmark with both surfaces, confirm the SQL and DataFrame query
       sets cover the same logical queries (matching ids/keys) and can run on a
       shared DuckDB cell. Record which are in scope, which are single-surface
@@ -133,8 +138,18 @@ work:
   - id: w5
     summary: "Build a production-faithful DataFrame-context substrate for the gate (reuse the real loader)"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
+      DONE. Added build_production_contexts() in core/equivalence/cross_surface.py:
+      per backend it instantiates the real adapter and calls the new public
+      BenchmarkExecutionMixin.load_benchmark_into_context() - the exact data path
+      run_benchmark uses (_extract_benchmark_config + _load_data_phase, prefer_parquet
+      default), stopping short of query execution. CrossSurfaceData now carries the
+      benchmark instance + data_dir (not table_specs); the DuckDB SQL reference and
+      both DataFrame backends read the SAME generated files. The comparator and the
+      DuckDB SQL-reference builder are unchanged. (No new fork of the loader: the
+      gate calls the production mixin.) Original plan below.
+
       Replace the gate's bespoke DuckDB->Arrow context-build
       (build_dataframe_contexts_from_specs) with one that loads each backend's
       DataFrame context via the REAL production loader, so the gate exercises the
@@ -156,8 +171,20 @@ work:
   - id: w6
     summary: "Fix production-loader correctness bugs surfaced by real benchmarks (now in-scope: benchbox/platforms/dataframe/)"
     needs: [w5]
-    status: pending
+    status: done
     notes: |
+      DONE (#821). Made the Pandas loader's date-column inference TYPE-AWARE:
+      _pandas_parse_date_columns now takes the schema column types and never
+      treats a numeric-typed column as a date even if its name ends in date/time,
+      so SSB's INTEGER lo_orderdate/lo_commitdate load as integers (real string
+      dates like d_date VARCHAR still parse). Behavior is unchanged when types are
+      absent. Threaded benchmark -> load_table -> _load_csv_files -> read_csv ->
+      _pandas_parse_date_columns; abstract load_table signature made honest. SSB
+      now loads via the production loader (gate 26/26). Routing coffeeshop through
+      the real loader surfaced GENUINE divergences (date32-vs-string impl bugs,
+      value mismatches, a KeyError) - logged for w2/w3 burndown, NOT masked.
+      Original plan + diagnosis below.
+
       Driving the real loader over real benchmark data exposes loader defects the
       gate must not paper over. Known, reproduced:
         * Pandas adapter date heuristic: _pandas_parse_date_columns
@@ -178,8 +205,18 @@ work:
   - id: w7
     summary: "Re-base the SSB gate (and the shared harness) onto the production-loader substrate; re-verify"
     needs: [w5, w6]
-    status: pending
+    status: done
     notes: |
+      DONE. The SSB gate + its fast-lane test now build DataFrame contexts via
+      build_production_contexts (w5); re-verified 26/26, 0 divergent at SF=0.1 and
+      re-proved the planted-defect failure (corrupting Q1.1's expression impl
+      flags exactly Q1.1_expression, no collateral) on the new substrate. The
+      tpchavoc DataFrame gate is LEFT on its DuckDB->Arrow path (it is a
+      variant-vs-canonical gate, not cross-surface) and re-confirmed green. The
+      DuckDB->Arrow builder (build_dataframe_contexts_from_specs) remains in
+      dataframe_surface for tpchavoc; only the cross-surface gate moved. Original
+      plan below.
+
       Switch the merged SSB gate (#815) from DuckDB->Arrow to the w5 substrate and
       re-verify it stays green (26/26) under production dtypes; this is the
       reference example every later benchmark follows. Re-confirm the TPC-Havoc
@@ -204,6 +241,37 @@ work:
       clean but is re-confirmed there. Remaining ungated benchmarks are reported on
       the production substrate as each gate is built (now needs w5/w6/w7).
 
+      APPLICABILITY SWEEP: a reproducible sweep
+      (_project/scripts/cross_surface_applicability_sweep.py ->
+      _project/analysis/cross-surface-applicability.md, locked by
+      tests/unit/test_cross_surface_applicability.py) classifies the dual-surface
+      UNGUARDED benchmarks by whether they ship a DataFrame query `QueryRegistry`
+      (the registry the cross-surface gate builders consume directly) - the
+      authoritative gate-applicability signal. `supports_dataframe` over-counts
+      (it is a LOADING flag); the production query *resolver* under-counts (it
+      misses per-benchmark `<BENCH>_DATAFRAME_QUERIES` registries - e.g. it
+      returned 0 for coffeeshop, which #842 nonetheless gated). Registry detection
+      fixes both.
+
+      RESULT (16 unguarded candidates; coffeeshop already gated/excluded):
+        - GATEABLE, ids overlap as-is (6): clickbench, flightdata, h2odb,
+          joinorder, joinorder_synthetic, read_primitives (152/157 ids).
+        - GATEABLE, needs id normalization first (6): amplab, datavault, nyctaxi,
+          tpch_skew, tsbs_devops (ids Q-prefixed/friendly vs SQL ids), tpcds_obt
+          (only 3 DF queries vs 89 SQL - partial).
+        - w2 FALLBACK, NO DataFrame query registry (4): metadata_primitives,
+          tpcdi, transaction_primitives, write_primitives. Only these four need a
+          differential second-engine or curated expected-results oracle.
+      So the cross-surface gate burn-down is ~12 benchmarks, not 2 (the earlier
+      resolver-based "only 2" was wrong).
+
+      CAVEAT proven during the sweep: a GENERIC build is not load-faithful (it
+      loads DataFrame contexts without the schema/headers the production loader
+      applies, yielding spurious "column not found" divergences), so enumerating
+      REAL divergence counts requires a load-faithful per-benchmark builder like
+      build_ssb_duckdb. That builder work is w3 (clickbench done; the other 11
+      gateable benchmarks next, normalizing ids where the sweep flags it).
+
   - id: w3
     summary: "Burn down divergences (fix the wrong surface) or declare intentional ones"
     needs: [w2]
@@ -216,6 +284,29 @@ work:
       TPC-Havoc baseline discipline (default: empty baseline, every query matches).
 
       IN PROGRESS. ssb: no burndown required (0 divergences); baseline empty.
+
+      clickbench: load-faithful gate WIRED (build_clickbench_duckdb), STAGED_GATES
+      (NOT GATES), runnable via `make clickbench-cross-surface-equivalence-report`.
+
+      BURN-DOWN PROGRESS (full detail:
+      _project/analysis/clickbench-cross-surface-divergences.md):
+        - DETERMINISM FIX (prerequisite): the ClickBench generator was UNSEEDED, so
+          every run produced different data and top-N/tie-sensitive cells flipped
+          divergence run-to-run (the gate was flaky). Added random.seed(42) in
+          _generate_data_local (mirrors SSBDataGenerator); the gate is now
+          deterministic (verified: two runs report the identical divergence set).
+        - ALL 10 engine/error-category cells FIXED: added UnifiedStrExpr.replace
+          (Q29) and UnifiedLazyFrame.slice (Q39-42) to the shared abstraction;
+          compared EventDate to native date literals not strings (Q37-43); pandas
+          `<> ''` filters now exclude NULL via .notna() to match SQL/Polars
+          (Q25/27). 1129 dataframe/clickbench unit tests still pass.
+        - REMAINING: 27 stable value-divergence cells across 14 queries (identical across 3 runs) (Q6, Q9,
+          Q10, Q15-19, Q24, Q31-33, Q36, Q38) - per-query triage: empty-vs-None
+          null materialization (Q17/Q24), large aggregate diffs (Q16/18/32/33/36 -
+          dropped predicate/DISTINCT), and top-N tie-break ordering (Q9/10/38/15/31).
+      Once those 26 are clean, promote STAGED_GATES->GATES + a blocking pr.yml step
+      + fast-lane regression (w4). joinorder_synthetic and the other registry-bearing
+      benchmarks (per the corrected applicability sweep) are the next gates to wire.
 
   - id: w4
     summary: "Promote to bounded CI gates and add fast-lane regressions"
