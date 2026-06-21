@@ -164,19 +164,23 @@ def test_reference_failure_records_one_cell_and_skips_candidates():
     assert "no such table" in divergences[0].detail
 
 
-def test_clickbench_is_staged_not_enforced():
-    """ClickBench is wired as a STAGED gate (report mode) but NOT an enforced GATES entry.
+def test_clickbench_and_joinorder_are_enforced_gates():
+    """ClickBench and joinorder_synthetic are promoted to enforced GATES (w4).
 
-    It still has open SQL<->DataFrame divergences (see
-    _project/analysis/clickbench-cross-surface-divergences.md), so it must stay out
-    of GATES - the oracle coverage map reads GATES to mark a benchmark "guarded",
-    and registering a red gate there would be coverage theater. `get_gate` must
-    still resolve it for report-mode runs.
+    Once the two cross-cutting prerequisites landed - w9 (loader applies schema
+    column TYPES + DuckDB empty-string semantics) and w8 (tie-aware comparator) -
+    both staged gates went clean and graduated from STAGED_GATES to GATES, so the
+    oracle coverage map marks them cross-surface "guarded". ClickBench's only
+    baseline entry is the genuinely order-less Q18.
     """
     from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES, get_gate
 
-    assert "clickbench" in STAGED_GATES
-    assert "clickbench" not in GATES
+    assert "clickbench" in GATES
+    assert "joinorder_synthetic" in GATES
+    assert "clickbench" not in STAGED_GATES
     assert get_gate("clickbench").name == "clickbench"
+    assert set(GATES["clickbench"].known_divergences) == {"Q18_expression", "Q18_pandas"}
+    # joinorder_synthetic is clean (empty baseline).
+    assert GATES["joinorder_synthetic"].known_divergences == {}
     # ssb stays the enforced precedent.
     assert "ssb" in GATES

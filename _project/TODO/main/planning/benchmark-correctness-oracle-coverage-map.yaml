@@ -80,13 +80,16 @@ work:
       oracle) rather than the cross-surface gate.
 
       STATUS SYNC (2026-06-21) from benchmark-cross-surface-equivalence-gate: ssb,
-      amplab (#835, PR open), coffeeshop are GATED; clickbench and joinorder_synthetic
-      are WIRED in report mode (STAGED_GATES) and promote to enforced GATES once that
-      campaign's w8 (tie-aware top-N comparator) and w9 (loader dtype-from-schema)
-      land. Remaining dual-surface dispatch targets: datavault, flightdata, h2odb,
-      joinorder (SF=1-only - use joinorder_synthetic), nyctaxi, read_primitives,
-      tpcds_obt, tpch_skew, tsbs_devops (several need id normalization first). This
-      item only tracks coverage; the gates themselves are owned there.
+      amplab, coffeeshop are GATED, and clickbench + joinorder_synthetic are now
+      PROMOTED to enforced GATES (campaign w4) - their prerequisites landed (w9
+      loader dtype/empty-string semantics, w8 tie-aware top-N comparator), both run
+      as blocking pr.yml steps with medium-marker fast-lane tests, and the oracle
+      coverage map (regenerated here) shows both as cross-surface "guarded". So 5
+      dual-surface benchmarks are guarded. Remaining dual-surface dispatch targets
+      (one focused gate PR each, several need id normalization or a bounded
+      data-source check first): datavault, flightdata, h2odb, joinorder (SF=1-only -
+      use joinorder_synthetic), nyctaxi, read_primitives, tpcds_obt, tpch_skew,
+      tsbs_devops. This item only tracks coverage; the gates themselves are owned there.
 
   - id: w2
     summary: "Choose and apply a fallback oracle for single-surface, no-oracle benchmarks"

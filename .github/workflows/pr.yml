@@ -407,6 +407,12 @@ jobs:
       - name: Run CoffeeShop cross-surface SQL<->DataFrame equivalence gate
         run: make coffeeshop-cross-surface-equivalence-report
 
+      - name: Run ClickBench cross-surface SQL<->DataFrame equivalence gate
+        run: make clickbench-cross-surface-equivalence-report
+
+      - name: Run JoinOrder-synthetic cross-surface SQL<->DataFrame equivalence gate
+        run: make joinorder-synthetic-cross-surface-equivalence-report
+
   postgres-integration:
     name: postgres-integration
     needs: ci-paths
