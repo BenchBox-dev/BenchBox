@@ -55,19 +55,27 @@ class TestPostgreSQLPlanCapture:
         assert result is None
 
     def test_get_query_plan_accepts_cursor_backed_stream(self, adapter):
-        """A per-stream cursor (no callable .cursor()) is used directly, so streamed
-        TPC-DS power/throughput runs still capture plans instead of silently failing."""
+        """A per-stream cursor (no callable .cursor()) still captures plans, but EXPLAIN
+        runs on a FRESH cursor derived from the stream cursor's underlying connection so a
+        timed-out EXPLAIN daemon thread cannot corrupt the stream cursor reused by the
+        next query."""
         # psycopg cursors expose execute/fetchall but NOT a .cursor() factory; spec
-        # restricts the mock so getattr(stream_cursor, "cursor") is absent.
-        stream_cursor = MagicMock(spec=["execute", "fetchall", "close"])
-        stream_cursor.fetchall.return_value = [('[{"Plan": {"Node Type": "Seq Scan"}}]',)]
+        # restricts the mock so getattr(stream_cursor, "cursor") is absent. The cursor
+        # exposes `.connection`, from which a fresh cursor is opened for EXPLAIN.
+        fresh_cursor = MagicMock(spec=["execute", "fetchall", "close"])
+        fresh_cursor.fetchall.return_value = [('[{"Plan": {"Node Type": "Seq Scan"}}]',)]
+        stream_cursor = MagicMock(spec=["execute", "fetchall", "close", "connection"])
+        stream_cursor.connection.cursor.return_value = fresh_cursor
 
         result = adapter.get_query_plan(stream_cursor, "SELECT 1")
 
         assert result is not None
         assert "Seq Scan" in result
-        stream_cursor.execute.assert_called_once()
-        # The caller owns the stream cursor; plan capture must not close it.
+        # EXPLAIN runs on the fresh cursor, never the caller's stream cursor.
+        fresh_cursor.execute.assert_called_once()
+        stream_cursor.execute.assert_not_called()
+        # The fresh cursor is owned by plan capture and closed; the stream cursor is not.
+        fresh_cursor.close.assert_called_once()
         stream_cursor.close.assert_not_called()
 
     def test_execute_query_with_capture_adds_plan_fields(self, adapter, monkeypatch):

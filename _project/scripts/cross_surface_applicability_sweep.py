@@ -80,10 +80,17 @@ def _dataframe_query_registry(benchmark_id: str) -> Any | None:
     """
     from benchbox.core.dataframe.query import QueryRegistry
 
+    target = f"benchbox.core.{benchmark_id}.dataframe_queries"
     try:
-        module = importlib.import_module(f"benchbox.core.{benchmark_id}.dataframe_queries")
-    except ModuleNotFoundError:
-        return None
+        module = importlib.import_module(target)
+    except ModuleNotFoundError as exc:
+        # Only treat this as "no df-query surface" when the TARGET module itself is
+        # absent. If a nested dependency of the module is missing/renamed, the
+        # surface exists but is broken: re-raise so it is classified ``blocked``
+        # rather than silently undercounted as a fallback-oracle candidate.
+        if exc.name is None or exc.name == target:
+            return None
+        raise
     for value in vars(module).values():
         if isinstance(value, QueryRegistry):
             return value
@@ -91,9 +98,15 @@ def _dataframe_query_registry(benchmark_id: str) -> Any | None:
 
 
 def _instantiate(benchmark_id: str) -> tuple[Any | None, float | None, str]:
-    from benchbox.core.benchmark_registry import get_benchmark_class
+    # Resolve through the SAME core loader production runs use
+    # (benchbox/core/benchmark_loader.py), not the public-wrapper registry. Several
+    # wrappers do not forward ``get_dataframe_queries`` even though their core
+    # classes do (e.g. tpcds_obt, joinorder, read_primitives), so resolving via the
+    # public wrapper would see 0 DataFrame queries and misclassify a gateable
+    # benchmark as a fallback-oracle candidate.
+    from benchbox.core.benchmark_loader import get_core_benchmark_class
 
-    cls = get_benchmark_class(benchmark_id)
+    cls = get_core_benchmark_class(benchmark_id)
     last_error = ""
     for scale in _INSTANTIATE_SCALES:
         try:
@@ -105,7 +118,10 @@ def _instantiate(benchmark_id: str) -> tuple[Any | None, float | None, str]:
 
 def classify_applicability(benchmark_id: str) -> tuple[str, dict[str, Any]]:
     """Classify a benchmark's cross-surface gate applicability via registry detection."""
-    registry = _dataframe_query_registry(benchmark_id)
+    try:
+        registry = _dataframe_query_registry(benchmark_id)
+    except ImportError as exc:  # broken (not absent) df-query module -> a finding, not "no surface"
+        return BLOCKED, {"error": f"dataframe_queries import {type(exc).__name__}: {exc}"}
     if registry is None:
         return NO_DF_QUERY_SURFACE, {"df_queries": 0}
 

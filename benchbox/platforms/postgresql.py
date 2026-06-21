@@ -716,10 +716,21 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         # In TPC-DS power/throughput streaming paths a per-stream cursor is passed as
         # `connection` (see _make_stream_cursor / PlatformAdapterConnection); a real
         # connection exposes a callable `.cursor()`, a cursor does not. Detect which we
-        # were given so cursor-backed streams capture plans instead of silently failing,
-        # and only close a cursor we created (never the caller's stream cursor).
-        _owns_cursor = callable(getattr(connection, "cursor", None))
-        cursor = connection.cursor() if _owns_cursor else connection
+        # were given so cursor-backed streams capture plans instead of silently failing.
+        #
+        # Always run EXPLAIN on a FRESH cursor that we own, never on the caller's stream
+        # cursor: capture_query_plan() runs this via run_with_timeout and may return on a
+        # timeout while a daemon thread is still executing EXPLAIN. Psycopg cursors are not
+        # safe for concurrent cross-thread use, so reusing the stream cursor would let the
+        # abandoned EXPLAIN corrupt the next query on that stream. When given a cursor,
+        # derive a new cursor from its underlying `.connection`; when given a real
+        # connection, open one from it. We own (and close) the cursor we create in both
+        # cases, never the caller's stream cursor.
+        if callable(getattr(connection, "cursor", None)):
+            cursor = connection.cursor()
+        else:
+            cursor = connection.connection.cursor()
+        _owns_cursor = True
 
         # Use FORMAT JSON so PostgreSQLQueryPlanParser can parse the output.
         # ANALYZE and BUFFERS give actual timing and I/O info for SELECT queries,
