@@ -15,7 +15,10 @@ version = "0.1.0"
 description = "Internal BenchBox TODO and release tooling - not shipped in the wheel"
 requires-python = ">=3.10"
 dependencies = [
-    "duckdb>=1.0.0,<1.4.0",
+    # Cap <2 to catch the next-major API break; browser results.duckdb files use
+    # the default v1.0.0 on-disk format, attachable by @duckdb/duckdb-wasm
+    # regardless of writer version (kept in sync with the root manifest).
+    "duckdb>=1.0.0,<2.0.0",
     "jsonschema>=4.25.1", # validate_todo.py: Draft7Validator
     "pyyaml>=6.0.0", # todo_cli.py + validate_todo.py: yaml.safe_load
     "ruamel-yaml>=0.19.1", # todo_cli.py: YAML() for structure-preserving edits (done command)

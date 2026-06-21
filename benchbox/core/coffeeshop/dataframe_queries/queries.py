@@ -49,6 +49,51 @@ def _date_between(series: Any, start: str | date, end: str | date) -> Any:
     return (series >= low) & (series <= high)
 
 
+def _hour_pandas(series: Any) -> Any:
+    """Extract the hour (0-23) from a pandas order_time column.
+
+    Production loads TIME columns as "HH:MM:SS" strings, but custom contexts and
+    temporal fixtures may register order_time as a native temporal column. Use the
+    ``.dt`` accessor for temporal dtypes and only slice the leading two characters
+    when the column is genuinely string-typed - slicing a timestamp such as
+    "2023-..." would otherwise misread the year prefix as hour 20.
+    """
+    import pandas as pd
+
+    if isinstance(series, pd.Series) and (
+        pd.api.types.is_datetime64_any_dtype(series) or isinstance(series.dtype, pd.PeriodDtype)
+    ):
+        return series.dt.hour.astype("int64")
+    if isinstance(series, pd.Series) and pd.api.types.is_timedelta64_dtype(series):
+        return (series.dt.total_seconds() // 3600).astype("int64")
+    return series.astype("string").str[:2].astype("int64")
+
+
+def _is_temporal_expression_column(frame: Any, name: str) -> bool:
+    """Return True when *name* is a native temporal column on an expression frame.
+
+    Inspects the underlying native (Polars/PySpark/DataFusion) schema so TM1 can
+    use the temporal hour accessor for time/datetime columns and fall back to the
+    "HH:MM:SS" string-slice path for string columns. Returns False on any
+    introspection failure (e.g. expression mocks in unit tests) so the safe
+    string-slice path is used.
+    """
+    try:
+        native = getattr(frame, "native", frame)
+        if hasattr(native, "collect_schema"):
+            dtype = native.collect_schema().get(name)
+        elif hasattr(native, "schema") and not callable(native.schema):
+            dtype = dict(native.schema).get(name)
+        else:
+            return False
+        if dtype is None:
+            return False
+        type_name = type(dtype).__name__.lower()
+        return any(token in type_name for token in ("time", "date", "datetime", "timestamp"))
+    except Exception:
+        return False
+
+
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 
@@ -546,10 +591,16 @@ def tm1_expression_impl(ctx: DataFrameContext) -> Any:
         .join(dl, left_on="location_record_id", right_on="record_id")
         .filter(col("region") == lit(region))
     )
-    # order_time is loaded as an "HH:MM:SS" string (TIME has no reliable DataFrame
-    # dtype), so parse the hour from the leading two characters rather than via a
-    # datetime accessor, matching the SQL's hour(order_time).
-    with_hour = joined.with_columns(col("order_time").str.slice(0, 2).cast_int().alias("hour"))
+    # order_time is usually loaded as an "HH:MM:SS" string (TIME has no reliable
+    # DataFrame dtype), so parse the hour from the leading two characters - but when
+    # a context registers order_time as a native temporal column, use the temporal
+    # hour accessor instead so we match the SQL's hour(order_time) without misreading
+    # a "2023-..." timestamp prefix.
+    if _is_temporal_expression_column(joined, "order_time"):
+        hour_expr = col("order_time").dt.hour()
+    else:
+        hour_expr = col("order_time").str.slice(0, 2).cast_int()
+    with_hour = joined.with_columns(hour_expr.alias("hour"))
     with_part = with_hour.with_columns(
         ctx.when((col("hour") >= lit(5)) & (col("hour") <= lit(10)))
         .then(lit("Morning"))
@@ -594,9 +645,11 @@ def tm1_pandas_impl(ctx: DataFrameContext) -> Any:
         dl, left_on="location_record_id", right_on="record_id"
     )
     merged = merged[merged["region"] == region].copy()
-    # order_time is loaded as an "HH:MM:SS" string; parse the hour from the leading
-    # two characters rather than via .dt (matching the SQL's hour(order_time)).
-    merged["hour"] = merged["order_time"].astype("string").str[:2].astype("int64")
+    # order_time is usually loaded as an "HH:MM:SS" string, but custom contexts may
+    # register it as a native temporal column; extract the hour via .dt for temporal
+    # dtypes and only string-slice genuine strings (slicing a "2023-..." timestamp
+    # would misread the year prefix as hour 20). Matches the SQL's hour(order_time).
+    merged["hour"] = _hour_pandas(merged["order_time"])
     conditions = [
         (merged["hour"] >= 5) & (merged["hour"] <= 10),
         (merged["hour"] >= 11) & (merged["hour"] <= 14),

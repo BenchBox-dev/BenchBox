@@ -2,15 +2,18 @@ id: cross-surface-oracle-remediation
 title: "Remediate the cross-surface equivalence oracle: fix the bugs it found-and-dismissed, make it deterministic, order-aware, non-vacuous, and honest"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
   An adversarial review of the cross-surface SQL<->DataFrame equivalence campaign
-  (PRs #826-#848 on develop; see
-  _project/analysis/adversarial-cross-surface-equivalence-review.md) reproduced
-  every finding by running the gates and found the oracle is real but narrow,
-  oversold, and partly vacuous. This TODO addresses ALL of those findings.
+  (PRs #826-#848 on develop) reproduced every finding by running the gates and
+  found the oracle is real but narrow, oversold, and partly vacuous. This TODO
+  addresses ALL of those findings. The committed evidence the review draws on
+  lives in _project/analysis/clickbench-cross-surface-divergences.md,
+  _project/analysis/joinorder-synthetic-cross-surface-divergences.md, and
+  _project/analysis/oracle-coverage-map.md; reproduce any cell with
+  `make <benchmark>-cross-surface-equivalence-report`.
 
   The headline problem: PR #848 concluded "ClickBench has ~no genuine DataFrame
   logic bugs" and triaged 27 divergences as "tie-ambiguous top-N." That is false.
@@ -63,7 +66,9 @@ description: |
       says "do NOT guess").
 
 prior_art:
-  - "_project/analysis/adversarial-cross-surface-equivalence-review.md - the review this TODO remediates; every finding has a reproduction command + output."
+  - "_project/analysis/clickbench-cross-surface-divergences.md - committed ClickBench divergence evidence (the Q6/Q17/Q18/Q24 cases this TODO remediates); reproduce with `make clickbench-cross-surface-equivalence-report`."
+  - "_project/analysis/joinorder-synthetic-cross-surface-divergences.md - committed joinorder_synthetic divergence evidence (the deferred-dtype cases); reproduce with `make joinorder_synthetic-cross-surface-equivalence-report`."
+  - "_project/analysis/oracle-coverage-map.md - the coverage/applicability map (guarded == GATES membership, the 12-gateable headline) the M1/M2 honesty fixes target."
   - "benchbox/core/equivalence/cross_surface.py - GATES vs STAGED_GATES, build_*_duckdb, find_cross_surface_divergences, count_executed_cells, run_gate, _report; the empty-RESULT guard belongs here."
   - "benchbox/core/equivalence/dataframe_surface.py - materialize_rows, fetch_reference_rows, find_surface_divergences, _normalize_value (lines 239-263), build_dataframe_contexts_from_specs (74-125); the loader-bypass and the None/NaN coercion live here."
   - "benchbox/core/tpchavoc/validation.py - ResultValidator.validate_results_exact (54-79) full-row sort; the order/tie-awareness change must not regress the TPC-Havoc gates that rely on it."
@@ -77,7 +82,7 @@ prior_art:
 work:
   - id: w1
     summary: "Fix the empty-string/null conflation in the DataFrame load path (C1: Q6, Q17, Q18, Q24 are REAL bugs)"
-    status: pending
+    status: done
     addresses: [C1, "review:CRITICAL C1", "#848 false conclusion"]
     notes: |
       The DataFrame surface conflates SQL '' with None, which changes results, not
@@ -187,9 +192,22 @@ work:
 
   - id: w5
     summary: "Re-triage ClickBench with the fixed loader+comparator and correct the #848 record (C1 closeout)"
-    status: pending
+    status: in_progress
     needs: [w1, w2, w3]
     addresses: [C1, "#848", "review:C1"]
+    progress: |
+      DONE (w1-enabled): corrected the #848 record in
+      _project/analysis/clickbench-cross-surface-divergences.md - the "~no genuine
+      DataFrame logic bugs" conclusion was false; Q6/Q17/Q18/Q24 were real
+      null-handling bugs, now fixed at the loader (w1). Verified post-w1: Q6 == 18 on
+      all three surfaces and gone from the divergence set; Q17/Q18 full GROUP BY
+      covers all rows on every surface. The doc also corrects the false "seeded /
+      stable" claim (the gate is nondeterministic at the engine tie-ordering level).
+      BLOCKED on w2 (tie-aware comparator) + w3 (determinism) for the rest: the
+      residual divergences (Q9/Q10/Q15/Q16/Q19/Q31/Q32/Q33/Q36/Q38) are the
+      tie-ambiguous/nondeterminism class and cannot be cleanly re-triaged or driven
+      to a deterministic empty baseline until those land. ClickBench remains in
+      STAGED_GATES (not promoted) per the anti-pattern.
     notes: |
       After w1 (null fix), w2 (tie-aware), w3 (determinism): re-run the ClickBench
       gate. Expectation: the genuine ties (Q9, Q15, Q16, Q31, Q32, Q33, Q38) become
@@ -215,6 +233,13 @@ work:
         - Add a gate cell/mode that loads each gated benchmark through the REAL
           DataFrameDataLoader (CSV->parquet->read_parquet) and compares both dtypes
           and values to the SQL reference, so loader corruption is observable.
+        - Carry the w1 empty-string->'' contract to the remaining raw-CSV adapters.
+          w1 fixed the Parquet path (strings_can_be_null=False) and the pandas CSV
+          path; Polars scan_csv / modin / dask / cudf still map an empty string
+          field to null on their raw-CSV read, so prefer_parquet=False (or a
+          CSV-recommending adapter) reintroduces the Q6/Q17/Q18 divergence on those
+          surfaces. Thread declared column types into each adapter's read_csv and
+          preserve '' for string columns, mirroring pandas_df.read_csv.
         - Harden schema_utils.column_name/column_sql_type (schema_utils.py:29-51):
           replace the naive column.split() with a paren-aware, quote-aware DDL
           column parser that handles DECIMAL(10, 2) (space after comma), quoted/
@@ -234,8 +259,18 @@ work:
 
   - id: w7
     summary: "Stop overclaiming independence; document what the oracle actually proves (BS1)"
-    status: pending
+    status: done
     addresses: [BS1, "review:Blind Spot 1", "claim 1"]
+    progress: |
+      DONE: corrected the cross_surface.py module docstring and the
+      dataframe_surface.py DATAFRAME_BACKENDS comment - they no longer claim "two
+      independent implementations"; they state the oracle catches transcription
+      (not conceptual) errors, and that ssb + most clickbench generate BOTH
+      DataFrame backends from one DSL spec (no backend-vs-backend independence)
+      while coffeeshop AND amplab hand-write a separate impl per backend (verified
+      by inspecting the query modules - amplab is hand-written too, not only
+      coffeeshop). Added the per-benchmark generated-vs-hand-written record at
+      _project/analysis/cross-surface-oracle-independence.md.
     notes: |
       Correct the docstrings that assert "two independent implementations"
       (cross_surface.py:3-6) and "independent ... can diverge independently"
@@ -364,5 +399,5 @@ finding_coverage:
 
 metadata:
   created: "2026-06-21"
-  source: "_project/analysis/adversarial-cross-surface-equivalence-review.md"
+  source: "_project/analysis/clickbench-cross-surface-divergences.md, _project/analysis/joinorder-synthetic-cross-surface-divergences.md, _project/analysis/oracle-coverage-map.md"
   reviewed_prs: "#826-#848 (develop)"

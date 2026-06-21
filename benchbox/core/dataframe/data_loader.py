@@ -75,7 +75,9 @@ DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
 # all-null Time column), so pre-v3 caches must be regenerated to pick up values.
 # v4: declared text columns (TEXT/STRING/CHAR families) are now written as string
 # even when all-NULL or numeric-looking, instead of being left to PyArrow
-# inference, so pre-v4 caches must be regenerated to pick up the declared dtypes.
+# inference; and empty fields in declared string columns load as '' instead of
+# null when the SQL dialect keeps '' (null_marker is None). Pre-v4 caches must be
+# regenerated to pick up the declared dtypes and the empty-string contract.
 DATAFRAME_CACHE_VERSION = "v4"
 
 # Format subdirectory names that belong to the DataFrame cache layer.
@@ -583,14 +585,14 @@ class DataCache:
             nation.tbl              ← raw generated data (not managed by cache)
             _datagen_manifest.json  ← SQL datagen manifest (not managed by cache)
             parquet/                ← cached format conversions
-              v2/
+              v3/
                 _manifest.json
                 customer.parquet
                 lineitem.parquet
                 ...
           tpch_sf001/
             parquet/
-              v2/
+              v3/
                 ...
           tpcds_sf1/
             ...

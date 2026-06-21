@@ -364,3 +364,12 @@ class TestStripHelpers:
         out = strip_estimates("part=[Estimated Cardinality: 5], key=a")
         assert "[]" not in out
         assert "5" not in out and "key=a" in out
+
+    def test_strip_estimates_preserves_empty_list_alongside_stripped_estimate(self):
+        # Regression: a genuine empty-list predicate must survive even when the SAME line
+        # also carries an estimate that gets stripped. Previously the global ``[]`` tidy-up
+        # ran on any removal and corrupted ``arr = []`` -> ``arr =``, changing the
+        # signature/fingerprint. Only estimate-vacated brackets should be removed.
+        out = strip_estimates("FilterExec: arr = [], metrics=[output_rows=5]")
+        assert "arr = []" in out
+        assert "output_rows" not in out and "metrics=" not in out
