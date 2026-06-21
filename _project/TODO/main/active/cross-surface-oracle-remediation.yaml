@@ -259,8 +259,18 @@ work:
 
   - id: w7
     summary: "Stop overclaiming independence; document what the oracle actually proves (BS1)"
-    status: pending
+    status: done
     addresses: [BS1, "review:Blind Spot 1", "claim 1"]
+    progress: |
+      DONE: corrected the cross_surface.py module docstring and the
+      dataframe_surface.py DATAFRAME_BACKENDS comment - they no longer claim "two
+      independent implementations"; they state the oracle catches transcription
+      (not conceptual) errors, and that ssb + most clickbench generate BOTH
+      DataFrame backends from one DSL spec (no backend-vs-backend independence)
+      while coffeeshop AND amplab hand-write a separate impl per backend (verified
+      by inspecting the query modules - amplab is hand-written too, not only
+      coffeeshop). Added the per-benchmark generated-vs-hand-written record at
+      _project/analysis/cross-surface-oracle-independence.md.
     notes: |
       Correct the docstrings that assert "two independent implementations"
       (cross_surface.py:3-6) and "independent ... can diverge independently"

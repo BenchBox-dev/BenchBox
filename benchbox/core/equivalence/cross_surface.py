@@ -1,12 +1,33 @@
 """Cross-surface SQL<->DataFrame result-equivalence gates.
 
-A benchmark that ships both a SQL surface and a DataFrame surface has two
-*independent* implementations of the same logical queries, so a divergence
-between them proves at least one is wrong - a maintenance-free correctness
-oracle that needs no hand-curated answer key. For every benchmark except tpch
-and tpcds (which have stored expected results) and tpchavoc (which has its own
-variant + DataFrame gates), this cross-surface check is the only automated
-correctness oracle available today.
+A benchmark that ships both a SQL surface and a DataFrame surface gives two
+expressions of the same logical queries, so a divergence between them proves at
+least one is wrong - a maintenance-free correctness oracle that needs no
+hand-curated answer key. For every benchmark except tpch and tpcds (which have
+stored expected results) and tpchavoc (which has its own variant + DataFrame
+gates), this cross-surface check is the only automated correctness oracle
+available today.
+
+What the oracle actually proves (and what it does NOT) - be precise about the
+independence, because it varies by benchmark and is weaker than "two independent
+implementations" suggests:
+
+* The independence is always SQL-text vs DataFrame-code, authored by the same
+  person from the same understanding. So the oracle reliably catches
+  TRANSCRIPTION errors (a column/filter/join mistyped on one surface) but not a
+  shared CONCEPTUAL error (a misread spec that the author encodes identically on
+  both surfaces).
+* For ``ssb`` (and ~40/43 ``clickbench`` queries) the two DataFrame backends are
+  not independent of each other at all: both the Polars-expression and the
+  Pandas impl are GENERATED from one compact DSL spec row, so a logic error in
+  that spec appears identically on both backends - the only signal is SQL vs the
+  shared spec.
+* For ``coffeeshop`` and ``amplab`` each query's two backends are SEPARATELY
+  hand-written (``*_expression_impl`` and ``*_pandas_impl``), so they can also
+  diverge on engine semantics - a stronger (but still same-author) check.
+
+See ``_project/analysis/cross-surface-oracle-independence.md`` for the
+per-benchmark generated-vs-hand-written record.
 
 This module runs that oracle on a bounded small-SF cell, reusing the shared
 harness in :mod:`benchbox.core.equivalence.dataframe_surface`:

@@ -44,9 +44,14 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
-# The two shipped DataFrame reference backends. They are independent
-# implementations (Polars expression family vs Pandas) and can diverge
-# independently, so a gate that cares about the DataFrame surface checks both.
+# The two shipped DataFrame reference backends (Polars expression family vs
+# Pandas). A gate that cares about the DataFrame surface checks both because they
+# can diverge on engine semantics - but they are only *independent of each other*
+# when a benchmark hand-writes a separate impl per backend (coffeeshop, amplab).
+# For DSL-generated benchmarks (ssb, most of clickbench) both backends are
+# emitted from one spec row, so they share any spec-level logic error; the only
+# independent reference there is the SQL surface. See cross_surface.py's module
+# docstring for the per-benchmark detail.
 DATAFRAME_BACKENDS = ("expression", "pandas")
 
 _MIDNIGHT = time(0, 0, 0)
