@@ -36,6 +36,8 @@ class ResultValidator:
         variant_results: list[tuple[Any, ...]],
         query_id: int,
         variant_id: int,
+        *,
+        tie_aware: bool = False,
     ) -> bool:
         """Validate exact result matching between original and variant.
 
@@ -44,6 +46,17 @@ class ResultValidator:
             variant_results: Results from variant query
             query_id: The query ID being validated
             variant_id: The variant ID being validated
+            tie_aware: When True, additionally accept a divergence that is purely
+                a tie-ambiguous top-N boundary (an ``ORDER BY <col> ... LIMIT N``
+                whose ties span the LIMIT cutoff, so each surface keeps a
+                different but equally-valid subset of the tied rows). Off by
+                default, so the strict comparison is unchanged for existing
+                callers (e.g. the TPC-Havoc gates, which strip the LIMIT and have
+                no truncated boundary). The relaxation only engages AFTER the
+                strict comparison fails and only when the deterministic
+                (non-boundary) rows still match exactly, so genuine
+                value-misplacement bugs are still caught - it is NOT whole-row
+                set-equality.
 
         Returns:
             True if results match exactly
@@ -62,21 +75,152 @@ class ResultValidator:
         original_sorted = sorted(original_results)
         variant_sorted = sorted(variant_results)
 
+        detail = self._first_positional_mismatch(original_sorted, variant_sorted, query_id, variant_id)
+        if detail is None:
+            return True
+
+        if tie_aware and self._is_boundary_tie_equivalent(original_results, variant_results, query_id, variant_id):
+            return True
+
+        raise ValidationError(detail)
+
+    def _first_positional_mismatch(
+        self,
+        original_sorted: list[tuple[Any, ...]],
+        variant_sorted: list[tuple[Any, ...]],
+        query_id: int,
+        variant_id: int,
+    ) -> str | None:
+        """Return the first row/column mismatch detail, or None if equal.
+
+        Assumes the two lists have equal length and are already sorted. Reused by
+        both the strict path and the tie-aware deterministic-remainder check so
+        the comparison semantics (``_values_equal`` tolerance) stay identical.
+        """
         for i, (orig_row, var_row) in enumerate(zip(original_sorted, variant_sorted)):
             if len(orig_row) != len(var_row):
-                raise ValidationError(
+                return (
                     f"Q{query_id}.{variant_id}: Column count mismatch at row {i}. "
                     f"Original: {len(orig_row)}, Variant: {len(var_row)}"
                 )
-
             for j, (orig_val, var_val) in enumerate(zip(orig_row, var_row)):
                 if not self._values_equal(orig_val, var_val):
-                    raise ValidationError(
+                    return (
                         f"Q{query_id}.{variant_id}: Value mismatch at row {i}, column {j}. "
                         f"Original: {orig_val}, Variant: {var_val}"
                     )
+        return None
 
-        return True
+    def _is_boundary_tie_equivalent(
+        self,
+        original: list[tuple[Any, ...]],
+        variant: list[tuple[Any, ...]],
+        query_id: int,
+        variant_id: int,
+    ) -> bool:
+        """True if the only difference is an ambiguous top-N boundary tie.
+
+        ``original`` is the trusted reference in its query (``ORDER BY``) order. A
+        top-N whose order-key value ties across the ``LIMIT`` cutoff lets each
+        surface keep a different but equally-valid subset of the tied rows. This
+        accepts that case - and ONLY that case - deterministically:
+
+          1. The differing rows are the multiset difference each way (the swapped
+             tie members); the rest are byte-identical and thus deterministic.
+          2. There must be an order-key column ``c`` - one that is monotonic
+             across the reference result (the ``ORDER BY`` key is; a grouped
+             non-key column generally is not) - whose value on EVERY swapped row
+             (both sides) equals the reference's boundary value ``original[-1][c]``
+             (stable run to run even when tied rows reorder), and that boundary
+             value is an extreme (min/max) of the column. Then the swap is exactly
+             an ambiguous selection among rows tied at the worst-kept order key.
+
+        A real value-misplacement bug outside the tie puts a non-boundary value
+        into the swapped set (or breaks the shared remainder), so no qualifying
+        column exists and it still fails - this is NOT whole-row set-equality.
+        """
+        if not original or not variant or len(original[0]) != len(variant[0]):
+            return False
+
+        from collections import Counter
+
+        try:
+            only_original = list((Counter(original) - Counter(variant)).elements())
+            only_variant = list((Counter(variant) - Counter(original)).elements())
+        except TypeError:
+            # Unhashable cell -> cannot reason about ties safely; stay strict.
+            return False
+
+        if not only_original or not only_variant:
+            return False  # identical multisets would have passed the strict check
+
+        swapped = only_original + only_variant
+        candidate_cols = self._monotonic_columns(original)
+        for c in candidate_cols:
+            boundary_value = original[-1][c]
+            if boundary_value is None:
+                continue
+            column = [row[c] for row in original]
+            # A genuine boundary tie needs >= 2 reference rows sharing the worst-kept
+            # value; a unique boundary row is deterministic and must still match.
+            if sum(1 for v in column if self._values_equal(v, boundary_value)) < 2:
+                continue
+            if any(not self._values_equal(row[c], boundary_value) for row in swapped):
+                continue  # a swapped row is NOT at the boundary order-key value
+            present = [v for v in column if v is not None]
+            try:
+                at_extreme = self._values_equal(boundary_value, min(present)) or self._values_equal(
+                    boundary_value, max(present)
+                )
+            except TypeError:
+                continue
+            if at_extreme:
+                return True
+        return False
+
+    def _monotonic_columns(self, rows: list[tuple[Any, ...]]) -> list[int]:
+        """Column indices whose values are monotonic across ``rows`` (in order).
+
+        A top-N result is sorted by its order key, so the order-key column is
+        monotonic (non-decreasing or non-increasing, constant counts as both); a
+        grouped non-key column generally is not. A column with an unorderable or
+        NULL-mixed value is treated as non-monotonic (excluded), which only makes
+        the boundary split finer (stricter), never weaker.
+        """
+        if len(rows) < 2:
+            return []
+        width = len(rows[0])
+        result: list[int] = []
+        for c in range(width):
+            non_decreasing = True
+            non_increasing = True
+            for left, right in zip(rows, rows[1:]):
+                order = self._safe_compare(left[c], right[c])
+                if order is None:
+                    non_decreasing = non_increasing = False
+                    break
+                if order < 0:
+                    non_increasing = False
+                elif order > 0:
+                    non_decreasing = False
+            if non_decreasing or non_increasing:
+                result.append(c)
+        return result
+
+    def _safe_compare(self, a: Any, b: Any) -> int | None:
+        """Return -1/0/1 for an orderable pair, or None if not orderable.
+
+        Uses ``_values_equal`` for equality (so float tolerance and NULL handling
+        match the rest of the comparator) and a plain ``<`` otherwise.
+        """
+        if self._values_equal(a, b):
+            return 0
+        if a is None or b is None:
+            return None
+        try:
+            return -1 if a < b else 1
+        except TypeError:
+            return None
 
     def validate_results_checksum(
         self,

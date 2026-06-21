@@ -184,7 +184,13 @@ def find_cross_surface_divergences(
                 query_id: Any = query_id,
             ) -> None:
                 candidate = materialize_rows(impl(contexts[backend]))
-                validator.validate_results_exact(reference, candidate, query_id, 0)
+                # tie_aware: a benchmark's own SQL and DataFrame surfaces are
+                # independent top-N implementations, so an ORDER BY ... LIMIT N
+                # whose ties span the cutoff can keep a different but equally-valid
+                # subset of the tied rows. Accept that boundary-tie ambiguity (the
+                # deterministic rows must still match exactly) rather than
+                # false-flagging it.
+                validator.validate_results_exact(reference, candidate, query_id, 0, tie_aware=True)
 
             yield backend, check
 
@@ -494,8 +500,27 @@ GATES: dict[str, CrossSurfaceGate] = {
 # be promoted into GATES (and made a blocking CI gate). Kept OUT of GATES so the
 # coverage map does not prematurely mark these benchmarks "guarded". See
 # `make <name>-cross-surface-equivalence-report` to enumerate their divergences.
+# Q18 is `SELECT UserID, SearchPhrase, COUNT(*) ... GROUP BY ... LIMIT 10` with NO
+# ORDER BY: at SF=0.1 the GROUP BY yields ~97k groups and the bare LIMIT keeps an
+# arbitrary 10, so the SQL and DataFrame surfaces each return a different - but
+# equally valid - subset (verified: both are subsets of the full grouped result).
+# There is no total order to make this deterministic, so it is a genuinely
+# tie-ambiguous query, classified here (the last-resort option) rather than masked:
+# the tie-aware comparator handles every ORDER BY ... LIMIT case, only this
+# order-less LIMIT needs a baseline entry.
+_CLICKBENCH_TIE_AMBIGUOUS = (
+    "Q18 is LIMIT 10 with no ORDER BY over ~97k groups - an arbitrary, order-less top-N selection"
+)
+
 STAGED_GATES: dict[str, CrossSurfaceGate] = {
-    "clickbench": CrossSurfaceGate(name="clickbench", build=build_clickbench_duckdb),
+    "clickbench": CrossSurfaceGate(
+        name="clickbench",
+        build=build_clickbench_duckdb,
+        known_divergences={
+            "Q18_expression": _CLICKBENCH_TIE_AMBIGUOUS,
+            "Q18_pandas": _CLICKBENCH_TIE_AMBIGUOUS,
+        },
+    ),
     "joinorder_synthetic": CrossSurfaceGate(name="joinorder_synthetic", build=build_joinorder_synthetic_duckdb),
 }
 
