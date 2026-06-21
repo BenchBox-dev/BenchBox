@@ -282,8 +282,18 @@ work:
   - id: w3
     summary: "Burn down divergences (fix the wrong surface) or declare intentional ones"
     needs: [w2]
-    status: in_progress
+    status: done
     notes: |
+      DONE. Burn-down complete for every wired/staged gate: ssb (0), amplab (10
+      date-vs-string impl bugs fixed in the DataFrame surface), coffeeshop (0),
+      joinorder_synthetic (loader dtype/null fixes, w9 -> 26/26), clickbench (the
+      remaining cells were the tie-ambiguous top-N class, not logic bugs - resolved
+      by the w8 tie-aware comparator, with Q18's order-less LIMIT classified as a
+      justified known-divergence). No real divergence was masked into a baseline;
+      the only baseline entry is ClickBench Q18 (genuinely order-less LIMIT). The
+      last in_progress reason was the ClickBench tie cells, which w8 cleared - so
+      w3 closes with w8. Original plan below.
+
       For each divergence, determine which surface is wrong and fix it; verify the
       fix makes the two surfaces agree. Where a difference is intentional and
       defensible (e.g. a surface deliberately omits a presentational LIMIT),
@@ -410,8 +420,55 @@ work:
   - id: w8
     summary: "Make the cross-surface comparator tie-aware for top-N queries (clears ClickBench's 27 tie-ambiguous cells)"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
+      DONE. Made ResultValidator.validate_results_exact opt-in tie_aware (additive,
+      default False so the TPC-Havoc gates are byte-unchanged). Chose option (b) (a
+      tie-aware comparator) over (a) (the ClickBench SQL queries are also the perf
+      queries, so adding tie-breaker ORDER BY columns would pollute the benchmark)
+      and over weakening to set-equality.
+
+      MECHANISM: the relaxation engages ONLY after the strict sorted-positional
+      comparison fails, and accepts a divergence iff it is exactly an ambiguous
+      top-N boundary tie - deterministically, independent of run-to-run tie
+      reordering:
+        - the differing rows are the multiset difference each way (the swapped tie
+          members); the rest are byte-identical (the deterministic remainder);
+        - there must be an order-key column c that is monotonic across the
+          reference result (the ORDER BY key is; a grouped non-key column is not),
+          whose value on EVERY swapped row equals the reference's boundary value
+          original[-1][c] (stable even when tied rows reorder), the boundary value
+          occurs >=2 times (a genuine tie, not a unique last row), and is an
+          extreme (min/max) of the column.
+      So a real value-misplacement bug outside the tie (wrong order-key value,
+      wrong non-key value on a determined row, wrong row count, unique-last-row
+      change) puts a non-boundary value into the swap and still FAILS. The
+      cross-surface gate passes tie_aware=True; TPC-Havoc keeps the default.
+
+      An EARLIER attempt inferred the key by splitting on all monotonic columns
+      jointly; DuckDB's non-deterministic tie order made a non-key column
+      (SearchPhrase) coincidentally monotonic in ~1/3 of runs, so the gate was
+      flaky. The multiset-difference + boundary-value formulation is order-stable
+      (the count column always qualifies); verified 5 consecutive clean runs.
+
+      Q18 (`... GROUP BY ... LIMIT 10` with NO ORDER BY over ~97k groups) is the
+      one genuinely order-less query - any 10 rows are valid and the two surfaces
+      pick different subsets (both verified subsets of the full grouped result).
+      It is the last-resort option (c): classified in clickbench's
+      known_divergences with justification, NOT masked (the tie-aware comparator
+      handles every ORDER BY ... LIMIT case; only this order-less LIMIT needs a
+      baseline entry).
+
+      EVIDENCE: make clickbench-cross-surface-equivalence-report 27 -> 0
+      unclassified (Q18's 1-2 classified cells aside), stable across 5 runs; ssb
+      26/26, amplab 16/16, coffeeshop 22/22, joinorder_synthetic 26/26 all 0
+      divergent on the tie_aware path; TPC-Havoc SQL 220/220 and DataFrame 440/440
+      unchanged (default strict path); a planted REAL ClickBench defect (Q1 count
+      +1000) still flags Q1_expression+Q1_pandas; 80 tpchavoc+equivalence unit
+      tests pass (6 new tie_aware cases lock accept/reject behavior). Files:
+      benchbox/core/tpchavoc/validation.py, benchbox/core/equivalence/cross_surface.py.
+      Original triage below.
+
       PREREQUISITE for promoting ClickBench STAGED_GATES->GATES (w4). Surfaced and
       triaged during w3 ClickBench burn-down (PR #848; detail in
       _project/analysis/clickbench-cross-surface-divergences.md).
@@ -644,4 +701,4 @@ metadata:
   tags: [equivalence, correctness, dataframe, sql, ci, tpch, tpcds, ssb]
   estimated_effort: "Large"
   created_date: "2026-06-16"
-  last_updated: "2026-06-21T22:00:00"
+  last_updated: "2026-06-21T23:30:00"

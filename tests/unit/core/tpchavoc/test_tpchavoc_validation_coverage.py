@@ -21,6 +21,65 @@ def test_validate_results_exact_accepts_reordered_rows() -> None:
     assert validator.validate_results_exact(original, variant, query_id=3, variant_id=2)
 
 
+# --- tie_aware top-N boundary handling (cross-surface gate) -------------------
+# The reference (``original``) is in ORDER BY order; the order key is the last
+# column, DESC, so the worst-kept value (the boundary) is the minimum. Rows tied
+# at that boundary value may be an ambiguous selection across the LIMIT cutoff.
+
+
+def test_tie_aware_accepts_boundary_tie_swap() -> None:
+    """A swap confined to rows tied at the boundary order-key value is accepted."""
+    validator = ResultValidator()
+    original = [(10, 5), (11, 5), (12, 3), (13, 2), (14, 2)]
+    # row (13,2) -> (99,2): a different but equally-valid boundary-tie member
+    variant = [(10, 5), (11, 5), (12, 3), (99, 2), (14, 2)]
+
+    assert validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
+
+
+def test_tie_aware_off_by_default_still_strict() -> None:
+    """Without tie_aware the same boundary-tie swap is a hard failure (unchanged)."""
+    validator = ResultValidator()
+    original = [(10, 5), (11, 5), (12, 3), (13, 2), (14, 2)]
+    variant = [(10, 5), (11, 5), (12, 3), (99, 2), (14, 2)]
+
+    with pytest.raises(ValidationError, match="Value mismatch"):
+        validator.validate_results_exact(original, variant, 1, 0)
+
+
+def test_tie_aware_rejects_non_boundary_value_bug() -> None:
+    """A wrong order-key value on a fully-included (non-boundary) row still fails."""
+    validator = ResultValidator()
+    original = [(10, 5), (11, 5), (12, 3), (13, 2), (14, 2)]
+    # top row's order key 5 -> 4: a real value bug, not a boundary tie
+    variant = [(10, 4), (11, 5), (12, 3), (13, 2), (14, 2)]
+
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
+
+
+def test_tie_aware_rejects_non_key_bug_on_determined_row() -> None:
+    """A wrong non-key value on a non-boundary row is not masked by tie tolerance."""
+    validator = ResultValidator()
+    original = [(1, "A", 5), (2, "B", 5), (3, "C", 3), (4, "D", 2), (5, "E", 2)]
+    # (2,'B',5) -> (2,'X',5): wrong dimension at the TOP (count 5), not the boundary
+    variant = [(1, "A", 5), (2, "X", 5), (3, "C", 3), (4, "D", 2), (5, "E", 2)]
+
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
+
+
+def test_tie_aware_rejects_unique_last_row_change() -> None:
+    """A unique (untied) boundary row is deterministic and must still match."""
+    validator = ResultValidator()
+    original = [(10, 5), (11, 4), (12, 3), (13, 2), (14, 1)]
+    # last row's non-key value changed; the boundary value 1 is unique (no tie)
+    variant = [(10, 5), (11, 4), (12, 3), (13, 2), (99, 1)]
+
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
+
+
 @pytest.mark.parametrize(
     ("original", "variant", "message"),
     [
