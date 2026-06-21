@@ -25,9 +25,11 @@ These were hard errors, not value mismatches; all now resolved:
 | Date columns compared to native `date` literals, not strings | Q37, Q38, Q39–Q42, Q43 |
 | Pandas `<> ''` filters exclude NULL (`.notna()`), matching SQL/Polars | Q25, Q27 |
 
-## Remaining: 27 value-divergence cells (14 queries) — per-query triage
+## Remaining: 27 value-divergence cells (14 queries)
 
-Deterministic baseline; these are genuine SQL↔DataFrame value disagreements:
+Deterministic baseline (the raw row-0 mismatch the gate reports). NOTE: the triage
+below shows these are mostly tie-ambiguous top-N comparison artifacts, not value
+errors — read the "Triage finding" section after the table.
 
 | Query | expression (SQL → DF) | pandas |
 | --- | --- | --- |
@@ -46,15 +48,45 @@ Deterministic baseline; these are genuine SQL↔DataFrame value disagreements:
 | Q36 | 27418322 → 288711262 | (same) |
 | Q38 | Home Page → Blog (row 1) | (same) |
 
-Patterns for the burn-down:
+### Triage finding: these are mostly NOT logic bugs — they are tie-ambiguous top-N
+
+Direct comparison of SQL vs DataFrame results (set-level + count-column level)
+shows the DataFrame computes **correct aggregates**; the divergences come from the
+gate's order-sensitive, row-by-row comparison of `ORDER BY <col> ... LIMIT N`
+queries whose ties span the LIMIT boundary:
+
+- **Q32/Q33** `GROUP BY WatchID, ClientIP ORDER BY c DESC LIMIT 10`: at SF=0.1
+  every group has count `c=1` (verified: both surfaces' top-10 `c` column is all
+  `1`). With thousands of count-1 groups, `LIMIT 10` keeps an arbitrary 10 — SQL
+  and the DataFrame keep different (equally valid) `WatchID`s. The mismatch is at
+  column 0 (WatchID), not the count.
+- **Q16** (count distribution `4,4,4,4,4,4,3,3,3,3` is **identical** on both
+  surfaces): only the order among the `c=4` ties and which `c=3` groups land in the
+  last slots differ — a boundary tie, not a wrong value.
+- The other count/top-N rows (Q6, Q9, Q10, Q15, Q18, Q19, Q31, Q33, Q36, Q38) are
+  the same class: correct aggregates, ambiguous selection/order among ties at the
+  LIMIT cutoff (no total order in the `ORDER BY`).
+
+So these are **false positives of an order-sensitive comparator**, not ClickBench
+DataFrame logic bugs. The right fix is at the **gate/validator level**, not
+per-query:
+  - add a deterministic total-order tie-breaker to BOTH surfaces before comparison
+    (append the remaining columns / a stable key to the `ORDER BY`), or
+  - make the validator tie-aware (compare the multiset of rows that share the
+    boundary order-key value, instead of position-by-position), or
+  - classify genuinely tie-ambiguous queries as accepted divergences.
+
+Exceptions (a different, real class — and the deferred dtype issue):
 - **Empty-string vs None** (Q17 col 1, Q24 col 14): SQL emits `""`, the DataFrame
-  surface emits `None` — a null-materialization difference; confirm the source
-  value before deciding which surface is correct.
-- **Large aggregate differences** (Q16/Q18/Q32/Q33/Q36): a dropped predicate,
-  missing `DISTINCT`, or wrong aggregation in the DataFrame impl.
-- **Top-N row-value differences** (Q9 row 8, Q10 row 4, Q38 row 1, Q15, Q31):
-  likely the DataFrame top-N breaks ties differently than the SQL `ORDER BY`;
-  align the sort keys/tie-breakers (now reproducible thanks to the seed).
+  emits `None`. This is the same null/dtype materialization issue tracked for
+  joinorder_synthetic (CSV→parquet conversion); see
+  `joinorder-synthetic-cross-surface-divergences.md`. Resolve with the loader
+  dtype fix, not a ClickBench change.
+
+Net: ClickBench has ~no genuine DataFrame *logic* bugs here — the staged-gate
+divergences are (1) tie-ambiguous top-N comparison (gate-level) and (2) the
+loader null/dtype issue (deferred). Promote ClickBench to `GATES` once the gate
+handles tie-ambiguity and the loader dtype fix lands.
 
 ## Status
 
