@@ -70,7 +70,10 @@ logger = logging.getLogger(__name__)
 # Relative cache directory suffix (resolved against runtime CWD).
 # Unified with SQL datagen under benchmark_runs/datagen/ for data reuse.
 DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
-DATAFRAME_CACHE_VERSION = "v2"
+# Bump when schema/type-conversion rules change so stale cached Parquet is not
+# silently reused on rerun. v3: TIME columns now load as strings (previously an
+# all-null Time column), so pre-v3 caches must be regenerated to pick up values.
+DATAFRAME_CACHE_VERSION = "v3"
 
 # Format subdirectory names that belong to the DataFrame cache layer.
 # Used by clear_cache() to selectively remove cached conversions without
@@ -167,6 +170,10 @@ class SchemaMapper:
         "CHAR": "Utf8",
         "DATE": "Date",
         "TIMESTAMP": "Datetime",
+        # TIME has no reliable DataFrame dtype across backends (pyarrow->Parquet->Polars
+        # yields an all-null Time column; pandas has no time-only dtype), so load it as a
+        # string and let query impls parse the components, matching the SQL hour(time).
+        "TIME": "Utf8",
     }
 
     # Mapping from TPC DataType enum values to Pandas types
@@ -177,6 +184,7 @@ class SchemaMapper:
         "CHAR": "object",
         "DATE": "datetime64[ns]",
         "TIMESTAMP": "datetime64[ns]",
+        "TIME": "object",
     }
 
     # Mapping for PyArrow types (used in Parquet conversion)
@@ -187,6 +195,7 @@ class SchemaMapper:
         "CHAR": "string",
         "DATE": "date32",
         "TIMESTAMP": "timestamp[us]",
+        "TIME": "string",
     }
 
     @classmethod
@@ -512,7 +521,7 @@ class DataCache:
         """Get the cache path for a benchmark/SF/format combination.
 
         The cache is nested inside the canonical flat datagen directory
-        (e.g. ``tpch_sf001/parquet/v2/``), reusing the same naming
+        (e.g. ``tpch_sf001/parquet/v3/``), reusing the same naming
         convention as SQL generators via :func:`get_benchmark_runs_datagen_path`.
 
         Args:

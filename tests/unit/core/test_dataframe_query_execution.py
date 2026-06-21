@@ -396,7 +396,9 @@ class TestCoffeeShopDataFrameQueriesExecution:
             {
                 "record_id": [1, 2],
                 "product_id": [101, 102],
-                "product_name": ["Latte", "Espresso"],
+                # Production dim_products exposes the raw column as "name"; SA2's SQL
+                # aliases it to product_name in its output.
+                "name": ["Latte", "Espresso"],
                 "category": ["Hot Drinks", "Hot Drinks"],
                 "subcategory": ["Coffee", "Coffee"],
                 "cost": [1.50, 1.00],

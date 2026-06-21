@@ -82,6 +82,19 @@ COLLAPSIBLE_OPERATOR_TYPES: frozenset[str] = frozenset(
     }
 )
 
+# Dropped wrapper types that are pure physical pass-throughs (exchanges, repartitions
+# and codegen stages, all harmonized to ``Other``). A collapsible backbone run separated
+# only by these still collapses — ``Aggregate -> Exchange -> Aggregate`` is the partial+
+# final stages of ONE aggregate. Every other dropped wrapper (Filter/Project/Subquery/CTE)
+# is a real relational boundary and is NOT transparent: it resets the collapse context so
+# separate aggregations/sorts on either side (e.g. a grouped subquery filtered before an
+# outer aggregate, ``Aggregate -> Filter -> Aggregate``) are counted as two operators.
+TRANSPARENT_WRAPPER_TYPES: frozenset[str] = frozenset(
+    {
+        LogicalOperatorType.OTHER.value,
+    }
+)
+
 
 def _backbone_type(node: LogicalOperator) -> str | None:
     """Return the backbone operator-type string for a node, or None if it is wrapper noise."""
@@ -100,8 +113,10 @@ def structural_backbone_counts(
     parent->child run of the same *collapsible* backbone type
     (``COLLAPSIBLE_OPERATOR_TYPES`` — aggregate, sort) is collapsed to a single node,
     so a partial+final aggregate or a multi-stage sort counts once. The collapse looks
-    through dropped wrapper nodes, so ``Aggregate -> Exchange -> Aggregate`` still
-    counts as one aggregate. Non-collapsible backbone operators (joins, scans, set
+    through transparent physical wrappers (exchanges), so ``Aggregate -> Exchange ->
+    Aggregate`` still counts as one aggregate, but a semantic boundary resets it, so
+    ``Aggregate -> Filter -> Aggregate`` correctly counts two. Non-collapsible backbone
+    operators (joins, scans, set
     operators) are always counted per node, so a left-deep 3-table join correctly
     reports two joins.
 
@@ -123,10 +138,15 @@ def structural_backbone_counts(
     def walk(node: LogicalOperator, collapsing_type: str | None) -> None:
         backbone = _backbone_type(node)
         if backbone is None:
-            # Wrapper node: drop it but keep the collapse context so a run of the same
-            # collapsible backbone type separated by wrappers still collapses.
+            # Wrapper node: drop it. Keep the collapse context only through transparent
+            # physical pass-throughs (exchanges harmonized to ``Other``) so a partial+
+            # final aggregate still collapses; reset it through semantic relational
+            # boundaries (Filter/Project/Subquery/CTE) so separate aggregations/sorts on
+            # either side are counted independently.
+            wrapper_type = get_operator_type_str(node.operator_type, warn_unknown=False)
+            child_collapsing = collapsing_type if wrapper_type in TRANSPARENT_WRAPPER_TYPES else None
             for child in node.children:
-                walk(child, collapsing_type)
+                walk(child, child_collapsing)
             return
         # Count the node unless it continues a collapsible same-type run.
         if not (backbone in COLLAPSIBLE_OPERATOR_TYPES and backbone == collapsing_type):

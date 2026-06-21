@@ -213,6 +213,35 @@ work:
       (per-engine skip-lists) and (2) on a native-dialect engine, a small, enumerable set
       of irreducible engine result-semantics - never a silent mistranslation.
 
+  - id: w5
+    summary: "Post-review fidelity follow-ups: production query-time transforms + NULL-ordering scope"
+    needs: [w4]
+    status: done
+    notes: |
+      RESOLVED (review follow-up to the two #817 threads).
+
+      (1) Transform-wrapper parity. The sample now routes both canonical and variant SQL
+      through the SAME production query-time rewrites the real ClickHouse adapter applies
+      (ClickHouseQueryTransformer.transform - Decimal/Float casts + safe division - then
+      add_query_settings), via a new engine-agnostic `execute_transform` hook on
+      find_divergences and `_clickhouse_execute_transform`. Applied identically to both
+      sides, so shared transforms still cancel out. Re-verified at SF=0.1: the classified
+      surface is UNCHANGED (7 CLICKHOUSE_KNOWN_DIVERGENCES still diverge, no new
+      unclassified ones).
+
+      Surfaced and fixed a real production bug: safe_division wrapped a WINDOWED divisor
+      `SUM(x) OVER (...)` as the invalid `NULLIF(SUM(x), 0) OVER (...)` (ClickHouse:
+      'NULLIF ... OVER' is not a window function), which would also fail variant 8_v9 and
+      any windowed-division TPC-DS query on real ClickHouse runs. The operand scanner now
+      treats `agg(...) OVER (...)` as one operand, so it wraps as
+      `NULLIF(SUM(x) OVER (...), 0)`.
+
+      (2) NULL-ordering scope. The order-insensitive comparator (it sorts both sides)
+      structurally cannot observe a difference that shows up only as NULL placement within
+      an ORDER BY, so that axis is NOT sampled by this row-set oracle - now documented
+      explicitly in the equivalence module docstring. Covering it would need a separate
+      order-sensitive check on the NULL-bearing-sort-key subset; left out of scope here.
+
       Is a fifth engine worth sequencing? NO. We now have both a Postgres-family cohort
       (systematic-zero) and a non-Postgres-family engine (faithful + a fully classified
       result-semantic residue) agreeing that the seam introduces no translation

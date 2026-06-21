@@ -46,8 +46,10 @@ Postgres-family engines. ClickHouse also differs on the result-semantic axes the
 prior TODOs flagged, and unlike the first three engines it does NOT yield
 systematic-zero: after excluding the variants it cannot execute
 (CLICKHOUSE_TPCHAVOC_SKIPS) and running with the engine's production TPC-H session
-configuration (SQL-standard NULL semantics via ``join_use_nulls=1``), a small
-residue of irreducible
+configuration (SQL-standard NULL semantics via ``join_use_nulls=1``) AND the same
+production query-time rewrites the real adapter applies (Decimal/Float casts, safe
+division, the ``joined_subquery_requires_alias`` SETTINGS - see
+:func:`_clickhouse_execute_transform`), a small residue of irreducible
 engine-semantic RESULT differences remains, classified in
 :data:`CLICKHOUSE_KNOWN_DIVERGENCES` (Decimal-vs-Float division truncation,
 ``SUM`` of an empty group returning 0 instead of NULL, and partial
@@ -60,6 +62,14 @@ Comparison is order-insensitive with float tolerance (the validator sorts both
 sides). Because canonical TPC-H queries carry a presentational ``ORDER BY ...
 LIMIT n`` top-N cut that the variant families treat inconsistently, the trailing
 ``LIMIT`` is stripped from both sides before comparison.
+
+One consequence: NULL ordering/placement is deliberately NOT sampled by this
+oracle. Sorting both sides is what lets variants legitimately permute row order
+without being flagged, but it also normalizes away a difference that shows up only
+as where NULLs land within an ``ORDER BY`` (e.g. ``NULLS FIRST`` vs ``NULLS
+LAST``). Such a difference is invisible here by construction; covering it would
+need a separate order-sensitive check on the subset of queries with a
+NULL-bearing sort key, which is out of scope for this row-set equivalence sample.
 
 The gate's burndown (24 divergences at the first report) resolved every
 divergence class as a variant defect:
@@ -193,6 +203,7 @@ def find_divergences(
     query_ids: list[int] | None = None,
     translate_variant: Callable[[str], str] | None = None,
     skip_variants: Collection[str] | None = None,
+    execute_transform: Callable[[str], str] | None = None,
 ) -> list[Divergence]:
     """Compare every variant of each query to canonical TPC-H on ``connection``.
 
@@ -224,6 +235,13 @@ def find_divergences(
             sweep entirely - e.g. POSTGRES_TPCHAVOC_SKIPS, which the engine
             cannot execute. Excluded variants are neither run nor counted as
             divergences; they are NEVER silently marked equivalent.
+        execute_transform: Optional callable applied to the FINAL SQL string of
+            BOTH sides (after dialect rendering and top-N stripping) immediately
+            before execution. Use to reproduce an engine's production query-time
+            rewrites (e.g. ClickHouse's Decimal/Float casts + SETTINGS) so the
+            sample exercises the real execution path; applied identically to
+            canonical and variant, so shared transforms still cancel out. Defaults
+            to identity, leaving the DuckDB/Postgres/DataFusion samples unchanged.
 
     Returns:
         One :class:`Divergence` per variant whose result is not equivalent to
@@ -231,11 +249,12 @@ def find_divergences(
     """
     ids = query_ids if query_ids is not None else benchmark.get_implemented_queries()
     render_variant = translate_variant if translate_variant is not None else _identity
+    transform_for_engine = execute_transform if execute_transform is not None else _identity
     excluded = set(skip_variants or ())
     divergences: list[Divergence] = []
     for query_id in ids:
         try:
-            original = connection.execute(strip_top_n(canonical_query(query_id))).fetchall()
+            original = connection.execute(transform_for_engine(strip_top_n(canonical_query(query_id)))).fetchall()
         except Exception as exc:  # noqa: BLE001 - a diagnostic must report, not crash, on a bad query
             divergences.append(Divergence(query_id, 0, f"canonical query failed: {exc}"))
             continue
@@ -243,7 +262,9 @@ def find_divergences(
             if f"{query_id}_v{variant_id}" in excluded:
                 continue
             try:
-                variant_sql = render_variant(strip_top_n(benchmark.get_query(f"{query_id}_v{variant_id}")))
+                variant_sql = transform_for_engine(
+                    render_variant(strip_top_n(benchmark.get_query(f"{query_id}_v{variant_id}")))
+                )
                 variant_rows = connection.execute(variant_sql).fetchall()
                 benchmark.validate_variant_equivalence(query_id, variant_id, original, variant_rows)
             except ValidationError as exc:
@@ -787,6 +808,23 @@ def build_clickhouse_with_tpch(scale_factor: float, output_dir: str | Path) -> t
     return connection, tpchavoc, tpch
 
 
+def _clickhouse_execute_transform(sql: str) -> str:
+    """Apply the SAME query-time rewrites the production ClickHouse adapter runs.
+
+    ``ClickHouseWorkloadMixin.execute_query`` rewrites every query through
+    ``ClickHouseQueryTransformer.transform`` (Decimal/Float casts + safe division)
+    and then ``add_query_settings`` (the ``joined_subquery_requires_alias = 0``
+    SETTINGS clause) before executing it. Reusing that exact sequence here makes the
+    fourth-engine sample exercise the real execution path rather than the raw SQLGlot
+    translation; it is applied identically to canonical and variant, so shared
+    transforms cancel out and only genuine variant-vs-canonical differences surface.
+    """
+    from benchbox.platforms.clickhouse.query_transformer import ClickHouseQueryTransformer
+
+    transformer = ClickHouseQueryTransformer()
+    return transformer.add_query_settings(transformer.transform(sql))
+
+
 def find_clickhouse_divergences(
     connection: Any,
     tpchavoc: TPCHavocBenchmark,
@@ -799,7 +837,9 @@ def find_clickhouse_divergences(
     Single source of truth for *how* the ClickHouse sample is run - both the CLI
     (:func:`run_clickhouse_sample`) and the integration test call this so they
     cannot drift. Canonical and variants are both translated to the NATIVE
-    clickhouse dialect through the SAME seam (NOT normalized to postgres), and
+    clickhouse dialect through the SAME seam (NOT normalized to postgres), then
+    run through the SAME production query-time transforms the real ClickHouse
+    adapter applies (see :func:`_clickhouse_execute_transform`), and
     CLICKHOUSE_TPCHAVOC_SKIPS variants are excluded (never marked equivalent).
     """
     from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
@@ -811,6 +851,7 @@ def find_clickhouse_divergences(
         query_ids=query_ids,
         translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", CLICKHOUSE_TARGET_DIALECT),
         skip_variants=set(CLICKHOUSE_TPCHAVOC_SKIPS),
+        execute_transform=_clickhouse_execute_transform,
     )
 
 

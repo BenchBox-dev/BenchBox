@@ -911,7 +911,38 @@ class TestDriversMixin:
             ]
 
     def _execute_queries_by_type(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
-        """Execute queries based on test execution type."""
+        """Execute queries for the requested test type, with isolated plan capture.
+
+        Plan capture is fully isolated from measured execution for EVERY test type
+        (power, throughput, maintenance, combined). For phase-eligible EXPLAIN-based
+        engines, inline capture is suppressed for the entire timed run — the inline
+        chokepoint records each executed query instead — and all plans are captured in
+        a single post-measurement pass on the same connection, strictly after the last
+        timed query and never inside a concurrent stream. This is the canonical
+        contract (see ``benchbox/core/plan_capture_phase.py``); engines that obtain a
+        plan only as a side effect of the measured job keep inline capture.
+        """
+        phase_eligible = (
+            bool(getattr(self, "capture_plans", False))
+            and getattr(self, "plan_capture_phase_eligible", False)
+            and not getattr(self, "dry_run_mode", False)
+        )
+        if not phase_eligible:
+            return self._dispatch_queries_by_type(benchmark, connection, run_config)
+
+        # Isolate capture: record executed queries during the timed run, capture after.
+        self._plan_capture_phase_active = True
+        self._phase_recorded_queries = {}
+        try:
+            results = self._dispatch_queries_by_type(benchmark, connection, run_config)
+        finally:
+            self._plan_capture_phase_active = False
+
+        self._capture_plans_post_measurement(connection, dict(self._phase_recorded_queries), results)
+        return results
+
+    def _dispatch_queries_by_type(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
+        """Route to the per-test-type driver (no plan-capture concerns)."""
         test_execution_type = run_config.get("test_execution_type", "standard")
 
         if test_execution_type == "power":
@@ -1376,27 +1407,12 @@ class TestDriversMixin:
         if hasattr(signal, "SIGTERM"):
             original_sigterm = signal.signal(signal.SIGTERM, signal_handler)
 
-        # Isolated plan-capture phase: for eligible EXPLAIN-based engines, suppress
-        # inline capture during the timed loop and capture all plans in a single
-        # post-measurement pass (see _capture_plans_post_measurement). This keeps
-        # EXPLAIN off the measurement path entirely. Side-effect-capture platforms
-        # (BigQuery/Spark) keep inline capture (plan_capture_phase_eligible=False).
-        phase_eligible = (
-            bool(getattr(self, "capture_plans", False))
-            and getattr(self, "plan_capture_phase_eligible", False)
-            and not getattr(self, "dry_run_mode", False)
-        )
-        saved_capture_plans = getattr(self, "capture_plans", False)
-        saved_show_query_plans = getattr(self, "show_query_plans", False)
-        if phase_eligible:
-            self.capture_plans = False
-            # Suppress show_query_plans too: adapters guard display behind
-            # `if not self.capture_plans`, which setting capture_plans=False
-            # would re-enable. Suppressing both keeps EXPLAIN off the
-            # measurement path even when --show-plans and --capture-plans
-            # are both active.
-            self.show_query_plans = False
-
+        # Plan capture isolation is handled centrally by _execute_queries_by_type
+        # (it records executed queries during the timed loop and runs a single
+        # post-measurement capture phase for every test type). This loop only
+        # executes the timed queries; for phase-eligible engines the inline capture
+        # chokepoint records instead of running EXPLAIN, so nothing extra is needed
+        # here.
         try:
             console.print(
                 f"[cyan]Running {total_queries} {benchmark_name} queries. Press Ctrl+C to cancel (will stop after current query).[/cyan]"
@@ -1443,12 +1459,6 @@ class TestDriversMixin:
             signal.signal(signal.SIGINT, original_sigint)
             if hasattr(signal, "SIGTERM") and original_sigterm is not None:
                 signal.signal(signal.SIGTERM, original_sigterm)
-            if phase_eligible:
-                self.capture_plans = saved_capture_plans
-                self.show_query_plans = saved_show_query_plans
-
-        if phase_eligible:
-            self._capture_plans_post_measurement(connection, queries, results)
 
         self._log_execution_summary(results, total_queries, cancelled)
 
@@ -1460,12 +1470,19 @@ class TestDriversMixin:
         queries: dict[str, str],
         results: list[dict[str, Any]],
     ) -> None:
-        """Capture query plans in an isolated pass after the timed loop.
+        """Capture query plans in an isolated pass after the timed run.
+
+        Driven by ``_execute_queries_by_type`` for EVERY test type (power,
+        throughput, maintenance, combined): ``queries`` is the set of distinct
+        executed queries recorded by the inline chokepoint during the timed run
+        (``_phase_recorded_queries``), so the capture covers exactly what ran and
+        fires once per distinct query — never inside a concurrent stream.
 
         Runs ``run_plan_capture_phase`` for the successfully-executed queries on
         the *measurement* connection, strictly after all timed queries have run,
         then merges ``query_plan`` / ``plan_fingerprint`` / ``plan_capture_time_ms``
-        into the matching result dicts.
+        into every result row sharing that ``query_id`` (a throughput run has one
+        row per stream for the same query).
 
         The measurement connection is reused (rather than a fresh one) so embedded
         in-memory engines still see the loaded data; isolation comes from running
@@ -1487,10 +1504,14 @@ class TestDriversMixin:
         """
         from benchbox.core.plan_capture_phase import run_plan_capture_phase
 
+        # The recorded buffer is keyed by str(query_id); result rows may carry a
+        # non-str query_id (TPC-H power/throughput rows use the integer query
+        # permutation id), so coerce to str on every lookup or the merge silently
+        # never matches and plans fail to land.
         success_queries = {
-            result["query_id"]: queries[result["query_id"]]
+            str(result["query_id"]): queries[str(result["query_id"])]
             for result in results
-            if result.get("status") == "SUCCESS" and result.get("query_id") in queries
+            if result.get("status") == "SUCCESS" and str(result.get("query_id")) in queries
         }
         if not success_queries:
             return
@@ -1504,7 +1525,7 @@ class TestDriversMixin:
         )
 
         for result in results:
-            query_id = result.get("query_id")
+            query_id = str(result.get("query_id"))
             plan = phase.plans.get(query_id)
             if plan is not None:
                 result["query_plan"] = plan

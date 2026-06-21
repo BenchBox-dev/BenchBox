@@ -54,6 +54,22 @@ class TestPostgreSQLPlanCapture:
         result = adapter.get_query_plan(conn, "SELECT 1")
         assert result is None
 
+    def test_get_query_plan_accepts_cursor_backed_stream(self, adapter):
+        """A per-stream cursor (no callable .cursor()) is used directly, so streamed
+        TPC-DS power/throughput runs still capture plans instead of silently failing."""
+        # psycopg cursors expose execute/fetchall but NOT a .cursor() factory; spec
+        # restricts the mock so getattr(stream_cursor, "cursor") is absent.
+        stream_cursor = MagicMock(spec=["execute", "fetchall", "close"])
+        stream_cursor.fetchall.return_value = [('[{"Plan": {"Node Type": "Seq Scan"}}]',)]
+
+        result = adapter.get_query_plan(stream_cursor, "SELECT 1")
+
+        assert result is not None
+        assert "Seq Scan" in result
+        stream_cursor.execute.assert_called_once()
+        # The caller owns the stream cursor; plan capture must not close it.
+        stream_cursor.close.assert_not_called()
+
     def test_execute_query_with_capture_adds_plan_fields(self, adapter, monkeypatch):
         conn = _make_connection()
 

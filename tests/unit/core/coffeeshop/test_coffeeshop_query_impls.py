@@ -153,9 +153,9 @@ def _pandas_ctx():
             "total_price": [5.0, 3.0, 8.0, 4.0],
             "quantity": [1, 2, 1, 1],
             "unit_price": [5.0, 3.0, 8.0, 4.0],
-            "order_time": pd.to_datetime(
-                ["2023-01-10 08:00", "2023-01-10 12:00", "2023-01-15 16:00", "2024-06-01 20:00"]
-            ),
+            # Production loads TIME columns as "HH:MM:SS" strings (TIME has no
+            # reliable DataFrame dtype), so the fixture mirrors that contract.
+            "order_time": ["08:00:00", "12:00:00", "16:00:00", "20:00:00"],
         }
     )
     dim_locations = pd.DataFrame(
@@ -171,7 +171,6 @@ def _pandas_ctx():
         {
             "record_id": [10, 20],
             "subcategory": ["Coffee", "Tea"],
-            "product_name": ["Espresso", "Green Tea"],
             "name": ["Espresso", "Green Tea"],
             "product_id": [1001, 1002],
             "from_date": pd.to_datetime(["2022-01-01", "2022-01-01"]),
@@ -309,7 +308,7 @@ def test_sa5_expression_impl():
 def test_sa5_pandas_impl():
     from benchbox.core.coffeeshop.dataframe_queries.queries import sa5_pandas_impl
 
-    ctx = _mock_ctx()
+    ctx = _pandas_ctx()
     result = sa5_pandas_impl(ctx)
     assert result is not None
 
@@ -330,7 +329,7 @@ def test_pr1_expression_impl():
 def test_pr1_pandas_impl():
     from benchbox.core.coffeeshop.dataframe_queries.queries import pr1_pandas_impl
 
-    ctx = _mock_ctx()
+    ctx = _pandas_ctx()
     result = pr1_pandas_impl(ctx)
     assert result is not None
 

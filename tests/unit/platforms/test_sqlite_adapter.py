@@ -291,6 +291,21 @@ class TestSQLiteAdapter:
         assert result["error"] == "SQL syntax error"
         assert isinstance(result["execution_time_seconds"], float)
 
+    def test_execute_query_cursor_acquisition_failure_returns_failed(self):
+        """A broken/closed connection that fails at cursor() is recorded FAILED, not raised."""
+        adapter = SQLiteAdapter()
+        connection = Mock()
+        connection.cursor.side_effect = Exception("Cannot operate on a closed database.")
+
+        # Acquiring the cursor inside the try means setup failures become a FAILED query
+        # result rather than aborting the whole benchmark run before it is recorded.
+        result = adapter.execute_query(connection, "SELECT 1", "q1")
+
+        assert result["status"] == "FAILED"
+        assert result["query_id"] == "q1"
+        assert result["rows_returned"] == 0
+        assert "closed database" in result["error"]
+
     def test_apply_table_tunings(self):
         """Test table tuning application (limited support in SQLite)."""
         adapter = SQLiteAdapter()

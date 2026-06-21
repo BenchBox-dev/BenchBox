@@ -28,7 +28,12 @@ def _hits(ctx: DataFrameContext) -> Any:
 
 def _expr_july_mask(ctx: DataFrameContext, start: str = _DATE_FROM, end: str = _DATE_TO) -> Any:
     col, lit = ctx.col, ctx.lit
-    return (col("CounterID") == lit(62)) & (col("EventDate") >= lit(start)) & (col("EventDate") <= lit(end))
+    # EventDate is a Date column; compare against native date literals. Comparing a
+    # date column to a string literal raises in Polars ("cannot compare
+    # date/datetime to a string value"), unlike the SQL reference where the string
+    # is parsed as a date.
+    start_date, end_date = date.fromisoformat(start), date.fromisoformat(end)
+    return (col("CounterID") == lit(62)) & (col("EventDate") >= lit(start_date)) & (col("EventDate") <= lit(end_date))
 
 
 def _expr_filter(ctx: DataFrameContext, hits: Any, code: str) -> Any:
@@ -95,17 +100,20 @@ def _pandas_filter(hits: Any, code: str) -> Any:
     if code == "adv_ne_0":
         return hits[hits["AdvEngineID"] != 0]
     if code == "phone_model_nonempty":
-        return hits[hits["MobilePhoneModel"] != ""]
+        return hits[hits["MobilePhoneModel"].notna() & (hits["MobilePhoneModel"] != "")]
     if code == "search_nonempty":
-        return hits[hits["SearchPhrase"] != ""]
+        return hits[hits["SearchPhrase"].notna() & (hits["SearchPhrase"] != "")]
     if code == "url_google":
         return hits[hits["URL"].str.contains("google", na=False)]
     if code == "google_search":
-        return hits[hits["URL"].str.contains("google", na=False) & (hits["SearchPhrase"] != "")]
+        return hits[
+            hits["URL"].str.contains("google", na=False) & hits["SearchPhrase"].notna() & (hits["SearchPhrase"] != "")
+        ]
     if code == "google_title":
         return hits[
             hits["Title"].str.contains("Google", na=False)
             & ~hits["URL"].str.contains(".google.", na=False, regex=False)
+            & hits["SearchPhrase"].notna()
             & (hits["SearchPhrase"] != "")
         ]
     if code == "user_lookup":
