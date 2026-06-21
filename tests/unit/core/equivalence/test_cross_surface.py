@@ -60,8 +60,7 @@ class _FakeQuery:
         return self._impls.get(family)
 
 
-def _make_inputs(reference_rows, impls_by_backend):
-    sql = "SELECT * FROM t"
+def _make_inputs(reference_rows, impls_by_backend, sql="SELECT * FROM t"):
     connection = _FakeConnection({sql: reference_rows})
 
     def reference_sql(_qid):
@@ -102,6 +101,48 @@ def test_divergent_backend_is_reported_with_backend_cell():
         validator=ResultValidator(),
     )
     assert [(d.query_id, d.cell, d.key) for d in divergences] == [("Q1.1", "pandas", "Q1.1_pandas")]
+
+
+def test_tie_aware_only_applies_to_truncated_top_n_queries():
+    """A boundary-tie swap is tolerated for a LIMIT query but NOT a non-LIMIT one.
+
+    The tie-aware relaxation is only sound where a LIMIT can truncate a tie across
+    the cutoff; for a full (non-LIMIT) result set a changed duplicated-last-row is
+    a real divergence and must still be reported (it is not an ambiguous swap).
+    """
+    # Reference ordered by the last column DESC; boundary value 3 is duplicated.
+    ref = [(1, 5), (2, 3), (3, 3)]
+    swapped = [(1, 5), (2, 3), (99, 3)]  # a different row at the boundary tie value
+
+    # Non-LIMIT query: strict comparison -> the swap is reported.
+    connection, reference_sql, dataframe_query, contexts = _make_inputs(
+        ref, {"expression": swapped}, sql="SELECT a, c FROM t ORDER BY c DESC"
+    )
+    strict = find_cross_surface_divergences(
+        connection,
+        query_ids=["Q1"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(),
+        backends=("expression",),
+    )
+    assert [d.key for d in strict] == ["Q1_expression"], "non-LIMIT swap must be reported, not masked"
+
+    # Same swap under an ORDER BY ... LIMIT query: accepted as a boundary tie.
+    connection, reference_sql, dataframe_query, contexts = _make_inputs(
+        ref, {"expression": swapped}, sql="SELECT a, c FROM t ORDER BY c DESC LIMIT 3"
+    )
+    relaxed = find_cross_surface_divergences(
+        connection,
+        query_ids=["Q1"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(),
+        backends=("expression",),
+    )
+    assert relaxed == [], "boundary-tie swap under a LIMIT query should be tolerated"
 
 
 def test_missing_backend_impl_is_skipped_not_a_divergence():

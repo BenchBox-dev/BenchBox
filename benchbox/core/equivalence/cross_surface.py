@@ -64,6 +64,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -90,6 +91,23 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # gates' SF=0.1 DuckDB cell so routine PRs stay cheap (one bounded cell per
 # gated benchmark, never a full platform matrix).
 EQUIVALENCE_SCALE = 0.1
+
+_TRAILING_LIMIT_RE = re.compile(r"(?is)\blimit\s+\d+\s*(?:offset\s+\d+\s*)?;?\s*$")
+
+
+def _is_truncated_top_n(sql: str) -> bool:
+    """True if a SQL query ends in a ``LIMIT n`` (a truncated top-N candidate).
+
+    The tie-aware boundary relaxation is only sound where a ``LIMIT`` can actually
+    truncate a tie across the cutoff. Applying it to a full (un-truncated) result
+    set whose last order-key value is duplicated could let a real divergence in a
+    determined boundary row pass as an ambiguous "tie swap", so the gate enables
+    ``tie_aware`` per query ONLY for queries that carry a trailing ``LIMIT``;
+    everything else uses the strict comparator. A trailing line comment /
+    statement terminator is stripped first so ``... limit 10 -- note`` matches.
+    """
+    stripped = re.sub(r"\s*--[^\n]*$", "", sql.strip())
+    return bool(_TRAILING_LIMIT_RE.search(stripped))
 
 
 @dataclass(frozen=True)
@@ -171,6 +189,14 @@ def find_cross_surface_divergences(
         query_id: Any,
     ) -> Iterable[tuple[str, Callable[[list[tuple[Any, ...]]], None]]]:
         query = dataframe_query(query_id)
+        # tie_aware only for truncated top-N queries: a benchmark's own SQL and
+        # DataFrame surfaces are independent top-N implementations, so an
+        # ORDER BY ... LIMIT N whose ties span the cutoff can keep a different but
+        # equally-valid subset of the tied rows. Accept that boundary-tie ambiguity
+        # (the deterministic rows must still match exactly) - but ONLY where a
+        # LIMIT can actually truncate; a non-LIMIT query is compared strictly so a
+        # real divergence in a duplicated last row is never masked.
+        tie_aware = _is_truncated_top_n(reference_sql(query_id))
         for backend in backends:
             impl = query.get_impl_for_family(backend)
             if impl is None:
@@ -184,15 +210,10 @@ def find_cross_surface_divergences(
                 impl: Any = impl,
                 backend: str = backend,
                 query_id: Any = query_id,
+                tie_aware: bool = tie_aware,
             ) -> None:
                 candidate = materialize_rows(impl(contexts[backend]))
-                # tie_aware: a benchmark's own SQL and DataFrame surfaces are
-                # independent top-N implementations, so an ORDER BY ... LIMIT N
-                # whose ties span the cutoff can keep a different but equally-valid
-                # subset of the tied rows. Accept that boundary-tie ambiguity (the
-                # deterministic rows must still match exactly) rather than
-                # false-flagging it.
-                validator.validate_results_exact(reference, candidate, query_id, 0, tie_aware=True)
+                validator.validate_results_exact(reference, candidate, query_id, 0, tie_aware=tie_aware)
 
             yield backend, check
 
