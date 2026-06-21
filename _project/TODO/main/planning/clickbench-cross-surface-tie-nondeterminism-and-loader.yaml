@@ -41,23 +41,36 @@ description: |
   (A) REAL BUG - empty-string -> null/NaN on .tbl/.csv load (HIGH VALUE, affects
       all benchmarks). DuckDB reads an empty delimited field in a VARCHAR column
       as '', the DataFrame loaders read it as null (polars/expression) / NaN
-      (pandas). Confirmed manifestations:
-        - Q6_pandas   : COUNT(DISTINCT SearchPhrase) = 17 vs SQL 18 (NaN dropped
-                        by Series.nunique, which excludes NaN by default).
-        - Q25_pandas, : WHERE SearchPhrase <> '' ... ORDER BY EventTime[,SearchPhrase]
-          Q27_pandas    LIMIT 10 -> "'<' not supported between instances of 'str'
-                        and 'NoneType'" - the null-ified empty strings collide
-                        with real strings during the sort.
+      (pandas). DIRECTLY CONFIRMED on a build: SearchPhrase had 74948 empty
+      strings ('' = 74948, NULL = 0) in DuckDB, while BOTH DataFrame backends
+      loaded those same rows as null/NaN (pandas isna = 74948, == '' = 0; expr
+      null_count = 74948, == '' = 0). The generator genuinely emits '' (e.g.
+      generator.py:264 mobile_model = ... if is_mobile else ""), so this is a
+      load-time fidelity loss, not a data artifact. Manifestations:
+        - Q6_pandas (RELIABLE, deterministic): COUNT(DISTINCT SearchPhrase) =
+          SQL - 1 (e.g. 17 vs 18) because Series.nunique() excludes NaN by
+          default, dropping the former '' bucket DuckDB still counts.
+        - Q25_pandas / Q27_pandas (INTERMITTENT, data-dependent): seen in the
+          logged build as "'<' not supported between instances of 'str' and
+          'NoneType'" when the null-ified empty strings collide with real strings
+          during the ORDER BY sort - but a re-build (different random data, see
+          the non-determinism note below) ran both clean. Treat these as
+          non-reliable symptoms of the SAME root cause, not standalone bugs.
         - Compounds Q15/Q18/Q19/Q24/Q31/Q32 (WHERE SearchPhrase<>'' semantics and
           '' vs None in output rows), though those are ALSO tie-affected (D).
-      Loader read sites: benchbox/platforms/dataframe/pandas_family.py:554
-      (read_csv) and expression_family.py:930 (read_csv). Fix at the loader so a
-      VARCHAR/string-typed column keeps '' rather than null when the source field
-      is empty (pandas: na_filter/keep_default_na off for string columns or
-      post-read fillna(''); polars: missing_utf8_is_empty_string / equivalent),
-      gated on the SCHEMA TYPE being string (mirror the type-aware date-heuristic
-      discipline from w6 - never infer from the column name alone). Re-verify the
-      real DataFrame run path after the change; do NOT special-case the gate.
+      Loader read sites (the CONCRETE adapters build_production_contexts drives,
+      NOT the abstract read_csv signatures in pandas_family.py:554 /
+      expression_family.py:930): benchbox/platforms/dataframe/pandas_df.py:316
+      (df = pd.read_csv(path, **read_kwargs); read_kwargs is already assembled
+      type-aware at :300-307 - the w6 date-heuristic precedent and the natural
+      home for the fix) and polars_df.py:291 (lf = pl.scan_csv(path,
+      **scan_kwargs)). Fix so a string-typed column keeps '' rather than null
+      when the source field is empty (pandas: na_filter/keep_default_na off, or a
+      converters/post-read fillna('') restricted to string columns; polars:
+      missing_utf8_is_empty_string=True / equivalent scan_kwargs), gated on the
+      SCHEMA TYPE being string (mirror the type-aware date heuristic - never infer
+      from the column name alone). Re-verify the real DataFrame run path after the
+      change; do NOT special-case the gate.
 
   (B) REAL BUG - expression date-column compared to a STRING literal. The shared
       mask helper benchbox/core/clickbench/dataframe_queries/queries.py:31
@@ -111,15 +124,29 @@ description: |
         Q43 (ORDER BY DATE_TRUNC('minute', EventTime)) may be deterministic once
         (B) is fixed - re-check after the date fix before classifying.
 
+  (E) NOT A BUG, but a gateability blocker - the ClickBench generator is UNSEEDED.
+      ClickBenchDataGenerator (benchbox/core/clickbench/generator.py:42) takes no
+      seed and calls the process-global random module directly (random.randint /
+      random.choice at :229-269), so EVERY build produces different data. Observed
+      directly: two report builds gave different Q9 top rows (run 1 RegionID 147
+      u=134; run 2 RegionID 911 u=141) and different Q25/Q27 outcomes (errored vs
+      clean). So the gate's EXACT divergent-cell set is not stable run to run -
+      independent of the tie problem, an unseeded generator makes any
+      exact-comparison CI gate flaky. (joinorder_synthetic must be checked for the
+      same property before w4; if it too is unseeded, seed it or its generator at
+      the gate boundary.)
+
   CONSEQUENCE / why this reframes the gate: even after fixing every genuine bug
   (A, B, C), ClickBench CANNOT pass an exact cross-surface gate, because ~15 of
   its 43 queries are inherently non-deterministic at the LIMIT boundary. Forcing
   it green would require classifying ~15 queries as permanent known_divergences,
-  which guts the gate's value for ClickBench. This was not knowable at
-  applicability-sweep time (the sweep only counts shipped DataFrame queries 1:1
-  with SQL; it does not execute them). The campaign's w3 burndown for ClickBench
-  must therefore make an explicit SCOPING decision (see w3 below) rather than a
-  mechanical "fix the wrong surface" pass.
+  which guts the gate's value for ClickBench. The unseeded generator (E)
+  compounds this: even the deterministic cells would be validated against
+  different data each run. This was not knowable at applicability-sweep time (the
+  sweep only counts shipped DataFrame queries 1:1 with SQL; it does not execute
+  them). The campaign's w3 burndown for ClickBench must therefore make an explicit
+  SCOPING decision (see w3 below) rather than a mechanical "fix the wrong surface"
+  pass.
 
   RECOMMENDATION (for the campaign owner to ratify in w3): land (A) as a
   standalone loader-fidelity fix (it benefits ssb/coffeeshop and every future
@@ -136,39 +163,46 @@ prior_art:
   - "_project/analysis/cross-surface-applicability.md - marks clickbench + joinorder_synthetic as the two GATEABLE targets; should be annotated with the tie/LIMIT caveat (clickbench is shipped-DataFrame-complete but not exact-gateable)."
   - "benchbox/core/clickbench/dataframe_queries/queries.py - the spec-driven impls; bugs at :31 (_expr_july_mask date-vs-string), :260 (.slice OFFSET path), :350 (str.replace). The generic builders (_make_group_expression/_make_group_pandas, _make_scalar_*, _make_select_*) mean a single helper fix corrects many queries."
   - "benchbox/platforms/dataframe/unified_frame.py - UnifiedStrExpr (:104) needs .replace; UnifiedLazyFrame (:2917) needs .slice."
-  - "benchbox/platforms/dataframe/{pandas_family.py:554, expression_family.py:930} read_csv - the .tbl/.csv read sites where an empty VARCHAR field becomes null/NaN instead of ''."
+  - "benchbox/platforms/dataframe/pandas_df.py:316 (pd.read_csv, read_kwargs assembled type-aware at :300-307) and polars_df.py:291 (pl.scan_csv) - the CONCRETE production read sites where an empty VARCHAR field becomes null/NaN instead of ''. The pandas_family.py:554 / expression_family.py:930 read_csv are abstract signatures, not the fix site."
   - "d37396cb / e8125abe / 4a08ed3d - the coffeeshop precedent: route through the real loader, fix impl bugs the gate surfaces, fix LOADER bugs only where the loader is wrong (type-aware date heuristic, w6)."
 
 work:
   - id: w0
-    summary: "Re-validate the report-mode evidence and the A/B/C/D breakdown on a fresh build"
+    summary: "Re-validate the report-mode evidence and the A-E breakdown on a fresh build"
     status: pending
     notes: |
-      ClickBench data is generated randomly per build, so absolute aggregate
-      values differ run to run - the gate compares SQL vs DataFrame within ONE
-      build, which stays valid. Re-run the cross-surface gate in report mode for
-      clickbench at SF=0.1 (GATES["clickbench"], build_production_contexts,
+      ClickBench data is generated randomly per build (unseeded generator, (E)),
+      so absolute aggregate values AND the exact divergent-cell set differ run to
+      run - the gate compares SQL vs DataFrame within ONE build, which stays
+      valid. Re-run the cross-surface gate in report mode for clickbench at SF=0.1
+      (GATES["clickbench"], build_production_contexts,
       find_cross_surface_divergences) and capture stdout to /tmp/clickbench_gate.log.
-      Assert: 86 cells compared, ~35 divergent, and the divergent set still
-      partitions into (A) empty-string/null [Q6_pandas, Q25_pandas, Q27_pandas],
-      (B) date-vs-string [Q37/Q38/Q43_expression], (C) .slice [Q39-42_expression]
-      + .replace [Q29_expression], (D) tie/LIMIT [the remainder]. Confirm the
-      dtype parity (UserID n_unique identical across DuckDB/expression/pandas;
-      SearchPhrase n_unique 18/18/17). Record the replayable command + counts.
+      Assert the STRUCTURE (not the exact cell list, which varies): ~30-35
+      divergent cells partitioning into (A) empty-string/null [reliably Q6_pandas;
+      Q25/Q27_pandas only on some builds], (B) date-vs-string
+      [Q37/Q38/Q43_expression], (C) .slice [Q39-42_expression] + .replace
+      [Q29_expression], (D) tie/LIMIT [the remainder]. Confirm the deterministic
+      anchors: dtype parity (UserID n_unique identical across
+      DuckDB/expression/pandas) and SearchPhrase load divergence (DuckDB '' count
+      == both backends' null/NaN count, e.g. 74948). Record the replayable
+      command + counts.
 
   - id: w1
     summary: "(A) Fix empty-string -> null/NaN loader fidelity (type-aware, all benchmarks)"
     needs: [w0]
     status: pending
     notes: |
-      In the pandas and expression read_csv paths, keep an empty source field as
-      '' (not null/NaN) for SCHEMA-string columns, mirroring DuckDB. Gate the
-      behavior on the column's schema TYPE (never the name), like the w6 date
-      heuristic. Re-verify a real DataFrame benchmark run still works, then
-      re-run the clickbench report: Q6_pandas (nunique 18), Q25_pandas/Q27_pandas
-      (sort no longer raises) should clear. Re-check ssb + coffeeshop gates stay
-      green (no regression from the loader change). This is independently
-      shippable and is the highest-value item.
+      In the CONCRETE adapter read paths - pandas_df.py:316 (pd.read_csv, extend
+      the type-aware read_kwargs at :300-307) and polars_df.py:291 (pl.scan_csv
+      scan_kwargs) - keep an empty source field as '' (not null/NaN) for
+      SCHEMA-string columns, mirroring DuckDB. Gate the behavior on the column's
+      schema TYPE (never the name), like the w6 date heuristic. Re-verify a real
+      DataFrame benchmark run still works, then re-run the clickbench report:
+      Q6_pandas (the RELIABLE check - COUNT(DISTINCT SearchPhrase) should match
+      SQL) clears; Q25_pandas/Q27_pandas are intermittent (data-dependent) so do
+      not treat them as a pass/fail signal for this fix. Re-check ssb + coffeeshop
+      gates stay green (no regression from the loader change). This is
+      independently shippable and is the highest-value item.
 
   - id: w2
     summary: "(B)+(C) Fix the ClickBench expression impl bugs surfaced by the gate"
@@ -237,7 +271,7 @@ verification:
     expected_output: "~35 divergent cells partitioning into empty-string(A)/date(B)/slice+replace(C)/tie(D)"
   - description: "Loader fix clears the empty-string cells without breaking shipped gates"
     command: "re-run clickbench report after w1; re-run ssb + coffeeshop gates"
-    expected_output: "Q6_pandas/Q25_pandas/Q27_pandas cleared; ssb + coffeeshop still 0 divergent"
+    expected_output: "Q6_pandas reliably cleared (DuckDB '' count now == both backends' loaded '' count); ssb + coffeeshop still 0 divergent"
   - description: "expr impl fixes clear the error cells"
     command: "re-run clickbench report after w2"
     expected_output: "Q29/Q37/Q38/Q39/Q40/Q41/Q42/Q43_expression no longer ERROR (may become tie mismatches, handled in w3)"
