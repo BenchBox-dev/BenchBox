@@ -213,6 +213,56 @@ class TestDuckDBDisplayQueryPlan:
         )
 
 
+class TestDuckDBPlanRawOutputPolicy:
+    """capture_query_plan must honor the plan_raw_output retention config."""
+
+    def _capture(self, **config):
+        adapter = DuckDBAdapter(capture_plans=True, **config)
+        connection = adapter.create_connection()
+        try:
+            connection.execute("CREATE TABLE t (id INTEGER, val VARCHAR)")
+            connection.execute("INSERT INTO t VALUES (1, 'a'), (2, 'b')")
+            plan, _ = adapter.capture_query_plan(connection, "SELECT * FROM t WHERE id = 1", "rawpol")
+            return plan
+        finally:
+            adapter.close_connection(connection)
+
+    def test_default_policy_retains_raw_output(self):
+        # Default 'truncated' with a 16 KiB cap keeps a small plan's raw text whole.
+        plan = self._capture()
+        assert plan is not None
+        assert plan.raw_explain_output is not None
+        assert plan.plan_fingerprint is not None
+
+    def test_none_policy_drops_raw_output_but_keeps_dag(self):
+        plan = self._capture(plan_raw_output="none")
+        assert plan is not None
+        assert plan.raw_explain_output is None
+        # Structured DAG and fingerprint are retained regardless of the raw policy.
+        assert plan.logical_root is not None
+        assert plan.plan_fingerprint is not None
+
+    def test_truncated_policy_caps_raw_output(self):
+        plan = self._capture(plan_raw_output="truncated", plan_raw_output_max_bytes=64)
+        assert plan is not None
+        assert plan.raw_explain_output is not None
+        assert "truncated" in plan.raw_explain_output
+        assert plan.logical_root is not None
+
+    def test_invalid_max_bytes_config_falls_back_to_default(self):
+        # A non-integer cap must not crash capture; it falls back to the default cap.
+        plan = self._capture(plan_raw_output="truncated", plan_raw_output_max_bytes="not-an-int")
+        assert plan is not None
+        assert plan.raw_explain_output is not None
+
+    def test_non_positive_max_bytes_falls_back_to_default_not_drop(self):
+        # A non-positive cap is misconfiguration: it must fall back to the default cap
+        # (retaining raw text) rather than silently nulling it like the 'none' policy.
+        plan = self._capture(plan_raw_output="truncated", plan_raw_output_max_bytes=0)
+        assert plan is not None
+        assert plan.raw_explain_output is not None
+
+
 class TestDuckDBPlanCapture:
     """Test query plan capture in DuckDB adapter."""
 
