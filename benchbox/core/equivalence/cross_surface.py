@@ -281,9 +281,7 @@ def build_ssb_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
     SSBDataGenerator(scale_factor=scale_factor, output_dir=output_dir).generate_data()
     benchmark = SSBBenchmark(scale_factor=scale_factor, output_dir=output_dir)
 
-    connection = _load_duckdb_cell(
-        benchmark, output_dir, [table["name"] for table in TABLES.values()], label="SSB"
-    )
+    connection = _load_duckdb_cell(benchmark, output_dir, [table["name"] for table in TABLES.values()], label="SSB")
     return CrossSurfaceData(
         connection=connection,
         query_ids=list(benchmark.get_queries().keys()),
@@ -312,9 +310,7 @@ def build_amplab_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceDa
     AMPLabDataGenerator(scale_factor=scale_factor, output_dir=output_dir).generate_data()
     benchmark = AMPLabBenchmark(scale_factor=scale_factor, output_dir=output_dir)
 
-    connection = _load_duckdb_cell(
-        benchmark, output_dir, [table["name"] for table in TABLES.values()], label="AMPLab"
-    )
+    connection = _load_duckdb_cell(benchmark, output_dir, [table["name"] for table in TABLES.values()], label="AMPLab")
     return CrossSurfaceData(
         connection=connection,
         query_ids=list(benchmark.get_queries().keys()),
