@@ -1,0 +1,368 @@
+id: cross-surface-oracle-remediation
+title: "Remediate the cross-surface equivalence oracle: fix the bugs it found-and-dismissed, make it deterministic, order-aware, non-vacuous, and honest"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  An adversarial review of the cross-surface SQL<->DataFrame equivalence campaign
+  (PRs #826-#848 on develop; see
+  _project/analysis/adversarial-cross-surface-equivalence-review.md) reproduced
+  every finding by running the gates and found the oracle is real but narrow,
+  oversold, and partly vacuous. This TODO addresses ALL of those findings.
+
+  The headline problem: PR #848 concluded "ClickBench has ~no genuine DataFrame
+  logic bugs" and triaged 27 divergences as "tie-ambiguous top-N." That is false.
+  Re-running the gate shows at least three REAL, deterministic DataFrame bugs that
+  #848 rationalized away as ties:
+    - Q6_pandas: wrong COUNT(DISTINCT SearchPhrase) (18 SQL vs 17 pandas), a
+      scalar with NO ORDER BY and NO LIMIT - a tie is impossible. Root cause: the
+      DataFrame loader maps empty-string -> None and pandas .nunique() drops the
+      null. SearchPhrase has 74,724 empty strings / 0 nulls.
+    - Q17_pandas / Q18_pandas: wrong GROUP BY - pandas default groupby(dropna=True)
+      silently drops ~74k null-key rows, so the query runs over ~25% of the data.
+      The count multiset differs, which a boundary tie cannot cause.
+    - Q24 / Q17 col-1 "" vs None: the SAME root cause #848 deferred as a cosmetic
+      "dtype" issue. It is not cosmetic - it changes COUNT(DISTINCT) and GROUP BY
+      membership.
+
+  Compounding issues the review proved by reproduction:
+    - NON-DETERMINISM: the ClickBench gate returned 27 -> 25 -> 26 divergent cells
+      across three identical runs, with per-query values changing run to run. The
+      generated DATA is byte-identical across runs (verified by md5), so the wobble
+      is ENGINE tie-ordering (DuckDB/Polars thread parallelism under
+      LIMIT-without-total-ORDER), NOT data. random.seed(42) cannot fix it, and a
+      known_divergences baseline is therefore un-pinnable.
+    - ORDER-BY BLINDNESS: ResultValidator.validate_results_exact sorts FULL ROWS
+      before comparing (tpchavoc/validation.py:54-79), so ORDER BY is never checked
+      except via which rows survive LIMIT. A reversed ORDER BY passes silently;
+      equally-valid tie picks are flagged as false divergences; a column mixing
+      None and non-None crashes Python sorted() and is mislabeled "error:".
+    - VACUOUS CELLS: at SF=0.1, 6 of 13 SSB queries (Q2.1-2.3, Q3.3, Q3.4, Q4.3)
+      return ZERO rows on both surfaces, so 12 of 26 SSB cells pass empty-vs-empty
+      while the report counts them as "compared". The build guards empty TABLES
+      (cross_surface.py:261) but not empty RESULTS.
+    - FALSE INDEPENDENCE: SSB and ~40/43 ClickBench DataFrame queries are GENERATED
+      from a compact DSL spec, and BOTH "independent backends" are emitted from the
+      SAME spec row - so a spec-level logic error appears identically on both, and
+      the docs' "two independent implementations" claim (cross_surface.py:3-6,
+      dataframe_surface.py:48-50) is false for them. CoffeeShop (hand-written) is
+      the genuine exception.
+    - LOADER BYPASS: the gate materializes contexts straight from typed DuckDB
+      Arrow (dataframe_surface.py:74-125), never through DataFrameDataLoader, so a
+      green gate proves NOTHING about the production CSV->parquet loader's dtype
+      fidelity (leading-zero VARCHAR->int, empty->null). #847 "deferred dtype" is
+      docs-only and the bug is still live; the #846 DDL parser is a naive
+      whitespace tokenizer that breaks on DECIMAL(p, s), quoted names, and
+      multi-word types.
+    - GOVERNANCE: STAGED gates are not run in CI and have no promotion forcing
+      function; "guarded" in the coverage map means "registered in the GATES dict",
+      not "verified green"; the "12 gateable" applicability headline counts 6
+      benchmarks whose SQL<->DF id mapping was never verified (the team's own TODO
+      says "do NOT guess").
+
+prior_art:
+  - "_project/analysis/adversarial-cross-surface-equivalence-review.md - the review this TODO remediates; every finding has a reproduction command + output."
+  - "benchbox/core/equivalence/cross_surface.py - GATES vs STAGED_GATES, build_*_duckdb, find_cross_surface_divergences, count_executed_cells, run_gate, _report; the empty-RESULT guard belongs here."
+  - "benchbox/core/equivalence/dataframe_surface.py - materialize_rows, fetch_reference_rows, find_surface_divergences, _normalize_value (lines 239-263), build_dataframe_contexts_from_specs (74-125); the loader-bypass and the None/NaN coercion live here."
+  - "benchbox/core/tpchavoc/validation.py - ResultValidator.validate_results_exact (54-79) full-row sort; the order/tie-awareness change must not regress the TPC-Havoc gates that rely on it."
+  - "benchbox/core/clickbench/dataframe_queries/queries.py - _make_group_pandas (groupby as_index=False, line 291), nunique op (206/285), _SCALAR_ROWS/_GROUP_ROWS/_SELECT_ROWS spec tables (394/404/433); the dropna/nunique null bugs are systemic to these factories."
+  - "benchbox/core/ssb/dataframe_queries/queries.py - _QUERY_SPECS (158) and _make_expression_impl/_make_pandas_impl; both backends from one spec; SSB parameters that yield 6 empty results at SF=0.1."
+  - "benchbox/core/dataframe/data_loader.py - PYARROW_TYPE_MAP (191-199), _extract_arrow_types (1373-1382), convert_csv_to_parquet strings_can_be_null=True (329), cache version (74); the production load path the gate bypasses."
+  - "benchbox/core/dataframe/schema_utils.py - column_name (29-43) / column_sql_type (46-51) naive column.split() DDL parser (#846)."
+  - "_project/scripts/generate_oracle_coverage_map.py (guarded := GATES membership, 85/111) and cross_surface_applicability_sweep.py (registry presence + id overlap); the honesty fixes for M1/M2."
+  - "_project/TODO/main/active/benchmark-cross-surface-equivalence-gate.yaml - the original campaign TODO; w2/w3/w4 there are still 'in_progress' and overlap this remediation."
+
+work:
+  - id: w1
+    summary: "Fix the empty-string/null conflation in the DataFrame load path (C1: Q6, Q17, Q18, Q24 are REAL bugs)"
+    status: not_started
+    addresses: [C1, "review:CRITICAL C1", "#848 false conclusion"]
+    notes: |
+      The DataFrame surface conflates SQL '' with None, which changes results, not
+      just presentation. Two layers must be decided and fixed:
+
+      ROOT FIX (preferred) - loader fidelity: a CSV empty field in a declared
+      string/VARCHAR/TEXT column must materialize as '' (matching DuckDB/SQL), not
+      Arrow null. Today convert_csv_to_parquet passes strings_can_be_null=True
+      (data_loader.py:329) and pandas read_csv uses default na_values, so empties
+      become null on the production path; the gate path (DuckDB->Arrow) keeps ''.
+      Decide the canonical contract (recommend: declared-string empties stay '',
+      matching the SQL reference and the upstream ClickBench data) and enforce it on
+      BOTH load paths. This is the true fix and also resolves Q24/Q17-col1.
+
+      SYMPTOM FIX (only if the loader contract cannot be '' for a real reason):
+      make the generated factories null-correct - groupby(..., dropna=False) in
+      _make_group_pandas (clickbench queries.py:291; mirror in ssb) and a
+      null-aware distinct count instead of bare pandas .nunique() (queries.py:206/
+      285). But note this only patches generated factories; hand-written impls and
+      future benchmarks would still be exposed - which is why the loader fix is
+      preferred.
+
+      Whichever path: verify against the REAL DataFrame run (dataframe_runner /
+      benchmark_mixin), not the gate only - the gate bypasses the loader (see w6),
+      so a gate-only fix would be invisible to production.
+    acceptance:
+      - "Q6 COUNT(DISTINCT SearchPhrase) == 18 on DuckDB SQL, Polars expression, AND pandas."
+      - "Q17/Q18 GROUP BY count-multisets are identical across all three surfaces (no silently dropped null-key rows)."
+      - "Q24 and Q17 col-1 no longer diverge on '' vs None."
+      - "A new fast-lane unit test pins the empty-vs-null contract for a declared string column on the production load path."
+
+  - id: w2
+    summary: "Make the comparator order-aware and tie-aware; fix the None/NaN sort crash (BS2)"
+    status: not_started
+    addresses: [BS2, "review:Blind Spot 2", "review:DEMO1/2/3"]
+    notes: |
+      validate_results_exact (validation.py:54-79) sorts full rows then compares
+      positionally, so it is simultaneously BLIND to real ORDER BY bugs (a reversed
+      order passes - DEMO1) and NOISY on legitimate ties (two equally-valid tie
+      picks fail - DEMO2), and it crashes on a column mixing None with non-None
+      because Python sorted() cannot order None vs int (DEMO3), which
+      find_surface_divergences (dataframe_surface.py:234) then mislabels as
+      "error:" instead of a clean result.
+
+      Add an ORDER-AWARE comparison mode for queries that declare an ORDER BY:
+        - compare the ordered prefix up to the first tie group exactly (this
+          restores ORDER BY signal), then
+        - treat the rows sharing the boundary order-key as a MULTISET (this removes
+          the tie noise that #848 mistook for the whole story).
+      For queries with no ORDER BY, keep multiset/set comparison.
+      Fix the sort key to place None deterministically (e.g. sort on a (is_none,
+      value) surrogate) so a NULL-bearing column never raises, and so a genuine
+      None-vs-value difference is reported as a MISMATCH, not an "error:".
+
+      CRITICAL CONSTRAINT: this comparator is shared with the TPC-Havoc SQL and
+      DataFrame gates, which rely on its current semantics and run with empty
+      baselines. The order/tie-awareness must be additive (opt-in per query/gate)
+      and MUST keep all TPC-Havoc gates byte-identical-green. Do NOT fork the
+      validator for cross-surface only; extend it.
+    acceptance:
+      - "Ten consecutive ClickBench gate runs produce an IDENTICAL divergence set (determinism, jointly with w5)."
+      - "A deliberately reversed ORDER BY in a gated DataFrame query is caught (new mutation test, see w9)."
+      - "Two equally-valid tie picks at a LIMIT boundary are NOT reported as a divergence."
+      - "A result column mixing None and values yields a MISMATCH (if it differs) or a clean pass (if equal), never an 'error:' from sorted()."
+      - "All TPC-Havoc SQL and DataFrame equivalence gates remain green with unchanged output."
+
+  - id: w3
+    summary: "Eliminate engine nondeterminism at the gate boundary (H1)"
+    status: not_started
+    addresses: [H1, "review:HIGH H1", "claim 5"]
+    notes: |
+      The wobble is engine tie-ordering, not data. Pin it at the gate:
+        - run the gate's DuckDB connection and the Polars/pandas execution
+          single-threaded (PRAGMA threads=1; pl.Config / POLARS_MAX_THREADS=1), AND
+        - have both surfaces apply a deterministic TOTAL-ORDER tie-breaker before any
+          LIMIT (append all remaining columns / a stable key to ORDER BY on the SQL
+          reference and the DataFrame impls), so LIMIT truncation is reproducible.
+      Document explicitly (in cross_surface.py and the review's "determinism" claim)
+      that random.seed(42) makes the DATA reproducible but does NOT make the GATE
+      deterministic; the tie-breaker + single-thread is what does.
+    acceptance:
+      - "Three+ identical ClickBench AND SSB gate runs produce identical reports (count AND per-cell values)."
+      - "A regression test asserts gate output is byte-stable across two in-process runs on the same seed."
+
+  - id: w4
+    summary: "Fail (not silently pass) on vacuous empty-vs-empty cells; make every gated query discriminating (BS3)"
+    status: not_started
+    addresses: [BS3, "review:Blind Spot 3", "claim 4"]
+    notes: |
+      6/13 SSB queries return 0 rows at SF=0.1, so 12/26 cells pass empty-vs-empty.
+      Two parts:
+        1. Gate hygiene: track per-query reference row count in
+           find_cross_surface_divergences; in _report, count a both-empty cell as
+           NON-discriminating. The gate should FAIL (or require an explicit
+           classified "legitimately-empty" entry) if any gated query's reference is
+           empty, and the "compared N of M cells" line must exclude vacuous cells
+           from the discriminating count.
+        2. Data discrimination: for SSB, choose query parameters (or a per-benchmark
+           SF) so Q2.1-2.3/Q3.3/Q3.4/Q4.3 return rows at the bounded cell. Prefer
+           parameterization over raising SF globally (keep PRs cheap).
+      Apply the same empty-result audit to coffeeshop (currently 0/11 empty - good),
+      clickbench, and joinorder_synthetic before promotion.
+    acceptance:
+      - "Every gated query returns >=1 reference row at the bounded cell, OR is explicitly classified legitimately-empty with a rationale."
+      - "The gate report distinguishes discriminating cells from vacuous ones, and fails on an un-classified vacuous cell."
+      - "SSB still green after re-parameterization, now with 26/26 DISCRIMINATING cells."
+
+  - id: w5
+    summary: "Re-triage ClickBench with the fixed loader+comparator and correct the #848 record (C1 closeout)"
+    status: not_started
+    needs: [w1, w2, w3]
+    addresses: [C1, "#848", "review:C1"]
+    notes: |
+      After w1 (null fix), w2 (tie-aware), w3 (determinism): re-run the ClickBench
+      gate. Expectation: the genuine ties (Q9, Q15, Q16, Q31, Q32, Q33, Q38) become
+      clean (tie-aware comparison), and the real bugs (Q6, Q17, Q18, Q24) are fixed
+      by w1. ANY residual divergence is a real bug to fix, verified by checking the
+      ORDER-BY-key multiset, not extrapolated.
+      Correct _project/analysis/clickbench-cross-surface-divergences.md: the "~no
+      genuine DataFrame logic bugs" conclusion was wrong; record that Q6/Q17/Q18
+      were real null-handling bugs sharing root cause with the deferred '' vs None
+      issue. Promote clickbench from STAGED_GATES to GATES only once it is green with
+      an empty baseline AND deterministic.
+    acceptance:
+      - "ClickBench gate is deterministically green with an EMPTY known_divergences, or every residual divergence is a classified, evidence-backed real difference."
+      - "The clickbench analysis doc no longer claims 'no logic bugs'; it cites the fixed Q6/Q17/Q18."
+
+  - id: w6
+    summary: "Add a production-loader-path gate cell + harden the DDL parser and type maps (M4, L1, L2)"
+    status: not_started
+    addresses: [M4, L1, L2, "review:MEDIUM M4", "review:LOW L1/L2"]
+    notes: |
+      The gate's loader bypass (dataframe_surface.py:74-125 materializes from typed
+      DuckDB Arrow) means it cannot see production CSV->parquet dtype corruption.
+        - Add a gate cell/mode that loads each gated benchmark through the REAL
+          DataFrameDataLoader (CSV->parquet->read_parquet) and compares both dtypes
+          and values to the SQL reference, so loader corruption is observable.
+        - Harden schema_utils.column_name/column_sql_type (schema_utils.py:29-51):
+          replace the naive column.split() with a paren-aware, quote-aware DDL
+          column parser that handles DECIMAL(10, 2) (space after comma), quoted/
+          spaced names, and multi-word types (DOUBLE PRECISION, TIMESTAMP WITH TIME
+          ZONE, NOT NULL DEFAULT ...). Add unit tests for each shape.
+        - Extend PYARROW_TYPE_MAP and the polars/pandas maps (data_loader.py:191-199)
+          to cover TEXT, BIGINT, REAL, DOUBLE PRECISION, NUMERIC, BOOLEAN so declared
+          string/numeric types are applied at conversion instead of inferred.
+        - Apply declared STRING dtypes on the production load path (not just date-
+          name suppression) so a leading-zero VARCHAR is not inferred as int.
+      Re-verify the real DataFrame benchmark run still works (this is a loader fix,
+      not gate-only special-casing).
+    acceptance:
+      - "A leading-zero VARCHAR ('007') and an all-empty TEXT column survive the production load path identical to the SQL reference (new test)."
+      - "schema_utils parser unit tests pass for DECIMAL(p, s), quoted names, and multi-word types."
+      - "joinorder_synthetic's 10 deferred dtype divergences are resolved on the production path (closes the #847 deferral)."
+
+  - id: w7
+    summary: "Stop overclaiming independence; document what the oracle actually proves (BS1)"
+    status: not_started
+    addresses: [BS1, "review:Blind Spot 1", "claim 1"]
+    notes: |
+      Correct the docstrings that assert "two independent implementations"
+      (cross_surface.py:3-6) and "independent ... can diverge independently"
+      (dataframe_surface.py:48-50). For SSB and ~40/43 ClickBench queries BOTH
+      backends are generated from one DSL spec row, so they cannot diverge on logic
+      - only on engine semantics; the only real independence is SQL-text vs DSL-spec
+      (same author, same understanding). State plainly that the oracle catches
+      TRANSCRIPTION errors, not CONCEPTUAL ones, for DSL-generated benchmarks.
+      Record per gated benchmark whether its DataFrame surface is hand-written
+      (coffeeshop) or generated (ssb, clickbench). Optional but recommended: for at
+      least the enforced gates, ensure one surface is independently authored, or add
+      a second independent reference (e.g. the upstream published ClickBench answer
+      set) so the oracle is not just self-consistency.
+    acceptance:
+      - "Module docstrings accurately describe the independence the oracle has (and lacks) per benchmark."
+      - "The coverage map / a doc records generated-vs-handwritten for each gated benchmark."
+
+  - id: w8
+    summary: "Run staged gates in CI and add a promotion forcing-function (M3)"
+    status: not_started
+    addresses: [M3, "review:MEDIUM M3", "claim 10"]
+    notes: |
+      STAGED_GATES (clickbench, joinorder_synthetic) are not run in CI (pr.yml runs
+      only ssb + coffeeshop) and nothing fails when a staged gate is parked
+      indefinitely; test_clickbench_is_staged_not_enforced only BLESSES parking.
+        - Add the staged cross-surface reports to a non-blocking CI job so their
+          divergence snapshots cannot silently rot (promote to blocking once green
+          via w5).
+        - Add a governance test: a benchmark may sit in STAGED_GATES only with a
+          dated rationale and an owner; fail if a staged gate has been parked past a
+          declared review-by date. Delete a staged gate that no one will burn down
+          rather than leave a permanent red parking lot.
+    acceptance:
+      - "pr.yml runs the clickbench and joinorder_synthetic staged reports (non-blocking until green)."
+      - "A staged gate without a dated promotion rationale fails a governance test."
+
+  - id: w9
+    summary: "Tighten coverage-map / applicability honesty (M1, M2)"
+    status: not_started
+    addresses: [M1, M2, "review:MEDIUM M1/M2", "claims 6,7"]
+    notes: |
+      - generate_oracle_coverage_map.py derives 'guarded' from GATES dict membership
+        (85/111) and never checks the gate is green. Either run each gate (or read
+        its CI result) and add a distinct 'verified-green' signal, or rename
+        'guarded' -> 'gate-registered' so a registered-but-unverified gate is not
+        reported as coverage.
+      - cross_surface_applicability_sweep.py counts 6 'needs-id-mapping' benchmarks
+        (amplab, datavault, nyctaxi, tpcds_obt, tpch_skew, tsbs_devops) as 'gateable'
+        on ZERO verified id overlap; the campaign's own TODO warns 'do NOT guess'
+        the nyctaxi/tsbs mappings and tpcds_obt is 3 DF queries vs 89 SQL. Downgrade
+        these from 'gateable' to 'candidate-unverified' until an independent
+        SQL<->DF id mapping is confirmed per benchmark.
+    acceptance:
+      - "The coverage map separates 'gate registered' from 'gate verified green'."
+      - "Applicability does not count an unverified id mapping as gateable; the 6 are 'candidate-unverified' with a per-benchmark verification task."
+
+  - id: w10
+    summary: "Mutation-test the oracle to measure SENSITIVITY, not just specificity (C2 - the central question)"
+    status: not_started
+    needs: [w2, w4]
+    addresses: [C2, "review:CRITICAL C2", "deeper-question 2", "claim 9"]
+    notes: |
+      The campaign measured only that the gates PASS (specificity); it never measured
+      whether they CATCH a seeded bug (sensitivity). Add a mutation-test harness that,
+      per gated benchmark, injects a known DataFrame error and asserts the gate goes
+      RED:
+        - flip a filter comparator (< -> <=),
+        - drop a GROUP BY key,
+        - reverse a sort direction (this is the BS2 regression guard),
+        - drop a join.
+      For each mutation that the gate does NOT catch, document why (e.g. an empty-
+      result query from BS3, or an order-only change the comparator ignores) and feed
+      it back into w2/w4. This closes the central unanswered question: is the oracle
+      strong enough to find logic bugs, or did it find "no bugs" because it is too
+      weak/vacuous?
+    acceptance:
+      - "Each gated benchmark has >=3 mutation tests the gate provably catches."
+      - "Every mutation class the gate cannot catch is documented with the reason and a tracking item."
+
+deferred:
+  - summary: "A truly independent SQL-side oracle for non-tpch/tpcds benchmarks (e.g. upstream published answer sets)."
+    reason: "Large; cross-surface proves agreement not correctness. Tracked as a deeper question in the review, not required to close these findings."
+
+must_preserve:
+  - "All TPC-Havoc SQL and DataFrame equivalence gates stay green with empty baselines and byte-identical output - the comparator change (w2) is additive, never a fork."
+  - "benchbox run default (execution-only) behavior is unchanged for every benchmark; gate and loader changes must keep the real DataFrame run path working (re-verify a DataFrame benchmark run after w1/w6)."
+  - "The bounded one-cell-per-benchmark cost model is preserved; no full platform matrix in routine PRs."
+  - "SSB and CoffeeShop enforced gates stay green throughout (CoffeeShop is the reference 'good' gate)."
+
+anti_patterns:
+  - "DO NOT silence a divergence by adding it to known_divergences - because the baseline is for intentional presentational differences only - fix the wrong surface (this is exactly how #848 went wrong)."
+  - "DO NOT fix the null bug only in the gate path or only in the generated factories - because production and hand-written impls would stay broken - fix the loader contract (w1) and verify on the real run path."
+  - "DO NOT fork ResultValidator for cross-surface - because TPC-Havoc depends on it - extend it with an opt-in order/tie-aware mode."
+  - "DO NOT promote a staged gate to GATES while it is nondeterministic or has a non-empty baseline - because GATES membership is the coverage signal - green+empty+deterministic first."
+  - "DO NOT count an empty-vs-empty or unverified-id-mapping cell as coverage - because that is the exact 'theater' the review flagged."
+
+verification:
+  - description: "Re-run the full review reproduction appendix and confirm each finding is resolved."
+    command: "python -m benchbox.core.equivalence.cross_surface --benchmark clickbench  (x3, expect identical deterministic output)"
+  - description: "Mutation tests prove the gate catches seeded filter/group/sort/join bugs."
+    command: "pytest tests for cross-surface mutation sensitivity (w10)"
+  - description: "TPC-Havoc gates unchanged."
+    command: "make tpchavoc-equivalence-report && make tpchavoc-dataframe-equivalence-report"
+
+success_metrics:
+  - "ClickBench gate is deterministically green (empty baseline) across repeated runs, and Q6/Q17/Q18 are fixed at the loader."
+  - "The comparator catches a reversed ORDER BY and ignores legitimate tie reshuffles; no run-to-run wobble."
+  - "No gated query passes vacuously; every gated cell is discriminating or explicitly classified."
+  - "Coverage/applicability artifacts distinguish 'registered' from 'verified green' and do not count unverified id mappings; staged gates run in CI with a promotion deadline."
+  - "Module docs state honestly what the oracle proves; mutation tests quantify its sensitivity."
+
+finding_coverage:
+  - "CRITICAL C1 (real null bugs Q6/Q17/Q18/Q24) -> w1, w5"
+  - "CRITICAL C2 (oracle too weak/vacuous - central question) -> w10 (+ w2,w4 enabling)"
+  - "HIGH H1 (nondeterminism) -> w3 (+ w2 tie-awareness)"
+  - "Blind Spot 1 (false independence) -> w7"
+  - "Blind Spot 2 (order-blind, tie-noisy, None crash) -> w2"
+  - "Blind Spot 3 (vacuous empty cells) -> w4"
+  - "MEDIUM M1 (guarded == registered) -> w9"
+  - "MEDIUM M2 (12 gateable / unverified id maps) -> w9"
+  - "MEDIUM M3 (STAGED parking lot, no CI) -> w8"
+  - "MEDIUM M4 (gate bypasses loader) -> w6"
+  - "LOW L1 (fragile DDL parser #846) -> w6"
+  - "LOW L2 (#847 docs-only, type map gaps) -> w6"
+  - "LOW L3 (genuine fixes #836/#837/#841) -> no action (credit only)"
+
+metadata:
+  created: "2026-06-21"
+  source: "_project/analysis/adversarial-cross-surface-equivalence-review.md"
+  reviewed_prs: "#826-#848 (develop)"
