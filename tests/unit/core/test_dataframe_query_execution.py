@@ -67,7 +67,9 @@ class TestAMPLabDataFrameQueriesExecution:
             {
                 "sourceIP": ["1.2.3.4", "5.6.7.8", "9.10.11.12"],
                 "destURL": ["http://a.com/1", "http://b.com/2", "http://c.com/3"],
-                "visitDate": ["2000-01-15", "2000-02-10", "2000-03-20"],
+                # Date-typed to mirror the production loader's date32 visitDate column;
+                # the AMPLab DataFrame impls compare it against datetime.date params.
+                "visitDate": [date(2000, 1, 15), date(2000, 2, 10), date(2000, 3, 20)],
                 "adRevenue": [1.50, 0.00, 3.20],
                 "userAgent": ["Mozilla/5.0", "Mozilla/5.0", "Chrome"],
                 "countryCode": ["USA", "CHN", "USA"],
