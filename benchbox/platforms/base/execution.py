@@ -1302,14 +1302,34 @@ class TestDriversMixin:
         op_kwargs["platform_key"] = self.get_target_dialect()
         op_kwargs["platform_name"] = self.platform_name
 
-        if hasattr(self, "preprocess_operation_sql") and hasattr(benchmark, "get_operation"):
-            operation = benchmark.get_operation(str(query_id))
+        # Resolve the operation when we either preprocess its SQL or need to record it
+        # for deferred plan capture (the operation path bypasses execute_query() and so
+        # never reaches _merge_plan_capture_into_result()).
+        phase_active = getattr(self, "_plan_capture_phase_active", False)
+        operation = None
+        executed_sql: str | None = None
+        if (hasattr(self, "preprocess_operation_sql") or phase_active) and hasattr(benchmark, "get_operation"):
+            with contextlib.suppress(Exception):
+                operation = benchmark.get_operation(str(query_id))
+        if operation is not None and hasattr(self, "preprocess_operation_sql"):
             preprocessed = self.preprocess_operation_sql(str(query_id), operation)
             if preprocessed is not None:
                 op_kwargs["sql_override"] = preprocessed
+                executed_sql = preprocessed
+        if executed_sql is None and operation is not None:
+            executed_sql = getattr(operation, "write_sql", None)
 
         op_result = benchmark.execute_operation(query_id, connection, **op_kwargs)
         op_status = getattr(op_result, "status", None) or ("SUCCESS" if op_result.success else "FAILED")
+
+        # Record the executed SQL into the deferred plan-capture buffer so DML/write
+        # operations also get structural plans under --capture-plans. Operations go
+        # through this path rather than execute_query(), so they never reach
+        # _merge_plan_capture_into_result(); mirror its phase-recording here (SUCCESS
+        # only, guarded by the shared lock since throughput streams run concurrently).
+        if phase_active and op_status == "SUCCESS" and executed_sql:
+            with self._plan_capture_lock:
+                self._phase_recorded_queries.setdefault(str(query_id), executed_sql)
 
         result: dict[str, Any] = {
             "query_id": str(query_id),
@@ -1525,6 +1545,13 @@ class TestDriversMixin:
         )
 
         for result in results:
+            # Per-row SUCCESS guard mirrors the inline capture chokepoint: a captured
+            # plan is attached only to rows whose own status succeeded. ``success_queries``
+            # selects a query for capture if *any* row succeeded, but a failed row sharing
+            # that query_id must never be annotated as plan-captured (it would skew
+            # downstream plan stats).
+            if result.get("status") != "SUCCESS":
+                continue
             query_id = str(result.get("query_id"))
             plan = phase.plans.get(query_id)
             if plan is not None:

@@ -141,23 +141,36 @@ def strip_estimates(text: str) -> str:
     Genuine predicate text is preserved: removal is anchored to explicit estimate
     wording, so a predicate on a column literally named ``cost``, ``rows`` or
     ``num_rows`` (e.g. ``(cost=5 AND x=1)`` or ``num_rows = 5``) is left intact. A
-    genuine empty-list literal (e.g. ``arr = []``) is also preserved: the empty-bracket
-    tidy-up only runs when a removal actually happened.
+    genuine empty-list literal (e.g. ``arr = []``) is also preserved even on a line
+    that also carries an estimate (e.g. ``arr = [], metrics=[output_rows=5]`` keeps
+    ``arr = []``): only brackets *vacated by estimate removal* are tidied, never bare
+    brackets that were already empty in the input.
     Returns the cleaned, whitespace-normalized string.
     """
     if not text:
         return text
+    # The ``metrics=[...]`` block is always removed whole (including an empty
+    # ``metrics=[]``), so strip it first.
     cleaned = _METRICS_BLOCK_RE.sub("", text)
-    cleaned = _COST_PAREN_RE.sub("", cleaned)
+    # Protect genuine empty-list literals (``arr = []``, ``x IN []``) that survive
+    # metrics removal so the post-removal tidy-up below cannot delete them. Only the
+    # inline-estimate removal can vacate a *previously non-empty* bracket
+    # (``[Estimated Cardinality: 5]`` -> ``[]``); those newly-emptied brackets must
+    # still be tidied. Masking the pre-existing empties keeps a line such as
+    # ``FilterExec: arr = [], metrics=[...]`` intact as ``FilterExec: arr = []``.
+    sentinel = "\x00EMPTYBRACKET\x00"
+    masked_original = re.sub(r"\[\s*\]", sentinel, text)
+    masked = re.sub(r"\[\s*\]", sentinel, cleaned)
+    cleaned = _COST_PAREN_RE.sub("", masked)
     cleaned = _INLINE_ESTIMATE_RE.sub("", cleaned)
-    if cleaned != text:
+    if cleaned != masked_original:
         # Tidy separators left behind by a removal (trailing commas, and the now-empty
-        # ``[]`` an estimate token vacated). Guarding on an actual removal keeps a
-        # genuine empty-list predicate such as ``arr = []`` intact when no estimate
-        # text was stripped — previously every empty bracket pair was deleted.
+        # ``[]`` an estimate token vacated). Only brackets emptied *by the removal* are
+        # collapsed here; genuine empty-list predicates were masked above and so survive.
         cleaned = re.sub(r"\[\s*\]", "", cleaned)
         cleaned = re.sub(r"\s*,\s*(?=,|$)", "", cleaned)
         cleaned = re.sub(r",\s*$", "", cleaned)
+    cleaned = cleaned.replace(sentinel, "[]")
     cleaned = re.sub(r"\s{2,}", " ", cleaned)
     return cleaned.strip().strip(",").strip()
 

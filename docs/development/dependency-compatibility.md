@@ -37,12 +37,16 @@ future interpreter release needs bespoke packaging rules.
 | pydantic | `>=2.0.0` |
 | pyyaml | `>=6.0.0` |
 | packaging | `>=24.0` |
-| duckdb | `>=1.0.0,<1.4.0` |
+| duckdb | `>=1.0.0,<2.0.0` |
 
-DuckDB is capped below 1.4.0 across the development, `all`, `duckdb`, and
-`explorer` dependency paths until the browser runtime moves beyond
-`@duckdb/duckdb-wasm` 1.32.x. Newer native DuckDB writers can emit
-`results.duckdb` snapshots that the current WASM reader fails to attach.
+DuckDB is capped below the next major (`<2.0.0`) across the development,
+`all`, `duckdb`, and `explorer` dependency paths so a future 2.x API break
+surfaces in CI rather than silently during `uv sync`. Browser
+`results.duckdb` snapshots stay attachable by `@duckdb/duckdb-wasm`: DuckDB
+1.x writers default to the v1.0.0 on-disk storage format (version 64), which
+the WASM reader attaches regardless of the writer's version (a newer format
+is only emitted when a writer explicitly opts into
+`storage_compatibility_version`, which the snapshot builder does not).
 
 ## Optional Extras
 
@@ -53,7 +57,7 @@ DuckDB is capped below 1.4.0 across the development, `all`, `duckdb`, and
 | clickhouse | `clickhouse-driver>=0.2.0` |
 | cloud | `databricks-sql-connector>=2.0.0`, `google-cloud-bigquery>=3.0.0`, `google-cloud-storage>=2.0.0`, `redshift-connector>=2.0.0`, `snowflake-connector-python>=3.0.0`, `boto3>=1.20.0`, `cloudpathlib>=0.15.0` |
 | databricks | `databricks-sql-connector>=2.0.0`, `cloudpathlib>=0.15.0` |
-| dev | `pytest>=8.0.0`, `pytest-cov>=4.1.0`, `pytest-benchmark>=4.0.0`, `pytest-xdist>=3.0.0`, `duckdb>=1.0.0,<1.4.0`, `tox>=4.13.0` |
+| dev | `pytest>=8.0.0`, `pytest-cov>=4.1.0`, `pytest-benchmark>=4.0.0`, `pytest-xdist>=3.0.0`, `duckdb>=1.0.0,<2.0.0`, `tox>=4.13.0` |
 | docs | `sphinx>=7.2.0`, `sphinx-rtd-theme>=2.0.0`, `myst-parser>=2.0.0` |
 | redshift | `redshift-connector>=2.0.0`, `boto3>=1.20.0`, `cloudpathlib>=0.15.0` |
 | snowflake | `snowflake-connector-python>=3.0.0`, `cloudpathlib>=0.15.0` |

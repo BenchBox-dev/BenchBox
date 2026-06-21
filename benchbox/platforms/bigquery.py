@@ -1813,6 +1813,13 @@ class BigQueryAdapter(PlatformAdapter):
             self._record_plan_capture_failure(query_id, reason="parse_error", message="Parser returned no plan")
             return None, capture_time_ms
 
+        # Apply the raw_explain_output retention policy, mirroring the generic
+        # EXPLAIN-based capture_query_plan() path. This BigQuery path bypasses that
+        # method, so without this the plan_raw_output="none"/truncated policy would be
+        # ignored and the full raw plan text retained in the result bundle.
+        raw_output_policy, raw_output_max_bytes = self._resolve_raw_output_policy(query_id)
+        plan.apply_raw_output_policy(raw_output_policy, raw_output_max_bytes)
+
         capture_time_ms = (time.perf_counter() - start_time) * 1000
         self.query_plans_captured += 1
         return plan, capture_time_ms

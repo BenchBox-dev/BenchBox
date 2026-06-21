@@ -32,6 +32,25 @@ from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from .parameters import get_parameters
 from .registry import register_query
 
+
+def _visit_date(series: Any) -> Any:
+    """Coerce a pandas ``visitDate`` column to ``datetime.date`` for comparison.
+
+    The Parquet load path yields a date/datetime column already, but the raw-CSV
+    path (``prefer_parquet=False``) leaves ``visitDate`` as ISO ``YYYY-MM-DD``
+    strings, which pandas refuses to compare against the ``datetime.date`` query
+    params. Normalize both to ``date`` so the comparison matches the date-typed
+    params (mirroring the expression path's ``cast_date()``).
+    """
+    import pandas as pd
+
+    if isinstance(series, pd.Series) and not pd.api.types.is_datetime64_any_dtype(series):
+        return pd.to_datetime(series).dt.date
+    if isinstance(series, pd.Series):
+        return series.dt.date
+    return series
+
+
 # =============================================================================
 # Q1: Scan Query - filter rankings by pageRank
 # =============================================================================
@@ -114,8 +133,9 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
+    visit_date = col("visitDate").cast_date()
     return (
-        uservisits.filter((col("visitDate") >= lit(start_date)) & (col("visitDate") <= lit(end_date)))
+        uservisits.filter((visit_date >= lit(start_date)) & (visit_date <= lit(end_date)))
         .join(rankings, left_on="destURL", right_on="pageURL")
         .group_by("sourceIP")
         .agg(
@@ -136,7 +156,8 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
 
     uservisits = ctx.get_table("uservisits")
     rankings = ctx.get_table("rankings")
-    filtered = uservisits[(uservisits["visitDate"] >= start_date) & (uservisits["visitDate"] <= end_date)]
+    visit_date = _visit_date(uservisits["visitDate"])
+    filtered = uservisits[(visit_date >= start_date) & (visit_date <= end_date)]
     merged = filtered.merge(rankings, left_on="destURL", right_on="pageURL")
     return (
         merged.groupby(["sourceIP"], as_index=False)
@@ -164,7 +185,7 @@ def q2a_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     return (
-        uservisits.filter(col("visitDate") >= lit(start_date))
+        uservisits.filter(col("visitDate").cast_date() >= lit(start_date))
         .join(rankings, left_on="destURL", right_on="pageURL")
         .filter(col("pageRank") > lit(threshold))
         .select("destURL", "visitDate", "adRevenue", "pageRank", "avgDuration")
@@ -182,7 +203,7 @@ def q2a_pandas_impl(ctx: DataFrameContext) -> Any:
 
     uservisits = ctx.get_table("uservisits")
     rankings = ctx.get_table("rankings")
-    filtered = uservisits[uservisits["visitDate"] >= start_date]
+    filtered = uservisits[_visit_date(uservisits["visitDate"]) >= start_date]
     merged = filtered.merge(rankings, left_on="destURL", right_on="pageURL")
     merged = merged[merged["pageRank"] > threshold]
     return (
@@ -212,8 +233,8 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
 
     return (
         uservisits.filter(
-            (col("visitDate") >= lit(start_date))
-            & (col("visitDate") <= lit(end_date))
+            (col("visitDate").cast_date() >= lit(start_date))
+            & (col("visitDate").cast_date() <= lit(end_date))
             & (col("searchWord").str.contains(search_term))
         )
         .group_by("sourceIP")
@@ -238,9 +259,10 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
     limit_rows = params.get("limit_rows", 100)
 
     uservisits = ctx.get_table("uservisits")
+    visit_date = _visit_date(uservisits["visitDate"])
     filtered = uservisits[
-        (uservisits["visitDate"] >= start_date)
-        & (uservisits["visitDate"] <= end_date)
+        (visit_date >= start_date)
+        & (visit_date <= end_date)
         & (uservisits["searchWord"].str.contains(search_term, na=False))
     ]
     grouped = filtered.groupby(["sourceIP"], as_index=False).agg(
@@ -321,7 +343,7 @@ def q4_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     return (
-        uservisits.filter((col("visitDate") >= lit(start_date)) & (col("adRevenue") > lit(min_revenue)))
+        uservisits.filter((col("visitDate").cast_date() >= lit(start_date)) & (col("adRevenue") > lit(min_revenue)))
         .group_by("countryCode", "languageCode")
         .agg(
             col("countryCode").count().alias("visit_count"),
@@ -344,7 +366,8 @@ def q4_pandas_impl(ctx: DataFrameContext) -> Any:
     limit_rows = params.get("limit_rows", 100)
 
     uservisits = ctx.get_table("uservisits")
-    filtered = uservisits[(uservisits["visitDate"] >= start_date) & (uservisits["adRevenue"] > min_revenue)]
+    visit_date = _visit_date(uservisits["visitDate"])
+    filtered = uservisits[(visit_date >= start_date) & (uservisits["adRevenue"] > min_revenue)]
     grouped = filtered.groupby(["countryCode", "languageCode"], as_index=False).agg(
         visit_count=("countryCode", "count"),
         total_revenue=("adRevenue", "sum"),
@@ -374,7 +397,7 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     return (
-        uservisits.filter(col("visitDate") >= lit(start_date))
+        uservisits.filter(col("visitDate").cast_date() >= lit(start_date))
         .join(rankings, left_on="destURL", right_on="pageURL")
         .filter(col("pageRank") > lit(threshold))
         .group_by("countryCode")
@@ -401,7 +424,7 @@ def q5_pandas_impl(ctx: DataFrameContext) -> Any:
 
     uservisits = ctx.get_table("uservisits")
     rankings = ctx.get_table("rankings")
-    filtered = uservisits[uservisits["visitDate"] >= start_date]
+    filtered = uservisits[_visit_date(uservisits["visitDate"]) >= start_date]
     merged = filtered.merge(rankings, left_on="destURL", right_on="pageURL")
     merged = merged[merged["pageRank"] > threshold]
     grouped = merged.groupby(["countryCode"], as_index=False).agg(
