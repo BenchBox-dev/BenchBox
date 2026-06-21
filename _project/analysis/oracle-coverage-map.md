@@ -2,19 +2,19 @@
 
 **Generated** by `_project/scripts/generate_oracle_coverage_map.py` from the benchmark registry, the expected-results provider registry, and the equivalence-gate registries. Do not edit by hand — run the generator and commit. `tests/unit/test_oracle_coverage_map.py` fails if this drifts.
 
-**Summary:** 23 shipped benchmarks — 6 guarded, 17 UNGUARDED (15 reachable by the cross-surface gate, 2 single-surface needing a fallback oracle).
+**Summary:** 23 shipped benchmarks — 8 guarded, 15 UNGUARDED (13 reachable by the cross-surface gate, 2 single-surface needing a fallback oracle).
 
 | Benchmark | Surfaces | Oracle | Notes |
 | --- | --- | --- | --- |
 | ai_primitives | sql | NONE | single-surface → needs fallback oracle (w2) |
 | amplab | sql+dataframe | cross-surface | cross-surface |
-| clickbench | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
+| clickbench | sql+dataframe | cross-surface | cross-surface |
 | coffeeshop | sql+dataframe | cross-surface | cross-surface |
 | datavault | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
 | flightdata | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
 | h2odb | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
 | joinorder | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| joinorder_synthetic | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
+| joinorder_synthetic | sql+dataframe | cross-surface | cross-surface |
 | metadata_primitives | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
 | nyctaxi | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
 | read_primitives | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
@@ -36,5 +36,5 @@ These ship with no automated correctness oracle today. Dual-surface ones are dis
 
 > Caveat (w2 oracle choice): write/DML/nondeterministic benchmarks (`write_primitives`, `transaction_primitives`, `metadata_primitives`, `tpcdi`) are listed as dual-surface, but their two surfaces may not be result-comparable; prefer structural-invariant oracles (row counts, post-state assertions) over cross-surface equality for those.
 
-- Dual-surface (cross-surface candidates): clickbench, datavault, flightdata, h2odb, joinorder, joinorder_synthetic, metadata_primitives, nyctaxi, read_primitives, tpcdi, tpcds_obt, tpch_skew, transaction_primitives, tsbs_devops, write_primitives
+- Dual-surface (cross-surface candidates): datavault, flightdata, h2odb, joinorder, metadata_primitives, nyctaxi, read_primitives, tpcdi, tpcds_obt, tpch_skew, transaction_primitives, tsbs_devops, write_primitives
 - Single-surface (fallback-oracle needed): ai_primitives, vector_search

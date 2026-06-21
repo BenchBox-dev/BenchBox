@@ -59,12 +59,13 @@ def test_w2_fallback_set_is_exactly_the_registry_less_benchmarks(rows):
 
 
 def test_registry_bearing_benchmarks_are_gateable(rows):
-    """clickbench (direct) and a known id-mapping case are classified gateable."""
+    """h2odb (direct) and a known id-mapping case are classified gateable."""
     by_id = {r["benchmark"]: r["status"] for r in rows}
-    assert by_id.get("clickbench") == GATEABLE
+    assert by_id.get("h2odb") == GATEABLE
     # datavault ships a registry but its ids are friendly/Q-prefixed vs the SQL ids
-    # -> needs mapping. (amplab was previously the example here; it is now an
-    # enforced cross-surface gate, so it no longer appears among unguarded candidates.)
+    # -> needs mapping. (amplab, then clickbench/joinorder_synthetic, were previously
+    # the direct example here; all are now enforced cross-surface gates, so they no
+    # longer appear among the unguarded candidates.)
     assert by_id.get("datavault") == GATEABLE_NEEDS_ID_MAPPING
 
 

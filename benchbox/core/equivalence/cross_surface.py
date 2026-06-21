@@ -49,11 +49,13 @@ queries via :meth:`DataFrameQuery.get_impl_for_family` (the same accessor
 ``DataFrameAdapter.execute_query`` uses) - rather than any bespoke engine, and
 the comparator is reused from the shared harness, never forked.
 
-Currently gated: ssb (canonical and small; SQL and DataFrame ids correspond 1:1
-as ``Q1.1`` .. ``Q4.3``) and amplab (8 queries; the SQL ids ``"1"``, ``"1a"``,
-``"2"`` .. ``"5"`` map 1:1 to the DataFrame ids by a mechanical ``Q`` prefix:
-``"Q1"``, ``"Q1a"``, ``"Q2"`` .. ``"Q5"``). Additional dual-surface benchmarks
-are added by registering a :class:`CrossSurfaceGate` in :data:`GATES`.
+Currently gated (enforced :data:`GATES`): ssb (canonical and small; SQL and
+DataFrame ids correspond 1:1 as ``Q1.1`` .. ``Q4.3``), amplab (8 queries; the SQL
+ids ``"1"``, ``"1a"``, ``"2"`` .. ``"5"`` map 1:1 to the DataFrame ids by a
+mechanical ``Q`` prefix: ``"Q1"``, ``"Q1a"``, ``"Q2"`` .. ``"Q5"``), coffeeshop,
+clickbench (the one classified exception is the order-less ``Q18``) and
+joinorder_synthetic. Additional dual-surface benchmarks are added by registering a
+:class:`CrossSurfaceGate` in :data:`GATES`.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -62,6 +64,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -88,6 +91,23 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # gates' SF=0.1 DuckDB cell so routine PRs stay cheap (one bounded cell per
 # gated benchmark, never a full platform matrix).
 EQUIVALENCE_SCALE = 0.1
+
+_TRAILING_LIMIT_RE = re.compile(r"(?is)\blimit\s+\d+\s*(?:offset\s+\d+\s*)?;?\s*$")
+
+
+def _is_truncated_top_n(sql: str) -> bool:
+    """True if a SQL query ends in a ``LIMIT n`` (a truncated top-N candidate).
+
+    The tie-aware boundary relaxation is only sound where a ``LIMIT`` can actually
+    truncate a tie across the cutoff. Applying it to a full (un-truncated) result
+    set whose last order-key value is duplicated could let a real divergence in a
+    determined boundary row pass as an ambiguous "tie swap", so the gate enables
+    ``tie_aware`` per query ONLY for queries that carry a trailing ``LIMIT``;
+    everything else uses the strict comparator. A trailing line comment /
+    statement terminator is stripped first so ``... limit 10 -- note`` matches.
+    """
+    stripped = re.sub(r"\s*--[^\n]*$", "", sql.strip())
+    return bool(_TRAILING_LIMIT_RE.search(stripped))
 
 
 @dataclass(frozen=True)
@@ -169,6 +189,14 @@ def find_cross_surface_divergences(
         query_id: Any,
     ) -> Iterable[tuple[str, Callable[[list[tuple[Any, ...]]], None]]]:
         query = dataframe_query(query_id)
+        # tie_aware only for truncated top-N queries: a benchmark's own SQL and
+        # DataFrame surfaces are independent top-N implementations, so an
+        # ORDER BY ... LIMIT N whose ties span the cutoff can keep a different but
+        # equally-valid subset of the tied rows. Accept that boundary-tie ambiguity
+        # (the deterministic rows must still match exactly) - but ONLY where a
+        # LIMIT can actually truncate; a non-LIMIT query is compared strictly so a
+        # real divergence in a duplicated last row is never masked.
+        tie_aware = _is_truncated_top_n(reference_sql(query_id))
         for backend in backends:
             impl = query.get_impl_for_family(backend)
             if impl is None:
@@ -182,15 +210,10 @@ def find_cross_surface_divergences(
                 impl: Any = impl,
                 backend: str = backend,
                 query_id: Any = query_id,
+                tie_aware: bool = tie_aware,
             ) -> None:
                 candidate = materialize_rows(impl(contexts[backend]))
-                # tie_aware: a benchmark's own SQL and DataFrame surfaces are
-                # independent top-N implementations, so an ORDER BY ... LIMIT N
-                # whose ties span the cutoff can keep a different but equally-valid
-                # subset of the tied rows. Accept that boundary-tie ambiguity (the
-                # deterministic rows must still match exactly) rather than
-                # false-flagging it.
-                validator.validate_results_exact(reference, candidate, query_id, 0, tie_aware=True)
+                validator.validate_results_exact(reference, candidate, query_id, 0, tie_aware=tie_aware)
 
             yield backend, check
 
@@ -485,21 +508,6 @@ def build_joinorder_synthetic_duckdb(scale_factor: float, output_dir: Path) -> C
     )
 
 
-# Registry of ENFORCED gated benchmarks: clean, blocking cross-surface gates whose
-# DataFrame surface matches its SQL surface. The oracle coverage map reads this set
-# to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
-# belong here (registering a red gate here would be coverage theater).
-GATES: dict[str, CrossSurfaceGate] = {
-    "ssb": CrossSurfaceGate(name="ssb", build=build_ssb_duckdb),
-    "amplab": CrossSurfaceGate(name="amplab", build=build_amplab_duckdb),
-    "coffeeshop": CrossSurfaceGate(name="coffeeshop", build=build_coffeeshop_duckdb),
-}
-
-# Staged gates: the load-faithful builder is wired and runnable in report mode, but
-# the benchmark still has open cross-surface divergences to burn down before it can
-# be promoted into GATES (and made a blocking CI gate). Kept OUT of GATES so the
-# coverage map does not prematurely mark these benchmarks "guarded". See
-# `make <name>-cross-surface-equivalence-report` to enumerate their divergences.
 # Q18 is `SELECT UserID, SearchPhrase, COUNT(*) ... GROUP BY ... LIMIT 10` with NO
 # ORDER BY: at SF=0.1 the GROUP BY yields ~97k groups and the bare LIMIT keeps an
 # arbitrary 10, so the SQL and DataFrame surfaces each return a different - but
@@ -512,7 +520,19 @@ _CLICKBENCH_TIE_AMBIGUOUS = (
     "Q18 is LIMIT 10 with no ORDER BY over ~97k groups - an arbitrary, order-less top-N selection"
 )
 
-STAGED_GATES: dict[str, CrossSurfaceGate] = {
+# Registry of ENFORCED gated benchmarks: clean, blocking cross-surface gates whose
+# DataFrame surface matches its SQL surface. The oracle coverage map reads this set
+# to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
+# belong here (registering a red gate here would be coverage theater).
+GATES: dict[str, CrossSurfaceGate] = {
+    "ssb": CrossSurfaceGate(name="ssb", build=build_ssb_duckdb),
+    "amplab": CrossSurfaceGate(name="amplab", build=build_amplab_duckdb),
+    "coffeeshop": CrossSurfaceGate(name="coffeeshop", build=build_coffeeshop_duckdb),
+    # Promoted from STAGED_GATES once the two cross-cutting prerequisites landed:
+    # w9 (loader applies schema column TYPES + DuckDB empty-string semantics) made
+    # joinorder_synthetic 26/26 and cleared ClickBench Q17/Q24; w8 (tie-aware
+    # comparator) cleared ClickBench's tie-ambiguous top-N cells. ClickBench's only
+    # baseline entry is the order-less Q18 (see above).
     "clickbench": CrossSurfaceGate(
         name="clickbench",
         build=build_clickbench_duckdb,
@@ -523,6 +543,15 @@ STAGED_GATES: dict[str, CrossSurfaceGate] = {
     ),
     "joinorder_synthetic": CrossSurfaceGate(name="joinorder_synthetic", build=build_joinorder_synthetic_duckdb),
 }
+
+# Staged gates: a load-faithful builder is wired and runnable in report mode, but
+# the benchmark still has open cross-surface divergences to burn down before it can
+# be promoted into GATES (and made a blocking CI gate). Kept OUT of GATES so the
+# coverage map does not prematurely mark these benchmarks "guarded". Currently empty
+# - clickbench and joinorder_synthetic graduated to GATES; the next gateable
+# benchmarks (datavault, flightdata, h2odb, nyctaxi, read_primitives, tpcds_obt,
+# tpch_skew, tsbs_devops) land here first when their builders are wired.
+STAGED_GATES: dict[str, CrossSurfaceGate] = {}
 
 
 def get_gate(name: str) -> CrossSurfaceGate:

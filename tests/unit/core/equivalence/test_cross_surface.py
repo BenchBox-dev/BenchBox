@@ -60,8 +60,7 @@ class _FakeQuery:
         return self._impls.get(family)
 
 
-def _make_inputs(reference_rows, impls_by_backend):
-    sql = "SELECT * FROM t"
+def _make_inputs(reference_rows, impls_by_backend, sql="SELECT * FROM t"):
     connection = _FakeConnection({sql: reference_rows})
 
     def reference_sql(_qid):
@@ -102,6 +101,48 @@ def test_divergent_backend_is_reported_with_backend_cell():
         validator=ResultValidator(),
     )
     assert [(d.query_id, d.cell, d.key) for d in divergences] == [("Q1.1", "pandas", "Q1.1_pandas")]
+
+
+def test_tie_aware_only_applies_to_truncated_top_n_queries():
+    """A boundary-tie swap is tolerated for a LIMIT query but NOT a non-LIMIT one.
+
+    The tie-aware relaxation is only sound where a LIMIT can truncate a tie across
+    the cutoff; for a full (non-LIMIT) result set a changed duplicated-last-row is
+    a real divergence and must still be reported (it is not an ambiguous swap).
+    """
+    # Reference ordered by the last column DESC; boundary value 3 is duplicated.
+    ref = [(1, 5), (2, 3), (3, 3)]
+    swapped = [(1, 5), (2, 3), (99, 3)]  # a different row at the boundary tie value
+
+    # Non-LIMIT query: strict comparison -> the swap is reported.
+    connection, reference_sql, dataframe_query, contexts = _make_inputs(
+        ref, {"expression": swapped}, sql="SELECT a, c FROM t ORDER BY c DESC"
+    )
+    strict = find_cross_surface_divergences(
+        connection,
+        query_ids=["Q1"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(),
+        backends=("expression",),
+    )
+    assert [d.key for d in strict] == ["Q1_expression"], "non-LIMIT swap must be reported, not masked"
+
+    # Same swap under an ORDER BY ... LIMIT query: accepted as a boundary tie.
+    connection, reference_sql, dataframe_query, contexts = _make_inputs(
+        ref, {"expression": swapped}, sql="SELECT a, c FROM t ORDER BY c DESC LIMIT 3"
+    )
+    relaxed = find_cross_surface_divergences(
+        connection,
+        query_ids=["Q1"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(),
+        backends=("expression",),
+    )
+    assert relaxed == [], "boundary-tie swap under a LIMIT query should be tolerated"
 
 
 def test_missing_backend_impl_is_skipped_not_a_divergence():
@@ -164,19 +205,23 @@ def test_reference_failure_records_one_cell_and_skips_candidates():
     assert "no such table" in divergences[0].detail
 
 
-def test_clickbench_is_staged_not_enforced():
-    """ClickBench is wired as a STAGED gate (report mode) but NOT an enforced GATES entry.
+def test_clickbench_and_joinorder_are_enforced_gates():
+    """ClickBench and joinorder_synthetic are promoted to enforced GATES (w4).
 
-    It still has open SQL<->DataFrame divergences (see
-    _project/analysis/clickbench-cross-surface-divergences.md), so it must stay out
-    of GATES - the oracle coverage map reads GATES to mark a benchmark "guarded",
-    and registering a red gate there would be coverage theater. `get_gate` must
-    still resolve it for report-mode runs.
+    Once the two cross-cutting prerequisites landed - w9 (loader applies schema
+    column TYPES + DuckDB empty-string semantics) and w8 (tie-aware comparator) -
+    both staged gates went clean and graduated from STAGED_GATES to GATES, so the
+    oracle coverage map marks them cross-surface "guarded". ClickBench's only
+    baseline entry is the genuinely order-less Q18.
     """
     from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES, get_gate
 
-    assert "clickbench" in STAGED_GATES
-    assert "clickbench" not in GATES
+    assert "clickbench" in GATES
+    assert "joinorder_synthetic" in GATES
+    assert "clickbench" not in STAGED_GATES
     assert get_gate("clickbench").name == "clickbench"
+    assert set(GATES["clickbench"].known_divergences) == {"Q18_expression", "Q18_pandas"}
+    # joinorder_synthetic is clean (empty baseline).
+    assert GATES["joinorder_synthetic"].known_divergences == {}
     # ssb stays the enforced precedent.
     assert "ssb" in GATES

@@ -379,10 +379,37 @@ work:
   - id: w4
     summary: "Promote to bounded CI gates and add fast-lane regressions"
     needs: [w3, w8, w9]
-    status: in_progress
+    status: done
     notes: |
-      One bounded small-SF DuckDB cell per gated benchmark, wired into the
-      correctness-gate CI job and a Make target, mirroring
+      DONE for the two STAGED gates (the prerequisite-driven promotion w8/w9
+      unblocked). clickbench and joinorder_synthetic moved STAGED_GATES -> GATES in
+      cross_surface.py; both wired as BLOCKING steps in the pr.yml correctness-gate
+      job (make clickbench-cross-surface-equivalence-report,
+      make joinorder-synthetic-cross-surface-equivalence-report) beside ssb/amplab/
+      coffeeshop; medium-marker fast-lane regressions added
+      (tests/integration/test_{clickbench,joinorder_synthetic}_cross_surface_equivalence.py)
+      mirroring test_ssb_cross_surface_equivalence.py; unit test updated
+      (test_clickbench_and_joinorder_are_enforced_gates). Proved each FAILS on a
+      planted divergence (clickbench Q1 count+1000 -> Q1_expression+Q1_pandas;
+      joinorder 1a value+99999 -> 1a_expression+1a_pandas; no collateral).
+      clickbench's only baseline entry is the order-less Q18; joinorder_synthetic is
+      clean. Regenerated the oracle coverage map (make oracle-coverage-map) - both
+      now show cross-surface "guarded" (15 UNGUARDED, was 17 dual-surface) - and
+      committed it; updated the coverage-map TODO w1 dispatch note. STAGED_GATES is
+      now empty. ssb/amplab/coffeeshop and TPC-Havoc gates re-verified green.
+
+      FOLLOW-ON (separate focused gate PRs, tracked by
+      benchmark-correctness-oracle-coverage-map w1, NOT a blocker for this item):
+      wire the remaining gateable dual-surface benchmarks one PR each - datavault,
+      flightdata, h2odb, nyctaxi, read_primitives (152-id intersection), tpcds_obt
+      (partial), tpch_skew, tsbs_devops (several need id normalization or a bounded
+      data-source check first), and joinorder (SF=1-only; covered by
+      joinorder_synthetic). Each follows the same recipe: build_<bench>_duckdb,
+      register in GATES, add a pr.yml step + a fast-lane test, prove a planted
+      divergence fails, regenerate the coverage map.
+
+      Original plan: one bounded small-SF DuckDB cell per gated benchmark, wired into
+      the correctness-gate CI job and a Make target, mirroring
       tpchavoc-(dataframe-)equivalence-report. Add a medium-marker pytest per
       benchmark like tests/integration/test_tpchavoc_variant_equivalence.py.
       Prove each gate fails when a deliberate divergence is introduced into one
@@ -701,4 +728,4 @@ metadata:
   tags: [equivalence, correctness, dataframe, sql, ci, tpch, tpcds, ssb]
   estimated_effort: "Large"
   created_date: "2026-06-16"
-  last_updated: "2026-06-21T23:30:00"
+  last_updated: "2026-06-22T00:30:00"
