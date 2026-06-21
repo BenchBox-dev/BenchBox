@@ -6,7 +6,28 @@ at SF=0.1 on DuckDB, SQL as the reference for its own DataFrame surface
 (`expression` = Polars, `pandas`). The generator is seeded (#845), so the cell is
 reproducible.
 
-13 queries × 2 backends = 26 cells. **Current: 10 divergent, 16 passing.**
+13 queries × 2 backends = 26 cells. **RESOLVED (w9): 26/26, 0 divergent.**
+
+## Resolution (w9, 2026-06-21)
+
+The 10 dtype cells below were cleared by applying the schema's declared column
+TYPES on the real DataFrame load path (not per-file inference):
+  - **CSV→Parquet (Polars/expression):** `SchemaMapper.PYARROW_TYPE_MAP` only
+    listed a few SQL type names, so declared `TEXT` columns fell through to
+    inference (all-NULL `note` → `Null`; numeric-looking `info` → `float64`).
+    Added `SchemaMapper.sql_type_to_pyarrow()` covering every SQL type family
+    (`TEXT`/`STRING`/`CHAR` → string, INT family → int64, DECIMAL/FLOAT → float64,
+    DATE → date32, TIMESTAMP → timestamp[us]) and routed `_extract_arrow_types`
+    through it. Cleared 1a/1b/5a/8a/9a/10a (expression) and 4a/12a (expression).
+  - **Pandas (reads CSV, not Parquet):** `read_csv` now reads declared text
+    columns as `object` (so `info` ratings are not inferred `float64`) and parses
+    declared DATE/TIMESTAMP columns as temporal even when the name misses the
+    suffix heuristic. Cleared 4a/12a (pandas).
+
+Bumped the DataFrame Parquet cache `v3`→`v4` (conversion rules changed). The
+benchmark now promotes to `GATES` in w4. Original diagnosis retained below.
+
+### Original snapshot: 10 divergent, 16 passing
 
 ## Fixed while wiring this gate
 
@@ -61,6 +82,6 @@ rushed.
 
 ## Status
 
-joinorder_synthetic stays in `STAGED_GATES` (report mode), **not** `GATES`, until
-the 10 dtype cells are resolved. Then promote to `GATES` + a blocking `pr.yml`
-step.
+RESOLVED (w9): the 10 dtype cells are cleared (26/26, 0 divergent) by the
+loader-layer type/null fixes above. Promote to `GATES` + a blocking `pr.yml` step
+in w4.

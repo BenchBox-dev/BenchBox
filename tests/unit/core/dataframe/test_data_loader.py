@@ -311,6 +311,72 @@ class TestFormatConverter:
             shipdate_col = table.column("l_shipdate")
             assert shipdate_col[0].as_py() == __import__("datetime").date(1996, 3, 13)
 
+    def test_sql_type_to_pyarrow_covers_type_families(self):
+        """Declared SQL type families resolve to a PyArrow type (w9 regression).
+
+        Before w9 the lookup only knew the few names in PYARROW_TYPE_MAP, so a
+        declared TEXT/STRING/BIGINT/NUMERIC column fell through to inference and a
+        null-heavy or numeric-looking text column got the wrong dtype.
+        """
+        assert SchemaMapper.sql_type_to_pyarrow("TEXT") == "string"
+        assert SchemaMapper.sql_type_to_pyarrow("text not null") == "string"
+        assert SchemaMapper.sql_type_to_pyarrow("STRING") == "string"
+        assert SchemaMapper.sql_type_to_pyarrow("VARCHAR(12)") == "string"
+        assert SchemaMapper.sql_type_to_pyarrow("CHARACTER VARYING") == "string"
+        assert SchemaMapper.sql_type_to_pyarrow("BIGINT") == "int64"
+        assert SchemaMapper.sql_type_to_pyarrow("INTEGER") == "int64"
+        assert SchemaMapper.sql_type_to_pyarrow("NUMERIC(10,2)") == "float64"
+        assert SchemaMapper.sql_type_to_pyarrow("DOUBLE PRECISION") == "float64"
+        assert SchemaMapper.sql_type_to_pyarrow("DATE") == "date32"
+        assert SchemaMapper.sql_type_to_pyarrow("TIMESTAMP") == "timestamp[us]"
+        assert SchemaMapper.sql_type_to_pyarrow("TIME") == "string"
+        # Genuinely unknown types are left to inference (None).
+        assert SchemaMapper.sql_type_to_pyarrow("SOMEWEIRDTYPE") is None
+
+    def test_convert_csv_null_marker_controls_empty_string_vs_null(self):
+        """null_marker gates empty-field handling for string columns (w9 regression).
+
+        With null_marker=None an empty field stays "" (matching DuckDB's nullstr
+        sentinel); with null_marker="" it becomes NULL. The same data must
+        materialize differently per the benchmark's resolved CSV dialect so the
+        DataFrame surface does not emit None where the SQL surface emits "".
+        """
+        import pyarrow.parquet as pq
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            csv_path = tmpdir / "t.csv"
+            # row 1 has an empty 'note'
+            csv_path.write_text("1|\n2|hello\n")
+            column_names = ["id", "note"]
+            column_types = {"id": "int64", "note": "string"}
+
+            keep = tmpdir / "keep.parquet"
+            status, _ = FormatConverter.convert_csv_to_parquet(
+                source_path=csv_path,
+                target_path=keep,
+                column_names=column_names,
+                delimiter="|",
+                column_types=column_types,
+                null_marker=None,
+            )
+            assert status == ConversionStatus.SUCCESS
+            note_keep = pq.read_table(keep).column("note").to_pylist()
+            assert note_keep == ["", "hello"]
+
+            nulled = tmpdir / "nulled.parquet"
+            status, _ = FormatConverter.convert_csv_to_parquet(
+                source_path=csv_path,
+                target_path=nulled,
+                column_names=column_names,
+                delimiter="|",
+                column_types=column_types,
+                null_marker="",
+            )
+            assert status == ConversionStatus.SUCCESS
+            note_nulled = pq.read_table(nulled).column("note").to_pylist()
+            assert note_nulled == [None, "hello"]
+
     def test_convert_tbl_with_column_types_casts_dates(self):
         """Test that column_types ensures date typing in TBL files.
 

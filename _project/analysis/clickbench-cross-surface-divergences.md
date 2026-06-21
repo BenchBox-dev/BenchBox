@@ -76,12 +76,18 @@ per-query:
     boundary order-key value, instead of position-by-position), or
   - classify genuinely tie-ambiguous queries as accepted divergences.
 
-Exceptions (a different, real class — and the deferred dtype issue):
-- **Empty-string vs None** (Q17 col 1, Q24 col 14): SQL emits `""`, the DataFrame
-  emits `None`. This is the same null/dtype materialization issue tracked for
-  joinorder_synthetic (CSV→parquet conversion); see
-  `joinorder-synthetic-cross-surface-divergences.md`. Resolve with the loader
-  dtype fix, not a ClickBench change.
+Exceptions (a different, real class — RESOLVED in w9):
+- **Empty-string vs None** (Q17 col 1, Q24 col 14): SQL emitted `""`, the
+  DataFrame emitted `None`. RESOLVED (w9, 2026-06-21): the root cause was the
+  per-benchmark CSV `null_marker`, not dtype — DuckDB resolves `nullstr` via
+  `resolve_csv_dialect` (ClickBench `null_marker=None` ⇒ empty kept `""`), while
+  the DataFrame path always nulled empty fields. The resolved `null_marker` is now
+  threaded into both surfaces (Parquet `strings_can_be_null`, pandas `""` restore
+  on declared string columns), so empty stays `""` for ClickBench. Q24 also
+  surfaced `ClientEventTime` (declared `TIMESTAMP`) read as a string in pandas —
+  fixed by making pandas date parsing TYPE-aware. **Q24 fully clears; Q17's
+  remaining divergence is the tie-ambiguous top-N below (w8), not the loader
+  issue.** See `joinorder-synthetic-cross-surface-divergences.md`.
 
 Net: ClickBench has ~no genuine DataFrame *logic* bugs here — the staged-gate
 divergences are (1) tie-ambiguous top-N comparison (gate-level) and (2) the

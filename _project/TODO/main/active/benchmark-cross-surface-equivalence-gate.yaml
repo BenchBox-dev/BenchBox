@@ -444,8 +444,68 @@ work:
   - id: w9
     summary: "Apply schema column TYPES (not just names) when loading the DataFrame surface (clears joinorder_synthetic's 10 dtype cells)"
     needs: [w5, w6]
-    status: pending
+    status: done
     notes: |
+      DONE. Made the production DataFrame loader apply the schema's declared column
+      TYPES (and DuckDB-matching empty-field semantics) instead of per-file
+      inference. Three loader-layer fixes, all additive, no per-query changes:
+
+        1. SQL-type -> Arrow-type map was incomplete. The CSV->Parquet conversion
+           (the Polars/expression path, which reads read_parquet) only typed the
+           handful of names in SchemaMapper.PYARROW_TYPE_MAP (VARCHAR/CHAR/INTEGER/
+           DATE/...), so declared TEXT/STRING/BIGINT/NUMERIC/... columns fell
+           through to PyArrow inference - an all-NULL TEXT column (joinorder
+           movie_companies.note) inferred as Null, a numeric-looking TEXT column
+           (movie_info_idx.info ratings) as float64. Added
+           SchemaMapper.sql_type_to_pyarrow() covering every SQL type family
+           (TEXT/STRING/CHAR -> string, INT family -> int64, DECIMAL/FLOAT family
+           -> float64, DATE -> date32, TIMESTAMP/DATETIME -> timestamp[us]) and
+           routed _extract_arrow_types through it. Cleared the 6 Polars
+           "expected String type" cells (1a/1b/5a/8a/9a/10a) and the float64-vs-str
+           cells (4a/12a).
+        2. Pandas reads CSV, not Parquet (its recommended_data_format is CSV), so
+           the Parquet fix did not reach it. read_csv now (a) reads declared text
+           columns as object (so numeric-looking text is not inferred float64) and
+           (b) parses a declared DATE/TIMESTAMP column as temporal even when its
+           NAME does not match the date-suffix heuristic (ClickBench
+           ClientEventTime TIMESTAMP was read as a raw string vs DuckDB's datetime).
+           Date detection is now TYPE-aware (extends the w6 numeric-exclusion).
+        3. Empty-string vs NULL (ClickBench Q17/Q24): the DataFrame surface emitted
+           None where the SQL surface emits "". Root cause was the per-benchmark
+           CSV null_marker, NOT dtype: DuckDB resolves nullstr via
+           resolve_csv_dialect (ClickBench null_marker=None -> empty kept "";
+           JoinOrder null_marker="" -> empty -> NULL), while the DataFrame path
+           always nulled empties (coincidentally matching JoinOrder, diverging from
+           ClickBench). Threaded the SAME resolved null_marker into both surfaces:
+           the Parquet conversion sets strings_can_be_null = (null_marker is not
+           None); pandas restores "" on declared string columns when null_marker is
+           None; pandas load_table now resolves null_marker via resolve_csv_dialect
+           (not the file-extension heuristic) so JoinOrder still nulls empties.
+           Bumped the DataFrame Parquet cache v3->v4 (conversion rules changed).
+
+      EVIDENCE:
+        - make joinorder-synthetic-cross-surface-equivalence-report: 26/26, 0
+          divergent (was 16/26). Deterministic (seeded generator).
+        - make clickbench-cross-surface-equivalence-report: Q24 fully cleared (both
+          backends); Q17's empty-string/dtype residue cleared - Q17's remaining
+          divergence is the tie-ambiguous top-N (ORDER BY COUNT(*) DESC LIMIT 10,
+          different tied UserIDs per backend), which is w8's domain, not w9. Overall
+          clickbench 27 -> 22 divergent; the 22 are exactly the w8 tie-ambiguous set.
+        - Enforced gates unaffected: ssb 26/26, amplab 16/16, coffeeshop 22/22, all
+          0 divergent (their null_marker is "" or .tbl, or None with no compared
+          empties). tpchavoc SQL gate 220/220 and DataFrame gate 440/440, 0
+          divergent (the latter uses DuckDB->Arrow, unaffected).
+        - 1863 tests/unit/core/dataframe + core/equivalence + platforms/dataframe
+          pass. ruff clean; no new ty diagnostics. Real benchbox-run DataFrame load
+          path re-verified (data loads via the production loader unchanged; the
+          NOT_RUN CLI query-selection quirk pre-exists on develop).
+      Files: benchbox/core/dataframe/data_loader.py (sql_type_to_pyarrow,
+      _get_null_markers, null_marker threading, cache v4),
+      benchbox/platforms/dataframe/pandas_df.py (string-col dtype, type-aware date
+      parse, empty-string restore), benchbox/platforms/dataframe/pandas_family.py
+      (resolve_csv_dialect for the benchmark-instance null_marker). Original plan
+      below.
+
       PREREQUISITE for promoting joinorder_synthetic STAGED_GATES->GATES (w4) and for
       ClickBench Q17/Q24 (empty-string-vs-None). DEFERRED by user decision
       (2026-06-21) to keep that session focused; it remains REQUIRED for w4 and is
@@ -584,4 +644,4 @@ metadata:
   tags: [equivalence, correctness, dataframe, sql, ci, tpch, tpcds, ssb]
   estimated_effort: "Large"
   created_date: "2026-06-16"
-  last_updated: "2026-06-21T00:00:00"
+  last_updated: "2026-06-21T22:00:00"

@@ -173,6 +173,78 @@ class TestPandasDataLoading:
         assert not pd.api.types.is_datetime64_any_dtype(df["d_date_sk"])
         assert pd.api.types.is_datetime64_any_dtype(df["EventTime"])
 
+    def test_read_csv_type_aware_date_parsing_by_declared_type(self, tmp_path):
+        """A declared TIMESTAMP column parses even when its name misses the suffix heuristic (w9).
+
+        ClickBench's ClientEventTime is TIMESTAMP but does not end in
+        date/timestamp, so the name-only heuristic read it as a raw string while
+        the SQL surface returned a datetime. Declared types are now authoritative.
+        """
+        adapter = PandasDataFrameAdapter()
+        csv_path = tmp_path / "hits.csv"
+        csv_path.write_text("1|2013-07-01 00:01:34\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "ClientEventTime"],
+            null_marker=None,
+            column_types=["INTEGER", "TIMESTAMP"],
+        )
+        assert pd.api.types.is_datetime64_any_dtype(df["ClientEventTime"])
+
+    def test_read_csv_declared_text_column_not_inferred_numeric(self, tmp_path):
+        """A declared TEXT column with numeric-looking values stays string (w9).
+
+        join-order movie_info_idx.info holds rating strings like "8.0"; pandas
+        would infer float64 and diverge from the VARCHAR SQL surface.
+        """
+        adapter = PandasDataFrameAdapter()
+        csv_path = tmp_path / "info.csv"
+        csv_path.write_text("1|8.0\n2|10.0\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "info"],
+            null_marker="",
+            column_types=["INTEGER", "TEXT"],
+        )
+        assert not pd.api.types.is_numeric_dtype(df["info"])
+        assert df["info"].iloc[0] == "8.0"
+
+    def test_read_csv_empty_string_handling_follows_null_marker(self, tmp_path):
+        """Empty text fields stay "" when null_marker is None, NaN when "" (w9).
+
+        Matches the SQL surface per the benchmark's resolved CSV dialect:
+        ClickBench (null_marker=None) keeps ""; JoinOrder (null_marker="") nulls.
+        """
+        adapter = PandasDataFrameAdapter()
+        csv_path = tmp_path / "t.csv"
+        csv_path.write_text("1|\n2|hello\n")
+
+        kept = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "note"],
+            null_marker=None,
+            column_types=["INTEGER", "TEXT"],
+        )
+        assert kept["note"].iloc[0] == ""
+
+        nulled = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "note"],
+            null_marker="",
+            column_types=["INTEGER", "TEXT"],
+        )
+        assert pd.isna(nulled["note"].iloc[0])
+
     def test_load_headered_csv_with_column_names_parses_dates(self, tmp_path):
         """Headered CSV loads still use schema names for pandas date converters."""
         adapter = PandasDataFrameAdapter()
