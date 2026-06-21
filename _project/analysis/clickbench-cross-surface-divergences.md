@@ -33,7 +33,7 @@ errors — read the "Triage finding" section after the table.
 
 | Query | expression (SQL → DF) | pandas |
 | --- | --- | --- |
-| Q6 | — | 18 → 17 |
+| Q6 | — | 18 → 17 (real null-count bug, see Exceptions) |
 | Q9 | 584 → 407 (row 8) | (same) |
 | Q10 | 196 → 117 (row 4) | (same) |
 | Q15 | 10 → 1 | (same) |
@@ -63,7 +63,7 @@ queries whose ties span the LIMIT boundary:
 - **Q16** (count distribution `4,4,4,4,4,4,3,3,3,3` is **identical** on both
   surfaces): only the order among the `c=4` ties and which `c=3` groups land in the
   last slots differ — a boundary tie, not a wrong value.
-- The other count/top-N rows (Q6, Q9, Q10, Q15, Q18, Q19, Q31, Q33, Q36, Q38) are
+- The other count/top-N rows (Q9, Q10, Q15, Q18, Q19, Q31, Q33, Q36, Q38) are
   the same class: correct aggregates, ambiguous selection/order among ties at the
   LIMIT cutoff (no total order in the `ORDER BY`).
 
@@ -77,16 +77,32 @@ per-query:
   - classify genuinely tie-ambiguous queries as accepted divergences.
 
 Exceptions (a different, real class — and the deferred dtype issue):
+- **Scalar COUNT(DISTINCT) null-count mismatch** (Q6: `18 → 17`): this is NOT
+  tie-ambiguous. Q6 is the scalar `SELECT COUNT(DISTINCT SearchPhrase) FROM hits;`
+  (no `ORDER BY`, no `LIMIT`, no boundary) and the DataFrame side is the scalar
+  `uniq_search=SearchPhrase:nunique` (a bare `n_unique()`/pandas `nunique`, see
+  `dataframe_queries/queries.py:206`). With no ordering and a single scalar output,
+  a tie is impossible — the `18 → 17` gap is a genuine off-by-one in the distinct
+  count. Root cause is the same null/empty-string materialization as Q17/Q24 below:
+  the DataFrame loader maps an empty-string `SearchPhrase` to `None`, and pandas
+  `nunique()` (and Polars `n_unique()` here) drop the null, so the all-empty value
+  is not counted as a distinct value the way SQL counts it. Fix at the loader
+  (empty-string-vs-null contract) and/or with a null-aware distinct count; do NOT
+  classify this as an accepted tie divergence.
 - **Empty-string vs None** (Q17 col 1, Q24 col 14): SQL emits `""`, the DataFrame
   emits `None`. This is the same null/dtype materialization issue tracked for
   joinorder_synthetic (CSV→parquet conversion); see
   `joinorder-synthetic-cross-surface-divergences.md`. Resolve with the loader
   dtype fix, not a ClickBench change.
 
-Net: ClickBench has ~no genuine DataFrame *logic* bugs here — the staged-gate
-divergences are (1) tie-ambiguous top-N comparison (gate-level) and (2) the
-loader null/dtype issue (deferred). Promote ClickBench to `GATES` once the gate
-handles tie-ambiguity and the loader dtype fix lands.
+Net: the staged-gate divergences fall into three classes — (1) tie-ambiguous
+top-N comparison (gate-level, the majority), (2) the loader null/dtype empty-vs-
+None issue (Q17/Q24, deferred to the loader fix), and (3) at least one genuine
+result bug: Q6's scalar `COUNT(DISTINCT)` is off-by-one (`18 → 17`) because the
+null/empty-string materialization drops the all-empty value from the distinct
+count. Q6 is NOT tie-ambiguous and must be triaged as a real aggregate/null-count
+bug, not promoted past. Promote ClickBench to `GATES` only once the gate handles
+tie-ambiguity, the loader dtype/null fix lands, and Q6's scalar count matches.
 
 ## Status
 

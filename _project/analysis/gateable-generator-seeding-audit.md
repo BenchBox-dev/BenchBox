@@ -19,8 +19,8 @@ depends on that source.
 | clickbench | random | ✅ seeded (this campaign) | deterministic (staged gate) |
 | amplab | random | ✅ seeded | deterministic |
 | h2odb | random | ✅ seeded | deterministic |
-| tpch_skew | random | ✅ seeded | deterministic |
-| tsbs_devops | random | ✅ seeded | deterministic |
+| tpch_skew | numpy | ⚠️ NOT by default | non-deterministic unless seeded |
+| tsbs_devops | numpy | ⚠️ NOT by default | non-deterministic unless seeded |
 | joinorder_synthetic | random | ✅ **seeded in this change** | deterministic (verified) |
 | read_primitives | none | n/a | deterministic |
 | datavault | (no generator.py) | — | verify source before gating |
@@ -39,6 +39,15 @@ the manifest's embedded timestamp, which the gate does not read).
 
 ## Notes / follow-ups
 
+- **`tpch_skew` and `tsbs_devops` are NOT seeded for default gate runs** (corrected
+  2026-06-21): `TPCHSkewDataGenerator` calls `get_preset_config(SkewPreset.MODERATE)`
+  with no seed, so `skew_config.seed` is `None` (`skew_config.py:157,211`) and
+  `np.random.default_rng(self.skew_config.seed)` (`generator.py:111`) is entropy-
+  seeded. `TSBSDevOpsDataGenerator` defaults `seed: int | None = None`
+  (`generator.py:74`) before `np.random.default_rng(seed)` (`generator.py:111`).
+  Both are deterministic ONLY when the caller passes an explicit seed; the seeding
+  fix (pass a fixed seed in the gate builder, mirroring SSB/ClickBench) must land
+  before either is wired as a cross-surface gate, or the gate will be flaky.
 - **Manifest timestamps**: generated `manifest`/`*.json` files embed a generation
   timestamp, so raw-file-byte comparisons are not a reliable determinism signal —
   compare *data tables* (the gate reads those, not the manifest).

@@ -1321,6 +1321,32 @@ class UnifiedExpr:
 
         return UnifiedExpr(self._expr.cast(pl.Utf8))
 
+    def cast_date(self) -> UnifiedExpr:
+        """Cast to a Date type.
+
+        Provides unified date casting so queries can coerce a column to a date
+        regardless of whether it was loaded as a temporal type (Parquet/date32 -
+        a no-op) or as an ISO ``YYYY-MM-DD`` string (raw-CSV path):
+        - Polars: Uses .cast(pl.Date)
+        - PySpark: Uses .cast(DateType())
+        - DataFusion: Uses .cast(pa.date32())
+
+        Returns:
+            UnifiedExpr with date values
+        """
+        if self._is_pyspark:
+            from pyspark.sql.types import DateType
+
+            return UnifiedExpr(self._expr.cast(DateType()))
+        if self._is_datafusion:
+            import pyarrow as pa
+
+            return UnifiedExpr(self._expr.cast(pa.date32()))
+
+        import polars as pl
+
+        return UnifiedExpr(self._expr.cast(pl.Date))
+
     def cast_int32(self) -> UnifiedExpr:
         """Cast to Int32/IntegerType.
 

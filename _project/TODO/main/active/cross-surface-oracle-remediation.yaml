@@ -7,10 +7,13 @@ category: Testing and Quality Assurance
 
 description: |
   An adversarial review of the cross-surface SQL<->DataFrame equivalence campaign
-  (PRs #826-#848 on develop; see
-  _project/analysis/adversarial-cross-surface-equivalence-review.md) reproduced
-  every finding by running the gates and found the oracle is real but narrow,
-  oversold, and partly vacuous. This TODO addresses ALL of those findings.
+  (PRs #826-#848 on develop) reproduced every finding by running the gates and
+  found the oracle is real but narrow, oversold, and partly vacuous. This TODO
+  addresses ALL of those findings. The committed evidence the review draws on
+  lives in _project/analysis/clickbench-cross-surface-divergences.md,
+  _project/analysis/joinorder-synthetic-cross-surface-divergences.md, and
+  _project/analysis/oracle-coverage-map.md; reproduce any cell with
+  `make <benchmark>-cross-surface-equivalence-report`.
 
   The headline problem: PR #848 concluded "ClickBench has ~no genuine DataFrame
   logic bugs" and triaged 27 divergences as "tie-ambiguous top-N." That is false.
@@ -63,7 +66,9 @@ description: |
       says "do NOT guess").
 
 prior_art:
-  - "_project/analysis/adversarial-cross-surface-equivalence-review.md - the review this TODO remediates; every finding has a reproduction command + output."
+  - "_project/analysis/clickbench-cross-surface-divergences.md - committed ClickBench divergence evidence (the Q6/Q17/Q18/Q24 cases this TODO remediates); reproduce with `make clickbench-cross-surface-equivalence-report`."
+  - "_project/analysis/joinorder-synthetic-cross-surface-divergences.md - committed joinorder_synthetic divergence evidence (the deferred-dtype cases); reproduce with `make joinorder_synthetic-cross-surface-equivalence-report`."
+  - "_project/analysis/oracle-coverage-map.md - the coverage/applicability map (guarded == GATES membership, the 12-gateable headline) the M1/M2 honesty fixes target."
   - "benchbox/core/equivalence/cross_surface.py - GATES vs STAGED_GATES, build_*_duckdb, find_cross_surface_divergences, count_executed_cells, run_gate, _report; the empty-RESULT guard belongs here."
   - "benchbox/core/equivalence/dataframe_surface.py - materialize_rows, fetch_reference_rows, find_surface_divergences, _normalize_value (lines 239-263), build_dataframe_contexts_from_specs (74-125); the loader-bypass and the None/NaN coercion live here."
   - "benchbox/core/tpchavoc/validation.py - ResultValidator.validate_results_exact (54-79) full-row sort; the order/tie-awareness change must not regress the TPC-Havoc gates that rely on it."
@@ -364,5 +369,5 @@ finding_coverage:
 
 metadata:
   created: "2026-06-21"
-  source: "_project/analysis/adversarial-cross-surface-equivalence-review.md"
+  source: "_project/analysis/clickbench-cross-surface-divergences.md, _project/analysis/joinorder-synthetic-cross-surface-divergences.md, _project/analysis/oracle-coverage-map.md"
   reviewed_prs: "#826-#848 (develop)"

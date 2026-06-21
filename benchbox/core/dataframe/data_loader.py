@@ -489,14 +489,14 @@ class DataCache:
             nation.tbl              ← raw generated data (not managed by cache)
             _datagen_manifest.json  ← SQL datagen manifest (not managed by cache)
             parquet/                ← cached format conversions
-              v2/
+              v3/
                 _manifest.json
                 customer.parquet
                 lineitem.parquet
                 ...
           tpch_sf001/
             parquet/
-              v2/
+              v3/
                 ...
           tpcds_sf1/
             ...
