@@ -116,8 +116,21 @@ work:
 
   - id: w2
     summary: "Make the comparator order-aware and tie-aware; fix the None/NaN sort crash (BS2)"
-    status: pending
+    status: in_progress
     addresses: [BS2, "review:Blind Spot 2", "review:DEMO1/2/3"]
+    progress: |
+      PARTIAL (landed in #858). The tie-aware boundary relaxation shipped:
+      cross_surface.py enables tie_aware per query for trailing-LIMIT top-N
+      (_is_truncated_top_n), and validate_results_exact takes a tie_aware flag.
+      Verified effect: ClickBench collapsed from 27 wobbling divergences to a
+      STABLE 2 (green across 3 runs).
+      STILL OPEN - two halves of BS2 are NOT verified closed:
+      (1) ORDER-BY blindness: the non-tie path still full-row-sorts, so a reversed
+          ORDER BY may still pass silently (the dangerous false-negative half).
+      (2) The None/non-None Python sorted() crash that find_surface_divergences
+          mislabels as "error:" was not addressed.
+      Keep open until w10's reversed-sort mutation proves order-sensitivity and a
+      None-mixed-column test proves a clean MISMATCH (not an "error:").
     notes: |
       validate_results_exact (validation.py:54-79) sorts full rows then compares
       positionally, so it is simultaneously BLIND to real ORDER BY bugs (a reversed
@@ -151,8 +164,16 @@ work:
 
   - id: w3
     summary: "Eliminate engine nondeterminism at the gate boundary (H1)"
-    status: pending
+    status: done
     addresses: [H1, "review:HIGH H1", "claim 5"]
+    progress: |
+      DONE via the w2 tie-aware comparator (#858), NOT the single-thread +
+      total-order tie-breaker route this item originally specified. Re-verified
+      post-merge: ClickBench reports a STABLE "2 divergent", green, across 3
+      identical runs (was 27/25/26); SSB is stable green. The engine still reorders
+      tied rows, but the tie-aware comparator makes that reordering irrelevant to
+      the gate verdict, which satisfies the determinism acceptance. A dedicated
+      byte-stability regression test is folded into w10.
     notes: |
       The wobble is engine tie-ordering, not data. Pin it at the gate:
         - run the gate's DuckDB connection and the Polars/pandas execution
@@ -192,11 +213,18 @@ work:
 
   - id: w5
     summary: "Re-triage ClickBench with the fixed loader+comparator and correct the #848 record (C1 closeout)"
-    status: in_progress
+    status: done
     needs: [w1, w2, w3]
     addresses: [C1, "#848", "review:C1"]
     progress: |
-      DONE (w1-enabled): corrected the #848 record in
+      DONE (closed out by #859): ClickBench was promoted from STAGED_GATES to the
+      enforced, blocking GATES and is deterministically green; its only baseline
+      entry is the order-less Q18. The #848 "~no genuine DataFrame logic bugs"
+      record is corrected and the real Q6/Q17/Q18/Q24 bugs are fixed at the loader
+      (w1). Caveat carried into w2: the residual ties are handled by the tie-aware
+      comparator, whose ORDER-BY-sensitivity half is still unverified.
+
+      Earlier (w1-enabled): corrected the #848 record in
       _project/analysis/clickbench-cross-surface-divergences.md - the "~no genuine
       DataFrame logic bugs" conclusion was false; Q6/Q17/Q18/Q24 were real
       null-handling bugs, now fixed at the loader (w1). Verified post-w1: Q6 == 18 on
@@ -290,8 +318,16 @@ work:
 
   - id: w8
     summary: "Run staged gates in CI and add a promotion forcing-function (M3)"
-    status: pending
+    status: done
     addresses: [M3, "review:MEDIUM M3", "claim 10"]
+    progress: |
+      DONE by promotion (#859), which resolves M3 more directly than the
+      staged-CI-plus-deadline approach this item proposed: clickbench and
+      joinorder_synthetic were promoted from STAGED_GATES to enforced, BLOCKING
+      GATES with new pr.yml steps and fast-lane regressions. STAGED_GATES is now
+      EMPTY, so the "parked staged gate that silently rots" gap no longer exists.
+      If a benchmark is ever staged again, revisit the dated-promotion forcing
+      function then (re-file as a fresh item; not needed while STAGED is empty).
     notes: |
       STAGED_GATES (clickbench, joinorder_synthetic) are not run in CI (pr.yml runs
       only ssb + coffeeshop) and nothing fails when a staged gate is parked
