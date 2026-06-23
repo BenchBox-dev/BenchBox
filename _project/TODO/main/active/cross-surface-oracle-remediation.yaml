@@ -316,6 +316,26 @@ work:
     summary: "Add a production-loader-path gate cell + harden the DDL parser and type maps (M4, L1, L2)"
     status: pending
     addresses: [M4, L1, L2, "review:MEDIUM M4", "review:LOW L1/L2"]
+    progress: |
+      PARSER SUB-PART DONE (L1, fix/dataframe-ddl-column-parser): replaced the
+      naive column.split() in schema_utils.column_name/column_sql_type with a
+      paren-aware, quote-aware DDL column parser (_split_ddl_column). It now
+      preserves parenthesized precision/scale with internal commas/spaces
+      (DECIMAL(10, 2), VARCHAR(255), NUMERIC(18, 4)), multi-word types
+      (DOUBLE PRECISION, TIMESTAMP WITH/WITHOUT TIME ZONE, CHARACTER VARYING),
+      and quoted/bracketed/backtick identifiers with internal spaces
+      ("odd name", [odd name], `odd name`); trailing constraints (NOT NULL,
+      DEFAULT ..., PRIMARY KEY, UNIQUE, CHECK(...), REFERENCES ...) are stripped
+      from the type. Simple "name TYPE" behavior is byte-identical. New table-
+      driven unit tests in tests/unit/core/dataframe/test_schema_utils_ddl_parser.py
+      (59 cases). Verified: dataframe + joinorder unit suites (1298 passed),
+      joinorder_synthetic and ssb cross-surface gates green (0 divergent),
+      tpchavoc-equivalence-report unchanged (220 equivalent).
+      STILL OPEN (do not close w6): the production-loader-path gate cell (M4
+      loader bypass), the remaining raw-CSV adapter empty-string contract
+      (Polars/modin/dask/cudf scan_csv), applying declared STRING dtypes on the
+      production load path, and closing the joinorder_synthetic deferral. The
+      loader PYARROW/polars/pandas type-map gaps (L2) were done in #857.
     notes: |
       The gate's loader bypass (dataframe_surface.py:74-125 materializes from typed
       DuckDB Arrow) means it cannot see production CSV->parquet dtype corruption.
