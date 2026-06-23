@@ -1240,18 +1240,32 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             effective_delimiter = delimiter or ("|" if format_type == "tbl" else ",")
             has_header = format_type == "csv" and delimiter is None
 
-            # Resolve null_marker for trailing-delimiter probing via the resolver when a
-            # DataSource is available (manifest path).  Without one, derive from format_type
-            # so .tbl files (format_type=="tbl") keep their existing trailing-delimiter behaviour.
-            # When benchmark=None, NO_BENCHMARK is used: path (a) wins when table_metadata is
-            # present; otherwise path (c) of resolve_csv_dialect derives null_marker from the
-            # file extension (.tbl/.dat → "", everything else → None), which is correct.
+            # Resolve null_marker via the resolver so it matches the DuckDB SQL
+            # reference. With a DataSource use the manifest path; without one but with
+            # a known benchmark (e.g. the cross-surface gate loads straight from a
+            # benchmark instance) resolve from the benchmark the SAME way SQL does, so
+            # a .csv benchmark that sets csv_null_marker="" (e.g. JoinOrder) nulls empty
+            # fields. Otherwise fall back to the file-extension heuristic.
+            # This benchmark branch matters now that column_types is forwarded: the
+            # fill-null("") branch fires only when null_marker is None, so without
+            # resolving csv_null_marker here a csv_null_marker="" benchmark would have
+            # its SQL NULL empty fields wrongly converted to "" (matches pandas family).
             if data_source is not None:
                 from benchbox.platforms.base.data_loading import NO_BENCHMARK, resolve_csv_dialect
 
                 bm = benchmark if benchmark is not None else NO_BENCHMARK
                 _dialect = resolve_csv_dialect(data_source, table_name, first_file, bm)
                 null_marker: str | None = _dialect.null_marker
+            elif benchmark is not None:
+                from benchbox.platforms.base.data_loading import DataSource, resolve_csv_dialect
+
+                _dialect = resolve_csv_dialect(
+                    DataSource(source_type="benchmark_instance", tables={}),
+                    table_name,
+                    first_file,
+                    benchmark,
+                )
+                null_marker = _dialect.null_marker
             else:
                 null_marker = "" if format_type == "tbl" else None
 
