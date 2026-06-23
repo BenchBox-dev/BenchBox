@@ -111,6 +111,9 @@ class QueryResultInput:
     query_plan: Any | None = None
     plan_fingerprint: str | None = None
     plan_capture_time_ms: float | None = None
+    # Gate-only value-digest oracle (BENCHBOX_EMIT_RESULT_DIGEST): full-result
+    # digest of a stream-0 query. None on a normal run (no payload change).
+    result_digest: str | None = None
 
 
 def normalize_query_result(
@@ -194,6 +197,7 @@ def normalize_query_result(
         query_plan=raw_result.get("query_plan"),
         plan_fingerprint=raw_result.get("plan_fingerprint"),
         plan_capture_time_ms=raw_result.get("plan_capture_time_ms"),
+        result_digest=raw_result.get("result_digest"),
     )
 
 

@@ -105,10 +105,16 @@ test-smoke: test-quick
 
 # Bounded real-result correctness gate for develop PRs: one local benchmark case
 # (DuckDB x TPC-H, SF=1, reference qgen seed) through generate/load/execute with
-# phase, cardinality, and EXACT stored answer-set row-count checks. The query subset
-# is the 18 TPC-H queries whose answer-set cardinalities are stable across dbgen
-# builds; Q11/Q16/Q18/Q20 are excluded because their HAVING/threshold boundaries make
-# the stored row count vary with the generated data (see tests/README.md).
+# phase, cardinality, EXACT stored answer-set row-count checks, AND stored VALUE
+# digests. The value oracle (BENCHBOX_EMIT_RESULT_DIGEST=1) makes the runner emit an
+# order-normalized digest of each stream-0 query's full result set, which the gate
+# asserts against a stored reference digest -- so a wrong-but-same-cardinality answer
+# (e.g. a perturbed Q1 aggregate, a swapped column) is caught, not just a wrong row
+# count. The proven guarantee is value+cardinality at SF=1/pinned-seed only; values
+# above SF=1 are UNGUARDED (no stored answers exist there). The query subset is the
+# 18 TPC-H queries whose answer-set cardinalities are stable across dbgen builds;
+# Q11/Q16/Q18/Q20 are excluded because their HAVING/threshold boundaries make the
+# stored row count vary with the generated data (see tests/README.md).
 # The JUnit-report guard fails the target if the selected node SKIPs instead of
 # running: pytest exits 0 on a selected skip, which would otherwise pass the gate
 # without executing the benchmark. The report goes to a private temp file (not the
@@ -116,7 +122,7 @@ test-smoke: test-quick
 # parsing; both the pytest status and the guard status are propagated.
 test-correctness-gate:
 	@REPORT="$$(mktemp)"; \
-	BENCHBOX_STRICT_EXPECTED_RESULTS=1 BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22 uv run -- python -m pytest -m stress "tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]" -n 0 --tb=short --timeout=1200 -v --junitxml="$$REPORT"; \
+	BENCHBOX_STRICT_EXPECTED_RESULTS=1 BENCHBOX_EMIT_RESULT_DIGEST=1 BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22 uv run -- python -m pytest -m stress "tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]" -n 0 --tb=short --timeout=1200 -v --junitxml="$$REPORT"; \
 	PYTEST_STATUS=$$?; \
 	uv run -- python -c "import sys, xml.etree.ElementTree as ET; root = ET.parse(sys.argv[1]).getroot(); suites = [root] if root.tag == 'testsuite' else root.findall('testsuite'); tests = sum(int(s.get('tests') or 0) for s in suites); skipped = sum(int(s.get('skipped') or 0) for s in suites); errors = sum(int(s.get('errors') or 0) for s in suites); failures = sum(int(s.get('failures') or 0) for s in suites); print('correctness gate guard: ran=%d skipped=%d failures=%d errors=%d' % (tests, skipped, failures, errors)); sys.exit(0 if (tests == 1 and skipped == 0 and errors == 0 and failures == 0) else 'correctness gate: expected exactly 1 node to run with 0 skipped/failed/errored; a selected skip means duckdb/tpch dropped from the stable matrix or the node-id drifted')" "$$REPORT"; \
 	GUARD_STATUS=$$?; \
@@ -540,6 +546,14 @@ lint:
 # Fails if an unused dep is introduced. See _project/scripts/dependency_audit/.
 audit-deps:
 	uv run -- python _project/scripts/dependency_audit/check_deps.py
+
+# Regenerate the raw declared-dependency inventory from pyproject.toml.
+audit-raw:
+	uv run -- python _project/scripts/dependency_audit/parse_deps.py
+
+# Verify the committed raw inventory matches pyproject.toml. Fails on drift.
+audit-raw-check:
+	uv run -- python _project/scripts/dependency_audit/parse_deps.py --check
 
 # Validate that an audit report records the develop SHA it describes.
 audit-sha-check:

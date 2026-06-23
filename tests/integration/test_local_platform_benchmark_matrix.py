@@ -307,16 +307,58 @@ def _expected_result_queries(payload: dict, expected_query_ids: set[str] | None)
     ]
 
 
+def _stored_value_digest(
+    validator: QueryValidator,
+    benchmark_name: str,
+    query_id: str,
+    scale_factor: float,
+    stream_id: int,
+) -> str | None:
+    """Return the stored reference VALUE digest for a query, or None if none exists.
+
+    A value digest is valid ONLY at the scale it was computed for. The expected-
+    results registry applies a scale-INDEPENDENT fallback for some queries (e.g.
+    TPC-H Q1, whose row count is constant across scales): at SF != 1 it returns the
+    SF=1 ``ExpectedQueryResult``. That object's row count is scale-independent, but
+    its VALUE digest is not (the aggregates sum over different data). So honor the
+    digest only when the stored object's own scale matches the run scale, otherwise
+    a run at SF != 1 with digest emission on would compare an emitted SF!=1 digest
+    against the SF=1 reference and fail spuriously.
+    """
+    expected = validator.registry.get_expected_result(benchmark_name, str(query_id), scale_factor, stream_id)
+    if expected is None or expected.value_digest is None:
+        return None
+    if expected.scale_factor != scale_factor:
+        return None
+    return expected.value_digest
+
+
 def _validate_against_expected_results(
     payload: dict,
     benchmark_name: str,
     scale_factor: float,
     expected_query_ids: set[str] | None = None,
 ) -> None:
-    """Validate query row counts against stored expected results where available."""
+    """Validate query row counts AND value digests against stored expected results.
+
+    Row counts are validated for every benchmark/scale with stored answers (the
+    historical behavior). Where a query also has a stored reference VALUE digest
+    (TPC-H at SF=1 with the pinned seed today), the emitted full-result digest is
+    asserted to match it IN ADDITION to the row count, so a wrong-but-same-
+    cardinality answer is caught. Both checks share the same strict arming: under
+    ``BENCHBOX_STRICT_EXPECTED_RESULTS`` every configured query must produce a
+    non-SKIP row-count validation AND, where a reference digest exists, a matched
+    value digest -- a missing/unevaluated digest disarms RED, never green.
+    """
+    from benchbox.core.results.result_digest import digests_match
+
     validator = QueryValidator()
     checked = 0
+    digest_evaluated = 0
+    digest_reference_count = 0
     failures: list[str] = []
+
+    strict = os.environ.get("BENCHBOX_STRICT_EXPECTED_RESULTS", "").strip().lower() in {"1", "true", "yes", "on"}
 
     for query in _expected_result_queries(payload, expected_query_ids):
         if query.get("status") != "SUCCESS":
@@ -343,6 +385,28 @@ def _validate_against_expected_results(
                 f"actual={validation.actual_row_count}, mode={validation.validation_mode.value}"
             )
 
+        # Value-digest oracle: in addition to the row count, compare the emitted
+        # full-result digest to the stored reference digest where one exists.
+        stored_digest = _stored_value_digest(validator, benchmark_name, query["id"], scale_factor, stream_id)
+        if stored_digest is not None:
+            digest_reference_count += 1
+            emitted_digest = query.get("digest")
+            if emitted_digest is not None:
+                # A digest comparison actually happened (armed), whether or not it
+                # matched -- this counts toward strict coverage below.
+                digest_evaluated += 1
+                if not digests_match(stored_digest, emitted_digest):
+                    # A wrong VALUE at the same cardinality: always RED, regardless
+                    # of strict arming -- the headline gap this oracle closes.
+                    failures.append(
+                        f"{benchmark_name} query {validation.query_id}: VALUE DIGEST mismatch "
+                        f"expected={stored_digest}, actual={emitted_digest} (row count matched -- a "
+                        f"wrong-but-same-cardinality answer)"
+                    )
+            # emitted_digest is None: the runner did not emit a digest (e.g. flag
+            # unset). Under strict arming the digest-coverage assertion below turns
+            # this RED; non-strict callers keep the additive row-count-only behavior.
+
     # Strict mode: when enabled, every configured expected-results check must
     # actually evaluate (non-SKIP). This is deliberately NOT gated on benchmark
     # name or scale factor. The previous `benchmark_name == "tpch" and
@@ -352,7 +416,6 @@ def _validate_against_expected_results(
     # was never reached. Now strict mode fails whenever a configured subset does
     # not fully evaluate, regardless of benchmark/scale. The default non-strict
     # matrix still skips unsupported expected-results validation (see callers).
-    strict = os.environ.get("BENCHBOX_STRICT_EXPECTED_RESULTS", "").strip().lower() in {"1", "true", "yes", "on"}
     if strict:
         configured = set(expected_query_ids or ())
         if configured:
@@ -367,8 +430,19 @@ def _validate_against_expected_results(
                 f"strict expected-results: no {benchmark_name} queries (sf={scale_factor}) were validated "
                 f"against stored expected results"
             )
+        # Value-digest arming: where reference digests exist for the configured
+        # queries, every one must evaluate to a MATCHED digest. A missing or
+        # unevaluated digest disarms the value oracle and must fail RED, exactly
+        # like the row-count arming above -- never a silent value-skip.
+        if digest_reference_count:
+            assert digest_evaluated == digest_reference_count, (
+                f"strict value-digest: evaluated {digest_evaluated} of {digest_reference_count} configured "
+                f"{benchmark_name} value digests (sf={scale_factor}); every configured query with a stored "
+                f"reference digest must emit a value digest. A missing/unevaluated digest indicates the value "
+                f"oracle was disarmed (digest emission off, query skipped, or scale/seed drift)."
+            )
 
-    assert not failures, "Row-count validation failures:\n" + "\n".join(failures)
+    assert not failures, "Expected-results validation failures (row count and/or value digest):\n" + "\n".join(failures)
 
 
 @pytest.mark.integration

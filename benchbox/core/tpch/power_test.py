@@ -325,6 +325,12 @@ class TPCHPowerTest:
                         }
                     )
 
+                    # Gate-only value oracle: forward the full-result digest the
+                    # adapter computed (behind BENCHBOX_EMIT_RESULT_DIGEST) so the
+                    # bounded correctness gate can assert VALUES, not just row counts.
+                    # None when emission is off; downstream forwarders drop None.
+                    query_result["result_digest"] = self._result_digest_from_cursor(cursor)
+
                     result.queries_successful += 1
 
                     if self.config.verbose:
@@ -382,6 +388,22 @@ class TPCHPowerTest:
             if self.config.verbose:
                 self.logger.error(f"Power Test failed: {e}")
             return result
+
+    @staticmethod
+    def _result_digest_from_cursor(cursor: Any) -> str | None:
+        """Return the gate-only full-result digest the adapter computed, if any.
+
+        The full result set lives in the platform adapter (the wrapped cursor here
+        only carries first_row + count), so the digest is computed there and
+        surfaced via ``platform_result`` behind ``BENCHBOX_EMIT_RESULT_DIGEST``.
+        Only stream 0 carries a stored reference digest (the reference qgen seed).
+        """
+        platform_result = getattr(cursor, "platform_result", None)
+        if isinstance(platform_result, dict):
+            digest = platform_result.get("result_digest")
+            if digest is not None:
+                return str(digest)
+        return None
 
     @staticmethod
     def _query_result_count(cursor: Any, rows: list[Any]) -> int:

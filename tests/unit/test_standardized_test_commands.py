@@ -287,6 +287,11 @@ class TestMakefileCommands:
         gate_body = _makefile_target_body(makefile_content, "test-correctness-gate")
 
         assert "BENCHBOX_STRICT_EXPECTED_RESULTS=1" in gate_body
+        # The value oracle: the gate must arm full-result digest emission so it
+        # validates VALUES, not just row counts. Without this the digest check
+        # silently no-ops (no digest emitted) and the gate regresses to
+        # cardinality-only.
+        assert "BENCHBOX_EMIT_RESULT_DIGEST=1" in gate_body
         assert f"BENCHBOX_CORRECTNESS_GATE_QUERY_IDS={CORRECTNESS_GATE_QUERY_IDS}" in gate_body
         assert CORRECTNESS_GATE_NODEID in gate_body
         assert "-m stress" in gate_body
@@ -348,6 +353,31 @@ class TestMakefileCommands:
             repo_root / ".github" / "workflows" / "pr.yml",
             "ci-required-result",
         )
+
+    def test_correctness_gate_job_runs_value_level_equivalence_steps(self):
+        """The required correctness-gate job runs VALUE-level gates, not only row counts.
+
+        A reader who sees only ``make test-correctness-gate`` in the ratchet above
+        could infer the required job is row-count-only. It is not: the same job runs
+        the TPC-Havoc variant/DataFrame equivalence gates and the cross-surface
+        SQL<->DataFrame equivalence gates, all of which compare full result VALUES.
+        Pin that composition so dropping a value-level step is caught.
+        """
+        repo_root = Path.cwd()
+        run_text = _workflow_job_run_text(repo_root / ".github" / "workflows" / "pr.yml", "correctness-gate")
+
+        # Row-count + value-digest TPC-H gate.
+        assert "make test-correctness-gate" in run_text
+        # Value-level TPC-Havoc variant gates.
+        assert "make tpchavoc-equivalence-report" in run_text
+        assert "make tpchavoc-dataframe-equivalence-report" in run_text
+        # Value-level cross-surface SQL<->DataFrame gates (enforced subset).
+        for target in (
+            "make ssb-cross-surface-equivalence-report",
+            "make amplab-cross-surface-equivalence-report",
+            "make coffeeshop-cross-surface-equivalence-report",
+        ):
+            assert target in run_text, f"required correctness-gate job missing value-level step: {target}"
 
     def test_main_release_required_includes_bounded_correctness_gate(self):
         repo_root = Path.cwd()
@@ -502,10 +532,40 @@ class TestCorrectnessGateOracle:
             _validate_against_expected_results(payload, "tpch_future_variant", 1.0, expected_query_ids={"1"})
 
     def test_strict_mode_passes_when_all_configured_queries_evaluate(self, monkeypatch):
-        """Strict mode passes when every configured query evaluates against stored answers."""
+        """Strict mode passes when every configured query evaluates against stored answers.
+
+        At SF=1 the value oracle is armed too, so a configured query must supply BOTH
+        the correct row count AND a matching value digest. The digest is read from the
+        provider (not hard-coded) so the test tracks the stored reference.
+        """
+        from benchbox.core.expected_results import register_all_providers
+        from benchbox.core.expected_results.registry import get_registry
+
+        monkeypatch.setenv("BENCHBOX_STRICT_EXPECTED_RESULTS", "1")
+        register_all_providers()
+        q9_digest = get_registry().get_expected_result("tpch", "9", 1.0, 0).value_digest
+        payload = {"queries": [{"id": "9", "stream": 0, "status": "SUCCESS", "rows": 175, "digest": q9_digest}]}
+        _validate_against_expected_results(payload, "tpch", 1.0, expected_query_ids={"9"})
+
+    def test_strict_mode_fails_on_value_digest_mismatch(self, monkeypatch):
+        """At SF=1 a wrong VALUE (right cardinality) must fail strict mode RED.
+
+        This is the headline value-oracle guarantee in the gate's own validation
+        seam: Q9's row count is correct but the emitted digest is wrong.
+        """
+        monkeypatch.setenv("BENCHBOX_STRICT_EXPECTED_RESULTS", "1")
+        payload = {
+            "queries": [{"id": "9", "stream": 0, "status": "SUCCESS", "rows": 175, "digest": "deadbeefwrongdigest"}]
+        }
+        with pytest.raises(AssertionError, match="VALUE DIGEST mismatch"):
+            _validate_against_expected_results(payload, "tpch", 1.0, expected_query_ids={"9"})
+
+    def test_strict_mode_fails_when_value_digest_missing(self, monkeypatch):
+        """At SF=1 a missing emitted digest disarms the value oracle -> strict RED."""
         monkeypatch.setenv("BENCHBOX_STRICT_EXPECTED_RESULTS", "1")
         payload = {"queries": [{"id": "9", "stream": 0, "status": "SUCCESS", "rows": 175}]}
-        _validate_against_expected_results(payload, "tpch", 1.0, expected_query_ids={"9"})
+        with pytest.raises(AssertionError, match="strict value-digest"):
+            _validate_against_expected_results(payload, "tpch", 1.0, expected_query_ids={"9"})
 
     def test_non_strict_mode_tolerates_unsupported_validation(self, monkeypatch):
         """Default (non-strict) matrix behavior must still skip unsupported validation, not fail."""

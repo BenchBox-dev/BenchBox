@@ -73,12 +73,19 @@ def execute_sql_query(
                 stream_id=stream_id,
             )
 
+        # Gate-only value oracle: digest the FULL result set (behind
+        # BENCHBOX_EMIT_RESULT_DIGEST, stream 0 only). Absent on a normal run.
+        from benchbox.core.results.result_digest import compute_result_digest, result_digest_enabled
+
+        result_digest = compute_result_digest(results) if result_digest_enabled() and stream_id in (None, 0) else None
+
         return build_query_result_with_validation(
             query_id=query_id,
             execution_time=execution_time,
             actual_row_count=actual_row_count,
             first_row=results[0] if results else None,
             validation_result=validation_result,
+            result_digest=result_digest,
         )
 
     except Exception as exc:

@@ -68,7 +68,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import logging
 
-from benchbox.core.expected_results.loader import load_tpch_expected_results
+from benchbox.core.expected_results.loader import load_tpch_expected_results, load_tpch_value_digests
 from benchbox.core.expected_results.models import (
     BenchmarkExpectedResults,
     ExpectedQueryResult,
@@ -102,6 +102,10 @@ def get_tpch_expected_results(scale_factor: float = 1.0) -> BenchmarkExpectedRes
 
     # Load row counts from answer files (SF=1.0)
     row_counts = load_tpch_expected_results(scale_factor=1.0)
+    # Load stored reference VALUE digests (SF=1.0, pinned reference seed). Backs the
+    # bounded correctness gate's value oracle; absent queries fall back to row-count
+    # only. Keyed by the same query IDs as the row counts.
+    value_digests = load_tpch_value_digests(scale_factor=1.0)
 
     # Build ExpectedQueryResult objects
     query_results = {}
@@ -122,6 +126,7 @@ def get_tpch_expected_results(scale_factor: float = 1.0) -> BenchmarkExpectedRes
             validation_mode=ValidationMode.EXACT,
             scale_independent=is_scale_independent,
             notes=f"Expected result from TPC-H answer file for SF={scale_factor}",
+            value_digest=value_digests.get(query_id),
         )
 
     return BenchmarkExpectedResults(
@@ -132,6 +137,7 @@ def get_tpch_expected_results(scale_factor: float = 1.0) -> BenchmarkExpectedRes
             "source": "TPC-H answer files",
             "answer_files_scale_factor": 1.0,
             "total_queries": len(query_results),
+            "value_digest_queries": sum(1 for r in query_results.values() if r.value_digest is not None),
         },
     )
 

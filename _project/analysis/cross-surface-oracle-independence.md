@@ -1,5 +1,10 @@
 # Cross-surface oracle: what independence each gated benchmark actually has
 
+> Provenance: this is a hand-written, point-in-time correctness analysis. When you
+> revise it against a specific tree, stamp the reviewed commit here
+> (`Reviewed-at: <git-sha>`) and re-check `git merge-base --is-ancestor <sha>
+> origin/develop` before publishing — see `_project/analysis/REVIEW-PROTOCOL.md`.
+
 The cross-surface SQL↔DataFrame gate is a correctness oracle only to the extent
 the two surfaces are *independent*. That independence is weaker than the phrase
 "two independent implementations" implies, and it varies by benchmark. This file
