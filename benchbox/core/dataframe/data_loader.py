@@ -170,6 +170,8 @@ class SchemaMapper:
         "DECIMAL(15,2)": "Float64",  # Polars doesn't have native Decimal
         "VARCHAR": "Utf8",
         "CHAR": "Utf8",
+        "TEXT": "Utf8",
+        "STRING": "Utf8",
         "DATE": "Date",
         "TIMESTAMP": "Datetime",
         # TIME has no reliable DataFrame dtype across backends (pyarrow->Parquet->Polars
@@ -184,6 +186,8 @@ class SchemaMapper:
         "DECIMAL(15,2)": "float64",
         "VARCHAR": "object",
         "CHAR": "object",
+        "TEXT": "object",
+        "STRING": "object",
         "DATE": "datetime64[ns]",
         "TIMESTAMP": "datetime64[ns]",
         "TIME": "object",
