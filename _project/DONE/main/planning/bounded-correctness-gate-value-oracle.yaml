@@ -1,0 +1,245 @@
+id: bounded-correctness-gate-value-oracle
+title: "Add value-level validation to the bounded TPC-H/TPC-DS correctness gate (it is row-count-only today)"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-06-23"
+category: Testing and Quality Assurance
+
+description: |
+  An adversarial review of the bounded correctness gate (#830, reviewed on
+  develop) reproduced that the gate named "correctness" only validates ROW
+  COUNTS, never result VALUES. The hardening in #830 (no-skip JUnit guard,
+  strict-arming hoist, discrimination ratchet) is real and survives attack, but
+  it ratchets on cardinality SHAPE, not on detection of a wrong answer.
+
+  Reproduced facts (all verified by reading code / running the gate on develop):
+
+  - `_validate_against_expected_results`
+    (tests/integration/test_local_platform_benchmark_matrix.py) calls
+    `validator.validate_query_result(actual_row_count=int(query["rows"]), ...)`,
+    and that method (benchbox/core/validation/query_validation.py:99) compares only
+    counts. All 18 gate-configured TPC-H queries are EXACT-mode, but EXACT means
+    "exact row count", not "exact values"
+    (benchbox/core/expected_results/models.py ValidationMode).
+  - The result payload the gate consumes carries ONLY a per-query row count
+    (`{"id", "ms", "rows"}` - benchbox/core/results/schema.py). It contains no
+    values, checksums, or digests, so value validation is not merely absent: it
+    is impossible without extending the result contract.
+  - Consequence: a value-mutating bug that preserves cardinality ships GREEN. The
+    canonical example is TPC-H Q1 (`sum(l_extendedprice*(1-l_discount))`), which
+    returns 4 grouped rows no matter how wrong the revenue arithmetic is; the gate
+    asserts rows==4 and passes. Wrong rounding, a swapped column, an off-by-one in
+    an aggregate, or a wrong but same-cardinality join all pass.
+  - Scale: TPC-H/TPC-DS expected results exist ONLY at SF=1
+    (benchbox/core/expected_results/loader.py raises for any other scale), and the
+    bounded gate pins SF=1 (_select_scale), so even the row-count oracle covers
+    exactly one scale.
+  - The reference qgen seed is already pinned for the gate (get_reference_seed in
+    benchbox/core/tpch/benchmark.py), so at SF=1 the result VALUES are
+    deterministic - which is precisely what makes a stored value digest feasible.
+
+  This item adds the missing value axis to the bounded gate so a wrong-but-same-
+  cardinality answer is caught, and corrects the docs/naming that oversell the
+  gate's current guarantee. It is the value-level complement to the cardinality
+  hardening already shipped in testing-approach-oracle-hardening (#830, DONE).
+
+prior_art:
+- "benchbox/core/tpchavoc/validation.py:229 _calculate_checksum - the EXISTING single-result digest primitive to reuse for
+  w1 (emit a digest); currently private, so promote/expose it rather than inventing a new hash. It already backs the TPC-Havoc
+  gates."
+- "benchbox/core/tpchavoc/validation.py:81 validate_results_checksum - the EXISTING pairwise (original vs variant) checksum
+  comparator to reuse for w2 (compare emitted digest vs stored reference); not a digest emitter itself."
+- "benchbox/core/tpch/benchmark.py:35 get_reference_seed - the pinned seed that makes SF=1 result values deterministic; the
+  stored reference digests must be computed at this seed."
+- "benchbox/core/expected_results/registry.py - the expected-results provider registry where stored reference digests (keyed
+  by benchmark/query_id/SF) would live alongside the existing row-count answers."
+- "benchbox/core/results/schema.py / normalizer.py - the result payload contract that today carries only `rows`; a per-query
+  result digest field would be added here (gate-only, behind a flag, to avoid runtime cost on normal runs)."
+- "tests/integration/test_local_platform_benchmark_matrix.py:_validate_against_expected_results - the validation seam to extend;
+  keep the row-count check, add the digest check."
+- "_project/DONE/main/planning/testing-approach-oracle-hardening.yaml - #830 cardinality hardening this complements; do NOT
+  redo the no-skip/strict/ratchet work, add the value axis it explicitly deferred."
+- "_project/TODO/main/active/cross-surface-oracle-remediation.yaml:w10 - the parallel mutation-sensitivity harness for the
+  cross-surface oracle; share the planted-mutation test approach rather than building a second one."
+
+work:
+- id: w1
+  summary: "Emit a deterministic per-query result digest into the result payload (gate-only, behind a flag)"
+  status: done
+  notes: |
+    Extend the runner/normalizer so a benchmark run can emit a canonical,
+    order-normalized digest of each stream-0 query's full result set, written
+    into the per-query result JSON next to `rows`. Reuse `_calculate_checksum`
+    (tpchavoc/validation.py:229, the single-result digest primitive; promote it
+    from private) so SQL and the gate share one digest definition. Gate it behind
+    an env flag (e.g. BENCHBOX_EMIT_RESULT_DIGEST=1) set only by
+    `make test-correctness-gate`, so normal `benchbox run` keeps its current
+    cost and payload shape.
+    Canonicalization must be value-correct, not order-correct: sort full rows
+    before hashing (matching the existing comparator) so unordered queries are
+    stable, and normalize numeric formatting/rounding so a digest is reproducible
+    across DuckDB builds at the pinned seed.
+  acceptance:
+  - "With the flag set, the bounded gate's result JSON carries a stable digest per stream-0 query; two consecutive gate runs
+    at the pinned seed produce identical digests."
+  - "With the flag unset, `benchbox run` output (payload shape + cost) is unchanged - verified by an existing matrix run."
+
+- id: w2
+  summary: "Store reference value digests for the 18 bounded TPC-H queries at SF=1/pinned seed and assert them in the gate"
+  needs: [w1]
+  status: done
+  notes: |
+    Compute the reference digests once at SF=1 with the pinned reference seed,
+    store them via the expected-results registry (keyed by benchmark/query_id/
+    scale), and extend `_validate_against_expected_results` to compare the emitted
+    digest to the stored one IN ADDITION to the row count. The digest check must
+    be subject to the SAME strict-arming the row-count check already has (every
+    configured query must produce a non-SKIP value validation under
+    BENCHBOX_STRICT_EXPECTED_RESULTS), so a missing digest disarms RED, not green.
+    Keep the change additive: a benchmark/scale without stored digests still
+    validates row counts and (non-strict) skips the digest, exactly as today.
+  acceptance:
+  - "`make test-correctness-gate` validates both row counts AND value digests for all 18 gate-configured TPC-H queries at
+    SF=1; the gate is green on a correct tree."
+  - "Under strict mode, a missing/unevaluated digest for a configured query fails RED (no silent value-skip)."
+
+- id: w3
+  summary: "Prove sensitivity: a value mutation that preserves cardinality turns the gate RED"
+  needs: [w2]
+  status: done
+  notes: |
+    Add a sensitivity test (coordinate with cross-surface-oracle-remediation w10's
+    mutation harness) that injects a value-only error which preserves row count -
+    e.g. perturb a Q1 aggregate value, swap two columns of equal cardinality, or
+    change rounding - and asserts the gate goes RED. This converts the
+    discrimination-ratchet from "the query set could detect cardinality changes"
+    to "the gate provably detects a wrong value", closing the headline review gap.
+  acceptance:
+  - ">=3 cardinality-preserving value mutations are each provably caught by the gate (RED)."
+  - "Any value-mutation class the digest cannot catch is documented with the reason."
+
+- id: w4
+  summary: "Correct the docs/naming that oversell the gate, including the required CI job's real scope"
+  needs: [w2]
+  status: done
+  notes: |
+    The review found two disclosure defects independent of the value fix:
+      - the Makefile note / tests/README / #830 docs describe the gate as
+        deliberately NOT proving values; once w2 lands, update them to state the
+        gate proves value+cardinality at SF=1/pinned-seed, and that values are
+        unguarded above SF=1.
+      - the required `correctness-gate` CI job (.github/workflows/pr.yml) actually
+        runs SIX gates - test-correctness-gate plus tpchavoc variant, tpchavoc
+        DataFrame, and ssb/amplab/coffeeshop cross-surface (all value-level) - but
+        the ratchet test (test_standardized_test_commands.py
+        test_develop_pr_invokes_bounded_correctness_gate) only asserts
+        `make test-correctness-gate` is present, so a reader infers the job is
+        row-count-only. Add a ratchet asserting the value-level gate steps are
+        present, and document the job's true composition.
+  acceptance:
+  - "Gate docs (Makefile note, tests/README) accurately state value+cardinality@SF=1 and the SF>1 value gap."
+  - "A test pins that the required correctness-gate CI job runs the value-level cross-surface/tpchavoc steps, not only the
+    row-count gate."
+
+- id: w5
+  summary: "Quantify and decide the TPC-DS loose +/-50% band"
+  status: done
+  notes: |
+    TPC-DS validation runs in LOOSE mode with a +/-50% default tolerance
+    (benchbox/core/expected_results/models.py loose_tolerance_percent=50.0), so a
+    regression that shifts TPC-DS cardinality by <50% hides. Scope it honestly:
+    this loose band lives in the broad stress matrix, NOT in the bounded
+    `make test-correctness-gate` (which is tpch-duckdb only), so it is less
+    load-bearing than a reader of the review might assume. Decide per query
+    whether the pinned-seed run is deterministic enough to tighten TPC-DS toward
+    EXACT (or RANGE with a tight band), or document why loose is retained, and
+    record the decision next to the TPC-DS provider.
+  acceptance:
+  - "The +/-50% TPC-DS band is documented with its scope (stress matrix, not the bounded gate) and an explicit keep-or-tighten
+    decision per query class."
+
+deferred:
+- summary: "Backfill stored value digests for benchmarks beyond tpch/tpcds, or for scales above SF=1."
+  reason: "Out of scope; breadth is owned by benchmark-correctness-oracle-coverage-map (w1/w2) and the cross-surface gate.
+    This item fixes the value-blindness of the EXISTING bounded tpch/tpcds gate at its existing SF=1 cell."
+- summary: "Harden the no-skip JUnit guard to count child <skipped/> elements instead of trusting suite-level attributes."
+  reason: "Currently unreachable - pytest sets suite skip attributes consistently with children, and the report is generated
+    in-process to a mktemp file with no external control. Noted as a latent hardening only."
+
+must_preserve:
+- "The #830 cardinality hardening is unchanged: no-skip JUnit guard, strict arming, and the discrimination ratchet keep working
+  exactly as today."
+- "`benchbox run` default behavior, payload shape, and cost are unchanged when the digest flag is unset (digest emission is
+  gate-only)."
+- "The existing row-count validation stays in place and authoritative; the digest check is additive, never a replacement."
+- "TPC-Havoc gates that already use validate_results_checksum stay green - reuse, do not fork, the comparator."
+
+approach: |
+  Reuse the existing value-level comparator (validate_results_checksum) and the
+  pinned reference seed rather than building new machinery. Sequence: (w1) make
+  the runner emit a deterministic digest behind a gate-only flag; (w2) store the
+  18 SF=1 reference digests in the expected-results registry and assert them under
+  the same strict-arming as the row-count check; (w3) prove sensitivity with
+  planted cardinality-preserving mutations (shared with cross-surface w10); (w4)
+  fix the docs/naming and the CI-scope ratchet; (w5) settle the TPC-DS loose band.
+
+anti_patterns:
+- "DO NOT compute the digest over only the row count or a single column - because that reproduces the value-blindness - hash
+  the full, order-normalized result set."
+- "DO NOT emit the digest on every `benchbox run` - because it adds cost to normal benchmarking and changes the payload for
+  all consumers - gate it behind a flag the correctness gate sets."
+- "DO NOT fork ResultValidator for the bounded gate - because TPC-Havoc depends on it - reuse _calculate_checksum (digest)
+  and validate_results_checksum (comparison)."
+- "DO NOT exempt the digest check from strict arming - because a missing digest would then silently disarm the value oracle
+  exactly like the old scale-gated strict block did - require non-SKIP under strict mode."
+- "DO NOT re-implement the no-skip/strict/ratchet work from #830 - it is done - only add the value axis."
+
+verification:
+- description: "Bounded gate validates values and cardinality and is green on a correct tree"
+  command: "make test-correctness-gate"
+  expected_output: "1 passed, ran=1 skipped=0; both row-count and digest checks evaluated for all 18 queries"
+- description: "A planted cardinality-preserving value mutation turns the gate RED"
+  command: "apply a Q1 aggregate-value mutation, then run the sensitivity test (w3)"
+  expected_output: "the gate fails on a value-digest mismatch despite unchanged row count"
+- description: "TPC-Havoc value gates remain green (comparator reuse did not regress them)"
+  command: "make tpchavoc-equivalence-report && make tpchavoc-dataframe-equivalence-report"
+  expected_output: "both exit 0 with unchanged output"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/expected_results/"
+  - "benchbox/core/results/"
+  - "benchbox/core/tpch/"
+  - "tests/"
+  - "Makefile"
+  - "_project/"
+  - "docs/"
+  - ".github/workflows/"
+
+success_metrics:
+- "The bounded TPC-H gate catches a wrong-but-same-cardinality answer (value digest), not just a wrong row count."
+- "A missing reference digest disarms the gate RED under strict mode, never green."
+- "Gate docs and the required-CI-job ratchet accurately describe what is proven (value+cardinality@SF=1) and what is not (values
+  above SF=1)."
+- "The TPC-DS loose +/-50% band has a documented scope and an explicit keep-or-tighten decision."
+
+open_questions:
+- question: "Should the value digest be a single full-result hash (cheapest, but a mismatch gives no column-level locality)
+    or a small per-column checksum vector (slightly more storage, far better failure diagnostics)?"
+  gating: true
+  affects: ["w1 digest shape", "w2 stored reference shape"]
+  default: "Start with a single order-normalized full-result hash (reuses _calculate_checksum directly); add per-column checksums
+    only if w3 shows mismatches are hard to localize."
+- question: "Are all 18 TPC-H SF=1 result sets value-stable across the DuckDB versions BenchBox supports at the pinned seed,
+    or do float-formatting differences require a rounding normalization before hashing?"
+  gating: false
+  affects: ["w1 canonicalization", "w2 reference digest stability"]
+  default: "Normalize numeric values to a fixed precision before hashing; verify stability across the supported DuckDB cap
+    in w1."
+
+metadata:
+  tags: [correctness, oracle, expected-results, tpch, tpcds, ci, testing, value-validation]
+  estimated_effort: "Medium"
+  created_date: "2026-06-23"
+  last_updated: "2026-06-23T00:00:00"
