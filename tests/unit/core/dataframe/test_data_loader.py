@@ -134,6 +134,15 @@ class TestFormatConverter:
         all-empty declared-text column must load identically to the SQL reference:
         for a .tbl source (null_marker == "", e.g. TPC/JoinOrder) DuckDB nulls empty
         fields, so the DataFrame surface does too.
+
+        Crucially the column types and null marker are DERIVED by the production
+        loader (``DataFrameDataLoader._get_pyarrow_types`` /
+        ``_get_null_markers``) from the declared schema, not hand-injected. Because
+        the converter's ``_resolve_arrow_types`` defaults unrecognized names to
+        ``pa.string()``, a test that passed ``column_types`` by hand would still
+        pass even if the loader stopped mapping declared string columns; driving the
+        derivation here means this test FAILS (the '007' VARCHAR would be inferred as
+        an int) if production stops mapping/passing declared string column types.
         """
         import pyarrow.parquet as pq
 
@@ -143,12 +152,57 @@ class TestFormatConverter:
             tbl_path.write_text("007|\n010|\n100|\n")
             parquet_path = tmpdir / "codes.parquet"
 
+            # A minimal benchmark declaring a VARCHAR and a TEXT column, exactly as
+            # the production schema-normalization path consumes it.
+            class _DeclaredStringBenchmark:
+                name = "declared_string_fixture"
+
+                def get_schema(self):
+                    return {
+                        "codes": {
+                            "columns": [
+                                {"name": "code", "type": "VARCHAR"},
+                                {"name": "note", "type": "TEXT"},
+                            ]
+                        }
+                    }
+
+            benchmark = _DeclaredStringBenchmark()
+            loader = DataFrameDataLoader(platform="polars")
+
+            # PRODUCTION derivation: the declared VARCHAR/TEXT columns must be
+            # mapped to a string Arrow type here. If the loader stopped mapping
+            # declared string columns this dict would omit them and the leading-zero
+            # assertion below would fail.
+            pyarrow_types = loader._get_pyarrow_types(benchmark)
+            derived_types = pyarrow_types["codes"]
+            assert derived_types["code"] == "string", (
+                f"production loader must derive a string Arrow type for the declared "
+                f"VARCHAR column; got {derived_types.get('code')!r}"
+            )
+            assert derived_types["note"] == "string", (
+                f"production loader must derive a string Arrow type for the declared "
+                f"TEXT column; got {derived_types.get('note')!r}"
+            )
+
+            # PRODUCTION null-marker resolution: a .tbl source resolves to the
+            # empty->NULL marker (""), matching the DuckDB SQL reference.
+            null_markers = loader._get_null_markers(benchmark, {"codes": tbl_path})
+            assert null_markers["codes"] == "", (
+                f"a .tbl source should resolve to the empty->NULL marker; "
+                f"got {null_markers['codes']!r}"
+            )
+
+            # Feed the PRODUCTION-derived types and null marker into the converter
+            # (not hand-injected values), so the contract this test guards is the
+            # real schema -> arrow-types -> converter plumbing.
             status, row_count = FormatConverter.convert_csv_to_parquet(
                 source_path=tbl_path,
                 target_path=parquet_path,
                 column_names=["code", "note"],
                 delimiter="|",
-                column_types={"code": "VARCHAR", "note": "TEXT"},
+                column_types=derived_types,
+                null_marker=null_markers["codes"],
             )
 
             assert status == ConversionStatus.SUCCESS

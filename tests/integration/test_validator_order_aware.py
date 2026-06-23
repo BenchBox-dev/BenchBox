@@ -93,6 +93,22 @@ def test_order_aware_truncated_limit_boundary_swap_is_not_flagged():
     )
 
 
+def test_order_aware_single_row_final_group_value_bug_is_caught():
+    """A value change on a UNIQUE final order-key row is caught, not masked as a tie.
+
+    The final-group tie relaxation only applies to a genuine tie (>= 2 rows sharing
+    the final key). When the final key is unique, its single row is deterministic, so
+    a non-key value change there (``good`` -> ``bad``) is a real regression and must
+    still raise even with ``tie_aware``.
+    """
+    validator = _validator()
+    reference = [(1, "ok"), (2, "good")]
+    bug = [(1, "ok"), (2, "bad")]
+    order_by = [0]
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(reference, bug, 3, 1, order_aware=True, order_by=order_by, tie_aware=True)
+
+
 def test_order_aware_value_bug_in_non_tie_row_is_caught():
     """A value bug in a deterministically-ordered (non-tie) row is still a MISMATCH."""
     validator = _validator()

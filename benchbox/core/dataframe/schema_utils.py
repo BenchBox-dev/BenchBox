@@ -72,6 +72,34 @@ _TYPE_CONTINUATIONS = {
 _QUOTE_PAIRS = {'"': '"', "`": "`", "[": "]"}
 
 
+def _read_quoted_identifier(text: str, opener: str, closer: str) -> tuple[str, int, bool]:
+    """Read a delimited identifier whose first char (``text[0]``) is ``opener``.
+
+    Returns ``(identifier, pos_after, terminated)`` where ``identifier`` is the
+    UNQUOTED logical name (outer delimiters removed) and ``pos_after`` is the index
+    just past the closing delimiter. A doubled closing delimiter is the standard
+    SQL escape for a literal delimiter inside the name (``"a""b"`` -> ``a"b``,
+    ``[a]]b]`` -> ``a]b``). ``terminated`` is False for an unterminated quote, in
+    which case ``identifier`` is the remainder after the opener and ``pos_after``
+    is ``len(text)``.
+    """
+    i = 1
+    n = len(text)
+    chars: list[str] = []
+    while i < n:
+        ch = text[i]
+        if ch == closer:
+            if i + 1 < n and text[i + 1] == closer:
+                # Doubled delimiter: an escaped literal delimiter inside the name.
+                chars.append(closer)
+                i += 2
+                continue
+            return "".join(chars), i + 1, True
+        chars.append(ch)
+        i += 1
+    return "".join(chars), n, False
+
+
 def _split_ddl_column(column: str) -> tuple[str | None, str | None]:
     """Split a DDL column definition into ``(name, type)``.
 
@@ -100,12 +128,14 @@ def _split_ddl_column(column: str) -> tuple[str | None, str | None]:
     # --- extract the column name (respecting quoted identifiers) ---
     if text[0] in _QUOTE_PAIRS:
         closer = _QUOTE_PAIRS[text[0]]
-        end = text.find(closer, 1)
-        if end == -1:
-            # Unterminated quote: treat the whole remainder as the name.
-            return text, None
-        name = text[: end + 1]
-        pos = end + 1
+        # Return the UNQUOTED identifier: the delimiters are SQL syntax, not part
+        # of the logical name. The parsed name feeds the DataFrame loaders'
+        # ``column_names``, which must match the SQL identifier (``odd name``), so
+        # returning ``"odd name"`` verbatim would break cross-surface column lookups.
+        name, pos, terminated = _read_quoted_identifier(text, text[0], closer)
+        if not terminated:
+            # Unterminated quote: treat the remainder as the (unquoted) name.
+            return name, None
     else:
         start = pos
         while pos < n and not text[pos].isspace():

@@ -236,16 +236,18 @@ class ResultValidator:
                 )
             if self._multisets_equal(orig_rows, var_rows):
                 continue
-            # The FINAL group under a trailing LIMIT is the truncated boundary: all
-            # its rows share the order key (that is what defines the group), and the
-            # total row count already matched, so any membership difference here is
-            # an equally-valid tie pick across the LIMIT cutoff - accept it (the
-            # tie-aware relaxation). This is sound BECAUSE the group is keyed by the
-            # actual ORDER BY value, so we never mistake a genuinely-ordered row for
-            # a boundary tie the way the order-blind heuristic could. Earlier groups
-            # are complete windows and must match as multisets, so a value bug there
-            # is still caught.
-            if i == last_index and tie_aware:
+            # The FINAL group under a trailing LIMIT can be a truncated boundary
+            # tie: all its rows share the order key, the total row count already
+            # matched, so a membership difference is an equally-valid tie pick across
+            # the LIMIT cutoff. Accept it (the tie-aware relaxation) - BUT only when
+            # the group is a genuine tie of >= 2 rows sharing the final key, mirroring
+            # the strict ">= 2 reference rows at the boundary value" guard the
+            # order-blind tie-aware path applies. A single-row final group has nothing
+            # to reshuffle, so a difference there is a real value change (or a
+            # unique-final-key regression) on the last row and must still be CAUGHT -
+            # an unconditional skip here would mask it. Earlier groups are complete
+            # windows and always compared as multisets, so a value bug there is caught.
+            if i == last_index and tie_aware and len(orig_rows) >= 2:
                 continue
             detail = self._first_positional_mismatch(
                 sorted(orig_rows, key=self._row_sort_key),
