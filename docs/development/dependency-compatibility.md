@@ -37,6 +37,7 @@ future interpreter release needs bespoke packaging rules.
 | pydantic | `>=2.0.0` |
 | pyyaml | `>=6.0.0` |
 | packaging | `>=24.0` |
+| requests | `>=2.31.0` |
 | duckdb | `>=1.0.0,<2.0.0` |
 
 DuckDB is capped below the next major (`<2.0.0`) across the development,
