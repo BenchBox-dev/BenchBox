@@ -1,0 +1,73 @@
+id: cross-surface-comparator-boundary-tie-soundness
+title: "Cross-surface comparator: make the final-tie-group guard boundary-aware (one-visible-row LIMIT ties)"
+worktree: main
+priority: Low
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Follow-up spun out of PR #878 (review-sweep pass 3) and the order-aware
+  comparator landed in #872. It records a known, accepted limitation in the
+  shared cross-surface SQL<->DataFrame validator so it is tracked rather than
+  forgotten.
+
+  `ResultValidator.validate_results_exact(order_aware=True, tie_aware=True)`
+  (benchbox/core/tpchavoc/validation.py, `_validate_order_aware`) partitions the
+  returned rows into consecutive same-order-key groups and, for the FINAL group
+  under a trailing `LIMIT`, tolerates a membership difference as an
+  equally-valid tie pick across the LIMIT cutoff. #878 tightened that acceptance
+  to require a genuine tie of `len(orig_rows) >= 2` rows sharing the final key,
+  so a deterministic single-row final-group difference is CAUGHT instead of
+  masked.
+
+  Codex review on #878 (discussion r3462372977) correctly observed the residual
+  edge: when a `LIMIT` cuts mid-tie, a legitimate boundary tie can leave exactly
+  ONE of the tied rows visible (keys `10, 5a, 5b` with `LIMIT 2` -> `[10, 5]`).
+  Two surfaces picking different `5` rows is valid SQL, but the `>= 2` guard now
+  flags it as a mismatch.
+
+  The root cause is fundamental: from the TRUNCATED result alone, a one-visible-
+  row boundary tie and a genuine unique-final-key value change (e.g.
+  `(2,"good")` vs `(2,"bad")`) are structurally identical - same final order
+  key, differing non-key column, a single row in the group. The comparator
+  cannot distinguish them without signal from outside the LIMIT.
+
+  Accepted tradeoff (decided on #878): land the `>= 2` guard as-is. Its failure
+  mode is a LOUD false positive (a gate fails when it should not), which is
+  recoverable and safer than the prior behavior (#872 accepted ALL final-group
+  differences, silently MASKING real single-row value bugs). All five enforced
+  cross-surface gates currently pass (0 unclassified divergent), so the false
+  positive is latent and data-dependent, not an active breakage.
+
+prior_art:
+  - ref: "PR #872"
+    note: "Introduced the order-aware/tie-aware comparator; original final-group accept was unconditional (masked single-row value bugs)."
+  - ref: "PR #878 + Codex discussion r3462372977"
+    note: "Tightened the final-group accept to len(orig_rows) >= 2; surfaced the one-visible-row boundary-tie false-positive edge documented here."
+  - ref: "benchbox/core/tpchavoc/validation.py:_validate_order_aware"
+    note: "The guard site (`if i == last_index and tie_aware and len(orig_rows) >= 2`)."
+
+work:
+  - id: w1
+    summary: "Give the comparator a boundary-tie probe so a one-visible-row final tie is not a false positive"
+    status: pending
+    notes: |
+      The comparator needs signal it does not have today to tell a truncated
+      boundary tie from a genuine deterministic last row. Candidate approaches,
+      to be evaluated for cost vs. value:
+        - Have the cross-surface gate run each trailing-LIMIT query at `LIMIT N+1`
+          (or unbounded) to learn whether the final order key is genuinely tied
+          beyond the cutoff, and pass that fact into validate_results_exact so a
+          single-visible-row final group can be accepted ONLY when the key is
+          actually tied past the LIMIT.
+        - Or thread the resolved `ORDER BY` / `LIMIT` structure plus a
+          tie-multiplicity hint from the SQL surface into the comparator.
+      Keep the change ADDITIVE: the TPC-Havoc strict path (no order_aware/
+      tie_aware) must stay byte-identical, and the default must remain catching
+      single-row value bugs. Add a regression test for the keys `10,5,5`
+      `LIMIT 2` boundary-tie case (currently a false positive) alongside the
+      existing `(2,"good")` vs `(2,"bad")` true-positive case.
+
+deferred:
+  - summary: "Reworking the gate to compare untruncated result sets generally"
+    reason: "Out of scope - changing query shape (dropping LIMITs) would change what the cross-surface gate measures; the probe in w1 is the targeted, additive fix."
