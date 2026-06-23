@@ -428,9 +428,48 @@ work:
 
   - id: w10
     summary: "Mutation-test the oracle to measure SENSITIVITY, not just specificity (C2 - the central question)"
-    status: pending
+    status: done
     needs: [w2, w4]
     addresses: [C2, "review:CRITICAL C2", "deeper-question 2", "claim 9"]
+    progress: |
+      DONE: a systematic mutation-sensitivity suite lands in
+      tests/integration/test_cross_surface_mutation_sensitivity.py and its
+      caught-vs-uncaught matrix is committed as evidence in
+      _project/analysis/cross-surface-mutation-sensitivity.md. For every enforced
+      gated benchmark (read live from GATES: ssb, amplab, coffeeshop, clickbench,
+      joinorder_synthetic) it wraps ONE target query's DataFrame impl at test time
+      (dataclasses.replace on the DataFrameQuery - the production registries are
+      NOT touched) and drives the real gate machinery
+      (find_cross_surface_divergences + the reused ResultValidator) on the bounded
+      SF=0.1 cell. No production code or comparator changed, so TPC-Havoc stays
+      byte-identical-green.
+
+      Matrix (both backends; verified at SF=0.1):
+        flip_comparator (<->-<=, +1 row)  : CAUGHT on all 5 (row-count path)
+        drop_group_key  (drop leading col): CAUGHT on all 5 (column-count path)
+        drop_join       (value perturb)   : CAUGHT on all 5 (value path)
+        reverse_sort    (reverse rows)    : NOT CAUGHT on the 4 multi-row gates
+                                            (ssb/amplab/coffeeshop/clickbench);
+                                            no-op on joinorder_synthetic (every
+                                            gated query is a single-row scalar).
+      So each gated benchmark has >=3 mutation classes the gate provably catches
+      (acceptance #1), and the one uncaught class is documented (acceptance #2).
+
+      HONEST FINDING (the C2 answer): the reversed-sort miss CONFIRMS the open half
+      of w2/BS2 - validate_results_exact full-row-sorts both sides before
+      comparing, so a reversed ORDER BY that preserves the multiset passes
+      silently. This is recorded (NOT baselined - that would be the anti-pattern)
+      with a tracking note pointing back at w2; the dedicated
+      test_reversed_sort_is_the_bs2_probe will flip to failing the moment an
+      order-aware comparator lands, forcing the doc + the harness _EXPECT_CAUGHT
+      table to be updated. The oracle is strong on row-membership, column-shape,
+      and value bugs and blind only to pure ordering bugs - it did NOT find "no
+      bugs" because it is vacuous; w4's empty-cell guard plus this suite's
+      non-empty-target assertion (test_unmutated_target_is_green) rule that out.
+
+      Also folds in the w3 byte-stability regression
+      (test_gate_output_is_byte_stable_across_two_in_process_runs): two in-process
+      ssb gate runs on the same seed produce an identical divergence set.
     notes: |
       The campaign measured only that the gates PASS (specificity); it never measured
       whether they CATCH a seeded bug (sensitivity). Add a mutation-test harness that,
