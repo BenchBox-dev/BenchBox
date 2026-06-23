@@ -110,6 +110,124 @@ def _is_truncated_top_n(sql: str) -> bool:
     return bool(_TRAILING_LIMIT_RE.search(stripped))
 
 
+def _is_star_projection(projection: Any) -> bool:
+    """True if a SELECT projection is a wildcard (``*`` or ``t.*``), else False.
+
+    A wildcard expands to an unknown number of output columns, so it cannot be
+    enumerated to positions without the table schema. A ``Star`` nested INSIDE an
+    expression (e.g. ``COUNT(*)``) is a normal single output column and is NOT a
+    wildcard projection, so it must return False here.
+    """
+    from sqlglot import exp
+
+    return isinstance(projection, exp.Star) or (
+        isinstance(projection, exp.Column) and isinstance(projection.this, exp.Star)
+    )
+
+
+def _order_by_result_key(sql: str) -> list[int] | None:
+    """Resolve a query's ``ORDER BY`` key to RESULT-column positions, or ``None``.
+
+    Returns the list of RESULT-row column indices (in key order) that the query's
+    ``ORDER BY`` sorts on, which the order-aware comparator
+    (:meth:`ResultValidator.validate_results_exact` with ``order_aware=True``) uses
+    to compare rows in returned order. Only the COLUMNS matter, not the sort
+    direction: a reversed ``ORDER BY`` is caught by the comparator detecting that
+    the returned sequence of distinct key values differs, which is
+    direction-independent. Returns ``None`` when no sound mapping exists, so the
+    caller falls back to the order-insensitive comparison rather than guessing:
+
+      * the query has no ``ORDER BY`` (nothing to check in returned order);
+      * the SQL does not parse (a malformed or unsupported shape);
+      * ANY ``ORDER BY`` expression does not correspond to a projected output
+        column - e.g. ``ORDER BY EventTime`` over ``SELECT SearchPhrase`` (the
+        sort key is not in the result, so the order cannot be verified from the
+        returned columns), or ``SELECT *`` (the projection is not enumerable to
+        positions without resolving the table schema). Refusing to map these is
+        deliberate: an order-blind fallback that silently "passed" an unverifiable
+        ORDER BY is exactly the BS2 blind spot, so we never claim an order check we
+        cannot perform.
+
+    The mapping resolves each ``ORDER BY`` term to a projection by, in order: a
+    1-based ordinal literal (``ORDER BY 2`` -> result column index 1); the
+    alias-or-name (so ``ORDER BY revenue`` finds ``SUM(...) AS revenue`` and
+    ``ORDER BY ol.order_date`` finds the ``order_date`` output); else the
+    normalized SQL of the underlying expression (so ``ORDER BY COUNT(*)`` finds the
+    ``COUNT(*)`` projection and ``ORDER BY DATE_TRUNC(...)`` finds its aliased
+    projection).
+    """
+    import sqlglot
+    from sqlglot import exp
+
+    try:
+        tree = sqlglot.parse_one(sql, read="duckdb")
+    except Exception:  # noqa: BLE001 - an unparseable query is just "no sound mapping"
+        return None
+    if tree is None:
+        return None
+    select = tree.find(exp.Select)
+    if select is None:
+        return None
+    order = select.args.get("order")
+    if order is None:
+        return None
+
+    # A bare `SELECT *` (or `t.*`) cannot be enumerated to output positions without
+    # resolving the table schema, so a star PROJECTION makes the mapping unsound.
+    # Only a projection that IS a star counts: a star nested inside an expression
+    # (e.g. ``COUNT(*)``) is a normal single output column, not a wildcard
+    # expansion, so it must NOT disqualify the query.
+    projections = select.expressions
+    if any(_is_star_projection(proj) for proj in projections):
+        return None
+
+    alias_to_index: dict[str, int] = {}
+    expr_to_index: dict[str, int] = {}
+    for index, proj in enumerate(projections):
+        name = proj.alias_or_name
+        if name:
+            alias_to_index.setdefault(name.lower(), index)
+        inner = proj.this if isinstance(proj, exp.Alias) else proj
+        expr_to_index.setdefault(inner.sql(dialect="duckdb", normalize=True).lower(), index)
+
+    resolved: list[int] = []
+    for ordered in order.expressions:
+        target = ordered.this
+        index = _resolve_order_term(target, projections, alias_to_index, expr_to_index)
+        if index is None:
+            # An ORDER BY term that is not a projected output column - the order
+            # cannot be verified from the returned rows. Refuse the whole key.
+            return None
+        resolved.append(index)
+    return resolved
+
+
+def _resolve_order_term(
+    target: Any,
+    projections: Sequence[Any],
+    alias_to_index: dict[str, int],
+    expr_to_index: dict[str, int],
+) -> int | None:
+    """Resolve one ``ORDER BY`` term to a result-column index, or ``None``.
+
+    Tries, in order: a 1-based positional ordinal (``ORDER BY 2``); the column
+    alias-or-name; else the normalized SQL of the expression. ``None`` means the
+    term is not a projected output column (the caller then refuses the whole key).
+    """
+    from sqlglot import exp
+
+    # 1-based ordinal: ``ORDER BY 2`` references the 2nd projected column. Only a
+    # plain integer literal in range is a valid ordinal.
+    if isinstance(target, exp.Literal) and target.is_int:
+        ordinal = int(target.name)
+        return ordinal - 1 if 1 <= ordinal <= len(projections) else None
+    if isinstance(target, exp.Column):
+        index = alias_to_index.get(target.name.lower())
+        if index is not None:
+            return index
+    return expr_to_index.get(target.sql(dialect="duckdb", normalize=True).lower())
+
+
 @dataclass(frozen=True)
 class CrossSurfaceData:
     """Everything the gate needs to compare a benchmark's two surfaces.
@@ -220,6 +338,7 @@ def find_cross_surface_divergences(
         query_id: Any,
     ) -> Iterable[tuple[str, Callable[[list[tuple[Any, ...]]], None]]]:
         query = dataframe_query(query_id)
+        sql = reference_sql(query_id)
         # tie_aware only for truncated top-N queries: a benchmark's own SQL and
         # DataFrame surfaces are independent top-N implementations, so an
         # ORDER BY ... LIMIT N whose ties span the cutoff can keep a different but
@@ -227,7 +346,17 @@ def find_cross_surface_divergences(
         # (the deterministic rows must still match exactly) - but ONLY where a
         # LIMIT can actually truncate; a non-LIMIT query is compared strictly so a
         # real divergence in a duplicated last row is never masked.
-        tie_aware = _is_truncated_top_n(reference_sql(query_id))
+        tie_aware = _is_truncated_top_n(sql)
+        # order_aware whenever the query declares an ORDER BY whose key maps to
+        # result-column positions: the comparator then checks the RETURNED order
+        # (catching a reversed ORDER BY) instead of full-row-sorting both sides,
+        # while still treating each tie group as a multiset (so a legitimate tie
+        # reshuffle is not flagged) and the LIMIT boundary as a tie when
+        # tie_aware. _order_by_result_key returns None for an unmappable ORDER BY
+        # (e.g. ORDER BY a non-projected column), so those fall back to the
+        # order-insensitive comparison rather than a silent order-blind "pass".
+        order_by = _order_by_result_key(sql)
+        order_aware = order_by is not None
         for backend in backends:
             impl = query.get_impl_for_family(backend)
             if impl is None:
@@ -242,9 +371,19 @@ def find_cross_surface_divergences(
                 backend: str = backend,
                 query_id: Any = query_id,
                 tie_aware: bool = tie_aware,
+                order_aware: bool = order_aware,
+                order_by: list[int] | None = order_by,
             ) -> None:
                 candidate = materialize_rows(impl(contexts[backend]))
-                validator.validate_results_exact(reference, candidate, query_id, 0, tie_aware=tie_aware)
+                validator.validate_results_exact(
+                    reference,
+                    candidate,
+                    query_id,
+                    0,
+                    tie_aware=tie_aware,
+                    order_aware=order_aware,
+                    order_by=order_by,
+                )
 
             yield backend, check
 

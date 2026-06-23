@@ -182,14 +182,16 @@ def _perturb_value(value: Any) -> Any:
 #          findings doc and asserted as a documented blind spot, never silently
 #          ignored.
 _EXPECT_CAUGHT: dict[tuple[str, str], bool] = {
-    # reverse_sort is the BS2 order-blindness probe: the comparator full-row-sorts
-    # both sides, so a reversed order over a multi-row result passes silently.
-    ("ssb", "reverse_sort"): False,
-    ("amplab", "reverse_sort"): False,
-    ("coffeeshop", "reverse_sort"): False,
-    ("clickbench", "reverse_sort"): False,
+    # reverse_sort is the BS2 order-blindness probe. The order-aware comparator
+    # (w2: validate_results_exact(order_aware=True), enabled per query whose
+    # ORDER BY maps to result-column positions) now compares the RETURNED order, so
+    # a reversed ORDER BY over a multi-row result with a discriminating order key is
+    # CAUGHT. Every multi-row target here declares such an ORDER BY (ssb Q3.1
+    # d_year/revenue, amplab "4" total_revenue DESC, coffeeshop SA1
+    # order_date/region, clickbench Q8 COUNT(*) DESC), so each flips to caught.
     # joinorder_synthetic is single-row: reversing a 1-row list is a no-op, so the
-    # mutation injects no divergence at all (a degenerate, expected miss).
+    # mutation injects no divergence at all (a degenerate, expected miss) - it stays
+    # the one documented reverse_sort blind spot.
     ("joinorder_synthetic", "reverse_sort"): False,
 }
 
@@ -402,24 +404,33 @@ def test_mutation_sensitivity(kind: str, gate_cell: _GateCell) -> None:
 
 @pytest.mark.parametrize("gate_cell", ["ssb"], indirect=True)
 def test_reversed_sort_is_the_bs2_probe(gate_cell: _GateCell) -> None:
-    """Headline BS2 probe: a reversed ORDER BY passes silently on a multi-row gate.
+    """Headline BS2 probe: a reversed ORDER BY is now CAUGHT on a multi-row gate.
 
-    The unresolved half of w2/BS2 is whether the comparator catches a reversed
-    ORDER BY. It full-row-sorts both sides before comparing, so it cannot. This
-    test pins that property directly on ssb Q3.1 (149 ordered rows): the reversed
-    result yields ZERO divergences. If a future comparator change makes ORDER BY
-    visible, this test flips and forces the findings doc + _EXPECT_CAUGHT update.
+    The previously-open half of w2/BS2 was whether the comparator catches a
+    reversed ORDER BY. It used to full-row-sort both sides before comparing, so it
+    could not - and this test pinned the silent pass. The w2 order-aware comparator
+    closes that blind spot: for a query whose ORDER BY maps to result-column
+    positions (ssb Q3.1 sorts by d_year ASC, revenue DESC -> result columns 2, 3),
+    ``validate_results_exact(order_aware=True)`` compares the RETURNED order, so a
+    reversed result now diverges. This test pins the FIXED property directly on ssb
+    Q3.1 (149 ordered rows): the reversed result yields >= 1 divergence, and it is a
+    genuine ORDER BY mismatch, not a harness ``error:``.
     """
     # The probe is only meaningful over a genuinely ordered, multi-row result: a
-    # 0/1-row reference would make "not caught" vacuous rather than a comparator
+    # 0/1-row reference would make the result an artifact rather than a comparator
     # property.
     assert gate_cell.reference_row_count >= 2, (
         f"ssb {_TARGETS['ssb']} returned only {gate_cell.reference_row_count} row(s); reverse-sort probe is vacuous."
     )
     divergences = _run_target_gate(gate_cell, mutation="reverse_sort")
-    assert not divergences, (
-        "ssb Q3.1 reversed-sort was caught - the comparator is now ORDER BY-aware; "
-        "update _project/analysis/cross-surface-mutation-sensitivity.md and _EXPECT_CAUGHT."
+    assert divergences, (
+        "ssb Q3.1 reversed-sort was NOT caught - the order-aware comparator (w2) "
+        "should make a reversed ORDER BY visible on this multi-row gate."
+    )
+    errored = [d for d in divergences if d.detail.startswith("error:")]
+    assert not errored, (
+        f"ssb Q3.1 reversed-sort was flagged only via a harness execution error, "
+        f"not an ORDER BY mismatch: {[(d.key, d.detail) for d in errored]}"
     )
 
 
