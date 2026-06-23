@@ -1302,31 +1302,32 @@ class TestDriversMixin:
         op_kwargs["platform_key"] = self.get_target_dialect()
         op_kwargs["platform_name"] = self.platform_name
 
-        # Resolve the operation when we either preprocess its SQL or need to record it
-        # for deferred plan capture (the operation path bypasses execute_query() and so
-        # never reaches _merge_plan_capture_into_result()).
-        phase_active = getattr(self, "_plan_capture_phase_active", False)
+        # Adapter SQL preprocessing (e.g. bulk-load rewrites) is threaded through as
+        # sql_override so execute_operation runs the rewritten statement.
         operation = None
-        executed_sql: str | None = None
-        if (hasattr(self, "preprocess_operation_sql") or phase_active) and hasattr(benchmark, "get_operation"):
+        if hasattr(self, "preprocess_operation_sql") and hasattr(benchmark, "get_operation"):
             with contextlib.suppress(Exception):
                 operation = benchmark.get_operation(str(query_id))
-        if operation is not None and hasattr(self, "preprocess_operation_sql"):
+        if operation is not None:
             preprocessed = self.preprocess_operation_sql(str(query_id), operation)
             if preprocessed is not None:
                 op_kwargs["sql_override"] = preprocessed
-                executed_sql = preprocessed
-        if executed_sql is None and operation is not None:
-            executed_sql = getattr(operation, "write_sql", None)
 
         op_result = benchmark.execute_operation(query_id, connection, **op_kwargs)
         op_status = getattr(op_result, "status", None) or ("SUCCESS" if op_result.success else "FAILED")
 
-        # Record the executed SQL into the deferred plan-capture buffer so DML/write
-        # operations also get structural plans under --capture-plans. Operations go
-        # through this path rather than execute_query(), so they never reach
-        # _merge_plan_capture_into_result(); mirror its phase-recording here (SUCCESS
-        # only, guarded by the shared lock since throughput streams run concurrently).
+        # Record the SQL the operation ACTUALLY executed for deferred plan capture, so
+        # write/transaction primitives get structural plans under --capture-plans.
+        # execute_operation exposes the final statement (after platform overrides,
+        # dialect rewrites, and placeholder replacement) as ``executed_sql``; we never
+        # fall back to the catalog-default ``operation.write_sql``, which can differ
+        # from what ran (e.g. ON CONFLICT -> INSERT OR IGNORE on sqlite/duckdb) and
+        # would make the post-measurement phase EXPLAIN a wrong/dialect-incompatible
+        # statement. Operations bypass execute_query()/_merge_plan_capture_into_result(),
+        # so this mirrors that chokepoint's phase-recording (SUCCESS only, under the
+        # shared lock since throughput streams run concurrently).
+        phase_active = getattr(self, "_plan_capture_phase_active", False)
+        executed_sql = getattr(op_result, "executed_sql", None)
         if phase_active and op_status == "SUCCESS" and executed_sql:
             with self._plan_capture_lock:
                 self._phase_recorded_queries.setdefault(str(query_id), executed_sql)

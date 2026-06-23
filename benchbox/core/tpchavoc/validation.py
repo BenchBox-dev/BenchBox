@@ -179,13 +179,17 @@ class ResultValidator:
         return False
 
     def _monotonic_columns(self, rows: list[tuple[Any, ...]]) -> list[int]:
-        """Column indices whose values are monotonic across ``rows`` (in order).
+        """Column indices whose values are strictly varying yet monotonic across ``rows``.
 
         A top-N result is sorted by its order key, so the order-key column is
-        monotonic (non-decreasing or non-increasing, constant counts as both); a
-        grouped non-key column generally is not. A column with an unorderable or
-        NULL-mixed value is treated as non-monotonic (excluded), which only makes
-        the boundary split finer (stricter), never weaker.
+        monotonic (non-decreasing or non-increasing); a grouped non-key column
+        generally is not. A *constant* column is excluded even though it is
+        technically monotonic: it carries no ordering information, so it must not
+        qualify as the tie-boundary key. Otherwise a literal/constant result column
+        (e.g. ClickBench Q35's ``SELECT 1``) would always equal the boundary value
+        and let an arbitrary row swap pass as a tie. A column with an unorderable or
+        NULL-mixed value is also excluded; both exclusions only make the boundary
+        split finer (stricter), never weaker.
         """
         if len(rows) < 2:
             return []
@@ -194,6 +198,7 @@ class ResultValidator:
         for c in range(width):
             non_decreasing = True
             non_increasing = True
+            saw_change = False
             for left, right in zip(rows, rows[1:]):
                 order = self._safe_compare(left[c], right[c])
                 if order is None:
@@ -201,9 +206,13 @@ class ResultValidator:
                     break
                 if order < 0:
                     non_increasing = False
+                    saw_change = True
                 elif order > 0:
                     non_decreasing = False
-            if non_decreasing or non_increasing:
+                    saw_change = True
+            # Require a genuinely varying column: a constant column (saw_change is
+            # False) is monotonic in form only and must not serve as the boundary key.
+            if saw_change and (non_decreasing or non_increasing):
                 result.append(c)
         return result
 
