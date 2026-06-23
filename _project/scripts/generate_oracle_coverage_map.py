@@ -65,12 +65,18 @@ def classify_oracles(
     *,
     expected_results_providers: set[str],
     cross_surface_gates: set[str],
+    staged_cross_surface_gates: set[str],
 ) -> list[str]:
     """Return every correctness oracle that currently guards ``benchmark_id``.
 
     Detection is from live sources only; adding a real oracle (a provider, a
     ``GATES`` entry, or a TPC-Havoc gate module) automatically reclassifies the
     benchmark on the next regeneration.
+
+    A cross-surface oracle is detected from membership in either the enforced
+    ``GATES`` registry or the (currently empty) ``STAGED_GATES`` registry; the
+    caller records *which* of the two via ``cross_surface_enforced`` so a
+    registered-but-not-CI-enforced gate is never reported as enforced coverage.
     """
     oracles: list[str] = []
     if benchmark_id in expected_results_providers:
@@ -82,7 +88,7 @@ def classify_oracles(
             oracles.append(ORACLE_VARIANT_EQUIVALENCE)
         if _module_exists("benchbox.core.tpchavoc.dataframe_equivalence"):
             oracles.append(ORACLE_CROSS_SURFACE_VARIANT)
-    if benchmark_id in cross_surface_gates:
+    if benchmark_id in cross_surface_gates or benchmark_id in staged_cross_surface_gates:
         oracles.append(ORACLE_CROSS_SURFACE)
     return oracles
 
@@ -108,11 +114,12 @@ def _surfaces(metadata: dict[str, Any]) -> tuple[bool, bool]:
 def build_coverage_map() -> list[dict[str, Any]]:
     """Build the coverage matrix: one classified row per shipped benchmark."""
     from benchbox.core.benchmark_registry import get_benchmark_metadata, list_benchmark_ids
-    from benchbox.core.equivalence.cross_surface import GATES
+    from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES
     from benchbox.core.expected_results.registry import get_registry
 
     expected_results_providers = set(get_registry().list_available_benchmarks())
     cross_surface_gates = set(GATES.keys())
+    staged_cross_surface_gates = set(STAGED_GATES.keys())
 
     rows: list[dict[str, Any]] = []
     for benchmark_id in sorted(list_benchmark_ids()):
@@ -123,12 +130,21 @@ def build_coverage_map() -> list[dict[str, Any]]:
             benchmark_id,
             expected_results_providers=expected_results_providers,
             cross_surface_gates=cross_surface_gates,
+            staged_cross_surface_gates=staged_cross_surface_gates,
         )
         primary = primary_oracle(oracles)
         # A dual-surface benchmark with no oracle is reachable by the cross-surface
         # SQL<->DataFrame gate (the w1 dispatch target). A single-surface benchmark
         # is not and needs a fallback oracle (w2).
         dual_surface = has_sql and has_dataframe
+        # Honesty signal (M1): a cross-surface oracle's mere REGISTRATION does not
+        # prove it is green. Distinguish a CI-enforced (blocking) gate -- which is
+        # green-or-CI-fails -- from a STAGED gate that is registered but not run in
+        # CI. ``None`` for benchmarks with no cross-surface gate at all.
+        if ORACLE_CROSS_SURFACE in oracles:
+            cross_surface_enforced: bool | None = benchmark_id in cross_surface_gates
+        else:
+            cross_surface_enforced = None
         rows.append(
             {
                 "benchmark": benchmark_id,
@@ -137,10 +153,27 @@ def build_coverage_map() -> list[dict[str, Any]]:
                 "oracles": oracles,
                 "primary_oracle": primary,
                 "guarded": primary != ORACLE_NONE,
+                "cross_surface_enforced": cross_surface_enforced,
                 "cross_surface_applicable": dual_surface and primary == ORACLE_NONE,
             }
         )
     return rows
+
+
+def _enforcement_label(row: dict[str, Any]) -> str:
+    """Honesty signal for a cross-surface gate: CI-enforced vs merely registered.
+
+    ``cross_surface_enforced`` is ``True`` for an enforced (CI-blocking) gate,
+    ``False`` for a STAGED (registered-but-not-run-in-CI) gate, and ``None`` when
+    the benchmark has no cross-surface gate. Only an enforced gate is green-or-
+    CI-fails; a staged gate's registration proves nothing about correctness.
+    """
+    enforced = row.get("cross_surface_enforced")
+    if enforced is True:
+        return "enforced (CI-blocking)"
+    if enforced is False:
+        return "staged (NOT CI-enforced)"
+    return "—"
 
 
 def render_markdown(rows: list[dict[str, Any]]) -> str:
@@ -148,6 +181,8 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     unguarded = [r for r in rows if not r["guarded"]]
     dispatchable = [r for r in unguarded if r["cross_surface_applicable"]]
     single_surface_gap = [r for r in unguarded if not r["cross_surface_applicable"]]
+    enforced_cross_surface = [r for r in rows if r.get("cross_surface_enforced") is True]
+    staged_cross_surface = [r for r in rows if r.get("cross_surface_enforced") is False]
 
     lines: list[str] = []
     lines.append("# Benchmark correctness-oracle coverage map")
@@ -160,24 +195,47 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     )
     lines.append("")
     lines.append(
-        f"**Summary:** {len(rows)} shipped benchmarks — {len(guarded)} guarded, "
-        f"{len(unguarded)} UNGUARDED ({len(dispatchable)} reachable by the "
-        f"cross-surface gate, {len(single_surface_gap)} single-surface needing a "
-        f"fallback oracle)."
+        "**What an oracle here means.** A benchmark is listed as *guarded* when an "
+        "oracle is REGISTERED for it — it is **not** a claim that the oracle is "
+        "currently green. The distinction matters most for cross-surface gates: only "
+        "a gate in the enforced `GATES` registry is run as a CI-blocking step (so it "
+        "is green or CI fails); a gate in `STAGED_GATES` is registered but not run "
+        "in CI, so its registration proves nothing about correctness. The "
+        "**Enforced** column reports this *cross-surface* enforcement status: "
+        "`enforced (CI-blocking)`, `staged (NOT CI-enforced)`, or `—` for any "
+        "benchmark that is not cross-surface-gated. A `—` therefore says nothing "
+        "about whether a *non*-cross-surface oracle is enforced: the expected-results "
+        "(tpch, tpcds) and TPC-Havoc variant oracles are CI-enforced via their own "
+        "test suites despite showing `—` here."
     )
     lines.append("")
-    lines.append("| Benchmark | Surfaces | Oracle | Notes |")
-    lines.append("| --- | --- | --- | --- |")
+    lines.append(
+        f"**Summary:** {len(rows)} shipped benchmarks — {len(guarded)} guarded "
+        f"(oracle registered), {len(unguarded)} UNGUARDED ({len(dispatchable)} "
+        f"reachable by the cross-surface gate, {len(single_surface_gap)} "
+        f"single-surface needing a fallback oracle). Cross-surface gates: "
+        f"{len(enforced_cross_surface)} CI-enforced, {len(staged_cross_surface)} "
+        f"staged (not CI-enforced)."
+    )
+    lines.append("")
+    lines.append("| Benchmark | Surfaces | Oracle | Enforced | Notes |")
+    lines.append("| --- | --- | --- | --- | --- |")
     for r in rows:
         surfaces = "+".join(r["surfaces"]) or "—"
         oracle = r["primary_oracle"]
         if r["guarded"]:
             note = ", ".join(r["oracles"])
+            # M1 honesty: a STAGED cross-surface gate is registered but not run in
+            # CI, so spell that out in the row note too -- never let the Oracle
+            # column alone imply a verified gate.
+            if r.get("cross_surface_enforced") is False:
+                note += " (registered, NOT CI-enforced)"
         elif r["cross_surface_applicable"]:
             note = "dual-surface → dispatch to cross-surface gate (w1)"
         else:
             note = "single-surface → needs fallback oracle (w2)"
-        lines.append(f"| {r['benchmark']} | {surfaces} | {oracle} | {note} |")
+        enforced = _enforcement_label(r)
+        lines.append(f"| {r['benchmark']} | {surfaces} | {oracle} | {enforced} | {note} |")
     lines.append("")
     lines.append("## UNGUARDED benchmarks")
     lines.append("")

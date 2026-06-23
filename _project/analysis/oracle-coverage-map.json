@@ -3,6 +3,7 @@
     {
       "benchmark": "ai_primitives",
       "cross_surface_applicable": false,
+      "cross_surface_enforced": null,
       "dual_surface": false,
       "guarded": false,
       "oracles": [],
@@ -14,6 +15,7 @@
     {
       "benchmark": "amplab",
       "cross_surface_applicable": false,
+      "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
       "oracles": [
@@ -28,6 +30,7 @@
     {
       "benchmark": "clickbench",
       "cross_surface_applicable": false,
+      "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
       "oracles": [
@@ -42,6 +45,7 @@
     {
       "benchmark": "coffeeshop",
       "cross_surface_applicable": false,
+      "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
       "oracles": [
@@ -56,6 +60,7 @@
     {
       "benchmark": "datavault",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],
@@ -68,6 +73,7 @@
     {
       "benchmark": "flightdata",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],
@@ -80,6 +86,7 @@
     {
       "benchmark": "h2odb",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],
@@ -92,6 +99,7 @@
     {
       "benchmark": "joinorder",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],
@@ -104,6 +112,7 @@
     {
       "benchmark": "joinorder_synthetic",
       "cross_surface_applicable": false,
+      "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
       "oracles": [
@@ -118,6 +127,7 @@
     {
       "benchmark": "metadata_primitives",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],
@@ -130,6 +140,7 @@
     {
       "benchmark": "nyctaxi",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],
@@ -142,6 +153,7 @@
     {
       "benchmark": "read_primitives",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],
@@ -154,6 +166,7 @@
     {
       "benchmark": "ssb",
       "cross_surface_applicable": false,
+      "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
       "oracles": [
@@ -168,6 +181,7 @@
     {
       "benchmark": "tpcdi",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],
@@ -180,6 +194,7 @@
     {
       "benchmark": "tpcds",
       "cross_surface_applicable": false,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": true,
       "oracles": [
@@ -194,6 +209,7 @@
     {
       "benchmark": "tpcds_obt",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],
@@ -206,6 +222,7 @@
     {
       "benchmark": "tpch",
       "cross_surface_applicable": false,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": true,
       "oracles": [
@@ -220,6 +237,7 @@
     {
       "benchmark": "tpch_skew",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],
@@ -232,6 +250,7 @@
     {
       "benchmark": "tpchavoc",
       "cross_surface_applicable": false,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": true,
       "oracles": [
@@ -247,6 +266,7 @@
     {
       "benchmark": "transaction_primitives",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],
@@ -259,6 +279,7 @@
     {
       "benchmark": "tsbs_devops",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],
@@ -271,6 +292,7 @@
     {
       "benchmark": "vector_search",
       "cross_surface_applicable": false,
+      "cross_surface_enforced": null,
       "dual_surface": false,
       "guarded": false,
       "oracles": [],
@@ -282,6 +304,7 @@
     {
       "benchmark": "write_primitives",
       "cross_surface_applicable": true,
+      "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
       "oracles": [],

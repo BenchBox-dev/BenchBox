@@ -24,10 +24,15 @@ that.
 
 Classification per candidate:
   - ``gateable``: has a registry whose ids overlap the SQL ids as-is -> wire a
-    cross-surface gate on the overlapping ids (w3).
-  - ``gateable-needs-id-mapping``: has a registry but its ids do not overlap the
-    SQL ids verbatim (a prefix/naming convention differs, e.g. ``1`` vs ``Q1``);
-    gateable after a mechanical id normalization in the builder (w3).
+    cross-surface gate on the overlapping ids (w3). A non-zero VERIFIED id overlap
+    is what makes a benchmark genuinely gateable.
+  - ``candidate-unverified``: has a registry but ZERO ids overlap the SQL ids
+    verbatim, so there is no verified SQL<->DataFrame query correspondence. A gate
+    here would require GUESSING which DataFrame query maps to which SQL query, and
+    the campaign's own TODO warns "do NOT guess" (e.g. nyctaxi/tsbs). This is NOT
+    counted as gateable coverage: it needs an independent, per-benchmark id mapping
+    to be confirmed first (some, like tpcds_obt at 3 DF vs ~89 SQL queries, may
+    never be a clean correspondence). The honest status the M2 review demanded.
   - ``no-df-query-surface``: no DataFrame query registry -> NOT cross-surface
     gateable; needs a w2 fallback oracle (differential second-engine or a curated
     expected-results subset).
@@ -60,13 +65,15 @@ ARTIFACT = _REPO_ROOT / "_project" / "analysis" / "cross-surface-applicability.m
 _INSTANTIATE_SCALES = (0.01, 1.0)
 
 GATEABLE = "gateable"
-GATEABLE_NEEDS_ID_MAPPING = "gateable-needs-id-mapping"
+CANDIDATE_UNVERIFIED = "candidate-unverified"
 NO_DF_QUERY_SURFACE = "no-df-query-surface"
 BLOCKED = "blocked"
 
-# Statuses that mean "a DataFrame query surface exists, so a cross-surface gate is
-# applicable" (directly or after id normalization).
-_GATEABLE_STATUSES = frozenset({GATEABLE, GATEABLE_NEEDS_ID_MAPPING})
+# Statuses that mean "a cross-surface gate is genuinely applicable today". Only a
+# VERIFIED id overlap counts: a zero-overlap registry (``candidate-unverified``)
+# is deliberately excluded, because counting an unverified id mapping as coverage
+# is exactly the theater the M2 review flagged.
+_GATEABLE_STATUSES = frozenset({GATEABLE})
 
 
 def _dataframe_query_registry(benchmark_id: str) -> Any | None:
@@ -142,7 +149,11 @@ def classify_applicability(benchmark_id: str) -> tuple[str, dict[str, Any]]:
         "raw_id_overlap": raw_overlap,
         "scale": used_scale,
     }
-    status = GATEABLE if raw_overlap > 0 else GATEABLE_NEEDS_ID_MAPPING
+    # Honesty (M2): only a VERIFIED (non-zero) verbatim id overlap is gateable. A
+    # zero-overlap registry has no confirmed SQL<->DataFrame query correspondence,
+    # so it is a ``candidate-unverified`` until an independent id mapping is
+    # confirmed per benchmark -- never silently counted as gateable coverage.
+    status = GATEABLE if raw_overlap > 0 else CANDIDATE_UNVERIFIED
     return status, detail
 
 
@@ -160,6 +171,7 @@ def build_applicability_sweep() -> list[dict[str, Any]]:
 
 def render_markdown(rows: list[dict[str, Any]]) -> str:
     gateable = [r for r in rows if r["status"] in _GATEABLE_STATUSES]
+    candidate_unverified = [r for r in rows if r["status"] == CANDIDATE_UNVERIFIED]
     no_surface = [r for r in rows if r["status"] == NO_DF_QUERY_SURFACE]
     blocked = [r for r in rows if r["status"] == BLOCKED]
 
@@ -178,8 +190,22 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     )
     lines.append("")
     lines.append(
+        "**Gateable means VERIFIED, not merely registered.** A benchmark is counted "
+        "as `gateable` only when its DataFrame query ids overlap the SQL query ids "
+        "verbatim — a confirmed SQL<->DataFrame correspondence the gate can compare. "
+        "A benchmark whose registry has ZERO verbatim id overlap is "
+        "`candidate-unverified`, NOT gateable: wiring a gate would require *guessing* "
+        "which DataFrame query answers which SQL query, and the campaign's own TODO "
+        'warns "do NOT guess". These need an independent, per-benchmark id mapping '
+        "confirmed first (and some, like `tpcds_obt` at 3 DataFrame vs ~89 SQL "
+        "queries, may never be a clean correspondence)."
+    )
+    lines.append("")
+    lines.append(
         f"**Summary:** {len(rows)} dual-surface unguarded candidates — "
-        f"{len(gateable)} cross-surface gateable (ship a DataFrame query registry), "
+        f"{len(gateable)} cross-surface gateable (verified verbatim id overlap), "
+        f"{len(candidate_unverified)} candidate-unverified (registry exists but ZERO "
+        f"verified id overlap — needs a confirmed id mapping first), "
         f"{len(no_surface)} have no DataFrame query surface (need a w2 fallback oracle), "
         f"{len(blocked)} blocked."
     )
@@ -188,7 +214,9 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     lines.append("| --- | --- | --- | --- | --- | --- |")
     for r in rows:
         if r["status"] == BLOCKED:
-            lines.append(f"| {r['benchmark']} | {BLOCKED} | — | {r.get('df_queries', '—')} | — | {r.get('error', '')} |")
+            lines.append(
+                f"| {r['benchmark']} | {BLOCKED} | — | {r.get('df_queries', '—')} | — | {r.get('error', '')} |"
+            )
             continue
         if r["status"] == NO_DF_QUERY_SURFACE:
             note = "→ w2 fallback oracle (no DataFrame query registry)"
@@ -197,7 +225,7 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
         note = (
             "→ cross-surface gate (w3)"
             if r["status"] == GATEABLE
-            else "→ cross-surface gate after id normalization (w3)"
+            else "→ confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess)"
         )
         lines.append(
             f"| {r['benchmark']} | {r['status']} | {r.get('sql_queries', '—')} | "
@@ -207,15 +235,15 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     lines.append("## Campaign dispatch")
     lines.append("")
     direct = [r["benchmark"] for r in rows if r["status"] == GATEABLE]
-    needs_mapping = [r["benchmark"] for r in rows if r["status"] == GATEABLE_NEEDS_ID_MAPPING]
+    unverified = [r["benchmark"] for r in candidate_unverified]
+    lines.append("- **Cross-surface gate, ids overlap as-is (w3):** " + (", ".join(direct) or "none") + ".")
     lines.append(
-        "- **Cross-surface gate, ids overlap as-is (w3):** " + (", ".join(direct) or "none") + "."
-    )
-    lines.append(
-        "- **Cross-surface gate, needs id normalization first (w3):** "
-        + (", ".join(needs_mapping) or "none")
-        + " — a DataFrame query registry exists but its ids differ from the SQL ids "
-        "by a naming convention (e.g. `1` vs `Q1`); normalize in the builder."
+        "- **Candidate-unverified (NOT gateable yet):** "
+        + (", ".join(unverified) or "none")
+        + " — a DataFrame query registry exists but ZERO ids overlap the SQL ids "
+        "verbatim, so there is no verified query correspondence. Each needs an "
+        "independent, per-benchmark id mapping confirmed (the campaign TODO says "
+        '"do NOT guess") before a gate can be wired; do not count these as coverage.'
     )
     lines.append(
         "- **w2 fallback oracle** — no DataFrame query registry, so the cross-surface "
