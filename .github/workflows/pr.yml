@@ -322,6 +322,9 @@ jobs:
       - name: Dependency audit (no unused declarations)
         run: make audit-deps
 
+      - name: Dependency inventory drift check
+        run: make audit-raw-check
+
       - name: Release curation list drift check
         run: uv run -- python scripts/check_release_curation.py
 
