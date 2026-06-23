@@ -143,8 +143,25 @@ class CrossSurfaceGate:
     # for a deliberate, defensible presentational difference - never to mute a
     # regression.
     known_divergences: dict[str, str] = field(default_factory=dict)
+    # Queries whose SQL reference legitimately returns 0 rows at the bounded
+    # cell, keyed by query id, with a rationale string. A both-empty cell
+    # compares empty-vs-empty and is NON-discriminating (every backend trivially
+    # "matches"), so the gate FAILS on any vacuous query that is NOT listed here -
+    # the same discipline as ``known_divergences``, but for vacuity rather than a
+    # tolerated mismatch. Prefer making a query non-empty (a discriminating SF or
+    # parameter) over classifying it; classify only when the generated data simply
+    # cannot contain rows matching the canonical query (e.g. a value-format
+    # mismatch the benchmark's own parameters cannot bridge), with a written
+    # reason here. NEVER add an entry to mute a query you could make discriminating.
+    legitimately_empty: dict[Any, str] = field(default_factory=dict)
     backends: tuple[str, ...] = DATAFRAME_BACKENDS
     tolerance: float = 1e-10
+    # Per-gate data scale for the bounded cell. Defaults to the shared
+    # EQUIVALENCE_SCALE so every gate stays cheap; a gate raises it ONLY when a
+    # larger (still bounded) cell is the cheapest way to make its queries
+    # discriminating. Kept on the gate (not a global) so one benchmark's data
+    # needs never inflate every other gate's cost.
+    scale_factor: float = EQUIVALENCE_SCALE
 
 
 def find_cross_surface_divergences(
@@ -156,6 +173,7 @@ def find_cross_surface_divergences(
     contexts: dict[str, Any],
     validator: ResultValidator,
     backends: tuple[str, ...] = DATAFRAME_BACKENDS,
+    reference_row_counts: dict[Any, int] | None = None,
 ) -> list[SurfaceDivergence]:
     """Compare each query's DataFrame surface to its own SQL surface on DuckDB.
 
@@ -174,6 +192,16 @@ def find_cross_surface_divergences(
             implement is skipped (not counted as a divergence). Whether a *whole*
             gated backend is unimplemented (which would silently compare nothing)
             is detected separately via :func:`count_executed_cells`.
+        reference_row_counts: Optional mutable mapping; when supplied it is
+            populated with ``query_id -> reference row count`` as each query's
+            SQL reference is fetched. A query whose reference returns 0 rows
+            compares empty-vs-empty (every backend trivially "matches"), so it is
+            NON-discriminating - :func:`_report` uses these counts to exclude
+            vacuous cells from the compared count and to FAIL on an unclassified
+            vacuous query. A query whose reference *fails* is not recorded here
+            (it has no row count); it surfaces as a ``reference`` divergence
+            instead. Default ``None`` keeps behavior unchanged for callers (e.g.
+            the fast-lane integration tests) that do not need the vacuity audit.
 
     Returns:
         One :class:`SurfaceDivergence` per query/backend cell whose DataFrame
@@ -183,7 +211,10 @@ def find_cross_surface_divergences(
     from benchbox.core.tpchavoc.validation import ValidationError
 
     def reference_rows(query_id: Any) -> list[tuple[Any, ...]]:
-        return fetch_reference_rows(connection, reference_sql(query_id))
+        rows = fetch_reference_rows(connection, reference_sql(query_id))
+        if reference_row_counts is not None:
+            reference_row_counts[query_id] = len(rows)
+        return rows
 
     def candidate_cells(
         query_id: Any,
@@ -520,13 +551,102 @@ _CLICKBENCH_TIE_AMBIGUOUS = (
     "Q18 is LIMIT 10 with no ORDER BY over ~97k groups - an arbitrary, order-less top-N selection"
 )
 
+# Six SSB queries return 0 reference rows at EVERY bounded scale (verified empty at
+# SF=0.1, 0.2, 0.3, 0.5 AND 1.0), so no cheap SF override makes them discriminating.
+# Root cause: the BenchBox SSB generator emits value FORMATS that the canonical SSB
+# query parameters never match, so the highly-selective multi-join filters select
+# nothing at any scale:
+#   * p_category is generated as 'MFGR#112' (3-digit), but Q2.1/Q4.3 filter on the
+#     canonical 'MFGR#12' (2-digit) - no part row ever qualifies (verified
+#     count(part WHERE p_category='MFGR#12') == 0 at SF=1.0).
+#   * c_city/s_city are generated as 'UNITED K0'..'UNITED K9' (name truncated to
+#     10 chars), but Q3.3 filters on the canonical 'UNITED KI1'/'UNITED KI5' - no
+#     city row ever qualifies.
+#   * Q2.2/Q2.3 filter on canonical p_brand1 ranges/values that the generated
+#     'MFGR#NNNNN' brand format does not populate; Q3.4 layers the same city
+#     mismatch with a yearmonth filter.
+# Fixing this would require either changing SSB's canonical query parameters (which
+# would alter the benchmark itself - forbidden) or regenerating the SSB data with
+# SSB-faithful value formats (a generator change out of scope for this gate). Until
+# then these queries are LEGITIMATELY empty: SQL and DataFrame both return 0 rows
+# because the data genuinely contains no matching rows, not because of a load or
+# logic bug. They are classified (not silently passed) so the vacuity guard fails
+# loudly if a future change makes one of them produce rows on only one surface.
+_SSB_VACUOUS = (
+    "0 reference rows at every bounded SF (verified to SF=1.0): the BenchBox SSB "
+    "generator's value formats (p_category 'MFGR#112' not 'MFGR#12'; c_city/s_city "
+    "'UNITED K0' not 'UNITED KI1') never match this query's canonical SSB filter "
+    "parameters, so the selective multi-join selects no rows on either surface. "
+    "Tracked: regenerate SSB data with SSB-faithful value formats (do NOT change "
+    "the canonical query parameters)."
+)
+_SSB_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(("Q2.1", "Q2.2", "Q2.3", "Q3.3", "Q3.4", "Q4.3"), _SSB_VACUOUS)
+
+# Two AMPLab queries return 0 reference rows at the bounded cell. Both end in a
+# `GROUP BY ... HAVING COUNT(*) > 10` over a heavily pre-filtered uservisits set,
+# and at SF=0.1 no surviving group reaches that per-group threshold (the filtered
+# rows fan out across too many distinct grouping keys), so SQL and DataFrame both
+# return 0 rows for data-density reasons, not a logic bug:
+#   * Q3 filters a 3-day visitDate window AND searchWord LIKE '%database%' then
+#     groups by the high-cardinality sourceIP - no single source IP visits >10
+#     times in that narrow window (verified still empty at SF=1.0; raising SF
+#     scales sourceIP cardinality in step, so it does not cross the threshold).
+#   * Q5 joins uservisits to rankings on pageRank>1000 (only ~111 qualifying
+#     ranking rows at SF=0.1) then groups by countryCode HAVING COUNT(*)>10 - the
+#     join survivors do not reach 10 per country at the bounded cell.
+# Making these discriminating would require a much larger (un-bounded) cell, which
+# the one-cell-per-benchmark cost model forbids; they are classified (not silently
+# passed) so the vacuity guard fails loudly if either becomes one-sided.
+_AMPLAB_VACUOUS_Q3 = (
+    "0 reference rows at the bounded cell (still empty at SF=1.0): GROUP BY sourceIP "
+    "HAVING COUNT(*)>10 over a 3-day visitDate window AND searchWord LIKE '%database%' "
+    "- no source IP reaches >10 visits in that narrow slice; data density, not a bug."
+)
+_AMPLAB_VACUOUS_Q5 = (
+    "0 reference rows at the bounded SF=0.1 cell: JOIN rankings ON pageRank>1000 "
+    "(~111 qualifying rows) then GROUP BY countryCode HAVING COUNT(*)>10 - the join "
+    "survivors do not reach 10 per country at the bounded cell; data density, not a bug."
+)
+_AMPLAB_LEGITIMATELY_EMPTY: dict[Any, str] = {"3": _AMPLAB_VACUOUS_Q3, "5": _AMPLAB_VACUOUS_Q5}
+
+# Eight canonical ClickBench queries return 0 reference rows at SF=0.1. ClickBench's
+# SQL keeps the UPSTREAM ClickBench literals (specific UserID/RefererHash/URLHash
+# values, CounterID=62, the July-2013 EventDate window) and HAVING/OFFSET cutoffs
+# tuned for the full ~100M-row upstream dataset; the BenchBox synthetic generator
+# emits different ids/dates at 100k rows, so these select nothing on EITHER surface:
+#   * Q20 (UserID = <specific 18-digit literal>), Q41/Q42 (RefererHash/URLHash =
+#     specific literals) - the exact id never occurs in the synthetic 100k rows.
+#   * Q28/Q29 (HAVING COUNT(*) > 100000) - impossible when the whole table is 100k
+#     rows at SF=0.1, so no group can exceed the threshold.
+#   * Q23 (Title LIKE '%Google%' AND URL NOT LIKE '%.google.%' AND SearchPhrase<>'')
+#     - the combined upstream-text filters match nothing in the synthetic text.
+#   * Q39/Q40 (CounterID=62 + July-2013 window + LIMIT 10 OFFSET 1000) - the
+#     filtered slice has fewer than 1000 grouped rows, so the OFFSET skips them all.
+# These are upstream-literal/threshold artifacts, not load or logic bugs, and cannot
+# be made discriminating without either the full upstream dataset (un-bounded) or
+# changing ClickBench's canonical queries (forbidden). Classified so the guard still
+# fails loudly if any becomes one-sided.
+_CLICKBENCH_VACUOUS = (
+    "0 reference rows at the bounded SF=0.1 (100k-row) cell: the canonical ClickBench "
+    "query keeps an UPSTREAM literal/threshold (a specific UserID/RefererHash/URLHash, "
+    "CounterID=62 + the July-2013 EventDate window, HAVING COUNT(*)>100000, or a "
+    "LIMIT...OFFSET past the filtered slice) tuned for the ~100M-row upstream dataset; "
+    "the synthetic 100k-row generator emits different ids/dates so the filter selects "
+    "nothing on either surface. Data/literal artifact, not a load or logic bug. "
+    "Tracked: a larger discriminating cell or upstream-faithful literals (do NOT change "
+    "the canonical ClickBench query)."
+)
+_CLICKBENCH_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(
+    ("Q20", "Q23", "Q28", "Q29", "Q39", "Q40", "Q41", "Q42"), _CLICKBENCH_VACUOUS
+)
+
 # Registry of ENFORCED gated benchmarks: clean, blocking cross-surface gates whose
 # DataFrame surface matches its SQL surface. The oracle coverage map reads this set
 # to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
 # belong here (registering a red gate here would be coverage theater).
 GATES: dict[str, CrossSurfaceGate] = {
-    "ssb": CrossSurfaceGate(name="ssb", build=build_ssb_duckdb),
-    "amplab": CrossSurfaceGate(name="amplab", build=build_amplab_duckdb),
+    "ssb": CrossSurfaceGate(name="ssb", build=build_ssb_duckdb, legitimately_empty=_SSB_LEGITIMATELY_EMPTY),
+    "amplab": CrossSurfaceGate(name="amplab", build=build_amplab_duckdb, legitimately_empty=_AMPLAB_LEGITIMATELY_EMPTY),
     "coffeeshop": CrossSurfaceGate(name="coffeeshop", build=build_coffeeshop_duckdb),
     # Promoted from STAGED_GATES once the two cross-cutting prerequisites landed:
     # w9 (loader applies schema column TYPES + DuckDB empty-string semantics) made
@@ -540,6 +660,7 @@ GATES: dict[str, CrossSurfaceGate] = {
             "Q18_expression": _CLICKBENCH_TIE_AMBIGUOUS,
             "Q18_pandas": _CLICKBENCH_TIE_AMBIGUOUS,
         },
+        legitimately_empty=_CLICKBENCH_LEGITIMATELY_EMPTY,
     ),
     "joinorder_synthetic": CrossSurfaceGate(name="joinorder_synthetic", build=build_joinorder_synthetic_duckdb),
 }
@@ -568,10 +689,13 @@ def run_gate(gate: CrossSurfaceGate) -> int:
     from benchbox.core.tpchavoc.validation import ResultValidator
 
     with tempfile.TemporaryDirectory() as tmp:
-        data = gate.build(EQUIVALENCE_SCALE, Path(tmp))
+        data = gate.build(gate.scale_factor, Path(tmp))
         connection = data.connection
+        reference_row_counts: dict[Any, int] = {}
         try:
-            contexts = build_production_contexts(data.benchmark, data.data_dir, backends=gate.backends)
+            contexts = build_production_contexts(
+                data.benchmark, data.data_dir, backends=gate.backends, scale_factor=gate.scale_factor
+            )
             divergences = find_cross_surface_divergences(
                 connection,
                 query_ids=data.query_ids,
@@ -580,13 +704,33 @@ def run_gate(gate: CrossSurfaceGate) -> int:
                 contexts=contexts,
                 validator=ResultValidator(tolerance=gate.tolerance),
                 backends=gate.backends,
+                reference_row_counts=reference_row_counts,
             )
             coverage = count_executed_cells(data.query_ids, data.dataframe_query, gate.backends)
+            # Count vacuous CELLS exactly (one per backend a vacuous query
+            # actually implements), not an estimate: a future gate may implement
+            # a query on only one backend, and overstating vacuous cells would be
+            # the very coverage theater this guard prevents.
+            vacuous_cells = count_executed_cells(
+                [qid for qid, n in reference_row_counts.items() if n == 0],
+                data.dataframe_query,
+                gate.backends,
+            )
         finally:
             connection.close()
 
     total = len(data.query_ids) * len(gate.backends)
-    return _report(divergences, total, coverage, gate.known_divergences, benchmark=gate.name)
+    return _report(
+        divergences,
+        total,
+        coverage,
+        gate.known_divergences,
+        benchmark=gate.name,
+        reference_row_counts=reference_row_counts,
+        legitimately_empty=gate.legitimately_empty,
+        scale_factor=gate.scale_factor,
+        vacuous_cells=sum(vacuous_cells.values()),
+    )
 
 
 def _report(
@@ -596,23 +740,65 @@ def _report(
     known: dict[str, str],
     *,
     benchmark: str,
+    reference_row_counts: dict[Any, int] | None = None,
+    legitimately_empty: dict[Any, str] | None = None,
+    scale_factor: float = EQUIVALENCE_SCALE,
+    vacuous_cells: int | None = None,
 ) -> int:
     """Print a categorized divergence report and return the gate exit code.
 
-    Fails (non-zero) on any unclassified divergence OR any gated backend that
-    implemented no queries (which would otherwise make the gate silently green
-    by comparing nothing on that backend).
+    Fails (non-zero) on:
+      * any unclassified cross-surface divergence,
+      * any gated backend that implemented no queries (which would otherwise make
+        the gate silently green by comparing nothing on that backend), and
+      * any VACUOUS query - one whose SQL reference returns 0 rows, so every
+        backend compares empty-vs-empty and trivially "matches" without
+        discriminating anything - UNLESS it is explicitly classified in
+        ``legitimately_empty`` with a rationale.
+
+    The "compared N of M cells" line reports DISCRIMINATING cells only: a vacuous
+    query's cells are excluded from the discriminating count and reported
+    separately, so a report can never present empty-vs-empty passes as coverage.
     """
+    legitimately_empty = legitimately_empty or {}
+    reference_row_counts = reference_row_counts or {}
+
     found = {d.key for d in divergences}
     new = sorted(found - set(known))
     resolved = sorted(set(known) - found)
     missing_backends = sorted(backend for backend, count in coverage.items() if count == 0)
     executed = sum(coverage.values())
 
-    print(f"{benchmark} cross-surface SQL<->DataFrame equivalence @ SF={EQUIVALENCE_SCALE} (DuckDB-backed)")
+    # A query is vacuous when its reference returned 0 rows; classify each as
+    # legitimately-empty (tolerated, with a rationale) or unclassified (a gate
+    # failure). Reference-row-count availability is opt-in (run_gate passes it;
+    # the fast-lane integration tests do not), so when it is absent every cell is
+    # treated as discriminating - the prior behavior is preserved.
+    vacuous = sorted(qid for qid, count in reference_row_counts.items() if count == 0)
+    classified_empty = [qid for qid in vacuous if qid in legitimately_empty]
+    unclassified_empty = [qid for qid in vacuous if qid not in legitimately_empty]
+
+    # Each vacuous query compares one trivially-matching cell per gated backend it
+    # implements; exclude those from the discriminating count so coverage is
+    # honest. ``run_gate`` passes the EXACT vacuous-cell count (counted per
+    # implemented backend via :func:`count_executed_cells`), which stays correct
+    # even for a future gate that implements a query on only one backend. When no
+    # exact count is supplied (a direct ``_report`` caller such as a unit test),
+    # fall back to "one cell per executed backend per vacuous query" - exact for
+    # every gated benchmark today (each query implements both backends) and a
+    # conservative under-count of discriminating cells otherwise.
+    if vacuous_cells is not None:
+        vacuous_executed = vacuous_cells
+    else:
+        implemented_backends = sum(1 for count in coverage.values() if count)
+        vacuous_executed = len(vacuous) * implemented_backends if reference_row_counts else 0
+    discriminating = max(executed - vacuous_executed, 0)
+
+    print(f"{benchmark} cross-surface SQL<->DataFrame equivalence @ SF={scale_factor} (DuckDB-backed)")
     print(
-        f"  compared {executed} of {total} query-backend cells "
-        f"({total - executed} not implemented by the DataFrame surface) - {len(divergences)} divergent\n"
+        f"  compared {discriminating} of {total} query-backend cells "
+        f"({total - executed} not implemented by the DataFrame surface, "
+        f"{vacuous_executed} vacuous empty-vs-empty) - {len(divergences)} divergent\n"
     )
 
     by_class: dict[str, list[SurfaceDivergence]] = {}
@@ -625,15 +811,27 @@ def _report(
             print(f"    {divergence.key}: {divergence.detail}")
         print()
 
+    if classified_empty:
+        print("  [legitimately-empty - classified, NON-discriminating]")
+        for qid in classified_empty:
+            print(f"    {qid}: {legitimately_empty[qid]}")
+        print()
+
     if missing_backends:
         print(f"GATE FAILURE - gated backend(s) implement no queries (nothing compared): {missing_backends}")
     if new:
         print(f"GATE FAILURE - unclassified cross-surface divergences: {new}")
+    if unclassified_empty:
+        print(
+            "GATE FAILURE - vacuous empty-vs-empty queries (0 reference rows) not classified "
+            f"legitimately_empty: {unclassified_empty} - make them discriminating or classify them with a rationale"
+        )
     if resolved:
         print(f"Previously-known divergences now equivalent - update the baseline: {resolved}")
-    if not new and not resolved and not missing_backends:
-        print("SQL and DataFrame surfaces are equivalent (modulo classified exceptions).")
-    return 1 if (new or missing_backends) else 0
+    if not new and not resolved and not missing_backends and not unclassified_empty:
+        suffix = " (modulo classified exceptions)" if (known or classified_empty) else ""
+        print(f"SQL and DataFrame surfaces are equivalent{suffix}.")
+    return 1 if (new or missing_backends or unclassified_empty) else 0
 
 
 def main(argv: list[str] | None = None) -> int:

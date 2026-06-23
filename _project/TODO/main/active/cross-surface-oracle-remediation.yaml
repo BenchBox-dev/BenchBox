@@ -190,8 +190,47 @@ work:
 
   - id: w4
     summary: "Fail (not silently pass) on vacuous empty-vs-empty cells; make every gated query discriminating (BS3)"
-    status: pending
+    status: done
     addresses: [BS3, "review:Blind Spot 3", "claim 4"]
+    progress: |
+      DONE. Part 1 (gate hygiene) shipped: find_cross_surface_divergences now
+      takes an opt-in reference_row_counts out-map; _report uses it to exclude
+      vacuous (0-reference-row) cells from the discriminating "compared N of M"
+      count, lists them separately, and FAILS the gate on any vacuous query NOT
+      classified in a new per-gate CrossSurfaceGate.legitimately_empty mapping
+      (mirrors known_divergences, with a written rationale). A per-gate
+      scale_factor override (default EQUIVALENCE_SCALE) was also added and threaded
+      through run_gate/build/build_production_contexts.
+      Part 2 (SSB discrimination): the scale_factor route was tried and REJECTED on
+      evidence - all 6 empty SSB queries (Q2.1-2.3, Q3.3, Q3.4, Q4.3) return 0 rows
+      at EVERY bounded SF (verified empty at 0.1, 0.2, 0.3, 0.5 AND 1.0). Root
+      cause is a value-FORMAT mismatch, not data density: the BenchBox SSB
+      generator emits p_category='MFGR#112' (3-digit) but the canonical query
+      filters 'MFGR#12' (2-digit) [count(part WHERE p_category='MFGR#12')==0 at
+      SF=1.0]; c_city/s_city are 'UNITED K0'..'K9' (10-char truncation) but the
+      query filters 'UNITED KI1'/'KI5'. No bounded SF can bridge that, and changing
+      the canonical query parameters is forbidden (it would alter the benchmark).
+      Per the w4 fallback, the 6 are classified legitimately_empty with that written
+      rationale and a tracking note (regenerate SSB data with faithful value
+      formats; do NOT touch the canonical params). The guard is proven to surface
+      them: the SSB gate is green at 14/26 DISCRIMINATING + 12 vacuous-classified,
+      and a fast-lane unit test asserts _report FAILS on an UNclassified vacuous
+      query and passes when classified.
+      The audit of the other gates found the guard exposed PREVIOUSLY-HIDDEN
+      vacuity (the exact BS3 theater): amplab had 2 empty-vs-empty queries (Q3, Q5
+      - GROUP BY ... HAVING COUNT(*)>10 selects no qualifying group at the bounded
+      cell) and clickbench had 8 (Q20/Q23/Q28/Q29/Q39/Q40/Q41/Q42 - canonical
+      ClickBench upstream literals/thresholds: specific UserID/RefererHash/URLHash,
+      CounterID=62 + July-2013 window, HAVING COUNT(*)>100000, OFFSET past the
+      filtered slice - that the synthetic 100k-row data cannot satisfy). All are
+      classified legitimately_empty with written rationales (cannot be made
+      discriminating without an un-bounded cell or changing canonical queries -
+      both forbidden); coffeeshop (22/22) and joinorder_synthetic (26/26) are
+      genuinely clean with 0 vacuous. Every gate is green again, now HONESTLY:
+      coffeeshop 22/22, joinorder 26/26, ssb 14 discriminating, amplab 12, click
+      70 discriminating + Q18 tie baseline. TPC-Havoc SQL (220/220) + DataFrame
+      (440/440) reports unchanged green - the shared ResultValidator is untouched;
+      the guard lives only in cross_surface._report.
     notes: |
       6/13 SSB queries return 0 rows at SF=0.1, so 12/26 cells pass empty-vs-empty.
       Two parts:
