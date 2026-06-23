@@ -17,6 +17,11 @@ from benchbox.core.dataframe.schema_utils import (
     column_sql_type,
 )
 
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+]
+
 # (ddl_string, expected_name, expected_type)
 _DDL_CASES = [
     # --- simple "name TYPE" (must stay byte-identical to old behavior) ---
