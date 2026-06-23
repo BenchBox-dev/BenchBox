@@ -7,6 +7,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql"
       ]
@@ -20,6 +22,8 @@
         "cross-surface"
       ],
       "primary_oracle": "cross-surface",
+      "scale": "SF=0.1",
+      "strength": "value-level",
       "surfaces": [
         "sql",
         "dataframe"
@@ -34,6 +38,8 @@
         "cross-surface"
       ],
       "primary_oracle": "cross-surface",
+      "scale": "SF=0.1",
+      "strength": "value-level",
       "surfaces": [
         "sql",
         "dataframe"
@@ -48,6 +54,8 @@
         "cross-surface"
       ],
       "primary_oracle": "cross-surface",
+      "scale": "SF=0.1",
+      "strength": "value-level",
       "surfaces": [
         "sql",
         "dataframe"
@@ -60,6 +68,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -72,6 +82,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -84,6 +96,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -96,6 +110,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -110,6 +126,8 @@
         "cross-surface"
       ],
       "primary_oracle": "cross-surface",
+      "scale": "SF=0.1",
+      "strength": "value-level",
       "surfaces": [
         "sql",
         "dataframe"
@@ -122,6 +140,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -134,6 +154,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -146,6 +168,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -160,6 +184,8 @@
         "cross-surface"
       ],
       "primary_oracle": "cross-surface",
+      "scale": "SF=0.1",
+      "strength": "value-level",
       "surfaces": [
         "sql",
         "dataframe"
@@ -172,6 +198,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -186,6 +214,8 @@
         "expected-results"
       ],
       "primary_oracle": "expected-results",
+      "scale": "SF=1",
+      "strength": "cardinality-only",
       "surfaces": [
         "sql",
         "dataframe"
@@ -198,6 +228,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -212,6 +244,8 @@
         "expected-results"
       ],
       "primary_oracle": "expected-results",
+      "scale": "SF=1",
+      "strength": "value+cardinality",
       "surfaces": [
         "sql",
         "dataframe"
@@ -224,6 +258,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -239,6 +275,8 @@
         "cross-surface-variant"
       ],
       "primary_oracle": "variant-equivalence",
+      "scale": "SF=0.1",
+      "strength": "value-level",
       "surfaces": [
         "sql",
         "dataframe"
@@ -251,6 +289,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -263,6 +303,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -275,6 +317,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql"
       ]
@@ -286,6 +330,8 @@
       "guarded": false,
       "oracles": [],
       "primary_oracle": "NONE",
+      "scale": "\u2014",
+      "strength": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
