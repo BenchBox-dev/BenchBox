@@ -126,6 +126,40 @@ class TestFormatConverter:
             assert row_count == 2
             assert parquet_path.exists()
 
+    def test_convert_declared_string_columns_survive_production_load_path(self):
+        """A leading-zero VARCHAR keeps its zeros and an all-empty TEXT follows the
+        dialect on the CSV->Parquet production path (w6 acceptance).
+
+        A leading-zero VARCHAR ('007') must not be inferred as an integer, and an
+        all-empty declared-text column must load identically to the SQL reference:
+        for a .tbl source (null_marker == "", e.g. TPC/JoinOrder) DuckDB nulls empty
+        fields, so the DataFrame surface does too.
+        """
+        import pyarrow.parquet as pq
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            tbl_path = tmpdir / "codes.tbl"
+            tbl_path.write_text("007|\n010|\n100|\n")
+            parquet_path = tmpdir / "codes.parquet"
+
+            status, row_count = FormatConverter.convert_csv_to_parquet(
+                source_path=tbl_path,
+                target_path=parquet_path,
+                column_names=["code", "note"],
+                delimiter="|",
+                column_types={"code": "VARCHAR", "note": "TEXT"},
+            )
+
+            assert status == ConversionStatus.SUCCESS
+            assert row_count == 3
+            table = pq.read_table(parquet_path)
+            # Leading zeros preserved (string, not inferred int).
+            assert table.column("code").to_pylist() == ["007", "010", "100"]
+            # All-empty TEXT is pinned to a string column (not dropped to a null
+            # type), matching the SQL reference's nullable VARCHAR.
+            assert str(table.schema.field("note").type) in {"string", "large_string"}
+
     def test_convert_tbl_file(self):
         """Test TBL file conversion with pipe delimiter."""
         with tempfile.TemporaryDirectory() as tmpdir:
