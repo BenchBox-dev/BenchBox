@@ -42,10 +42,16 @@ _DDL_CASES = [
     ("cv CHARACTER VARYING", "cv", "CHARACTER VARYING"),
     ("cv2 CHARACTER VARYING(64)", "cv2", "CHARACTER VARYING(64)"),
     # --- quoted / bracketed / backtick-quoted names with spaces ---
-    ('"odd name" INTEGER', '"odd name"', "INTEGER"),
-    ("[odd name] INT", "[odd name]", "INT"),
-    ("`odd name` INT", "`odd name`", "INT"),
-    ('"id" BIGINT', '"id"', "BIGINT"),
+    # The delimiters are SQL syntax, not part of the logical name: column_name
+    # must return the UNQUOTED identifier so it matches the SQL identifier that
+    # the DataFrame loaders key on (a quoted spelling breaks cross-surface lookups).
+    ('"odd name" INTEGER', "odd name", "INTEGER"),
+    ("[odd name] INT", "odd name", "INT"),
+    ("`odd name` INT", "odd name", "INT"),
+    ('"id" BIGINT', "id", "BIGINT"),
+    # doubled delimiter is an escaped literal inside the identifier
+    ('"a""b" INT', 'a"b', "INT"),
+    ("[a]]b] INT", "a]b", "INT"),
     # --- trailing column constraints are stripped from the type ---
     ("id INTEGER PRIMARY KEY", "id", "INTEGER"),
     ("title TEXT NOT NULL", "title", "TEXT"),

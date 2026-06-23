@@ -31,7 +31,7 @@ description: |
 
     Q2.1 (p_category='MFGR#12'), Q2.2/Q2.3 (p_brand1 range/eq),
     Q3.3/Q3.4 (c_city IN ('UNITED KI1','UNITED KI5'), s_city pairs),
-    Q4.3 (p_category='MFGR#14')
+    Q4.3 (p_category='MFGR#12')
 
   i.e. 6 of the 13 SSB queries. This is currently MASKED in the cross-surface gate
   by classifying those 6 as `legitimately_empty` (#866) - a stopgap that should be
@@ -60,7 +60,8 @@ work:
       Before touching the generator, add tests that assert the canonical formats so
       the fix is verifiable and cannot regress:
         - p_category matches ^MFGR#[1-5][1-5]$ (exactly 2 digits) and the canonical
-          literals (e.g. 'MFGR#12', 'MFGR#14') each match >=1 generated row.
+          query literal 'MFGR#12' (used by both Q2.1 and Q4.3 in the code) matches
+          >=1 generated row.
         - p_brand1 matches the canonical MFGR#<cat2><brand2> width.
         - c_city / s_city are the canonical 10-char nation-prefix+digit format and
           the canonical literals (e.g. 'UNITED KI1') match generated rows.
