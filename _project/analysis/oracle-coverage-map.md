@@ -2,33 +2,35 @@
 
 **Generated** by `_project/scripts/generate_oracle_coverage_map.py` from the benchmark registry, the expected-results provider registry, and the equivalence-gate registries. Do not edit by hand — run the generator and commit. `tests/unit/test_oracle_coverage_map.py` fails if this drifts.
 
-**Summary:** 23 shipped benchmarks — 8 guarded, 15 UNGUARDED (13 reachable by the cross-surface gate, 2 single-surface needing a fallback oracle).
+**What an oracle here means.** A benchmark is listed as *guarded* when an oracle is REGISTERED for it — it is **not** a claim that the oracle is currently green. The distinction matters most for cross-surface gates: only a gate in the enforced `GATES` registry is run as a CI-blocking step (so it is green or CI fails); a gate in `STAGED_GATES` is registered but not run in CI, so its registration proves nothing about correctness. The **Enforced** column reports this *cross-surface* enforcement status: `enforced (CI-blocking)`, `staged (NOT CI-enforced)`, or `—` for any benchmark that is not cross-surface-gated. A `—` therefore says nothing about whether a *non*-cross-surface oracle is enforced: the expected-results (tpch, tpcds) and TPC-Havoc variant oracles are CI-enforced via their own test suites despite showing `—` here.
 
-| Benchmark | Surfaces | Oracle | Notes |
-| --- | --- | --- | --- |
-| ai_primitives | sql | NONE | single-surface → needs fallback oracle (w2) |
-| amplab | sql+dataframe | cross-surface | cross-surface |
-| clickbench | sql+dataframe | cross-surface | cross-surface |
-| coffeeshop | sql+dataframe | cross-surface | cross-surface |
-| datavault | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| flightdata | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| h2odb | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| joinorder | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| joinorder_synthetic | sql+dataframe | cross-surface | cross-surface |
-| metadata_primitives | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| nyctaxi | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| read_primitives | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| ssb | sql+dataframe | cross-surface | cross-surface |
-| tpcdi | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| tpcds | sql+dataframe | expected-results | expected-results |
-| tpcds_obt | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| tpch | sql+dataframe | expected-results | expected-results |
-| tpch_skew | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| tpchavoc | sql+dataframe | variant-equivalence | variant-equivalence, cross-surface-variant |
-| transaction_primitives | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| tsbs_devops | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
-| vector_search | sql | NONE | single-surface → needs fallback oracle (w2) |
-| write_primitives | sql+dataframe | NONE | dual-surface → dispatch to cross-surface gate (w1) |
+**Summary:** 23 shipped benchmarks — 8 guarded (oracle registered), 15 UNGUARDED (13 reachable by the cross-surface gate, 2 single-surface needing a fallback oracle). Cross-surface gates: 5 CI-enforced, 0 staged (not CI-enforced).
+
+| Benchmark | Surfaces | Oracle | Enforced | Notes |
+| --- | --- | --- | --- | --- |
+| ai_primitives | sql | NONE | — | single-surface → needs fallback oracle (w2) |
+| amplab | sql+dataframe | cross-surface | enforced (CI-blocking) | cross-surface |
+| clickbench | sql+dataframe | cross-surface | enforced (CI-blocking) | cross-surface |
+| coffeeshop | sql+dataframe | cross-surface | enforced (CI-blocking) | cross-surface |
+| datavault | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
+| flightdata | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
+| h2odb | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
+| joinorder | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
+| joinorder_synthetic | sql+dataframe | cross-surface | enforced (CI-blocking) | cross-surface |
+| metadata_primitives | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
+| nyctaxi | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
+| read_primitives | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
+| ssb | sql+dataframe | cross-surface | enforced (CI-blocking) | cross-surface |
+| tpcdi | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
+| tpcds | sql+dataframe | expected-results | — | expected-results |
+| tpcds_obt | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
+| tpch | sql+dataframe | expected-results | — | expected-results |
+| tpch_skew | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
+| tpchavoc | sql+dataframe | variant-equivalence | — | variant-equivalence, cross-surface-variant |
+| transaction_primitives | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
+| tsbs_devops | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
+| vector_search | sql | NONE | — | single-surface → needs fallback oracle (w2) |
+| write_primitives | sql+dataframe | NONE | — | dual-surface → dispatch to cross-surface gate (w1) |
 
 ## UNGUARDED benchmarks
 

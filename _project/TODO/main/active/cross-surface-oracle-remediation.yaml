@@ -345,8 +345,32 @@ work:
 
   - id: w9
     summary: "Tighten coverage-map / applicability honesty (M1, M2)"
-    status: pending
+    status: done
     addresses: [M1, M2, "review:MEDIUM M1/M2", "claims 6,7"]
+    progress: |
+      DONE. Both honesty signals landed (re-derived from the LIVE registries, not
+      hardcoded).
+      M1 (coverage map): generate_oracle_coverage_map.py now records
+      cross_surface_enforced per benchmark (True for enforced GATES = CI-blocking
+      hence green-or-CI-fails, False for STAGED_GATES = registered-but-not-run, None
+      for non-cross-surface). The md gains an "Enforced" column plus a "What an
+      oracle here means" preamble stating that 'guarded' is REGISTERED, not green;
+      the json carries the new field. The 5 enforced gates (amplab, clickbench,
+      coffeeshop, joinorder_synthetic, ssb) report "enforced (CI-blocking)"; STAGED
+      is currently empty. Drift test (oracle-coverage-map-check) regenerated + green.
+      M2 (applicability): cross_surface_applicability_sweep.py downgrades the
+      zero-verified-overlap benchmarks from gateable to a new candidate-unverified
+      status; _GATEABLE_STATUSES no longer counts them as coverage. The live sweep
+      now reports 4 gateable (flightdata, h2odb, joinorder, read_primitives) and 5
+      candidate-unverified (datavault, nyctaxi, tpcds_obt, tpch_skew, tsbs_devops).
+      amplab is no longer in this list at all (promoted to an enforced gate in #859),
+      so the original "6" is 5 unguarded candidates here.
+      Tests: tests/unit/test_oracle_coverage_map.py gains
+      test_cross_surface_enforced_distinguishes_registered_from_verified_green;
+      tests/unit/test_cross_surface_applicability.py pins the new
+      candidate-unverified set and asserts none are counted gateable. Both committed
+      artifacts regenerated; both -check/drift targets and both unit test modules
+      green; ruff/format/ty clean.
     notes: |
       - generate_oracle_coverage_map.py derives 'guarded' from GATES dict membership
         (85/111) and never checks the gate is green. Either run each gate (or read
