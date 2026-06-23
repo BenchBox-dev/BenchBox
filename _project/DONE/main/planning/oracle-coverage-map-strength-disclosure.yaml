@@ -1,0 +1,209 @@
+id: oracle-coverage-map-strength-disclosure
+title: "Make the oracle coverage map disclose oracle STRENGTH and SCALE, not just existence"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-06-23"
+category: Testing and Quality Assurance
+
+description: |
+  An adversarial review of the oracle coverage map (#834, reviewed on develop)
+  found the map collapses very different guarantees into a single word, "guarded".
+  The drift machinery is sound and on the required PR path - it was verified to go
+  RED on a mutated artifact and a removed GATES entry - but it protects the map's
+  CONSISTENCY with the generator, not the TRUTH of what "guarded" implies.
+
+  Reproduced facts (verified against develop @ 8596ab51):
+
+  - `build_coverage_map` / `classify_oracles`
+    (_project/scripts/generate_oracle_coverage_map.py) emit one primary oracle per
+    benchmark and a boolean `guarded`. They do NOT record how STRONG that oracle is
+    or at what SCALE it holds. The rendered map shows e.g.
+    `tpch | expected-results | guarded` with no qualifier.
+  - The guaranteed strengths differ enormously and are not distinguished:
+      * expected-results (tpch, tpcds): ROW-COUNT only today, and ONLY at SF=1
+        (loader raises for other scales). Cardinality, one scale.
+      * cross-surface (ssb, amplab, coffeeshop): VALUE-level (validate_results_exact
+        sorts full result sets and compares cell-by-cell with tol 1e-10,
+        benchbox/core/tpchavoc/validation.py), but self-referential (SQL is the
+        reference for its own DataFrame surface) at the bounded SF=0.1.
+      * variant-equivalence (tpchavoc): value-level vs canonical TPC-H.
+  - A reviewer reading a green "guarded" cell reasonably infers "correctness is
+    proven" and may skip manual value inspection. That is the coverage-theater risk
+    the map was meant to remove, re-introduced one abstraction up: the map is honest
+    about its DENOMINATOR (6/23 guarded, 17 named UNGUARDED) but not about the
+    QUALITY of each guarded cell.
+
+  This item adds two disclosure axes to the generated map - oracle STRENGTH-TYPE
+  (value-level / cardinality-only / structural) and SCALE coverage - plus a
+  classifier-correctness test so the new axes cannot silently regress, and an
+  artifact-provenance note that addresses the review-staleness failure mode.
+
+  SCOPE BOUNDARY (do not duplicate): a separate, higher-priority axis -
+  "gate-registered vs verified-green" - is already owned by
+  cross-surface-oracle-remediation w9. This item owns the orthogonal STRENGTH-TYPE
+  + SCALE + provenance axes and must layer onto whatever naming w9 lands.
+
+prior_art:
+- "_project/scripts/generate_oracle_coverage_map.py:classify_oracles/build_coverage_map/render_markdown - the generator to
+  extend with strength + scale columns; keep it derived from live sources, no hand-maintained doc."
+- "benchbox/core/expected_results/models.py - ValidationMode (EXACT/RANGE/LOOSE) and the row-count-only nature of the expected-results
+  oracle; the source of the 'cardinality-only' strength label for tpch/tpcds."
+- "benchbox/core/expected_results/loader.py - raises for non-SF=1 TPC-H/TPC-DS; the source of the 'SF=1 only' scale label."
+- "benchbox/core/equivalence/cross_surface.py:GATES + tpchavoc/validation.py:validate_results_exact - the value-level comparator
+  backing cross-surface/variant gates; the source of the 'value-level' strength label and the SF=0.1 scale label."
+- "tests/unit/test_oracle_coverage_map.py - the existing drift/completeness/exemplar tests to extend with strength/scale classifier
+  assertions."
+- "_project/TODO/main/active/cross-surface-oracle-remediation.yaml:w9 - owns 'registered vs verified-green'; coordinate, do
+  NOT duplicate that axis here."
+- "_project/TODO/main/planning/benchmark-correctness-oracle-coverage-map.yaml - owns coverage BREADTH (closing the 17 UNGUARDED);
+  this item is about disclosure QUALITY of the guarded cells, not breadth."
+
+work:
+- id: w1
+  summary: "Classify and render oracle STRENGTH-TYPE per benchmark (value-level / cardinality-only / structural)"
+  status: done
+  notes: |
+    Extend classify_oracles/build_coverage_map to attach a strength-type to each
+    oracle, derived from live sources: expected-results -> cardinality-only (read
+    the provider's ValidationMode; it is row-count regardless of EXACT/LOOSE);
+    cross-surface and variant-equivalence -> value-level (they use
+    validate_results_exact). Render it as a distinct column in
+    oracle-coverage-map.md and a field in the .json so a reader sees
+    `tpch | expected-results | cardinality-only` vs
+    `ssb | cross-surface | value-level`.
+  acceptance:
+  - "The generated map shows a strength-type column; tpch/tpcds read 'cardinality-only', ssb/amplab/coffeeshop/tpchavoc read
+    'value-level'."
+  - "The strength-type is derived from live sources (provider mode / comparator), not hard-coded per benchmark."
+
+- id: w2
+  summary: "Disclose SCALE coverage per oracle (e.g. expected-results = SF=1 only)"
+  needs: [w1]
+  status: done
+  notes: |
+    Add a scale-coverage signal to each guarded row: expected-results guard only
+    at SF=1 (loader raises otherwise); cross-surface/variant gates run at the
+    bounded SF (0.1). Derive from the same live sources where possible (probe the
+    provider's available scales; read the gate's bounded scale). Render it so a
+    reader cannot mistake "guarded" for "guarded at the scale I run".
+  acceptance:
+  - "Each guarded row discloses the scale(s) at which its oracle actually holds (tpch/tpcds = SF=1 only)."
+  - "The map's summary or notes state plainly that no expected-results oracle exists above SF=1."
+
+- id: w3
+  summary: "Stamp analysis-artifact provenance and document the review-reproducibility protocol"
+  status: done
+  notes: |
+    The review went stale because it was run against a develop SHA that advanced
+    underneath it (a parallel second-opinion hit the same trap). Two concrete,
+    conflict-free fixes:
+      - Provenance: stamp _project/analysis correctness artifacts that are read
+        out-of-band (the divergence analyses, and a non-drift-compared header of
+        the coverage map) with the generation date and git SHA, so a reader can
+        tell when an artifact predates current develop.
+      - Protocol: document in the relevant README / review-protocol note that an
+        adversarial correctness review MUST pin the reviewed SHA and re-run
+        `git merge-base --is-ancestor <reviewed-sha> origin/develop` at write
+        time, or review against a tag.
+    CRITICAL DESIGN CONSTRAINT: the coverage map's drift check requires committed
+    == regenerated byte-for-byte. A volatile SHA inside the drift-compared region
+    would make `--check` fail on every commit. Put provenance in a region the
+    drift check ignores (or normalizes), never in the compared body.
+  acceptance:
+  - "Out-of-band analysis artifacts carry generation date + SHA provenance."
+  - "`make oracle-coverage-map-check` still passes on a clean tree across multiple commits (provenance did NOT make the drift
+    check churn)."
+  - "The review-protocol note documents the pin-SHA + ancestry-recheck requirement."
+
+- id: w4
+  summary: "Add a classifier-correctness test so strength/scale labels cannot silently regress"
+  needs: [w1, w2]
+  status: done
+  notes: |
+    The existing drift test only proves committed == regenerated (consistency,
+    not truth). Add assertions that pin the TRUTH of the new axes for known
+    oracles: tpch/tpcds are cardinality-only + SF=1; ssb/amplab/coffeeshop/
+    tpchavoc are value-level. This is the truth check the drift check lacks, and
+    it guards the strength dimension itself.
+  acceptance:
+  - "tests/unit/test_oracle_coverage_map.py asserts the strength-type and scale of each known oracle, failing if a future
+    change mislabels one."
+
+deferred:
+- summary: "A 'gate-registered vs verified-green' strength signal in the map."
+  reason: "Owned by cross-surface-oracle-remediation w9; this item layers strength-TYPE + scale onto whatever naming that
+    lands, and must not duplicate it."
+- summary: "Closing the 17 UNGUARDED benchmarks."
+  reason: "Owned by benchmark-correctness-oracle-coverage-map w1/w2 (breadth). This item improves disclosure of the already-guarded
+    cells."
+
+must_preserve:
+- "The map stays GENERATED from live sources - no hand-maintained classification - so it cannot drift from reality."
+- "The drift check (`make oracle-coverage-map-check`) stays green on a clean tree and on the required PR path; new columns
+  must regenerate deterministically."
+- "The existing summary semantics (N guarded / M UNGUARDED, the UNGUARDED dispatch lists) are preserved; strength/scale are
+  additive columns."
+
+approach: |
+  Keep the generator the single source of truth and derive both new axes from live
+  sources (provider ValidationMode + available scales; comparator identity + bounded
+  SF) so they cannot be faked. Sequence: (w1) strength-type column; (w2) scale
+  column; (w3) provenance + protocol, carefully kept out of the drift-compared body;
+  (w4) a truth test for the new labels. Coordinate naming with
+  cross-surface-oracle-remediation w9 rather than competing with it.
+
+anti_patterns:
+- "DO NOT hard-code the strength/scale per benchmark - because it would rot exactly like a hand-maintained doc - derive from
+  the provider/comparator/loader."
+- "DO NOT embed a volatile git SHA in the drift-compared region of the coverage map - because `--check` would fail on every
+  commit - put provenance where the drift comparison ignores it."
+- "DO NOT duplicate the 'registered vs verified-green' axis from cross-surface-oracle-remediation w9 - coordinate with it."
+- "DO NOT widen scope into closing UNGUARDED benchmarks - that is benchmark-correctness-oracle-coverage-map; this is disclosure
+  quality only."
+
+verification:
+- description: "Map shows strength + scale and is internally consistent"
+  command: "make oracle-coverage-map && make oracle-coverage-map-check"
+  expected_output: "regenerates with strength/scale columns; --check reports up to date"
+- description: "Classifier-truth test catches a mislabeled oracle"
+  command: "uv run -- python -m pytest tests/unit/test_oracle_coverage_map.py -q"
+  expected_output: "tests pass; flipping a known oracle's strength label fails the new assertion"
+- description: "Provenance does not make the drift check churn"
+  command: "make oracle-coverage-map-check  (on two successive commits without registry/gate changes)"
+  expected_output: "up to date both times"
+
+scope_limit:
+  only_modify:
+  - "_project/scripts/generate_oracle_coverage_map.py"
+  - "_project/analysis/"
+  - "tests/unit/test_oracle_coverage_map.py"
+  - "_project/"
+  - "docs/"
+
+success_metrics:
+- "Every guarded cell in the coverage map discloses its oracle strength-type and scale coverage, derived from live sources."
+- "A reader can distinguish 'value-level at SF=0.1' from 'cardinality-only at SF=1' at a glance."
+- "A classifier-truth test fails if a known oracle's strength/scale is mislabeled."
+- "Out-of-band analysis artifacts carry provenance, and the review-protocol note requires SHA pinning + ancestry recheck."
+
+open_questions:
+- question: "Once bounded-correctness-gate-value-oracle adds value digests to tpch/tpcds, the expected-results strength flips
+    from 'cardinality-only' to 'value-level@SF=1'. Should the strength label be computed from the provider's actual capabilities
+    (auto-updates) or stated statically?"
+  gating: false
+  affects: ["w1 strength derivation"]
+  default: "Compute from the provider's actual capability (presence of stored digests) so the label tracks reality without
+    a manual edit; cross-reference bounded-correctness-gate-value-oracle."
+
+# No hard deps.needs: this disclosure work is independent of the breadth campaign
+# (the generator already exists), so it must not be blocked behind
+# benchmark-correctness-oracle-coverage-map reaching DONE. Coordination with that
+# item and with cross-surface-oracle-remediation w9 is captured in prior_art /
+# deferred / anti_patterns instead.
+
+metadata:
+  tags: [correctness, oracle, coverage, governance, ci, disclosure, provenance]
+  estimated_effort: "Small"
+  created_date: "2026-06-23"
+  last_updated: "2026-06-23T00:00:00"

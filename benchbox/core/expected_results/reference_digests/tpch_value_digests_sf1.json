@@ -1,0 +1,37 @@
+{
+  "benchmark": "tpch",
+  "scale_factor": 1.0,
+  "reference_seed": 17039360,
+  "digest": {
+    "primitive": "benchbox.core.tpchavoc.validation.calculate_checksum",
+    "algorithm": "md5-of-order-normalized-rows",
+    "numeric_normalization": "float/Decimal cells rendered with fixed 4-decimal precision before hashing",
+    "emitter": "benchbox.core.results.result_digest.compute_result_digest"
+  },
+  "provenance": {
+    "generated_with_duckdb": "1.3.2",
+    "generated_with_platform": "duckdb",
+    "phases": "generate,load,power",
+    "note": "Reference VALUE digests for the 18 bounded correctness-gate TPC-H queries at SF=1 with the pinned reference qgen seed. Regenerate by running `make test-correctness-gate` query set with BENCHBOX_EMIT_RESULT_DIGEST=1 at SF=1/seed=17039360 on the locked DuckDB and copying the stream-0 per-query digests here. Digests are tied to the DuckDB build pinned in uv.lock; a DuckDB bump that changes a query's emitted values requires regenerating this file."
+  },
+  "digests": {
+    "1": "0fafaebd6b40880e0c6bb3c4cc502a8b",
+    "2": "6bf591af57282b8a49e8949a1f012a89",
+    "3": "7b982eb505fbf0d3cf0939a804fa9260",
+    "4": "0243a51b60f14f89eb9fa437512d2553",
+    "5": "650216a516ed4ee05abe420e189fb336",
+    "6": "c8c3881175b6a9f4436f048eff70cac2",
+    "7": "d7182e8ed8f450d727b0e89bb4e42a47",
+    "8": "deaa67c46437efdba98294913baaee40",
+    "9": "c797e44a78d9000f6f64748fbff415fc",
+    "10": "e991d61b567929bfa42374cdecf8a5c1",
+    "12": "b1469ee8d24753b438da3f6ed2787696",
+    "13": "1074e0d1b99093fc6f09a030b1586405",
+    "14": "9ac65fa68d10e546e07f82d78856a0e9",
+    "15": "a3923315b10465befb1eb53df28d526a",
+    "17": "af0c2df2ba1bd19b9123ca3b05ce9dab",
+    "19": "f1918c5e6c4983bf8773c3af3153cbc4",
+    "21": "a7175b7b06def91d4120ae357ad6b969",
+    "22": "db127b065576668343a7b336e951c69b"
+  }
+}

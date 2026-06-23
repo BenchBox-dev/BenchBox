@@ -92,29 +92,47 @@ The standard gates are intentionally split by the risk they are meant to catch:
   changes. This is the coverage-bearing lane in `.github/workflows/pr.yml`.
 - `make test-correctness-gate`: bounded develop-PR real-result gate. It runs the
   DuckDB TPC-H matrix slice (SF=1, pinned reference qgen seed) through generate,
-  load, and execute, then validates the emitted stream-0 cardinalities against the
-  stored TPC-H answer files with EXACT row-count checking. The gated subset is the
-  18 TPC-H queries whose answer-set cardinalities are stable across dbgen builds;
-  Q11/Q16/Q18/Q20 are excluded because their HAVING/threshold boundaries make the
-  stored row count vary with the generated data. The subset is deliberately
-  *discriminating* — it is not dominated by one-row queries and includes multiple
-  high-cardinality answer-backed queries (e.g. Q9=175, Q2/Q21=100) — so a wrong
-  join/filter/aggregate that still emits one row is caught. The subset shape is
-  ratcheted in `tests/unit/test_standardized_test_commands.py`
+  load, and execute, then validates the emitted stream-0 results against the stored
+  TPC-H answers with EXACT row-count checking **and** stored VALUE digests. The
+  gated subset is the 18 TPC-H queries whose answer-set cardinalities are stable
+  across dbgen builds; Q11/Q16/Q18/Q20 are excluded because their HAVING/threshold
+  boundaries make the stored row count vary with the generated data. The subset is
+  deliberately *discriminating* — it is not dominated by one-row queries and
+  includes multiple high-cardinality answer-backed queries (e.g. Q9=175, Q2/Q21=100)
+  — so a wrong join/filter/aggregate that still emits one row is caught. The subset
+  shape is ratcheted in `tests/unit/test_standardized_test_commands.py`
   (`TestCorrectnessGateOracle`). What the gate proves and what it does not:
-  - **Strict arming**: with `BENCHBOX_STRICT_EXPECTED_RESULTS=1`, every configured
-    query *must* produce a non-SKIP row-count validation or the run fails. This is
-    not gated on benchmark name or scale, so a future CI speedup that retargets the
-    gate (a different benchmark, or SF<1 where no answer files exist) cannot
-    silently disarm the oracle.
+  - **Value + cardinality at SF=1/pinned-seed**: with `BENCHBOX_EMIT_RESULT_DIGEST=1`
+    the runner emits an order-normalized digest of each stream-0 query's *full*
+    result set (reusing `benchbox.core.tpchavoc.validation.calculate_checksum`, the
+    same primitive the TPC-Havoc gates use), which the gate asserts against a stored
+    reference digest (`benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json`)
+    in addition to the row count. So a wrong-but-same-cardinality answer — a perturbed
+    Q1 aggregate, a swapped column, a changed rounding — turns the gate RED, not just
+    a wrong row count. Sensitivity is proven in
+    `tests/unit/test_correctness_gate_value_oracle.py`.
+  - **Values are UNGUARDED above SF=1**: stored answers and digests exist only at
+    SF=1 (the expected-results loader raises for other scales), so the value
+    guarantee holds at SF=1 only. There is no expected-results value or cardinality
+    oracle above SF=1.
+  - **Strict arming (both axes)**: with `BENCHBOX_STRICT_EXPECTED_RESULTS=1`, every
+    configured query *must* produce a non-SKIP row-count validation **and**, where a
+    reference digest exists, an evaluated value digest, or the run fails. A missing
+    digest disarms RED, never green. This is not gated on benchmark name or scale, so
+    a future CI speedup that retargets the gate (a different benchmark, or SF<1 where
+    no answers exist) cannot silently disarm either oracle.
   - **No-skip guard**: the Makefile target emits a JUnit report and fails unless
     exactly one node ran with zero skips. `pytest` exits 0 when a *selected* node
     SKIPs (e.g. duckdb unavailable, or the case dropped from the stable matrix),
     which would otherwise pass the gate without executing anything.
-  - **Cardinality, not values**: this validates result *cardinality*, not result
-    *values* — value-level answer comparison (the `_sources/tpc-h/dbgen/answers` +
-    `cmpq.pl` checksum path) remains future work, as do the high-cardinality
-    threshold queries (Q11/Q16) excluded above for dbgen-build stability.
+  - **Required CI job composition**: the `correctness-gate` job in
+    `.github/workflows/pr.yml` runs more than this row-count+value gate. It also runs
+    the value-level cross-surface and TPC-Havoc equivalence gates
+    (`tpchavoc-equivalence-report`, `tpchavoc-dataframe-equivalence-report`, and the
+    ssb/amplab/coffeeshop/clickbench/joinorder-synthetic cross-surface reports), so
+    the required job proves value-level equivalence across several benchmarks, not
+    only TPC-H row counts. This composition is ratcheted in
+    `tests/unit/test_standardized_test_commands.py`.
 - `make test-integration`: non-live, non-stress integration coverage for broader
   local and main/release validation.
 - `make test-local-matrix`: opt-in stress matrix for the full local platform

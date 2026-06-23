@@ -15,6 +15,35 @@ To enable EXACT validation (for advanced users who have aligned seeds):
 
 **Warning:** EXACT validation will fail if seeds don't match answer file generation.
 
+## TPC-DS loose ±50% band: scope and keep/tighten decision
+
+TPC-DS row-count validation runs in LOOSE mode with a ±50% default tolerance
+(``benchbox/core/expected_results/models.py`` ``loose_tolerance_percent=50.0``), so a
+regression that shifts TPC-DS cardinality by <50% can hide. Scoped honestly:
+
+* **Where it lives:** the loose band is exercised only by the broad, opt-in stress
+  matrix (``tests/integration/test_local_platform_benchmark_matrix.py`` sets
+  ``BENCHBOX_QUERY_VALIDATION_MODE=loose`` for TPC-DS). It is **not** in the bounded
+  ``make test-correctness-gate``, which is TPC-H/DuckDB only. So it is less
+  load-bearing than a reader of the #830/#834 review might assume — no required
+  develop-PR gate depends on TPC-DS row counts at all.
+* **Decision (keep LOOSE for now, per query class):** unlike TPC-H, BenchBox does not
+  pin TPC-DS to a single reference dsqgen parameterization whose stored answer set is
+  cardinality-stable across builds — the answer files represent one RNGSEED, while
+  runs use different seeds, and several query classes (windowed/top-N/threshold
+  ``HAVING`` queries) have genuinely seed-sensitive cardinality. Tightening those to
+  EXACT/RANGE would be flaky across dsqgen builds and seeds. The loose band is
+  therefore retained as a 0-row / order-of-magnitude *crash* guard (the critical
+  ``expected>0 but actual==0`` failure always fails regardless of tolerance), not as a
+  precise oracle.
+* **When to tighten:** the right place to add a precise TPC-DS value oracle is the
+  same value-digest mechanism TPC-H now uses (a pinned reference seed + stored
+  full-result digest at SF=1), tracked by ``bounded-correctness-gate-value-oracle``
+  (deferred for TPC-DS) and the breadth item
+  ``benchmark-correctness-oracle-coverage-map``. Until a pinned TPC-DS seed + digest
+  store exists, EXACT row counts would regress reliability without adding a real value
+  guarantee.
+
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.

@@ -46,6 +46,17 @@ _ORACLE_PRIORITY = [
     ORACLE_CROSS_SURFACE,
 ]
 
+# Oracle STRENGTH-TYPE: what a guarded cell actually proves. Distinct from the
+# oracle KIND above, and derived from live sources (provider capability / comparator
+# identity), never hand-labelled per benchmark.
+STRENGTH_VALUE = "value-level"  # full result values compared (cross-surface, variant gates)
+STRENGTH_CARDINALITY = "cardinality-only"  # row counts only (expected-results without value digests)
+STRENGTH_VALUE_AND_CARDINALITY = "value+cardinality"  # row counts AND stored value digests
+STRENGTH_NONE = "—"
+
+# Sentinel for "no scale guarantee" (UNGUARDED rows).
+SCALE_NONE = "—"
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT_DIR = _REPO_ROOT / "_project" / "analysis"
 JSON_ARTIFACT = ARTIFACT_DIR / "oracle-coverage-map.json"
@@ -100,6 +111,56 @@ def primary_oracle(oracles: list[str]) -> str:
     return ORACLE_NONE
 
 
+def _expected_results_has_value_digests(benchmark_id: str) -> bool:
+    """True if the expected-results provider stores VALUE digests for this benchmark.
+
+    Probed from the committed digest reference (no answer files / DuckDB needed, so
+    the result is deterministic across environments and the drift check stays
+    stable). This is what flips the expected-results strength from cardinality-only
+    to value+cardinality once stored digests land -- derived from the provider's
+    actual capability, not a hand-edited label.
+    """
+    try:
+        if benchmark_id == "tpch":
+            from benchbox.core.expected_results.loader import load_tpch_value_digests
+
+            return bool(load_tpch_value_digests(1.0))
+    except Exception:  # pragma: no cover - absence simply means cardinality-only
+        return False
+    return False
+
+
+def _bounded_value_gate_scale() -> str:
+    """The bounded scale value-level gates run at, read live from the gate module."""
+    from benchbox.core.equivalence.cross_surface import EQUIVALENCE_SCALE
+
+    return f"SF={EQUIVALENCE_SCALE}"
+
+
+def oracle_strength_and_scale(primary: str, benchmark_id: str) -> tuple[str, str]:
+    """Return ``(strength_type, scale_coverage)`` for a benchmark's primary oracle.
+
+    Derived from live sources so it cannot rot:
+      * expected-results -> cardinality-only OR value+cardinality (probe the
+        provider's stored value digests); scale SF=1 (the loader raises for any
+        other scale, so no expected-results oracle exists above SF=1).
+      * variant-equivalence / cross-surface(-variant) -> value-level (they compare
+        full result sets via ResultValidator/validate_results_exact); scale = the
+        bounded gate scale read live from the equivalence module.
+    """
+    if primary == ORACLE_EXPECTED_RESULTS:
+        strength = (
+            STRENGTH_VALUE_AND_CARDINALITY
+            if _expected_results_has_value_digests(benchmark_id)
+            else STRENGTH_CARDINALITY
+        )
+        # SF=1 only: benchbox/core/expected_results/loader.py raises for other scales.
+        return strength, "SF=1"
+    if primary in (ORACLE_VARIANT_EQUIVALENCE, ORACLE_CROSS_SURFACE_VARIANT, ORACLE_CROSS_SURFACE):
+        return STRENGTH_VALUE, _bounded_value_gate_scale()
+    return STRENGTH_NONE, SCALE_NONE
+
+
 def _surfaces(metadata: dict[str, Any]) -> tuple[bool, bool]:
     """Return ``(has_sql, has_dataframe)`` for a benchmark's metadata.
 
@@ -133,6 +194,7 @@ def build_coverage_map() -> list[dict[str, Any]]:
             staged_cross_surface_gates=staged_cross_surface_gates,
         )
         primary = primary_oracle(oracles)
+        strength, scale = oracle_strength_and_scale(primary, benchmark_id)
         # A dual-surface benchmark with no oracle is reachable by the cross-surface
         # SQL<->DataFrame gate (the w1 dispatch target). A single-surface benchmark
         # is not and needs a fallback oracle (w2).
@@ -152,6 +214,8 @@ def build_coverage_map() -> list[dict[str, Any]]:
                 "dual_surface": dual_surface,
                 "oracles": oracles,
                 "primary_oracle": primary,
+                "strength": strength,
+                "scale": scale,
                 "guarded": primary != ORACLE_NONE,
                 "cross_surface_enforced": cross_surface_enforced,
                 "cross_surface_applicable": dual_surface and primary == ORACLE_NONE,
@@ -218,8 +282,19 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
         f"staged (not CI-enforced)."
     )
     lines.append("")
-    lines.append("| Benchmark | Surfaces | Oracle | Enforced | Notes |")
-    lines.append("| --- | --- | --- | --- | --- |")
+    lines.append(
+        "**Strength + scale disclosure:** a guarded cell is not a uniform guarantee. "
+        "The **Strength** column says what the oracle proves — `value-level` (full "
+        "result values compared) vs `cardinality-only` (row counts only) vs "
+        "`value+cardinality` (both) — and the **Scale** column says at which scale it "
+        "actually holds. Both are derived from live sources (the provider's stored "
+        "answers/digests and the equivalence gate's bounded scale), not hand-labelled. "
+        "No expected-results oracle exists above SF=1 (the loader raises for other "
+        "scales), so `tpch`/`tpcds` values are unguarded above SF=1."
+    )
+    lines.append("")
+    lines.append("| Benchmark | Surfaces | Oracle | Strength | Scale | Enforced | Notes |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- |")
     for r in rows:
         surfaces = "+".join(r["surfaces"]) or "—"
         oracle = r["primary_oracle"]
@@ -235,7 +310,9 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
         else:
             note = "single-surface → needs fallback oracle (w2)"
         enforced = _enforcement_label(r)
-        lines.append(f"| {r['benchmark']} | {surfaces} | {oracle} | {enforced} | {note} |")
+        lines.append(
+            f"| {r['benchmark']} | {surfaces} | {oracle} | {r['strength']} | {r['scale']} | {enforced} | {note} |"
+        )
     lines.append("")
     lines.append("## UNGUARDED benchmarks")
     lines.append("")
@@ -270,21 +347,84 @@ def render_json(rows: list[dict[str, Any]]) -> str:
     return json.dumps({"benchmarks": rows}, indent=2, sort_keys=True) + "\n"
 
 
+# Provenance is stamped into a leading HTML-comment region of the markdown that the
+# drift check IGNORES (see _strip_provenance / check_artifacts). It carries the
+# generation date + reviewed git SHA so a reader of the out-of-band artifact can tell
+# whether it predates current develop -- WITHOUT putting a volatile SHA into the
+# drift-compared body (which would make `--check` churn on every commit).
+_PROVENANCE_START = "<!-- PROVENANCE"
+_PROVENANCE_END = "-->"
+
+
+def _current_git_sha() -> str:
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=_REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    except Exception:  # pragma: no cover - provenance is best-effort
+        pass
+    return "unknown"
+
+
+def _provenance_header() -> str:
+    import datetime
+
+    generated = datetime.date.today().isoformat()
+    return (
+        f"{_PROVENANCE_START}\n"
+        f"generated: {generated}\n"
+        f"revision: {_current_git_sha()}\n"
+        "This header is drift-IGNORED by `--check` (see _strip_provenance); it records when\n"
+        "this generated artifact was last written so a reviewer can tell if it predates\n"
+        "current develop. Do not rely on it for diffs.\n"
+        f"{_PROVENANCE_END}\n"
+    )
+
+
+def _strip_provenance(text: str) -> str:
+    """Remove a leading provenance HTML-comment region so drift compares only the body."""
+    if not text.startswith(_PROVENANCE_START):
+        return text
+    end = text.find(_PROVENANCE_END)
+    if end == -1:
+        return text
+    rest = text[end + len(_PROVENANCE_END) :]
+    return rest.lstrip("\n")
+
+
 def write_artifacts(rows: list[dict[str, Any]]) -> None:
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     JSON_ARTIFACT.write_text(render_json(rows), encoding="utf-8")
-    MARKDOWN_ARTIFACT.write_text(render_markdown(rows), encoding="utf-8")
+    MARKDOWN_ARTIFACT.write_text(_provenance_header() + render_markdown(rows), encoding="utf-8")
 
 
 def check_artifacts(rows: list[dict[str, Any]]) -> list[str]:
-    """Return a list of human-readable drift problems (empty == in sync)."""
+    """Return a list of human-readable drift problems (empty == in sync).
+
+    The markdown's provenance header is stripped before comparison so a refreshed
+    date/SHA never makes the drift check churn; only the generated body must match.
+    """
     problems: list[str] = []
-    expected_json = render_json(rows)
-    expected_md = render_markdown(rows)
-    for path, expected in ((JSON_ARTIFACT, expected_json), (MARKDOWN_ARTIFACT, expected_md)):
+    checks = (
+        (JSON_ARTIFACT, render_json(rows), False),
+        (MARKDOWN_ARTIFACT, render_markdown(rows), True),
+    )
+    for path, expected, strip in checks:
         if not path.exists():
             problems.append(f"missing artifact: {path.relative_to(_REPO_ROOT)} (run the generator)")
-        elif path.read_text(encoding="utf-8") != expected:
+            continue
+        actual = path.read_text(encoding="utf-8")
+        if strip:
+            actual = _strip_provenance(actual)
+        if actual != expected:
             problems.append(f"stale artifact: {path.relative_to(_REPO_ROOT)} (run the generator and commit)")
     return problems
 

@@ -221,6 +221,41 @@ def load_tpch_expected_results(scale_factor: float = 1.0) -> dict[str, int]:
     return expected_results
 
 
+def load_tpch_value_digests(scale_factor: float = 1.0) -> dict[str, str]:
+    """Load stored reference VALUE digests for TPC-H queries at a given scale.
+
+    These back the bounded correctness gate's value oracle: an order-normalized,
+    numeric-stable digest of each query's full result set at the pinned reference
+    qgen seed. Only SF=1 is stored today (the only scale with stored answers and a
+    pinned seed). Returns an empty mapping for unsupported scales so the gate
+    degrades to row-count-only there rather than raising.
+
+    Args:
+        scale_factor: Scale factor (only 1.0 currently has stored digests).
+
+    Returns:
+        Mapping of query ID (string) -> hex digest. Empty if none stored.
+    """
+    if scale_factor != 1.0:
+        return {}
+
+    digest_file = Path(__file__).with_name("reference_digests") / "tpch_value_digests_sf1.json"
+    if not digest_file.exists():
+        logger.warning("TPC-H value-digest reference file not found: %s", digest_file)
+        return {}
+
+    import json
+
+    try:
+        payload = json.loads(digest_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        logger.warning("Failed to read TPC-H value-digest reference file %s: %s", digest_file, exc)
+        return {}
+
+    digests = payload.get("digests", {})
+    return {str(query_id): str(digest) for query_id, digest in digests.items()}
+
+
 def _find_tpcds_answers_dir() -> Path:
     """Locate the TPC-DS answer files directory.
 

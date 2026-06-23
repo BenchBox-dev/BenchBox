@@ -16,6 +16,60 @@ from collections.abc import Sequence
 from typing import Any, Optional, Union
 
 
+def calculate_checksum(results: list[tuple[Any, ...]]) -> str:
+    """Calculate an order-normalized MD5 digest of a single result set.
+
+    This is the canonical single-result digest primitive for BenchBox. Rows are
+    sorted before hashing so unordered queries hash stably, and each cell is
+    rendered with ``str`` (``None`` -> ``"NULL"``). It backs both the TPC-Havoc
+    equivalence comparators (:meth:`ResultValidator.validate_results_checksum`)
+    and the bounded correctness gate's value-digest oracle, so SQL results and
+    the gate share exactly one digest definition.
+
+    Callers that need cross-build numeric stability (e.g. the gate, which stores
+    a reference digest) should normalize numeric precision *before* calling this
+    (see :func:`benchbox.core.results.result_digest.compute_result_digest`).
+
+    Args:
+        results: Result set as a list of row tuples.
+
+    Returns:
+        Hex-encoded MD5 digest string.
+    """
+    # Convert results to a consistent string representation. Sort on the None-safe
+    # surrogate so a NULL-bearing or mixed-type column never raises TypeError here
+    # (a caller would otherwise mislabel that as an execution "error:").
+    result_str = ""
+    for row in sorted(results, key=_row_sort_key):
+        row_str = "|".join(str(val) if val is not None else "NULL" for val in row)
+        result_str += row_str + "\n"
+
+    return hashlib.md5(result_str.encode("utf-8")).hexdigest()
+
+
+def _cell_sort_key(value: Any) -> tuple[Any, ...]:
+    """A None-safe, type-safe sort surrogate for one result cell.
+
+    Python ``sorted`` raises ``TypeError`` on a column mixing ``None`` with a value
+    or mixing types. This maps every cell to a ``(type_rank, type_name, value)``
+    triple so ordering is total and never raises: ``None`` sorts first, and values
+    of different types group by a stable type name rather than comparing across
+    types. ``bool`` folds into the numeric bucket (it subclasses ``int``) so it
+    sorts consistently with equality (``True == 1``). Used only to impose a stable
+    order; it never changes a match/mismatch verdict.
+    """
+    if value is None:
+        return (0, "", 0.0)
+    if isinstance(value, (int, float)):  # includes bool (subclass of int)
+        return (1, "num", float(value))
+    return (1, type(value).__name__, str(value))
+
+
+def _row_sort_key(row: tuple[Any, ...]) -> tuple[Any, ...]:
+    """A total, never-raising sort key for a result row (see :func:`_cell_sort_key`)."""
+    return tuple(_cell_sort_key(value) for value in row)
+
+
 class ValidationError(Exception):
     """Exception raised when query variant validation fails."""
 
@@ -312,24 +366,22 @@ class ResultValidator:
         it only stops a NULL-bearing or mixed-type column from raising (which a
         caller would otherwise mislabel as an execution ``error:`` rather than a
         clean MISMATCH).
+
+        Delegates to the module-level :func:`_row_sort_key` so the comparator and
+        the value-digest primitive (:func:`calculate_checksum`) share exactly one
+        sort definition.
         """
-        return tuple(self._cell_sort_key(value) for value in row)
+        return _row_sort_key(row)
 
     @staticmethod
     def _cell_sort_key(value: Any) -> tuple[Any, ...]:
         """A None-safe, type-safe sort surrogate for one cell (see _row_sort_key).
 
-        ``bool`` is folded into the numeric bucket (``bool`` subclasses ``int``)
-        so it sorts CONSISTENTLY with :meth:`_values_equal`, which treats
-        ``True == 1``: a column mixing ``True`` and ``1`` must sort them adjacently,
-        or two equal cells would land at different positions and break the
-        positional comparison after sorting.
+        Thin wrapper over the module-level :func:`_cell_sort_key`; ``bool`` folds
+        into the numeric bucket so it sorts CONSISTENTLY with :meth:`_values_equal`
+        (``True == 1``).
         """
-        if value is None:
-            return (0, "", 0.0)
-        if isinstance(value, (int, float)):  # includes bool (subclass of int)
-            return (1, "num", float(value))
-        return (1, type(value).__name__, str(value))
+        return _cell_sort_key(value)
 
     def _first_positional_mismatch(
         self,
@@ -639,17 +691,15 @@ class ResultValidator:
             return abs(val1 - val2) < self.tolerance
 
     def _calculate_checksum(self, results: list[tuple[Any, ...]]) -> str:
-        """Calculate MD5 checksum of result set."""
-        # Convert results to a consistent string representation. Sort on the
-        # None-safe surrogate so a NULL-bearing or mixed-type column never raises
-        # TypeError here (matching the order-insensitive comparison path), which a
-        # caller would otherwise mislabel as an execution "error:".
-        result_str = ""
-        for row in sorted(results, key=self._row_sort_key):
-            row_str = "|".join(str(val) if val is not None else "NULL" for val in row)
-            result_str += row_str + "\n"
+        """Calculate MD5 checksum of result set.
 
-        return hashlib.md5(result_str.encode("utf-8")).hexdigest()
+        Thin instance wrapper over the promoted module-level
+        :func:`calculate_checksum`; kept for API stability of existing callers.
+        Both sort on the None-safe surrogate (:func:`_row_sort_key`) so a
+        NULL-bearing or mixed-type column never raises ``TypeError`` here (matching
+        the order-insensitive comparison path).
+        """
+        return calculate_checksum(results)
 
     def validate_query1_results(
         self,

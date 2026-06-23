@@ -43,6 +43,12 @@ class ExpectedQueryResult:
         scale_independent: Whether this result is independent of scale factor
         loose_tolerance_percent: Tolerance percentage for LOOSE mode (default 50%)
         notes: Additional context about this expectation
+        value_digest: Optional order-normalized full-result VALUE digest for this
+            query at this scale/reference seed (the bounded correctness gate's
+            value oracle). When present, the gate asserts the emitted digest
+            matches it IN ADDITION to the row count; when absent, only the row
+            count is validated (the historical behavior). This is what lets the
+            gate catch a wrong-but-same-cardinality answer.
     """
 
     query_id: str
@@ -55,6 +61,7 @@ class ExpectedQueryResult:
     scale_independent: bool = False
     loose_tolerance_percent: float = 50.0
     notes: str | None = None
+    value_digest: str | None = None
 
     def __post_init__(self):
         """Validate that the configuration is coherent."""

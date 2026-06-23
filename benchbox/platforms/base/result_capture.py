@@ -1221,6 +1221,7 @@ class ResultCaptureMixin:
         first_row: Any = None,
         validation_result: Any = None,
         error: str | None = None,
+        result_digest: str | None = None,
     ) -> dict[str, Any]:
         """Build query result dictionary with consistent validation field mapping.
 
@@ -1234,6 +1235,9 @@ class ResultCaptureMixin:
             first_row: First row of results (optional)
             validation_result: ValidationResult from QueryValidator (optional)
             error: Error message if query failed (optional)
+            result_digest: Gate-only full-result value digest (optional). Present
+                only when BENCHBOX_EMIT_RESULT_DIGEST armed the value oracle; absent
+                on a normal run so the payload shape is unchanged.
 
         Returns:
             Dictionary with standardized query result fields
@@ -1249,6 +1253,9 @@ class ResultCaptureMixin:
             "rows_returned": actual_row_count,
             "first_row": first_row,
         }
+
+        if result_digest is not None:
+            result_dict["result_digest"] = result_digest
 
         if error:
             result_dict["error"] = error

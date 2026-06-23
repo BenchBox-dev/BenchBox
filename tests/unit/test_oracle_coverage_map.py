@@ -31,8 +31,13 @@ from _project.scripts.generate_oracle_coverage_map import (  # noqa: E402
     ORACLE_EXPECTED_RESULTS,
     ORACLE_NONE,
     ORACLE_VARIANT_EQUIVALENCE,
+    STRENGTH_CARDINALITY,
+    STRENGTH_NONE,
+    STRENGTH_VALUE,
+    STRENGTH_VALUE_AND_CARDINALITY,
     build_coverage_map,
     check_artifacts,
+    oracle_strength_and_scale,
 )
 
 pytestmark = [
@@ -81,6 +86,68 @@ def test_cross_surface_applicable_implies_dual_surface_and_unguarded(rows):
         if r["cross_surface_applicable"]:
             assert r["dual_surface"], f"{r['benchmark']} flagged cross-surface but is single-surface"
             assert not r["guarded"], f"{r['benchmark']} flagged cross-surface but already guarded"
+
+
+# --- Strength + scale disclosure (oracle-coverage-map-strength-disclosure) ---
+
+
+def test_strength_and_scale_columns_present(rows):
+    """Every row carries a strength + scale field (the new disclosure axes)."""
+    for r in rows:
+        assert "strength" in r and r["strength"], f"{r['benchmark']} missing strength"
+        assert "scale" in r and r["scale"], f"{r['benchmark']} missing scale"
+        # Unguarded rows disclose no guarantee on either axis.
+        if not r["guarded"]:
+            assert r["strength"] == STRENGTH_NONE, f"{r['benchmark']} unguarded but strength={r['strength']}"
+
+
+def test_known_oracle_strength_and_scale_truth(rows):
+    """Pin the TRUTH of strength + scale for known oracles (classifier-truth, w4).
+
+    The drift test only proves committed == regenerated (consistency). This pins
+    what each known oracle ACTUALLY proves, so a future change that mislabels an
+    oracle's strength/scale fails here even if the artifact is internally consistent.
+    """
+    by_id = {r["benchmark"]: r for r in rows}
+
+    # expected-results: cardinality-only by default; TPC-H carries stored VALUE
+    # digests (bounded-correctness-gate value oracle), so it reads value+cardinality.
+    # Both hold only at SF=1 (the loader raises for other scales).
+    assert by_id["tpch"]["strength"] == STRENGTH_VALUE_AND_CARDINALITY
+    assert by_id["tpch"]["scale"] == "SF=1"
+    assert by_id["tpcds"]["strength"] == STRENGTH_CARDINALITY
+    assert by_id["tpcds"]["scale"] == "SF=1"
+
+    # cross-surface / variant gates compare full result VALUES at the bounded scale.
+    for benchmark in ("ssb", "amplab", "coffeeshop", "tpchavoc"):
+        assert by_id[benchmark]["strength"] == STRENGTH_VALUE, f"{benchmark} should be value-level"
+        assert by_id[benchmark]["scale"].startswith("SF="), f"{benchmark} missing bounded scale"
+
+
+def test_expected_results_strength_is_derived_not_hardcoded(monkeypatch):
+    """The expected-results strength must track the provider's real digest capability.
+
+    Flipping the live signal (stored value digests present/absent) must flip the
+    label, proving it is derived rather than a hand-maintained constant.
+    """
+    import _project.scripts.generate_oracle_coverage_map as gen
+
+    monkeypatch.setattr(gen, "_expected_results_has_value_digests", lambda _b: True)
+    strength, scale = oracle_strength_and_scale(ORACLE_EXPECTED_RESULTS, "tpch")
+    assert strength == STRENGTH_VALUE_AND_CARDINALITY
+    assert scale == "SF=1"
+
+    monkeypatch.setattr(gen, "_expected_results_has_value_digests", lambda _b: False)
+    strength, _ = oracle_strength_and_scale(ORACLE_EXPECTED_RESULTS, "tpch")
+    assert strength == STRENGTH_CARDINALITY
+
+
+def test_value_level_oracle_scale_is_read_live(rows):
+    """Value-level gate scale must equal the equivalence module's bounded scale."""
+    from benchbox.core.equivalence.cross_surface import EQUIVALENCE_SCALE
+
+    by_id = {r["benchmark"]: r for r in rows}
+    assert by_id["ssb"]["scale"] == f"SF={EQUIVALENCE_SCALE}"
 
 
 def test_cross_surface_enforced_distinguishes_registered_from_verified_green(rows):
