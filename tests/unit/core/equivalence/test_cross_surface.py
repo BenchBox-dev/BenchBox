@@ -17,13 +17,46 @@ from __future__ import annotations
 
 import pytest
 
-from benchbox.core.equivalence.cross_surface import count_executed_cells, find_cross_surface_divergences
+from benchbox.core.equivalence.cross_surface import (
+    count_executed_cells,
+    find_cross_surface_divergences,
+    order_key_from_sql,
+)
 from benchbox.core.tpchavoc.validation import ResultValidator
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+class TestOrderKeyFromSql:
+    """Mapping a query's ORDER BY to output-column indices (w2)."""
+
+    def test_alias_order_key(self) -> None:
+        sql = "SELECT RegionID, COUNT(DISTINCT UserID) AS u FROM hits GROUP BY RegionID ORDER BY u DESC LIMIT 10"
+        assert order_key_from_sql(sql) == ([1], True)
+
+    def test_expression_order_key(self) -> None:
+        sql = "SELECT UserID, COUNT(*) FROM hits GROUP BY UserID ORDER BY COUNT(*) DESC LIMIT 10"
+        assert order_key_from_sql(sql) == ([1], True)
+
+    def test_no_order_by(self) -> None:
+        sql = "SELECT UserID, SearchPhrase, COUNT(*) FROM hits GROUP BY UserID, SearchPhrase LIMIT 10"
+        assert order_key_from_sql(sql) == ([], True)
+
+    def test_no_limit(self) -> None:
+        sql = "SELECT M, COUNT(*) AS c FROM hits GROUP BY M ORDER BY M"
+        assert order_key_from_sql(sql) == ([0], False)
+
+    def test_select_star_resolves_with_column_names(self) -> None:
+        sql = "SELECT * FROM hits WHERE URL LIKE '%g%' ORDER BY EventTime LIMIT 10"
+        columns = ["WatchID", "JavaEnable", "Title", "GoodEvent", "EventTime"]
+        assert order_key_from_sql(sql, columns) == ([4], True)
+
+    def test_select_star_without_columns_is_unresolved(self) -> None:
+        sql = "SELECT * FROM hits ORDER BY EventTime LIMIT 10"
+        assert order_key_from_sql(sql) is None
 
 
 class _FakeFrame:

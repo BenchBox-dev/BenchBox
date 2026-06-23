@@ -21,6 +21,71 @@ def test_validate_results_exact_accepts_reordered_rows() -> None:
     assert validator.validate_results_exact(original, variant, query_id=3, variant_id=2)
 
 
+def test_validate_results_exact_none_bearing_column_does_not_crash() -> None:
+    """A column mixing None and values must not raise from sorted() (BS2)."""
+    validator = ResultValidator()
+    original = [("a", None), ("b", 2)]
+    variant = [("b", 2), ("a", None)]
+    # Equal as multisets -> passes; the None-safe key keeps sorted() from raising.
+    assert validator.validate_results_exact(original, variant, query_id=1, variant_id=1)
+    # A genuine None-vs-value difference is a clean MISMATCH, never a sort crash.
+    with pytest.raises(ValidationError, match="Value mismatch"):
+        validator.validate_results_exact([("a", None)], [("a", 5)], query_id=1, variant_id=1)
+
+
+class TestValidateResultsOrdered:
+    """Order-aware, tie-tolerant comparison (w2)."""
+
+    def test_identical_ordered_results_pass(self) -> None:
+        validator = ResultValidator()
+        rows = [("u1", 5), ("u2", 3), ("u3", 3)]
+        assert validator.validate_results_ordered(rows, list(rows), "Q", order_key=[1], has_limit=True)
+
+    def test_boundary_tie_with_different_members_is_tolerated(self) -> None:
+        """Under LIMIT, the final tie group's specific members are ambiguous."""
+        validator = ResultValidator()
+        reference = [("u1", 5), ("u2", 3), ("u3", 3)]  # boundary tie at count 3
+        candidate = [("u1", 5), ("u9", 3), ("u7", 3)]  # same keys, different tied rows
+        assert validator.validate_results_ordered(reference, candidate, "Q", order_key=[1], has_limit=True)
+
+    def test_reversed_order_is_caught(self) -> None:
+        validator = ResultValidator()
+        reference = [("u1", 5), ("u2", 3), ("u3", 1)]
+        reversed_candidate = [("u3", 1), ("u2", 3), ("u1", 5)]
+        with pytest.raises(ValidationError, match="key mismatch|ordering not respected"):
+            validator.validate_results_ordered(reference, reversed_candidate, "Q", order_key=[1], has_limit=False)
+
+    def test_interior_value_bug_is_caught(self) -> None:
+        """A wrong row in a fully-contained (non-boundary) tie group is a divergence."""
+        validator = ResultValidator()
+        reference = [("u1", 5), ("u2", 5), ("u3", 1)]  # boundary group is the count=1 singleton
+        candidate = [("u1", 5), ("uX", 5), ("u3", 1)]  # interior count=5 group has a wrong member
+        with pytest.raises(ValidationError, match="rows differ"):
+            validator.validate_results_ordered(reference, candidate, "Q", order_key=[1], has_limit=True)
+
+    def test_no_order_key_with_limit_is_arbitrary_slice(self) -> None:
+        """LIMIT without ORDER BY: only the row count is checkable."""
+        validator = ResultValidator()
+        reference = [("u1", 1), ("u2", 1)]
+        candidate = [("u9", 1), ("u8", 1)]
+        assert validator.validate_results_ordered(reference, candidate, "Q", order_key=[], has_limit=True)
+        with pytest.raises(ValidationError, match="Row count mismatch"):
+            validator.validate_results_ordered(reference, [("u1", 1)], "Q", order_key=[], has_limit=True)
+
+    def test_no_order_key_without_limit_compares_as_set(self) -> None:
+        validator = ResultValidator()
+        reference = [("a", 1), ("b", 2)]
+        assert validator.validate_results_ordered(reference, [("b", 2), ("a", 1)], "Q", order_key=[], has_limit=False)
+        with pytest.raises(ValidationError, match="rows differ"):
+            validator.validate_results_ordered(reference, [("a", 1), ("c", 9)], "Q", order_key=[], has_limit=False)
+
+    def test_none_in_ordered_rows_does_not_crash(self) -> None:
+        validator = ResultValidator()
+        reference = [("u1", 5), (None, 3), ("u3", 3)]
+        candidate = [("u1", 5), ("u3", 3), (None, 3)]
+        assert validator.validate_results_ordered(reference, candidate, "Q", order_key=[1], has_limit=True)
+
+
 @pytest.mark.parametrize(
     ("original", "variant", "message"),
     [

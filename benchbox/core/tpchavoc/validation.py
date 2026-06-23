@@ -19,6 +19,19 @@ class ValidationError(Exception):
     """Exception raised when query variant validation fails."""
 
 
+def _none_safe_sort_key(row: tuple[Any, ...]) -> tuple[Any, ...]:
+    """A total, crash-free sort key for a result row.
+
+    Python ``sorted()`` raises when a column mixes ``None`` with non-None values
+    (``None`` is not orderable against ``int``/``str``). This keys each value as
+    ``(is_none, type_name, value)`` so ``None`` sorts deterministically and values
+    of different types never compare directly. For None-free, single-type columns
+    the induced order matches natural tuple ordering, so existing comparisons are
+    unaffected.
+    """
+    return tuple((value is None, type(value).__name__, value if value is not None else 0) for value in row)
+
+
 class ResultValidator:
     """Validates that query variants produce identical results."""
 
@@ -58,9 +71,10 @@ class ResultValidator:
             )
 
         # Sort both result sets to handle potential ordering differences
-        # (though TPC-H queries should have deterministic ordering)
-        original_sorted = sorted(original_results)
-        variant_sorted = sorted(variant_results)
+        # (though TPC-H queries should have deterministic ordering). The
+        # None-safe key keeps a NULL-bearing column from raising in sorted().
+        original_sorted = sorted(original_results, key=_none_safe_sort_key)
+        variant_sorted = sorted(variant_results, key=_none_safe_sort_key)
 
         for i, (orig_row, var_row) in enumerate(zip(original_sorted, variant_sorted)):
             if len(orig_row) != len(var_row):
@@ -77,6 +91,107 @@ class ResultValidator:
                     )
 
         return True
+
+    def validate_results_ordered(
+        self,
+        reference_results: list[tuple[Any, ...]],
+        candidate_results: list[tuple[Any, ...]],
+        query_id: Any,
+        *,
+        order_key: list[int],
+        has_limit: bool,
+    ) -> bool:
+        """Order-aware, tie-tolerant comparison against an ordered reference.
+
+        ``reference_results`` is authoritative: it was executed in the SQL
+        ``ORDER BY`` order. ``order_key`` lists the output-column indices the
+        ``ORDER BY`` sorts on (empty => no ``ORDER BY``). The comparison:
+
+        * verifies the order-key VALUE sequence matches (so a reversed or missing
+          ``ORDER BY`` on the candidate is caught), then
+        * compares each tie group (rows sharing one order-key value) as a MULTISET
+          (so two equally-valid orderings within a tie are NOT a divergence), and
+        * tolerates only the FINAL tie group under a ``LIMIT`` (its members are
+          ambiguous because ``LIMIT`` truncates a tie arbitrarily), checking just
+          its size and key — interior groups are matched exactly so value/group
+          bugs are still caught.
+
+        A query with no ``ORDER BY`` under a ``LIMIT`` is an arbitrary slice, so
+        only the row count is checkable (already asserted by the caller path).
+        """
+        if len(reference_results) != len(candidate_results):
+            raise ValidationError(
+                f"Q{query_id}: Row count mismatch. "
+                f"Reference: {len(reference_results)}, Candidate: {len(candidate_results)}"
+            )
+
+        if not order_key:
+            # No ORDER BY: a LIMIT yields an arbitrary slice (nothing more to
+            # check); without a LIMIT the full result is one order-insensitive set.
+            if not has_limit:
+                self._assert_multiset_equal(reference_results, candidate_results, query_id)
+            return True
+
+        ref_groups = self._group_by_order_key(reference_results, order_key)
+        cand_groups = self._group_by_order_key(candidate_results, order_key)
+
+        if len(ref_groups) != len(cand_groups):
+            raise ValidationError(
+                f"Q{query_id}: ORDER BY tie-group count mismatch "
+                f"({len(ref_groups)} vs {len(cand_groups)}) - ordering not respected."
+            )
+
+        last = len(ref_groups) - 1
+        for gi, ((ref_key, ref_rows), (cand_key, cand_rows)) in enumerate(zip(ref_groups, cand_groups)):
+            if not self._rows_equal(ref_key, cand_key):
+                raise ValidationError(
+                    f"Q{query_id}: ORDER BY key mismatch at group {gi}. "
+                    f"Reference: {ref_key}, Candidate: {cand_key} - ordering not respected."
+                )
+            if len(ref_rows) != len(cand_rows):
+                raise ValidationError(
+                    f"Q{query_id}: tie-group size mismatch at group {gi} "
+                    f"(key {ref_key}): {len(ref_rows)} vs {len(cand_rows)}."
+                )
+            # The final group under a LIMIT is a truncated tie: its specific
+            # members are ambiguous, so size+key (already checked) is the most we
+            # can assert. Every interior group must match exactly.
+            if not (has_limit and gi == last):
+                self._assert_multiset_equal(ref_rows, cand_rows, query_id)
+
+        return True
+
+    def _group_by_order_key(
+        self, rows: list[tuple[Any, ...]], order_key: list[int]
+    ) -> list[tuple[tuple[Any, ...], list[tuple[Any, ...]]]]:
+        """Partition ordered rows into consecutive runs sharing one order-key value."""
+        groups: list[tuple[tuple[Any, ...], list[tuple[Any, ...]]]] = []
+        for row in rows:
+            key = tuple(row[i] for i in order_key)
+            if groups and self._rows_equal(groups[-1][0], key):
+                groups[-1][1].append(row)
+            else:
+                groups.append((key, [row]))
+        return groups
+
+    def _rows_equal(self, row1: tuple[Any, ...], row2: tuple[Any, ...]) -> bool:
+        """Element-wise equality using the validator's tolerant value comparison."""
+        if len(row1) != len(row2):
+            return False
+        return all(self._values_equal(a, b) for a, b in zip(row1, row2))
+
+    def _assert_multiset_equal(
+        self, reference_rows: list[tuple[Any, ...]], candidate_rows: list[tuple[Any, ...]], query_id: Any
+    ) -> None:
+        """Assert two row collections are equal as multisets (order-insensitive)."""
+        ref_sorted = sorted(reference_rows, key=_none_safe_sort_key)
+        cand_sorted = sorted(candidate_rows, key=_none_safe_sort_key)
+        for ref_row, cand_row in zip(ref_sorted, cand_sorted):
+            if not self._rows_equal(ref_row, cand_row):
+                raise ValidationError(
+                    f"Q{query_id}: result rows differ (order-insensitive). "
+                    f"Reference row {ref_row} has no match in the candidate."
+                )
 
     def validate_results_checksum(
         self,

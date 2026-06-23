@@ -97,9 +97,19 @@ def _pandas_parse_date_columns(
         lower_name = name.lower()
         if lower_name.endswith("_sk"):
             continue
-        if _is_numeric_sql_type(types_by_name.get(lower_name)):
+        sql_type = types_by_name.get(lower_name)
+        if _is_numeric_sql_type(sql_type):
             continue
-        if lower_name.endswith(("datetime", "_datetime", "timestamp", "_timestamp", "_dts")):
+        # Prefer the declared SQL type: a TIMESTAMP/DATE column parses as
+        # datetime/date regardless of its name (e.g. ClientEventTime), matching
+        # the SQL/parquet surfaces. Fall back to name suffixes so string-typed
+        # date columns (e.g. a VARCHAR ``d_date``) still parse.
+        base_type = str(sql_type).upper().split("(", 1)[0].strip() if sql_type else ""
+        if base_type in ("TIMESTAMP", "DATETIME"):
+            datetime_columns.append(name)
+        elif base_type == "DATE":
+            date_columns.append(name)
+        elif lower_name.endswith(("datetime", "_datetime", "timestamp", "_timestamp", "_dts")):
             datetime_columns.append(name)
         elif lower_name.endswith(("date", "_date")):
             date_columns.append(name)
@@ -320,11 +330,19 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
         # None the SQL reference keeps empty fields as '' (e.g. ClickBench),
         # but pandas' default na handling turns them into NaN — which silently
         # changes COUNT(DISTINCT) and groupby membership. Restore '' on string
-        # (object) columns only; numeric/date columns keep their NaN/NaT.
+        # columns; numeric/date columns keep their NaN/NaT. Schema-declared
+        # string columns are filled even when an all-empty column was inferred
+        # as float64 (so it would be missed by an object-dtype check alone).
         if null_marker is None:
-            object_columns = df.select_dtypes(include=["object"]).columns
-            if len(object_columns):
-                df[object_columns] = df[object_columns].fillna("")
+            string_columns: set[str] = set(df.select_dtypes(include=["object"]).columns)
+            if names and column_types and len(column_types) == len(names):
+                string_sql_types = ("VARCHAR", "CHAR", "TEXT", "STRING", "CLOB")
+                for column_name, sql_type in zip(names, column_types):
+                    if str(sql_type).upper().split("(", 1)[0].strip() in string_sql_types:
+                        string_columns.add(column_name)
+            present = [column for column in string_columns if column in df.columns]
+            if present:
+                df[present] = df[present].fillna("")
 
         # Drop trailing column if present
         if TRAILING_DUMMY_COLUMN in df.columns:

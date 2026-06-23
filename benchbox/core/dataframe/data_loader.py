@@ -195,6 +195,8 @@ class SchemaMapper:
         "DECIMAL(15,2)": "float64",
         "VARCHAR": "string",
         "CHAR": "string",
+        "TEXT": "string",
+        "STRING": "string",
         "DATE": "date32",
         "TIMESTAMP": "timestamp[us]",
         "TIME": "string",

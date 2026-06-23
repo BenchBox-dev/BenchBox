@@ -69,6 +69,67 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 EQUIVALENCE_SCALE = 0.1
 
 
+def order_key_from_sql(sql: str, column_names: Sequence[str] | None = None) -> tuple[list[int], bool] | None:
+    """Map a query's ``ORDER BY`` to output-column indices for order-aware compare.
+
+    Returns ``(order_key_indices, has_limit)`` where ``order_key_indices`` are the
+    positions (in SELECT/projection order) of the columns the ``ORDER BY`` sorts
+    on, and ``has_limit`` says whether a ``LIMIT`` truncates the result. Returns
+    ``None`` when the ordering cannot be resolved to output columns; the caller
+    then falls back to an exact (order-insensitive) comparison rather than guess.
+
+    ``column_names`` (the executed result's columns, in order) lets a ``SELECT *``
+    query resolve a bare-column ``ORDER BY``. Both surfaces project the same column
+    order, so an index resolved here addresses the same column on each surface.
+    """
+    import sqlglot
+    from sqlglot import expressions as exp
+
+    try:
+        tree = sqlglot.parse_one(sql, read="duckdb")
+    except Exception:
+        return None
+    select = tree.find(exp.Select)
+    if select is None:
+        return None
+
+    alias_to_idx: dict[str, int] = {}
+    expr_to_idx: dict[str, int] = {}
+    for i, proj in enumerate(select.expressions):
+        name = proj.alias_or_name
+        if name:
+            alias_to_idx.setdefault(name.lower(), i)
+        inner = proj.this if isinstance(proj, exp.Alias) else proj
+        expr_to_idx.setdefault(inner.sql(dialect="duckdb"), i)
+
+    # For SELECT * the projection list does not name the columns; fall back to the
+    # executed result's column order to resolve a bare-column ORDER BY.
+    star_to_idx: dict[str, int] = {}
+    if column_names is not None and any(isinstance(p, exp.Star) for p in select.expressions):
+        star_to_idx = {str(n).lower(): i for i, n in enumerate(column_names)}
+
+    order = tree.find(exp.Order)
+    has_limit = tree.find(exp.Limit) is not None
+    if order is None:
+        return ([], has_limit)
+
+    indices: list[int] = []
+    for ordered in order.expressions:
+        keyed = ordered.this
+        key_sql = keyed.sql(dialect="duckdb")
+        if key_sql in expr_to_idx:
+            indices.append(expr_to_idx[key_sql])
+        elif isinstance(keyed, exp.Column) and keyed.name.lower() in alias_to_idx:
+            indices.append(alias_to_idx[keyed.name.lower()])
+        elif isinstance(keyed, exp.Column) and keyed.name.lower() in star_to_idx:
+            indices.append(star_to_idx[keyed.name.lower()])
+        else:
+            # An ORDER BY term we can't tie to an output column: do not guess -
+            # signal an exact-comparison fallback.
+            return None
+    return (indices, has_limit)
+
+
 @dataclass(frozen=True)
 class CrossSurfaceData:
     """Everything the gate needs to compare a benchmark's two surfaces.
@@ -141,6 +202,18 @@ def find_cross_surface_divergences(
     """
     from benchbox.core.tpchavoc.validation import ValidationError
 
+    column_cache: dict[Any, list[str] | None] = {}
+
+    def result_columns(query_id: Any) -> list[str] | None:
+        """Result column names (in order), cached, for SELECT * order-key resolution."""
+        if query_id not in column_cache:
+            try:
+                described = connection.execute(f"DESCRIBE {reference_sql(query_id)}").fetchall()
+                column_cache[query_id] = [str(row[0]) for row in described]
+            except Exception:
+                column_cache[query_id] = None
+        return column_cache[query_id]
+
     def reference_rows(query_id: Any) -> list[tuple[Any, ...]]:
         return fetch_reference_rows(connection, reference_sql(query_id))
 
@@ -163,7 +236,14 @@ def find_cross_surface_divergences(
                 query_id: Any = query_id,
             ) -> None:
                 candidate = materialize_rows(impl(contexts[backend]))
-                validator.validate_results_exact(reference, candidate, query_id, 0)
+                resolved = order_key_from_sql(reference_sql(query_id), result_columns(query_id))
+                if resolved is not None:
+                    order_key, has_limit = resolved
+                    validator.validate_results_ordered(
+                        reference, candidate, query_id, order_key=order_key, has_limit=has_limit
+                    )
+                else:
+                    validator.validate_results_exact(reference, candidate, query_id, 0)
 
             yield backend, check
 
