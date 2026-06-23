@@ -475,7 +475,7 @@ def _dtype_family(dtype: Any) -> str:
         return "boolean"
     if any(token in text for token in ("int", "float", "double", "decimal", "number", "numeric")):
         return "numeric"
-    if any(token in text for token in ("str", "utf8", "object", "categor")):
+    if any(token in text for token in ("str", "utf8", "object", "category", "categorical")):
         return "string"
     return "other"
 
