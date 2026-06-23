@@ -116,21 +116,43 @@ work:
 
   - id: w2
     summary: "Make the comparator order-aware and tie-aware; fix the None/NaN sort crash (BS2)"
-    status: in_progress
+    status: done
     addresses: [BS2, "review:Blind Spot 2", "review:DEMO1/2/3"]
     progress: |
-      PARTIAL (landed in #858). The tie-aware boundary relaxation shipped:
-      cross_surface.py enables tie_aware per query for trailing-LIMIT top-N
-      (_is_truncated_top_n), and validate_results_exact takes a tie_aware flag.
-      Verified effect: ClickBench collapsed from 27 wobbling divergences to a
-      STABLE 2 (green across 3 runs).
-      STILL OPEN - two halves of BS2 are NOT verified closed:
-      (1) ORDER-BY blindness: the non-tie path still full-row-sorts, so a reversed
-          ORDER BY may still pass silently (the dangerous false-negative half).
-      (2) The None/non-None Python sorted() crash that find_surface_divergences
-          mislabels as "error:" was not addressed.
-      Keep open until w10's reversed-sort mutation proves order-sensitivity and a
-      None-mixed-column test proves a clean MISMATCH (not an "error:").
+      DONE. Both previously-open halves of BS2 are now closed (additive, opt-in;
+      ResultValidator is extended, never forked).
+      (1) ORDER-BY blindness CLOSED: validate_results_exact gained an opt-in
+          order_aware mode + an order_by (result-column positions) parameter. When
+          enabled it compares rows in RETURNED order - the sequence of distinct
+          order-key values must match exactly (so a reversed ORDER BY is CAUGHT),
+          while rows sharing an order-key value are a multiset (so a legitimate tie
+          reshuffle is NOT flagged) and the final group under a trailing LIMIT is a
+          boundary tie (so the tie-aware fix from #858 does not regress). The
+          cross_surface gate resolves each query's ORDER BY to result-column
+          positions via sqlglot (_order_by_result_key) and enables order_aware only
+          when EVERY ORDER BY term maps to a projected column; an unmappable key
+          (e.g. clickbench Q24 SELECT *, Q25 ORDER BY a non-projected EventTime)
+          returns None and falls back to the order-insensitive comparison rather
+          than a silent order-blind "pass" (the residual blind spot is enumerated
+          and documented, not muted via a baseline).
+      (2) None/non-None sorted() crash FIXED: the comparator now sorts on a
+          None-safe, type-safe surrogate (_row_sort_key / _cell_sort_key) so a
+          column mixing None with a value (or mixed types) never raises TypeError;
+          a genuine None-vs-value difference is reported as a clean MISMATCH, not an
+          "error:" from sorted().
+      Verified: w10's test_reversed_sort_is_the_bs2_probe FLIPPED from "not caught"
+      to CAUGHT on ssb Q3.1 (149 ordered rows); _EXPECT_CAUGHT now expects the
+      multi-row reverse_sort caught on ssb/amplab/coffeeshop/clickbench (only
+      joinorder_synthetic's single-row no-op stays an expected miss). New fast-lane
+      unit suite tests/integration/test_validator_order_aware.py pins reversed-order
+      MISMATCH, tie/boundary tolerance, and the None-mixed-column clean MISMATCH
+      (never "error:"). All 5 enforced cross-surface gates stay green (ssb 14/26
+      discriminating, amplab 12/16, coffeeshop 22/22, clickbench 70 discriminating,
+      joinorder 26/26); tie reshuffles still not flagged. TPC-Havoc SQL (220/220)
+      and DataFrame (440/440) gates remain byte-identical green - they pass
+      order_aware=False, so their path is unchanged. Findings doc
+      _project/analysis/cross-surface-mutation-sensitivity.md updated (matrix flips
+      to caught + the documented residual non-projected-ORDER-BY blind spot).
     notes: |
       validate_results_exact (validation.py:54-79) sorts full rows then compares
       positionally, so it is simultaneously BLIND to real ORDER BY bugs (a reversed

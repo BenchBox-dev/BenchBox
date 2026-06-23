@@ -321,3 +321,35 @@ def test_clickbench_and_joinorder_are_enforced_gates():
     assert GATES["joinorder_synthetic"].known_divergences == {}
     # ssb stays the enforced precedent.
     assert "ssb" in GATES
+
+
+def test_order_by_result_key_maps_alias_name_expr_and_ordinal():
+    """_order_by_result_key resolves the ORDER BY shapes the gated queries use."""
+    from benchbox.core.equivalence.cross_surface import _order_by_result_key as resolve
+
+    # plain output column names
+    assert resolve("SELECT a, b FROM t ORDER BY a, b") == [0, 1]
+    # an alias (ORDER BY revenue -> SUM(...) AS revenue at position 0)
+    assert resolve("SELECT sum(x) AS revenue, y FROM t GROUP BY y ORDER BY revenue DESC") == [0]
+    # a qualified column resolves by its bare name to the output position
+    assert resolve("SELECT ol.d, dl.r FROM o ol JOIN d dl ON 1=1 ORDER BY ol.d, dl.r") == [0, 1]
+    # an aggregate EXPRESSION (COUNT(*)) - a nested star must NOT disqualify it
+    assert resolve("SELECT k, COUNT(*) AS c FROM t GROUP BY k ORDER BY COUNT(*) DESC") == [1]
+    # a 1-based ordinal maps to the result column index
+    assert resolve("SELECT a, b FROM t ORDER BY 2 DESC") == [1]
+
+
+def test_order_by_result_key_refuses_unmappable_keys():
+    """An ORDER BY whose key is not a projected column yields None (no order claim).
+
+    These fall back to the order-insensitive comparison rather than a silent
+    order-blind "pass" - the documented residual blind spot.
+    """
+    from benchbox.core.equivalence.cross_surface import _order_by_result_key as resolve
+
+    assert resolve("SELECT a FROM t") is None  # no ORDER BY
+    assert resolve("SELECT * FROM t ORDER BY x") is None  # SELECT * - unenumerable
+    assert resolve("SELECT t.* FROM t ORDER BY x") is None  # qualified star
+    assert resolve("SELECT a FROM t ORDER BY b") is None  # ORDER BY a non-projected column
+    assert resolve("SELECT a, b FROM t ORDER BY 5") is None  # out-of-range ordinal
+    assert resolve("this is not sql ;;;") is None  # unparseable

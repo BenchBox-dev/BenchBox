@@ -27,7 +27,7 @@ comparator:
 | --- | --- | --- | --- |
 | `flip_comparator` (`<` → `<=`) | a relaxed filter admits boundary-equal rows | append a duplicate boundary row → +1 row | **row-count** check (first check in `validate_results_exact`) |
 | `drop_group_key` | grouping on fewer keys changes the row shape | drop the leading column from every row | **column-count** check (per-row width) |
-| `reverse_sort` | a reversed `ORDER BY` | reverse the row order, multiset preserved | **order** — the comparator full-row-sorts both sides, so there is none |
+| `reverse_sort` | a reversed `ORDER BY` | reverse the row order, multiset preserved | **order** — the order-aware comparator (w2) compares the RETURNED order for any query whose `ORDER BY` maps to result columns, so a reversed order is a key-sequence mismatch |
 | `drop_join` | a dropped/incorrect join changes a joined column value | perturb one cell to a value outside the reference | **value** check (`_values_equal`, tolerance-aware) |
 
 ## Caught-vs-uncaught matrix (verified at SF=0.1)
@@ -38,43 +38,52 @@ discriminating (multi-row, ORDER BY + GROUP BY) where the benchmark has one.
 
 | Benchmark | Target | `flip_comparator` | `drop_group_key` | `reverse_sort` | `drop_join` |
 | --- | --- | --- | --- | --- | --- |
-| **ssb** | Q3.1 (149×4) | ✅ caught | ✅ caught | ❌ **not caught** | ✅ caught |
-| **amplab** | 4 (100×6) | ✅ caught | ✅ caught | ❌ **not caught** | ✅ caught |
-| **coffeeshop** | SA1 (93×5) | ✅ caught | ✅ caught | ❌ **not caught** | ✅ caught |
-| **clickbench** | Q8 (20×2) | ✅ caught | ✅ caught | ❌ **not caught** | ✅ caught |
+| **ssb** | Q3.1 (149×4) | ✅ caught | ✅ caught | ✅ **caught (w2)** | ✅ caught |
+| **amplab** | 4 (100×6) | ✅ caught | ✅ caught | ✅ **caught (w2)** | ✅ caught |
+| **coffeeshop** | SA1 (93×5) | ✅ caught | ✅ caught | ✅ **caught (w2)** | ✅ caught |
+| **clickbench** | Q8 (20×2) | ✅ caught | ✅ caught | ✅ **caught (w2)** | ✅ caught |
 | **joinorder_synthetic** | 4a (1×2) | ✅ caught | ✅ caught | ⚪ no-op (single row) | ✅ caught |
 
 Every benchmark therefore has **≥3** mutation classes the gate provably catches
-(the w10 acceptance bar), and every uncaught cell is explained below.
+(the w10 acceptance bar), and the one remaining non-catch (joinorder_synthetic's
+single-row `reverse_sort`) is a degenerate no-op explained below, not a
+comparator blind spot.
 
-## The reversed-sort result is the headline BS2 probe
+## The reversed-sort probe: BS2 closed by the order-aware comparator (w2)
 
-`reverse_sort` is **not caught** on any of the four multi-row benchmarks. This
-**confirms** the unresolved half of w2/BS2: `ResultValidator.validate_results_exact`
-(`benchbox/core/tpchavoc/validation.py`) calls `sorted(original_results)` and
-`sorted(variant_results)` and compares positionally, so reversing the row order
-of a result yields two identical sorted lists — the divergence is invisible. A
-genuinely reversed `ORDER BY` in a gated DataFrame query would pass the gate
-silently. The dedicated `test_reversed_sort_is_the_bs2_probe` pins this on
-ssb Q3.1; if a future comparator change makes ORDER BY visible, that test flips
-and forces this doc and the harness's `_EXPECT_CAUGHT` table to be updated.
+`reverse_sort` is now **caught** on all four multi-row benchmarks — this is the
+closed half of w2/BS2. Previously `ResultValidator.validate_results_exact`
+(`benchbox/core/tpchavoc/validation.py`) full-row-sorted both sides and compared
+positionally, so reversing the row order yielded two identical sorted lists and
+the divergence was invisible. The w2 change adds an opt-in **order-aware** mode:
+the cross-surface gate resolves each query's `ORDER BY` to result-column
+positions (`cross_surface._order_by_result_key`, via sqlglot) and, when that
+mapping succeeds, passes `order_aware=True`. The comparator then compares rows in
+**returned order** — the sequence of distinct order-key values must match — while
+still treating each tied group as a multiset (so a legitimate tie reshuffle is
+*not* flagged) and the final group under a trailing `LIMIT` as a boundary tie (so
+the tie-aware fix does not regress). A reversed `ORDER BY` produces a reversed
+key sequence and is therefore reported. The dedicated
+`test_reversed_sort_is_the_bs2_probe` now asserts ssb Q3.1's reversed result is
+caught (and that the catch is a genuine ORDER BY mismatch, not a harness
+`error:`).
 
-This is honest evidence about the oracle's strength, not a failure of the
-harness: the oracle is strong on row-membership, column-shape, and value bugs,
-and **blind to pure ordering bugs**. It is tracked as the open half of **w2**
-(BS2). It is *not* added to any `known_divergences` baseline (that would be the
-exact anti-pattern the remediation flagged); it is recorded here as a sensitivity
-gap with a tracking item.
+The oracle is now strong on row-membership, column-shape, value, **and ordering**
+bugs for any query whose `ORDER BY` key is a projected column.
 
-### Why this blind spot is bounded in practice
+### The residual, documented order blind spot
 
-A pure ordering bug that preserves the exact result multiset is the only thing
-this misses. Any ordering bug that *also* changes which rows survive a `LIMIT`
-(the common case for a top-N) changes the row multiset and is caught by the
-row-count / value paths. The residual exposure is a reversed (or otherwise
-permuted) `ORDER BY` on a result whose rows are all returned — exactly the case
-`reverse_sort` models. Closing it requires the order-aware comparison mode
-specified in w2 (compare the ordered prefix up to the first tie group exactly).
+Order-awareness is engaged only when every `ORDER BY` term maps to a projected
+output column. A query that sorts by a column **not in its result** cannot have
+its order verified from the returned rows — e.g. clickbench Q25
+(`SELECT SearchPhrase … ORDER BY EventTime LIMIT 10`) and Q24 (`SELECT * …
+ORDER BY EventTime`). For those, `_order_by_result_key` returns `None` and the
+gate falls back to the order-insensitive comparison rather than guess (an
+order-blind fallback that silently "passed" would re-introduce exactly the BS2
+gap). These are a small, enumerated set; closing them would require projecting
+the sort key (which would change the canonical query) or a schema-resolved
+`SELECT *` expansion, both out of scope. They are recorded here, not muted via a
+baseline.
 
 ## Single-row + mostly-NULL caveat: joinorder_synthetic
 
@@ -96,11 +105,12 @@ so its drop_join can land a real value mismatch:
   an `error:`).
 - `reverse_sort` is a **no-op**: reversing a one-element list changes nothing, so
   no divergence is injected and none is reported. This is the expected,
-  degenerate outcome — it is *not* the comparator's order-blindness (which is
-  demonstrated instead on the four multi-row benchmarks above). The harness
-  records this as an expected non-catch for `joinorder_synthetic/reverse_sort`.
+  degenerate outcome — it is *not* a comparator order blind spot (the order-aware
+  catch is demonstrated instead on the four multi-row benchmarks above). The
+  harness records this as an expected non-catch for
+  `joinorder_synthetic/reverse_sort`.
 
-The multi-row reverse-sort blindness (the real BS2 probe) is established on ssb,
+The multi-row reverse-sort catch (the real BS2 probe) is established on ssb,
 amplab, coffeeshop, and clickbench, so joinorder_synthetic's single-row shape
 does not weaken the headline finding.
 
@@ -116,10 +126,12 @@ artifact). Q8 avoids both, so its `drop_join` value mutation is genuinely caught
 
 ## Tracking
 
-- **Open (w2 / BS2):** reversed `ORDER BY` passes the gate silently. Add the
-  order-aware comparison mode (ordered prefix exact, boundary tie as multiset) so
-  this mutation flips to caught. The `test_reversed_sort_is_the_bs2_probe`
-  regression will detect the moment that lands.
+- **Closed (w2 / BS2):** the order-aware comparison mode (compare returned order,
+  each tie group as a multiset, final-LIMIT group as a boundary tie) landed, so a
+  reversed `ORDER BY` whose key is a projected column now flips to caught on all
+  four multi-row benchmarks. `test_reversed_sort_is_the_bs2_probe` asserts the
+  fixed property. The residual order blind spot (ORDER BY a non-projected column,
+  e.g. clickbench Q24/Q25) is documented above, not muted via a baseline.
 - The byte-stability regression promised in **w3** is included in the same suite
   (`test_gate_output_is_byte_stable_across_two_in_process_runs`): two in-process
   ssb gate runs on the same seed produce an identical divergence set.
