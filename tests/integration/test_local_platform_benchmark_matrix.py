@@ -314,9 +314,23 @@ def _stored_value_digest(
     scale_factor: float,
     stream_id: int,
 ) -> str | None:
-    """Return the stored reference VALUE digest for a query, or None if none exists."""
+    """Return the stored reference VALUE digest for a query, or None if none exists.
+
+    A value digest is valid ONLY at the scale it was computed for. The expected-
+    results registry applies a scale-INDEPENDENT fallback for some queries (e.g.
+    TPC-H Q1, whose row count is constant across scales): at SF != 1 it returns the
+    SF=1 ``ExpectedQueryResult``. That object's row count is scale-independent, but
+    its VALUE digest is not (the aggregates sum over different data). So honor the
+    digest only when the stored object's own scale matches the run scale, otherwise
+    a run at SF != 1 with digest emission on would compare an emitted SF!=1 digest
+    against the SF=1 reference and fail spuriously.
+    """
     expected = validator.registry.get_expected_result(benchmark_name, str(query_id), scale_factor, stream_id)
-    return expected.value_digest if expected is not None else None
+    if expected is None or expected.value_digest is None:
+        return None
+    if expected.scale_factor != scale_factor:
+        return None
+    return expected.value_digest
 
 
 def _validate_against_expected_results(

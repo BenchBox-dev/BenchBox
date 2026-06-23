@@ -129,7 +129,10 @@ def _make_fake_validator(stored_digests):
             qid = str(query_id)
             if qid not in stored_digests:
                 return None
-            return SimpleNamespace(value_digest=stored_digests[qid], expected_row_count=_GATE_ROWS.get(qid))
+            # Stored references are SF=1 (the only scale with stored digests).
+            return SimpleNamespace(
+                value_digest=stored_digests[qid], expected_row_count=_GATE_ROWS.get(qid), scale_factor=1.0
+            )
 
     class _FakeValidator:
         def __init__(self):
@@ -225,3 +228,29 @@ def test_digests_match_never_silently_matches_missing():
     assert digests_match("abc", None) is False
     assert digests_match(None, "abc") is False
     assert digests_match(None, None) is False
+
+
+def test_sf1_value_digest_is_not_reused_at_other_scales():
+    """A scale-independent fallback must NOT leak the SF=1 value digest to SF != 1.
+
+    The registry returns the SF=1 ExpectedQueryResult for a scale-independent query
+    (e.g. TPC-H Q1) at any scale; its row count is scale-independent but its VALUE
+    digest is not. `_stored_value_digest` must therefore decline the digest when the
+    stored object's scale does not match the run scale, so digest emission at SF != 1
+    cannot produce a spurious RED.
+    """
+    import tests.integration.test_local_platform_benchmark_matrix as matrix
+
+    class _ScaleIndependentRegistry:
+        def get_expected_result(self, benchmark_type, query_id, scale_factor, stream_id):
+            # Mirrors the real registry's scale-independent fallback: always returns
+            # the SF=1 object regardless of the requested scale.
+            return SimpleNamespace(value_digest="sf1digest", expected_row_count=4, scale_factor=1.0)
+
+    validator = SimpleNamespace(registry=_ScaleIndependentRegistry())
+
+    # At the stored scale (SF=1) the digest is honored.
+    assert matrix._stored_value_digest(validator, "tpch", "1", 1.0, 0) == "sf1digest"
+    # At other scales the SF=1 digest is declined (row-count fallback still applies).
+    assert matrix._stored_value_digest(validator, "tpch", "1", 0.01, 0) is None
+    assert matrix._stored_value_digest(validator, "tpch", "1", 10.0, 0) is None
