@@ -541,6 +541,14 @@ lint:
 audit-deps:
 	uv run -- python _project/scripts/dependency_audit/check_deps.py
 
+# Regenerate the raw declared-dependency inventory from pyproject.toml.
+audit-raw:
+	uv run -- python _project/scripts/dependency_audit/parse_deps.py
+
+# Verify the committed raw inventory matches pyproject.toml. Fails on drift.
+audit-raw-check:
+	uv run -- python _project/scripts/dependency_audit/parse_deps.py --check
+
 # Validate that an audit report records the develop SHA it describes.
 audit-sha-check:
 	@test -n "$(FILE)" || { echo "Usage: make audit-sha-check FILE=<audit.md>"; exit 1; }
