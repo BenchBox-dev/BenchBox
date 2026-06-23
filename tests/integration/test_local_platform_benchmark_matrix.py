@@ -442,9 +442,7 @@ def _validate_against_expected_results(
                 f"oracle was disarmed (digest emission off, query skipped, or scale/seed drift)."
             )
 
-    assert not failures, "Expected-results validation failures (row count and/or value digest):\n" + "\n".join(
-        failures
-    )
+    assert not failures, "Expected-results validation failures (row count and/or value digest):\n" + "\n".join(failures)
 
 
 @pytest.mark.integration

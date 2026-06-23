@@ -996,11 +996,7 @@ class DuckDBAdapter(PlatformAdapter):
             # only stream with a stored reference digest), so a normal run is unchanged.
             from benchbox.core.results.result_digest import compute_result_digest, result_digest_enabled
 
-            result_digest = (
-                compute_result_digest(rows)
-                if result_digest_enabled() and stream_id in (None, 0)
-                else None
-            )
+            result_digest = compute_result_digest(rows) if result_digest_enabled() and stream_id in (None, 0) else None
 
             # Use centralized helper to build result with consistent validation field mapping
             result = self._build_query_result_with_validation(
