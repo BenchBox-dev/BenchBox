@@ -16,10 +16,11 @@ description: |
 
   - `_validate_against_expected_results`
     (tests/integration/test_local_platform_benchmark_matrix.py) calls
-    `validator.validate_query_result(actual_row_count=int(query["rows"]), ...)`.
-    The only thing compared is a row count. All 18 bounded-gate TPC-H queries are
-    EXACT-mode, but EXACT means "exact row count", not "exact values"
-    (benchbox/core/expected_results/models.py).
+    `validator.validate_query_result(actual_row_count=int(query["rows"]), ...)`,
+    and that method (benchbox/core/validation/query_validation.py:99) compares only
+    counts. All 18 gate-configured TPC-H queries are EXACT-mode, but EXACT means
+    "exact row count", not "exact values"
+    (benchbox/core/expected_results/models.py ValidationMode).
   - The result payload the gate consumes carries ONLY a per-query row count
     (`{"id", "ms", "rows"}` - benchbox/core/results/schema.py). It contains no
     values, checksums, or digests, so value validation is not merely absent: it
@@ -43,7 +44,8 @@ description: |
   hardening already shipped in testing-approach-oracle-hardening (#830, DONE).
 
 prior_art:
-  - "benchbox/core/tpchavoc/validation.py:81 validate_results_checksum / _calculate_checksum - an EXISTING value-level digest comparator the bounded gate should reuse rather than inventing a new one; it already backs the TPC-Havoc gates."
+  - "benchbox/core/tpchavoc/validation.py:229 _calculate_checksum - the EXISTING single-result digest primitive to reuse for w1 (emit a digest); currently private, so promote/expose it rather than inventing a new hash. It already backs the TPC-Havoc gates."
+  - "benchbox/core/tpchavoc/validation.py:81 validate_results_checksum - the EXISTING pairwise (original vs variant) checksum comparator to reuse for w2 (compare emitted digest vs stored reference); not a digest emitter itself."
   - "benchbox/core/tpch/benchmark.py:35 get_reference_seed - the pinned seed that makes SF=1 result values deterministic; the stored reference digests must be computed at this seed."
   - "benchbox/core/expected_results/registry.py - the expected-results provider registry where stored reference digests (keyed by benchmark/query_id/SF) would live alongside the existing row-count answers."
   - "benchbox/core/results/schema.py / normalizer.py - the result payload contract that today carries only `rows`; a per-query result digest field would be added here (gate-only, behind a flag, to avoid runtime cost on normal runs)."
@@ -58,9 +60,9 @@ work:
     notes: |
       Extend the runner/normalizer so a benchmark run can emit a canonical,
       order-normalized digest of each stream-0 query's full result set, written
-      into the per-query result JSON next to `rows`. Reuse
-      validate_results_checksum/_calculate_checksum (tpchavoc/validation.py:81) for
-      the digest function so SQL and the gate share one definition. Gate it behind
+      into the per-query result JSON next to `rows`. Reuse `_calculate_checksum`
+      (tpchavoc/validation.py:229, the single-result digest primitive; promote it
+      from private) so SQL and the gate share one digest definition. Gate it behind
       an env flag (e.g. BENCHBOX_EMIT_RESULT_DIGEST=1) set only by
       `make test-correctness-gate`, so normal `benchbox run` keeps its current
       cost and payload shape.
@@ -87,7 +89,7 @@ work:
       Keep the change additive: a benchmark/scale without stored digests still
       validates row counts and (non-strict) skips the digest, exactly as today.
     acceptance:
-      - "`make test-correctness-gate` validates both row counts AND value digests for all 18 TPC-H queries at SF=1; the gate is green on a correct tree."
+      - "`make test-correctness-gate` validates both row counts AND value digests for all 18 gate-configured TPC-H queries at SF=1; the gate is green on a correct tree."
       - "Under strict mode, a missing/unevaluated digest for a configured query fails RED (no silent value-skip)."
 
   - id: w3
@@ -167,7 +169,7 @@ approach: |
 anti_patterns:
   - "DO NOT compute the digest over only the row count or a single column - because that reproduces the value-blindness - hash the full, order-normalized result set."
   - "DO NOT emit the digest on every `benchbox run` - because it adds cost to normal benchmarking and changes the payload for all consumers - gate it behind a flag the correctness gate sets."
-  - "DO NOT fork ResultValidator for the bounded gate - because TPC-Havoc depends on it - reuse validate_results_checksum / _calculate_checksum."
+  - "DO NOT fork ResultValidator for the bounded gate - because TPC-Havoc depends on it - reuse _calculate_checksum (digest) and validate_results_checksum (comparison)."
   - "DO NOT exempt the digest check from strict arming - because a missing digest would then silently disarm the value oracle exactly like the old scale-gated strict block did - require non-SKIP under strict mode."
   - "DO NOT re-implement the no-skip/strict/ratchet work from #830 - it is done - only add the value axis."
 
