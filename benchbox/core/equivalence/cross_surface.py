@@ -202,6 +202,17 @@ def find_cross_surface_divergences(
     """
     from benchbox.core.tpchavoc.validation import ValidationError
 
+    # Determinism (H1): the generators are seeded (random.seed(42)) so the DATA
+    # is reproducible, and the order-aware comparator tolerates engine tie order,
+    # so the gate verdict is already stable. Pinning the SQL reference to a single
+    # thread additionally fixes DuckDB's row order run-to-run, so the raw report
+    # (not just the verdict) is byte-stable. Note: a seed alone does NOT make the
+    # gate deterministic - the tie-tolerant comparator and single-thread do.
+    try:
+        connection.execute("PRAGMA threads=1")
+    except Exception:  # noqa: BLE001 - non-DuckDB connections need no pinning
+        pass
+
     column_cache: dict[Any, list[str] | None] = {}
 
     def result_columns(query_id: Any) -> list[str] | None:
