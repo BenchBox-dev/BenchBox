@@ -2,7 +2,7 @@ id: cross-surface-oracle-remediation
 title: "Remediate the cross-surface equivalence oracle: fix the bugs it found-and-dismissed, make it deterministic, order-aware, non-vacuous, and honest"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
@@ -82,7 +82,8 @@ prior_art:
 work:
   - id: w1
     summary: "Fix the empty-string/null conflation in the DataFrame load path (C1: Q6, Q17, Q18, Q24 are REAL bugs)"
-    status: pending
+    status: done
+    done_note: "Loader honors csv_null_marker on both paths (empties stay ''); TEXT/STRING typed, TIMESTAMP/DATE by type; cache v3->v4. Q6==18, Q18 groups match; SSB/coffeeshop green."
     addresses: [C1, "review:CRITICAL C1", "#848 false conclusion"]
     notes: |
       The DataFrame surface conflates SQL '' with None, which changes results, not
@@ -116,7 +117,8 @@ work:
 
   - id: w2
     summary: "Make the comparator order-aware and tie-aware; fix the None/NaN sort crash (BS2)"
-    status: pending
+    status: done
+    done_note: "Order-aware tie-tolerant comparator (validate_results_ordered) + None-safe sort; order_key_from_sql via sqlglot. ClickBench 25->0; reversed-order/interior-bug caught; TPC-Havoc 220+440 green."
     addresses: [BS2, "review:Blind Spot 2", "review:DEMO1/2/3"]
     notes: |
       validate_results_exact (validation.py:54-79) sorts full rows then compares
@@ -151,7 +153,8 @@ work:
 
   - id: w3
     summary: "Eliminate engine nondeterminism at the gate boundary (H1)"
-    status: pending
+    status: done
+    done_note: "Generators already seeded; SQL reference pinned PRAGMA threads=1; tie-tolerant comparator absorbs engine tie order. Byte-stable regression test added (clickbench identical across 2 runs)."
     addresses: [H1, "review:HIGH H1", "claim 5"]
     notes: |
       The wobble is engine tie-ordering, not data. Pin it at the gate:
@@ -192,7 +195,8 @@ work:
 
   - id: w5
     summary: "Re-triage ClickBench with the fixed loader+comparator and correct the #848 record (C1 closeout)"
-    status: pending
+    status: done
+    done_note: "ClickBench 0/86, promoted STAGED_GATES->GATES; coverage map regenerated (guarded); clickbench-cross-surface-divergences.md rewritten to correct #848. joinorder_synthetic 10->2, stays staged."
     needs: [w1, w2, w3]
     addresses: [C1, "#848", "review:C1"]
     notes: |
