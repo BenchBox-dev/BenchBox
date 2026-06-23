@@ -156,7 +156,17 @@ class ResultValidator:
 
         swapped = only_original + only_variant
         candidate_cols = self._monotonic_columns(original)
-        for c in candidate_cols:
+        # A constant column carries no ordering information, so a literal/constant
+        # result column (e.g. ClickBench Q35's ``SELECT 1``) must not serve as the
+        # tie-boundary key while a genuinely-ordered column exists - otherwise an
+        # arbitrary swap that perturbs the real order key would be masked. Prefer
+        # varying monotonic columns; fall back to constant ones ONLY when no
+        # monotonic column varies (a fully-tied top-N window, e.g. ORDER BY c DESC
+        # LIMIT 10 where every kept row has c=1, whose constant order key IS the
+        # legitimate boundary).
+        varying_cols = [c for c in candidate_cols if not self._column_is_constant(original, c)]
+        boundary_cols = varying_cols or candidate_cols
+        for c in boundary_cols:
             boundary_value = original[-1][c]
             if boundary_value is None:
                 continue
@@ -179,17 +189,16 @@ class ResultValidator:
         return False
 
     def _monotonic_columns(self, rows: list[tuple[Any, ...]]) -> list[int]:
-        """Column indices whose values are strictly varying yet monotonic across ``rows``.
+        """Column indices whose values are monotonic across ``rows`` (in order).
 
         A top-N result is sorted by its order key, so the order-key column is
-        monotonic (non-decreasing or non-increasing); a grouped non-key column
-        generally is not. A *constant* column is excluded even though it is
-        technically monotonic: it carries no ordering information, so it must not
-        qualify as the tie-boundary key. Otherwise a literal/constant result column
-        (e.g. ClickBench Q35's ``SELECT 1``) would always equal the boundary value
-        and let an arbitrary row swap pass as a tie. A column with an unorderable or
-        NULL-mixed value is also excluded; both exclusions only make the boundary
-        split finer (stricter), never weaker.
+        monotonic (non-decreasing or non-increasing, constant counts as both); a
+        grouped non-key column generally is not. A column with an unorderable or
+        NULL-mixed value is treated as non-monotonic (excluded), which only makes
+        the boundary split finer (stricter), never weaker. Constant columns are
+        retained here (a fully-tied top-N window has a constant order key);
+        ``_is_boundary_tie_equivalent`` decides when a constant column may serve as
+        the boundary key.
         """
         if len(rows) < 2:
             return []
@@ -198,7 +207,6 @@ class ResultValidator:
         for c in range(width):
             non_decreasing = True
             non_increasing = True
-            saw_change = False
             for left, right in zip(rows, rows[1:]):
                 order = self._safe_compare(left[c], right[c])
                 if order is None:
@@ -206,15 +214,18 @@ class ResultValidator:
                     break
                 if order < 0:
                     non_increasing = False
-                    saw_change = True
                 elif order > 0:
                     non_decreasing = False
-                    saw_change = True
-            # Require a genuinely varying column: a constant column (saw_change is
-            # False) is monotonic in form only and must not serve as the boundary key.
-            if saw_change and (non_decreasing or non_increasing):
+            if non_decreasing or non_increasing:
                 result.append(c)
         return result
+
+    def _column_is_constant(self, rows: list[tuple[Any, ...]], c: int) -> bool:
+        """True if every row shares the same value in column ``c`` (NULLs included)."""
+        if not rows:
+            return True
+        first = rows[0][c]
+        return all(self._values_equal(row[c], first) for row in rows)
 
     def _safe_compare(self, a: Any, b: Any) -> int | None:
         """Return -1/0/1 for an orderable pair, or None if not orderable.
