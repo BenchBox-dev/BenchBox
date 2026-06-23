@@ -189,8 +189,7 @@ class TestFormatConverter:
             # empty->NULL marker (""), matching the DuckDB SQL reference.
             null_markers = loader._get_null_markers(benchmark, {"codes": tbl_path})
             assert null_markers["codes"] == "", (
-                f"a .tbl source should resolve to the empty->NULL marker; "
-                f"got {null_markers['codes']!r}"
+                f"a .tbl source should resolve to the empty->NULL marker; got {null_markers['codes']!r}"
             )
 
             # Feed the PRODUCTION-derived types and null marker into the converter
