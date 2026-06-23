@@ -211,6 +211,7 @@ scope_limit:
   - "benchbox/core/expected_results/"
   - "benchbox/core/results/"
   - "benchbox/core/tpch/"
+  - "benchbox/core/tpchavoc/"
   - "tests/"
   - "Makefile"
   - "_project/"

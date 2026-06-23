@@ -22,8 +22,8 @@ if str(_REPO_ROOT) not in sys.path:
 from _project.scripts.cross_surface_applicability_sweep import (  # noqa: E402
     ARTIFACT,
     BLOCKED,
+    CANDIDATE_UNVERIFIED,
     GATEABLE,
-    GATEABLE_NEEDS_ID_MAPPING,
     NO_DF_QUERY_SURFACE,
     build_applicability_sweep,
     render_markdown,
@@ -58,22 +58,43 @@ def test_w2_fallback_set_is_exactly_the_registry_less_benchmarks(rows):
     assert no_surface == _W2_FALLBACK_BENCHMARKS, f"w2-fallback set changed: {sorted(no_surface)}"
 
 
+# Benchmarks whose DataFrame registry has ZERO verbatim id overlap with the SQL
+# ids: there is no VERIFIED SQL<->DataFrame query correspondence, so they are
+# `candidate-unverified` (honest M2 classification), NOT gateable. Wiring a gate
+# would require guessing an id mapping, which the campaign TODO forbids. (amplab,
+# clickbench, joinorder_synthetic were previously here; all are now enforced
+# cross-surface gates, so they no longer appear among the unguarded candidates.)
+_CANDIDATE_UNVERIFIED_BENCHMARKS = {"datavault", "nyctaxi", "tpcds_obt", "tpch_skew", "tsbs_devops"}
+
+
 def test_registry_bearing_benchmarks_are_gateable(rows):
-    """h2odb (direct) and a known id-mapping case are classified gateable."""
+    """h2odb (verified verbatim overlap) is gateable; a zero-overlap registry is not."""
     by_id = {r["benchmark"]: r["status"] for r in rows}
     assert by_id.get("h2odb") == GATEABLE
-    # datavault ships a registry but its ids are friendly/Q-prefixed vs the SQL ids
-    # -> needs mapping. (amplab, then clickbench/joinorder_synthetic, were previously
-    # the direct example here; all are now enforced cross-surface gates, so they no
-    # longer appear among the unguarded candidates.)
-    assert by_id.get("datavault") == GATEABLE_NEEDS_ID_MAPPING
+    # datavault ships a registry but its ids do not overlap the SQL ids verbatim
+    # (friendly/Q-prefixed names), so there is no verified correspondence: it is
+    # candidate-unverified, NOT counted as gateable coverage.
+    assert by_id.get("datavault") == CANDIDATE_UNVERIFIED
+
+
+def test_zero_overlap_registries_are_candidate_unverified_not_gateable(rows):
+    """An unverified id mapping is never counted as gateable coverage (M2 honesty).
+
+    Each of these ships a DataFrame query registry but with ZERO verbatim id
+    overlap, so a gate would require guessing the SQL<->DataFrame mapping. They
+    must be classified `candidate-unverified`, never `gateable`.
+    """
+    unverified = {r["benchmark"] for r in rows if r["status"] == CANDIDATE_UNVERIFIED}
+    assert unverified == _CANDIDATE_UNVERIFIED_BENCHMARKS, f"candidate-unverified set changed: {sorted(unverified)}"
+    gateable = {r["benchmark"] for r in rows if r["status"] == GATEABLE}
+    assert _CANDIDATE_UNVERIFIED_BENCHMARKS.isdisjoint(gateable), "a zero-overlap benchmark was counted as gateable"
 
 
 def test_no_candidate_is_silently_dropped(rows):
     """Every candidate is classified into a known status."""
     assert rows, "applicability sweep produced no candidates"
     for r in rows:
-        assert r["status"] in {GATEABLE, GATEABLE_NEEDS_ID_MAPPING, NO_DF_QUERY_SURFACE, BLOCKED}, r
+        assert r["status"] in {GATEABLE, CANDIDATE_UNVERIFIED, NO_DF_QUERY_SURFACE, BLOCKED}, r
 
 
 def test_committed_artifact_is_current(rows):

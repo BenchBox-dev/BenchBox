@@ -148,3 +148,35 @@ def test_value_level_oracle_scale_is_read_live(rows):
 
     by_id = {r["benchmark"]: r for r in rows}
     assert by_id["ssb"]["scale"] == f"SF={EQUIVALENCE_SCALE}"
+
+
+def test_cross_surface_enforced_distinguishes_registered_from_verified_green(rows):
+    """A cross-surface gate's CI-enforcement (M1 honesty) is recorded and accurate.
+
+    ``cross_surface_enforced`` separates a CI-enforced (blocking, hence green-or-
+    CI-fails) gate from one merely registered: it is ``True`` for gates in the
+    enforced ``GATES`` registry, ``False`` for ``STAGED_GATES`` (registered but not
+    run in CI), and ``None`` for benchmarks with no cross-surface gate. Mere
+    registration must never be reported as enforced coverage.
+    """
+    from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES
+
+    by_id = {r["benchmark"]: r for r in rows}
+    for benchmark_id in GATES:
+        assert by_id[benchmark_id]["cross_surface_enforced"] is True, (
+            f"{benchmark_id} is in enforced GATES but not reported as CI-enforced"
+        )
+    for benchmark_id in STAGED_GATES:
+        assert by_id[benchmark_id]["cross_surface_enforced"] is False, (
+            f"{benchmark_id} is STAGED (not CI-enforced) but reported as enforced"
+        )
+    # The currently-enforced cross-surface gates must be reported as such.
+    assert {"ssb", "coffeeshop", "amplab", "clickbench", "joinorder_synthetic"} <= set(GATES), (
+        "expected enforced cross-surface gate set changed; update the coverage-map honesty test"
+    )
+    for r in rows:
+        # A non-cross-surface benchmark carries no enforcement signal.
+        if ORACLE_CROSS_SURFACE not in r["oracles"]:
+            assert r["cross_surface_enforced"] is None, (
+                f"{r['benchmark']} has no cross-surface gate but carries an enforcement flag"
+            )

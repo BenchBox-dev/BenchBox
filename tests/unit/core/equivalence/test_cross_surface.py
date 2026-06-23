@@ -17,7 +17,12 @@ from __future__ import annotations
 
 import pytest
 
-from benchbox.core.equivalence.cross_surface import count_executed_cells, find_cross_surface_divergences
+from benchbox.core.equivalence.cross_surface import (
+    _report,
+    count_executed_cells,
+    find_cross_surface_divergences,
+)
+from benchbox.core.equivalence.dataframe_surface import SurfaceDivergence
 from benchbox.core.tpchavoc.validation import ResultValidator
 
 pytestmark = [
@@ -205,6 +210,97 @@ def test_reference_failure_records_one_cell_and_skips_candidates():
     assert "no such table" in divergences[0].detail
 
 
+def test_reference_row_counts_are_populated_when_requested():
+    """The opt-in row-count map records the per-query reference row count.
+
+    The vacuity guard (BS3) needs to know which queries returned 0 rows; the
+    count map is how :func:`run_gate` learns that without the comparator side
+    needing to know about vacuity.
+    """
+    rows = [(1, 2.0), (3, 4.0)]
+    connection, reference_sql, dataframe_query, contexts = _make_inputs(rows, {"expression": rows, "pandas": rows})
+    counts: dict = {}
+    find_cross_surface_divergences(
+        connection,
+        query_ids=["Q1.1"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(),
+        reference_row_counts=counts,
+    )
+    assert counts == {"Q1.1": 2}
+
+
+def test_report_fails_on_unclassified_vacuous_query():
+    """An empty-vs-empty query (0 reference rows) with no classification FAILS.
+
+    This is the core BS3 guard: a query whose reference returns 0 rows compares
+    empty-vs-empty and trivially "matches", so the gate must NOT report it as a
+    pass. With no divergences and full backend coverage the gate would otherwise
+    be green; the vacuity guard turns it red.
+    """
+    coverage = {"expression": 1, "pandas": 1}
+    exit_code = _report(
+        [],  # no divergences: empty-vs-empty trivially "matches"
+        total=2,
+        coverage=coverage,
+        known={},
+        benchmark="fake",
+        reference_row_counts={"Q1": 0},
+        legitimately_empty={},
+    )
+    assert exit_code == 1, "an unclassified vacuous (0-row) query must FAIL the gate"
+
+
+def test_report_passes_when_vacuous_query_is_classified():
+    """A vacuous query explicitly classified ``legitimately_empty`` is tolerated."""
+    coverage = {"expression": 1, "pandas": 1}
+    exit_code = _report(
+        [],
+        total=2,
+        coverage=coverage,
+        known={},
+        benchmark="fake",
+        reference_row_counts={"Q1": 0},
+        legitimately_empty={"Q1": "genuinely empty at the bounded cell - rationale"},
+    )
+    assert exit_code == 0, "a classified legitimately-empty query must pass"
+
+
+def test_report_excludes_vacuous_cells_from_discriminating_count(capsys):
+    """The 'compared N of M' line counts discriminating cells only, not vacuous ones."""
+    coverage = {"expression": 2, "pandas": 2}
+    _report(
+        [],
+        total=4,
+        coverage=coverage,
+        known={},
+        benchmark="fake",
+        reference_row_counts={"Q1": 5, "Q2": 0},  # Q2 vacuous on both backends
+        legitimately_empty={"Q2": "classified"},
+    )
+    out = capsys.readouterr().out
+    # 4 executed - 2 vacuous (Q2 x 2 backends) = 2 discriminating.
+    assert "compared 2 of 4 query-backend cells" in out
+    assert "2 vacuous empty-vs-empty" in out
+
+
+def test_report_with_real_divergence_still_fails_for_nonempty_query():
+    """A genuine mismatch on a NON-empty query still fails - the guard is additive."""
+    coverage = {"expression": 1, "pandas": 1}
+    exit_code = _report(
+        [SurfaceDivergence("Q1", "pandas", "value mismatch")],
+        total=2,
+        coverage=coverage,
+        known={},
+        benchmark="fake",
+        reference_row_counts={"Q1": 5},
+        legitimately_empty={},
+    )
+    assert exit_code == 1
+
+
 def test_clickbench_and_joinorder_are_enforced_gates():
     """ClickBench and joinorder_synthetic are promoted to enforced GATES (w4).
 
@@ -225,3 +321,35 @@ def test_clickbench_and_joinorder_are_enforced_gates():
     assert GATES["joinorder_synthetic"].known_divergences == {}
     # ssb stays the enforced precedent.
     assert "ssb" in GATES
+
+
+def test_order_by_result_key_maps_alias_name_expr_and_ordinal():
+    """_order_by_result_key resolves the ORDER BY shapes the gated queries use."""
+    from benchbox.core.equivalence.cross_surface import _order_by_result_key as resolve
+
+    # plain output column names
+    assert resolve("SELECT a, b FROM t ORDER BY a, b") == [0, 1]
+    # an alias (ORDER BY revenue -> SUM(...) AS revenue at position 0)
+    assert resolve("SELECT sum(x) AS revenue, y FROM t GROUP BY y ORDER BY revenue DESC") == [0]
+    # a qualified column resolves by its bare name to the output position
+    assert resolve("SELECT ol.d, dl.r FROM o ol JOIN d dl ON 1=1 ORDER BY ol.d, dl.r") == [0, 1]
+    # an aggregate EXPRESSION (COUNT(*)) - a nested star must NOT disqualify it
+    assert resolve("SELECT k, COUNT(*) AS c FROM t GROUP BY k ORDER BY COUNT(*) DESC") == [1]
+    # a 1-based ordinal maps to the result column index
+    assert resolve("SELECT a, b FROM t ORDER BY 2 DESC") == [1]
+
+
+def test_order_by_result_key_refuses_unmappable_keys():
+    """An ORDER BY whose key is not a projected column yields None (no order claim).
+
+    These fall back to the order-insensitive comparison rather than a silent
+    order-blind "pass" - the documented residual blind spot.
+    """
+    from benchbox.core.equivalence.cross_surface import _order_by_result_key as resolve
+
+    assert resolve("SELECT a FROM t") is None  # no ORDER BY
+    assert resolve("SELECT * FROM t ORDER BY x") is None  # SELECT * - unenumerable
+    assert resolve("SELECT t.* FROM t ORDER BY x") is None  # qualified star
+    assert resolve("SELECT a FROM t ORDER BY b") is None  # ORDER BY a non-projected column
+    assert resolve("SELECT a, b FROM t ORDER BY 5") is None  # out-of-range ordinal
+    assert resolve("this is not sql ;;;") is None  # unparseable

@@ -12,6 +12,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import hashlib
 import math
+from collections.abc import Sequence
 from typing import Any, Optional, Union
 
 
@@ -35,13 +36,38 @@ def calculate_checksum(results: list[tuple[Any, ...]]) -> str:
     Returns:
         Hex-encoded MD5 digest string.
     """
-    # Convert results to a consistent string representation
+    # Convert results to a consistent string representation. Sort on the None-safe
+    # surrogate so a NULL-bearing or mixed-type column never raises TypeError here
+    # (a caller would otherwise mislabel that as an execution "error:").
     result_str = ""
-    for row in sorted(results):
+    for row in sorted(results, key=_row_sort_key):
         row_str = "|".join(str(val) if val is not None else "NULL" for val in row)
         result_str += row_str + "\n"
 
     return hashlib.md5(result_str.encode("utf-8")).hexdigest()
+
+
+def _cell_sort_key(value: Any) -> tuple[Any, ...]:
+    """A None-safe, type-safe sort surrogate for one result cell.
+
+    Python ``sorted`` raises ``TypeError`` on a column mixing ``None`` with a value
+    or mixing types. This maps every cell to a ``(type_rank, type_name, value)``
+    triple so ordering is total and never raises: ``None`` sorts first, and values
+    of different types group by a stable type name rather than comparing across
+    types. ``bool`` folds into the numeric bucket (it subclasses ``int``) so it
+    sorts consistently with equality (``True == 1``). Used only to impose a stable
+    order; it never changes a match/mismatch verdict.
+    """
+    if value is None:
+        return (0, "", 0.0)
+    if isinstance(value, (int, float)):  # includes bool (subclass of int)
+        return (1, "num", float(value))
+    return (1, type(value).__name__, str(value))
+
+
+def _row_sort_key(row: tuple[Any, ...]) -> tuple[Any, ...]:
+    """A total, never-raising sort key for a result row (see :func:`_cell_sort_key`)."""
+    return tuple(_cell_sort_key(value) for value in row)
 
 
 class ValidationError(Exception):
@@ -67,6 +93,8 @@ class ResultValidator:
         variant_id: int,
         *,
         tie_aware: bool = False,
+        order_aware: bool = False,
+        order_by: Sequence[int] | None = None,
     ) -> bool:
         """Validate exact result matching between original and variant.
 
@@ -86,6 +114,27 @@ class ResultValidator:
                 (non-boundary) rows still match exactly, so genuine
                 value-misplacement bugs are still caught - it is NOT whole-row
                 set-equality.
+            order_aware: When True (and ``order_by`` resolves the query's
+                ``ORDER BY`` key to result-column positions), compare the rows in
+                RETURNED order instead of full-row-sorting both sides. The
+                sequence of distinct order-key values must match exactly (so a
+                reversed ``ORDER BY`` is CAUGHT), while rows that share an
+                order-key value - an engine-arbitrary tie group - are compared as
+                a multiset (so a legitimate tie reshuffle is NOT flagged). The
+                final tie group additionally tolerates a truncated-``LIMIT``
+                boundary swap (the ``tie_aware`` relaxation), so tie false
+                positives stay fixed. Off by default, so the strict comparison is
+                unchanged for callers that do not opt in (the TPC-Havoc gates).
+            order_by: Sequence of RESULT-row column indices forming the query's
+                ``ORDER BY`` key, in key order (resolved by the caller, e.g.
+                ``cross_surface._order_by_result_key``). Only the columns matter,
+                not the sort DIRECTION: the comparator catches a reversed
+                ``ORDER BY`` by detecting that the RETURNED sequence of distinct
+                key values differs, which is direction-independent. Required for
+                ``order_aware`` to engage; an empty/None key (no ``ORDER BY``, or
+                an ``ORDER BY`` whose key is not present in the projected columns)
+                falls back to the order-insensitive comparison, never silently
+                claiming an order check it cannot perform.
 
         Returns:
             True if results match exactly
@@ -99,10 +148,29 @@ class ResultValidator:
                 f"Original: {len(original_results)}, Variant: {len(variant_results)}"
             )
 
+        # Order-aware engages only when a non-empty key is supplied AND every key
+        # column is in range for the actual result width on both sides. An
+        # out-of-range index (e.g. the caller's SQL-derived projection count ever
+        # disagreeing with the materialized result width) would make ``row[c]``
+        # raise IndexError - which a caller would mislabel as an execution "error:"
+        # rather than a clean verdict - so we fall back to the order-insensitive
+        # comparison instead of indexing a column that does not exist. The
+        # order-insensitive path is the sound default when the order key cannot be
+        # located in the result (the same stance _order_by_result_key takes for an
+        # unmappable ORDER BY).
+        if order_aware and order_by and self._order_key_in_range(order_by, original_results, variant_results):
+            return self._validate_order_aware(
+                original_results, variant_results, query_id, variant_id, order_by, tie_aware=tie_aware
+            )
+
         # Sort both result sets to handle potential ordering differences
-        # (though TPC-H queries should have deterministic ordering)
-        original_sorted = sorted(original_results)
-        variant_sorted = sorted(variant_results)
+        # (though TPC-H queries should have deterministic ordering). A NULL-bearing
+        # or mixed-type column cannot be ordered by Python ``sorted`` directly, so
+        # sort on a None-safe surrogate rather than the raw row (a bare ``sorted``
+        # would raise TypeError, which a caller would then mislabel as an execution
+        # "error:" instead of a clean MISMATCH/match - see _row_sort_key).
+        original_sorted = sorted(original_results, key=self._row_sort_key)
+        variant_sorted = sorted(variant_results, key=self._row_sort_key)
 
         detail = self._first_positional_mismatch(original_sorted, variant_sorted, query_id, variant_id)
         if detail is None:
@@ -112,6 +180,208 @@ class ResultValidator:
             return True
 
         raise ValidationError(detail)
+
+    def _first_column_count_mismatch(
+        self,
+        original: list[tuple[Any, ...]],
+        variant: list[tuple[Any, ...]],
+        query_id: int,
+        variant_id: int,
+    ) -> str | None:
+        """Return the first row whose two sides differ in column count, or None.
+
+        Assumes equal row counts (the caller checked). Used by the order-aware path
+        to surface a projection-width change (e.g. a dropped GROUP BY key) as a
+        clean column-count MISMATCH before indexing the order-key columns, rather
+        than letting an out-of-range index raise.
+        """
+        for i, (orig_row, var_row) in enumerate(zip(original, variant)):
+            if len(orig_row) != len(var_row):
+                return (
+                    f"Q{query_id}.{variant_id}: Column count mismatch at row {i}. "
+                    f"Original: {len(orig_row)}, Variant: {len(var_row)}"
+                )
+        return None
+
+    @staticmethod
+    def _order_key_in_range(
+        key_columns: Sequence[int],
+        original: list[tuple[Any, ...]],
+        variant: list[tuple[Any, ...]],
+    ) -> bool:
+        """True if every order-key column index is valid for every row on both sides.
+
+        Guards the order-aware path from an ``IndexError`` when the caller's
+        SQL-derived column positions ever exceed the actual result width (so an
+        unsound mapping falls back to the order-insensitive comparison instead of
+        crashing into a mislabeled ``error:``). An empty result trivially satisfies
+        this (there is no row to index).
+        """
+        if not key_columns:
+            return False
+        max_index = max(key_columns)
+        if max_index < 0:
+            return False
+        return all(len(row) > max_index for row in original) and all(len(row) > max_index for row in variant)
+
+    def _validate_order_aware(
+        self,
+        original: list[tuple[Any, ...]],
+        variant: list[tuple[Any, ...]],
+        query_id: int,
+        variant_id: int,
+        key_columns: Sequence[int],
+        *,
+        tie_aware: bool,
+    ) -> bool:
+        """Compare two results in RETURNED order, tolerating only tie-group reshuffles.
+
+        ``original`` is the trusted reference in its ``ORDER BY`` order. The key is
+        ``key_columns`` (positions into the result row). Rows are partitioned, in
+        returned order, into consecutive runs sharing the same order-key value (a
+        tie group). The COMPARISON:
+
+          1. The sequence of order-key values must be identical between the two
+             results (same values, same order). A reversed ``ORDER BY`` produces a
+             reversed key sequence and is therefore CAUGHT here - this is the BS2
+             fix.
+          2. Within each tie group the row ORDER is engine-arbitrary, so the two
+             groups are compared as MULTISETS (full-row), not positionally. A
+             legitimate tie reshuffle passes; a value bug inside a group still
+             fails the multiset check.
+          3. The FINAL tie group may be truncated by a trailing ``LIMIT`` that
+             cuts across the tie, so when ``tie_aware`` is set its membership is
+             allowed to differ as an ambiguous boundary swap. This is sound because
+             the group is keyed by the ACTUAL ``ORDER BY`` value (every row in it
+             shares the order key) and the total row count already matched, so the
+             difference can only be an equally-valid tie pick across the cutoff -
+             not a reordering of distinct order-key values.
+
+        Raises ``ValidationError`` on the first divergence, mirroring the strict
+        path's contract.
+        """
+        # Column-count guard. The order-key columns index into every row, so a
+        # candidate row that is too NARROW (e.g. a dropped GROUP BY key shrank the
+        # projection) must surface as a clean column-count MISMATCH here, not as an
+        # IndexError that the harness would mislabel as an execution "error:". Check
+        # both sides positionally up front; a width difference is a real divergence.
+        detail = self._first_column_count_mismatch(original, variant, query_id, variant_id)
+        if detail is not None:
+            raise ValidationError(detail)
+
+        original_groups = self._group_by_order_key(original, key_columns)
+        variant_groups = self._group_by_order_key(variant, key_columns)
+
+        if len(original_groups) != len(variant_groups):
+            raise ValidationError(
+                f"Q{query_id}.{variant_id}: ORDER BY tie-group count mismatch. "
+                f"Original: {len(original_groups)}, Variant: {len(variant_groups)} "
+                f"(order-key columns {key_columns}) - the returned order differs."
+            )
+
+        last_index = len(original_groups) - 1
+        for i, ((orig_key, orig_rows), (var_key, var_rows)) in enumerate(zip(original_groups, variant_groups)):
+            if not self._order_keys_equal(orig_key, var_key):
+                raise ValidationError(
+                    f"Q{query_id}.{variant_id}: ORDER BY key mismatch at position {i}. "
+                    f"Original key: {orig_key}, Variant key: {var_key} "
+                    f"(order-key columns {key_columns}) - the returned order differs "
+                    f"(e.g. a reversed ORDER BY)."
+                )
+            if self._multisets_equal(orig_rows, var_rows):
+                continue
+            # The FINAL group under a trailing LIMIT is the truncated boundary: all
+            # its rows share the order key (that is what defines the group), and the
+            # total row count already matched, so any membership difference here is
+            # an equally-valid tie pick across the LIMIT cutoff - accept it (the
+            # tie-aware relaxation). This is sound BECAUSE the group is keyed by the
+            # actual ORDER BY value, so we never mistake a genuinely-ordered row for
+            # a boundary tie the way the order-blind heuristic could. Earlier groups
+            # are complete windows and must match as multisets, so a value bug there
+            # is still caught.
+            if i == last_index and tie_aware:
+                continue
+            detail = self._first_positional_mismatch(
+                sorted(orig_rows, key=self._row_sort_key),
+                sorted(var_rows, key=self._row_sort_key),
+                query_id,
+                variant_id,
+            )
+            raise ValidationError(
+                detail
+                or (
+                    f"Q{query_id}.{variant_id}: ORDER BY tie group at position {i} differs as a multiset "
+                    f"(order-key {orig_key})."
+                )
+            )
+        return True
+
+    def _group_by_order_key(
+        self, rows: list[tuple[Any, ...]], key_columns: list[int]
+    ) -> list[tuple[tuple[Any, ...], list[tuple[Any, ...]]]]:
+        """Partition ``rows`` (in returned order) into consecutive same-key runs.
+
+        Returns a list of ``(order_key_tuple, rows_in_that_group)`` preserving the
+        returned order of the groups. Consecutive rows whose order-key columns are
+        equal (via :meth:`_values_equal`, so float tolerance / NULL handling match
+        the rest of the comparator) form one group.
+        """
+        groups: list[tuple[tuple[Any, ...], list[tuple[Any, ...]]]] = []
+        for row in rows:
+            key = tuple(row[c] for c in key_columns)
+            if groups and self._order_keys_equal(groups[-1][0], key):
+                groups[-1][1].append(row)
+            else:
+                groups.append((key, [row]))
+        return groups
+
+    def _order_keys_equal(self, a: tuple[Any, ...], b: tuple[Any, ...]) -> bool:
+        """Element-wise order-key equality using the comparator's value semantics."""
+        return len(a) == len(b) and all(self._values_equal(x, y) for x, y in zip(a, b))
+
+    def _multisets_equal(self, left: list[tuple[Any, ...]], right: list[tuple[Any, ...]]) -> bool:
+        """True if ``left`` and ``right`` are equal as full-row multisets.
+
+        Sorts both on the None-safe :meth:`_row_sort_key` (so a NULL-mixed column
+        never raises) and compares positionally with :meth:`_values_equal`, so the
+        float tolerance and NULL handling stay identical to the strict path.
+        """
+        if len(left) != len(right):
+            return False
+        left_sorted = sorted(left, key=self._row_sort_key)
+        right_sorted = sorted(right, key=self._row_sort_key)
+        return all(self._order_keys_equal(lhs, rhs) for lhs, rhs in zip(left_sorted, right_sorted))
+
+    def _row_sort_key(self, row: tuple[Any, ...]) -> tuple[Any, ...]:
+        """A total, never-raising sort key for a result row.
+
+        Python ``sorted`` raises ``TypeError`` on a column mixing ``None`` with a
+        value (``None < 1`` is unorderable) and on a column mixing types. This
+        surrogate replaces every cell with a ``(type_rank, type_name, value)``
+        triple so ordering is deterministic and total without raising: ``None``
+        sorts before any value, and values of different types are grouped by a
+        stable type name rather than compared across types. It is used ONLY to
+        impose a stable order for positional comparison; equality is still decided
+        by :meth:`_values_equal`, so this never changes a match/mismatch verdict -
+        it only stops a NULL-bearing or mixed-type column from raising (which a
+        caller would otherwise mislabel as an execution ``error:`` rather than a
+        clean MISMATCH).
+
+        Delegates to the module-level :func:`_row_sort_key` so the comparator and
+        the value-digest primitive (:func:`calculate_checksum`) share exactly one
+        sort definition.
+        """
+        return _row_sort_key(row)
+
+    @staticmethod
+    def _cell_sort_key(value: Any) -> tuple[Any, ...]:
+        """A None-safe, type-safe sort surrogate for one cell (see _row_sort_key).
+
+        Thin wrapper over the module-level :func:`_cell_sort_key`; ``bool`` folds
+        into the numeric bucket so it sorts CONSISTENTLY with :meth:`_values_equal`
+        (``True == 1``).
+        """
+        return _cell_sort_key(value)
 
     def _first_positional_mismatch(
         self,
@@ -185,7 +455,17 @@ class ResultValidator:
 
         swapped = only_original + only_variant
         candidate_cols = self._monotonic_columns(original)
-        for c in candidate_cols:
+        # A constant column carries no ordering information, so a literal/constant
+        # result column (e.g. ClickBench Q35's ``SELECT 1``) must not serve as the
+        # tie-boundary key while a genuinely-ordered column exists - otherwise an
+        # arbitrary swap that perturbs the real order key would be masked. Prefer
+        # varying monotonic columns; fall back to constant ones ONLY when no
+        # monotonic column varies (a fully-tied top-N window, e.g. ORDER BY c DESC
+        # LIMIT 10 where every kept row has c=1, whose constant order key IS the
+        # legitimate boundary).
+        varying_cols = [c for c in candidate_cols if not self._column_is_constant(original, c)]
+        boundary_cols = varying_cols or candidate_cols
+        for c in boundary_cols:
             boundary_value = original[-1][c]
             if boundary_value is None:
                 continue
@@ -214,7 +494,10 @@ class ResultValidator:
         monotonic (non-decreasing or non-increasing, constant counts as both); a
         grouped non-key column generally is not. A column with an unorderable or
         NULL-mixed value is treated as non-monotonic (excluded), which only makes
-        the boundary split finer (stricter), never weaker.
+        the boundary split finer (stricter), never weaker. Constant columns are
+        retained here (a fully-tied top-N window has a constant order key);
+        ``_is_boundary_tie_equivalent`` decides when a constant column may serve as
+        the boundary key.
         """
         if len(rows) < 2:
             return []
@@ -235,6 +518,13 @@ class ResultValidator:
             if non_decreasing or non_increasing:
                 result.append(c)
         return result
+
+    def _column_is_constant(self, rows: list[tuple[Any, ...]], c: int) -> bool:
+        """True if every row shares the same value in column ``c`` (NULLs included)."""
+        if not rows:
+            return True
+        first = rows[0][c]
+        return all(self._values_equal(row[c], first) for row in rows)
 
     def _safe_compare(self, a: Any, b: Any) -> int | None:
         """Return -1/0/1 for an orderable pair, or None if not orderable.
@@ -312,9 +602,10 @@ class ResultValidator:
                 f"Original: {len(original_results)}, Variant: {len(variant_results)}"
             )
 
-        # Sort both result sets
-        original_sorted = sorted(original_results)
-        variant_sorted = sorted(variant_results)
+        # Sort both result sets on the None-safe surrogate so a NULL-bearing or
+        # mixed-type column never raises TypeError (see _row_sort_key).
+        original_sorted = sorted(original_results, key=self._row_sort_key)
+        variant_sorted = sorted(variant_results, key=self._row_sort_key)
 
         for i, (orig_row, var_row) in enumerate(zip(original_sorted, variant_sorted)):
             if len(orig_row) != len(var_row):
@@ -404,6 +695,9 @@ class ResultValidator:
 
         Thin instance wrapper over the promoted module-level
         :func:`calculate_checksum`; kept for API stability of existing callers.
+        Both sort on the None-safe surrogate (:func:`_row_sort_key`) so a
+        NULL-bearing or mixed-type column never raises ``TypeError`` here (matching
+        the order-insensitive comparison path).
         """
         return calculate_checksum(results)
 

@@ -265,7 +265,10 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             delimiter: Field delimiter
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
-            null_marker: Unused for Polars (truncate_ragged_lines handles trailing delimiters natively).
+            null_marker: The SQL dialect's null marker. ``None`` means empty fields
+                stay '' in string columns (match DuckDB/pandas); ``""`` means empty
+                fields are NULL. (Trailing delimiters are handled natively by
+                truncate_ragged_lines.)
 
         Returns:
             Polars LazyFrame with the file contents
@@ -277,6 +280,16 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             "ignore_errors": True,
             # Handle files with or without trailing delimiters
             "truncate_ragged_lines": True,
+            # Mirror the SQL dialect's empty-field semantics, matching the pandas
+            # CSV path: when the loader keeps empty fields as '' (null_marker is
+            # None, e.g. ClickBench) keep '' in string columns so the raw-CSV path
+            # agrees with the SQL reference (DuckDB keeps ''), the Parquet path
+            # (strings_can_be_null=False) and pandas; when the dialect treats empty
+            # as NULL (null_marker == '', e.g. JoinOrder) leave Polars' default
+            # empty->null. Without this, a prefer_parquet=False load reintroduces the
+            # empty-string->null divergence (the cross-surface Q6/Q17/Q18 bug) on the
+            # Polars surface. Numeric columns always treat an empty field as null.
+            "missing_utf8_is_empty_string": null_marker is None,
         }
 
         # Add row limit if specified

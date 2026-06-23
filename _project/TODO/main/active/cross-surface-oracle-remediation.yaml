@@ -2,7 +2,7 @@ id: cross-surface-oracle-remediation
 title: "Remediate the cross-surface equivalence oracle: fix the bugs it found-and-dismissed, make it deterministic, order-aware, non-vacuous, and honest"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -116,21 +116,43 @@ work:
 
   - id: w2
     summary: "Make the comparator order-aware and tie-aware; fix the None/NaN sort crash (BS2)"
-    status: in_progress
+    status: done
     addresses: [BS2, "review:Blind Spot 2", "review:DEMO1/2/3"]
     progress: |
-      PARTIAL (landed in #858). The tie-aware boundary relaxation shipped:
-      cross_surface.py enables tie_aware per query for trailing-LIMIT top-N
-      (_is_truncated_top_n), and validate_results_exact takes a tie_aware flag.
-      Verified effect: ClickBench collapsed from 27 wobbling divergences to a
-      STABLE 2 (green across 3 runs).
-      STILL OPEN - two halves of BS2 are NOT verified closed:
-      (1) ORDER-BY blindness: the non-tie path still full-row-sorts, so a reversed
-          ORDER BY may still pass silently (the dangerous false-negative half).
-      (2) The None/non-None Python sorted() crash that find_surface_divergences
-          mislabels as "error:" was not addressed.
-      Keep open until w10's reversed-sort mutation proves order-sensitivity and a
-      None-mixed-column test proves a clean MISMATCH (not an "error:").
+      DONE. Both previously-open halves of BS2 are now closed (additive, opt-in;
+      ResultValidator is extended, never forked).
+      (1) ORDER-BY blindness CLOSED: validate_results_exact gained an opt-in
+          order_aware mode + an order_by (result-column positions) parameter. When
+          enabled it compares rows in RETURNED order - the sequence of distinct
+          order-key values must match exactly (so a reversed ORDER BY is CAUGHT),
+          while rows sharing an order-key value are a multiset (so a legitimate tie
+          reshuffle is NOT flagged) and the final group under a trailing LIMIT is a
+          boundary tie (so the tie-aware fix from #858 does not regress). The
+          cross_surface gate resolves each query's ORDER BY to result-column
+          positions via sqlglot (_order_by_result_key) and enables order_aware only
+          when EVERY ORDER BY term maps to a projected column; an unmappable key
+          (e.g. clickbench Q24 SELECT *, Q25 ORDER BY a non-projected EventTime)
+          returns None and falls back to the order-insensitive comparison rather
+          than a silent order-blind "pass" (the residual blind spot is enumerated
+          and documented, not muted via a baseline).
+      (2) None/non-None sorted() crash FIXED: the comparator now sorts on a
+          None-safe, type-safe surrogate (_row_sort_key / _cell_sort_key) so a
+          column mixing None with a value (or mixed types) never raises TypeError;
+          a genuine None-vs-value difference is reported as a clean MISMATCH, not an
+          "error:" from sorted().
+      Verified: w10's test_reversed_sort_is_the_bs2_probe FLIPPED from "not caught"
+      to CAUGHT on ssb Q3.1 (149 ordered rows); _EXPECT_CAUGHT now expects the
+      multi-row reverse_sort caught on ssb/amplab/coffeeshop/clickbench (only
+      joinorder_synthetic's single-row no-op stays an expected miss). New fast-lane
+      unit suite tests/integration/test_validator_order_aware.py pins reversed-order
+      MISMATCH, tie/boundary tolerance, and the None-mixed-column clean MISMATCH
+      (never "error:"). All 5 enforced cross-surface gates stay green (ssb 14/26
+      discriminating, amplab 12/16, coffeeshop 22/22, clickbench 70 discriminating,
+      joinorder 26/26); tie reshuffles still not flagged. TPC-Havoc SQL (220/220)
+      and DataFrame (440/440) gates remain byte-identical green - they pass
+      order_aware=False, so their path is unchanged. Findings doc
+      _project/analysis/cross-surface-mutation-sensitivity.md updated (matrix flips
+      to caught + the documented residual non-projected-ORDER-BY blind spot).
     notes: |
       validate_results_exact (validation.py:54-79) sorts full rows then compares
       positionally, so it is simultaneously BLIND to real ORDER BY bugs (a reversed
@@ -190,8 +212,47 @@ work:
 
   - id: w4
     summary: "Fail (not silently pass) on vacuous empty-vs-empty cells; make every gated query discriminating (BS3)"
-    status: pending
+    status: done
     addresses: [BS3, "review:Blind Spot 3", "claim 4"]
+    progress: |
+      DONE. Part 1 (gate hygiene) shipped: find_cross_surface_divergences now
+      takes an opt-in reference_row_counts out-map; _report uses it to exclude
+      vacuous (0-reference-row) cells from the discriminating "compared N of M"
+      count, lists them separately, and FAILS the gate on any vacuous query NOT
+      classified in a new per-gate CrossSurfaceGate.legitimately_empty mapping
+      (mirrors known_divergences, with a written rationale). A per-gate
+      scale_factor override (default EQUIVALENCE_SCALE) was also added and threaded
+      through run_gate/build/build_production_contexts.
+      Part 2 (SSB discrimination): the scale_factor route was tried and REJECTED on
+      evidence - all 6 empty SSB queries (Q2.1-2.3, Q3.3, Q3.4, Q4.3) return 0 rows
+      at EVERY bounded SF (verified empty at 0.1, 0.2, 0.3, 0.5 AND 1.0). Root
+      cause is a value-FORMAT mismatch, not data density: the BenchBox SSB
+      generator emits p_category='MFGR#112' (3-digit) but the canonical query
+      filters 'MFGR#12' (2-digit) [count(part WHERE p_category='MFGR#12')==0 at
+      SF=1.0]; c_city/s_city are 'UNITED K0'..'K9' (10-char truncation) but the
+      query filters 'UNITED KI1'/'KI5'. No bounded SF can bridge that, and changing
+      the canonical query parameters is forbidden (it would alter the benchmark).
+      Per the w4 fallback, the 6 are classified legitimately_empty with that written
+      rationale and a tracking note (regenerate SSB data with faithful value
+      formats; do NOT touch the canonical params). The guard is proven to surface
+      them: the SSB gate is green at 14/26 DISCRIMINATING + 12 vacuous-classified,
+      and a fast-lane unit test asserts _report FAILS on an UNclassified vacuous
+      query and passes when classified.
+      The audit of the other gates found the guard exposed PREVIOUSLY-HIDDEN
+      vacuity (the exact BS3 theater): amplab had 2 empty-vs-empty queries (Q3, Q5
+      - GROUP BY ... HAVING COUNT(*)>10 selects no qualifying group at the bounded
+      cell) and clickbench had 8 (Q20/Q23/Q28/Q29/Q39/Q40/Q41/Q42 - canonical
+      ClickBench upstream literals/thresholds: specific UserID/RefererHash/URLHash,
+      CounterID=62 + July-2013 window, HAVING COUNT(*)>100000, OFFSET past the
+      filtered slice - that the synthetic 100k-row data cannot satisfy). All are
+      classified legitimately_empty with written rationales (cannot be made
+      discriminating without an un-bounded cell or changing canonical queries -
+      both forbidden); coffeeshop (22/22) and joinorder_synthetic (26/26) are
+      genuinely clean with 0 vacuous. Every gate is green again, now HONESTLY:
+      coffeeshop 22/22, joinorder 26/26, ssb 14 discriminating, amplab 12, click
+      70 discriminating + Q18 tie baseline. TPC-Havoc SQL (220/220) + DataFrame
+      (440/440) reports unchanged green - the shared ResultValidator is untouched;
+      the guard lives only in cross_surface._report.
     notes: |
       6/13 SSB queries return 0 rows at SF=0.1, so 12/26 cells pass empty-vs-empty.
       Two parts:
@@ -253,8 +314,52 @@ work:
 
   - id: w6
     summary: "Add a production-loader-path gate cell + harden the DDL parser and type maps (M4, L1, L2)"
-    status: pending
+    status: done
     addresses: [M4, L1, L2, "review:MEDIUM M4", "review:LOW L1/L2"]
+    progress: |
+      PARSER SUB-PART DONE (L1, fix/dataframe-ddl-column-parser): replaced the
+      naive column.split() in schema_utils.column_name/column_sql_type with a
+      paren-aware, quote-aware DDL column parser (_split_ddl_column). It now
+      preserves parenthesized precision/scale with internal commas/spaces
+      (DECIMAL(10, 2), VARCHAR(255), NUMERIC(18, 4)), multi-word types
+      (DOUBLE PRECISION, TIMESTAMP WITH/WITHOUT TIME ZONE, CHARACTER VARYING),
+      and quoted/bracketed/backtick identifiers with internal spaces
+      ("odd name", [odd name], `odd name`); trailing constraints (NOT NULL,
+      DEFAULT ..., PRIMARY KEY, UNIQUE, CHECK(...), REFERENCES ...) are stripped
+      from the type. Simple "name TYPE" behavior is byte-identical. New table-
+      driven unit tests in tests/unit/core/dataframe/test_schema_utils_ddl_parser.py
+      (59 cases). Verified: dataframe + joinorder unit suites (1298 passed),
+      joinorder_synthetic and ssb cross-surface gates green (0 divergent),
+      tpchavoc-equivalence-report unchanged (220 equivalent).
+      ADAPTER EMPTY-STRING CONTRACT DONE (raw-CSV path): carried the dialect-aware
+      empty-string->'' contract from the pandas adapter to the other DataFrame
+      adapters' read_csv. Polars now passes missing_utf8_is_empty_string=(null_marker
+      is None) to scan_csv; modin/dask/cudf now read declared text columns as object
+      and restore '' for empty fields when null_marker is None (NULL when ''),
+      reusing _pandas_string_columns. So a prefer_parquet=False (or CSV-recommending)
+      load no longer reintroduces the empty-string->null divergence (Q6/Q17/Q18) on
+      those surfaces. Verified: polars read_csv unit test (both dialect cases),
+      adapter coverage suites (139 passed), no import cycle, ssb gate still green.
+      modin/cudf are not installed in this env so their read_csv was not runtime-
+      exercised, but the change is the same pattern proven on the pandas adapter.
+      ACCEPTANCE MET, w6 CLOSED:
+        - Leading-zero VARCHAR + all-empty TEXT survive the production load path
+          identical to the SQL reference (new test
+          test_convert_declared_string_columns_survive_production_load_path: '007'
+          stays string, an all-empty TEXT column is a string column following the
+          dialect - NULL for a .tbl whose null_marker is "", matching DuckDB; '' for
+          a .csv whose null_marker is None). Declared STRING dtypes ARE applied on
+          the production path (the leading zeros prove a VARCHAR is not inferred as
+          int), via the type maps (#857) + pandas/dask/modin/cudf dtype=object.
+        - schema_utils DDL parser unit tests pass (DDL parser #864).
+        - joinorder_synthetic's deferred dtype divergences are resolved: its
+          cross-surface gate is GREEN (0 divergent, 0 vacuous), closing the #847
+          deferral.
+      M4's core concern (the gate bypassed the loader) was already resolved on
+      develop: the gate drives the REAL DataFrameDataLoader and caught the
+      TEXT->null and TIMESTAMP->string bugs. A dedicated DTYPE-asserting gate cell
+      (compare column dtypes, not just values) is an additive enhancement, not part
+      of w6's acceptance - moved to deferred.
     notes: |
       The gate's loader bypass (dataframe_surface.py:74-125 materializes from typed
       DuckDB Arrow) means it cannot see production CSV->parquet dtype corruption.
@@ -345,8 +450,32 @@ work:
 
   - id: w9
     summary: "Tighten coverage-map / applicability honesty (M1, M2)"
-    status: pending
+    status: done
     addresses: [M1, M2, "review:MEDIUM M1/M2", "claims 6,7"]
+    progress: |
+      DONE. Both honesty signals landed (re-derived from the LIVE registries, not
+      hardcoded).
+      M1 (coverage map): generate_oracle_coverage_map.py now records
+      cross_surface_enforced per benchmark (True for enforced GATES = CI-blocking
+      hence green-or-CI-fails, False for STAGED_GATES = registered-but-not-run, None
+      for non-cross-surface). The md gains an "Enforced" column plus a "What an
+      oracle here means" preamble stating that 'guarded' is REGISTERED, not green;
+      the json carries the new field. The 5 enforced gates (amplab, clickbench,
+      coffeeshop, joinorder_synthetic, ssb) report "enforced (CI-blocking)"; STAGED
+      is currently empty. Drift test (oracle-coverage-map-check) regenerated + green.
+      M2 (applicability): cross_surface_applicability_sweep.py downgrades the
+      zero-verified-overlap benchmarks from gateable to a new candidate-unverified
+      status; _GATEABLE_STATUSES no longer counts them as coverage. The live sweep
+      now reports 4 gateable (flightdata, h2odb, joinorder, read_primitives) and 5
+      candidate-unverified (datavault, nyctaxi, tpcds_obt, tpch_skew, tsbs_devops).
+      amplab is no longer in this list at all (promoted to an enforced gate in #859),
+      so the original "6" is 5 unguarded candidates here.
+      Tests: tests/unit/test_oracle_coverage_map.py gains
+      test_cross_surface_enforced_distinguishes_registered_from_verified_green;
+      tests/unit/test_cross_surface_applicability.py pins the new
+      candidate-unverified set and asserts none are counted gateable. Both committed
+      artifacts regenerated; both -check/drift targets and both unit test modules
+      green; ruff/format/ty clean.
     notes: |
       - generate_oracle_coverage_map.py derives 'guarded' from GATES dict membership
         (85/111) and never checks the gate is green. Either run each gate (or read
@@ -365,9 +494,48 @@ work:
 
   - id: w10
     summary: "Mutation-test the oracle to measure SENSITIVITY, not just specificity (C2 - the central question)"
-    status: pending
+    status: done
     needs: [w2, w4]
     addresses: [C2, "review:CRITICAL C2", "deeper-question 2", "claim 9"]
+    progress: |
+      DONE: a systematic mutation-sensitivity suite lands in
+      tests/integration/test_cross_surface_mutation_sensitivity.py and its
+      caught-vs-uncaught matrix is committed as evidence in
+      _project/analysis/cross-surface-mutation-sensitivity.md. For every enforced
+      gated benchmark (read live from GATES: ssb, amplab, coffeeshop, clickbench,
+      joinorder_synthetic) it wraps ONE target query's DataFrame impl at test time
+      (dataclasses.replace on the DataFrameQuery - the production registries are
+      NOT touched) and drives the real gate machinery
+      (find_cross_surface_divergences + the reused ResultValidator) on the bounded
+      SF=0.1 cell. No production code or comparator changed, so TPC-Havoc stays
+      byte-identical-green.
+
+      Matrix (both backends; verified at SF=0.1):
+        flip_comparator (<->-<=, +1 row)  : CAUGHT on all 5 (row-count path)
+        drop_group_key  (drop leading col): CAUGHT on all 5 (column-count path)
+        drop_join       (value perturb)   : CAUGHT on all 5 (value path)
+        reverse_sort    (reverse rows)    : NOT CAUGHT on the 4 multi-row gates
+                                            (ssb/amplab/coffeeshop/clickbench);
+                                            no-op on joinorder_synthetic (every
+                                            gated query is a single-row scalar).
+      So each gated benchmark has >=3 mutation classes the gate provably catches
+      (acceptance #1), and the one uncaught class is documented (acceptance #2).
+
+      HONEST FINDING (the C2 answer): the reversed-sort miss CONFIRMS the open half
+      of w2/BS2 - validate_results_exact full-row-sorts both sides before
+      comparing, so a reversed ORDER BY that preserves the multiset passes
+      silently. This is recorded (NOT baselined - that would be the anti-pattern)
+      with a tracking note pointing back at w2; the dedicated
+      test_reversed_sort_is_the_bs2_probe will flip to failing the moment an
+      order-aware comparator lands, forcing the doc + the harness _EXPECT_CAUGHT
+      table to be updated. The oracle is strong on row-membership, column-shape,
+      and value bugs and blind only to pure ordering bugs - it did NOT find "no
+      bugs" because it is vacuous; w4's empty-cell guard plus this suite's
+      non-empty-target assertion (test_unmutated_target_is_green) rule that out.
+
+      Also folds in the w3 byte-stability regression
+      (test_gate_output_is_byte_stable_across_two_in_process_runs): two in-process
+      ssb gate runs on the same seed produce an identical divergence set.
     notes: |
       The campaign measured only that the gates PASS (specificity); it never measured
       whether they CATCH a seeded bug (sensitivity). Add a mutation-test harness that,
@@ -389,6 +557,10 @@ work:
 deferred:
   - summary: "A truly independent SQL-side oracle for non-tpch/tpcds benchmarks (e.g. upstream published answer sets)."
     reason: "Large; cross-surface proves agreement not correctness. Tracked as a deeper question in the review, not required to close these findings."
+  - summary: "A dedicated DTYPE-asserting cross-surface gate cell (compare each loaded column's dtype, not just its values, against the SQL reference)."
+    reason: "Additive enhancement beyond w6's acceptance and M4's core concern (which is resolved: the gate drives the real production loader and already caught the TEXT->null / TIMESTAMP->string dtype bugs via value comparison). Designing an acceptable cross-engine dtype-equivalence map is a separable piece."
+  - summary: "SSB generator emits a 3-digit p_category ('MFGR#212') so the standard SSB Q2.x predicates ('MFGR#12') match no rows at any scale (Q2.1-2.3/Q3.3/Q3.4/Q4.3 empty to SF=1.0)."
+    reason: "A separate SSB data-generation bug, not a cross-surface oracle defect; the vacuous cells are honestly classified in the ssb gate's allowlist. Tracked in #870."
 
 must_preserve:
   - "All TPC-Havoc SQL and DataFrame equivalence gates stay green with empty baselines and byte-identical output - the comparator change (w2) is additive, never a fork."

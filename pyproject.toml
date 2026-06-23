@@ -54,6 +54,11 @@ dependencies = [
     # the minimal-import-surface CI gate enforces this. See
     # docs/development/dependency-inventory.md (pandas = DataFrame/Benchmark).
     "zstandard>=0.20.0",
+    # requests: imported unconditionally by benchbox.core.data_fetch.downloader, which is
+    # reached on the canonical JoinOrder benchmark import path. Must be core so a bare
+    # `pip install benchbox` (no extras) doesn't raise ModuleNotFoundError. Floor matches
+    # the version already pinned in the questdb / cloud-spark extras.
+    "requests>=2.31.0",
     # grpcio / grpcio-status are NOT declared at the core level. They are
     # pulled in transitively by optional cloud / connectivity extras
     # (e.g. influxdb3-python, snowflake, databricks-sdk, pyspark[connect]).

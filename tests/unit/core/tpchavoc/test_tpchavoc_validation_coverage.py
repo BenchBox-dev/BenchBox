@@ -80,6 +80,23 @@ def test_tie_aware_rejects_unique_last_row_change() -> None:
         validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
 
 
+def test_tie_aware_constant_column_is_not_a_boundary_key() -> None:
+    """A constant/literal column must not qualify as the tie-boundary key.
+
+    Mirrors ClickBench Q35 (``SELECT 1, URL, COUNT(*) AS c ... ORDER BY c DESC
+    LIMIT N``): column 0 is the literal ``1``. A real count bug on a non-boundary
+    row (top ``c`` 5 -> 4) shares that constant 1, so treating column 0 as a
+    monotonic boundary key would wrongly accept the swap. The actual order key
+    (column 2) puts the change off the boundary value, so it must still fail.
+    """
+    validator = ResultValidator()
+    original = [(1, "a", 5), (1, "b", 5), (1, "c", 3), (1, "d", 2), (1, "e", 2)]
+    variant = [(1, "a", 4), (1, "b", 5), (1, "c", 3), (1, "d", 2), (1, "e", 2)]
+
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
+
+
 @pytest.mark.parametrize(
     ("original", "variant", "message"),
     [

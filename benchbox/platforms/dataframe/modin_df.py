@@ -123,6 +123,7 @@ except ImportError:
 
 # These imports must come after Ray/Modin initialization above
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration  # noqa: E402
+from benchbox.platforms.dataframe.pandas_df import _pandas_string_columns  # noqa: E402
 from benchbox.platforms.dataframe.pandas_family import (  # noqa: E402
     PandasFamilyAdapter,
 )
@@ -271,7 +272,7 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
         header: int | None = 0,
         names: list[str] | None = None,
         null_marker: str | None = None,
-        column_types: list[str] | None = None,  # noqa: ARG002 - accepted for signature parity; Modin infers types
+        column_types: list[str] | None = None,
     ) -> ModinDF:
         """Read a CSV file into a Modin DataFrame.
 
@@ -292,8 +293,15 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
         }
 
         # Add column names if provided
+        string_columns: list[str] = []
         if names:
             read_kwargs["names"] = names
+            # Read declared text columns as object and (below) restore '' for empty
+            # fields, mirroring the pandas adapter so the empty-string contract holds
+            # on Modin's raw-CSV path too.
+            string_columns = _pandas_string_columns(names, column_types, set())
+            if string_columns:
+                read_kwargs["dtype"] = dict.fromkeys(string_columns, "object")
 
         # Trailing-delimiter probing only for TPC-style sources (null_marker is not None).
         if null_marker is not None and names and has_trailing_delimiter(path, delimiter, names):
@@ -301,6 +309,15 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
             read_kwargs["names"] = extended_names
 
         df = mpd.read_csv(path, **read_kwargs)
+
+        # Match the SQL dialect's empty-field semantics (null_marker None -> keep '';
+        # '' -> NULL), as the pandas adapter does.
+        if null_marker is None and string_columns:
+            for column in string_columns:
+                if column in df.columns:
+                    # Per-column (not df[list]=...) so it works across dask/modin/cudf,
+                    # whose multi-column assignment support differs from pandas.
+                    df[column] = df[column].fillna("")
 
         # Drop trailing column if present
         if TRAILING_DUMMY_COLUMN in df.columns:
