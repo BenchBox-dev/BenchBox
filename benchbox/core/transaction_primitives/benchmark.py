@@ -90,6 +90,8 @@ class OperationResult:
         cleanup_warning: Warning message for cleanup failures
         status: Explicit status string ("SUCCESS", "FAILED", "SKIPPED"); derived from success if None
         skip_reason: Human-readable explanation when status is "SKIPPED"; distinct from error
+        executed_sql: The final transaction SQL actually executed (after platform
+            overrides, dialect rewrites, and placeholder replacement); used for plan capture.
     """
 
     operation_id: str
@@ -105,6 +107,7 @@ class OperationResult:
     cleanup_warning: Optional[str] = None
     status: Optional[str] = None
     skip_reason: Optional[str] = None
+    executed_sql: Optional[str] = None
 
 
 class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
@@ -814,6 +817,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 cleanup_duration_ms=cleanup_duration_ms,
                 cleanup_success=cleanup_success,
                 cleanup_warning=cleanup_warning,
+                executed_sql=write_sql,
             )
 
         except Exception as e:

@@ -156,7 +156,17 @@ class ResultValidator:
 
         swapped = only_original + only_variant
         candidate_cols = self._monotonic_columns(original)
-        for c in candidate_cols:
+        # A constant column carries no ordering information, so a literal/constant
+        # result column (e.g. ClickBench Q35's ``SELECT 1``) must not serve as the
+        # tie-boundary key while a genuinely-ordered column exists - otherwise an
+        # arbitrary swap that perturbs the real order key would be masked. Prefer
+        # varying monotonic columns; fall back to constant ones ONLY when no
+        # monotonic column varies (a fully-tied top-N window, e.g. ORDER BY c DESC
+        # LIMIT 10 where every kept row has c=1, whose constant order key IS the
+        # legitimate boundary).
+        varying_cols = [c for c in candidate_cols if not self._column_is_constant(original, c)]
+        boundary_cols = varying_cols or candidate_cols
+        for c in boundary_cols:
             boundary_value = original[-1][c]
             if boundary_value is None:
                 continue
@@ -185,7 +195,10 @@ class ResultValidator:
         monotonic (non-decreasing or non-increasing, constant counts as both); a
         grouped non-key column generally is not. A column with an unorderable or
         NULL-mixed value is treated as non-monotonic (excluded), which only makes
-        the boundary split finer (stricter), never weaker.
+        the boundary split finer (stricter), never weaker. Constant columns are
+        retained here (a fully-tied top-N window has a constant order key);
+        ``_is_boundary_tie_equivalent`` decides when a constant column may serve as
+        the boundary key.
         """
         if len(rows) < 2:
             return []
@@ -206,6 +219,13 @@ class ResultValidator:
             if non_decreasing or non_increasing:
                 result.append(c)
         return result
+
+    def _column_is_constant(self, rows: list[tuple[Any, ...]], c: int) -> bool:
+        """True if every row shares the same value in column ``c`` (NULLs included)."""
+        if not rows:
+            return True
+        first = rows[0][c]
+        return all(self._values_equal(row[c], first) for row in rows)
 
     def _safe_compare(self, a: Any, b: Any) -> int | None:
         """Return -1/0/1 for an orderable pair, or None if not orderable.

@@ -99,6 +99,8 @@ class OperationResult:
         cleanup_success: Whether cleanup succeeded
         error: Error message if operation failed
         cleanup_warning: Warning message for transaction cleanup failures
+        executed_sql: The final write SQL actually executed (after platform overrides,
+            dialect rewrites, and placeholder replacement); used for plan capture.
     """
 
     operation_id: str
@@ -114,6 +116,7 @@ class OperationResult:
     error: Optional[str] = None
     cleanup_warning: Optional[str] = None
     skip_reason: Optional[str] = None
+    executed_sql: Optional[str] = None
 
 
 def _check_validation_query(val_query: Any, actual_rows: int, val_result: list | None = None) -> bool:
@@ -1079,6 +1082,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 cleanup_success=cleanup_success,
                 status="SUCCESS",
                 cleanup_warning=cleanup_warning,
+                executed_sql=write_sql,
             )
 
         except Exception as e:
