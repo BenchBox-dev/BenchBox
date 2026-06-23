@@ -16,7 +16,7 @@ depends on that source.
 | --- | --- | --- | --- |
 | ssb | random | ✅ `random.seed(42)` | deterministic (gated) |
 | coffeeshop | none (static seed-data files) | n/a | deterministic (gated) |
-| clickbench | random | ✅ seeded (this campaign) | deterministic (staged gate) |
+| clickbench | random | ✅ seeded (this campaign) | deterministic (gated) |
 | amplab | random | ✅ seeded | deterministic |
 | h2odb | random | ✅ seeded | deterministic |
 | tpch_skew | numpy | ⚠️ NOT by default | non-deterministic unless seeded |

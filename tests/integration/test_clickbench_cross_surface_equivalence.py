@@ -1,4 +1,4 @@
-"""Cross-surface SQL<->DataFrame equivalence for ClickBench (staged gate).
+"""Cross-surface SQL<->DataFrame equivalence for ClickBench (enforced gate).
 
 ClickBench is a single wide ``hits`` table whose queries are dominated by
 ``ORDER BY <aggregate> [DESC] LIMIT N`` with heavily tied aggregates. The

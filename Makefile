@@ -184,9 +184,9 @@ amplab-cross-surface-equivalence-report:
 coffeeshop-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark coffeeshop
 
-# Report-mode (STAGED gate): enumerate clickbench SQL<->DataFrame divergences.
-# Not a blocking CI gate yet - clickbench has open divergences to burn down (see
-# _project/analysis/clickbench-cross-surface-divergences.md) before promotion.
+# Report-mode run of the clickbench SQL<->DataFrame gate (now an enforced GATES
+# entry; the blocking check is tests/integration/test_clickbench_cross_surface_equivalence.py).
+# See _project/analysis/clickbench-cross-surface-divergences.md for the closeout.
 clickbench-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark clickbench
 

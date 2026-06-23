@@ -197,19 +197,21 @@ def test_reference_failure_records_one_cell_and_skips_candidates():
     assert "no such table" in divergences[0].detail
 
 
-def test_clickbench_is_staged_not_enforced():
-    """ClickBench is wired as a STAGED gate (report mode) but NOT an enforced GATES entry.
+def test_clickbench_is_enforced_after_remediation():
+    """ClickBench is now an enforced GATES entry (promoted from STAGED_GATES).
 
-    It still has open SQL<->DataFrame divergences (see
-    _project/analysis/clickbench-cross-surface-divergences.md), so it must stay out
-    of GATES - the oracle coverage map reads GATES to mark a benchmark "guarded",
-    and registering a red gate there would be coverage theater. `get_gate` must
-    still resolve it for report-mode runs.
+    The empty-string/null loader fix and the order-aware tie-tolerant comparator
+    closed its divergences (the remaining cells were genuine ORDER BY/LIMIT ties),
+    so it is green with an empty baseline and byte-stable - the criteria for
+    promotion. joinorder_synthetic stays staged until its 2 open divergences burn
+    down.
     """
     from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES, get_gate
 
-    assert "clickbench" in STAGED_GATES
-    assert "clickbench" not in GATES
+    assert "clickbench" in GATES
+    assert "clickbench" not in STAGED_GATES
     assert get_gate("clickbench").name == "clickbench"
+    # joinorder_synthetic remains staged (open divergences).
+    assert "joinorder_synthetic" in STAGED_GATES
     # ssb stays the enforced precedent.
     assert "ssb" in GATES

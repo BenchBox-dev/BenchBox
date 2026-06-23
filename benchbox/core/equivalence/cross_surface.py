@@ -557,6 +557,12 @@ GATES: dict[str, CrossSurfaceGate] = {
     "ssb": CrossSurfaceGate(name="ssb", build=build_ssb_duckdb),
     "amplab": CrossSurfaceGate(name="amplab", build=build_amplab_duckdb),
     "coffeeshop": CrossSurfaceGate(name="coffeeshop", build=build_coffeeshop_duckdb),
+    # Promoted from STAGED_GATES: the empty-string/null loader fix and the
+    # order-aware tie-tolerant comparator close ClickBench's divergences (its
+    # remaining cells were genuine ORDER BY/LIMIT ties, not bugs). The gate is
+    # green with an empty baseline and byte-stable run-to-run (see
+    # tests/integration/test_clickbench_cross_surface_equivalence.py).
+    "clickbench": CrossSurfaceGate(name="clickbench", build=build_clickbench_duckdb),
 }
 
 # Staged gates: the load-faithful builder is wired and runnable in report mode, but
@@ -565,7 +571,8 @@ GATES: dict[str, CrossSurfaceGate] = {
 # coverage map does not prematurely mark these benchmarks "guarded". See
 # `make <name>-cross-surface-equivalence-report` to enumerate their divergences.
 STAGED_GATES: dict[str, CrossSurfaceGate] = {
-    "clickbench": CrossSurfaceGate(name="clickbench", build=build_clickbench_duckdb),
+    # joinorder_synthetic still has 2 pre-existing pandas string-dtype divergences
+    # (4a/12a) to burn down before promotion.
     "joinorder_synthetic": CrossSurfaceGate(name="joinorder_synthetic", build=build_joinorder_synthetic_duckdb),
 }
 
