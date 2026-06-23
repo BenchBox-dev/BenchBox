@@ -176,9 +176,11 @@ open_questions:
     affects: ["w1 strength derivation"]
     default: "Compute from the provider's actual capability (presence of stored digests) so the label tracks reality without a manual edit; cross-reference bounded-correctness-gate-value-oracle."
 
-deps:
-  needs:
-    - "benchmark-correctness-oracle-coverage-map"
+# No hard deps.needs: this disclosure work is independent of the breadth campaign
+# (the generator already exists), so it must not be blocked behind
+# benchmark-correctness-oracle-coverage-map reaching DONE. Coordination with that
+# item and with cross-surface-oracle-remediation w9 is captured in prior_art /
+# deferred / anti_patterns instead.
 
 metadata:
   tags: [correctness, oracle, coverage, governance, ci, disclosure, provenance]
