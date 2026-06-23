@@ -153,6 +153,7 @@ class _ExpressionStub(ExpressionFamilyAdapter[dict, dict, str]):
         has_header: bool = True,
         column_names: list[str] | None = None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,
     ) -> dict:
         self.calls.append({"path": path, "delimiter": delimiter, "null_marker": null_marker})
         return {"rows": 0, "_columns": column_names or []}

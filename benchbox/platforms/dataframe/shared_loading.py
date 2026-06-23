@@ -8,6 +8,72 @@ from typing import Any, Protocol, runtime_checkable
 from benchbox.core.dataframe.schema_utils import column_name, iter_schema_columns
 
 
+def schema_column_types(
+    benchmark: Any,
+    table_name: str,
+    column_names: list[str] | None,
+) -> list[str | None] | None:
+    """Return the SQL types parallel to ``column_names`` from the benchmark schema.
+
+    Returns ``None`` (so the caller falls back to name-only heuristics) when the
+    benchmark, its schema, or this table's columns are unavailable. Per-column
+    entries are ``None`` when a type is unknown; only columns with a known type
+    are acted on downstream (date-vs-numeric disambiguation, declared-string
+    empty-field handling). Shared by every DataFrame family so the pandas-family
+    and expression-family (polars) CSV loaders derive identical column types.
+    """
+    if benchmark is None or not column_names:
+        return None
+    try:
+        from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
+
+        schema = get_benchmark_schema_columns(benchmark)
+    except Exception:  # noqa: BLE001 - a schema lookup must never break data loading
+        return None
+    if not schema:
+        return None
+    columns = schema.get(table_name)
+    if columns is None:
+        lowered = {key.lower(): value for key, value in schema.items()}
+        columns = lowered.get(table_name.lower())
+    if not columns:
+        return None
+    type_by_name = {column.get("name", "").lower(): column.get("type") for column in columns}
+    return [type_by_name.get(name.lower()) for name in column_names]
+
+
+def declared_string_columns(
+    names: list[str] | None,
+    column_types: list[str] | None,
+    exclude: set[str] | None = None,
+) -> list[str]:
+    """Return the columns (parallel ``names``/``column_types``) declared as text.
+
+    A column whose declared SQL type maps to the Arrow ``string`` family
+    (VARCHAR, CHAR, TEXT, ...) must be read as text and have empty CSV fields
+    preserved as ``""`` rather than coerced to null - matching the DuckDB SQL
+    reference and the Parquet load path (``strings_can_be_null=False``). This is
+    the single source of truth for the w1 empty-string contract shared by every
+    raw-CSV adapter (pandas, modin, dask, cuDF, polars); the classification reuses
+    :meth:`SchemaMapper.sql_type_to_pyarrow` so every surface agrees on what a
+    string column is. Columns in ``exclude`` (e.g. already handled as dates) are
+    skipped; returns ``[]`` when types are absent or misaligned (so the caller
+    falls back to inference, keeping behavior additive).
+    """
+    if not names or not column_types or len(column_types) != len(names):
+        return []
+    from benchbox.core.dataframe.data_loader import SchemaMapper
+
+    skip = exclude or set()
+    string_columns: list[str] = []
+    for name, sql_type in zip(names, column_types):
+        if name in skip or not sql_type:
+            continue
+        if SchemaMapper.sql_type_to_pyarrow(str(sql_type)) == "string":
+            string_columns.append(name)
+    return string_columns
+
+
 @runtime_checkable
 class LoadableAdapter(Protocol):
     """Contract required by :func:`load_tables_from_data_source_impl`.

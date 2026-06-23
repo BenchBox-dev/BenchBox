@@ -147,17 +147,9 @@ def _pandas_string_columns(
     conflict; numeric/date columns are left to pandas inference (it already
     matches the SQL surface there), so this is additive.
     """
-    if not names or not column_types or len(column_types) != len(names):
-        return []
-    from benchbox.core.dataframe.data_loader import SchemaMapper
+    from benchbox.platforms.dataframe.shared_loading import declared_string_columns
 
-    string_columns: list[str] = []
-    for name, sql_type in zip(names, column_types):
-        if name in exclude or not sql_type:
-            continue
-        if SchemaMapper.sql_type_to_pyarrow(str(sql_type)) == "string":
-            string_columns.append(name)
-    return string_columns
+    return declared_string_columns(names, column_types, exclude)
 
 
 def _coerce_date_columns(df: PandasDF, date_columns: list[str]) -> PandasDF:

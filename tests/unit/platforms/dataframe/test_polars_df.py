@@ -344,6 +344,68 @@ class TestPolarsDataLoading:
 
         assert df["id"].to_list() == [1, 2]
 
+    def test_read_csv_declared_text_column_not_inferred_numeric(self, tmp_path):
+        """A declared TEXT column with numeric-looking values stays Utf8 (w6 polars).
+
+        Mirrors the pandas contract: a leading-zero VARCHAR "007" must stay a
+        string, not be inferred Int64, so it matches the SQL surface.
+        """
+        adapter = PolarsDataFrameAdapter()
+        csv_path = tmp_path / "info.csv"
+        csv_path.write_text("id,code\n1,007\n2,042\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            column_names=["id", "code"],
+            null_marker=None,
+            column_types=["INTEGER", "VARCHAR(8)"],
+        ).collect()
+
+        assert df.schema["code"] == pl.Utf8
+        assert df["code"].to_list() == ["007", "042"]
+
+    def test_read_csv_empty_string_handling_follows_null_marker(self, tmp_path):
+        """Empty text fields stay "" when null_marker is None, NULL when "" (w6 polars).
+
+        Without this, prefer_parquet=False reintroduces the Q6/Q17/Q18 divergence
+        on the Polars surface (empty -> null drops rows from GROUP BY / nunique).
+        """
+        adapter = PolarsDataFrameAdapter()
+        csv_path = tmp_path / "t.csv"
+        csv_path.write_text("id,note\n1,\n2,hello\n")
+
+        kept = adapter.read_csv(
+            csv_path,
+            column_names=["id", "note"],
+            null_marker=None,
+            column_types=["INTEGER", "TEXT"],
+        ).collect()
+        assert kept["note"].to_list() == ["", "hello"]
+
+        nulled = adapter.read_csv(
+            csv_path,
+            column_names=["id", "note"],
+            null_marker="",
+            column_types=["INTEGER", "TEXT"],
+        ).collect()
+        assert nulled["note"].to_list() == [None, "hello"]
+
+    def test_read_csv_headerless_declared_text_preserves_empty(self, tmp_path):
+        """Headerless CSV with new_columns still applies the empty-string contract."""
+        adapter = PolarsDataFrameAdapter()
+        csv_path = tmp_path / "h.csv"
+        csv_path.write_text("1,\n2,world\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            has_header=False,
+            column_names=["id", "note"],
+            null_marker=None,
+            column_types=["INTEGER", "VARCHAR(16)"],
+        ).collect()
+
+        assert df["note"].to_list() == ["", "world"]
+
     def test_read_parquet(self, tmp_path):
         """Test reading a Parquet file."""
         adapter = PolarsDataFrameAdapter()

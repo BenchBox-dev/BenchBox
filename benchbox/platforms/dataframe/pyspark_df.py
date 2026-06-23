@@ -443,6 +443,7 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
         has_header: bool = True,
         column_names: list[str] | None = None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,  # noqa: ARG002 - accepted for signature parity; PySpark infers types
     ) -> PySparkLazyDF:
         """Read a CSV file into a PySpark DataFrame.
 
@@ -452,6 +453,9 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
             null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
+            column_types: Accepted for signature parity with the other expression-family
+                adapters; PySpark infers types so the declared-string empty-field
+                contract is not yet applied here (tracked for a follow-up).
 
         Returns:
             PySpark DataFrame with the file contents

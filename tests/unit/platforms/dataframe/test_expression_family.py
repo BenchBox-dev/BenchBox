@@ -146,6 +146,7 @@ class MockExpressionAdapter(ExpressionFamilyAdapter[dict, dict, str]):
         has_header: bool = True,
         column_names: list[str] | None = None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,
     ) -> dict:
         return {"type": "csv", "path": str(path), "delimiter": delimiter}
 

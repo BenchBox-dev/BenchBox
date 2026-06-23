@@ -162,3 +162,47 @@ class TestLoadTablesFromDataSourceImpl:
         adapter = MagicMock(spec=[])  # spec=[] prevents auto-creating platform_name
         with pytest.raises(AttributeError):
             load_tables_from_data_source_impl(adapter, MagicMock(), tmp_path)
+
+
+class TestDeclaredStringColumns:
+    """Unit tests for the shared empty-string-contract helper (w6)."""
+
+    def test_returns_only_declared_string_columns(self) -> None:
+        from benchbox.platforms.dataframe.shared_loading import declared_string_columns
+
+        names = ["id", "code", "amount", "note"]
+        types = ["INTEGER", "VARCHAR(8)", "DECIMAL(10,2)", "TEXT"]
+        assert declared_string_columns(names, types) == ["code", "note"]
+
+    def test_excludes_listed_columns(self) -> None:
+        from benchbox.platforms.dataframe.shared_loading import declared_string_columns
+
+        names = ["code", "note"]
+        types = ["VARCHAR(8)", "TEXT"]
+        assert declared_string_columns(names, types, exclude={"code"}) == ["note"]
+
+    def test_misaligned_or_missing_types_returns_empty(self) -> None:
+        from benchbox.platforms.dataframe.shared_loading import declared_string_columns
+
+        assert declared_string_columns(["a", "b"], ["VARCHAR"]) == []  # length mismatch
+        assert declared_string_columns(None, ["VARCHAR"]) == []
+        assert declared_string_columns(["a"], None) == []
+
+
+class TestSchemaColumnTypes:
+    """Unit tests for the shared schema-type resolver (w6)."""
+
+    def test_resolves_types_parallel_to_column_names(self) -> None:
+        from benchbox.platforms.dataframe.shared_loading import schema_column_types
+
+        class _Benchmark:
+            def get_schema(self):
+                return {"t": {"columns": [{"name": "code", "type": "VARCHAR(8)"}, {"name": "id", "type": "INTEGER"}]}}
+
+        assert schema_column_types(_Benchmark(), "t", ["id", "code"]) == ["INTEGER", "VARCHAR(8)"]
+
+    def test_missing_benchmark_or_columns_returns_none(self) -> None:
+        from benchbox.platforms.dataframe.shared_loading import schema_column_types
+
+        assert schema_column_types(None, "t", ["id"]) is None
+        assert schema_column_types(object(), "t", None) is None

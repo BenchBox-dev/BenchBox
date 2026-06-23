@@ -46,6 +46,7 @@ from benchbox.platforms.dataframe._result_helpers import (
     build_success_result_dict,
 )
 from benchbox.platforms.dataframe.benchmark_mixin import BenchmarkExecutionMixin
+from benchbox.platforms.dataframe.shared_loading import schema_column_types as _schema_column_types
 from benchbox.platforms.dataframe.tuning_mixin import TuningConfigurableMixin
 from benchbox.platforms.dataframe.unified_pandas_frame import UnifiedPandasFrame
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -58,38 +59,6 @@ logger = logging.getLogger(__name__)
 
 # Type variable for generic DataFrame type
 DF = TypeVar("DF")  # DataFrame type (e.g., pd.DataFrame)
-
-
-def _schema_column_types(
-    benchmark: Any,
-    table_name: str,
-    column_names: list[str] | None,
-) -> list[str | None] | None:
-    """Return the SQL types parallel to ``column_names`` from the benchmark schema.
-
-    Returns ``None`` (so the caller falls back to name-only heuristics) when the
-    benchmark, its schema, or this table's columns are unavailable. Per-column
-    entries are ``None`` when a type is unknown; only columns with a known
-    numeric type are excluded from date parsing downstream.
-    """
-    if benchmark is None or not column_names:
-        return None
-    try:
-        from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
-
-        schema = get_benchmark_schema_columns(benchmark)
-    except Exception:  # noqa: BLE001 - a schema lookup must never break data loading
-        return None
-    if not schema:
-        return None
-    columns = schema.get(table_name)
-    if columns is None:
-        lowered = {key.lower(): value for key, value in schema.items()}
-        columns = lowered.get(table_name.lower())
-    if not columns:
-        return None
-    type_by_name = {column.get("name", "").lower(): column.get("type") for column in columns}
-    return [type_by_name.get(name.lower()) for name in column_names]
 
 
 class PandasFamilyContext(DataFrameContextImpl[DF], Generic[DF]):

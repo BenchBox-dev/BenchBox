@@ -353,3 +353,115 @@ def test_order_by_result_key_refuses_unmappable_keys():
     assert resolve("SELECT a FROM t ORDER BY b") is None  # ORDER BY a non-projected column
     assert resolve("SELECT a, b FROM t ORDER BY 5") is None  # out-of-range ordinal
     assert resolve("this is not sql ;;;") is None  # unparseable
+
+
+# ---------------------------------------------------------------------------
+# Production-loader dtype observability (M4): the gate must SEE loader dtype
+# corruption (a declared VARCHAR inferred numeric) even when values still match.
+# ---------------------------------------------------------------------------
+
+
+class _FakeLoadedTable:
+    """A loaded table exposing dtypes the way each backend does.
+
+    ``polars`` style: a ``collect_schema()`` returning name->dtype. ``pandas``
+    style: a ``.dtypes`` mapping. Wrapped behind ``.native`` like the real
+    unified frames so :func:`_loaded_column_dtypes` exercises its unwrap path
+    and picks the right accessor per backend.
+    """
+
+    def __init__(self, dtypes: dict, *, polars: bool):
+        if polars:
+            self.native = type("N", (), {"collect_schema": lambda _self, d=dtypes: dict(d)})()
+        else:
+            self.native = type("N", (), {"dtypes": dict(dtypes)})()
+
+
+class _FakeContext:
+    def __init__(self, tables: dict):
+        self._tables = {name.lower(): table for name, table in tables.items()}
+
+    def get_table(self, name: str):
+        return self._tables[name.lower()]
+
+
+class _FakeBenchmark:
+    """Exposes get_schema() the way get_benchmark_schema_columns expects."""
+
+    def __init__(self, schema: dict):
+        self._schema = schema
+
+    def get_schema(self):
+        return self._schema
+
+
+def _schema(columns):
+    # get_schema() shape: {table: {"columns": [{"name","type"}, ...]}}, which
+    # extract_schema_columns normalizes to {table: [{"name","type"}, ...]}.
+    return {"t": {"columns": [{"name": name, "type": sql_type} for name, sql_type in columns]}}
+
+
+def test_dtype_family_classifies_each_backend_spelling():
+    from benchbox.core.equivalence.cross_surface import _dtype_family
+
+    assert _dtype_family("Int64") == "numeric"
+    assert _dtype_family("int64[pyarrow]") == "numeric"
+    assert _dtype_family("float64") == "numeric"
+    assert _dtype_family("String") == "string"
+    assert _dtype_family("large_string[pyarrow]") == "string"
+    assert _dtype_family("object") == "string"
+    assert _dtype_family("date32[day][pyarrow]") == "temporal"
+    assert _dtype_family("datetime64[ns]") == "temporal"
+    assert _dtype_family("bool") == "boolean"
+
+
+def test_loader_dtype_divergence_flags_string_column_inferred_numeric():
+    """A declared VARCHAR loaded as a numeric dtype is reported (the '007'->7 bug)."""
+    from benchbox.core.equivalence.cross_surface import find_loader_dtype_divergences
+
+    benchmark = _FakeBenchmark(_schema([("code", "VARCHAR(8)"), ("amount", "INTEGER")]))
+    # The loader CORRUPTED 'code': declared VARCHAR but loaded as Int64.
+    corrupted = _FakeContext({"t": _FakeLoadedTable({"code": "Int64", "amount": "Int64"}, polars=True)})
+
+    divergences = find_loader_dtype_divergences(benchmark, {"expression": corrupted}, backends=("expression",))
+
+    assert [d.key for d in divergences] == ["t.code_expression:dtype"]
+    assert "declared VARCHAR(8) loaded as Int64 (numeric)" in divergences[0].detail
+
+
+def test_loader_dtype_divergence_clean_string_column_passes():
+    """A declared VARCHAR loaded as a string dtype yields no divergence."""
+    from benchbox.core.equivalence.cross_surface import find_loader_dtype_divergences
+
+    benchmark = _FakeBenchmark(_schema([("code", "VARCHAR(8)")]))
+    clean = _FakeContext({"t": _FakeLoadedTable({"code": "object"}, polars=False)})
+
+    assert find_loader_dtype_divergences(benchmark, {"pandas": clean}, backends=("pandas",)) == []
+
+
+def test_loader_dtype_divergence_ignores_string_loaded_as_temporal():
+    """A declared string column loaded as a DATE (loader date coercion) is NOT flagged.
+
+    The loader deliberately coerces date-named VARCHAR columns (e.g. SSB d_date)
+    to a date dtype; its VALUE fidelity is checked by the cross-surface compare,
+    so the dtype observer must only flag the numeric-inference corruption M4 is
+    about - not this documented temporal coercion (regression guard for the SSB
+    d_date false positive seen in development).
+    """
+    from benchbox.core.equivalence.cross_surface import find_loader_dtype_divergences
+
+    benchmark = _FakeBenchmark(_schema([("d_date", "VARCHAR(18)")]))
+    coerced = _FakeContext({"t": _FakeLoadedTable({"d_date": "date32[day][pyarrow]"}, polars=False)})
+
+    assert find_loader_dtype_divergences(benchmark, {"pandas": coerced}, backends=("pandas",)) == []
+
+
+def test_loader_dtype_divergence_empty_schema_is_noop():
+    """A benchmark with no introspectable schema fabricates no divergence."""
+    from benchbox.core.equivalence.cross_surface import find_loader_dtype_divergences
+
+    class _NoSchema:
+        pass
+
+    ctx = _FakeContext({"t": _FakeLoadedTable({"x": "Int64"}, polars=True)})
+    assert find_loader_dtype_divergences(_NoSchema(), {"expression": ctx}, backends=("expression",)) == []

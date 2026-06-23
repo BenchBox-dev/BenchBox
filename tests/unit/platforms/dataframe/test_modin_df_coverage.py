@@ -172,3 +172,56 @@ class TestModinCoverage:
         assert info["platform"] == "Modin"
         assert info["engine"] == "ray"
         assert info["version"] == "0.30"
+
+
+class _ContractDF:
+    """Records read kwargs and supports the fillna assignment the contract uses."""
+
+    def __init__(self, columns, store):
+        self.columns = list(columns)
+        self._store = store
+
+    def __getitem__(self, key):
+        # df[present] -> a stand-in supporting .fillna(value)
+        cols = key if isinstance(key, list) else [key]
+
+        class _Sel:
+            def fillna(self, value):
+                return ("filled", cols, value)
+
+        return _Sel()
+
+    def __setitem__(self, key, value):
+        self._store["fillna"] = (key, value)
+
+
+def test_read_csv_applies_string_dtype_and_empty_string_contract(monkeypatch, tmp_path):
+    """Declared string columns get dtype=object and "" is preserved when null_marker is None (w6)."""
+    store: dict = {}
+
+    def _read_csv(path, **kwargs):  # noqa: ARG001
+        store["kwargs"] = kwargs
+        return _ContractDF(["id", "code", "note"], store)
+
+    monkeypatch.setattr(mod, "mpd", SimpleNamespace(read_csv=_read_csv))
+
+    adapter = mod.ModinDataFrameAdapter.__new__(mod.ModinDataFrameAdapter)
+    adapter.verbose = False
+    adapter.very_verbose = False
+
+    csv_path = tmp_path / "t.csv"
+    csv_path.write_text("id,code,note\n1,007,\n")
+
+    adapter.read_csv(
+        csv_path,
+        header=0,
+        names=["id", "code", "note"],
+        null_marker=None,
+        column_types=["INTEGER", "VARCHAR(8)", "TEXT"],
+    )
+    # Declared string columns are read as object so a leading-zero VARCHAR stays text.
+    assert store["kwargs"]["dtype"] == {"code": "object", "note": "object"}
+    # Empty fields restored to "" on the declared string columns (null_marker is None).
+    key, value = store["fillna"]
+    assert sorted(key) == ["code", "note"]
+    assert value == ("filled", ["code", "note"], "")

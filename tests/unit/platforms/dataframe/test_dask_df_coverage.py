@@ -368,3 +368,43 @@ def test_get_platform_info_and_error_tolerance():
     )
     info2 = adapter.get_platform_info()
     assert info2["platform"] == "Dask"
+
+
+try:
+    import dask.dataframe  # noqa: F401
+
+    DASK_AVAILABLE = True
+except Exception:  # noqa: BLE001
+    DASK_AVAILABLE = False
+
+
+@pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
+def test_read_csv_empty_string_contract_real_dask(tmp_path):
+    """Declared string columns keep "" (null_marker None) and are not inferred numeric (w6).
+
+    Exercises the real dd.read_csv: prefer_parquet=False on Dask must reproduce
+    the DuckDB SQL surface ("007" stays a string, an empty text field stays "").
+    """
+    adapter = _make_adapter()
+    csv_path = tmp_path / "t.csv"
+    csv_path.write_text("id,code,note\n1,007,\n2,042,hello\n")
+
+    kept = adapter.read_csv(
+        csv_path,
+        header=0,
+        names=["id", "code", "note"],
+        null_marker=None,
+        column_types=["INTEGER", "VARCHAR(8)", "TEXT"],
+    ).compute()
+    assert not pd.api.types.is_numeric_dtype(kept["code"])
+    assert kept["code"].tolist() == ["007", "042"]
+    assert kept["note"].tolist() == ["", "hello"]
+
+    nulled = adapter.read_csv(
+        csv_path,
+        header=0,
+        names=["id", "code", "note"],
+        null_marker="",
+        column_types=["INTEGER", "VARCHAR(8)", "TEXT"],
+    ).compute()
+    assert pd.isna(nulled["note"].iloc[0])

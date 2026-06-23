@@ -935,6 +935,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         has_header: bool = True,
         column_names: list[str] | None = None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,
     ) -> LazyDF:
         """Read a CSV file into a DataFrame.
 
@@ -944,6 +945,9 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
             null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
+            column_types: Optional SQL types parallel to ``column_names``; declared
+                string columns are read as text and empty fields preserved as ``""``
+                (the w1 empty-string contract) when ``null_marker is None``.
 
         Returns:
             LazyFrame/DataFrame with the file contents
@@ -1251,12 +1255,21 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             else:
                 null_marker = "" if format_type == "tbl" else None
 
+            # Pull this table's declared SQL types (parallel to column_names) from
+            # the benchmark schema so declared string columns keep "" for empty
+            # fields and a leading-zero VARCHAR is not inferred numeric - the same
+            # w1 contract the pandas family applies.
+            from benchbox.platforms.dataframe.shared_loading import schema_column_types
+
+            column_types = schema_column_types(benchmark, table_name, column_names)
+
             df = self._load_csv_files(
                 file_paths,
                 delimiter=effective_delimiter,
                 has_header=has_header,
                 column_names=column_names,
                 null_marker=null_marker,
+                column_types=column_types,
             )
 
         # Register table
@@ -1542,6 +1555,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         has_header: bool,
         column_names: list[str] | None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,
     ) -> LazyDF:
         """Load CSV/TBL files.
 
@@ -1551,6 +1565,9 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             has_header: Whether files have headers
             column_names: Optional column names
             null_marker: Passed through to read_csv for trailing-delimiter probing.
+            column_types: Optional SQL types parallel to ``column_names``, passed
+                through so declared string columns are read as text and empty
+                fields preserved as ``""`` (the w1 empty-string contract).
 
         Returns:
             Combined DataFrame
@@ -1562,6 +1579,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 has_header=has_header,
                 column_names=column_names,
                 null_marker=null_marker,
+                column_types=column_types,
             )
 
         # Multiple files - load and concatenate
@@ -1572,6 +1590,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 has_header=has_header,
                 column_names=column_names,
                 null_marker=null_marker,
+                column_types=column_types,
             )
             for f in file_paths
         ]

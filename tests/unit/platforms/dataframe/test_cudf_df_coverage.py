@@ -187,3 +187,50 @@ def test_platform_info_merge_groupby_pandas_conversions_and_gpu_usage(monkeypatc
         SimpleNamespace(cuda=SimpleNamespace(Device=lambda _i: (_ for _ in ()).throw(RuntimeError()))),
     )
     assert adapter.get_gpu_memory_usage() == {"free_gb": 0.0, "total_gb": 0.0, "used_gb": 0.0}
+
+
+class _ContractCuDFFrame:
+    """Records read kwargs and supports the fillna assignment the contract uses."""
+
+    def __init__(self, columns, store):
+        self.columns = list(columns)
+        self._store = store
+
+    def __getitem__(self, key):
+        cols = key if isinstance(key, list) else [key]
+
+        class _Sel:
+            def fillna(self, value):
+                return ("filled", cols, value)
+
+        return _Sel()
+
+    def __setitem__(self, key, value):
+        self._store["fillna"] = (key, value)
+
+
+def test_read_csv_applies_string_dtype_and_empty_string_contract(monkeypatch, tmp_path):
+    """Declared string columns get dtype=str and "" is preserved when null_marker is None (w6)."""
+    store: dict = {}
+
+    def _read_csv(_path, **kwargs):
+        store["kwargs"] = kwargs
+        return _ContractCuDFFrame(["id", "code", "note"], store)
+
+    monkeypatch.setattr(mod, "cudf", SimpleNamespace(read_csv=_read_csv))
+
+    adapter = _make_adapter()
+    csv_path = tmp_path / "t.csv"
+    csv_path.write_text("id,code,note\n1,007,\n")
+
+    adapter.read_csv(
+        csv_path,
+        header=0,
+        names=["id", "code", "note"],
+        null_marker=None,
+        column_types=["INTEGER", "VARCHAR(8)", "TEXT"],
+    )
+    assert store["kwargs"]["dtype"] == {"code": "str", "note": "str"}
+    key, value = store["fillna"]
+    assert sorted(key) == ["code", "note"]
+    assert value == ("filled", ["code", "note"], "")

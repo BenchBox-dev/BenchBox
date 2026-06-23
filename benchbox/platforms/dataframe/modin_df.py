@@ -126,6 +126,7 @@ from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration  # noqa:
 from benchbox.platforms.dataframe.pandas_family import (  # noqa: E402
     PandasFamilyAdapter,
 )
+from benchbox.platforms.dataframe.shared_loading import declared_string_columns  # noqa: E402
 from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -271,7 +272,7 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
         header: int | None = 0,
         names: list[str] | None = None,
         null_marker: str | None = None,
-        column_types: list[str] | None = None,  # noqa: ARG002 - accepted for signature parity; Modin infers types
+        column_types: list[str] | None = None,
     ) -> ModinDF:
         """Read a CSV file into a Modin DataFrame.
 
@@ -281,6 +282,9 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
             header: Row to use as header (None for no header)
             names: Column names (if header is None)
             null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
+            column_types: Optional SQL types parallel to ``names``; declared string
+                columns are read as text and empty fields preserved as ``""`` (the
+                w1 contract) when ``null_marker is None``, mirroring pandas.
 
         Returns:
             Modin DataFrame with the file contents
@@ -291,9 +295,15 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
             "on_bad_lines": "skip",
         }
 
+        string_columns: list[str] = []
         # Add column names if provided
         if names:
             read_kwargs["names"] = names
+            string_columns = declared_string_columns(names, column_types)
+            if string_columns:
+                # Read declared text columns as object so a leading-zero VARCHAR
+                # ("007") is not inferred numeric, matching the SQL surface.
+                read_kwargs["dtype"] = dict.fromkeys(string_columns, "object")
 
         # Trailing-delimiter probing only for TPC-style sources (null_marker is not None).
         if null_marker is not None and names and has_trailing_delimiter(path, delimiter, names):
@@ -301,6 +311,15 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
             read_kwargs["names"] = extended_names
 
         df = mpd.read_csv(path, **read_kwargs)
+
+        # Preserve "" on declared text columns when the SQL loader keeps empty
+        # fields as empty strings (null_marker is None, e.g. ClickBench): Modin/
+        # pandas read an empty field as NaN, which would diverge from the DuckDB
+        # SQL reference that emits "". Skipped when null_marker == "" (empty -> NULL).
+        if null_marker is None and string_columns:
+            present = [column for column in string_columns if column in df.columns]
+            if present:
+                df[present] = df[present].fillna("")
 
         # Drop trailing column if present
         if TRAILING_DUMMY_COLUMN in df.columns:

@@ -44,6 +44,7 @@ from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
 from benchbox.platforms.dataframe.expression_family import (
     ExpressionFamilyAdapter,
 )
+from benchbox.platforms.dataframe.shared_loading import declared_string_columns
 
 logger = logging.getLogger(__name__)
 
@@ -257,6 +258,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         has_header: bool = True,
         column_names: list[str] | None = None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,
     ) -> PolarsLazyDF:
         """Read a CSV file into a Polars LazyFrame.
 
@@ -265,7 +267,11 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             delimiter: Field delimiter
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
-            null_marker: Unused for Polars (truncate_ragged_lines handles trailing delimiters natively).
+            null_marker: When ``""`` an empty field is NULL (e.g. JoinOrder); when
+                ``None`` an empty declared-string field is preserved as ``""`` (the
+                w1 contract, e.g. ClickBench), matching the DuckDB SQL reference.
+            column_types: Optional SQL types parallel to ``column_names`` used to
+                identify declared string columns for the empty-string contract.
 
         Returns:
             Polars LazyFrame with the file contents
@@ -287,8 +293,25 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         if column_names:
             scan_kwargs["new_columns"] = column_names
 
+        # Force declared string columns to Utf8 so a leading-zero VARCHAR ("007")
+        # is not inferred numeric. schema_overrides keys must match the columns as
+        # they appear in the file BEFORE new_columns renaming, so key by position
+        # via the file's own header/index when a header is present; otherwise the
+        # override keys are the provided names (which are also the scan's names).
+        string_columns = declared_string_columns(column_names, column_types)
+        if string_columns:
+            scan_kwargs["schema_overrides"] = dict.fromkeys(string_columns, pl.Utf8)
+
         # Scan the file(s)
         lf = pl.scan_csv(path, **scan_kwargs)
+
+        # Preserve "" on declared text columns when the SQL loader keeps empty
+        # fields as empty strings (null_marker is None, e.g. ClickBench): Polars
+        # reads an empty field as null, which would diverge from the DuckDB SQL
+        # reference that emits "". Skipped when null_marker == "" (empty -> NULL,
+        # e.g. JoinOrder), preserving that surface's NULLs.
+        if null_marker is None and string_columns:
+            lf = lf.with_columns([pl.col(column).fill_null("") for column in string_columns])
 
         return lf
 

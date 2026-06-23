@@ -500,6 +500,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         has_header: bool = True,
         column_names: list[str] | None = None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,  # noqa: ARG002 - accepted for signature parity; DataFusion infers types
     ) -> DataFusionLazyDF:
         """Read a CSV file into a DataFusion DataFrame.
 
@@ -511,6 +512,9 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
             null_marker: Unused for DataFusion — TPC-style trailing delimiters are handled
                 via detect_data_format() which routes .tbl/.dat files through
                 _read_tbl_via_datafusion / _read_tbl_via_pyarrow above.
+            column_types: Accepted for signature parity with the other expression-family
+                adapters; DataFusion infers types so the declared-string empty-field
+                contract is not yet applied here (tracked for a follow-up).
 
         Returns:
             DataFusion DataFrame with the file contents

@@ -455,6 +455,127 @@ def build_production_contexts(
     return contexts
 
 
+def _dtype_family(dtype: Any) -> str:
+    """Classify a loaded DataFrame column dtype into a coarse family.
+
+    Maps a Polars or Pandas/Arrow dtype to one of ``"string"``, ``"numeric"``,
+    ``"temporal"``, ``"boolean"`` or ``"other"`` so a loaded column's family can
+    be compared to the family the benchmark's DECLARED SQL type implies. This is
+    deliberately coarse: the gate only needs to catch a *family* corruption (a
+    declared VARCHAR materialized as an integer because a leading-zero string was
+    inferred numeric), not an exact width/precision difference.
+    """
+    text = str(dtype).lower()
+    # Order matters: check temporal/bool before the numeric substring test, and
+    # the string test last so a "string" anywhere wins only when nothing numeric
+    # matched (e.g. Arrow "large_string", Polars "String", pandas "object").
+    if any(token in text for token in ("date", "time", "timestamp", "duration")):
+        return "temporal"
+    if "bool" in text:
+        return "boolean"
+    if any(token in text for token in ("int", "float", "double", "decimal", "number", "numeric")):
+        return "numeric"
+    if any(token in text for token in ("str", "utf8", "object", "categor")):
+        return "string"
+    return "other"
+
+
+def _loaded_column_dtypes(table: Any) -> dict[str, Any]:
+    """Return ``{column_name: dtype}`` for a production-loaded table.
+
+    Handles every backend the gate loads: a unified wrapper (unwrapped via
+    ``.native``), a Polars lazy/eager frame (``collect_schema``/``schema``), and a
+    Pandas-family frame (``.dtypes``). Returns ``{}`` for an unintrospectable
+    object so a dtype check is simply skipped rather than crashing the gate.
+    """
+    native = getattr(table, "native", table)
+    # Polars LazyFrame: schema without materializing rows.
+    collect_schema = getattr(native, "collect_schema", None)
+    if callable(collect_schema):
+        return dict(collect_schema())
+    schema = getattr(native, "schema", None)
+    if schema is not None and hasattr(schema, "items"):
+        return dict(schema)
+    dtypes = getattr(native, "dtypes", None)
+    if dtypes is not None and hasattr(dtypes, "items"):
+        return {str(name): dtype for name, dtype in dtypes.items()}
+    return {}
+
+
+def find_loader_dtype_divergences(
+    benchmark: Any,
+    contexts: dict[str, Any],
+    *,
+    backends: tuple[str, ...] = DATAFRAME_BACKENDS,
+) -> list[SurfaceDivergence]:
+    """Observe production-loader dtype fidelity for each gated backend.
+
+    The value comparison in :func:`find_cross_surface_divergences` already runs
+    through the REAL production loader (:func:`build_production_contexts` ->
+    ``adapter.load_benchmark_into_context``), so loader corruption that *changes a
+    value* is already caught. This adds the missing DTYPE-level observability the
+    M4 review flagged: a column DECLARED as a string/VARCHAR/TEXT on the SQL
+    surface must NOT be silently inferred NUMERIC by the production load path -
+    the leading-zero ``"007"`` -> ``7`` corruption (and the related empty-field
+    inference that drops a column to a float/null numeric). For every loaded
+    table, each declared-string column whose loaded dtype family is ``"numeric"``
+    is reported as a divergence keyed ``<table>.<column>_<backend>:dtype`` so the
+    gate goes RED on loader dtype corruption even when the surviving values happen
+    to still compare equal.
+
+    A declared-string column loaded as a TEMPORAL dtype is deliberately NOT
+    flagged: that is the loader's documented date/timestamp coercion for
+    date-named columns (e.g. SSB's ``d_date``), a separate behavior whose VALUE
+    fidelity the cross-surface comparison already checks - not the numeric
+    inference M4 is about. ``boolean``/``other``/``string`` are likewise left to
+    the value comparison.
+
+    Returns an empty list when the benchmark exposes no introspectable schema
+    (the check is additive and never fabricates a divergence from missing data).
+    """
+    from benchbox.core.dataframe.data_loader import SchemaMapper
+    from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
+
+    schema = get_benchmark_schema_columns(benchmark)
+    if not schema:
+        return []
+
+    divergences: list[SurfaceDivergence] = []
+    for backend in backends:
+        context = contexts.get(backend)
+        if context is None:
+            continue
+        for table_name, columns in schema.items():
+            declared_string = {
+                str(column.get("name")): column.get("type")
+                for column in columns
+                if column.get("name") and SchemaMapper.sql_type_to_pyarrow(str(column.get("type") or "")) == "string"
+            }
+            if not declared_string:
+                continue
+            try:
+                table = context.get_table(table_name)
+            except Exception:  # noqa: BLE001 - a table the gate does not load is not a dtype defect
+                continue
+            loaded = _loaded_column_dtypes(table)
+            lowered = {name.lower(): dtype for name, dtype in loaded.items()}
+            for column, sql_type in declared_string.items():
+                dtype = loaded.get(column, lowered.get(column.lower()))
+                if dtype is None:
+                    continue
+                family = _dtype_family(dtype)
+                if family == "numeric":
+                    divergences.append(
+                        SurfaceDivergence(
+                            f"{table_name}.{column}",
+                            f"{backend}:dtype",
+                            f"declared {sql_type} loaded as {dtype} (numeric); production loader "
+                            f"inferred a string column numeric (e.g. leading-zero VARCHAR '007' -> 7)",
+                        )
+                    )
+    return divergences
+
+
 def _load_duckdb_cell(benchmark: Any, output_dir: Path, table_names: Sequence[str], *, label: str) -> Any:
     """Create an in-memory DuckDB, build the schema, load the data, and verify it.
 
@@ -845,6 +966,12 @@ def run_gate(gate: CrossSurfaceGate) -> int:
                 backends=gate.backends,
                 reference_row_counts=reference_row_counts,
             )
+            # Production-loader dtype observability (M4): assert each declared
+            # string column survived the REAL CSV->parquet->read loader as a
+            # string family, so a leading-zero VARCHAR inferred numeric (or an
+            # all-empty TEXT column dropped to a null/float column) makes the gate
+            # RED even if the surviving values still compared equal above.
+            divergences += find_loader_dtype_divergences(data.benchmark, contexts, backends=gate.backends)
             coverage = count_executed_cells(data.query_ids, data.dataframe_query, gate.backends)
             # Count vacuous CELLS exactly (one per backend a vacuous query
             # actually implements), not an estimate: a future gate may implement
