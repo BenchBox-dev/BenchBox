@@ -973,6 +973,8 @@ class ResultBuilder:
                 result_dict["plan_fingerprint"] = result.plan_fingerprint
             if result.plan_capture_time_ms is not None:
                 result_dict["plan_capture_time_ms"] = result.plan_capture_time_ms
+            if result.result_digest is not None:
+                result_dict["result_digest"] = result.result_digest
 
             results.append(result_dict)
 

@@ -104,6 +104,7 @@ def _normalize_query_result(qr: Any) -> dict[str, Any]:
         "query_plan",
         "plan_fingerprint",
         "dataframe_skip_summary",
+        "result_digest",
     ):
         if hasattr(qr, attr):
             val = getattr(qr, attr)
@@ -363,6 +364,15 @@ def _build_query_results_section(
         entry["stream"] = stream_id
         entry["run_type"] = run_type
         entry["status"] = status
+        # Gate-only value-digest oracle (BENCHBOX_EMIT_RESULT_DIGEST): present only
+        # when the runner emitted a full-result digest, so a normal run's payload
+        # shape is unchanged. Explicit None checks (not `or`) so a digest is never
+        # dropped by a falsy value.
+        result_digest = qr.get("result_digest")
+        if result_digest is None:
+            result_digest = qr.get("digest")
+        if result_digest is not None:
+            entry["digest"] = result_digest
         if qr.get("dataframe_skip_summary"):
             entry["dataframe_skip_summary"] = qr["dataframe_skip_summary"]
 

@@ -15,6 +15,35 @@ import math
 from typing import Any, Optional, Union
 
 
+def calculate_checksum(results: list[tuple[Any, ...]]) -> str:
+    """Calculate an order-normalized MD5 digest of a single result set.
+
+    This is the canonical single-result digest primitive for BenchBox. Rows are
+    sorted before hashing so unordered queries hash stably, and each cell is
+    rendered with ``str`` (``None`` -> ``"NULL"``). It backs both the TPC-Havoc
+    equivalence comparators (:meth:`ResultValidator.validate_results_checksum`)
+    and the bounded correctness gate's value-digest oracle, so SQL results and
+    the gate share exactly one digest definition.
+
+    Callers that need cross-build numeric stability (e.g. the gate, which stores
+    a reference digest) should normalize numeric precision *before* calling this
+    (see :func:`benchbox.core.results.result_digest.compute_result_digest`).
+
+    Args:
+        results: Result set as a list of row tuples.
+
+    Returns:
+        Hex-encoded MD5 digest string.
+    """
+    # Convert results to a consistent string representation
+    result_str = ""
+    for row in sorted(results):
+        row_str = "|".join(str(val) if val is not None else "NULL" for val in row)
+        result_str += row_str + "\n"
+
+    return hashlib.md5(result_str.encode("utf-8")).hexdigest()
+
+
 class ValidationError(Exception):
     """Exception raised when query variant validation fails."""
 
@@ -371,14 +400,12 @@ class ResultValidator:
             return abs(val1 - val2) < self.tolerance
 
     def _calculate_checksum(self, results: list[tuple[Any, ...]]) -> str:
-        """Calculate MD5 checksum of result set."""
-        # Convert results to a consistent string representation
-        result_str = ""
-        for row in sorted(results):
-            row_str = "|".join(str(val) if val is not None else "NULL" for val in row)
-            result_str += row_str + "\n"
+        """Calculate MD5 checksum of result set.
 
-        return hashlib.md5(result_str.encode("utf-8")).hexdigest()
+        Thin instance wrapper over the promoted module-level
+        :func:`calculate_checksum`; kept for API stability of existing callers.
+        """
+        return calculate_checksum(results)
 
     def validate_query1_results(
         self,

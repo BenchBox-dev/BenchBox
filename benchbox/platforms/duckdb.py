@@ -990,6 +990,18 @@ class DuckDBAdapter(PlatformAdapter):
                         f"(expected: {validation_result.expected_row_count})"
                     )
 
+            # Gate-only value oracle: compute a digest of the FULL result set here,
+            # where the rows are materialized (the power-test seam only sees
+            # first_row + count). Behind BENCHBOX_EMIT_RESULT_DIGEST and stream 0 (the
+            # only stream with a stored reference digest), so a normal run is unchanged.
+            from benchbox.core.results.result_digest import compute_result_digest, result_digest_enabled
+
+            result_digest = (
+                compute_result_digest(rows)
+                if result_digest_enabled() and stream_id in (None, 0)
+                else None
+            )
+
             # Use centralized helper to build result with consistent validation field mapping
             result = self._build_query_result_with_validation(
                 query_id=query_id,
@@ -997,6 +1009,7 @@ class DuckDBAdapter(PlatformAdapter):
                 actual_row_count=actual_row_count,
                 first_row=rows[0] if rows else None,
                 validation_result=validation_result,
+                result_digest=result_digest,
             )
 
             # Capture and merge structured query plan (SUCCESS-guarded in the helper)

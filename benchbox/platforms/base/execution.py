@@ -73,6 +73,11 @@ def _power_query_result(
         "iteration": iteration,
         "run_type": run_type,
     }
+    # Gate-only value-digest oracle: forward the full-result digest when the power
+    # driver emitted one (behind BENCHBOX_EMIT_RESULT_DIGEST). Additive — absent on
+    # a normal run, so the payload shape is unchanged.
+    if query_result.get("result_digest") is not None:
+        platform_result["result_digest"] = query_result["result_digest"]
     if not query_result["success"]:
         platform_result["error"] = query_result.get("error", "Unknown error")
     return platform_result
