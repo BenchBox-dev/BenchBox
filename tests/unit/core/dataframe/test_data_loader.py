@@ -126,6 +126,48 @@ class TestFormatConverter:
             assert row_count == 2
             assert parquet_path.exists()
 
+    def test_null_marker_none_preserves_empty_strings(self):
+        """null_marker=None keeps empty string fields as '' (e.g. ClickBench).
+
+        Pins the empty-vs-NULL contract on the production parquet load path so
+        the DataFrame surface agrees with the SQL reference (DuckDB nullstr),
+        instead of silently turning '' into NULL (which changes COUNT(DISTINCT)
+        and GROUP BY membership).
+        """
+        import pyarrow.parquet as pq
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            csv_path = tmpdir / "phrases.csv"
+            # Row 2 has an empty string in the declared-string column "phrase".
+            csv_path.write_text("id,phrase\n1,hello\n2,\n3,world\n")
+            column_types = {"id": "int64", "phrase": "string"}
+
+            preserve = tmpdir / "preserve.parquet"
+            status, _ = FormatConverter.convert_csv_to_parquet(
+                source_path=csv_path,
+                target_path=preserve,
+                delimiter=",",
+                column_types=column_types,
+                null_marker=None,
+            )
+            assert status == ConversionStatus.SUCCESS
+            phrases = pq.read_table(preserve).column("phrase").to_pylist()
+            assert phrases == ["hello", "", "world"], phrases
+            assert None not in phrases
+
+            # The default contract (null_marker="") still maps empty -> NULL.
+            as_null = tmpdir / "as_null.parquet"
+            FormatConverter.convert_csv_to_parquet(
+                source_path=csv_path,
+                target_path=as_null,
+                delimiter=",",
+                column_types=column_types,
+                null_marker="",
+            )
+            null_phrases = pq.read_table(as_null).column("phrase").to_pylist()
+            assert null_phrases == ["hello", None, "world"], null_phrases
+
     def test_convert_tbl_file(self):
         """Test TBL file conversion with pipe delimiter."""
         with tempfile.TemporaryDirectory() as tmpdir:

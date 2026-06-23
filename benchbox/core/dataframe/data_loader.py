@@ -73,7 +73,9 @@ DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
 # Bump when schema/type-conversion rules change so stale cached Parquet is not
 # silently reused on rerun. v3: TIME columns now load as strings (previously an
 # all-null Time column), so pre-v3 caches must be regenerated to pick up values.
-DATAFRAME_CACHE_VERSION = "v3"
+# v4: string columns honor the benchmark's csv_null_marker (e.g. ClickBench
+# empty fields now stay '' instead of NULL), so pre-v4 caches must regenerate.
+DATAFRAME_CACHE_VERSION = "v4"
 
 # Format subdirectory names that belong to the DataFrame cache layer.
 # Used by clear_cache() to selectively remove cached conversions without
@@ -278,6 +280,7 @@ class FormatConverter:
         compression: str = "zstd",
         write_config: DataFrameWriteConfiguration | None = None,
         column_types: dict[str, str] | None = None,
+        null_marker: str | None = "",
     ) -> tuple[ConversionStatus, int]:
         """Convert CSV/TBL file to Parquet format.
 
@@ -295,6 +298,12 @@ class FormatConverter:
                 strings (e.g. {"l_shipdate": "date32"}) for explicit typing.
                 Without this, PyArrow infers types and date columns may be
                 read as strings.
+            null_marker: CSV null-conversion contract for string columns,
+                mirroring the SQL load path's ``nullstr`` (see
+                ``resolve_csv_dialect``). ``""`` (the default) means an empty
+                field is NULL — the historical behavior. ``None`` means empty
+                fields stay empty strings (e.g. ClickBench, whose SQL reference
+                preserves ''); a non-empty marker maps only that token to NULL.
 
         Returns:
             Tuple of (conversion status, row count)
@@ -324,11 +333,24 @@ class FormatConverter:
             parse_options = pv.ParseOptions(delimiter=delimiter)
             arrow_column_types = FormatConverter._resolve_arrow_types(column_types)
 
-            convert_options = pv.ConvertOptions(
-                auto_dict_encode=True,
-                strings_can_be_null=True,
-                column_types=arrow_column_types,
-            )
+            # Mirror the SQL load path's nullstr contract for STRING columns so
+            # the DataFrame surface and the DuckDB SQL reference agree on empty
+            # vs NULL. null_marker="" => empty is NULL (default null_values
+            # already contains ""); None => string empties stay '' (e.g.
+            # ClickBench); a sentinel => only that token is NULL. Numeric columns
+            # are unaffected by strings_can_be_null and still null on empty.
+            convert_kwargs: dict[str, Any] = {
+                "auto_dict_encode": True,
+                "column_types": arrow_column_types,
+            }
+            if null_marker is None:
+                convert_kwargs["strings_can_be_null"] = False
+            elif null_marker == "":
+                convert_kwargs["strings_can_be_null"] = True
+            else:
+                convert_kwargs["strings_can_be_null"] = True
+                convert_kwargs["null_values"] = [null_marker]
+            convert_options = pv.ConvertOptions(**convert_kwargs)
 
             logger.debug(f"Reading {source_path}")
             table = FormatConverter._read_csv_source(source_path, read_options, parse_options, convert_options, pv)
@@ -1141,6 +1163,10 @@ class DataFrameDataLoader:
         table_metadata: dict[str, dict[str, Any]] = {}
 
         benchmark_delimiter = getattr(benchmark, "csv_delimiter", None)
+        # Absent attribute => "" (empty field is NULL), preserving historical
+        # behavior. A benchmark whose SQL reference preserves empty strings
+        # (e.g. ClickBench) declares csv_null_marker=None explicitly.
+        benchmark_null_marker = getattr(benchmark, "csv_null_marker", "")
 
         for table_name, source_path in source_files.items():
             source_list = source_path if isinstance(source_path, list) else [source_path]
@@ -1149,7 +1175,14 @@ class DataFrameDataLoader:
             table_write_config = self._get_table_write_config(write_config, table_name, column_names)
 
             converted_list, table_entries = self._convert_table_files(
-                table_name, source_list, column_names, column_types, table_write_config, benchmark_delimiter, cache_path
+                table_name,
+                source_list,
+                column_names,
+                column_types,
+                table_write_config,
+                benchmark_delimiter,
+                cache_path,
+                benchmark_null_marker,
             )
 
             if len(converted_list) == 1:
@@ -1194,6 +1227,7 @@ class DataFrameDataLoader:
         table_write_config: DataFrameWriteConfiguration | None,
         benchmark_delimiter: str | None,
         cache_path: Path,
+        benchmark_null_marker: str | None = "",
     ) -> tuple[list[Path], list[dict[str, Any]]]:
         """Convert a single table's source files to Parquet."""
         converted_list: list[Path] = []
@@ -1220,6 +1254,7 @@ class DataFrameDataLoader:
                 delimiter=delimiter,
                 write_config=table_write_config,
                 column_types=column_types,
+                null_marker=benchmark_null_marker,
             )
 
             if status == ConversionStatus.SUCCESS:

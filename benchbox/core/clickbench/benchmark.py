@@ -206,6 +206,18 @@ class ClickBenchBenchmark(GeneratorOutputDirMixin, SimpleBenchmarkMixin, DataGen
         """ClickBench uses pipe-delimited CSV files."""
         return "|"
 
+    @property
+    def csv_null_marker(self) -> None:
+        """ClickBench preserves empty strings rather than mapping them to NULL.
+
+        The schema declares fields NOT NULL and queries filter with ``<> ''``,
+        so an empty field must load as '' on every surface. The SQL path already
+        enforces this (DDL nullstr='__NULL__'); returning None makes the
+        DataFrame loader keep empty strings too, instead of the default
+        empty-field-is-NULL behavior. See get_csv_loading_config below.
+        """
+        return None
+
     def get_csv_loading_config(self, table_name: str) -> list[str]:
         """Get CSV loading configuration for ClickBench tables.
 

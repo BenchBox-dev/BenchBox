@@ -316,6 +316,16 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
         df = pd.read_csv(path, **read_kwargs)
         df = _coerce_date_columns(df, date_columns)
 
+        # Honor the CSV null contract for string columns. When null_marker is
+        # None the SQL reference keeps empty fields as '' (e.g. ClickBench),
+        # but pandas' default na handling turns them into NaN — which silently
+        # changes COUNT(DISTINCT) and groupby membership. Restore '' on string
+        # (object) columns only; numeric/date columns keep their NaN/NaT.
+        if null_marker is None:
+            object_columns = df.select_dtypes(include=["object"]).columns
+            if len(object_columns):
+                df[object_columns] = df[object_columns].fillna("")
+
         # Drop trailing column if present
         if TRAILING_DUMMY_COLUMN in df.columns:
             df = df.drop(columns=[TRAILING_DUMMY_COLUMN])

@@ -153,6 +153,27 @@ class TestPandasDataLoading:
 
         assert list(df.columns) == ["id", "name", "amount"]
 
+    def test_read_csv_null_marker_none_keeps_empty_strings(self, tmp_path):
+        """null_marker=None keeps empty string fields as '' on the CSV load path.
+
+        Mirrors the SQL nullstr contract (e.g. ClickBench): an empty field in a
+        string column must stay '' rather than becoming NaN, which would change
+        COUNT(DISTINCT) and groupby membership.
+        """
+        adapter = PandasDataFrameAdapter()
+        csv_path = tmp_path / "phrases.csv"
+        # Two columns so the middle row's empty "phrase" is a field, not a
+        # blank line (which pandas would skip).
+        csv_path.write_text("1,hello\n2,\n3,world\n")
+
+        kept = adapter.read_csv(csv_path, header=None, names=["id", "phrase"], null_marker=None)
+        assert kept["phrase"].tolist() == ["hello", "", "world"]
+        assert kept["phrase"].isna().sum() == 0
+
+        # Default contract still treats an empty field as NaN.
+        as_nan = adapter.read_csv(csv_path, header=None, names=["id", "phrase"], null_marker="")
+        assert as_nan["phrase"].isna().sum() == 1
+
     def test_read_csv_with_column_names_parses_dates(self, tmp_path):
         """Explicit-schema raw CSV loads parse date columns without date surrogate keys."""
         adapter = PandasDataFrameAdapter()
