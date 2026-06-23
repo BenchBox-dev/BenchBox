@@ -57,6 +57,7 @@ except ImportError:
     PANDAS_AVAILABLE = False
 
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
+from benchbox.platforms.dataframe.pandas_df import _pandas_string_columns
 from benchbox.platforms.dataframe.pandas_family import (
     PandasFamilyAdapter,
 )
@@ -400,7 +401,7 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         header: int | None = 0,
         names: list[str] | None = None,
         null_marker: str | None = None,
-        column_types: list[str] | None = None,  # noqa: ARG002 - accepted for signature parity; Dask infers types
+        column_types: list[str] | None = None,
     ) -> DaskDF:
         """Read a CSV file into a Dask DataFrame.
 
@@ -428,8 +429,16 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             read_kwargs["header"] = None
 
         # Add column names if provided
+        string_columns: list[str] = []
         if names:
             read_kwargs["names"] = names
+            # Read declared text columns as object so a numeric-looking string is
+            # not inferred as a number, and (below) restore '' for empty fields -
+            # mirroring the pandas adapter so the empty-string contract holds on the
+            # raw-CSV path too (see _pandas_string_columns).
+            string_columns = _pandas_string_columns(names, column_types, set())
+            if string_columns:
+                read_kwargs["dtype"] = dict.fromkeys(string_columns, "object")
 
         # Trailing-delimiter probing only for TPC-style sources (null_marker is not None).
         if null_marker is not None and names and has_trailing_delimiter(path, delimiter, names):
@@ -437,6 +446,16 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             read_kwargs["names"] = extended_names
 
         df = dd.read_csv(path, **read_kwargs)
+
+        # Match the SQL dialect's empty-field semantics (null_marker None -> keep '';
+        # '' -> NULL), as the pandas adapter does, so an empty text field does not
+        # surface as None where the SQL reference emits ''.
+        if null_marker is None and string_columns:
+            for column in string_columns:
+                if column in df.columns:
+                    # Per-column (not df[list]=...) so it works across dask/modin/cudf,
+                    # whose multi-column assignment support differs from pandas.
+                    df[column] = df[column].fillna("")
 
         # Drop trailing column if present (lazy operation)
         if TRAILING_DUMMY_COLUMN in df.columns:

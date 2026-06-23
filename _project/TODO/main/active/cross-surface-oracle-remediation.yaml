@@ -331,10 +331,21 @@ work:
       (59 cases). Verified: dataframe + joinorder unit suites (1298 passed),
       joinorder_synthetic and ssb cross-surface gates green (0 divergent),
       tpchavoc-equivalence-report unchanged (220 equivalent).
-      STILL OPEN (do not close w6): the production-loader-path gate cell (M4
-      loader bypass), the remaining raw-CSV adapter empty-string contract
-      (Polars/modin/dask/cudf scan_csv), applying declared STRING dtypes on the
-      production load path, and closing the joinorder_synthetic deferral. The
+      ADAPTER EMPTY-STRING CONTRACT DONE (raw-CSV path): carried the dialect-aware
+      empty-string->'' contract from the pandas adapter to the other DataFrame
+      adapters' read_csv. Polars now passes missing_utf8_is_empty_string=(null_marker
+      is None) to scan_csv; modin/dask/cudf now read declared text columns as object
+      and restore '' for empty fields when null_marker is None (NULL when ''),
+      reusing _pandas_string_columns. So a prefer_parquet=False (or CSV-recommending)
+      load no longer reintroduces the empty-string->null divergence (Q6/Q17/Q18) on
+      those surfaces. Verified: polars read_csv unit test (both dialect cases),
+      adapter coverage suites (139 passed), no import cycle, ssb gate still green.
+      modin/cudf are not installed in this env so their read_csv was not runtime-
+      exercised, but the change is the same pattern proven on the pandas adapter.
+      STILL OPEN (do not close w6): the production-loader-path DTYPE-asserting gate
+      cell (M4 - the gate already compares values through the loader and caught the
+      TEXT/TIMESTAMP bugs, so this is additive), applying declared STRING dtypes on
+      the production load path, and closing the joinorder_synthetic deferral. The
       loader PYARROW/polars/pandas type-map gaps (L2) were done in #857.
     notes: |
       The gate's loader bypass (dataframe_surface.py:74-125 materializes from typed
