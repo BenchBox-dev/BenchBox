@@ -869,6 +869,62 @@ class TestDuckDBAdapter:
         assert isinstance(result["execution_time_seconds"], float)
 
     @patch("benchbox.platforms.duckdb.duckdb")
+    def test_show_plans_displays_without_capture(self, mock_duckdb):
+        """--show-plans is decoupled from --capture-plans.
+
+        With show_query_plans=True and capture_plans=False the plan is displayed
+        to the console but NOT captured into the result bundle, exercising the
+        flag decoupling (run.py no longer ties show_query_plans to capture_plans).
+        """
+        mock_connection = Mock()
+        mock_result = Mock()
+        mock_result.fetchall.return_value = [(1,)]
+        mock_connection.execute.return_value = mock_result
+        mock_duckdb.connect.return_value = mock_connection
+
+        adapter = DuckDBAdapter(show_query_plans=True, capture_plans=False)
+
+        with (
+            patch.object(adapter, "display_query_plan_if_enabled") as mock_display,
+            patch.object(adapter, "capture_query_plan") as mock_capture,
+        ):
+            result = adapter.execute_query(mock_connection, "SELECT 1", "q1")
+
+        assert result["status"] == "SUCCESS"
+        # Display fires for show_query_plans=True, capture_plans=False.
+        mock_display.assert_called_once()
+        # Capture must not run when capture_plans is False.
+        mock_capture.assert_not_called()
+
+    @patch("benchbox.platforms.duckdb.duckdb")
+    def test_capture_no_display_suppresses_plan_display(self, mock_duckdb):
+        """--capture-plans suppresses console display to avoid a double EXPLAIN.
+
+        With capture_plans=True and show_query_plans=False the plan is captured
+        into the result bundle but the display call is suppressed (the guard in
+        execute_query), so get_query_plan/EXPLAIN runs once, not twice.
+        """
+        mock_connection = Mock()
+        mock_result = Mock()
+        mock_result.fetchall.return_value = [(1,)]
+        mock_connection.execute.return_value = mock_result
+        mock_duckdb.connect.return_value = mock_connection
+
+        adapter = DuckDBAdapter(show_query_plans=False, capture_plans=True)
+
+        with (
+            patch.object(adapter, "display_query_plan_if_enabled") as mock_display,
+            patch.object(adapter, "capture_query_plan", return_value=(None, 0.0)) as mock_capture,
+        ):
+            result = adapter.execute_query(mock_connection, "SELECT 1", "q1")
+
+        assert result["status"] == "SUCCESS"
+        # Display suppressed while capturing (prevents the double-EXPLAIN path).
+        mock_display.assert_not_called()
+        # Capture runs exactly once.
+        mock_capture.assert_called_once()
+
+    @patch("benchbox.platforms.duckdb.duckdb")
     def test_get_query_plan(self, mock_duckdb):
         """Test query plan retrieval via EXPLAIN (ANALYZE, FORMAT JSON) / EXPLAIN (FORMAT JSON)."""
         mock_connection = Mock()
