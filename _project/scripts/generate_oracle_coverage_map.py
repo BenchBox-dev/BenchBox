@@ -54,6 +54,24 @@ STRENGTH_CARDINALITY = "cardinality-only"  # row counts only (expected-results w
 STRENGTH_VALUE_AND_CARDINALITY = "value+cardinality"  # row counts AND stored value digests
 STRENGTH_NONE = "—"
 
+# Oracle REFERENCE-INDEPENDENCE: whether a guarded cell compares against a reference
+# INDEPENDENT of the system under test, or against ITSELF. This is ORTHOGONAL to
+# Strength (a value-level oracle can be independent or self-referential), so it is a
+# SEPARATE column, never folded into Strength. Derived from the oracle KIND + the
+# digest provenance, never hand-labelled per benchmark:
+#   * cross-surface / variant gates: the SQL surface is the reference for its OWN
+#     DataFrame/variant surface (shared spec), so the comparison is self-referential
+#     -- it catches transcription bugs between surfaces, not conceptual value bugs.
+#   * expected-results VALUE digests (tpch): a frozen benchbox-on-DuckDB snapshot, so
+#     the value axis is self-referential (a regression snapshot, not an authority).
+#   * expected-results ROW COUNTS (tpch/tpcds cardinality): the cardinalities come
+#     from the published TPC answer sets, an authority outside benchbox -- but only
+#     the row COUNT is checked, not the values, so this is SEMI-independent, not full.
+INDEPENDENCE_INDEPENDENT = "independent"  # reference is an external authority (full values)
+INDEPENDENCE_SEMI = "semi-independent"  # external authority on cardinality only (TPC answer-set row counts)
+INDEPENDENCE_SELF = "self-referential"  # compared against itself (shared spec / frozen self-snapshot)
+INDEPENDENCE_NONE = "—"
+
 # Sentinel for "no scale guarantee" (UNGUARDED rows).
 SCALE_NONE = "—"
 
@@ -161,6 +179,35 @@ def oracle_strength_and_scale(primary: str, benchmark_id: str) -> tuple[str, str
     return STRENGTH_NONE, SCALE_NONE
 
 
+def oracle_reference_independence(primary: str, strength: str) -> str:
+    """Return the reference-independence axis for a benchmark's primary oracle.
+
+    Orthogonal to Strength and derived from the oracle KIND + the strength signal
+    (which already encodes whether stored VALUE digests exist), so it tracks the
+    classifier without a new hand-maintained field:
+
+      * cross-surface / variant gates -> self-referential (SQL surface is the
+        reference for its own DataFrame/variant surface; shared spec).
+      * expected-results with value+cardinality (tpch) -> self-referential: the value
+        digest is a frozen benchbox-on-DuckDB snapshot (a regression snapshot, not an
+        authority). The strength signal flips this label (drop the stored digests and
+        it falls back to the semi-independent row-count case), so it is derived.
+      * expected-results cardinality-only (tpcds) -> semi-independent: row counts come
+        from the published TPC answer sets (an authority outside benchbox), but only
+        the cardinality is checked, never the values.
+    """
+    if primary in (ORACLE_VARIANT_EQUIVALENCE, ORACLE_CROSS_SURFACE_VARIANT, ORACLE_CROSS_SURFACE):
+        return INDEPENDENCE_SELF
+    if primary == ORACLE_EXPECTED_RESULTS:
+        # A stored value digest is a frozen self-snapshot, so the (stronger) value
+        # claim is self-referential; without it only the answer-set cardinality is
+        # checked, which is semi-independent.
+        if strength == STRENGTH_VALUE_AND_CARDINALITY:
+            return INDEPENDENCE_SELF
+        return INDEPENDENCE_SEMI
+    return INDEPENDENCE_NONE
+
+
 def _surfaces(metadata: dict[str, Any]) -> tuple[bool, bool]:
     """Return ``(has_sql, has_dataframe)`` for a benchmark's metadata.
 
@@ -195,6 +242,7 @@ def build_coverage_map() -> list[dict[str, Any]]:
         )
         primary = primary_oracle(oracles)
         strength, scale = oracle_strength_and_scale(primary, benchmark_id)
+        independence = oracle_reference_independence(primary, strength)
         # A dual-surface benchmark with no oracle is reachable by the cross-surface
         # SQL<->DataFrame gate (the w1 dispatch target). A single-surface benchmark
         # is not and needs a fallback oracle (w2).
@@ -216,6 +264,7 @@ def build_coverage_map() -> list[dict[str, Any]]:
                 "primary_oracle": primary,
                 "strength": strength,
                 "scale": scale,
+                "independence": independence,
                 "guarded": primary != ORACLE_NONE,
                 "cross_surface_enforced": cross_surface_enforced,
                 "cross_surface_applicable": dual_surface and primary == ORACLE_NONE,
@@ -238,6 +287,25 @@ def _enforcement_label(row: dict[str, Any]) -> str:
     if enforced is False:
         return "staged (NOT CI-enforced)"
     return "—"
+
+
+# SF>1 value-blindness disclosure (w2): an expected-results VALUE oracle holds only at
+# SF=1 (the loader raises above it). Render it INTO the Strength cell so the tpch row
+# alone -- without reading the Scale column or the prose -- shows the gap. Derived from
+# the live strength signal, not a hand-typed caveat.
+_SF1_VALUE_DISCLOSURE = " (SF=1 only; values UNGUARDED above SF=1)"
+
+
+def _strength_cell(row: dict[str, Any]) -> str:
+    """Strength text for the markdown table, self-contained for the SF>1 value gap.
+
+    For an expected-results oracle that guards VALUES (``value+cardinality``), append
+    the SF>1 value-blindness disclosure so a skimmer reading only the Strength column
+    cannot conclude the values are guarded generally. Other cells are unchanged.
+    """
+    if row["primary_oracle"] == ORACLE_EXPECTED_RESULTS and row["strength"] == STRENGTH_VALUE_AND_CARDINALITY:
+        return row["strength"] + _SF1_VALUE_DISCLOSURE
+    return row["strength"]
 
 
 def render_markdown(rows: list[dict[str, Any]]) -> str:
@@ -290,11 +358,30 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
         "actually holds. Both are derived from live sources (the provider's stored "
         "answers/digests and the equivalence gate's bounded scale), not hand-labelled. "
         "No expected-results oracle exists above SF=1 (the loader raises for other "
-        "scales), so `tpch`/`tpcds` values are unguarded above SF=1."
+        "scales), so `tpch`/`tpcds` values are unguarded above SF=1 — the tpch "
+        "**Strength** cell states this inline so the row is self-contained."
     )
     lines.append("")
-    lines.append("| Benchmark | Surfaces | Oracle | Strength | Scale | Enforced | Notes |")
-    lines.append("| --- | --- | --- | --- | --- | --- | --- |")
+    lines.append(
+        "**Reference-independence disclosure:** the **Independence** column says "
+        "whether a guarded cell compares against a reference INDEPENDENT of the system "
+        "under test, or against ITSELF — orthogonal to Strength (a `value-level` oracle "
+        "can be either). `self-referential` = compared against a shared spec or a frozen "
+        "self-snapshot (the cross-surface gates compare a benchmark's DataFrame surface "
+        "to its OWN SQL surface; the tpch value digest is a frozen benchbox-on-DuckDB "
+        "snapshot, a regression tripwire, not an authority). `semi-independent` = an "
+        "external authority on CARDINALITY only (tpch/tpcds row counts come from the "
+        "published TPC answer sets, but the values are not checked there). `independent` "
+        "= full values checked against an external authority (no shipped oracle reaches "
+        "this today). So a green `value-level`/`value+cardinality` cell that reads "
+        "`self-referential` proves *unchanged from a shared/frozen reference*, NOT "
+        "*values proven correct against an authority* — do not skip manual inspection on "
+        "the strength of it. Derived from the oracle kind + digest provenance, not "
+        "hand-labelled."
+    )
+    lines.append("")
+    lines.append("| Benchmark | Surfaces | Oracle | Strength | Scale | Independence | Enforced | Notes |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
     for r in rows:
         surfaces = "+".join(r["surfaces"]) or "—"
         oracle = r["primary_oracle"]
@@ -311,7 +398,8 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
             note = "single-surface → needs fallback oracle (w2)"
         enforced = _enforcement_label(r)
         lines.append(
-            f"| {r['benchmark']} | {surfaces} | {oracle} | {r['strength']} | {r['scale']} | {enforced} | {note} |"
+            f"| {r['benchmark']} | {surfaces} | {oracle} | {_strength_cell(r)} | {r['scale']} | "
+            f"{r['independence']} | {enforced} | {note} |"
         )
     lines.append("")
     lines.append("## UNGUARDED benchmarks")
@@ -349,42 +437,48 @@ def render_json(rows: list[dict[str, Any]]) -> str:
 
 # Provenance is stamped into a leading HTML-comment region of the markdown that the
 # drift check IGNORES (see _strip_provenance / check_artifacts). It carries the
-# generation date + reviewed git SHA so a reader of the out-of-band artifact can tell
-# whether it predates current develop -- WITHOUT putting a volatile SHA into the
-# drift-compared body (which would make `--check` churn on every commit).
+# generation date + a CONTENT HASH of the generated body so a reader can verify the
+# artifact by regenerating, WITHOUT putting a volatile value into the drift-compared
+# body (which would make `--check` churn on every commit).
+#
+# Why a content hash and not a git SHA: a PR-branch HEAD SHA is ORPHANED by
+# squash-merge (the squashed commit discards the branch HEAD, so `git cat-file`
+# reports "bad object" for the stamped revision -- reproduced on the prior
+# `revision: ddd96c47…` stamp). A content hash of the body is reproducible from the
+# live sources on develop and survives a squash, so a reader can confirm the committed
+# map matches its inputs by rerunning the generator. See
+# `_project/analysis/REVIEW-PROTOCOL.md` (squash-merge orphans PR-branch SHAs).
 _PROVENANCE_START = "<!-- PROVENANCE"
 _PROVENANCE_END = "-->"
 
 
-def _current_git_sha() -> str:
-    import subprocess
+def _content_revision(rows: list[dict[str, Any]]) -> str:
+    """A reproducible content hash of the generated body (squash-survivable provenance).
 
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=_REPO_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if out.returncode == 0 and out.stdout.strip():
-            return out.stdout.strip()
-    except Exception:  # pragma: no cover - provenance is best-effort
-        pass
-    return "unknown"
+    Hashes the drift-compared bodies (markdown + json) so the stamp is derivable from
+    the live sources on develop and resolvable by regeneration, unlike a PR-branch SHA
+    that a squash-merge orphans. Excludes the provenance header itself (which carries
+    this value) so it is well-defined.
+    """
+    import hashlib
+
+    body = render_markdown(rows) + render_json(rows)
+    return "sha256:" + hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
 
 
-def _provenance_header() -> str:
+def _provenance_header(rows: list[dict[str, Any]]) -> str:
     import datetime
 
     generated = datetime.date.today().isoformat()
     return (
         f"{_PROVENANCE_START}\n"
         f"generated: {generated}\n"
-        f"revision: {_current_git_sha()}\n"
-        "This header is drift-IGNORED by `--check` (see _strip_provenance); it records when\n"
-        "this generated artifact was last written so a reviewer can tell if it predates\n"
-        "current develop. Do not rely on it for diffs.\n"
+        f"content-revision: {_content_revision(rows)}\n"
+        "This header is drift-IGNORED by `--check` (see _strip_provenance). content-revision\n"
+        "is a hash of the generated body (markdown + json), NOT a git SHA: a PR-branch SHA is\n"
+        "orphaned by squash-merge, so to verify this artifact, regenerate it with\n"
+        "`make oracle-coverage-map` on develop and confirm the body matches (the drift check\n"
+        "does this). Do not rely on this header for diffs.\n"
         f"{_PROVENANCE_END}\n"
     )
 
@@ -403,7 +497,7 @@ def _strip_provenance(text: str) -> str:
 def write_artifacts(rows: list[dict[str, Any]]) -> None:
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     JSON_ARTIFACT.write_text(render_json(rows), encoding="utf-8")
-    MARKDOWN_ARTIFACT.write_text(_provenance_header() + render_markdown(rows), encoding="utf-8")
+    MARKDOWN_ARTIFACT.write_text(_provenance_header(rows) + render_markdown(rows), encoding="utf-8")
 
 
 def check_artifacts(rows: list[dict[str, Any]]) -> list[str]:

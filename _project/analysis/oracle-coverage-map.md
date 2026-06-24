@@ -1,9 +1,11 @@
 <!-- PROVENANCE
-generated: 2026-06-23
-revision: ddd96c47cbce69fa084c7ced6759442321aba2c0
-This header is drift-IGNORED by `--check` (see _strip_provenance); it records when
-this generated artifact was last written so a reviewer can tell if it predates
-current develop. Do not rely on it for diffs.
+generated: 2026-06-24
+content-revision: sha256:7e9183cbbc89ec29
+This header is drift-IGNORED by `--check` (see _strip_provenance). content-revision
+is a hash of the generated body (markdown + json), NOT a git SHA: a PR-branch SHA is
+orphaned by squash-merge, so to verify this artifact, regenerate it with
+`make oracle-coverage-map` on develop and confirm the body matches (the drift check
+does this). Do not rely on this header for diffs.
 -->
 # Benchmark correctness-oracle coverage map
 
@@ -13,33 +15,35 @@ current develop. Do not rely on it for diffs.
 
 **Summary:** 23 shipped benchmarks — 8 guarded (oracle registered), 15 UNGUARDED (13 reachable by the cross-surface gate, 2 single-surface needing a fallback oracle). Cross-surface gates: 5 CI-enforced, 0 staged (not CI-enforced).
 
-**Strength + scale disclosure:** a guarded cell is not a uniform guarantee. The **Strength** column says what the oracle proves — `value-level` (full result values compared) vs `cardinality-only` (row counts only) vs `value+cardinality` (both) — and the **Scale** column says at which scale it actually holds. Both are derived from live sources (the provider's stored answers/digests and the equivalence gate's bounded scale), not hand-labelled. No expected-results oracle exists above SF=1 (the loader raises for other scales), so `tpch`/`tpcds` values are unguarded above SF=1.
+**Strength + scale disclosure:** a guarded cell is not a uniform guarantee. The **Strength** column says what the oracle proves — `value-level` (full result values compared) vs `cardinality-only` (row counts only) vs `value+cardinality` (both) — and the **Scale** column says at which scale it actually holds. Both are derived from live sources (the provider's stored answers/digests and the equivalence gate's bounded scale), not hand-labelled. No expected-results oracle exists above SF=1 (the loader raises for other scales), so `tpch`/`tpcds` values are unguarded above SF=1 — the tpch **Strength** cell states this inline so the row is self-contained.
 
-| Benchmark | Surfaces | Oracle | Strength | Scale | Enforced | Notes |
-| --- | --- | --- | --- | --- | --- | --- |
-| ai_primitives | sql | NONE | — | — | — | single-surface → needs fallback oracle (w2) |
-| amplab | sql+dataframe | cross-surface | value-level | SF=0.1 | enforced (CI-blocking) | cross-surface |
-| clickbench | sql+dataframe | cross-surface | value-level | SF=0.1 | enforced (CI-blocking) | cross-surface |
-| coffeeshop | sql+dataframe | cross-surface | value-level | SF=0.1 | enforced (CI-blocking) | cross-surface |
-| datavault | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| flightdata | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| h2odb | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| joinorder | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| joinorder_synthetic | sql+dataframe | cross-surface | value-level | SF=0.1 | enforced (CI-blocking) | cross-surface |
-| metadata_primitives | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| nyctaxi | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| read_primitives | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| ssb | sql+dataframe | cross-surface | value-level | SF=0.1 | enforced (CI-blocking) | cross-surface |
-| tpcdi | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| tpcds | sql+dataframe | expected-results | cardinality-only | SF=1 | — | expected-results |
-| tpcds_obt | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| tpch | sql+dataframe | expected-results | value+cardinality | SF=1 | — | expected-results |
-| tpch_skew | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| tpchavoc | sql+dataframe | variant-equivalence | value-level | SF=0.1 | — | variant-equivalence, cross-surface-variant |
-| transaction_primitives | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| tsbs_devops | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| vector_search | sql | NONE | — | — | — | single-surface → needs fallback oracle (w2) |
-| write_primitives | sql+dataframe | NONE | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+**Reference-independence disclosure:** the **Independence** column says whether a guarded cell compares against a reference INDEPENDENT of the system under test, or against ITSELF — orthogonal to Strength (a `value-level` oracle can be either). `self-referential` = compared against a shared spec or a frozen self-snapshot (the cross-surface gates compare a benchmark's DataFrame surface to its OWN SQL surface; the tpch value digest is a frozen benchbox-on-DuckDB snapshot, a regression tripwire, not an authority). `semi-independent` = an external authority on CARDINALITY only (tpch/tpcds row counts come from the published TPC answer sets, but the values are not checked there). `independent` = full values checked against an external authority (no shipped oracle reaches this today). So a green `value-level`/`value+cardinality` cell that reads `self-referential` proves *unchanged from a shared/frozen reference*, NOT *values proven correct against an authority* — do not skip manual inspection on the strength of it. Derived from the oracle kind + digest provenance, not hand-labelled.
+
+| Benchmark | Surfaces | Oracle | Strength | Scale | Independence | Enforced | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| ai_primitives | sql | NONE | — | — | — | — | single-surface → needs fallback oracle (w2) |
+| amplab | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | enforced (CI-blocking) | cross-surface |
+| clickbench | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | enforced (CI-blocking) | cross-surface |
+| coffeeshop | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | enforced (CI-blocking) | cross-surface |
+| datavault | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| flightdata | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| h2odb | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| joinorder | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| joinorder_synthetic | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | enforced (CI-blocking) | cross-surface |
+| metadata_primitives | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| nyctaxi | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| read_primitives | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| ssb | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | enforced (CI-blocking) | cross-surface |
+| tpcdi | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| tpcds | sql+dataframe | expected-results | cardinality-only | SF=1 | semi-independent | — | expected-results |
+| tpcds_obt | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| tpch | sql+dataframe | expected-results | value+cardinality (SF=1 only; values UNGUARDED above SF=1) | SF=1 | self-referential | — | expected-results |
+| tpch_skew | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| tpchavoc | sql+dataframe | variant-equivalence | value-level | SF=0.1 | self-referential | — | variant-equivalence, cross-surface-variant |
+| transaction_primitives | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| tsbs_devops | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| vector_search | sql | NONE | — | — | — | — | single-surface → needs fallback oracle (w2) |
+| write_primitives | sql+dataframe | NONE | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
 
 ## UNGUARDED benchmarks
 
