@@ -481,8 +481,6 @@ def _apply_cli_adapter(s: types.SimpleNamespace) -> None:
     plan_cfg = s.plan_config or PlanCaptureConfig()
     s.plan_cfg = plan_cfg
     s.strict_plan_capture = plan_cfg.strict
-    s.plan_sampling_rate = plan_cfg.sample_rate
-    s.plan_first_n = plan_cfg.first_n
     s.plan_queries_str = ",".join(plan_cfg.queries) if plan_cfg.queries else None
     s.show_query_plans = s.show_plans
 
@@ -1326,8 +1324,6 @@ def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManag
         "force_upload": bool(s.force_upload),
         "capture_plans": s.capture_plans,
         "strict_plan_capture": s.strict_plan_capture,
-        "plan_sampling_rate": s.plan_sampling_rate,
-        "plan_first_n": s.plan_first_n,
         "plan_queries": s.plan_queries,
         "execution_mode": s.resolved_mode,
     }
@@ -1388,8 +1384,6 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         "force_upload": bool(s.force_upload),
         "capture_plans": s.capture_plans,
         "strict_plan_capture": s.strict_plan_capture,
-        "plan_sampling_rate": s.plan_sampling_rate,
-        "plan_first_n": s.plan_first_n,
         "plan_queries": s.plan_queries,
         "execution_mode": s.resolved_mode,
     }
@@ -1611,8 +1605,6 @@ def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: Database
         "force_upload": bool(s.force_upload),
         "capture_plans": s.capture_plans,
         "strict_plan_capture": s.strict_plan_capture,
-        "plan_sampling_rate": s.plan_sampling_rate,
-        "plan_first_n": s.plan_first_n,
         "plan_queries": s.plan_queries,
         "execution_mode": s.resolved_mode,
     }
@@ -2404,10 +2396,6 @@ def _interactive_show_preview(s: types.SimpleNamespace) -> None:
     plan_config_str = None
     if s.plan_config:
         plan_parts = []
-        if s.plan_config.sample_rate is not None:
-            plan_parts.append(f"sample:{s.plan_config.sample_rate}")
-        if s.plan_config.first_n is not None:
-            plan_parts.append(f"first:{s.plan_config.first_n}")
         if s.plan_config.queries:
             plan_parts.append(f"queries:{','.join(s.plan_config.queries)}")
         if s.plan_config.strict:
@@ -2616,7 +2604,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--plan-config",
     type=PLAN_CONFIG,
     default=None,
-    help="Plan capture config: sample:0.1,first:5,queries:1,6,strict:true",
+    help="Plan capture config: queries:1,6,17,strict:true (capture is once-per-query; use --analyze-plans for detail)",
 )
 # Compression
 @advanced_option(

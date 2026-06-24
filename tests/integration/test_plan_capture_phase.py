@@ -93,18 +93,17 @@ def test_capture_phase_dml_single_execution(file_adapter):
 
 
 def test_capture_phase_restores_adapter_config(file_adapter):
-    """The phase must not leak its structural-only overrides back to the adapter."""
+    """The phase must not leak its capture-on / analyze override back to the adapter."""
     _seed_table(file_adapter)
     file_adapter.analyze_plans = True
-    file_adapter.plan_first_n = 7
-    file_adapter.plan_sampling_rate = 0.5
+    saved_capture_plans = file_adapter.capture_plans
 
+    # The phase forces analyze_plans=False (default) and capture_plans=True for its
+    # duration, then must restore the adapter's prior values.
     run_plan_capture_phase(file_adapter, {"q": "SELECT 1"})
 
     assert file_adapter.analyze_plans is True
-    assert file_adapter.plan_first_n == 7
-    assert file_adapter.plan_sampling_rate == 0.5
-    assert file_adapter.capture_plans is True
+    assert file_adapter.capture_plans == saved_capture_plans
 
 
 def test_capture_phase_reuses_supplied_connection(file_adapter):

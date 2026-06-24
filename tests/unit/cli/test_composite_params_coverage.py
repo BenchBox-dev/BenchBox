@@ -24,13 +24,14 @@ def test_compression_parse_and_validation() -> None:
 
 
 def test_plan_capture_parse_variants() -> None:
-    p = mod.PlanCaptureConfig.parse("sample:0.1,first:5,queries:1,6,17,strict:true")
-    assert p.sample_rate == 0.1
-    assert p.first_n == 5
+    p = mod.PlanCaptureConfig.parse("queries:1,6,17,strict:true")
     assert p.queries == ["1", "6", "17"]
     assert p.strict is True
+    # The retired per-iteration sampling keys are rejected with a clear error.
     with pytest.raises(click.BadParameter):
-        mod.PlanCaptureConfig.parse("sample:2")
+        mod.PlanCaptureConfig.parse("sample:0.1")
+    with pytest.raises(click.BadParameter):
+        mod.PlanCaptureConfig.parse("first:5")
 
 
 def test_convert_validation_and_partition_parsing() -> None:
@@ -58,7 +59,7 @@ def test_validation_and_force_parse() -> None:
 def test_click_param_types_convert() -> None:
     assert mod.FORCE.convert(True, None, None).any is True
     assert mod.COMPRESSION.convert("gzip:6", None, None).level == 6
-    assert mod.PLAN_CONFIG.convert("first:3", None, None).first_n == 3
+    assert mod.PLAN_CONFIG.convert("queries:3", None, None).queries == ["3"]
     assert mod.TABLE_FORMAT.convert("parquet", None, None).format == "parquet"
     assert mod.VALIDATION.convert("postgen", None, None).postgen is True
 

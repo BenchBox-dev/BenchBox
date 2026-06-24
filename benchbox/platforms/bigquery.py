@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import random
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -1778,19 +1777,12 @@ class BigQueryAdapter(PlatformAdapter):
 
         Returns a ``(QueryPlanDAG | None, capture_time_ms)`` tuple, mirroring
         ``capture_query_plan``. Honors the same ``capture_plans`` /
-        ``plan_query_filter`` / ``plan_first_n`` / ``plan_sampling_rate`` gates.
+        ``plan_query_filter`` gates (the per-iteration / per-stream sampling
+        machinery has been retired).
         """
         if not self.capture_plans:
             return None, 0.0
         if self.plan_query_filter and query_id not in self.plan_query_filter:
-            return None, 0.0
-        if self.plan_first_n is not None:
-            with self._plan_capture_lock:
-                iteration = self._plan_capture_iteration_counts.get(query_id, 0)
-                self._plan_capture_iteration_counts[query_id] = iteration + 1
-            if iteration >= self.plan_first_n:
-                return None, 0.0
-        if self.plan_sampling_rate is not None and random.random() > self.plan_sampling_rate:
             return None, 0.0
 
         start_time = time.perf_counter()

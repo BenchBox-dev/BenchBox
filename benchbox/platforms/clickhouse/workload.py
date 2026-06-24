@@ -439,21 +439,14 @@ class ClickHouseWorkloadMixin:
                 "error_type": error_type,
             }
 
-        # Capture the query plan outside the try so a strict-mode PlanCaptureError
-        # propagates instead of being swallowed by the broad `except` above and
-        # mislabeled as a failed query. Guarded by capture_plans, so EXPLAIN PLAN
-        # is never issued when capture is disabled. When strict_plan_capture is
-        # False, capture_query_plan never raises.
-        if getattr(self, "capture_plans", False) and result_dict.get("status") == "SUCCESS":
-            # EXPLAIN the transformed query (the one that actually ran): the original
-            # may not parse under ClickHouse without the compatibility transforms, so
-            # EXPLAIN PLAN of it would fail for exactly the queries that needed them.
-            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, transformed_query, query_id)
-            if query_plan:
-                result_dict["query_plan"] = query_plan
-                result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
-            if plan_capture_time_ms is not None:
-                result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+        # Plan capture routes through the shared chokepoint, outside the try so a
+        # strict-mode PlanCaptureError propagates rather than being swallowed by the
+        # broad `except` above. For phase-eligible engines (the default) the
+        # chokepoint records the executed query for the isolated post-measurement
+        # phase instead of running EXPLAIN inline; otherwise it captures inline.
+        # EXPLAIN targets the transformed query (the one that actually ran): the
+        # original may not parse under ClickHouse without the compatibility transforms.
+        self._merge_plan_capture_into_result(result_dict, connection, transformed_query, query_id)
 
         return result_dict
 

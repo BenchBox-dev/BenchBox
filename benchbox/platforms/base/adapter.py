@@ -139,18 +139,15 @@ class PlatformAdapter(
         self.analyze_plans: bool = config.get("analyze_plans", True)
         self.strict_plan_capture = config.get("strict_plan_capture", False)
         self.plan_capture_timeout_seconds = int(config.get("plan_capture_timeout_seconds", 30))
-        # Plan capture sampling options
-        self.plan_sampling_rate: float | None = config.get("plan_sampling_rate")
-        self.plan_first_n: int | None = config.get("plan_first_n")
+        # Plan capture query selection. plan_query_filter restricts capture to an
+        # explicit set of query ids; it is orthogonal to the retired per-iteration /
+        # per-stream sampling machinery (plan_first_n / plan_sampling_rate), which the
+        # canonical capture-once-per-query model made obsolete and which is gone.
         plan_queries_str = config.get("plan_queries")
         self.plan_query_filter: set[str] | None = (
             {q.strip() for q in plan_queries_str.split(",") if q.strip()} if plan_queries_str else None
         )
-        # Track iteration counts for plan_first_n. Under concurrent stream
-        # execution (--streams > 1) multiple threads call capture_query_plan()
-        # and run a read-increment-write against this dict, so the increment is
-        # guarded by a lock to keep plan_first_n a correct per-query-id counter.
-        self._plan_capture_iteration_counts: dict[str, int] = {}
+        # Guards concurrent writes to _phase_recorded_queries from throughput streams.
         self._plan_capture_lock = threading.Lock()
         # Isolated-phase plan capture (see TestDriversMixin._execute_queries_by_type).
         # When ``_plan_capture_phase_active`` is True, the inline capture chokepoint

@@ -166,7 +166,6 @@ def test_sequential_reuse_resets_run_scoped_adapter_state(tmp_path: Path) -> Non
     adapter.query_plans_captured = 7
     adapter.plan_capture_failures = 3
     adapter.plan_capture_errors = [{"query_id": "Q-stale", "message": "stale"}]
-    adapter._plan_capture_iteration_counts = {"Q1": 99}
 
     second = adapter.run_benchmark(benchmark, benchmark_name="tpch")
 
@@ -180,7 +179,6 @@ def test_sequential_reuse_resets_run_scoped_adapter_state(tmp_path: Path) -> Non
     assert adapter.query_plans_captured == 0
     assert adapter.plan_capture_failures == 0
     assert adapter.plan_capture_errors == []
-    assert adapter._plan_capture_iteration_counts == {}
 
 
 def test_dry_run_mode_keeps_mode_but_clears_stale_captured_sql(tmp_path: Path) -> None:
