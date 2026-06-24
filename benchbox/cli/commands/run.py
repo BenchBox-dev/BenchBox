@@ -1236,6 +1236,7 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
         compression_level=s.compression_level,
         test_execution_type=s.test_execution_type,
         capture_plans=s.capture_plans,
+        analyze_plans=s.analyze_plans,
         strict_plan_capture=s.strict_plan_capture,
         options={
             **s.verbosity_payload,
@@ -1444,6 +1445,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         compression_level=s.compression_level,
         test_execution_type=s.test_execution_type,
         capture_plans=s.capture_plans,
+        analyze_plans=s.analyze_plans,
         strict_plan_capture=s.strict_plan_capture,
         options={
             **s.verbosity_payload,
@@ -1698,6 +1700,7 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
         compression_level=s.compression_level,
         test_execution_type=s.test_execution_type,
         capture_plans=s.capture_plans,
+        analyze_plans=s.analyze_plans,
         strict_plan_capture=s.strict_plan_capture,
         options={
             **s.verbosity_payload,
@@ -2425,6 +2428,7 @@ def _interactive_show_preview(s: types.SimpleNamespace) -> None:
         force=force_str,
         official=s.official,
         capture_plans=s.capture_plans,
+        analyze_plans=getattr(s, "analyze_plans", None),
         validation=s.validation_mode if s.validation_mode and s.validation_mode != "exact" else None,
         verbose=s.verbosity_settings.level,
         console_obj=console,
@@ -2579,10 +2583,23 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--capture-plans",
     is_flag=True,
     help=(
-        "Capture query execution plans. Supported: DuckDB, PostgreSQL, DataFusion. "
-        "DuckDB uses EXPLAIN (ANALYZE, FORMAT JSON) by default - actual per-operator timing and "
-        "cardinality included, at ~2x query cost per captured plan. "
-        "Set analyze_plans=false via --platform-option to capture estimated plans only."
+        "Capture query execution plans into the result bundle, in an isolated "
+        "post-measurement phase (never inside the timed loop). Plans are captured "
+        "with EXPLAIN ANALYZE by default (actual per-operator timing/cardinality, "
+        "~1x extra query cost outside the measured window); pass --no-analyze-plans "
+        "for estimated plans only (a static EXPLAIN, no re-execution)."
+    ),
+)
+@advanced_option(
+    "--analyze-plans/--no-analyze-plans",
+    "analyze_plans",
+    default=None,
+    help=(
+        "With --capture-plans, control capture detail: --analyze-plans (default) "
+        "runs EXPLAIN ANALYZE post-measurement for actual timing/cardinality; "
+        "--no-analyze-plans captures the static (estimated) plan with no re-execution. "
+        "The single capture-detail knob. (Write statements are never re-executed "
+        "regardless: DML stays on a non-ANALYZE EXPLAIN.)"
     ),
 )
 @advanced_option(
@@ -2723,6 +2740,7 @@ def run(
     non_interactive: bool,
     official: bool,
     capture_plans: bool,
+    analyze_plans: bool | None,
     show_plans: bool,
     strict_translation: bool,
     plan_config: PlanCaptureConfig | None,
@@ -2781,6 +2799,7 @@ def run(
         non_interactive=non_interactive,
         official=official,
         capture_plans=capture_plans,
+        analyze_plans=analyze_plans,
         show_plans=show_plans,
         strict_translation=strict_translation,
         plan_config=plan_config,

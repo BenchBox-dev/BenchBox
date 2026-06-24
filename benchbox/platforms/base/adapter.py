@@ -456,11 +456,16 @@ class PlatformAdapter(
         self._reset_run_scoped_state()
         plan_capture_config = {
             "capture_plans": self.capture_plans,
+            "analyze_plans": self.analyze_plans,
             "strict_plan_capture": self.strict_plan_capture,
             "plan_capture_timeout_seconds": self.plan_capture_timeout_seconds,
         }
         if "capture_plans" in run_config:
             self.capture_plans = bool(run_config.get("capture_plans"))
+        # analyze_plans is tri-state in RunConfig: only override the adapter's value
+        # when the first-class flag was set (non-None); None leaves the adapter default.
+        if run_config.get("analyze_plans") is not None:
+            self.analyze_plans = bool(run_config.get("analyze_plans"))
         if "strict_plan_capture" in run_config:
             self.strict_plan_capture = bool(run_config.get("strict_plan_capture"))
         if "plan_capture_timeout_seconds" in run_config:
@@ -631,6 +636,7 @@ class PlatformAdapter(
 
         finally:
             self.capture_plans = plan_capture_config["capture_plans"]
+            self.analyze_plans = plan_capture_config["analyze_plans"]
             self.strict_plan_capture = plan_capture_config["strict_plan_capture"]
             self.plan_capture_timeout_seconds = plan_capture_config["plan_capture_timeout_seconds"]
             if hasattr(self, "connection") and self.connection:

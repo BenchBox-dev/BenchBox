@@ -705,6 +705,7 @@ def _build_run_config_from_options(
         warm_up_iterations=max(0, warmups),
         power_fail_fast=bool(options.get("power_fail_fast", False)),
         capture_plans=benchmark_config.capture_plans,
+        analyze_plans=getattr(benchmark_config, "analyze_plans", None),
         strict_plan_capture=benchmark_config.strict_plan_capture,
         table_format=table_format,
         table_format_compression=str(options.get("table_format_compression", "snappy") or "snappy"),
