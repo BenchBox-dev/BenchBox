@@ -110,13 +110,14 @@ class PlatformAdapter(
     supports_external_tables: bool = False
     # Plan-capture style. When True, the generic query pipeline captures plans in
     # an isolated post-measurement phase (a single EXPLAIN pass after all timed
-    # queries on the same connection, structural-only so DML is not re-executed)
-    # instead of inline inside each timed execute_query(). Opt-in per adapter:
-    # only EXPLAIN-based engines where a post-hoc EXPLAIN on the measurement
-    # connection reproduces the plan should enable it. Platforms that obtain
-    # plans as a side effect of execution (BigQuery job stats, Spark event logs)
-    # must leave this False and keep inline capture.
-    plan_capture_phase_eligible: bool = False
+    # queries on the same connection) instead of inline inside each timed
+    # execute_query(). This is the canonical default for EVERY EXPLAIN-based
+    # engine: a standalone EXPLAIN on the measurement connection reproduces the
+    # plan with no loss, so capture is fully isolatable from measurement.
+    # The ONLY exceptions are engines whose plan/stats are obtainable solely as a
+    # side effect of running the workload query (BigQuery-class): they set this
+    # False explicitly and keep their inline/job-harvest capture path.
+    plan_capture_phase_eligible: bool = True
 
     def __init__(self, **config):
         """Initialize the platform adapter with configuration.

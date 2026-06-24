@@ -64,6 +64,12 @@ class BigQueryAdapter(PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
     _DELIMITED_FORMATS = frozenset({"tbl", "csv"})
+    # Genuine side-effect engine: BigQuery has no EXPLAIN statement; the real plan
+    # and stage timing are only available from the executed QueryJob (job.query_plan).
+    # A standalone EXPLAIN/dry-run yields only an estimate and a real re-run costs
+    # money, so BigQuery is excluded from the isolated phase and keeps job-harvest
+    # capture. See _project/TODO/main/planning/query-plan-capture-sideeffect-engine-policy.yaml.
+    plan_capture_phase_eligible = False
 
     def __init__(self, **config):
         super().__init__(**config)
