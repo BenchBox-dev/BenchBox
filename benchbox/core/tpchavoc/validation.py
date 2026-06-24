@@ -290,16 +290,20 @@ class ResultValidator:
                 )
             if self._multisets_equal(orig_rows, var_rows):
                 continue
-            # The FINAL group under a trailing LIMIT is the truncated boundary: all
-            # its rows share the order key (that is what defines the group), and the
-            # total row count already matched, so any membership difference here is
-            # an equally-valid tie pick across the LIMIT cutoff - accept it (the
-            # tie-aware relaxation). This is sound BECAUSE the group is keyed by the
-            # actual ORDER BY value, so we never mistake a genuinely-ordered row for
-            # a boundary tie the way the order-blind heuristic could. Earlier groups
-            # are complete windows and must match as multisets, so a value bug there
-            # is still caught.
-            if i == last_index and tie_aware:
+            # The FINAL group under a trailing LIMIT is the truncated boundary: its
+            # rows share the order key, and the total row count already matched, so a
+            # membership difference among >= 2 genuinely-tied rows is an equally-valid
+            # tie pick across the LIMIT cutoff - accept it (the tie-aware relaxation).
+            # But a SINGLE-row final group is NOT a tie: it is the deterministic last
+            # row, structurally indistinguishable from a genuine value bug
+            # ((2,"good") vs (2,"bad")) from the truncated result alone, so it must
+            # still match. This mirrors the >= 2 guard the order-blind boundary
+            # heuristic already applies (_is_tie_ambiguous_boundary). The residual
+            # one-visible-row genuine-tie false positive is tracked in
+            # cross-surface-comparator-boundary-tie-soundness. Earlier groups are
+            # complete windows and must match as multisets, so a value bug there is
+            # still caught.
+            if i == last_index and tie_aware and len(orig_rows) >= 2:
                 continue
             detail = self._first_positional_mismatch(
                 sorted(orig_rows, key=self._row_sort_key),

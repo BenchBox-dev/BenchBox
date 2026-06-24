@@ -43,9 +43,11 @@ prior_art:
   - ref: "PR #872"
     note: "Introduced the order-aware/tie-aware comparator; original final-group accept was unconditional (masked single-row value bugs)."
   - ref: "PR #878 + Codex discussion r3462372977"
-    note: "Tightened the final-group accept to len(orig_rows) >= 2; surfaced the one-visible-row boundary-tie false-positive edge documented here."
+    note: "Tightened the ORDER-BLIND boundary heuristic (_is_tie_ambiguous_boundary) to require len(...) >= 2 worst-kept rows; surfaced the one-visible-row boundary-tie false-positive edge documented here."
+  - ref: "self-review follow-up (this branch)"
+    note: "The order-AWARE path (_validate_order_aware) was MISSING the same >= 2 guard - its final-group accept was unconditional (`if i == last_index and tie_aware`), so a deterministic single-row final-group value bug was masked there even though the order-blind path caught it. Added `and len(orig_rows) >= 2` so both paths are consistent; regression tests test_order_aware_rejects_unique_last_row_change / _accepts_genuine_boundary_tie_swap. The one-visible-row FP below now applies to BOTH paths, and w1's boundary probe should fix both."
   - ref: "benchbox/core/tpchavoc/validation.py:_validate_order_aware"
-    note: "The guard site (`if i == last_index and tie_aware and len(orig_rows) >= 2`)."
+    note: "The guard site (now `if i == last_index and tie_aware and len(orig_rows) >= 2`)."
 
 work:
   - id: w1

@@ -97,6 +97,45 @@ def test_tie_aware_constant_column_is_not_a_boundary_key() -> None:
         validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
 
 
+# --- order_aware path: the same single-row final-group guard ------------------
+# The ORDER-AWARE path (order_aware=True + a resolved order_by key, used by the
+# cross-surface gate for queries whose ORDER BY maps to result columns) partitions
+# rows by the order key. Its final-group acceptance must apply the SAME ">= 2
+# genuinely-tied rows" guard the order-blind path uses, or a deterministic
+# single-row final-group value bug is silently masked.
+
+
+def test_order_aware_rejects_unique_last_row_change() -> None:
+    """A unique (untied) final row under order_aware must still match, not be masked."""
+    validator = ResultValidator()
+    original = [("a", 3), ("b", 2), ("c", 1)]
+    # final group is one row whose order-key value (1) is unique -> deterministic.
+    variant = [("a", 3), ("b", 2), ("X", 1)]
+
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(original, variant, 1, 0, order_by=[1], order_aware=True, tie_aware=True)
+
+
+def test_order_aware_accepts_genuine_boundary_tie_swap() -> None:
+    """A swap among >= 2 rows genuinely tied at the final order key is still accepted."""
+    validator = ResultValidator()
+    original = [("a", 3), ("b", 1), ("c", 1)]
+    # final group order-key value 1 has two rows; swapping their members is valid.
+    variant = [("a", 3), ("z", 1), ("y", 1)]
+
+    assert validator.validate_results_exact(original, variant, 1, 0, order_by=[1], order_aware=True, tie_aware=True)
+
+
+def test_order_aware_rejects_interior_value_bug() -> None:
+    """A wrong value in a fully-included interior group is still caught under order_aware."""
+    validator = ResultValidator()
+    original = [("a", 3), ("b", 2), ("c", 1)]
+    variant = [("a", 3), ("Q", 2), ("c", 1)]  # interior order-key 2 group differs
+
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(original, variant, 1, 0, order_by=[1], order_aware=True, tie_aware=True)
+
+
 @pytest.mark.parametrize(
     ("original", "variant", "message"),
     [
