@@ -719,6 +719,60 @@ def build_h2odb_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceDat
     )
 
 
+def build_read_primitives_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
+    """Generate Read Primitives data, load it into DuckDB, and wire both surfaces.
+
+    Read Primitives reuses the canonical TPC-H schema (8 tables) and dbgen-based
+    generator, so the bounded cell is reproducible for a given scale. Unlike
+    ssb/h2odb - whose canonical SQL is already DuckDB-native - Read Primitives
+    ships a rich per-dialect *catalog-variant* system: its canonical SQL uses
+    portable/ANSI forms (``TRANSFORM``, ``STRUCT(...)``, ``APPROX_*``) that DuckDB
+    does not accept verbatim. The trusted reference here is therefore the
+    DuckDB-DIALECT surface - ``benchmark.get_queries(dialect="duckdb")``, which
+    returns each query's authored DuckDB catalog variant verbatim and translates
+    the rest - NOT the raw canonical SQL, so the comparison runs the SQL a DuckDB
+    production run would actually execute.
+
+    The DataFrame registry keys 152 queries by ids that are a strict subset of the
+    157 SQL ids (the 5 SQL-only ids are the documented ``get_skip_for_dataframe``
+    set). Four of those 152 - ``fulltext_*`` (FTS, no portable DuckDB form) and
+    ``json_extract_simple`` (skipped on duckdb) - have NO DuckDB SQL surface
+    (``get_queries(dialect="duckdb")`` drops them), so there is no DuckDB reference
+    to compare and they are excluded here, leaving 148 gateable queries. The
+    exclusion is the same discipline as a missing-backend skip: there is genuinely
+    nothing to compare on this engine, not a muted divergence.
+
+    Platform/generator imports are deferred so importing this module stays cheap.
+    """
+    from benchbox.core.read_primitives.benchmark import ReadPrimitivesBenchmark
+    from benchbox.core.read_primitives.dataframe_queries import get_dataframe_queries
+    from benchbox.core.read_primitives.schema import TABLES
+
+    output_dir = Path(output_dir)
+    benchmark = ReadPrimitivesBenchmark(scale_factor=scale_factor, output_dir=output_dir)
+    benchmark.data_generator.output_dir = output_dir
+    benchmark.data_generator.generate_data()
+
+    # The DuckDB-dialect surface is the trusted reference (catalog variants
+    # verbatim + translation). Computed once; queries DuckDB cannot transpile are
+    # absent from this dict and are filtered out of the gateable id set below.
+    duckdb_sql = benchmark.get_queries(dialect="duckdb")
+    registry = get_dataframe_queries()
+    gateable_ids = [qid for qid in registry.get_query_ids() if qid in duckdb_sql]
+
+    connection = _load_duckdb_cell(
+        benchmark, output_dir, [table["name"] for table in TABLES.values()], label="Read Primitives"
+    )
+    return CrossSurfaceData(
+        connection=connection,
+        query_ids=gateable_ids,
+        reference_sql=lambda query_id: duckdb_sql[query_id],
+        dataframe_query=lambda query_id: registry.get_or_raise(query_id),
+        benchmark=benchmark,
+        data_dir=output_dir,
+    )
+
+
 # Q18 is `SELECT UserID, SearchPhrase, COUNT(*) ... GROUP BY ... LIMIT 10` with NO
 # ORDER BY: at SF=0.1 the GROUP BY yields ~97k groups and the bare LIMIT keeps an
 # arbitrary 10, so the SQL and DataFrame surfaces each return a different - but
@@ -862,14 +916,32 @@ GATES: dict[str, CrossSurfaceGate] = {
     ),
 }
 
+# Read Primitives bounded-cell scale. Its TPC-H generator base means SF=1.0 is
+# ~6M lineitem rows; SF=0.05 gives a ~300k-row cell that keeps the selective
+# filter/aggregate queries discriminating while staying a single bounded cell.
+# Tuned during burn-down (see the staged-gate TODO).
+_READ_PRIMITIVES_SCALE = 0.05
+
 # Staged gates: a load-faithful builder is wired and runnable in report mode, but
 # the benchmark still has open cross-surface divergences to burn down before it can
 # be promoted into GATES (and made a blocking CI gate). Kept OUT of GATES so the
-# coverage map does not prematurely mark these benchmarks "guarded". Currently empty
-# - clickbench, joinorder_synthetic and h2odb graduated to GATES; the next gateable
-# benchmarks (datavault, flightdata, nyctaxi, read_primitives, tpcds_obt,
-# tpch_skew, tsbs_devops) land here first when their builders are wired.
-STAGED_GATES: dict[str, CrossSurfaceGate] = {}
+# coverage map does not prematurely mark these benchmarks "guarded".
+#
+# read_primitives: builder wired (DuckDB-dialect reference over 148 gateable
+# queries; the 4 fulltext/json ids DuckDB cannot transpile are excluded in
+# build_read_primitives_duckdb). Open burn-down: the SQL and DataFrame surfaces
+# were authored independently and diverge on ~127 cells (projection shape, row
+# cardinality, result ordering, and a residue of genuinely approximate/decimal
+# cells). Tracked for promotion to GATES once clean. The remaining next gateable
+# benchmarks (datavault, flightdata, nyctaxi, tpcds_obt, tpch_skew, tsbs_devops)
+# land here first when their builders are wired.
+STAGED_GATES: dict[str, CrossSurfaceGate] = {
+    "read_primitives": CrossSurfaceGate(
+        name="read_primitives",
+        build=build_read_primitives_duckdb,
+        scale_factor=_READ_PRIMITIVES_SCALE,
+    ),
+}
 
 
 def get_gate(name: str) -> CrossSurfaceGate:
