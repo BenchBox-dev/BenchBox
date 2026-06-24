@@ -101,12 +101,26 @@ so the oracle-coverage-map does not prematurely mark it "guarded".
   aggregate_pushdown, column_pruning, distinct_elimination, join_reordering,
   limit_pushdown, predicate_pushdown, runtime_filter, union_optimization (all
   verified PASS at SF=0.05).
-* **Measured state now (SF=0.05): ~94/148 clean, ~89 divergent cells** (down from
-  127). Remaining by signature: column-count (array/list leaked-column + stats/olap
-  rewrites), ORDER BY + tie-group (array/list ordering, qualify/window, min/max_by),
-  row-count (olap CUBE/ROLLUP, qualify_lag_lead, window_row_number, timeseries,
-  optimizer_common_subexpression/constant_folding/limit), value-mismatch
-  (approx/decimal/precision), 7 impl errors; 6 vacuous.
+* **Batch 4 (qualify/groupby)** — `groupby_all_complex` (pandas month-start dtype),
+  `qualify_percentile` (PERCENT_RANK formula + sort form), `qualify_cume_dist`
+  (transform-rank + sort form). Verified PASS.
+* **Measured state now (SF=0.05): ~97/148 clean, ~84 divergent cells** (down from
+  127). Remaining: array/list leaked-column + ordering; stats/olap rewrites
+  (correlation/variance_stddev/percentiles, CUBE/ROLLUP, timeseries, pivot, unpivot);
+  remaining window/qualify (window_row_number/rank/running_sum/lead_lag/moving_frame/
+  multiple_orderings, qualify_ntile/dense_rank/lag_lead); min/max_by + orderby_decimal16;
+  optimizer_common_subexpression/constant_folding/limit; approx/decimal/Polars-Map
+  classifications; 6 vacuous.
+
+### Platform bugs found (Agent B) — fix separately; impls above route around them
+
+* `UnifiedExpr.desc()` is not honored as a sort-key direction marker by
+  `UnifiedLazyFrame.sort` (`unified_frame.py` ~1812/3904): `.sort(col(a), col(b).desc())`
+  yields wrong order. Always use `.sort([names], descending=[...])`. (This was the
+  root cause of several "ORDER BY" divergences.)
+* `window_ntile` (`polars_df.py:774`, wrong bucket formula) and `window_lag`/
+  `window_lead` (`:742/756`, shift-before-sort) are buggy. Compute NTILE inline and
+  LAG/LEAD via `.shift().over()` after an explicit total-order `.sort(...)`.
 
 ### API constraints discovered (for the remaining rewrites)
 
