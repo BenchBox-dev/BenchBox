@@ -81,3 +81,66 @@ contract, fix the SQL.
 
 Until clean, `read_primitives` stays in `STAGED_GATES` (report mode, non-blocking)
 so the oracle-coverage-map does not prematurely mark it "guarded".
+
+## Progress log
+
+* **Cross-cutting prerequisite landed** — `ResultValidator._values_equal` now recurses
+  into list/struct/map cells element-wise with numeric tolerance (Decimal coercion
+  included), clearing the nested Decimal-vs-float class for every gate. This is why
+  several array/map cells no longer diverge on value.
+* **Batch 1 (column projection)** — the `SELECT *`/wider-projection column-count
+  divergences whose DataFrame factory projected a subset: `filter_*` selective
+  family, `orderby_all`, `orderby_multicol` (+catalog `o_orderkey` tie-break), and
+  the `empty_build_join` / `min_max_runtime_filter` / `filter_in_predicate_selective`
+  semi/left-join cases (drop the column subset; semi-join already returns only the
+  left table's columns).
+* **Measured baseline after the above (SF=0.05): 83/148 clean, 111 divergent cells**
+  (down from 127). Remaining by signature: ~35 column-count (mostly array/list +
+  stats/olap rewrites), ~34 ORDER BY + 3 tie-group, ~30 row-count (optimizer_*
+  rewrites), ~17 value-mismatch (approx/decimal/precision), 7 impl errors; 6 vacuous.
+
+### API constraints discovered (for the remaining rewrites)
+
+* `UnifiedExpr.var()` / `.std()` take **no `ddof`** argument (sample/ddof=1 only).
+  For `STDDEV_POP`/`COVAR_POP`/`REGR_*` (population moments) use raw Polars
+  (`import polars as pl`; `pl.col(...).var(ddof=0)`, `pl.cov(a,b,ddof=0)`,
+  `pl.corr`) inside the expression impl — the `expression` backend IS Polars.
+* `UnifiedExpr.quantile(q, interpolation=...)` **does** support interpolation;
+  default is `"nearest"`, so percentile impls must pass `interpolation="linear"`
+  to match DuckDB `QUANTILE_CONT`/`PERCENTILE_CONT`.
+* `ctx.when` / `ctx.concat` / `ctx.struct` / `ctx.window_*` / `ctx.map_from_entries`
+  are delegated (not on `DataFrameContext.__dir__`) but callable; `concat`,
+  `struct`, `window_*` are exercised by existing impls. `map_from_entries` raises
+  `NotImplementedError` on Polars (no native Map dtype) — the three `map_*`
+  expression cells are an unsupported-backend gap (skip/classify, not a logic fix).
+* `frame.join(..., how="semi"|"left"|"anti")` is supported; a semi-join returns
+  only the left table's columns.
+
+### Remaining buckets (per-query specs captured; SQL/contract is the arbiter)
+
+* optimizer_* row-count rewrites (impls implement simplified queries — restore the
+  full WHERE/HAVING/ORDER BY/LIMIT/CASE); `optimizer_common_subexpression` and
+  `optimizer_constant_folding` need `ctx.when`/`.round` (verify first).
+* stats/olap: `statistical_correlation` (REGR_* via raw Polars), `statistical_variance_stddev`
+  (dedicated impl, pop+samp), `statistical_percentiles` (linear interpolation),
+  `olap_cube_analysis`/`olap_rollup_analysis` (emit all CUBE/ROLLUP grouping sets),
+  `timeseries_trend_analysis` (date window + regression slope + month-start dtype),
+  `pivot_basic` (restrict to 4 modes), `unpivot_basic` (sort).
+* array/list ordering: add the SQL `ORDER BY` sort key + drop the leaked
+  intermediate column on `array_*`/`list_*` (the nested-decimal residue is already
+  cleared by the validator fix).
+* ordering/tie: `min_by_*`/`max_by_with_ties` (deterministic tie-break + correct
+  output column names), `orderby_decimal16` (l_orderkey tertiary key on both
+  surfaces), qualify/window (Agent B bucket).
+* impl errors (7): `groupby_all_complex` (`to_period`), qualify pandas KeyErrors
+  (`groupby().apply(include_groups=False)` drops the key), `timeseries` `datetime64[M]`.
+* classify (genuinely irreducible, with rationale — the h2odb Q9 precedent):
+  `approx_count_distinct_*` (HLL), `approx_quantile_groupby` (T-Digest), the three
+  `map_*_expression` (Polars no Map dtype), residual ARG_MIN/MAX supplier tie.
+* vacuous (6): make discriminating via parameter/scale, or classify as
+  `legitimately_empty` (`json_extract_nested` — TPC-H has no JSON; the selective
+  `filter_*` literals fall outside the bounded-cell ranges).
+
+Then promote `read_primitives` `STAGED_GATES` → `GATES`, add the blocking CI step
+in `.github/workflows/pr.yml`, refresh the oracle-coverage-map, and add the
+fast-lane + unit tests (mirroring the h2odb PR).

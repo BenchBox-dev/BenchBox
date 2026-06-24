@@ -1200,14 +1200,36 @@ def shuffle_join_pandas_impl(ctx: DataFrameContext) -> Any:
     return merged.groupby("o_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
 
 
+_LINEITEM_COLS = (
+    "l_orderkey",
+    "l_partkey",
+    "l_suppkey",
+    "l_linenumber",
+    "l_quantity",
+    "l_extendedprice",
+    "l_discount",
+    "l_tax",
+    "l_returnflag",
+    "l_linestatus",
+    "l_shipdate",
+    "l_commitdate",
+    "l_receiptdate",
+    "l_shipinstruct",
+    "l_shipmode",
+    "l_comment",
+)
+
+
 def empty_build_join_expression_impl(ctx: DataFrameContext) -> Any:
     """Join when build side produces no rows (edge case handling)."""
     col, lit = ctx.col, ctx.lit
     empty_orders = ctx.get_table("orders").filter(col("o_totalprice") < lit(0)).select("o_orderkey")
+    # SQL is `SELECT l.* FROM lineitem l LEFT JOIN ...` -> all 16 lineitem columns
+    # (excluding the joined o_orderkey from the empty build side).
     return (
         ctx.get_table("lineitem")
         .join(empty_orders, left_on="l_orderkey", right_on="o_orderkey", how="left")
-        .select("l_orderkey", "l_partkey", "l_quantity")
+        .select(*_LINEITEM_COLS)
     )
 
 
@@ -1216,26 +1238,22 @@ def empty_build_join_pandas_impl(ctx: DataFrameContext) -> Any:
     empty_orders = ctx.get_table("orders")
     empty_orders = empty_orders[empty_orders["o_totalprice"] < 0][["o_orderkey"]]
     return ctx.get_table("lineitem").merge(empty_orders, left_on="l_orderkey", right_on="o_orderkey", how="left")[
-        ["l_orderkey", "l_partkey", "l_quantity"]
+        list(_LINEITEM_COLS)
     ]
 
 
 def filter_in_predicate_subquery_expression_impl(ctx: DataFrameContext) -> Any:
     """IN predicate with subquery and selective filtering."""
+    # SQL is `SELECT * FROM part WHERE p_partkey IN (...)` -> all 9 part columns.
+    # A semi-join keeps only the left (part) columns, so no projection is needed.
     high_qty = ctx.get_table("lineitem").filter(ctx.col("l_quantity") > ctx.lit(45)).select("l_partkey").unique()
-    return (
-        ctx.get_table("part")
-        .join(high_qty, left_on="p_partkey", right_on="l_partkey", how="semi")
-        .select("p_partkey", "p_name", "p_type", "p_size")
-    )
+    return ctx.get_table("part").join(high_qty, left_on="p_partkey", right_on="l_partkey", how="semi")
 
 
 def filter_in_predicate_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
     """IN predicate with subquery and selective filtering."""
     high_qty = ctx.get_table("lineitem")[ctx.get_table("lineitem")["l_quantity"] > 45]["l_partkey"].unique()
-    return ctx.get_table("part")[ctx.get_table("part")["p_partkey"].isin(high_qty)][
-        ["p_partkey", "p_name", "p_type", "p_size"]
-    ]
+    return ctx.get_table("part")[ctx.get_table("part")["p_partkey"].isin(high_qty)].reset_index(drop=True)
 
 
 def orderby_expression_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1740,9 +1758,9 @@ def min_max_runtime_filter_expression_impl(ctx: DataFrameContext) -> Any:
         (col("o_orderdate") >= lit(date(1995, 1, 1))) & (col("o_orderdate") <= lit(date(1995, 3, 31)))
     ).select("o_orderkey")
 
-    return lineitem.join(date_filtered_orders, left_on="l_orderkey", right_on="o_orderkey", how="semi").select(
-        "l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"
-    )
+    # SQL is `SELECT l.* FROM lineitem l WHERE l_orderkey IN (...)` -> all 16
+    # lineitem columns; a semi-join keeps exactly the left (lineitem) columns.
+    return lineitem.join(date_filtered_orders, left_on="l_orderkey", right_on="o_orderkey", how="semi")
 
 
 def min_max_runtime_filter_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1753,9 +1771,7 @@ def min_max_runtime_filter_pandas_impl(ctx: DataFrameContext) -> Any:
         (orders["o_orderdate"] >= date(1995, 1, 1)) & (orders["o_orderdate"] <= date(1995, 3, 31))
     ]["o_orderkey"].unique()
 
-    return lineitem[lineitem["l_orderkey"].isin(date_filtered_orders)][
-        ["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"]
-    ]
+    return lineitem[lineitem["l_orderkey"].isin(date_filtered_orders)].reset_index(drop=True)
 
 
 # -----------------------------------------------------------------------------
