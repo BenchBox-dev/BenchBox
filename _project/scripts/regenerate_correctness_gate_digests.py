@@ -113,6 +113,13 @@ def _run_gate(work_dir: Path, query_ids: list[str], seed: int) -> dict:
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
     env[EMIT_RESULT_DIGEST_ENV] = "1"
+    # Pin the child's output root to the temp work dir. Otherwise a caller that has
+    # BENCHBOX_OUTPUT_DIR set (a supported configuration -- it relocates the
+    # benchmark_runs root, see benchbox.utils.path_utils.resolve_benchmark_runs_dir)
+    # would make `benchbox run` write its result under that configured root while we
+    # search work_dir, and the run would complete but then fail with "no result JSON".
+    runs_root = work_dir / "benchmark_runs"
+    env["BENCHBOX_OUTPUT_DIR"] = str(runs_root)
 
     print(f"Running gate: {' '.join(command[3:])}", file=sys.stderr)
     proc = subprocess.run(
@@ -132,7 +139,7 @@ def _run_gate(work_dir: Path, query_ids: list[str], seed: int) -> dict:
         sys.stderr.write(proc.stderr)
         raise SystemExit(f"gate run failed (exit {proc.returncode})")
 
-    results_dir = work_dir / "benchmark_runs" / "results"
+    results_dir = runs_root / "results"
     result_path = find_latest_result(results_dir, benchmark="tpch")
     if result_path is None:
         raise SystemExit(f"no result JSON found under {results_dir}")
