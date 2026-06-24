@@ -13,6 +13,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import hashlib
 import math
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import Any, Optional, Union
 
 
@@ -641,9 +642,26 @@ class ResultValidator:
         if val1 is None or val2 is None:
             return False
 
-        # Handle numeric values with tolerance
-        if isinstance(val1, (int, float)) and isinstance(val2, (int, float)):
+        # Handle numeric values with tolerance. ``Decimal`` is included so a
+        # DECIMAL value from one engine compares (within tolerance) against a
+        # ``float`` from another - the same coercion :meth:`_numeric_values_equal`
+        # documents - including when it appears nested inside a list/struct/map
+        # cell (see the container recursion below), where the cross-surface
+        # ``_normalize_value`` does not reach.
+        if isinstance(val1, (int, float, Decimal)) and isinstance(val2, (int, float, Decimal)):
             return self._numeric_values_equal(val1, val2)
+
+        # Handle list/array and struct/map cells element-wise so the float
+        # tolerance and Decimal coercion above apply INSIDE containers too. Lists
+        # stay order-sensitive (an ordered array's element order is meaningful);
+        # dicts/structs/maps are compared key-aligned. A bare ``==`` here would
+        # force exact equality on nested Decimal-vs-float and lose tolerance,
+        # spuriously flagging an array of DECIMAL values (DuckDB) against the same
+        # array materialized as float64 (DataFrame surface).
+        if isinstance(val1, (list, tuple)) and isinstance(val2, (list, tuple)):
+            return len(val1) == len(val2) and all(self._values_equal(x, y) for x, y in zip(val1, val2))
+        if isinstance(val1, dict) and isinstance(val2, dict):
+            return val1.keys() == val2.keys() and all(self._values_equal(val1[k], val2[k]) for k in val1)
 
         # Handle string values
         if isinstance(val1, str) and isinstance(val2, str):

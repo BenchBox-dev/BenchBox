@@ -126,6 +126,27 @@ def test_numeric_and_string_value_comparison_behavior() -> None:
     assert not validator._values_equal("x", "y")
 
 
+def test_container_values_compared_elementwise_with_tolerance() -> None:
+    """List/struct/map cells recurse so float tolerance + Decimal coercion apply
+    INSIDE containers (a DECIMAL array from DuckDB vs the same array as float64
+    from a DataFrame surface), while staying order-sensitive for lists."""
+    from decimal import Decimal
+
+    validator = ResultValidator(tolerance=1e-6)
+
+    # Nested Decimal-vs-float and nested float precision are tolerated.
+    assert validator._values_equal([Decimal("322261.46"), Decimal("1.5")], [322261.46, 1.5])
+    assert validator._values_equal([1100.011], [1100.0110000000001])
+    assert validator._values_equal({"125": Decimal("806.66")}, {"125": 806.66})
+    assert validator._values_equal(Decimal("77.87"), 77.87)
+
+    # Lists stay order-sensitive; length / key / real-value differences still fail.
+    assert not validator._values_equal([1, 2, 3], [1, 3, 2])
+    assert not validator._values_equal([1, 2], [1, 2, 3])
+    assert not validator._values_equal({"a": 1}, {"b": 1})
+    assert not validator._values_equal([1.0, 2.0], [1.0, 2.5])
+
+
 def test_validate_results_checksum_mismatch_raises() -> None:
     validator = ResultValidator()
 
