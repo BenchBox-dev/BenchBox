@@ -253,6 +253,16 @@ work:
       70 discriminating + Q18 tie baseline. TPC-Havoc SQL (220/220) + DataFrame
       (440/440) reports unchanged green - the shared ResultValidator is untouched;
       the guard lives only in cross_surface._report.
+      UPDATE (ssb-generator-dimension-value-fidelity, #870): the SSB
+      legitimately_empty stopgap has now been RETIRED. The generator was fixed to
+      emit canonical value formats (p_category 'MFGR#12', p_brand1 'MFGR#2221',
+      c_city/s_city 'UNITED KI1'); a second latent bug (lo_orderdate drew random
+      integers that mostly were not valid datekeys, orphaning ~95% of the fact
+      table from DATE) was also fixed by sampling real datekeys, and Q3.4's SQL
+      year_month default was resolved per-query to the canonical 'Dec1997'. All 6
+      previously-empty queries now return rows at SF=0.1, so the SSB gate is
+      26/26 DISCRIMINATING, 0 vacuous, and the _SSB_LEGITIMATELY_EMPTY mapping is
+      deleted (not re-classified).
     notes: |
       6/13 SSB queries return 0 rows at SF=0.1, so 12/26 cells pass empty-vs-empty.
       Two parts:

@@ -690,37 +690,6 @@ _CLICKBENCH_TIE_AMBIGUOUS = (
     "Q18 is LIMIT 10 with no ORDER BY over ~97k groups - an arbitrary, order-less top-N selection"
 )
 
-# Six SSB queries return 0 reference rows at EVERY bounded scale (verified empty at
-# SF=0.1, 0.2, 0.3, 0.5 AND 1.0), so no cheap SF override makes them discriminating.
-# Root cause: the BenchBox SSB generator emits value FORMATS that the canonical SSB
-# query parameters never match, so the highly-selective multi-join filters select
-# nothing at any scale:
-#   * p_category is generated as 'MFGR#112' (3-digit), but Q2.1/Q4.3 filter on the
-#     canonical 'MFGR#12' (2-digit) - no part row ever qualifies (verified
-#     count(part WHERE p_category='MFGR#12') == 0 at SF=1.0).
-#   * c_city/s_city are generated as 'UNITED K0'..'UNITED K9' (name truncated to
-#     10 chars), but Q3.3 filters on the canonical 'UNITED KI1'/'UNITED KI5' - no
-#     city row ever qualifies.
-#   * Q2.2/Q2.3 filter on canonical p_brand1 ranges/values that the generated
-#     'MFGR#NNNNN' brand format does not populate; Q3.4 layers the same city
-#     mismatch with a yearmonth filter.
-# Fixing this would require either changing SSB's canonical query parameters (which
-# would alter the benchmark itself - forbidden) or regenerating the SSB data with
-# SSB-faithful value formats (a generator change out of scope for this gate). Until
-# then these queries are LEGITIMATELY empty: SQL and DataFrame both return 0 rows
-# because the data genuinely contains no matching rows, not because of a load or
-# logic bug. They are classified (not silently passed) so the vacuity guard fails
-# loudly if a future change makes one of them produce rows on only one surface.
-_SSB_VACUOUS = (
-    "0 reference rows at every bounded SF (verified to SF=1.0): the BenchBox SSB "
-    "generator's value formats (p_category 'MFGR#112' not 'MFGR#12'; c_city/s_city "
-    "'UNITED K0' not 'UNITED KI1') never match this query's canonical SSB filter "
-    "parameters, so the selective multi-join selects no rows on either surface. "
-    "Tracked: regenerate SSB data with SSB-faithful value formats (do NOT change "
-    "the canonical query parameters)."
-)
-_SSB_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(("Q2.1", "Q2.2", "Q2.3", "Q3.3", "Q3.4", "Q4.3"), _SSB_VACUOUS)
-
 # Two AMPLab queries return 0 reference rows at the bounded cell. Both end in a
 # `GROUP BY ... HAVING COUNT(*) > 10` over a heavily pre-filtered uservisits set,
 # and at SF=0.1 no surviving group reaches that per-group threshold (the filtered
@@ -784,7 +753,7 @@ _CLICKBENCH_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(
 # to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
 # belong here (registering a red gate here would be coverage theater).
 GATES: dict[str, CrossSurfaceGate] = {
-    "ssb": CrossSurfaceGate(name="ssb", build=build_ssb_duckdb, legitimately_empty=_SSB_LEGITIMATELY_EMPTY),
+    "ssb": CrossSurfaceGate(name="ssb", build=build_ssb_duckdb),
     "amplab": CrossSurfaceGate(name="amplab", build=build_amplab_duckdb, legitimately_empty=_AMPLAB_LEGITIMATELY_EMPTY),
     "coffeeshop": CrossSurfaceGate(name="coffeeshop", build=build_coffeeshop_duckdb),
     # Promoted from STAGED_GATES once the two cross-cutting prerequisites landed:
