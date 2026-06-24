@@ -12,7 +12,7 @@
     "generated_with_duckdb": "1.3.2",
     "generated_with_platform": "duckdb",
     "phases": "generate,load,power",
-    "note": "Reference VALUE digests for the 18 bounded correctness-gate TPC-H queries at SF=1 with the pinned reference qgen seed. Regenerate by running `make test-correctness-gate` query set with BENCHBOX_EMIT_RESULT_DIGEST=1 at SF=1/seed=17039360 on the locked DuckDB and copying the stream-0 per-query digests here. Digests are tied to the DuckDB build pinned in uv.lock; a DuckDB bump that changes a query's emitted values requires regenerating this file."
+    "note": "Reference VALUE digests for the bounded correctness-gate TPC-H queries at SF=1 with the pinned reference qgen seed. REGENERATE with `make correctness-gate-digests-regen` (_project/scripts/regenerate_correctness_gate_digests.py), which runs the same gate configuration with BENCHBOX_EMIT_RESULT_DIGEST=1 and writes this file -- do NOT hand-copy. This oracle is a REGRESSION SNAPSHOT vs a DuckDB-pinned baseline (it detects change from the frozen benchbox-on-DuckDB answer), NOT an independent correctness oracle: a conceptual value bug present at freeze time is enshrined, not caught. The digest is a value+TYPE-rendering digest (int renders exactly, float/Decimal at fixed 4dp), so it is DuckDB-pinned; cross-engine reuse is deferred (see _project/analysis/value-digest-cross-engine-independence-decision.md). Digests are tied to the DuckDB build pinned in uv.lock; a DuckDB bump that changes a query's emitted values requires regenerating this file."
   },
   "digests": {
     "1": "0fafaebd6b40880e0c6bb3c4cc502a8b",

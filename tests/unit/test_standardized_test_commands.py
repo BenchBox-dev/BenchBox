@@ -292,11 +292,29 @@ class TestMakefileCommands:
         # silently no-ops (no digest emitted) and the gate regresses to
         # cardinality-only.
         assert "BENCHBOX_EMIT_RESULT_DIGEST=1" in gate_body
-        assert f"BENCHBOX_CORRECTNESS_GATE_QUERY_IDS={CORRECTNESS_GATE_QUERY_IDS}" in gate_body
+        # The gated query-id set lives in ONE shared Makefile variable
+        # (CORRECTNESS_GATE_QUERY_IDS), so the reference digests are regenerated from
+        # the same set the gate asserts against (never two hand-copied lists). The gate
+        # body references the variable; the variable holds the ratcheted literal.
+        assert f"CORRECTNESS_GATE_QUERY_IDS := {CORRECTNESS_GATE_QUERY_IDS}" in makefile_content
+        assert "BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS)" in gate_body
         assert CORRECTNESS_GATE_NODEID in gate_body
         assert "-m stress" in gate_body
         assert "-n 0" in gate_body
         assert "--timeout=1200" in gate_body
+
+    def test_makefile_digest_regen_shares_gate_query_id_source(self):
+        """The digest regeneration target reuses the gate's query-id set, not a copy.
+
+        correctness-gate-value-digest-fidelity-followups w3: the reference must be
+        regenerated from one source shared with the gate, so a wrong-but-same-
+        cardinality answer cannot hide behind a digest reference generated from a
+        different query set than the gate validates.
+        """
+        makefile_content = (Path.cwd() / "Makefile").read_text()
+        regen_body = _makefile_target_body(makefile_content, "correctness-gate-digests-regen")
+        assert "BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS)" in regen_body
+        assert "regenerate_correctness_gate_digests.py" in regen_body
 
     def test_correctness_gate_nodeid_collects_under_stress(self):
         """The gate node-id must actually resolve under ``-m stress``.

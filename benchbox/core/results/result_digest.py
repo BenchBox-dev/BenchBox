@@ -23,6 +23,18 @@ Design constraints (see
   at the pinned reference seed, while remaining sensitive to value mutations
   (which shift values by far more than the normalization granularity).
 
+WHAT THIS ORACLE IS (and is NOT). The stored reference digests
+(``benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json``)
+were produced by running benchbox-on-DuckDB and frozen. The value oracle therefore
+detects CHANGE from that benchbox-on-DuckDB baseline -- a genuine regression
+tripwire -- but it is NOT an independent correctness oracle: a conceptual value bug
+that was present at freeze time is enshrined in the reference, not caught. It is a
+regression SNAPSHOT vs a DuckDB-pinned baseline. Read a green value+cardinality cell
+as "unchanged from the frozen DuckDB answer", never as "values proven correct against
+an external authority". See
+``_project/analysis/value-digest-cross-engine-independence-decision.md`` for the
+independence analysis and the deferred cross-engine upgrade.
+
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.
@@ -45,6 +57,33 @@ RESULT_DIGEST_FIELD = "digest"
 # Fixed fractional precision applied to real-numbered cells before hashing. Large
 # enough to absorb sub-precision float-formatting noise across DuckDB builds, far
 # smaller than any value-mutation the gate must catch.
+#
+# PRECISION-FLOOR DECISION (correctness-gate-value-digest-fidelity-followups w1).
+# The floor is ABSOLUTE, not relative: rounding to 4 fractional digits makes a
+# per-cell error below 5e-5 ABSOLUTE invisible (and an error of exactly 5e-5 at a
+# bucket midpoint invisible too, by round-half-even), regardless of the column's
+# magnitude. The exposure this creates is QUANTIFIED and PINNED in
+# tests/unit/test_correctness_gate_value_oracle.py
+# (test_precision_floor_is_absolute_*):
+#   * Large-magnitude columns (e.g. TPC-H revenue ~1e10) -- 5e-5 absolute is ~5e-15
+#     relative, effectively perfect.
+#   * Small averaged-ratio columns -- the worst exposed gate column is TPC-H Q1's
+#     ``avg_disc`` (~0.0500): a sub-5e-5-absolute (~0.1% relative) aggregate/rounding
+#     bug on that column survives the gate.
+# DECISION: KEEP absolute 4dp; DOCUMENT the small-ratio blind spot (naming
+# ``avg_disc``) rather than switch to relative / significant-figure rounding. Reasons:
+#   1. Stability is the gate's first duty -- a relative/significant-figure rounding
+#      near zero can be LESS reproducible across DuckDB builds than a fixed absolute
+#      grid (the ~0 boundary makes the chosen exponent jitter), so a uniform-relative
+#      scheme risks spurious RED on a correct tree, the opposite of what the gate is for.
+#   2. The exposure is bounded and named: only sub-0.1%-relative errors on small
+#      averaged ratios survive, and the value oracle is explicitly a regression
+#      SNAPSHOT vs a DuckDB baseline (see module docstring / the reference JSON
+#      provenance), not an independent correctness oracle, so a freeze-time bug on
+#      ``avg_disc`` would already be enshrined regardless of the floor.
+# Any future switch to relative/hybrid rounding MUST re-verify two-run determinism at
+# the pinned seed and regenerate the 18 reference digests in the SAME change (see
+# ``make correctness-gate-digests-regen``), or the gate goes RED on a correct tree.
 _DIGEST_FLOAT_PRECISION = 4
 
 
@@ -61,6 +100,24 @@ def _normalize_cell(value: Any, ndigits: int = _DIGEST_FLOAT_PRECISION) -> Any:
     float-formatting differences across engine builds do not change the digest,
     while genuine value differences still do. All other types are left untouched
     (``calculate_checksum`` renders them with ``str``).
+
+    VALUE+TYPE COUPLING (correctness-gate-value-digest-fidelity-followups w2). This
+    is a value+TYPE-RENDERING digest, not a pure value digest: an ``int`` renders
+    exactly (``37734107`` -> ``"37734107"``) while a ``float``/``Decimal`` of the
+    SAME numeric value renders at fixed precision (``37734107.0`` -> ``"37734107.0000"``),
+    so the same logical value hashes DIFFERENTLY across Python numeric types. This is
+    pinned in tests/unit/test_correctness_gate_value_oracle.py
+    (test_digest_couples_value_with_numeric_type). It is DELIBERATELY ACCEPTABLE here
+    because the oracle is DuckDB-PINNED: DuckDB 1.3.2 returns a stable, deterministic
+    column type for each of the 18 gate queries at the reference seed, so the rendered
+    type never varies run-to-run and the stored reference digests reproduce exactly.
+    The coupling is therefore the BLOCKER for any cross-engine reuse (a second engine
+    may return ``Decimal`` where DuckDB returns ``float``), which is why the
+    cross-engine independence upgrade (w5) is DEFERRED rather than enabled on this
+    primitive -- see _project/analysis/value-digest-cross-engine-independence-decision.md.
+    Canonicalizing integer-valued numerics to one representation would change the
+    rendered form of every integer cell and thus require regenerating all 18 reference
+    digests; it is intentionally NOT done while the oracle stays single-engine.
     """
     # bool is an int subclass; keep it distinct from numeric rounding.
     if isinstance(value, bool):
