@@ -1860,10 +1860,17 @@ def groupby_all_complex_expression_impl(ctx: DataFrameContext) -> Any:
 
 def groupby_all_complex_pandas_impl(ctx: DataFrameContext) -> Any:
     """GROUP BY ALL with multiple non-aggregate expressions."""
+    import pandas as pd
+
     orders = ctx.get_table("orders")
 
     filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)].copy()
-    filtered["order_month"] = filtered["o_orderdate"].dt.to_period("M")
+    # Month-start date matching DATE_TRUNC('MONTH', ...). o_orderdate is Arrow
+    # date32-backed, so .dt.to_period("M") raises and a Period would not normalize
+    # to a date; subtract (day-1) to get a midnight Timestamp that normalizes to
+    # date(Y, M, 1) like the SQL DATE column.
+    dt = filtered["o_orderdate"].astype("datetime64[ns]")
+    filtered["order_month"] = dt - pd.to_timedelta(dt.dt.day - 1, unit="D")
 
     return (
         filtered.groupby(["order_month", "o_orderpriority"], as_index=False)
@@ -1872,6 +1879,7 @@ def groupby_all_complex_pandas_impl(ctx: DataFrameContext) -> Any:
             monthly_revenue=("o_totalprice", "sum"),
         )
         .sort_values(["order_month", "o_orderpriority"])
+        .reset_index(drop=True)
     )
 
 
@@ -3020,7 +3028,9 @@ def qualify_percentile_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         result.filter(ctx.col("price_percentile") >= ctx.lit(0.9))
         .select("o_orderpriority", "o_orderkey", "o_totalprice", "price_percentile")
-        .sort(ctx.col("o_orderpriority"), ctx.col("o_totalprice").desc())
+        # Use the (names, descending=[...]) sort form: a `.desc()` sort-key marker
+        # is not honored by UnifiedLazyFrame.sort and yields the wrong order.
+        .sort(["o_orderpriority", "o_totalprice"], descending=[False, True])
     )
 
 
@@ -3028,7 +3038,12 @@ def qualify_percentile_pandas_impl(ctx: DataFrameContext) -> Any:
     """Find orders in top 10% by value for each order priority using PERCENT_RANK."""
     result = ctx.get_table("orders")
     result = result[result["o_orderdate"] >= date(1995, 1, 1)].copy()
-    result["price_percentile"] = result.groupby("o_orderpriority")["o_totalprice"].rank(pct=True)
+    # SQL PERCENT_RANK = (rank_min - 1) / (n - 1), NOT pandas rank(pct=True)
+    # (which is average-rank/n). Single-row partitions are 0 (matches DuckDB).
+    grp = result.groupby("o_orderpriority")["o_totalprice"]
+    n = grp.transform("count")
+    rank_min = grp.rank(method="min", ascending=True)
+    result["price_percentile"] = ((rank_min - 1) / (n - 1)).where(n > 1, 0.0)
     return (
         result[result["price_percentile"] >= 0.9][["o_orderpriority", "o_orderkey", "o_totalprice", "price_percentile"]]
         .sort_values(["o_orderpriority", "o_totalprice"], ascending=[True, False])
@@ -3054,26 +3069,25 @@ def qualify_cume_dist_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         result.filter(col("quantity_cumulative_dist") >= lit(0.95))
         .select("l_shipdate", "l_orderkey", "l_linenumber", "l_quantity", "quantity_cumulative_dist")
-        .sort(col("l_shipdate"), col("l_quantity").desc())
+        # (names, descending=[...]) form + the SQL's full ORDER BY tie-break keys
+        # (a `.desc()` marker is not honored by UnifiedLazyFrame.sort).
+        .sort(["l_shipdate", "l_quantity", "l_orderkey", "l_linenumber"], descending=[False, True, False, False])
     )
 
 
 def qualify_cume_dist_pandas_impl(ctx: DataFrameContext) -> Any:
     """Find lineitems with quantity in top 5% of their ship date using CUME_DIST."""
-
-    def calc_cume_dist(group: Any) -> Any:
-        group = group.copy()
-        group["quantity_cumulative_dist"] = group["l_quantity"].rank(method="max") / len(group)
-        return group
-
     lineitem = ctx.get_table("lineitem")
     result = lineitem[(lineitem["l_shipdate"] >= date(1995, 1, 1)) & (lineitem["l_shipdate"] < date(1996, 1, 1))].copy()
-    result = result.groupby("l_shipdate", group_keys=False).apply(calc_cume_dist, include_groups=False)
+    # transform-based per-group rank (CUME_DIST = rank_max / group_size) avoids the
+    # groupby().apply(include_groups=False) path that drops the l_shipdate key.
+    grp = result.groupby("l_shipdate")["l_quantity"]
+    result["quantity_cumulative_dist"] = grp.rank(method="max") / grp.transform("count")
     return (
         result[result["quantity_cumulative_dist"] >= 0.95][
             ["l_shipdate", "l_orderkey", "l_linenumber", "l_quantity", "quantity_cumulative_dist"]
         ]
-        .sort_values(["l_shipdate", "l_quantity"], ascending=[True, False])
+        .sort_values(["l_shipdate", "l_quantity", "l_orderkey", "l_linenumber"], ascending=[True, False, True, True])
         .reset_index(drop=True)
     )
 
