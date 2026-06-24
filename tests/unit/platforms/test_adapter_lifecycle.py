@@ -191,3 +191,31 @@ def test_dry_run_mode_keeps_mode_but_clears_stale_captured_sql(tmp_path: Path) -
 
     assert adapter.dry_run_mode is True
     assert adapter.get_captured_sql() == {"1": "SELECT 1"}
+
+
+def test_run_benchmark_applies_and_restores_analyze_plans(tmp_path: Path) -> None:
+    """analyze_plans (the first-class capture-detail knob) is applied from run_config
+    for the run and restored afterwards, exactly like capture_plans."""
+    adapter = _LifecycleAdapter(existing_databases=[False])
+    benchmark = _LifecycleBenchmark(tmp_path)
+    assert adapter.analyze_plans is True  # adapter default
+
+    adapter.run_benchmark(
+        benchmark,
+        benchmark_name="tpch",
+        capture_plans=True,
+        analyze_plans=False,
+    )
+
+    # Restored to the adapter default after the run (saved/restored in run_benchmark).
+    assert adapter.analyze_plans is True
+
+
+def test_run_benchmark_leaves_analyze_plans_default_when_run_config_omits_it(tmp_path: Path) -> None:
+    """A None/omitted analyze_plans in run_config must not override the adapter default."""
+    adapter = _LifecycleAdapter(existing_databases=[False])
+    benchmark = _LifecycleBenchmark(tmp_path)
+
+    adapter.run_benchmark(benchmark, benchmark_name="tpch", capture_plans=True, analyze_plans=None)
+
+    assert adapter.analyze_plans is True
