@@ -95,6 +95,7 @@ class ResultValidator:
         tie_aware: bool = False,
         order_aware: bool = False,
         order_by: Sequence[int] | None = None,
+        boundary_tie_past_limit: bool | None = None,
     ) -> bool:
         """Validate exact result matching between original and variant.
 
@@ -135,6 +136,16 @@ class ResultValidator:
                 an ``ORDER BY`` whose key is not present in the projected columns)
                 falls back to the order-insensitive comparison, never silently
                 claiming an order check it cannot perform.
+            boundary_tie_past_limit: PRECISE per-query signal (from a
+                ``LIMIT N+1`` probe of the SQL reference) of whether the final
+                order-key value is genuinely tied PAST the ``LIMIT`` cutoff. When
+                supplied it REPLACES the ``len(final_group) >= 2`` heuristic for
+                accepting a final-group membership difference: ``True`` accepts it
+                even with a single visible row (a real truncated tie), ``False``
+                REQUIRES the final group to match exactly (it is a complete,
+                untruncated group, so a membership difference is a real bug).
+                ``None`` (the default, e.g. the order-blind fallback or when the
+                probe is unavailable) keeps the ``>= 2`` heuristic.
 
         Returns:
             True if results match exactly
@@ -160,7 +171,13 @@ class ResultValidator:
         # unmappable ORDER BY).
         if order_aware and order_by and self._order_key_in_range(order_by, original_results, variant_results):
             return self._validate_order_aware(
-                original_results, variant_results, query_id, variant_id, order_by, tie_aware=tie_aware
+                original_results,
+                variant_results,
+                query_id,
+                variant_id,
+                order_by,
+                tie_aware=tie_aware,
+                boundary_tie_past_limit=boundary_tie_past_limit,
             )
 
         # Sort both result sets to handle potential ordering differences
@@ -233,6 +250,7 @@ class ResultValidator:
         key_columns: Sequence[int],
         *,
         tie_aware: bool,
+        boundary_tie_past_limit: bool | None = None,
     ) -> bool:
         """Compare two results in RETURNED order, tolerating only tie-group reshuffles.
 
@@ -290,21 +308,32 @@ class ResultValidator:
                 )
             if self._multisets_equal(orig_rows, var_rows):
                 continue
-            # The FINAL group under a trailing LIMIT is the truncated boundary: its
-            # rows share the order key, and the total row count already matched, so a
-            # membership difference among >= 2 genuinely-tied rows is an equally-valid
-            # tie pick across the LIMIT cutoff - accept it (the tie-aware relaxation).
-            # But a SINGLE-row final group is NOT a tie: it is the deterministic last
-            # row, structurally indistinguishable from a genuine value bug
-            # ((2,"good") vs (2,"bad")) from the truncated result alone, so it must
-            # still match. This mirrors the >= 2 guard the order-blind boundary
-            # heuristic already applies (_is_tie_ambiguous_boundary). The residual
-            # one-visible-row genuine-tie false positive is tracked in
+            # The FINAL group under a trailing LIMIT may be a truncated boundary
+            # tie: its rows share the order key and the total row count already
+            # matched, so a membership difference can be an equally-valid tie pick
+            # across the LIMIT cutoff. Accept it ONLY when the boundary really is
+            # truncated, decided precisely when the caller supplies a LIMIT N+1
+            # probe result (``boundary_tie_past_limit``):
+            #   * True  -> the order key IS tied past the cutoff; accept even a
+            #     single visible row (it is an arbitrary pick from a real tie).
+            #   * False -> the final group is COMPLETE (the next row has a different
+            #     key, or there is no truncation); it must match exactly, so a
+            #     membership difference is a real bug - do NOT accept.
+            # Without a probe (None - the order-blind fallback, or a query the gate
+            # could not probe) fall back to the >= 2 heuristic: a single-row final
+            # group is the deterministic last row (structurally identical to a
+            # genuine value bug from the truncated result alone) and must match,
+            # while >= 2 visible rows are treated as a likely truncated tie. The
+            # residual one-visible-row heuristic false positive is tracked in
             # cross-surface-comparator-boundary-tie-soundness. Earlier groups are
-            # complete windows and must match as multisets, so a value bug there is
-            # still caught.
-            if i == last_index and tie_aware and len(orig_rows) >= 2:
-                continue
+            # complete windows and must match as multisets regardless.
+            if i == last_index and tie_aware:
+                if boundary_tie_past_limit is None:
+                    accept_boundary = len(orig_rows) >= 2
+                else:
+                    accept_boundary = boundary_tie_past_limit
+                if accept_boundary:
+                    continue
             detail = self._first_positional_mismatch(
                 sorted(orig_rows, key=self._row_sort_key),
                 sorted(var_rows, key=self._row_sort_key),

@@ -2,7 +2,7 @@ id: cross-surface-comparator-boundary-tie-soundness
 title: "Cross-surface comparator: make the final-tie-group guard boundary-aware (one-visible-row LIMIT ties)"
 worktree: main
 priority: Low
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
@@ -52,24 +52,34 @@ prior_art:
 work:
   - id: w1
     summary: "Give the comparator a boundary-tie probe so a one-visible-row final tie is not a false positive"
-    status: pending
+    status: done
     notes: |
-      The comparator needs signal it does not have today to tell a truncated
-      boundary tie from a genuine deterministic last row. Candidate approaches,
-      to be evaluated for cost vs. value:
-        - Have the cross-surface gate run each trailing-LIMIT query at `LIMIT N+1`
-          (or unbounded) to learn whether the final order key is genuinely tied
-          beyond the cutoff, and pass that fact into validate_results_exact so a
-          single-visible-row final group can be accepted ONLY when the key is
-          actually tied past the LIMIT.
-        - Or thread the resolved `ORDER BY` / `LIMIT` structure plus a
-          tie-multiplicity hint from the SQL surface into the comparator.
-      Keep the change ADDITIVE: the TPC-Havoc strict path (no order_aware/
-      tie_aware) must stay byte-identical, and the default must remain catching
-      single-row value bugs. Add a regression test for the keys `10,5,5`
-      `LIMIT 2` boundary-tie case (currently a false positive) alongside the
-      existing `(2,"good")` vs `(2,"bad")` true-positive case.
+      DONE for the ORDER-AWARE path (the principled case). Implemented the first
+      candidate approach: cross_surface._boundary_tied_past_limit re-runs each
+      trailing-LIMIT query's SQL reference at `LIMIT N+1` and reports whether the
+      first dropped row shares the final kept row's resolved order-key value
+      (True = genuinely tied past the cutoff; False = the final group is complete /
+      untruncated; None = not applicable / unanswerable). The gate threads it as
+      validate_results_exact(boundary_tie_past_limit=...), which REPLACES the
+      order-aware `>= 2` heuristic with the precise signal: a one-visible-row tie
+      that is tied past the cutoff is now ACCEPTED (the false positive is gone),
+      AND a >= 2-visible COMPLETE final group that differs is now CAUGHT (a false
+      negative the heuristic masked). None falls back to the `>= 2` heuristic, so
+      the change is additive; TPC-Havoc (no order_aware) stays byte-identical (440
+      cells, 0 divergent). Regression tests: comparator
+      (test_boundary_probe_* in test_tpchavoc_validation_coverage) and the probe
+      itself (TestBoundaryTiedPastLimitProbe in test_cross_surface). All five
+      enforced gates stay green.
+
+      RESIDUAL (smaller, separate): the ORDER-BLIND boundary heuristic
+      (_is_tie_ambiguous_boundary, used only when the ORDER BY does not resolve to
+      result columns - e.g. ORDER BY a non-projected column, or SELECT *) cannot
+      consume the result-column probe and keeps its own `>= 2` guard, so its
+      one-visible-row false positive remains. It affects only the minority of
+      gated queries with an unmappable ORDER BY and is latent (all gates pass).
 
 deferred:
+  - summary: "Extend the boundary-tie probe to the order-BLIND heuristic (unmappable ORDER BY / SELECT *)"
+    reason: "The LIMIT N+1 probe needs a resolved order-key column to compare; order-blind queries have none, so they keep the `>= 2` heuristic and its one-visible-row false positive. Minority of gated queries, latent (all gates pass). A fix would need a different probe (e.g. compare full first-dropped vs last-kept rows, or derive the boundary column from the order-blind heuristic's monotonic-column pick)."
   - summary: "Reworking the gate to compare untruncated result sets generally"
     reason: "Out of scope - changing query shape (dropping LIMITs) would change what the cross-surface gate measures; the probe in w1 is the targeted, additive fix."

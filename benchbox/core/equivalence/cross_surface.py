@@ -228,6 +228,53 @@ def _resolve_order_term(
     return expr_to_index.get(target.sql(dialect="duckdb", normalize=True).lower())
 
 
+def _boundary_tied_past_limit(connection: Any, sql: str, order_by: Sequence[int] | None) -> bool | None:
+    """Probe whether a trailing-``LIMIT`` query's final order key is tied PAST the cutoff.
+
+    The tie-aware comparator must accept a final-group membership difference only
+    when the boundary order-key value is genuinely truncated by the ``LIMIT`` (more
+    rows share it beyond the cutoff). From the truncated result alone a one-visible-
+    row boundary tie and a deterministic unique last row are indistinguishable, so
+    we ask the SQL reference directly: re-run it at ``LIMIT N+1`` and check whether
+    the first dropped row shares the final kept row's order-key value.
+
+    Returns ``True`` (tied past the cutoff -> accept the boundary swap), ``False``
+    (the final group is complete / untruncated -> it must match exactly), or
+    ``None`` when the question does not apply or cannot be answered (no resolvable
+    ORDER BY key, no integer ``LIMIT``, or the probe query fails) - the caller then
+    keeps the order-aware ``>= 2`` heuristic.
+    """
+    if not order_by:
+        return None
+    import sqlglot
+    from sqlglot import exp
+
+    try:
+        tree = sqlglot.parse_one(sql, read="duckdb")
+    except Exception:
+        return None
+    limit = tree.find(exp.Limit)
+    if limit is None or not isinstance(limit.expression, exp.Literal) or not limit.expression.is_int:
+        return None
+    n = int(limit.expression.name)
+    if n < 1:
+        return None
+    limit.set("expression", exp.Literal.number(n + 1))
+    try:
+        probe_rows = connection.execute(tree.sql(dialect="duckdb")).fetchall()
+    except Exception:
+        return None
+    if len(probe_rows) <= n:
+        # The original LIMIT N did not truncate (fewer than N+1 rows exist), so the
+        # final group is complete: a membership difference there is a real bug.
+        return False
+    last_kept, first_dropped = probe_rows[n - 1], probe_rows[n]
+    try:
+        return all(last_kept[c] == first_dropped[c] for c in order_by)
+    except IndexError:
+        return None
+
+
 @dataclass(frozen=True)
 class CrossSurfaceData:
     """Everything the gate needs to compare a benchmark's two surfaces.
@@ -357,6 +404,13 @@ def find_cross_surface_divergences(
         # order-insensitive comparison rather than a silent order-blind "pass".
         order_by = _order_by_result_key(sql)
         order_aware = order_by is not None
+        # Precise boundary signal for the order-aware final-group guard: only a
+        # truncated top-N with a resolvable order key can have an ambiguous
+        # boundary tie, so probe (LIMIT N+1) only then; otherwise keep the
+        # comparator's >= 2 heuristic (boundary_tie_past_limit=None).
+        boundary_tie_past_limit = (
+            _boundary_tied_past_limit(connection, sql, order_by) if (tie_aware and order_aware) else None
+        )
         for backend in backends:
             impl = query.get_impl_for_family(backend)
             if impl is None:
@@ -373,6 +427,7 @@ def find_cross_surface_divergences(
                 tie_aware: bool = tie_aware,
                 order_aware: bool = order_aware,
                 order_by: list[int] | None = order_by,
+                boundary_tie_past_limit: bool | None = boundary_tie_past_limit,
             ) -> None:
                 candidate = materialize_rows(impl(contexts[backend]))
                 validator.validate_results_exact(
@@ -383,6 +438,7 @@ def find_cross_surface_divergences(
                     tie_aware=tie_aware,
                     order_aware=order_aware,
                     order_by=order_by,
+                    boundary_tie_past_limit=boundary_tie_past_limit,
                 )
 
             yield backend, check

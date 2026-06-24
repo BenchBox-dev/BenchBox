@@ -136,6 +136,56 @@ def test_order_aware_rejects_interior_value_bug() -> None:
         validator.validate_results_exact(original, variant, 1, 0, order_by=[1], order_aware=True, tie_aware=True)
 
 
+# --- boundary_tie_past_limit: the precise LIMIT N+1 probe signal ---------------
+# When the gate supplies the probe result, it REPLACES the >= 2 heuristic: the
+# final-group membership difference is accepted iff the boundary key is genuinely
+# tied past the LIMIT cutoff, regardless of how many tied rows are visible.
+
+
+def test_boundary_probe_true_accepts_single_visible_row_tie() -> None:
+    """A one-visible-row final tie that IS tied past the cutoff is accepted (the
+    boundary-tie-soundness false positive the >= 2 heuristic could not."""
+    validator = ResultValidator()
+    original = [("a", 10), ("b", 5)]  # final group v=5 has one visible row
+    variant = [("a", 10), ("z", 5)]  # a different equally-valid member of the v=5 tie
+    assert validator.validate_results_exact(
+        original, variant, 1, 0, order_by=[1], order_aware=True, tie_aware=True, boundary_tie_past_limit=True
+    )
+
+
+def test_boundary_probe_false_rejects_complete_final_group_difference() -> None:
+    """A >= 2-visible final group that is COMPLETE (not truncated) must match
+    exactly - the precise signal catches what the >= 2 heuristic would mask."""
+    validator = ResultValidator()
+    original = [("a", 3), ("b", 1), ("c", 1)]  # v=1 final group, complete
+    variant = [("a", 3), ("x", 1), ("y", 1)]  # different members -> a real bug here
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(
+            original, variant, 1, 0, order_by=[1], order_aware=True, tie_aware=True, boundary_tie_past_limit=False
+        )
+
+
+def test_boundary_probe_false_rejects_single_row_value_bug() -> None:
+    """A deterministic unique last row ((2,'good') vs (2,'bad')) is caught."""
+    validator = ResultValidator()
+    original = [("a", 3), ("good", 2)]
+    variant = [("a", 3), ("bad", 2)]
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(
+            original, variant, 1, 0, order_by=[1], order_aware=True, tie_aware=True, boundary_tie_past_limit=False
+        )
+
+
+def test_boundary_probe_none_falls_back_to_size_heuristic() -> None:
+    """Without a probe, the >= 2 heuristic stands: 1 visible -> caught, >= 2 -> accepted."""
+    validator = ResultValidator()
+    one = ([("a", 10), ("b", 5)], [("a", 10), ("z", 5)])
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(*one, 1, 0, order_by=[1], order_aware=True, tie_aware=True)
+    two = ([("a", 3), ("b", 1), ("c", 1)], [("a", 3), ("x", 1), ("y", 1)])
+    assert validator.validate_results_exact(*two, 1, 0, order_by=[1], order_aware=True, tie_aware=True)
+
+
 @pytest.mark.parametrize(
     ("original", "variant", "message"),
     [

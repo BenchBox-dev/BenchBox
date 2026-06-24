@@ -353,3 +353,55 @@ def test_order_by_result_key_refuses_unmappable_keys():
     assert resolve("SELECT a FROM t ORDER BY b") is None  # ORDER BY a non-projected column
     assert resolve("SELECT a, b FROM t ORDER BY 5") is None  # out-of-range ordinal
     assert resolve("this is not sql ;;;") is None  # unparseable
+
+
+class TestBoundaryTiedPastLimitProbe:
+    """The LIMIT N+1 probe that gives the comparator a precise boundary signal."""
+
+    def _conn(self):
+        duckdb = pytest.importorskip("duckdb")
+        pytest.importorskip("sqlglot")
+        c = duckdb.connect(":memory:")
+        c.execute("CREATE TABLE t(k VARCHAR, v INTEGER)")
+        c.execute("INSERT INTO t VALUES ('a',10),('b',5),('c',5),('d',5)")
+        return c
+
+    def test_tied_past_cutoff_is_true(self):
+        from benchbox.core.equivalence.cross_surface import _boundary_tied_past_limit, _order_by_result_key
+
+        c = self._conn()
+        try:
+            sql = "SELECT k, v FROM t ORDER BY v DESC LIMIT 2"  # keeps [10,5]; v=5 has 3 rows
+            assert _boundary_tied_past_limit(c, sql, _order_by_result_key(sql)) is True
+        finally:
+            c.close()
+
+    def test_complete_final_group_is_false(self):
+        from benchbox.core.equivalence.cross_surface import _boundary_tied_past_limit, _order_by_result_key
+
+        c = self._conn()
+        try:
+            sql = "SELECT k, v FROM t ORDER BY v DESC LIMIT 1"  # top v=10 is unique
+            assert _boundary_tied_past_limit(c, sql, _order_by_result_key(sql)) is False
+        finally:
+            c.close()
+
+    def test_untruncated_is_false(self):
+        from benchbox.core.equivalence.cross_surface import _boundary_tied_past_limit, _order_by_result_key
+
+        c = self._conn()
+        try:
+            sql = "SELECT k, v FROM t ORDER BY v DESC LIMIT 10"  # only 4 rows exist
+            assert _boundary_tied_past_limit(c, sql, _order_by_result_key(sql)) is False
+        finally:
+            c.close()
+
+    def test_no_order_key_or_no_limit_is_none(self):
+        from benchbox.core.equivalence.cross_surface import _boundary_tied_past_limit
+
+        c = self._conn()
+        try:
+            assert _boundary_tied_past_limit(c, "SELECT k, v FROM t ORDER BY v DESC LIMIT 2", None) is None
+            assert _boundary_tied_past_limit(c, "SELECT k, v FROM t ORDER BY v DESC", [1]) is None
+        finally:
+            c.close()
