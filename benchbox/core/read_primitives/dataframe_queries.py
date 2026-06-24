@@ -638,46 +638,50 @@ for _spec in (
         ("l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"),
         None,
     ),
+    # The *_selective / *_in_list / *_like filter queries are `SELECT * FROM <t>
+    # WHERE ...` on the SQL surface, so the DataFrame surface must project every
+    # column in schema order (the prior 4-col subsets caused column-count
+    # divergences). An empty result still carries the full schema.
     (
         "filter_bigint_selective",
         "orders",
         (("o_orderkey", "eq", 1234567, False),),
-        ("o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"),
+        ("o_orderkey", "o_custkey", "o_orderstatus", "o_totalprice", "o_orderdate", "o_orderpriority", "o_clerk", "o_shippriority", "o_comment"),
         None,
     ),
     (
         "filter_bigint_in_list",
         "orders",
         (("o_orderkey", "in", [1, 100, 1000, 10000, 100000], False),),
-        ("o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"),
+        ("o_orderkey", "o_custkey", "o_orderstatus", "o_totalprice", "o_orderdate", "o_orderpriority", "o_clerk", "o_shippriority", "o_comment"),
         None,
     ),
     (
         "filter_decimal_selective",
         "lineitem",
         (("l_extendedprice", "eq", 12345.67, False), ("l_discount", "eq", 0.05, False)),
-        ("l_orderkey", "l_partkey", "l_extendedprice", "l_discount"),
+        ("l_orderkey", "l_partkey", "l_suppkey", "l_linenumber", "l_quantity", "l_extendedprice", "l_discount", "l_tax", "l_returnflag", "l_linestatus", "l_shipdate", "l_commitdate", "l_receiptdate", "l_shipinstruct", "l_shipmode", "l_comment"),
         None,
     ),
     (
         "filter_decimal_in_list",
         "lineitem",
         (("l_extendedprice", "in", [1000.00, 5000.00, 10000.00, 50000.00], False),),
-        ("l_orderkey", "l_partkey", "l_extendedprice", "l_quantity"),
+        ("l_orderkey", "l_partkey", "l_suppkey", "l_linenumber", "l_quantity", "l_extendedprice", "l_discount", "l_tax", "l_returnflag", "l_linestatus", "l_shipdate", "l_commitdate", "l_receiptdate", "l_shipinstruct", "l_shipmode", "l_comment"),
         None,
     ),
     (
         "filter_string_selective",
         "customer",
         (("c_name", "eq", "Customer#000001234", False),),
-        ("c_custkey", "c_name", "c_address", "c_phone"),
+        ("c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"),
         None,
     ),
     (
         "filter_string_like",
         "part",
         (("p_name", "contains", "COPPER", False),),
-        ("p_partkey", "p_name", "p_type", "p_size"),
+        ("p_partkey", "p_name", "p_mfgr", "p_brand", "p_type", "p_size", "p_container", "p_retailprice", "p_comment"),
         None,
     ),
     ("limit", "lineitem", (), ("l_orderkey", "l_partkey", "l_suppkey", "l_quantity"), 1000),
@@ -828,19 +832,36 @@ for _spec in (
     ("orderby_desc", "orders", ("o_orderkey", "o_totalprice", "o_orderdate"), ("o_totalprice",), True, 100),
     ("topn", "lineitem", ("l_orderkey", "l_partkey", "l_extendedprice"), ("l_extendedprice",), True, 10),
     (
+        # SQL is `SELECT * FROM customer ORDER BY c_custkey` (8 cols). The prior
+        # 7-col projection dropped c_comment.
         "orderby_all",
         "customer",
-        ("c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment"),
+        ("c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"),
         ("c_custkey",),
         False,
         None,
     ),
     (
+        # SQL is `SELECT * FROM orders ORDER BY o_orderpriority, o_orderdate DESC,
+        # o_totalprice DESC LIMIT 100` (9 cols). Project all orders columns in
+        # schema order; append o_orderkey (PK) as a deterministic tie-break so the
+        # LIMIT-100 boundary is a total order (the catalog SQL carries the same
+        # trailing key).
         "orderby_multicol",
         "orders",
-        ("o_orderkey", "o_custkey", "o_orderpriority", "o_orderdate", "o_totalprice"),
-        ("o_orderpriority", "o_orderdate", "o_totalprice"),
-        (False, True, True),
+        (
+            "o_orderkey",
+            "o_custkey",
+            "o_orderstatus",
+            "o_totalprice",
+            "o_orderdate",
+            "o_orderpriority",
+            "o_clerk",
+            "o_shippriority",
+            "o_comment",
+        ),
+        ("o_orderpriority", "o_orderdate", "o_totalprice", "o_orderkey"),
+        (False, True, True, False),
         100,
     ),
     (
