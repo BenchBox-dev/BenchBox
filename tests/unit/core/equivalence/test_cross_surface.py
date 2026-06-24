@@ -323,6 +323,25 @@ def test_clickbench_and_joinorder_are_enforced_gates():
     assert "ssb" in GATES
 
 
+def test_h2odb_is_an_enforced_gate_with_classified_percentile_exception():
+    """H2O-DB is an enforced GATE; its only baseline entry is Q9's DECIMAL percentile.
+
+    DuckDB's PERCENTILE_CONT over the DECIMAL(8,2) fare_amount column returns a
+    value at the column's 2-decimal scale, while the DataFrame computes the same
+    linear-interpolated percentile over float64 - a deterministic sub-cent
+    presentational difference classified (not masked) for both backends. Every
+    other H2O-DB cell must match, so no other key is in the baseline.
+    """
+    from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES, get_gate
+
+    assert "h2odb" in GATES
+    assert "h2odb" not in STAGED_GATES
+    assert get_gate("h2odb").name == "h2odb"
+    assert set(GATES["h2odb"].known_divergences) == {"Q9_expression", "Q9_pandas"}
+    # Runs on a smaller-than-default bounded cell (its generator base is 10M rows).
+    assert GATES["h2odb"].scale_factor == 0.01
+
+
 def test_order_by_result_key_maps_alias_name_expr_and_ordinal():
     """_order_by_result_key resolves the ORDER BY shapes the gated queries use."""
     from benchbox.core.equivalence.cross_surface import _order_by_result_key as resolve

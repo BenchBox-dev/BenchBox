@@ -53,9 +53,12 @@ Currently gated (enforced :data:`GATES`): ssb (canonical and small; SQL and
 DataFrame ids correspond 1:1 as ``Q1.1`` .. ``Q4.3``), amplab (8 queries; the SQL
 ids ``"1"``, ``"1a"``, ``"2"`` .. ``"5"`` map 1:1 to the DataFrame ids by a
 mechanical ``Q`` prefix: ``"Q1"``, ``"Q1a"``, ``"Q2"`` .. ``"Q5"``), coffeeshop,
-clickbench (the one classified exception is the order-less ``Q18``) and
-joinorder_synthetic. Additional dual-surface benchmarks are added by registering a
-:class:`CrossSurfaceGate` in :data:`GATES`.
+clickbench (the one classified exception is the order-less ``Q18``),
+joinorder_synthetic and h2odb (single ``trips`` table; SQL and DataFrame ids
+correspond 1:1 as ``Q1`` .. ``Q10``; the one classified exception is ``Q9``'s
+PERCENTILE_CONT, where DuckDB returns the percentile at the source column's
+DECIMAL(8,2) scale - see ``_H2ODB_PERCENTILE_DECIMAL``). Additional dual-surface
+benchmarks are added by registering a :class:`CrossSurfaceGate` in :data:`GATES`.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -678,6 +681,44 @@ def build_joinorder_synthetic_duckdb(scale_factor: float, output_dir: Path) -> C
     )
 
 
+def build_h2odb_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
+    """Generate H2O-DB data, load it into in-memory DuckDB, and wire both surfaces.
+
+    Mirrors :func:`build_ssb_duckdb` via :func:`_load_duckdb_cell`. H2O-DB is a
+    single wide ``trips`` table; the SQL surface (``H2OQueryManager``, ids
+    ``Q1``..``Q10``) and the ``H2ODB_DATAFRAME_QUERIES`` registry key by the same
+    ids 1:1, so no id normalization is needed. The generator is seeded
+    (``random.seed(42)`` in its ``__init__``), so the bounded cell is reproducible.
+
+    H2O-DB's generator base is the published 10M-row small tier, so the shared
+    ``EQUIVALENCE_SCALE`` (0.1) would generate ~1M rows - far from a cheap bounded
+    cell and ~100x the other gates' row counts. The gate therefore runs at a
+    smaller per-gate ``scale_factor`` (see :data:`GATES`); every query stays fully
+    discriminating at that cell (low-cardinality group keys: passenger_count <= 6,
+    vendor_id = 2, hour = 24, year span 5, pickup_location_id <= 263; the
+    percentile and top-10 queries are well-determined over the remaining rows).
+    Platform/generator imports are deferred so importing this module stays cheap.
+    """
+    from benchbox.core.h2odb.benchmark import H2OBenchmark
+    from benchbox.core.h2odb.dataframe_queries import H2ODB_DATAFRAME_QUERIES
+    from benchbox.core.h2odb.generator import H2ODataGenerator
+    from benchbox.core.h2odb.schema import TABLES
+
+    output_dir = Path(output_dir)
+    H2ODataGenerator(scale_factor=scale_factor, output_dir=output_dir).generate_data()
+    benchmark = H2OBenchmark(scale_factor=scale_factor, output_dir=output_dir)
+
+    connection = _load_duckdb_cell(benchmark, output_dir, [table["name"] for table in TABLES.values()], label="H2O-DB")
+    return CrossSurfaceData(
+        connection=connection,
+        query_ids=list(benchmark.get_queries().keys()),
+        reference_sql=lambda query_id: benchmark.get_query(query_id),
+        dataframe_query=lambda query_id: H2ODB_DATAFRAME_QUERIES.get_or_raise(query_id),
+        benchmark=benchmark,
+        data_dir=output_dir,
+    )
+
+
 # Q18 is `SELECT UserID, SearchPhrase, COUNT(*) ... GROUP BY ... LIMIT 10` with NO
 # ORDER BY: at SF=0.1 the GROUP BY yields ~97k groups and the bare LIMIT keeps an
 # arbitrary 10, so the SQL and DataFrame surfaces each return a different - but
@@ -748,6 +789,44 @@ _CLICKBENCH_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(
     ("Q20", "Q23", "Q28", "Q29", "Q39", "Q40", "Q41", "Q42"), _CLICKBENCH_VACUOUS
 )
 
+# H2O-DB bounded-cell scale. Its generator base is the 10M-row small tier, so the
+# shared EQUIVALENCE_SCALE (0.1) would emit ~1M rows; 0.01 gives a ~100k-row cell
+# (comparable to ClickBench's SF=0.1 cell) that is cheap yet keeps every H2O-DB
+# query discriminating (see build_h2odb_duckdb for the per-query argument).
+_H2ODB_SCALE = 0.01
+
+# H2O-DB Q9 is the only classified cell: it computes PERCENTILE_CONT(0.5, 0.9) of
+# fare_amount, a DECIMAL(8,2) column. DuckDB's PERCENTILE_CONT over a DECIMAL
+# column returns a DECIMAL of the SAME scale (verified: typeof(...) == DECIMAL(8,2)),
+# so the continuous (linear-interpolated) percentile is rounded to 2 decimals on
+# the SQL surface (e.g. p90 of the passenger_count=4 group = 77.87). The DataFrame
+# surface loads fare_amount as float64 (the loader maps DECIMAL -> float) and
+# computes the SAME linear-interpolated percentile, keeping full precision (77.874).
+# This is NOT a logic or interpolation-method bug: both DataFrame backends use
+# linear interpolation and agree with EACH OTHER to full precision, and casting the
+# SQL argument to DOUBLE (PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY
+# fare_amount::DOUBLE)) yields 77.874 too - proving the only difference is DuckDB's
+# DECIMAL(8,2) result scale. The sub-cent gap (<= 0.005, the 3rd decimal of a
+# 2-decimal currency) cannot be reproduced faithfully in float (DuckDB's DECIMAL
+# rounding is not standard float round-half-away: the passenger_count=5 group rounds
+# 77.915 -> 77.91, not 77.92). It is classified here - the last-resort option, with
+# justification - rather than masked or papered over with a fragile per-query
+# round(). The polars backend originally defaulted to "nearest" interpolation (a
+# REAL divergence: it disagreed with both pandas and SQL) and was FIXED to linear in
+# the same change; only this DECIMAL-scale residue is classified. Q9's median column
+# (0.5) matches exactly on both surfaces; only the p90 column carries the residue.
+_H2ODB_PERCENTILE_DECIMAL = (
+    "PERCENTILE_CONT over the DECIMAL(8,2) fare_amount column returns a DECIMAL(8,2) "
+    "on the SQL surface (continuous percentile rounded to the column's 2-decimal "
+    "scale), while the DataFrame surface computes the same linear-interpolated "
+    "percentile over float64 (DECIMAL->float at load) and keeps full precision. Both "
+    "DataFrame backends use linear interpolation and agree; casting the SQL to DOUBLE "
+    "yields the DataFrame value, so the only difference is DuckDB's DECIMAL result "
+    "scale - a deterministic, sub-cent presentational/dtype difference, not a logic bug."
+)
+_H2ODB_KNOWN_DIVERGENCES: dict[str, str] = dict.fromkeys(("Q9_expression", "Q9_pandas"), _H2ODB_PERCENTILE_DECIMAL)
+
+
 # Registry of ENFORCED gated benchmarks: clean, blocking cross-surface gates whose
 # DataFrame surface matches its SQL surface. The oracle coverage map reads this set
 # to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
@@ -771,14 +850,24 @@ GATES: dict[str, CrossSurfaceGate] = {
         legitimately_empty=_CLICKBENCH_LEGITIMATELY_EMPTY,
     ),
     "joinorder_synthetic": CrossSurfaceGate(name="joinorder_synthetic", build=build_joinorder_synthetic_duckdb),
+    # H2O-DB's generator base is the published 10M-row small tier, so the shared
+    # EQUIVALENCE_SCALE (0.1) would generate ~1M rows - far from a cheap bounded
+    # cell. Run this gate on a smaller cell (~100k rows, comparable to ClickBench's
+    # SF=0.1 100k-row cell) where every H2O-DB query is still fully discriminating.
+    "h2odb": CrossSurfaceGate(
+        name="h2odb",
+        build=build_h2odb_duckdb,
+        known_divergences=_H2ODB_KNOWN_DIVERGENCES,
+        scale_factor=_H2ODB_SCALE,
+    ),
 }
 
 # Staged gates: a load-faithful builder is wired and runnable in report mode, but
 # the benchmark still has open cross-surface divergences to burn down before it can
 # be promoted into GATES (and made a blocking CI gate). Kept OUT of GATES so the
 # coverage map does not prematurely mark these benchmarks "guarded". Currently empty
-# - clickbench and joinorder_synthetic graduated to GATES; the next gateable
-# benchmarks (datavault, flightdata, h2odb, nyctaxi, read_primitives, tpcds_obt,
+# - clickbench, joinorder_synthetic and h2odb graduated to GATES; the next gateable
+# benchmarks (datavault, flightdata, nyctaxi, read_primitives, tpcds_obt,
 # tpch_skew, tsbs_devops) land here first when their builders are wired.
 STAGED_GATES: dict[str, CrossSurfaceGate] = {}
 
