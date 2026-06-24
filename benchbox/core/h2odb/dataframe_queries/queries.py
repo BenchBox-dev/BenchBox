@@ -253,11 +253,15 @@ def q9_expression_impl(ctx: DataFrameContext) -> Any:
     """Q9: PERCENTILE_CONT(0.5, 0.9) of fare_amount GROUP BY passenger_count."""
     trips = ctx.get_table("trips")
     col = ctx.col
+    # SQL PERCENTILE_CONT is the continuous (linear-interpolated) percentile, so
+    # request linear interpolation explicitly: Polars' quantile default is
+    # "nearest" (which would diverge from both the SQL surface and the pandas
+    # backend, whose own default is linear).
     return (
         trips.group_by("passenger_count")
         .agg(
-            col("fare_amount").quantile(0.5).alias("median_fare_amount"),
-            col("fare_amount").quantile(0.9).alias("p90_fare_amount"),
+            col("fare_amount").quantile(0.5, interpolation="linear").alias("median_fare_amount"),
+            col("fare_amount").quantile(0.9, interpolation="linear").alias("p90_fare_amount"),
         )
         .sort("passenger_count")
     )
@@ -267,8 +271,18 @@ def q9_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q9: PERCENTILE_CONT(0.5, 0.9) of fare_amount GROUP BY passenger_count."""
     trips = ctx.get_table("trips")
     grouped = trips.groupby("passenger_count")["fare_amount"]
-    median = grouped.quantile(0.5).reset_index().rename(columns={"fare_amount": "median_fare_amount"})
-    p90 = grouped.quantile(0.9).reset_index().rename(columns={"fare_amount": "p90_fare_amount"})
+    # interpolation="linear" is pandas' default; stated explicitly to match the
+    # SQL PERCENTILE_CONT semantics and the Polars backend (see above).
+    median = (
+        grouped.quantile(0.5, interpolation="linear")
+        .reset_index()
+        .rename(columns={"fare_amount": "median_fare_amount"})
+    )
+    p90 = (
+        grouped.quantile(0.9, interpolation="linear")
+        .reset_index()
+        .rename(columns={"fare_amount": "p90_fare_amount"})
+    )
     return median.merge(p90, on="passenger_count").sort_values("passenger_count")
 
 
