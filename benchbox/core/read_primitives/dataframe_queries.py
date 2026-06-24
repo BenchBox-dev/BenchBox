@@ -646,28 +646,82 @@ for _spec in (
         "filter_bigint_selective",
         "orders",
         (("o_orderkey", "eq", 1234567, False),),
-        ("o_orderkey", "o_custkey", "o_orderstatus", "o_totalprice", "o_orderdate", "o_orderpriority", "o_clerk", "o_shippriority", "o_comment"),
+        (
+            "o_orderkey",
+            "o_custkey",
+            "o_orderstatus",
+            "o_totalprice",
+            "o_orderdate",
+            "o_orderpriority",
+            "o_clerk",
+            "o_shippriority",
+            "o_comment",
+        ),
         None,
     ),
     (
         "filter_bigint_in_list",
         "orders",
         (("o_orderkey", "in", [1, 100, 1000, 10000, 100000], False),),
-        ("o_orderkey", "o_custkey", "o_orderstatus", "o_totalprice", "o_orderdate", "o_orderpriority", "o_clerk", "o_shippriority", "o_comment"),
+        (
+            "o_orderkey",
+            "o_custkey",
+            "o_orderstatus",
+            "o_totalprice",
+            "o_orderdate",
+            "o_orderpriority",
+            "o_clerk",
+            "o_shippriority",
+            "o_comment",
+        ),
         None,
     ),
     (
         "filter_decimal_selective",
         "lineitem",
         (("l_extendedprice", "eq", 12345.67, False), ("l_discount", "eq", 0.05, False)),
-        ("l_orderkey", "l_partkey", "l_suppkey", "l_linenumber", "l_quantity", "l_extendedprice", "l_discount", "l_tax", "l_returnflag", "l_linestatus", "l_shipdate", "l_commitdate", "l_receiptdate", "l_shipinstruct", "l_shipmode", "l_comment"),
+        (
+            "l_orderkey",
+            "l_partkey",
+            "l_suppkey",
+            "l_linenumber",
+            "l_quantity",
+            "l_extendedprice",
+            "l_discount",
+            "l_tax",
+            "l_returnflag",
+            "l_linestatus",
+            "l_shipdate",
+            "l_commitdate",
+            "l_receiptdate",
+            "l_shipinstruct",
+            "l_shipmode",
+            "l_comment",
+        ),
         None,
     ),
     (
         "filter_decimal_in_list",
         "lineitem",
         (("l_extendedprice", "in", [1000.00, 5000.00, 10000.00, 50000.00], False),),
-        ("l_orderkey", "l_partkey", "l_suppkey", "l_linenumber", "l_quantity", "l_extendedprice", "l_discount", "l_tax", "l_returnflag", "l_linestatus", "l_shipdate", "l_commitdate", "l_receiptdate", "l_shipinstruct", "l_shipmode", "l_comment"),
+        (
+            "l_orderkey",
+            "l_partkey",
+            "l_suppkey",
+            "l_linenumber",
+            "l_quantity",
+            "l_extendedprice",
+            "l_discount",
+            "l_tax",
+            "l_returnflag",
+            "l_linestatus",
+            "l_shipdate",
+            "l_commitdate",
+            "l_receiptdate",
+            "l_shipinstruct",
+            "l_shipmode",
+            "l_comment",
+        ),
         None,
     ),
     (
@@ -2367,11 +2421,15 @@ def optimizer_distinct_elimination_expression_impl(ctx: DataFrameContext) -> Any
     col = ctx.col
     lit = ctx.lit
 
-    # Apply DISTINCT even though o_orderkey is unique (optimizer should eliminate)
+    # SQL: date window AND o_totalprice > 50000, DISTINCT, ORDER BY o_orderkey,
+    # LIMIT 2000.
     return (
         orders.filter((col("o_orderdate") >= lit(date(1995, 1, 1))) & (col("o_orderdate") < lit(date(1996, 1, 1))))
+        .filter(col("o_totalprice") > lit(50000))
         .select("o_orderkey", "o_custkey", "o_orderdate", "o_totalprice")
-        .unique()  # Should be eliminated by optimizer since o_orderkey is unique
+        .unique()
+        .sort("o_orderkey")
+        .limit(2000)
     )
 
 
@@ -2379,8 +2437,18 @@ def optimizer_distinct_elimination_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test DISTINCT elimination when result is already unique (PK included)."""
     orders = ctx.get_table("orders")
 
-    filtered = orders[(orders["o_orderdate"] >= date(1995, 1, 1)) & (orders["o_orderdate"] < date(1996, 1, 1))]
-    return filtered[["o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"]].drop_duplicates()
+    filtered = orders[
+        (orders["o_orderdate"] >= date(1995, 1, 1))
+        & (orders["o_orderdate"] < date(1996, 1, 1))
+        & (orders["o_totalprice"] > 50000)
+    ]
+    return (
+        filtered[["o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"]]
+        .drop_duplicates()
+        .sort_values("o_orderkey")
+        .head(2000)
+        .reset_index(drop=True)
+    )
 
 
 def optimizer_common_subexpression_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2440,13 +2508,17 @@ def optimizer_predicate_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    # Join first, THEN filter (optimizer should push predicates down)
+    # SQL: c_nationkey=15 AND date window AND c_mktsegment='BUILDING',
+    # ORDER BY o_totalprice DESC, LIMIT 1000.
     return (
         customer.join(orders, col("c_custkey") == col("o_custkey"))
-        .filter(col("c_nationkey") == lit(15))  # Predicate on customer - should push before join
-        .filter(col("o_orderdate") >= lit(date(1995, 1, 1)))  # Predicate on orders - should push before join
+        .filter(col("c_nationkey") == lit(15))
+        .filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
+        .filter(col("o_orderdate") < lit(date(1996, 1, 1)))
+        .filter(col("c_mktsegment") == lit("BUILDING"))
         .select("c_name", "c_mktsegment", "o_orderdate", "o_totalprice")
-        .limit(100)
+        .sort(["o_totalprice", "c_name", "o_orderdate"], descending=[True, False, False])
+        .limit(1000)
     )
 
 
@@ -2454,10 +2526,19 @@ def optimizer_predicate_pushdown_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test predicate pushdown through joins."""
     customer, orders = _tables(ctx, "customer", "orders")
 
-    # Join first, then filter (pandas doesn't optimize, but tests the pattern)
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    filtered = merged[(merged["c_nationkey"] == 15) & (merged["o_orderdate"] >= date(1995, 1, 1))]
-    return filtered[["c_name", "c_mktsegment", "o_orderdate", "o_totalprice"]].head(100)
+    filtered = merged[
+        (merged["c_nationkey"] == 15)
+        & (merged["o_orderdate"] >= date(1995, 1, 1))
+        & (merged["o_orderdate"] < date(1996, 1, 1))
+        & (merged["c_mktsegment"] == "BUILDING")
+    ]
+    return (
+        filtered[["c_name", "c_mktsegment", "o_orderdate", "o_totalprice"]]
+        .sort_values(["o_totalprice", "c_name", "o_orderdate"], ascending=[False, True, True])
+        .head(1000)
+        .reset_index(drop=True)
+    )
 
 
 def optimizer_join_reordering_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2469,17 +2550,23 @@ def optimizer_join_reordering_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    # Join in "bad" order: orders (largest) -> customer -> nation (smallest)
-    # Good optimizer should reorder to nation -> customer -> orders
+    # SQL: n_regionkey=1 AND date window, GROUP BY n_name,c_name,
+    # HAVING COUNT(o_orderkey) > 5, ORDER BY total_value DESC, LIMIT 100.
     return (
         orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
+        .filter(col("o_orderdate") < lit(date(1996, 1, 1)))
         .join(customer, col("o_custkey") == col("c_custkey"))
         .join(nation, col("c_nationkey") == col("n_nationkey"))
+        .filter(col("n_regionkey") == lit(1))
         .group_by("n_name", "c_name")
         .agg(
             col("o_orderkey").count().alias("order_count"),
             col("o_totalprice").sum().alias("total_value"),
         )
+        .filter(col("order_count") > lit(5))
+        .select("n_name", "c_name", "order_count", "total_value")
+        .sort(["total_value", "n_name", "c_name"], descending=[True, False, False])
+        .limit(100)
     )
 
 
@@ -2487,14 +2574,21 @@ def optimizer_join_reordering_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test join reordering optimization."""
     orders, customer, nation = _tables(ctx, "orders", "customer", "nation")
 
-    # Join in suboptimal order
-    filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)]
+    filtered = orders[(orders["o_orderdate"] >= date(1995, 1, 1)) & (orders["o_orderdate"] < date(1996, 1, 1))]
     merged = filtered.merge(customer, left_on="o_custkey", right_on="c_custkey")
     merged = merged.merge(nation, left_on="c_nationkey", right_on="n_nationkey")
+    merged = merged[merged["n_regionkey"] == 1]
 
-    return merged.groupby(["n_name", "c_name"], as_index=False).agg(
+    grouped = merged.groupby(["n_name", "c_name"], as_index=False).agg(
         order_count=("o_orderkey", "count"),
         total_value=("o_totalprice", "sum"),
+    )
+    grouped = grouped[grouped["order_count"] > 5]
+    return (
+        grouped[["n_name", "c_name", "order_count", "total_value"]]
+        .sort_values(["total_value", "n_name", "c_name"], ascending=[False, True, True])
+        .head(100)
+        .reset_index(drop=True)
     )
 
 
@@ -2507,13 +2601,17 @@ def optimizer_limit_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    # Join and sort, then limit at the end only
+    # SQL: c_mktsegment='BUILDING' AND date window, ORDER BY o_totalprice DESC,
+    # LIMIT 100. Append c_name,o_orderdate as deterministic tie-breaks so the
+    # LIMIT-100 boundary is a total order across engines.
     return (
         customer.join(orders, col("c_custkey") == col("o_custkey"))
+        .filter(col("c_mktsegment") == lit("BUILDING"))
         .filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
+        .filter(col("o_orderdate") < lit(date(1996, 1, 1)))
         .select("c_name", "c_mktsegment", "o_orderdate", "o_totalprice", "o_orderpriority")
-        .sort("o_totalprice", descending=True)
-        .limit(100)  # Optimizer should push partial limit into join
+        .sort(["o_totalprice", "c_name", "o_orderdate"], descending=[True, False, False])
+        .limit(100)
     )
 
 
@@ -2522,11 +2620,16 @@ def optimizer_limit_pushdown_pandas_impl(ctx: DataFrameContext) -> Any:
     customer, orders = _tables(ctx, "customer", "orders")
 
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    filtered = merged[merged["o_orderdate"] >= date(1995, 1, 1)]
+    filtered = merged[
+        (merged["c_mktsegment"] == "BUILDING")
+        & (merged["o_orderdate"] >= date(1995, 1, 1))
+        & (merged["o_orderdate"] < date(1996, 1, 1))
+    ]
     return (
         filtered[["c_name", "c_mktsegment", "o_orderdate", "o_totalprice", "o_orderpriority"]]
-        .sort_values("o_totalprice", ascending=False)
+        .sort_values(["o_totalprice", "c_name", "o_orderdate"], ascending=[False, True, True])
         .head(100)
+        .reset_index(drop=True)
     )
 
 
@@ -2539,16 +2642,24 @@ def optimizer_aggregate_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    # Join first, then aggregate (optimizer can push partial agg before join)
+    # SQL: c_nationkey=15 AND date window, GROUP BY c_custkey,c_name,c_mktsegment,
+    # c_nationkey, HAVING SUM(o_totalprice) > 500000, ORDER BY total_spent DESC,
+    # LIMIT 50.
     return (
         customer.join(orders, col("c_custkey") == col("o_custkey"))
+        .filter(col("c_nationkey") == lit(15))
         .filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
-        .group_by("c_custkey", "c_name", "c_mktsegment")
+        .filter(col("o_orderdate") < lit(date(1996, 1, 1)))
+        .group_by("c_custkey", "c_name", "c_mktsegment", "c_nationkey")
         .agg(
             col("o_orderkey").count().alias("order_count"),
             col("o_totalprice").sum().alias("total_spent"),
-            col("o_totalprice").mean().alias("avg_order"),
+            col("o_totalprice").mean().alias("avg_order_value"),
         )
+        .filter(col("total_spent") > lit(500000))
+        .select("c_name", "c_mktsegment", "c_nationkey", "order_count", "total_spent", "avg_order_value")
+        .sort(["total_spent", "c_name"], descending=[True, False])
+        .limit(50)
     )
 
 
@@ -2557,12 +2668,22 @@ def optimizer_aggregate_pushdown_pandas_impl(ctx: DataFrameContext) -> Any:
     customer, orders = _tables(ctx, "customer", "orders")
 
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    filtered = merged[merged["o_orderdate"] >= date(1995, 1, 1)]
-
-    return filtered.groupby(["c_custkey", "c_name", "c_mktsegment"], as_index=False).agg(
+    filtered = merged[
+        (merged["c_nationkey"] == 15)
+        & (merged["o_orderdate"] >= date(1995, 1, 1))
+        & (merged["o_orderdate"] < date(1996, 1, 1))
+    ]
+    grouped = filtered.groupby(["c_custkey", "c_name", "c_mktsegment", "c_nationkey"], as_index=False).agg(
         order_count=("o_orderkey", "count"),
         total_spent=("o_totalprice", "sum"),
-        avg_order=("o_totalprice", "mean"),
+        avg_order_value=("o_totalprice", "mean"),
+    )
+    grouped = grouped[grouped["total_spent"] > 500000]
+    return (
+        grouped[["c_name", "c_mktsegment", "c_nationkey", "order_count", "total_spent", "avg_order_value"]]
+        .sort_values(["total_spent", "c_name"], ascending=[False, True])
+        .head(50)
+        .reset_index(drop=True)
     )
 
 
@@ -2610,15 +2731,18 @@ def optimizer_column_pruning_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    # Don't select early - let optimizer prune columns
+    # SQL: date window AND l_quantity > 40 AND c_nationkey = 15, SELECT c_name
+    # (NO DISTINCT), ORDER BY c_name, LIMIT 500.
     return (
         customer.join(orders, col("c_custkey") == col("o_custkey"))
         .join(lineitem, col("o_orderkey") == col("l_orderkey"))
         .filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
-        .filter(col("l_quantity") > lit(10))
-        .select("c_name")  # Only select c_name at the end - optimizer prunes all other columns
-        .unique()
-        .limit(100)
+        .filter(col("o_orderdate") < lit(date(1996, 1, 1)))
+        .filter(col("l_quantity") > lit(40))
+        .filter(col("c_nationkey") == lit(15))
+        .select("c_name")
+        .sort("c_name")
+        .limit(500)
     )
 
 
@@ -2628,9 +2752,14 @@ def optimizer_column_pruning_pandas_impl(ctx: DataFrameContext) -> Any:
 
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
     merged = merged.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    filtered = merged[(merged["o_orderdate"] >= date(1995, 1, 1)) & (merged["l_quantity"] > 10)]
+    filtered = merged[
+        (merged["o_orderdate"] >= date(1995, 1, 1))
+        & (merged["o_orderdate"] < date(1996, 1, 1))
+        & (merged["l_quantity"] > 40)
+        & (merged["c_nationkey"] == 15)
+    ]
 
-    return filtered[["c_name"]].drop_duplicates().head(100)
+    return filtered[["c_name"]].sort_values("c_name").head(500).reset_index(drop=True)
 
 
 def optimizer_union_optimization_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2638,36 +2767,49 @@ def optimizer_union_optimization_expression_impl(ctx: DataFrameContext) -> Any:
 
     Use multiple unions, then sort - optimizer may combine/deduplicate scans.
     """
-    orders = ctx.get_table("orders")
     col = ctx.col
     lit = ctx.lit
 
-    # Create multiple filtered views and union them
-    urgent = orders.filter(col("o_orderpriority") == lit("1-URGENT")).select(
-        "o_orderkey", "o_custkey", "o_orderpriority", "o_totalprice"
+    # SQL: 3-branch UNION ALL over customer c_acctbal bands AND c_nationkey IN
+    # (1,2,3), projecting c_name, c_mktsegment, customer_type (band label),
+    # c_acctbal; ORDER BY c_acctbal DESC, LIMIT 300.
+    customer = ctx.get_table("customer")
+    in_nations = col("c_nationkey").is_in([1, 2, 3])
+    out_cols = ("c_name", "c_mktsegment", "customer_type", "c_acctbal")
+    high = (
+        customer.filter((col("c_acctbal") > lit(8000)) & in_nations)
+        .with_columns(lit("high_value").alias("customer_type"))
+        .select(*out_cols)
     )
-    high = orders.filter(col("o_orderpriority") == lit("2-HIGH")).select(
-        "o_orderkey", "o_custkey", "o_orderpriority", "o_totalprice"
+    medium = (
+        customer.filter((col("c_acctbal") >= lit(4000)) & (col("c_acctbal") <= lit(8000)) & in_nations)
+        .with_columns(lit("medium_value").alias("customer_type"))
+        .select(*out_cols)
     )
-    medium = orders.filter(col("o_orderpriority") == lit("3-MEDIUM")).select(
-        "o_orderkey", "o_custkey", "o_orderpriority", "o_totalprice"
+    low = (
+        customer.filter((col("c_acctbal") >= lit(1000)) & (col("c_acctbal") <= lit(4000)) & in_nations)
+        .with_columns(lit("low_value").alias("customer_type"))
+        .select(*out_cols)
     )
-
-    # Union and sort
-    return ctx.concat([urgent, high, medium]).sort("o_totalprice", descending=True).limit(100)
+    return ctx.concat([high, medium, low]).sort(["c_acctbal", "c_name"], descending=[True, False]).limit(300)
 
 
 def optimizer_union_optimization_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test union optimization."""
-    orders = ctx.get_table("orders")
+    customer = ctx.get_table("customer")
 
-    cols = ["o_orderkey", "o_custkey", "o_orderpriority", "o_totalprice"]
-    urgent = orders[orders["o_orderpriority"] == "1-URGENT"][cols]
-    high = orders[orders["o_orderpriority"] == "2-HIGH"][cols]
-    medium = orders[orders["o_orderpriority"] == "3-MEDIUM"][cols]
+    in_nations = customer["c_nationkey"].isin([1, 2, 3])
+    cols = ["c_name", "c_mktsegment", "customer_type", "c_acctbal"]
+    high = customer[(customer["c_acctbal"] > 8000) & in_nations].assign(customer_type="high_value")[cols]
+    medium = customer[(customer["c_acctbal"] >= 4000) & (customer["c_acctbal"] <= 8000) & in_nations].assign(
+        customer_type="medium_value"
+    )[cols]
+    low = customer[(customer["c_acctbal"] >= 1000) & (customer["c_acctbal"] <= 4000) & in_nations].assign(
+        customer_type="low_value"
+    )[cols]
 
-    combined = ctx.concat([urgent, high, medium])
-    return combined.sort_values("o_totalprice", ascending=False).head(100)
+    combined = ctx.concat([high, medium, low])
+    return combined.sort_values(["c_acctbal", "c_name"], ascending=[False, True]).head(300).reset_index(drop=True)
 
 
 def optimizer_runtime_filter_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2679,19 +2821,20 @@ def optimizer_runtime_filter_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    # Selective filter on part table - Spark can use this to generate runtime filter
-    selective_parts = part.filter(col("p_brand") == lit("Brand#23")).filter(col("p_container") == lit("MED BOX"))
-
+    # SQL: p_type LIKE '%STEEL%' AND p_size BETWEEN 10 AND 20 AND shipdate window
+    # AND l_quantity > 20; project l_orderkey,l_partkey,l_suppkey,l_quantity,
+    # l_extendedprice,p_name,p_type; ORDER BY l_extendedprice DESC, LIMIT 1000.
+    selective_parts = part.filter(col("p_type").str.contains("STEEL")).filter(
+        (col("p_size") >= lit(10)) & (col("p_size") <= lit(20))
+    )
     return (
         lineitem.join(selective_parts, col("l_partkey") == col("p_partkey"))
-        .select(
-            "l_orderkey",
-            "l_quantity",
-            "l_extendedprice",
-            "p_partkey",
-            "p_name",
-        )
-        .limit(100)
+        .filter(col("l_shipdate") >= lit(date(1995, 1, 1)))
+        .filter(col("l_shipdate") < lit(date(1996, 1, 1)))
+        .filter(col("l_quantity") > lit(20))
+        .select("l_orderkey", "l_partkey", "l_suppkey", "l_quantity", "l_extendedprice", "p_name", "p_type")
+        .sort(["l_extendedprice", "l_orderkey", "l_partkey"], descending=[True, False, False])
+        .limit(1000)
     )
 
 
@@ -2699,11 +2842,21 @@ def optimizer_runtime_filter_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test runtime filter / dynamic partition pruning."""
     lineitem, part = _tables(ctx, "lineitem", "part")
 
-    # Selective filter on part table
-    selective_parts = part[(part["p_brand"] == "Brand#23") & (part["p_container"] == "MED BOX")]
-
+    selective_parts = part[
+        part["p_type"].str.contains("STEEL", na=False) & (part["p_size"] >= 10) & (part["p_size"] <= 20)
+    ]
     merged = lineitem.merge(selective_parts, left_on="l_partkey", right_on="p_partkey")
-    return merged[["l_orderkey", "l_quantity", "l_extendedprice", "p_partkey", "p_name"]].head(100)
+    filtered = merged[
+        (merged["l_shipdate"] >= date(1995, 1, 1))
+        & (merged["l_shipdate"] < date(1996, 1, 1))
+        & (merged["l_quantity"] > 20)
+    ]
+    return (
+        filtered[["l_orderkey", "l_partkey", "l_suppkey", "l_quantity", "l_extendedprice", "p_name", "p_type"]]
+        .sort_values(["l_extendedprice", "l_orderkey", "l_partkey"], ascending=[False, True, True])
+        .head(1000)
+        .reset_index(drop=True)
+    )
 
 
 def optimizer_groupjoin_expression_impl(ctx: DataFrameContext) -> Any:
