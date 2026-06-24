@@ -95,14 +95,19 @@ the successfully-executed queries on the measurement connection and merges the r
 - **No EXPLAIN on the measurement path.** Plan capture never interleaves with a timed query or
   holds the connection between measured queries — the EXPLAIN pass runs strictly after the timed
   loop, so measured per-query execution times are never inflated by capture cost.
-- **Honours `analyze_plans` — the single capture-detail knob.** With `analyze_plans=true`
-  (the default for these engines) the phase re-runs each SELECT once with `EXPLAIN (ANALYZE)`
-  *after* measurement, so captured plans carry actual per-operator timing and cardinality
-  (~1× extra query cost, outside the measured window). With
-  `--platform-option analyze_plans=false` the phase uses a static (non-`ANALYZE`) `EXPLAIN`,
-  giving estimated plans only with no re-execution cost (~1-5 ms). The structural
-  `plan_fingerprint` is identical either way (it excludes timing/cardinality by design); the
-  measured execution times in the result bundle remain the authoritative timings.
+- **Honours `analyze_plans` on the engines that support ANALYZE.** On DuckDB,
+  MotherDuck, and PostgreSQL — the engines whose `EXPLAIN` has an ANALYZE mode —
+  `analyze_plans=true` (the default) re-runs each SELECT once with `EXPLAIN
+  (ANALYZE)` *after* measurement, so captured plans carry actual per-operator
+  timing and cardinality (~1× extra query cost, outside the measured window), and
+  `--platform-option analyze_plans=false` uses a static (non-`ANALYZE`) `EXPLAIN`
+  giving estimated plans only with no re-execution cost (~1-5 ms). SQLite
+  (`EXPLAIN QUERY PLAN`), DataFusion, and Redshift (plain `EXPLAIN`) have no
+  ANALYZE mode: they always capture a static, estimated plan and the
+  `analyze_plans` toggle has no effect on those adapters (no per-operator timing
+  is available). The structural `plan_fingerprint` is identical either way (it
+  excludes timing/cardinality by design); the measured execution times in the
+  result bundle remain the authoritative timings.
 - **DML runs exactly once.** Even with `analyze_plans=true`, an
   INSERT/UPDATE/DELETE/MERGE/COPY (or CTAS / `SELECT ... INTO`) query is downgraded to a
   non-`ANALYZE` `EXPLAIN` by the shared `is_dml_query` write guard, so writes are captured

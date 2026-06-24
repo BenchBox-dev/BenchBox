@@ -154,8 +154,13 @@ deferred:
   reason: "Already shipped (#867) and coordinated with cross-surface-oracle-remediation; the independence axis is orthogonal and
     must not overload or duplicate it."
 - summary: "Building an actual independent value oracle for any benchmark."
-  reason: "That is correctness-gate-value-digest-fidelity-followups w5 (cross-engine agreement). This item only DISCLOSES the
-    independence status, it does not change any oracle's strength."
+  reason: "This item only DISCLOSES the independence status; it does not change any oracle's strength. The closest scoped
+    upgrade is correctness-gate-value-digest-fidelity-followups w5 (cross-engine digest agreement, DuckDB vs
+    postgres/datafusion at SF=1) — but that is only SEMI-independent: both engines run the SAME BenchBox-authored SQL over the
+    SAME generated data, so a conceptual query bug or a data-generation bug agrees across both engines and is NOT caught by it.
+    A FULLY independent value oracle (an external answer key / spec-derived expected values that does not share BenchBox's
+    query implementation or generator) is distinct, currently-unowned work; it is recorded here as an explicit roadmap gap so
+    cross-engine agreement is never mistaken for it."
 
 must_preserve:
 - "The map stays GENERATED from live sources — no hand-maintained classification — so it cannot drift from reality."
