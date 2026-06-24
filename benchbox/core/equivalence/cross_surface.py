@@ -95,7 +95,22 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # gated benchmark, never a full platform matrix).
 EQUIVALENCE_SCALE = 0.1
 
-_TRAILING_LIMIT_RE = re.compile(r"(?is)\blimit\s+\d+\s*(?:offset\s+\d+\s*)?;?\s*$")
+# Captures a trailing ``LIMIT n`` so it can be both DETECTED (truncated top-N) and
+# REWRITTEN one row wider (the boundary-tie probe). Group 1 is ``limit `` (original
+# case/spacing), group 2 the integer, group 3 any OFFSET / statement terminator /
+# trailing whitespace - reassembled verbatim so only the count changes.
+_TRAILING_LIMIT_RE = re.compile(r"(?is)(\blimit\s+)(\d+)(\s*(?:offset\s+\d+\s*)?;?\s*)$")
+_TRAILING_COMMENT_RE = re.compile(r"\s*--[^\n]*$")
+
+
+def _strip_trailing_comment(sql: str) -> str:
+    """Strip a trailing ``-- line comment`` and surrounding whitespace from ``sql``.
+
+    Shared by the trailing-``LIMIT`` detector and rewriter so ``... limit 10 -- note``
+    is handled identically by both. Removing a trailing comment never changes query
+    semantics, so the stripped form is still valid SQL to execute.
+    """
+    return _TRAILING_COMMENT_RE.sub("", sql.strip())
 
 
 def _is_truncated_top_n(sql: str) -> bool:
@@ -109,8 +124,86 @@ def _is_truncated_top_n(sql: str) -> bool:
     everything else uses the strict comparator. A trailing line comment /
     statement terminator is stripped first so ``... limit 10 -- note`` matches.
     """
-    stripped = re.sub(r"\s*--[^\n]*$", "", sql.strip())
-    return bool(_TRAILING_LIMIT_RE.search(stripped))
+    return bool(_TRAILING_LIMIT_RE.search(_strip_trailing_comment(sql)))
+
+
+def _bump_trailing_limit(sql: str) -> str | None:
+    """Return ``sql`` with its trailing ``LIMIT n`` raised to ``LIMIT n+1``, or None.
+
+    The boundary-tie probe (:func:`_final_key_tied_beyond_limit`) needs exactly one
+    row PAST the original top-N cutoff to learn whether the final order key ties
+    across it. Raising the trailing ``LIMIT`` by one row does that while preserving
+    any ``OFFSET`` (the window simply widens by one at its end), statement
+    terminator, and trailing comment, so the probe is the same query plus one row.
+    Returns None when no trailing numeric ``LIMIT`` is present (the caller then
+    skips the probe and stays strict).
+    """
+    stripped = _strip_trailing_comment(sql)
+    match = _TRAILING_LIMIT_RE.search(stripped)
+    if match is None:
+        return None
+    bumped = int(match.group(2)) + 1
+    return f"{stripped[: match.start()]}{match.group(1)}{bumped}{match.group(3)}"
+
+
+def _final_key_tied_beyond_limit(
+    connection: Any,
+    sql: str,
+    order_by: Sequence[int],
+    reference: list[tuple[Any, ...]],
+) -> bool:
+    """True if the reference's final ORDER BY key value recurs past the LIMIT cutoff.
+
+    A trailing-``LIMIT`` top-N can cut across a tie in the order key, leaving only a
+    SUBSET of the rows that share the worst-kept key value. When exactly ONE such
+    row stays visible, the truncated result alone cannot tell that legitimate
+    boundary tie apart from a deterministic unique final row, so the comparator
+    would either mask a real single-row value bug or false-positive a valid tie pick
+    (the soundness gap this probe closes). The probe supplies the missing signal: it
+    re-runs the query one row wider (``LIMIT n+1``) and reports whether the row JUST
+    past the original cutoff carries the SAME order-key value as the last row inside
+    it. If so, the final key is genuinely tied across the cutoff and a
+    single-visible-row final-group difference is an equally-valid boundary pick; if
+    not (or there is no row past the cutoff), the final row is deterministic.
+
+    Returns False on any condition that makes the probe unsound, unnecessary, or
+    impossible - an empty reference, an out-of-range order key, a final tie group
+    that already spans >= 2 visible rows (accepted as a boundary swap without the
+    probe), an un-rewritable ``LIMIT``, or a probe-query failure - so the caller
+    keeps the strict default and the worst case is a (loud, recoverable) caught
+    mismatch, never a masked bug.
+    """
+    if not reference or not order_by:
+        return False
+    n = len(reference)
+    width = len(reference[-1])
+    if any(c < 0 or c >= width for c in order_by):
+        return False
+    # The order-aware relaxation reads this probe ONLY for a single-visible-row final
+    # tie group; a final group that already spans >= 2 rows is accepted as a boundary
+    # swap without it. So when the reference's own final group is already >= 2 rows,
+    # the result would be ignored - skip the extra LIMIT n+1 query entirely.
+    final_key = tuple(reference[-1][c] for c in order_by)
+    if n >= 2 and tuple(reference[-2][c] for c in order_by) == final_key:
+        return False
+    probe_sql = _bump_trailing_limit(sql)
+    if probe_sql is None:
+        return False
+    try:
+        probe = fetch_reference_rows(connection, probe_sql)
+    except Exception:  # noqa: BLE001 - a failed probe must not crash the gate; stay strict
+        return False
+    # No row past the original cutoff -> the final visible row is the true last row,
+    # so its key is not tied beyond the LIMIT.
+    if len(probe) <= n or len(probe[n]) <= max(order_by):
+        return False
+    # The first n probe rows are the original window (same deterministic ORDER BY key
+    # sequence as the reference), so probe[n] is the first row PAST the cutoff. The
+    # final key ties across the cutoff iff probe[n] carries that same key. Both values
+    # come from the same DuckDB result, so exact equality is the right within-result
+    # tie test (the comparator's cross-engine float tolerance does not apply here).
+    key_beyond = tuple(probe[n][c] for c in order_by)
+    return final_key == key_beyond
 
 
 def _is_star_projection(projection: Any) -> bool:
@@ -360,6 +453,28 @@ def find_cross_surface_divergences(
         # order-insensitive comparison rather than a silent order-blind "pass".
         order_by = _order_by_result_key(sql)
         order_aware = order_by is not None
+        # Boundary-tie probe, computed at most once per query (lazily, on the first
+        # backend's reference, then memoized): a trailing LIMIT can leave just ONE
+        # row of a final order-key tie visible, which the truncated result alone
+        # cannot tell apart from a deterministic unique last row. For an order-aware
+        # truncated top-N, learn whether that final key genuinely ties PAST the cutoff
+        # so the comparator accepts a single-visible-row boundary swap but still
+        # catches a real unique-final-key value bug. Every backend of a query shares
+        # the SAME reference, so the extra LIMIT n+1 query runs once, not per backend.
+        probe_result: bool | None = None  # None = not yet computed (memo sentinel)
+
+        def final_key_tied(reference: list[tuple[Any, ...]]) -> bool:
+            nonlocal probe_result
+            if probe_result is None:
+                # order_by is not None is load-bearing: it narrows the type for the
+                # call below (the runtime guard inside also rejects a falsy key).
+                probe_result = bool(
+                    tie_aware
+                    and order_by is not None
+                    and _final_key_tied_beyond_limit(connection, sql, order_by, reference)
+                )
+            return probe_result
+
         for backend in backends:
             impl = query.get_impl_for_family(backend)
             if impl is None:
@@ -386,6 +501,7 @@ def find_cross_surface_divergences(
                     tie_aware=tie_aware,
                     order_aware=order_aware,
                     order_by=order_by,
+                    final_key_tied_beyond_limit=final_key_tied(reference),
                 )
 
             yield backend, check
