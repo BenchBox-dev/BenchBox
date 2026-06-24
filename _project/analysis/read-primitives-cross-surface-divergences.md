@@ -94,10 +94,19 @@ so the oracle-coverage-map does not prematurely mark it "guarded".
   the `empty_build_join` / `min_max_runtime_filter` / `filter_in_predicate_selective`
   semi/left-join cases (drop the column subset; semi-join already returns only the
   left table's columns).
-* **Measured baseline after the above (SF=0.05): 83/148 clean, 111 divergent cells**
-  (down from 127). Remaining by signature: ~35 column-count (mostly array/list +
-  stats/olap rewrites), ~34 ORDER BY + 3 tie-group, ~30 row-count (optimizer_*
-  rewrites), ~17 value-mismatch (approx/decimal/precision), 7 impl errors; 6 vacuous.
+* **Batch 2 (semi/left-join columns)** — `empty_build_join`,
+  `min_max_runtime_filter`, `filter_in_predicate_selective` (verified PASS).
+* **Batch 3 (optimizer row-count rewrites)** — 8 `optimizer_*` impls rebuilt to
+  reproduce their DuckDB SQL exactly (full WHERE/HAVING/ORDER BY/LIMIT/projection):
+  aggregate_pushdown, column_pruning, distinct_elimination, join_reordering,
+  limit_pushdown, predicate_pushdown, runtime_filter, union_optimization (all
+  verified PASS at SF=0.05).
+* **Measured state now (SF=0.05): ~94/148 clean, ~89 divergent cells** (down from
+  127). Remaining by signature: column-count (array/list leaked-column + stats/olap
+  rewrites), ORDER BY + tie-group (array/list ordering, qualify/window, min/max_by),
+  row-count (olap CUBE/ROLLUP, qualify_lag_lead, window_row_number, timeseries,
+  optimizer_common_subexpression/constant_folding/limit), value-mismatch
+  (approx/decimal/precision), 7 impl errors; 6 vacuous.
 
 ### API constraints discovered (for the remaining rewrites)
 
