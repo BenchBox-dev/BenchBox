@@ -278,11 +278,7 @@ def q9_pandas_impl(ctx: DataFrameContext) -> Any:
         .reset_index()
         .rename(columns={"fare_amount": "median_fare_amount"})
     )
-    p90 = (
-        grouped.quantile(0.9, interpolation="linear")
-        .reset_index()
-        .rename(columns={"fare_amount": "p90_fare_amount"})
-    )
+    p90 = grouped.quantile(0.9, interpolation="linear").reset_index().rename(columns={"fare_amount": "p90_fare_amount"})
     return median.merge(p90, on="passenger_count").sort_values("passenger_count")
 
 
@@ -295,11 +291,14 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
     """Q10: Top 10 pickup locations by trip count."""
     trips = ctx.get_table("trips")
     col = ctx.col
+    # Tie-break on pickup_location_id (ascending) so the truncated top-N is a total
+    # order matching the SQL `ORDER BY trip_count DESC, pickup_location_id` - trip
+    # counts tie at the cutoff, so without it the LIMIT keeps an arbitrary member.
     return (
         trips.filter(col("pickup_location_id").is_not_null())
         .group_by("pickup_location_id")
         .agg(col("pickup_location_id").count().alias("trip_count"))
-        .sort("trip_count", descending=True)
+        .sort(["trip_count", "pickup_location_id"], descending=[True, False])
         .limit(10)
     )
 
@@ -308,10 +307,12 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q10: Top 10 pickup locations by trip count."""
     trips = ctx.get_table("trips")
     filtered = trips[trips["pickup_location_id"].notna()]
+    # Tie-break on pickup_location_id (ascending) to match the SQL total order (see
+    # the expression impl) so the cutoff is deterministic across engines/runs.
     return (
         filtered.groupby(["pickup_location_id"], as_index=False)
         .agg(trip_count=("pickup_location_id", "count"))
-        .sort_values("trip_count", ascending=False)
+        .sort_values(["trip_count", "pickup_location_id"], ascending=[False, True])
         .head(10)
     )
 

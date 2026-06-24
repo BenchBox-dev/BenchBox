@@ -855,9 +855,7 @@ _H2ODB_PERCENTILE_DECIMAL = (
     "yields the DataFrame value, so the only difference is DuckDB's DECIMAL result "
     "scale - a deterministic, sub-cent presentational/dtype difference, not a logic bug."
 )
-_H2ODB_KNOWN_DIVERGENCES: dict[str, str] = dict.fromkeys(
-    ("Q9_expression", "Q9_pandas"), _H2ODB_PERCENTILE_DECIMAL
-)
+_H2ODB_KNOWN_DIVERGENCES: dict[str, str] = dict.fromkeys(("Q9_expression", "Q9_pandas"), _H2ODB_PERCENTILE_DECIMAL)
 
 
 # Registry of ENFORCED gated benchmarks: clean, blocking cross-surface gates whose
