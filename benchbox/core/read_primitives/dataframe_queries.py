@@ -260,10 +260,12 @@ def aggregation_groupby_impl(
             "count": lambda column: column.count(),
             "max": lambda column: column.max(),
             "first": lambda column: column.first(),
-            "median": lambda column: column.quantile(0.5),
-            "q25": lambda column: column.quantile(0.25),
-            "q75": lambda column: column.quantile(0.75),
-            "q95": lambda column: column.quantile(0.95),
+            # DuckDB QUANTILE_CONT/PERCENTILE_CONT use linear interpolation; the
+            # UnifiedExpr default is "nearest", which lands on a different element.
+            "median": lambda column: column.quantile(0.5, interpolation="linear"),
+            "q25": lambda column: column.quantile(0.25, interpolation="linear"),
+            "q75": lambda column: column.quantile(0.75, interpolation="linear"),
+            "q95": lambda column: column.quantile(0.95, interpolation="linear"),
             "std": lambda column: column.std(),
             "var": lambda column: column.var(),
         }
@@ -411,18 +413,8 @@ for _spec in (
         True,
         10,
     ),
-    (
-        "statistical_variance",
-        "orders",
-        ("o_orderpriority",),
-        (
-            ("o_orderkey", "count", "order_count"),
-            ("o_totalprice", "mean", "avg_price"),
-            ("o_totalprice", "var", "price_variance"),
-            ("o_totalprice", "std", "price_stddev"),
-        ),
-        (("o_orderdate", "ge", date(1995, 1, 1), False),),
-    ),
+    # statistical_variance (impl_base of statistical_variance_stddev) is a dedicated
+    # impl below - the factory cannot express the ddof=0 population stddev.
     (
         "any_value_simple",
         "customer",
@@ -1696,31 +1688,86 @@ def exchange_shuffle_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def statistical_correlation_expression_impl(ctx: DataFrameContext) -> Any:
-    """Correlation analysis between numeric columns."""
-    col, lit = ctx.col, ctx.lit
-    filtered = ctx.get_table("lineitem").filter(
-        (col("l_shipdate") >= lit(date(1995, 1, 1))) & (col("l_shipdate") < lit(date(1996, 1, 1)))
+    """Correlation, covariance, and linear regression between numeric columns.
+
+    Raw Polars for the population-moment regression terms (UnifiedExpr.var/std have
+    no ddof). REGR_*(y, x) in DuckDB take y=l_extendedprice, x=l_quantity:
+    slope = cov_pop(x, y)/var_pop(x); intercept = mean(y) - slope*mean(x);
+    r2 = corr(x, y)**2.
+    """
+    import polars as pl
+
+    lf = ctx.get_table("lineitem").native.filter(
+        (pl.col("l_shipdate") >= date(1995, 1, 1)) & (pl.col("l_shipdate") < date(1996, 1, 1))
     )
-    return filtered.select(
-        col("l_quantity").mean().alias("avg_quantity"),
-        col("l_extendedprice").mean().alias("avg_price"),
-        (
-            (col("l_quantity") * col("l_extendedprice")).mean()
-            - col("l_quantity").mean() * col("l_extendedprice").mean()
-        ).alias("covariance_approx"),
+    slope = pl.cov("l_quantity", "l_extendedprice", ddof=0) / pl.col("l_quantity").var(ddof=0)
+    intercept = pl.col("l_extendedprice").mean() - slope * pl.col("l_quantity").mean()
+    return lf.select(
+        pl.corr("l_quantity", "l_extendedprice").alias("qty_price_correlation"),
+        pl.cov("l_quantity", "l_discount", ddof=0).alias("qty_discount_covariance"),
+        pl.cov("l_tax", "l_extendedprice", ddof=1).alias("tax_price_covariance"),
+        slope.alias("price_qty_slope"),
+        intercept.alias("price_qty_intercept"),
+        (pl.corr("l_quantity", "l_extendedprice") ** 2).alias("regression_r_squared"),
     )
 
 
 def statistical_correlation_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Correlation analysis between numeric columns."""
+    """Correlation, covariance, and linear regression between numeric columns."""
     filtered = ctx.get_table("lineitem")
     filtered = filtered[(filtered["l_shipdate"] >= date(1995, 1, 1)) & (filtered["l_shipdate"] < date(1996, 1, 1))]
+    qty = filtered["l_quantity"]
+    price = filtered["l_extendedprice"]
+    slope = qty.cov(price, ddof=0) / qty.var(ddof=0)
+    intercept = price.mean() - slope * qty.mean()
+    corr_xy = qty.corr(price)
     return ctx.scalar_to_df(
         {
-            "avg_quantity": filtered["l_quantity"].mean(),
-            "avg_price": filtered["l_extendedprice"].mean(),
-            "qty_price_correlation": filtered["l_quantity"].corr(filtered["l_extendedprice"]),
+            "qty_price_correlation": corr_xy,
+            "qty_discount_covariance": qty.cov(filtered["l_discount"], ddof=0),
+            "tax_price_covariance": filtered["l_tax"].cov(price, ddof=1),
+            "price_qty_slope": slope,
+            "price_qty_intercept": intercept,
+            "regression_r_squared": corr_xy**2,
         }
+    )
+
+
+def statistical_variance_expression_impl(ctx: DataFrameContext) -> Any:
+    """Variance and standard deviation (sample + population) by order priority.
+
+    Raw Polars for the ddof control (UnifiedExpr.var/std have none). DuckDB
+    VARIANCE/STDDEV/STDDEV_SAMP are sample (ddof=1); STDDEV_POP is population
+    (ddof=0).
+    """
+    import polars as pl
+
+    return (
+        ctx.get_table("orders")
+        .native.filter(pl.col("o_orderdate") >= date(1995, 1, 1))
+        .group_by("o_orderpriority")
+        .agg(
+            pl.len().alias("order_count"),
+            pl.col("o_totalprice").mean().alias("avg_price"),
+            pl.col("o_totalprice").var(ddof=1).alias("price_variance"),
+            pl.col("o_totalprice").std(ddof=1).alias("price_stddev"),
+            pl.col("o_totalprice").std(ddof=0).alias("price_stddev_pop"),
+            pl.col("o_totalprice").std(ddof=1).alias("price_stddev_samp"),
+        )
+    )
+
+
+def statistical_variance_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Variance and standard deviation (sample + population) by order priority."""
+    orders = ctx.get_table("orders")
+    filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)]
+    return filtered.groupby("o_orderpriority", as_index=False).agg(
+        order_count=("o_orderkey", "count"),
+        avg_price=("o_totalprice", "mean"),
+        price_variance=("o_totalprice", lambda s: s.var(ddof=1)),
+        price_stddev=("o_totalprice", lambda s: s.std(ddof=1)),
+        price_stddev_pop=("o_totalprice", lambda s: s.std(ddof=0)),
+        price_stddev_samp=("o_totalprice", lambda s: s.std(ddof=1)),
     )
 
 
@@ -1849,8 +1896,11 @@ def orderby_decimal_expression_impl(ctx: DataFrameContext) -> Any:
     """Multi-column sort with mixed ASC/DESC on decimal columns."""
     lineitem = ctx.get_table("lineitem")
 
+    # l_orderkey is the tertiary tie-break (matches the catalog SQL) so the
+    # LIMIT-100 boundary over the non-unique (l_extendedprice, l_discount) keys is a
+    # total order on both surfaces.
     return (
-        lineitem.sort(["l_extendedprice", "l_discount"], descending=[True, False])
+        lineitem.sort(["l_extendedprice", "l_discount", "l_orderkey"], descending=[True, False, False])
         .select("l_orderkey", "l_extendedprice", "l_discount")
         .limit(100)
     )
@@ -1860,9 +1910,13 @@ def orderby_decimal_pandas_impl(ctx: DataFrameContext) -> Any:
     """Multi-column sort with mixed ASC/DESC on decimal columns."""
     lineitem = ctx.get_table("lineitem")
 
-    return lineitem.sort_values(["l_extendedprice", "l_discount"], ascending=[False, True])[
-        ["l_orderkey", "l_extendedprice", "l_discount"]
-    ].head(100)
+    return (
+        lineitem.sort_values(["l_extendedprice", "l_discount", "l_orderkey"], ascending=[False, True, True])[
+            ["l_orderkey", "l_extendedprice", "l_discount"]
+        ]
+        .head(100)
+        .reset_index(drop=True)
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -2428,19 +2482,26 @@ def pivot_basic_pandas_impl(ctx: DataFrameContext) -> Any:
     """
     lineitem = ctx.get_table("lineitem")
 
-    # Filter
-    filtered = lineitem[(lineitem["l_shipdate"] >= date(1995, 1, 1)) & (lineitem["l_shipdate"] < date(1995, 4, 1))][
-        ["l_returnflag", "l_shipmode", "l_quantity"]
-    ]
+    # Filter - restrict to the four pivoted modes so the result has exactly the
+    # SQL's `FOR l_shipmode IN ('AIR','RAIL','SHIP','TRUCK')` columns (pivot_table
+    # would otherwise emit a column per shipmode present in the data).
+    modes = ["AIR", "RAIL", "SHIP", "TRUCK"]
+    filtered = lineitem[
+        (lineitem["l_shipdate"] >= date(1995, 1, 1))
+        & (lineitem["l_shipdate"] < date(1995, 4, 1))
+        & (lineitem["l_shipmode"].isin(modes))
+    ][["l_returnflag", "l_shipmode", "l_quantity"]]
 
-    # Pivot
-    return filtered.pivot_table(
+    pivoted = filtered.pivot_table(
         index="l_returnflag",
         columns="l_shipmode",
         values="l_quantity",
         aggfunc="sum",
         fill_value=0,
-    ).reset_index()
+    ).reindex(columns=modes, fill_value=0)
+    pivoted = pivoted.reset_index()
+    pivoted.columns.name = None
+    return pivoted
 
 
 def unpivot_basic_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2465,7 +2526,7 @@ def unpivot_basic_expression_impl(ctx: DataFrameContext) -> Any:
         value_vars=["p_size", "p_retailprice"],
         variable_name="dimension_name",
         value_name="dimension_value",
-    )
+    ).sort(["p_partkey", "dimension_name"])
 
 
 def unpivot_basic_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2480,11 +2541,15 @@ def unpivot_basic_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["p_size"] = filtered["p_size"].astype(float)
 
     # Melt (unpivot)
-    return filtered.melt(
-        id_vars=["p_partkey"],
-        value_vars=["p_size", "p_retailprice"],
-        var_name="dimension_name",
-        value_name="dimension_value",
+    return (
+        filtered.melt(
+            id_vars=["p_partkey"],
+            value_vars=["p_size", "p_retailprice"],
+            var_name="dimension_name",
+            value_name="dimension_value",
+        )
+        .sort_values(["p_partkey", "dimension_name"])
+        .reset_index(drop=True)
     )
 
 
