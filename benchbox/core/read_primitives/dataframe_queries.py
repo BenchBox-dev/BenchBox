@@ -800,12 +800,106 @@ for _spec in (
     ("max_by_simple", "Find the customer with the highest account balance in each nation.", "customer", (("nation", "c_nationkey", "n_nationkey"),), ("n_name",), ("n_name",), "c_acctbal", "max", "max_balance", ("n_name", "c_name", "max_balance"), ("n_name",), ("n_name", "c_name", "c_acctbal"), {"c_acctbal": "max_balance"}, True, None),
     ("min_by_simple", "Find the customer with the lowest account balance in each nation.", "customer", (("nation", "c_nationkey", "n_nationkey"),), ("n_name",), ("n_name",), "c_acctbal", "min", "min_balance", ("n_name", "c_name", "min_balance"), ("n_name",), ("n_name", "c_name", "c_acctbal"), {"c_acctbal": "min_balance"}, False, None),
     ("max_by_complex", "Find the most expensive order for each customer segment.", "orders", (("customer", "o_custkey", "c_custkey"),), ("c_mktsegment",), ("c_mktsegment",), "o_totalprice", "max", "max_order_value", ("c_mktsegment", "o_orderkey", "o_orderdate", "max_order_value"), ("c_mktsegment",), ("c_mktsegment", "o_orderkey", "o_orderdate", "o_totalprice"), {"o_totalprice": "max_order_value"}, True, None),
-    ("min_by_complex", "Find the cheapest part for each brand.", "part", (), ("p_brand",), ("p_brand",), "p_retailprice", "min", "min_price", ("p_brand", "p_name", "p_type", "min_price"), ("p_brand",), ("p_brand", "p_name", "p_type", "p_retailprice"), {"p_retailprice": "min_price"}, False, None),
-    ("max_by_with_ties", "Find the supplier with the highest supply cost for each part.", "partsupp", (("part", "ps_partkey", "p_partkey"), ("supplier", "ps_suppkey", "s_suppkey")), ("ps_partkey", "p_name"), ("p_partkey", "p_name"), "ps_supplycost", "max", "max_supply_cost", ("ps_partkey", "p_name", "s_name", "max_supply_cost"), ("ps_partkey",), ("p_partkey", "p_name", "s_name", "ps_supplycost"), {"ps_supplycost": "max_supply_cost", "s_name": "supplier_name"}, True, 100),
-    ("min_by_with_ties", "Find the supplier with the lowest supply cost for each part.", "partsupp", (("part", "ps_partkey", "p_partkey"), ("supplier", "ps_suppkey", "s_suppkey")), ("ps_partkey", "p_name"), ("p_partkey", "p_name"), "ps_supplycost", "min", "min_supply_cost", ("ps_partkey", "p_name", "s_name", "min_supply_cost"), ("ps_partkey",), ("p_partkey", "p_name", "s_name", "ps_supplycost"), {"ps_supplycost": "min_supply_cost", "s_name": "supplier_name"}, False, 100),
+    # min_by_complex, min_by_with_ties, max_by_with_ties are dedicated impls below:
+    # they need a deterministic ARG_MIN/MAX tie-break and the SQL's secondary
+    # ORDER BY keys, which this factory (sort-by-alias + arbitrary unique) cannot
+    # express.
 ):
     _make_extreme_row_impls(*_spec)
 # fmt: on
+
+
+def min_by_complex_expression_impl(ctx: DataFrameContext) -> Any:
+    """Cheapest part per brand (ARG_MIN by p_retailprice), deterministic tie-break."""
+    col = ctx.col
+    return (
+        ctx.get_table("part")
+        .sort(["p_brand", "p_retailprice", "p_name", "p_type"])
+        .group_by("p_brand")
+        .agg(
+            col("p_name").first().alias("cheapest_part_name"),
+            col("p_type").first().alias("cheapest_part_type"),
+            col("p_retailprice").min().alias("min_price"),
+        )
+        .sort(["min_price", "p_brand"])
+        .select("p_brand", "cheapest_part_name", "cheapest_part_type", "min_price")
+    )
+
+
+def min_by_complex_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Cheapest part per brand (ARG_MIN by p_retailprice), deterministic tie-break."""
+    ordered = ctx.get_table("part").sort_values(["p_brand", "p_retailprice", "p_name", "p_type"])
+    picked = ordered.groupby("p_brand", as_index=False).agg(
+        cheapest_part_name=("p_name", "first"),
+        cheapest_part_type=("p_type", "first"),
+        min_price=("p_retailprice", "first"),
+    )
+    return picked.sort_values(["min_price", "p_brand"])[
+        ["p_brand", "cheapest_part_name", "cheapest_part_type", "min_price"]
+    ].reset_index(drop=True)
+
+
+def _supply_cost_extreme_expr(ctx: DataFrameContext, *, descending: bool, value_alias: str, limit: int) -> Any:
+    """Lowest/highest-supply-cost supplier per part with a deterministic tie-break."""
+    col = ctx.col
+    # Polars consumes the right join key (p_partkey); ps_partkey == p_partkey on
+    # joined rows, so group/sort/project on ps_partkey (it fills the p_partkey
+    # output position).
+    joined = (
+        ctx.get_table("partsupp")
+        .join(ctx.get_table("part"), left_on="ps_partkey", right_on="p_partkey")
+        .join(ctx.get_table("supplier"), left_on="ps_suppkey", right_on="s_suppkey")
+        .sort(["ps_partkey", "p_name", "ps_supplycost", "s_name"], descending=[False, False, descending, False])
+    )
+    value = col("ps_supplycost").max() if descending else col("ps_supplycost").min()
+    return (
+        joined.group_by("ps_partkey", "p_name")
+        .agg(col("s_name").first().alias("supplier_name"), value.alias(value_alias))
+        .sort([value_alias, "ps_partkey", "p_name"], descending=[descending, False, False])
+        .select("ps_partkey", "p_name", "supplier_name", value_alias)
+        .limit(limit)
+    )
+
+
+def _supply_cost_extreme_pandas(ctx: DataFrameContext, *, descending: bool, value_alias: str, limit: int) -> Any:
+    joined = (
+        ctx.get_table("partsupp")
+        .merge(ctx.get_table("part"), left_on="ps_partkey", right_on="p_partkey")
+        .merge(ctx.get_table("supplier"), left_on="ps_suppkey", right_on="s_suppkey")
+    )
+    ordered = joined.sort_values(
+        ["p_partkey", "p_name", "ps_supplycost", "s_name"], ascending=[True, True, not descending, True]
+    )
+    picked = ordered.groupby(["p_partkey", "p_name"], as_index=False).agg(
+        supplier_name=("s_name", "first"), **{value_alias: ("ps_supplycost", "first")}
+    )
+    return (
+        picked.sort_values([value_alias, "p_partkey", "p_name"], ascending=[not descending, True, True])[
+            ["p_partkey", "p_name", "supplier_name", value_alias]
+        ]
+        .head(limit)
+        .reset_index(drop=True)
+    )
+
+
+def min_by_with_ties_expression_impl(ctx: DataFrameContext) -> Any:
+    """Lowest-supply-cost supplier per part (ARG_MIN), deterministic tie-break."""
+    return _supply_cost_extreme_expr(ctx, descending=False, value_alias="min_supply_cost", limit=100)
+
+
+def min_by_with_ties_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Lowest-supply-cost supplier per part (ARG_MIN), deterministic tie-break."""
+    return _supply_cost_extreme_pandas(ctx, descending=False, value_alias="min_supply_cost", limit=100)
+
+
+def max_by_with_ties_expression_impl(ctx: DataFrameContext) -> Any:
+    """Highest-supply-cost supplier per part (ARG_MAX), deterministic tie-break."""
+    return _supply_cost_extreme_expr(ctx, descending=True, value_alias="max_supply_cost", limit=100)
+
+
+def max_by_with_ties_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Highest-supply-cost supplier per part (ARG_MAX), deterministic tie-break."""
+    return _supply_cost_extreme_pandas(ctx, descending=True, value_alias="max_supply_cost", limit=100)
 
 
 def _sort_key(cols: tuple[str, ...]) -> str | list[str]:
@@ -2353,44 +2447,83 @@ def olap_cube_analysis_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    # Join tables to get nation/region info
-    joined = (
-        orders.filter((col("o_orderdate") >= lit(date(1995, 1, 1))) & (col("o_orderdate") < lit(date(1997, 1, 1))))
-        .join(customer, col("o_custkey") == col("c_custkey"))
-        .join(nation, col("c_nationkey") == col("n_nationkey"))
-        .join(region, col("n_regionkey") == col("r_regionkey"))
-    )
+    # Full CUBE over (nation, region, order_year, order_quarter) = 2^4 grouping
+    # sets, NULL for each non-grouped dim. No ORDER BY -> order-insensitive. Raw
+    # Polars to emit and union the grouping sets.
+    import itertools
 
-    # Simple groupby aggregation (CUBE approximation - just the most detailed level)
-    # Full CUBE would require union of all dimension combinations
-    return joined.group_by("n_name", "r_name").agg(
-        col("o_orderkey").count().alias("order_count"),
-        col("o_totalprice").sum().alias("total_revenue"),
-        col("o_totalprice").mean().alias("avg_order_value"),
+    import polars as pl
+
+    del col, lit
+    joined = (
+        orders.native.filter((pl.col("o_orderdate") >= date(1995, 1, 1)) & (pl.col("o_orderdate") < date(1997, 1, 1)))
+        .join(customer.native, left_on="o_custkey", right_on="c_custkey")
+        .join(nation.native, left_on="c_nationkey", right_on="n_nationkey")
+        .join(region.native, left_on="n_regionkey", right_on="r_regionkey")
+        .with_columns(
+            pl.col("n_name").alias("nation"),
+            pl.col("r_name").alias("region"),
+            pl.col("o_orderdate").dt.year().cast(pl.Int64).alias("order_year"),
+            pl.col("o_orderdate").dt.quarter().cast(pl.Int64).alias("order_quarter"),
+        )
     )
+    dims = ["nation", "region", "order_year", "order_quarter"]
+    measures = [
+        pl.len().alias("order_count"),
+        pl.col("o_totalprice").sum().alias("total_revenue"),
+        pl.col("o_totalprice").mean().alias("avg_order_value"),
+    ]
+    frames = []
+    for k in range(len(dims), -1, -1):
+        for grp in itertools.combinations(dims, k):
+            sub = joined.group_by(list(grp)).agg(*measures) if grp else joined.select(*measures)
+            for dim in dims:
+                if dim not in grp:
+                    dtype = pl.Int64 if dim in ("order_year", "order_quarter") else pl.Utf8
+                    sub = sub.with_columns(pl.lit(None, dtype=dtype).alias(dim))
+            frames.append(sub.select(*dims, "order_count", "total_revenue", "avg_order_value"))
+    return pl.concat(frames, how="vertical_relaxed")
 
 
 def olap_cube_analysis_pandas_impl(ctx: DataFrameContext) -> Any:
-    """CUBE operation for multidimensional analysis.
+    """CUBE operation for multidimensional analysis."""
+    import itertools
 
-    Pandas-family implementation using groupby.
-    """
+    import pandas as pd
+
     orders, customer, nation, region = _tables(ctx, "orders", "customer", "nation", "region")
-
-    # Filter orders
     filtered = orders[(orders["o_orderdate"] >= date(1995, 1, 1)) & (orders["o_orderdate"] < date(1997, 1, 1))]
-
-    # Join tables
     merged = filtered.merge(customer, left_on="o_custkey", right_on="c_custkey")
     merged = merged.merge(nation, left_on="c_nationkey", right_on="n_nationkey")
-    merged = merged.merge(region, left_on="n_regionkey", right_on="r_regionkey")
-
-    # Groupby aggregation (simplified CUBE - most detailed level)
-    return merged.groupby(["n_name", "r_name"], as_index=False).agg(
-        order_count=("o_orderkey", "count"),
-        total_revenue=("o_totalprice", "sum"),
-        avg_order_value=("o_totalprice", "mean"),
-    )
+    merged = merged.merge(region, left_on="n_regionkey", right_on="r_regionkey").copy()
+    od = pd.to_datetime(merged["o_orderdate"])
+    merged["nation"] = merged["n_name"]
+    merged["region"] = merged["r_name"]
+    merged["order_year"] = od.dt.year
+    merged["order_quarter"] = od.dt.quarter
+    dims = ["nation", "region", "order_year", "order_quarter"]
+    frames = []
+    for k in range(len(dims), -1, -1):
+        for grp in itertools.combinations(dims, k):
+            if grp:
+                sub = merged.groupby(list(grp), as_index=False).agg(
+                    order_count=("o_orderkey", "count"),
+                    total_revenue=("o_totalprice", "sum"),
+                    avg_order_value=("o_totalprice", "mean"),
+                )
+            else:
+                sub = pd.DataFrame(
+                    {
+                        "order_count": [len(merged)],
+                        "total_revenue": [merged["o_totalprice"].sum()],
+                        "avg_order_value": [merged["o_totalprice"].mean()],
+                    }
+                )
+            for dim in dims:
+                if dim not in grp:
+                    sub[dim] = None
+            frames.append(sub[dims + ["order_count", "total_revenue", "avg_order_value"]])
+    return pd.concat(frames, ignore_index=True)
 
 
 def olap_rollup_analysis_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2402,49 +2535,80 @@ def olap_rollup_analysis_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    # Join tables
-    joined = (
-        orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
-        .join(customer, col("o_custkey") == col("c_custkey"))
-        .join(nation, col("c_nationkey") == col("n_nationkey"))
-        .join(region, col("n_regionkey") == col("r_regionkey"))
-    )
+    # Full ROLLUP over (region, nation, market_segment) = 4 prefix grouping sets
+    # {(r,n,m),(r,n),(r),()}, NULL for rolled-up dims, ORDER BY dims NULLS LAST.
+    import polars as pl
 
-    # Hierarchical aggregation (simplified ROLLUP - most detailed level)
-    return (
-        joined.group_by("r_name", "n_name", "c_mktsegment")
-        .agg(
-            col("c_custkey").n_unique().alias("customer_count"),
-            col("o_orderkey").count().alias("order_count"),
-            col("o_totalprice").sum().alias("total_revenue"),
-            col("o_totalprice").mean().alias("avg_order_value"),
+    del col, lit
+    joined = (
+        orders.native.filter(pl.col("o_orderdate") >= date(1995, 1, 1))
+        .join(customer.native, left_on="o_custkey", right_on="c_custkey")
+        .join(nation.native, left_on="c_nationkey", right_on="n_nationkey")
+        .join(region.native, left_on="n_regionkey", right_on="r_regionkey")
+        .with_columns(
+            pl.col("r_name").alias("region"),
+            pl.col("n_name").alias("nation"),
+            pl.col("c_mktsegment").alias("market_segment"),
         )
-        .sort("r_name", "n_name", "c_mktsegment", nulls_last=True)
     )
+    dims = ["region", "nation", "market_segment"]
+    # Polars consumes the right join key, so c_custkey is gone after the join;
+    # o_custkey == c_custkey on joined rows, so DISTINCT o_custkey == DISTINCT
+    # c_custkey.
+    measures = [
+        pl.col("o_custkey").n_unique().alias("customer_count"),
+        pl.len().alias("order_count"),
+        pl.col("o_totalprice").sum().alias("total_revenue"),
+        pl.col("o_totalprice").mean().alias("avg_order_value"),
+    ]
+    frames = []
+    for k in range(len(dims), -1, -1):
+        grp = dims[:k]
+        sub = joined.group_by(grp).agg(*measures) if grp else joined.select(*measures)
+        for dim in dims:
+            if dim not in grp:
+                sub = sub.with_columns(pl.lit(None, dtype=pl.Utf8).alias(dim))
+        frames.append(sub.select(*dims, "customer_count", "order_count", "total_revenue", "avg_order_value"))
+    return pl.concat(frames, how="vertical_relaxed").sort(dims, nulls_last=True)
 
 
 def olap_rollup_analysis_pandas_impl(ctx: DataFrameContext) -> Any:
-    """ROLLUP operation for hierarchical aggregation.
+    """ROLLUP operation for hierarchical aggregation."""
+    import pandas as pd
 
-    Pandas-family implementation.
-    """
     orders, customer, nation, region = _tables(ctx, "orders", "customer", "nation", "region")
-
-    # Filter and join
     filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)]
     merged = filtered.merge(customer, left_on="o_custkey", right_on="c_custkey")
     merged = merged.merge(nation, left_on="c_nationkey", right_on="n_nationkey")
-    merged = merged.merge(region, left_on="n_regionkey", right_on="r_regionkey")
-
-    # Hierarchical aggregation
-    result = merged.groupby(["r_name", "n_name", "c_mktsegment"], as_index=False).agg(
-        customer_count=("c_custkey", "nunique"),
-        order_count=("o_orderkey", "count"),
-        total_revenue=("o_totalprice", "sum"),
-        avg_order_value=("o_totalprice", "mean"),
-    )
-
-    return result.sort_values(["r_name", "n_name", "c_mktsegment"], na_position="last")
+    merged = merged.merge(region, left_on="n_regionkey", right_on="r_regionkey").copy()
+    merged["region"] = merged["r_name"]
+    merged["nation"] = merged["n_name"]
+    merged["market_segment"] = merged["c_mktsegment"]
+    dims = ["region", "nation", "market_segment"]
+    frames = []
+    for k in range(len(dims), -1, -1):
+        grp = dims[:k]
+        if grp:
+            sub = merged.groupby(grp, as_index=False).agg(
+                customer_count=("c_custkey", "nunique"),
+                order_count=("o_orderkey", "count"),
+                total_revenue=("o_totalprice", "sum"),
+                avg_order_value=("o_totalprice", "mean"),
+            )
+        else:
+            sub = pd.DataFrame(
+                {
+                    "customer_count": [merged["c_custkey"].nunique()],
+                    "order_count": [len(merged)],
+                    "total_revenue": [merged["o_totalprice"].sum()],
+                    "avg_order_value": [merged["o_totalprice"].mean()],
+                }
+            )
+        for dim in dims:
+            if dim not in grp:
+                sub[dim] = None
+        frames.append(sub[dims + ["customer_count", "order_count", "total_revenue", "avg_order_value"]])
+    return pd.concat(frames, ignore_index=True).sort_values(dims, na_position="last").reset_index(drop=True)
 
 
 # =============================================================================
@@ -3924,59 +4088,82 @@ def json_aggregates_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def timeseries_trend_analysis_expression_impl(ctx: DataFrameContext) -> Any:
-    """Time series trend analysis with aggregations.
+    """Time series trend analysis: monthly aggregates, MoM growth, regression slope.
 
-    Expression-family implementation using date truncation and window functions.
+    Raw Polars: the regression slope is REGR_SLOPE(monthly_revenue, month_epoch)
+    OVER () = cov_pop(epoch, revenue)/var_pop(epoch), broadcast to every row.
+    month_epoch = EXTRACT(EPOCH FROM order_month) seconds (date days * 86400).
     """
-    orders = ctx.get_table("orders")
-    col = ctx.col
-    lit = ctx.lit
+    import polars as pl
 
-    # Truncate to month and aggregate
     monthly = (
-        orders.with_columns(col("o_orderdate").dt.truncate("1mo").alias("order_month"))
+        ctx.get_table("orders")
+        .native.filter((pl.col("o_orderdate") >= date(1995, 1, 1)) & (pl.col("o_orderdate") < date(1997, 1, 1)))
+        .with_columns(pl.col("o_orderdate").dt.truncate("1mo").alias("order_month"))
         .group_by("order_month")
         .agg(
-            col("o_orderkey").count().alias("order_count"),
-            col("o_totalprice").sum().alias("monthly_revenue"),
-            col("o_totalprice").mean().alias("avg_order_value"),
+            pl.len().alias("order_count"),
+            pl.col("o_totalprice").sum().alias("monthly_revenue"),
+            pl.col("o_totalprice").mean().alias("avg_order_value"),
         )
+        .sort("order_month")
+        .with_columns((pl.col("order_month").cast(pl.Int64) * 86400).cast(pl.Float64).alias("month_epoch"))
     )
-
-    # Add month-over-month metrics using ctx.window_lag
+    slope = pl.cov("month_epoch", "monthly_revenue", ddof=0) / pl.col("month_epoch").var(ddof=0)
     return (
-        monthly.with_columns(
-            ctx.window_lag("monthly_revenue", offset=1, order_by=[("order_month", True)]).alias("prev_month_revenue")
-        )
+        monthly.with_columns(slope.alias("revenue_trend_slope"))
+        .with_columns(pl.col("monthly_revenue").shift(1).alias("prev_month_revenue"))
         .with_columns(
-            ((col("monthly_revenue") - col("prev_month_revenue")) / col("prev_month_revenue") * lit(100)).alias(
-                "mom_growth_pct"
-            )
+            pl.when(pl.col("prev_month_revenue") == 0)
+            .then(None)
+            .otherwise((pl.col("monthly_revenue") - pl.col("prev_month_revenue")) / pl.col("prev_month_revenue") * 100)
+            .alias("mom_growth_pct")
+        )
+        .select(
+            "order_month",
+            "order_count",
+            "monthly_revenue",
+            "avg_order_value",
+            "revenue_trend_slope",
+            "prev_month_revenue",
+            "mom_growth_pct",
         )
         .sort("order_month")
     )
 
 
 def timeseries_trend_analysis_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Time series trend analysis with aggregations."""
+    """Time series trend analysis: monthly aggregates, MoM growth, regression slope."""
+    import pandas as pd
+
     orders = ctx.get_table("orders")
-
-    # Truncate to month
-    df = orders.copy()
-    df["order_month"] = df["o_orderdate"].values.astype("datetime64[M]")
-
-    # Aggregate by month
-    monthly = df.groupby("order_month").agg({"o_orderkey": "count", "o_totalprice": ["sum", "mean"]}).reset_index()
-    monthly.columns = ["order_month", "order_count", "monthly_revenue", "avg_order_value"]
-
-    # Add month-over-month metrics
-    monthly = monthly.sort_values("order_month")
-    monthly["prev_month_revenue"] = monthly["monthly_revenue"].shift(1)
-    monthly["mom_growth_pct"] = (
-        (monthly["monthly_revenue"] - monthly["prev_month_revenue"]) / monthly["prev_month_revenue"] * 100
+    df = orders[(orders["o_orderdate"] >= date(1995, 1, 1)) & (orders["o_orderdate"] < date(1997, 1, 1))].copy()
+    # Month-start matching DATE_TRUNC('month', ...) (avoids the datetime64[M] crash).
+    df["order_month"] = pd.to_datetime(df["o_orderdate"]).dt.to_period("M").dt.to_timestamp()
+    monthly = df.groupby("order_month", as_index=False).agg(
+        order_count=("o_orderkey", "count"),
+        monthly_revenue=("o_totalprice", "sum"),
+        avg_order_value=("o_totalprice", "mean"),
     )
-
-    return monthly.reset_index(drop=True)
+    monthly = monthly.sort_values("order_month")
+    monthly["month_epoch"] = monthly["order_month"].astype("int64") // 1_000_000_000
+    epoch = monthly["month_epoch"]
+    slope = epoch.cov(monthly["monthly_revenue"], ddof=0) / epoch.var(ddof=0)
+    monthly["revenue_trend_slope"] = slope
+    monthly["prev_month_revenue"] = monthly["monthly_revenue"].shift(1)
+    prev = monthly["prev_month_revenue"]
+    monthly["mom_growth_pct"] = ((monthly["monthly_revenue"] - prev) / prev.replace(0, pd.NA)) * 100
+    return monthly[
+        [
+            "order_month",
+            "order_count",
+            "monthly_revenue",
+            "avg_order_value",
+            "revenue_trend_slope",
+            "prev_month_revenue",
+            "mom_growth_pct",
+        ]
+    ].reset_index(drop=True)
 
 
 # =============================================================================
