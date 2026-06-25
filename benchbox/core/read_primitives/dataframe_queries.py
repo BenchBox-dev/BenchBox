@@ -1940,6 +1940,7 @@ def array_agg_distinct_expression_impl(ctx: DataFrameContext) -> Any:
         ctx.get_table("customer")
         .group_by("c_mktsegment")
         .agg(ctx.col("c_nationkey").unique().sort().alias("nation_keys"))
+        .sort("c_mktsegment")
     )
 
 
@@ -1949,6 +1950,8 @@ def array_agg_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
         ctx.get_table("customer")
         .groupby("c_mktsegment", as_index=False)
         .agg(nation_keys=("c_nationkey", lambda x: sorted(set(x))))
+        .sort_values("c_mktsegment")
+        .reset_index(drop=True)
     )
 
 
@@ -3570,6 +3573,8 @@ def array_contains_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         _expr_grouped_list(ctx, "partsupp", "ps_suppkey", "ps_partkey", "parts")
         .with_columns(col("parts").list.contains(lit(100)).alias("has_part_100"))
+        .select("ps_suppkey", "has_part_100")
+        .sort("ps_suppkey")
         .limit(100)
     )
 
@@ -3577,11 +3582,8 @@ def array_contains_expression_impl(ctx: DataFrameContext) -> Any:
 def array_contains_pandas_impl(ctx: DataFrameContext) -> Any:
     """Check if array contains a value."""
     supplier_parts = _pandas_grouped_list(ctx.get_table("partsupp"), "ps_suppkey", "ps_partkey", "parts")
-
-    # Check if 100 is in each list
     supplier_parts["has_part_100"] = supplier_parts["parts"].apply(lambda x: 100 in x)
-
-    return supplier_parts.head(100).reset_index(drop=True)
+    return supplier_parts.sort_values("ps_suppkey")[["ps_suppkey", "has_part_100"]].head(100).reset_index(drop=True)
 
 
 def array_distinct_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3593,7 +3595,9 @@ def array_distinct_expression_impl(ctx: DataFrameContext) -> Any:
 
     return (
         _expr_grouped_list(ctx, "lineitem", "l_orderkey", "l_shipmode", "modes")
-        .with_columns(col("modes").list.unique().alias("unique_modes"))
+        .with_columns(col("modes").list.unique().list.sort().alias("unique_modes"))
+        .select("l_orderkey", "unique_modes")
+        .sort("l_orderkey")
         .limit(100)
     )
 
@@ -3601,11 +3605,10 @@ def array_distinct_expression_impl(ctx: DataFrameContext) -> Any:
 def array_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
     """Get distinct array elements."""
     ship_modes = _pandas_grouped_list(ctx.get_table("lineitem"), "l_orderkey", "l_shipmode", "modes")
-
-    # Get unique modes
-    ship_modes["unique_modes"] = ship_modes["modes"].apply(lambda x: list(set(x)))
-
-    return ship_modes.head(100).reset_index(drop=True)
+    # Sort the distinct elements so element order is deterministic across surfaces
+    # (the comparator compares list cells order-sensitively).
+    ship_modes["unique_modes"] = ship_modes["modes"].apply(lambda x: sorted(set(x)))
+    return ship_modes.sort_values("l_orderkey")[["l_orderkey", "unique_modes"]].head(100).reset_index(drop=True)
 
 
 def array_length_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3618,7 +3621,8 @@ def array_length_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         _expr_grouped_list(ctx, "partsupp", "ps_suppkey", "ps_partkey", "parts")
         .with_columns(col("parts").list.len().alias("num_parts"))
-        .sort(col("num_parts").desc())
+        .select("ps_suppkey", "num_parts")
+        .sort(["num_parts", "ps_suppkey"], descending=[True, False])
         .limit(100)
     )
 
@@ -3626,12 +3630,12 @@ def array_length_expression_impl(ctx: DataFrameContext) -> Any:
 def array_length_pandas_impl(ctx: DataFrameContext) -> Any:
     """Get array length/cardinality."""
     supplier_parts = _pandas_grouped_list(ctx.get_table("partsupp"), "ps_suppkey", "ps_partkey", "parts")
-
-    # Get length
     supplier_parts["num_parts"] = supplier_parts["parts"].apply(len)
-
-    # Sort by num_parts descending
-    return supplier_parts.sort_values("num_parts", ascending=False).head(100).reset_index(drop=True)
+    return (
+        supplier_parts.sort_values(["num_parts", "ps_suppkey"], ascending=[False, True])[["ps_suppkey", "num_parts"]]
+        .head(100)
+        .reset_index(drop=True)
+    )
 
 
 def array_min_max_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3644,6 +3648,8 @@ def array_min_max_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         _expr_grouped_list(ctx, "orders", "o_custkey", "o_totalprice", "prices")
         .with_columns(col("prices").list.min().alias("min_order"), col("prices").list.max().alias("max_order"))
+        .select("o_custkey", "min_order", "max_order")
+        .sort("o_custkey")
         .limit(100)
     )
 
@@ -3651,12 +3657,11 @@ def array_min_max_expression_impl(ctx: DataFrameContext) -> Any:
 def array_min_max_pandas_impl(ctx: DataFrameContext) -> Any:
     """Get min/max from array."""
     order_prices = _pandas_grouped_list(ctx.get_table("orders"), "o_custkey", "o_totalprice", "prices")
-
-    # Get min and max
     order_prices["min_order"] = order_prices["prices"].apply(min)
     order_prices["max_order"] = order_prices["prices"].apply(max)
-
-    return order_prices.head(100).reset_index(drop=True)
+    return (
+        order_prices.sort_values("o_custkey")[["o_custkey", "min_order", "max_order"]].head(100).reset_index(drop=True)
+    )
 
 
 def array_of_struct_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3669,11 +3674,12 @@ def array_of_struct_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
     struct = ctx.struct
 
-    # Filter orders and join with lineitem
+    # Filter orders and join with lineitem; sort by l_linenumber so the aggregated
+    # struct list is ordered like the SQL's ARRAY_AGG(... ORDER BY l_linenumber),
+    # and sort the rows by o_orderkey for the outer ORDER BY.
     filtered_orders = orders.filter(col("o_orderdate") == lit(date(1995, 3, 15)))
-    joined = lineitem.join(filtered_orders, col("l_orderkey") == col("o_orderkey"))
+    joined = lineitem.join(filtered_orders, col("l_orderkey") == col("o_orderkey")).sort("l_linenumber")
 
-    # Create struct and aggregate into array
     return (
         joined.group_by("o_orderkey")
         .agg(
@@ -3681,6 +3687,7 @@ def array_of_struct_expression_impl(ctx: DataFrameContext) -> Any:
             .list()
             .alias("line_items")
         )
+        .sort("o_orderkey")
         .limit(50)
     )
 
@@ -3708,7 +3715,7 @@ def array_of_struct_pandas_impl(ctx: DataFrameContext) -> Any:
     result = joined.groupby("o_orderkey").apply(agg_to_struct_list, include_groups=False).reset_index()
     result.columns = ["o_orderkey", "line_items"]
 
-    return result.head(50).reset_index(drop=True)
+    return result.sort_values("o_orderkey").head(50).reset_index(drop=True)
 
 
 def array_slice_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3729,6 +3736,7 @@ def array_slice_expression_impl(ctx: DataFrameContext) -> Any:
         order_prices.filter(col("cnt") >= 5)
         .with_columns(col("prices").list.slice(0, 3).alias("top_3_orders"))
         .select("o_custkey", "top_3_orders")
+        .sort("o_custkey")
         .limit(100)
     )
 
@@ -3745,7 +3753,7 @@ def array_slice_pandas_impl(ctx: DataFrameContext) -> Any:
     order_prices = order_prices[order_prices["prices"].apply(len) >= 5].copy()
     order_prices["top_3_orders"] = order_prices["prices"].apply(lambda x: x[:3])
 
-    return order_prices[["o_custkey", "top_3_orders"]].head(100).reset_index(drop=True)
+    return order_prices.sort_values("o_custkey")[["o_custkey", "top_3_orders"]].head(100).reset_index(drop=True)
 
 
 def array_sort_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3758,6 +3766,8 @@ def array_sort_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         _expr_grouped_list(ctx, "part", "p_brand", "p_size", "sizes")
         .with_columns(col("sizes").list.sort().alias("sorted_sizes"))
+        .select("p_brand", "sorted_sizes")
+        .sort("p_brand")
         .limit(50)
     )
 
@@ -3765,11 +3775,8 @@ def array_sort_expression_impl(ctx: DataFrameContext) -> Any:
 def array_sort_pandas_impl(ctx: DataFrameContext) -> Any:
     """Sort array elements."""
     part_sizes = _pandas_grouped_list(ctx.get_table("part"), "p_brand", "p_size", "sizes")
-
-    # Sort each array
     part_sizes["sorted_sizes"] = part_sizes["sizes"].apply(sorted)
-
-    return part_sizes.head(50).reset_index(drop=True)
+    return part_sizes.sort_values("p_brand")[["p_brand", "sorted_sizes"]].head(50).reset_index(drop=True)
 
 
 def array_unnest_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3896,6 +3903,8 @@ def list_filter_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         _expr_grouped_list(ctx, "orders", "o_custkey", "o_totalprice", "prices")
         .with_columns(col("prices").list.eval(elem.filter(elem > lit(100000))).alias("large_orders"))
+        .select("o_custkey", "large_orders")
+        .sort("o_custkey")
         .limit(100)
     )
 
@@ -3903,11 +3912,8 @@ def list_filter_expression_impl(ctx: DataFrameContext) -> Any:
 def list_filter_pandas_impl(ctx: DataFrameContext) -> Any:
     """Filter array elements by condition."""
     order_prices = _pandas_grouped_list(ctx.get_table("orders"), "o_custkey", "o_totalprice", "prices")
-
-    # Filter to keep only large orders
     order_prices["large_orders"] = order_prices["prices"].apply(lambda x: [p for p in x if p > 100000])
-
-    return order_prices.head(100).reset_index(drop=True)
+    return order_prices.sort_values("o_custkey")[["o_custkey", "large_orders"]].head(100).reset_index(drop=True)
 
 
 def list_transform_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3922,6 +3928,8 @@ def list_transform_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         _expr_grouped_list(ctx, "part", "p_brand", "p_retailprice", "prices")
         .with_columns(col("prices").list.eval(elem * lit(1.1)).alias("prices_with_tax"))
+        .select("p_brand", "prices_with_tax")
+        .sort("p_brand")
         .limit(50)
     )
 
@@ -3929,11 +3937,8 @@ def list_transform_expression_impl(ctx: DataFrameContext) -> Any:
 def list_transform_pandas_impl(ctx: DataFrameContext) -> Any:
     """Transform each array element."""
     part_prices = _pandas_grouped_list(ctx.get_table("part"), "p_brand", "p_retailprice", "prices")
-
-    # Transform with 10% markup
     part_prices["prices_with_tax"] = part_prices["prices"].apply(lambda x: [p * 1.1 for p in x])
-
-    return part_prices.head(50).reset_index(drop=True)
+    return part_prices.sort_values("p_brand")[["p_brand", "prices_with_tax"]].head(50).reset_index(drop=True)
 
 
 def list_reduce_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3946,6 +3951,8 @@ def list_reduce_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         _expr_grouped_list(ctx, "lineitem", "l_orderkey", "l_quantity", "qtys")
         .with_columns(col("qtys").list.sum().alias("total_qty"))
+        .select("l_orderkey", "total_qty")
+        .sort("l_orderkey")
         .limit(100)
     )
 
@@ -3953,11 +3960,8 @@ def list_reduce_expression_impl(ctx: DataFrameContext) -> Any:
 def list_reduce_pandas_impl(ctx: DataFrameContext) -> Any:
     """Reduce array to single value."""
     quantities = _pandas_grouped_list(ctx.get_table("lineitem"), "l_orderkey", "l_quantity", "qtys")
-
-    # Reduce to sum
     quantities["total_qty"] = quantities["qtys"].apply(sum)
-
-    return quantities.head(100).reset_index(drop=True)
+    return quantities.sort_values("l_orderkey")[["l_orderkey", "total_qty"]].head(100).reset_index(drop=True)
 
 
 # =============================================================================
