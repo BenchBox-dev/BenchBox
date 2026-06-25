@@ -1102,19 +1102,26 @@ def _window_select(frame: Any, cols: tuple[str, ...]) -> Any:
 
 def window_row_number_expression_impl(ctx: DataFrameContext) -> Any:
     """Window function ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)."""
-    result = ctx.get_table("lineitem").with_columns(
-        ctx.window_row_number(order_by=[("l_extendedprice", False)], partition_by=["l_orderkey"]).alias("row_num")
-    )
-    return _window_select(
-        result.filter(ctx.col("row_num") <= 3), ("l_orderkey", "l_linenumber", "l_extendedprice", "row_num")
+    # SQL is over orders (PARTITION BY o_custkey ORDER BY o_totalprice DESC), with
+    # a date window and NO rank filter.
+    col, lit = ctx.col, ctx.lit
+    return (
+        ctx.get_table("orders")
+        .filter((col("o_orderdate") >= lit(date(1995, 1, 1))) & (col("o_orderdate") < lit(date(1996, 1, 1))))
+        .with_columns(
+            ctx.window_row_number(order_by=[("o_totalprice", False)], partition_by=["o_custkey"]).alias("order_rank")
+        )
+        .select("o_custkey", "o_orderkey", "o_totalprice", "order_rank")
     )
 
 
 def window_row_number_pandas_impl(ctx: DataFrameContext) -> Any:
     """Window function ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)."""
-    result = ctx.get_table("lineitem").sort_values(["l_orderkey", "l_extendedprice"], ascending=[True, False])
-    result["row_num"] = result.groupby("l_orderkey").cumcount() + 1
-    return result[result["row_num"] <= 3][["l_orderkey", "l_linenumber", "l_extendedprice", "row_num"]]
+    orders = ctx.get_table("orders")
+    result = orders[(orders["o_orderdate"] >= date(1995, 1, 1)) & (orders["o_orderdate"] < date(1996, 1, 1))].copy()
+    result = result.sort_values(["o_custkey", "o_totalprice"], ascending=[True, False])
+    result["order_rank"] = result.groupby("o_custkey").cumcount() + 1
+    return result[["o_custkey", "o_orderkey", "o_totalprice", "order_rank"]].reset_index(drop=True)
 
 
 def window_rank_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1122,8 +1129,11 @@ def window_rank_expression_impl(ctx: DataFrameContext) -> Any:
     result = ctx.get_table("lineitem").with_columns(
         ctx.window_rank(order_by=[("l_quantity", False)], partition_by=["l_returnflag"]).alias("qty_rank")
     )
-    return _window_select(
-        result.filter(ctx.col("qty_rank") <= 5), ("l_orderkey", "l_returnflag", "l_quantity", "qty_rank")
+    # SQL ORDER BY l_returnflag, qty_rank, l_orderkey (all projected -> order-aware).
+    return (
+        result.filter(ctx.col("qty_rank") <= 5)
+        .select("l_orderkey", "l_returnflag", "l_quantity", "qty_rank")
+        .sort(["l_returnflag", "qty_rank", "l_orderkey"])
     )
 
 
@@ -1131,7 +1141,11 @@ def window_rank_pandas_impl(ctx: DataFrameContext) -> Any:
     """Window function RANK() OVER (PARTITION BY ... ORDER BY ...)."""
     result = ctx.get_table("lineitem").copy()
     result["qty_rank"] = result.groupby("l_returnflag")["l_quantity"].rank(method="min", ascending=False)
-    return result[result["qty_rank"] <= 5][["l_orderkey", "l_returnflag", "l_quantity", "qty_rank"]]
+    return (
+        result[result["qty_rank"] <= 5][["l_orderkey", "l_returnflag", "l_quantity", "qty_rank"]]
+        .sort_values(["l_returnflag", "qty_rank", "l_orderkey"])
+        .reset_index(drop=True)
+    )
 
 
 def window_sum_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1151,21 +1165,39 @@ def window_sum_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def window_running_sum_expression_impl(ctx: DataFrameContext) -> Any:
-    """Window function SUM() OVER (ORDER BY ...) - cumulative sum."""
-    return (
-        ctx.get_table("orders")
+    """Window function SUM() OVER (ORDER BY o_orderdate) - RANGE running sum."""
+    # SQL SUM(...) OVER (ORDER BY o_orderdate) with no frame = RANGE UNBOUNDED
+    # PRECEDING -> all rows of a date share the cumulative total through that date.
+    # Compute per-date totals, cumulate across dates, then broadcast to each row.
+    col = ctx.col
+    orders = ctx.get_table("orders")
+    daily = (
+        orders.group_by("o_orderdate")
+        .agg(col("o_totalprice").sum().alias("_daily_total"))
         .sort("o_orderdate")
-        .with_columns(ctx.window_sum("o_totalprice", order_by=[("o_orderdate", True)]).alias("cumulative_revenue"))
+        .with_columns(ctx.window_sum("_daily_total", order_by=[("o_orderdate", True)]).alias("cumulative_revenue"))
+        .select("o_orderdate", "cumulative_revenue")
+    )
+    return (
+        orders.join(daily, on="o_orderdate")
+        .sort("o_orderdate")
         .select("o_orderkey", "o_orderdate", "o_totalprice", "cumulative_revenue")
         .limit(100)
     )
 
 
 def window_running_sum_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Window function SUM() OVER (ORDER BY ...) - cumulative sum."""
-    result = ctx.get_table("orders").sort_values("o_orderdate").copy()
-    result["cumulative_revenue"] = result["o_totalprice"].cumsum()
-    return result[["o_orderkey", "o_orderdate", "o_totalprice", "cumulative_revenue"]].head(100)
+    """Window function SUM() OVER (ORDER BY o_orderdate) - RANGE running sum."""
+    orders = ctx.get_table("orders")
+    daily = orders.groupby("o_orderdate", as_index=False).agg(_daily_total=("o_totalprice", "sum"))
+    daily = daily.sort_values("o_orderdate")
+    daily["cumulative_revenue"] = daily["_daily_total"].cumsum()
+    result = orders.merge(daily[["o_orderdate", "cumulative_revenue"]], on="o_orderdate")
+    return (
+        result.sort_values("o_orderdate")[["o_orderkey", "o_orderdate", "o_totalprice", "cumulative_revenue"]]
+        .head(100)
+        .reset_index(drop=True)
+    )
 
 
 def broadcast_join_two_tables_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1416,60 +1448,97 @@ def window_growing_frame_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def window_lead_lag_expression_impl(ctx: DataFrameContext) -> Any:
-    """Offset window functions over the same frame."""
-    col, lit = ctx.col, ctx.lit
+    """Offset window functions over the same frame (deterministic tie-break).
+
+    Uses raw Polars via ``.native``: ``UnifiedExpr`` has no ``.shift`` and the
+    ``window_lag``/``window_lead`` helpers shift before sorting. LAG/LEAD are
+    computed with ``shift().over()`` after a total-order sort that matches the
+    catalog SQL's ``ORDER BY o_orderdate, o_orderkey`` window tie-break.
+    """
+    import polars as pl
+
     return (
         ctx.get_table("orders")
-        .filter((col("o_orderdate") >= lit(date(1995, 1, 1))) & (col("o_orderdate") < lit(date(1996, 1, 1))))
-        .sort(["o_custkey", "o_orderdate"])
+        .native.filter((pl.col("o_orderdate") >= date(1995, 1, 1)) & (pl.col("o_orderdate") < date(1996, 1, 1)))
+        .sort(["o_custkey", "o_orderdate", "o_orderkey"])
         .with_columns(
-            [
-                ctx.window_lag("o_totalprice", partition_by=["o_custkey"], order_by=[("o_orderdate", True)]).alias(
-                    "prev_order_price"
-                ),
-                ctx.window_lead("o_totalprice", partition_by=["o_custkey"], order_by=[("o_orderdate", True)]).alias(
-                    "next_order_price"
-                ),
-            ]
+            pl.col("o_totalprice").shift(1).over("o_custkey").alias("prev_order_price"),
+            pl.col("o_totalprice").shift(-1).over("o_custkey").alias("next_order_price"),
         )
         .select("o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price", "next_order_price")
     )
 
 
 def window_lead_lag_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Offset window functions over the same frame."""
+    """Offset window functions over the same frame (deterministic tie-break)."""
     result = ctx.get_table("orders")
     result = result[(result["o_orderdate"] >= date(1995, 1, 1)) & (result["o_orderdate"] < date(1996, 1, 1))].copy()
-    result = result.sort_values(["o_custkey", "o_orderdate"])
+    result = result.sort_values(["o_custkey", "o_orderdate", "o_orderkey"])
     result["prev_order_price"] = result.groupby("o_custkey")["o_totalprice"].shift(1)
     result["next_order_price"] = result.groupby("o_custkey")["o_totalprice"].shift(-1)
-    return result[["o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price", "next_order_price"]]
+    return result[["o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price", "next_order_price"]].reset_index(
+        drop=True
+    )
 
 
 def window_dense_rank_expression_impl(ctx: DataFrameContext) -> Any:
-    """Window function DENSE_RANK() OVER (PARTITION BY ... ORDER BY ...)."""
-    col, lit = ctx.col, ctx.lit
+    """Multiple window orderings: DENSE_RANK + PERCENT_RANK + CUME_DIST.
+
+    Raw Polars: PERCENT_RANK = (rank_min - 1)/(n - 1) is 0/0 = NaN for a single-row
+    partition where DuckDB returns 0.0, so it is coalesced (fill_nan + fill_null).
+    CUME_DIST = rank_max / n.
+    """
+    import polars as pl
+
+    n = pl.len().over("l_orderkey")
     return (
         ctx.get_table("lineitem")
-        .filter(col("l_orderkey") <= lit(10000))
+        .native.filter(pl.col("l_orderkey") <= 10000)
         .with_columns(
-            ctx.window_dense_rank(order_by=[("l_extendedprice", False)], partition_by=["l_orderkey"]).alias(
-                "price_rank"
-            )
+            pl.col("l_extendedprice").rank("dense", descending=True).over("l_orderkey").alias("price_rank"),
+            ((pl.col("l_quantity").rank("min").over("l_orderkey") - 1) / (n - 1))
+            .fill_nan(0.0)
+            .fill_null(0.0)
+            .alias("quantity_percentile"),
+            (pl.col("l_extendedprice").rank("max").over("l_orderkey") / n).alias("price_distribution"),
         )
         .sort(["l_orderkey", "price_rank"])
-        .select("l_orderkey", "l_partkey", "l_quantity", "l_extendedprice", "price_rank")
+        .select(
+            "l_orderkey",
+            "l_partkey",
+            "l_quantity",
+            "l_extendedprice",
+            "price_rank",
+            "quantity_percentile",
+            "price_distribution",
+        )
     )
 
 
 def window_dense_rank_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Window function DENSE_RANK() OVER (PARTITION BY ... ORDER BY ...)."""
+    """Multiple window orderings: DENSE_RANK + PERCENT_RANK + CUME_DIST."""
     result = ctx.get_table("lineitem")
     result = result[result["l_orderkey"] <= 10000].copy()
-    result["price_rank"] = result.groupby("l_orderkey")["l_extendedprice"].rank(method="dense", ascending=False)
+    grp = result.groupby("l_orderkey")
+    result["price_rank"] = grp["l_extendedprice"].rank(method="dense", ascending=False)
+    # PERCENT_RANK = (rank_min - 1) / (n - 1); single-row partition -> 0.
+    n = grp["l_quantity"].transform("count")
+    rank_min_qty = grp["l_quantity"].rank(method="min", ascending=True)
+    result["quantity_percentile"] = ((rank_min_qty - 1) / (n - 1)).where(n > 1, 0.0)
+    # CUME_DIST = rank_max / n.
+    rank_max_price = grp["l_extendedprice"].rank(method="max", ascending=True)
+    result["price_distribution"] = rank_max_price / grp["l_extendedprice"].transform("count")
     return result.sort_values(["l_orderkey", "price_rank"])[
-        ["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice", "price_rank"]
-    ]
+        [
+            "l_orderkey",
+            "l_partkey",
+            "l_quantity",
+            "l_extendedprice",
+            "price_rank",
+            "quantity_percentile",
+            "price_distribution",
+        ]
+    ].reset_index(drop=True)
 
 
 def predicate_ordering_groupby_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2019,35 +2088,49 @@ def shuffle_union_all_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def window_moving_frame_expression_impl(ctx: DataFrameContext) -> Any:
-    """Window aggregations with complex moving frame definitions."""
-    orders = ctx.get_table("orders")
-    col = ctx.col
-    lit = ctx.lit
+    """Window aggregations with complex moving frame definitions.
 
-    return (
-        orders.filter((col("o_orderdate") >= lit(date(1995, 1, 1))) & (col("o_orderdate") < lit(date(1996, 1, 1))))
-        .sort("o_orderdate")
-        .with_columns(
-            ctx.window_avg(
-                "o_totalprice",
-                order_by=[("o_orderdate", True)],
-            ).alias("moving_avg")
-        )
-        .select("o_orderkey", "o_orderdate", "o_totalprice", "moving_avg")
-        .sort("o_orderdate")
+    Raw Polars: a 6-row trailing AVG (ROWS frame, over the total-order sort) plus a
+    30-day RANGE SUM (``rolling_sum_by`` on o_orderdate). The unified surface has
+    no bounded-frame window helper.
+    """
+    import polars as pl
+
+    lf = (
+        ctx.get_table("orders")
+        .native.filter((pl.col("o_orderdate") >= date(1995, 1, 1)) & (pl.col("o_orderdate") < date(1996, 1, 1)))
+        .sort(["o_orderdate", "o_orderkey"])
     )
+    return lf.with_columns(
+        pl.col("o_totalprice").rolling_mean(window_size=6, min_samples=1).alias("moving_avg_6_orders"),
+        pl.col("o_totalprice")
+        .rolling_sum_by("o_orderdate", window_size="30d", closed="both")
+        .alias("monthly_running_total"),
+    ).select("o_orderkey", "o_orderdate", "o_totalprice", "moving_avg_6_orders", "monthly_running_total")
 
 
 def window_moving_frame_pandas_impl(ctx: DataFrameContext) -> Any:
     """Window aggregations with complex moving frame definitions."""
+    import pandas as pd
+
     orders = ctx.get_table("orders")
-
     filtered = orders[(orders["o_orderdate"] >= date(1995, 1, 1)) & (orders["o_orderdate"] < date(1996, 1, 1))].copy()
-    filtered = filtered.sort_values("o_orderdate")
-    # Rolling average with 6 order window
-    filtered["moving_avg"] = filtered["o_totalprice"].rolling(window=6, min_periods=1).mean()
-
-    return filtered[["o_orderkey", "o_orderdate", "o_totalprice", "moving_avg"]]
+    filtered = filtered.sort_values(["o_orderdate", "o_orderkey"]).reset_index(drop=True)
+    # 6-row trailing average (ROWS BETWEEN 5 PRECEDING AND CURRENT ROW).
+    filtered["moving_avg_6_orders"] = filtered["o_totalprice"].rolling(window=6, min_periods=1).mean()
+    # 30-day RANGE sum: value-based and PEER-inclusive (every row of a date shares
+    # the same total), so aggregate to one row per date first, roll over the unique
+    # dates ([t-30d, t]), then broadcast back - a row-position rolling window would
+    # miss same-date peers that sort after the current row.
+    daily = filtered.groupby("o_orderdate", as_index=False)["o_totalprice"].sum().sort_values("o_orderdate")
+    didx = pd.DatetimeIndex(daily["o_orderdate"].astype("datetime64[ns]"))
+    daily["monthly_running_total"] = (
+        pd.Series(daily["o_totalprice"].to_numpy(), index=didx).rolling("30D", closed="both").sum().to_numpy()
+    )
+    filtered = filtered.merge(daily[["o_orderdate", "monthly_running_total"]], on="o_orderdate")
+    return filtered.sort_values(["o_orderdate", "o_orderkey"])[
+        ["o_orderkey", "o_orderdate", "o_totalprice", "moving_avg_6_orders", "monthly_running_total"]
+    ].reset_index(drop=True)
 
 
 def window_unbounded_frame_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2957,10 +3040,11 @@ def qualify_dense_rank_expression_impl(ctx: DataFrameContext) -> Any:
     result = ctx.get_table("part").with_columns(
         ctx.window_dense_rank(order_by=[("p_retailprice", False)], partition_by=["p_type"]).alias("price_rank")
     )
+    # SQL ORDER BY p_type, price_rank, p_name (all projected -> order-aware).
     return (
         result.filter(ctx.col("price_rank") <= ctx.lit(2))
         .select("p_type", "p_name", "p_retailprice", "price_rank")
-        .sort("p_type", "price_rank")
+        .sort(["p_type", "price_rank", "p_name"])
     )
 
 
@@ -2970,7 +3054,7 @@ def qualify_dense_rank_pandas_impl(ctx: DataFrameContext) -> Any:
     result["price_rank"] = result.groupby("p_type")["p_retailprice"].rank(method="dense", ascending=False)
     return (
         result[result["price_rank"] <= 2][["p_type", "p_name", "p_retailprice", "price_rank"]]
-        .sort_values(["p_type", "price_rank"])
+        .sort_values(["p_type", "price_rank", "p_name"])
         .reset_index(drop=True)
     )
 
@@ -2978,35 +3062,62 @@ def qualify_dense_rank_pandas_impl(ctx: DataFrameContext) -> Any:
 def qualify_ntile_expression_impl(ctx: DataFrameContext) -> Any:
     """Find orders in top quartile by value for each market segment using NTILE.
 
-    Expression-family implementation using window functions.
+    The ``window_ntile`` helper uses a wrong bucket formula, so NTILE is computed
+    inline (raw Polars): the SQL definition assigns the first ``cnt % n`` buckets
+    ``ceil(cnt/n)`` rows. Ordering matches the catalog tie-break
+    ``ORDER BY o_totalprice, o_orderkey``.
     """
-    result = _orders_customer_since_1995_expr(ctx).with_columns(
-        ctx.window_ntile(4, order_by=[("o_totalprice", True)], partition_by=["c_mktsegment"]).alias("quartile")
+    import polars as pl
+
+    n = 4
+    lf = (
+        _orders_customer_since_1995_expr(ctx)
+        .native.sort(["c_mktsegment", "o_totalprice", "o_orderkey"])
+        .with_columns(
+            pl.int_range(0, pl.len()).over("c_mktsegment").alias("_r0"),
+            pl.len().over("c_mktsegment").alias("_cnt"),
+        )
     )
+    base = pl.col("_cnt") // n
+    rem = pl.col("_cnt") % n
+    big = rem * (base + 1)
+    quartile = (
+        pl.when(pl.col("_r0") < big)
+        .then(pl.col("_r0") // (base + 1) + 1)
+        .otherwise(rem + (pl.col("_r0") - big) // base + 1)
+    )
+    lf = lf.with_columns(quartile.cast(pl.Int64).alias("quartile"))
     return (
-        result.filter(ctx.col("quartile") == ctx.lit(4))
+        lf.filter(pl.col("quartile") == n)
         .select("c_mktsegment", "o_orderkey", "o_totalprice", "quartile")
-        .sort(ctx.col("c_mktsegment"), ctx.col("o_totalprice").desc())
+        .sort(["c_mktsegment", "o_totalprice", "o_orderkey"], descending=[False, True, True])
     )
 
 
 def qualify_ntile_pandas_impl(ctx: DataFrameContext) -> Any:
     """Find orders in top quartile by value for each market segment using NTILE."""
-    import pandas as pd
+    import numpy as np
 
-    def assign_quartile(group: Any) -> Any:
-        group = group.copy().sort_values("o_totalprice")
-        group["quartile"] = pd.qcut(range(len(group)), 4, labels=[1, 2, 3, 4], duplicates="drop") if len(group) else []
-        return group
-
+    n = 4
     result = (
         _orders_customer_since_1995_pandas(ctx)
-        .groupby("c_mktsegment", group_keys=False)
-        .apply(assign_quartile, include_groups=False)
+        .sort_values(["c_mktsegment", "o_totalprice", "o_orderkey"], kind="stable")
+        .copy()
     )
+    grp = result.groupby("c_mktsegment")
+    r0 = grp.cumcount()
+    cnt = grp["o_orderkey"].transform("count")
+    base = cnt // n
+    rem = cnt % n
+    big = rem * (base + 1)
+    # base is 0 for partitions smaller than n, but those rows always satisfy
+    # r0 < big and take the first branch; guard the divisor so the (discarded)
+    # else branch never divides by zero.
+    quartile = np.where(r0 < big, r0 // (base + 1) + 1, rem + (r0 - big) // base.replace(0, 1) + 1)
+    result["quartile"] = quartile.astype("int64")
     return (
-        result[result["quartile"] == 4][["c_mktsegment", "o_orderkey", "o_totalprice", "quartile"]]
-        .sort_values(["c_mktsegment", "o_totalprice"], ascending=[True, False])
+        result[result["quartile"] == n][["c_mktsegment", "o_orderkey", "o_totalprice", "quartile"]]
+        .sort_values(["c_mktsegment", "o_totalprice", "o_orderkey"], ascending=[True, False, False])
         .reset_index(drop=True)
     )
 
@@ -3095,29 +3206,30 @@ def qualify_cume_dist_pandas_impl(ctx: DataFrameContext) -> Any:
 def qualify_lag_lead_expression_impl(ctx: DataFrameContext) -> Any:
     """Find orders where price increased from previous order using LAG.
 
-    Expression-family implementation using window functions.
+    Raw Polars (via ``.native``) for a correct LAG: ``shift(1).over()`` after a
+    total-order sort matching the catalog SQL's ``ORDER BY o_orderdate, o_orderkey``
+    window tie-break (the ``window_lag`` helper shifts before sorting).
     """
-    result = _orders_customer_since_1995_expr(ctx).with_columns(
-        ctx.window_lag("o_totalprice", offset=1, partition_by=["c_custkey"], order_by=[("o_orderdate", True)]).alias(
-            "prev_order_price"
-        )
-    )
+    import polars as pl
+
+    lf = _orders_customer_since_1995_expr(ctx).native.sort(["c_custkey", "o_orderdate", "o_orderkey"])
+    lf = lf.with_columns(pl.col("o_totalprice").shift(1).over("c_custkey").alias("prev_order_price"))
     return (
-        result.filter(ctx.col("o_totalprice") > ctx.col("prev_order_price"))
+        lf.filter(pl.col("o_totalprice") > pl.col("prev_order_price"))
         .select("c_custkey", "c_name", "o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price")
-        .sort("c_custkey", "o_orderdate")
+        .sort(["c_custkey", "o_orderdate", "o_orderkey"])
     )
 
 
 def qualify_lag_lead_pandas_impl(ctx: DataFrameContext) -> Any:
     """Find orders where price increased from previous order using LAG."""
-    result = _orders_customer_since_1995_pandas(ctx).sort_values(["c_custkey", "o_orderdate"])
+    result = _orders_customer_since_1995_pandas(ctx).sort_values(["c_custkey", "o_orderdate", "o_orderkey"])
     result["prev_order_price"] = result.groupby("c_custkey")["o_totalprice"].shift(1)
     return (
         result[result["o_totalprice"] > result["prev_order_price"]][
             ["c_custkey", "c_name", "o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price"]
         ]
-        .sort_values(["c_custkey", "o_orderdate"])
+        .sort_values(["c_custkey", "o_orderdate", "o_orderkey"])
         .reset_index(drop=True)
     )
 
