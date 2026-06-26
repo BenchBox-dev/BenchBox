@@ -881,6 +881,83 @@ _H2ODB_PERCENTILE_DECIMAL = (
 _H2ODB_KNOWN_DIVERGENCES: dict[str, str] = dict.fromkeys(("Q9_expression", "Q9_pandas"), _H2ODB_PERCENTILE_DECIMAL)
 
 
+# Read Primitives classified cells. As a *primitives* benchmark it deliberately
+# exercises engine features that have no faithful exact DataFrame equivalent:
+# approximate sketches, DECIMAL-scale arithmetic, JSON text, and a Polars Map gap.
+# Each is the last-resort classification (with rationale), not a masked defect.
+_READ_PRIMITIVES_APPROX = (
+    "DuckDB APPROX_COUNT_DISTINCT (HyperLogLog) and APPROX_QUANTILE (T-Digest) are "
+    "inherently approximate sketches; the DataFrame computes the exact distinct "
+    "count / quantile, so the values differ by the sketch's error - approximate by "
+    "construction, not a logic divergence."
+)
+_READ_PRIMITIVES_DECIMAL_PERCENTILE = (
+    "PERCENTILE_CONT over DECIMAL(15,2) returns a 2-decimal value on the SQL surface; "
+    "the DataFrame interpolates in float64. Both use linear interpolation - only the "
+    "DECIMAL result scale differs (sub-cent), the same presentational class as h2odb Q9."
+)
+_READ_PRIMITIVES_DECIMAL_ROUND = (
+    "ROUND() of a DECIMAL revenue (DuckDB, exact) vs the same product computed in "
+    "float64 (DataFrame) flips at a half-cent rounding boundary; a DECIMAL-vs-float "
+    "presentational residue (every other column matches), not a logic divergence."
+)
+_READ_PRIMITIVES_ARGMIN_TIE = (
+    "ARG_MIN(p_name, p_retailprice) is non-deterministic when several parts in a brand "
+    "share the minimum retail price; DuckDB's tie pick is engine-defined and not "
+    "reproducible by a fixed DataFrame tie-break (the min_price value matches exactly)."
+)
+_READ_PRIMITIVES_JSON_TEXT = (
+    "JSON_GROUP_ARRAY/JSON_GROUP_OBJECT return JSON *text* with engine-defined element/"
+    "key order and number formatting; the DataFrame produces native list/dict "
+    "containers. Representational difference, not a logic divergence."
+)
+_READ_PRIMITIVES_POLARS_MAP = (
+    "Polars (the expression backend) has no native Map dtype, so MAP_FROM_ENTRIES is "
+    "unsupported (the query is in the benchmark's SKIP_FOR_POLARS set); there is no "
+    "expression-surface result to compare. The pandas surface matches its SQL."
+)
+_READ_PRIMITIVES_KNOWN_DIVERGENCES: dict[str, str] = {
+    **dict.fromkeys(
+        (
+            "approx_count_distinct_simple_expression",
+            "approx_count_distinct_simple_pandas",
+            "approx_count_distinct_groupby_expression",
+            "approx_count_distinct_groupby_pandas",
+            "approx_quantile_groupby_expression",
+            "approx_quantile_groupby_pandas",
+        ),
+        _READ_PRIMITIVES_APPROX,
+    ),
+    **dict.fromkeys(
+        ("statistical_percentiles_expression", "statistical_percentiles_pandas"),
+        _READ_PRIMITIVES_DECIMAL_PERCENTILE,
+    ),
+    **dict.fromkeys(
+        ("optimizer_common_subexpression_expression", "optimizer_common_subexpression_pandas"),
+        _READ_PRIMITIVES_DECIMAL_ROUND,
+    ),
+    **dict.fromkeys(("min_by_complex_expression", "min_by_complex_pandas"), _READ_PRIMITIVES_ARGMIN_TIE),
+    **dict.fromkeys(("json_aggregates_expression", "json_aggregates_pandas"), _READ_PRIMITIVES_JSON_TEXT),
+    **dict.fromkeys(
+        ("map_access_expression", "map_construction_expression", "map_keys_values_expression"),
+        _READ_PRIMITIVES_POLARS_MAP,
+    ),
+}
+_READ_PRIMITIVES_LEGITIMATELY_EMPTY: dict[Any, str] = {
+    **dict.fromkeys(
+        ("filter_bigint_selective", "filter_decimal_selective", "filter_decimal_in_list_selective"),
+        "Highly selective exact-match filter whose literal does not occur in the bounded "
+        "SF=0.05 cell (an orderkey outside the generated range, or an exact DECIMAL price "
+        "that the generator never produces), so the SQL reference is empty.",
+    ),
+    "json_extract_nested": (
+        "TPC-H c_comment is free natural-language text, never valid JSON, so "
+        "WHERE JSON_VALID(c_comment) matches nothing at any scale - the benchmark has no "
+        "JSON source data. The DataFrame surface mirrors the empty result."
+    ),
+}
+
+
 # Registry of ENFORCED gated benchmarks: clean, blocking cross-surface gates whose
 # DataFrame surface matches its SQL surface. The oracle coverage map reads this set
 # to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
@@ -940,6 +1017,8 @@ STAGED_GATES: dict[str, CrossSurfaceGate] = {
         name="read_primitives",
         build=build_read_primitives_duckdb,
         scale_factor=_READ_PRIMITIVES_SCALE,
+        known_divergences=_READ_PRIMITIVES_KNOWN_DIVERGENCES,
+        legitimately_empty=_READ_PRIMITIVES_LEGITIMATELY_EMPTY,
     ),
 }
 
