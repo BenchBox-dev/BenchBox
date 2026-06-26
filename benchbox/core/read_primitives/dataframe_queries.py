@@ -730,7 +730,8 @@ for _spec in (
         ("p_partkey", "p_name", "p_mfgr", "p_brand", "p_type", "p_size", "p_container", "p_retailprice", "p_comment"),
         None,
     ),
-    ("limit", "lineitem", (), ("l_orderkey", "l_partkey", "l_suppkey", "l_quantity"), 1000),
+    # "limit" is a dedicated impl below (SELECT * + ORDER BY, which this filtered
+    # -select factory cannot express).
     ("string_like", "part", (("p_name", "contains", "blue", False),), ("p_partkey", "p_name", "p_type"), None),
     ("string_starts_with", "part", (("p_type", "starts", "STANDARD", False),), ("p_partkey", "p_name", "p_type"), None),
     ("string_ends_with", "part", (("p_type", "ends", "BRASS", False),), ("p_partkey", "p_name", "p_type"), None),
@@ -1960,6 +1961,16 @@ def array_agg_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 
 
+def limit_expression_impl(ctx: DataFrameContext) -> Any:
+    """SELECT * FROM lineitem ORDER BY l_orderkey, l_linenumber LIMIT 100."""
+    return ctx.get_table("lineitem").sort(["l_orderkey", "l_linenumber"]).limit(100)
+
+
+def limit_pandas_impl(ctx: DataFrameContext) -> Any:
+    """SELECT * FROM lineitem ORDER BY l_orderkey, l_linenumber LIMIT 100."""
+    return ctx.get_table("lineitem").sort_values(["l_orderkey", "l_linenumber"]).head(100).reset_index(drop=True)
+
+
 def limit_ordered_expression_impl(ctx: DataFrameContext) -> Any:
     """LIMIT clause with ordering on large result set."""
     lineitem = ctx.get_table("lineitem")
@@ -2777,49 +2788,75 @@ def optimizer_distinct_elimination_pandas_impl(ctx: DataFrameContext) -> Any:
 def optimizer_common_subexpression_expression_impl(ctx: DataFrameContext) -> Any:
     """Test Common Subexpression Elimination (CSE).
 
-    Write the SAME complex expression multiple times - optimizer should compute once.
+    Raw Polars for the CASE + ROUND. SQL: shipdate window AND revenue > 1000;
+    7 cols (revenue_with_tax, value_category CASE, rounded_revenue); ORDER BY
+    revenue DESC, LIMIT 5000 (l_orderkey, l_linenumber tie-break matches catalog).
     """
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
+    import polars as pl
 
-    # Define the complex expression (will be repeated)
-    # DO NOT name it once and reuse - let optimizer find the common subexpression
+    revenue = pl.col("l_quantity") * pl.col("l_extendedprice") * (1 - pl.col("l_discount")) * (1 + pl.col("l_tax"))
+    lf = (
+        ctx.get_table("lineitem")
+        .native.filter((pl.col("l_shipdate") >= date(1995, 1, 1)) & (pl.col("l_shipdate") < date(1996, 1, 1)))
+        .with_columns(revenue.alias("revenue_with_tax"))
+        .filter(pl.col("revenue_with_tax") > 1000)
+    )
     return (
-        lineitem.filter(col("l_quantity") > lit(0))
+        lf.with_columns(
+            pl.when(pl.col("revenue_with_tax") > 50000)
+            .then(pl.lit("High Value"))
+            .when(pl.col("revenue_with_tax") > 10000)
+            .then(pl.lit("Medium Value"))
+            .otherwise(pl.lit("Low Value"))
+            .alias("value_category"),
+            pl.col("revenue_with_tax").round(2).alias("rounded_revenue"),
+        )
         .select(
             "l_orderkey",
             "l_partkey",
             "l_suppkey",
             "l_linenumber",
-            # Repeat the same expression multiple times
-            (col("l_quantity") * col("l_extendedprice") * (lit(1) - col("l_discount")) * (lit(1) + col("l_tax"))).alias(
-                "revenue_with_tax"
-            ),
-            (col("l_quantity") * col("l_extendedprice") * (lit(1) - col("l_discount")) * (lit(1) + col("l_tax"))).alias(
-                "revenue_copy"
-            ),
+            "revenue_with_tax",
+            "value_category",
+            "rounded_revenue",
         )
-        .filter(col("revenue_with_tax") > lit(1000))
-        .limit(100)
+        .sort(["revenue_with_tax", "l_orderkey", "l_linenumber"], descending=[True, False, False])
+        .limit(5000)
     )
 
 
 def optimizer_common_subexpression_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test Common Subexpression Elimination (CSE)."""
     lineitem = ctx.get_table("lineitem")
-
-    filtered = lineitem[lineitem["l_quantity"] > 0].copy()
-
-    # Compute the expression multiple times (pandas will compute each time)
-    expr = filtered["l_quantity"] * filtered["l_extendedprice"] * (1 - filtered["l_discount"]) * (1 + filtered["l_tax"])
-
-    filtered["revenue_with_tax"] = expr
-    filtered["revenue_copy"] = expr
-
-    return filtered[filtered["revenue_with_tax"] > 1000][
-        ["l_orderkey", "l_partkey", "l_suppkey", "l_linenumber", "revenue_with_tax", "revenue_copy"]
-    ].head(100)
+    filtered = lineitem[
+        (lineitem["l_shipdate"] >= date(1995, 1, 1)) & (lineitem["l_shipdate"] < date(1996, 1, 1))
+    ].copy()
+    revenue = (
+        filtered["l_quantity"] * filtered["l_extendedprice"] * (1 - filtered["l_discount"]) * (1 + filtered["l_tax"])
+    )
+    filtered["revenue_with_tax"] = revenue
+    filtered = filtered[filtered["revenue_with_tax"] > 1000].copy()
+    rev = filtered["revenue_with_tax"]
+    filtered["value_category"] = "Low Value"
+    filtered.loc[rev > 10000, "value_category"] = "Medium Value"
+    filtered.loc[rev > 50000, "value_category"] = "High Value"
+    filtered["rounded_revenue"] = rev.round(2)
+    return (
+        filtered[
+            [
+                "l_orderkey",
+                "l_partkey",
+                "l_suppkey",
+                "l_linenumber",
+                "revenue_with_tax",
+                "value_category",
+                "rounded_revenue",
+            ]
+        ]
+        .sort_values(["revenue_with_tax", "l_orderkey", "l_linenumber"], ascending=[False, True, True])
+        .head(5000)
+        .reset_index(drop=True)
+    )
 
 
 def optimizer_predicate_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3019,30 +3056,61 @@ def optimizer_constant_folding_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    # Use Spark expressions for constants (optimizer should fold lit(2)*lit(3)+lit(4) to lit(10))
-    return (
-        lineitem.filter(col("l_quantity") > lit(0))
-        .select(
-            "l_orderkey",
-            "l_quantity",
-            # Constant expression that should be folded
-            (col("l_quantity") * (lit(2) * lit(3) + lit(4))).alias("scaled_quantity"),
-            (col("l_extendedprice") * (lit(1) - lit(0.1)) / lit(10)).alias("discounted_unit_price"),
-        )
-        .limit(1000)
+    # SQL: 10 projected columns (folded arithmetic), filters l_quantity>10,
+    # shipdate>=1995, l_discount<0.1, ORDER BY l_quantity DESC LIMIT 1000.
+    # l_quantity is not projected, so sort before select; l_orderkey,l_linenumber
+    # tie-break (matches catalog) makes the LIMIT-1000 cut deterministic.
+    filtered = (
+        lineitem.filter(col("l_quantity") > lit(10))
+        .filter(col("l_shipdate") >= lit(date(1995, 1, 1)))
+        .filter(col("l_discount") < lit(0.1))
+        .sort(["l_quantity", "l_orderkey", "l_linenumber"], descending=[True, False, False])
     )
+    return filtered.select(
+        "l_orderkey",
+        "l_partkey",
+        "l_suppkey",
+        "l_linenumber",
+        (col("l_quantity") * (lit(1.0) + lit(0.0))).alias("simplified_qty"),
+        (col("l_extendedprice") * (lit(2) * lit(3) + lit(4))).alias("constant_folded"),
+        (col("l_discount") + lit(0.0) - lit(0.0)).alias("zero_folded"),
+        col("l_tax").alias("condition_folded"),
+        (col("l_quantity") / lit(1.0)).alias("division_folded"),
+        (col("l_extendedprice") + (lit(5) - lit(5))).alias("addition_folded"),
+    ).limit(1000)
 
 
 def optimizer_constant_folding_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test constant folding optimization."""
     lineitem = ctx.get_table("lineitem")
-
-    filtered = lineitem[lineitem["l_quantity"] > 0].copy()
-    # In pandas, constants are evaluated at Python level anyway
-    filtered["scaled_quantity"] = filtered["l_quantity"] * (2 * 3 + 4)
-    filtered["discounted_unit_price"] = filtered["l_extendedprice"] * (1 - 0.1) / 10
-
-    return filtered[["l_orderkey", "l_quantity", "scaled_quantity", "discounted_unit_price"]].head(1000)
+    filtered = lineitem[
+        (lineitem["l_quantity"] > 10) & (lineitem["l_shipdate"] >= date(1995, 1, 1)) & (lineitem["l_discount"] < 0.1)
+    ].copy()
+    filtered = filtered.sort_values(["l_quantity", "l_orderkey", "l_linenumber"], ascending=[False, True, True])
+    filtered["simplified_qty"] = filtered["l_quantity"] * (1.0 + 0.0)
+    filtered["constant_folded"] = filtered["l_extendedprice"] * (2 * 3 + 4)
+    filtered["zero_folded"] = filtered["l_discount"] + 0.0 - 0.0
+    filtered["condition_folded"] = filtered["l_tax"]
+    filtered["division_folded"] = filtered["l_quantity"] / 1.0
+    filtered["addition_folded"] = filtered["l_extendedprice"]
+    return (
+        filtered[
+            [
+                "l_orderkey",
+                "l_partkey",
+                "l_suppkey",
+                "l_linenumber",
+                "simplified_qty",
+                "constant_folded",
+                "zero_folded",
+                "condition_folded",
+                "division_folded",
+                "addition_folded",
+            ]
+        ]
+        .head(1000)
+        .reset_index(drop=True)
+    )
 
 
 def optimizer_column_pruning_expression_impl(ctx: DataFrameContext) -> Any:
