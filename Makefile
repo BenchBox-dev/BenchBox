@@ -210,11 +210,13 @@ joinorder-synthetic-cross-surface-equivalence-report:
 h2odb-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark h2odb
 
-# Staged gate (report mode, NOT yet blocking CI): Read Primitives DataFrame
-# surface vs its DuckDB-dialect SQL surface on a bounded ~300k-row TPC-H cell
-# (SF=0.05). 148 gateable queries (the 4 fulltext/json ids DuckDB cannot transpile
-# are excluded). Open cross-surface burn-down in progress before promotion to
-# GATES; exits non-zero while divergences remain.
+# Enforced gate: Read Primitives DataFrame surface vs its DuckDB-dialect SQL
+# surface on a bounded ~300k-row TPC-H cell (SF=0.05). 148 gateable queries (the 4
+# fulltext/json ids DuckDB cannot transpile are excluded). Every compared cell
+# matches; the classified cells are irreducible engine differences (HLL/T-Digest
+# approximation, DECIMAL-scale percentile/ROUND, ARG_MIN ties, JSON text, Polars
+# Map-dtype gap) plus legitimately-empty selective/no-JSON filters. Exits non-zero
+# on any unclassified divergence.
 read-primitives-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark read_primitives
 

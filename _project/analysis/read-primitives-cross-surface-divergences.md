@@ -1,4 +1,17 @@
-# read_primitives cross-surface divergences (staged gate)
+# read_primitives cross-surface divergences (ENFORCED gate)
+
+**RESOLVED.** The burn-down is complete: `read_primitives` is an enforced gate in
+`GATES`, wired into the `correctness-gate` CI job. The full gate is green - every
+compared cell matches its DuckDB-dialect SQL surface; 17 cells are classified
+`known_divergences` (HLL/T-Digest approximation, DECIMAL-scale `PERCENTILE_CONT`/
+`ROUND`, the non-deterministic `ARG_MIN` tie, JSON text vs containers, and the
+Polars Map-dtype gap) and 4 selective/no-JSON queries are `legitimately_empty`.
+The cross-cutting prerequisite (validator container recursion) and the per-query
+fixes were verified at SF=0.05 batch by batch. Original burn-down landscape below.
+
+---
+
+# read_primitives cross-surface divergences (burn-down history)
 
 Snapshot from `make read-primitives-cross-surface-equivalence-report`
 (`python -m benchbox.core.equivalence.cross_surface --benchmark read_primitives`)

@@ -916,6 +916,11 @@ _READ_PRIMITIVES_POLARS_MAP = (
     "unsupported (the query is in the benchmark's SKIP_FOR_POLARS set); there is no "
     "expression-surface result to compare. The pandas surface matches its SQL."
 )
+# Read Primitives bounded-cell scale. Its TPC-H generator base means SF=1.0 is
+# ~6M lineitem rows; SF=0.05 gives a ~300k-row cell that keeps the selective
+# filter/aggregate queries discriminating while staying a single bounded cell.
+_READ_PRIMITIVES_SCALE = 0.05
+
 _READ_PRIMITIVES_KNOWN_DIVERGENCES: dict[str, str] = {
     **dict.fromkeys(
         (
@@ -991,36 +996,31 @@ GATES: dict[str, CrossSurfaceGate] = {
         known_divergences=_H2ODB_KNOWN_DIVERGENCES,
         scale_factor=_H2ODB_SCALE,
     ),
+    # Read Primitives: a 152-query DataFrame surface vs its DuckDB-dialect SQL
+    # surface on a bounded ~300k-row TPC-H cell (SF=0.05). 148 gateable queries (the
+    # 4 fulltext/json ids DuckDB cannot transpile are excluded in the builder); every
+    # compared cell matches. The classified cells are the irreducible engine
+    # differences a primitives benchmark exercises - HyperLogLog/T-Digest
+    # approximations, DECIMAL-scale percentile/ROUND residues, ARG_MIN ties, JSON
+    # text, and the Polars Map-dtype gap - plus the legitimately-empty selective and
+    # no-JSON filters. Promoted from STAGED_GATES after the full burn-down.
+    "read_primitives": CrossSurfaceGate(
+        name="read_primitives",
+        build=build_read_primitives_duckdb,
+        known_divergences=_READ_PRIMITIVES_KNOWN_DIVERGENCES,
+        legitimately_empty=_READ_PRIMITIVES_LEGITIMATELY_EMPTY,
+        scale_factor=_READ_PRIMITIVES_SCALE,
+    ),
 }
-
-# Read Primitives bounded-cell scale. Its TPC-H generator base means SF=1.0 is
-# ~6M lineitem rows; SF=0.05 gives a ~300k-row cell that keeps the selective
-# filter/aggregate queries discriminating while staying a single bounded cell.
-# Tuned during burn-down (see the staged-gate TODO).
-_READ_PRIMITIVES_SCALE = 0.05
 
 # Staged gates: a load-faithful builder is wired and runnable in report mode, but
 # the benchmark still has open cross-surface divergences to burn down before it can
 # be promoted into GATES (and made a blocking CI gate). Kept OUT of GATES so the
-# coverage map does not prematurely mark these benchmarks "guarded".
-#
-# read_primitives: builder wired (DuckDB-dialect reference over 148 gateable
-# queries; the 4 fulltext/json ids DuckDB cannot transpile are excluded in
-# build_read_primitives_duckdb). Open burn-down: the SQL and DataFrame surfaces
-# were authored independently and diverge on ~127 cells (projection shape, row
-# cardinality, result ordering, and a residue of genuinely approximate/decimal
-# cells). Tracked for promotion to GATES once clean. The remaining next gateable
+# coverage map does not prematurely mark these benchmarks "guarded". Currently empty
+# - read_primitives graduated to GATES after its burn-down; the next gateable
 # benchmarks (datavault, flightdata, nyctaxi, tpcds_obt, tpch_skew, tsbs_devops)
 # land here first when their builders are wired.
-STAGED_GATES: dict[str, CrossSurfaceGate] = {
-    "read_primitives": CrossSurfaceGate(
-        name="read_primitives",
-        build=build_read_primitives_duckdb,
-        scale_factor=_READ_PRIMITIVES_SCALE,
-        known_divergences=_READ_PRIMITIVES_KNOWN_DIVERGENCES,
-        legitimately_empty=_READ_PRIMITIVES_LEGITIMATELY_EMPTY,
-    ),
-}
+STAGED_GATES: dict[str, CrossSurfaceGate] = {}
 
 
 def get_gate(name: str) -> CrossSurfaceGate:
