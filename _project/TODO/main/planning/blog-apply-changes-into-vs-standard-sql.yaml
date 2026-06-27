@@ -1,0 +1,174 @@
+id: blog-apply-changes-into-vs-standard-sql
+title: Blog - Evaluate Databricks APPLY CHANGES INTO vs Standard SQL MERGE for SCD Type 2
+worktree: main
+category: Documentation
+priority: Low
+status: Not Started
+description: |
+  Write a platform-deep-dive blog post that explicitly evaluates Databricks'
+  declarative APPLY CHANGES INTO (DLT / Lakeflow Declarative Pipelines) against
+  hand-written standard SQL MERGE for Slowly Changing Dimension (SCD) Type 2
+  maintenance.
+
+  The hook (from a widely shared Databricks/Delta Lake infographic): APPLY
+  CHANGES INTO replaces "~200 lines of MERGE logic" with a few declarative lines
+  that handle inserts/updates/deletes, history management, and record
+  open/close automatically. The post should test that marketing claim with a
+  fair, reproducible, BenchBox-grounded evaluation rather than restating it.
+
+  The post must cover BOTH axes honestly:
+    - Ergonomics / maintainability: lines of code, edge cases handled for you
+      (out-of-order events via SEQUENCE BY, schema evolution, deletes), and
+      where the abstraction leaks.
+    - Portability / lock-in: APPLY CHANGES INTO only runs inside a Databricks
+      declarative pipeline (not a plain SQL warehouse, not any other engine),
+      whereas the MERGE form runs unchanged across DuckDB, PostgreSQL,
+      Snowflake, BigQuery, and ClickHouse.
+    - Performance / cost: where measurable, compare the two on the same SCD2
+      workload (see dependency below) - net new versions written, runtime, and
+      $ where a cost model exists - and clearly label what is NOT measurable
+      inside BenchBox today (the DLT pipeline path) versus what is.
+
+  This is a companion to the write-primitives-scd-type2-coverage TODO: that TODO
+  adds the portable MERGE-based SCD2 operation to the benchmark; this post uses
+  it (plus a Databricks pipeline run, if feasible) to produce the evaluation.
+
+context_sections:
+  "Editorial angle": |
+    Not "declarative good / SQL bad" and not a Databricks teardown. The thesis:
+    APPLY CHANGES INTO genuinely removes boilerplate and a class of SCD2 bugs
+    (correct ordering, record closing), and that convenience is real - but it is
+    a proprietary, pipeline-bound abstraction, so the right lens is
+    convenience-vs-portability, with numbers where we can get them. Let readers
+    weigh the trade-off; show the actual MERGE it replaces side by side.
+
+  "What we can measure vs what we can't (be explicit)": |
+    Measurable in BenchBox: the standard MERGE SCD2 op across engines (runtime,
+    rows versioned, correctness, $ via the cost model where present).
+    NOT currently measurable in the harness: APPLY CHANGES INTO itself, because
+    it requires a DLT/Lakeflow pipeline context (streaming source + pipeline
+    run), not a SQL-warehouse session. The post must label any APPLY CHANGES
+    INTO timing as a manually-run Databricks pipeline observation, not a
+    BenchBox harness result, to avoid an apples-to-oranges comparison.
+
+  "Claims to fact-check (cite Databricks docs)": |
+    - "Replaces ~200 lines of MERGE" - reconstruct the real equivalent MERGE and
+      count honestly (it is far fewer than 200 for a basic Type 2).
+    - "Handles deletes / history / open-close automatically" - confirm against
+      docs and a real run; note APPLY AS DELETE / SCD TYPE 2 semantics.
+    - "Optimized / faster" - verify or qualify; do not assert speed we did not
+      observe.
+
+prior_art:
+  - "_blog/platform-deep-dives/drafts/duckdb-architecture.md — reuse the platform-deep-dive structure and depth"
+  - "_blog/platform-deep-dives/research/duckdb-architecture-verification-2026-02-20.md — reuse the research/verification-log convention (every claim backed by a dated, replayable check)"
+  - "_blog/STYLE_GUIDE.md and _blog/VOICE_REFERENCE.md — match house voice and evidence standards"
+
+files_affected:
+  added:
+    - "_blog/platform-deep-dives/research/apply-changes-into-vs-merge-verification-2026-06-27.md"
+    - "_blog/platform-deep-dives/outlines/apply-changes-into-vs-standard-sql.md"
+    - "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md"
+
+must_preserve:
+  - "Every performance / behavior claim is backed by a dated entry in the research/verification file (house evidence standard)"
+  - "BenchBox harness results and manually-run Databricks pipeline observations are never conflated"
+
+approach: |
+  1. Research pass: read Databricks APPLY CHANGES INTO / AUTO CDC docs; capture
+     exact syntax, SCD Type 2 semantics, SEQUENCE BY, APPLY AS DELETE, and the
+     pipeline-context requirement. Log each verified fact (dated) in the
+     research file.
+  2. Reconstruct the equivalent standard MERGE (reuse the SCD2 op from
+     write-primitives-scd-type2-coverage) and do an honest line/edge-case count
+     vs the declarative form.
+  3. Measure the MERGE form via BenchBox across engines; if a Databricks
+     workspace is available, run the APPLY CHANGES INTO pipeline on the same
+     data and record it as a clearly-labeled external observation.
+  4. Outline -> draft following the platform-deep-dive structure. Land the
+     convenience-vs-portability trade-off with the side-by-side code and the
+     numbers we actually have.
+
+anti_patterns:
+  - "DO NOT present APPLY CHANGES INTO timings as BenchBox harness results - because they come from a Databricks pipeline run the harness cannot drive - label them explicitly as external manual observations."
+  - "DO NOT repeat the '200 lines' claim uncritically - because the real equivalent MERGE for a basic Type 2 is far shorter - reconstruct and count it."
+  - "DO NOT publish without the research/verification file - because the blog evidence standard requires every claim to be replayable - log dated checks first."
+
+verification:
+  - description: "Research/verification file exists with dated, sourced claims"
+    command: "uv run -- python -m pytest tests/unit/test_todo_executable_docs.py -q"
+    expected_output: "all tests pass (no broken doc references introduced)"
+  - description: "Draft references a real, runnable BenchBox SCD2 operation"
+    command: 'uv run -- python -c "from benchbox import WritePrimitives; print(any(k.startswith(''merge_scd_type2'') for k in WritePrimitives(0.01).get_all_operations()))"'
+    expected_output: "True"
+
+scope_limit:
+  only_modify:
+    - "_blog/platform-deep-dives/"
+  do_not_modify:
+    - "benchbox/"
+    - "tests/"
+
+deps:
+  needs:
+    - "write-primitives-scd-type2-coverage"
+
+work:
+  - id: w1
+    summary: Research APPLY CHANGES INTO semantics and pipeline-context constraint
+    status: pending
+    notes: |
+      Databricks docs: APPLY CHANGES INTO / AUTO CDC, SCD TYPE 2, SEQUENCE BY,
+      APPLY AS DELETE, COLUMNS/EXCEPT, the DLT/Lakeflow pipeline requirement.
+      Log each verified fact (dated) in the research file.
+  - id: w2
+    summary: Reconstruct equivalent standard MERGE and do honest LOC/edge-case count
+    needs: [w1]
+    status: pending
+    notes: |
+      Reuse the merge_scd_type2 op. Count real lines and enumerate which edge
+      cases (ordering, deletes, schema evolution) each form handles.
+  - id: w3
+    summary: Gather measurements - MERGE via BenchBox; APPLY CHANGES INTO externally if feasible
+    needs: [w2]
+    status: pending
+    notes: |
+      MERGE form across engines via BenchBox (runtime, rows versioned, $ where
+      a cost model exists). APPLY CHANGES INTO only if a Databricks workspace is
+      available; record as a clearly-labeled external observation.
+  - id: w4
+    summary: Write outline
+    needs: [w1, w2]
+    status: pending
+  - id: w5
+    summary: Write draft with side-by-side code and the measurements we have
+    needs: [w3, w4]
+    status: pending
+
+deferred:
+  - summary: "Benchmarking the DLT pipeline path inside the BenchBox harness"
+    reason: "Requires a pipeline-execution adapter the harness does not have; the post treats Databricks pipeline timings as external observations instead. Tied to the same constraint in write-primitives-scd-type2-coverage."
+
+metadata:
+  owners:
+    - "@benchbox-maintainers"
+  tags:
+    - blog
+    - platform-deep-dive
+    - databricks
+    - delta-lake
+    - scd-type-2
+    - merge
+    - apply-changes-into
+  estimated_effort: "2-3 days"
+  created_date: "2026-06-27"
+
+success_metrics:
+  - "Published post fairly evaluates both ergonomics and portability/lock-in, not just one"
+  - "Every performance/behavior claim is backed by a dated entry in the research/verification file"
+  - "The '200 lines of MERGE' claim is reconstructed and counted honestly rather than restated"
+  - "BenchBox harness results and external Databricks pipeline observations are clearly distinguished"
+
+open_questions:
+  - "Is a Databricks workspace available to actually run an APPLY CHANGES INTO pipeline, or is the post limited to the standard-SQL side plus a docs-grounded narrative of the declarative form?"
+  - "Best home: platform-deep-dives (Databricks lens) or table-formats (Delta CDC lens)? Leaning platform-deep-dives since the subject is a Databricks-specific feature."
