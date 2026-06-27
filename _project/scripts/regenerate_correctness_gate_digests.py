@@ -68,7 +68,7 @@ _PROVENANCE_NOTE = (
     "This oracle is a REGRESSION SNAPSHOT vs a DuckDB-pinned baseline (it detects change from the "
     "frozen benchbox-on-DuckDB answer), NOT an independent correctness oracle: a conceptual value "
     "bug present at freeze time is enshrined, not caught. The digest is a value+TYPE-rendering "
-    "digest (int renders exactly, float/Decimal at fixed 4dp), so it is DuckDB-pinned; cross-engine "
+    "digest (int renders exactly, float/Decimal at fixed significant figures), so it is DuckDB-pinned; cross-engine "
     "reuse is deferred (see _project/analysis/value-digest-cross-engine-independence-decision.md). "
     "Digests are tied to the DuckDB build pinned in uv.lock; a DuckDB bump that changes a query's "
     "emitted values requires regenerating this file."
@@ -183,7 +183,7 @@ def build_reference(digests: dict[str, str], seed: int, duckdb_version: str) -> 
         "digest": {
             "primitive": "benchbox.core.tpchavoc.validation.calculate_checksum",
             "algorithm": "md5-of-order-normalized-rows",
-            "numeric_normalization": "float/Decimal cells rendered with fixed 4-decimal precision before hashing",
+            "numeric_normalization": "float/Decimal cells rendered to fixed significant figures (relative precision) before hashing",
             "emitter": "benchbox.core.results.result_digest.compute_result_digest",
         },
         "provenance": {

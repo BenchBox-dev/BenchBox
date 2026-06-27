@@ -41,7 +41,10 @@ _BASE_ROWS = [
 def _perturb_aggregate(rows):
     """Cardinality-preserving: change one aggregate value in one row."""
     mutated = [list(r) for r in rows]
-    mutated[0][3] = mutated[0][3] + 0.02  # shift a revenue sum by 2 cents
+    # Shift a revenue sum by ~1e-5 relative -- above the digest's ~1e-6 relative floor
+    # at any magnitude (a fixed 2-cent absolute shift is now far below the floor on a
+    # ~5.6e10 revenue value, so the perturbation is expressed relatively).
+    mutated[0][3] = mutated[0][3] * (1 + 1e-5)
     return [tuple(r) for r in mutated]
 
 
@@ -110,54 +113,59 @@ def test_column_swap_with_identical_columns_is_a_known_blind_spot():
     assert compute_result_digest(rows) == compute_result_digest(swapped)
 
 
-# --- Precision floor: absolute, not relative (w1) -------------------------------
+# --- Precision floor: relative, not absolute (w1) -------------------------------
 #
-# The digest normalizes real numbers with ``f"{value:.4f}"``, so the sensitivity
-# floor is 5e-5 ABSOLUTE per cell (half of the 1e-4 rounding grid), independent of
-# column magnitude. These tests PIN that boundary on a real gate column so a future
-# normalization change cannot silently move it without updating the recorded
-# decision next to ``_format_real``.
+# The digest normalizes real numbers to ``_DIGEST_FLOAT_SIGFIGS`` significant figures,
+# so the sensitivity floor is ~1e-6 RELATIVE per cell (half of the last-sig-fig grid),
+# uniform across column magnitude. These tests PIN that boundary on a real gate column
+# so a future normalization change cannot silently move it without updating the
+# recorded decision next to ``_format_real``.
 
-# TPC-H Q1 ``avg_disc`` (result column index 8 in the canonical Q1 projection) is the
-# worst-exposed gate column: it is a small averaged ratio ~0.05, so the absolute
-# floor is only ~0.1% relative there. ``_BASE_ROWS`` column index 5 is this avg_disc.
+# TPC-H Q1 ``avg_disc`` (result column index 8 in the canonical Q1 projection) is a
+# small averaged ratio ~0.05. Under the OLD absolute 4dp floor it had only ~0.1%
+# relative sensitivity; the relative floor now gives it the same ~1e-6 relative
+# sensitivity as any other column. At ~0.05 the 6-sig-fig grid is 1e-7 absolute, so
+# the half-bucket floor is ~5e-8 absolute (~1e-6 relative).
 _AVG_DISC = 0.05  # representative TPC-H Q1 avg_disc value (a float, ~0.0500)
 
 
-def test_precision_floor_is_absolute_below_floor_not_caught():
-    """A per-cell error JUST BELOW 5e-5 absolute on avg_disc is INVISIBLE to the digest.
+def test_precision_floor_is_relative_below_floor_not_caught():
+    """A per-cell error BELOW the ~1e-6 relative floor on avg_disc is INVISIBLE.
 
-    0.0500 rounds to "0.0500"; 0.0500 + 4.9e-5 = 0.050049 stays inside the same 4dp
-    bucket, so the digest is identical -- a sub-5e-5-absolute (~0.1% relative) bug on
-    Q1 avg_disc survives the gate. This is the documented small-ratio blind spot.
+    At ~0.05 the half-bucket floor is ~5e-8 absolute; 0.05 + 4e-8 rounds to the same
+    6-sig-fig token, so the digest is unchanged. This residual blind spot is now
+    ~1000x finer than the old absolute 4dp floor (~5e-5 absolute / ~0.1% relative).
     """
     base = compute_result_digest([(_AVG_DISC,)])
-    just_below = compute_result_digest([(_AVG_DISC + 4.9e-5,)])
-    assert just_below == base, "an error below the 5e-5 absolute floor must NOT change the digest"
+    just_below = compute_result_digest([(_AVG_DISC + 4e-8,)])
+    assert just_below == base, "an error below the relative floor must NOT change the digest"
 
 
-def test_precision_floor_is_absolute_above_floor_caught():
-    """A per-cell error JUST ABOVE 5e-5 absolute on avg_disc IS caught by the digest.
+def test_precision_floor_is_relative_above_floor_caught():
+    """A per-cell error ABOVE the ~1e-6 relative floor on avg_disc IS caught.
 
-    0.0500 + 5.1e-5 = 0.050051 crosses into the next 4dp bucket ("0.0501"), so the
-    digest differs. Below/above 5e-5 absolute is exactly the sensitivity boundary;
-    the precise midpoint (5e-5) is round-half-even and float-representation dependent,
-    so it is deliberately not asserted here.
+    0.05 + 6e-8 crosses into the next 6-sig-fig token, so the digest differs. The
+    precise midpoint (~5e-8 absolute here) is round-half-even and float-representation
+    dependent, so it is deliberately not asserted.
     """
     base = compute_result_digest([(_AVG_DISC,)])
-    just_above = compute_result_digest([(_AVG_DISC + 5.1e-5,)])
-    assert just_above != base, "an error above the 5e-5 absolute floor MUST change the digest"
+    just_above = compute_result_digest([(_AVG_DISC + 6e-8,)])
+    assert just_above != base, "an error above the relative floor MUST change the digest"
 
 
-def test_precision_floor_is_effectively_perfect_on_large_magnitude_columns():
-    """The SAME 5e-5 absolute floor is ~5e-15 relative on a revenue-scale column.
+def test_precision_floor_is_uniform_relative_across_magnitudes():
+    """The floor is RELATIVE, so a large-magnitude column has the SAME ~1e-6 relative
+    sensitivity -- finer than the old absolute floor on small ratios, coarser on big
+    ones (the accepted tradeoff of switching to significant-figure rounding).
 
-    On a large-magnitude column (TPC-H revenue ~5.6e10) a 2-cent change is ~10^9x the
-    floor, so it is always caught -- the absolute floor is coarse ONLY on small
-    averaged ratios, which is why the decision is keep-absolute + document avg_disc.
+    On revenue ~5.66e10 a 2-cent (absolute) change is ~3e-13 relative -- far below the
+    floor, so it is now INVISIBLE (the old absolute 4dp scheme would have caught it);
+    a change above ~1e-6 relative IS caught.
     """
     revenue = 56586554400.73
-    assert compute_result_digest([(revenue,)]) != compute_result_digest([(revenue + 0.02,)])
+    base = compute_result_digest([(revenue,)])
+    assert compute_result_digest([(revenue + 0.02,)]) == base, "below the relative floor -> invisible"
+    assert compute_result_digest([(revenue * (1 + 1e-5),)]) != base, "above the relative floor -> caught"
 
 
 # --- Value+type coupling: a value+type digest, DuckDB-pinned (w2) ----------------
@@ -167,7 +175,7 @@ def test_digest_couples_value_with_numeric_type():
     """The digest is a value+TYPE digest: equal value, different Python type -> differs.
 
     An ``int`` renders exactly ("37734107") while a ``float``/``Decimal`` of the same
-    value renders at fixed precision ("37734107.0000"), so they hash DIFFERENTLY. This
+    value renders to fixed significant figures ("377341e2"), so they hash DIFFERENTLY. This
     is acceptable ONLY because the oracle is DuckDB-pinned (DuckDB returns a stable
     column type per query), and it is the documented blocker for cross-engine reuse
     (w5 deferred). If a future change canonicalizes integer-valued numerics to one

@@ -122,9 +122,9 @@ The standard gates are intentionally split by the risk they are meant to catch:
     gap and the deferred cross-engine upgrade are analyzed in
     `_project/analysis/value-digest-cross-engine-independence-decision.md`. Two further
     fidelity properties are pinned in `test_correctness_gate_value_oracle.py`: the
-    sensitivity floor is **absolute** (~5e-5 per cell, coarsest on small averaged ratios
-    like Q1 `avg_disc`), and the digest is a **value+type** digest (DuckDB-pinned), which
-    is why cross-engine reuse is deferred.
+    sensitivity floor is **relative** (~1e-6 per cell via significant-figure rounding,
+    uniform across column magnitude), and the digest is a **value+type** digest
+    (DuckDB-pinned), which is why cross-engine reuse is deferred.
   - **Values are UNGUARDED above SF=1**: stored answers and digests exist only at
     SF=1 (the expected-results loader raises for other scales), so the value
     guarantee holds at SF=1 only. There is no expected-results value or cardinality

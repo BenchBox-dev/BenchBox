@@ -43,9 +43,10 @@ than vague.
    render to different tokens. Engines must be normalized to one temporal string form
    before any cross-engine digest can agree.
 
-3. **Decimal scale / trailing-zero rendering.** Even at the same fixed precision,
-   engines differ in returned decimal scale (`37734107.00` vs `37734107.000`); the
-   4dp normalization absorbs some of this but not the integer-vs-fixed split in (1).
+3. **Decimal scale / trailing-zero rendering.** Even at the same precision, engines
+   differ in returned decimal scale (`37734107.00` vs `37734107.000`); the
+   significant-figure normalization absorbs some of this but not the integer-vs-fixed
+   split in (1).
 
 4. **NULL-as-None vs NULL-as-NaN.** SQL `NULL` arrives as `None` from most engines but
    as `float('nan')` from some Arrow/pandas decoders (ClickHouse). `calculate_checksum`
