@@ -401,12 +401,31 @@ work:
       FOLLOW-ON (separate focused gate PRs, tracked by
       benchmark-correctness-oracle-coverage-map w1, NOT a blocker for this item):
       wire the remaining gateable dual-surface benchmarks one PR each - datavault,
-      flightdata, h2odb, nyctaxi, read_primitives (152-id intersection), tpcds_obt
+      flightdata, nyctaxi, read_primitives (152-id intersection), tpcds_obt
       (partial), tpch_skew, tsbs_devops (several need id normalization or a bounded
       data-source check first), and joinorder (SF=1-only; covered by
       joinorder_synthetic). Each follows the same recipe: build_<bench>_duckdb,
       register in GATES, add a pr.yml step + a fast-lane test, prove a planted
       divergence fails, regenerate the coverage map.
+
+      DONE so far (follow-on gate PRs): h2odb (2026-06-24) - enforced GATE,
+      build_h2odb_duckdb on a bounded SF=0.01 ~100k-row cell (its generator base is
+      the 10M-row small tier, so the shared SF=0.1 would emit ~1M rows; every query
+      stays discriminating at 100k). SQL/DataFrame ids correspond 1:1 (Q1..Q10).
+      Wiring caught a REAL DataFrame bug: the Polars Q9 percentile defaulted to
+      "nearest" interpolation, disagreeing with both pandas (linear) and SQL
+      PERCENTILE_CONT - fixed the WRONG surface by passing interpolation="linear"
+      (added an additive `interpolation` arg to UnifiedExpr.quantile, default
+      "nearest" so other callers are unchanged). Q9's only residue is one classified
+      known-divergence per backend: DuckDB's PERCENTILE_CONT over the DECIMAL(8,2)
+      fare_amount column returns the percentile at the column's 2-decimal scale
+      (77.87) while the DataFrame computes the same linear percentile over float64
+      (77.874) - verified presentational (casting the SQL arg to DOUBLE yields the
+      DataFrame value), not a logic bug. Evidence: gate green + deterministic across
+      3 runs (18/20 cells strictly compared, 2 classified); planted Q4 corruption
+      flags only Q4_expression (no collateral); coverage map shows h2odb guarded
+      (UNGUARDED 15 -> 14). The applicability sweep's gateable example was retargeted
+      h2odb -> flightdata (h2odb left the unguarded-candidate set).
 
       Original plan: one bounded small-SF DuckDB cell per gated benchmark, wired into
       the correctness-gate CI job and a Make target, mirroring
@@ -728,4 +747,4 @@ metadata:
   tags: [equivalence, correctness, dataframe, sql, ci, tpch, tpcds, ssb]
   estimated_effort: "Large"
   created_date: "2026-06-16"
-  last_updated: "2026-06-22T00:30:00"
+  last_updated: "2026-06-24T00:00:00"

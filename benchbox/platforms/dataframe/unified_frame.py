@@ -1126,11 +1126,19 @@ class UnifiedExpr:
         """Variance aggregation."""
         return self._apply_aggregation("variance", "var_samp", "var")
 
-    def quantile(self, q: float) -> UnifiedExpr:
+    def quantile(self, q: float, interpolation: str = "nearest") -> UnifiedExpr:
         """Quantile/percentile aggregation.
 
         Args:
             q: Quantile value between 0 and 1 (e.g., 0.5 for median, 0.9 for p90)
+            interpolation: How to interpolate when ``q`` falls between two ranks.
+                Polars defaults to ``"nearest"``; pass ``"linear"`` to compute the
+                continuous percentile that SQL ``PERCENTILE_CONT`` and pandas
+                ``Series.quantile`` (whose own default is linear) produce, so the
+                two DataFrame backends agree with each other and with SQL. The
+                default is left at ``"nearest"`` so existing callers are unchanged.
+                The PySpark/DataFusion branches use their engine's approximate
+                percentile and ignore this argument.
 
         Returns:
             UnifiedExpr with the quantile value
@@ -1143,7 +1151,7 @@ class UnifiedExpr:
             from datafusion import functions as df_f
 
             return UnifiedExpr(df_f.approx_percentile_cont(self._expr, q))
-        return UnifiedExpr(self._expr.quantile(q))
+        return UnifiedExpr(self._expr.quantile(q, interpolation=interpolation))
 
     # =========================================================================
     # Naming Methods

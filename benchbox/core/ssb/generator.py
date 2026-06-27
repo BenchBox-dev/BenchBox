@@ -180,26 +180,63 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             # Restore original output directory
             self.output_dir = original_output_dir
 
+    # DATE dimension spans 7 years; kept as a shared constant so the LINEORDER
+    # generator can sample valid order dates from the same range.
+    _DATE_START = datetime(1992, 1, 1)
+    _DATE_END = datetime(1998, 12, 31)
+
+    # Canonical SSB date strings are English month/day names. strftime("%A"/"%B"/"%b")
+    # is LOCALE-dependent (e.g. 'Dec1997' becomes 'déc1997' under a French locale),
+    # which would silently desync the canonical query literals (notably Q3.4's
+    # d_yearmonth='Dec1997') from the generated data. Format these from fixed tables
+    # so the output is identical on every machine/locale.
+    _MONTH_NAMES = (
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    )
+    _MONTH_ABBR = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    # Indexed by datetime.weekday() (Monday == 0).
+    _DAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+    def _date_objects(self) -> list[datetime]:
+        """Return every DATE dimension day as a datetime, in chronological order.
+
+        Single source of truth for the date range so the DATE dimension and the
+        LINEORDER order/commit dates cannot drift apart.
+        """
+        days: list[datetime] = []
+        current = self._DATE_START
+        while current <= self._DATE_END:
+            days.append(current)
+            current += timedelta(days=1)
+        return days
+
     def _generate_date_data(self) -> str:
         """Generate the DATE dimension data."""
         filename = self.get_compressed_filename("date.tbl")
         file_path = self.output_dir / filename
 
-        start_date = datetime(1992, 1, 1)
-        end_date = datetime(1998, 12, 31)
-
         with self.open_output_file(file_path, "wt") as f:
             writer = csv.writer(f, delimiter="|")
 
-            current_date = start_date
-            while current_date <= end_date:
+            for current_date in self._date_objects():
                 d_datekey = int(current_date.strftime("%Y%m%d"))
                 d_date = current_date.strftime("%Y-%m-%d")
-                d_dayofweek = current_date.strftime("%A")
-                d_month = current_date.strftime("%B")
+                d_dayofweek = self._DAY_NAMES[current_date.weekday()]
+                d_month = self._MONTH_NAMES[current_date.month - 1]
                 d_year = current_date.year
                 d_yearmonthnum = int(current_date.strftime("%Y%m"))
-                d_yearmonth = current_date.strftime("%b%Y")
+                d_yearmonth = f"{self._MONTH_ABBR[current_date.month - 1]}{current_date.year}"
                 d_daynuminweek = current_date.weekday() + 1
                 d_daynuminmonth = current_date.day
                 d_daynuminyear = current_date.timetuple().tm_yday
@@ -256,7 +293,6 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 ]
 
                 writer.writerow(row)
-                current_date += timedelta(days=1)
 
         return str(file_path)
 
@@ -378,7 +414,9 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 else:
                     region = "MIDDLE EAST"
 
-                c_city = f"{nation[:8]}{random.randint(0, 9)}"
+                # Canonical SSB c_city is the first 9 chars of the nation name plus a
+                # city digit, e.g. 'UNITED KI1' (10 chars), not an 8-char truncation.
+                c_city = f"{nation[:9]}{random.randint(0, 9)}"
                 c_nation = nation
                 c_region = region
                 c_phone = f"{random.randint(10, 99)}-{random.randint(100, 999)}-{random.randint(1000, 9999)}"
@@ -444,7 +482,9 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 else:
                     region = "MIDDLE EAST"
 
-                s_city = f"{nation[:8]}{random.randint(0, 9)}"
+                # Canonical SSB s_city: first 9 chars of the nation name + a city digit,
+                # e.g. 'UNITED KI1' (10 chars). Mirrors c_city in the customer table.
+                s_city = f"{nation[:9]}{random.randint(0, 9)}"
                 s_nation = nation
                 s_region = region
                 s_phone = f"{random.randint(10, 99)}-{random.randint(100, 999)}-{random.randint(1000, 9999)}"
@@ -507,10 +547,21 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 p_partkey = i
                 p_name = f"Part {i}"
 
-                # Manufacturer hierarchy: MFGR#1-5, each with categories #11-17, each with brands #1-5
-                mfgr_num = ((i - 1) % 5) + 1
-                category_num = ((i - 1) % 7) + 11
-                brand_num = ((i - 1) % 40) + 1
+                # Manufacturer hierarchy (canonical SSB formats):
+                #   p_mfgr     = 'MFGR#' + M                  -> 'MFGR#1'..'MFGR#5'
+                #   p_category = 'MFGR#' + M + C              -> 'MFGR#11'..'MFGR#55'
+                #   p_brand1   = 'MFGR#' + M + C + BB(01-40)  -> 'MFGR#1101'..'MFGR#5540'
+                # where mfgr M and category C are single digits 1..5 and brand BB is
+                # 01..40. The three dimensions are varied at different rates over the
+                # full 1000-value brand space (5 mfgr * 5 categories * 40 brands):
+                # mfgr fastest, then category, then brand. This is deterministic and
+                # covers every (mfgr, category) pair within the first 25 parts -- so
+                # all of p_mfgr/p_category appear even at tiny scales -- while every
+                # canonical value (e.g. p_category 'MFGR#12', p_brand1 'MFGR#2221')
+                # still appears once num_parts >= 1000.
+                mfgr_num = (i - 1) % 5 + 1
+                category_num = ((i - 1) // 5) % 5 + 1
+                brand_num = ((i - 1) // 25) % 40 + 1
 
                 p_mfgr = f"MFGR#{mfgr_num}"
                 p_category = f"MFGR#{mfgr_num}{category_num}"
@@ -546,9 +597,12 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         num_suppliers = int(self.base_suppliers * self.scale_factor)
         num_parts = int(self.base_parts * self.scale_factor)
 
-        # Date range: 1992-1998
-        start_datekey = 19920101
-        end_datekey = 19981231
+        # lo_orderdate is a foreign key into the DATE dimension, so it must be one of
+        # the dimension's actual days. Drawing a raw random integer in
+        # [19920101, 19981231] would mostly land on non-dates (e.g. 19920230), which
+        # never join to DATE and silently orphan ~95% of the fact table. Sample from
+        # the exact set of DATE dimension days instead (shared single source).
+        valid_dates = self._date_objects()
 
         with self.open_output_file(file_path, "wt") as f:
             writer = csv.writer(f, delimiter="|")
@@ -569,8 +623,9 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 lo_partkey = random.randint(1, num_parts)
                 lo_suppkey = random.randint(1, num_suppliers)
 
-                # Generate random date in range
-                lo_orderdate = random.randint(start_datekey, end_datekey)
+                # Pick a real date so the row joins to the DATE dimension.
+                order_date = random.choice(valid_dates)
+                lo_orderdate = int(order_date.strftime("%Y%m%d"))
 
                 lo_orderpriority = random.choice(self._priorities)
                 lo_shippriority = random.randint(0, 1)
@@ -587,8 +642,11 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 lo_supplycost = unit_price * random.randint(50, 80) // 100  # 50-80% of unit price
                 lo_tax = random.randint(0, 8)  # 0-8% tax
 
-                # Commit date is usually after order date
-                lo_commitdate = lo_orderdate + random.randint(1, 121)  # 1-121 days later
+                # Commit date is 1-121 days after the order date. Compute it as a real
+                # calendar date so it stays a valid YYYYMMDD value -- plain integer
+                # addition on the datekey would yield non-dates (e.g. 19971235).
+                commit_date = order_date + timedelta(days=random.randint(1, 121))
+                lo_commitdate = int(commit_date.strftime("%Y%m%d"))
                 lo_shipmode = random.choice(self._ship_modes)
 
                 row = [

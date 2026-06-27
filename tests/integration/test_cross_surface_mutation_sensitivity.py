@@ -376,15 +376,29 @@ def test_mutation_sensitivity(kind: str, gate_cell: _GateCell) -> None:
     ``_project/analysis/cross-surface-mutation-sensitivity.md``.
     """
     gate_name = gate_cell.gate_name
+    gate = GATES[gate_name]
     target = _TARGETS[gate_name]
     divergences = _run_target_gate(gate_cell, mutation=kind)
     caught = bool(divergences)
     expected = _expect_caught(gate_name, kind)
 
     if expected:
-        assert caught, (
+        # find_cross_surface_divergences emits one SurfaceDivergence per
+        # query/backend cell, keyed ``f"{query_id}_{backend}"``. A bare
+        # ``bool(divergences)`` would pass as soon as ANY single backend caught
+        # the mutation, so if the target query lost one of its gated impls (or
+        # only one gated backend caught it) the other backend would be silently
+        # skipped/green while the test still claimed sensitivity. Require EVERY
+        # gated backend to have caught it.
+        expected_keys = {f"{target}_{backend}" for backend in gate.backends}
+        found_keys = {d.key for d in divergences}
+        missing = expected_keys - found_keys
+        assert not missing, (
             f"SENSITIVITY GAP: {gate_name} {target} {kind} was NOT caught by the gate "
-            f"(expected RED). The comparator missed a seeded bug it should detect."
+            f"on every gated backend (expected RED on {sorted(expected_keys)}; "
+            f"missing {sorted(missing)}, got {sorted(found_keys)}). A target query that "
+            f"lost an implementation or that only one backend catches must not pass as "
+            f"'sensitive' - the comparator missed a seeded bug it should detect."
         )
         # The catch must be a genuine result mismatch, not an ``error:`` from the
         # harness failing to build the mutated frame (which would "pass" for the

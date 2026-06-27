@@ -376,8 +376,8 @@ class _DefaultNativeExpr:
     def std(self):
         return _DefaultNativeExpr(("std", self.value))
 
-    def quantile(self, q):
-        return _DefaultNativeExpr(("quantile", self.value, q))
+    def quantile(self, q, interpolation="nearest"):
+        return _DefaultNativeExpr(("quantile", self.value, q, interpolation))
 
     def alias(self, name):
         return _DefaultNativeExpr(("alias", self.value, name))

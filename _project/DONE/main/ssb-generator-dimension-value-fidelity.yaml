@@ -1,9 +1,43 @@
 id: ssb-generator-dimension-value-fidelity
-title: "Fix SSB generator dimension value formats (p_category/p_brand1/c_city) — 6 canonical SSB queries return empty for everyone"
+title: "Fix SSB generator dimension value formats (p_category/p_brand1/c_city) — 6 canonical SSB queries return empty for
+  everyone"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-06-23"
 category: Benchmark Correctness
+completion_notes: |
+  Fixed in benchbox/core/ssb/generator.py:
+    - p_category -> 'MFGR#'+mfgr(1-5)+category(1-5) (2-digit, e.g. 'MFGR#12');
+      p_brand1 -> 'MFGR#'+mfgr+category+brand(01-40) (e.g. 'MFGR#2221'), assigned
+      deterministically over the full 1000-value brand space for uniform coverage.
+    - c_city/s_city -> nation_name[:9] + city digit (10 chars, e.g. 'UNITED KI1').
+  Beyond the three documented format bugs, a second latent defect blocked Q3.4:
+    - lo_orderdate drew a raw random integer in [19920101, 19981231], landing mostly
+      on non-dates (~95% of the fact table never joined to DATE). Now samples a real
+      datekey, so date-dimension queries (incl. Q3.4's single-month filter) are dense.
+    - Q3.4's SQL default reused the numeric year_month (199401) for the STRING
+      d_yearmonth column; resolved per-query to the canonical 'Dec1997' in
+      benchbox/core/ssb/queries.py (matches the already-canonical DataFrame param).
+  Result: all 6 queries return rows at SF=0.1; SSB cross-surface gate is 26/26
+  DISCRIMINATING, 0 vacuous, 0 divergent, and the legitimately_empty SSB stopgap
+  is removed (not re-classified).
+  Adversarial-review hardening (follow-up pass):
+    - Locale safety: the DATE dimension built d_dayofweek/d_month/d_yearmonth via
+      strftime('%A'/'%B'/'%b'), which is locale-dependent ('Dec1997' -> 'déc1997'
+      under fr_FR) and would silently desync Q3.4's 'Dec1997' literal. Now formatted
+      from fixed English tables so output is locale-independent on every machine.
+    - Small-scale coverage: the brand assignment now varies mfgr fastest, then
+      category, then brand, so every (mfgr, category) pair appears within the first
+      25 parts (all p_mfgr/p_category present even at tiny scales), instead of the
+      single %1000 cycle that only reached MFGR#2 after 200 parts.
+    - lo_commitdate was integer-added to the datekey (yielding non-dates like
+      19971235); now computed as a real calendar date. No SSB query joins it, but it
+      removes invalid generated data.
+    - _generate_date_data and the lineorder date sampling now share one _date_objects()
+      source so the dimension and fact dates cannot drift apart.
+    - Added unit tests for canonical English date strings, locale independence, valid
+      lineorder dates, and small-scale mfgr/category coverage.
 
 description: |
   The BenchBox SSB data generator emits dimension column VALUES that do not match
@@ -46,79 +80,85 @@ description: |
   do not change the canonical query literals to chase the malformed data.
 
 prior_art:
-  - "benchbox/core/ssb/generator.py - SSBDataGenerator; the dimension value construction for part (p_category, p_brand1, p_mfgr), customer (c_city), supplier (s_city) that must match canonical SSB formats."
-  - "benchbox/core/ssb/queries.py + benchbox/core/ssb/dataframe_queries/parameters.py - the canonical query literals (e.g. p_category='MFGR#12', c_city='UNITED KI1') that are CORRECT and must not be changed to match malformed data."
-  - "https://www.cs.umb.edu/~poneil/StarSchemaB.PDF - the canonical SSB spec for p_category (MFGR#<1-5><1-5>), p_brand1 (MFGR#<cat2><brand2>), and the 10-char c_city/s_city format (nation[0:9]+digit)."
-  - "_project/TODO/main/active/cross-surface-oracle-remediation.yaml:w4 - surfaced this; its `legitimately_empty` SSB classification (#866) is the stopgap to retire once this lands."
-  - "tests/test_ssb.py - existing SSB tests; extend with value-format assertions."
+- "benchbox/core/ssb/generator.py - SSBDataGenerator; the dimension value construction for part (p_category, p_brand1, p_mfgr),
+  customer (c_city), supplier (s_city) that must match canonical SSB formats."
+- "benchbox/core/ssb/queries.py + benchbox/core/ssb/dataframe_queries/parameters.py - the canonical query literals (e.g. p_category='MFGR#12',
+  c_city='UNITED KI1') that are CORRECT and must not be changed to match malformed data."
+- "https://www.cs.umb.edu/~poneil/StarSchemaB.PDF - the canonical SSB spec for p_category (MFGR#<1-5><1-5>), p_brand1 (MFGR#<cat2><brand2>),
+  and the 10-char c_city/s_city format (nation[0:9]+digit)."
+- "_project/TODO/main/active/cross-surface-oracle-remediation.yaml:w4 - surfaced this; its `legitimately_empty` SSB classification
+  (#866) is the stopgap to retire once this lands."
+- "tests/test_ssb.py - existing SSB tests; extend with value-format assertions."
 
 work:
-  - id: w1
-    summary: "Pin the canonical SSB dimension value formats with a failing test"
-    status: pending
-    notes: |
-      Before touching the generator, add tests that assert the canonical formats so
-      the fix is verifiable and cannot regress:
-        - p_category matches ^MFGR#[1-5][1-5]$ (exactly 2 digits) and the canonical
-          literals (e.g. 'MFGR#12', 'MFGR#14') each match >=1 generated row.
-        - p_brand1 matches the canonical MFGR#<cat2><brand2> width.
-        - c_city / s_city are the canonical 10-char nation-prefix+digit format and
-          the canonical literals (e.g. 'UNITED KI1') match generated rows.
-        - Every one of the 13 canonical SSB queries returns >=1 row at SF=1 (and the
-          6 currently-empty ones in particular).
-      These start RED on current develop (that is the bug).
-    acceptance:
-      - "New tests encode the canonical p_category/p_brand1/c_city/s_city formats and the non-empty-result expectation; they FAIL on current develop."
+- id: w1
+  summary: "Pin the canonical SSB dimension value formats with a failing test"
+  status: done
+  notes: |
+    Before touching the generator, add tests that assert the canonical formats so
+    the fix is verifiable and cannot regress:
+      - p_category matches ^MFGR#[1-5][1-5]$ (exactly 2 digits) and the canonical
+        literals (e.g. 'MFGR#12', 'MFGR#14') each match >=1 generated row.
+      - p_brand1 matches the canonical MFGR#<cat2><brand2> width.
+      - c_city / s_city are the canonical 10-char nation-prefix+digit format and
+        the canonical literals (e.g. 'UNITED KI1') match generated rows.
+      - Every one of the 13 canonical SSB queries returns >=1 row at SF=1 (and the
+        6 currently-empty ones in particular).
+    These start RED on current develop (that is the bug).
+  acceptance:
+  - "New tests encode the canonical p_category/p_brand1/c_city/s_city formats and the non-empty-result expectation; they FAIL
+    on current develop."
 
-  - id: w2
-    summary: "Fix the generator's dimension value construction to canonical SSB formats"
-    needs: [w1]
-    status: pending
-    notes: |
-      Correct SSBDataGenerator so p_category is MFGR#<mfgr:1-5><category:1-5> (drop
-      the extra digit), p_brand1 is MFGR#<category:2><brand:2>, p_mfgr is MFGR#<1-5>,
-      and c_city/s_city use the canonical 10-char nation-prefix+digit format. Keep the
-      generator seeded/deterministic (do not regress reproducibility). Bump any
-      generated-data cache/version key so stale data regenerates.
-    acceptance:
-      - "All w1 tests pass."
-      - "All 13 SSB queries return >=1 row at SF=1; the previously-empty Q2.1-2.3/Q3.3/Q3.4/Q4.3 now return rows."
-      - "SSB generation stays deterministic (two generations -> identical dimension values)."
+- id: w2
+  summary: "Fix the generator's dimension value construction to canonical SSB formats"
+  needs: [w1]
+  status: done
+  notes: |
+    Correct SSBDataGenerator so p_category is MFGR#<mfgr:1-5><category:1-5> (drop
+    the extra digit), p_brand1 is MFGR#<category:2><brand:2>, p_mfgr is MFGR#<1-5>,
+    and c_city/s_city use the canonical 10-char nation-prefix+digit format. Keep the
+    generator seeded/deterministic (do not regress reproducibility). Bump any
+    generated-data cache/version key so stale data regenerates.
+  acceptance:
+  - "All w1 tests pass."
+  - "All 13 SSB queries return >=1 row at SF=1; the previously-empty Q2.1-2.3/Q3.3/Q3.4/Q4.3 now return rows."
+  - "SSB generation stays deterministic (two generations -> identical dimension values)."
 
-  - id: w3
-    summary: "Retire the cross-surface gate's `legitimately_empty` SSB stopgap and make SSB fully discriminating"
-    needs: [w2]
-    status: pending
-    notes: |
-      Once the generator emits canonical values, remove the SSB
-      `legitimately_empty` classification added in #866 (cross_surface.py SSB gate)
-      so all 13 SSB queries are DISCRIMINATING cells, and confirm the SSB
-      cross-surface gate is green with 26/26 discriminating (no vacuous cells).
-      Update the w4 progress note in cross-surface-oracle-remediation accordingly.
-    acceptance:
-      - "SSB cross-surface gate reports 26/26 DISCRIMINATING cells, 0 vacuous, green."
-      - "The `legitimately_empty` SSB entries are removed (not just re-classified)."
+- id: w3
+  summary: "Retire the cross-surface gate's `legitimately_empty` SSB stopgap and make SSB fully discriminating"
+  needs: [w2]
+  status: done
+  notes: |
+    Once the generator emits canonical values, remove the SSB
+    `legitimately_empty` classification added in #866 (cross_surface.py SSB gate)
+    so all 13 SSB queries are DISCRIMINATING cells, and confirm the SSB
+    cross-surface gate is green with 26/26 discriminating (no vacuous cells).
+    Update the w4 progress note in cross-surface-oracle-remediation accordingly.
+  acceptance:
+  - "SSB cross-surface gate reports 26/26 DISCRIMINATING cells, 0 vacuous, green."
+  - "The `legitimately_empty` SSB entries are removed (not just re-classified)."
 
 must_preserve:
-  - "The canonical SSB query literals/parameters stay canonical - fix the data, never the queries."
-  - "SSB generation stays seeded/deterministic; the cross-surface SSB gate stays green throughout."
-  - "Other SSB tests and any downstream consumers of SSB data continue to pass."
+- "The canonical SSB query literals/parameters stay canonical - fix the data, never the queries."
+- "SSB generation stays seeded/deterministic; the cross-surface SSB gate stays green throughout."
+- "Other SSB tests and any downstream consumers of SSB data continue to pass."
 
 anti_patterns:
-  - "DO NOT change the query parameters to match the malformed data - that would bless the bug and keep real SSB results wrong."
-  - "DO NOT only fix the cross-surface gate (e.g. by leaving the data wrong and widening `legitimately_empty`) - the bug affects every SSB run, so fix the generator."
+- "DO NOT change the query parameters to match the malformed data - that would bless the bug and keep real SSB results wrong."
+- "DO NOT only fix the cross-surface gate (e.g. by leaving the data wrong and widening `legitimately_empty`) - the bug affects
+  every SSB run, so fix the generator."
 
 verification:
-  - description: "Canonical-format tests pass and all SSB queries return rows"
-    command: "uv run -- python -m pytest tests/test_ssb.py -q"
-  - description: "SSB cross-surface gate fully discriminating and green"
-    command: "make ssb-cross-surface-equivalence-report"
-    expected_output: "26/26 discriminating cells, 0 vacuous, 0 divergent"
+- description: "Canonical-format tests pass and all SSB queries return rows"
+  command: "uv run -- python -m pytest tests/test_ssb.py -q"
+- description: "SSB cross-surface gate fully discriminating and green"
+  command: "make ssb-cross-surface-equivalence-report"
+  expected_output: "26/26 discriminating cells, 0 vacuous, 0 divergent"
 
 success_metrics:
-  - "All 13 canonical SSB queries return non-empty correct results on BenchBox-generated SSB data."
-  - "p_category/p_brand1/c_city/s_city match the canonical SSB value formats."
-  - "The cross-surface SSB gate has zero vacuous cells and no `legitimately_empty` SSB classifications."
+- "All 13 canonical SSB queries return non-empty correct results on BenchBox-generated SSB data."
+- "p_category/p_brand1/c_city/s_city match the canonical SSB value formats."
+- "The cross-surface SSB gate has zero vacuous cells and no `legitimately_empty` SSB classifications."
 
 metadata:
   tags: [ssb, generator, benchmark-correctness, data-fidelity]

@@ -2,7 +2,7 @@ id: query-plan-capture-display-decouple
 title: "Decouple show_query_plans from capture_plans and remove dead display-during-capture path"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Core Functionality
 
 description: |
@@ -58,7 +58,7 @@ prior_art:
 work:
   - id: w1
     summary: "Add --show-plans CLI flag to benchbox run, wired to show_query_plans independently"
-    status: pending
+    status: done
     notes: |
       In benchbox/cli/commands/run.py add a --show-plans boolean flag (default False).
       Remove the coupling assignment:
@@ -73,7 +73,7 @@ work:
   - id: w2
     summary: "Update docs and --help to document --show-plans flag"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Add --show-plans to docs/reference/cli/run.md under the plan capture options
       section. Describe the distinction: --capture-plans persists to the result
@@ -82,7 +82,7 @@ work:
   - id: w3
     summary: "Add test asserting display fires when show_query_plans=True and capture_plans=False"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Unit test: create DuckDBAdapter with show_query_plans=True, capture_plans=False.
       Mock display_query_plan_if_enabled. Execute a SELECT. Assert the display
@@ -137,8 +137,23 @@ success_metrics:
   - "--capture-plans persists plans without displaying to console (display suppressed)."
   - "No double-EXPLAIN in any configuration."
 
+resolution: |
+  Completed. The CLI fix (w1) and docs (w2) landed via PR #800 ("add --show-plans
+  flag, decouple plan display from capture"): run.py:487 now reads
+  s.show_query_plans = s.show_plans (the coupling to capture_plans is gone), the
+  --show-plans flag is wired through benchbox/cli/dryrun.py and run.py, and
+  docs/reference/cli/run.md documents --show-plans. The display-suppressed-during-
+  capture guard (if not self.capture_plans: ...) is present in duckdb.py. The
+  tests (w3) were the residual gap and are added here in
+  tests/unit/platforms/test_duckdb_adapter.py:
+  test_show_plans_displays_without_capture (show_query_plans=True,
+  capture_plans=False -> display fires, capture does not) and
+  test_capture_no_display_suppresses_plan_display (capture_plans=True,
+  show_query_plans=False -> display suppressed, capture runs once). Verification
+  `pytest tests/unit/platforms/ -k 'show_plans or capture_no_display'` passes.
+
 metadata:
   tags: [query-plan, cli, display, decoupling, duckdb]
   estimated_effort: "Small"
   created_date: "2026-06-11"
-  last_updated: "2026-06-11T00:00:00-04:00"
+  last_updated: "2026-06-24T00:00:00-04:00"

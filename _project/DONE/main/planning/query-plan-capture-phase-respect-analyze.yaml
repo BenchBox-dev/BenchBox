@@ -3,7 +3,7 @@ title: "Make the isolated capture phase respect analyze_plans (restore the ANALY
 worktree: main
 priority: High
 category: Core Functionality
-status: Not Started
+status: Completed
 
 description: |
   The isolated post-measurement capture phase wired in by the CLI/orchestrator
@@ -49,7 +49,7 @@ prior_art:
 work:
   - id: w1
     summary: "Thread analyze_plans from the adapter into the post-measurement phase call"
-    status: pending
+    status: done
     notes: |
       In _capture_plans_post_measurement pass analyze_plans=self.analyze_plans to
       run_plan_capture_phase. Confirm run_plan_capture_phase saves/restores the
@@ -57,7 +57,7 @@ work:
   - id: w2
     summary: "Verify the is_dml_query guard still downgrades writes under ANALYZE in the phase"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       With analyze_plans=True, a write statement (INSERT/UPDATE/DELETE/MERGE/COPY,
       CTAS/CMV/SELECT INTO) must NOT be re-executed by the capture EXPLAIN. Assert
@@ -66,7 +66,7 @@ work:
   - id: w3
     summary: "Tests: phase honours analyze_plans (ANALYZE plan vs estimate) on an eligible adapter"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       Integration test on DuckDB: capture_plans=True + analyze_plans=True via the
       phase yields a plan whose physical operator carries timing; analyze_plans=False
@@ -74,7 +74,7 @@ work:
   - id: w4
     summary: "Re-correct docs to match restored behavior"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Update docs/features/query-plan-analysis.md: phase-eligible adapters capture
       ANALYZE plans by default (post-measurement, ~1x extra cost), analyze_plans=false
@@ -112,8 +112,26 @@ success_metrics:
   - "analyze_plans is the single effective capture-detail knob in both phase and inline paths."
   - "No write statement is executed twice during capture."
 
+resolution: |
+  Completed. The code fix (w1/w2) landed via PR #827 ("ratify canonical capture
+  contract and restore the analyze knob"):
+  _capture_plans_post_measurement now passes
+  analyze_plans=getattr(self, "analyze_plans", True) to run_plan_capture_phase,
+  and run_plan_capture_phase saves/restores the adapter's analyze_plans. The
+  is_dml_query guard keeps writes on a non-ANALYZE EXPLAIN even with
+  analyze_plans=True. Tests (w3) cover all three cases:
+  test_phase_honors_analyze_plans_true (ANALYZE -> per-operator timing),
+  test_phase_structural_only_when_analyze_disabled (estimate -> no timing), and
+  test_dml_executed_exactly_once (INSERT runs exactly once under the default
+  analyze_plans=True). Docs (w4) re-corrected here: the "Capture Isolation"
+  section of docs/features/query-plan-analysis.md no longer claims the phase is
+  structural-only; it now documents that the phase honours analyze_plans
+  (ANALYZE by default, ~1x extra cost outside the measured window) with the DML
+  downgrade. Verification `pytest tests/integration/test_plan_capture_phase.py
+  -k analyze` passes.
+
 metadata:
   tags: [query-plan, capture, isolation-phase, analyze, regression]
   estimated_effort: "Small"
   created_date: "2026-06-15"
-  last_updated: "2026-06-15T00:00:00-04:00"
+  last_updated: "2026-06-24T00:00:00-04:00"
