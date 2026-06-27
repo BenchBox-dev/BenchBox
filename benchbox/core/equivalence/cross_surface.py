@@ -346,6 +346,22 @@ class CrossSurfaceData:
 
 
 @dataclass(frozen=True)
+class ClassifiedDivergence:
+    """A baselined divergence accepted ONLY when ``accepts`` matches the live cell.
+
+    A bare ``str`` baseline entry tolerates ANY divergence on its key, which masks a
+    real regression that happens to land on the same query/backend. A
+    ``ClassifiedDivergence`` instead tolerates a divergence only when its ``accepts``
+    predicate confirms the actual cell detail is the specific, defensible difference
+    described by ``reason`` - so a genuinely wrong value on the same key is still
+    reported as an unclassified gate failure.
+    """
+
+    reason: str
+    accepts: Callable[[SurfaceDivergence], bool]
+
+
+@dataclass(frozen=True)
 class CrossSurfaceGate:
     """Per-benchmark wiring for a cross-surface SQL<->DataFrame gate."""
 
@@ -356,7 +372,7 @@ class CrossSurfaceGate:
     # DataFrame surface, so every cell must match. Add a classified entry only
     # for a deliberate, defensible presentational difference - never to mute a
     # regression.
-    known_divergences: dict[str, str] = field(default_factory=dict)
+    known_divergences: dict[str, str | ClassifiedDivergence] = field(default_factory=dict)
     # Queries whose SQL reference legitimately returns 0 rows at the bounded
     # cell, keyed by query id, with a rationale string. A both-empty cell
     # compares empty-vs-empty and is NON-discriminating (every backend trivially
@@ -940,7 +956,39 @@ _H2ODB_PERCENTILE_DECIMAL = (
     "yields the DataFrame value, so the only difference is DuckDB's DECIMAL result "
     "scale - a deterministic, sub-cent presentational/dtype difference, not a logic bug."
 )
-_H2ODB_KNOWN_DIVERGENCES: dict[str, str] = dict.fromkeys(("Q9_expression", "Q9_pandas"), _H2ODB_PERCENTILE_DECIMAL)
+# Detail-aware acceptance for the Q9 residue: classify ONLY a single value mismatch
+# whose two numeric values differ by at most half a cent (the DECIMAL(8,2) rounding
+# bound, with a little float-formatting slack - still far below a full cent). A wrong
+# median, a wrong grouping, a row/column-count mismatch, an execution error, or any
+# larger value bug (e.g. an interpolation-method regression) does NOT parse as a
+# sub-cent numeric residue, so Q9 stays guarded against real result regressions
+# instead of the bare key tolerating every Q9 difference.
+_H2ODB_Q9_RESIDUE_MAX = 0.005 + 1e-6
+_VALUE_MISMATCH_RE = re.compile(r"Value mismatch\b.*?Original:\s*(.+?),\s*Variant:\s*(.+)$")
+_NUMBER_RE = re.compile(r"[-+]?\d*\.\d+|[-+]?\d+")
+
+
+def _first_number(text: str) -> float | None:
+    match = _NUMBER_RE.search(text)
+    return float(match.group()) if match else None
+
+
+def _h2odb_q9_decimal_residue(divergence: SurfaceDivergence) -> bool:
+    """True iff a Q9 divergence is the documented sub-cent DECIMAL-scale residue."""
+    match = _VALUE_MISMATCH_RE.search(str(divergence.detail))
+    if match is None:
+        return False
+    orig = _first_number(match.group(1))
+    variant = _first_number(match.group(2))
+    if orig is None or variant is None:
+        return False
+    return abs(orig - variant) <= _H2ODB_Q9_RESIDUE_MAX
+
+
+_H2ODB_KNOWN_DIVERGENCES: dict[str, str | ClassifiedDivergence] = dict.fromkeys(
+    ("Q9_expression", "Q9_pandas"),
+    ClassifiedDivergence(_H2ODB_PERCENTILE_DECIMAL, _h2odb_q9_decimal_residue),
+)
 
 
 # Registry of ENFORCED gated benchmarks: clean, blocking cross-surface gates whose
@@ -1046,11 +1094,27 @@ def run_gate(gate: CrossSurfaceGate) -> int:
     )
 
 
+def _classification(known: dict[str, str | ClassifiedDivergence], divergence: SurfaceDivergence) -> str | None:
+    """Return the reason a divergence is tolerated, or None if it is unclassified.
+
+    A bare-string baseline entry tolerates ANY divergence on that key (back-compat).
+    A :class:`ClassifiedDivergence` entry tolerates the divergence only when its
+    ``accepts`` predicate confirms the live cell, so a regression on a baselined key
+    is still unclassified.
+    """
+    entry = known.get(divergence.key)
+    if entry is None:
+        return None
+    if isinstance(entry, ClassifiedDivergence):
+        return entry.reason if entry.accepts(divergence) else None
+    return entry
+
+
 def _report(
     divergences: list[SurfaceDivergence],
     total: int,
     coverage: dict[str, int],
-    known: dict[str, str],
+    known: dict[str, str | ClassifiedDivergence],
     *,
     benchmark: str,
     reference_row_counts: dict[Any, int] | None = None,
@@ -1077,7 +1141,10 @@ def _report(
     reference_row_counts = reference_row_counts or {}
 
     found = {d.key for d in divergences}
-    new = sorted(found - set(known))
+    # A divergence is classified only if its key is baselined AND (for a detail-aware
+    # ClassifiedDivergence entry) the live cell matches the entry's predicate, so a
+    # real regression on a baselined key is still reported as unclassified.
+    new = sorted({d.key for d in divergences if _classification(known, d) is None})
     resolved = sorted(set(known) - found)
     missing_backends = sorted(backend for backend, count in coverage.items() if count == 0)
     executed = sum(coverage.values())
@@ -1116,7 +1183,7 @@ def _report(
 
     by_class: dict[str, list[SurfaceDivergence]] = {}
     for divergence in sorted(divergences, key=lambda d: d.key):
-        klass = known.get(divergence.key, "UNCLASSIFIED")
+        klass = _classification(known, divergence) or "UNCLASSIFIED"
         by_class.setdefault(klass, []).append(divergence)
     for klass in sorted(by_class):
         print(f"  [{klass}]")

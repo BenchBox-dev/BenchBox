@@ -463,6 +463,52 @@ def test_h2odb_is_an_enforced_gate_with_classified_percentile_exception():
     assert GATES["h2odb"].scale_factor == 0.01
 
 
+def test_h2odb_q9_baseline_tolerates_only_the_sub_cent_residue_not_real_bugs():
+    """The Q9 baseline is detail-aware: it classifies ONLY the sub-cent DECIMAL
+    residue, so a genuine Q9 regression on the same key still fails the gate."""
+    from benchbox.core.equivalence.cross_surface import GATES
+
+    known = GATES["h2odb"].known_divergences
+    coverage = {"expression": 1, "pandas": 1}
+
+    # The documented residue: p90 differs by < half a cent on both backends ->
+    # classified, the gate passes.
+    residue = [
+        SurfaceDivergence("Q9", "expression", "Q9.0: Value mismatch at row 4, column 2. Original: 77.87, Variant: 77.874"),
+        SurfaceDivergence("Q9", "pandas", "Q9.0: Value mismatch at row 4, column 2. Original: 77.87, Variant: 77.874"),
+    ]
+    assert (
+        _report(residue, total=2, coverage=coverage, known=known, benchmark="h2odb", reference_row_counts={"Q9": 6})
+        == 0
+    )
+
+    # A real value bug on the SAME key (wrong median, off by ten) is not sub-cent,
+    # so it is unclassified and the gate FAILS - the bare key no longer masks it.
+    real_bug = [
+        SurfaceDivergence("Q9", "pandas", "Q9.0: Value mismatch at row 0, column 1. Original: 50.0, Variant: 60.0"),
+    ]
+    assert (
+        _report(real_bug, total=2, coverage=coverage, known=known, benchmark="h2odb", reference_row_counts={"Q9": 6})
+        == 1
+    )
+
+
+def test_h2odb_q9_residue_predicate_rejects_structural_and_large_diffs():
+    """The Q9 acceptance predicate accepts a sub-cent value mismatch and nothing else."""
+    from benchbox.core.equivalence.cross_surface import _h2odb_q9_decimal_residue
+
+    def d(detail: str) -> SurfaceDivergence:
+        return SurfaceDivergence("Q9", "pandas", detail)
+
+    assert _h2odb_q9_decimal_residue(d("Q9.0: Value mismatch at row 4, column 2. Original: 77.87, Variant: 77.874"))
+    # Reject: a full value bug (>= a cent), a wrong grouping (row/column-count
+    # mismatch), and an execution error.
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Value mismatch at row 0, column 1. Original: 50.0, Variant: 60.0"))
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Row count mismatch. Original: 6, Variant: 5"))
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Column count mismatch at row 0. Original: 3, Variant: 2"))
+    assert not _h2odb_q9_decimal_residue(d("error: boom"))
+
+
 def test_order_by_result_key_maps_alias_name_expr_and_ordinal():
     """_order_by_result_key resolves the ORDER BY shapes the gated queries use."""
     from benchbox.core.equivalence.cross_surface import _order_by_result_key as resolve
