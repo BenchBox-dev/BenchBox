@@ -1259,19 +1259,13 @@ class AthenaAdapter(PlatformAdapter):
         finally:
             cursor.close()
 
-        # Capture outside the try so that, in strict_plan_capture mode, a
-        # PlanCaptureError propagates (matching PrestoTrinoAdapterBase / PostgreSQL)
-        # rather than being swallowed by the broad `except` above and mislabeled
-        # as a failed query. Only runs on SUCCESS; capture_query_plan opens its own
-        # cursor (the query cursor is already closed by `finally`). When
-        # strict_plan_capture is False, capture_query_plan never raises.
-        if self.capture_plans and result_dict.get("status") == "SUCCESS":
-            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
-            if query_plan:
-                result_dict["query_plan"] = query_plan
-                result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
-            if plan_capture_time_ms is not None:
-                result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+        # Plan capture routes through the shared chokepoint, outside the try so that
+        # in strict_plan_capture mode a PlanCaptureError propagates rather than being
+        # swallowed by the broad `except` above. For phase-eligible engines (the
+        # default) the chokepoint records the executed query for the isolated
+        # post-measurement phase instead of running EXPLAIN inline; otherwise it
+        # captures inline (capture_query_plan opens its own cursor).
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
 
         return result_dict
 

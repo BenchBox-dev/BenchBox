@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import random
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -64,6 +63,12 @@ class BigQueryAdapter(PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
     _DELIMITED_FORMATS = frozenset({"tbl", "csv"})
+    # Genuine side-effect engine: BigQuery has no EXPLAIN statement; the real plan
+    # and stage timing are only available from the executed QueryJob (job.query_plan).
+    # A standalone EXPLAIN/dry-run yields only an estimate and a real re-run costs
+    # money, so BigQuery is excluded from the isolated phase and keeps job-harvest
+    # capture. See _project/TODO/main/planning/query-plan-capture-sideeffect-engine-policy.yaml.
+    plan_capture_phase_eligible = False
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -1772,19 +1777,12 @@ class BigQueryAdapter(PlatformAdapter):
 
         Returns a ``(QueryPlanDAG | None, capture_time_ms)`` tuple, mirroring
         ``capture_query_plan``. Honors the same ``capture_plans`` /
-        ``plan_query_filter`` / ``plan_first_n`` / ``plan_sampling_rate`` gates.
+        ``plan_query_filter`` gates (the per-iteration / per-stream sampling
+        machinery has been retired).
         """
         if not self.capture_plans:
             return None, 0.0
         if self.plan_query_filter and query_id not in self.plan_query_filter:
-            return None, 0.0
-        if self.plan_first_n is not None:
-            with self._plan_capture_lock:
-                iteration = self._plan_capture_iteration_counts.get(query_id, 0)
-                self._plan_capture_iteration_counts[query_id] = iteration + 1
-            if iteration >= self.plan_first_n:
-                return None, 0.0
-        if self.plan_sampling_rate is not None and random.random() > self.plan_sampling_rate:
             return None, 0.0
 
         start_time = time.perf_counter()

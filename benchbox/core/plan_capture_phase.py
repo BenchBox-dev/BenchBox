@@ -51,9 +51,10 @@ Key isolation properties of ``run_plan_capture_phase``:
   non-ANALYZE EXPLAIN in ``get_query_plan()`` (DuckDB/MotherDuck/PostgreSQL do via
   ``is_dml_query``) so writes are never re-executed. The structural fingerprint is
   unaffected either way (it excludes timing/cardinality by design).
-- **Filter-independent**: the measurement-phase sampling filters
-  (``plan_first_n``, ``plan_sampling_rate``) are bypassed so each requested
-  query is captured exactly once; the explicit query list is the selection.
+- **Capture once per query**: the explicit query list is the selection; each
+  requested query is captured exactly once. (The inline-era per-iteration /
+  per-stream sampling machinery — ``plan_first_n`` / ``plan_sampling_rate`` — has
+  been retired; only the ``plan_query_filter`` query-selection set remains.)
 """
 
 from __future__ import annotations
@@ -100,7 +101,6 @@ def run_plan_capture_phase(
     connection_config: Mapping[str, Any] | None = None,
     analyze_plans: bool = False,
     close_connection: bool | None = None,
-    respect_sampling_filters: bool = False,
 ) -> PlanCapturePhaseResult:
     """Capture query plans in an isolated phase, decoupled from measurement.
 
@@ -127,12 +127,6 @@ def run_plan_capture_phase(
         close_connection: Whether to close the connection when done. Defaults to
             ``True`` when this function opened the connection and ``False`` when
             the caller supplied one.
-        respect_sampling_filters: When ``False`` (default) the explicit query
-            list is treated as the selection and the measurement-phase sampling
-            filters (``plan_first_n``, ``plan_sampling_rate``) are bypassed so
-            each query is captured exactly once. When ``True`` those filters are
-            left in place — used by the integrated per-iteration run path so
-            ``--plan-first-n`` / ``--plan-sampling-rate`` keep their meaning.
 
     Returns:
         A :class:`PlanCapturePhaseResult` with plans, fingerprints, and timing.
@@ -144,13 +138,11 @@ def run_plan_capture_phase(
     if close_connection is None:
         close_connection = owns_connection
 
-    # Save the measurement-phase configuration so the phase can run structural,
-    # filter-free capture without leaking that override back into the adapter.
+    # Save the measurement-phase configuration so the phase can force capture on
+    # without leaking that override back into the adapter.
     saved = {
         "analyze_plans": getattr(adapter, "analyze_plans", True),
         "capture_plans": getattr(adapter, "capture_plans", False),
-        "plan_first_n": getattr(adapter, "plan_first_n", None),
-        "plan_sampling_rate": getattr(adapter, "plan_sampling_rate", None),
     }
 
     phase_start = time.perf_counter()
@@ -160,11 +152,6 @@ def run_plan_capture_phase(
 
         adapter.analyze_plans = analyze_plans
         adapter.capture_plans = True
-        if not respect_sampling_filters:
-            # The explicit query list is the selection for this phase; bypass the
-            # measurement-phase sampling filters so each query is captured once.
-            adapter.plan_first_n = None
-            adapter.plan_sampling_rate = None
 
         for query_id, sql in items:
             plan, capture_ms = adapter.capture_query_plan(connection, sql, query_id)
@@ -178,8 +165,6 @@ def run_plan_capture_phase(
     finally:
         adapter.analyze_plans = saved["analyze_plans"]
         adapter.capture_plans = saved["capture_plans"]
-        adapter.plan_first_n = saved["plan_first_n"]
-        adapter.plan_sampling_rate = saved["plan_sampling_rate"]
         if close_connection and connection is not None:
             with contextlib.suppress(Exception):
                 connection.close()

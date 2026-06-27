@@ -93,18 +93,17 @@ def test_capture_phase_dml_single_execution(file_adapter):
 
 
 def test_capture_phase_restores_adapter_config(file_adapter):
-    """The phase must not leak its structural-only overrides back to the adapter."""
+    """The phase must not leak its capture-on / analyze override back to the adapter."""
     _seed_table(file_adapter)
     file_adapter.analyze_plans = True
-    file_adapter.plan_first_n = 7
-    file_adapter.plan_sampling_rate = 0.5
+    saved_capture_plans = file_adapter.capture_plans
 
+    # The phase forces analyze_plans=False (default) and capture_plans=True for its
+    # duration, then must restore the adapter's prior values.
     run_plan_capture_phase(file_adapter, {"q": "SELECT 1"})
 
     assert file_adapter.analyze_plans is True
-    assert file_adapter.plan_first_n == 7
-    assert file_adapter.plan_sampling_rate == 0.5
-    assert file_adapter.capture_plans is True
+    assert file_adapter.capture_plans == saved_capture_plans
 
 
 def test_capture_phase_reuses_supplied_connection(file_adapter):
@@ -329,3 +328,44 @@ class TestIntegratedCapturePhase:
             assert results[0].get("plan_fingerprint")
         finally:
             conn.close()
+
+
+class TestCanonicalCaptureContract:
+    """w6: the canonical model — one isolated phase, ``analyze_plans`` the only
+    capture-detail knob, default eligibility ON for every EXPLAIN engine, and the
+    per-iteration/per-stream sampling machinery retired.
+    """
+
+    def test_explain_engines_default_phase_eligible(self):
+        """EXPLAIN engines inherit default-ON eligibility; the base default is True."""
+        from benchbox.platforms.base.adapter import PlatformAdapter
+
+        assert PlatformAdapter.plan_capture_phase_eligible is True
+        assert DuckDBAdapter.plan_capture_phase_eligible is True
+
+    def test_bigquery_is_the_side_effect_exception(self):
+        """BigQuery is the one engine excluded from the isolated phase."""
+        from benchbox.platforms.bigquery import BigQueryAdapter
+
+        assert BigQueryAdapter.plan_capture_phase_eligible is False
+
+    def test_sampling_machinery_is_retired(self, file_adapter):
+        """The per-iteration / per-stream sampling attributes no longer exist;
+        only the ``plan_query_filter`` query-selection set remains."""
+        assert not hasattr(file_adapter, "plan_first_n")
+        assert not hasattr(file_adapter, "plan_sampling_rate")
+        assert not hasattr(file_adapter, "_plan_capture_iteration_counts")
+        assert hasattr(file_adapter, "plan_query_filter")
+
+    def test_analyze_plans_is_first_class_tri_state_on_configs(self):
+        """analyze_plans is a first-class, tri-state field on BenchmarkConfig and
+        RunConfig (None = not specified, so the adapter default True applies)."""
+        from benchbox.core.schemas import BenchmarkConfig, RunConfig
+
+        assert BenchmarkConfig(name="tpch", display_name="x").analyze_plans is None
+        assert RunConfig(benchmark="tpch").analyze_plans is None
+
+        bc = BenchmarkConfig(name="tpch", display_name="x", capture_plans=True, analyze_plans=False)
+        # The orchestrator/runner thread BenchmarkConfig.analyze_plans into RunConfig.
+        rc = RunConfig(benchmark="tpch", capture_plans=True, analyze_plans=bc.analyze_plans)
+        assert rc.analyze_plans is False

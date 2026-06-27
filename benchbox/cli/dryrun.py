@@ -44,6 +44,7 @@ def generate_cli_command(
     force: str | None = None,
     official: bool = False,
     capture_plans: bool = False,
+    analyze_plans: bool | None = None,
     show_plans: bool = False,
     strict_translation: bool = False,
     validation: str | None = None,
@@ -152,6 +153,11 @@ def generate_cli_command(
         if flag_value:
             parts.append(flag)
 
+    # analyze_plans is a tri-state --analyze-plans/--no-analyze-plans flag: only
+    # emit it when explicitly set (None = not passed, adapter default applies).
+    if analyze_plans is not None:
+        parts.append("--analyze-plans" if analyze_plans else "--no-analyze-plans")
+
     # Publish target/label only meaningful when --publish is set
     if publish:
         if publish_target and publish_target != "benchmark_runs/published":
@@ -205,6 +211,7 @@ def display_interactive_preview(
     force: str | None = None,
     official: bool = False,
     capture_plans: bool = False,
+    analyze_plans: bool | None = None,
     strict_translation: bool = False,
     validation: str | None = None,
     verbose: int = 0,
@@ -350,6 +357,7 @@ def display_interactive_preview(
         force=force,
         official=official,
         capture_plans=capture_plans,
+        analyze_plans=analyze_plans,
         strict_translation=strict_translation,
         validation=validation,
         verbose=verbose,
