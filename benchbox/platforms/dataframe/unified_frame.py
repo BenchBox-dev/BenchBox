@@ -1812,16 +1812,23 @@ class UnifiedExpr:
     def desc(self) -> UnifiedExpr:
         """Mark expression for descending sort order.
 
-        Returns a sort-marked expression that UnifiedLazyFrame.sort() can interpret.
-        - Polars: Uses sort_by with descending=True
-        - DataFusion: Uses expr.sort(ascending=False)
+        Returns a sort-marked expression that ``UnifiedLazyFrame.sort()`` interprets
+        as "sort by this column descending".
+        - DataFusion / PySpark: their native expr.sort(ascending=False) / .desc()
+          markers are consumed by the per-backend sort builders.
+        - Polars: carry a ``_sort_descending`` marker on the PLAIN column expression.
+          The previous implementation returned ``expr.sort(descending=True)`` - a
+          value-reordering expression, NOT a sort key - so the column was sorted
+          ASCENDING by that derived value (i.e. the descending intent was lost).
+          ``_normalize_sort_inputs`` reads the marker and flips the per-column flag.
         """
         if self._is_datafusion:
             return UnifiedExpr(self._expr.sort(ascending=False, nulls_first=False))
         elif self._is_pyspark:
             return UnifiedExpr(self._expr.desc())
-        # Polars: return expr with descending flag via sort_by
-        return UnifiedExpr(self._expr.sort(descending=True))
+        marked = UnifiedExpr(self._expr)
+        marked._sort_descending = True
+        return marked
 
     # =========================================================================
     # Namespace Accessors
@@ -2859,6 +2866,13 @@ def _normalize_sort_inputs(
         desc_flags = list(descending)
         if len(desc_flags) < len(cols):
             desc_flags.extend([False] * (len(cols) - len(desc_flags)))
+
+    # Honor per-column descending markers from UnifiedExpr.desc() (the
+    # `.sort(col_a, col_b.desc())` calling style) - the marker takes precedence
+    # over the (default ascending) `descending` flag for that column.
+    for i, c in enumerate(cols):
+        if getattr(c, "_sort_descending", False):
+            desc_flags[i] = True
     return cols, desc_flags
 
 

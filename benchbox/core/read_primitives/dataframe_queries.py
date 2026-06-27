@@ -322,7 +322,7 @@ def _partsupp_map_expression(ctx: DataFrameContext, max_suppkey: int) -> Any:
         ctx.get_table("partsupp")
         .filter(col("ps_suppkey") <= lit(max_suppkey))
         .group_by("ps_suppkey")
-        .agg(ctx.struct(col("ps_partkey").cast("str"), col("ps_supplycost")).list().alias("entries"))
+        .agg(ctx.struct(col("ps_partkey").cast_string(), col("ps_supplycost")).list().alias("entries"))
         .with_columns(ctx.map_from_entries("entries").alias("part_costs"))
     )
 

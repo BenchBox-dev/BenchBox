@@ -125,15 +125,23 @@ so the oracle-coverage-map does not prematurely mark it "guarded".
   optimizer_common_subexpression/constant_folding/limit; approx/decimal/Polars-Map
   classifications; 6 vacuous.
 
-### Platform bugs found (Agent B) — fix separately; impls above route around them
+### Platform bugs found (Agent B) — FIXED (tests in test_window_and_sort_fixes.py)
 
-* `UnifiedExpr.desc()` is not honored as a sort-key direction marker by
-  `UnifiedLazyFrame.sort` (`unified_frame.py` ~1812/3904): `.sort(col(a), col(b).desc())`
-  yields wrong order. Always use `.sort([names], descending=[...])`. (This was the
-  root cause of several "ORDER BY" divergences.)
-* `window_ntile` (`polars_df.py:774`, wrong bucket formula) and `window_lag`/
-  `window_lead` (`:742/756`, shift-before-sort) are buggy. Compute NTILE inline and
-  LAG/LEAD via `.shift().over()` after an explicit total-order `.sort(...)`.
+These shared-platform defects were discovered during the burn-down (the
+read_primitives impls route around them, so the gate is green regardless) and have
+since been fixed at the source with regression tests:
+
+* `UnifiedExpr.desc()` returned a value-reordering expression on Polars instead of
+  a descending sort marker, so `.sort(col(a), col(b).desc())` sorted ascending.
+  Fixed: `desc()` now carries a `_sort_descending` marker that
+  `_normalize_sort_inputs` honors.
+* `window_ntile` used `ceil(rank*n/count)` (wrong bucket distribution). Fixed to the
+  SQL NTILE piecewise formula (first `count % n` buckets get one extra row).
+* `window_lag`/`window_lead` shifted in frame order then re-sorted the shifted
+  values. Fixed to `shift(offset).over(partition, order_by=...)` (shift in window
+  order, restore row order).
+* Cosmetic: `_partsupp_map_expression` used `cast("str")` (a misleading Polars
+  error); now `cast_string()`.
 
 ### API constraints discovered (for the remaining rewrites)
 

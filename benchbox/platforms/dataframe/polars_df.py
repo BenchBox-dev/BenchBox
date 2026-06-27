@@ -738,12 +738,16 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         partition_by: list[str] | None = None,
         order_by: list[tuple[str, bool]] | None = None,
     ) -> PolarsExpr:
-        """Create a LAG() window function expression."""
+        """Create a LAG() window function expression.
+
+        The shift must happen in the window's ORDER BY order, so use Polars'
+        ``over(..., order_by=...)`` (which orders within the window and restores the
+        original row order) rather than shifting in the frame's current order and
+        then re-sorting the shifted values.
+        """
         order_col, ascending = order_by[0] if order_by else (column, True)
-        expr = pl.col(column).shift(offset).sort_by(order_col, descending=not ascending)
-        if partition_by:
-            return expr.over(partition_by)
-        return expr
+        parts = partition_by if partition_by else [pl.lit(1)]
+        return pl.col(column).shift(offset).over(parts, order_by=order_col, descending=not ascending)
 
     def window_lead(
         self,
@@ -752,12 +756,10 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         partition_by: list[str] | None = None,
         order_by: list[tuple[str, bool]] | None = None,
     ) -> PolarsExpr:
-        """Create a LEAD() window function expression."""
+        """Create a LEAD() window function expression (see window_lag)."""
         order_col, ascending = order_by[0] if order_by else (column, True)
-        expr = pl.col(column).shift(-offset).sort_by(order_col, descending=not ascending)
-        if partition_by:
-            return expr.over(partition_by)
-        return expr
+        parts = partition_by if partition_by else [pl.lit(1)]
+        return pl.col(column).shift(-offset).over(parts, order_by=order_col, descending=not ascending)
 
     def window_ntile(
         self,
@@ -765,13 +767,30 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         order_by: list[tuple[str, bool]],
         partition_by: list[str] | None = None,
     ) -> PolarsExpr:
-        """Create a NTILE() window function expression."""
+        """Create a NTILE() window function expression.
+
+        SQL NTILE(n) splits the ordered rows into n buckets as evenly as possible:
+        the first ``count % n`` buckets get ``ceil(count/n)`` rows, the rest get
+        ``floor(count/n)``. The naive ``ceil(rank*n/count)`` formula does not match
+        that distribution (e.g. n=3 over 5 rows), so compute the buckets piecewise
+        from the 0-indexed position.
+        """
         order_col, ascending = order_by[0]
-        # Polars doesn't have ntile directly; use rank-based calculation
-        rank_expr = pl.col(order_col).rank(method="ordinal", descending=not ascending)
+        r0 = pl.col(order_col).rank(method="ordinal", descending=not ascending) - pl.lit(1)
         count_expr = pl.col(order_col).count()
-        # NTILE formula: ceil(rank * n / count)
-        ntile_expr = ((rank_expr * pl.lit(n) - pl.lit(1)) / count_expr).floor().cast(pl.Int64) + pl.lit(1)
+        base = count_expr // n  # floor bucket size
+        rem = count_expr % n  # number of larger (base+1) buckets
+        big = rem * (base + pl.lit(1))  # rows covered by the larger buckets
+        # Guard the small-partition case (base == 0): those rows always satisfy
+        # r0 < big and take the first branch, so the divisor is never used, but the
+        # expression is still evaluated - keep it >= 1.
+        denom = pl.when(base == pl.lit(0)).then(pl.lit(1)).otherwise(base)
+        ntile_expr = (
+            pl.when(r0 < big)
+            .then(r0 // (base + pl.lit(1)) + pl.lit(1))
+            .otherwise(rem + (r0 - big) // denom + pl.lit(1))
+            .cast(pl.Int64)
+        )
         if partition_by:
             return ntile_expr.over(partition_by)
         return ntile_expr
