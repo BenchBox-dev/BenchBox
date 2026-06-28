@@ -2,8 +2,9 @@ id: dataframe-csv-empty-string-null-uniform
 title: "Normalize empty-string-vs-null semantics across all DataFrame adapters on the CSV-direct load path"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
 category: Core Functionality
+completed_date: "2026-06-28"
 
 description: |
   The empty-string-vs-null contract is centralized at the Parquet conversion layer
