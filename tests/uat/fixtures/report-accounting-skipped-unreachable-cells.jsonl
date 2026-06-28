@@ -1,0 +1,5 @@
+{"platform":"duckdb","benchmark":"tpch","scale":0.01,"status":"passed","exit_code":0,"elapsed_s":1.0,"log_path":"/tmp/duckdb-tpch-0.01.log","result_path":"/tmp/duckdb-tpch-0.01.json","submit_terminal_state":"submittable"}
+{"platform":"duckdb","benchmark":"tpch","scale":0.1,"status":"failed","exit_code":1,"elapsed_s":2.0,"log_path":"/tmp/duckdb-tpch-0.1.log","result_path":null,"submit_terminal_state":"submittable"}
+{"platform":"duckdb","benchmark":"tpch","scale":1.0,"status":"skipped","exit_code":0,"elapsed_s":0.0,"log_path":"/tmp/duckdb-tpch-1.0.log","result_path":null,"submit_terminal_state":"submittable"}
+{"platform":"sqlite","benchmark":"tpch","scale":0.01,"status":"skipped-unreachable","exit_code":0,"elapsed_s":0.0,"log_path":"/tmp/sqlite-tpch-0.01.log","result_path":null,"submit_terminal_state":"submittable"}
+{"platform":"sqlite","benchmark":"tpch","scale":0.1,"status":"passed","exit_code":0,"elapsed_s":1.5,"log_path":"/tmp/sqlite-tpch-0.1.log","result_path":"/tmp/sqlite-tpch-0.1.json","submit_terminal_state":"submittable"}

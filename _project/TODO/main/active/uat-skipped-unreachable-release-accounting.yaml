@@ -2,7 +2,7 @@ id: uat-skipped-unreachable-release-accounting
 title: "Account for skipped/unreachable UAT cells in release-report candidate counts (release-evidence integrity)"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Release Tooling
 
 description: |
@@ -29,7 +29,7 @@ prior_art:
 work:
   - id: w0
     summary: "Reproduce and characterize the undercount with a fixture (re-validate the claim)"
-    status: pending
+    status: done
     needs: []
     notes: |
       Build a small fixture CELLS_JSONL of UAT cell records with N defined cells, K
