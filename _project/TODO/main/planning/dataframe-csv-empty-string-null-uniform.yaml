@@ -69,7 +69,7 @@ anti_patterns:
 
 verification:
   - description: "CSV-direct empty-string parity on the two lagging adapters"
-    command: "run ClickBench cross-surface on pyspark+datafusion with prefer_parquet=False"
+    command: "uv run -- python -m pytest tests/integration/test_dataframe_csv_empty_string_null_semantics.py -q"
     expected_output: "0 empty-string-vs-null divergences; JoinOrder still nulls empties"
 
 scope_limit:
