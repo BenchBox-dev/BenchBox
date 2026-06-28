@@ -174,6 +174,12 @@ SKIP_FOR_PYSPARK = [
     # PySpark does not override element() so it raises NotImplementedError.
     "list_filter",
     "list_transform",
+    # window_lead_lag_same_frame's expression impl uses raw Polars (`.native` +
+    # pl.col(...).shift().over()) for a deterministic composite-key LAG/LEAD that
+    # the unified window helpers cannot yet express (single-column order_by only;
+    # see TODO read-primitives-simplify-inline-window-helpers). pl.col(...) on a
+    # non-Polars native frame fails, so PySpark skips it until the impl is ported.
+    "window_lead_lag_same_frame",
 ]
 
 # Queries skipped specifically for DataFusion DataFrame mode.
@@ -183,6 +189,9 @@ SKIP_FOR_DATAFUSION = [
     "list_transform",  # .list.eval() is Polars-only - no DataFusion equivalent
     "list_reduce",  # array_sum() not in DataFusion v50 Python bindings
     "array_distinct",  # DataFusion array_distinct returns Dictionary(Int32,Utf8) causing Arrow type mismatch
+    # Raw-Polars (`.native` + pl.col) deterministic LAG/LEAD impl; pl.col on a
+    # non-Polars native frame fails (see SKIP_FOR_PYSPARK note above).
+    "window_lead_lag_same_frame",
 ]
 
 
