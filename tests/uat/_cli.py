@@ -185,6 +185,11 @@ def _handle_report(args: argparse.Namespace) -> int:
             {
                 "tsv": str(summary.tsv_path),
                 "rows": summary.rows,
+                "candidates": summary.candidate_count,
+                "attempted": summary.attempted_count,
+                "skipped": summary.skipped_count,
+                "unreachable": summary.unreachable_count,
+                "total_defined": summary.total_defined_count,
                 "passed": summary.pass_count,
                 "failed": summary.fail_count,
                 "timed_out": summary.timeout_count,

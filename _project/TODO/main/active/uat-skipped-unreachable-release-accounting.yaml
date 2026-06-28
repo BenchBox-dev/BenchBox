@@ -43,7 +43,7 @@ work:
 
   - id: w1
     summary: "Make report totals reconcile and surface unreachable loudly"
-    status: pending
+    status: done
     needs: [w0]
     notes: |
       Update the report/validate accounting so the summary reports passed /
