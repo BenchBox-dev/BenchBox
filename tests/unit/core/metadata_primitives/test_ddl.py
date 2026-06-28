@@ -59,6 +59,22 @@ def test_create_table_rendering_snapshot_by_dialect(dialect: str, expected: str)
     assert generate_create_table_sql(table, dialect) == expected
 
 
+def test_clickhouse_no_primary_key_renders_bare_tuple_order_by() -> None:
+    """A ClickHouse table with no primary key renders ``ORDER BY tuple()`` — the
+    empty-order expression is verbatim, NOT wrapped as ``ORDER BY (tuple())``."""
+    table = TableDefinition(
+        name="sample",
+        columns=[
+            ColumnDefinition("id", "Int64", nullable=False),
+            ColumnDefinition("name", "String"),
+        ],
+    )
+
+    sql = generate_create_table_sql(table, "clickhouse")
+    assert sql.endswith(" ENGINE = MergeTree() ORDER BY tuple();")
+    assert "ORDER BY (tuple())" not in sql
+
+
 @pytest.mark.parametrize(
     ("dialect", "expected_names"),
     [

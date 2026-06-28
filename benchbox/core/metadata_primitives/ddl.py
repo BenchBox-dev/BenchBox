@@ -358,7 +358,11 @@ def generate_create_table_sql(
     parts.append(")")
 
     if capabilities.table_engine_clause_template:
-        order_by = ", ".join(pk_columns) if pk_columns else capabilities.table_engine_empty_order_by
+        # Keyed tables wrap the key list in parens, e.g. ``ORDER BY (a, b)``; the
+        # no-key case renders the empty-order expression verbatim (``ORDER BY
+        # tuple()``), so the parens belong to the key list, not the template — wrapping
+        # the template would emit ``ORDER BY (tuple())`` and break byte-identical DDL.
+        order_by = f"({', '.join(pk_columns)})" if pk_columns else capabilities.table_engine_empty_order_by
         parts.append(capabilities.table_engine_clause_template.format(order_by=order_by))
 
     return "\n".join(parts) + ";"

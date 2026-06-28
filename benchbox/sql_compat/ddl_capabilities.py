@@ -56,7 +56,7 @@ _DIALECT_CAPABILITIES: dict[str, MetadataDdlCapabilities] = {
         supports_primary_key_clause=False,
         supports_views=False,
         supports_foreign_keys=False,
-        table_engine_clause_template=" ENGINE = MergeTree() ORDER BY ({order_by})",
+        table_engine_clause_template=" ENGINE = MergeTree() ORDER BY {order_by}",
     ),
     "databricks": MetadataDdlCapabilities(
         supports_complex_types=True,
