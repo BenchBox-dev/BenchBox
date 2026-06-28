@@ -1,0 +1,105 @@
+id: plan-capture-blocking-ci-gate
+title: "Add a blocking plan-capture CI gate (the highest escaped-defect-density subsystem has no required check)"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Query-plan capture was added/expanded across ~20 platforms this month and is
+  the area where escaped defects cluster - the PR review follow-up sweeps repeatedly
+  fixed plan-capture parser/wiring bugs after merge (e.g. #824 Azure Synapse DAG
+  and QuestDB cursor AttributeError, #862 wrong executed_sql, #894 Spark parser
+  accepting an EXPLAIN-failure sentinel and ClickHouse parser not registered).
+
+  Yet a grep of .github/workflows/ for plan_capture / capture_plans / query-plan
+  returns NOTHING (re-confirmed on develop @ cb49cecf5, 2026-06-28:
+  `grep -rl 'plan_capture\|capture_plans\|query-plan' .github/workflows/` -> no
+  match). Plan-capture correctness rides only on the fast unit suite and a
+  non-blocking (continue-on-error: true, excluded from ci-required-result) postgres
+  integration sample. The cross-surface correctness gates ARE wired and required
+  (pr.yml:369 correctness-gate, in the ci-required-result needs list at :637) -
+  plan capture is the conspicuous gap.
+
+  Add a small, fast, in-process plan-capture gate (DuckDB + SQLite, no service
+  container, no credentials) that runs the isolated capture phase end-to-end and
+  asserts: each result carries a parsed plan, fingerprints are stable across runs,
+  and DML statements are not double-executed. Wire it as a BLOCKING job in pr.yml.
+
+prior_art:
+  - ref: ".github/workflows/pr.yml:369"
+    note: "correctness-gate job - the model for a new required gate job; add the plan-capture job beside it and into the ci-required-result needs list (:637)."
+  - ref: "Makefile"
+    note: "ssb-cross-surface-equivalence-report and the other *-report targets are the template for a new `plan-capture-gate` make target."
+  - ref: "tests/integration/test_plan_capture_phase.py"
+    note: "Existing E2E capture-phase test; the gate should drive the same run_plan_capture_phase path rather than a bespoke one."
+  - ref: "tests/unit/platforms/test_duckdb_plan_capture.py, test_sqlite_plan_capture.py"
+    note: "Existing per-platform in-process capture tests - reuse their fixtures/engines for a credential-free gate."
+  - ref: "tests/unit/query_plans/test_fingerprint_hygiene.py"
+    note: "Existing fingerprint-stability assertions to fold into the gate's stability check."
+
+work:
+  - id: w1
+    summary: "Add a make plan-capture-gate target that runs an in-process DuckDB+SQLite capture E2E with assertions"
+    status: pending
+    needs: []
+    notes: |
+      New Makefile target invoking a focused pytest selection (or a small driver)
+      that, for DuckDB and SQLite: runs a bounded benchmark with capture_plans
+      through the production run pipeline, asserts every result row has a parsed
+      plan, asserts fingerprint stability across two runs, and asserts a DML/CTAS
+      statement executed exactly once (no double-execution). Reuse the existing
+      in-process plan-capture tests and run_plan_capture_phase; do not fork the
+      capture path. Keep it credential-free and fast (no postgres service).
+
+  - id: w2
+    summary: "Wire plan-capture-gate as a BLOCKING pr.yml job in ci-required-result"
+    status: pending
+    needs: [w1]
+    notes: |
+      Add a plan-capture-gate job to .github/workflows/pr.yml modeled on
+      correctness-gate, and add it to the ci-required-result needs list (pr.yml:637)
+      and its status echo (:694). It must NOT be continue-on-error. Confirm it is a
+      hard blocker by checking the aggregator logic.
+
+  - id: w3
+    summary: "Prove the gate catches a planted plan-capture defect (no silent green)"
+    status: pending
+    needs: [w1]
+    notes: |
+      Demonstrate the gate FAILS when a plan-capture defect is planted (e.g. a
+      parser that returns a sentinel-as-plan, or a fingerprint that leaks a
+      cost/cardinality field), mirroring the planted-divergence proof the
+      cross-surface gates use. Capture the before/after in the PR body.
+
+must_preserve:
+  - "Routine PRs stay cheap: the gate is in-process (DuckDB+SQLite), no service containers, no secrets, fast-marked."
+  - "The non-blocking postgres/datafusion/clickhouse equivalence SAMPLES (continue-on-error) are unchanged; this adds coverage, it does not make samples blocking."
+
+anti_patterns:
+  - "DO NOT require a database service container or credentials - the gate must run on a bare CI runner."
+  - "DO NOT fork the capture pipeline for the gate - drive run_plan_capture_phase / the production path the real run uses."
+
+verification:
+  - description: "Gate runs green in-process"
+    command: "make plan-capture-gate"
+    expected_output: "DuckDB and SQLite capture E2E pass; fingerprints stable; no DML double-execution"
+  - description: "Gate is a required check"
+    command: "grep -n plan-capture-gate .github/workflows/pr.yml"
+    expected_output: "job defined AND present in the ci-required-result needs list (not continue-on-error)"
+
+scope_limit:
+  only_modify:
+    - "Makefile"
+    - ".github/workflows/pr.yml"
+    - "tests/"
+
+success_metrics:
+  - "make plan-capture-gate exists, is green on develop, and blocks merge in pr.yml."
+  - "A planted plan-capture defect fails the gate."
+
+metadata:
+  tags: [query-plans, plan-capture, ci, correctness, gate]
+  estimated_effort: "Medium"
+  created_date: "2026-06-28"
+  last_updated: "2026-06-28T00:00:00"
