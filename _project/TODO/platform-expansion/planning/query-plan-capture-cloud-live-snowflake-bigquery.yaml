@@ -93,12 +93,19 @@ work:
     notes: |
       Add the new secrets as job-level env vars, add the
       GOOGLE_APPLICATION_CREDENTIALS file-write step from w1, and extend the
-      pytest invocation marker expression to
-        -m "live_redshift or live_motherduck or live_snowflake or live_bigquery"
-      with the two new test files in the path list. If the
+      pytest invocation by appending ONLY the plan-capture classes from w2/w3 as
+      node ids — NOT the whole live modules. Selecting the modules with
+      -m "... or live_snowflake or live_bigquery" would also run the heavy
+      TPC-H load / warehouse-cost live tests in those files and violate the
+      SELECT-1 / 0-byte billing guardrails below. Append:
+        "tests/integration/platforms/test_snowflake_live.py::TestLiveSnowflakeQueryPlanCapture"
+        "tests/integration/platforms/test_bigquery_live.py::TestLiveBigQueryQueryPlanCapture"
+      keeping -m "live_snowflake or live_bigquery" as a secondary safety filter
+      so the classes still skip cleanly when credentials are absent. If the
       Redshift/MotherDuck job does not exist yet (TODOs landed out of order),
       create the job following the postgres-integration pattern in nightly.yml
-      with only the Snowflake/BigQuery pieces. Nightly-only; never pr.yml.
+      with only the Snowflake/BigQuery plan-capture classes. Nightly-only;
+      never pr.yml.
 
 deps:
   needs: ["query-plan-capture-cloud-saas"]

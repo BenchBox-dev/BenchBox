@@ -136,10 +136,18 @@ Each query result includes three plan-related fields when `--capture-plans` is a
 |-------|------|-------------|
 | `query_plan` | `QueryPlan \| None` | Parsed logical plan tree; `None` if capture failed or was skipped |
 | `plan_fingerprint` | `str \| None` | SHA256 of the plan's logical structure; `None` when `query_plan` is `None` |
-| `plan_capture_time_ms` | `float \| None` | Wall-clock milliseconds spent on plan capture (excludes query execution time) |
+| `plan_capture_time_ms` | `float \| None` | Wall-clock milliseconds spent on plan capture (excludes the *timed* benchmark execution; see note below) |
 
 `plan_fingerprint` is `None` when `query_plan` is `None`. Both are `None` when `--capture-plans` is
 not set or when the query was excluded by `--plan-config`.
+
+> **`plan_capture_time_ms` is the full capture overhead, including EXPLAIN execution — not parse-only.**
+> Plan capture runs in a separate post-measurement phase, so it never affects the timed benchmark
+> result. But the metric does include the cost of running `EXPLAIN` itself. On DuckDB the default
+> `EXPLAIN (ANALYZE, FORMAT JSON)` **re-executes the query**, so `plan_capture_time_ms` there is
+> roughly the query's own runtime plus parsing (~1× query cost), not a few milliseconds of parsing.
+> Engines that capture estimated plans only (Redshift, DataFusion, SQLite, PostgreSQL DML) add just
+> ~1-5 ms because no re-execution occurs.
 
 ## Viewing Plans
 
@@ -576,7 +584,7 @@ Plans are fingerprinted using SHA256 of the logical structure:
 | Same query, same schema, same engine version | **Same fingerprint** |
 | Stats refresh / `VACUUM ANALYZE` (no plan change) | **Same fingerprint** |
 | Adding an index that is not used by the query | **Same fingerprint** |
-| Adding an index the planner starts using | **Different fingerprint** (join/scan operator changes) |
+| Adding an index the planner starts using | **May differ** — only when it changes the *logical* structure (e.g. an index join replacing a hash join). A pure scan-method switch (Seq Scan → Index Scan on the same table) keeps the **same fingerprint**, because scan variants normalize to a logical `Scan` and physical operator details are excluded from the hash. Use `compare-plans` or the physical-plan details to detect scan-method changes. |
 | Engine minor version upgrade with no plan change | **Usually same** — not guaranteed across major versions |
 | `analyze_plans=true` vs `analyze_plans=false` (DuckDB) | **Same fingerprint** — timing/cardinality excluded from hash |
 

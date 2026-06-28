@@ -111,6 +111,18 @@ class TestSparkErrorRecovery:
         result = parser.parse_explain_output("q", "!@#$ %^&*")
         assert result is None or result.logical_root is not None
 
+    @pytest.mark.parametrize(
+        "sentinel",
+        [
+            "Could not get query plan: EXPLAIN failed",
+            "Failed to get query plan: connection reset",
+        ],
+    )
+    def test_error_sentinel_returns_none(self, parser, sentinel):
+        # get_spark_query_plan returns an error sentinel string on EXPLAIN
+        # failure; it must not be accepted as a one-node "Other" plan.
+        assert parser.parse_explain_output("q", sentinel) is None
+
 
 class TestSparkRegistration:
     @pytest.mark.parametrize("dialect", ["spark", "databricks"])

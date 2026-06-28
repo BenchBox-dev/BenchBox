@@ -202,10 +202,38 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
+      - name: Wait for PostgreSQL service to be reachable
+        run: |
+          # The live tests skip via skip_unless_docker_service when localhost:5432
+          # is unreachable, and pytest exits 0 on an all-skipped run. That would
+          # turn this REQUIRED gate green without ever exercising PostgreSQL plan
+          # capture. Fail the step outright if the service container never came up.
+          for attempt in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U benchbox >/dev/null 2>&1; then
+              echo "PostgreSQL is reachable."
+              exit 0
+            fi
+            echo "Waiting for PostgreSQL (attempt ${attempt}/30)..."
+            sleep 2
+          done
+          echo "::error::PostgreSQL service never became reachable on localhost:5432; the live integration gate cannot be skipped silently."
+          exit 1
+
       - name: Run PostgreSQL live integration tests
         run: |
+          # --no-header keeps the summary line parseable; -p no:cacheprovider
+          # avoids a stale cache masking collection. The grep guard fails the
+          # step when the run collected/ran nothing but skips (e.g. every test
+          # skipped despite a reachable service), so an all-skipped run cannot
+          # green this required gate.
+          set -o pipefail
           uv run -- python -m pytest tests/integration/platforms/test_postgresql_live.py \
-            -m "live_postgresql" --tb=short -v
+            -m "live_postgresql" --tb=short -v -p no:cacheprovider \
+            | tee /tmp/pg_live_output.txt
+          if ! grep -Eq '[0-9]+ passed' /tmp/pg_live_output.txt; then
+            echo "::error::PostgreSQL live integration tests produced no passing tests (all skipped or none collected); refusing to pass the gate."
+            exit 1
+          fi
 
   integration:
     runs-on: ubuntu-latest

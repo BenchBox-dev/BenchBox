@@ -151,6 +151,17 @@ class StarburstAdapter(TrinoAdapter):
     def platform_name(self) -> str:
         return "Starburst"
 
+    def get_query_plan_parser(self):
+        """Return the shared Presto/Trino parser stamped as ``starburst``.
+
+        Starburst inherits Trino's ``platform_key`` (for credential lookup), so the
+        concrete plan-capture platform name is supplied explicitly here rather than
+        recording captured plans under ``trino``.
+        """
+        from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
+
+        return PrestoTrinoQueryPlanParser(platform_name="starburst")
+
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get Starburst Galaxy platform information.
 
