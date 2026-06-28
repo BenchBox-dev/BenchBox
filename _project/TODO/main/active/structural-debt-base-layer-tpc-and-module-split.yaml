@@ -50,7 +50,7 @@ work:
 
 - id: w2
   summary: "Split cross_surface.py: extract per-benchmark builders, share the empty-table guard"
-  status: pending
+  status: done
   needs: []
   notes: |
     Extract the six build_*_duckdb builders into per-benchmark modules and route
