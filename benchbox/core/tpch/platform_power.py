@@ -150,7 +150,7 @@ def execute_tpch_power_test(
                 console.print(
                     f"  Queries executed: {power_test_result.queries_executed}, Successful: {power_test_result.queries_successful}"
                 )
-                console.print(f"  Success rate: {success_rate:.1%} (TPC-H requires >=95%)")
+                console.print(f"  Success rate: {success_rate:.1%} (TPC-H requires ≥95%)")
                 console.print(f"  Total execution time: {power_test_result.total_time:.2f}s")
             else:
                 console.print("[red]❌ TPC-H Power Test failed[/red]")
