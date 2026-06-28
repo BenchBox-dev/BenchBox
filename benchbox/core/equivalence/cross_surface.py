@@ -166,12 +166,10 @@ def _final_key_tied_beyond_limit(
     single-visible-row final-group difference is an equally-valid boundary pick; if
     not (or there is no row past the cutoff), the final row is deterministic.
 
-    Returns False on any condition that makes the probe unsound, unnecessary, or
-    impossible - an empty reference, an out-of-range order key, a final tie group
-    that already spans >= 2 visible rows (accepted as a boundary swap without the
-    probe), an un-rewritable ``LIMIT``, or a probe-query failure - so the caller
-    keeps the strict default and the worst case is a (loud, recoverable) caught
-    mismatch, never a masked bug.
+    Returns False on any condition that makes the probe unsound or impossible - an
+    empty reference, an out-of-range order key, an un-rewritable ``LIMIT``, or a
+    probe-query failure - so the caller keeps the strict default and the worst case
+    is a (loud, recoverable) caught mismatch, never a masked bug.
     """
     if not reference or not order_by:
         return False
@@ -179,13 +177,7 @@ def _final_key_tied_beyond_limit(
     width = len(reference[-1])
     if any(c < 0 or c >= width for c in order_by):
         return False
-    # The order-aware relaxation reads this probe ONLY for a single-visible-row final
-    # tie group; a final group that already spans >= 2 rows is accepted as a boundary
-    # swap without it. So when the reference's own final group is already >= 2 rows,
-    # the result would be ignored - skip the extra LIMIT n+1 query entirely.
     final_key = tuple(reference[-1][c] for c in order_by)
-    if n >= 2 and tuple(reference[-2][c] for c in order_by) == final_key:
-        return False
     probe_sql = _bump_trailing_limit(sql)
     if probe_sql is None:
         return False

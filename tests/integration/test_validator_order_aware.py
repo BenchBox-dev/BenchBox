@@ -89,7 +89,45 @@ def test_order_aware_truncated_limit_boundary_swap_is_not_flagged():
     variant = [(9, "x"), (5, "a"), (5, "c")]
     order_by = [0]
     assert validator.validate_results_exact(
-        reference, variant, 3, 1, order_aware=True, order_by=order_by, tie_aware=True
+        reference,
+        variant,
+        3,
+        1,
+        order_aware=True,
+        order_by=order_by,
+        tie_aware=True,
+        final_key_tied_beyond_limit=True,
+    )
+
+
+def test_order_aware_complete_final_tie_group_value_bug_is_caught():
+    """A complete multi-row final tie must match; row count alone is not enough."""
+    validator = _validator()
+    # ORDER BY col0 DESC LIMIT 3 over exactly these three rows. The final key 5 is
+    # tied in the visible result, but no key-5 row exists beyond the LIMIT, so this
+    # is a complete final tie group. A different tied member is a real value bug.
+    reference = [(9, "x"), (5, "a"), (5, "b")]
+    bug = [(9, "x"), (5, "a"), (5, "c")]
+    order_by = [0]
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(reference, bug, 3, 1, order_aware=True, order_by=order_by, tie_aware=True)
+
+
+def test_order_aware_complete_final_tie_group_accepts_only_with_probe():
+    """The same multi-row final tie swap is accepted only when the probe proves truncation."""
+    validator = _validator()
+    reference = [(9, "x"), (5, "a"), (5, "b")]
+    variant = [(9, "x"), (5, "a"), (5, "c")]
+    order_by = [0]
+    assert validator.validate_results_exact(
+        reference,
+        variant,
+        3,
+        1,
+        order_aware=True,
+        order_by=order_by,
+        tie_aware=True,
+        final_key_tied_beyond_limit=True,
     )
 
 
