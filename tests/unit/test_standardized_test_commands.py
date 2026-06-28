@@ -12,7 +12,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-from benchbox.core.equivalence.cross_surface import GATES
 from tests.integration.test_local_platform_benchmark_matrix import (
     LOCAL_SQL_STABLE_MATRIX,
     _validate_against_expected_results,
@@ -409,6 +408,8 @@ class TestMakefileCommands:
         gates. Deriving this guard from that registry keeps the Make/CI surface
         from silently drifting when a new benchmark graduates into GATES.
         """
+        from benchbox.core.equivalence.cross_surface import GATES
+
         repo_root = Path.cwd()
         makefile_content = (repo_root / "Makefile").read_text()
         correctness_gate_run_text = _workflow_job_run_text(
