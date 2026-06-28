@@ -53,7 +53,7 @@ work:
 
 - id: w2
   summary: "Bound the capture timeout thread so it cannot corrupt subsequent captures"
-  status: pending
+  status: done
   needs: []
   notes: |
     Add a test reproducing back-to-back captures where the first times out, then
