@@ -464,6 +464,9 @@ def run_sweep(  # noqa: C901
                     len(getattr(execute_outcome, "compatibility_pruned", ())) if execute_outcome else 0
                 ),
                 early_stop_pruned_count=(len(getattr(execute_outcome, "pruned", ())) if execute_outcome else 0),
+                skipped_unreachable_count=(
+                    len(getattr(execute_outcome, "skipped_unreachable", ())) if execute_outcome else 0
+                ),
                 source_info=source_info,
             )
             phase_exit_codes[phase] = summary.exit_code()
@@ -511,6 +514,9 @@ def _emit_abort_artifacts(
         cross_scale_floor=config.report.cross_scale_coverage_min_pairs,
         compatibility_pruned_count=len(compatibility_pruned),
         early_stop_pruned_count=early_stop_pruned_count,
+        skipped_unreachable_count=len(getattr(execute_outcome, "skipped_unreachable", ()))
+        if execute_outcome is not None
+        else 0,
         source_info=source_info,
         run_status="ABORTED",
         abort_phase=aborted_phase,
