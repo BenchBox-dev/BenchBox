@@ -207,9 +207,7 @@ def test_download_publishes_atomically_dest_never_partial(tmp_path: Path) -> Non
                 # Mid-stream the final path must not exist yet, but a
                 # process-unique .part temp must.
                 seen_dest_during_stream.append(dest.exists())
-                part_seen_during_stream.append(
-                    any(p.name.endswith(".part") for p in tmp_path.iterdir())
-                )
+                part_seen_during_stream.append(any(p.name.endswith(".part") for p in tmp_path.iterdir()))
                 yield self._body[i : i + chunk_size]
 
     sess = _Session([_Observing(200, full)])
