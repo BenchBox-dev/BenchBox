@@ -2,7 +2,7 @@ id: structural-debt-base-layer-tpc-and-module-split
 title: "Structural debt: extract TPC harnesses out of platforms/base/execution.py and split the cross_surface god-module"
 worktree: main
 priority: Low
-status: In Progress
+status: Completed
 category: Code Quality and Technical Debt
 
 description: |
@@ -85,4 +85,5 @@ metadata:
   tags: [technical-debt, refactor, architecture, bus-factor]
   estimated_effort: "Large"
   created_date: "2026-06-28"
+  completed_date: "2026-06-28"
   last_updated: "2026-06-28T00:00:00"
