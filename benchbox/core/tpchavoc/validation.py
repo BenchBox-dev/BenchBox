@@ -403,20 +403,30 @@ class ResultValidator:
         caller would otherwise mislabel as an execution ``error:`` rather than a
         clean MISMATCH).
 
-        Delegates to the module-level :func:`_row_sort_key` so the comparator and
-        the value-digest primitive (:func:`calculate_checksum`) share exactly one
-        sort definition.
+        When ``treat_nan_as_null`` is set this routes through :meth:`_cell_sort_key`
+        so a float ``NaN`` sorts into the SAME bucket as ``None`` - otherwise the
+        sort would pair a NULL row against a non-NaN candidate and a NaN row against
+        a different one, turning two rows that :meth:`_values_equal` deems equal into
+        a spurious value MISMATCH. With the flag off it delegates to the module-level
+        :func:`_row_sort_key` so the comparator and the value-digest primitive
+        (:func:`calculate_checksum`) share exactly one sort definition.
         """
+        if self.treat_nan_as_null:
+            return tuple(self._cell_sort_key(value) for value in row)
         return _row_sort_key(row)
 
-    @staticmethod
-    def _cell_sort_key(value: Any) -> tuple[Any, ...]:
+    def _cell_sort_key(self, value: Any) -> tuple[Any, ...]:
         """A None-safe, type-safe sort surrogate for one cell (see _row_sort_key).
 
-        Thin wrapper over the module-level :func:`_cell_sort_key`; ``bool`` folds
-        into the numeric bucket so it sorts CONSISTENTLY with :meth:`_values_equal`
-        (``True == 1``).
+        Wraps the module-level :func:`_cell_sort_key` (``bool`` folds into the
+        numeric bucket so it sorts CONSISTENTLY with :meth:`_values_equal`, where
+        ``True == 1``). When ``treat_nan_as_null`` is set a float ``NaN`` is mapped
+        to the ``None`` surrogate so it sorts ALONGSIDE SQL NULL - mirroring the
+        NaN-as-NULL widening :meth:`_values_equal` applies, so equivalent NULL/NaN
+        rows pair up under the positional sort instead of mismatching.
         """
+        if self.treat_nan_as_null and isinstance(value, float) and math.isnan(value):
+            return _cell_sort_key(None)
         return _cell_sort_key(value)
 
     def _first_positional_mismatch(

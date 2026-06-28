@@ -215,6 +215,26 @@ def test_validate_results_exact_reports_nan_null_and_whitespace_divergences() ->
     assert widened.validate_results_exact([(None,), ("foo",)], [(float("nan"),), ("foo ",)], 6, 3)
 
 
+def test_treat_nan_as_null_sorts_nan_into_null_bucket_so_rows_pair() -> None:
+    """The positional comparator sorts both sides before pairing rows. The NaN-as-NULL
+    widening only helps if the sort agrees: a reference NULL row and a candidate NaN
+    row must land in the SAME ordinal position. Without normalizing the sort key, NaN
+    sorts in the numeric bucket while NULL sorts first, so the rows below pair NULL vs
+    a numeric value and raise a spurious mismatch despite the flag."""
+    widened = ResultValidator(treat_nan_as_null=True)
+
+    reference = [(None, "a"), (2, "b")]
+    candidate = [(2, "b"), (float("nan"), "a")]
+
+    # The sort surrogate maps NaN to the None bucket so both lists order identically.
+    assert widened._row_sort_key((float("nan"), "a")) == widened._row_sort_key((None, "a"))
+    assert widened.validate_results_exact(reference, candidate, query_id=7, variant_id=1)
+
+    # Strict mode leaves NaN in the numeric bucket (distinct from the None bucket).
+    strict = ResultValidator()
+    assert strict._row_sort_key((float("nan"), "a")) != strict._row_sort_key((None, "a"))
+
+
 def test_container_values_compared_elementwise_with_tolerance() -> None:
     """List/struct/map cells recurse so float tolerance + Decimal coercion apply
     INSIDE containers (a DECIMAL array from DuckDB vs the same array as float64
