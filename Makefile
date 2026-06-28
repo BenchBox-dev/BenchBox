@@ -1118,13 +1118,15 @@ pr-content-guard:
 		echo "No docs paths changed."; \
 	fi
 
-# Push current branch and open a PR against develop with auto-merge enabled.
+# Push current branch and open a PR against develop with auto-merge enabled
+# unless the diff touches soundness-critical comparator/plan-parser paths.
 # Squash-merge happens automatically once `lint` + `test (ubuntu-latest, 3.12)`
 # go green. Refuses to run from develop/main.
 #
 # Idempotent: safe to rerun. If a PR is already open for the branch, reuses it
-# and just (re)enables auto-merge — useful after a partial run, or to flip
-# auto-merge on for a PR opened via `gh pr create` directly.
+# and just (re)enables auto-merge when the soundness-path review gate does not
+# apply — useful after a partial run, or to flip auto-merge on for a PR opened
+# via `gh pr create` directly.
 #
 # Pre-push warning: runs `git merge-tree` against every other open PR head
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
@@ -1139,6 +1141,7 @@ pr-open:
 		echo "PR_BODY_FILE does not exist: $(PR_BODY_FILE)" >&2; \
 		exit 1; \
 	fi; \
+	git fetch origin develop --quiet; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
 	URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
@@ -1155,7 +1158,12 @@ pr-open:
 		fi; \
 	fi && \
 	echo "$$URL" && \
-	gh pr merge --auto --squash "$$URL"
+	SOUNDNESS_PATH=$$(git diff --name-only origin/develop...HEAD | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin); \
+	if [ "$$SOUNDNESS_PATH" = "true" ]; then \
+		echo "Soundness-critical paths changed; leaving auto-merge disabled pending review."; \
+	else \
+		gh pr merge --auto --squash "$$URL"; \
+	fi
 
 shrink-rollup:
 	@git fetch origin develop --quiet

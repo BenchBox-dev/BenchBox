@@ -176,6 +176,11 @@ make pr-open
 `pr-open` is idempotent: pushes, opens/reuses a PR to `develop`, and enables
 squash auto-merge when CI passes. Do not poll; post-merge safety opens a
 revert PR or incident issue if `develop` goes red.
+PRs touching `benchbox/core/**/validation.py`, `benchbox/core/equivalence/**`,
+or `benchbox/core/query_plans/parsers/**` are the exception: `pr-open` and the
+GitHub auto-merge backstop leave auto-merge disabled so Code Owner review can
+gate the merge. GitHub branch protection on `develop` must require Code Owner
+review for `.github/CODEOWNERS` to enforce that precondition.
 Run `make pr-preflight` and `make pr-open` through a low-effort subagent when
 the agent environment supports it.
 
