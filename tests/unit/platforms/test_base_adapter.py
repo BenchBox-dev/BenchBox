@@ -5,6 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import inspect
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -1873,6 +1874,14 @@ class TestBenchmarkIdentityInExecutionMetadata:
 
 class TestTPCExecutionRouting:
     """Exercise benchmark-family routing for specialized TPC helpers."""
+
+    def test_power_dispatch_path_has_no_literal_tpc_benchmark_names(self):
+        from benchbox.platforms.base.execution import TestDriversMixin
+
+        source = inspect.getsource(TestDriversMixin._execute_power_test)
+
+        assert '"tpch"' not in source
+        assert '"tpcds"' not in source
 
     def test_execute_power_test_routes_tpch_via_run_config_benchmark_name(self):
         # Routing now reads benchmark_name from run_config, not display_name sniffing.
