@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from benchbox.core.metadata_primitives.complexity import TypeComplexity
+from benchbox.sql_compat.ddl_capabilities import get_metadata_ddl_capabilities
 
 
 @dataclass
@@ -292,8 +293,8 @@ def generate_wide_table_columns(
                 nullable=True,
             )
         )
-        # Add map column (some platforms don't support)
-        if dialect.lower() not in ("snowflake", "bigquery"):
+        # Add map column when the dialect capability table says it is renderable.
+        if get_metadata_ddl_capabilities(dialect).supports_map_columns:
             columns.append(
                 ColumnDefinition(
                     name="col_map",
@@ -346,21 +347,19 @@ def generate_create_table_sql(
         if col.primary_key:
             pk_columns.append(col.name)
 
-    # Add primary key constraint if applicable
-    # Skip for ClickHouse (different PK syntax) and Doris (OLAP table model handles keys)
-    if pk_columns and dialect.lower() not in ("clickhouse", "doris"):
+    capabilities = get_metadata_ddl_capabilities(dialect)
+
+    # Add primary key constraint if applicable.
+    if pk_columns and capabilities.supports_primary_key_clause:
         pk_constraint = f"    PRIMARY KEY ({', '.join(pk_columns)})"
         col_defs.append(pk_constraint)
 
     parts.append(",\n".join(col_defs))
     parts.append(")")
 
-    # ClickHouse-specific engine clause
-    if dialect.lower() == "clickhouse":
-        if pk_columns:
-            parts.append(f" ENGINE = MergeTree() ORDER BY ({', '.join(pk_columns)})")
-        else:
-            parts.append(" ENGINE = MergeTree() ORDER BY tuple()")
+    if capabilities.table_engine_clause_template:
+        order_by = ", ".join(pk_columns) if pk_columns else capabilities.table_engine_empty_order_by
+        parts.append(capabilities.table_engine_clause_template.format(order_by=order_by))
 
     return "\n".join(parts) + ";"
 
@@ -386,25 +385,9 @@ def generate_create_view_sql(
     else:
         full_name = view_def.name
 
-    # Handle dialect-specific CREATE VIEW syntax
-    if dialect.lower() == "bigquery":
-        # BigQuery uses CREATE OR REPLACE VIEW
-        if or_replace:
-            return f"CREATE OR REPLACE VIEW {full_name} AS\n{view_def.source_sql};"
-        else:
-            return f"CREATE VIEW IF NOT EXISTS {full_name} AS\n{view_def.source_sql};"
-    elif dialect.lower() == "clickhouse":
-        # ClickHouse views
-        if or_replace:
-            return f"CREATE OR REPLACE VIEW {full_name} AS\n{view_def.source_sql};"
-        else:
-            return f"CREATE VIEW IF NOT EXISTS {full_name} AS\n{view_def.source_sql};"
-    else:
-        # Standard SQL / DuckDB / Snowflake / Databricks
-        if or_replace:
-            return f"CREATE OR REPLACE VIEW {full_name} AS\n{view_def.source_sql};"
-        else:
-            return f"CREATE VIEW IF NOT EXISTS {full_name} AS\n{view_def.source_sql};"
+    capabilities = get_metadata_ddl_capabilities(dialect)
+    prefix = capabilities.create_or_replace_view_prefix if or_replace else capabilities.create_view_if_not_exists_prefix
+    return f"{prefix} {full_name} AS\n{view_def.source_sql};"
 
 
 def generate_drop_table_sql(
@@ -528,8 +511,7 @@ def supports_complex_types(dialect: str) -> bool:
     Returns:
         True if complex types are supported
     """
-    # All modern platforms support some form of complex types
-    return dialect.lower() in ("duckdb", "snowflake", "bigquery", "clickhouse", "databricks")
+    return get_metadata_ddl_capabilities(dialect).supports_complex_types
 
 
 def supports_views(dialect: str) -> bool:
@@ -541,10 +523,7 @@ def supports_views(dialect: str) -> bool:
     Returns:
         True if views are queryable via INFORMATION_SCHEMA
     """
-    # ClickHouse has limited view support in metadata
-    if dialect.lower() == "clickhouse":
-        return False
-    return True
+    return get_metadata_ddl_capabilities(dialect).supports_views
 
 
 def supports_foreign_keys(dialect: str) -> bool:
@@ -556,10 +535,7 @@ def supports_foreign_keys(dialect: str) -> bool:
     Returns:
         True if FK constraints are supported
     """
-    # BigQuery and ClickHouse don't support traditional FKs
-    if dialect.lower() in ("bigquery", "clickhouse"):
-        return False
-    return True
+    return get_metadata_ddl_capabilities(dialect).supports_foreign_keys
 
 
 # =============================================================================
