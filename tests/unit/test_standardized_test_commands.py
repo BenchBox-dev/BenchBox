@@ -35,6 +35,10 @@ def _makefile_target_body(makefile_content: str, target_name: str) -> str:
     return match.group("body")
 
 
+def _cross_surface_make_target(gate_name: str) -> str:
+    return f"{gate_name.replace('_', '-')}-cross-surface-equivalence-report"
+
+
 def _workflow_job_run_text(workflow_path: Path, job_name: str) -> str:
     workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
     steps = workflow["jobs"][job_name]["steps"]
@@ -396,6 +400,40 @@ class TestMakefileCommands:
             "make coffeeshop-cross-surface-equivalence-report",
         ):
             assert target in run_text, f"required correctness-gate job missing value-level step: {target}"
+
+    def test_cross_surface_gates_are_pinned_in_make_and_ci(self):
+        """Every enforced cross-surface gate must have a Make target and CI step.
+
+        ``cross_surface.GATES`` is the source of truth for blocking equivalence
+        gates. Deriving this guard from that registry keeps the Make/CI surface
+        from silently drifting when a new benchmark graduates into GATES.
+        """
+        from benchbox.core.equivalence.cross_surface import GATES
+
+        repo_root = Path.cwd()
+        makefile_content = (repo_root / "Makefile").read_text()
+        correctness_gate_run_text = _workflow_job_run_text(
+            repo_root / ".github" / "workflows" / "pr.yml",
+            "correctness-gate",
+        )
+        missing_make_targets: list[str] = []
+        missing_ci_steps: list[str] = []
+
+        for gate_name in sorted(GATES):
+            target = _cross_surface_make_target(gate_name)
+            try:
+                body = _makefile_target_body(makefile_content, target)
+            except AssertionError:
+                missing_make_targets.append(target)
+            else:
+                assert f"--benchmark {gate_name}" in body, (
+                    f"Make target {target} must invoke the matching cross_surface benchmark {gate_name!r}"
+                )
+            if f"make {target}" not in correctness_gate_run_text:
+                missing_ci_steps.append(f"make {target}")
+
+        assert not missing_make_targets, f"GATES entries missing Make targets: {missing_make_targets}"
+        assert not missing_ci_steps, f"GATES entries missing correctness-gate CI steps: {missing_ci_steps}"
 
     def test_main_release_required_includes_bounded_correctness_gate(self):
         repo_root = Path.cwd()

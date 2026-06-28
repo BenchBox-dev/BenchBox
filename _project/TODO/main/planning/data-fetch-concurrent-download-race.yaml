@@ -2,7 +2,7 @@ id: data-fetch-concurrent-download-race
 title: "Make real-data archive downloads safe under concurrent fetch_data callers"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Under Review
 category: Testing and Quality Assurance
 
 description: |
@@ -24,39 +24,39 @@ description: |
   follow-up instead of fixing it inline.
 
 work:
-  - id: w1
-    summary: "Add a per-archive interprocess lock around download/extract verification"
-    status: pending
-    notes: |
-      Use an existing project locking pattern if one exists. The lock should
-      cover the check-download-verify handoff so a second process reuses the
-      verified archive after the first completes.
+- id: w1
+  summary: "Add a per-archive interprocess lock around download/extract verification"
+  status: done
+  notes: |
+    Use an existing project locking pattern if one exists. The lock should
+    cover the check-download-verify handoff so a second process reuses the
+    verified archive after the first completes.
 
-  - id: w2
-    summary: "Download to a process-unique temp file and atomically replace the archive only after checksum verification"
-    status: pending
-    needs: [w1]
-    notes: |
-      Avoid writing directly to the shared final path. Preserve the current
-      checksum failure diagnostics.
+- id: w2
+  summary: "Download to a process-unique temp file and atomically replace the archive only after checksum verification"
+  status: done
+  needs: [w1]
+  notes: |
+    Avoid writing directly to the shared final path. Preserve the current
+    checksum failure diagnostics.
 
-  - id: w3
-    summary: "Add concurrency tests for two fetch_data callers targeting the same missing archive"
-    status: pending
-    needs: [w1, w2]
-    notes: |
-      Tests should prove one completed archive is reused and no caller observes
-      a partially written final archive.
+- id: w3
+  summary: "Add concurrency tests for two fetch_data callers targeting the same missing archive"
+  status: done
+  needs: [w1, w2]
+  notes: |
+    Tests should prove one completed archive is reused and no caller observes
+    a partially written final archive.
 
 prior_art:
-  - "benchbox/core/data_fetch/manager.py:fetch_data — current archive path resolution and checksum verification path to extend"
-  - "benchbox/core/data_fetch/downloader.py:download — current direct-to-destination streaming implementation to harden"
-  - "tests/conftest.py test lock — existing interprocess lock pattern to consider before adding a new dependency"
+- "benchbox/core/data_fetch/manager.py:fetch_data — current archive path resolution and checksum verification path to extend"
+- "benchbox/core/data_fetch/downloader.py:download — current direct-to-destination streaming implementation to harden"
+- "tests/conftest.py test lock — existing interprocess lock pattern to consider before adding a new dependency"
 
 must_preserve:
-  - "Existing checksum mismatch errors keep surfacing expected and actual sha256 values"
-  - "Pre-populated verified table files still skip network access"
-  - "Downloader test seams remain mockable without live network access"
+- "Existing checksum mismatch errors keep surfacing expected and actual sha256 values"
+- "Pre-populated verified table files still skip network access"
+- "Downloader test seams remain mockable without live network access"
 
 approach: |
   First make the critical section explicit: only one process should decide and
@@ -66,24 +66,24 @@ approach: |
   `data_fetch`, not JoinOrder-specific.
 
 anti_patterns:
-  - "DO NOT fix this only in joinorder — data_fetch is shared by future real-data benchmarks"
-  - "DO NOT write directly to the shared final archive path from multiple processes"
-  - "DO NOT remove checksum verification to make concurrent downloads appear to pass"
+- "DO NOT fix this only in joinorder — data_fetch is shared by future real-data benchmarks"
+- "DO NOT write directly to the shared final archive path from multiple processes"
+- "DO NOT remove checksum verification to make concurrent downloads appear to pass"
 
 verification:
-  - description: "Concurrent fetch_data callers cannot corrupt the final archive"
-    command: "uv run -- python -m pytest tests/unit/core/data_fetch -q"
-    expected_output: "data_fetch concurrency tests pass"
+- description: "Concurrent fetch_data callers cannot corrupt the final archive"
+  command: "uv run -- python -m pytest tests/unit/core/data_fetch -q"
+  expected_output: "data_fetch concurrency tests pass"
 
 scope_limit:
   only_modify:
-    - "benchbox/core/data_fetch/"
-    - "tests/unit/core/data_fetch/"
+  - "benchbox/core/data_fetch/"
+  - "tests/unit/core/data_fetch/"
 
 metadata:
   tags:
-    - data-fetch
-    - concurrency
-    - joinorder
-    - issue-289
+  - data-fetch
+  - concurrency
+  - joinorder
+  - issue-289
   created_date: "2026-05-12"

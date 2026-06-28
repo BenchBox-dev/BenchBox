@@ -276,21 +276,10 @@ class ResultValidator:
           3. The FINAL tie group may be truncated by a trailing ``LIMIT`` that
              cuts across the tie, so when ``tie_aware`` is set its membership is
              allowed to differ as an ambiguous boundary swap - but ONLY when the
-             group is genuinely a tie at the cutoff, not a deterministic last row:
-               * >= 2 visible rows share the final order key, so a real tie is
-                 present in the result and a membership swap among them is an
-                 equally-valid boundary pick; OR
-               * exactly ONE visible row remains, but ``final_key_tied_beyond_limit``
-                 (the caller's boundary-tie probe) confirms the final key genuinely
-                 ties PAST the ``LIMIT`` cutoff, so the lone row is one arbitrary
-                 pick among rows tied at the worst-kept key.
-             A single visible row whose key does NOT tie beyond the cutoff is a
-             deterministic last row: a difference there is a real value change
-             (e.g. ``(2,"good")`` vs ``(2,"bad")``) and is still CAUGHT. This is
-             sound because the group is keyed by the ACTUAL ``ORDER BY`` value and
-             the total row count already matched, so an accepted difference can only
-             be an equally-valid tie pick across the cutoff - not a reordering of
-             distinct order-key values.
+             caller's boundary-tie probe (``final_key_tied_beyond_limit``)
+             confirms the final order-key value recurs PAST the ``LIMIT`` cutoff.
+             Without that evidence the final group is complete or unproven, so a
+             membership difference is a real value change and is still CAUGHT.
 
         Raises ``ValidationError`` on the first divergence, mirroring the strict
         path's contract.
@@ -326,27 +315,13 @@ class ResultValidator:
             if self._multisets_equal(orig_rows, var_rows):
                 continue
             # The FINAL group under a trailing LIMIT can be a truncated boundary
-            # tie: all its rows share the order key (that is what defines the group)
-            # and the total row count already matched, so a membership difference can
-            # be an equally-valid tie pick across the cutoff. Accept it ONLY when the
-            # group is genuinely a tie at the boundary, not a deterministic last row:
-            #   * >= 2 visible rows share the final key (a real tie is present in the
-            #     result, so a swap among them is an ambiguous boundary pick), OR
-            #   * exactly one visible row but the caller's boundary-tie probe says
-            #     that key ties PAST the LIMIT (final_key_tied_beyond_limit).
-            # A single visible row whose key does NOT tie beyond the cutoff is
-            # deterministic, so a difference there (e.g. (2,"good") vs (2,"bad")) is a
-            # real value change and falls through to be CAUGHT below. This is sound
-            # because the group is keyed by the actual ORDER BY value, so a
-            # genuinely-ordered row is never mistaken for a boundary tie. Earlier
-            # groups are complete windows and must match as multisets, so a value bug
-            # there is still caught. (Residual limitation, inherited from the #872/#878
-            # design: the >= 2 branch accepts a final-group multiset difference even
-            # when the LIMIT did not truncate that tie - e.g. a complete, table-
-            # exhausted final group. The boundary-tie probe only refines the
-            # single-visible-row case it was scoped to; it is NOT the order-blind
-            # path's stronger boundary-value+extreme proof.)
-            if i == last_index and tie_aware and (len(orig_rows) >= 2 or final_key_tied_beyond_limit):
+            # tie. Accept a membership difference there only when the caller's
+            # bounded LIMIT n+1 probe proves the final order-key value recurs past
+            # the cutoff. This proof is required for both a one-row visible final
+            # group and a multi-row visible final group: without a row beyond the
+            # cutoff, the final tie is complete and a different member is a value
+            # bug, not an ambiguous top-N pick.
+            if i == last_index and tie_aware and final_key_tied_beyond_limit:
                 continue
             detail = self._first_positional_mismatch(
                 sorted(orig_rows, key=self._row_sort_key),

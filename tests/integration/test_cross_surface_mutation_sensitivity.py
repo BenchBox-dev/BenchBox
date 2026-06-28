@@ -36,9 +36,10 @@ comparator (see :func:`_mutate_rows`):
 The caught-vs-uncaught matrix this suite asserts is recorded as committed
 evidence in ``_project/analysis/cross-surface-mutation-sensitivity.md``.
 
-These tests build one bounded SF=0.1 DuckDB cell per benchmark (the same cell the
-gates use) and are marked ``slow``; the heavier benchmarks (amplab, clickbench)
-generate large data, so the whole suite is opt-in via ``-m slow``.
+These tests build one bounded DuckDB cell per benchmark at each gate's declared
+scale factor (the same cell the gates use) and are marked ``slow``; the heavier
+benchmarks (amplab, clickbench) generate large data, so the whole suite is opt-in
+via ``-m slow``.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -103,6 +104,8 @@ _TARGETS: dict[str, str] = {
     "coffeeshop": "SA1",  # 93 rows x 5 cols, ORDER BY + GROUP BY (hand-written impls)
     "clickbench": "Q8",  # 20 rows x 2 cols, GROUP BY + ORDER BY, no LIMIT (strict path)
     "joinorder_synthetic": "4a",  # 1 row x 2 non-NULL string cols (single-row caveat)
+    "h2odb": "Q6",  # multiple rows x 4 cols, GROUP BY + ORDER BY at _H2ODB_SCALE
+    "read_primitives": "orderby_bigint",  # many rows x 2 cols, GROUP BY + ORDER BY at _READ_PRIMITIVES_SCALE
 }
 
 
@@ -266,8 +269,10 @@ class _GateCell:
 def _build_gate_cell(gate_name: str, tmp_path: Any) -> _GateCell:
     """Build one benchmark's bounded cell and capture the target's reference count."""
     gate = GATES[gate_name]
-    data = gate.build(EQUIVALENCE_SCALE, tmp_path)
-    contexts = build_production_contexts(data.benchmark, data.data_dir, backends=gate.backends)
+    data = gate.build(gate.scale_factor, tmp_path)
+    contexts = build_production_contexts(
+        data.benchmark, data.data_dir, backends=gate.backends, scale_factor=gate.scale_factor
+    )
     reference_row_count = len(fetch_reference_rows(data.connection, data.reference_sql(_TARGETS[gate_name])))
     return _GateCell(gate_name=gate_name, data=data, contexts=contexts, reference_row_count=reference_row_count)
 
@@ -357,7 +362,7 @@ def test_unmutated_target_is_green(gate_cell: _GateCell) -> None:
     minimum = 1 if gate_name == "joinorder_synthetic" else 2
     assert gate_cell.reference_row_count >= minimum, (
         f"{gate_name} target {target} returned {gate_cell.reference_row_count} reference row(s) "
-        f"at SF={EQUIVALENCE_SCALE}; a vacuous/too-small target would make 'not caught' results a "
+        f"at SF={GATES[gate_name].scale_factor}; a vacuous/too-small target would make 'not caught' results a "
         f"BS3 artifact - pick a discriminating target."
     )
 

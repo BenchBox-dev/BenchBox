@@ -257,6 +257,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         has_header: bool = True,
         column_names: list[str] | None = None,
         null_marker: str | None = None,
+        string_columns: list[str] | None = None,
     ) -> PolarsLazyDF:
         """Read a CSV file into a Polars LazyFrame.
 
@@ -269,6 +270,8 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
                 stay '' in string columns (match DuckDB/pandas); ``""`` means empty
                 fields are NULL. (Trailing delimiters are handled natively by
                 truncate_ragged_lines.)
+            string_columns: Accepted for expression-family parity; Polars applies
+                this via ``missing_utf8_is_empty_string`` for UTF-8 columns.
 
         Returns:
             Polars LazyFrame with the file contents

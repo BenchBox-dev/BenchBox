@@ -136,10 +136,12 @@ def test_tie_aware_only_applies_to_truncated_top_n_queries():
     )
     assert [d.key for d in strict] == ["Q1_expression"], "non-LIMIT swap must be reported, not masked"
 
-    # Same swap under an ORDER BY ... LIMIT query: accepted as a boundary tie.
+    # Same swap under an ORDER BY ... LIMIT query with the final key tied past the
+    # cutoff: accepted as a boundary tie.
     connection, reference_sql, dataframe_query, contexts = _make_inputs(
         ref, {"expression": swapped}, sql="SELECT a, c FROM t ORDER BY c DESC LIMIT 3"
     )
+    connection._rows_by_sql["SELECT a, c FROM t ORDER BY c DESC LIMIT 4"] = [(1, 5), (2, 3), (3, 3), (4, 3)]
     relaxed = find_cross_surface_divergences(
         connection,
         query_ids=["Q1"],
@@ -198,6 +200,46 @@ def test_final_key_tied_beyond_limit_false_when_next_row_is_a_distinct_key():
     connection = _FakeConnection({"SELECT a, b FROM t ORDER BY a DESC LIMIT 3": [(10, "x"), (5, "a"), (3, "c")]})
     reference = [(10, "x"), (5, "a")]
     assert _final_key_tied_beyond_limit(connection, sql, [0], reference) is False
+
+
+def test_final_key_tied_beyond_limit_checks_multi_row_final_group():
+    """A visible multi-row final tie still needs the LIMIT n+1 probe."""
+    sql = "SELECT a, b FROM t ORDER BY a DESC LIMIT 3"
+    connection = _FakeConnection(
+        {"SELECT a, b FROM t ORDER BY a DESC LIMIT 4": [(10, "x"), (5, "a"), (5, "b"), (5, "c")]}
+    )
+    reference = [(10, "x"), (5, "a"), (5, "b")]
+    assert _final_key_tied_beyond_limit(connection, sql, [0], reference) is True
+
+
+def test_multi_row_complete_final_tie_value_bug_is_caught_via_probe():
+    """End-to-end: complete multi-row final ties cannot hide value divergence."""
+    sql = "SELECT a, b FROM t ORDER BY a DESC LIMIT 3"
+    reference = [(10, "x"), (5, "a"), (5, "b")]
+    candidate = [(10, "x"), (5, "a"), (5, "bad")]
+    connection = _FakeConnection(
+        {
+            sql: reference,
+            "SELECT a, b FROM t ORDER BY a DESC LIMIT 4": reference,
+        }
+    )
+
+    def reference_sql(_qid):
+        return sql
+
+    def dataframe_query(_qid):
+        return _FakeQuery({"expression": lambda ctx: _FakeFrame(candidate)})
+
+    divergences = find_cross_surface_divergences(
+        connection,
+        query_ids=["Q1"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts={"expression": object()},
+        validator=ResultValidator(),
+        backends=("expression",),
+    )
+    assert [d.key for d in divergences] == ["Q1_expression"], "complete final tie divergence must be reported"
 
 
 def test_one_visible_row_boundary_tie_is_not_a_divergence_via_probe():
@@ -420,6 +462,62 @@ def test_report_with_real_divergence_still_fails_for_nonempty_query():
         legitimately_empty={},
     )
     assert exit_code == 1
+
+
+def test_known_divergence_baseline_fails_when_entry_is_resolved(capsys):
+    """A known-divergence entry must be removed once the live cell matches again."""
+    coverage = {"expression": 1, "pandas": 1}
+
+    exit_code = _report(
+        [],
+        total=2,
+        coverage=coverage,
+        known={"Q1_pandas": "documented test baseline"},
+        benchmark="fake",
+        reference_row_counts={"Q1": 5},
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert "GATE FAILURE - previously-known divergences now equivalent: ['Q1_pandas']" in out
+    assert "remove the stale baseline entry" in out
+
+
+def test_known_divergence_baseline_accepts_live_entry(capsys):
+    """A still-reproducing, baselined divergence remains accepted."""
+    coverage = {"expression": 1, "pandas": 1}
+
+    exit_code = _report(
+        [SurfaceDivergence("Q1", "pandas", "accepted mismatch")],
+        total=2,
+        coverage=coverage,
+        known={"Q1_pandas": "documented test baseline"},
+        benchmark="fake",
+        reference_row_counts={"Q1": 5},
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "[documented test baseline]" in out
+    assert "SQL and DataFrame surfaces are equivalent (modulo classified exceptions)." in out
+
+
+def test_known_divergence_baseline_does_not_hide_new_unclassified_divergence(capsys):
+    """An unlisted divergence is still a gate failure."""
+    coverage = {"expression": 1, "pandas": 1}
+
+    exit_code = _report(
+        [SurfaceDivergence("Q2", "pandas", "new mismatch")],
+        total=2,
+        coverage=coverage,
+        known={},
+        benchmark="fake",
+        reference_row_counts={"Q2": 5},
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert "GATE FAILURE - unclassified cross-surface divergences: ['Q2_pandas']" in out
 
 
 def test_clickbench_and_joinorder_are_enforced_gates():

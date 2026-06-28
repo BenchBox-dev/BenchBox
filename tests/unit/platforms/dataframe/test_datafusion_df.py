@@ -200,6 +200,52 @@ class TestDataFusionDataLoading:
         result = adapter.collect(df)
         assert result.num_rows == 2
 
+    def test_read_csv_headerless_with_schema_string_columns_does_not_raise(self, tmp_path):
+        """Headerless non-.tbl CSV with declared schema names.
+
+        ClickBench's generated hits.csv is written without a header and the
+        non-.tbl CSV path never applies `column_names`, so the frame columns
+        are DataFusion's inferred names (column_1, …). The empty-string
+        coalesce for declared `string_columns` must guard on the frame's
+        actual columns instead of calling col(<schema_name>) blindly, which
+        would raise and abort the load before any rows are counted.
+        """
+        adapter = DataFusionDataFrameAdapter()
+
+        csv_path = tmp_path / "hits.csv"
+        # Headerless: column_2 (the would-be string column) has an empty field.
+        csv_path.write_text("1,Alice\n2,\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            has_header=False,
+            null_marker=None,
+            # Declared benchmark schema name that is NOT a frame column.
+            string_columns=["url"],
+        )
+
+        result = adapter.collect(df)
+        assert result.num_rows == 2
+
+    def test_read_csv_coalesces_present_string_columns_to_empty(self, tmp_path):
+        """Columns that ARE present keep the empty-string coalesce contract."""
+        adapter = DataFusionDataFrameAdapter()
+
+        csv_path = tmp_path / "with_header.csv"
+        csv_path.write_text("id,name\n1,Alice\n2,\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            has_header=True,
+            null_marker=None,
+            string_columns=["name"],
+        )
+
+        result = adapter.collect(df)
+        names = result.column("name").to_pylist()
+        assert "" in names
+        assert None not in names
+
     def test_read_tbl_with_column_names(self, tmp_path):
         """Test reading TPC-style .tbl with trailing delimiter."""
         adapter = DataFusionDataFrameAdapter()

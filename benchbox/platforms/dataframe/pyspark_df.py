@@ -443,6 +443,7 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
         has_header: bool = True,
         column_names: list[str] | None = None,
         null_marker: str | None = None,
+        string_columns: list[str] | None = None,
     ) -> PySparkLazyDF:
         """Read a CSV file into a PySpark DataFrame.
 
@@ -452,6 +453,8 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
             null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
+            string_columns: Declared string columns whose empty CSV fields must
+                stay ``""`` when ``null_marker`` is ``None``.
 
         Returns:
             PySpark DataFrame with the file contents
@@ -472,6 +475,11 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
         else:
             # Let Spark infer schema
             df = reader.option("inferSchema", "true").csv(path_str)
+
+        if null_marker is None and string_columns:
+            present = [name for name in string_columns if name in df.columns]
+            if present:
+                df = df.fillna("", subset=present)
 
         return df
 

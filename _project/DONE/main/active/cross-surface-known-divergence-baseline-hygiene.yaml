@@ -2,8 +2,9 @@ id: cross-surface-known-divergence-baseline-hygiene
 title: "Fail (or force baseline update) when a known cross-surface divergence no longer reproduces"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
+completed_date: "2026-06-28"
 
 description: |
   Cross-surface gates carry classified known_divergences (e.g. ClickBench Q18's
@@ -30,7 +31,7 @@ prior_art:
 work:
   - id: w1
     summary: "Detect resolved-but-listed known divergences and fail (or require --update-baseline)"
-    status: pending
+    status: done
     needs: []
     notes: |
       In the gate runner, after comparison, check each known_divergences entry: if
@@ -43,7 +44,7 @@ work:
 
   - id: w2
     summary: "Test both directions: stale entry fails, live entry still accepted"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Add tests: (a) a known-divergence entry whose cell now matches fails the gate

@@ -23,6 +23,9 @@ REPORT_HEADER = (
     "submit_terminal_state\tvalidator_status\tsource_commit_sha\tsource_dirty"
 )
 
+_SKIPPED_STATUSES = frozenset({"skipped"})
+_UNREACHABLE_STATUSES = frozenset({"skipped-unreachable", "skipped_unreachable", "unreachable"})
+
 
 class SourceInfo(Protocol):
     commit_sha: str
@@ -38,6 +41,10 @@ class ReportSummary(PhaseResult):
     timeout_count: int
     candidate_count: int
     executed_count: int
+    attempted_count: int
+    skipped_count: int
+    unreachable_count: int
+    total_defined_count: int
     compatibility_pruned_count: int
     early_stop_pruned_count: int
     cross_scale_clean_pairs: int
@@ -71,6 +78,10 @@ def terminal_state(cell: CellResult) -> str:
     """Classify the terminal state visible in durable UAT artifacts."""
     if cell.status == "passed":
         return "passed"
+    if _is_skipped_status(cell.status):
+        return "skipped"
+    if _is_unreachable_status(cell.status):
+        return "unreachable"
     if cell.status == "timed-out" or cell.exit_code == 124:
         return "timeout"
     if cell.exit_code in {-9, 137}:
@@ -132,6 +143,7 @@ def write_report(
     validator_status_by_path: dict[Path, str] | None = None,
     compatibility_pruned_count: int = 0,
     early_stop_pruned_count: int = 0,
+    skipped_unreachable_count: int = 0,
     source_info: SourceInfo | None = None,
     run_status: str = "COMPLETED",
     abort_phase: str | None = None,
@@ -141,11 +153,17 @@ def write_report(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     rows = list(cells)
     executed_count = len(rows)
-    candidate_count = executed_count + compatibility_pruned_count + early_stop_pruned_count
 
     pass_count = sum(1 for r in rows if r.status == "passed")
     fail_count = sum(1 for r in rows if r.status == "failed")
     timeout_count = sum(1 for r in rows if r.status == "timed-out")
+    row_skipped_count = sum(1 for r in rows if _is_skipped_status(r.status))
+    row_unreachable_count = sum(1 for r in rows if _is_unreachable_status(r.status))
+    attempted_count = executed_count - row_skipped_count - row_unreachable_count
+    skipped_count = row_skipped_count + compatibility_pruned_count + early_stop_pruned_count
+    unreachable_count = row_unreachable_count + skipped_unreachable_count
+    total_defined_count = attempted_count + skipped_count + unreachable_count
+    candidate_count = total_defined_count
 
     with output_path.open("w", encoding="utf-8") as fh:
         fh.write(REPORT_HEADER + "\n")
@@ -163,10 +181,22 @@ def write_report(
             f"executed={executed_count} "
             f"compatibility_pruned={compatibility_pruned_count} "
             f"early_stop_pruned={early_stop_pruned_count} "
+            f"attempted={attempted_count} "
+            f"skipped={skipped_count} "
+            f"unreachable={unreachable_count} "
+            f"total_defined={total_defined_count} "
             f"passed={pass_count} "
             f"failed={fail_count} "
             f"timed_out={timeout_count}\n"
         )
+        fh.write(
+            "# "
+            f"release_accounting passed={pass_count} failed={fail_count} timed_out={timeout_count} "
+            f"attempted={attempted_count} skipped={skipped_count} unreachable={unreachable_count} "
+            f"total_defined={total_defined_count}\n"
+        )
+        if unreachable_count:
+            fh.write(f"# UNREACHABLE_CELLS={unreachable_count} release_gate_attention=required\n")
         footer = f"# run_status={run_status}"
         if source_info is not None:
             footer += f" source_commit_sha={source_info.commit_sha} source_dirty={str(source_info.dirty).lower()}"
@@ -192,6 +222,10 @@ def write_report(
         timeout_count=timeout_count,
         candidate_count=candidate_count,
         executed_count=executed_count,
+        attempted_count=attempted_count,
+        skipped_count=skipped_count,
+        unreachable_count=unreachable_count,
+        total_defined_count=total_defined_count,
         compatibility_pruned_count=compatibility_pruned_count,
         early_stop_pruned_count=early_stop_pruned_count,
         cross_scale_clean_pairs=clean_pairs,
@@ -204,6 +238,18 @@ def write_report(
 
 def _footer_value(value: str) -> str:
     return value.replace("\t", " ").replace("\n", " ")
+
+
+def _normalized_status(status: str) -> str:
+    return status.strip().lower()
+
+
+def _is_skipped_status(status: str) -> bool:
+    return _normalized_status(status) in _SKIPPED_STATUSES
+
+
+def _is_unreachable_status(status: str) -> bool:
+    return _normalized_status(status) in _UNREACHABLE_STATUSES
 
 
 # ---------------------------------------------------------------------------

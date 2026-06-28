@@ -155,23 +155,21 @@ def _final_key_tied_beyond_limit(
     """True if the reference's final ORDER BY key value recurs past the LIMIT cutoff.
 
     A trailing-``LIMIT`` top-N can cut across a tie in the order key, leaving only a
-    SUBSET of the rows that share the worst-kept key value. When exactly ONE such
-    row stays visible, the truncated result alone cannot tell that legitimate
-    boundary tie apart from a deterministic unique final row, so the comparator
-    would either mask a real single-row value bug or false-positive a valid tie pick
-    (the soundness gap this probe closes). The probe supplies the missing signal: it
-    re-runs the query one row wider (``LIMIT n+1``) and reports whether the row JUST
-    past the original cutoff carries the SAME order-key value as the last row inside
-    it. If so, the final key is genuinely tied across the cutoff and a
-    single-visible-row final-group difference is an equally-valid boundary pick; if
-    not (or there is no row past the cutoff), the final row is deterministic.
+    SUBSET of the rows that share the worst-kept key value. The truncated result
+    alone cannot tell that legitimate boundary tie apart from a complete final tie
+    group whose members must match, so the comparator would either mask a real value
+    bug or false-positive a valid tie pick (the soundness gap this probe closes).
+    The probe supplies the missing signal: it re-runs the query one row wider
+    (``LIMIT n+1``) and reports whether the row JUST past the original cutoff
+    carries the SAME order-key value as the last row inside it. If so, the final key
+    is genuinely tied across the cutoff and a final-group membership difference is
+    an equally-valid boundary pick; if not (or there is no row past the cutoff), the
+    final group is complete or unproven and must match.
 
-    Returns False on any condition that makes the probe unsound, unnecessary, or
-    impossible - an empty reference, an out-of-range order key, a final tie group
-    that already spans >= 2 visible rows (accepted as a boundary swap without the
-    probe), an un-rewritable ``LIMIT``, or a probe-query failure - so the caller
-    keeps the strict default and the worst case is a (loud, recoverable) caught
-    mismatch, never a masked bug.
+    Returns False on any condition that makes the probe unsound or impossible - an
+    empty reference, an out-of-range order key, an un-rewritable ``LIMIT``, or a
+    probe-query failure - so the caller keeps the strict default and the worst case
+    is a (loud, recoverable) caught mismatch, never a masked bug.
     """
     if not reference or not order_by:
         return False
@@ -179,13 +177,7 @@ def _final_key_tied_beyond_limit(
     width = len(reference[-1])
     if any(c < 0 or c >= width for c in order_by):
         return False
-    # The order-aware relaxation reads this probe ONLY for a single-visible-row final
-    # tie group; a final group that already spans >= 2 rows is accepted as a boundary
-    # swap without it. So when the reference's own final group is already >= 2 rows,
-    # the result would be ignored - skip the extra LIMIT n+1 query entirely.
     final_key = tuple(reference[-1][c] for c in order_by)
-    if n >= 2 and tuple(reference[-2][c] for c in order_by) == final_key:
-        return False
     probe_sql = _bump_trailing_limit(sql)
     if probe_sql is None:
         return False
@@ -1340,6 +1332,8 @@ def _report(
       * any unclassified cross-surface divergence,
       * any gated backend that implemented no queries (which would otherwise make
         the gate silently green by comparing nothing on that backend), and
+      * any known divergence whose cell is now equivalent, so stale baselines are
+        removed in a reviewed change instead of masking a future regression, and
       * any VACUOUS query - one whose SQL reference returns 0 rows, so every
         backend compares empty-vs-empty and trivially "matches" without
         discriminating anything - UNLESS it is explicitly classified in
@@ -1419,11 +1413,14 @@ def _report(
             f"legitimately_empty: {unclassified_empty} - make them discriminating or classify them with a rationale"
         )
     if resolved:
-        print(f"Previously-known divergences now equivalent - update the baseline: {resolved}")
+        print(
+            "GATE FAILURE - previously-known divergences now equivalent: "
+            f"{resolved} - remove the stale baseline entry in a reviewed change"
+        )
     if not new and not resolved and not missing_backends and not unclassified_empty:
         suffix = " (modulo classified exceptions)" if (known or classified_empty) else ""
         print(f"SQL and DataFrame surfaces are equivalent{suffix}.")
-    return 1 if (new or missing_backends or unclassified_empty) else 0
+    return 1 if (new or resolved or missing_backends or unclassified_empty) else 0
 
 
 def main(argv: list[str] | None = None) -> int:

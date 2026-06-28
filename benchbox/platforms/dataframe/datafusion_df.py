@@ -500,6 +500,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         has_header: bool = True,
         column_names: list[str] | None = None,
         null_marker: str | None = None,
+        string_columns: list[str] | None = None,
     ) -> DataFusionLazyDF:
         """Read a CSV file into a DataFusion DataFrame.
 
@@ -508,9 +509,10 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
             delimiter: Field delimiter
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
-            null_marker: Unused for DataFusion — TPC-style trailing delimiters are handled
-                via detect_data_format() which routes .tbl/.dat files through
-                _read_tbl_via_datafusion / _read_tbl_via_pyarrow above.
+            null_marker: ``None`` means empty fields stay ``""`` in declared
+                string columns; non-``None`` preserves NULL semantics.
+            string_columns: Declared string columns whose empty CSV fields must
+                stay ``""`` when ``null_marker`` is ``None``.
 
         Returns:
             DataFusion DataFrame with the file contents
@@ -542,6 +544,19 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         except TypeError:
             # Fall back to simpler API
             df = self.session_ctx.read_csv(path_str)
+
+        if null_marker is None and string_columns:
+            # For headerless CSV with a declared schema (e.g. ClickBench's
+            # generated hits.csv), this non-.tbl path never applies
+            # `column_names`, so the frame columns are DataFusion's inferred
+            # names (column_1, …) rather than the benchmark schema names.
+            # Guard each coalesce on membership in the frame's actual columns
+            # so a declared string column that isn't present by name does not
+            # raise on `col(<schema_name>)` and abort the load.
+            present_columns = {field.name for field in df.schema()}
+            for name in string_columns:
+                if name in present_columns:
+                    df = df.with_column(name, f.coalesce(col(name), lit("")))
 
         return df
 

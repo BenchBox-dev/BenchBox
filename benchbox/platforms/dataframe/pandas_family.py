@@ -46,6 +46,7 @@ from benchbox.platforms.dataframe._result_helpers import (
     build_success_result_dict,
 )
 from benchbox.platforms.dataframe.benchmark_mixin import BenchmarkExecutionMixin
+from benchbox.platforms.dataframe.shared_loading import resolve_dataframe_csv_dialect
 from benchbox.platforms.dataframe.tuning_mixin import TuningConfigurableMixin
 from benchbox.platforms.dataframe.unified_pandas_frame import UnifiedPandasFrame
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -1077,48 +1078,18 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             # CSV or TBL
             actual_delimiter = delimiter if delimiter is not None else ("|" if format_type == "tbl" else ",")
 
-            # Resolve the CSV dialect (has_header + null_marker) via the resolver when a
-            # DataSource is available (manifest path).  Without one, derive from format_type
-            # so .tbl files (format_type=="tbl") keep their existing trailing-delimiter behaviour.
-            # When benchmark=None, NO_BENCHMARK is used: path (a) wins when table_metadata is
-            # present; otherwise path (c) of resolve_csv_dialect derives null_marker from the
-            # file extension (.tbl/.dat → "", everything else → None), which is correct.
-            #
             # has_header MUST come from the dialect, not the file extension: the SQL loaders
             # (e.g. DuckDB) honor csv_has_header and default to headerless, so assuming every
             # .csv carries a header here silently drops the first data row of headerless .csv
             # benchmarks (e.g. CoffeeShop), diverging the DataFrame surface from SQL.
-            if data_source is not None:
-                from benchbox.platforms.base.data_loading import NO_BENCHMARK, resolve_csv_dialect
-
-                bm = benchmark if benchmark is not None else NO_BENCHMARK
-                _dialect = resolve_csv_dialect(data_source, table_name, first_file, bm)
-                null_marker: str | None = _dialect.null_marker
-                has_header = _dialect.has_header
-            elif benchmark is not None:
-                # No DataSource, but a known benchmark (e.g. the cross-surface gate
-                # loads straight from a benchmark instance): resolve the dialect the
-                # SAME way the DuckDB SQL reference does so null_marker AND
-                # has_header match it. This matters for empty-field handling: a .csv
-                # benchmark that sets csv_null_marker="" (e.g. JoinOrder) nulls empty
-                # fields, while one that does not (e.g. ClickBench) keeps "" - the
-                # file-extension heuristic alone returned None for both and diverged
-                # from SQL on the latter.
-                from benchbox.platforms.base.data_loading import DataSource, resolve_csv_dialect
-
-                _dialect = resolve_csv_dialect(
-                    DataSource(source_type="benchmark_instance", tables={}),
-                    table_name,
-                    first_file,
-                    benchmark,
-                )
-                null_marker = _dialect.null_marker
-                has_header = _dialect.has_header
-            else:
-                # Ad-hoc load with no benchmark/DataSource: keep the file-extension
-                # heuristic that treats a bare .csv as headered.
-                null_marker = "" if format_type == "tbl" else None
-                has_header = format_type == "csv"
+            null_marker, has_header = resolve_dataframe_csv_dialect(
+                data_source=data_source,
+                table_name=table_name,
+                first_file=first_file,
+                benchmark=benchmark,
+                format_type=format_type,
+                default_has_header=format_type == "csv",
+            )
 
             # Pull this table's declared SQL types (parallel to column_names) from
             # the benchmark schema so numeric columns named like dates (e.g. SSB's

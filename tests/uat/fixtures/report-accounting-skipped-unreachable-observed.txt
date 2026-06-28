@@ -1,0 +1,22 @@
+Command:
+uv run -- python -m tests.uat._cli report --cells-jsonl tests/uat/fixtures/report-accounting-skipped-unreachable-cells.jsonl --output-tsv "$tmpdir/matrix_summary.tsv"
+
+Reviewed base:
+develop @ 7f171f28c
+
+Fixture shape:
+total_defined=5 passed=2 failed=1 skipped=1 unreachable=1
+
+Observed pre-fix CLI JSON:
+rows=5 passed=2 failed=1 timed_out=0
+No attempted, skipped, unreachable, or total_defined fields are emitted.
+
+Observed pre-fix TSV footer:
+# rows=5 candidates=5 executed=5 compatibility_pruned=0 early_stop_pruned=0 passed=2 failed=1 timed_out=0
+# run_status=COMPLETED
+
+Defect:
+The skipped and skipped-unreachable rows are rendered as ordinary rows, but the
+summary has no reconciling denominator. It reports executed=5 even though only
+three rows were attempted, and unreachable is not surfaced as a release-gate
+signal.

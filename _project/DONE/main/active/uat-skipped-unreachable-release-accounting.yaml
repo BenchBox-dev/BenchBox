@@ -2,8 +2,9 @@ id: uat-skipped-unreachable-release-accounting
 title: "Account for skipped/unreachable UAT cells in release-report candidate counts (release-evidence integrity)"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Release Tooling
+completed_date: "2026-06-28"
 
 description: |
   UAT records skipped and unreachable cells, but the release report's candidate
@@ -29,7 +30,7 @@ prior_art:
 work:
   - id: w0
     summary: "Reproduce and characterize the undercount with a fixture (re-validate the claim)"
-    status: pending
+    status: done
     needs: []
     notes: |
       Build a small fixture CELLS_JSONL of UAT cell records with N defined cells, K
@@ -43,7 +44,7 @@ work:
 
   - id: w1
     summary: "Make report totals reconcile and surface unreachable loudly"
-    status: pending
+    status: done
     needs: [w0]
     notes: |
       Update the report/validate accounting so the summary reports passed /
@@ -55,7 +56,7 @@ work:
 
   - id: w2
     summary: "Regression test the reconciliation"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Add a test on the report generator asserting totals reconcile for the w0

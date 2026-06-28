@@ -185,22 +185,39 @@ def run_execute(
                     else:
                         platform_abort_reason = startup_reason
             if platform_abort_reason is None and not docker_startup_failed:
-                _run_or_skip_platform(
-                    config,
-                    platform=platform,
-                    platform_pairs=platform_pairs,
-                    by_pb=by_pb,
-                    results=results,
-                    pruned=pruned,
-                    skipped_unreachable=skipped_unreachable,
-                    completed_pairs=completed_pairs,
-                    already_pruned=already_pruned,
-                    databases_root=databases_root,
-                    cleanup_enabled=cleanup_enabled,
-                    runner=runner,
-                    log_dir=log_dir,
-                    benchmark_runs_dir=benchmark_runs_dir,
-                )
+                try:
+                    _run_or_skip_platform(
+                        config,
+                        platform=platform,
+                        platform_pairs=platform_pairs,
+                        by_pb=by_pb,
+                        results=results,
+                        pruned=pruned,
+                        skipped_unreachable=skipped_unreachable,
+                        completed_pairs=completed_pairs,
+                        already_pruned=already_pruned,
+                        databases_root=databases_root,
+                        cleanup_enabled=cleanup_enabled,
+                        runner=runner,
+                        log_dir=log_dir,
+                        benchmark_runs_dir=benchmark_runs_dir,
+                    )
+                except Exception as exc:  # noqa: BLE001 - re-raised after annotation
+                    # A mid-sweep DiskFloorAbort propagates out of the runner
+                    # here, bypassing the normal ExecuteOutcome return. The
+                    # skipped-unreachable cells accumulated for earlier
+                    # platforms would otherwise be lost (run_execute never
+                    # returns), causing the abort report to under-count
+                    # `total_defined`. Annotate the exception with the count
+                    # so the orchestrator can thread it into the abort
+                    # artifact. The platform teardown still runs via the
+                    # enclosing `finally` before the exception propagates.
+                    if not hasattr(exc, "skipped_unreachable_count"):
+                        try:
+                            exc.skipped_unreachable_count = len(skipped_unreachable)  # type: ignore[attr-defined]
+                        except (AttributeError, TypeError):
+                            pass
+                    raise
         finally:
             docker_state, teardown_abort_reason = _teardown_docker_platform_if_needed(
                 config,
