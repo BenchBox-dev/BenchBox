@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lockedAt": "2026-06-28T15:19:01.510Z",
+  "lockedAt": "2026-06-28T22:14:53.695Z",
   "skills": {
     "blog": {
       "source": {
@@ -92,7 +92,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/todo",
-        "fetchedAt": "2026-06-28T15:19:01.426Z"
+        "fetchedAt": "2026-06-28T22:14:53.598Z"
       },
       "installMode": "mirror",
       "files": {
@@ -113,12 +113,12 @@
           "size": 1464
         },
         "SKILL.md": {
-          "sha256": "8358856a88588df2dbd1bc999f9f1b64fec0c44541b3b88b818e0ba5a6fe0913",
-          "size": 7613
+          "sha256": "1b327cc47e678eedd439f6bc5bda986b45acf0ea39be8a5c8cc3166581a6a1aa",
+          "size": 7985
         },
         "skill.yaml": {
-          "sha256": "9bd74caf58dbf07c5ae218109faa0a7cb2fefd44ff85b91414d7dc46b82714ab",
-          "size": 361
+          "sha256": "ef9dbc136a154a9e527d9c48c0339e9beef333e881c95f98db79c48496fbbdfb",
+          "size": 634
         }
       }
     },
@@ -277,13 +277,17 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/tidy-perms",
-        "fetchedAt": "2026-06-28T15:19:01.436Z"
+        "fetchedAt": "2026-06-28T22:14:53.608Z"
       },
       "installMode": "mirror",
       "files": {
         "SKILL.md": {
           "sha256": "b007c63349e5edb7378c9f82a42591461ed5dc100052a920bfb86022b2721cb3",
           "size": 3048
+        },
+        "skill.yaml": {
+          "sha256": "6d78cd1a38c54d7c83954e28c997e980ed0e5cd02a5b190c2c2cd38663cb21c5",
+          "size": 405
         }
       }
     },
@@ -398,6 +402,25 @@
         "skill.yaml": {
           "sha256": "efe5d79366ee8ff39450f8e68b47c2fcd021f547585d1546a35e3e3f66078545",
           "size": 104
+        }
+      }
+    },
+    "docs": {
+      "source": {
+        "type": "local",
+        "name": "personal",
+        "path": "~/.skill-sync/skills/docs",
+        "fetchedAt": "2026-06-28T22:14:53.596Z"
+      },
+      "installMode": "mirror",
+      "files": {
+        "SKILL.md": {
+          "sha256": "ca18bd636d8b511a9a70b72b59add5aa68d76ba10984281c5fa35eb31205b0a3",
+          "size": 2549
+        },
+        "skill.yaml": {
+          "sha256": "b348d06c928d986a3714d5337723e59c40a45939e31405a8de2019171de32970",
+          "size": 204
         }
       }
     }

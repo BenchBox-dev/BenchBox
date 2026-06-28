@@ -1,0 +1,11 @@
+depends:
+  - SHARED/commit-framework
+  - SHARED/compare-framework
+  - SHARED/shrink-framework
+  - SHARED/research-framework
+tags:
+  - documentation
+category: content
+targets:
+  claude: true
+  codex: true

@@ -8,7 +8,16 @@ depends:
 config_inputs:
   - key: todo.cli
     type: string
-    description: TODO CLI command path
+    description: "TODO CLI command (e.g. `uv run --project <todo-tool-dir> todo-cli`)"
+    default: todo-cli
+  - key: todo.validate
+    type: string
+    description: TODO validate command
+    default: todo-validate
+  - key: todo.index
+    type: string
+    description: TODO index command
+    default: todo-index
 tags:
   - workflow
   - todo

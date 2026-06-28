@@ -13,10 +13,12 @@ YAML TODO management with dependency graphs, indexes, and implementation guardra
 
 Resolve paths from `todo.config.yaml`, else `_project/TODO` and `_project/DONE` at git root. Indexes live under `_indexes/` and are generated, never hand-edited.
 
+Resolve the CLI commands from the `todo` section of `skill-sync.config.yaml` (`cli`, `validate`, `index`); if unset, fall back to the tools on `PATH`. To point at a local checkout, set `todo.cli` (etc.) in project config to e.g. `uv run --project <todo-tool-dir> todo-cli`. The actions below use `$TODO_CLI`, `$TODO_VALIDATE`, `$TODO_INDEX`:
+
 ```bash
-TODO_CLI="uv run --project ~/.claude/tools/todo todo-cli"
-TODO_VALIDATE="uv run --project ~/.claude/tools/todo todo-validate"
-TODO_INDEX="uv run --project ~/.claude/tools/todo todo-index"
+TODO_CLI="${TODO_CLI:-todo-cli}"                   # config: todo.cli
+TODO_VALIDATE="${TODO_VALIDATE:-todo-validate}"    # config: todo.validate
+TODO_INDEX="${TODO_INDEX:-todo-index}"             # config: todo.index
 ```
 
 ## Actions
