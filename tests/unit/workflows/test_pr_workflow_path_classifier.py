@@ -34,6 +34,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "LINT_RESULT": "skipped",
         "TEST_RESULT": "skipped",
         "CORRECTNESS_RESULT": "skipped",
+        "PLAN_CAPTURE_RESULT": "skipped",
         "EXPLORER_TOKENS_RESULT": "skipped",
         "AUDIT_SHA_RESULT": "skipped",
         "CONTENT_GUARD_NEEDED": "false",
@@ -86,6 +87,7 @@ def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
         LINT_RESULT="success",
         TEST_RESULT="success",
         CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
         EXPLORER_TOKENS_RESULT="failure",
     )
 
@@ -112,11 +114,12 @@ def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
         LINT_RESULT="success",
         TEST_RESULT="success",
         CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
         EXPLORER_TOKENS_RESULT="skipped",
     )
 
     assert result.returncode == 0
-    assert "Code/infra PR; lint, fast tests, and correctness gate passed." in result.stdout
+    assert "Code/infra PR; lint, fast tests, correctness gate, and plan-capture gate passed." in result.stdout
 
 
 def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
@@ -128,11 +131,27 @@ def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
         LINT_RESULT="success",
         TEST_RESULT="success",
         CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
         EXPLORER_TOKENS_RESULT="success",
     )
 
     assert result.returncode == 0
-    assert "Code/infra PR; lint, fast tests, and correctness gate passed." in result.stdout
+    assert "Code/infra PR; lint, fast tests, correctness gate, and plan-capture gate passed." in result.stdout
+
+
+def test_ci_required_result_fails_on_plan_capture_gate_failure() -> None:
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="failure",
+        EXPLORER_TOKENS_RESULT="success",
+    )
+
+    assert result.returncode == 1
+    assert "plan-capture-gate=failure" in result.stdout
 
 
 def test_ci_required_result_required_jobs_in_needs() -> None:
@@ -144,3 +163,4 @@ def test_ci_required_result_required_jobs_in_needs() -> None:
     needs = workflow_yaml["jobs"]["ci-required-result"]["needs"]
     assert "explorer-tokens" in needs
     assert "correctness-gate" in needs
+    assert "plan-capture-gate" in needs
