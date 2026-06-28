@@ -2,7 +2,8 @@ id: equivalence-comparator-value-widening-opt-in
 title: "Make equivalence-comparator value-widening (NaN==NULL, whitespace strip) opt-in instead of unconditional"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-06-28"
 category: Testing and Quality Assurance
 
 description: |
