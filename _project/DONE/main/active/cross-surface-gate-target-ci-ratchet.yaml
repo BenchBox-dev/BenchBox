@@ -2,7 +2,8 @@ id: cross-surface-gate-target-ci-ratchet
 title: "Derive expected cross-surface Make/CI targets from GATES so newer gates cannot be unpinned"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-06-28"
 category: Testing and Quality Assurance
 
 description: |
