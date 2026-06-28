@@ -44,6 +44,7 @@ from benchbox.platforms.dataframe._result_helpers import (
     build_success_result_dict,
 )
 from benchbox.platforms.dataframe.benchmark_mixin import BenchmarkExecutionMixin
+from benchbox.platforms.dataframe.shared_loading import declared_string_columns, resolve_dataframe_csv_dialect
 from benchbox.platforms.dataframe.tuning_mixin import TuningConfigurableMixin
 from benchbox.platforms.dataframe.unified_frame import UnifiedExpr, UnifiedLazyFrame, UnifiedWhen
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -935,6 +936,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         has_header: bool = True,
         column_names: list[str] | None = None,
         null_marker: str | None = None,
+        string_columns: list[str] | None = None,
     ) -> LazyDF:
         """Read a CSV file into a DataFrame.
 
@@ -944,6 +946,8 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
             null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
+            string_columns: Declared string columns whose empty CSV fields must
+                stay ``""`` when ``null_marker`` is ``None``.
 
         Returns:
             LazyFrame/DataFrame with the file contents
@@ -1236,20 +1240,15 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             effective_delimiter = delimiter or ("|" if format_type == "tbl" else ",")
             has_header = format_type == "csv" and delimiter is None
 
-            # Resolve null_marker for trailing-delimiter probing via the resolver when a
-            # DataSource is available (manifest path).  Without one, derive from format_type
-            # so .tbl files (format_type=="tbl") keep their existing trailing-delimiter behaviour.
-            # When benchmark=None, NO_BENCHMARK is used: path (a) wins when table_metadata is
-            # present; otherwise path (c) of resolve_csv_dialect derives null_marker from the
-            # file extension (.tbl/.dat → "", everything else → None), which is correct.
-            if data_source is not None:
-                from benchbox.platforms.base.data_loading import NO_BENCHMARK, resolve_csv_dialect
-
-                bm = benchmark if benchmark is not None else NO_BENCHMARK
-                _dialect = resolve_csv_dialect(data_source, table_name, first_file, bm)
-                null_marker: str | None = _dialect.null_marker
-            else:
-                null_marker = "" if format_type == "tbl" else None
+            null_marker, has_header = resolve_dataframe_csv_dialect(
+                data_source=data_source,
+                table_name=table_name,
+                first_file=first_file,
+                benchmark=benchmark,
+                format_type=format_type,
+                default_has_header=has_header,
+            )
+            string_columns = declared_string_columns(benchmark, table_name, column_names)
 
             df = self._load_csv_files(
                 file_paths,
@@ -1257,6 +1256,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 has_header=has_header,
                 column_names=column_names,
                 null_marker=null_marker,
+                string_columns=string_columns,
             )
 
         # Register table
@@ -1542,6 +1542,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         has_header: bool,
         column_names: list[str] | None,
         null_marker: str | None = None,
+        string_columns: list[str] | None = None,
     ) -> LazyDF:
         """Load CSV/TBL files.
 
@@ -1551,6 +1552,8 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             has_header: Whether files have headers
             column_names: Optional column names
             null_marker: Passed through to read_csv for trailing-delimiter probing.
+            string_columns: Declared string columns whose empty CSV fields must
+                stay ``""`` when ``null_marker`` is ``None``.
 
         Returns:
             Combined DataFrame
@@ -1562,6 +1565,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 has_header=has_header,
                 column_names=column_names,
                 null_marker=null_marker,
+                string_columns=string_columns,
             )
 
         # Multiple files - load and concatenate
@@ -1572,6 +1576,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 has_header=has_header,
                 column_names=column_names,
                 null_marker=null_marker,
+                string_columns=string_columns,
             )
             for f in file_paths
         ]

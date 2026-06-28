@@ -2,7 +2,7 @@ id: dataframe-csv-empty-string-null-uniform
 title: "Normalize empty-string-vs-null semantics across all DataFrame adapters on the CSV-direct load path"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Core Functionality
 
 description: |
@@ -37,7 +37,7 @@ prior_art:
 work:
   - id: w1
     summary: "Add a shared null_marker-aware empty-string post-coercion on the CSV-direct path"
-    status: pending
+    status: done
     needs: []
     notes: |
       Add one shared post-load step (in benchmark_mixin/shared_loading) that, when
