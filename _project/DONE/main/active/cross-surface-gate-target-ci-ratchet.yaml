@@ -1,0 +1,70 @@
+id: cross-surface-gate-target-ci-ratchet
+title: "Derive expected cross-surface Make/CI targets from GATES so newer gates cannot be unpinned"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-06-28"
+category: Testing and Quality Assurance
+
+description: |
+  A benchmark can be enforced in code (registered in cross_surface.GATES) yet not
+  pinned in the Make/CI surface - the standardized-command test does not assert that
+  every gate has a corresponding *-cross-surface-equivalence-report Make target and
+  a pr.yml correctness-gate step. The newer gates (ClickBench, JoinOrder-synthetic,
+  H2O-DB) are exposed to exactly this drift: enforced in GATES, but their
+  Make/CI pinning is maintained by hand and can fall out of sync.
+
+  Add a check that DERIVES the expected Make targets and pr.yml steps from the live
+  GATES registry and fails when a gate lacks its target or CI step. This closes the
+  same drift class as the mutation-target guard (set(_TARGETS)==set(GATES)), one
+  layer up at the Make/CI boundary.
+
+prior_art:
+- ref: "tests/unit/test_standardized_test_commands.py"
+  note: "Existing standardized-command test; extend it (or add a sibling) to derive expectations from GATES rather than a
+    hand-maintained list."
+- ref: "tests/integration/test_cross_surface_mutation_sensitivity.py:332"
+  note: "test_targets_cover_every_enforced_gate is the precedent: assert a registry-derived set equals the live GATES set.
+    Mirror it for Make/CI targets."
+- ref: ".github/workflows/pr.yml:404"
+  note: "The per-gate correctness-gate steps (ssb/amplab/coffeeshop/clickbench/joinorder/h2odb) that must be derivable from
+    GATES."
+- ref: "benchbox/core/equivalence/cross_surface.py (GATES)"
+  note: "The single source of truth the check derives from."
+
+work:
+- id: w1
+  summary: "Assert every GATES entry has a Make target and a pr.yml correctness-gate step"
+  status: done
+  needs: []
+  notes: |
+    Add a test that, for each name in cross_surface.GATES, asserts a
+    `<name>-cross-surface-equivalence-report` Make target exists AND a
+    corresponding step is present in pr.yml's correctness-gate job. Parse the
+    Makefile and pr.yml as text/data; key off GATES so adding a gate without its
+    target/step fails. Account for the name normalization already used
+    (joinorder_synthetic -> joinorder-synthetic-...).
+
+must_preserve:
+- "No change to gate behavior; this is a drift guard over the Make/CI surface."
+
+anti_patterns:
+- "DO NOT hand-maintain a second list of expected gate names - derive from GATES, or the guard itself drifts."
+
+verification:
+- description: "Adding a gate without its target/step fails the guard"
+  command: "uv run -- python -m pytest tests/unit/test_standardized_test_commands.py -q"
+  expected_output: "passes for current GATES; fails if a GATES entry lacks a Make target or pr.yml correctness-gate step"
+
+scope_limit:
+  only_modify:
+  - "tests/"
+
+success_metrics:
+- "A gate enforced in GATES is guaranteed pinned in both Make and CI."
+
+metadata:
+  tags: [equivalence, ci, drift-guard, makefile]
+  estimated_effort: "Small"
+  created_date: "2026-06-28"
+  last_updated: "2026-06-28T00:00:00"
