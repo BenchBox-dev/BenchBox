@@ -1558,28 +1558,20 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         Returns:
             Combined DataFrame
         """
+        read_kwargs: dict[str, Any] = {
+            "delimiter": delimiter,
+            "has_header": has_header,
+            "column_names": column_names,
+            "null_marker": null_marker,
+        }
+        if string_columns:
+            read_kwargs["string_columns"] = string_columns
+
         if len(file_paths) == 1:
-            return self.read_csv(
-                file_paths[0],
-                delimiter=delimiter,
-                has_header=has_header,
-                column_names=column_names,
-                null_marker=null_marker,
-                string_columns=string_columns,
-            )
+            return self.read_csv(file_paths[0], **read_kwargs)
 
         # Multiple files - load and concatenate
-        dfs = [
-            self.read_csv(
-                f,
-                delimiter=delimiter,
-                has_header=has_header,
-                column_names=column_names,
-                null_marker=null_marker,
-                string_columns=string_columns,
-            )
-            for f in file_paths
-        ]
+        dfs = [self.read_csv(f, **read_kwargs) for f in file_paths]
         return self._concat_dataframes(dfs)
 
     def concat_dataframes(self, dfs: list[LazyDF]) -> LazyDF:

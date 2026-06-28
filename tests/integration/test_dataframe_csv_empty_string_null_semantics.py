@@ -11,7 +11,10 @@ from benchbox.platforms.dataframe.benchmark_mixin import DataFrameRunOptions
 from benchbox.platforms.dataframe.datafusion_df import DATAFUSION_DF_AVAILABLE, DataFusionDataFrameAdapter
 from benchbox.platforms.dataframe.pyspark_df import PYSPARK_AVAILABLE, PySparkDataFrameAdapter
 
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.fast,
+]
 
 
 class _CsvNullMarkerBenchmark:
