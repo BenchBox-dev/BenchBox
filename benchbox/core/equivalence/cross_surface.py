@@ -347,10 +347,16 @@ class ClassifiedDivergence:
     predicate confirms the actual cell detail is the specific, defensible difference
     described by ``reason`` - so a genuinely wrong value on the same key is still
     reported as an unclassified gate failure.
+
+    ``requires_live_divergence`` preserves stale-baseline hygiene by default. Set it
+    false only for a nondeterministic classification whose absence is not evidence
+    of resolution (for example, an order-less LIMIT whose arbitrary top-N selection
+    can occasionally line up across surfaces by chance).
     """
 
     reason: str
     accepts: Callable[[SurfaceDivergence], bool]
+    requires_live_divergence: bool = True
 
 
 @dataclass(frozen=True)
@@ -905,8 +911,20 @@ def build_read_primitives_duckdb(scale_factor: float, output_dir: Path) -> Cross
 # tie-ambiguous query, classified here (the last-resort option) rather than masked:
 # the tie-aware comparator handles every ORDER BY ... LIMIT case, only this
 # order-less LIMIT needs a baseline entry.
-_CLICKBENCH_TIE_AMBIGUOUS = (
+_CLICKBENCH_TIE_AMBIGUOUS_REASON = (
     "Q18 is LIMIT 10 with no ORDER BY over ~97k groups - an arbitrary, order-less top-N selection"
+)
+
+
+def _is_clickbench_q18_arbitrary_topn(divergence: SurfaceDivergence) -> bool:
+    """Classify only the documented arbitrary-row mismatch, not execution errors."""
+    return "Value mismatch" in str(divergence.detail)
+
+
+_CLICKBENCH_TIE_AMBIGUOUS = ClassifiedDivergence(
+    reason=_CLICKBENCH_TIE_AMBIGUOUS_REASON,
+    accepts=_is_clickbench_q18_arbitrary_topn,
+    requires_live_divergence=False,
 )
 
 # Two AMPLab queries return 0 reference rows at the bounded cell. Both end in a
@@ -1191,8 +1209,9 @@ GATES: dict[str, CrossSurfaceGate] = {
     # Promoted from STAGED_GATES once the two cross-cutting prerequisites landed:
     # w9 (loader applies schema column TYPES + DuckDB empty-string semantics) made
     # joinorder_synthetic 26/26 and cleared ClickBench Q17/Q24; w8 (tie-aware
-    # comparator) cleared ClickBench's tie-ambiguous top-N cells. ClickBench's only
-    # baseline entry is the order-less Q18 (see above).
+    # comparator) cleared ORDER BY ... LIMIT top-N cells. ClickBench's residual
+    # order-less Q18 baselines may line up by chance on a run, so they are not
+    # stale merely because one execution happens to compare equal.
     "clickbench": CrossSurfaceGate(
         name="clickbench",
         build=build_clickbench_duckdb,
@@ -1314,6 +1333,11 @@ def _classification(known: dict[str, str | ClassifiedDivergence], divergence: Su
     return entry
 
 
+def _requires_live_divergence(entry: str | ClassifiedDivergence) -> bool:
+    """True if a missing known divergence should fail as a stale baseline."""
+    return entry.requires_live_divergence if isinstance(entry, ClassifiedDivergence) else True
+
+
 def _report(
     divergences: list[SurfaceDivergence],
     total: int,
@@ -1351,7 +1375,7 @@ def _report(
     # ClassifiedDivergence entry) the live cell matches the entry's predicate, so a
     # real regression on a baselined key is still reported as unclassified.
     new = sorted({d.key for d in divergences if _classification(known, d) is None})
-    resolved = sorted(set(known) - found)
+    resolved = sorted(key for key, entry in known.items() if key not in found and _requires_live_divergence(entry))
     missing_backends = sorted(backend for backend, count in coverage.items() if count == 0)
     executed = sum(coverage.values())
 

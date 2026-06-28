@@ -18,6 +18,7 @@ from __future__ import annotations
 import pytest
 
 from benchbox.core.equivalence.cross_surface import (
+    ClassifiedDivergence,
     _bump_trailing_limit,
     _final_key_tied_beyond_limit,
     _report,
@@ -530,6 +531,31 @@ def test_known_divergence_baseline_fails_when_entry_is_resolved(capsys):
     assert "remove the stale baseline entry" in out
 
 
+def test_known_divergence_baseline_allows_nondeterministic_absence(capsys):
+    """A marked nondeterministic baseline may compare equal by chance."""
+    coverage = {"expression": 1, "pandas": 1}
+
+    exit_code = _report(
+        [],
+        total=2,
+        coverage=coverage,
+        known={
+            "Q1_pandas": ClassifiedDivergence(
+                reason="arbitrary top-N selection",
+                accepts=lambda divergence: "Value mismatch" in str(divergence.detail),
+                requires_live_divergence=False,
+            )
+        },
+        benchmark="fake",
+        reference_row_counts={"Q1": 5},
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "previously-known divergences now equivalent" not in out
+    assert "SQL and DataFrame surfaces are equivalent (modulo classified exceptions)." in out
+
+
 def test_known_divergence_baseline_accepts_live_entry(capsys):
     """A still-reproducing, baselined divergence remains accepted."""
     coverage = {"expression": 1, "pandas": 1}
@@ -573,8 +599,8 @@ def test_clickbench_and_joinorder_are_enforced_gates():
     Once the two cross-cutting prerequisites landed - w9 (loader applies schema
     column TYPES + DuckDB empty-string semantics) and w8 (tie-aware comparator) -
     both staged gates went clean and graduated from STAGED_GATES to GATES, so the
-    oracle coverage map marks them cross-surface "guarded". ClickBench's only
-    baseline entry is the genuinely order-less Q18.
+    oracle coverage map marks them cross-surface "guarded". ClickBench's residual
+    baseline entries are the genuinely order-less Q18 backends.
     """
     from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES, get_gate
 
