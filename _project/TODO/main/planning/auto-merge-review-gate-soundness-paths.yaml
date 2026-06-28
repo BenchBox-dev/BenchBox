@@ -42,20 +42,33 @@ work:
       all other paths on the existing auto-merge default.
 
   - id: w2
-    summary: "Make pr-open and the auto-merge backstop skip auto-merge when the diff touches a soundness path"
+    summary: "Make pr-open skip auto-merge when the diff touches a soundness path"
     status: pending
     needs: [w1]
     notes: |
       Adjust the pr-open flow so it does NOT auto-enable squash auto-merge when the
       changed files intersect the soundness paths (diff --name-only against the path
       set). For those PRs, open without auto-merge so the required review gates the
-      merge.
+      merge. Document the behavior in AGENTS.md/CLAUDE.md in the terse house style.
 
-      Apply the same predicate to .github/workflows/auto-merge-on-open.yml, which is
+  - id: w3
+    summary: "Gate the auto-merge-on-open backstop workflow on the same soundness-path predicate"
+    status: pending
+    needs: [w1]
+    notes: |
+      .github/workflows/auto-merge-on-open.yml currently runs `gh pr merge --auto
+      --squash` UNCONDITIONALLY for every non-draft PR opened against develop. That is
       the GitHub-side backstop for PRs opened via the UI, `gh pr create`, or any path
-      that skips `make pr-open`. If the workflow keeps auto-enabling merge for
-      soundness-path PRs, the local pr-open guard is bypassable. Document the behavior
-      in AGENTS.md/CLAUDE.md in the terse house style.
+      that skips `make pr-open`. While it stays unconditional it RE-ENABLES auto-merge
+      on soundness-path PRs even when w2 opened them without it, defeating the
+      review-before-auto-merge goal.
+
+      Gate this workflow on the SAME soundness-path predicate w2 uses: detect whether
+      the PR diff intersects the soundness paths (e.g. a paths/paths-ignore filter or
+      a diff --name-only check in the job) and SKIP the `gh pr merge --auto --squash`
+      step for those PRs. Keep the cheap auto-merge default for every non-soundness
+      diff. The predicate MUST be the single shared source the regression test pins,
+      so the local pr-open guard and this backstop never diverge.
 
 must_preserve:
   - "The cheap squash-auto-merge default is unchanged for all non-soundness paths."
@@ -74,6 +87,9 @@ scope_limit:
     - "_project/scripts/"
     - "AGENTS.md"
     - "CLAUDE.md"
+    # The verification step requires this regression test; allow the
+    # implementer to add it without breaching the guardrail.
+    - "tests/unit/test_auto_merge_soundness_paths.py"
 
 success_metrics:
   - "PRs touching the comparator or plan parsers cannot squash-auto-merge without a review; everything else stays on the fast default."

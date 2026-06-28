@@ -270,7 +270,9 @@ def _build_gate_cell(gate_name: str, tmp_path: Any) -> _GateCell:
     """Build one benchmark's bounded cell and capture the target's reference count."""
     gate = GATES[gate_name]
     data = gate.build(gate.scale_factor, tmp_path)
-    contexts = build_production_contexts(data.benchmark, data.data_dir, backends=gate.backends)
+    contexts = build_production_contexts(
+        data.benchmark, data.data_dir, backends=gate.backends, scale_factor=gate.scale_factor
+    )
     reference_row_count = len(fetch_reference_rows(data.connection, data.reference_sql(_TARGETS[gate_name])))
     return _GateCell(gate_name=gate_name, data=data, contexts=contexts, reference_row_count=reference_row_count)
 

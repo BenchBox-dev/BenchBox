@@ -518,3 +518,80 @@ def test_manifest_runner_reuses_attempted_cells_and_runs_complement(tmp_path: Pa
     assert calls == [0.1]
     assert [result.scale for result in outcome.results] == [0.01, 0.1]
     assert outcome.results[0].result_path == tmp_path / "prior.json"
+
+
+def _source_info() -> orchestrator.RunSourceInfo:
+    return orchestrator.RunSourceInfo(commit_sha="deadbeef", commit_short_sha="deadbee", dirty=False)
+
+
+def test_write_cells_jsonl_persists_skipped_unreachable_sidecar(tmp_path: Path):
+    cells_jsonl = tmp_path / "cells.jsonl"
+    orchestrator._write_cells_jsonl(
+        cells_jsonl,
+        (),
+        source_info=_source_info(),
+        skipped_unreachable_count=3,
+    )
+    sidecar = cells_jsonl.with_name("cells.jsonl.accounting.json")
+    assert sidecar.exists()
+    assert json.loads(sidecar.read_text(encoding="utf-8"))["skipped_unreachable_count"] == 3
+
+
+def test_abort_artifacts_thread_skipped_unreachable_when_outcome_missing(tmp_path: Path):
+    cfg = validate_config(
+        {
+            "name": "abort-accounting",
+            "phases": ["execute"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    orchestrator._emit_abort_artifacts(
+        config=cfg,
+        log_dir=log_dir,
+        attempted=(),
+        execute_outcome=None,
+        source_info=_source_info(),
+        aborted_phase="execute",
+        abort_reason="free space 1.0 GiB < cutoff 5.0 GiB",
+        skipped_unreachable_count=2,
+    )
+    # The abort report must reflect the unreachable cells skipped before the
+    # disk-floor trip, not the zero implied by execute_outcome=None.
+    partial = log_dir / "matrix_summary.partial.tsv"
+    text = partial.read_text(encoding="utf-8")
+    assert "unreachable=2" in text
+    assert "# UNREACHABLE_CELLS=2 release_gate_attention=required" in text
+    # And the sidecar carries the count for report regeneration.
+    sidecar = (log_dir / "cells.jsonl").with_name("cells.jsonl.accounting.json")
+    assert json.loads(sidecar.read_text(encoding="utf-8"))["skipped_unreachable_count"] == 2
+
+
+def test_disk_floor_abort_carries_skipped_unreachable_count():
+    cfg = validate_config(
+        {
+            "name": "disk-floor-annotate",
+            "platforms": {"include": ["duckdb", "clickhouse-server"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+
+    def runner(platform, benchmark, scale, **kwargs):
+        raise orchestrator.DiskFloorAbort("free space 1.0 GiB < cutoff 5.0 GiB")
+
+    # duckdb is processed first and recorded as skipped-unreachable; the
+    # reachable clickhouse-server stack then trips the disk-floor runner. The
+    # raised abort must carry the already-accumulated unreachable count (1).
+    with patch.object(exec_phase, "platform_is_reachable", side_effect=lambda p, **_: p != "duckdb"):
+        with pytest.raises(orchestrator.DiskFloorAbort) as excinfo:
+            exec_phase.run_execute(
+                cfg,
+                log_dir=Path("/tmp"),
+                databases_root=Path("/tmp/databases"),
+                runner=runner,
+            )
+    assert getattr(excinfo.value, "skipped_unreachable_count", None) == 1

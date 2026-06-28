@@ -129,11 +129,15 @@ scope_limit:
   only_modify:
     - "benchbox/core/write_primitives/catalog/operations.yaml"
     - "benchbox/core/write_primitives/schema_specs.yaml"
+    # Required: setup/reset populate only the hard-coded table_population_map and
+    # reset_map in benchmark.py, so the new scd2_ops_* staging tables must be
+    # registered there too — otherwise they are created empty and never reset.
+    # Limit edits to those two maps (do not touch unrelated benchmark logic).
+    - "benchbox/core/write_primitives/benchmark.py"
     - "docs/benchmarks/write-primitives.md"
     - "tests/unit/benchmarks/test_write_primitives_core.py"
     - "tests/integration/test_write_primitives_duckdb.py"
   do_not_modify:
-    - "benchbox/core/write_primitives/benchmark.py"
     - "benchbox/core/runner.py"
     - "benchbox/cli/"
 
@@ -146,6 +150,10 @@ work:
       surrogate sk, c_custkey business key, attribute subset, row_hash,
       is_current bool, valid_from, valid_to. Change-staging derived dynamically
       from TPC-H (changed + unchanged + new keys) with effective_ts + row_hash.
+      Register the new scd2_ops_* staging tables in benchmark.py's
+      table_population_map (so they are populated at setup) and reset_map (so they
+      are restored on cleanup) — a spec-only addition would leave them empty and
+      un-reset.
   - id: w2
     summary: Add merge_scd_type2_basic operation to operations.yaml
     needs: [w1]
