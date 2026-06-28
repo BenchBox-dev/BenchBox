@@ -57,7 +57,7 @@ work:
 
 - id: w2
   summary: "Wire plan-capture-gate as a BLOCKING pr.yml job in ci-required-result"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Add a plan-capture-gate job to .github/workflows/pr.yml modeled on
