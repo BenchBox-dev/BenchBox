@@ -70,6 +70,9 @@ STRENGTH_NONE = "—"
 INDEPENDENCE_INDEPENDENT = "independent"  # reference is an external authority (full values)
 INDEPENDENCE_SEMI = "semi-independent"  # external authority on cardinality only (TPC answer-set row counts)
 INDEPENDENCE_SELF = "self-referential"  # compared against itself (shared spec / frozen self-snapshot)
+INDEPENDENCE_SHARED_SPEC = "shared-spec"  # cross-surface gate generated from one shared DataFrame spec
+INDEPENDENCE_MIXED = "mixed-provenance"  # cross-surface gate mixes generated/shared and bespoke implementations
+INDEPENDENCE_SEPARATE = "separate-handwritten"  # cross-surface gate has separately handwritten DataFrame impls
 INDEPENDENCE_NONE = "—"
 
 # Sentinel for "no scale guarantee" (UNGUARDED rows).
@@ -189,15 +192,31 @@ def oracle_strength_and_scale(primary: str, benchmark_id: str) -> tuple[str, str
     return STRENGTH_NONE, SCALE_NONE
 
 
-def oracle_reference_independence(primary: str, strength: str) -> str:
+def _cross_surface_independence(benchmark_id: str) -> tuple[str, str]:
+    """Return cross-surface implementation-provenance metadata for ``benchmark_id``."""
+    from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES
+
+    gate = GATES.get(benchmark_id) or STAGED_GATES.get(benchmark_id)
+    if gate is None:
+        return (
+            INDEPENDENCE_SELF,
+            "Cross-surface gate metadata is unavailable; treat as self-referential until registered.",
+        )
+    return gate.surface_independence, gate.surface_independence_rationale
+
+
+def oracle_reference_independence(primary: str, strength: str, benchmark_id: str | None = None) -> str:
     """Return the reference-independence axis for a benchmark's primary oracle.
 
     Orthogonal to Strength and derived from the oracle KIND + the strength signal
     (which already encodes whether stored VALUE digests exist), so it tracks the
     classifier without a new hand-maintained field:
 
-      * cross-surface / variant gates -> self-referential (SQL surface is the
-        reference for its own DataFrame/variant surface; shared spec).
+      * cross-surface gates -> per-gate surface provenance from
+        ``CrossSurfaceGate.surface_independence`` (shared-spec, mixed-provenance,
+        or separate-handwritten).
+      * variant gates -> self-referential (canonical SQL variant is the reference
+        for generated/variant surfaces).
       * expected-results with value+cardinality (tpch) -> self-referential: the value
         digest is a frozen benchbox-on-DuckDB snapshot (a regression snapshot, not an
         authority). The strength signal flips this label (drop the stored digests and
@@ -206,7 +225,11 @@ def oracle_reference_independence(primary: str, strength: str) -> str:
         from the published TPC answer sets (an authority outside benchbox), but only
         the cardinality is checked, never the values.
     """
-    if primary in (ORACLE_VARIANT_EQUIVALENCE, ORACLE_CROSS_SURFACE_VARIANT, ORACLE_CROSS_SURFACE):
+    if primary == ORACLE_CROSS_SURFACE:
+        if benchmark_id is None:
+            return INDEPENDENCE_SELF
+        return _cross_surface_independence(benchmark_id)[0]
+    if primary in (ORACLE_VARIANT_EQUIVALENCE, ORACLE_CROSS_SURFACE_VARIANT):
         return INDEPENDENCE_SELF
     if primary == ORACLE_EXPECTED_RESULTS:
         # A stored value digest is a frozen self-snapshot, so the (stronger) value
@@ -216,6 +239,20 @@ def oracle_reference_independence(primary: str, strength: str) -> str:
             return INDEPENDENCE_SELF
         return INDEPENDENCE_SEMI
     return INDEPENDENCE_NONE
+
+
+def oracle_independence_and_rationale(primary: str, strength: str, benchmark_id: str) -> tuple[str, str]:
+    """Return the independence label plus one-line rationale rendered in the map."""
+    if primary == ORACLE_CROSS_SURFACE:
+        return _cross_surface_independence(benchmark_id)
+    independence = oracle_reference_independence(primary, strength, benchmark_id)
+    if independence == INDEPENDENCE_SELF:
+        return independence, "Reference is a shared/generated surface or frozen benchbox snapshot, not an external authority."
+    if independence == INDEPENDENCE_SEMI:
+        return independence, "External TPC answer sets provide row-count authority only; result values are not checked."
+    if independence == INDEPENDENCE_INDEPENDENT:
+        return independence, "Full result values are checked against an external authority."
+    return independence, INDEPENDENCE_NONE
 
 
 def _surfaces(metadata: dict[str, Any]) -> tuple[bool, bool]:
@@ -252,7 +289,7 @@ def build_coverage_map() -> list[dict[str, Any]]:
         )
         primary = primary_oracle(oracles)
         strength, scale = oracle_strength_and_scale(primary, benchmark_id)
-        independence = oracle_reference_independence(primary, strength)
+        independence, independence_rationale = oracle_independence_and_rationale(primary, strength, benchmark_id)
         # A dual-surface benchmark with no oracle is reachable by the cross-surface
         # SQL<->DataFrame gate (the w1 dispatch target). A single-surface benchmark
         # is not and needs a fallback oracle (w2).
@@ -275,6 +312,7 @@ def build_coverage_map() -> list[dict[str, Any]]:
                 "strength": strength,
                 "scale": scale,
                 "independence": independence,
+                "independence_rationale": independence_rationale,
                 "guarded": primary != ORACLE_NONE,
                 "cross_surface_enforced": cross_surface_enforced,
                 "cross_surface_applicable": dual_surface and primary == ORACLE_NONE,
@@ -373,25 +411,23 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     )
     lines.append("")
     lines.append(
-        "**Reference-independence disclosure:** the **Independence** column says "
-        "whether a guarded cell compares against a reference INDEPENDENT of the system "
-        "under test, or against ITSELF — orthogonal to Strength (a `value-level` oracle "
-        "can be either). `self-referential` = compared against a shared spec or a frozen "
-        "self-snapshot (the cross-surface gates compare a benchmark's DataFrame surface "
-        "to its OWN SQL surface; the tpch value digest is a frozen benchbox-on-DuckDB "
-        "snapshot, a regression tripwire, not an authority). `semi-independent` = an "
-        "external authority on CARDINALITY only (tpch/tpcds row counts come from the "
-        "published TPC answer sets, but the values are not checked there). `independent` "
-        "= full values checked against an external authority (no shipped oracle reaches "
-        "this today). So a green `value-level`/`value+cardinality` cell that reads "
-        "`self-referential` proves *unchanged from a shared/frozen reference*, NOT "
-        "*values proven correct against an authority* — do not skip manual inspection on "
-        "the strength of it. Derived from the oracle kind + digest provenance, not "
-        "hand-labelled."
+        "**Reference-independence disclosure:** the **Independence** column says how "
+        "independent the oracle reference is from the implementation under test — "
+        "orthogonal to Strength (a `value-level` oracle can still be weak). For "
+        "cross-surface gates it is per-gate surface provenance from the live "
+        "`CrossSurfaceGate` metadata: `shared-spec` means DataFrame backends are "
+        "generated/maintained from one shared spec, `mixed-provenance` means some "
+        "cells are shared/generated and some bespoke, and `separate-handwritten` means "
+        "the DataFrame families are separately written implementations. For "
+        "expected-results oracles, `self-referential` is a frozen benchbox snapshot "
+        "and `semi-independent` is external TPC authority on cardinality only. The "
+        "**Independence rationale** column gives the per-row reason."
     )
     lines.append("")
-    lines.append("| Benchmark | Surfaces | Oracle | Strength | Scale | Independence | Enforced | Notes |")
-    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
+    lines.append(
+        "| Benchmark | Surfaces | Oracle | Strength | Scale | Independence | Independence rationale | Enforced | Notes |"
+    )
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for r in rows:
         surfaces = "+".join(r["surfaces"]) or "—"
         oracle = r["primary_oracle"]
@@ -409,7 +445,7 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
         enforced = _enforcement_label(r)
         lines.append(
             f"| {r['benchmark']} | {surfaces} | {oracle} | {_strength_cell(r)} | {r['scale']} | "
-            f"{r['independence']} | {enforced} | {note} |"
+            f"{r['independence']} | {r['independence_rationale']} | {enforced} | {note} |"
         )
     lines.append("")
     lines.append("## UNGUARDED benchmarks")

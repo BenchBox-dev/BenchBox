@@ -27,9 +27,12 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from _project.scripts.generate_oracle_coverage_map import (  # noqa: E402
+    INDEPENDENCE_MIXED,
     INDEPENDENCE_NONE,
     INDEPENDENCE_SELF,
     INDEPENDENCE_SEMI,
+    INDEPENDENCE_SEPARATE,
+    INDEPENDENCE_SHARED_SPEC,
     ORACLE_CROSS_SURFACE,
     ORACLE_EXPECTED_RESULTS,
     ORACLE_NONE,
@@ -159,12 +162,18 @@ def test_value_level_oracle_scale_is_read_live(rows):
 
 
 def test_independence_column_present(rows):
-    """Every row carries an independence field; unguarded rows disclose no axis."""
+    """Every row carries independence fields; unguarded rows disclose no axis."""
     for r in rows:
         assert "independence" in r and r["independence"], f"{r['benchmark']} missing independence"
+        assert "independence_rationale" in r and r["independence_rationale"], (
+            f"{r['benchmark']} missing independence rationale"
+        )
         if not r["guarded"]:
             assert r["independence"] == INDEPENDENCE_NONE, (
                 f"{r['benchmark']} unguarded but independence={r['independence']}"
+            )
+            assert r["independence_rationale"] == INDEPENDENCE_NONE, (
+                f"{r['benchmark']} unguarded but rationale={r['independence_rationale']}"
             )
 
 
@@ -184,12 +193,18 @@ def test_known_oracle_independence_truth(rows):
     # tpcds is cardinality-only: row counts come from the published TPC answer sets
     # (an authority on cardinality), values unchecked -> semi-independent.
     assert by_id["tpcds"]["independence"] == INDEPENDENCE_SEMI
-    # cross-surface / variant gates compare a benchmark's DataFrame/variant surface to
-    # its OWN SQL surface (shared spec) -> self-referential.
-    for benchmark in ("ssb", "amplab", "coffeeshop", "tpchavoc"):
-        assert by_id[benchmark]["independence"] == INDEPENDENCE_SELF, (
-            f"{benchmark} cross-surface/variant oracle should be self-referential"
-        )
+    # cross-surface gates now disclose surface provenance, not one coarse label.
+    for benchmark in ("ssb", "joinorder_synthetic"):
+        assert by_id[benchmark]["independence"] == INDEPENDENCE_SHARED_SPEC
+    for benchmark in ("clickbench", "read_primitives"):
+        assert by_id[benchmark]["independence"] == INDEPENDENCE_MIXED
+    for benchmark in ("amplab", "coffeeshop", "h2odb"):
+        assert by_id[benchmark]["independence"] == INDEPENDENCE_SEPARATE
+    assert "separately handwritten" in by_id["coffeeshop"]["independence_rationale"]
+
+    # TPC-Havoc variant gates still compare against their own canonical/variant
+    # surfaces rather than an external authority.
+    assert by_id["tpchavoc"]["independence"] == INDEPENDENCE_SELF
 
 
 def test_independence_is_derived_from_value_digest_signal(monkeypatch):
@@ -215,8 +230,11 @@ def test_independence_is_derived_from_value_digest_signal(monkeypatch):
     assert flipped_off["tpch"]["strength"] == STRENGTH_CARDINALITY
     assert flipped_off["tpch"]["independence"] == INDEPENDENCE_SEMI
 
-    # And the pure classifier agrees (orthogonal to the cross-surface KIND).
+    # And the pure classifier agrees (orthogonal to the cross-surface KIND). A
+    # cross-surface row needs benchmark metadata to refine beyond the conservative
+    # fallback; variant gates remain self-referential.
     assert oracle_reference_independence(ORACLE_CROSS_SURFACE, STRENGTH_VALUE) == INDEPENDENCE_SELF
+    assert oracle_reference_independence(ORACLE_CROSS_SURFACE, STRENGTH_VALUE, "coffeeshop") == INDEPENDENCE_SEPARATE
     assert oracle_reference_independence(ORACLE_VARIANT_EQUIVALENCE, STRENGTH_VALUE) == INDEPENDENCE_SELF
 
 
@@ -245,14 +263,14 @@ def test_tpch_row_discloses_sf1_value_blindness(rows):
 def test_independence_does_not_overload_strength(rows):
     """The independence axis is a SEPARATE column, never folded into Strength.
 
-    A `value-level` cross-surface cell (self-referential) and the `value+cardinality`
-    tpch cell (self-referential) share an independence label but keep distinct Strength
-    labels -- proving the axes are orthogonal columns, not one merged signal.
+    A `value-level` variant cell and the `value+cardinality` tpch cell share an
+    independence label but keep distinct Strength labels -- proving the axes are
+    orthogonal columns, not one merged signal.
     """
     by_id = {r["benchmark"]: r for r in rows}
-    assert by_id["ssb"]["strength"] == STRENGTH_VALUE
+    assert by_id["tpchavoc"]["strength"] == STRENGTH_VALUE
     assert by_id["tpch"]["strength"] == STRENGTH_VALUE_AND_CARDINALITY
-    assert by_id["ssb"]["independence"] == by_id["tpch"]["independence"] == INDEPENDENCE_SELF
+    assert by_id["tpchavoc"]["independence"] == by_id["tpch"]["independence"] == INDEPENDENCE_SELF
 
 
 def test_cross_surface_enforced_distinguishes_registered_from_verified_green(rows):
