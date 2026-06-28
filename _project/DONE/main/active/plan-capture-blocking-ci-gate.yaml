@@ -2,7 +2,7 @@ id: plan-capture-blocking-ci-gate
 title: "Add a blocking plan-capture CI gate (the highest escaped-defect-density subsystem has no required check)"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -107,3 +107,4 @@ metadata:
   estimated_effort: "Medium"
   created_date: "2026-06-28"
   last_updated: "2026-06-28T00:00:00"
+completed_date: "2026-06-28"
