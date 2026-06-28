@@ -89,7 +89,22 @@ jobs:
             exit 0
           fi
           mapfile -t yaml_paths < .ci-paths/yaml.txt
-          uv run -- pre-commit run check-yaml --files "${yaml_paths[@]}"
+          # The changed-path lists include deletions; a deleted file path passed
+          # to check-yaml would fail the hook on a legitimate deletion-only PR
+          # (mirrors the TODO-graph step's deleted-path skip below).
+          existing_yaml_paths=()
+          for yaml_path in "${yaml_paths[@]}"; do
+            if [ -e "$yaml_path" ]; then
+              existing_yaml_paths+=("$yaml_path")
+            else
+              echo "Skipping deleted YAML path: $yaml_path"
+            fi
+          done
+          if [ ${#existing_yaml_paths[@]} -eq 0 ]; then
+            echo "No existing YAML content paths to lint."
+            exit 0
+          fi
+          uv run -- pre-commit run check-yaml --files "${existing_yaml_paths[@]}"
 
       - name: Validate artifact hygiene
         run: uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
@@ -102,7 +117,21 @@ jobs:
             exit 0
           fi
           mapfile -t markdown_paths < .ci-paths/markdown.txt
-          uv run -- pre-commit run markdownlint --files "${markdown_paths[@]}"
+          # Skip deleted paths so a deletion-only markdown PR doesn't fail the
+          # hook on a path that no longer exists (see the YAML step above).
+          existing_markdown_paths=()
+          for markdown_path in "${markdown_paths[@]}"; do
+            if [ -e "$markdown_path" ]; then
+              existing_markdown_paths+=("$markdown_path")
+            else
+              echo "Skipping deleted markdown path: $markdown_path"
+            fi
+          done
+          if [ ${#existing_markdown_paths[@]} -eq 0 ]; then
+            echo "No existing markdown content paths to lint."
+            exit 0
+          fi
+          uv run -- pre-commit run markdownlint --files "${existing_markdown_paths[@]}"
 
       - name: Validate TODO graph
         shell: bash

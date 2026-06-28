@@ -32,6 +32,7 @@ from typing import Literal
 
 from .downloader import download, sha256_of
 from .errors import ChecksumMismatchError, DataFetchError
+from .locking import archive_lock
 from .manifest import DataManifest, load_manifest
 
 
@@ -147,27 +148,47 @@ def fetch_data(
     # against the manifest) and tell the caller it must extract.
     archive_name = archive_filename or Path(manifest.url).name or f"{benchmark_id}.tar.zst"
     archive_path = out / archive_name
-    if archive_path.exists() and sha256_of(archive_path) == manifest.archive_sha256:
+
+    # Serialize the check-download-verify handoff per archive: two callers
+    # that both saw the files missing must not both download. The first to
+    # acquire the lock publishes a verified archive; the rest reuse it.
+    with archive_lock(archive_path):
+        # Re-check inside the lock — another process may have completed the
+        # download (and extraction) while we were waiting for it.
+        bad = _verify_table_files(manifest, out)
+        if not bad:
+            return out
+
+        mismatches = [b for b in bad if b.kind == "sha_mismatch"]
+        if mismatches:
+            first = mismatches[0]
+            raise ChecksumMismatchError(
+                path=str(out / first.file),
+                expected_sha256=first.expected_sha256 or "",
+                actual_sha256=first.actual_sha256 or "",
+            )
+
+        if archive_path.exists() and sha256_of(archive_path) == manifest.archive_sha256:
+            raise ExtractionRequiredError(archive_path=str(archive_path), output_dir=str(out))
+
+        fetch = downloader or download
+        fetch(manifest.url, archive_path, expected_sha256=manifest.archive_sha256)
+
+        # Re-verify post-download. If the caller (e.g., test stub) has
+        # arranged for the per-table files to materialize, we're done.
+        bad = _verify_table_files(manifest, out)
+        if not bad:
+            return out
+
+        mismatches = [b for b in bad if b.kind == "sha_mismatch"]
+        if mismatches:
+            first = mismatches[0]
+            raise ChecksumMismatchError(
+                path=str(out / first.file),
+                expected_sha256=first.expected_sha256 or "",
+                actual_sha256=first.actual_sha256 or "",
+            )
+
+        # Archive present, table files still missing — extraction is the
+        # caller's responsibility. Surface a typed error.
         raise ExtractionRequiredError(archive_path=str(archive_path), output_dir=str(out))
-
-    fetch = downloader or download
-    fetch(manifest.url, archive_path, expected_sha256=manifest.archive_sha256)
-
-    # Re-verify post-download. If the caller (e.g., test stub) has
-    # arranged for the per-table files to materialize, we're done.
-    bad = _verify_table_files(manifest, out)
-    if not bad:
-        return out
-
-    mismatches = [b for b in bad if b.kind == "sha_mismatch"]
-    if mismatches:
-        first = mismatches[0]
-        raise ChecksumMismatchError(
-            path=str(out / first.file),
-            expected_sha256=first.expected_sha256 or "",
-            actual_sha256=first.actual_sha256 or "",
-        )
-
-    # Archive present, table files still missing — extraction is the
-    # caller's responsibility. Surface a typed error.
-    raise ExtractionRequiredError(archive_path=str(archive_path), output_dir=str(out))
