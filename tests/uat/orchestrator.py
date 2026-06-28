@@ -323,9 +323,18 @@ def run_sweep(  # noqa: C901
                     source_info=source_info,
                     aborted_phase=phase,
                     abort_reason=abort_reason,
+                    # run_execute annotates the abort with the unreachable
+                    # cells skipped before the disk-floor trip; without this
+                    # the abort report would drop them from total_defined.
+                    skipped_unreachable_count=getattr(exc, "skipped_unreachable_count", 0),
                 )
                 break
-            _write_cells_jsonl(cells_jsonl, execute_outcome.results, source_info=source_info)
+            _write_cells_jsonl(
+                cells_jsonl,
+                execute_outcome.results,
+                source_info=source_info,
+                skipped_unreachable_count=len(getattr(execute_outcome, "skipped_unreachable", ())),
+            )
             _write_compatibility_pruned_jsonl(
                 compatibility_pruned_jsonl,
                 getattr(execute_outcome, "compatibility_pruned", ()),
@@ -497,6 +506,7 @@ def _emit_abort_artifacts(
     source_info: RunSourceInfo,
     aborted_phase: str,
     abort_reason: str | None,
+    skipped_unreachable_count: int | None = None,
 ) -> None:
     cells = tuple(getattr(execute_outcome, "results", ())) if execute_outcome is not None else tuple(attempted)
     compatibility_pruned = (
@@ -505,7 +515,20 @@ def _emit_abort_artifacts(
         else _compatibility_pruned_for_config(config)
     )
     early_stop_pruned_count = len(getattr(execute_outcome, "pruned", ())) if execute_outcome is not None else 0
-    _write_cells_jsonl(log_dir / "cells.jsonl", cells, source_info=source_info)
+    # When the execute outcome is available, derive the unreachable count from
+    # it; otherwise (e.g. a mid-sweep DiskFloorAbort that bypassed the normal
+    # return) fall back to the count threaded in via `skipped_unreachable_count`
+    # so the abort report still reflects platforms skipped before the abort.
+    if skipped_unreachable_count is None:
+        skipped_unreachable_count = (
+            len(getattr(execute_outcome, "skipped_unreachable", ())) if execute_outcome is not None else 0
+        )
+    _write_cells_jsonl(
+        log_dir / "cells.jsonl",
+        cells,
+        source_info=source_info,
+        skipped_unreachable_count=skipped_unreachable_count,
+    )
     _write_compatibility_pruned_jsonl(log_dir / "compatibility_pruned.jsonl", compatibility_pruned)
     report_phase.write_report(
         cells,
@@ -514,9 +537,7 @@ def _emit_abort_artifacts(
         cross_scale_floor=config.report.cross_scale_coverage_min_pairs,
         compatibility_pruned_count=len(compatibility_pruned),
         early_stop_pruned_count=early_stop_pruned_count,
-        skipped_unreachable_count=len(getattr(execute_outcome, "skipped_unreachable", ()))
-        if execute_outcome is not None
-        else 0,
+        skipped_unreachable_count=skipped_unreachable_count,
         source_info=source_info,
         run_status="ABORTED",
         abort_phase=aborted_phase,
@@ -534,8 +555,27 @@ def _compatibility_pruned_for_config(config: UATConfig) -> tuple[Any, ...]:
     return tuple(exec_phase.enumerate_cells_with_pruning(config).compatibility_pruned)
 
 
-def _write_cells_jsonl(path: Path, cells: Iterable[CellResult], *, source_info: RunSourceInfo) -> None:
+def _cells_accounting_path(cells_jsonl: Path) -> Path:
+    """Sidecar that persists accounting counts not representable as cell rows."""
+    return cells_jsonl.with_name(cells_jsonl.name + ".accounting.json")
+
+
+def _write_cells_jsonl(
+    path: Path,
+    cells: Iterable[CellResult],
+    *,
+    source_info: RunSourceInfo,
+    skipped_unreachable_count: int = 0,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    # The skipped-unreachable cells are `Cell` records (not `CellResult` rows)
+    # and are therefore not part of the JSONL stream. Persist their count in a
+    # sidecar so a report regenerated from `cells.jsonl` (make uat-report) can
+    # read it back and keep `total_defined` faithful.
+    accounting_path = _cells_accounting_path(path)
+    with accounting_path.open("w", encoding="utf-8") as acc_fh:
+        json.dump({"skipped_unreachable_count": int(skipped_unreachable_count)}, acc_fh)
+        acc_fh.write("\n")
     with path.open("w", encoding="utf-8") as fh:
         for cell in cells:
             terminal_state = report_phase.terminal_state(cell)

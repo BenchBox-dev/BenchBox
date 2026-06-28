@@ -71,3 +71,72 @@ def test_report_counts_execute_unreachable_cells_outside_rows(tmp_path: Path):
     text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
     assert "compatibility_pruned=2 early_stop_pruned=1 attempted=3 skipped=3 unreachable=4 total_defined=10" in text
     assert "# UNREACHABLE_CELLS=4 release_gate_attention=required" in text
+
+
+def test_report_cli_reads_skipped_unreachable_sidecar(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    """A report regenerated from cells.jsonl must read skipped-unreachable
+    cells back from the durable sidecar instead of printing unreachable: 0."""
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        "\n".join(
+            json.dumps(
+                {
+                    "platform": "duckdb",
+                    "benchmark": "tpch",
+                    "scale": 0.01,
+                    "status": "passed",
+                    "exit_code": 0,
+                    "elapsed_s": 1.0,
+                    "log_path": "/tmp/a.log",
+                    "result_path": "/tmp/a.json",
+                }
+            )
+            for _ in range(2)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    # The durable sweep writes this sidecar next to cells.jsonl.
+    cells_jsonl.with_name("cells.jsonl.accounting.json").write_text(
+        json.dumps({"skipped_unreachable_count": 3}), encoding="utf-8"
+    )
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["unreachable"] == 3
+    assert payload["attempted"] == 2
+    assert payload["total_defined"] == 5
+    text = output_tsv.read_text(encoding="utf-8")
+    assert "# UNREACHABLE_CELLS=3 release_gate_attention=required" in text
+
+
+def test_report_cli_without_sidecar_defaults_unreachable_zero(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    """Older artifacts predate the sidecar; the report must still regenerate."""
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        json.dumps(
+            {
+                "platform": "duckdb",
+                "benchmark": "tpch",
+                "scale": 0.01,
+                "status": "passed",
+                "exit_code": 0,
+                "elapsed_s": 1.0,
+                "log_path": "/tmp/a.log",
+                "result_path": "/tmp/a.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["unreachable"] == 0
+    assert payload["total_defined"] == 1

@@ -360,6 +360,15 @@ jobs:
             tests/integration/test_cross_surface_mutation_sensitivity.py::test_targets_cover_every_enforced_gate \
             -m "slow" -n 0 --tb=short -q
 
+      - name: Run cross-surface GATES Make/CI pinning guard
+        run: |
+          # Medium-marked ratchet, so the fast-lane selection below skips it;
+          # invoke the node explicitly so a new GATES entry without its Make
+          # target + correctness-gate CI step fails required CI.
+          uv run -- python -m pytest \
+            tests/unit/test_standardized_test_commands.py::TestMakefileCommands::test_cross_surface_gates_are_pinned_in_make_and_ci \
+            -m "medium" -n 0 --tb=short -q
+
       - name: Run fast tests
         run: |
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)

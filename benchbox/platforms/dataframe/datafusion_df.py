@@ -546,8 +546,17 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
             df = self.session_ctx.read_csv(path_str)
 
         if null_marker is None and string_columns:
+            # For headerless CSV with a declared schema (e.g. ClickBench's
+            # generated hits.csv), this non-.tbl path never applies
+            # `column_names`, so the frame columns are DataFusion's inferred
+            # names (column_1, …) rather than the benchmark schema names.
+            # Guard each coalesce on membership in the frame's actual columns
+            # so a declared string column that isn't present by name does not
+            # raise on `col(<schema_name>)` and abort the load.
+            present_columns = {field.name for field in df.schema()}
             for name in string_columns:
-                df = df.with_column(name, f.coalesce(col(name), lit("")))
+                if name in present_columns:
+                    df = df.with_column(name, f.coalesce(col(name), lit("")))
 
         return df
 
