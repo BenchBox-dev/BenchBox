@@ -3,7 +3,8 @@ title: "Plan-capture robustness: explicit phase-eligibility, bounded timeout-thr
   honesty"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-06-28"
 category: Code Quality and Technical Debt
 
 description: |
