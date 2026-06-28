@@ -384,12 +384,27 @@ class CrossSurfaceGate:
     legitimately_empty: dict[Any, str] = field(default_factory=dict)
     backends: tuple[str, ...] = DATAFRAME_BACKENDS
     tolerance: float = 1e-10
+    # Comparator widening is strict by default. Enable these only for a gate with
+    # documented engine decode behavior that otherwise reports presentational
+    # NULL/CHAR differences rather than logical result differences.
+    treat_nan_as_null: bool = False
+    strip_strings: bool = False
     # Per-gate data scale for the bounded cell. Defaults to the shared
     # EQUIVALENCE_SCALE so every gate stays cheap; a gate raises it ONLY when a
     # larger (still bounded) cell is the cheapest way to make its queries
     # discriminating. Kept on the gate (not a global) so one benchmark's data
     # needs never inflate every other gate's cost.
     scale_factor: float = EQUIVALENCE_SCALE
+
+    def build_validator(self) -> ResultValidator:
+        """Create the comparator configured for this gate's documented tolerances."""
+        from benchbox.core.tpchavoc.validation import ResultValidator
+
+        return ResultValidator(
+            tolerance=self.tolerance,
+            treat_nan_as_null=self.treat_nan_as_null,
+            strip_strings=self.strip_strings,
+        )
 
 
 def find_cross_surface_divergences(
@@ -1245,6 +1260,10 @@ GATES: dict[str, CrossSurfaceGate] = {
         build=build_read_primitives_duckdb,
         known_divergences=_READ_PRIMITIVES_KNOWN_DIVERGENCES,
         legitimately_empty=_READ_PRIMITIVES_LEGITIMATELY_EMPTY,
+        # Pandas decodes selected SQL NULL cells as NaN in object/numeric result
+        # columns (for example MAP lookup misses and LEAD/LAG frame edges). Keep
+        # the global comparator strict; opt in only for this gate's decode path.
+        treat_nan_as_null=True,
         scale_factor=_READ_PRIMITIVES_SCALE,
     ),
 }
@@ -1270,8 +1289,6 @@ def run_gate(gate: CrossSurfaceGate) -> int:
     """Run one benchmark's cross-surface gate and print a categorized report."""
     import tempfile
 
-    from benchbox.core.tpchavoc.validation import ResultValidator
-
     with tempfile.TemporaryDirectory() as tmp:
         data = gate.build(gate.scale_factor, Path(tmp))
         connection = data.connection
@@ -1286,7 +1303,7 @@ def run_gate(gate: CrossSurfaceGate) -> int:
                 reference_sql=data.reference_sql,
                 dataframe_query=data.dataframe_query,
                 contexts=contexts,
-                validator=ResultValidator(tolerance=gate.tolerance),
+                validator=gate.build_validator(),
                 backends=gate.backends,
                 reference_row_counts=reference_row_counts,
             )

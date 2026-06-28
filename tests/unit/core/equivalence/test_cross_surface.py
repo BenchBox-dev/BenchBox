@@ -615,6 +615,19 @@ def test_clickbench_and_joinorder_are_enforced_gates():
     assert "ssb" in GATES
 
 
+def test_read_primitives_gate_opts_into_documented_nan_null_decode_tolerance():
+    """Read Primitives keeps strict defaults global while opting in for pandas NULL decode."""
+    from benchbox.core.equivalence.cross_surface import GATES
+
+    gate = GATES["read_primitives"]
+    validator = gate.build_validator()
+
+    assert gate.treat_nan_as_null is True
+    assert validator.treat_nan_as_null is True
+    assert validator.strip_strings is False
+    assert GATES["ssb"].build_validator().treat_nan_as_null is False
+
+
 def test_h2odb_is_an_enforced_gate_with_classified_percentile_exception():
     """H2O-DB is an enforced GATE; its only baseline entry is Q9's DECIMAL percentile.
 
