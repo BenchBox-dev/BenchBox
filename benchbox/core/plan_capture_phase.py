@@ -135,6 +135,12 @@ def run_plan_capture_phase(
     result = PlanCapturePhaseResult()
 
     owns_connection = connection is None
+    # The caller-supplied path passes the measurement connection precisely so an
+    # in-memory database / temporary tables / session-scoped state stay visible
+    # during EXPLAIN. A fresh connection cannot see that state, so we must never
+    # silently reopen a caller-owned connection (captured before the timeout
+    # branch flips ``owns_connection``).
+    caller_supplied_connection = not owns_connection
     owned_connections: list[Any] = []
     if close_connection is None:
         close_connection = owns_connection
@@ -168,6 +174,16 @@ def run_plan_capture_phase(
                 result.failed += 1
             new_failures = getattr(adapter, "plan_capture_errors", [])[failure_count_before:]
             if index != last_index and any(failure.get("reason") == "timeout" for failure in new_failures):
+                # A timeout can leave the connection unusable, so remaining captures
+                # normally continue on a fresh connection. But for a caller-supplied
+                # connection a fresh one cannot see the in-memory/session-scoped state
+                # (default ``:memory:`` DuckDB/SQLite), so reopening would run the
+                # remaining EXPLAINs against an empty or wrong schema — describing the
+                # wrong plan or failing outright. Skip the rest instead, counting them
+                # as failed so coverage is reported honestly rather than silently.
+                if caller_supplied_connection:
+                    result.failed += last_index - index
+                    break
                 if owns_connection and connection is not None:
                     with contextlib.suppress(Exception):
                         connection.close()

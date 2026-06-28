@@ -261,26 +261,73 @@ def test_plan_capture_returns_zero_time_when_disabled() -> None:
     assert capture_time_ms == 0.0
 
 
-def test_capture_phase_replaces_connection_after_timeout() -> None:
-    """A timed-out EXPLAIN must not poison later captures in the same phase."""
+def test_capture_phase_replaces_owned_connection_after_timeout() -> None:
+    """A timed-out EXPLAIN must not poison later captures when the phase owns the
+    connection: it closes the poisoned one and reopens a fresh connection so the
+    remaining captures still run."""
     release_explain = threading.Event()
-    original_connection = object()
-    replacement_connection = object()
     created_connections: list[object] = []
     capture_connections: list[object] = []
 
     class FencedAdapter(DummyAdapter):
         def create_connection(self, **connection_config) -> Any:
-            created_connections.append(replacement_connection)
-            return replacement_connection
+            connection = object()
+            created_connections.append(connection)
+            return connection
 
         def get_query_plan(self, connection: Any, query: str) -> Any:
             capture_connections.append(connection)
             if query == "SELECT slow":
                 release_explain.wait(timeout=30)
                 return "SLOW PLAN"
-            if connection is original_connection:
+            if connection is created_connections[0]:
                 raise AssertionError("timed-out connection was reused for a later capture")
+            return "FAST PLAN"
+
+    adapter = FencedAdapter(
+        capture_plans=True,
+        plan_capture_timeout_seconds=1,
+        parser=_QuickParser(),
+    )
+
+    try:
+        # connection=None => the phase opens (and owns) the connection, so it is
+        # safe to close and reopen after a timeout.
+        result = run_plan_capture_phase(
+            adapter,
+            [("slow", "SELECT slow"), ("fast", "SELECT fast")],
+        )
+    finally:
+        release_explain.set()
+
+    assert result.failed == 1
+    assert result.captured == 1
+    assert set(result.plans) == {"fast"}
+    # First (poisoned) and second (fresh) connections both came from create_connection.
+    assert len(created_connections) == 2
+    assert capture_connections[:2] == [created_connections[0], created_connections[1]]
+
+
+def test_capture_phase_skips_remaining_on_caller_connection_timeout() -> None:
+    """A caller-supplied connection carries in-memory/session-scoped state that a
+    fresh connection cannot see, so after a timeout the phase must NOT reopen it
+    (that would EXPLAIN against an empty/wrong schema). It skips the remaining
+    captures instead, counting them as failed and never calling create_connection."""
+    release_explain = threading.Event()
+    original_connection = object()
+    created_connections: list[object] = []
+    capture_connections: list[object] = []
+
+    class FencedAdapter(DummyAdapter):
+        def create_connection(self, **connection_config) -> Any:
+            created_connections.append(object())
+            raise AssertionError("caller-supplied connection must not be reopened after a timeout")
+
+        def get_query_plan(self, connection: Any, query: str) -> Any:
+            capture_connections.append(connection)
+            if query == "SELECT slow":
+                release_explain.wait(timeout=30)
+                return "SLOW PLAN"
             return "FAST PLAN"
 
     adapter = FencedAdapter(
@@ -298,11 +345,13 @@ def test_capture_phase_replaces_connection_after_timeout() -> None:
     finally:
         release_explain.set()
 
-    assert result.failed == 1
-    assert result.captured == 1
-    assert set(result.plans) == {"fast"}
-    assert capture_connections[:2] == [original_connection, replacement_connection]
-    assert created_connections == [replacement_connection]
+    # The slow query timed out; the fast query was skipped (not reopened/run).
+    assert result.captured == 0
+    assert result.failed == 2
+    assert result.plans == {}
+    assert created_connections == []
+    # Only the slow capture ran, on the caller's connection; the fast one never ran.
+    assert capture_connections == [original_connection]
 
 
 def test_plan_query_filter_only_captures_specified_queries() -> None:

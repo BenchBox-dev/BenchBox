@@ -114,6 +114,23 @@ def _plan_capture_key(query_id: Any, sql: str) -> str:
     return f"{query_id}#{sql_digest}"
 
 
+# Matches the ``#<16-hex-digest>`` suffix that ``_plan_capture_key`` appends, so the
+# public query id can be recovered from an internal capture key for filter matching
+# (the isolated phase keys queries by the internal key, not the user-facing id).
+_PLAN_CAPTURE_KEY_SUFFIX_RE = re.compile(r"#[0-9a-f]{16}$")
+
+
+def _plan_capture_public_id(query_id: str) -> str:
+    """Recover the public query id from a capture key (``<public>#<digest>``).
+
+    ``--plan-queries`` filters on user-facing ids (``q1``), but the isolated
+    capture phase passes the internal :func:`_plan_capture_key` as the capture
+    query id. Stripping only the exact 16-hex digest suffix leaves a genuine
+    ``#``-bearing id untouched unless it actually ends in a capture digest.
+    """
+    return _PLAN_CAPTURE_KEY_SUFFIX_RE.sub("", query_id)
+
+
 def _has_top_level_keyword(statement: str, keyword: str, followed_by: re.Pattern[str] | None = None) -> bool:
     """Return True when ``keyword`` appears at paren depth 0 outside quotes.
 
@@ -823,7 +840,16 @@ class ResultCaptureMixin:
         # machinery: the canonical model captures each distinct query exactly once
         # in the isolated post-measurement phase, so plan_first_n / plan_sampling_rate
         # no longer exist.
-        if self.plan_query_filter and query_id not in self.plan_query_filter:
+        # Match the filter against the public query id. The isolated capture
+        # phase passes the internal capture key (``<public>#<digest>``) as the
+        # capture query id, so filtering on the raw value would reject a normal
+        # ``--plan-queries q1`` and silently produce no plans. Fall back to the
+        # public id recovered from the key; the inline path passes a bare public
+        # id, which is unchanged by the recovery.
+        if self.plan_query_filter and (
+            query_id not in self.plan_query_filter
+            and _plan_capture_public_id(query_id) not in self.plan_query_filter
+        ):
             return None, 0.0
 
         start_time = time.perf_counter()
