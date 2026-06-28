@@ -1011,11 +1011,15 @@ class TestExpressionWindow:
         return _to_pandas(query.expression_impl(self.ctx))
 
     def test_window_row_number(self):
-        """ROW_NUMBER() OVER (PARTITION BY l_orderkey ORDER BY l_extendedprice DESC)."""
+        """ROW_NUMBER() OVER (PARTITION BY o_custkey ORDER BY o_totalprice DESC) as order_rank."""
         result = self._execute("window_row_number")
-        assert "row_num" in result.columns
-        # All row_nums should be <= 3
-        assert result["row_num"].max() <= 3
+        assert "order_rank" in result.columns
+        # ROW_NUMBER per o_custkey partition: every partition starts at 1 and its
+        # ranks form a contiguous 1..n sequence.
+        assert result["order_rank"].min() == 1
+        for _, group in result.groupby("o_custkey"):
+            ranks = sorted(int(rank) for rank in group["order_rank"].tolist())
+            assert ranks == list(range(1, len(ranks) + 1))
 
     def test_window_rank(self):
         """RANK() OVER (PARTITION BY l_returnflag ORDER BY l_quantity DESC)."""

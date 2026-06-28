@@ -851,6 +851,60 @@ def build_h2odb_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceDat
     )
 
 
+def build_read_primitives_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
+    """Generate Read Primitives data, load it into DuckDB, and wire both surfaces.
+
+    Read Primitives reuses the canonical TPC-H schema (8 tables) and dbgen-based
+    generator, so the bounded cell is reproducible for a given scale. Unlike
+    ssb/h2odb - whose canonical SQL is already DuckDB-native - Read Primitives
+    ships a rich per-dialect *catalog-variant* system: its canonical SQL uses
+    portable/ANSI forms (``TRANSFORM``, ``STRUCT(...)``, ``APPROX_*``) that DuckDB
+    does not accept verbatim. The trusted reference here is therefore the
+    DuckDB-DIALECT surface - ``benchmark.get_queries(dialect="duckdb")``, which
+    returns each query's authored DuckDB catalog variant verbatim and translates
+    the rest - NOT the raw canonical SQL, so the comparison runs the SQL a DuckDB
+    production run would actually execute.
+
+    The DataFrame registry keys 152 queries by ids that are a strict subset of the
+    157 SQL ids (the 5 SQL-only ids are the documented ``get_skip_for_dataframe``
+    set). Four of those 152 - ``fulltext_*`` (FTS, no portable DuckDB form) and
+    ``json_extract_simple`` (skipped on duckdb) - have NO DuckDB SQL surface
+    (``get_queries(dialect="duckdb")`` drops them), so there is no DuckDB reference
+    to compare and they are excluded here, leaving 148 gateable queries. The
+    exclusion is the same discipline as a missing-backend skip: there is genuinely
+    nothing to compare on this engine, not a muted divergence.
+
+    Platform/generator imports are deferred so importing this module stays cheap.
+    """
+    from benchbox.core.read_primitives.benchmark import ReadPrimitivesBenchmark
+    from benchbox.core.read_primitives.dataframe_queries import get_dataframe_queries
+    from benchbox.core.read_primitives.schema import TABLES
+
+    output_dir = Path(output_dir)
+    benchmark = ReadPrimitivesBenchmark(scale_factor=scale_factor, output_dir=output_dir)
+    benchmark.data_generator.output_dir = output_dir
+    benchmark.data_generator.generate_data()
+
+    # The DuckDB-dialect surface is the trusted reference (catalog variants
+    # verbatim + translation). Computed once; queries DuckDB cannot transpile are
+    # absent from this dict and are filtered out of the gateable id set below.
+    duckdb_sql = benchmark.get_queries(dialect="duckdb")
+    registry = get_dataframe_queries()
+    gateable_ids = [qid for qid in registry.get_query_ids() if qid in duckdb_sql]
+
+    connection = _load_duckdb_cell(
+        benchmark, output_dir, [table["name"] for table in TABLES.values()], label="Read Primitives"
+    )
+    return CrossSurfaceData(
+        connection=connection,
+        query_ids=gateable_ids,
+        reference_sql=lambda query_id: duckdb_sql[query_id],
+        dataframe_query=lambda query_id: registry.get_or_raise(query_id),
+        benchmark=benchmark,
+        data_dir=output_dir,
+    )
+
+
 # Q18 is `SELECT UserID, SearchPhrase, COUNT(*) ... GROUP BY ... LIMIT 10` with NO
 # ORDER BY: at SF=0.1 the GROUP BY yields ~97k groups and the bare LIMIT keeps an
 # arbitrary 10, so the SQL and DataFrame surfaces each return a different - but
@@ -1052,6 +1106,88 @@ _H2ODB_KNOWN_DIVERGENCES: dict[str, str | ClassifiedDivergence] = dict.fromkeys(
 )
 
 
+# Read Primitives classified cells. As a *primitives* benchmark it deliberately
+# exercises engine features that have no faithful exact DataFrame equivalent:
+# approximate sketches, DECIMAL-scale arithmetic, JSON text, and a Polars Map gap.
+# Each is the last-resort classification (with rationale), not a masked defect.
+_READ_PRIMITIVES_APPROX = (
+    "DuckDB APPROX_COUNT_DISTINCT (HyperLogLog) and APPROX_QUANTILE (T-Digest) are "
+    "inherently approximate sketches; the DataFrame computes the exact distinct "
+    "count / quantile, so the values differ by the sketch's error - approximate by "
+    "construction, not a logic divergence."
+)
+_READ_PRIMITIVES_DECIMAL_PERCENTILE = (
+    "PERCENTILE_CONT over DECIMAL(15,2) returns a 2-decimal value on the SQL surface; "
+    "the DataFrame interpolates in float64. Both use linear interpolation - only the "
+    "DECIMAL result scale differs (sub-cent), the same presentational class as h2odb Q9."
+)
+_READ_PRIMITIVES_DECIMAL_ROUND = (
+    "ROUND() of a DECIMAL revenue (DuckDB, exact) vs the same product computed in "
+    "float64 (DataFrame) flips at a half-cent rounding boundary; a DECIMAL-vs-float "
+    "presentational residue (every other column matches), not a logic divergence."
+)
+_READ_PRIMITIVES_ARGMIN_TIE = (
+    "ARG_MIN(p_name, p_retailprice) is non-deterministic when several parts in a brand "
+    "share the minimum retail price; DuckDB's tie pick is engine-defined and not "
+    "reproducible by a fixed DataFrame tie-break (the min_price value matches exactly)."
+)
+_READ_PRIMITIVES_JSON_TEXT = (
+    "JSON_GROUP_ARRAY/JSON_GROUP_OBJECT return JSON *text* with engine-defined element/"
+    "key order and number formatting; the DataFrame produces native list/dict "
+    "containers. Representational difference, not a logic divergence."
+)
+_READ_PRIMITIVES_POLARS_MAP = (
+    "Polars (the expression backend) has no native Map dtype, so MAP_FROM_ENTRIES is "
+    "unsupported (the query is in the benchmark's SKIP_FOR_POLARS set); there is no "
+    "expression-surface result to compare. The pandas surface matches its SQL."
+)
+# Read Primitives bounded-cell scale. Its TPC-H generator base means SF=1.0 is
+# ~6M lineitem rows; SF=0.05 gives a ~300k-row cell that keeps the selective
+# filter/aggregate queries discriminating while staying a single bounded cell.
+_READ_PRIMITIVES_SCALE = 0.05
+
+_READ_PRIMITIVES_KNOWN_DIVERGENCES: dict[str, str] = {
+    **dict.fromkeys(
+        (
+            "approx_count_distinct_simple_expression",
+            "approx_count_distinct_simple_pandas",
+            "approx_count_distinct_groupby_expression",
+            "approx_count_distinct_groupby_pandas",
+            "approx_quantile_groupby_expression",
+            "approx_quantile_groupby_pandas",
+        ),
+        _READ_PRIMITIVES_APPROX,
+    ),
+    **dict.fromkeys(
+        ("statistical_percentiles_expression", "statistical_percentiles_pandas"),
+        _READ_PRIMITIVES_DECIMAL_PERCENTILE,
+    ),
+    **dict.fromkeys(
+        ("optimizer_common_subexpression_expression", "optimizer_common_subexpression_pandas"),
+        _READ_PRIMITIVES_DECIMAL_ROUND,
+    ),
+    **dict.fromkeys(("min_by_complex_expression", "min_by_complex_pandas"), _READ_PRIMITIVES_ARGMIN_TIE),
+    **dict.fromkeys(("json_aggregates_expression", "json_aggregates_pandas"), _READ_PRIMITIVES_JSON_TEXT),
+    **dict.fromkeys(
+        ("map_access_expression", "map_construction_expression", "map_keys_values_expression"),
+        _READ_PRIMITIVES_POLARS_MAP,
+    ),
+}
+_READ_PRIMITIVES_LEGITIMATELY_EMPTY: dict[Any, str] = {
+    **dict.fromkeys(
+        ("filter_bigint_selective", "filter_decimal_selective", "filter_decimal_in_list_selective"),
+        "Highly selective exact-match filter whose literal does not occur in the bounded "
+        "SF=0.05 cell (an orderkey outside the generated range, or an exact DECIMAL price "
+        "that the generator never produces), so the SQL reference is empty.",
+    ),
+    "json_extract_nested": (
+        "TPC-H c_comment is free natural-language text, never valid JSON, so "
+        "WHERE JSON_VALID(c_comment) matches nothing at any scale - the benchmark has no "
+        "JSON source data. The DataFrame surface mirrors the empty result."
+    ),
+}
+
+
 # Registry of ENFORCED gated benchmarks: clean, blocking cross-surface gates whose
 # DataFrame surface matches its SQL surface. The oracle coverage map reads this set
 # to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
@@ -1085,15 +1221,30 @@ GATES: dict[str, CrossSurfaceGate] = {
         known_divergences=_H2ODB_KNOWN_DIVERGENCES,
         scale_factor=_H2ODB_SCALE,
     ),
+    # Read Primitives: a 152-query DataFrame surface vs its DuckDB-dialect SQL
+    # surface on a bounded ~300k-row TPC-H cell (SF=0.05). 148 gateable queries (the
+    # 4 fulltext/json ids DuckDB cannot transpile are excluded in the builder); every
+    # compared cell matches. The classified cells are the irreducible engine
+    # differences a primitives benchmark exercises - HyperLogLog/T-Digest
+    # approximations, DECIMAL-scale percentile/ROUND residues, ARG_MIN ties, JSON
+    # text, and the Polars Map-dtype gap - plus the legitimately-empty selective and
+    # no-JSON filters. Promoted from STAGED_GATES after the full burn-down.
+    "read_primitives": CrossSurfaceGate(
+        name="read_primitives",
+        build=build_read_primitives_duckdb,
+        known_divergences=_READ_PRIMITIVES_KNOWN_DIVERGENCES,
+        legitimately_empty=_READ_PRIMITIVES_LEGITIMATELY_EMPTY,
+        scale_factor=_READ_PRIMITIVES_SCALE,
+    ),
 }
 
 # Staged gates: a load-faithful builder is wired and runnable in report mode, but
 # the benchmark still has open cross-surface divergences to burn down before it can
 # be promoted into GATES (and made a blocking CI gate). Kept OUT of GATES so the
 # coverage map does not prematurely mark these benchmarks "guarded". Currently empty
-# - clickbench, joinorder_synthetic and h2odb graduated to GATES; the next gateable
-# benchmarks (datavault, flightdata, nyctaxi, read_primitives, tpcds_obt,
-# tpch_skew, tsbs_devops) land here first when their builders are wired.
+# - read_primitives graduated to GATES after its burn-down; the next gateable
+# benchmarks (datavault, flightdata, nyctaxi, tpcds_obt, tpch_skew, tsbs_devops)
+# land here first when their builders are wired.
 STAGED_GATES: dict[str, CrossSurfaceGate] = {}
 
 

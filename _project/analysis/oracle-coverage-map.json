@@ -187,15 +187,17 @@
     },
     {
       "benchmark": "read_primitives",
-      "cross_surface_applicable": true,
-      "cross_surface_enforced": null,
+      "cross_surface_applicable": false,
+      "cross_surface_enforced": true,
       "dual_surface": true,
-      "guarded": false,
-      "independence": "\u2014",
-      "oracles": [],
-      "primary_oracle": "NONE",
-      "scale": "\u2014",
-      "strength": "\u2014",
+      "guarded": true,
+      "independence": "self-referential",
+      "oracles": [
+        "cross-surface"
+      ],
+      "primary_oracle": "cross-surface",
+      "scale": "SF=0.05",
+      "strength": "value-level",
       "surfaces": [
         "sql",
         "dataframe"

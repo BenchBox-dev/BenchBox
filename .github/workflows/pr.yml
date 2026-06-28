@@ -419,6 +419,9 @@ jobs:
       - name: Run H2O-DB cross-surface SQL<->DataFrame equivalence gate
         run: make h2odb-cross-surface-equivalence-report
 
+      - name: Run Read Primitives cross-surface SQL<->DataFrame equivalence gate
+        run: make read-primitives-cross-surface-equivalence-report
+
   postgres-integration:
     name: postgres-integration
     needs: ci-paths
