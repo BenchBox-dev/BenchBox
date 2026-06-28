@@ -1333,9 +1333,13 @@ class TestDriversMixin:
         # shared lock since throughput streams run concurrently).
         phase_active = getattr(self, "_plan_capture_phase_active", False)
         executed_sql = getattr(op_result, "executed_sql", None)
+        plan_capture_key = None
         if phase_active and op_status == "SUCCESS" and executed_sql:
+            from benchbox.platforms.base.result_capture import _plan_capture_key
+
+            plan_capture_key = _plan_capture_key(query_id, executed_sql)
             with self._plan_capture_lock:
-                self._phase_recorded_queries.setdefault(str(query_id), executed_sql)
+                self._phase_recorded_queries.setdefault(plan_capture_key, executed_sql)
 
         result: dict[str, Any] = {
             "query_id": str(query_id),
@@ -1347,6 +1351,8 @@ class TestDriversMixin:
             "validation_passed": op_result.validation_passed,
             "cleanup_time": op_result.cleanup_duration_ms / 1000.0,
         }
+        if plan_capture_key is not None:
+            result["_plan_capture_key"] = plan_capture_key
         if op_result.skip_reason:
             result["skip_reason"] = op_result.skip_reason
         return result
@@ -1531,14 +1537,16 @@ class TestDriversMixin:
         """
         from benchbox.core.plan_capture_phase import run_plan_capture_phase
 
-        # The recorded buffer is keyed by str(query_id); result rows may carry a
-        # non-str query_id (TPC-H power/throughput rows use the integer query
-        # permutation id), so coerce to str on every lookup or the merge silently
-        # never matches and plans fail to land.
+        # The recorded buffer is keyed by an internal capture key derived from the
+        # result's query_id plus exact executed SQL. Result rows produced before that
+        # key existed (or tests constructing rows by hand) fall back to str(query_id).
         success_queries = {
-            str(result["query_id"]): queries[str(result["query_id"])]
+            str(result.get("_plan_capture_key") or result["query_id"]): queries[
+                str(result.get("_plan_capture_key") or result["query_id"])
+            ]
             for result in results
-            if result.get("status") == "SUCCESS" and str(result.get("query_id")) in queries
+            if result.get("status") == "SUCCESS"
+            and str(result.get("_plan_capture_key") or result.get("query_id")) in queries
         }
         if not success_queries:
             return
@@ -1557,14 +1565,17 @@ class TestDriversMixin:
             # that query_id must never be annotated as plan-captured (it would skew
             # downstream plan stats).
             if result.get("status") != "SUCCESS":
+                result.pop("_plan_capture_key", None)
                 continue
             query_id = str(result.get("query_id"))
-            plan = phase.plans.get(query_id)
+            capture_key = str(result.pop("_plan_capture_key", None) or query_id)
+            plan = phase.plans.get(capture_key)
             if plan is not None:
+                plan.query_id = query_id
                 result["query_plan"] = plan
-                result["plan_fingerprint"] = phase.fingerprints.get(query_id)
-            if query_id in phase.per_query_capture_ms:
-                result["plan_capture_time_ms"] = phase.per_query_capture_ms[query_id]
+                result["plan_fingerprint"] = phase.fingerprints.get(capture_key)
+            if capture_key in phase.per_query_capture_ms:
+                result["plan_capture_time_ms"] = phase.per_query_capture_ms[capture_key]
 
     # -------------------------------------------------------------------------
     # Dry-run and SQL capture helpers (extracted w9)

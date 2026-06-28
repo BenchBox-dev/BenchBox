@@ -28,6 +28,7 @@ Instance attributes these methods read (initialized on the host adapter):
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import math
 import os
@@ -105,6 +106,12 @@ _AS_QUERY_RE = re.compile(r"AS\s*\(*\s*(?:SELECT|WITH|VALUES|TABLE|FROM)\b", re.
 _SELECT_LEADING_RE = re.compile(r"^SELECT\b", re.IGNORECASE)
 _WITH_LEADING_RE = re.compile(r"^WITH\b", re.IGNORECASE)
 _WORD_CHARS_RE = re.compile(r"\w")
+
+
+def _plan_capture_key(query_id: Any, sql: str) -> str:
+    """Return a stable internal key for a measured query id + executed SQL pair."""
+    sql_digest = hashlib.sha256(str(sql).encode("utf-8")).hexdigest()[:16]
+    return f"{query_id}#{sql_digest}"
 
 
 def _has_top_level_keyword(statement: str, keyword: str, followed_by: re.Pattern[str] | None = None) -> bool:
@@ -974,12 +981,15 @@ class ResultCaptureMixin:
         if getattr(self, "_plan_capture_phase_active", False):
             # Isolated-phase mode: do NOT run EXPLAIN inline (that would interleave
             # capture with the timed query). Record the executed query so the
-            # post-measurement phase captures it exactly once. Written from concurrent
-            # throughput streams, so guard the buffer with the shared lock.
+            # post-measurement phase captures it exactly once per executed SQL.
+            # Written from concurrent throughput streams, so guard the buffer with
+            # the shared lock.
             recorded_id = result.get("query_id") or query_id
             if recorded_id is not None:
+                capture_key = _plan_capture_key(recorded_id, query)
+                result["_plan_capture_key"] = capture_key
                 with self._plan_capture_lock:
-                    self._phase_recorded_queries.setdefault(str(recorded_id), query)
+                    self._phase_recorded_queries.setdefault(capture_key, query)
             return
         query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
         if query_plan:

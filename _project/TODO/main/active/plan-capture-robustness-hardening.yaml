@@ -63,7 +63,7 @@ work:
 
 - id: w3
   summary: "Key plan capture/attachment on the result's exact executed SQL, not query_id alone"
-  status: pending
+  status: done
   needs: []
   notes: |
     Audit _capture_plans_post_measurement / _merge_plan_capture_into_result so each
