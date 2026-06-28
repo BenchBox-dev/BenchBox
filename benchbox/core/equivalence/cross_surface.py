@@ -956,15 +956,45 @@ _H2ODB_PERCENTILE_DECIMAL = (
     "yields the DataFrame value, so the only difference is DuckDB's DECIMAL result "
     "scale - a deterministic, sub-cent presentational/dtype difference, not a logic bug."
 )
-# Detail-aware acceptance for the Q9 residue: classify ONLY a single value mismatch
-# whose two numeric values differ by at most half a cent (the DECIMAL(8,2) rounding
-# bound, with a little float-formatting slack - still far below a full cent). A wrong
-# median, a wrong grouping, a row/column-count mismatch, an execution error, or any
-# larger value bug (e.g. an interpolation-method regression) does NOT parse as a
-# sub-cent numeric residue, so Q9 stays guarded against real result regressions
-# instead of the bare key tolerating every Q9 difference.
+# Detail-aware acceptance for the Q9 residue. The documented exception is ONLY the
+# p90 PERCENTILE_CONT DECIMAL(8,2) scale residue: a SINGLE value, sub-half-cent,
+# living in the p90 output column. Q9's projection is
+#   col 0 = passenger_count (grouping key),
+#   col 1 = median_fare_amount (PERCENTILE_CONT(0.5)),
+#   col 2 = p90_fare_amount    (PERCENTILE_CONT(0.9)),
+# and the validator reports a divergence as the FIRST positional mismatch
+# ("Value mismatch at row {i}, column {j}. Original: {orig}, Variant: {variant}").
+# So the predicate is sound only if it pins the difference to the EXACT documented
+# cell and signature, not merely "the first value is sub-cent":
+#   * it must be a Value mismatch (NOT a row/column-count mismatch, an execution
+#     error, or a reference failure - those detail strings do not match and are
+#     rejected);
+#   * it must be in column 2 (the p90 column). A grouping-key (col 0) or median
+#     (col 1) mismatch - even a sub-cent one - is REJECTED, so a wrong median or a
+#     wrong group no longer slips through on a small numeric delta;
+#   * both values must be numeric and differ by at most half a cent (the
+#     DECIMAL(8,2) rounding bound, with a hair of float-formatting slack - still
+#     far below a full cent), so any >=1-cent value bug is rejected; and
+#   * the SQL (Original) value must already be at the column's 2-decimal scale and
+#     the DataFrame (Variant) value must differ only beyond that scale - the actual
+#     DECIMAL-rounding signature - so an arbitrary "both happen to be close" pair
+#     does not qualify.
+# A wrong median, a wrong grouping key, a row/column-count mismatch, an execution
+# error, or any larger value bug (e.g. an interpolation-method regression) fails one
+# of these checks, so Q9 stays guarded against real result regressions instead of the
+# bare key tolerating every Q9 difference.
+#
+# Residual blind spot (validator-imposed, documented): the validator reports only the
+# FIRST positional mismatch, so a SECOND, later Q9 bug behind an accepted p90 residue
+# cannot be seen from the detail string alone. Pinning the accepted cell to the exact
+# p90 column + sub-half-cent + 2-decimal-scale signature minimizes the surface of that
+# blind spot (only the documented cell is ever the "first" accepted mismatch); closing
+# it fully would require the validator to surface ALL mismatches, not one.
+_H2ODB_Q9_P90_COLUMN = 2
 _H2ODB_Q9_RESIDUE_MAX = 0.005 + 1e-6
-_VALUE_MISMATCH_RE = re.compile(r"Value mismatch\b.*?Original:\s*(.+?),\s*Variant:\s*(.+)$")
+_VALUE_MISMATCH_RE = re.compile(
+    r"Value mismatch at row \d+, column (?P<col>\d+)\. Original:\s*(?P<orig>.+?),\s*Variant:\s*(?P<variant>.+)$"
+)
 _NUMBER_RE = re.compile(r"[-+]?\d*\.\d+|[-+]?\d+")
 
 
@@ -973,14 +1003,45 @@ def _first_number(text: str) -> float | None:
     return float(match.group()) if match else None
 
 
+def _is_two_decimal_scale(value: str) -> bool:
+    """True if ``value`` is a plain decimal already rounded to <= 2 fractional digits.
+
+    The SQL (Original) side of the documented residue is a DECIMAL(8,2), so it never
+    carries a 3rd fractional digit; the DataFrame (Variant) side keeps full float
+    precision. Requiring the Original to be at 2-decimal scale pins the difference to
+    DuckDB's DECIMAL-scale rounding rather than an arbitrary near-equal pair.
+    """
+    number = _NUMBER_RE.search(value)
+    if number is None:
+        return False
+    _, _, frac = number.group().partition(".")
+    return len(frac) <= 2
+
+
 def _h2odb_q9_decimal_residue(divergence: SurfaceDivergence) -> bool:
-    """True iff a Q9 divergence is the documented sub-cent DECIMAL-scale residue."""
+    """True iff a Q9 divergence is the documented sub-cent p90 DECIMAL-scale residue.
+
+    Pins the accepted difference to the EXACT documented cell (the p90 column, a
+    single sub-half-cent value at the SQL column's 2-decimal scale) so a wrong
+    median, a wrong grouping key, a structural mismatch, an execution error, or any
+    >=1-cent value bug is rejected rather than tolerated.
+    """
     match = _VALUE_MISMATCH_RE.search(str(divergence.detail))
     if match is None:
         return False
-    orig = _first_number(match.group(1))
-    variant = _first_number(match.group(2))
+    # Only the p90 column (index 2) carries the documented residue; a grouping-key
+    # or median mismatch - sub-cent or not - is a real Q9 regression.
+    if int(match.group("col")) != _H2ODB_Q9_P90_COLUMN:
+        return False
+    orig_text = match.group("orig")
+    variant_text = match.group("variant")
+    orig = _first_number(orig_text)
+    variant = _first_number(variant_text)
     if orig is None or variant is None:
+        return False
+    # The SQL value must already be at DECIMAL(8,2) scale (the rounding signature);
+    # the DataFrame value differs only beyond that scale, sub-half-cent.
+    if not _is_two_decimal_scale(orig_text):
         return False
     return abs(orig - variant) <= _H2ODB_Q9_RESIDUE_MAX
 
