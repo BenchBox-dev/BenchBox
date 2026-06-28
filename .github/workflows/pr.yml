@@ -354,6 +354,12 @@ jobs:
         run: |
           uv sync --group dev
 
+      - name: Run cross-surface mutation target drift guard
+        run: |
+          uv run -- python -m pytest \
+            tests/integration/test_cross_surface_mutation_sensitivity.py::test_targets_cover_every_enforced_gate \
+            -m "slow" -n 0 --tb=short -q
+
       - name: Run fast tests
         run: |
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
