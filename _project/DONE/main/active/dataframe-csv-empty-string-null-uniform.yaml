@@ -2,8 +2,9 @@ id: dataframe-csv-empty-string-null-uniform
 title: "Normalize empty-string-vs-null semantics across all DataFrame adapters on the CSV-direct load path"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Core Functionality
+completed_date: "2026-06-28"
 
 description: |
   The empty-string-vs-null contract is centralized at the Parquet conversion layer
@@ -37,7 +38,7 @@ prior_art:
 work:
   - id: w1
     summary: "Add a shared null_marker-aware empty-string post-coercion on the CSV-direct path"
-    status: pending
+    status: done
     needs: []
     notes: |
       Add one shared post-load step (in benchmark_mixin/shared_loading) that, when
@@ -49,7 +50,7 @@ work:
 
   - id: w2
     summary: "Gate the fix: ClickBench cross-surface on PySpark/DataFusion with prefer_parquet=False"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Extend coverage to run a null-marker-less benchmark (ClickBench) cross-surface
