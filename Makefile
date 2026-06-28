@@ -1158,7 +1158,7 @@ pr-open:
 		fi; \
 	fi && \
 	echo "$$URL" && \
-	SOUNDNESS_PATH=$$(git diff --name-only origin/develop...HEAD | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin); \
+	SOUNDNESS_PATH=$$(git diff --name-only --no-renames origin/develop...HEAD | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin); \
 	if [ "$$SOUNDNESS_PATH" = "true" ]; then \
 		echo "Soundness-critical paths changed; leaving auto-merge disabled pending review."; \
 	else \

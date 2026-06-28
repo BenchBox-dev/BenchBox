@@ -52,7 +52,9 @@ def test_make_pr_open_uses_shared_predicate_and_skips_auto_merge() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
 
     assert "_project/scripts/auto_merge_soundness_paths.py --stdin" in makefile
-    assert "git diff --name-only origin/develop...HEAD" in makefile
+    # --no-renames so a rename out of a protected tree surfaces the deleted
+    # source path (rename detection would report only the destination).
+    assert "git diff --name-only --no-renames origin/develop...HEAD" in makefile
     assert "Soundness-critical paths changed; leaving auto-merge disabled pending review." in makefile
     assert 'if [ "$$SOUNDNESS_PATH" = "true" ]' in makefile
 
@@ -61,9 +63,13 @@ def test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge() -> None:
     workflow = (ROOT / ".github/workflows/auto-merge-on-open.yml").read_text(encoding="utf-8")
 
     assert "| _project/scripts/auto_merge_soundness_paths.py --stdin --format github-output" in workflow
-    assert "gh pr diff --name-only" in workflow
+    # Diff via git with --no-renames (gh pr diff --name-only drops rename sources).
+    assert "git diff --name-only --no-renames" in workflow
     assert "if: steps.soundness.outputs.soundness_path != 'true'" in workflow
     assert "if: steps.soundness.outputs.soundness_path == 'true'" in workflow
+    # A soundness-touching push must re-evaluate and clear any stale auto-merge.
+    assert "synchronize" in workflow
+    assert "gh pr merge --disable-auto" in workflow
 
 
 def test_shared_predicate_script_is_executable_for_workflow() -> None:
