@@ -2,7 +2,8 @@ id: oracle-coverage-independence-disclosure
 title: "Disclose per-gate oracle independence strength in the coverage map (strong vs self-referential)"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-06-28"
 category: Documentation
 
 description: |
