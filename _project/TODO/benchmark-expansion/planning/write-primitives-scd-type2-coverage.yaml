@@ -1,0 +1,216 @@
+id: write-primitives-scd-type2-coverage
+title: Write Primitives - Add SCD Type 2 Dimension Maintenance Coverage
+worktree: benchmark-expansion
+category: Benchmark Development
+priority: Medium
+status: Not Started
+description: |
+  Add Slowly Changing Dimension (SCD) Type 2 coverage to the Write Primitives
+  benchmark. The MERGE category currently has 20 operations (overlap variants,
+  conditional update/insert, ETL aggregation, ROW_NUMBER deduplication, etc.)
+  but NONE exercise the canonical SCD Type 2 dimension-maintenance pattern:
+  close the current version of a changed row (set is_current = false and stamp
+  an end timestamp) and insert a new current version, keyed on a business key.
+
+  This is the single most common real-world MERGE workload in analytics ETL and
+  is a conspicuous gap. It is fully portable SQL - expressible as a standard
+  MERGE (or UPDATE + INSERT where MERGE is unavailable) on every platform the
+  benchmark targets (DuckDB, PostgreSQL, Snowflake, BigQuery, ClickHouse,
+  Databricks) - so it fits the benchmark's "broad platform compatibility,
+  non-transactional cleanup" design without compromise.
+
+  Motivation: a Databricks/Delta Lake post (SCD Type 2 via APPLY CHANGES INTO
+  vs ~200 lines of hand-written MERGE) highlighted the workload. The benchmark
+  should measure the portable MERGE form of this workload. The Databricks-native
+  declarative form (APPLY CHANGES INTO) is intentionally OUT OF SCOPE here - see
+  anti_patterns and deferred - and is evaluated narratively by the companion
+  blog TODO (blog-apply-changes-into-vs-standard-sql).
+
+context_sections:
+  "Why this is a gap, not a duplicate": |
+    Existing merge ops mutate `merge_ops_target`, a copy of `orders`, in place.
+    SCD Type 2 is structurally different: it requires versioning columns
+    (surrogate key, business/natural key, is_current flag, valid_from/valid_to
+    timestamps) and produces TWO row events per changed key (one UPDATE to close
+    the old version, one INSERT to open the new). None of the 20 current merge
+    ops model row versioning or history retention.
+
+  "Operation shape (portable MERGE)": |
+    Canonical form, matching the "old way" from the source infographic:
+
+      MERGE INTO scd2_ops_dim_customer t
+      USING scd2_ops_stage_customer s
+        ON  t.c_custkey = s.c_custkey
+        AND t.is_current = true
+      WHEN MATCHED AND (t.row_hash <> s.row_hash) THEN
+        UPDATE SET t.is_current = false,
+                   t.valid_to   = s.effective_ts
+      -- second statement (MERGE matches one target row per source key):
+      INSERT INTO scd2_ops_dim_customer (...)
+      SELECT ... , true AS is_current, s.effective_ts AS valid_from,
+             DATE '9999-12-31' AS valid_to
+      FROM scd2_ops_stage_customer s ... ;
+
+    Note the two-statement reality: a single MERGE cannot both close the old
+    version and insert a new one for the SAME matched key on most engines, so
+    the operation is modeled as an UPDATE-to-close followed by an INSERT-new
+    (the standard SCD2 idiom). Validation asserts exactly one current row per
+    business key and that closed rows carry a non-sentinel valid_to.
+
+  "Staging tables required": |
+    Add a dedicated dimension table and a change-staging table to the SCD2
+    fixtures (defined in benchbox/core/write_primitives/schema_specs.yaml,
+    alongside merge_ops_target / merge_ops_source at ~line 221):
+      - scd2_ops_dim_customer:  surrogate sk, c_custkey (business key),
+        dimension attributes (subset of customer/orders columns), row_hash,
+        is_current (bool), valid_from, valid_to.
+      - scd2_ops_stage_customer: incoming changes with effective_ts and a
+        recomputed row_hash, derived dynamically from TPC-H data so it works at
+        any scale factor (mix of changed + unchanged + brand-new keys).
+
+prior_art:
+  - "benchbox/core/write_primitives/catalog/operations.yaml:merge_etl_aggregation_pattern — reuse the one-line JSON op shape (write_sql / validation_queries / cleanup_sql / platform_overrides)"
+  - "benchbox/core/write_primitives/catalog/operations.yaml:merge_deduplication_window_function — reuse percentage/range-bounded dynamic source derivation so the op works at any scale factor"
+  - "benchbox/core/write_primitives/schema_specs.yaml:merge_ops_target — extend the staging-table spec pattern for the new dimension + change-staging tables"
+
+files_affected:
+  modified:
+    - "benchbox/core/write_primitives/catalog/operations.yaml"
+    - "benchbox/core/write_primitives/schema_specs.yaml"
+    - "docs/benchmarks/write-primitives.md"
+    - "tests/unit/benchmarks/test_write_primitives_core.py"
+    - "tests/integration/test_write_primitives_duckdb.py"
+
+must_preserve:
+  - "All 20 existing merge operations keep their ids, SQL, and validation results unchanged"
+  - "WritePrimitives.get_all_operations() count increases by exactly the number of SCD2 ops added; existing operation ids are untouched"
+  - "Existing staging-table setup/reset/teardown behavior for non-SCD2 categories is unaffected"
+  - "Non-transactional explicit cleanup contract (no reliance on ROLLBACK) is preserved"
+
+approach: |
+  1. Add the two staging-table specs to schema_specs.yaml (dimension +
+     change-staging), populated dynamically from TPC-H orders/customer so they
+     scale from 3 rows to 10M. Keep them in the MERGE category isolation group.
+  2. Add SCD2 operations to operations.yaml following the existing one-line JSON
+     entry format: start with merge_scd_type2_basic (close-old + insert-new),
+     then optionally merge_scd_type2_no_change (idempotent re-run -> zero new
+     versions) and merge_scd_type2_new_keys_only (all inserts, no closes).
+  3. Write SQL in portable standard dialect; rely on the existing sql_compat
+     rewrite layer for per-platform syntax rather than branching in the catalog.
+  4. Validation queries assert: exactly one is_current=true row per business
+     key; changed keys produced a closed (is_current=false, valid_to<sentinel)
+     prior version; unchanged keys produced no new version.
+  5. cleanup_sql restores the dimension to its pre-op state (DELETE inserted
+     versions, restore is_current/valid_to on reopened rows) so the op is
+     repeatable without a full reset.
+  6. Document the new ops and staging tables in docs/benchmarks/write-primitives.md
+     (bump the MERGE operation count and the staging-table list).
+
+anti_patterns:
+  - "DO NOT add APPLY CHANGES INTO (or any DLT / Lakeflow declarative pipeline syntax) as a benchmark operation - because it is not a standalone SQL statement and only runs inside a Databricks declarative pipeline, breaking the cross-platform + standalone-statement contract - express SCD2 as portable MERGE/UPDATE+INSERT instead."
+  - "DO NOT mutate merge_ops_target for SCD2 - because it lacks versioning columns and is shared by the existing 20 merge ops - add dedicated scd2_ops_* staging tables instead."
+  - "DO NOT hard-code orderkey/custkey ranges - because the op must run at any scale factor - derive the change set dynamically with percentage/range-bounded selects like the existing merge ops."
+
+verification:
+  - description: "New SCD2 operation(s) are registered"
+    command: 'uv run -- python -c "from benchbox import WritePrimitives; ops=WritePrimitives(0.01).get_all_operations(); print(any(k.startswith(''merge_scd_type2'') for k in ops))"'
+    expected_output: "True"
+  - description: "merge category count increased and existing ids preserved"
+    command: "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py -q"
+    expected_output: "all tests pass"
+  - description: "SCD2 op executes, validates, and cleans up on DuckDB"
+    command: "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -q -k scd2"
+    expected_output: "all tests pass"
+  - description: "Catalog still parses; raw entry count grows by the SCD2 ops added"
+    command: 'uv run -- python -c "from benchbox.core.write_primitives.catalog.loader import load_write_primitives_catalog as L; print(len(L().operations))"'
+    expected_output: "raw catalog entry count > 133 (133 today; note get_all_operations() is the 109 user-facing count)"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/write_primitives/catalog/operations.yaml"
+    - "benchbox/core/write_primitives/schema_specs.yaml"
+    - "docs/benchmarks/write-primitives.md"
+    - "tests/unit/benchmarks/test_write_primitives_core.py"
+    - "tests/integration/test_write_primitives_duckdb.py"
+  do_not_modify:
+    - "benchbox/core/write_primitives/benchmark.py"
+    - "benchbox/core/runner.py"
+    - "benchbox/cli/"
+
+work:
+  - id: w1
+    summary: Add scd2_ops_dim_customer and scd2_ops_stage_customer staging specs
+    status: pending
+    notes: |
+      In schema_specs.yaml, alongside merge_ops_target. Dimension columns:
+      surrogate sk, c_custkey business key, attribute subset, row_hash,
+      is_current bool, valid_from, valid_to. Change-staging derived dynamically
+      from TPC-H (changed + unchanged + new keys) with effective_ts + row_hash.
+  - id: w2
+    summary: Add merge_scd_type2_basic operation to operations.yaml
+    needs: [w1]
+    status: pending
+    notes: |
+      Close-old (UPDATE is_current=false, stamp valid_to) + insert-new current
+      version. Portable standard SQL. validation: exactly one current row per
+      business key; changed keys have a closed prior version. cleanup restores
+      pre-op state so the op is repeatable.
+  - id: w3
+    summary: Add SCD2 edge-case ops (no-change idempotent, new-keys-only)
+    needs: [w2]
+    status: pending
+    notes: |
+      merge_scd_type2_no_change (re-run with identical row_hash -> zero new
+      versions) and merge_scd_type2_new_keys_only (all inserts, no closes).
+      Both reuse the w1 staging tables.
+  - id: w4
+    summary: Unit tests - registration, count, validation, cleanup
+    needs: [w2]
+    status: pending
+    notes: |
+      Assert ops registered, merge category count bumped, existing ids intact,
+      validation_queries shape correct.
+  - id: w5
+    summary: Integration test on DuckDB (-k scd2)
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      End-to-end execute_operation: write -> validate (one current row per key)
+      -> cleanup -> repeatable. Verify against actual TPC-H SF0.01 data.
+  - id: w6
+    summary: Update docs/benchmarks/write-primitives.md
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Add SCD2 to the MERGE catalog list, bump the "20 operations" / "109
+      operations" counts, and add scd2_ops_* tables to the staging-table list.
+
+deferred:
+  - summary: "Databricks-native APPLY CHANGES INTO rewrite for the SCD2 op via sql_compat"
+    reason: "Declarative APPLY CHANGES INTO requires a DLT/Lakeflow pipeline context (streaming source, pipeline run), not a SQL-warehouse session, so it cannot execute inside the current execute/validate/cleanup harness. Revisit if/when a pipeline-execution path exists. Tracked narratively by blog-apply-changes-into-vs-standard-sql."
+  - summary: "Type 1 (overwrite) and Type 3 (previous-value column) SCD variants"
+    reason: "Type 2 is the canonical history-retention workload and the one the source material highlights; add other types only if there is demand."
+
+metadata:
+  owners:
+    - "@benchbox-maintainers"
+  tags:
+    - write-primitives
+    - merge
+    - scd
+    - scd-type-2
+    - dimension
+    - etl
+    - benchmark
+  estimated_effort: "2-3 days"
+  created_date: "2026-06-27"
+
+success_metrics:
+  - "At least one merge_scd_type2_* operation runs, validates, and cleans up on DuckDB at SF0.01"
+  - "Validation proves exactly one current row per business key after the op"
+  - "All 20 pre-existing merge operations remain unchanged (ids and results)"
+  - "Operation is scale-independent (passes at SF0.01 and a larger SF without SQL changes)"
+
+open_questions:
+  - "Model close-old + insert-new as two operations or one composite operation with two SQL statements? (Leaning: one composite op, since SCD2 is a single logical workload and the harness measures the full write.)"
+  - "Use orders or customer as the dimension base table? customer is the more natural slowly-changing dimension; orders has more rows for scale testing."

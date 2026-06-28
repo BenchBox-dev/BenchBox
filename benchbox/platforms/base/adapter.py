@@ -110,13 +110,14 @@ class PlatformAdapter(
     supports_external_tables: bool = False
     # Plan-capture style. When True, the generic query pipeline captures plans in
     # an isolated post-measurement phase (a single EXPLAIN pass after all timed
-    # queries on the same connection, structural-only so DML is not re-executed)
-    # instead of inline inside each timed execute_query(). Opt-in per adapter:
-    # only EXPLAIN-based engines where a post-hoc EXPLAIN on the measurement
-    # connection reproduces the plan should enable it. Platforms that obtain
-    # plans as a side effect of execution (BigQuery job stats, Spark event logs)
-    # must leave this False and keep inline capture.
-    plan_capture_phase_eligible: bool = False
+    # queries on the same connection) instead of inline inside each timed
+    # execute_query(). This is the canonical default for EVERY EXPLAIN-based
+    # engine: a standalone EXPLAIN on the measurement connection reproduces the
+    # plan with no loss, so capture is fully isolatable from measurement.
+    # The ONLY exceptions are engines whose plan/stats are obtainable solely as a
+    # side effect of running the workload query (BigQuery-class): they set this
+    # False explicitly and keep their inline/job-harvest capture path.
+    plan_capture_phase_eligible: bool = True
 
     def __init__(self, **config):
         """Initialize the platform adapter with configuration.
@@ -138,18 +139,15 @@ class PlatformAdapter(
         self.analyze_plans: bool = config.get("analyze_plans", True)
         self.strict_plan_capture = config.get("strict_plan_capture", False)
         self.plan_capture_timeout_seconds = int(config.get("plan_capture_timeout_seconds", 30))
-        # Plan capture sampling options
-        self.plan_sampling_rate: float | None = config.get("plan_sampling_rate")
-        self.plan_first_n: int | None = config.get("plan_first_n")
+        # Plan capture query selection. plan_query_filter restricts capture to an
+        # explicit set of query ids; it is orthogonal to the retired per-iteration /
+        # per-stream sampling machinery (plan_first_n / plan_sampling_rate), which the
+        # canonical capture-once-per-query model made obsolete and which is gone.
         plan_queries_str = config.get("plan_queries")
         self.plan_query_filter: set[str] | None = (
             {q.strip() for q in plan_queries_str.split(",") if q.strip()} if plan_queries_str else None
         )
-        # Track iteration counts for plan_first_n. Under concurrent stream
-        # execution (--streams > 1) multiple threads call capture_query_plan()
-        # and run a read-increment-write against this dict, so the increment is
-        # guarded by a lock to keep plan_first_n a correct per-query-id counter.
-        self._plan_capture_iteration_counts: dict[str, int] = {}
+        # Guards concurrent writes to _phase_recorded_queries from throughput streams.
         self._plan_capture_lock = threading.Lock()
         # Isolated-phase plan capture (see TestDriversMixin._execute_queries_by_type).
         # When ``_plan_capture_phase_active`` is True, the inline capture chokepoint
@@ -455,11 +453,16 @@ class PlatformAdapter(
         self._reset_run_scoped_state()
         plan_capture_config = {
             "capture_plans": self.capture_plans,
+            "analyze_plans": self.analyze_plans,
             "strict_plan_capture": self.strict_plan_capture,
             "plan_capture_timeout_seconds": self.plan_capture_timeout_seconds,
         }
         if "capture_plans" in run_config:
             self.capture_plans = bool(run_config.get("capture_plans"))
+        # analyze_plans is tri-state in RunConfig: only override the adapter's value
+        # when the first-class flag was set (non-None); None leaves the adapter default.
+        if run_config.get("analyze_plans") is not None:
+            self.analyze_plans = bool(run_config.get("analyze_plans"))
         if "strict_plan_capture" in run_config:
             self.strict_plan_capture = bool(run_config.get("strict_plan_capture"))
         if "plan_capture_timeout_seconds" in run_config:
@@ -630,6 +633,7 @@ class PlatformAdapter(
 
         finally:
             self.capture_plans = plan_capture_config["capture_plans"]
+            self.analyze_plans = plan_capture_config["analyze_plans"]
             self.strict_plan_capture = plan_capture_config["strict_plan_capture"]
             self.plan_capture_timeout_seconds = plan_capture_config["plan_capture_timeout_seconds"]
             if hasattr(self, "connection") and self.connection:

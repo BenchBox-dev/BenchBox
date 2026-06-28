@@ -106,6 +106,10 @@ class RunConfig(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
     enable_postload_validation: bool = False
     capture_plans: bool = False
+    # analyze_plans is the single capture-detail knob (ANALYZE vs estimated EXPLAIN).
+    # Tri-state: None = not specified (the adapter default, True, applies); the
+    # first-class --analyze-plans/--no-analyze-plans flag sets it True/False.
+    analyze_plans: bool | None = None
     strict_plan_capture: bool = False
     # PyPI distribution name (e.g. "psycopg", "duckdb") - no extras markers or version specifiers
     driver_package: Optional[str] = None
@@ -247,6 +251,8 @@ class BenchmarkConfig(BaseModel):
     queries: Optional[list[str]] = None
     concurrency: int = 1
     capture_plans: bool = False
+    # See RunConfig.analyze_plans: tri-state capture-detail knob (None = adapter default).
+    analyze_plans: bool | None = None
     strict_plan_capture: bool = False
     options: dict[str, Any] = Field(default_factory=dict)
     compress_data: bool = False

@@ -93,13 +93,28 @@ def test_order_aware_truncated_limit_boundary_swap_is_not_flagged():
     )
 
 
+def test_order_aware_value_bug_in_non_tie_row_is_caught():
+    """A value bug in a deterministically-ordered (non-tie) row is still a MISMATCH."""
+    validator = _validator()
+    reference = [(1, 100, "a"), (2, 90, "b"), (3, 50, "c")]
+    bug = [(1, 100, "a"), (2, 90, "WRONG"), (3, 50, "c")]
+    order_by = [0]
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(reference, bug, 3, 1, order_aware=True, order_by=order_by, tie_aware=True)
+
+
+# --- Order-aware: one-visible-row boundary tie vs unique-final-key value bug ------
+
+
 def test_order_aware_single_row_final_group_value_bug_is_caught():
     """A value change on a UNIQUE final order-key row is caught, not masked as a tie.
 
-    The final-group tie relaxation only applies to a genuine tie (>= 2 rows sharing
-    the final key). When the final key is unique, its single row is deterministic, so
-    a non-key value change there (``good`` -> ``bad``) is a real regression and must
-    still raise even with ``tie_aware``.
+    The final-group tie relaxation only applies to a genuine tie (>= 2 visible rows
+    sharing the final key, OR a probe confirming the key ties past the LIMIT). When
+    the final key is unique and no probe says otherwise, its single row is
+    deterministic, so a non-key value change there (``good`` -> ``bad``) is a real
+    regression and must still raise even with ``tie_aware``. This pins #878's intent
+    (the single-row final group is no longer unconditionally accepted).
     """
     validator = _validator()
     reference = [(1, "ok"), (2, "good")]
@@ -109,14 +124,36 @@ def test_order_aware_single_row_final_group_value_bug_is_caught():
         validator.validate_results_exact(reference, bug, 3, 1, order_aware=True, order_by=order_by, tie_aware=True)
 
 
-def test_order_aware_value_bug_in_non_tie_row_is_caught():
-    """A value bug in a deterministically-ordered (non-tie) row is still a MISMATCH."""
+def test_order_aware_one_visible_row_boundary_tie_accepted_only_with_probe():
+    """A one-visible-row final tie is accepted ONLY when the probe says it ties past LIMIT.
+
+    Keys ``10, 5, 5`` with ``LIMIT 2`` return ``[10, 5]`` - exactly one row of the
+    boundary tie (key 5) stays visible, so two surfaces picking different ``5`` rows
+    is valid SQL. That single-visible-row final group is structurally identical to a
+    genuine unique-final-key value bug in the truncated result, so it is accepted
+    ONLY when ``final_key_tied_beyond_limit`` (the cross-surface boundary-tie probe)
+    confirms the key 5 recurs past the cutoff; without that signal the same diff
+    stays a CAUGHT mismatch (the conservative default).
+    """
     validator = _validator()
-    reference = [(1, 100, "a"), (2, 90, "b"), (3, 50, "c")]
-    bug = [(1, 100, "a"), (2, 90, "WRONG"), (3, 50, "c")]
+    reference = [(10, "x"), (5, "a")]
+    variant = [(10, "x"), (5, "b")]  # the lone visible boundary-tie member differs
     order_by = [0]
+    # Probe confirms key 5 is tied beyond LIMIT 2 -> the swap is a valid boundary pick.
+    assert validator.validate_results_exact(
+        reference,
+        variant,
+        3,
+        1,
+        order_aware=True,
+        order_by=order_by,
+        tie_aware=True,
+        final_key_tied_beyond_limit=True,
+    )
+    # Default (no probe signal): the same single-row difference is CAUGHT, so a genuine
+    # unique-final-key value bug is never masked.
     with pytest.raises(ValidationError):
-        validator.validate_results_exact(reference, bug, 3, 1, order_aware=True, order_by=order_by, tie_aware=True)
+        validator.validate_results_exact(reference, variant, 3, 1, order_aware=True, order_by=order_by, tie_aware=True)
 
 
 def test_order_aware_dropped_column_is_a_clean_column_count_mismatch():

@@ -68,9 +68,13 @@ _CANDIDATE_UNVERIFIED_BENCHMARKS = {"datavault", "nyctaxi", "tpcds_obt", "tpch_s
 
 
 def test_registry_bearing_benchmarks_are_gateable(rows):
-    """h2odb (verified verbatim overlap) is gateable; a zero-overlap registry is not."""
+    """flightdata (verified verbatim overlap) is gateable; a zero-overlap registry is not.
+
+    (h2odb was the prior example here; it is now an enforced cross-surface gate, so
+    it no longer appears among the unguarded candidates the sweep drills into.)
+    """
     by_id = {r["benchmark"]: r["status"] for r in rows}
-    assert by_id.get("h2odb") == GATEABLE
+    assert by_id.get("flightdata") == GATEABLE
     # datavault ships a registry but its ids do not overlap the SQL ids verbatim
     # (friendly/Q-prefixed names), so there is no verified correspondence: it is
     # candidate-unverified, NOT counted as gateable coverage.

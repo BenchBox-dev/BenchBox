@@ -97,8 +97,6 @@ def _split_plan_config_parts(value: str) -> list[str]:
 class PlanCaptureConfig:
     """Parsed plan capture configuration."""
 
-    sample_rate: Optional[float] = None
-    first_n: Optional[int] = None
     queries: Optional[list[str]] = None
     strict: bool = False
 
@@ -107,14 +105,17 @@ class PlanCaptureConfig:
         """Parse plan-config string.
 
         Format: key:value pairs separated by commas
-            - sample:0.1 -> capture 10% of executions
-            - first:5 -> capture first 5 iterations only
-            - queries:1,6,17 -> capture specific queries
+            - queries:1,6,17 -> capture only these specific queries
             - strict:true -> fail if capture fails
 
         Examples:
-            "sample:0.1,first:5"
+            "queries:1,6,17"
             "queries:1,6,17,strict:true"
+
+        Note: the per-iteration / per-stream sampling keys ``sample:`` and
+        ``first:`` have been retired. The canonical model captures each distinct
+        query exactly once in the isolated post-measurement phase, so sampling a
+        fraction of executions or only the first N iterations is meaningless.
 
         Args:
             value: Plan config specification string
@@ -141,21 +142,13 @@ class PlanCaptureConfig:
             key = key.strip().lower()
             val = val.strip()
 
-            if key == "sample":
-                try:
-                    config.sample_rate = float(val)
-                    if not (0.0 <= config.sample_rate <= 1.0):
-                        raise click.BadParameter(f"sample rate must be 0.0-1.0, got {val}")
-                except ValueError:
-                    raise click.BadParameter(f"Invalid sample rate '{val}', expected float") from None
-
-            elif key == "first":
-                try:
-                    config.first_n = int(val)
-                    if config.first_n < 1:
-                        raise click.BadParameter(f"first must be positive, got {val}")
-                except ValueError:
-                    raise click.BadParameter(f"Invalid first value '{val}', expected integer") from None
+            if key in ("sample", "first"):
+                raise click.BadParameter(
+                    f"plan-config key '{key}' has been removed: plan capture now records each "
+                    "distinct query exactly once in an isolated post-measurement phase, so "
+                    "per-iteration sampling ('sample'/'first') no longer applies. Use "
+                    "'queries:<ids>' to restrict which queries are captured."
+                )
 
             elif key == "queries":
                 # Split query IDs
@@ -165,7 +158,7 @@ class PlanCaptureConfig:
                 config.strict = val.lower() in ("true", "1", "yes")
 
             else:
-                raise click.BadParameter(f"Unknown plan-config key '{key}'. Valid keys: sample, first, queries, strict")
+                raise click.BadParameter(f"Unknown plan-config key '{key}'. Valid keys: queries, strict")
 
         return config
 

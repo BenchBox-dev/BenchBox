@@ -18,6 +18,8 @@ from __future__ import annotations
 import pytest
 
 from benchbox.core.equivalence.cross_surface import (
+    _bump_trailing_limit,
+    _final_key_tied_beyond_limit,
     _report,
     count_executed_cells,
     find_cross_surface_divergences,
@@ -148,6 +150,125 @@ def test_tie_aware_only_applies_to_truncated_top_n_queries():
         backends=("expression",),
     )
     assert relaxed == [], "boundary-tie swap under a LIMIT query should be tolerated"
+
+
+# --- Boundary-tie probe: a one-visible-row final tie is not a false positive -----
+
+
+@pytest.mark.parametrize(
+    "sql, expected",
+    [
+        ("SELECT a FROM t ORDER BY a DESC LIMIT 2", "SELECT a FROM t ORDER BY a DESC LIMIT 3"),
+        ("SELECT a FROM t ORDER BY a LIMIT 10 OFFSET 5", "SELECT a FROM t ORDER BY a LIMIT 11 OFFSET 5"),
+        ("select a from t order by a limit 1;", "select a from t order by a limit 2;"),
+        ("SELECT a FROM t ORDER BY a LIMIT 7 -- top seven", "SELECT a FROM t ORDER BY a LIMIT 8"),
+        ("SELECT a FROM t ORDER BY a", None),  # no trailing LIMIT -> not rewritable
+    ],
+)
+def test_bump_trailing_limit_raises_the_cutoff_by_one(sql, expected):
+    """The probe rewriter raises ``LIMIT n`` to ``n+1``, preserving OFFSET/terminator."""
+    assert _bump_trailing_limit(sql) == expected
+
+
+def test_final_key_tied_beyond_limit_true_when_key_recurs_past_cutoff():
+    """The probe reports True when the row past the cutoff shares the final order key."""
+    sql = "SELECT a, b FROM t ORDER BY a DESC LIMIT 2"
+    # Keys 10, 5, 5 under LIMIT 2 -> visible [10, 5]; the row just past the cutoff is
+    # another key-5 row, so the final key 5 ties across the LIMIT.
+    connection = _FakeConnection({"SELECT a, b FROM t ORDER BY a DESC LIMIT 3": [(10, "x"), (5, "a"), (5, "b")]})
+    reference = [(10, "x"), (5, "a")]
+    assert _final_key_tied_beyond_limit(connection, sql, [0], reference) is True
+
+
+def test_final_key_tied_beyond_limit_false_when_no_row_past_cutoff():
+    """The probe reports False when the table is exhausted at the cutoff (deterministic)."""
+    sql = "SELECT a, b FROM t ORDER BY a DESC LIMIT 2"
+    # Only two rows total: LIMIT 3 returns the same two, nothing past the cutoff, so
+    # the final row is deterministic - a difference there is a real value bug.
+    connection = _FakeConnection({"SELECT a, b FROM t ORDER BY a DESC LIMIT 3": [(10, "x"), (5, "good")]})
+    reference = [(10, "x"), (5, "good")]
+    assert _final_key_tied_beyond_limit(connection, sql, [0], reference) is False
+
+
+def test_final_key_tied_beyond_limit_false_when_next_row_is_a_distinct_key():
+    """A distinct order key just past the cutoff means the final row is deterministic."""
+    sql = "SELECT a, b FROM t ORDER BY a DESC LIMIT 2"
+    # The row past the cutoff has key 3 (not the boundary value 5), so key 5 is NOT
+    # tied across the LIMIT - the lone visible key-5 row is the true last row.
+    connection = _FakeConnection({"SELECT a, b FROM t ORDER BY a DESC LIMIT 3": [(10, "x"), (5, "a"), (3, "c")]})
+    reference = [(10, "x"), (5, "a")]
+    assert _final_key_tied_beyond_limit(connection, sql, [0], reference) is False
+
+
+def test_one_visible_row_boundary_tie_is_not_a_divergence_via_probe():
+    """End-to-end: a one-visible-row boundary tie is accepted once the probe confirms it.
+
+    Reference top-2 is ``[10, 5]`` with the boundary key 5 tied past the LIMIT (a
+    third key-5 row exists). The DataFrame surface keeps a DIFFERENT but equally-valid
+    key-5 row, so the lone final group differs - and the gate must NOT flag it,
+    because the boundary-tie probe (``LIMIT 3``) shows key 5 recurs past the cutoff.
+    """
+    sql = "SELECT a, b FROM t ORDER BY a DESC LIMIT 2"
+    reference = [(10, "x"), (5, "a")]
+    candidate = [(10, "x"), (5, "b")]  # the lone visible boundary-tie member differs
+    connection = _FakeConnection(
+        {
+            sql: reference,
+            "SELECT a, b FROM t ORDER BY a DESC LIMIT 3": [(10, "x"), (5, "a"), (5, "b")],
+        }
+    )
+
+    def reference_sql(_qid):
+        return sql
+
+    def dataframe_query(_qid):
+        return _FakeQuery({"expression": lambda ctx: _FakeFrame(candidate)})
+
+    divergences = find_cross_surface_divergences(
+        connection,
+        query_ids=["Q1"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts={"expression": object()},
+        validator=ResultValidator(),
+        backends=("expression",),
+    )
+    assert divergences == [], "a probe-confirmed one-visible-row boundary tie must not be flagged"
+
+
+def test_one_visible_row_final_value_bug_is_caught_when_not_tied_past_limit():
+    """End-to-end: a unique-final-key value bug is still caught when the probe says deterministic.
+
+    Same single-row final-group shape as the boundary-tie case, but the probe
+    (``LIMIT 3``) finds NO row tied past the cutoff, so the final row is deterministic
+    and the ``good`` -> ``bad`` change is a real divergence the gate must report.
+    """
+    sql = "SELECT a, b FROM t ORDER BY a DESC LIMIT 2"
+    reference = [(10, "x"), (5, "good")]
+    candidate = [(10, "x"), (5, "bad")]
+    connection = _FakeConnection(
+        {
+            sql: reference,
+            "SELECT a, b FROM t ORDER BY a DESC LIMIT 3": [(10, "x"), (5, "good")],
+        }
+    )
+
+    def reference_sql(_qid):
+        return sql
+
+    def dataframe_query(_qid):
+        return _FakeQuery({"expression": lambda ctx: _FakeFrame(candidate)})
+
+    divergences = find_cross_surface_divergences(
+        connection,
+        query_ids=["Q1"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts={"expression": object()},
+        validator=ResultValidator(),
+        backends=("expression",),
+    )
+    assert [d.key for d in divergences] == ["Q1_expression"], "a deterministic final-row bug must still be caught"
 
 
 def test_missing_backend_impl_is_skipped_not_a_divergence():
@@ -321,6 +442,25 @@ def test_clickbench_and_joinorder_are_enforced_gates():
     assert GATES["joinorder_synthetic"].known_divergences == {}
     # ssb stays the enforced precedent.
     assert "ssb" in GATES
+
+
+def test_h2odb_is_an_enforced_gate_with_classified_percentile_exception():
+    """H2O-DB is an enforced GATE; its only baseline entry is Q9's DECIMAL percentile.
+
+    DuckDB's PERCENTILE_CONT over the DECIMAL(8,2) fare_amount column returns a
+    value at the column's 2-decimal scale, while the DataFrame computes the same
+    linear-interpolated percentile over float64 - a deterministic sub-cent
+    presentational difference classified (not masked) for both backends. Every
+    other H2O-DB cell must match, so no other key is in the baseline.
+    """
+    from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES, get_gate
+
+    assert "h2odb" in GATES
+    assert "h2odb" not in STAGED_GATES
+    assert get_gate("h2odb").name == "h2odb"
+    assert set(GATES["h2odb"].known_divergences) == {"Q9_expression", "Q9_pandas"}
+    # Runs on a smaller-than-default bounded cell (its generator base is 10M rows).
+    assert GATES["h2odb"].scale_factor == 0.01
 
 
 def test_order_by_result_key_maps_alias_name_expr_and_ordinal():

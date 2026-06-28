@@ -84,10 +84,20 @@ work:
       PROMOTED to enforced GATES (campaign w4) - their prerequisites landed (w9
       loader dtype/empty-string semantics, w8 tie-aware top-N comparator), both run
       as blocking pr.yml steps with medium-marker fast-lane tests, and the oracle
-      coverage map (regenerated here) shows both as cross-surface "guarded". So 5
-      dual-surface benchmarks are guarded. Remaining dual-surface dispatch targets
-      (one focused gate PR each, several need id normalization or a bounded
-      data-source check first): datavault, flightdata, h2odb, joinorder (SF=1-only -
+      coverage map (regenerated here) shows both as cross-surface "guarded".
+
+      STATUS SYNC (2026-06-24): h2odb is now an enforced cross-surface GATE
+      (single trips table, ids Q1..Q10 1:1; blocking pr.yml step
+      `make h2odb-cross-surface-equivalence-report` + medium-marker fast-lane test;
+      gated on a bounded SF=0.01 ~100k-row cell because its generator base is the
+      10M-row small tier). Wiring it caught and fixed a REAL DataFrame bug: the
+      Polars Q9 percentile defaulted to "nearest" interpolation (disagreeing with
+      both pandas and SQL PERCENTILE_CONT) - fixed to linear. Q9's only residue is a
+      classified DECIMAL(8,2)-scale percentile difference (DuckDB returns the
+      percentile at the column's 2-decimal scale; the DataFrame computes it over
+      float64). So 6 dual-surface benchmarks are guarded. Remaining dual-surface
+      dispatch targets (one focused gate PR each, several need id normalization or a
+      bounded data-source check first): datavault, flightdata, joinorder (SF=1-only -
       use joinorder_synthetic), nyctaxi, read_primitives, tpcds_obt, tpch_skew,
       tsbs_devops. This item only tracks coverage; the gates themselves are owned there.
 
@@ -187,4 +197,4 @@ metadata:
   tags: [correctness, equivalence, coverage, governance, ci, benchmarks]
   estimated_effort: "Large"
   created_date: "2026-06-16"
-  last_updated: "2026-06-21T00:00:00"
+  last_updated: "2026-06-24T00:00:00"

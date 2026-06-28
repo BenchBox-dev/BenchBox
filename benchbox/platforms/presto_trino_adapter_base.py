@@ -673,14 +673,11 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             validate_row_count=validate_row_count,
             stream_id=stream_id,
         )
-        # Capture only on SUCCESS to avoid a wasted EXPLAIN on validation-failed results.
-        if self.capture_plans and result.get("status") == "SUCCESS":
-            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
-            if query_plan:
-                result["query_plan"] = query_plan
-                result["plan_fingerprint"] = query_plan.plan_fingerprint
-            if plan_capture_time_ms is not None:
-                result["plan_capture_time_ms"] = plan_capture_time_ms
+        # Plan capture routes through the shared chokepoint: for phase-eligible
+        # engines (the default) it records the executed query for the isolated
+        # post-measurement phase instead of running EXPLAIN inline; otherwise it
+        # captures inline. SUCCESS-guarded inside the chokepoint.
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
         return result
 
     def close_connection(self, connection: Any) -> None:

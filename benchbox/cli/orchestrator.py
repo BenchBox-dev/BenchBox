@@ -475,6 +475,7 @@ class BenchmarkOrchestrator:
             test_execution_type=getattr(config, "test_execution_type", "standard"),
             scale_factor=config.scale_factor,
             capture_plans=config.capture_plans,
+            analyze_plans=getattr(config, "analyze_plans", None),
             strict_plan_capture=config.strict_plan_capture,
             seed=int(options.get("seed")) if options.get("seed") is not None else None,
             connection={"database_path": str(database_path)},

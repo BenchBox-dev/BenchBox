@@ -15,9 +15,8 @@ Extracted from `benchbox.platforms.base.adapter` per the refactor map
 
 Instance attributes these methods read (initialized on the host adapter):
 - `query_plans_captured`, `plan_capture_failures`, `plan_capture_errors`
-- `capture_plans`, `plan_query_filter`, `plan_first_n`,
-  `plan_sampling_rate`, `plan_capture_timeout_seconds`,
-  `strict_plan_capture`, `_plan_capture_iteration_counts`
+- `capture_plans`, `analyze_plans`, `plan_query_filter`,
+  `plan_capture_timeout_seconds`, `strict_plan_capture`
 - `show_query_plans`, `enable_validation`
 - `platform_name` (property), `logger`
 - `platform_config` (raw config dict). Read for the raw_explain_output retention
@@ -33,7 +32,6 @@ import logging
 import math
 import os
 import platform
-import random
 import re
 import statistics
 import threading
@@ -471,7 +469,6 @@ class ResultCaptureMixin:
         self.query_plans_captured = 0
         self.plan_capture_failures = 0
         self.plan_capture_errors: list[dict[str, Any]] = []
-        self._plan_capture_iteration_counts: dict[str, int] = {}
         # Isolated-phase recording buffer (see _execute_queries_by_type): cleared per
         # run for symmetry with the other plan-capture state, so a prior run's
         # recorded queries can never leak into the next.
@@ -814,24 +811,13 @@ class ResultCaptureMixin:
         if not self.capture_plans:
             return None, 0.0
 
-        # Apply query filter if specified
+        # Apply query filter if specified. This is query *selection* (which queries
+        # to capture), orthogonal to the retired per-iteration/per-stream sampling
+        # machinery: the canonical model captures each distinct query exactly once
+        # in the isolated post-measurement phase, so plan_first_n / plan_sampling_rate
+        # no longer exist.
         if self.plan_query_filter and query_id not in self.plan_query_filter:
             return None, 0.0
-
-        # Apply first-N iterations filter if specified. The read-increment-write
-        # is guarded so concurrent streams (--streams > 1) cannot interleave and
-        # capture more (or fewer) than plan_first_n plans per query_id.
-        if self.plan_first_n is not None:
-            with self._plan_capture_lock:
-                iteration = self._plan_capture_iteration_counts.get(query_id, 0)
-                self._plan_capture_iteration_counts[query_id] = iteration + 1
-            if iteration >= self.plan_first_n:
-                return None, 0.0
-
-        # Apply sampling rate if specified
-        if self.plan_sampling_rate is not None:
-            if random.random() > self.plan_sampling_rate:
-                return None, 0.0
 
         start_time = time.perf_counter()
 
@@ -983,7 +969,7 @@ class ResultCaptureMixin:
             query: SQL query text.
             query_id: Query identifier.
         """
-        if not self.capture_plans or result.get("status") != "SUCCESS":
+        if not getattr(self, "capture_plans", False) or result.get("status") != "SUCCESS":
             return
         if getattr(self, "_plan_capture_phase_active", False):
             # Isolated-phase mode: do NOT run EXPLAIN inline (that would interleave

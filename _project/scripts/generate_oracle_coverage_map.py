@@ -148,11 +148,21 @@ def _expected_results_has_value_digests(benchmark_id: str) -> bool:
     return False
 
 
-def _bounded_value_gate_scale() -> str:
-    """The bounded scale value-level gates run at, read live from the gate module."""
-    from benchbox.core.equivalence.cross_surface import EQUIVALENCE_SCALE
+def _bounded_value_gate_scale(benchmark_id: str) -> str:
+    """The bounded scale this benchmark's value-level gate runs at, read live.
 
-    return f"SF={EQUIVALENCE_SCALE}"
+    A cross-surface gate may override the shared ``EQUIVALENCE_SCALE`` per gate
+    (e.g. ``h2odb`` runs a smaller cell because its generator base is the 10M-row
+    small tier), so read the per-gate ``scale_factor`` where one is registered;
+    fall back to the shared default for the TPC-Havoc variant gates, which are not
+    in the cross-surface ``GATES`` registry. Reading it live keeps the artifact
+    honest rather than hand-labelled.
+    """
+    from benchbox.core.equivalence.cross_surface import EQUIVALENCE_SCALE, GATES
+
+    gate = GATES.get(benchmark_id)
+    scale = gate.scale_factor if gate is not None else EQUIVALENCE_SCALE
+    return f"SF={scale}"
 
 
 def oracle_strength_and_scale(primary: str, benchmark_id: str) -> tuple[str, str]:
@@ -175,7 +185,7 @@ def oracle_strength_and_scale(primary: str, benchmark_id: str) -> tuple[str, str
         # SF=1 only: benchbox/core/expected_results/loader.py raises for other scales.
         return strength, "SF=1"
     if primary in (ORACLE_VARIANT_EQUIVALENCE, ORACLE_CROSS_SURFACE_VARIANT, ORACLE_CROSS_SURFACE):
-        return STRENGTH_VALUE, _bounded_value_gate_scale()
+        return STRENGTH_VALUE, _bounded_value_gate_scale(benchmark_id)
     return STRENGTH_NONE, SCALE_NONE
 
 
