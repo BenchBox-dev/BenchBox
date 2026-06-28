@@ -55,7 +55,7 @@ work:
 
   - id: w2
     summary: "Regression test the reconciliation"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Add a test on the report generator asserting totals reconcile for the w0
