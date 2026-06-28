@@ -39,7 +39,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -115,19 +115,46 @@ test-smoke: test-quick
 # 18 TPC-H queries whose answer-set cardinalities are stable across dbgen builds;
 # Q11/Q16/Q18/Q20 are excluded because their HAVING/threshold boundaries make the
 # stored row count vary with the generated data (see tests/README.md).
+#
+# WHAT THE VALUE ORACLE IS (and is NOT): the stored reference digests are a frozen
+# benchbox-on-DuckDB snapshot, so the value check is a REGRESSION SNAPSHOT vs a
+# DuckDB-pinned baseline (it detects CHANGE from the frozen answer), NOT an
+# independent correctness oracle -- a conceptual value bug present at freeze time is
+# enshrined, not caught. Regenerate the reference with `make correctness-gate-digests-regen`.
+#
 # The JUnit-report guard fails the target if the selected node SKIPs instead of
 # running: pytest exits 0 on a selected skip, which would otherwise pass the gate
 # without executing the benchmark. The report goes to a private temp file (not the
 # repo-root test-results.xml that pytest-ci.ini also writes) and is removed after
 # parsing; both the pytest status and the guard status are propagated.
+#
+# CORRECTNESS_GATE_QUERY_IDS is the ONE source of the gated query-id set, shared by
+# both this gate and `correctness-gate-digests-regen` (the reference is regenerated
+# from the same query set it is asserted against -- never re-hardcode the list).
+CORRECTNESS_GATE_QUERY_IDS := 1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22
+
 test-correctness-gate:
 	@REPORT="$$(mktemp)"; \
-	BENCHBOX_STRICT_EXPECTED_RESULTS=1 BENCHBOX_EMIT_RESULT_DIGEST=1 BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22 uv run -- python -m pytest -m stress "tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]" -n 0 --tb=short --timeout=1200 -v --junitxml="$$REPORT"; \
+	BENCHBOX_STRICT_EXPECTED_RESULTS=1 BENCHBOX_EMIT_RESULT_DIGEST=1 BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS) uv run -- python -m pytest -m stress "tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]" -n 0 --tb=short --timeout=1200 -v --junitxml="$$REPORT"; \
 	PYTEST_STATUS=$$?; \
 	uv run -- python -c "import sys, xml.etree.ElementTree as ET; root = ET.parse(sys.argv[1]).getroot(); suites = [root] if root.tag == 'testsuite' else root.findall('testsuite'); tests = sum(int(s.get('tests') or 0) for s in suites); skipped = sum(int(s.get('skipped') or 0) for s in suites); errors = sum(int(s.get('errors') or 0) for s in suites); failures = sum(int(s.get('failures') or 0) for s in suites); print('correctness gate guard: ran=%d skipped=%d failures=%d errors=%d' % (tests, skipped, failures, errors)); sys.exit(0 if (tests == 1 and skipped == 0 and errors == 0 and failures == 0) else 'correctness gate: expected exactly 1 node to run with 0 skipped/failed/errored; a selected skip means duckdb/tpch dropped from the stable matrix or the node-id drifted')" "$$REPORT"; \
 	GUARD_STATUS=$$?; \
 	rm -f "$$REPORT"; \
 	test $$PYTEST_STATUS -eq 0 && test $$GUARD_STATUS -eq 0
+
+# Regenerate the bounded correctness-gate VALUE-digest reference
+# (benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json)
+# from a live gate run. Replaces the historical hand-copy: this runs the SAME gate
+# configuration (DuckDB x TPC-H, SF=1, reference qgen seed, the shared
+# CORRECTNESS_GATE_QUERY_IDS set) with BENCHBOX_EMIT_RESULT_DIGEST=1 and WRITES the
+# stream-0 per-query digests + provenance back to the JSON. Idempotent on a clean
+# tree: `make correctness-gate-digests-regen && git diff --exit-code <json>` is clean.
+# The reference is a regression SNAPSHOT vs a DuckDB-pinned baseline, tied to the
+# DuckDB build in uv.lock (stamped into the file's provenance). Run this whenever the
+# digest normalization changes or DuckDB is bumped, in the SAME change, or
+# `make test-correctness-gate` goes RED on a correct tree.
+correctness-gate-digests-regen:
+	BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS) uv run -- python _project/scripts/regenerate_correctness_gate_digests.py
 
 # Gate: compare every TPC-Havoc SQL variant to canonical TPC-H on real SF=0.1
 # DuckDB data; exits non-zero on any divergence beyond KNOWN_DIVERGENCES

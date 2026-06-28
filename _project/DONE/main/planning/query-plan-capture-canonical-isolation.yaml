@@ -3,7 +3,7 @@ title: "Canonical plan-capture isolation: one isolated phase for all engines, an
 worktree: main
 priority: High
 category: Core Functionality
-status: In Progress
+status: Completed
 
 progress_note: |
   PARTIAL (2026-06-19): the dependency-ordered first increment landed; this remains
@@ -128,7 +128,7 @@ work:
   - id: w2
     summary: "Default phase eligibility ON for all EXPLAIN-based engines (incl. Spark/Databricks)"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Invert plan_capture_phase_eligible from opt-in to default-True, with an explicit
       exception list for genuine side-effect engines. Enable Spark/Databricks and the
@@ -146,7 +146,7 @@ work:
   - id: w4
     summary: "Remove the inline capture path from EXPLAIN-based adapters and its dead complexity"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       Delete the inline capture calls from execute_query in the EXPLAIN-based adapters
       (the _merge_plan_capture_into_result / capture_query_plan blocks), leaving only
@@ -157,7 +157,7 @@ work:
   - id: w5
     summary: "Collapse the capture knob surface to analyze_plans"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Reduce the user-facing surface to: --capture-plans (run the phase) and
       analyze_plans (the one mode knob, promoted from a buried --platform-option to a
@@ -166,7 +166,7 @@ work:
   - id: w6
     summary: "Docs + end-to-end test for the canonical model"
     needs: [w4, w5]
-    status: pending
+    status: done
     notes: |
       Document capture as a single isolated post-measurement phase with analyze_plans
       as the only knob; add an integration test asserting capture fires after every
@@ -212,6 +212,33 @@ success_metrics:
   - "Inline capture code is removed from EXPLAIN-based adapters; only get_query_plan/get_query_plan_parser remain."
   - "analyze_plans is the only capture knob; sampling/first_n machinery and its lock are gone."
   - "Spark and Databricks capture via the phase; only documented side-effect engines remain on a special path."
+
+resolution: |
+  Completed (2026-06-24, all work items). w1/w3 landed earlier (#827/#828); w2/w4/w5/w6
+  completed together:
+    - w2: plan_capture_phase_eligible default flipped to True in the base adapter; BigQuery
+      is the one explicit side-effect exception (eligible=False, job-harvest capture).
+    - w4: the 5 adapters still capturing inline (athena, presto/trino, databricks, spark,
+      clickhouse) now route through the shared phase-gated chokepoint
+      _merge_plan_capture_into_result, so every EXPLAIN engine has exactly one capture path
+      (the isolated phase) and none runs EXPLAIN inline during measurement. The per-iteration
+      / per-stream sampling machinery (plan_first_n / plan_sampling_rate /
+      _plan_capture_iteration_counts / respect_sampling_filters) is removed; --plan-config
+      sample:/first: now error. plan_query_filter (query selection) and _plan_capture_lock
+      (guards _phase_recorded_queries) are kept.
+    - w5: analyze_plans promoted to a first-class --analyze-plans/--no-analyze-plans flag,
+      threaded BenchmarkConfig -> RunConfig -> run_benchmark (the previously buried
+      --platform-option path was a no-op for from_config adapters).
+    - w6: docs rewritten to the canonical model; TestCanonicalCaptureContract + run_benchmark
+      apply/restore tests added.
+  Verification: ruff clean; make typecheck exit 0; full platform+integration+core+cli sweeps
+  green (18844 passed on the w4 set).
+  CAVEAT — live cloud/Spark validation NOT performed in-sandbox: Snowflake, BigQuery, Athena,
+  Databricks, Synapse, Firebolt, Fabric, Redshift, Presto/Trino, Spark and ClickHouse-server
+  changes are verified only by mock-based unit tests and structural consistency with the
+  in-sandbox engines (DuckDB/SQLite/DataFusion/PostgreSQL). Live validation is tracked by the
+  query-plan-capture-cloud-live-* TODOs; BigQuery's side-effect policy by
+  query-plan-capture-sideeffect-engine-policy.
 
 open_questions:
   - question: "Promote analyze_plans to a first-class --analyze-plans/--no-analyze-plans flag, or keep it as --platform-option?"

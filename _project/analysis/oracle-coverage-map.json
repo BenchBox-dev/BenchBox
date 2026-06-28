@@ -6,6 +6,7 @@
       "cross_surface_enforced": null,
       "dual_surface": false,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -20,6 +21,7 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
+      "independence": "self-referential",
       "oracles": [
         "cross-surface"
       ],
@@ -37,6 +39,7 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
+      "independence": "self-referential",
       "oracles": [
         "cross-surface"
       ],
@@ -54,6 +57,7 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
+      "independence": "self-referential",
       "oracles": [
         "cross-surface"
       ],
@@ -71,6 +75,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -86,6 +91,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -101,6 +107,7 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
+      "independence": "self-referential",
       "oracles": [
         "cross-surface"
       ],
@@ -118,6 +125,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -133,6 +141,7 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
+      "independence": "self-referential",
       "oracles": [
         "cross-surface"
       ],
@@ -150,6 +159,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -165,6 +175,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -180,6 +191,7 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
+      "independence": "self-referential",
       "oracles": [
         "cross-surface"
       ],
@@ -197,6 +209,7 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
+      "independence": "self-referential",
       "oracles": [
         "cross-surface"
       ],
@@ -214,6 +227,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -229,6 +243,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": true,
+      "independence": "semi-independent",
       "oracles": [
         "expected-results"
       ],
@@ -246,6 +261,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -261,6 +277,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": true,
+      "independence": "self-referential",
       "oracles": [
         "expected-results"
       ],
@@ -278,6 +295,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -293,6 +311,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": true,
+      "independence": "self-referential",
       "oracles": [
         "variant-equivalence",
         "cross-surface-variant"
@@ -311,6 +330,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -326,6 +346,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -341,6 +362,7 @@
       "cross_surface_enforced": null,
       "dual_surface": false,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -355,6 +377,7 @@
       "cross_surface_enforced": null,
       "dual_surface": true,
       "guarded": false,
+      "independence": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",

@@ -405,31 +405,26 @@ class TestAdapterPlanCaptureGaps:
         assert plan is None
         assert timing == 0.0
 
-    def test_capture_query_plan_first_n_limit(self, adapter):
+    def test_capture_query_plan_query_filter(self, adapter):
+        """plan_query_filter (query selection) still gates capture; ids not in the
+        set are skipped. The per-iteration sampling machinery has been retired."""
         adapter.capture_plans = True
-        adapter.plan_first_n = 1
+        adapter.plan_query_filter = {"Q1"}
 
         mock_plan = Mock()
         mock_plan.estimate_serialized_size.return_value = 1024
         mock_parser = Mock()
         mock_parser.parse_explain_output.return_value = mock_plan
 
-        # First call succeeds
         with patch.object(adapter, "get_query_plan", return_value="PLAN"):
             with patch.object(adapter, "get_query_plan_parser", return_value=mock_parser):
+                # Selected query is captured.
                 plan, _ = adapter.capture_query_plan(Mock(), "SELECT 1", "Q1")
                 assert plan == mock_plan
-                # Second call should be filtered out
-                plan2, timing2 = adapter.capture_query_plan(Mock(), "SELECT 1", "Q1")
+                # Non-selected query is filtered out.
+                plan2, timing2 = adapter.capture_query_plan(Mock(), "SELECT 1", "Q2")
                 assert plan2 is None
                 assert timing2 == 0.0
-
-    def test_capture_query_plan_sampling_filtered(self, adapter):
-        adapter.capture_plans = True
-        adapter.plan_sampling_rate = 0.0  # Never sample
-        plan, timing = adapter.capture_query_plan(Mock(), "SELECT 1", "Q1")
-        assert plan is None
-        assert timing == 0.0
 
     def test_capture_query_plan_timeout(self, adapter):
         adapter.capture_plans = True

@@ -1525,8 +1525,9 @@ class TestDriversMixin:
         ANALYZE timing for ``--capture-plans``; honouring ``analyze_plans`` restores
         the one knob the canonical contract defines.
 
-        The measurement-phase sampling filters (``plan_first_n`` /
-        ``plan_sampling_rate`` / ``plan_query_filter``) are still honoured.
+        The ``plan_query_filter`` query-selection set (``--plan-queries``) is still
+        honoured; the per-iteration / per-stream sampling machinery
+        (``plan_first_n`` / ``plan_sampling_rate``) has been retired.
         """
         from benchbox.core.plan_capture_phase import run_plan_capture_phase
 
@@ -1547,7 +1548,6 @@ class TestDriversMixin:
             success_queries,
             connection=connection,
             analyze_plans=getattr(self, "analyze_plans", True),
-            respect_sampling_filters=True,
         )
 
         for result in results:

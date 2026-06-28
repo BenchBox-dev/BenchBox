@@ -2025,17 +2025,12 @@ class DatabricksAdapter(PlatformAdapter):
         finally:
             cursor.close()
 
-        # Capture the query plan outside the try so a strict-mode PlanCaptureError
-        # propagates instead of being swallowed and mislabeled as a failed query.
-        # Guarded by capture_plans, so EXPLAIN is never issued when capture is off.
-        # capture_query_plan opens its own cursor (the query cursor is already closed).
-        if getattr(self, "capture_plans", False) and result_dict.get("status") == "SUCCESS":
-            query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
-            if query_plan:
-                result_dict["query_plan"] = query_plan
-                result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
-            if plan_capture_time_ms is not None:
-                result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+        # Plan capture routes through the shared chokepoint, outside the try so a
+        # strict-mode PlanCaptureError propagates rather than being swallowed. For
+        # phase-eligible engines (the default) the chokepoint records the executed
+        # query for the isolated post-measurement phase instead of running EXPLAIN
+        # inline; otherwise it captures inline (capture_query_plan opens its own cursor).
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
 
         return result_dict
 

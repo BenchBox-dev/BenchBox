@@ -481,8 +481,6 @@ def _apply_cli_adapter(s: types.SimpleNamespace) -> None:
     plan_cfg = s.plan_config or PlanCaptureConfig()
     s.plan_cfg = plan_cfg
     s.strict_plan_capture = plan_cfg.strict
-    s.plan_sampling_rate = plan_cfg.sample_rate
-    s.plan_first_n = plan_cfg.first_n
     s.plan_queries_str = ",".join(plan_cfg.queries) if plan_cfg.queries else None
     s.show_query_plans = s.show_plans
 
@@ -1236,6 +1234,7 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
         compression_level=s.compression_level,
         test_execution_type=s.test_execution_type,
         capture_plans=s.capture_plans,
+        analyze_plans=s.analyze_plans,
         strict_plan_capture=s.strict_plan_capture,
         options={
             **s.verbosity_payload,
@@ -1325,8 +1324,6 @@ def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManag
         "force_upload": bool(s.force_upload),
         "capture_plans": s.capture_plans,
         "strict_plan_capture": s.strict_plan_capture,
-        "plan_sampling_rate": s.plan_sampling_rate,
-        "plan_first_n": s.plan_first_n,
         "plan_queries": s.plan_queries,
         "execution_mode": s.resolved_mode,
     }
@@ -1387,8 +1384,6 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         "force_upload": bool(s.force_upload),
         "capture_plans": s.capture_plans,
         "strict_plan_capture": s.strict_plan_capture,
-        "plan_sampling_rate": s.plan_sampling_rate,
-        "plan_first_n": s.plan_first_n,
         "plan_queries": s.plan_queries,
         "execution_mode": s.resolved_mode,
     }
@@ -1444,6 +1439,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         compression_level=s.compression_level,
         test_execution_type=s.test_execution_type,
         capture_plans=s.capture_plans,
+        analyze_plans=s.analyze_plans,
         strict_plan_capture=s.strict_plan_capture,
         options={
             **s.verbosity_payload,
@@ -1609,8 +1605,6 @@ def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: Database
         "force_upload": bool(s.force_upload),
         "capture_plans": s.capture_plans,
         "strict_plan_capture": s.strict_plan_capture,
-        "plan_sampling_rate": s.plan_sampling_rate,
-        "plan_first_n": s.plan_first_n,
         "plan_queries": s.plan_queries,
         "execution_mode": s.resolved_mode,
     }
@@ -1698,6 +1692,7 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
         compression_level=s.compression_level,
         test_execution_type=s.test_execution_type,
         capture_plans=s.capture_plans,
+        analyze_plans=s.analyze_plans,
         strict_plan_capture=s.strict_plan_capture,
         options={
             **s.verbosity_payload,
@@ -2401,10 +2396,6 @@ def _interactive_show_preview(s: types.SimpleNamespace) -> None:
     plan_config_str = None
     if s.plan_config:
         plan_parts = []
-        if s.plan_config.sample_rate is not None:
-            plan_parts.append(f"sample:{s.plan_config.sample_rate}")
-        if s.plan_config.first_n is not None:
-            plan_parts.append(f"first:{s.plan_config.first_n}")
         if s.plan_config.queries:
             plan_parts.append(f"queries:{','.join(s.plan_config.queries)}")
         if s.plan_config.strict:
@@ -2425,6 +2416,7 @@ def _interactive_show_preview(s: types.SimpleNamespace) -> None:
         force=force_str,
         official=s.official,
         capture_plans=s.capture_plans,
+        analyze_plans=getattr(s, "analyze_plans", None),
         validation=s.validation_mode if s.validation_mode and s.validation_mode != "exact" else None,
         verbose=s.verbosity_settings.level,
         console_obj=console,
@@ -2579,10 +2571,23 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--capture-plans",
     is_flag=True,
     help=(
-        "Capture query execution plans. Supported: DuckDB, PostgreSQL, DataFusion. "
-        "DuckDB uses EXPLAIN (ANALYZE, FORMAT JSON) by default - actual per-operator timing and "
-        "cardinality included, at ~2x query cost per captured plan. "
-        "Set analyze_plans=false via --platform-option to capture estimated plans only."
+        "Capture query execution plans into the result bundle, in an isolated "
+        "post-measurement phase (never inside the timed loop). Plans are captured "
+        "with EXPLAIN ANALYZE by default (actual per-operator timing/cardinality, "
+        "~1x extra query cost outside the measured window); pass --no-analyze-plans "
+        "for estimated plans only (a static EXPLAIN, no re-execution)."
+    ),
+)
+@advanced_option(
+    "--analyze-plans/--no-analyze-plans",
+    "analyze_plans",
+    default=None,
+    help=(
+        "With --capture-plans, control capture detail: --analyze-plans (default) "
+        "runs EXPLAIN ANALYZE post-measurement for actual timing/cardinality; "
+        "--no-analyze-plans captures the static (estimated) plan with no re-execution. "
+        "The single capture-detail knob. (Write statements are never re-executed "
+        "regardless: DML stays on a non-ANALYZE EXPLAIN.)"
     ),
 )
 @advanced_option(
@@ -2599,7 +2604,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--plan-config",
     type=PLAN_CONFIG,
     default=None,
-    help="Plan capture config: sample:0.1,first:5,queries:1,6,strict:true",
+    help="Plan capture config: queries:1,6,17,strict:true (capture is once-per-query; use --analyze-plans for detail)",
 )
 # Compression
 @advanced_option(
@@ -2723,6 +2728,7 @@ def run(
     non_interactive: bool,
     official: bool,
     capture_plans: bool,
+    analyze_plans: bool | None,
     show_plans: bool,
     strict_translation: bool,
     plan_config: PlanCaptureConfig | None,
@@ -2781,6 +2787,7 @@ def run(
         non_interactive=non_interactive,
         official=official,
         capture_plans=capture_plans,
+        analyze_plans=analyze_plans,
         show_plans=show_plans,
         strict_translation=strict_translation,
         plan_config=plan_config,

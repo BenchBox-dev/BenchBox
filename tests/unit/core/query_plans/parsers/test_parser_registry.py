@@ -257,6 +257,23 @@ class TestGlobalRegistry:
         assert parser is not None
         assert parser.platform_name == "sqlite"
 
+    def test_clickhouse_deployment_mode_keys_resolve(self) -> None:
+        """ClickHouse parser resolves for the concrete platform identifiers.
+
+        The platform identifiers are clickhouse-local / clickhouse-server /
+        clickhouse-cloud, not the legacy "clickhouse" key, so a direct
+        get_parser_for_platform() lookup must work for every deployment mode.
+        """
+        for platform in (
+            "clickhouse",
+            "clickhouse-local",
+            "clickhouse-server",
+            "clickhouse-cloud",
+        ):
+            parser = get_parser_for_platform(platform)
+            assert parser is not None, f"no parser resolved for {platform}"
+            assert parser.platform_name == "clickhouse"
+
     def test_unknown_platform(self) -> None:
         """Test unknown platform returns None."""
         parser = get_parser_for_platform("unknowndb", "1.0.0")

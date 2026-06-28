@@ -18,6 +18,8 @@ from __future__ import annotations
 import pytest
 
 from benchbox.core.equivalence.cross_surface import (
+    _bump_trailing_limit,
+    _final_key_tied_beyond_limit,
     _report,
     count_executed_cells,
     find_cross_surface_divergences,
@@ -148,6 +150,125 @@ def test_tie_aware_only_applies_to_truncated_top_n_queries():
         backends=("expression",),
     )
     assert relaxed == [], "boundary-tie swap under a LIMIT query should be tolerated"
+
+
+# --- Boundary-tie probe: a one-visible-row final tie is not a false positive -----
+
+
+@pytest.mark.parametrize(
+    "sql, expected",
+    [
+        ("SELECT a FROM t ORDER BY a DESC LIMIT 2", "SELECT a FROM t ORDER BY a DESC LIMIT 3"),
+        ("SELECT a FROM t ORDER BY a LIMIT 10 OFFSET 5", "SELECT a FROM t ORDER BY a LIMIT 11 OFFSET 5"),
+        ("select a from t order by a limit 1;", "select a from t order by a limit 2;"),
+        ("SELECT a FROM t ORDER BY a LIMIT 7 -- top seven", "SELECT a FROM t ORDER BY a LIMIT 8"),
+        ("SELECT a FROM t ORDER BY a", None),  # no trailing LIMIT -> not rewritable
+    ],
+)
+def test_bump_trailing_limit_raises_the_cutoff_by_one(sql, expected):
+    """The probe rewriter raises ``LIMIT n`` to ``n+1``, preserving OFFSET/terminator."""
+    assert _bump_trailing_limit(sql) == expected
+
+
+def test_final_key_tied_beyond_limit_true_when_key_recurs_past_cutoff():
+    """The probe reports True when the row past the cutoff shares the final order key."""
+    sql = "SELECT a, b FROM t ORDER BY a DESC LIMIT 2"
+    # Keys 10, 5, 5 under LIMIT 2 -> visible [10, 5]; the row just past the cutoff is
+    # another key-5 row, so the final key 5 ties across the LIMIT.
+    connection = _FakeConnection({"SELECT a, b FROM t ORDER BY a DESC LIMIT 3": [(10, "x"), (5, "a"), (5, "b")]})
+    reference = [(10, "x"), (5, "a")]
+    assert _final_key_tied_beyond_limit(connection, sql, [0], reference) is True
+
+
+def test_final_key_tied_beyond_limit_false_when_no_row_past_cutoff():
+    """The probe reports False when the table is exhausted at the cutoff (deterministic)."""
+    sql = "SELECT a, b FROM t ORDER BY a DESC LIMIT 2"
+    # Only two rows total: LIMIT 3 returns the same two, nothing past the cutoff, so
+    # the final row is deterministic - a difference there is a real value bug.
+    connection = _FakeConnection({"SELECT a, b FROM t ORDER BY a DESC LIMIT 3": [(10, "x"), (5, "good")]})
+    reference = [(10, "x"), (5, "good")]
+    assert _final_key_tied_beyond_limit(connection, sql, [0], reference) is False
+
+
+def test_final_key_tied_beyond_limit_false_when_next_row_is_a_distinct_key():
+    """A distinct order key just past the cutoff means the final row is deterministic."""
+    sql = "SELECT a, b FROM t ORDER BY a DESC LIMIT 2"
+    # The row past the cutoff has key 3 (not the boundary value 5), so key 5 is NOT
+    # tied across the LIMIT - the lone visible key-5 row is the true last row.
+    connection = _FakeConnection({"SELECT a, b FROM t ORDER BY a DESC LIMIT 3": [(10, "x"), (5, "a"), (3, "c")]})
+    reference = [(10, "x"), (5, "a")]
+    assert _final_key_tied_beyond_limit(connection, sql, [0], reference) is False
+
+
+def test_one_visible_row_boundary_tie_is_not_a_divergence_via_probe():
+    """End-to-end: a one-visible-row boundary tie is accepted once the probe confirms it.
+
+    Reference top-2 is ``[10, 5]`` with the boundary key 5 tied past the LIMIT (a
+    third key-5 row exists). The DataFrame surface keeps a DIFFERENT but equally-valid
+    key-5 row, so the lone final group differs - and the gate must NOT flag it,
+    because the boundary-tie probe (``LIMIT 3``) shows key 5 recurs past the cutoff.
+    """
+    sql = "SELECT a, b FROM t ORDER BY a DESC LIMIT 2"
+    reference = [(10, "x"), (5, "a")]
+    candidate = [(10, "x"), (5, "b")]  # the lone visible boundary-tie member differs
+    connection = _FakeConnection(
+        {
+            sql: reference,
+            "SELECT a, b FROM t ORDER BY a DESC LIMIT 3": [(10, "x"), (5, "a"), (5, "b")],
+        }
+    )
+
+    def reference_sql(_qid):
+        return sql
+
+    def dataframe_query(_qid):
+        return _FakeQuery({"expression": lambda ctx: _FakeFrame(candidate)})
+
+    divergences = find_cross_surface_divergences(
+        connection,
+        query_ids=["Q1"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts={"expression": object()},
+        validator=ResultValidator(),
+        backends=("expression",),
+    )
+    assert divergences == [], "a probe-confirmed one-visible-row boundary tie must not be flagged"
+
+
+def test_one_visible_row_final_value_bug_is_caught_when_not_tied_past_limit():
+    """End-to-end: a unique-final-key value bug is still caught when the probe says deterministic.
+
+    Same single-row final-group shape as the boundary-tie case, but the probe
+    (``LIMIT 3``) finds NO row tied past the cutoff, so the final row is deterministic
+    and the ``good`` -> ``bad`` change is a real divergence the gate must report.
+    """
+    sql = "SELECT a, b FROM t ORDER BY a DESC LIMIT 2"
+    reference = [(10, "x"), (5, "good")]
+    candidate = [(10, "x"), (5, "bad")]
+    connection = _FakeConnection(
+        {
+            sql: reference,
+            "SELECT a, b FROM t ORDER BY a DESC LIMIT 3": [(10, "x"), (5, "good")],
+        }
+    )
+
+    def reference_sql(_qid):
+        return sql
+
+    def dataframe_query(_qid):
+        return _FakeQuery({"expression": lambda ctx: _FakeFrame(candidate)})
+
+    divergences = find_cross_surface_divergences(
+        connection,
+        query_ids=["Q1"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts={"expression": object()},
+        validator=ResultValidator(),
+        backends=("expression",),
+    )
+    assert [d.key for d in divergences] == ["Q1_expression"], "a deterministic final-row bug must still be caught"
 
 
 def test_missing_backend_impl_is_skipped_not_a_divergence():
@@ -340,6 +461,101 @@ def test_h2odb_is_an_enforced_gate_with_classified_percentile_exception():
     assert set(GATES["h2odb"].known_divergences) == {"Q9_expression", "Q9_pandas"}
     # Runs on a smaller-than-default bounded cell (its generator base is 10M rows).
     assert GATES["h2odb"].scale_factor == 0.01
+
+
+def test_h2odb_q9_baseline_tolerates_only_the_sub_cent_residue_not_real_bugs():
+    """The Q9 baseline is detail-aware: it classifies ONLY the sub-cent DECIMAL
+    residue, so a genuine Q9 regression on the same key still fails the gate."""
+    from benchbox.core.equivalence.cross_surface import GATES
+
+    known = GATES["h2odb"].known_divergences
+    coverage = {"expression": 1, "pandas": 1}
+
+    # The documented residue: p90 differs by < half a cent on both backends ->
+    # classified, the gate passes.
+    residue = [
+        SurfaceDivergence(
+            "Q9", "expression", "Q9.0: Value mismatch at row 4, column 2. Original: 77.87, Variant: 77.874"
+        ),
+        SurfaceDivergence("Q9", "pandas", "Q9.0: Value mismatch at row 4, column 2. Original: 77.87, Variant: 77.874"),
+    ]
+    assert (
+        _report(residue, total=2, coverage=coverage, known=known, benchmark="h2odb", reference_row_counts={"Q9": 6})
+        == 0
+    )
+
+    # A real value bug on the SAME key (wrong median, off by ten) is not sub-cent,
+    # so it is unclassified and the gate FAILS - the bare key no longer masks it.
+    real_bug = [
+        SurfaceDivergence("Q9", "pandas", "Q9.0: Value mismatch at row 0, column 1. Original: 50.0, Variant: 60.0"),
+    ]
+    assert (
+        _report(real_bug, total=2, coverage=coverage, known=known, benchmark="h2odb", reference_row_counts={"Q9": 6})
+        == 1
+    )
+
+    # A SUB-CENT bug in the WRONG column (the median, col 1, not the documented p90
+    # col 2) is a real Q9 regression - the gate FAILS. The magnitude-only predicate
+    # wrongly tolerated this; pinning the accepted cell to the p90 column catches it.
+    wrong_column = [
+        SurfaceDivergence("Q9", "pandas", "Q9.0: Value mismatch at row 4, column 1. Original: 77.87, Variant: 77.874"),
+    ]
+    assert (
+        _report(
+            wrong_column, total=2, coverage=coverage, known=known, benchmark="h2odb", reference_row_counts={"Q9": 6}
+        )
+        == 1
+    )
+
+
+def test_h2odb_q9_residue_predicate_rejects_structural_and_large_diffs():
+    """The Q9 acceptance predicate accepts a sub-cent p90 value mismatch and nothing
+    else.
+
+    The documented exception is ONLY the p90 PERCENTILE_CONT DECIMAL(8,2) scale
+    residue (Q9 projects col 0 = passenger_count, col 1 = median, col 2 = p90), so the
+    predicate must pin the EXACT cell: the p90 column, a single sub-half-cent value at
+    the SQL column's 2-decimal scale. A sub-cent mismatch in the median or the
+    grouping key, a structural mismatch, an execution error, or any >=1-cent value bug
+    is rejected.
+    """
+    from benchbox.core.equivalence.cross_surface import _h2odb_q9_decimal_residue
+
+    def d(detail: str) -> SurfaceDivergence:
+        return SurfaceDivergence("Q9", "pandas", detail)
+
+    # ACCEPT: the documented residue - p90 column (2), Original at DECIMAL(8,2) scale,
+    # Variant differs only in the 3rd decimal, sub-half-cent.
+    assert _h2odb_q9_decimal_residue(d("Q9.0: Value mismatch at row 4, column 2. Original: 77.87, Variant: 77.874"))
+
+    # REJECT: a full value bug (>= a cent), a wrong grouping (row/column-count
+    # mismatch), and an execution error.
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Value mismatch at row 0, column 1. Original: 50.0, Variant: 60.0"))
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Row count mismatch. Original: 6, Variant: 5"))
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Column count mismatch at row 0. Original: 3, Variant: 2"))
+    assert not _h2odb_q9_decimal_residue(d("error: boom"))
+
+    # REJECT: a SUB-CENT mismatch in the WRONG column. The bare-magnitude predicate
+    # wrongly accepted these (only the value delta was checked); pinning to the p90
+    # column (2) rejects a sub-cent median (col 1) or grouping-key (col 0) bug, which
+    # are real Q9 regressions, not the documented p90 DECIMAL residue.
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Value mismatch at row 4, column 1. Original: 77.87, Variant: 77.874"))
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Value mismatch at row 4, column 0. Original: 4.00, Variant: 4.004"))
+
+    # REJECT: a >=1-cent value bug in the p90 column (right column, wrong magnitude).
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Value mismatch at row 4, column 2. Original: 77.87, Variant: 77.90"))
+
+    # REJECT: a p90, sub-cent delta whose Original is NOT at DECIMAL(8,2) scale - so it
+    # lacks the DuckDB DECIMAL-rounding signature (both sides carry a 3rd decimal),
+    # which is not the documented presentational difference.
+    assert not _h2odb_q9_decimal_residue(
+        d("Q9.0: Value mismatch at row 4, column 2. Original: 77.874, Variant: 77.877")
+    )
+
+    # ACCEPT: the median (col 1) is allowed to be the documented residue too only when
+    # it is p90 - it is NOT - so this stays rejected even though it is sub-cent. (Guard
+    # against a future loosening: only column 2 is ever accepted.)
+    assert not _h2odb_q9_decimal_residue(d("Q9.5: Value mismatch at row 5, column 1. Original: 77.91, Variant: 77.915"))
 
 
 def test_order_by_result_key_maps_alias_name_expr_and_ordinal():

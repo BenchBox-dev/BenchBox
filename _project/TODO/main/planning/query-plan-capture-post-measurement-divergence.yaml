@@ -67,6 +67,33 @@ work:
       Add a test on DuckDB combined mode (or a DML-containing query set) asserting the
       captured plan matches the data state it was measured against (or that the
       documented warning fires and capture is skipped/labelled accordingly).
+  - id: w4
+    summary: "Preserve per-stream/seed query variants in the phase recording buffer"
+    status: pending
+    notes: |
+      Related fidelity gap raised in PR #889 review (chatgpt-codex-connector, P2): the
+      phase records executed queries in _phase_recorded_queries keyed by query_id via
+      setdefault (benchbox/platforms/base/result_capture.py and execution.py). In
+      TPC-H/TPC-DS power/throughput the SAME query_id renders DIFFERENT SQL per
+      seed/stream (e.g. TPCHPowerTest derives seed + stream_id*1000 and passes
+      stream_id to get_query). With setdefault-by-query_id only the FIRST variant's SQL
+      is recorded, so _capture_plans_post_measurement captures one plan and attaches it
+      (plan + fingerprint + capture_time) to EVERY later row sharing that query_id —
+      rows that actually ran a different variant. While fingerprints still embed literal
+      values (query-plan-capture-fingerprint-literal-normalization is Not Started), those
+      attached fingerprints are wrong for the non-first variants.
+      This is PRE-EXISTING isolated-phase behavior (it already affects the originally
+      phase-eligible engines: DuckDB/MotherDuck/PostgreSQL/Redshift/SQLite/DataFusion);
+      the canonical-isolation cutover (PR #889) extended the same phase to the remaining
+      EXPLAIN engines per the ratified contract, so it now applies uniformly.
+      Resolution to evaluate (coordinate with the literal-normalization TODO): key
+      _phase_recorded_queries by concrete SQL (or (query_id, sql)) and attach captured
+      plans to result rows by matching SQL, so each row gets the plan for the variant it
+      actually ran — for ALL eligible engines, not just the ones added in #889.
+      Interim contract: under "capture once per query — a plan is a property of
+      (query, schema, engine)", once fingerprints are literal-normalized the structural
+      fingerprint is variant-stable and the attachment is correct; the per-variant
+      ANALYZE timing remains representative rather than exact.
 
 deps:
   needs:

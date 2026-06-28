@@ -95,7 +95,22 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # gated benchmark, never a full platform matrix).
 EQUIVALENCE_SCALE = 0.1
 
-_TRAILING_LIMIT_RE = re.compile(r"(?is)\blimit\s+\d+\s*(?:offset\s+\d+\s*)?;?\s*$")
+# Captures a trailing ``LIMIT n`` so it can be both DETECTED (truncated top-N) and
+# REWRITTEN one row wider (the boundary-tie probe). Group 1 is ``limit `` (original
+# case/spacing), group 2 the integer, group 3 any OFFSET / statement terminator /
+# trailing whitespace - reassembled verbatim so only the count changes.
+_TRAILING_LIMIT_RE = re.compile(r"(?is)(\blimit\s+)(\d+)(\s*(?:offset\s+\d+\s*)?;?\s*)$")
+_TRAILING_COMMENT_RE = re.compile(r"\s*--[^\n]*$")
+
+
+def _strip_trailing_comment(sql: str) -> str:
+    """Strip a trailing ``-- line comment`` and surrounding whitespace from ``sql``.
+
+    Shared by the trailing-``LIMIT`` detector and rewriter so ``... limit 10 -- note``
+    is handled identically by both. Removing a trailing comment never changes query
+    semantics, so the stripped form is still valid SQL to execute.
+    """
+    return _TRAILING_COMMENT_RE.sub("", sql.strip())
 
 
 def _is_truncated_top_n(sql: str) -> bool:
@@ -109,8 +124,86 @@ def _is_truncated_top_n(sql: str) -> bool:
     everything else uses the strict comparator. A trailing line comment /
     statement terminator is stripped first so ``... limit 10 -- note`` matches.
     """
-    stripped = re.sub(r"\s*--[^\n]*$", "", sql.strip())
-    return bool(_TRAILING_LIMIT_RE.search(stripped))
+    return bool(_TRAILING_LIMIT_RE.search(_strip_trailing_comment(sql)))
+
+
+def _bump_trailing_limit(sql: str) -> str | None:
+    """Return ``sql`` with its trailing ``LIMIT n`` raised to ``LIMIT n+1``, or None.
+
+    The boundary-tie probe (:func:`_final_key_tied_beyond_limit`) needs exactly one
+    row PAST the original top-N cutoff to learn whether the final order key ties
+    across it. Raising the trailing ``LIMIT`` by one row does that while preserving
+    any ``OFFSET`` (the window simply widens by one at its end), statement
+    terminator, and trailing comment, so the probe is the same query plus one row.
+    Returns None when no trailing numeric ``LIMIT`` is present (the caller then
+    skips the probe and stays strict).
+    """
+    stripped = _strip_trailing_comment(sql)
+    match = _TRAILING_LIMIT_RE.search(stripped)
+    if match is None:
+        return None
+    bumped = int(match.group(2)) + 1
+    return f"{stripped[: match.start()]}{match.group(1)}{bumped}{match.group(3)}"
+
+
+def _final_key_tied_beyond_limit(
+    connection: Any,
+    sql: str,
+    order_by: Sequence[int],
+    reference: list[tuple[Any, ...]],
+) -> bool:
+    """True if the reference's final ORDER BY key value recurs past the LIMIT cutoff.
+
+    A trailing-``LIMIT`` top-N can cut across a tie in the order key, leaving only a
+    SUBSET of the rows that share the worst-kept key value. When exactly ONE such
+    row stays visible, the truncated result alone cannot tell that legitimate
+    boundary tie apart from a deterministic unique final row, so the comparator
+    would either mask a real single-row value bug or false-positive a valid tie pick
+    (the soundness gap this probe closes). The probe supplies the missing signal: it
+    re-runs the query one row wider (``LIMIT n+1``) and reports whether the row JUST
+    past the original cutoff carries the SAME order-key value as the last row inside
+    it. If so, the final key is genuinely tied across the cutoff and a
+    single-visible-row final-group difference is an equally-valid boundary pick; if
+    not (or there is no row past the cutoff), the final row is deterministic.
+
+    Returns False on any condition that makes the probe unsound, unnecessary, or
+    impossible - an empty reference, an out-of-range order key, a final tie group
+    that already spans >= 2 visible rows (accepted as a boundary swap without the
+    probe), an un-rewritable ``LIMIT``, or a probe-query failure - so the caller
+    keeps the strict default and the worst case is a (loud, recoverable) caught
+    mismatch, never a masked bug.
+    """
+    if not reference or not order_by:
+        return False
+    n = len(reference)
+    width = len(reference[-1])
+    if any(c < 0 or c >= width for c in order_by):
+        return False
+    # The order-aware relaxation reads this probe ONLY for a single-visible-row final
+    # tie group; a final group that already spans >= 2 rows is accepted as a boundary
+    # swap without it. So when the reference's own final group is already >= 2 rows,
+    # the result would be ignored - skip the extra LIMIT n+1 query entirely.
+    final_key = tuple(reference[-1][c] for c in order_by)
+    if n >= 2 and tuple(reference[-2][c] for c in order_by) == final_key:
+        return False
+    probe_sql = _bump_trailing_limit(sql)
+    if probe_sql is None:
+        return False
+    try:
+        probe = fetch_reference_rows(connection, probe_sql)
+    except Exception:  # noqa: BLE001 - a failed probe must not crash the gate; stay strict
+        return False
+    # No row past the original cutoff -> the final visible row is the true last row,
+    # so its key is not tied beyond the LIMIT.
+    if len(probe) <= n or len(probe[n]) <= max(order_by):
+        return False
+    # The first n probe rows are the original window (same deterministic ORDER BY key
+    # sequence as the reference), so probe[n] is the first row PAST the cutoff. The
+    # final key ties across the cutoff iff probe[n] carries that same key. Both values
+    # come from the same DuckDB result, so exact equality is the right within-result
+    # tie test (the comparator's cross-engine float tolerance does not apply here).
+    key_beyond = tuple(probe[n][c] for c in order_by)
+    return final_key == key_beyond
 
 
 def _is_star_projection(projection: Any) -> bool:
@@ -253,6 +346,22 @@ class CrossSurfaceData:
 
 
 @dataclass(frozen=True)
+class ClassifiedDivergence:
+    """A baselined divergence accepted ONLY when ``accepts`` matches the live cell.
+
+    A bare ``str`` baseline entry tolerates ANY divergence on its key, which masks a
+    real regression that happens to land on the same query/backend. A
+    ``ClassifiedDivergence`` instead tolerates a divergence only when its ``accepts``
+    predicate confirms the actual cell detail is the specific, defensible difference
+    described by ``reason`` - so a genuinely wrong value on the same key is still
+    reported as an unclassified gate failure.
+    """
+
+    reason: str
+    accepts: Callable[[SurfaceDivergence], bool]
+
+
+@dataclass(frozen=True)
 class CrossSurfaceGate:
     """Per-benchmark wiring for a cross-surface SQL<->DataFrame gate."""
 
@@ -263,7 +372,7 @@ class CrossSurfaceGate:
     # DataFrame surface, so every cell must match. Add a classified entry only
     # for a deliberate, defensible presentational difference - never to mute a
     # regression.
-    known_divergences: dict[str, str] = field(default_factory=dict)
+    known_divergences: dict[str, str | ClassifiedDivergence] = field(default_factory=dict)
     # Queries whose SQL reference legitimately returns 0 rows at the bounded
     # cell, keyed by query id, with a rationale string. A both-empty cell
     # compares empty-vs-empty and is NON-discriminating (every backend trivially
@@ -360,6 +469,28 @@ def find_cross_surface_divergences(
         # order-insensitive comparison rather than a silent order-blind "pass".
         order_by = _order_by_result_key(sql)
         order_aware = order_by is not None
+        # Boundary-tie probe, computed at most once per query (lazily, on the first
+        # backend's reference, then memoized): a trailing LIMIT can leave just ONE
+        # row of a final order-key tie visible, which the truncated result alone
+        # cannot tell apart from a deterministic unique last row. For an order-aware
+        # truncated top-N, learn whether that final key genuinely ties PAST the cutoff
+        # so the comparator accepts a single-visible-row boundary swap but still
+        # catches a real unique-final-key value bug. Every backend of a query shares
+        # the SAME reference, so the extra LIMIT n+1 query runs once, not per backend.
+        probe_result: bool | None = None  # None = not yet computed (memo sentinel)
+
+        def final_key_tied(reference: list[tuple[Any, ...]]) -> bool:
+            nonlocal probe_result
+            if probe_result is None:
+                # order_by is not None is load-bearing: it narrows the type for the
+                # call below (the runtime guard inside also rejects a falsy key).
+                probe_result = bool(
+                    tie_aware
+                    and order_by is not None
+                    and _final_key_tied_beyond_limit(connection, sql, order_by, reference)
+                )
+            return probe_result
+
         for backend in backends:
             impl = query.get_impl_for_family(backend)
             if impl is None:
@@ -386,6 +517,7 @@ def find_cross_surface_divergences(
                     tie_aware=tie_aware,
                     order_aware=order_aware,
                     order_by=order_by,
+                    final_key_tied_beyond_limit=final_key_tied(reference),
                 )
 
             yield backend, check
@@ -878,7 +1010,100 @@ _H2ODB_PERCENTILE_DECIMAL = (
     "yields the DataFrame value, so the only difference is DuckDB's DECIMAL result "
     "scale - a deterministic, sub-cent presentational/dtype difference, not a logic bug."
 )
-_H2ODB_KNOWN_DIVERGENCES: dict[str, str] = dict.fromkeys(("Q9_expression", "Q9_pandas"), _H2ODB_PERCENTILE_DECIMAL)
+# Detail-aware acceptance for the Q9 residue. The documented exception is ONLY the
+# p90 PERCENTILE_CONT DECIMAL(8,2) scale residue: a SINGLE value, sub-half-cent,
+# living in the p90 output column. Q9's projection is
+#   col 0 = passenger_count (grouping key),
+#   col 1 = median_fare_amount (PERCENTILE_CONT(0.5)),
+#   col 2 = p90_fare_amount    (PERCENTILE_CONT(0.9)),
+# and the validator reports a divergence as the FIRST positional mismatch
+# ("Value mismatch at row {i}, column {j}. Original: {orig}, Variant: {variant}").
+# So the predicate is sound only if it pins the difference to the EXACT documented
+# cell and signature, not merely "the first value is sub-cent":
+#   * it must be a Value mismatch (NOT a row/column-count mismatch, an execution
+#     error, or a reference failure - those detail strings do not match and are
+#     rejected);
+#   * it must be in column 2 (the p90 column). A grouping-key (col 0) or median
+#     (col 1) mismatch - even a sub-cent one - is REJECTED, so a wrong median or a
+#     wrong group no longer slips through on a small numeric delta;
+#   * both values must be numeric and differ by at most half a cent (the
+#     DECIMAL(8,2) rounding bound, with a hair of float-formatting slack - still
+#     far below a full cent), so any >=1-cent value bug is rejected; and
+#   * the SQL (Original) value must already be at the column's 2-decimal scale and
+#     the DataFrame (Variant) value must differ only beyond that scale - the actual
+#     DECIMAL-rounding signature - so an arbitrary "both happen to be close" pair
+#     does not qualify.
+# A wrong median, a wrong grouping key, a row/column-count mismatch, an execution
+# error, or any larger value bug (e.g. an interpolation-method regression) fails one
+# of these checks, so Q9 stays guarded against real result regressions instead of the
+# bare key tolerating every Q9 difference.
+#
+# Residual blind spot (validator-imposed, documented): the validator reports only the
+# FIRST positional mismatch, so a SECOND, later Q9 bug behind an accepted p90 residue
+# cannot be seen from the detail string alone. Pinning the accepted cell to the exact
+# p90 column + sub-half-cent + 2-decimal-scale signature minimizes the surface of that
+# blind spot (only the documented cell is ever the "first" accepted mismatch); closing
+# it fully would require the validator to surface ALL mismatches, not one.
+_H2ODB_Q9_P90_COLUMN = 2
+_H2ODB_Q9_RESIDUE_MAX = 0.005 + 1e-6
+_VALUE_MISMATCH_RE = re.compile(
+    r"Value mismatch at row \d+, column (?P<col>\d+)\. Original:\s*(?P<orig>.+?),\s*Variant:\s*(?P<variant>.+)$"
+)
+_NUMBER_RE = re.compile(r"[-+]?\d*\.\d+|[-+]?\d+")
+
+
+def _first_number(text: str) -> float | None:
+    match = _NUMBER_RE.search(text)
+    return float(match.group()) if match else None
+
+
+def _is_two_decimal_scale(value: str) -> bool:
+    """True if ``value`` is a plain decimal already rounded to <= 2 fractional digits.
+
+    The SQL (Original) side of the documented residue is a DECIMAL(8,2), so it never
+    carries a 3rd fractional digit; the DataFrame (Variant) side keeps full float
+    precision. Requiring the Original to be at 2-decimal scale pins the difference to
+    DuckDB's DECIMAL-scale rounding rather than an arbitrary near-equal pair.
+    """
+    number = _NUMBER_RE.search(value)
+    if number is None:
+        return False
+    _, _, frac = number.group().partition(".")
+    return len(frac) <= 2
+
+
+def _h2odb_q9_decimal_residue(divergence: SurfaceDivergence) -> bool:
+    """True iff a Q9 divergence is the documented sub-cent p90 DECIMAL-scale residue.
+
+    Pins the accepted difference to the EXACT documented cell (the p90 column, a
+    single sub-half-cent value at the SQL column's 2-decimal scale) so a wrong
+    median, a wrong grouping key, a structural mismatch, an execution error, or any
+    >=1-cent value bug is rejected rather than tolerated.
+    """
+    match = _VALUE_MISMATCH_RE.search(str(divergence.detail))
+    if match is None:
+        return False
+    # Only the p90 column (index 2) carries the documented residue; a grouping-key
+    # or median mismatch - sub-cent or not - is a real Q9 regression.
+    if int(match.group("col")) != _H2ODB_Q9_P90_COLUMN:
+        return False
+    orig_text = match.group("orig")
+    variant_text = match.group("variant")
+    orig = _first_number(orig_text)
+    variant = _first_number(variant_text)
+    if orig is None or variant is None:
+        return False
+    # The SQL value must already be at DECIMAL(8,2) scale (the rounding signature);
+    # the DataFrame value differs only beyond that scale, sub-half-cent.
+    if not _is_two_decimal_scale(orig_text):
+        return False
+    return abs(orig - variant) <= _H2ODB_Q9_RESIDUE_MAX
+
+
+_H2ODB_KNOWN_DIVERGENCES: dict[str, str | ClassifiedDivergence] = dict.fromkeys(
+    ("Q9_expression", "Q9_pandas"),
+    ClassifiedDivergence(_H2ODB_PERCENTILE_DECIMAL, _h2odb_q9_decimal_residue),
+)
 
 
 # Read Primitives classified cells. As a *primitives* benchmark it deliberately
@@ -1081,11 +1306,27 @@ def run_gate(gate: CrossSurfaceGate) -> int:
     )
 
 
+def _classification(known: dict[str, str | ClassifiedDivergence], divergence: SurfaceDivergence) -> str | None:
+    """Return the reason a divergence is tolerated, or None if it is unclassified.
+
+    A bare-string baseline entry tolerates ANY divergence on that key (back-compat).
+    A :class:`ClassifiedDivergence` entry tolerates the divergence only when its
+    ``accepts`` predicate confirms the live cell, so a regression on a baselined key
+    is still unclassified.
+    """
+    entry = known.get(divergence.key)
+    if entry is None:
+        return None
+    if isinstance(entry, ClassifiedDivergence):
+        return entry.reason if entry.accepts(divergence) else None
+    return entry
+
+
 def _report(
     divergences: list[SurfaceDivergence],
     total: int,
     coverage: dict[str, int],
-    known: dict[str, str],
+    known: dict[str, str | ClassifiedDivergence],
     *,
     benchmark: str,
     reference_row_counts: dict[Any, int] | None = None,
@@ -1112,7 +1353,10 @@ def _report(
     reference_row_counts = reference_row_counts or {}
 
     found = {d.key for d in divergences}
-    new = sorted(found - set(known))
+    # A divergence is classified only if its key is baselined AND (for a detail-aware
+    # ClassifiedDivergence entry) the live cell matches the entry's predicate, so a
+    # real regression on a baselined key is still reported as unclassified.
+    new = sorted({d.key for d in divergences if _classification(known, d) is None})
     resolved = sorted(set(known) - found)
     missing_backends = sorted(backend for backend, count in coverage.items() if count == 0)
     executed = sum(coverage.values())
@@ -1151,7 +1395,7 @@ def _report(
 
     by_class: dict[str, list[SurfaceDivergence]] = {}
     for divergence in sorted(divergences, key=lambda d: d.key):
-        klass = known.get(divergence.key, "UNCLASSIFIED")
+        klass = _classification(known, divergence) or "UNCLASSIFIED"
         by_class.setdefault(klass, []).append(divergence)
     for klass in sorted(by_class):
         print(f"  [{klass}]")

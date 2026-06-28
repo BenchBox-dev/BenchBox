@@ -473,6 +473,27 @@ class TestClickHouseAdapter:
             assert "my_float_col INT" in mixed_out
             assert "FLOAT[" not in mixed_out
 
+    def test_array_field_parsed_to_list_not_float(self):
+        """An Array column value like ``[0.1,0.2]`` is parsed to a Python list.
+
+        Regression for the embedding-column load: the ARRAY branch must take
+        precedence over the FLOAT substring match, so the raw literal is parsed
+        into a sequence for clickhouse-driver rather than being passed to
+        ``float("[0.1,0.2]")`` (which raised ValueError and dropped all rows).
+        """
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
+
+        handler = ClickHouseNativeHandler(delimiter=",", adapter=None, benchmark=None)
+
+        for type_name in ("Array(Float32)", "FLOAT_ARRAY", "Array(Float64)"):
+            converted = handler._convert_field_for_clickhouse("[0.1,0.2]", type_name)
+            assert converted == [0.1, 0.2], f"{type_name} should parse to a list"
+
+        # A genuine scalar FLOAT column is still converted to a float.
+        assert handler._convert_field_for_clickhouse("0.5", "FLOAT") == 0.5
+        # NULL sentinels in an array column become None.
+        assert handler._convert_field_for_clickhouse("\\N", "Array(Float32)") is None
+
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_get_platform_metadata(self, mock_client_class):
         """Test platform metadata collection."""

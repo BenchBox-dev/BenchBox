@@ -348,16 +348,24 @@ These flags control monitoring, progress display, memory handling, and caching b
   is also active, display is suppressed to avoid running EXPLAIN twice; use
   `benchbox show-plan` to inspect plans already captured to the results bundle.
 
+- `--analyze-plans` / `--no-analyze-plans`: The single capture-detail knob (used with
+  `--capture-plans`). `--analyze-plans` (default) captures `EXPLAIN (ANALYZE)` plans with actual
+  per-operator timing/cardinality, re-running each query once in the isolated post-measurement
+  phase (~1× extra cost, outside the measured window). `--no-analyze-plans` captures the static
+  (estimated) plan with no re-execution. Write statements are never re-executed regardless (DML
+  stays on a non-`ANALYZE` `EXPLAIN`).
+
 - `--plan-config TEXT`: Fine-grained control over query plan capture
   - Format: comma-separated key:value pairs
   - Keys:
-    - `sample:FLOAT` - fraction of queries to capture plans for (e.g., `sample:0.1` for 10%)
-    - `first:INT` - capture plans for the first N queries only
-    - `queries:ID1,ID2,...` - capture plans for specific query IDs
+    - `queries:ID1,ID2,...` - capture plans for specific query IDs only
     - `strict:true|false` - fail if plan capture encounters errors
   - Requires `--capture-plans` to also be set
-  - Example: `--capture-plans --plan-config "sample:0.1,strict:true"`
-  - **Note:** On DuckDB, plan capture uses `EXPLAIN (ANALYZE, FORMAT JSON)` which roughly doubles query execution time. Use `--platform-option analyze_plans=false` for estimated plans without the overhead.
+  - Example: `--capture-plans --plan-config "queries:Q1,Q6,strict:true"`
+  - **Note:** Plan capture records each distinct query exactly once in an isolated
+    post-measurement phase, so the old per-iteration sampling keys (`sample:` / `first:`) have
+    been removed. On DuckDB the default `EXPLAIN (ANALYZE, FORMAT JSON)` re-runs each query once;
+    use `--no-analyze-plans` for estimated plans without that overhead.
 
 ## Related
 

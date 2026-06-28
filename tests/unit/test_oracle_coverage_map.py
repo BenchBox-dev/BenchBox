@@ -27,6 +27,9 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from _project.scripts.generate_oracle_coverage_map import (  # noqa: E402
+    INDEPENDENCE_NONE,
+    INDEPENDENCE_SELF,
+    INDEPENDENCE_SEMI,
     ORACLE_CROSS_SURFACE,
     ORACLE_EXPECTED_RESULTS,
     ORACLE_NONE,
@@ -37,7 +40,9 @@ from _project.scripts.generate_oracle_coverage_map import (  # noqa: E402
     STRENGTH_VALUE_AND_CARDINALITY,
     build_coverage_map,
     check_artifacts,
+    oracle_reference_independence,
     oracle_strength_and_scale,
+    render_markdown,
 )
 
 pytestmark = [
@@ -148,6 +153,106 @@ def test_value_level_oracle_scale_is_read_live(rows):
 
     by_id = {r["benchmark"]: r for r in rows}
     assert by_id["ssb"]["scale"] == f"SF={EQUIVALENCE_SCALE}"
+
+
+# --- Reference-independence axis (oracle-coverage-map-reference-independence) ---
+
+
+def test_independence_column_present(rows):
+    """Every row carries an independence field; unguarded rows disclose no axis."""
+    for r in rows:
+        assert "independence" in r and r["independence"], f"{r['benchmark']} missing independence"
+        if not r["guarded"]:
+            assert r["independence"] == INDEPENDENCE_NONE, (
+                f"{r['benchmark']} unguarded but independence={r['independence']}"
+            )
+
+
+def test_known_oracle_independence_truth(rows):
+    """Pin the TRUTH of reference-independence for known oracles (classifier-truth, w4).
+
+    Orthogonal to Strength: a `value-level` oracle can be independent or
+    self-referential. This pins what each known oracle's reference ACTUALLY is, so a
+    future change that mislabels independence fails here even if the artifact is
+    internally consistent.
+    """
+    by_id = {r["benchmark"]: r for r in rows}
+
+    # tpch's VALUE digest is a frozen benchbox-on-DuckDB snapshot -> self-referential
+    # on the value axis (a regression snapshot, not an authority).
+    assert by_id["tpch"]["independence"] == INDEPENDENCE_SELF
+    # tpcds is cardinality-only: row counts come from the published TPC answer sets
+    # (an authority on cardinality), values unchecked -> semi-independent.
+    assert by_id["tpcds"]["independence"] == INDEPENDENCE_SEMI
+    # cross-surface / variant gates compare a benchmark's DataFrame/variant surface to
+    # its OWN SQL surface (shared spec) -> self-referential.
+    for benchmark in ("ssb", "amplab", "coffeeshop", "tpchavoc"):
+        assert by_id[benchmark]["independence"] == INDEPENDENCE_SELF, (
+            f"{benchmark} cross-surface/variant oracle should be self-referential"
+        )
+
+
+def test_independence_is_derived_from_value_digest_signal(monkeypatch):
+    """Independence must track the live digest signal: flip it -> the label flips.
+
+    The expected-results independence label is DERIVED, not hand-set: when stored
+    value digests are present the value axis is a frozen self-snapshot
+    (self-referential); drop them and only the answer-set cardinality is checked
+    (semi-independent). Proving the flip end-to-end is the truth check the drift check
+    lacks for the new axis.
+    """
+    import _project.scripts.generate_oracle_coverage_map as gen
+
+    # With value digests present (tpch today): value+cardinality -> self-referential.
+    monkeypatch.setattr(gen, "_expected_results_has_value_digests", lambda _b: True)
+    flipped_on = {r["benchmark"]: r for r in gen.build_coverage_map()}
+    assert flipped_on["tpch"]["strength"] == STRENGTH_VALUE_AND_CARDINALITY
+    assert flipped_on["tpch"]["independence"] == INDEPENDENCE_SELF
+
+    # Drop the digests: cardinality-only -> the label flips to semi-independent.
+    monkeypatch.setattr(gen, "_expected_results_has_value_digests", lambda _b: False)
+    flipped_off = {r["benchmark"]: r for r in gen.build_coverage_map()}
+    assert flipped_off["tpch"]["strength"] == STRENGTH_CARDINALITY
+    assert flipped_off["tpch"]["independence"] == INDEPENDENCE_SEMI
+
+    # And the pure classifier agrees (orthogonal to the cross-surface KIND).
+    assert oracle_reference_independence(ORACLE_CROSS_SURFACE, STRENGTH_VALUE) == INDEPENDENCE_SELF
+    assert oracle_reference_independence(ORACLE_VARIANT_EQUIVALENCE, STRENGTH_VALUE) == INDEPENDENCE_SELF
+
+
+def test_tpch_row_discloses_sf1_value_blindness(rows):
+    """The tpch row ALONE (not the Scale cell / prose) must show values are SF=1-only.
+
+    w2: a skimmer reading only the Strength column must not conclude tpch values are
+    guarded generally. The SF>1 value-blindness is rendered INTO the tpch Strength
+    cell, derived from the live strength signal.
+    """
+    markdown = render_markdown(rows)
+    tpch_line = next(line for line in markdown.splitlines() if line.startswith("| tpch |"))
+    # The disclosure rides in the Strength cell (column 4), so it is visible without
+    # reading the Scale column (column 5) or the prose.
+    cells = [c.strip() for c in tpch_line.strip().strip("|").split("|")]
+    strength_cell = cells[3]
+    assert "UNGUARDED above SF=1" in strength_cell, (
+        f"tpch Strength cell must disclose SF>1 value-blindness; got {strength_cell!r}"
+    )
+    # A cardinality-only expected-results row (tpcds) has no VALUE claim, so it carries
+    # no value-blindness disclosure (the marker is value-specific, not blanket).
+    tpcds_line = next(line for line in markdown.splitlines() if line.startswith("| tpcds |"))
+    assert "UNGUARDED above SF=1" not in tpcds_line
+
+
+def test_independence_does_not_overload_strength(rows):
+    """The independence axis is a SEPARATE column, never folded into Strength.
+
+    A `value-level` cross-surface cell (self-referential) and the `value+cardinality`
+    tpch cell (self-referential) share an independence label but keep distinct Strength
+    labels -- proving the axes are orthogonal columns, not one merged signal.
+    """
+    by_id = {r["benchmark"]: r for r in rows}
+    assert by_id["ssb"]["strength"] == STRENGTH_VALUE
+    assert by_id["tpch"]["strength"] == STRENGTH_VALUE_AND_CARDINALITY
+    assert by_id["ssb"]["independence"] == by_id["tpch"]["independence"] == INDEPENDENCE_SELF
 
 
 def test_cross_surface_enforced_distinguishes_registered_from_verified_green(rows):

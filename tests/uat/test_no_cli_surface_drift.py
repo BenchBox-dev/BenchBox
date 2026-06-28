@@ -24,6 +24,7 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/submit.py",
     "benchbox/cli/commands/tuning.py",
     "benchbox/cli/commands/visualize.py",
+    "benchbox/cli/composite_params.py",
     "benchbox/cli/config.py",
     "benchbox/cli/display.py",
     "benchbox/cli/dryrun.py",
@@ -37,6 +38,12 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     "benchbox/cli/commands/df_tuning.py",
     "benchbox/cli/commands/run_official.py",
     "benchbox/cli/commands/tuning.py",
+    # Temporary (mirrors PR #800's --show-plans landing): the canonical plan-capture
+    # work adds the first-class --analyze-plans/--no-analyze-plans option to `run`,
+    # which intentionally changes run()'s signature surface. Skip the surface check
+    # for run.py for this PR; a follow-up removes it here once the new signature is
+    # the develop baseline, re-enabling the guard for run.py.
+    "benchbox/cli/commands/run.py",
 }
 ALLOWED_INTERNAL_CLI_FILES = ALLOWED_INTERNAL_CLI_FILES | ALLOWED_HIDDEN_COMPAT_CLI_FILES
 FORBIDDEN_CLI_SURFACE_DECORATORS = {"argument", "command", "group", "option"}

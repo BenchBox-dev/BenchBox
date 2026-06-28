@@ -48,7 +48,10 @@ jobs:
           # so a bad manifest edit can merge without verifying the hash. For each
           # changed manifest, derive its paired bundle path and add it to CHANGED
           # so the existing validation step covers manifest-only PRs too.
-          CHANGED_MANIFESTS=$(git diff --name-only --diff-filter=ACMR \
+          # Include deletions (D): removing a manifest while leaving its paired
+          # bundle is a contract change that must still trip validation and the
+          # corpus inventory drift check, so a manifest removal cannot bypass it.
+          CHANGED_MANIFESTS=$(git diff --name-only --diff-filter=ACMRD \
             ${{ github.event.pull_request.base.sha }}...HEAD -- \
             'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
             | grep '\.manifest\.json$' \
@@ -57,6 +60,9 @@ jobs:
             while IFS= read -r manifest; do
               bundle="${manifest%.manifest.json}.json"
               # Only add if the paired bundle exists and is not already in CHANGED.
+              # For a deleted manifest whose bundle remains, the bundle still
+              # exists at HEAD and is added; if both were removed, there is no
+              # bundle to validate (the bundle deletion is covered on its own).
               if git cat-file -e "HEAD:${bundle}" 2>/dev/null \
                   && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
                 CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"

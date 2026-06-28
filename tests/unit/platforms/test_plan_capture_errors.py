@@ -300,8 +300,12 @@ def test_plan_query_filter_only_captures_specified_queries() -> None:
     assert time3 == 0.0
 
 
-def test_plan_first_n_only_captures_first_iterations() -> None:
-    """Test that plan_first_n only captures first N iterations per query."""
+def test_plan_query_filter_only_captures_selected_queries() -> None:
+    """plan_query_filter restricts capture to the selected query ids.
+
+    The per-iteration sampling machinery (plan_first_n / plan_sampling_rate) has
+    been retired; query selection is the only remaining capture filter.
+    """
 
     class SimpleParser:
         """Simple parser that returns a minimal plan."""
@@ -328,22 +332,16 @@ def test_plan_first_n_only_captures_first_iterations() -> None:
         capture_plans=True,
         explain_output="EXPLAIN PLAN",
         parser=SimpleParser(),
-        plan_first_n=2,
+        plan_queries="q01",
     )
 
-    # First iteration - should capture
+    # Selected query is captured, every time it is requested (no per-iteration cap).
     plan1, _ = adapter.capture_query_plan(None, "SELECT 1", "q01")
     assert plan1 is not None
-
-    # Second iteration - should capture
     plan2, _ = adapter.capture_query_plan(None, "SELECT 1", "q01")
     assert plan2 is not None
 
-    # Third iteration - should skip
-    plan3, time3 = adapter.capture_query_plan(None, "SELECT 1", "q01")
+    # Non-selected query is skipped.
+    plan3, time3 = adapter.capture_query_plan(None, "SELECT 1", "q02")
     assert plan3 is None
     assert time3 == 0.0
-
-    # Different query, first iteration - should capture
-    plan4, _ = adapter.capture_query_plan(None, "SELECT 1", "q02")
-    assert plan4 is not None

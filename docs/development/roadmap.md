@@ -113,9 +113,10 @@ DataFrame benchmarking is supported for 21 benchmarks across two API families:
 - Full coverage matching the Expression Family above
 
 **Transaction Primitives** — restricted to ACID-capable table-format adapters only:
-Delta Lake (`delta-lake`, `delta`), PySpark-Delta (`pyspark-delta`), and Iceberg
-(`iceberg`). Polars, DataFusion, and all Pandas-family adapters (`pandas-df`, Modin,
-cuDF, Dask) are rejected at runtime because they do not support ACID transactions.
+Delta Lake (`delta-lake`, `delta`), PySpark with Delta Lake (run via `--platform
+pyspark-df` using the Delta Lake table format), and Iceberg (`iceberg`). Polars,
+DataFusion, and all Pandas-family adapters (`pandas-df`, Modin, cuDF, Dask) are
+rejected at runtime because they do not support ACID transactions.
 
 ### Remaining Expansion
 

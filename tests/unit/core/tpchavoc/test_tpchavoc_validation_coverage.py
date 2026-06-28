@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from benchbox.core.tpchavoc.validation import ResultValidator, ValidationError, ValidationReport
+from benchbox.core.tpchavoc.validation import (
+    ResultValidator,
+    ValidationError,
+    ValidationReport,
+    calculate_checksum,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -78,6 +83,60 @@ def test_tie_aware_rejects_unique_last_row_change() -> None:
 
     with pytest.raises(ValidationError):
         validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
+
+
+# --- calculate_checksum on NULL-bearing / mixed-type rows ---------------------
+# (correctness-gate-value-digest-fidelity-followups w6)
+#
+# The bounded gate's 18 SF=1 result sets are NULL-free and single-typed per column,
+# so calculate_checksum's None-safe / type-safe ``_row_sort_key`` branch is NEVER
+# exercised by the gate. A bare ``sorted(rows)`` would raise ``TypeError`` on a
+# NULL-bearing column (``None < 1`` unorderable) or a mixed-type column, which the
+# gate would mislabel as an execution "error:" rather than a clean digest. These
+# tests exercise that path directly so a latent ordering bug in None handling cannot
+# hide behind the gate's NULL-free inputs. They FAIL if the None-safe surrogate is
+# removed (a bare sort would raise here).
+
+
+def test_calculate_checksum_null_bearing_rows_are_deterministic() -> None:
+    """A column mixing NULL with values hashes deterministically and never raises."""
+    rows = [(1, None), (2, "x"), (3, None), (4, "y")]
+
+    first = calculate_checksum(rows)
+    second = calculate_checksum(rows)
+    assert first == second, "checksum must be deterministic for identical NULL-bearing input"
+    # Order-normalized: a permutation of the same rows hashes identically.
+    assert calculate_checksum(list(reversed(rows))) == first
+
+
+def test_calculate_checksum_mixed_type_column_does_not_raise() -> None:
+    """A single column mixing int / str / None / float sorts via the surrogate, no TypeError.
+
+    A bare ``sorted`` would raise ``TypeError`` comparing ``int`` with ``str`` (or
+    ``None`` with anything); the None-safe ``_row_sort_key`` groups by a stable type
+    name so ordering is total. The digest is stable across input permutations.
+    """
+    rows = [(1,), ("a",), (None,), (2.5,), ("b",), (None,)]
+
+    digest = calculate_checksum(rows)  # must not raise
+    assert isinstance(digest, str) and len(digest) == 32  # md5 hex
+    # Permutation-invariant (order-normalized) despite the mixed types + NULLs.
+    import random
+
+    shuffled = rows[:]
+    random.Random(17).shuffle(shuffled)
+    assert calculate_checksum(shuffled) == digest
+
+
+def test_calculate_checksum_collides_null_with_string_null() -> None:
+    """A real NULL (None -> 'NULL') and the literal string 'NULL' hash to the same cell text.
+
+    Documents the one ambiguity of the str-rendering primitive: a ``None`` cell and a
+    literal ``"NULL"`` string render to the same token. This is an accepted property of
+    the shared digest (the gate's reference is DuckDB-pinned and NULL-free), pinned so a
+    future change is a conscious one.
+    """
+    assert calculate_checksum([(None,)]) == calculate_checksum([("NULL",)])
 
 
 def test_tie_aware_constant_column_is_not_a_boundary_key() -> None:

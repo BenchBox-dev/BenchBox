@@ -69,8 +69,12 @@ class PrestoTrinoQueryPlanParser(QueryPlanParser):
         ("except", LogicalOperatorType.EXCEPT),
     )
 
-    def __init__(self):
-        super().__init__("presto_trino")
+    def __init__(self, platform_name: str = "presto_trino"):
+        # The whole family (Presto, Trino, Starburst, Athena) shares this parser,
+        # so the concrete platform is threaded in by the adapter's
+        # ``get_query_plan_parser`` override and stamped onto the captured DAG;
+        # it defaults to the generic family name for direct/registry use.
+        super().__init__(platform_name)
 
     def _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:
         if not explain_output or not explain_output.strip():
