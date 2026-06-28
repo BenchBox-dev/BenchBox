@@ -347,10 +347,16 @@ class ClassifiedDivergence:
     predicate confirms the actual cell detail is the specific, defensible difference
     described by ``reason`` - so a genuinely wrong value on the same key is still
     reported as an unclassified gate failure.
+
+    ``requires_live_divergence`` preserves stale-baseline hygiene by default. Set it
+    false only for a nondeterministic classification whose absence is not evidence
+    of resolution (for example, an order-less LIMIT whose arbitrary top-N selection
+    can occasionally line up across surfaces by chance).
     """
 
     reason: str
     accepts: Callable[[SurfaceDivergence], bool]
+    requires_live_divergence: bool = True
 
 
 @dataclass(frozen=True)
@@ -378,12 +384,27 @@ class CrossSurfaceGate:
     legitimately_empty: dict[Any, str] = field(default_factory=dict)
     backends: tuple[str, ...] = DATAFRAME_BACKENDS
     tolerance: float = 1e-10
+    # Comparator widening is strict by default. Enable these only for a gate with
+    # documented engine decode behavior that otherwise reports presentational
+    # NULL/CHAR differences rather than logical result differences.
+    treat_nan_as_null: bool = False
+    strip_strings: bool = False
     # Per-gate data scale for the bounded cell. Defaults to the shared
     # EQUIVALENCE_SCALE so every gate stays cheap; a gate raises it ONLY when a
     # larger (still bounded) cell is the cheapest way to make its queries
     # discriminating. Kept on the gate (not a global) so one benchmark's data
     # needs never inflate every other gate's cost.
     scale_factor: float = EQUIVALENCE_SCALE
+
+    def build_validator(self) -> ResultValidator:
+        """Create the comparator configured for this gate's documented tolerances."""
+        from benchbox.core.tpchavoc.validation import ResultValidator
+
+        return ResultValidator(
+            tolerance=self.tolerance,
+            treat_nan_as_null=self.treat_nan_as_null,
+            strip_strings=self.strip_strings,
+        )
 
 
 def find_cross_surface_divergences(
@@ -905,8 +926,20 @@ def build_read_primitives_duckdb(scale_factor: float, output_dir: Path) -> Cross
 # tie-ambiguous query, classified here (the last-resort option) rather than masked:
 # the tie-aware comparator handles every ORDER BY ... LIMIT case, only this
 # order-less LIMIT needs a baseline entry.
-_CLICKBENCH_TIE_AMBIGUOUS = (
+_CLICKBENCH_TIE_AMBIGUOUS_REASON = (
     "Q18 is LIMIT 10 with no ORDER BY over ~97k groups - an arbitrary, order-less top-N selection"
+)
+
+
+def _is_clickbench_q18_arbitrary_topn(divergence: SurfaceDivergence) -> bool:
+    """Classify only the documented arbitrary-row mismatch, not execution errors."""
+    return "Value mismatch" in str(divergence.detail)
+
+
+_CLICKBENCH_TIE_AMBIGUOUS = ClassifiedDivergence(
+    reason=_CLICKBENCH_TIE_AMBIGUOUS_REASON,
+    accepts=_is_clickbench_q18_arbitrary_topn,
+    requires_live_divergence=False,
 )
 
 # Two AMPLab queries return 0 reference rows at the bounded cell. Both end in a
@@ -1191,8 +1224,9 @@ GATES: dict[str, CrossSurfaceGate] = {
     # Promoted from STAGED_GATES once the two cross-cutting prerequisites landed:
     # w9 (loader applies schema column TYPES + DuckDB empty-string semantics) made
     # joinorder_synthetic 26/26 and cleared ClickBench Q17/Q24; w8 (tie-aware
-    # comparator) cleared ClickBench's tie-ambiguous top-N cells. ClickBench's only
-    # baseline entry is the order-less Q18 (see above).
+    # comparator) cleared ORDER BY ... LIMIT top-N cells. ClickBench's residual
+    # order-less Q18 baselines may line up by chance on a run, so they are not
+    # stale merely because one execution happens to compare equal.
     "clickbench": CrossSurfaceGate(
         name="clickbench",
         build=build_clickbench_duckdb,
@@ -1226,6 +1260,10 @@ GATES: dict[str, CrossSurfaceGate] = {
         build=build_read_primitives_duckdb,
         known_divergences=_READ_PRIMITIVES_KNOWN_DIVERGENCES,
         legitimately_empty=_READ_PRIMITIVES_LEGITIMATELY_EMPTY,
+        # Pandas decodes selected SQL NULL cells as NaN in object/numeric result
+        # columns (for example MAP lookup misses and LEAD/LAG frame edges). Keep
+        # the global comparator strict; opt in only for this gate's decode path.
+        treat_nan_as_null=True,
         scale_factor=_READ_PRIMITIVES_SCALE,
     ),
 }
@@ -1251,8 +1289,6 @@ def run_gate(gate: CrossSurfaceGate) -> int:
     """Run one benchmark's cross-surface gate and print a categorized report."""
     import tempfile
 
-    from benchbox.core.tpchavoc.validation import ResultValidator
-
     with tempfile.TemporaryDirectory() as tmp:
         data = gate.build(gate.scale_factor, Path(tmp))
         connection = data.connection
@@ -1267,7 +1303,7 @@ def run_gate(gate: CrossSurfaceGate) -> int:
                 reference_sql=data.reference_sql,
                 dataframe_query=data.dataframe_query,
                 contexts=contexts,
-                validator=ResultValidator(tolerance=gate.tolerance),
+                validator=gate.build_validator(),
                 backends=gate.backends,
                 reference_row_counts=reference_row_counts,
             )
@@ -1314,6 +1350,11 @@ def _classification(known: dict[str, str | ClassifiedDivergence], divergence: Su
     return entry
 
 
+def _requires_live_divergence(entry: str | ClassifiedDivergence) -> bool:
+    """True if a missing known divergence should fail as a stale baseline."""
+    return entry.requires_live_divergence if isinstance(entry, ClassifiedDivergence) else True
+
+
 def _report(
     divergences: list[SurfaceDivergence],
     total: int,
@@ -1351,7 +1392,7 @@ def _report(
     # ClassifiedDivergence entry) the live cell matches the entry's predicate, so a
     # real regression on a baselined key is still reported as unclassified.
     new = sorted({d.key for d in divergences if _classification(known, d) is None})
-    resolved = sorted(set(known) - found)
+    resolved = sorted(key for key, entry in known.items() if key not in found and _requires_live_divergence(entry))
     missing_backends = sorted(backend for backend, count in coverage.items() if count == 0)
     executed = sum(coverage.values())
 

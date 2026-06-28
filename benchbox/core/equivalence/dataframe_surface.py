@@ -246,9 +246,10 @@ def _normalize_value(value: Any) -> Any:
 
     Maps DuckDB ``Decimal`` to float (the DataFrame surface computes in
     float64), midnight timestamps to dates (Pandas materializes DATE columns
-    as midnight ``Timestamp``), missing values (``None``/``NaN``/Pandas
-    ``NA``/``NaT``) to ``None``, and unwraps NumPy/Arrow scalars via
-    ``.item()``.
+    as midnight ``Timestamp``), Pandas missing sentinels (``NA``/``NaT``) to
+    ``None``, and unwraps NumPy/Arrow scalars via ``.item()``. Floating NaN is
+    preserved so the strict comparator can catch spurious NaN-vs-NULL divergence
+    unless a caller explicitly opts into NaN-as-NULL tolerance.
     """
     if value is None:
         return None
@@ -257,7 +258,7 @@ def _normalize_value(value: Any) -> Any:
     if isinstance(value, datetime):  # before date: datetime subclasses date
         return value.date() if value.time() == _MIDNIGHT else value
     if isinstance(value, float):  # before .item(): NumPy floats subclass float
-        return None if math.isnan(value) else float(value)
+        return value if math.isnan(value) else float(value)
     if isinstance(value, (str, bytes, int, date)):
         return value
     if type(value).__name__ in ("NAType", "NaTType"):  # pandas.NA / pandas.NaT without importing pandas

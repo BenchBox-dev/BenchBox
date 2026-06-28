@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from benchbox.core.tpchavoc.validation import (
@@ -178,11 +180,59 @@ def test_validate_results_exact_failure_modes(
 def test_numeric_and_string_value_comparison_behavior() -> None:
     validator = ResultValidator(tolerance=1e-6)
 
-    assert validator._values_equal("  abc ", "abc")
+    assert not validator._values_equal("  abc ", "abc")
     assert validator._values_equal(1.0000001, 1.0000002)
     assert validator._values_equal(None, None)
     assert not validator._values_equal(None, 1)
     assert not validator._values_equal("x", "y")
+
+
+def test_value_widening_is_strict_by_default_and_explicitly_opted_in() -> None:
+    strict = ResultValidator()
+    widened = ResultValidator(treat_nan_as_null=True, strip_strings=True)
+
+    assert not strict._values_equal(None, float("nan"))
+    assert not strict._values_equal(float("nan"), None)
+    assert not strict._values_equal(float("nan"), float("nan"))
+    assert not strict._values_equal("foo ", "foo")
+
+    assert widened._values_equal(None, float("nan"))
+    assert widened._values_equal(float("nan"), None)
+    assert widened._values_equal(float("nan"), float("nan"))
+    assert widened._values_equal("foo ", "foo")
+
+
+def test_validate_results_exact_reports_nan_null_and_whitespace_divergences() -> None:
+    strict = ResultValidator()
+
+    with pytest.raises(ValidationError, match="Value mismatch"):
+        strict.validate_results_exact([(None,)], [(float("nan"),)], query_id=6, variant_id=1)
+
+    with pytest.raises(ValidationError, match="Value mismatch"):
+        strict.validate_results_exact([("foo",)], [("foo ",)], query_id=6, variant_id=2)
+
+    widened = ResultValidator(treat_nan_as_null=True, strip_strings=True)
+    assert widened.validate_results_exact([(None,), ("foo",)], [(float("nan"),), ("foo ",)], 6, 3)
+
+
+def test_treat_nan_as_null_sorts_nan_into_null_bucket_so_rows_pair() -> None:
+    """The positional comparator sorts both sides before pairing rows. The NaN-as-NULL
+    widening only helps if the sort agrees: a reference NULL row and a candidate NaN
+    row must land in the SAME ordinal position. Without normalizing the sort key, NaN
+    sorts in the numeric bucket while NULL sorts first, so the rows below pair NULL vs
+    a numeric value and raise a spurious mismatch despite the flag."""
+    widened = ResultValidator(treat_nan_as_null=True)
+
+    reference = [(None, "a"), (2, "b")]
+    candidate = [(2, "b"), (float("nan"), "a")]
+
+    # The sort surrogate maps NaN to the None bucket so both lists order identically.
+    assert widened._row_sort_key((float("nan"), "a")) == widened._row_sort_key((None, "a"))
+    assert widened.validate_results_exact(reference, candidate, query_id=7, variant_id=1)
+
+    # Strict mode leaves NaN in the numeric bucket (distinct from the None bucket).
+    strict = ResultValidator()
+    assert strict._row_sort_key((float("nan"), "a")) != strict._row_sort_key((None, "a"))
 
 
 def test_container_values_compared_elementwise_with_tolerance() -> None:
@@ -204,6 +254,7 @@ def test_container_values_compared_elementwise_with_tolerance() -> None:
     assert not validator._values_equal([1, 2], [1, 2, 3])
     assert not validator._values_equal({"a": 1}, {"b": 1})
     assert not validator._values_equal([1.0, 2.0], [1.0, 2.5])
+    assert not validator._values_equal([math.nan], [math.nan])
 
 
 def test_validate_results_checksum_mismatch_raises() -> None:

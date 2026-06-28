@@ -38,7 +38,6 @@ from benchbox.core.equivalence.cross_surface import (
     count_executed_cells,
     find_cross_surface_divergences,
 )
-from benchbox.core.tpchavoc.validation import ResultValidator
 
 pytestmark = [
     pytest.mark.integration,
@@ -62,7 +61,7 @@ def test_read_primitives_dataframe_surface_equivalent_to_sql(tmp_path):
             reference_sql=data.reference_sql,
             dataframe_query=data.dataframe_query,
             contexts=contexts,
-            validator=ResultValidator(tolerance=gate.tolerance),
+            validator=gate.build_validator(),
             backends=gate.backends,
         )
         coverage = count_executed_cells(data.query_ids, data.dataframe_query, gate.backends)

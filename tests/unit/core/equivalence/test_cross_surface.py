@@ -18,6 +18,7 @@ from __future__ import annotations
 import pytest
 
 from benchbox.core.equivalence.cross_surface import (
+    ClassifiedDivergence,
     _bump_trailing_limit,
     _final_key_tied_beyond_limit,
     _report,
@@ -108,6 +109,53 @@ def test_divergent_backend_is_reported_with_backend_cell():
         validator=ResultValidator(),
     )
     assert [(d.query_id, d.cell, d.key) for d in divergences] == [("Q1.1", "pandas", "Q1.1_pandas")]
+
+
+def test_strict_default_reports_dataframe_nan_against_sql_null():
+    ref = [(None,)]
+    connection, reference_sql, dataframe_query, contexts = _make_inputs(ref, {"pandas": [(float("nan"),)]})
+    divergences = find_cross_surface_divergences(
+        connection,
+        query_ids=["Qnan"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(),
+        backends=("pandas",),
+    )
+    assert [(d.query_id, d.cell, d.key) for d in divergences] == [("Qnan", "pandas", "Qnan_pandas")]
+    assert "Value mismatch" in divergences[0].detail
+
+
+def test_strict_default_reports_trailing_whitespace_divergence():
+    ref = [("foo",)]
+    connection, reference_sql, dataframe_query, contexts = _make_inputs(ref, {"expression": [("foo ",)]})
+    divergences = find_cross_surface_divergences(
+        connection,
+        query_ids=["Qspace"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(),
+        backends=("expression",),
+    )
+    assert [(d.query_id, d.cell, d.key) for d in divergences] == [("Qspace", "expression", "Qspace_expression")]
+    assert "Value mismatch" in divergences[0].detail
+
+
+def test_explicit_value_widening_flags_accept_documented_decode_cases():
+    ref = [(None, "foo")]
+    connection, reference_sql, dataframe_query, contexts = _make_inputs(ref, {"pandas": [(float("nan"), "foo ")]})
+    divergences = find_cross_surface_divergences(
+        connection,
+        query_ids=["Qtolerated"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(treat_nan_as_null=True, strip_strings=True),
+        backends=("pandas",),
+    )
+    assert divergences == []
 
 
 def test_tie_aware_only_applies_to_truncated_top_n_queries():
@@ -483,6 +531,31 @@ def test_known_divergence_baseline_fails_when_entry_is_resolved(capsys):
     assert "remove the stale baseline entry" in out
 
 
+def test_known_divergence_baseline_allows_nondeterministic_absence(capsys):
+    """A marked nondeterministic baseline may compare equal by chance."""
+    coverage = {"expression": 1, "pandas": 1}
+
+    exit_code = _report(
+        [],
+        total=2,
+        coverage=coverage,
+        known={
+            "Q1_pandas": ClassifiedDivergence(
+                reason="arbitrary top-N selection",
+                accepts=lambda divergence: "Value mismatch" in str(divergence.detail),
+                requires_live_divergence=False,
+            )
+        },
+        benchmark="fake",
+        reference_row_counts={"Q1": 5},
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "previously-known divergences now equivalent" not in out
+    assert "SQL and DataFrame surfaces are equivalent (modulo classified exceptions)." in out
+
+
 def test_known_divergence_baseline_accepts_live_entry(capsys):
     """A still-reproducing, baselined divergence remains accepted."""
     coverage = {"expression": 1, "pandas": 1}
@@ -526,8 +599,8 @@ def test_clickbench_and_joinorder_are_enforced_gates():
     Once the two cross-cutting prerequisites landed - w9 (loader applies schema
     column TYPES + DuckDB empty-string semantics) and w8 (tie-aware comparator) -
     both staged gates went clean and graduated from STAGED_GATES to GATES, so the
-    oracle coverage map marks them cross-surface "guarded". ClickBench's only
-    baseline entry is the genuinely order-less Q18.
+    oracle coverage map marks them cross-surface "guarded". ClickBench's residual
+    baseline entries are the genuinely order-less Q18 backends.
     """
     from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES, get_gate
 
@@ -540,6 +613,19 @@ def test_clickbench_and_joinorder_are_enforced_gates():
     assert GATES["joinorder_synthetic"].known_divergences == {}
     # ssb stays the enforced precedent.
     assert "ssb" in GATES
+
+
+def test_read_primitives_gate_opts_into_documented_nan_null_decode_tolerance():
+    """Read Primitives keeps strict defaults global while opting in for pandas NULL decode."""
+    from benchbox.core.equivalence.cross_surface import GATES
+
+    gate = GATES["read_primitives"]
+    validator = gate.build_validator()
+
+    assert gate.treat_nan_as_null is True
+    assert validator.treat_nan_as_null is True
+    assert validator.strip_strings is False
+    assert GATES["ssb"].build_validator().treat_nan_as_null is False
 
 
 def test_h2odb_is_an_enforced_gate_with_classified_percentile_exception():

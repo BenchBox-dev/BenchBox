@@ -78,13 +78,27 @@ class ValidationError(Exception):
 class ResultValidator:
     """Validates that query variants produce identical results."""
 
-    def __init__(self, tolerance: float = 1e-10) -> None:
+    def __init__(
+        self,
+        tolerance: float = 1e-10,
+        *,
+        treat_nan_as_null: bool = False,
+        strip_strings: bool = False,
+    ) -> None:
         """Initialize result validator.
 
         Args:
             tolerance: Tolerance for floating-point comparisons
+            treat_nan_as_null: When True, treat floating NaN values as SQL NULLs.
+                Defaults to strict False so a spurious NaN is a value divergence.
+            strip_strings: When True, trim leading/trailing whitespace before
+                string comparison. Defaults to strict False so transcription
+                differences are caught unless a caller opts into CHAR-padding
+                tolerance.
         """
         self.tolerance = tolerance
+        self.treat_nan_as_null = treat_nan_as_null
+        self.strip_strings = strip_strings
 
     def validate_results_exact(
         self,
@@ -389,20 +403,30 @@ class ResultValidator:
         caller would otherwise mislabel as an execution ``error:`` rather than a
         clean MISMATCH).
 
-        Delegates to the module-level :func:`_row_sort_key` so the comparator and
-        the value-digest primitive (:func:`calculate_checksum`) share exactly one
-        sort definition.
+        When ``treat_nan_as_null`` is set this routes through :meth:`_cell_sort_key`
+        so a float ``NaN`` sorts into the SAME bucket as ``None`` - otherwise the
+        sort would pair a NULL row against a non-NaN candidate and a NaN row against
+        a different one, turning two rows that :meth:`_values_equal` deems equal into
+        a spurious value MISMATCH. With the flag off it delegates to the module-level
+        :func:`_row_sort_key` so the comparator and the value-digest primitive
+        (:func:`calculate_checksum`) share exactly one sort definition.
         """
+        if self.treat_nan_as_null:
+            return tuple(self._cell_sort_key(value) for value in row)
         return _row_sort_key(row)
 
-    @staticmethod
-    def _cell_sort_key(value: Any) -> tuple[Any, ...]:
+    def _cell_sort_key(self, value: Any) -> tuple[Any, ...]:
         """A None-safe, type-safe sort surrogate for one cell (see _row_sort_key).
 
-        Thin wrapper over the module-level :func:`_cell_sort_key`; ``bool`` folds
-        into the numeric bucket so it sorts CONSISTENTLY with :meth:`_values_equal`
-        (``True == 1``).
+        Wraps the module-level :func:`_cell_sort_key` (``bool`` folds into the
+        numeric bucket so it sorts CONSISTENTLY with :meth:`_values_equal`, where
+        ``True == 1``). When ``treat_nan_as_null`` is set a float ``NaN`` is mapped
+        to the ``None`` surrogate so it sorts ALONGSIDE SQL NULL - mirroring the
+        NaN-as-NULL widening :meth:`_values_equal` applies, so equivalent NULL/NaN
+        rows pair up under the positional sort instead of mismatching.
         """
+        if self.treat_nan_as_null and isinstance(value, float) and math.isnan(value):
+            return _cell_sort_key(None)
         return _cell_sort_key(value)
 
     def _first_positional_mismatch(
@@ -656,10 +680,12 @@ class ResultValidator:
     def _values_equal(self, val1: Any, val2: Any) -> bool:
         """Check if two values are equal with appropriate handling for different types."""
         # Handle None values
-        if val1 is None and val2 is None:
-            return True
         if val1 is None or val2 is None:
-            return False
+            if self.treat_nan_as_null:
+                val1_nullish = val1 is None or (isinstance(val1, float) and math.isnan(val1))
+                val2_nullish = val2 is None or (isinstance(val2, float) and math.isnan(val2))
+                return val1_nullish and val2_nullish
+            return val1 is None and val2 is None
 
         # Handle numeric values with tolerance. ``Decimal`` is included so a
         # DECIMAL value from one engine compares (within tolerance) against a
@@ -684,7 +710,9 @@ class ResultValidator:
 
         # Handle string values
         if isinstance(val1, str) and isinstance(val2, str):
-            return val1.strip() == val2.strip()
+            if self.strip_strings:
+                return val1.strip() == val2.strip()
+            return val1 == val2
 
         # Default equality check
         return val1 == val2
@@ -692,12 +720,10 @@ class ResultValidator:
     def _numeric_values_equal(self, val1: Union[int, float], val2: Union[int, float]) -> bool:
         """Check if two numeric values are equal within tolerance.
 
-        Normalizes "missing" operands first: SQL ``NULL`` arrives as ``None`` from
-        most engines but as ``float('nan')`` from ClickHouse's Arrow/pandas decode.
-        Two missing values compare equal and a missing-vs-present pair does not, so
-        a both-NULL aggregate is not reported as a spurious divergence and a
-        NULL-vs-number stays a real one (this also keeps ``float(...)`` below from
-        ever seeing ``None``/``NaN``).
+        Handles ``None`` and ``NaN`` before coercion so ``float(...)`` below never
+        sees a missing value. Strict mode treats ``NaN`` as a value distinct from
+        SQL ``NULL`` and from another ``NaN``; callers with a documented engine
+        decode path may opt into ``treat_nan_as_null``.
 
         Then coerces both operands to ``float`` so a mixed-type comparison (e.g. a
         ``decimal.Decimal`` from one engine vs a ``float`` from another) is compared
@@ -708,10 +734,18 @@ class ResultValidator:
         match or mismatch. This is engine-agnostic robustness, not an engine-specific
         path.
         """
-        val1_missing = val1 is None or (isinstance(val1, float) and math.isnan(val1))
-        val2_missing = val2 is None or (isinstance(val2, float) and math.isnan(val2))
-        if val1_missing or val2_missing:
-            return val1_missing and val2_missing
+        val1_is_none = val1 is None
+        val2_is_none = val2 is None
+        val1_is_nan = isinstance(val1, float) and math.isnan(val1)
+        val2_is_nan = isinstance(val2, float) and math.isnan(val2)
+        if val1_is_none or val2_is_none:
+            if self.treat_nan_as_null:
+                return (val1_is_none or val1_is_nan) and (val2_is_none or val2_is_nan)
+            return val1_is_none and val2_is_none
+        if val1_is_nan or val2_is_nan:
+            if self.treat_nan_as_null:
+                return (val1_is_none or val1_is_nan) and (val2_is_none or val2_is_nan)
+            return False
 
         val1 = float(val1)
         val2 = float(val2)
