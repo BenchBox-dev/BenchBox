@@ -3,8 +3,9 @@ title: "Mutation-sensitivity harness: build cells at each gate's own scale and c
   pass)"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Testing and Quality Assurance
+completed_date: "2026-06-28"
 
 description: |
   The cross-surface mutation-sensitivity suite measures whether each enforced
