@@ -2,7 +2,7 @@ id: cross-surface-known-divergence-baseline-hygiene
 title: "Fail (or force baseline update) when a known cross-surface divergence no longer reproduces"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
@@ -30,7 +30,7 @@ prior_art:
 work:
   - id: w1
     summary: "Detect resolved-but-listed known divergences and fail (or require --update-baseline)"
-    status: pending
+    status: done
     needs: []
     notes: |
       In the gate runner, after comparison, check each known_divergences entry: if

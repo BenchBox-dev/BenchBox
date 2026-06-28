@@ -1340,6 +1340,8 @@ def _report(
       * any unclassified cross-surface divergence,
       * any gated backend that implemented no queries (which would otherwise make
         the gate silently green by comparing nothing on that backend), and
+      * any known divergence whose cell is now equivalent, so stale baselines are
+        removed in a reviewed change instead of masking a future regression, and
       * any VACUOUS query - one whose SQL reference returns 0 rows, so every
         backend compares empty-vs-empty and trivially "matches" without
         discriminating anything - UNLESS it is explicitly classified in
@@ -1419,11 +1421,14 @@ def _report(
             f"legitimately_empty: {unclassified_empty} - make them discriminating or classify them with a rationale"
         )
     if resolved:
-        print(f"Previously-known divergences now equivalent - update the baseline: {resolved}")
+        print(
+            "GATE FAILURE - previously-known divergences now equivalent: "
+            f"{resolved} - remove the stale baseline entry in a reviewed change"
+        )
     if not new and not resolved and not missing_backends and not unclassified_empty:
         suffix = " (modulo classified exceptions)" if (known or classified_empty) else ""
         print(f"SQL and DataFrame surfaces are equivalent{suffix}.")
-    return 1 if (new or missing_backends or unclassified_empty) else 0
+    return 1 if (new or resolved or missing_backends or unclassified_empty) else 0
 
 
 def main(argv: list[str] | None = None) -> int:
