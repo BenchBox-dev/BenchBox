@@ -2,8 +2,9 @@ id: uat-skipped-unreachable-release-accounting
 title: "Account for skipped/unreachable UAT cells in release-report candidate counts (release-evidence integrity)"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Release Tooling
+completed_date: "2026-06-28"
 
 description: |
   UAT records skipped and unreachable cells, but the release report's candidate
