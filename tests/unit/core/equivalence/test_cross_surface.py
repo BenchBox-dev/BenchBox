@@ -463,6 +463,101 @@ def test_h2odb_is_an_enforced_gate_with_classified_percentile_exception():
     assert GATES["h2odb"].scale_factor == 0.01
 
 
+def test_h2odb_q9_baseline_tolerates_only_the_sub_cent_residue_not_real_bugs():
+    """The Q9 baseline is detail-aware: it classifies ONLY the sub-cent DECIMAL
+    residue, so a genuine Q9 regression on the same key still fails the gate."""
+    from benchbox.core.equivalence.cross_surface import GATES
+
+    known = GATES["h2odb"].known_divergences
+    coverage = {"expression": 1, "pandas": 1}
+
+    # The documented residue: p90 differs by < half a cent on both backends ->
+    # classified, the gate passes.
+    residue = [
+        SurfaceDivergence(
+            "Q9", "expression", "Q9.0: Value mismatch at row 4, column 2. Original: 77.87, Variant: 77.874"
+        ),
+        SurfaceDivergence("Q9", "pandas", "Q9.0: Value mismatch at row 4, column 2. Original: 77.87, Variant: 77.874"),
+    ]
+    assert (
+        _report(residue, total=2, coverage=coverage, known=known, benchmark="h2odb", reference_row_counts={"Q9": 6})
+        == 0
+    )
+
+    # A real value bug on the SAME key (wrong median, off by ten) is not sub-cent,
+    # so it is unclassified and the gate FAILS - the bare key no longer masks it.
+    real_bug = [
+        SurfaceDivergence("Q9", "pandas", "Q9.0: Value mismatch at row 0, column 1. Original: 50.0, Variant: 60.0"),
+    ]
+    assert (
+        _report(real_bug, total=2, coverage=coverage, known=known, benchmark="h2odb", reference_row_counts={"Q9": 6})
+        == 1
+    )
+
+    # A SUB-CENT bug in the WRONG column (the median, col 1, not the documented p90
+    # col 2) is a real Q9 regression - the gate FAILS. The magnitude-only predicate
+    # wrongly tolerated this; pinning the accepted cell to the p90 column catches it.
+    wrong_column = [
+        SurfaceDivergence("Q9", "pandas", "Q9.0: Value mismatch at row 4, column 1. Original: 77.87, Variant: 77.874"),
+    ]
+    assert (
+        _report(
+            wrong_column, total=2, coverage=coverage, known=known, benchmark="h2odb", reference_row_counts={"Q9": 6}
+        )
+        == 1
+    )
+
+
+def test_h2odb_q9_residue_predicate_rejects_structural_and_large_diffs():
+    """The Q9 acceptance predicate accepts a sub-cent p90 value mismatch and nothing
+    else.
+
+    The documented exception is ONLY the p90 PERCENTILE_CONT DECIMAL(8,2) scale
+    residue (Q9 projects col 0 = passenger_count, col 1 = median, col 2 = p90), so the
+    predicate must pin the EXACT cell: the p90 column, a single sub-half-cent value at
+    the SQL column's 2-decimal scale. A sub-cent mismatch in the median or the
+    grouping key, a structural mismatch, an execution error, or any >=1-cent value bug
+    is rejected.
+    """
+    from benchbox.core.equivalence.cross_surface import _h2odb_q9_decimal_residue
+
+    def d(detail: str) -> SurfaceDivergence:
+        return SurfaceDivergence("Q9", "pandas", detail)
+
+    # ACCEPT: the documented residue - p90 column (2), Original at DECIMAL(8,2) scale,
+    # Variant differs only in the 3rd decimal, sub-half-cent.
+    assert _h2odb_q9_decimal_residue(d("Q9.0: Value mismatch at row 4, column 2. Original: 77.87, Variant: 77.874"))
+
+    # REJECT: a full value bug (>= a cent), a wrong grouping (row/column-count
+    # mismatch), and an execution error.
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Value mismatch at row 0, column 1. Original: 50.0, Variant: 60.0"))
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Row count mismatch. Original: 6, Variant: 5"))
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Column count mismatch at row 0. Original: 3, Variant: 2"))
+    assert not _h2odb_q9_decimal_residue(d("error: boom"))
+
+    # REJECT: a SUB-CENT mismatch in the WRONG column. The bare-magnitude predicate
+    # wrongly accepted these (only the value delta was checked); pinning to the p90
+    # column (2) rejects a sub-cent median (col 1) or grouping-key (col 0) bug, which
+    # are real Q9 regressions, not the documented p90 DECIMAL residue.
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Value mismatch at row 4, column 1. Original: 77.87, Variant: 77.874"))
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Value mismatch at row 4, column 0. Original: 4.00, Variant: 4.004"))
+
+    # REJECT: a >=1-cent value bug in the p90 column (right column, wrong magnitude).
+    assert not _h2odb_q9_decimal_residue(d("Q9.0: Value mismatch at row 4, column 2. Original: 77.87, Variant: 77.90"))
+
+    # REJECT: a p90, sub-cent delta whose Original is NOT at DECIMAL(8,2) scale - so it
+    # lacks the DuckDB DECIMAL-rounding signature (both sides carry a 3rd decimal),
+    # which is not the documented presentational difference.
+    assert not _h2odb_q9_decimal_residue(
+        d("Q9.0: Value mismatch at row 4, column 2. Original: 77.874, Variant: 77.877")
+    )
+
+    # ACCEPT: the median (col 1) is allowed to be the documented residue too only when
+    # it is p90 - it is NOT - so this stays rejected even though it is sub-cent. (Guard
+    # against a future loosening: only column 2 is ever accepted.)
+    assert not _h2odb_q9_decimal_residue(d("Q9.5: Value mismatch at row 5, column 1. Original: 77.91, Variant: 77.915"))
+
+
 def test_order_by_result_key_maps_alias_name_expr_and_ordinal():
     """_order_by_result_key resolves the ORDER BY shapes the gated queries use."""
     from benchbox.core.equivalence.cross_surface import _order_by_result_key as resolve
