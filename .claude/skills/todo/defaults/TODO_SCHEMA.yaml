@@ -1,0 +1,330 @@
+# JSON Schema for Distributed TODO Items
+# Validates the structure of individual TODO/DONE entry files
+
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "TODO Entry"
+description: "Schema for individual TODO item files in the distributed TODO system"
+type: object
+
+required:
+  - title
+  - worktree
+  - priority
+  - status
+  - description
+
+properties:
+  # Stable identifier (matches filename slug, used for cross-references)
+  id:
+    type: string
+    description: "Stable identifier matching filename slug. Used for cross-item references."
+    pattern: "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+
+  # Core Required Fields
+  title:
+    type: string
+    description: "Descriptive name of the TODO item"
+    minLength: 5
+    maxLength: 200
+
+  worktree:
+    type: string
+    description: "Git branch/worktree identifier for this work item"
+    minLength: 1
+    pattern: "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+
+  priority:
+    type: string
+    description: "Priority level for this TODO item"
+    enum:
+      - "Critical"
+      - "High"
+      - "Medium-High"
+      - "Medium"
+      - "Low"
+
+  status:
+    type: string
+    description: "Current status of the TODO item"
+    enum:
+      - "Not Started"
+      - "Identified"
+      - "In Progress"
+      - "Blocked"
+      - "Under Review"
+      - "Completed"
+
+  description:
+    type: string
+    description: "Multi-line detailed explanation of the TODO item"
+    minLength: 10
+
+  # Common Optional Fields
+  category:
+    type: string
+    description: "Logical category for grouping related TODOs"
+    examples:
+      - "Core Functionality"
+      - "Platform Expansion"
+      - "Testing and Quality Assurance"
+      - "Documentation"
+
+  tasks:
+    description: "DEPRECATED: Hierarchical breakdown of work. Use 'work' instead."
+    oneOf:
+      - type: object
+        properties:
+          phases:
+            type: array
+      - type: array  # Legacy format: direct list of phases
+
+  # New flat work breakdown (replaces tasks.phases)
+  work:
+    type: array
+    description: "Flat list of work units with dependency edges (replaces tasks.phases)"
+    items:
+      type: object
+      required:
+        - id
+        - summary
+        - status
+      properties:
+        id:
+          type: string
+          description: "Unique within this TODO item (w1-w999)"
+          pattern: "^w[0-9]{1,3}$"
+        summary:
+          type: string
+          description: "One-line description of the work unit"
+          minLength: 5
+          maxLength: 200
+        needs:
+          type: array
+          description: "IDs of work units this depends on"
+          items:
+            type: string
+        status:
+          type: string
+          description: "Work unit status"
+          enum:
+            - "pending"
+            - "in_progress"
+            - "done"
+        notes:
+          type: string
+          description: "Implementation notes or context"
+
+  # Deferred items (known but explicitly out of scope)
+  deferred:
+    type: array
+    description: "Items that are known but explicitly not in scope for the current work"
+    items:
+      type: object
+      required:
+        - summary
+        - reason
+      properties:
+        summary:
+          type: string
+          description: "What was deferred"
+        reason:
+          type: string
+          description: "Why it's deferred"
+
+  # Normalized dependencies (replaces dependencies)
+  deps:
+    type: object
+    description: "Inter-item dependencies using stable IDs (replaces dependencies)"
+    properties:
+      needs:
+        type: array
+        description: "Item IDs that must be done before this item can start"
+        items:
+          type: string
+    additionalProperties: false
+
+  metadata:
+    type: object
+    description: "Additional metadata for tracking and organization"
+    properties:
+      owners:
+        type: array
+        items:
+          type: string
+        description: "Individuals or teams responsible"
+      tags:
+        type: array
+        items:
+          type: string
+        description: "Free-form tags for categorization"
+      estimated_effort:
+        type: string
+        description: "Rough effort estimate (e.g., '2-3 days', 'Large')"
+      due_date:
+        type: string
+        format: date
+        description: "Target completion date (YYYY-MM-DD)"
+      budget_allocated:
+        type: string
+        description: "Budget or resource allocation"
+      created_date:
+        type: string
+        format: date
+        description: "Date this TODO was created"
+      last_updated:
+        type: string
+        format: date-time
+        description: "Last modification timestamp"
+
+  impact:
+    description: "Business value and user impact - supports string or object format"
+    oneOf:
+      - type: string  # Simple string description
+      - type: object  # Structured impact assessment
+        properties:
+          business_value:
+            type: string
+          user_impact:
+            type: string
+          technical_debt:
+            type: string
+
+  files_affected:
+    description: "Files affected - supports multiple formats"
+    oneOf:
+      - type: object
+        properties:
+          modified:
+            type: array
+          added:
+            type: array
+          removed:
+            type: array
+      - type: array  # Legacy format: list with change_type and paths
+
+  # Implementation Guardrail Fields
+  must_preserve:
+    type: array
+    description: "Existing behaviors that must NOT break during implementation"
+    items:
+      type: string
+    examples:
+      - "All existing platform adapters continue to pass their test suites"
+      - "CLI --help output format remains unchanged"
+
+  approach:
+    type: string
+    description: "Implementation strategy: utilities to reuse, reference code, sequenced reasoning"
+
+  anti_patterns:
+    type: array
+    description: "Explicit 'DO NOT do X — because Y — do Z instead' directives"
+    items:
+      type: string
+    examples:
+      - "DO NOT add a new base class — because adapter hierarchy is already 3 levels deep — extend the existing mixin instead"
+
+  verification:
+    description: "Concrete test steps with optional command and expected output"
+    oneOf:
+      - type: array  # Structured format: list of verification steps
+        items:
+          type: object
+          properties:
+            description:
+              type: string
+            command:
+              type: string
+            expected_output:
+              type: string
+          required:
+            - description
+      - type: object  # Legacy format: {commands: [strings]}
+        properties:
+          commands:
+            type: array
+            items:
+              type: string
+
+  scope_limit:
+    type: object
+    description: "File-level allowlist/denylist for modifications"
+    properties:
+      only_modify:
+        type: array
+        description: "Only these files/directories may be modified"
+        items:
+          type: string
+      do_not_modify:
+        type: array
+        description: "These files/directories must NOT be modified"
+        items:
+          type: string
+
+  context_sections:
+    description: "Background context - supports object or array format"
+    oneOf:
+      - type: object  # Key-value pairs
+      - type: array   # List with name and summary
+
+  technical_requirements:
+    description: "Technical constraints - supports multiple formats"
+    oneOf:
+      - type: object
+      - type: array
+
+  dependencies:
+    description: "DEPRECATED: Use 'deps' instead. Supports multiple formats for backward compat."
+    oneOf:
+      - type: object
+      - type: array
+      - type: string
+
+  research_value:
+    description: "Research or validation value - supports string or object"
+    oneOf:
+      - type: string  # Simple description
+      - type: object  # Structured research plan
+        properties:
+          hypothesis:
+            type: string
+          validation_approach:
+            type: string
+          success_criteria:
+            type: string
+
+  success_metrics:
+    type: array
+    description: "Measurable success criteria"
+    items:
+      type: string
+
+  open_questions:
+    type: array
+    description: "Unresolved questions or uncertainties"
+    items:
+      type: string
+
+  commits:
+    type: array
+    description: "Related Git commit SHAs"
+    items:
+      type: string
+      pattern: "^[0-9a-f]{7,40}$"
+
+  # For completed items in DONE tree
+  completed_date:
+    type: string
+    format: date
+    description: "Date this item was completed (YYYY-MM-DD)"
+
+  sections:
+    type: object
+    description: "Additional documentation sections (often used in DONE items)"
+    patternProperties:
+      ".*":
+        type: string
+    additionalProperties: true
+
+# Allow additional fields for flexibility
+additionalProperties: true

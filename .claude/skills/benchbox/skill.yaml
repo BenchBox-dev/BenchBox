@@ -1,0 +1,7 @@
+tags:
+  - benchmarking
+  - domain
+category: domain
+targets:
+  claude: true
+  codex: true

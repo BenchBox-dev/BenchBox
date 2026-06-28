@@ -1,0 +1,44 @@
+depends:
+  - SHARED/commit-framework
+  - SHARED/verify-framework
+  - SHARED/research-framework
+  - SHARED/compare-framework
+  - SHARED/shrink-framework
+  - SHARED/context-guide
+  - SHARED/debug-framework
+  - SHARED/slicing-framework
+  - SHARED/plan-deepening-framework
+  - SHARED/review-protocol
+config_inputs:
+  - key: code.lint
+    type: string
+    description: Lint command
+  - key: code.lint_fix
+    type: string
+    description: Lint fix command
+  - key: code.format
+    type: string
+    description: Format command
+  - key: code.typecheck
+    type: string
+    description: Typecheck command
+  - key: code.fast_test
+    type: string
+    description: Fast test command
+  - key: code.verify
+    type: string
+    description: Verification command
+    default: npm test
+  - key: code.line_length
+    type: number
+    description: Max line length for review
+  - key: code.review_checklist
+    type: string
+    description: Project-specific review items
+tags:
+  - development
+  - code
+category: development
+targets:
+  claude: true
+  codex: true
