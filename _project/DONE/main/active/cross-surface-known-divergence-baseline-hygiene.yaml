@@ -2,8 +2,9 @@ id: cross-surface-known-divergence-baseline-hygiene
 title: "Fail (or force baseline update) when a known cross-surface divergence no longer reproduces"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
 category: Testing and Quality Assurance
+completed_date: "2026-06-28"
 
 description: |
   Cross-surface gates carry classified known_divergences (e.g. ClickBench Q18's
