@@ -29,6 +29,11 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+from __future__ import annotations
+
+import importlib
+from typing import Any
+
 from benchbox.platforms.dataframe.benchmark_mixin import (
     BenchmarkExecutionMixin,
     DataFramePhases,
@@ -37,10 +42,6 @@ from benchbox.platforms.dataframe.benchmark_mixin import (
 from benchbox.platforms.dataframe.expression_family import (
     ExpressionFamilyAdapter,
     ExpressionFamilyContext,
-)
-from benchbox.platforms.dataframe.pandas_df import (
-    PANDAS_AVAILABLE,
-    PandasDataFrameAdapter,
 )
 from benchbox.platforms.dataframe.pandas_family import (
     PandasFamilyAdapter,
@@ -57,95 +58,50 @@ from benchbox.platforms.dataframe.platform_checker import (
     get_platform_error_message,
     require_platform,
 )
-from benchbox.platforms.dataframe.polars_df import (
-    POLARS_AVAILABLE,
-    PolarsDataFrameAdapter,
-)
 
-# Modin adapter (optional - requires modin[ray] or modin[dask])
-try:
-    from benchbox.platforms.dataframe.modin_df import (
-        MODIN_AVAILABLE,
-        ModinDataFrameAdapter,
-    )
-except ImportError:
-    MODIN_AVAILABLE = False
-    ModinDataFrameAdapter = None  # type: ignore[assignment,misc]
-
-# cuDF adapter (optional - requires NVIDIA GPU and cudf)
-try:
-    from benchbox.platforms.dataframe.cudf_df import (
-        CUDF_AVAILABLE,
-        CuDFDataFrameAdapter,
-    )
-except ImportError:
-    CUDF_AVAILABLE = False
-    CuDFDataFrameAdapter = None  # type: ignore[assignment,misc]
-
-# Dask adapter (optional - requires dask[distributed])
-try:
-    from benchbox.platforms.dataframe.dask_df import (
-        DASK_AVAILABLE,
-        DaskDataFrameAdapter,
-    )
-except ImportError:
-    DASK_AVAILABLE = False
-    DaskDataFrameAdapter = None  # type: ignore[assignment,misc]
-
-# DataFusion adapter (optional - requires datafusion)
-try:
-    from benchbox.platforms.dataframe.datafusion_df import (
-        DATAFUSION_DF_AVAILABLE,
-        DataFusionDataFrameAdapter,
-    )
-except ImportError:
-    DATAFUSION_DF_AVAILABLE = False
-    DataFusionDataFrameAdapter = None  # type: ignore[assignment,misc]
+_LAZY_EXPORTS = {
+    "PANDAS_AVAILABLE": ("benchbox.platforms.dataframe.pandas_df", False),
+    "PandasDataFrameAdapter": ("benchbox.platforms.dataframe.pandas_df", None),
+    "POLARS_AVAILABLE": ("benchbox.platforms.dataframe.polars_df", False),
+    "PolarsDataFrameAdapter": ("benchbox.platforms.dataframe.polars_df", None),
+    "MODIN_AVAILABLE": ("benchbox.platforms.dataframe.modin_df", False),
+    "ModinDataFrameAdapter": ("benchbox.platforms.dataframe.modin_df", None),
+    "CUDF_AVAILABLE": ("benchbox.platforms.dataframe.cudf_df", False),
+    "CuDFDataFrameAdapter": ("benchbox.platforms.dataframe.cudf_df", None),
+    "DASK_AVAILABLE": ("benchbox.platforms.dataframe.dask_df", False),
+    "DaskDataFrameAdapter": ("benchbox.platforms.dataframe.dask_df", None),
+    "DATAFUSION_DF_AVAILABLE": ("benchbox.platforms.dataframe.datafusion_df", False),
+    "DataFusionDataFrameAdapter": ("benchbox.platforms.dataframe.datafusion_df", None),
+    "PYSPARK_AVAILABLE": ("benchbox.platforms.dataframe.pyspark_df", False),
+    "PYSPARK_VERSION": ("benchbox.platforms.dataframe.pyspark_df", None),
+    "PySparkDataFrameAdapter": ("benchbox.platforms.dataframe.pyspark_df", None),
+    "LakeSailDataFrameAdapter": ("benchbox.platforms.dataframe.lakesail_df", None),
+    "DELTA_SPARK_AVAILABLE": ("benchbox.platforms.dataframe.pyspark_maintenance", False),
+    "PYSPARK_DELTA_CAPABILITIES": ("benchbox.platforms.dataframe.pyspark_maintenance", None),
+    "PYSPARK_PARQUET_CAPABILITIES": ("benchbox.platforms.dataframe.pyspark_maintenance", None),
+    "PySparkMaintenanceOperations": ("benchbox.platforms.dataframe.pyspark_maintenance", None),
+    "get_pyspark_maintenance_operations": ("benchbox.platforms.dataframe.pyspark_maintenance", None),
+}
 
 
-# PySpark adapter (optional - requires pyspark)
-try:
-    from benchbox.platforms.dataframe.pyspark_df import (
-        PYSPARK_AVAILABLE,
-        PYSPARK_VERSION,
-        PySparkDataFrameAdapter,
-    )
-except ImportError:
-    PYSPARK_AVAILABLE = False
-    PYSPARK_VERSION = None  # type: ignore[assignment]
-    PySparkDataFrameAdapter = None  # type: ignore[assignment,misc]
+def __getattr__(name: str) -> Any:
+    if name == "ducklake_maintenance":
+        module = importlib.import_module("benchbox.platforms.dataframe.ducklake_maintenance")
+        globals()[name] = module
+        return module
+    target = _LAZY_EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_path, default = target
+    try:
+        module = importlib.import_module(module_path)
+    except (ImportError, OSError):
+        value = default
+    else:
+        value = getattr(module, name, default)
+    globals()[name] = value
+    return value
 
-# LakeSail Sail adapter (optional - requires pyspark, uses Spark Connect)
-try:
-    from benchbox.platforms.dataframe.lakesail_df import (
-        LakeSailDataFrameAdapter,
-    )
-except ImportError:
-    LakeSailDataFrameAdapter = None  # type: ignore[assignment,misc]
-
-# DuckLake maintenance operations (optional - requires duckdb and pyarrow)
-# Import as submodule to ensure ducklake_maintenance is always accessible as an
-# attribute on this package (needed for mock.patch on Python 3.10).
-try:
-    from . import ducklake_maintenance as ducklake_maintenance  # noqa: F401
-except ImportError:
-    pass
-
-# PySpark maintenance operations (optional - requires pyspark and optionally delta-spark)
-try:
-    from benchbox.platforms.dataframe.pyspark_maintenance import (
-        DELTA_SPARK_AVAILABLE,
-        PYSPARK_DELTA_CAPABILITIES,
-        PYSPARK_PARQUET_CAPABILITIES,
-        PySparkMaintenanceOperations,
-        get_pyspark_maintenance_operations,
-    )
-except ImportError:
-    DELTA_SPARK_AVAILABLE = False
-    PYSPARK_DELTA_CAPABILITIES = None  # type: ignore[assignment]
-    PYSPARK_PARQUET_CAPABILITIES = None  # type: ignore[assignment]
-    PySparkMaintenanceOperations = None  # type: ignore[assignment,misc]
-    get_pyspark_maintenance_operations = None  # type: ignore[assignment]
 
 __all__ = [
     # Benchmark Execution

@@ -367,7 +367,7 @@ spark = [
 ]
 
 [project.scripts]
-benchbox = "benchbox.cli.main:main"
+benchbox = "benchbox.cli.app:main"
 benchbox-mcp = "benchbox.mcp.cli:main"
 
 [project.urls]

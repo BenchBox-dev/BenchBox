@@ -2,7 +2,7 @@ id: cli-lean-import-guarantee
 title: "Restore and enforce the lean-import guarantee for import benchbox, import benchbox.cli.main, and benchbox --help"
 worktree: main
 priority: Critical
-status: In Progress
+status: Blocked
 category: Release Tooling
 
 description: |
@@ -216,6 +216,17 @@ success_metrics:
 - "tests/unit/test_import_isolation.py is green and required in PR CI."
 - "A clean no-extras wheel runs benchbox --help without crashing, verified pre-publish."
 - "A heavy-dep import on any of the three entry points fails CI before reaching PyPI."
+
+deferred:
+- summary: "Make the remaining cloud-path import path lazy outside this TODO's file allowlist."
+  reason: |
+    After the in-scope lazy refactor, tests/unit/test_import_isolation.py is down to
+    boto3/google/cloudpathlib failures only. The verified remaining path is
+    benchbox/__init__.py eagerly importing FlightData, which imports
+    benchbox/utils/datagen_manifest.py, whose top-level cloudpathlib import loads
+    cloudpathlib plus boto3/google provider SDKs. Both benchbox/__init__.py and
+    benchbox/utils/datagen_manifest.py are outside this TODO's scope_limit.only_modify,
+    so the contract cannot be made green without widening scope.
 
 metadata:
   tags: [packaging, lean-import, cli, ci, release, regression-guard]

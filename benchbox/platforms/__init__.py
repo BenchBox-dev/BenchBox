@@ -66,6 +66,15 @@ _lazy_adapter_diagnostics: dict[str, dict[str, object]] = {}
 
 # Mapping of lazy adapter names to their module paths.
 _LAZY_ADAPTER_ROWS = """\
+DuckDBAdapter|.duckdb
+MotherDuckAdapter|.motherduck
+SQLiteAdapter|.sqlite
+PostgreSQLAdapter|.postgresql
+TimescaleDBAdapter|.timescaledb
+PgDuckDBAdapter|.pg_duckdb
+PgMooncakeAdapter|.pg_mooncake
+CedarDBAdapter|.cedardb
+QuestDBAdapter|.questdb
 DatabricksAdapter|.databricks
 BigQueryAdapter|.bigquery
 SnowflakeAdapter|.snowflake
@@ -195,7 +204,16 @@ def _load_lazy_constant(name: str) -> bool:
         value = getattr(module, name, default)
         _lazy_constant_cache[name] = value
         return value
-    except ImportError:
+    except (ImportError, OSError) as exc:
+        _lazy_adapter_diagnostics[name] = {
+            "adapter": name,
+            "module_path": module_path,
+            "status": PlatformRegistry.classify_optional_import_error(
+                exc, module_path=_resolve_lazy_module_path(module_path)
+            ),
+            "error_type": type(exc).__name__,
+            "error_message": str(exc),
+        }
         _lazy_constant_cache[name] = default
         return default
 
@@ -222,7 +240,7 @@ def __getattr__(name: str):
         if _clickhouse_module_cache is None:
             try:
                 _clickhouse_module_cache = importlib.import_module(".clickhouse", __package__)
-            except ImportError:
+            except (ImportError, OSError):
                 pass  # Keep as None
         return _clickhouse_module_cache
 
@@ -250,20 +268,10 @@ def diagnose_optional_adapter_imports(platform_names: Optional[Iterable[str]] = 
 def _load_optional_adapter(module_path: str, class_name: str) -> Optional[Type[PlatformAdapter]]:
     try:
         module = importlib.import_module(module_path, __package__)
-    except ImportError:
+    except (ImportError, OSError):
         return None
     return getattr(module, class_name, None)
 
-
-DuckDBAdapter = _load_optional_adapter(".duckdb", "DuckDBAdapter")
-MotherDuckAdapter = _load_optional_adapter(".motherduck", "MotherDuckAdapter")
-SQLiteAdapter = _load_optional_adapter(".sqlite", "SQLiteAdapter")
-PostgreSQLAdapter = _load_optional_adapter(".postgresql", "PostgreSQLAdapter")
-TimescaleDBAdapter = _load_optional_adapter(".timescaledb", "TimescaleDBAdapter")
-PgDuckDBAdapter = _load_optional_adapter(".pg_duckdb", "PgDuckDBAdapter")
-PgMooncakeAdapter = _load_optional_adapter(".pg_mooncake", "PgMooncakeAdapter")
-CedarDBAdapter = _load_optional_adapter(".cedardb", "CedarDBAdapter")
-QuestDBAdapter = _load_optional_adapter(".questdb", "QuestDBAdapter")
 
 _EXPORT_NAMES = """\
 PlatformAdapter ConnectionConfig BenchmarkResults DuckDBAdapter MotherDuckAdapter DataFusionAdapter PolarsAdapter
@@ -839,47 +847,25 @@ velox|adaptive_enabled|Enable Spark Adaptive Query Execution|{'parser': 'parse_b
     # Presto
     PlatformHookRegistry.register_config_builder("presto", _make_lazy_config_builder(".presto", "_build_presto_config"))
 
-    # ========================================================================
-    # Eagerly-Loaded Platform Hooks (PostgreSQL, TimescaleDB)
-    # ========================================================================
-    # These platforms have lightweight dependencies that are already loaded
-    # eagerly, so we can use direct imports for their config builders.
-
-    # PostgreSQL (eagerly loaded - uses psycopg2 which is a core dependency)
-    if PostgreSQLAdapter is not None:
-        from benchbox.platforms.postgresql import _build_postgresql_config
-
-        PlatformHookRegistry.register_config_builder("postgresql", _build_postgresql_config)
-
-    # TimescaleDB (eagerly loaded - shares psycopg2 with PostgreSQL)
-    if TimescaleDBAdapter is not None:
-        from benchbox.platforms.timescaledb import _build_timescaledb_config
-
-        PlatformHookRegistry.register_config_builder("timescaledb", _build_timescaledb_config)
-
-    # pg_duckdb (eagerly loaded - shares psycopg2 with PostgreSQL)
-    if PgDuckDBAdapter is not None:
-        from benchbox.platforms.pg_duckdb import _build_pg_duckdb_config
-
-        PlatformHookRegistry.register_config_builder("pg-duckdb", _build_pg_duckdb_config)
-
-    # pg_mooncake (eagerly loaded - shares psycopg2 with PostgreSQL)
-    if PgMooncakeAdapter is not None:
-        from benchbox.platforms.pg_mooncake import _build_pg_mooncake_config
-
-        PlatformHookRegistry.register_config_builder("pg-mooncake", _build_pg_mooncake_config)
-
-    # QuestDB (eagerly loaded - shares psycopg2 with PostgreSQL)
-    if QuestDBAdapter is not None:
-        from benchbox.platforms.questdb import _build_questdb_config
-
-        PlatformHookRegistry.register_config_builder("questdb", _build_questdb_config)
-
-    # CedarDB (eagerly loaded - shares psycopg2 with PostgreSQL)
-    if CedarDBAdapter is not None:
-        from benchbox.platforms.cedardb import _build_cedardb_config
-
-        PlatformHookRegistry.register_config_builder("cedardb", _build_cedardb_config)
+    # PostgreSQL-family hooks are lazy too; importing their modules pulls psycopg.
+    PlatformHookRegistry.register_config_builder(
+        "postgresql", _make_lazy_config_builder(".postgresql", "_build_postgresql_config")
+    )
+    PlatformHookRegistry.register_config_builder(
+        "timescaledb", _make_lazy_config_builder(".timescaledb", "_build_timescaledb_config")
+    )
+    PlatformHookRegistry.register_config_builder(
+        "pg-duckdb", _make_lazy_config_builder(".pg_duckdb", "_build_pg_duckdb_config")
+    )
+    PlatformHookRegistry.register_config_builder(
+        "pg-mooncake", _make_lazy_config_builder(".pg_mooncake", "_build_pg_mooncake_config")
+    )
+    PlatformHookRegistry.register_config_builder(
+        "questdb", _make_lazy_config_builder(".questdb", "_build_questdb_config")
+    )
+    PlatformHookRegistry.register_config_builder(
+        "cedardb", _make_lazy_config_builder(".cedardb", "_build_cedardb_config")
+    )
 
     # ========================================================================
     # Lazy Cloud Platform Hooks (Azure Synapse, Fabric)

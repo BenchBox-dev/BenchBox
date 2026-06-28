@@ -18,12 +18,26 @@ from urllib.parse import urlparse
 
 from benchbox.utils.dependencies import get_install_command, get_package_install_message
 
-try:
-    from cloudpathlib import CloudPath
-    from cloudpathlib.exceptions import MissingCredentialsError
-except ImportError:
-    CloudPath = None  # type: ignore
-    MissingCredentialsError = Exception  # type: ignore
+_UNLOADED_CLOUDPATHLIB = object()
+CloudPath: Any = _UNLOADED_CLOUDPATHLIB
+MissingCredentialsError: type[BaseException] = Exception
+
+
+def _load_cloudpathlib() -> tuple[Any | None, type[BaseException]]:
+    """Load cloudpathlib only when a cloud path operation actually needs it."""
+    global CloudPath, MissingCredentialsError
+    if CloudPath is _UNLOADED_CLOUDPATHLIB:
+        try:
+            from cloudpathlib import CloudPath as LoadedCloudPath
+            from cloudpathlib.exceptions import MissingCredentialsError as LoadedMissingCredentialsError
+        except ImportError:
+            CloudPath = None
+            MissingCredentialsError = Exception
+        else:
+            CloudPath = LoadedCloudPath
+            MissingCredentialsError = LoadedMissingCredentialsError
+    return CloudPath, MissingCredentialsError
+
 
 logger = logging.getLogger(__name__)
 
@@ -375,7 +389,8 @@ def validate_cloud_path_support() -> bool:
     Returns:
         True if cloudpathlib is available, False otherwise
     """
-    return CloudPath is not None
+    cloud_path, _ = _load_cloudpathlib()
+    return cloud_path is not None
 
 
 def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, DatabricksPath]:
@@ -403,7 +418,8 @@ def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, Databr
 
     # If already a CloudPath instance, return as-is (avoids double-wrapping)
     # Check if CloudPath is actually a class type, not None or a mock
-    if CloudPath is not None and hasattr(CloudPath, "__mro__") and isinstance(path, CloudPath):
+    cloud_path_cls = CloudPath if CloudPath is not _UNLOADED_CLOUDPATHLIB else None
+    if cloud_path_cls is not None and hasattr(cloud_path_cls, "__mro__") and isinstance(path, cloud_path_cls):
         return path
 
     # Handle Databricks paths specially - they require local generation + upload
@@ -433,11 +449,12 @@ def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, Databr
     if not is_cloud_path(path):
         return Path(path)
 
-    if CloudPath is None:
+    cloud_path_cls, _ = _load_cloudpathlib()
+    if cloud_path_cls is None:
         raise ImportError(f"cloudpathlib is required for cloud storage paths. {get_install_command('cloudstorage')}")
 
     try:
-        return CloudPath(str(path))  # type: ignore
+        return cloud_path_cls(str(path))
     except Exception as e:
         raise ValueError(f"Invalid cloud path format '{path}': {e}") from e
 
@@ -496,7 +513,8 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
     if not is_cloud_path(path):
         return {"valid": True, "provider": "local", "error": None, "env_vars": []}
 
-    if CloudPath is None:
+    cloud_path_cls, missing_credentials_error = _load_cloudpathlib()
+    if cloud_path_cls is None:
         return {
             "valid": False,
             "provider": "unknown",
@@ -559,7 +577,7 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
 
     # Try to create a cloud path to test credentials
     try:
-        cloud_path = CloudPath(str(path))  # type: ignore
+        cloud_path = cloud_path_cls(str(path))
         # Test basic operations
         _ = cloud_path.exists()
         return {
@@ -568,7 +586,7 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
             "error": None,
             "env_vars": expected_vars,
         }
-    except MissingCredentialsError as e:
+    except missing_credentials_error as e:
         return {
             "valid": False,
             "provider": provider,
