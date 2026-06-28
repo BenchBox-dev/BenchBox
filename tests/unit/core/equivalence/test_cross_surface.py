@@ -110,6 +110,53 @@ def test_divergent_backend_is_reported_with_backend_cell():
     assert [(d.query_id, d.cell, d.key) for d in divergences] == [("Q1.1", "pandas", "Q1.1_pandas")]
 
 
+def test_strict_default_reports_dataframe_nan_against_sql_null():
+    ref = [(None,)]
+    connection, reference_sql, dataframe_query, contexts = _make_inputs(ref, {"pandas": [(float("nan"),)]})
+    divergences = find_cross_surface_divergences(
+        connection,
+        query_ids=["Qnan"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(),
+        backends=("pandas",),
+    )
+    assert [(d.query_id, d.cell, d.key) for d in divergences] == [("Qnan", "pandas", "Qnan_pandas")]
+    assert "Value mismatch" in divergences[0].detail
+
+
+def test_strict_default_reports_trailing_whitespace_divergence():
+    ref = [("foo",)]
+    connection, reference_sql, dataframe_query, contexts = _make_inputs(ref, {"expression": [("foo ",)]})
+    divergences = find_cross_surface_divergences(
+        connection,
+        query_ids=["Qspace"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(),
+        backends=("expression",),
+    )
+    assert [(d.query_id, d.cell, d.key) for d in divergences] == [("Qspace", "expression", "Qspace_expression")]
+    assert "Value mismatch" in divergences[0].detail
+
+
+def test_explicit_value_widening_flags_accept_documented_decode_cases():
+    ref = [(None, "foo")]
+    connection, reference_sql, dataframe_query, contexts = _make_inputs(ref, {"pandas": [(float("nan"), "foo ")]})
+    divergences = find_cross_surface_divergences(
+        connection,
+        query_ids=["Qtolerated"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(treat_nan_as_null=True, strip_strings=True),
+        backends=("pandas",),
+    )
+    assert divergences == []
+
+
 def test_tie_aware_only_applies_to_truncated_top_n_queries():
     """A boundary-tie swap is tolerated for a LIMIT query but NOT a non-LIMIT one.
 

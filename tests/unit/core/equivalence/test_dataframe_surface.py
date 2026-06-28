@@ -13,6 +13,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import math
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -143,7 +144,11 @@ class _Wrapper:
 
 def test_materialize_rows_collects_and_normalizes() -> None:
     frame = _FakeLazyFrame([(Decimal("1.50"), datetime(2020, 1, 1, 0, 0, 0)), (None, float("nan"))])
-    assert materialize_rows(_Wrapper(frame)) == [(1.5, date(2020, 1, 1)), (None, None)]
+    rows = materialize_rows(_Wrapper(frame))
+
+    assert rows[0] == (1.5, date(2020, 1, 1))
+    assert rows[1][0] is None
+    assert math.isnan(rows[1][1])
 
 
 def test_materialize_rows_rejects_unknown_result() -> None:
@@ -156,6 +161,6 @@ def test_normalize_value_scalar_mappings() -> None:
     assert _normalize_value(Decimal("2.25")) == 2.25
     assert _normalize_value(datetime(2021, 6, 1, 0, 0, 0)) == date(2021, 6, 1)
     assert _normalize_value(datetime(2021, 6, 1, 12, 30, 0)) == datetime(2021, 6, 1, 12, 30, 0)
-    assert _normalize_value(float("nan")) is None
+    assert math.isnan(_normalize_value(float("nan")))
     assert _normalize_value("abc") == "abc"
     assert _normalize_value(5) == 5

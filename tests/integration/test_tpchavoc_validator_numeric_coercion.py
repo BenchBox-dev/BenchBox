@@ -68,17 +68,27 @@ def test_aggregation_results_report_clean_mismatch_for_decimal_truncation():
         validator.validate_aggregation_results(original, variant, query_id=1, variant_id=4, aggregation_columns=[2])
 
 
-def test_numeric_equal_treats_nan_and_none_as_missing():
-    """SQL NULL arrives as None (most engines) or float('nan') (ClickHouse decode).
+def test_numeric_equal_treats_nan_and_none_as_missing_only_when_opted_in():
+    """SQL NULL/NaN widening is explicit, not the comparator default.
 
-    Two missing values must compare equal (no spurious divergence), a
-    missing-vs-present pair must compare unequal, and neither path may raise.
+    Some engine decode paths can present SQL NULL as ``float('nan')``. That
+    tolerance is available through ``treat_nan_as_null=True``, but strict mode
+    must catch spurious NaN-vs-NULL value divergences by default.
     """
-    validator = ResultValidator(tolerance=1e-10)
+    strict = ResultValidator(tolerance=1e-10)
+    widened = ResultValidator(tolerance=1e-10, treat_nan_as_null=True)
     nan = float("nan")
-    assert validator._numeric_values_equal(nan, nan)
-    assert validator._numeric_values_equal(None, None)
-    assert validator._numeric_values_equal(nan, None)
-    assert not validator._numeric_values_equal(nan, 0)
-    assert not validator._numeric_values_equal(0, nan)
-    assert not validator._numeric_values_equal(None, 5.0)
+
+    assert not strict._numeric_values_equal(nan, nan)
+    assert strict._numeric_values_equal(None, None)
+    assert not strict._numeric_values_equal(nan, None)
+    assert not strict._numeric_values_equal(nan, 0)
+    assert not strict._numeric_values_equal(0, nan)
+    assert not strict._numeric_values_equal(None, 5.0)
+
+    assert widened._numeric_values_equal(nan, nan)
+    assert widened._numeric_values_equal(None, None)
+    assert widened._numeric_values_equal(nan, None)
+    assert not widened._numeric_values_equal(nan, 0)
+    assert not widened._numeric_values_equal(0, nan)
+    assert not widened._numeric_values_equal(None, 5.0)

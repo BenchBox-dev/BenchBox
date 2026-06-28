@@ -78,13 +78,27 @@ class ValidationError(Exception):
 class ResultValidator:
     """Validates that query variants produce identical results."""
 
-    def __init__(self, tolerance: float = 1e-10) -> None:
+    def __init__(
+        self,
+        tolerance: float = 1e-10,
+        *,
+        treat_nan_as_null: bool = False,
+        strip_strings: bool = False,
+    ) -> None:
         """Initialize result validator.
 
         Args:
             tolerance: Tolerance for floating-point comparisons
+            treat_nan_as_null: When True, treat floating NaN values as SQL NULLs.
+                Defaults to strict False so a spurious NaN is a value divergence.
+            strip_strings: When True, trim leading/trailing whitespace before
+                string comparison. Defaults to strict False so transcription
+                differences are caught unless a caller opts into CHAR-padding
+                tolerance.
         """
         self.tolerance = tolerance
+        self.treat_nan_as_null = treat_nan_as_null
+        self.strip_strings = strip_strings
 
     def validate_results_exact(
         self,
@@ -656,10 +670,12 @@ class ResultValidator:
     def _values_equal(self, val1: Any, val2: Any) -> bool:
         """Check if two values are equal with appropriate handling for different types."""
         # Handle None values
-        if val1 is None and val2 is None:
-            return True
         if val1 is None or val2 is None:
-            return False
+            if self.treat_nan_as_null:
+                val1_nullish = val1 is None or (isinstance(val1, float) and math.isnan(val1))
+                val2_nullish = val2 is None or (isinstance(val2, float) and math.isnan(val2))
+                return val1_nullish and val2_nullish
+            return val1 is None and val2 is None
 
         # Handle numeric values with tolerance. ``Decimal`` is included so a
         # DECIMAL value from one engine compares (within tolerance) against a
@@ -684,7 +700,9 @@ class ResultValidator:
 
         # Handle string values
         if isinstance(val1, str) and isinstance(val2, str):
-            return val1.strip() == val2.strip()
+            if self.strip_strings:
+                return val1.strip() == val2.strip()
+            return val1 == val2
 
         # Default equality check
         return val1 == val2
@@ -692,12 +710,10 @@ class ResultValidator:
     def _numeric_values_equal(self, val1: Union[int, float], val2: Union[int, float]) -> bool:
         """Check if two numeric values are equal within tolerance.
 
-        Normalizes "missing" operands first: SQL ``NULL`` arrives as ``None`` from
-        most engines but as ``float('nan')`` from ClickHouse's Arrow/pandas decode.
-        Two missing values compare equal and a missing-vs-present pair does not, so
-        a both-NULL aggregate is not reported as a spurious divergence and a
-        NULL-vs-number stays a real one (this also keeps ``float(...)`` below from
-        ever seeing ``None``/``NaN``).
+        Handles ``None`` and ``NaN`` before coercion so ``float(...)`` below never
+        sees a missing value. Strict mode treats ``NaN`` as a value distinct from
+        SQL ``NULL`` and from another ``NaN``; callers with a documented engine
+        decode path may opt into ``treat_nan_as_null``.
 
         Then coerces both operands to ``float`` so a mixed-type comparison (e.g. a
         ``decimal.Decimal`` from one engine vs a ``float`` from another) is compared
@@ -708,10 +724,18 @@ class ResultValidator:
         match or mismatch. This is engine-agnostic robustness, not an engine-specific
         path.
         """
-        val1_missing = val1 is None or (isinstance(val1, float) and math.isnan(val1))
-        val2_missing = val2 is None or (isinstance(val2, float) and math.isnan(val2))
-        if val1_missing or val2_missing:
-            return val1_missing and val2_missing
+        val1_is_none = val1 is None
+        val2_is_none = val2 is None
+        val1_is_nan = isinstance(val1, float) and math.isnan(val1)
+        val2_is_nan = isinstance(val2, float) and math.isnan(val2)
+        if val1_is_none or val2_is_none:
+            if self.treat_nan_as_null:
+                return (val1_is_none or val1_is_nan) and (val2_is_none or val2_is_nan)
+            return val1_is_none and val2_is_none
+        if val1_is_nan or val2_is_nan:
+            if self.treat_nan_as_null:
+                return (val1_is_none or val1_is_nan) and (val2_is_none or val2_is_nan)
+            return False
 
         val1 = float(val1)
         val2 = float(val2)

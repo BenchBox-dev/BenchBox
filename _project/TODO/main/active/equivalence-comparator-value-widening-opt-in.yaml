@@ -1,0 +1,84 @@
+id: equivalence-comparator-value-widening-opt-in
+title: "Make equivalence-comparator value-widening (NaN==NULL, whitespace strip) opt-in instead of unconditional"
+worktree: main
+priority: Medium
+status: In Progress
+category: Testing and Quality Assurance
+
+description: |
+  The shared result comparator silently widens equivalence in two engine-justified
+  but globally-applied ways, each of which can mask a real cross-surface value
+  divergence:
+    - validation.py:718 (_numeric_values_equal) treats float('nan') and None as
+      both "missing" and reports two missing values as EQUAL. Combined with
+      _normalize_value mapping NaN->None, a DataFrame surface that produces a
+      spurious NaN (e.g. 0/0 from a division bug) compares EQUAL to a SQL NULL.
+    - validation.py:693 strips leading/trailing whitespace unconditionally
+      (val1.strip() == val2.strip()), so "foo " vs "foo" is declared equal - masking
+      a real transcription difference.
+  Both are justified for specific engine decode paths (e.g. ClickHouse Arrow/pandas
+  NULL decode, CHAR padding) but are applied engine-agnostically with no flag to
+  disable, so they widen equivalence for every gate.
+
+  Make both behaviors explicit comparator flags (e.g. treat_nan_as_null,
+  strip_strings) that default to STRICT, enabled only where an engine genuinely
+  needs them and documented at that call site.
+
+prior_art:
+- ref: "benchbox/core/tpchavoc/validation.py:718"
+  note: "_numeric_values_equal NaN/None handling - add a treat_nan_as_null flag, default False (strict)."
+- ref: "benchbox/core/tpchavoc/validation.py:693"
+  note: "Unconditional string .strip() compare - add a strip_strings flag, default False."
+- ref: "benchbox/core/equivalence/cross_surface.py / dataframe_surface.py (_normalize_value)"
+  note: "Where NaN->None normalization happens; enable the widening flags only where a specific engine decode requires it."
+
+work:
+- id: w1
+  summary: "Gate NaN==NULL and whitespace-strip behind comparator flags, default strict"
+  status: done
+  needs: []
+  notes: |
+    Add treat_nan_as_null and strip_strings flags (additive, default False so the
+    strict behavior is the default). Thread them through the comparator entry
+    points. Enable them ONLY at the specific engine decode sites that genuinely
+    need them, with an inline comment justifying each. Keep TPC-Havoc and all
+    enforced gates green (verify none silently depended on the widening - if one
+    does, that is a divergence to surface, not to preserve).
+
+- id: w2
+  summary: "Test that the strict default catches the masked divergences"
+  status: done
+  needs: [w1]
+  notes: |
+    Unit tests asserting, under the strict default: a DataFrame-side 0/0->NaN vs
+    SQL NULL is CAUGHT, and "foo " vs "foo" is CAUGHT. And that the opt-in flags,
+    where set, still accept the engine-justified case.
+
+must_preserve:
+- "Engine decode paths that genuinely need NaN-as-null or CHAR-padding tolerance still pass, via the explicit opt-in flag
+  at that site."
+- "Float relative-tolerance (1e-10) comparison semantics are unchanged."
+
+anti_patterns:
+- "DO NOT keep the widening unconditional - a value oracle that equates NaN with NULL or ignores trailing spaces by default
+  cannot be trusted to catch those bug classes."
+
+verification:
+- description: "Strict default catches widened divergences; enforced gates stay green"
+  command: "uv run -- python -m pytest tests/unit/core/equivalence -q && make ssb-cross-surface-equivalence-report"
+  expected_output: "new strict-default tests pass; all enforced gates still 0 divergent"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/tpchavoc/"
+  - "benchbox/core/equivalence/"
+  - "tests/"
+
+success_metrics:
+- "NaN-vs-NULL and trailing-whitespace divergences are caught by default; widening only happens where explicitly opted in."
+
+metadata:
+  tags: [equivalence, correctness, comparator, value-fidelity]
+  estimated_effort: "Small"
+  created_date: "2026-06-28"
+  last_updated: "2026-06-28T00:00:00"
