@@ -69,7 +69,7 @@ work:
 
 - id: w3
   summary: "Confirm the mutation-sensitivity lane actually runs in CI"
-  status: pending
+  status: done
   needs: [w2]
   notes: |
     The drift guard only protects if its lane executes. Confirm the integration
