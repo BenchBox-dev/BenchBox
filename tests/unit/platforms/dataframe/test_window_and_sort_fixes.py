@@ -25,6 +25,11 @@ pl = pytest.importorskip("polars", reason="Polars not installed")
 from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
 from benchbox.platforms.dataframe.unified_frame import UnifiedExpr, UnifiedLazyFrame
 
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+]
+
 
 def test_window_lag_sorts_before_shifting():
     adapter = PolarsDataFrameAdapter()
