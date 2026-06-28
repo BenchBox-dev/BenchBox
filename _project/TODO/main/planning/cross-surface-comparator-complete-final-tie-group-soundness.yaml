@@ -64,6 +64,7 @@ work:
   - id: w1
     summary: "Gate the >=2 final-tie-group accept on truncation evidence so a complete final tie no longer masks a value bug"
     status: pending
+    needs: []
     notes: |
       Make the order-aware final-group acceptance require evidence that the LIMIT
       actually truncated the tie, for BOTH the single-row and the >= 2 case, so a
@@ -91,6 +92,36 @@ work:
       Hard constraints (same as #886): the TPC-Havoc strict path (no order_aware/
       tie_aware) stays byte-identical; all six enforced cross-surface gates stay
       green with 0 unclassified divergent; tpchavoc 220/220 and 440/440 unchanged.
+
+must_preserve:
+  - "TPC-Havoc strict validation behavior is byte-identical when order_aware/tie_aware is disabled."
+  - "All enforced cross-surface gates remain green with 0 unclassified divergences after the tighter final-tie check."
+  - "Truncated ORDER BY/LIMIT boundary swaps remain accepted only when the probe proves the final key extends past the LIMIT."
+  - "The fix remains targeted to boundary-tie soundness; it does not rewrite queries or compare untruncated result sets."
+
+anti_patterns:
+  - "DO NOT keep accepting a multi-row final tie group on row count alone; require truncation evidence."
+  - "DO NOT disable tie-aware validation or weaken mismatch reporting to preserve current green gates."
+  - "DO NOT broaden scope into a general LIMIT-removal or untruncated-result comparison rewrite."
+
+verification:
+  - description: "Complete final tie with differing members now fails"
+    command: "uv run -- python -m pytest tests/integration/test_validator_order_aware.py -q -k 'final_tie or boundary'"
+    expected_output: "complete non-truncated >=2 final tie membership difference raises; genuinely truncated boundary swap still passes"
+  - description: "Cross-surface and TPC-Havoc behavior stays green"
+    command: "make ssb-cross-surface-equivalence-report && make clickbench-cross-surface-equivalence-report && make tpchavoc-equivalence-report"
+    expected_output: "cross-surface gates remain 0 unclassified divergent; tpchavoc strict result counts unchanged"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpchavoc/validation.py"
+    - "benchbox/core/equivalence/cross_surface.py"
+    - "tests/integration/test_validator_order_aware.py"
+    - "tests/"
+
+success_metrics:
+  - "A complete, non-truncated, multi-row final tie cannot mask a value divergence."
+  - "A truly truncated boundary tie remains accepted as an ambiguous ORDER BY/LIMIT pick."
 
 deferred:
   - summary: "Reworking the gate to compare untruncated result sets generally (dropping LIMITs)"
