@@ -121,6 +121,8 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
     - SINGLESTORE_DATABASE: Default database name
     """
 
+    plan_capture_phase_eligible = True
+
     _platform_key: ClassVar[str] = "singlestore"
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY

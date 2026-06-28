@@ -57,6 +57,8 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
     Requires PostgreSQL 15+ with pg_mooncake extension installed.
     """
 
+    plan_capture_phase_eligible = True
+
     @property
     def platform_name(self) -> str:
         return "pg_mooncake"

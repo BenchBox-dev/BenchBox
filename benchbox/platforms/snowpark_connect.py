@@ -102,6 +102,8 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
     - Based on warehouse size and query duration
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
     def __init__(

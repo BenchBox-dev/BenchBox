@@ -48,6 +48,8 @@ def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
 class SnowflakeAdapter(PlatformAdapter):
     """Snowflake platform adapter with cloud data warehouse optimizations."""
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
 

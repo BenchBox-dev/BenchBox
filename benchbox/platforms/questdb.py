@@ -125,6 +125,8 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
     - PARTITION BY for time-series tables
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     _max_identifier_length = 127  # QuestDB supports identifiers up to 127 chars (PostgreSQL caps at 63)
 

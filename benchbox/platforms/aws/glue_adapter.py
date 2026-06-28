@@ -105,6 +105,8 @@ class AWSGlueAdapter(SparkTuningMixin, PlatformAdapter):
     - Supports both SQL and DataFrame execution modes
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
     def __init__(self, **config: Any) -> None:

@@ -65,6 +65,8 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
     - AWS Athena: Use AthenaAdapter instead (managed Presto/Trino service)
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
     platform_key = "trino"

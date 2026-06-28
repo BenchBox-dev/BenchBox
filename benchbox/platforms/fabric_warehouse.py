@@ -94,6 +94,8 @@ class FabricWarehouseAdapter(PlatformAdapter):
         ... )
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
     # Fabric item type this adapter supports

@@ -43,6 +43,8 @@ except ImportError:
 class AzureSynapseAdapter(PlatformAdapter):
     """Azure Synapse Analytics platform adapter with cloud data warehouse optimizations."""
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
     supports_external_tables = True
 

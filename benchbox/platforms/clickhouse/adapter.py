@@ -37,6 +37,8 @@ class ClickHouseAdapter(
         manual query rewriting or ClickHouse engine improvements.
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
     # Known incompatible queries that may fail despite transformations

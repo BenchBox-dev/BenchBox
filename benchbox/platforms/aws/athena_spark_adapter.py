@@ -138,6 +138,8 @@ class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapte
     - Billed per session duration
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
     # CloudSparkConfigMixin: Uses EMR config as base for Athena Spark

@@ -39,6 +39,8 @@ except ImportError:
 class FabricLakehouseAdapter(PlatformAdapter):
     """Read-only adapter for Fabric Lakehouse SQL Analytics Endpoint."""
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
     _READ_ONLY_TOKENS = {

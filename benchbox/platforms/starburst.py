@@ -65,6 +65,8 @@ class StarburstAdapter(TrinoAdapter):
             --platform-option password=my-password
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
     def __init__(self, **config):

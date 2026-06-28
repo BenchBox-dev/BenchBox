@@ -87,6 +87,8 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
     - Docker-first local dev path on macOS/Windows (see docker/velox/)
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
     # Velox uses Apache Spark which handles .tbl / .dat / .zst files natively

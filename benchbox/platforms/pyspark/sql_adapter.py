@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 class PySparkSQLAdapter(SparkAdapter):
     """Spark SQL adapter that uses the shared SparkSessionManager singleton."""
 
+    plan_capture_phase_eligible = True
+
     def __init__(self, **config: Any) -> None:
         if not PYSPARK_AVAILABLE:
             raise SparkUnavailableError(get_package_install_message("pyspark pyarrow", "PySpark is not installed."))
