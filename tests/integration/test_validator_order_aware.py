@@ -113,8 +113,8 @@ def test_order_aware_complete_final_tie_group_value_bug_is_caught():
         validator.validate_results_exact(reference, bug, 3, 1, order_aware=True, order_by=order_by, tie_aware=True)
 
 
-def test_order_aware_complete_final_tie_group_accepts_only_with_probe():
-    """The same multi-row final tie swap is accepted only when the probe proves truncation."""
+def test_order_aware_multi_row_final_tie_group_accepts_only_with_probe():
+    """A multi-row final tie swap is accepted only when the probe proves truncation."""
     validator = _validator()
     reference = [(9, "x"), (5, "a"), (5, "b")]
     variant = [(9, "x"), (5, "a"), (5, "c")]

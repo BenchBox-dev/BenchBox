@@ -155,16 +155,16 @@ def _final_key_tied_beyond_limit(
     """True if the reference's final ORDER BY key value recurs past the LIMIT cutoff.
 
     A trailing-``LIMIT`` top-N can cut across a tie in the order key, leaving only a
-    SUBSET of the rows that share the worst-kept key value. When exactly ONE such
-    row stays visible, the truncated result alone cannot tell that legitimate
-    boundary tie apart from a deterministic unique final row, so the comparator
-    would either mask a real single-row value bug or false-positive a valid tie pick
-    (the soundness gap this probe closes). The probe supplies the missing signal: it
-    re-runs the query one row wider (``LIMIT n+1``) and reports whether the row JUST
-    past the original cutoff carries the SAME order-key value as the last row inside
-    it. If so, the final key is genuinely tied across the cutoff and a
-    single-visible-row final-group difference is an equally-valid boundary pick; if
-    not (or there is no row past the cutoff), the final row is deterministic.
+    SUBSET of the rows that share the worst-kept key value. The truncated result
+    alone cannot tell that legitimate boundary tie apart from a complete final tie
+    group whose members must match, so the comparator would either mask a real value
+    bug or false-positive a valid tie pick (the soundness gap this probe closes).
+    The probe supplies the missing signal: it re-runs the query one row wider
+    (``LIMIT n+1``) and reports whether the row JUST past the original cutoff
+    carries the SAME order-key value as the last row inside it. If so, the final key
+    is genuinely tied across the cutoff and a final-group membership difference is
+    an equally-valid boundary pick; if not (or there is no row past the cutoff), the
+    final group is complete or unproven and must match.
 
     Returns False on any condition that makes the probe unsound or impossible - an
     empty reference, an out-of-range order key, an un-rewritable ``LIMIT``, or a
