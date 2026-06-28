@@ -1,10 +1,10 @@
-"""Cross-engine plan-DAG conformance corpus and comparable-subset projection.
+"""Cross-engine plan-DAG operator-shape harmonization corpus.
 
 The raw ``plan_fingerprint`` is a PER-ENGINE within-version key and is NOT
 comparable across engines (see the decision in
-``benchbox/core/results/query_plan_models.py``). Cross-engine STRUCTURAL
-comparison is instead provided by the wrapper-stripped *comparable subset*
-projection in ``comparison.py``.
+``benchbox/core/results/query_plan_models.py``). Cross-engine operator-shape
+harmonization is instead provided by the wrapper-stripped *comparable subset*
+projection in ``comparison.py``; it is not full plan equivalence.
 
 This module:
 
@@ -16,7 +16,7 @@ This module:
 2. ``TestCrossEngineConformanceCorpus`` — a golden corpus of recorded EXPLAIN
    fixtures (no live engines). For each canonical query it asserts every engine's
    harmonized DAG meets the declared backbone invariant (e.g. exactly 2 base
-   scans, 1 join, 1 aggregate), that the comparable-subset signature is IDENTICAL
+   scans, 1 join, 1 aggregate), that the operator-shape signature is IDENTICAL
    across engines, and that the raw per-engine fingerprints remain DISTINCT.
 """
 
@@ -58,13 +58,14 @@ def _op(op_type: LogicalOperatorType, children=None) -> LogicalOperator:
 
 
 # ---------------------------------------------------------------------------
-# Cross-engine conformance corpus.
+# Cross-engine operator-shape conformance corpus.
 #
 # Each canonical query maps to (declared backbone invariant, {engine: fixture}).
 # The fixtures are the recorded EXPLAIN samples shared by the query-plan-capture
 # family; they all render the same canonical shape: an aggregate over a join of two
 # base tables. Engines differ in wrapper/exchange nodes, partial+final aggregates
 # and multi-stage sorts — the comparable-subset projection normalizes those away.
+# This is a harmonization check over operator shape, not a claim of plan equivalence.
 # ---------------------------------------------------------------------------
 
 _CORPUS: dict[str, dict] = {
@@ -265,12 +266,12 @@ class TestCrossEngineConformanceCorpus:
         )
 
     @pytest.mark.parametrize("query_id", sorted(_CORPUS))
-    def test_comparable_subset_is_identical_across_engines(self, query_id):
+    def test_operator_shape_signature_is_identical_across_engines(self, query_id):
         # Compares the reliably-cross-engine relational core (the declared invariant
         # keys: scans/joins/aggregates). Presentation operators (Sort/Limit/Window) are
         # deliberately excluded because engines surface them inconsistently in EXPLAIN
         # (e.g. Trino's fixture has a Limit, Presto/Spark have neither, others a Sort),
-        # so they are not part of the cross-engine comparable subset by design.
+        # so they are not part of the cross-engine operator-shape subset by design.
         invariant = _CORPUS[query_id]["invariant"]
         signatures = {}
         for engine, fixture in _CORPUS[query_id]["fixtures"].items():
@@ -279,14 +280,14 @@ class TestCrossEngineConformanceCorpus:
 
         distinct = set(signatures.values())
         assert len(distinct) == 1, (
-            f"Comparable-subset signatures diverged across engines for {query_id}: {signatures}. "
-            "The wrapper-stripped backbone must be identical across engines for the same query."
+            f"Operator-shape signatures diverged across engines for {query_id}: {signatures}. "
+            "The wrapper-stripped operator-shape backbone must be identical across engines for the same query."
         )
 
     @pytest.mark.parametrize("query_id", sorted(_CORPUS))
     def test_raw_fingerprints_remain_per_engine_distinct(self, query_id):
-        # The comparable subset matches across engines, but the RAW fingerprint must
-        # stay per-engine (distinct), documenting that it is not a cross-engine key.
+        # The operator-shape subset matches across engines, but the RAW fingerprint
+        # must stay per-engine (distinct), documenting that it is not a cross-engine key.
         fingerprints = {}
         for engine, fixture in _CORPUS[query_id]["fixtures"].items():
             dag = get_parser_for_platform(engine).parse_explain_output(query_id, _load(fixture))

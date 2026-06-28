@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Cross-engine comparable subset (wrapper-stripped structural backbone)
+# Cross-engine operator-shape harmonization (wrapper-stripped structural backbone)
 # ---------------------------------------------------------------------------
 #
 # The raw plan_fingerprint is a PER-ENGINE within-version key and is deliberately
@@ -39,18 +39,20 @@ logger = logging.getLogger(__name__)
 # -> Project, Spark Exchange -> Other), so the same logical query hashes differently
 # on each engine.
 #
-# This projection provides the SEPARATE, opt-in cross-engine view: it reduces a
-# harmonized DAG to its structural backbone — the relational skeleton of base
-# scans, joins, aggregates and set operations — by
+# This projection provides the SEPARATE, opt-in cross-engine operator-shape view:
+# it reduces a harmonized DAG to its structural backbone — the relational skeleton
+# of base scans, joins, aggregates and set operations — by
 #   1. dropping engine-variable wrapper nodes (Project/Filter/CTE/Subquery/Other),
 #      which carry no cross-engine-stable structural meaning, and
 #   2. collapsing a parent->child run of the SAME backbone type into one node, so a
 #      partial+final aggregate (Spark/Databend) or a multi-stage sort (Doris) counts
 #      once — the single logical operation it represents.
 #
-# The result is a multiset of backbone operator types that IS comparable across
-# engines for the same logical query. It is intentionally kept separate from the
-# raw fingerprint, which remains unchanged for within-engine regression detection.
+# The result is a multiset of backbone operator types that can be harmonized across
+# engines for the same logical query. It is intentionally weaker than plan
+# equivalence: it ignores table identity, predicates, join conditions and most
+# physical operators. It is kept separate from the raw fingerprint, which remains
+# unchanged for within-engine regression detection.
 
 # Operator types that form the cross-engine structural backbone. Everything else
 # (Project / Filter / CTE / Subquery / Other) is treated as engine-variable wrapper
@@ -107,7 +109,7 @@ def structural_backbone_counts(
     *,
     only: set[str] | frozenset[str] | None = None,
 ) -> dict[str, int]:
-    """Reduce a harmonized DAG to a cross-engine comparable multiset of backbone operators.
+    """Reduce a harmonized DAG to a cross-engine operator-shape multiset.
 
     Wrapper/engine-variable nodes (Project/Filter/CTE/Subquery/Other) are dropped. A
     parent->child run of the same *collapsible* backbone type
@@ -124,7 +126,8 @@ def structural_backbone_counts(
         root: Root of the harmonized logical operator tree.
         only: Optional set of backbone operator-type strings to restrict the result to
             (keys not present are reported as 0). Use to compare a declared invariant
-            subset (e.g. {"Scan", "Join", "Aggregate"}) across engines. Must be
+            subset (e.g. {"Scan", "Join", "Aggregate"}) across engines. This is an
+            operator-shape harmonization check, not plan equivalence. Must be
             non-empty when provided.
 
     Returns:
@@ -169,12 +172,13 @@ def comparable_subset_signature(
     *,
     only: set[str] | frozenset[str] | None = None,
 ) -> str:
-    """Deterministic string signature of the cross-engine structural backbone.
+    """Deterministic string signature of the cross-engine operator-shape backbone.
 
     Unlike ``QueryPlanDAG.plan_fingerprint`` (per-engine, not cross-engine comparable),
-    this signature is stable across engines for the same logical query because it is
+    this signature can align across engines for the same logical query because it is
     built from the wrapper-stripped, collapsed backbone. Two plans from different
-    engines that share a backbone produce the same signature.
+    engines that share a signature have the same backbone operator-shape multiset;
+    that does not prove table/predicate/condition equivalence.
 
     Args:
         root: Root of the harmonized logical operator tree.
@@ -193,11 +197,11 @@ def structural_backbones_match(
     *,
     only: set[str] | frozenset[str] | None = None,
 ) -> bool:
-    """Return True if two plans share the same cross-engine structural backbone.
+    """Return True if two plans share the same cross-engine operator-shape backbone.
 
-    This is the cross-engine equivalent of ``plan_fingerprint`` equality: it compares
-    the wrapper-stripped backbone multisets, so it is meaningful across engines for the
-    same logical query (whereas raw fingerprint equality is not).
+    This compares the wrapper-stripped backbone multisets, so it is a useful
+    cross-engine harmonization check for the same logical query. It is deliberately
+    weaker than ``plan_fingerprint`` equality and is not a plan-equivalence proof.
     """
     return structural_backbone_counts(left, only=only) == structural_backbone_counts(right, only=only)
 

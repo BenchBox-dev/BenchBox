@@ -73,7 +73,7 @@ work:
 
 - id: w4
   summary: "Strengthen or honestly relabel the cross-engine comparable subset"
-  status: pending
+  status: done
   needs: []
   notes: |
     Either add table-identity to the comparable subset and expand the conformance
