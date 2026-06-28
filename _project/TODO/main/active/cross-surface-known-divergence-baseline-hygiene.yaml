@@ -43,7 +43,7 @@ work:
 
   - id: w2
     summary: "Test both directions: stale entry fails, live entry still accepted"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Add tests: (a) a known-divergence entry whose cell now matches fails the gate

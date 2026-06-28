@@ -422,6 +422,62 @@ def test_report_with_real_divergence_still_fails_for_nonempty_query():
     assert exit_code == 1
 
 
+def test_known_divergence_baseline_fails_when_entry_is_resolved(capsys):
+    """A known-divergence entry must be removed once the live cell matches again."""
+    coverage = {"expression": 1, "pandas": 1}
+
+    exit_code = _report(
+        [],
+        total=2,
+        coverage=coverage,
+        known={"Q1_pandas": "documented test baseline"},
+        benchmark="fake",
+        reference_row_counts={"Q1": 5},
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert "GATE FAILURE - previously-known divergences now equivalent: ['Q1_pandas']" in out
+    assert "remove the stale baseline entry" in out
+
+
+def test_known_divergence_baseline_accepts_live_entry(capsys):
+    """A still-reproducing, baselined divergence remains accepted."""
+    coverage = {"expression": 1, "pandas": 1}
+
+    exit_code = _report(
+        [SurfaceDivergence("Q1", "pandas", "accepted mismatch")],
+        total=2,
+        coverage=coverage,
+        known={"Q1_pandas": "documented test baseline"},
+        benchmark="fake",
+        reference_row_counts={"Q1": 5},
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "[documented test baseline]" in out
+    assert "SQL and DataFrame surfaces are equivalent (modulo classified exceptions)." in out
+
+
+def test_known_divergence_baseline_does_not_hide_new_unclassified_divergence(capsys):
+    """An unlisted divergence is still a gate failure."""
+    coverage = {"expression": 1, "pandas": 1}
+
+    exit_code = _report(
+        [SurfaceDivergence("Q2", "pandas", "new mismatch")],
+        total=2,
+        coverage=coverage,
+        known={},
+        benchmark="fake",
+        reference_row_counts={"Q2": 5},
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert "GATE FAILURE - unclassified cross-surface divergences: ['Q2_pandas']" in out
+
+
 def test_clickbench_and_joinorder_are_enforced_gates():
     """ClickBench and joinorder_synthetic are promoted to enforced GATES (w4).
 
