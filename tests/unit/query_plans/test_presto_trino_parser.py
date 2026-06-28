@@ -164,3 +164,19 @@ class TestPrestoTrinoRegistration:
     def test_registered_for_dialect(self, dialect):
         parser = get_parser_for_platform(dialect)
         assert isinstance(parser, PrestoTrinoQueryPlanParser)
+
+
+class TestPrestoTrinoConcretePlatform:
+    def test_default_platform_is_family_name(self):
+        # Direct/registry instantiation keeps the generic family name.
+        assert PrestoTrinoQueryPlanParser().platform_name == "presto_trino"
+
+    @pytest.mark.parametrize("platform", ["presto", "trino", "starburst", "athena"])
+    def test_concrete_platform_threaded_into_dag(self, platform):
+        # The adapter threads its concrete platform name in, and it is stamped
+        # onto the captured DAG instead of the generic "presto_trino".
+        parser = PrestoTrinoQueryPlanParser(platform_name=platform)
+        assert parser.platform_name == platform
+        dag = parser.parse_explain_output("q1", _load("trino_explain_sample.json"))
+        assert dag is not None
+        assert dag.platform == platform

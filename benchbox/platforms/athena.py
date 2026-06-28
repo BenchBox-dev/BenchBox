@@ -1319,10 +1319,15 @@ class AthenaAdapter(PlatformAdapter):
             cursor.close()
 
     def get_query_plan_parser(self):
-        """Return the Presto/Trino parser (Athena uses the Presto engine)."""
+        """Return the Presto/Trino parser stamped as ``athena``.
+
+        Athena runs the Presto engine and shares the parser, but the captured
+        ``QueryPlanDAG.platform`` records the concrete ``athena`` platform rather
+        than the generic ``presto_trino`` family name.
+        """
         from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
 
-        return PrestoTrinoQueryPlanParser()
+        return PrestoTrinoQueryPlanParser(platform_name="athena")
 
     def close_connection(self, connection: Any) -> None:
         """Close Athena connection."""

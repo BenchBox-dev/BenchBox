@@ -90,6 +90,11 @@ class SparkQueryPlanParser(QueryPlanParser):
     def _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:
         if not explain_output or not explain_output.strip():
             raise ValueError("Empty EXPLAIN output")
+        # ``get_spark_query_plan`` returns an error sentinel string (not a plan)
+        # when EXPLAIN fails; reject it so the capture path records a failure
+        # instead of a bogus one-node "Other" plan / fingerprint.
+        if explain_output.lstrip().startswith(("Failed to get query plan", "Could not get query plan")):
+            raise ValueError("EXPLAIN returned an error message, not a plan")
 
         physical_text = self._extract_physical_section(explain_output)
         parsed_nodes = self._parse_lines(physical_text)

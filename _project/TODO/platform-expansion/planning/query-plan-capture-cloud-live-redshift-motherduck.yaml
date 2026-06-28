@@ -96,10 +96,16 @@ work:
         env:
           REDSHIFT_HOST: ${{ secrets.REDSHIFT_HOST }}
           ... (all names from w1)
-      Run: uv run -- python -m pytest
-             tests/integration/platforms/test_redshift_live.py
-             tests/integration/platforms/test_motherduck_live.py
-             -m "live_redshift or live_motherduck" --tb=short -v
+      Run ONLY the plan-capture classes added in w2/w3, not the whole marked
+      modules — selecting the modules with -m "live_redshift or live_motherduck"
+      would also run the heavy TPC-H load / S3 COPY / warehouse-cost live tests
+      in those files and violate the SELECT-1 / billing guardrail below:
+        uv run -- python -m pytest
+          "tests/integration/platforms/test_redshift_live.py::TestLiveRedshiftQueryPlanCapture"
+          "tests/integration/platforms/test_motherduck_live.py::TestLiveMotherDuckQueryPlanCapture"
+          -m "live_redshift or live_motherduck" --tb=short -v
+      (Node-id selection keeps the markers as a secondary safety filter so the
+      classes still skip cleanly when credentials are absent.)
       Job must NOT use continue-on-error: nightly is where persistent
       failures surface (same posture as postgres-integration in nightly).
       When secrets are unset the env vars are empty strings and the conftest

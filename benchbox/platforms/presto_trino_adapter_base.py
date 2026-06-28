@@ -648,10 +648,15 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             cursor.close()
 
     def get_query_plan_parser(self):
-        """Return the Presto/Trino parser (inherited by Presto and Starburst)."""
+        """Return the Presto/Trino parser (inherited by Presto and Starburst).
+
+        Thread the concrete ``platform_key`` (presto / trino / starburst) into the
+        parser so the captured ``QueryPlanDAG.platform`` records the real engine
+        rather than the generic ``presto_trino`` family name.
+        """
         from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
 
-        return PrestoTrinoQueryPlanParser()
+        return PrestoTrinoQueryPlanParser(platform_name=self.platform_key or "presto_trino")
 
     def execute_query(
         self,

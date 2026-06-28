@@ -233,7 +233,12 @@ def _create_default_registry() -> ParserRegistry:
     registry.register("sqlite", "0.0.0", SQLiteQueryPlanParser)
 
     # Register ClickHouse parser (local, server, and cloud modes share it).
-    registry.register("clickhouse", "0.0.0", ClickHouseQueryPlanParser)
+    # The legacy "clickhouse" key plus the concrete platform identifiers
+    # (clickhouse-local / clickhouse-server / clickhouse-cloud) all resolve to
+    # the same parser, so a direct get_parser_for_platform() lookup works for
+    # every deployment mode without relying on an adapter override.
+    for _ch_key in ("clickhouse", "clickhouse-local", "clickhouse-server", "clickhouse-cloud"):
+        registry.register(_ch_key, "0.0.0", ClickHouseQueryPlanParser)
 
     # Register Presto / Trino family parser (shared EXPLAIN FORMAT JSON dialect).
     # Starburst is Trino-compatible; Athena uses the Presto engine.
