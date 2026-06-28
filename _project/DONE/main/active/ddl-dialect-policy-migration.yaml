@@ -2,7 +2,8 @@ id: ddl-dialect-policy-migration
 title: "Migrate residual literal-dialect policy out of metadata_primitives/ddl.py rendering into sql_compat capability data"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-06-28"
 category: Code Quality and Technical Debt
 
 description: |
