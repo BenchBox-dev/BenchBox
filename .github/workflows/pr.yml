@@ -328,6 +328,12 @@ jobs:
       - name: Release curation list drift check
         run: uv run -- python scripts/check_release_curation.py
 
+      - name: skill-sync tracked snapshot verify (cloud/CI integrity gate)
+        # Public tool, pinned by sha (no token). Proves .claude/skills matches
+        # skill-sync.lock + the regenerated config — fails on any hand-edit or
+        # stale snapshot. Switch to `npx -y skill-sync@<ver>` once published.
+        run: npx -y github:joeharris76/skill-sync#d3c9c45 verify --project .
+
   code-test:
     name: test (ubuntu-latest, 3.12)
     needs: ci-paths
