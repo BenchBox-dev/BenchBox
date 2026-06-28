@@ -7,6 +7,7 @@
       "dual_surface": false,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -21,7 +22,8 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "self-referential",
+      "independence": "separate-handwritten",
+      "independence_rationale": "Expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators.",
       "oracles": [
         "cross-surface"
       ],
@@ -39,7 +41,8 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "self-referential",
+      "independence": "mixed-provenance",
+      "independence_rationale": "Most ClickBench DataFrame cells are generated from shared compact specs, with a small set of bespoke implementations; read as mixed provenance, not fully independent implementations.",
       "oracles": [
         "cross-surface"
       ],
@@ -57,7 +60,8 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "self-referential",
+      "independence": "separate-handwritten",
+      "independence_rationale": "Expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators.",
       "oracles": [
         "cross-surface"
       ],
@@ -76,6 +80,7 @@
       "dual_surface": true,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -92,6 +97,7 @@
       "dual_surface": true,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -107,7 +113,8 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "self-referential",
+      "independence": "separate-handwritten",
+      "independence_rationale": "H2O-DB expression and pandas DataFrame implementations are separately handwritten for each query.",
       "oracles": [
         "cross-surface"
       ],
@@ -126,6 +133,7 @@
       "dual_surface": true,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -141,7 +149,8 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "self-referential",
+      "independence": "shared-spec",
+      "independence_rationale": "Both DataFrame families are generated through shared JoinOrder translation helpers, so the gate primarily catches SQL-vs-generated-DataFrame transcription drift.",
       "oracles": [
         "cross-surface"
       ],
@@ -160,6 +169,7 @@
       "dual_surface": true,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -176,6 +186,7 @@
       "dual_surface": true,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -191,7 +202,8 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "self-referential",
+      "independence": "mixed-provenance",
+      "independence_rationale": "Read Primitives combines explicit family implementations with factory-built/query-catalog implementations, so provenance is mixed rather than wholly independent.",
       "oracles": [
         "cross-surface"
       ],
@@ -209,7 +221,8 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "self-referential",
+      "independence": "shared-spec",
+      "independence_rationale": "Both DataFrame backends are generated from compact SSB query metadata; the independent signal is SQL text versus the shared generated DataFrame spec.",
       "oracles": [
         "cross-surface"
       ],
@@ -228,6 +241,7 @@
       "dual_surface": true,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -244,6 +258,7 @@
       "dual_surface": true,
       "guarded": true,
       "independence": "semi-independent",
+      "independence_rationale": "External TPC answer sets provide row-count authority only; result values are not checked.",
       "oracles": [
         "expected-results"
       ],
@@ -262,6 +277,7 @@
       "dual_surface": true,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -278,6 +294,7 @@
       "dual_surface": true,
       "guarded": true,
       "independence": "self-referential",
+      "independence_rationale": "Reference is a shared/generated surface or frozen benchbox snapshot, not an external authority.",
       "oracles": [
         "expected-results"
       ],
@@ -296,6 +313,7 @@
       "dual_surface": true,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -312,6 +330,7 @@
       "dual_surface": true,
       "guarded": true,
       "independence": "self-referential",
+      "independence_rationale": "Reference is a shared/generated surface or frozen benchbox snapshot, not an external authority.",
       "oracles": [
         "variant-equivalence",
         "cross-surface-variant"
@@ -331,6 +350,7 @@
       "dual_surface": true,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -347,6 +367,7 @@
       "dual_surface": true,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -363,6 +384,7 @@
       "dual_surface": false,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",
@@ -378,6 +400,7 @@
       "dual_surface": true,
       "guarded": false,
       "independence": "\u2014",
+      "independence_rationale": "\u2014",
       "oracles": [],
       "primary_oracle": "NONE",
       "scale": "\u2014",

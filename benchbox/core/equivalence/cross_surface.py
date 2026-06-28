@@ -95,6 +95,15 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # gated benchmark, never a full platform matrix).
 EQUIVALENCE_SCALE = 0.1
 
+SURFACE_INDEPENDENCE_SHARED_SPEC = "shared-spec"
+SURFACE_INDEPENDENCE_MIXED = "mixed-provenance"
+SURFACE_INDEPENDENCE_SEPARATE = "separate-handwritten"
+
+_DEFAULT_SURFACE_INDEPENDENCE_RATIONALE = (
+    "SQL and DataFrame surfaces are maintained from a shared benchmark spec; the gate catches "
+    "transcription drift between surfaces, not shared conceptual mistakes."
+)
+
 # Captures a trailing ``LIMIT n`` so it can be both DETECTED (truncated top-N) and
 # REWRITTEN one row wider (the boundary-tie probe). Group 1 is ``limit `` (original
 # case/spacing), group 2 the integer, group 3 any OFFSET / statement terminator /
@@ -384,6 +393,8 @@ class CrossSurfaceGate:
     legitimately_empty: dict[Any, str] = field(default_factory=dict)
     backends: tuple[str, ...] = DATAFRAME_BACKENDS
     tolerance: float = 1e-10
+    surface_independence: str = SURFACE_INDEPENDENCE_SHARED_SPEC
+    surface_independence_rationale: str = _DEFAULT_SURFACE_INDEPENDENCE_RATIONALE
     # Comparator widening is strict by default. Enable these only for a gate with
     # documented engine decode behavior that otherwise reports presentational
     # NULL/CHAR differences rather than logical result differences.
@@ -1218,9 +1229,34 @@ _READ_PRIMITIVES_LEGITIMATELY_EMPTY: dict[Any, str] = {
 # to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
 # belong here (registering a red gate here would be coverage theater).
 GATES: dict[str, CrossSurfaceGate] = {
-    "ssb": CrossSurfaceGate(name="ssb", build=build_ssb_duckdb),
-    "amplab": CrossSurfaceGate(name="amplab", build=build_amplab_duckdb, legitimately_empty=_AMPLAB_LEGITIMATELY_EMPTY),
-    "coffeeshop": CrossSurfaceGate(name="coffeeshop", build=build_coffeeshop_duckdb),
+    "ssb": CrossSurfaceGate(
+        name="ssb",
+        build=build_ssb_duckdb,
+        surface_independence=SURFACE_INDEPENDENCE_SHARED_SPEC,
+        surface_independence_rationale=(
+            "Both DataFrame backends are generated from compact SSB query metadata; the independent "
+            "signal is SQL text versus the shared generated DataFrame spec."
+        ),
+    ),
+    "amplab": CrossSurfaceGate(
+        name="amplab",
+        build=build_amplab_duckdb,
+        legitimately_empty=_AMPLAB_LEGITIMATELY_EMPTY,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "Expression and pandas DataFrame implementations are separately handwritten for each query, "
+            "so the gate has stronger cross-implementation signal than shared-spec generators."
+        ),
+    ),
+    "coffeeshop": CrossSurfaceGate(
+        name="coffeeshop",
+        build=build_coffeeshop_duckdb,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "Expression and pandas DataFrame implementations are separately handwritten for each query, "
+            "so the gate has stronger cross-implementation signal than shared-spec generators."
+        ),
+    ),
     # Promoted from STAGED_GATES once the two cross-cutting prerequisites landed:
     # w9 (loader applies schema column TYPES + DuckDB empty-string semantics) made
     # joinorder_synthetic 26/26 and cleared ClickBench Q17/Q24; w8 (tie-aware
@@ -1235,8 +1271,21 @@ GATES: dict[str, CrossSurfaceGate] = {
             "Q18_pandas": _CLICKBENCH_TIE_AMBIGUOUS,
         },
         legitimately_empty=_CLICKBENCH_LEGITIMATELY_EMPTY,
+        surface_independence=SURFACE_INDEPENDENCE_MIXED,
+        surface_independence_rationale=(
+            "Most ClickBench DataFrame cells are generated from shared compact specs, with a small set "
+            "of bespoke implementations; read as mixed provenance, not fully independent implementations."
+        ),
     ),
-    "joinorder_synthetic": CrossSurfaceGate(name="joinorder_synthetic", build=build_joinorder_synthetic_duckdb),
+    "joinorder_synthetic": CrossSurfaceGate(
+        name="joinorder_synthetic",
+        build=build_joinorder_synthetic_duckdb,
+        surface_independence=SURFACE_INDEPENDENCE_SHARED_SPEC,
+        surface_independence_rationale=(
+            "Both DataFrame families are generated through shared JoinOrder translation helpers, so the "
+            "gate primarily catches SQL-vs-generated-DataFrame transcription drift."
+        ),
+    ),
     # H2O-DB's generator base is the published 10M-row small tier, so the shared
     # EQUIVALENCE_SCALE (0.1) would generate ~1M rows - far from a cheap bounded
     # cell. Run this gate on a smaller cell (~100k rows, comparable to ClickBench's
@@ -1245,6 +1294,10 @@ GATES: dict[str, CrossSurfaceGate] = {
         name="h2odb",
         build=build_h2odb_duckdb,
         known_divergences=_H2ODB_KNOWN_DIVERGENCES,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "H2O-DB expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
         scale_factor=_H2ODB_SCALE,
     ),
     # Read Primitives: a 152-query DataFrame surface vs its DuckDB-dialect SQL
@@ -1264,6 +1317,11 @@ GATES: dict[str, CrossSurfaceGate] = {
         # columns (for example MAP lookup misses and LEAD/LAG frame edges). Keep
         # the global comparator strict; opt in only for this gate's decode path.
         treat_nan_as_null=True,
+        surface_independence=SURFACE_INDEPENDENCE_MIXED,
+        surface_independence_rationale=(
+            "Read Primitives combines explicit family implementations with factory-built/query-catalog "
+            "implementations, so provenance is mixed rather than wholly independent."
+        ),
         scale_factor=_READ_PRIMITIVES_SCALE,
     ),
 }
