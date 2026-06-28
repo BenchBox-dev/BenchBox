@@ -111,6 +111,20 @@ The standard gates are intentionally split by the risk they are meant to catch:
     Q1 aggregate, a swapped column, a changed rounding — turns the gate RED, not just
     a wrong row count. Sensitivity is proven in
     `tests/unit/test_correctness_gate_value_oracle.py`.
+  - **Regression snapshot, NOT an independent oracle**: the reference digests were
+    produced by running benchbox-on-DuckDB and frozen, so the value check detects
+    *change* from that DuckDB-pinned baseline (a regression tripwire), not correctness
+    against an external authority. A conceptual value bug present at *freeze time* is
+    enshrined in the reference, not caught. Read a green `value+cardinality` cell as
+    "unchanged from the frozen DuckDB answer", never "values proven correct". The
+    reference is regenerated (never hand-copied) by `make correctness-gate-digests-regen`,
+    which reruns the same gate config and writes the file idempotently. The independence
+    gap and the deferred cross-engine upgrade are analyzed in
+    `_project/analysis/value-digest-cross-engine-independence-decision.md`. Two further
+    fidelity properties are pinned in `test_correctness_gate_value_oracle.py`: the
+    sensitivity floor is **relative** (~1e-6 per cell via significant-figure rounding,
+    uniform across column magnitude), and the digest is a **value+type** digest
+    (DuckDB-pinned), which is why cross-engine reuse is deferred.
   - **Values are UNGUARDED above SF=1**: stored answers and digests exist only at
     SF=1 (the expected-results loader raises for other scales), so the value
     guarantee holds at SF=1 only. There is no expected-results value or cardinality

@@ -43,3 +43,40 @@ current `develop`:
 The rule for any generated artifact that has a drift/`--check` guard: **never put a
 volatile value (git SHA, timestamp) inside the compared body** — put it in a region
 the comparison strips or normalizes, or the guard will fail on every commit.
+
+### Squash-merge orphans a PR-branch SHA — do not stamp it as provenance
+
+A provenance SHA is only useful if a reader can resolve it later. **Squash-merge
+discards every PR-branch commit**: when a PR lands as a single squashed commit on
+`develop`, the PR-branch HEAD that was current at generation time becomes
+unreachable from any ref (`git cat-file` reports "bad object"). A generated artifact
+that stamped `revision: <PR-branch HEAD>` therefore points at a commit that no longer
+exists. (Reproduced on `oracle-coverage-map.md`, whose `revision: ddd96c47…` stamp
+was orphaned by the squash that landed #867 as `e4a04484`; the same squash-orphaning
+is why review briefs sometimes cite pre-squash merge SHAs that are absent on develop.)
+
+Rule for provenance stamps on generated analysis artifacts: **use a value that
+survives a squash** — a develop-reachable SHA (e.g. the merge-base with
+`origin/develop`), a **content hash** of the generated body, or a plain
+"regenerate to verify" note — never the volatile PR-branch HEAD. The stamp still must
+live in the drift-ignored region (above), so it never churns `--check`.
+`oracle-coverage-map.md` now stamps a content hash of its own body plus a
+regenerate-to-verify instruction instead of a branch SHA.
+
+## Self-snapshot vs independent oracle — do not over-read a green value gate
+
+A "value-level" or "value+cardinality" correctness gate is only as strong as its
+reference. When the reference was produced by running the system under test and frozen
+(e.g. the TPC-H value digests in
+`benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json`, a
+frozen benchbox-on-DuckDB snapshot), the gate is a **regression snapshot vs a pinned
+baseline**, not an independent correctness oracle: it catches *change* from the frozen
+answer, but a conceptual value bug present at *freeze time* is enshrined, not caught.
+
+When reviewing or describing such a gate, state plainly whether its reference is
+**independent** of the system under test or **self-referential** (a frozen self-snapshot
+or a cross-surface comparison that shares a spec). The oracle coverage map carries this
+as an explicit `Independence` column (`independent` / `semi-independent` /
+`self-referential`) so a reader cannot mistake a green self-referential cell for proof
+of value correctness. Do not let a green "value-level" cell imply "values proven correct
+against an authority" when the authority is the system itself.
