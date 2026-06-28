@@ -2,7 +2,8 @@ id: cross-surface-comparator-complete-final-tie-group-soundness
 title: "Cross-surface comparator: close the >=2 final-tie-group gap for a complete (non-truncated) final tie"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-06-28"
 category: Testing and Quality Assurance
 
 description: |
