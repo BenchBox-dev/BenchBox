@@ -54,14 +54,14 @@ STRENGTH_CARDINALITY = "cardinality-only"  # row counts only (expected-results w
 STRENGTH_VALUE_AND_CARDINALITY = "value+cardinality"  # row counts AND stored value digests
 STRENGTH_NONE = "—"
 
-# Oracle REFERENCE-INDEPENDENCE: whether a guarded cell compares against a reference
-# INDEPENDENT of the system under test, or against ITSELF. This is ORTHOGONAL to
-# Strength (a value-level oracle can be independent or self-referential), so it is a
-# SEPARATE column, never folded into Strength. Derived from the oracle KIND + the
-# digest provenance, never hand-labelled per benchmark:
-#   * cross-surface / variant gates: the SQL surface is the reference for its OWN
-#     DataFrame/variant surface (shared spec), so the comparison is self-referential
-#     -- it catches transcription bugs between surfaces, not conceptual value bugs.
+# Oracle REFERENCE-INDEPENDENCE: how independent the guarded reference is from the
+# implementation under test. This is ORTHOGONAL to Strength (a value-level oracle
+# can still be weak), so it is a SEPARATE column, never folded into Strength.
+# Derived from live source metadata, never hand-labelled in the generated artifact:
+#   * cross-surface gates: per-gate ``CrossSurfaceGate.surface_independence`` and
+#     rationale (shared-spec, mixed-provenance, or separate-handwritten).
+#   * variant gates: canonical/variant surfaces from the same BenchBox family, so
+#     they remain self-referential.
 #   * expected-results VALUE digests (tpch): a frozen benchbox-on-DuckDB snapshot, so
 #     the value axis is self-referential (a regression snapshot, not an authority).
 #   * expected-results ROW COUNTS (tpch/tpcds cardinality): the cardinalities come
