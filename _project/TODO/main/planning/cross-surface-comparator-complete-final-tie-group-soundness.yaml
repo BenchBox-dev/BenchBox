@@ -1,7 +1,7 @@
 id: cross-surface-comparator-complete-final-tie-group-soundness
 title: "Cross-surface comparator: close the >=2 final-tie-group gap for a complete (non-truncated) final tie"
 worktree: main
-priority: Low
+priority: Medium
 status: Not Started
 category: Testing and Quality Assurance
 
@@ -43,6 +43,12 @@ description: |
   site. Closing it is a deliberate, separately-scoped change (below), not a
   drive-by, because it alters the #872/#878 established semantics and forces a
   test + cost change.
+
+  Priority raised Low -> Medium (2026-06-28, holistic-review remediation): for a
+  benchmark tool, false confidence in a correctness gate is the worst outcome, so a
+  documented masked-value-bug path in the comparator warrants Medium and should be
+  closed before the next published cross-platform comparison claim. (The fix is
+  already scoped in w1; this is the only change to this item.)
 
 prior_art:
   - ref: "PR #872"

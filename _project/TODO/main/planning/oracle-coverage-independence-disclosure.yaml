@@ -1,0 +1,76 @@
+id: oracle-coverage-independence-disclosure
+title: "Disclose per-gate oracle independence strength in the coverage map (strong vs self-referential)"
+worktree: main
+priority: Medium
+status: Not Started
+category: Documentation
+
+description: |
+  The cross-surface gates are honestly documented per-benchmark, but the campaign
+  headline ("N benchmarks gated") hides that the gates are not equally strong
+  oracles. For DSL-generated benchmarks (SSB, ~40/43 ClickBench), both DataFrame
+  backends are generated from ONE spec, so the only independent signal is
+  SQL-vs-spec - a weaker check than SQL-vs-independent-handwritten-DataFrame (e.g.
+  CoffeeShop's hand-written impls). A reader who sees "guarded" may infer an
+  independent cross-check that, for several gates, does not exist.
+
+  Relatedly, the oracle coverage map already reports "guarded" on REGISTRATION, with
+  an Enforced column distinguishing enforced (CI-blocking) vs staged; surface the
+  independence dimension in the same table so "guarded" cannot be misread as
+  "independently verified".
+
+prior_art:
+  - ref: "_project/scripts/generate_oracle_coverage_map.py:340"
+    note: "The Enforced column / table generation - add an independence-strength column here, derived from each gate's surface provenance."
+  - ref: "benchbox/core/equivalence/cross_surface.py:11"
+    note: "Module docstring already states reference-independence caveats per benchmark - lift that into structured per-gate metadata the map can render."
+  - ref: "_project/analysis/oracle-coverage-map.json"
+    note: "The generated artifact whose schema gains the independence field; regenerate and commit after the change."
+
+work:
+  - id: w1
+    summary: "Classify each gate's independence strength and render it in the coverage map"
+    status: pending
+    needs: []
+    notes: |
+      Add a per-gate independence rating (e.g. strong = SQL vs independent
+      hand-written DataFrame; weak = SQL vs shared DSL spec) with a one-line
+      rationale, derived from each gate's surface provenance. Render it as a column
+      in generate_oracle_coverage_map.py output alongside the existing Enforced
+      column, and regenerate _project/analysis/oracle-coverage-map.json. Keep the
+      drift-guard (--check) green after regeneration.
+
+  - id: w2
+    summary: "Update the --check test and any narrative docs to include the new column"
+    status: pending
+    needs: [w1]
+    notes: |
+      Update tests/unit/test_oracle_coverage_map.py (and the map's narrative, if any)
+      so the independence column is covered by the drift guard. Do not weaken the
+      existing reference-independence disclosures in the gate docstrings - this
+      structures and surfaces them, it does not replace them.
+
+must_preserve:
+  - "The existing coverage-map drift guard (--check) stays green after regeneration."
+  - "Per-benchmark reference-independence docstrings remain; this surfaces them, not removes them."
+
+verification:
+  - description: "Coverage map shows independence strength and drift guard passes"
+    command: "make oracle-coverage-map && make oracle-coverage-map-check"
+    expected_output: "map includes an independence-strength column per gate; --check passes"
+
+scope_limit:
+  only_modify:
+    - "_project/scripts/generate_oracle_coverage_map.py"
+    - "_project/analysis/"
+    - "benchbox/core/equivalence/"
+    - "tests/"
+
+success_metrics:
+  - "A reader of the coverage map can tell, per gate, whether it is an independent cross-check or a self-referential (shared-spec) one."
+
+metadata:
+  tags: [equivalence, documentation, oracle, disclosure]
+  estimated_effort: "Small"
+  created_date: "2026-06-28"
+  last_updated: "2026-06-28T00:00:00"

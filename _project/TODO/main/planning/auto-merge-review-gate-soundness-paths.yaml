@@ -1,0 +1,76 @@
+id: auto-merge-review-gate-soundness-paths
+title: "Require a review pass before squash-auto-merge for soundness-critical paths (comparator + plan parsers)"
+worktree: main
+priority: Medium
+status: Not Started
+category: Process and Workflow
+
+description: |
+  Nine numbered "PR review follow-up sweep" PRs landed this month fixing REAL
+  defects on already-merged PRs - including comparator-soundness holes in a
+  correctness gate (e.g. #862: the tie-aware comparator used a constant/literal
+  column as the boundary-tie key, letting an arbitrary row-swap pass; #872/#878:
+  unconditional multiset acceptance in the final ORDER BY group; #894: a Spark
+  parser accepting an EXPLAIN-failure sentinel as a one-node plan). These landed up
+  to ~3 weeks after merge because squash-auto-merge-on-CI-green makes human review a
+  post-merge activity, not a merge precondition.
+
+  Escaped defects cluster in a small set of files: the result comparator and the
+  query-plan parsers. Require one approving review for PRs touching those paths
+  before auto-merge, while leaving the cheap-merge default intact for everything
+  else.
+
+prior_art:
+  - ref: ".github/CODEOWNERS (if present) / GitHub branch protection on develop"
+    note: "The mechanism to require review on specific paths; if no CODEOWNERS exists, add one scoped to the soundness paths."
+  - ref: "Makefile (pr-open target) / CLAUDE.md 'squash auto-merge is the default'"
+    note: "make pr-open enables auto-merge automatically; it must NOT enable auto-merge when the diff touches the soundness paths."
+  - ref: "benchbox/core/tpchavoc/validation.py, benchbox/core/equivalence/, benchbox/core/query_plans/parsers/"
+    note: "The escaped-defect-dense paths to gate."
+
+work:
+  - id: w1
+    summary: "Add CODEOWNERS / branch-protection requiring one review on the soundness paths"
+    status: pending
+    needs: []
+    notes: |
+      Add a CODEOWNERS entry (and/or document the branch-protection rule) requiring
+      one approving review for PRs touching benchbox/core/**/validation.py,
+      benchbox/core/equivalence/**, and benchbox/core/query_plans/parsers/**. Keep
+      all other paths on the existing auto-merge default.
+
+  - id: w2
+    summary: "Make pr-open skip auto-merge when the diff touches a soundness path"
+    status: pending
+    needs: [w1]
+    notes: |
+      Adjust the pr-open flow so it does NOT auto-enable squash auto-merge when the
+      changed files intersect the soundness paths (diff --name-only against the path
+      set). For those PRs, open without auto-merge so the required review gates the
+      merge. Document the behavior in AGENTS.md/CLAUDE.md in the terse house style.
+
+must_preserve:
+  - "The cheap squash-auto-merge default is unchanged for all non-soundness paths."
+  - "No change to CI checks themselves; this adds a human-review precondition for a narrow path set."
+
+verification:
+  - description: "A PR touching the comparator requires review and does not auto-merge"
+    command: "open a test PR touching benchbox/core/tpchavoc/validation.py via the pr-open flow"
+    expected_output: "auto-merge NOT enabled; one approving review required before merge"
+
+scope_limit:
+  only_modify:
+    - ".github/"
+    - "Makefile"
+    - "_project/scripts/"
+    - "AGENTS.md"
+    - "CLAUDE.md"
+
+success_metrics:
+  - "PRs touching the comparator or plan parsers cannot squash-auto-merge without a review; everything else stays on the fast default."
+
+metadata:
+  tags: [process, review, ci, auto-merge, soundness]
+  estimated_effort: "Medium"
+  created_date: "2026-06-28"
+  last_updated: "2026-06-28T00:00:00"

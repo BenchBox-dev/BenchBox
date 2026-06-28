@@ -1,0 +1,86 @@
+id: structural-debt-base-layer-tpc-and-module-split
+title: "Structural debt: extract TPC harnesses out of platforms/base/execution.py and split the cross_surface god-module"
+worktree: main
+priority: Low
+status: Not Started
+category: Code Quality and Technical Debt
+
+description: |
+  Two structural smells confirmed on develop @ cb49cecf5. Neither is a defect (the
+  code works); both are maintainability/bus-factor debt, scheduled after the
+  release-risk and correctness fixes.
+
+  1. Benchmark identity leaks into the supposedly-agnostic base layer.
+     benchbox/platforms/base/execution.py:124 hardcodes TPC-specific harnesses
+     (_execute_tpch_power_test / _execute_tpcds_power_test with literal
+     benchmark_type="tpch"/"tpcds" and TPC-specific iteration constants). Generic
+     benchmarks already funnel through _execute_generic_power_test, so the
+     abstraction is two-tier and the TPC knowledge should live in core/{tpch,tpcds}/
+     behind a capability/protocol the base dispatches to. This leak GREW this month.
+
+  2. cross_surface.py is trending toward a god-module (~1,166 LOC) mixing comparator
+     wiring, six near-duplicate build_*_duckdb builders (:609-835, with the
+     empty-table guard inlined in three of them at :683/:727/:773 instead of shared),
+     classification constants, and reporting. Four function-local
+     `from benchbox.platforms.duckdb import DuckDBAdapter` imports (:590/:676/:721/
+     :767) paper over the layering.
+
+prior_art:
+  - ref: "benchbox/platforms/base/execution.py:124, _execute_generic_power_test"
+    note: "The TPC-specific harnesses vs the generic path - the generic path is the model; push TPC semantics down to core/{tpch,tpcds}/ behind a protocol."
+  - ref: "benchbox/core/equivalence/cross_surface.py:577 (_load_duckdb_cell)"
+    note: "Already factors some load-and-verify boilerplate; route clickbench/coffeeshop/joinorder builders through it instead of inlining the empty-table guard."
+  - ref: "benchbox/core/query_plans/ (parser registry + base ABC + one file per platform)"
+    note: "The plug-in decomposition pattern to emulate when splitting cross_surface.py per-benchmark builders."
+
+work:
+  - id: w1
+    summary: "Extract the TPC power-test harnesses out of platforms/base/execution.py"
+    status: pending
+    needs: []
+    notes: |
+      Move _execute_tpch_power_test / _execute_tpcds_power_test and their TPC
+      literals/constants into core/{tpch,tpcds}/ (or a TPC capability module) and
+      have the base layer dispatch via a capability/protocol so it carries no literal
+      benchmark names. Keep behavior byte-identical (TPC power-test results unchanged).
+      Add a test asserting the base layer's literal-benchmark-name references trend
+      to ~0 in the dispatch path.
+
+  - id: w2
+    summary: "Split cross_surface.py: extract per-benchmark builders, share the empty-table guard"
+    status: pending
+    needs: []
+    notes: |
+      Extract the six build_*_duckdb builders into per-benchmark modules and route
+      the inlined empty-table checks (:683/:727/:773) through _load_duckdb_cell so
+      they cannot drift. Keep the comparator wiring in the core module. Remove the
+      four function-local DuckDBAdapter imports by resolving the layering properly.
+      No behavior change; all gates stay green.
+
+must_preserve:
+  - "TPC-H/TPC-DS power-test execution results are byte-identical after w1."
+  - "All cross-surface gates stay green after w2; the comparator is reused, not forked."
+
+anti_patterns:
+  - "DO NOT change benchmark execution semantics - this is a relocation/decomposition refactor only."
+
+verification:
+  - description: "Behavior unchanged after both refactors"
+    command: "make test-fast && make ssb-cross-surface-equivalence-report"
+    expected_output: "tests green; gates 0 divergent; TPC power-test output unchanged"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/execution.py"
+    - "benchbox/core/"
+    - "tests/"
+
+success_metrics:
+  - "platforms/base/execution.py carries no literal TPC benchmark names in its dispatch path."
+  - "cross_surface.py builders live per-benchmark and share one empty-table guard."
+
+metadata:
+  tags: [technical-debt, refactor, architecture, bus-factor]
+  estimated_effort: "Large"
+  created_date: "2026-06-28"
+  last_updated: "2026-06-28T00:00:00"
