@@ -67,7 +67,7 @@ work:
 
 - id: w3
   summary: "Prove the gate catches a planted plan-capture defect (no silent green)"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Demonstrate the gate FAILS when a plan-capture defect is planted (e.g. a

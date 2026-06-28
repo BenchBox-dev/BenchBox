@@ -8,6 +8,7 @@ fingerprints are stable, and write statements are not double-executed by capture
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -83,8 +84,27 @@ def _row_count(connection: Any, sql: str) -> int:
     return int(connection.execute(sql).fetchone()[0])
 
 
-def test_plan_capture_gate_parses_plans_and_stabilizes_fingerprints(engine_case) -> None:
+def _plant_defect_if_requested(monkeypatch: pytest.MonkeyPatch, adapter: Any) -> None:
+    defect = os.environ.get("BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT")
+    if defect in (None, ""):
+        return
+    if defect != "drop_fingerprint":
+        raise AssertionError(f"unknown planted plan-capture defect: {defect}")
+
+    original_capture = adapter.capture_query_plan
+
+    def broken_capture_query_plan(*args: Any, **kwargs: Any) -> tuple[Any, float]:
+        plan, capture_ms = original_capture(*args, **kwargs)
+        if plan is not None:
+            plan.plan_fingerprint = None
+        return plan, capture_ms
+
+    monkeypatch.setattr(adapter, "capture_query_plan", broken_capture_query_plan)
+
+
+def test_plan_capture_gate_parses_plans_and_stabilizes_fingerprints(engine_case, monkeypatch) -> None:
     case, adapter, connection = engine_case
+    _plant_defect_if_requested(monkeypatch, adapter)
 
     first = run_plan_capture_phase(adapter, case.queries, connection=connection)
     second = run_plan_capture_phase(adapter, case.queries, connection=connection)
