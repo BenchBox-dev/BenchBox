@@ -22,7 +22,10 @@ skills:
   - skill-sync
   - tidy-perms
 targets:
-  claude: .claude/skills
+  claude:
+    dir: .claude/skills
+    tracked: true
+    ignore: [blog]
   codex: .codex/skills
   gemini: .gemini/skills
   antigravity: .antigravity/skills

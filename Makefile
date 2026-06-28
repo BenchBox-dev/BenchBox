@@ -39,7 +39,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-verify skill-sync-lock-audit mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -637,11 +637,12 @@ lint-explorer-stale-theme:
 artifact-hygiene:
 	uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
 
-# skill-sync — materialize project-local skill mirrors from ~/.skill-sync/skills.
-# Manifest is tracked (skill-sync.yaml/skill-sync.lock); the materialized
-# .claude/skills, .codex/skills, .gemini/skills are gitignored and regenerated
-# locally per developer. Override SKILL_SYNC to point at a different install
-# (e.g. an npm-installed copy).
+# skill-sync — materialize project-local skills from ~/.skill-sync/skills.
+# Manifest is tracked (skill-sync.yaml/skill-sync.lock). The `claude` target
+# (.claude/skills) is a TRACKED snapshot committed for cloud/CI parity — verify
+# it with `make skill-sync-verify`. The codex/gemini/antigravity mirrors stay
+# gitignored and are regenerated locally per developer. Override SKILL_SYNC to
+# point at a different install (e.g. an npm-installed copy).
 SKILL_SYNC ?= /Users/joe/Developer/skill-sync/dist/cli/index.js
 
 skill-sync:
@@ -657,6 +658,18 @@ skill-sync-check:
 		node "$(SKILL_SYNC)" doctor; \
 	else \
 		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
+	fi
+
+# skill-sync-verify — offline integrity gate for the tracked snapshot (CI/local).
+# Proves .claude/skills matches skill-sync.lock + the regenerated config; exits
+# non-zero on any hand-edit, stray file, or stale config. Skips when the CLI is
+# absent (e.g. cloud/CI without skill-sync) — the committed snapshot is plain
+# files and needs skill-sync only to be *verified*, not to be consumed.
+skill-sync-verify:
+	@if [ -f "$(SKILL_SYNC)" ]; then \
+		node "$(SKILL_SYNC)" verify; \
+	else \
+		echo "skill-sync not installed at $(SKILL_SYNC); skipping verify (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
 	fi
 
 # Review helper for PRs that modify skill-sync.lock while .claude/skills is gitignored.
@@ -980,7 +993,7 @@ release-cut:
 	@# staged-for-add by a later git add.
 	@# Curation list: A3 of _project/decisions/single-repo-migration.md.
 	-git rm -rf _project _blog results-data results-explorer .claude .codex .gemini
-	-git rm -f .pre-commit-config.yaml todo.config.yaml skill-sync.yaml skill-sync.lock .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
+	-git rm -f .pre-commit-config.yaml todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
 	-git rm -f .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
 	@# Stage only the files update_version.py + generate_changelog_entry.py write.
 	@# Explicit list (not `git add -A`) to avoid staging build/cache artifacts.

@@ -1,0 +1,201 @@
+# YAML template for authoring TODO entries in the distributed TODO system
+#
+# Fill in each section with task-specific content and remove any unused keys.
+#
+# Location: {todo_root}/{worktree}/{lifecycle-phase}/{item-slug}.yaml
+# Lifecycle phases: planning/ (for not-started, identified) or active/ (for in-progress)
+
+# ============================================================================
+# REQUIRED FIELDS
+# ============================================================================
+
+id: "<filename-slug>"  # Must match filename without .yaml extension
+title: "<Descriptive title of the TODO item>"
+worktree: "<git-branch-or-worktree-name>"  # lowercase-with-hyphens
+priority: "<Critical|High|Medium-High|Medium|Low>"
+status: "<Not Started|Identified|In Progress|Blocked|Under Review|Completed>"
+description: |
+  <Multi-line detailed explanation of the TODO item.
+
+  Include context, motivation, and scope. Can reference external docs,
+  related issues, or provide background information needed to understand
+  the work.>
+
+# ============================================================================
+# COMMON OPTIONAL FIELDS
+# ============================================================================
+
+category: "<Core Functionality|Platform Expansion|Testing and Quality Assurance|...>"
+
+# Flat work breakdown with dependency edges
+# Each unit should be completable in a single Claude Code session (1-4 hours).
+# Use 'needs' to express ordering; readiness is computed by CLI.
+work:
+  - id: w1
+    summary: "<First work unit — no dependencies>"
+    status: pending
+
+  - id: w2
+    summary: "<Second work unit — depends on w1>"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "<Third work unit — depends on w1>"
+    needs: [w1]
+    status: pending
+
+  - id: w4
+    summary: "<Fourth work unit — depends on w2 and w3>"
+    needs: [w2, w3]
+    status: pending
+    notes: "<Optional implementation notes>"
+
+# Items that are known but explicitly out of scope
+deferred:
+  - summary: "<Deferred work item>"
+    reason: "<Why it's deferred>"
+
+metadata:
+  owners:
+    - "<github-username or slack-handle>"
+  tags:
+    - "<tag1>"
+    - "<tag2>"
+  estimated_effort: "<2-3 days|Small|Medium|Large>"
+  due_date: "<YYYY-MM-DD>"
+  created_date: "<YYYY-MM-DD>"
+  last_updated: "<YYYY-MM-DDTHH:MM:SS>"
+  budget_allocated: "<$X or Y hours>"
+
+impact:
+  business_value: |
+    <Why this work matters for the business. What value does it provide?>
+  user_impact: |
+    <How does this affect end users? What problems does it solve?>
+  technical_debt: |
+    <Optional: Impact on technical debt, maintainability, or code quality.>
+
+files_affected:
+  modified:
+    - "<path/to/existing/file1.py>"
+    - "<path/to/existing/file2.py>"
+  added:
+    - "<path/to/new/file1.py>"
+    - "<path/to/new/file2.py>"
+  removed:
+    - "<path/to/deleted/file.py>"
+
+# ============================================================================
+# IMPLEMENTATION GUARDRAILS (optional — constrain AI agent behavior)
+# ============================================================================
+
+# Existing behaviors that must NOT break. Name specific files, functions,
+# classes, or observable behaviors — not vague "don't break things".
+# Different from success_metrics (project-level outcomes); this is about
+# preserving what already works during implementation.
+must_preserve:
+  - "<e.g., DuckDBAdapter.load_data() continues to handle both CSV and Parquet inputs>"
+  - "<e.g., benchbox run --help output format remains unchanged>"
+
+# Implementation strategy: what to reuse, where to look, sequenced reasoning.
+# Use multiline for chains like 'do X because Y, then Z'.
+# Different from description (what/why); this is about HOW.
+approach: |
+  <e.g., Follow the pattern in benchbox/platforms/duckdb.py:load_data() which
+  already handles compression detection. Reuse CompressionHelper from
+  benchbox/utils/compression.py rather than adding new decompression logic.
+  Start with the SQL path, then extend to DataFrame adapters.>
+
+# Explicit mistakes to avoid. Format: "DO NOT X — because Y — do Z instead".
+# Drawn from past implementation friction or known footguns in this area.
+anti_patterns:
+  - "<e.g., DO NOT add a new ABC — because the adapter hierarchy is already 3 levels deep — extend the existing PlatformMixin instead>"
+  - "<e.g., DO NOT shell out to tpc-h binary at runtime — because it segfaults on fractional SF — use pre-generated data from _binaries/>"
+
+# Concrete verification steps. Each step has a description and optional
+# command + expected_output so the agent can't misinterpret results.
+# Different from success_metrics (project outcomes); this checks the code works.
+verification:
+  - description: "<e.g., All existing platform tests still pass>"
+    command: "<e.g., uv run -- python -m pytest tests/unit/platforms/ -v>"
+    expected_output: "<e.g., all tests pass, 0 failures>"
+  - description: "<e.g., New compression option appears in CLI help>"
+    command: "<e.g., benchbox run --help all>"
+    expected_output: "<e.g., output contains '--compression' with zstd/gzip/none options>"
+
+# File-level modification boundaries. only_modify is an allowlist (only these
+# may be changed); do_not_modify is a denylist (these must NOT be touched).
+# Use one or both. Different from files_affected (intent); this enforces limits.
+scope_limit:
+  only_modify:
+    - "<e.g., benchbox/platforms/duckdb.py>"
+    - "<e.g., tests/unit/platforms/test_duckdb.py>"
+  do_not_modify:
+    - "<e.g., benchbox/core/runner.py>"
+    - "<e.g., benchbox/cli/>"
+
+# ============================================================================
+# ADVANCED OPTIONAL FIELDS
+# ============================================================================
+
+context_sections:
+  "Background and Motivation": |
+    <Domain-specific context, historical background, or motivation for this work.>
+
+  "Technical Context": |
+    <Technical considerations, architectural context, or system dependencies.>
+
+  "Research Findings": |
+    <Optional: Findings from research, experiments, or analysis.>
+
+technical_requirements:
+  constraints:
+    - "<Technical constraint 1>"
+    - "<Technical constraint 2>"
+  dependencies:
+    - "<External dependency 1 (library, service, etc.)>"
+  compatibility: |
+    <Compatibility requirements, version constraints, platform support, etc.>
+
+# Inter-item dependencies using stable IDs (not file paths)
+# Only author inbound 'needs'; reverse edges are computed by CLI.
+deps:
+  needs:
+    - "<slug-of-blocking-item>"  # Items that must be done before this one
+
+success_metrics:
+  - "<Measurable success criterion 1>"
+  - "<Measurable success criterion 2>"
+
+open_questions:
+  - "<Unresolved question 1?>"
+  - "<Unresolved question 2?>"
+
+research_value:
+  hypothesis: |
+    <What are we trying to prove or learn?>
+  validation_approach: |
+    <How will we validate the hypothesis?>
+  success_criteria: |
+    <What defines success for this research?>
+
+commits:
+  - "<commit-sha-1>"
+  - "<commit-sha-2>"
+
+# ============================================================================
+# FOR COMPLETED ITEMS (in DONE tree)
+# ============================================================================
+
+# completed_date: "<YYYY-MM-DD>"
+#
+# sections:
+#   "Implementation Summary": |
+#     <Summary of what was implemented and how.>
+#
+#   "Challenges and Solutions": |
+#     <Key challenges faced and how they were resolved.>
+#
+#   "Lessons Learned": |
+#     <Insights gained during implementation.>

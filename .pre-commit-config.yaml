@@ -92,6 +92,19 @@ repos:
         pass_filenames: false
         stages: [manual]
 
+      # Offline integrity gate for the tracked skill-sync snapshot
+      # (.claude/skills): proves the committed bytes match skill-sync.lock +
+      # the regenerated config. `make skill-sync-verify` skips gracefully when
+      # skill-sync isn't installed (cloud/CI, contributors without the CLI), so
+      # this never blocks those environments. Runs only when the snapshot changes.
+      - id: skill-sync-verify
+        name: skill-sync tracked snapshot verify
+        entry: make skill-sync-verify
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        files: ^\.claude/skills/
+
   # Code formatting with ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.13
@@ -114,7 +127,7 @@ repos:
           - --skip=*.pyc,_build,_binaries/*,benchbox/_binaries/*,*.json,*.lock,*.svg,*.min.js,*.min.css,*.csv
           - --quiet-level=2
         stages: [pre-commit]
-        exclude: ^_sources/  # vendored upstream sources; preserve byte-for-byte
+        exclude: ^(_sources/|\.claude/skills/)  # vendored sources + tracked skill snapshot; byte-for-byte
 
   # YAML validation
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -125,11 +138,12 @@ repos:
         stages: [pre-commit]
       - id: end-of-file-fixer
         stages: [pre-commit]
-        # Vendored upstream artifacts are preserved byte-for-byte.
-        exclude: ^(_sources/|_binaries/|benchbox/_binaries/)
+        # Vendored upstream artifacts + the tracked skill snapshot are preserved
+        # byte-for-byte (the snapshot is regenerated from source; verify enforces it).
+        exclude: ^(_sources/|_binaries/|benchbox/_binaries/|\.claude/skills/)
       - id: trailing-whitespace
         stages: [pre-commit]
-        exclude: ^(_sources/|_binaries/|benchbox/_binaries/)
+        exclude: ^(_sources/|_binaries/|benchbox/_binaries/|\.claude/skills/)
       - id: check-added-large-files
         args: [--maxkb=1000]
         stages: [pre-commit]
@@ -145,3 +159,4 @@ repos:
       - id: markdownlint
         args: [--fix, --disable, MD013, MD033, MD041]  # Disable line-length, HTML, first-line-heading rules
         stages: [pre-commit]
+        exclude: ^\.claude/skills/  # tracked skill snapshot; regenerated from source, preserve byte-for-byte

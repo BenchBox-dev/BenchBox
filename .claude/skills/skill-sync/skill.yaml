@@ -1,0 +1,11 @@
+tags:
+  - tooling
+  - skill-management
+category: infrastructure
+depends: []
+config_inputs: []
+targets:
+  claude: true
+  codex: true
+  gemini: true
+  generic-mcp: true
