@@ -1,0 +1,66 @@
+id: skill-sync-npm-pin-swap
+title: "Swap CI skill-sync verify from github-sha pin to npm version"
+worktree: chore-skill-sync-npm-pin-swap
+priority: Low
+status: Blocked
+category: "Testing and Quality Assurance"
+
+description: |
+  The cloud/CI integrity gate that verifies the tracked skill snapshot runs
+  skill-sync via a github-sha pin because the tool is not published to npm:
+
+    .github/workflows/pr.yml (skill-sync tracked snapshot verify step):
+      run: npx -y github:joeharris76/skill-sync#d3c9c45 verify --project .
+
+  The github pin is reproducible and tokenless, so this is acceptable as an
+  interim. Costs vs an npm dependency: a full repo clone on every CI run, no
+  semver, and reliance on GitHub availability.
+
+  When skill-sync is published to npm, replace the single call site with:
+
+      run: npx -y skill-sync@<ver> verify --project .
+
+  Update the adjacent comment, and optionally repoint the Makefile default
+  `SKILL_SYNC ?= /Users/joe/Developer/skill-sync/dist/cli/index.js` to the
+  npm-installed binary so local `make skill-sync` / `make skill-sync-verify`
+  use the published tool too. The Makefile and `.pre-commit-config.yaml`
+  already resolve skill-sync via the override-able `SKILL_SYNC` path, so the
+  only hard-coded github pin is the one CI line above.
+
+deferred:
+  - summary: "Publish skill-sync to npm"
+    reason: >
+      Lives in the separate joeharris76/skill-sync repo and is a deliberate
+      decision (the tool may stay github-only). This TODO is the consumer-side
+      swap; it unblocks only once that publish happens.
+
+deps:
+  needs: []
+
+work:
+  - id: w1
+    summary: "Replace github-sha pin with npx -y skill-sync@<ver> in pr.yml verify step"
+    status: pending
+    notes: "Single call site. Update the adjacent explanatory comment too."
+  - id: w2
+    summary: "Optionally repoint Makefile SKILL_SYNC default at the npm binary"
+    needs: [w1]
+    status: pending
+
+impact: >
+  Removes per-CI-run github clone latency and gives the integrity gate a
+  semver-pinned dependency. Low urgency: the sha pin is already reproducible
+  and tokenless.
+
+files_affected:
+  modified:
+    - .github/workflows/pr.yml
+    - Makefile
+
+metadata:
+  tags:
+    - skill-sync
+    - cloud-parity
+    - ci
+  created_date: "2026-06-29"
+  estimated_effort: "Small (1 line + comment once unblocked)"
