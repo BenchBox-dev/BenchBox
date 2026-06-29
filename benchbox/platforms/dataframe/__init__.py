@@ -93,8 +93,13 @@ def __getattr__(name: str) -> Any:
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module_path, default = target
+    # Route through __import__ (not importlib.import_module) so the lazy load
+    # honors the same import hooks as the eager ``from module_path import name``
+    # it replaced. importlib.import_module bypasses ``builtins.__import__``,
+    # which would defeat both real import-failure handling and the
+    # optional-import-fallback regression tests.
     try:
-        module = importlib.import_module(module_path)
+        module = __import__(module_path, fromlist=[name])
     except (ImportError, OSError):
         value = default
     else:
