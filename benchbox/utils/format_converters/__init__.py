@@ -1,29 +1,34 @@
-"""Format conversion utilities for BenchBox.
+"""Lazy exports for format conversion utilities.
 
-This module provides converters for transforming benchmark data between different
-table formats (TBL → Parquet → Delta Lake/Iceberg/Vortex).
+The converter implementations import optional heavy libraries such as pyarrow
+and pandas. Keep the package import itself lean; resolve concrete converters
+only when callers access them.
 """
 
-from benchbox.utils.format_converters.base import (
-    ArrowTypeMapper,
-    ConversionOptions,
-    ConversionResult,
-    FormatConverter,
-)
-from benchbox.utils.format_converters.delta_converter import DeltaConverter
-from benchbox.utils.format_converters.ducklake_converter import DuckLakeConverter
-from benchbox.utils.format_converters.iceberg_converter import IcebergConverter
-from benchbox.utils.format_converters.parquet_converter import ParquetConverter
-from benchbox.utils.format_converters.vortex_converter import VortexConverter
+from __future__ import annotations
 
-__all__ = [
-    "ArrowTypeMapper",
-    "FormatConverter",
-    "ConversionOptions",
-    "ConversionResult",
-    "ParquetConverter",
-    "DeltaConverter",
-    "DuckLakeConverter",
-    "IcebergConverter",
-    "VortexConverter",
-]
+import importlib
+from typing import Any
+
+_EXPORTS = {
+    "ArrowTypeMapper": "benchbox.utils.format_converters.base",
+    "ConversionOptions": "benchbox.utils.format_converters.base",
+    "ConversionResult": "benchbox.utils.format_converters.base",
+    "FormatConverter": "benchbox.utils.format_converters.base",
+    "ParquetConverter": "benchbox.utils.format_converters.parquet_converter",
+    "DeltaConverter": "benchbox.utils.format_converters.delta_converter",
+    "DuckLakeConverter": "benchbox.utils.format_converters.ducklake_converter",
+    "IcebergConverter": "benchbox.utils.format_converters.iceberg_converter",
+    "VortexConverter": "benchbox.utils.format_converters.vortex_converter",
+}
+
+__all__ = list(_EXPORTS)
+
+
+def __getattr__(name: str) -> Any:
+    module_path = _EXPORTS.get(name)
+    if module_path is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(importlib.import_module(module_path), name)
+    globals()[name] = value
+    return value

@@ -47,6 +47,27 @@ def _write_and_reload(tmp_path: Path, benchmark: str, tables_meta: dict) -> Mani
     return loaded
 
 
+def test_local_manifest_entry_path_normalization_is_lazy_cloud_safe(tmp_path: Path) -> None:
+    """Local manifest writes must not require CloudPath to be imported eagerly."""
+    stub = tmp_path / "lineitem.tbl"
+    stub.write_text("1|2|3|\n")
+
+    manifest = DataGenerationManifest(
+        output_dir=tmp_path,
+        benchmark="tpch",
+        scale_factor=0.01,
+        compression={"enabled": False, "type": None, "level": None},
+        parallel=1,
+    )
+    manifest.add_entry("lineitem", stub, row_count=1)
+    manifest_path = manifest.write()
+
+    assert manifest_path == tmp_path / "_datagen_manifest.json"
+    loaded = load_manifest(manifest_path)
+    assert isinstance(loaded, ManifestV2)
+    assert "lineitem" in loaded.tables
+
+
 def _get_first_entry_metadata(loaded: ManifestV2, table: str) -> dict:
     """Extract metadata from the first file entry for *table*."""
     table_formats = loaded.tables.get(table)

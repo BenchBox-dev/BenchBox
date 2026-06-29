@@ -122,3 +122,12 @@ def test_eager_optional_adapter_missing_class_returns_none(monkeypatch):
     monkeypatch.setattr(platform_module.importlib, "import_module", fake_import_module)
 
     assert platform_module._load_optional_adapter(".duckdb", "DuckDBAdapter") is None
+
+
+def test_eager_optional_adapter_native_load_failure_returns_none(monkeypatch):
+    def fake_import_module(module_path: str, package: str):
+        raise OSError("dlopen(libduckdb.dylib): image not found")
+
+    monkeypatch.setattr(platform_module.importlib, "import_module", fake_import_module)
+
+    assert platform_module._load_optional_adapter(".duckdb", "DuckDBAdapter") is None

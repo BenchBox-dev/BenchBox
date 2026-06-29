@@ -512,7 +512,7 @@ class PlatformRegistry:
             if version is not None and not isinstance(version, str):
                 version = str(version) if version else None
             return LibraryInfo(name=lib_name, version=version, installed=True)
-        except ImportError as e:
+        except (ImportError, OSError) as e:
             return LibraryInfo(name=lib_name, version=None, installed=False, import_error=str(e))
 
     @staticmethod
@@ -574,7 +574,7 @@ class PlatformRegistry:
                     test_config = {"database_path": ":memory:"} if platform_name == "duckdb" else {}
                     adapter_class(**test_config)
                     availability[platform_name] = True
-                except ImportError:
+                except (ImportError, OSError):
                     availability[platform_name] = False
                 except Exception:
                     availability[platform_name] = True

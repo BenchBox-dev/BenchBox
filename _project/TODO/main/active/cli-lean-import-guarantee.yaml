@@ -1,0 +1,235 @@
+id: cli-lean-import-guarantee
+title: "Restore and enforce the lean-import guarantee for import benchbox, import benchbox.cli.main, and benchbox --help"
+worktree: main
+priority: Critical
+status: Blocked
+category: Release Tooling
+
+description: |
+  v0.3.0 shipped a broken wheel to PyPI because an optional dependency loaded on
+  a CLI startup path that nothing tested. The contract test the team believed
+  guarded this (tests/unit/test_package_dependencies.py) does NOT exist on
+  develop (no git history at that path); the surviving startup test
+  (tests/unit/cli/test_cli_startup_imports.py) only asserts that runner/monitoring
+  and textcharts setup-help modules are absent - it makes NO assertion about heavy
+  optional deps.
+
+  A live import trace on develop @ cb49cecf5 shows the leak is real and
+  entry-point-specific:
+    - `import benchbox` eagerly loads duckdb, psycopg, boto3, google, cloudpathlib
+      (NOT pandas/polars/pyarrow - drop-pandas-from-core worked).
+    - `benchbox --help` additionally loads pandas, polars, pyarrow.
+  Verified culprits (first benchbox frame that triggers each):
+    - duckdb / psycopg     <- benchbox/platforms/__init__.py:252 (eager
+                              _load_optional_adapter of concrete adapters)
+    - boto3/google/cloudpathlib <- benchbox/core/benchmark_result_validation.py:8
+                              -> benchbox/utils/cloud_storage.py:22 (top-level
+                              cloudpathlib import)
+    - pandas               <- benchbox/utils/format_converters/__init__.py:16
+                              -> parquet_converter.py:15
+    - pyarrow              <- benchbox/utils/format_converters/__init__.py:7
+                              -> format_converters/base.py:15
+    - polars               <- benchbox/platforms/dataframe/__init__.py:60
+                              -> polars_df.py:36
+    - the CLI command surface <- benchbox/cli/main.py:8 re-exports every command;
+                              benchbox/cli/commands/__init__.py:9 eagerly imports
+                              all command modules; BenchBoxGroup.format_commands
+                              (benchbox/cli/help.py:383) calls get_command() per
+                              subcommand, re-importing bodies during top-level help.
+
+  The common root cause is the same throughout: package __init__ modules (and the
+  cli.main compat shim) eagerly import concrete heavy submodules. One consistent
+  technique - defer to lazy resolution - fixes every hub. This item pins the
+  contract with a test FIRST, then makes each hub lazy, then wires the test (and a
+  two-mode pre-publish wheel smoke) into CI so the regression cannot recur.
+
+prior_art:
+- ref: "tests/unit/cli/test_cli_startup_imports.py:24"
+  note: "Existing (too-narrow) startup-isolation test; extend its sys.modules pattern, do not invent a new harness. It only
+    checks runner/monitoring/textcharts."
+- ref: "tests/unit/test_release_infrastructure.py:104"
+  note: "test_import_benchbox_does_not_pull_pandas - the single-dep precedent to generalize to the full heavy set across three
+    entry points."
+- ref: ".github/workflows/nightly.yml:287"
+  note: "Existing isolated-wheel pandas-absence smoke (uv run --isolated --no-project --with wheel). Reuse its mechanism for
+    the pre-publish two-mode smoke; today it checks only pandas and runs post-build, not as a publish predecessor."
+- ref: ".github/workflows/release.yml:177"
+  note: "test-installation runs AFTER publish (needs: publish) and checks only pandas - detect not prevent. Reorder to a publish
+    predecessor and broaden the assertion."
+- ref: "benchbox/core/platform_registry.py:863"
+  note: "Existing native-import-error classifier (_NATIVE_IMPORT_ERROR_MARKERS, OSError handling) - route the normalized optional-import
+    handling (w6) through it; do not add a parallel classifier."
+
+work:
+- id: w0
+  summary: "Write the import-isolation contract test across all three entry points (expected RED until w1-w6 land)"
+  status: done
+  needs: []
+  notes: |
+    New tests/unit/test_import_isolation.py, subprocess-based (one clean
+    interpreter per case so the test session's own imports do not pollute
+    sys.modules), parametrized per dep so failures are individually legible.
+    Assert NONE of {pandas, polars, pyarrow, duckdb, psycopg, boto3, google,
+    cloudpathlib} appear in sys.modules after each of: `import benchbox`,
+    `import benchbox.cli.main`, and `benchbox --help` (via subprocess invocation
+    of the console entry, not an in-process CliRunner that shares sys.modules).
+    Mark it fast. It supersedes the narrow assertions in
+    tests/unit/cli/test_cli_startup_imports.py (keep that file's runner/monitoring
+    checks; do not duplicate). This pins the contract before any refactor.
+
+- id: w1
+  summary: "Lazy platform-adapter registration (fixes duckdb, psycopg)"
+  status: pending
+  needs: [w0]
+  notes: |
+    benchbox/platforms/__init__.py:252 eagerly calls _load_optional_adapter for
+    concrete adapters. The registry already supports lazy resolution (cudf is
+    registered lazily). Convert the eager concrete-adapter loads to string-based
+    lazy registration (module_path, class_name) resolved on first get_adapter()/
+    instantiation. Preserve the current `except ImportError -> None` degradation
+    and assert the missing-extra error message text in a test so it does not
+    regress.
+
+- id: w2
+  summary: "Defer cloud SDK imports (fixes boto3, google, cloudpathlib)"
+  status: pending
+  needs: [w0]
+  notes: |
+    Move the top-level cloudpathlib import in benchbox/utils/cloud_storage.py:22
+    to function scope inside the cloud-path helpers, so importing the module (via
+    core/benchmark_result_validation.py:8 on the core path) does not pull the
+    cloud SDKs. Re-verify cloud-path round-trip helpers still work.
+
+- id: w3
+  summary: "Lazy format-converter loading (fixes pandas, pyarrow)"
+  status: pending
+  needs: [w0]
+  notes: |
+    benchbox/utils/format_converters/__init__.py eagerly imports base (pyarrow,
+    :7) and parquet_converter (pandas, :16). Convert to PEP 562 module-level
+    __getattr__ lazy exports (or a string registry) so importing the package
+    does not pull pandas/pyarrow. Keep FormatConversionOrchestrator resolvable
+    (the existing test_cli_startup_imports.py:30 assertion must stay green).
+
+- id: w4
+  summary: "Lazy DataFrame-backend registration (fixes polars)"
+  status: pending
+  needs: [w0]
+  notes: |
+    benchbox/platforms/dataframe/__init__.py:60 eagerly imports polars_df.
+    Convert to lazy registration consistent with w1. Keep DataFrame backend
+    selection working.
+
+- id: w5
+  summary: "Make benchbox.cli.main itself lean - entrypoint, command fan-out, and static help (three parts)"
+  status: pending
+  needs: [w0]
+  notes: |
+    A lazy Click group alone does NOT fix `import benchbox.cli.main`; all three
+    parts are required or the CLI path stays heavy:
+      (i)  Entrypoint: move the console script from benchbox.cli.main:main
+           (pyproject.toml:370) to benchbox.cli.app:main, and reduce
+           benchbox/cli/main.py to a compat shim that re-exports cli/main/command
+           symbols lazily via module-level __getattr__ (PEP 562) so importing it
+           no longer eagerly binds command objects.
+      (ii) Command fan-out: benchbox/cli/commands/__init__.py:9 imports every
+           command module. Convert to lazy per-command resolution (string
+           "module:callback" registry resolved on first use).
+      (iii) Static help: BenchBoxGroup.format_commands (benchbox/cli/help.py:383)
+           calls self.get_command() per subcommand, re-importing bodies during
+           top-level help. Render from static command metadata (name + short help
+           held in the registry) so `benchbox --help` never imports command
+           bodies.
+    Acceptance is BOTH that w0's benchbox.cli.main + --help cases pass AND that
+    the full command list and help text are unchanged (snapshot/list test), and
+    `benchbox <cmd> --help` plus execution paths still work.
+
+- id: w6
+  summary: "Normalize optional-import failure handling to (ImportError, OSError) at every lazy-load site"
+  status: pending
+  needs: [w0]
+  notes: |
+    Inconsistent catches let a native .so/GLIBC OSError crash instead of
+    degrading to "platform unavailable". Standardize on (ImportError, OSError),
+    routed through the existing native classifier (platform_registry.py:863), at:
+      - benchbox/platforms/__init__.py:198, :225, :253 (catch ImportError only;
+        :165 already catches both - match it)
+      - benchbox/core/platform_registry.py:515 (_detect_library - ImportError
+        only; :577 too)
+    Add a unit test that simulates an optional adapter import raising OSError ->
+    reported unavailable, not a crash; ImportError behavior unchanged.
+
+- id: w7
+  summary: "Wire the contract test into required CI and split the wheel smoke into two pre-publish checks"
+  status: pending
+  needs: [w1, w2, w3, w4, w5, w6]
+  notes: |
+    1. Add tests/unit/test_import_isolation.py to the required code-lint/code-test
+       lane in .github/workflows/pr.yml so the contract blocks merge.
+    2. Pre-publish wheel smoke must verify TWO distinct properties, in two jobs,
+       BOTH as predecessors of the publish job (not post-publish as
+       release.yml:177 currently is):
+         (a) minimal no-extras install: install the bare wheel in a clean env;
+             `benchbox --help` must NOT crash.
+         (b) full-env import isolation: in an env where heavy deps ARE installed,
+             assert none appear in sys.modules after `import benchbox`,
+             `import benchbox.cli.main`, and `benchbox --help` (reuse w0's set).
+    Reuse the nightly.yml:287 isolated-wheel mechanism; broaden its single-pandas
+    assertion to the full heavy set.
+
+must_preserve:
+- "Every CLI command and its help text remain available and unchanged; benchbox <cmd> --help and command execution paths keep
+  working."
+- "Bare installs without an optional extra still degrade gracefully (clear 'platform unavailable' message), never crash, for
+  both ImportError and OSError."
+- "No behavior change to command logic; this is an import-time/laziness refactor only."
+
+anti_patterns:
+- "DO NOT fix the leak by removing functionality or dropping a dependency from a path that needs it at call time - defer the
+  import, do not delete the feature."
+- "DO NOT rely on an in-process CliRunner for the --help isolation assertion - it shares the test session's sys.modules and
+  will give a false PASS; invoke a fresh interpreter/subprocess."
+- "DO NOT add a second native-error classifier - reuse platform_registry.py:863."
+
+verification:
+- description: "All three entry points are lean in a clean interpreter"
+  command: "uv run -- python -m pytest tests/unit/test_import_isolation.py -q"
+  expected_output: "passes; none of pandas/polars/pyarrow/duckdb/psycopg/boto3/google/cloudpathlib in sys.modules after import
+    benchbox, import benchbox.cli.main, benchbox --help"
+- description: "Command surface and help unchanged"
+  command: "uv run -- benchbox --help && uv run -- benchbox run --help"
+  expected_output: "full command list rendered; exit 0; help text identical to pre-change snapshot"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/__init__.py"
+  - "benchbox/platforms/dataframe/__init__.py"
+  - "benchbox/utils/cloud_storage.py"
+  - "benchbox/utils/format_converters/"
+  - "benchbox/cli/"
+  - "benchbox/core/platform_registry.py"
+  - "pyproject.toml"
+  - "tests/"
+  - ".github/workflows/"
+
+success_metrics:
+- "tests/unit/test_import_isolation.py is green and required in PR CI."
+- "A clean no-extras wheel runs benchbox --help without crashing, verified pre-publish."
+- "A heavy-dep import on any of the three entry points fails CI before reaching PyPI."
+
+deferred:
+- summary: "Make the remaining cloud-path import path lazy outside this TODO's file allowlist."
+  reason: |
+    After the in-scope lazy refactor, tests/unit/test_import_isolation.py is down to
+    boto3/google/cloudpathlib failures only. The verified remaining path is
+    benchbox/__init__.py eagerly importing FlightData, which imports
+    benchbox/utils/datagen_manifest.py, whose top-level cloudpathlib import loads
+    cloudpathlib plus boto3/google provider SDKs. Both benchbox/__init__.py and
+    benchbox/utils/datagen_manifest.py are outside this TODO's scope_limit.only_modify,
+    so the contract cannot be made green without widening scope.
+
+metadata:
+  tags: [packaging, lean-import, cli, ci, release, regression-guard]
+  estimated_effort: "Medium"
+  created_date: "2026-06-28"
+  last_updated: "2026-06-28T00:00:00"

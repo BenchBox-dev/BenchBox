@@ -14,6 +14,7 @@ pytestmark = pytest.mark.fast
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/benchmarks.py",
+    "benchbox/cli/commands/__init__.py",
     "benchbox/cli/commands/calculate_qphh.py",
     "benchbox/cli/commands/compare_dataframes.py",
     "benchbox/cli/commands/compare_plans.py",
@@ -29,6 +30,7 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/display.py",
     "benchbox/cli/dryrun.py",
     "benchbox/cli/help.py",
+    "benchbox/cli/main.py",
     "benchbox/cli/orchestrator.py",
 }
 ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
