@@ -102,6 +102,8 @@ class DatabricksDataFrameAdapter(DatabricksAdapter):
         execution_mode: "sql" or "dataframe" (default: "dataframe")
     """
 
+    plan_capture_phase_eligible = True
+
     def __init__(self, **config: Any) -> None:
         """Initialize Databricks DataFrame adapter.
 

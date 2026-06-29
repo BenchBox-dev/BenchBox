@@ -68,6 +68,8 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
     - Starburst Enterprise: Use TrinoAdapter (Trino-based)
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
     platform_key = "presto"

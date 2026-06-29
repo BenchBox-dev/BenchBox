@@ -87,6 +87,8 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             --platform-option s3_staging_url=s3://my-bucket/benchbox-staging/
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
 

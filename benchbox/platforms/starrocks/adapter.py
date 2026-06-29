@@ -46,6 +46,8 @@ class StarRocksAdapter(
     - Stream Load for high-throughput data ingestion
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
     @classmethod

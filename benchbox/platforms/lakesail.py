@@ -83,6 +83,8 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
     - Spark SQL dialect compatibility via SQLGlot transpilation
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
     # Sail's CSV reader accepts zstd but doesn't auto-detect from file

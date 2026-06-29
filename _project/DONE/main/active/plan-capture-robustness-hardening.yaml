@@ -1,0 +1,117 @@
+id: plan-capture-robustness-hardening
+title: "Plan-capture robustness: explicit phase-eligibility, bounded timeout-thread leak, per-result plan identity, comparable-subset
+  honesty"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-06-28"
+category: Code Quality and Technical Debt
+
+description: |
+  Four independent robustness gaps in the plan-capture subsystem, each a separate
+  failure mode from the missing CI gate (tracked in plan-capture-blocking-ci-gate):
+
+  1. Implicit phase-eligibility. adapter.py:120 defaults
+     plan_capture_phase_eligible=True and ~12 SaaS adapters inherit it implicitly.
+     It is a correctness-critical flag (it decides whether plan capture is isolated
+     from measured timing); a future non-EXPLAIN subclass would silently inherit
+     True.
+  2. Timeout thread leak. On a capture timeout, result_capture.py:828 leaves a live
+     EXPLAIN thread on the measurement connection (an accepted tradeoff). It cannot
+     perturb MEASURED timing (post-measurement phase), but it can corrupt SUBSEQUENT
+     captures in the same phase - untested.
+  3. Plan identity / misattribution. Plans are captured and attached by query_id,
+     but for stream/seed-specific SQL (TPC power-test streams, unseeded variants)
+     the SQL bound to a query_id can differ from the measured statement, so the
+     attached plan may describe a different query text than the one timed.
+  4. Comparable-subset honesty. The cross-engine comparable subset is an
+     operator-type multiset over a single query shape (test_cross_engine_
+     conformance.py) with no tables/predicates - a meaningful harmonization check but
+     near-trivial as "plan equivalence". Either strengthen it or relabel it so
+     consumers do not over-trust it.
+
+prior_art:
+- ref: "benchbox/platforms/base/adapter.py:120"
+  note: "plan_capture_phase_eligible default; DuckDB/PostgreSQL/Redshift already declare it explicitly (postgresql.py:256)
+    - the pattern to apply to all adapters."
+- ref: "benchbox/platforms/base/result_capture.py:828"
+  note: "Documented timeout-thread tradeoff; the connection-fencing fix goes here / in the capture phase."
+- ref: "benchbox/platforms/base/result_capture.py (_merge_plan_capture_into_result), plan_capture_phase.py"
+  note: "Where capture is keyed to a result; w3 must key on the result's executed_sql, not query_id alone."
+- ref: "tests/unit/query_plans/test_cross_engine_conformance.py:70, benchbox/core/query_plans/comparison.py:105"
+  note: "The comparable-subset definition and corpus to strengthen or relabel."
+
+work:
+- id: w1
+  summary: "Make plan_capture_phase_eligible explicit on every adapter and assert no implicit inheritance"
+  status: done
+  needs: []
+  notes: |
+    Declare plan_capture_phase_eligible explicitly on every concrete adapter
+    (matching DuckDB/PG/Redshift). Add a unit test asserting no adapter relies on
+    the inherited base default for this flag (introspect the class dict, not the
+    resolved attribute).
+
+- id: w2
+  summary: "Bound the capture timeout thread so it cannot corrupt subsequent captures"
+  status: done
+  needs: []
+  notes: |
+    Add a test reproducing back-to-back captures where the first times out, then
+    either fence the measurement connection (reset/reconnect before the next
+    capture) or serialize captures behind a fresh connection. Preserve the
+    post-measurement isolation guarantee (measured timing unaffected).
+
+- id: w3
+  summary: "Key plan capture/attachment on the result's exact executed SQL, not query_id alone"
+  status: done
+  needs: []
+  notes: |
+    Audit _capture_plans_post_measurement / _merge_plan_capture_into_result so each
+    result carries the plan of ITS executed_sql. Add a test with two streams of the
+    same query_id whose SQL differs, asserting each result carries its own plan
+    (no cross-stream misattribution).
+
+- id: w4
+  summary: "Strengthen or honestly relabel the cross-engine comparable subset"
+  status: done
+  needs: []
+  notes: |
+    Either add table-identity to the comparable subset and expand the conformance
+    corpus to >=3 query shapes, OR relabel it in docs/output as "operator-shape
+    harmonization" (not plan equivalence) so consumers do not over-trust matching
+    subsets. Recommend the relabel unless multi-engine plan comparison becomes a
+    published feature. Pick one and record the decision.
+
+must_preserve:
+- "The post-measurement capture phase stays isolated; measured timing is unaffected by any change here."
+- "The centralized is_dml_query double-execution guard is unchanged."
+
+anti_patterns:
+- "DO NOT make plan-capture eligibility a silent base default for new adapters - require an explicit declaration."
+- "DO NOT claim cross-engine plan equivalence from an operator-type multiset - strengthen it or relabel it."
+
+verification:
+- description: "No adapter relies on the implicit eligibility default"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_plan_capture_phase_eligibility.py -q"
+  expected_output: "passes; every concrete adapter declares plan_capture_phase_eligible in its own class dict"
+- description: "Per-result plan identity holds across same-id streams"
+  command: "uv run -- python -m pytest tests/integration/test_plan_capture_phase.py -q -k identity"
+  expected_output: "each result's plan matches its executed_sql; two same-query_id streams carry distinct plans"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/"
+  - "benchbox/core/query_plans/"
+  - "docs/"
+  - "tests/"
+
+success_metrics:
+- "Plan-capture eligibility is explicit, the timeout thread cannot corrupt later captures, plans are per-result-SQL accurate,
+  and the comparable-subset claim matches what it actually proves."
+
+metadata:
+  tags: [query-plans, plan-capture, robustness, technical-debt]
+  estimated_effort: "Medium"
+  created_date: "2026-06-28"
+  last_updated: "2026-06-28T00:00:00"

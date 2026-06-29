@@ -79,6 +79,8 @@ def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
 class DatabricksAdapter(PlatformAdapter):
     """Databricks platform adapter with Delta Lake and Unity Catalog support."""
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
 

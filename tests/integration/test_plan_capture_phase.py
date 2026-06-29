@@ -17,6 +17,8 @@ motivated query-plan-capture-isolation-phase-design:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from benchbox.core.plan_capture_phase import run_plan_capture_phase
@@ -312,6 +314,46 @@ class TestIntegratedCapturePhase:
             assert results[0].get("query_plan") is not None
         finally:
             conn.close()
+
+    def test_plan_identity_tracks_same_query_id_distinct_sql(self, file_adapter, monkeypatch):
+        """Rows sharing a query_id must attach the plan for their own executed SQL."""
+        from benchbox.platforms.base.result_capture import _plan_capture_key
+
+        conn = file_adapter.create_connection()
+        capture_calls: list[tuple[str, str]] = []
+        sql_a = "SELECT 1 AS stream_value"
+        sql_b = "SELECT 2 AS stream_value"
+        capture_key_a = _plan_capture_key("q", sql_a)
+        capture_key_b = _plan_capture_key("q", sql_b)
+
+        def _capture_spy(connection, sql, capture_key):
+            capture_calls.append((capture_key, sql))
+            return SimpleNamespace(query_id=capture_key, plan_fingerprint=f"fp::{sql}"), 1.0
+
+        monkeypatch.setattr(file_adapter, "capture_query_plan", _capture_spy)
+        results = [
+            {"query_id": "q", "status": "SUCCESS", "stream_id": 0, "_plan_capture_key": capture_key_a},
+            {"query_id": "q", "status": "SUCCESS", "stream_id": 1, "_plan_capture_key": capture_key_b},
+        ]
+        try:
+            file_adapter._capture_plans_post_measurement(
+                conn,
+                {
+                    capture_key_a: sql_a,
+                    capture_key_b: sql_b,
+                },
+                results,
+            )
+        finally:
+            conn.close()
+
+        assert capture_calls == [(capture_key_a, sql_a), (capture_key_b, sql_b)]
+        assert results[0]["plan_fingerprint"] == f"fp::{sql_a}"
+        assert results[1]["plan_fingerprint"] == f"fp::{sql_b}"
+        assert results[0]["query_plan"].query_id == "q"
+        assert results[1]["query_plan"].query_id == "q"
+        assert "_plan_capture_key" not in results[0]
+        assert "_plan_capture_key" not in results[1]
 
     def test_dml_executed_exactly_once(self, file_adapter):
         """A DML query runs once during measurement; the phase must not re-execute it."""

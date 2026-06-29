@@ -135,6 +135,13 @@ def run_plan_capture_phase(
     result = PlanCapturePhaseResult()
 
     owns_connection = connection is None
+    # The caller-supplied path passes the measurement connection precisely so an
+    # in-memory database / temporary tables / session-scoped state stay visible
+    # during EXPLAIN. A fresh connection cannot see that state, so we must never
+    # silently reopen a caller-owned connection (captured before the timeout
+    # branch flips ``owns_connection``).
+    caller_supplied_connection = not owns_connection
+    owned_connections: list[Any] = []
     if close_connection is None:
         close_connection = owns_connection
 
@@ -149,11 +156,14 @@ def run_plan_capture_phase(
     try:
         if owns_connection:
             connection = adapter.create_connection(**(dict(connection_config) if connection_config else {}))
+            owned_connections.append(connection)
 
         adapter.analyze_plans = analyze_plans
         adapter.capture_plans = True
 
-        for query_id, sql in items:
+        last_index = len(items) - 1
+        for index, (query_id, sql) in enumerate(items):
+            failure_count_before = len(getattr(adapter, "plan_capture_errors", []))
             plan, capture_ms = adapter.capture_query_plan(connection, sql, query_id)
             result.per_query_capture_ms[query_id] = capture_ms
             if plan is not None:
@@ -162,12 +172,33 @@ def run_plan_capture_phase(
                 result.captured += 1
             else:
                 result.failed += 1
+            new_failures = getattr(adapter, "plan_capture_errors", [])[failure_count_before:]
+            if index != last_index and any(failure.get("reason") == "timeout" for failure in new_failures):
+                # A timeout can leave the connection unusable, so remaining captures
+                # normally continue on a fresh connection. But for a caller-supplied
+                # connection a fresh one cannot see the in-memory/session-scoped state
+                # (default ``:memory:`` DuckDB/SQLite), so reopening would run the
+                # remaining EXPLAINs against an empty or wrong schema — describing the
+                # wrong plan or failing outright. Skip the rest instead, counting them
+                # as failed so coverage is reported honestly rather than silently.
+                if caller_supplied_connection:
+                    result.failed += last_index - index
+                    break
+                if owns_connection and connection is not None:
+                    with contextlib.suppress(Exception):
+                        connection.close()
+                connection = adapter.create_connection(**(dict(connection_config) if connection_config else {}))
+                owned_connections.append(connection)
+                owns_connection = True
     finally:
         adapter.analyze_plans = saved["analyze_plans"]
         adapter.capture_plans = saved["capture_plans"]
-        if close_connection and connection is not None:
+        if close_connection and connection is not None and connection not in owned_connections:
             with contextlib.suppress(Exception):
                 connection.close()
+        for owned_connection in owned_connections:
+            with contextlib.suppress(Exception):
+                owned_connection.close()
 
     result.total_capture_ms = (time.perf_counter() - phase_start) * 1000
     return result

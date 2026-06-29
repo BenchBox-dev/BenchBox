@@ -51,6 +51,8 @@ class CedarDBAdapter(PostgreSQLAdapter):
     Requires CedarDB server with PostgreSQL wire protocol enabled (default port 5432).
     """
 
+    plan_capture_phase_eligible = True
+
     @property
     def platform_name(self) -> str:
         return "CedarDB"

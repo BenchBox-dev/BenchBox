@@ -82,6 +82,8 @@ class DatabendAdapter(PlatformAdapter):
     - Edge-case optimizations applied via _optimize_table_definition()
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
     def __init__(self, **config):

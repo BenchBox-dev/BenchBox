@@ -110,6 +110,8 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
     - Preemptible VMs: ~80% cheaper than standard
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
     # CloudSparkConfigMixin: Uses Dataproc-optimized config

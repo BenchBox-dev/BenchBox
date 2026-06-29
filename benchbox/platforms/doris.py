@@ -268,6 +268,8 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
     - DORIS_DATABASE: Default database name
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     connection_operation_name = "Doris connection"
     current_database_sql = "SELECT database()"

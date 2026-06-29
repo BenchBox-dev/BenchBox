@@ -73,6 +73,8 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
     Requires PostgreSQL 12+ with TimescaleDB 2.x extension installed.
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
     @property

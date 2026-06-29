@@ -117,6 +117,8 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, Platfor
     - Pricing: ~$0.06/vCPU-hour, ~$0.0065/GB-hour
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
     # CloudSparkConfigMixin: Uses Dataproc Serverless-optimized config

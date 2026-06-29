@@ -97,6 +97,8 @@ class QuantonAdapter(
     - Intelligent cluster management
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
     # CloudSparkConfigMixin: Uses Quanton-optimized config

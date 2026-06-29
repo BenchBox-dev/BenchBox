@@ -54,6 +54,8 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
     Requires PostgreSQL 14+ with pg_duckdb 1.0+ extension installed.
     """
 
+    plan_capture_phase_eligible = True
+
     @property
     def platform_name(self) -> str:
         return "pg_duckdb"

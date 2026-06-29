@@ -73,6 +73,8 @@ class AthenaAdapter(PlatformAdapter):
     - Workgroup-based resource management and cost controls
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
 

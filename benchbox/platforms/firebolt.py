@@ -165,6 +165,8 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
           ghcr.io/firebolt-db/firebolt-core:preview-rc
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
     def __init__(self, **config):
