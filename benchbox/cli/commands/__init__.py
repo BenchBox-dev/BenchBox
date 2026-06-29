@@ -156,6 +156,15 @@ class LazyCommand(click.Command):
             self._resolved = getattr(module, self._spec.attr)
         return self._resolved
 
+    def make_context(
+        self,
+        info_name: str | None,
+        args: list[str],
+        parent: click.Context | None = None,
+        **extra: Any,
+    ) -> click.Context:
+        return self._load().make_context(info_name, args, parent=parent, **extra)
+
     def get_short_help_str(self, limit: int = 45) -> str:
         return click.Command.get_short_help_str(self, limit)
 

@@ -10,17 +10,17 @@ _EXPORTS = {
     "version_callback": ("benchbox.cli.app", "version_callback"),
     "cli": ("benchbox.cli.app", "cli"),
     "main": ("benchbox.cli.app", "main"),
-    "PlatformOptionParamType": ("benchbox.cli.commands", "PlatformOptionParamType"),
-    "auth": ("benchbox.cli.commands", "auth"),
-    "run": ("benchbox.cli.commands", "run"),
-    "profile": ("benchbox.cli.commands", "profile"),
-    "benchmarks": ("benchbox.cli.commands", "benchmarks"),
-    "validate": ("benchbox.cli.commands", "validate"),
-    "create_sample_tuning": ("benchbox.cli.commands", "create_sample_tuning"),
-    "export": ("benchbox.cli.commands", "export"),
-    "check_dependencies": ("benchbox.cli.commands", "check_dependencies"),
-    "results": ("benchbox.cli.commands", "results"),
-    "setup_verbose_logging": ("benchbox.cli.commands", "setup_verbose_logging"),
+    "PlatformOptionParamType": ("benchbox.cli.commands.run", "PlatformOptionParamType"),
+    "auth": ("benchbox.cli.commands.auth", "auth"),
+    "run": ("benchbox.cli.commands.run", "run"),
+    "profile": ("benchbox.cli.commands.profile", "profile"),
+    "benchmarks": ("benchbox.cli.commands.benchmarks", "benchmarks"),
+    "validate": ("benchbox.cli.commands.config", "validate"),
+    "create_sample_tuning": ("benchbox.cli.commands.tuning", "create_sample_tuning"),
+    "export": ("benchbox.cli.commands.export", "export"),
+    "check_dependencies": ("benchbox.cli.commands.checks", "check_dependencies"),
+    "results": ("benchbox.cli.commands.results", "results"),
+    "setup_verbose_logging": ("benchbox.cli.commands.run", "setup_verbose_logging"),
     "BenchmarkConfig": ("benchbox.cli.benchmarks", "BenchmarkConfig"),
     "BenchmarkManager": ("benchbox.cli.benchmarks", "BenchmarkManager"),
     "ConfigManager": ("benchbox.cli.config", "ConfigManager"),
@@ -63,7 +63,10 @@ def __getattr__(name: str) -> Any:
 
 def get_config_manager() -> Any:
     """Factory indirection so tests can patch ConfigManager via this module."""
-    return __getattr__("ConfigManager")()
+    config_manager = globals().get("ConfigManager")
+    if config_manager is None:
+        config_manager = __getattr__("ConfigManager")
+    return config_manager()
 
 
 if __name__ == "__main__":

@@ -12,20 +12,21 @@ paths so the manifest is portable across local and cloud storage backends.
 
 from __future__ import annotations
 
+import importlib
 import json
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import benchbox
 from benchbox.utils.cloud_storage import DatabricksPath, create_path_handler
 
-try:  # Optional cloudpathlib dependency for cloud path support
-    from cloudpathlib import CloudPath  # type: ignore
-except ImportError:  # pragma: no cover - dependency optional
-    CloudPath = None  # type: ignore
+if TYPE_CHECKING:
+    from cloudpathlib import CloudPath
+
+_CLOUD_PATH_TYPE: type[Any] | None = None
 
 
 PathLike = Union[str, Path, "CloudPath"]
@@ -75,6 +76,18 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _get_cloud_path_type() -> type[Any] | None:
+    """Load cloudpathlib's CloudPath type only when path normalization needs it."""
+    global _CLOUD_PATH_TYPE
+    if _CLOUD_PATH_TYPE is None:
+        try:
+            cloud_path_type = importlib.import_module("cloudpathlib").CloudPath
+        except ImportError:  # pragma: no cover - dependency optional
+            return None
+        _CLOUD_PATH_TYPE = cloud_path_type
+    return _CLOUD_PATH_TYPE
+
+
 @dataclass
 class ManifestTableEntry:
     """Single file entry stored inside the manifest for a table."""
@@ -99,7 +112,8 @@ def _ensure_path(path: PathLike) -> Path | CloudPath | DatabricksPath:
 
     if isinstance(path, (Path,)):
         return path
-    if CloudPath is not None and isinstance(path, CloudPath):  # type: ignore
+    cloud_path_type = _get_cloud_path_type()
+    if cloud_path_type is not None and isinstance(path, cloud_path_type):
         return path
     return create_path_handler(path)
 
