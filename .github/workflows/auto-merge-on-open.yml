@@ -7,10 +7,16 @@ name: Auto-enable auto-merge
 # Drafts are explicitly skipped — opening a draft is the user's signal
 # that the PR is not yet ready to land. Auto-merge gets enabled when the
 # draft is marked ready (the `ready_for_review` event).
+#
+# `synchronize` re-evaluates on every push: a later commit that newly
+# touches a soundness-critical path must flip auto-merge back OFF. GitHub
+# only auto-disables auto-merge on push when the pusher lacks write access,
+# so in the normal same-repo/write-author flow a stale enabled auto-merge
+# would otherwise survive and merge after checks without review.
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review, synchronize]
     branches: [develop]
 
 permissions:
@@ -22,7 +28,27 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+
+      - name: Check soundness-critical paths
+        id: soundness
+        run: |
+          set -euo pipefail
+          # --no-renames so a rename OUT of a protected tree surfaces the deleted
+          # source path. With rename detection on, `git diff` reports only the
+          # (unprotected) destination, so a PR that removes a soundness-critical
+          # file via rename would slip past the gate.
+          git diff --name-only --no-renames "origin/${{ github.base_ref }}...HEAD" \
+            | _project/scripts/auto_merge_soundness_paths.py --stdin --format github-output \
+            >> "$GITHUB_OUTPUT"
+
       - name: Enable squash auto-merge
+        if: steps.soundness.outputs.soundness_path != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -32,3 +58,17 @@ jobs:
           # Idempotent: gh pr merge --auto is a no-op if auto-merge is already on
           # for the same method. We keep the call simple and rely on that.
           gh pr merge --auto --squash --repo "$REPO" "$PR_NUMBER"
+
+      - name: Disable auto-merge for soundness PR
+        if: steps.soundness.outputs.soundness_path == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "Soundness-critical paths changed; clearing any auto-merge pending review."
+          # A push that newly touches a soundness path must not ride an auto-merge
+          # enabled by an earlier (non-soundness) push. --disable-auto exits
+          # non-zero when auto-merge is already off, so tolerate that.
+          gh pr merge --disable-auto --repo "$REPO" "$PR_NUMBER" || true

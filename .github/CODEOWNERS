@@ -1,0 +1,4 @@
+# Soundness-critical result comparators and plan parsers require owner review.
+benchbox/core/**/validation.py @joeharris76
+benchbox/core/equivalence/** @joeharris76
+benchbox/core/query_plans/parsers/** @joeharris76
