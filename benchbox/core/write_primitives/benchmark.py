@@ -49,6 +49,18 @@ from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 _POSTGRES_OPERATION_SKIP_DIALECTS = frozenset({"postgres", "postgresql"})
 
+# Staging tables whose source TPC-H table is optional: if the source is absent
+# (e.g. a minimal fixture that loads only orders/lineitem), population is skipped
+# with a logged note rather than raising. supplier backs GDPR delete ops;
+# customer backs the SCD Type 2 dimension ops. In a full run the adapter loads
+# all 8 base tables, so these populate normally. Value = the capability lost when
+# the source is missing.
+_OPTIONAL_WHEN_SOURCE_MISSING = {
+    "delete_ops_supplier": "GDPR deletion operations will not be available.",
+    "scd2_ops_dim_customer": "SCD Type 2 dimension operations will not be available.",
+    "scd2_ops_stage_customer": "SCD Type 2 dimension operations will not be available.",
+}
+
 
 def _pk_lock_bypass_required(dialect: str) -> bool:
     """Return True if PK-based lock DDL should be bypassed for this platform.
@@ -485,6 +497,27 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         """
         return table_exists(connection, table_name, self.log_verbose)
 
+    @staticmethod
+    def _scd2_row_hash_expr(acctbal_expr: str) -> str:
+        """Build the portable SCD2 change-detection fingerprint expression.
+
+        Concatenates the tracked dimension attributes into a single string so
+        changed rows are detectable with a plain ``<>`` comparison on every
+        engine (no engine-specific hash function needed). The dimension seed and
+        the 'unchanged'/'new' staging groups pass ``c_acctbal`` so their
+        fingerprints match the dimension; the 'changed' staging group passes a
+        bumped expression so its fingerprint differs and triggers a new version.
+
+        Args:
+            acctbal_expr: SQL expression for the account-balance attribute
+                (``c_acctbal`` for an unchanged value, ``c_acctbal + 100`` for a
+                simulated change).
+
+        Returns:
+            A portable SQL string expression yielding the row fingerprint.
+        """
+        return f"c_name || '|' || c_address || '|' || CAST({acctbal_expr} AS VARCHAR) || '|' || c_mktsegment"
+
     def _get_population_sql(self, table_name: str, source_table: str) -> str:
         """Get the INSERT SQL to populate a staging table from its source.
 
@@ -517,6 +550,48 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             return (
                 f"INSERT INTO {quoted_table} SELECT * FROM {quoted_source} "
                 f"WHERE l_orderkey <= (SELECT CAST(MAX(l_orderkey) * 0.5 AS INTEGER) FROM {quoted_source})"
+            )
+        elif table_name == "scd2_ops_dim_customer":
+            # SCD Type 2 dimension seeded one current version per customer business
+            # key. row_hash is a portable change-detection fingerprint over the
+            # tracked attributes; valid_from is a fixed historical seed date and
+            # valid_to is the open-ended sentinel. Built from the full customer
+            # table so it scales with the scale factor.
+            fingerprint = self._scd2_row_hash_expr("c_acctbal")
+            return (
+                f"INSERT INTO {quoted_table} "
+                f"SELECT c_custkey AS sk, c_custkey, c_name, c_address, c_acctbal, c_mktsegment, "
+                f"{fingerprint} AS row_hash, true AS is_current, "
+                f"DATE '1990-01-01' AS valid_from, DATE '9999-12-31' AS valid_to "
+                f"FROM {quoted_source}"
+            )
+        elif table_name == "scd2_ops_stage_customer":
+            # SCD Type 2 incoming-change batch derived dynamically from the customer
+            # table (range-bounded so it runs at any scale factor). Three disjoint
+            # groups tag the SCD2 cases the catalog ops target:
+            #   changed   - existing keys whose tracked attribute moved (acctbal
+            #               bumped) so the fingerprint differs from the dimension;
+            #   unchanged - existing keys copied verbatim (fingerprint matches, so a
+            #               re-run produces zero new versions);
+            #   new       - brand-new business keys (custkey offset beyond the
+            #               current max) that have no current version yet.
+            fp_changed = self._scd2_row_hash_expr("c_acctbal + 100")
+            fp_same = self._scd2_row_hash_expr("c_acctbal")
+            effective = "DATE '2026-01-01'"
+            return (
+                f"INSERT INTO {quoted_table} "
+                f"SELECT c_custkey, c_name, c_address, c_acctbal + 100, c_mktsegment, "
+                f"{fp_changed} AS row_hash, {effective} AS effective_ts, 'changed' AS change_type "
+                f"FROM {quoted_source} WHERE c_custkey BETWEEN 1 AND 20;\n"
+                f"INSERT INTO {quoted_table} "
+                f"SELECT c_custkey, c_name, c_address, c_acctbal, c_mktsegment, "
+                f"{fp_same} AS row_hash, {effective} AS effective_ts, 'unchanged' AS change_type "
+                f"FROM {quoted_source} WHERE c_custkey BETWEEN 21 AND 40;\n"
+                f"INSERT INTO {quoted_table} "
+                f"SELECT c_custkey + (SELECT MAX(c_custkey) FROM {quoted_source}), "
+                f"c_name, c_address, c_acctbal, c_mktsegment, "
+                f"{fp_same} AS row_hash, {effective} AS effective_ts, 'new' AS change_type "
+                f"FROM {quoted_source} WHERE c_custkey BETWEEN 1 AND 20"
             )
         elif table_name == "ddl_truncate_target":
             # Take all rows but only 3 columns for truncate testing
@@ -554,11 +629,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     source_result = connection.execute(f"SELECT COUNT(*) FROM {quoted_source}").fetchone()
                     source_count = source_result[0] if source_result else 0
                 except Exception as e:
-                    # Source table doesn't exist - skip population for optional tables like supplier
-                    if table_name == "delete_ops_supplier":
+                    # Source table doesn't exist - skip population for optional tables
+                    # (see _OPTIONAL_WHEN_SOURCE_MISSING). Minimal test fixtures load
+                    # only orders/lineitem, so these are skipped rather than raising.
+                    if table_name in _OPTIONAL_WHEN_SOURCE_MISSING:
                         self.log_verbose(
                             f"Skipping {table_name} population - source table '{source_table}' does not exist. "
-                            f"GDPR deletion operations will not be available."
+                            f"{_OPTIONAL_WHEN_SOURCE_MISSING[table_name]}"
                         )
                         status[table_name] = 0
                         continue
@@ -676,6 +753,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 "merge_ops_target": "orders",
                 "merge_ops_source": "orders",
                 "merge_ops_lineitem_target": "lineitem",
+                "scd2_ops_dim_customer": "customer",
+                "scd2_ops_stage_customer": "customer",
                 "ddl_truncate_target": "orders",
             }
 
@@ -777,6 +856,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             "merge_ops_target": "orders",
             "merge_ops_source": "orders",
             "merge_ops_lineitem_target": "lineitem",
+            "scd2_ops_dim_customer": "customer",
+            "scd2_ops_stage_customer": "customer",
             "ddl_truncate_target": "orders",
         }
 

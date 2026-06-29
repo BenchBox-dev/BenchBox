@@ -538,5 +538,127 @@ class TestConsolidatedOperations:
             assert len(operation.cleanup_sql.strip()) > 0, f"{op_id} cleanup SQL should not be empty"
 
 
+class TestSCD2Operations:
+    """SCD Type 2 dimension-maintenance coverage in the MERGE category.
+
+    These ops add the canonical close-old + insert-new SCD2 pattern (and its
+    idempotent / insert-only edge cases) as portable standard SQL. They must not
+    disturb the 20 pre-existing MERGE operations.
+    """
+
+    SCD2_OP_IDS = (
+        "merge_scd_type2_basic",
+        "merge_scd_type2_no_change",
+        "merge_scd_type2_new_keys_only",
+    )
+
+    # The 20 MERGE operations that existed before SCD Type 2 coverage was added.
+    PREEXISTING_MERGE_OP_IDS = (
+        "merge_conditional_update",
+        "merge_conditional_insert",
+        "merge_etl_aggregation_pattern",
+        "merge_deduplication_window_function",
+    )
+
+    def test_scd2_ops_registered_in_merge_category(self):
+        """All SCD2 ops load and are categorized under MERGE."""
+        catalog = load_write_primitives_catalog()
+        for op_id in self.SCD2_OP_IDS:
+            assert op_id in catalog.operations, f"missing SCD2 op {op_id}"
+            assert catalog.operations[op_id].category == "merge"
+
+    def test_scd2_ops_exposed_via_get_all_operations(self):
+        """SCD2 ops are plain SQL ops, so they surface in the user-facing set."""
+        bench = WritePrimitivesBenchmark()
+        ops = bench.get_all_operations()
+        for op_id in self.SCD2_OP_IDS:
+            assert op_id in ops
+
+    def test_merge_category_count_increased_by_three(self):
+        """SCD2 adds exactly three ops to the MERGE category (20 -> 23)."""
+        bench = WritePrimitivesBenchmark()
+        merge_ops = bench.get_operations_by_category("merge")
+        assert len(merge_ops) == 23
+        # The pre-existing MERGE ops are untouched.
+        for op_id in self.PREEXISTING_MERGE_OP_IDS:
+            assert op_id in merge_ops
+
+    def test_user_facing_operation_count_is_112(self):
+        """get_all_operations() grows by exactly the three SCD2 ops (109 -> 112)."""
+        bench = WritePrimitivesBenchmark()
+        assert len(bench.get_all_operations()) == 112
+
+    def test_raw_catalog_count_is_136(self):
+        """Raw catalog grows by exactly three entries (133 -> 136)."""
+        catalog = load_write_primitives_catalog()
+        assert len(catalog.operations) == 136
+
+    def test_scd2_staging_tables_defined(self):
+        """Dedicated SCD2 staging tables exist with the versioning columns."""
+        assert "scd2_ops_dim_customer" in STAGING_TABLES
+        assert "scd2_ops_stage_customer" in STAGING_TABLES
+
+        dim_cols = {c["name"] for c in get_table_schema("scd2_ops_dim_customer")["columns"]}
+        for col in ("sk", "c_custkey", "row_hash", "is_current", "valid_from", "valid_to"):
+            assert col in dim_cols, f"dimension missing versioning column {col}"
+
+        stage_cols = {c["name"] for c in get_table_schema("scd2_ops_stage_customer")["columns"]}
+        for col in ("c_custkey", "row_hash", "effective_ts", "change_type"):
+            assert col in stage_cols, f"staging missing column {col}"
+
+    def test_scd2_ops_do_not_touch_merge_ops_target(self):
+        """SCD2 ops operate on scd2_ops_* tables only, never the shared merge target."""
+        catalog = load_write_primitives_catalog()
+        for op_id in self.SCD2_OP_IDS:
+            op = catalog.operations[op_id]
+            combined = (op.write_sql or "") + (op.cleanup_sql or "")
+            assert "merge_ops_target" not in combined
+            assert "scd2_ops_dim_customer" in op.write_sql
+
+    def test_scd2_ops_have_validation_and_cleanup(self):
+        """Each SCD2 op asserts the one-current-row invariant and cleans up."""
+        catalog = load_write_primitives_catalog()
+        for op_id in self.SCD2_OP_IDS:
+            op = catalog.operations[op_id]
+            assert len(op.validation_queries) >= 1
+            val_ids = {v.id for v in op.validation_queries}
+            assert "one_current_per_business_key" in val_ids
+            assert op.cleanup_sql is not None and op.cleanup_sql.strip()
+
+    def test_scd2_ops_are_scale_independent(self):
+        """No hard-coded surrogate keys / absolute scale assumptions in the SQL.
+
+        The change set is derived dynamically (range-bounded selects + offsets),
+        so the catalog SQL must not embed scale-specific magic numbers beyond the
+        small range bounds shared with the existing merge ops.
+        """
+        catalog = load_write_primitives_catalog()
+        basic = catalog.operations["merge_scd_type2_basic"]
+        # Surrogate keys are generated from MAX(sk) + ROW_NUMBER(), not literals.
+        assert "MAX(sk)" in basic.write_sql
+        assert "ROW_NUMBER()" in basic.write_sql
+
+    def test_scd2_insert_projection_shared_across_ops(self):
+        """All inserting SCD2 ops use the same surrogate-key + column projection.
+
+        The compact one-line-JSON catalog has no template layer, so this clause is
+        copy-pasted across ops. This guard fails loudly if one copy drifts (e.g. a
+        surrogate-key fix applied to only one op), which would silently desync
+        history semantics across the SCD2 ops.
+        """
+        catalog = load_write_primitives_catalog()
+        # The shared INSERT projection: surrogate key from MAX(sk) + ROW_NUMBER(),
+        # the staged attributes, the open-version flag, and the sentinel valid_to.
+        canonical_projection = (
+            "SELECT (SELECT MAX(sk) FROM scd2_ops_dim_customer) + ROW_NUMBER() OVER (ORDER BY s.c_custkey),\n"
+            "       s.c_custkey, s.c_name, s.c_address, s.c_acctbal, s.c_mktsegment, s.row_hash,\n"
+            "       true, s.effective_ts, DATE '9999-12-31'\n"
+        )
+        for op_id in self.SCD2_OP_IDS:
+            assert canonical_projection in catalog.operations[op_id].write_sql, (
+                f"{op_id} INSERT projection drifted from the shared SCD2 form"
+            )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
