@@ -847,8 +847,7 @@ class ResultCaptureMixin:
         # public id recovered from the key; the inline path passes a bare public
         # id, which is unchanged by the recovery.
         if self.plan_query_filter and (
-            query_id not in self.plan_query_filter
-            and _plan_capture_public_id(query_id) not in self.plan_query_filter
+            query_id not in self.plan_query_filter and _plan_capture_public_id(query_id) not in self.plan_query_filter
         ):
             return None, 0.0
 
