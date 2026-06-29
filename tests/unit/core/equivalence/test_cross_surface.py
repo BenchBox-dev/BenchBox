@@ -15,6 +15,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import inspect
+
 import pytest
 
 from benchbox.core.equivalence.cross_surface import (
@@ -32,6 +34,31 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def test_cross_surface_builders_are_decomposed_and_share_loader():
+    import benchbox.core.equivalence.cross_surface as cross_surface
+
+    builder_names = {
+        "build_ssb_duckdb",
+        "build_amplab_duckdb",
+        "build_clickbench_duckdb",
+        "build_coffeeshop_duckdb",
+        "build_joinorder_synthetic_duckdb",
+        "build_h2odb_duckdb",
+        "build_read_primitives_duckdb",
+    }
+
+    cross_surface_source = inspect.getsource(cross_surface)
+    for name in builder_names:
+        builder = getattr(cross_surface, name)
+        assert builder.__module__.startswith("benchbox.core.equivalence.builders.")
+        assert f"def {name}" not in cross_surface_source
+
+    for name in ("build_clickbench_duckdb", "build_coffeeshop_duckdb", "build_joinorder_synthetic_duckdb"):
+        builder_source = inspect.getsource(getattr(cross_surface, name))
+        assert "_load_duckdb_cell(" in builder_source
+        assert "DuckDBAdapter" not in builder_source
 
 
 class _FakeFrame:
