@@ -3,7 +3,8 @@ title: Write Primitives - Add SCD Type 2 Dimension Maintenance Coverage
 worktree: benchmark-expansion
 category: Benchmark Development
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: '2026-06-29'
 description: |
   Add Slowly Changing Dimension (SCD) Type 2 coverage to the Write Primitives
   benchmark. The MERGE category currently has 20 operations (overlap variants,
@@ -137,6 +138,15 @@ scope_limit:
     - "docs/benchmarks/write-primitives.md"
     - "tests/unit/benchmarks/test_write_primitives_core.py"
     - "tests/integration/test_write_primitives_duckdb.py"
+    # Added during implementation: this suite hard-codes the operation count
+    # (total_operations == 109 / len(all_ops) == 109). Adding 3 SCD2 ops makes
+    # the count 112, so the assertions (and their explanatory comments) had to be
+    # updated in lockstep — a required correctness fix, not new scope.
+    - "tests/integration/test_write_primitives_execution.py"
+    # Out-of-scope follow-up (NOT modified here): docs/benchmarks/transaction-primitives.md
+    # cross-reference and benchbox/core/write_primitives/README.md also cite the
+    # old count; the public cross-reference was reconciled, the package README
+    # (internally inconsistent pre-change) is deferred to a doc-sync follow-up.
   do_not_modify:
     - "benchbox/core/runner.py"
     - "benchbox/cli/"
@@ -144,7 +154,7 @@ scope_limit:
 work:
   - id: w1
     summary: Add scd2_ops_dim_customer and scd2_ops_stage_customer staging specs
-    status: pending
+    status: done
     notes: |
       In schema_specs.yaml, alongside merge_ops_target. Dimension columns:
       surrogate sk, c_custkey business key, attribute subset, row_hash,
@@ -157,7 +167,7 @@ work:
   - id: w2
     summary: Add merge_scd_type2_basic operation to operations.yaml
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Close-old (UPDATE is_current=false, stamp valid_to) + insert-new current
       version. Portable standard SQL. validation: exactly one current row per
@@ -166,7 +176,7 @@ work:
   - id: w3
     summary: Add SCD2 edge-case ops (no-change idempotent, new-keys-only)
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       merge_scd_type2_no_change (re-run with identical row_hash -> zero new
       versions) and merge_scd_type2_new_keys_only (all inserts, no closes).
@@ -174,21 +184,21 @@ work:
   - id: w4
     summary: Unit tests - registration, count, validation, cleanup
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Assert ops registered, merge category count bumped, existing ids intact,
       validation_queries shape correct.
   - id: w5
     summary: Integration test on DuckDB (-k scd2)
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       End-to-end execute_operation: write -> validate (one current row per key)
       -> cleanup -> repeatable. Verify against actual TPC-H SF0.01 data.
   - id: w6
     summary: Update docs/benchmarks/write-primitives.md
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       Add SCD2 to the MERGE catalog list, bump the "20 operations" / "109
       operations" counts, and add scd2_ops_* tables to the staging-table list.
