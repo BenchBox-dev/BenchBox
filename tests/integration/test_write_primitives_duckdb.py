@@ -501,8 +501,9 @@ class TestWritePrimitivesDuckDBBenchmarkRuns:
             result = write_bench.execute_operation(op_id, conn)
             results.append(result)
 
-        # Should have 109 operations (8 transaction ops moved to Transaction Primitives)
-        assert len(results) == 109
+        # Should have 112 operations (8 transaction ops moved to Transaction
+        # Primitives; +3 SCD Type 2 merge ops added in MERGE category)
+        assert len(results) == 112
 
         # All should be OperationResult instances
         for result in results:
@@ -970,6 +971,157 @@ class TestWritePrimitivesBulkLoad:
         # Verify category count
         bulk_load_ops = write_bench.get_operations_by_category("bulk_load")
         assert len(bulk_load_ops) == 36, f"BULK_LOAD category should have 36 operations, got {len(bulk_load_ops)}"
+
+
+@pytest.mark.integration
+@pytest.mark.duckdb
+@pytest.mark.write_primitives
+class TestWritePrimitivesSCD2DuckDB:
+    """End-to-end SCD Type 2 dimension-maintenance ops against real DuckDB.
+
+    Unlike the other execution fixtures, this one loads the ``customer`` base
+    table (the SCD2 dimension source) so the scd2_ops_* staging tables populate
+    and the ops exercise real close-old / insert-new behavior at SF0.01-shaped
+    data.
+    """
+
+    @pytest.fixture
+    def scd2_env(self, small_scale_factor, temp_dir):
+        conn = duckdb.connect(":memory:")
+
+        # setup() validates orders + lineitem exist; SCD2 sources customer.
+        conn.execute("""
+            CREATE TABLE orders (
+                o_orderkey INTEGER PRIMARY KEY, o_custkey INTEGER, o_orderstatus CHAR(1),
+                o_totalprice DECIMAL(15,2), o_orderdate DATE, o_orderpriority CHAR(15),
+                o_clerk CHAR(15), o_shippriority INTEGER, o_comment VARCHAR(79)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE lineitem (
+                l_orderkey INTEGER, l_partkey INTEGER, l_suppkey INTEGER, l_linenumber INTEGER,
+                l_quantity DECIMAL(15,2), l_extendedprice DECIMAL(15,2), l_discount DECIMAL(15,2),
+                l_tax DECIMAL(15,2), l_returnflag CHAR(1), l_linestatus CHAR(1), l_shipdate DATE,
+                l_commitdate DATE, l_receiptdate DATE, l_shipinstruct CHAR(25), l_shipmode CHAR(10),
+                l_comment VARCHAR(44)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE customer (
+                c_custkey INTEGER PRIMARY KEY, c_name VARCHAR(25), c_address VARCHAR(40),
+                c_nationkey INTEGER, c_phone VARCHAR(15), c_acctbal DECIMAL(15,2),
+                c_mktsegment VARCHAR(10), c_comment VARCHAR(117)
+            )
+        """)
+        conn.execute("INSERT INTO orders VALUES (1, 1, 'O', 10.0, DATE '2024-01-01', '1-URGENT', 'C#1', 0, 'o')")
+        conn.execute(
+            "INSERT INTO lineitem VALUES "
+            "(1, 1, 1, 1, 1.0, 1.0, 0.0, 0.0, 'N', 'O', DATE '2024-01-02', DATE '2024-01-01', "
+            "DATE '2024-01-03', 'NONE', 'TRUCK', 'c')"
+        )
+        # 50 customers so the change batch ranges (1-20 changed, 21-40 unchanged,
+        # offset-by-max new) all populate.
+        conn.execute("""
+            INSERT INTO customer
+            SELECT i, 'Customer#' || CAST(i AS VARCHAR), 'Addr ' || CAST(i AS VARCHAR),
+                   (i % 25), '555-' || CAST(i AS VARCHAR), (i * 10.0),
+                   CASE WHEN i % 2 = 0 THEN 'BUILDING' ELSE 'AUTOMOBILE' END,
+                   'comment ' || CAST(i AS VARCHAR)
+            FROM range(1, 51) t(i)
+        """)
+
+        write_bench = WritePrimitives(scale_factor=small_scale_factor, output_dir=temp_dir, quiet=True)
+        write_bench.setup(conn, force=True)
+        yield write_bench, conn
+        conn.close()
+
+    def _current_state(self, conn):
+        """Return (total_rows, current_rows, closed_rows) for the dimension."""
+        return conn.execute(
+            "SELECT COUNT(*), "
+            "SUM(CASE WHEN is_current THEN 1 ELSE 0 END), "
+            "SUM(CASE WHEN NOT is_current THEN 1 ELSE 0 END) "
+            "FROM scd2_ops_dim_customer"
+        ).fetchone()
+
+    def test_scd2_dimension_and_stage_seeded(self, scd2_env):
+        """Setup seeds one current version per customer and a mixed change batch."""
+        _, conn = scd2_env
+        total, current, closed = self._current_state(conn)
+        assert total == 50 and current == 50 and closed == 0
+        # Exactly one current row per business key after seeding.
+        offenders = conn.execute(
+            "SELECT c_custkey FROM scd2_ops_dim_customer WHERE is_current = true "
+            "GROUP BY c_custkey HAVING COUNT(*) <> 1"
+        ).fetchall()
+        assert offenders == []
+        stage = dict(
+            conn.execute("SELECT change_type, COUNT(*) FROM scd2_ops_stage_customer GROUP BY change_type").fetchall()
+        )
+        assert stage == {"changed": 20, "unchanged": 20, "new": 20}
+
+    def test_scd2_basic_executes_validates_and_cleans_up(self, scd2_env):
+        """Close-old + insert-new runs, validates, and restores pre-op state."""
+        write_bench, conn = scd2_env
+        result = write_bench.execute_operation("merge_scd_type2_basic", conn)
+        assert isinstance(result, OperationResult)
+        assert result.success is True, result.error
+        assert result.validation_passed is True
+        assert result.cleanup_success is True
+        # cleanup restores the seed state, so the op is repeatable.
+        assert self._current_state(conn) == (50, 50, 0)
+
+    def test_scd2_basic_writes_history_before_cleanup(self, scd2_env):
+        """Running the raw write SQL closes changed keys and inserts new versions."""
+        write_bench, conn = scd2_env
+        op = write_bench.get_operation("merge_scd_type2_basic")
+        conn.execute(op.write_sql)
+        # 20 changed keys closed + 20 changed-key new versions + 20 brand-new keys.
+        total, current, closed = self._current_state(conn)
+        assert closed == 20
+        assert current == 70  # 50 seed - 20 closed + 20 changed-new + 20 new
+        assert total == 90
+        # Still exactly one current row per business key.
+        offenders = conn.execute(
+            "SELECT c_custkey FROM scd2_ops_dim_customer WHERE is_current = true "
+            "GROUP BY c_custkey HAVING COUNT(*) <> 1"
+        ).fetchall()
+        assert offenders == []
+        # Closed rows carry a non-sentinel valid_to.
+        sentinel_closed = conn.execute(
+            "SELECT COUNT(*) FROM scd2_ops_dim_customer WHERE is_current = false AND valid_to = DATE '9999-12-31'"
+        ).fetchone()[0]
+        assert sentinel_closed == 0
+        conn.execute(op.cleanup_sql)
+        assert self._current_state(conn) == (50, 50, 0)
+
+    def test_scd2_basic_is_repeatable(self, scd2_env):
+        """Re-running the full op (write+validate+cleanup) stays correct."""
+        write_bench, conn = scd2_env
+        for _ in range(2):
+            result = write_bench.execute_operation("merge_scd_type2_basic", conn)
+            assert result.success is True, result.error
+            assert result.validation_passed is True
+            assert self._current_state(conn) == (50, 50, 0)
+
+    def test_scd2_no_change_is_idempotent(self, scd2_env):
+        """An unchanged batch closes no rows and inserts zero new versions."""
+        write_bench, conn = scd2_env
+        result = write_bench.execute_operation("merge_scd_type2_no_change", conn)
+        assert result.success is True, result.error
+        assert result.validation_passed is True
+        assert self._current_state(conn) == (50, 50, 0)
+
+    def test_scd2_new_keys_only_inserts_without_closing(self, scd2_env):
+        """Brand-new keys are appended as current versions; nothing is closed."""
+        write_bench, conn = scd2_env
+        op = write_bench.get_operation("merge_scd_type2_new_keys_only")
+        conn.execute(op.write_sql)
+        total, current, closed = self._current_state(conn)
+        assert closed == 0
+        assert current == 70 and total == 70
+        conn.execute(op.cleanup_sql)
+        assert self._current_state(conn) == (50, 50, 0)
 
 
 if __name__ == "__main__":

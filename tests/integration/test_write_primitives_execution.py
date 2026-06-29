@@ -35,8 +35,8 @@ class TestWritePrimitivesBasic:
         assert info["name"] == "Write Primitives Benchmark"
         assert info["version"] == "1.0"
         assert (
-            info["total_operations"] == 109
-        )  # Total operations: INSERT (12), UPDATE (15), DELETE (14), BULK_LOAD (36), MERGE (20), DDL (12)
+            info["total_operations"] == 112
+        )  # Total operations: INSERT (12), UPDATE (15), DELETE (14), BULK_LOAD (36), MERGE (23), DDL (12)
         assert "insert" in info["categories"]
         assert "update" in info["categories"]
         assert "delete" in info["categories"]
@@ -51,8 +51,8 @@ class TestWritePrimitivesBasic:
         # Get all operations
         all_ops = bench.get_all_operations()
         assert (
-            len(all_ops) == 109
-        )  # Total operations: INSERT (12), UPDATE (15), DELETE (14), BULK_LOAD (36), MERGE (20), DDL (12)
+            len(all_ops) == 112
+        )  # Total operations: INSERT (12), UPDATE (15), DELETE (14), BULK_LOAD (36), MERGE (23), DDL (12)
 
         # Get by category
         insert_ops = bench.get_operations_by_category("insert")

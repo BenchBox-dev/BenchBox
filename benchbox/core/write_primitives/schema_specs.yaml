@@ -328,6 +328,53 @@ tables:
     - name: order_count
       type: INTEGER
       nullable: true
+- id: SCD2_OPS_DIM_CUSTOMER
+  key: scd2_ops_dim_customer
+  schema:
+    name: scd2_ops_dim_customer
+    columns:
+    - name: sk
+      type: INTEGER
+      primary_key: true
+    - name: c_custkey
+      type: INTEGER
+    - name: c_name
+      type: VARCHAR(25)
+    - name: c_address
+      type: VARCHAR(40)
+    - name: c_acctbal
+      type: DECIMAL(15,2)
+    - name: c_mktsegment
+      type: VARCHAR(10)
+    - name: row_hash
+      type: VARCHAR(200)
+    - name: is_current
+      type: BOOLEAN
+    - name: valid_from
+      type: DATE
+    - name: valid_to
+      type: DATE
+- id: SCD2_OPS_STAGE_CUSTOMER
+  key: scd2_ops_stage_customer
+  schema:
+    name: scd2_ops_stage_customer
+    columns:
+    - name: c_custkey
+      type: INTEGER
+    - name: c_name
+      type: VARCHAR(25)
+    - name: c_address
+      type: VARCHAR(40)
+    - name: c_acctbal
+      type: DECIMAL(15,2)
+    - name: c_mktsegment
+      type: VARCHAR(10)
+    - name: row_hash
+      type: VARCHAR(200)
+    - name: effective_ts
+      type: DATE
+    - name: change_type
+      type: VARCHAR(10)
 - id: BULK_LOAD_OPS_TARGET
   key: bulk_load_ops_target
   schema:
@@ -457,6 +504,8 @@ staging_tables:
 - merge_ops_source
 - merge_ops_lineitem_target
 - merge_ops_summary_target
+- scd2_ops_dim_customer
+- scd2_ops_stage_customer
 - bulk_load_ops_target
 - ddl_truncate_target
 - write_ops_log
@@ -476,5 +525,7 @@ create_order:
 - merge_ops_source
 - merge_ops_lineitem_target
 - merge_ops_summary_target
+- scd2_ops_dim_customer
+- scd2_ops_stage_customer
 - bulk_load_ops_target
 - ddl_truncate_target
