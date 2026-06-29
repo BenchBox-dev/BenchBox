@@ -136,7 +136,8 @@ def _normalise_to_root(root: Path | CloudPath, path: PathLike) -> tuple[Path | C
     elif isinstance(resolved, Path):
         resolved = resolved.resolve()
 
-    if CloudPath is not None and isinstance(resolved, CloudPath):  # type: ignore
+    cloud_path_type = _get_cloud_path_type()
+    if cloud_path_type is not None and isinstance(resolved, cloud_path_type):
         # ``relative_to`` is supported when both share the same anchor. Nested
         # try/except keeps compatibility across providers.
         try:
