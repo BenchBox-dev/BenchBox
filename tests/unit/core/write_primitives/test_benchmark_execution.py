@@ -1563,6 +1563,58 @@ def test_get_effective_write_sql_no_overrides(fast_bench):
     assert skip is None
 
 
+def test_get_effective_write_sql_duckdb_skips_merge_into(fast_bench):
+    """DuckDB 1.3.2 rejects MERGE INTO, so such ops are gated out by the SQL token."""
+    operation = SimpleNamespace(
+        id="merge_simple_upsert_small",
+        write_sql="MERGE INTO t AS target USING s ON t.k = s.k WHEN MATCHED THEN UPDATE SET v = s.v",
+        platform_overrides={},
+        category="merge",
+    )
+    sql, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb")
+    assert sql is None
+    assert skip is not None
+    assert "MERGE INTO" in skip
+
+
+def test_get_effective_write_sql_duckdb_runs_portable_merge(fast_bench):
+    """Portable merge ops (UPDATE + INSERT, no MERGE INTO) run on DuckDB despite the merge category.
+
+    The skip is gated on the ``MERGE INTO`` token, not on the broad ``merge`` category, so portable
+    SCD Type 2 style ops are not skipped.
+    """
+    operation = SimpleNamespace(
+        id="merge_scd_type2_basic",
+        write_sql="UPDATE dim SET is_current = false WHERE k IN (SELECT k FROM stage);\nINSERT INTO dim SELECT * FROM stage",
+        platform_overrides={},
+        category="merge",
+    )
+    sql, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb")
+    assert skip is None
+    assert sql == operation.write_sql
+
+
+def test_get_effective_write_sql_duckdb_gate_matches_catalog(fast_bench):
+    """The real catalog: portable SCD2 ops run on DuckDB while legacy MERGE INTO ops skip."""
+    portable_ops = (
+        "merge_scd_type2_basic",
+        "merge_scd_type2_no_change",
+        "merge_scd_type2_new_keys_only",
+    )
+    for op_id in portable_ops:
+        operation = fast_bench.get_operation(op_id)
+        assert operation.category == "merge"
+        assert "MERGE INTO" not in operation.write_sql.upper()
+        _, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb")
+        assert skip is None, f"{op_id} should run on DuckDB, got skip: {skip}"
+
+    legacy = fast_bench.get_operation("merge_simple_upsert_small")
+    assert "MERGE INTO" in legacy.write_sql.upper()
+    _, legacy_skip = fast_bench._get_effective_write_sql(legacy, platform_key="duckdb")
+    assert legacy_skip is not None
+    assert "MERGE INTO" in legacy_skip
+
+
 def test_get_effective_write_sql_skips_when_file_dependencies_missing(fast_bench, tmp_path):
     """Bulk-load operations should be skipped when required files are unavailable."""
     fast_bench.data_generator.files_dir = tmp_path

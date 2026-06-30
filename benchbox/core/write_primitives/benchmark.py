@@ -37,8 +37,7 @@ from benchbox.core.write_primitives.schema import (
     get_create_table_sql,
 )
 from benchbox.sql_compat.rules.execution_filter.duckdb_write_primitives import (
-    DUCKDB_WRITE_PRIMITIVES_CATEGORY_SKIPS,
-    DUCKDB_WRITE_PRIMITIVES_OPERATION_SKIPS,
+    duckdb_write_primitive_skip_reason,
 )
 from benchbox.sql_compat.rules.execution_filter.postgres_write_primitives import (
     POSTGRES_WRITE_PRIMITIVES_CATEGORY_SKIPS,
@@ -412,17 +411,9 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 )
 
         if (platform_key or "").lower() == "duckdb":
-            category = getattr(operation, "category", "")
-            if category in DUCKDB_WRITE_PRIMITIVES_CATEGORY_SKIPS:
-                return None, (
-                    f"Operation '{operation.id}' is skipped on DuckDB: "
-                    f"{DUCKDB_WRITE_PRIMITIVES_CATEGORY_SKIPS[category]}"
-                )
-            if operation.id in DUCKDB_WRITE_PRIMITIVES_OPERATION_SKIPS:
-                return None, (
-                    f"Operation '{operation.id}' is skipped on DuckDB: "
-                    f"{DUCKDB_WRITE_PRIMITIVES_OPERATION_SKIPS[operation.id]}"
-                )
+            duckdb_skip_reason = duckdb_write_primitive_skip_reason(operation)
+            if duckdb_skip_reason is not None:
+                return None, (f"Operation '{operation.id}' is skipped on DuckDB: {duckdb_skip_reason}")
 
         effective_sql = operation.write_sql
 
