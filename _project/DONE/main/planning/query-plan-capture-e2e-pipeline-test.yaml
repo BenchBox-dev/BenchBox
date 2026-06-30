@@ -2,7 +2,7 @@ id: query-plan-capture-e2e-pipeline-test
 title: "Add end-to-end test for --capture-plans: run → results.json → show-plan/compare-plans CLI"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
