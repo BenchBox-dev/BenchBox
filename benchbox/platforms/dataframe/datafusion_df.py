@@ -545,14 +545,23 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
             # Fall back to simpler API
             df = self.session_ctx.read_csv(path_str)
 
+        if column_names:
+            # DataFusion's non-.tbl read_csv ignores column_names (unlike the
+            # .tbl path), so a headerless CSV (e.g. ClickBench's generated
+            # hits.csv) keeps DataFusion's inferred names (column_1, …) rather
+            # than the benchmark schema names. Re-apply the declared names
+            # positionally so downstream schema-name lookups resolve — without
+            # this the string-column coalesce below skips every declared column
+            # and the empty text fields stay NULL instead of "".
+            df = self._apply_tbl_column_names(df, column_names)
+
         if null_marker is None and string_columns:
-            # For headerless CSV with a declared schema (e.g. ClickBench's
-            # generated hits.csv), this non-.tbl path never applies
-            # `column_names`, so the frame columns are DataFusion's inferred
-            # names (column_1, …) rather than the benchmark schema names.
-            # Guard each coalesce on membership in the frame's actual columns
-            # so a declared string column that isn't present by name does not
-            # raise on `col(<schema_name>)` and abort the load.
+            # ``null_marker is None`` means empty fields in declared string
+            # columns must stay ``""`` (ClickBench filters ``SearchPhrase <> ''``
+            # etc.). DataFusion reads an empty CSV field as NULL, so coalesce it
+            # back to "". The membership guard tolerates a declared column that
+            # genuinely isn't present (e.g. column_names was not supplied so the
+            # rename above could not align the schema names).
             present_columns = {field.name for field in df.schema()}
             for name in string_columns:
                 if name in present_columns:

@@ -23,7 +23,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "case \"$TOOL_INPUT_file_path\" in *.py) uv run ruff check --fix \"$TOOL_INPUT_file_path\"; uv run ruff format \"$TOOL_INPUT_file_path\" 2>/dev/null; exit 0;; *) exit 0;; esac"
+            "command": "file_path=$(python3 -c \"import json,sys; raw=sys.stdin.read().strip() or '{}'; d=json.loads(raw) if raw[:1]=='{' else {}; print((d.get('tool_input') or {}).get('file_path',''))\"); case \"$file_path\" in *.py) uv run ruff check --fix \"$file_path\"; uv run ruff format \"$file_path\" 2>/dev/null; exit 0;; *) exit 0;; esac"
           }
         ]
       },
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "case \"$TOOL_INPUT_file_path\" in *.py) uv run ty check \"$TOOL_INPUT_file_path\"; exit 0;; *) exit 0;; esac"
+            "command": "file_path=$(python3 -c \"import json,sys; raw=sys.stdin.read().strip() or '{}'; d=json.loads(raw) if raw[:1]=='{' else {}; print((d.get('tool_input') or {}).get('file_path',''))\"); case \"$file_path\" in *.py) uv run ty check \"$file_path\"; exit 0;; *) exit 0;; esac"
           }
         ]
       }
