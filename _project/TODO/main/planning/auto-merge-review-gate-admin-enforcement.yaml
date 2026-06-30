@@ -2,7 +2,7 @@ id: auto-merge-review-gate-admin-enforcement
 title: "Make the soundness-path review gate enforceable at the repo layer, not just code"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Release Tooling
 
 description: |
@@ -35,7 +35,7 @@ prior_art:
 work:
   - id: w0
     summary: "Re-confirm live ruleset state and CODEOWNERS ownership of soundness globs"
-    status: pending
+    status: done
     needs: []
     notes: |
       Capture `gh api repos/joeharris76/BenchBox/rulesets` and the develop ruleset
@@ -45,7 +45,7 @@ work:
 
   - id: w1
     summary: "Add a CI meta-check that fails when the develop ruleset lacks review enforcement"
-    status: pending
+    status: done
     needs: [w0]
     notes: |
       Add a step (in pr.yml lint or content-guard, alongside the existing drift
@@ -57,7 +57,7 @@ work:
 
   - id: w2
     summary: "Correct the DONE success_metric and document the admin runbook step"
-    status: pending
+    status: done
     needs: [w0]
     notes: |
       Amend _project/DONE/main/active/auto-merge-review-gate-soundness-paths.yaml
