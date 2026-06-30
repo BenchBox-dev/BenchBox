@@ -32,7 +32,7 @@ import contextlib
 import signal
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
@@ -52,6 +52,21 @@ from benchbox.utils.dialect_utils import SQLTranslationError
 from benchbox.utils.printing import quiet_console
 
 __all__ = ["TestDriversMixin", "_power_query_result", "_power_test_error_result"]
+
+
+class _CapturedPlan(NamedTuple):
+    """One query's captured plan, accumulated across isolated capture passes.
+
+    Stored in the per-run ``_captured_plans`` accumulator keyed by capture key so a
+    pre-mutation checkpoint and the final post-measurement pass can each contribute
+    plans that are attached to result rows exactly once. ``plan`` is ``None`` when
+    capture failed or the query was filtered out; ``capture_ms`` is recorded even
+    then so plan-capture timing is reported honestly.
+    """
+
+    plan: Any
+    fingerprint: str | None
+    capture_ms: float | None
 
 
 class TestDriversMixin:
@@ -424,6 +439,11 @@ class TestDriversMixin:
 
         from benchbox.core.tpcds.maintenance_test import TPCDSMaintenanceTest
 
+        # Maintenance mutates table cardinalities. Capture any read-phase plans
+        # recorded so far (combined mode: power/throughput) against the current
+        # pre-mutation data state, before this phase changes it.
+        self._plan_capture_checkpoint(connection)
+
         console = quiet_console
 
         try:
@@ -510,6 +530,11 @@ class TestDriversMixin:
         """Execute TPC-H Maintenance Test using production TPCHMaintenanceTest implementation."""
 
         from benchbox.core.tpch.maintenance_test import TPCHMaintenanceTest
+
+        # Maintenance mutates table cardinalities. Capture any read-phase plans
+        # recorded so far (combined mode: power/throughput) against the current
+        # pre-mutation data state, before this phase changes it.
+        self._plan_capture_checkpoint(connection)
 
         console = quiet_console
 
@@ -612,8 +637,13 @@ class TestDriversMixin:
             return self._dispatch_queries_by_type(benchmark, connection, run_config)
 
         # Isolate capture: record executed queries during the timed run, capture after.
+        # ``_captured_plans`` is the per-run accumulator keyed by capture key; it lets
+        # capture happen in more than one isolated pass (a pre-mutation checkpoint plus
+        # the final pass) while plans are attached to result rows exactly once at the
+        # end. Reset here so a reused adapter never carries plans across runs.
         self._plan_capture_phase_active = True
         self._phase_recorded_queries = {}
+        self._captured_plans = {}
         try:
             results = self._dispatch_queries_by_type(benchmark, connection, run_config)
         finally:
@@ -1207,48 +1237,124 @@ class TestDriversMixin:
         The ``plan_query_filter`` query-selection set (``--plan-queries``) is still
         honoured; the per-iteration / per-stream sampling machinery
         (``plan_first_n`` / ``plan_sampling_rate``) has been retired.
+
+        Capture and attachment are split: :meth:`_capture_recorded_plans` runs the
+        isolated EXPLAIN pass and accumulates plans by capture key, while
+        :meth:`_attach_captured_plans` merges them into the result rows. This lets a
+        workload that mutates data mid-run capture its read-phase plans earlier, at a
+        pre-mutation checkpoint (:meth:`_plan_capture_checkpoint`), so a captured plan
+        always reflects the data state its query was measured against rather than the
+        post-mutation end state — while still attaching every plan exactly once here.
+
+        ``results`` is accepted for backward compatibility but capture is driven by
+        ``queries`` (the recorded-query buffer), which is already SUCCESS-only.
+        """
+        self._capture_recorded_plans(connection, queries)
+        self._attach_captured_plans(results)
+
+    def _capture_recorded_plans(self, connection: Any, queries: dict[str, str]) -> None:
+        """Run the isolated EXPLAIN pass for not-yet-captured recorded queries.
+
+        ``queries`` is the recorded-query buffer (``_phase_recorded_queries``),
+        keyed by capture key (``<public_id>#<sql_digest>``) and populated only for
+        queries that SUCCEEDED during the timed run. Capture is buffer-driven rather
+        than results-driven because the TPC power/throughput drivers rebuild their
+        result rows and drop the internal capture key — so a results-driven selection
+        would silently capture nothing for them. Each not-yet-captured key is
+        EXPLAINed exactly once and stored in the per-run ``_captured_plans``
+        accumulator; a key captured by an earlier pass (a pre-mutation checkpoint) is
+        skipped, so its plan reflects the data state present at its FIRST capture.
         """
         from benchbox.core.plan_capture_phase import run_plan_capture_phase
 
-        # The recorded buffer is keyed by an internal capture key derived from the
-        # result's query_id plus exact executed SQL. Result rows produced before that
-        # key existed (or tests constructing rows by hand) fall back to str(query_id).
-        success_queries = {
-            str(result.get("_plan_capture_key") or result["query_id"]): queries[
-                str(result.get("_plan_capture_key") or result["query_id"])
-            ]
-            for result in results
-            if result.get("status") == "SUCCESS"
-            and str(result.get("_plan_capture_key") or result.get("query_id")) in queries
-        }
-        if not success_queries:
+        captured = self._ensure_plan_capture_accumulator()
+        pending = {key: sql for key, sql in queries.items() if key not in captured}
+        if not pending:
             return
 
         phase = run_plan_capture_phase(
             self,
-            success_queries,
+            pending,
             connection=connection,
             analyze_plans=getattr(self, "analyze_plans", True),
         )
 
+        for capture_key in pending:
+            captured[capture_key] = _CapturedPlan(
+                plan=phase.plans.get(capture_key),
+                fingerprint=phase.fingerprints.get(capture_key),
+                capture_ms=phase.per_query_capture_ms.get(capture_key),
+            )
+
+    def _attach_captured_plans(self, results: list[dict[str, Any]]) -> None:
+        """Merge accumulated captured plans into result rows.
+
+        Per-row SUCCESS guard mirrors the inline capture chokepoint: a captured plan
+        is attached only to rows whose own status succeeded; a failed row sharing a
+        query_id must never be annotated as plan-captured (it would skew downstream
+        plan stats). The internal ``_plan_capture_key`` is popped from every row.
+
+        A row is matched to its captured plan by exact capture key when it carries
+        one (the standard ``_execute_all_queries`` path), else by its public
+        query_id — the TPC power/throughput drivers rebuild result rows without the
+        capture key, leaving only the bare id. The public-id fallback attaches a plan
+        only when that id maps to a single captured variant; a query_id that ran as
+        multiple distinct SQL variants (e.g. seed-varied throughput streams) is left
+        unattached rather than risk pairing a row with another variant's plan.
+        """
+        from benchbox.platforms.base.result_capture import _plan_capture_public_id
+
+        captured = self._ensure_plan_capture_accumulator()
+
+        # Public-id -> the single captured variant for that id, or None when the id
+        # ran as several distinct variants (ambiguous: do not guess which row ran which).
+        by_public_id: dict[str, _CapturedPlan | None] = {}
+        for capture_key, entry in captured.items():
+            public_id = _plan_capture_public_id(capture_key)
+            by_public_id[public_id] = None if public_id in by_public_id else entry
+
         for result in results:
-            # Per-row SUCCESS guard mirrors the inline capture chokepoint: a captured
-            # plan is attached only to rows whose own status succeeded. ``success_queries``
-            # selects a query for capture if *any* row succeeded, but a failed row sharing
-            # that query_id must never be annotated as plan-captured (it would skew
-            # downstream plan stats).
             if result.get("status") != "SUCCESS":
                 result.pop("_plan_capture_key", None)
                 continue
             query_id = str(result.get("query_id"))
-            capture_key = str(result.pop("_plan_capture_key", None) or query_id)
-            plan = phase.plans.get(capture_key)
-            if plan is not None:
-                plan.query_id = query_id
-                result["query_plan"] = plan
-                result["plan_fingerprint"] = phase.fingerprints.get(capture_key)
-            if capture_key in phase.per_query_capture_ms:
-                result["plan_capture_time_ms"] = phase.per_query_capture_ms[capture_key]
+            row_key = result.pop("_plan_capture_key", None)
+            entry = captured.get(str(row_key)) if row_key else by_public_id.get(query_id)
+            if entry is None:
+                continue
+            if entry.plan is not None:
+                entry.plan.query_id = query_id
+                result["query_plan"] = entry.plan
+                result["plan_fingerprint"] = entry.fingerprint
+            if entry.capture_ms is not None:
+                result["plan_capture_time_ms"] = entry.capture_ms
+
+    def _ensure_plan_capture_accumulator(self) -> dict[str, _CapturedPlan]:
+        """Return the per-run captured-plan accumulator, creating it if absent.
+
+        ``_execute_queries_by_type`` resets this at the start of every run; the lazy
+        fallback here keeps direct callers of ``_capture_plans_post_measurement``
+        (tests, bespoke pipelines) working without going through that wrapper.
+        """
+        captured = getattr(self, "_captured_plans", None)
+        if captured is None:
+            captured = {}
+            self._captured_plans = captured
+        return captured
+
+    def _plan_capture_checkpoint(self, connection: Any) -> None:
+        """Capture recorded plans now, before a subsequent data-mutating phase.
+
+        No-op unless the isolated capture phase is active (so it never fires for
+        non-eligible adapters or read-only inline capture). Captures the read-phase
+        plans recorded so far against the current pre-mutation data state so they are
+        not later EXPLAINed against post-mutation cardinalities (the combined-mode
+        divergence). Attachment still happens once, in the final post-measurement
+        pass; this only fixes *when* each read plan is captured.
+        """
+        if not getattr(self, "_plan_capture_phase_active", False):
+            return
+        self._capture_recorded_plans(connection, dict(self._phase_recorded_queries))
 
     # -------------------------------------------------------------------------
     # Dry-run and SQL capture helpers (extracted w9)

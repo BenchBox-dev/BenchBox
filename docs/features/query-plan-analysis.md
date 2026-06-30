@@ -128,6 +128,42 @@ stage timing are only available from the executed `QueryJob`), so it sets
 `plan_capture_phase_eligible = False` and harvests its plan from the completed job rather than
 through the isolated phase. `analyze_plans` is a no-op for it.
 
+#### Mid-run data mutation: capture before the mutation
+
+The isolated `EXPLAIN` pass runs *after* the timed loop, so for a **read-only** workload it sees the
+exact data state every query was measured against — captured plans and their cardinality estimates
+match what the optimizer chose during measurement. Standard TPC-H/TPC-DS **power** and **throughput**
+sets are `SELECT`-only, so this is always true for them.
+
+A workload that **mutates data mid-run** would otherwise break that guarantee. In **combined mode**
+the order is *power → throughput → maintenance*: the maintenance step (TPC-H RF1/RF2 inserts+deletes,
+TPC-DS data maintenance) changes table cardinalities, so a single capture pass at the very end would
+`EXPLAIN` the power/throughput read queries against the **post-maintenance** data — describing a plan
+the optimizer never chose during measurement.
+
+BenchBox resolves this by capturing **before the mutation**. A capture *checkpoint* runs at the start
+of the maintenance phase — after the read phases, before any maintenance write — so the
+power/throughput plans are EXPLAINed against the pre-maintenance state they were measured against.
+The maintenance writes themselves are then captured in the final post-measurement pass (downgraded to
+a non-`ANALYZE` `EXPLAIN`, so they are never re-executed). Each query is still captured exactly once,
+and plans are attached to result rows once, at the end. The checkpoint runs strictly between phases —
+never inside a timed query or a concurrent throughput stream — so measured timings are unaffected.
+
+Capture is driven by the recorded-query buffer (every distinct query that succeeded during the timed
+run), and each captured plan is attached to its result row by the exact recorded query, or — for the
+TPC power/throughput drivers, whose result rows carry only the query id — by that query id when it
+maps to a single executed SQL variant.
+
+> **Seed-varied throughput streams and bespoke DML query sets.** When one query id runs as *several*
+> distinct SQL variants in the same run (e.g. throughput streams rendered with different seeds), a
+> result row that carries only the query id cannot be matched to the specific variant it ran, so its
+> plan is left unattached rather than risk pairing it with another variant's plan (literal-normalized
+> fingerprints, tracked separately, make these variants structurally equal). Likewise, a *bespoke*
+> query set that runs an `INSERT`/`UPDATE`/`DELETE` partway through and then more `SELECT`s has no
+> maintenance phase boundary, so the isolated model captures those later reads against the end-of-run
+> state. Keep data-mutating steps in a maintenance phase (or a separate run) when you need read-query
+> fingerprints to reflect their measured data state.
+
 ### Captured Fields
 
 Each query result includes three plan-related fields when `--capture-plans` is active:
