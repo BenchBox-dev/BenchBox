@@ -1,0 +1,77 @@
+id: cloud-setup-script-plugin-activation
+title: "Activate committed Claude Code plugins in cloud via setup script"
+worktree: chore-cloud-parity-setup-script
+priority: Medium
+status: Identified
+category: "Testing and Quality Assurance"
+
+description: |
+  A fresh claude.ai/code cloud session loads committed skills and commands, but
+  NOT plugins or PostToolUse hooks. Validated 2026-06-30 (see
+  _project/decisions/claude-settings-cloud-ownership-2026-06-29.md, cloud
+  addendum):
+
+  - Plugins: not auto-installed by design. Per the docs (Claude Code >= v2.1.195)
+    a plugin enabled only by a project's .claude/settings.json from an external
+    source does not load until explicitly installed. No setting/flag/env var
+    overrides this.
+  - Hooks: PostToolUse ruff/ty hook never fires in cloud (command valid when run
+    manually); cloud likely blocks project hooks (allowManagedHooksOnly) or does
+    not wire PostToolUse in the web runtime.
+
+  scripts/cloud-claude-setup.sh now performs the plugin install step: it derives
+  the marketplace + enabled-plugin list from .claude/settings.json and runs
+  `claude plugin marketplace add` + `claude plugin install <plugin>@<marketplace>
+  --scope user`. It is idempotent and no-ops without the claude CLI / python.
+
+  Remaining work is wiring + verification, not authoring.
+
+  Hooks are intentionally OUT OF SCOPE: the ruff/ty hooks are an edit-time
+  convenience already enforced by CI (make lint / make typecheck / pr-preflight),
+  so the cloud gap is cosmetic. Do not chase hook activation in cloud.
+
+deferred:
+  - summary: "Provision PostToolUse ruff/ty hooks in cloud"
+    reason: >
+      Edit-time convenience already covered by CI; cloud may block project hooks
+      via allowManagedHooksOnly, so injecting them into VM user settings is
+      unreliable and buys nothing CI does not already guarantee.
+
+deps:
+  needs: []
+
+work:
+  - id: w1
+    summary: "Wire scripts/cloud-claude-setup.sh as the claude.ai/code env setup script"
+    status: pending
+    notes: >
+      Configured in the claude.ai/code environment settings (web UI), not a repo
+      file. Setup scripts are cached per environment.
+  - id: w2
+    summary: "Verify in a fresh cloud session: claude plugin list shows the 7 plugins and namespaced agents/commands are available"
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "Re-run the cloud-parity validation prompt; confirm plugins now PASS"
+    needs: [w2]
+    status: pending
+    notes: "Hooks expected to stay FAIL (out of scope, documented)."
+
+impact: >
+  Brings plugin-provided agents/commands (code-modernization:*, code-simplifier:*,
+  commit-commands:*, etc.) to cloud sessions, completing the executable side of
+  cloud parity. Skills/commands already work; this closes the plugin gap.
+
+files_affected:
+  added:
+    - scripts/cloud-claude-setup.sh
+  modified:
+    - _project/decisions/claude-settings-cloud-ownership-2026-06-29.md
+
+metadata:
+  tags:
+    - cloud-parity
+    - plugins
+    - claude-code
+  created_date: "2026-06-30"
+  estimated_effort: "Small (wiring + one verification pass)"
