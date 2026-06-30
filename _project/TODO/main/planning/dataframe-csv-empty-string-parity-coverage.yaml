@@ -1,0 +1,96 @@
+id: dataframe-csv-empty-string-parity-coverage
+title: "Pin empty-string/null CSV parity across all DataFrame adapters, not just DataFusion+PySpark"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Follow-up to dataframe-csv-empty-string-null-uniform (PR #904, DONE). The fix
+  made empty-string-vs-null CSV loading uniform, but the regression test covers
+  only DataFusion and PySpark. The success metric claims uniformity across ALL CSV
+  adapters; pandas/polars/dask/modin/cudf empty-string -> "" (not null) parity is
+  asserted nowhere new — it rests on untouched legacy behavior with no pin. #904
+  also landed the coercion per-adapter rather than as the single shared step the
+  YAML specified (functionally equivalent, but it means each adapter is its own
+  risk surface). This item pins the contract for the remaining adapters and adds a
+  CSV-path cross-surface case.
+
+  Test-only by intent: if a parity gap surfaces for any adapter, STOP and file a
+  defect TODO — do not fix adapter behavior inside this coverage item.
+
+prior_art:
+  - ref: "tests/integration/test_dataframe_csv_empty_string_null_semantics.py"
+    note: "The #904 regression test covering DataFusion+PySpark; parametrize its existing assertions across the remaining adapters rather than authoring a new harness."
+
+work:
+  - id: w0
+    summary: "Re-confirm on fresh develop that the #904 test still covers only DataFusion+PySpark"
+    status: pending
+    needs: []
+    notes: |
+      grep tests/integration/test_dataframe_csv_empty_string_null_semantics.py for
+      adapter imports/cases (review-time state: only DATAFUSION_DF_AVAILABLE and
+      PYSPARK_AVAILABLE). If a later commit already added adapters, narrow w1 to the
+      remaining ones. Record the live coverage in the PR body.
+
+  - id: w1
+    summary: "Parametrize empty-string/null CSV semantics across pandas, polars, dask, modin (cudf availability-skipped)"
+    status: pending
+    needs: [w0]
+    notes: |
+      Extend the existing test to assert, per adapter, that a quoted empty field
+      loads as "" and a bare empty field loads as null, uniformly. Guard cudf and
+      any non-installed adapter with availability skips so the fast lane stays green
+      on a standard dev env.
+
+  - id: w2
+    summary: "Add a cross-surface CSV-path case (prefer_parquet=False) exercising SQL<->DataFrame parity"
+    status: pending
+    needs: []
+    notes: |
+      Add at least one cross-surface equivalence case that forces the CSV load path
+      (prefer_parquet=False) so SQL<->DataFrame empty-string/null parity is exercised
+      end-to-end, not only per-adapter loading. Reuse an existing small cross-surface
+      fixture rather than a new benchmark.
+
+  - id: w3
+    summary: "Confirm the new cells run in the required fast lane"
+    status: pending
+    needs: [w0, w1, w2]
+    notes: |
+      Ensure the parametrized cells are fast-marked and collected by the required
+      code-test fast lane (or an explicit node if a marker excludes them). Record
+      the lane membership in the PR body.
+
+must_preserve:
+  - "No change to adapter CSV-loading behavior — this is coverage only."
+  - "Fast lane stays green on a standard dev environment (availability skips for absent adapters)."
+
+anti_patterns:
+  - "DO NOT fix an adapter parity gap inside this test-only item — surface it as a defect TODO."
+  - "DO NOT introduce a new benchmark or heavyweight fixture for the cross-surface case; reuse a small existing one."
+
+verification:
+  - description: "Empty-string/null parity holds across installed adapters"
+    command: "uv run -- python -m pytest tests/integration/test_dataframe_csv_empty_string_null_semantics.py -q"
+    expected_output: "per-adapter parametrized cells pass for pandas/polars/dask/modin; cudf skipped if absent"
+
+scope_limit:
+  only_modify:
+    - "tests/integration/test_dataframe_csv_empty_string_null_semantics.py"
+    - "tests/"
+
+success_metrics:
+  - "Empty-string vs null CSV parity is pinned for every installed DataFrame adapter, not just DataFusion+PySpark."
+  - "A CSV-path (prefer_parquet=False) cross-surface case exercises SQL<->DataFrame parity."
+
+deferred:
+  - summary: "Refactor the per-adapter coercion into the single shared step #904's YAML originally specified."
+    reason: "Functionally equivalent today; consolidation is a separate maintainability item, not coverage."
+
+metadata:
+  tags: [dataframe, csv, equivalence, testing, holistic-review-followup]
+  estimated_effort: "Small"
+  created_date: "2026-06-30"
+  last_updated: "2026-06-30T00:00:00"

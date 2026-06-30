@@ -1,0 +1,149 @@
+id: required-ci-coverage-deepest-reproducers
+title: "Pull the deepest holistic-review regression reproducers into required develop-PR CI"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Adversarial review of the 14-TODO holistic-review remediation found a systemic
+  gap: several PRs landed real regression reproducers but parked them in
+  non-required CI lanes (manual env var, `slow`, `integration`/`medium`), so the
+  develop required gate `ci-required-result` does NOT execute them. The PR that
+  introduced each reproducer self-merged without ever running its own deepest
+  guard; the reproducers only fire one ring out, at the main-release boundary
+  (test.yml). Three concrete instances:
+
+    1. #900 (plan-capture-blocking-ci-gate): the "gate catches a planted defect"
+       proof is gated only by env var BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT
+       (tests/integration/test_plan_capture_gate.py:88), which NOTHING in CI sets.
+       w3's no-silent-green claim is satisfied only as a one-time manual demo;
+       there is no standing automated negative test.
+    2. #901 (cross-surface-mutation-harness-scale-fidelity): the substantive
+       mutation-catch assertions (test_mutation_sensitivity,
+       test_unmutated_target_is_green) are module `slow`-marked and excluded from
+       the required code-test lane; only the set-equality drift guard
+       (test_targets_cover_every_enforced_gate, -m slow -n 0) runs in required CI.
+    3. #909 (plan-capture-robustness-hardening): the w2 connection-fencing and w3
+       plan-identity reproducers live in tests/integration/test_plan_capture_phase.py
+       ([integration, medium]) and run only in test.yml; no required develop-PR
+       job collects them.
+
+  Design principle this item establishes: a regression reproducer that proves a
+  fix MUST run in the required develop-PR gate, via an explicit-node step if its
+  marker excludes it from the fast lane. Cost is bounded by selecting only the
+  load-bearing cells, not whole slow matrices.
+
+prior_art:
+  - ref: ".github/workflows/pr.yml:357"
+    note: "Existing explicit-node pattern: 'Run cross-surface mutation target drift guard' invokes a single node with -m \"slow\" -n 0 so a marker-excluded test still runs in required code-test. Reuse this exact mechanism; do not add a new job."
+  - ref: ".github/workflows/pr.yml:363"
+    note: "'Run cross-surface GATES Make/CI pinning guard' invokes a node with -m \"medium\" -n 0 — the precedent for adding a medium-marked node to required CI."
+  - ref: ".github/workflows/pr.yml:719"
+    note: "ci-required-result aggregator needs[] — every step added here must live in a job already in that needs list (code-test or plan-capture-gate), not continue-on-error."
+  - ref: "tests/integration/test_plan_capture_gate.py:88"
+    note: "BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT hook to drive the standing negative test for w1; reuse the existing planting switch, do not invent a parallel one."
+
+work:
+  - id: w0
+    summary: "Re-confirm the three gaps on fresh develop before editing (markers, env-var usages, lane membership)"
+    status: pending
+    needs: []
+    notes: |
+      From a fresh worktree off develop: grep BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT
+      across the repo (expect: only the test reads it, nothing sets it); confirm
+      test_cross_surface_mutation_sensitivity.py module pytestmark includes slow;
+      confirm test_plan_capture_phase.py module pytestmark is [integration, medium];
+      confirm pr.yml code-test (test (ubuntu-latest, 3.12)) and plan-capture-gate
+      are in ci-required-result.needs. Record a compact summary (file:line, marker,
+      lane) in the PR body. Line numbers in this TODO are from origin/develop at
+      review time and may have drifted. NOTE: cli-lean-import-guarantee's w7 also
+      edits pr.yml's required lanes; if that item is in flight, coordinate/rebase to
+      avoid a conflict on the required-CI workflow (a merge-coordination concern, not
+      a logical dependency).
+
+  - id: w1
+    summary: "Add a standing automated negative test that the plan-capture gate fails on a planted defect (#900 F3)"
+    status: pending
+    needs: [w0]
+    notes: |
+      Add test (or CI step) that runs the plan-capture gate subprocess with
+      BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT=1 and asserts NON-ZERO exit (the gate
+      catches the dropped fingerprint). Wire it into the required plan-capture-gate
+      job (Makefile plan-capture-gate target region) or as an explicit node in
+      code-test. The positive path must stay green with the env var unset. This
+      regression-protects the catch capability itself, not just the happy path.
+
+  - id: w2
+    summary: "Promote the load-bearing mutation-catch cells into required code-test (#901 F4)"
+    status: pending
+    needs: [w0]
+    notes: |
+      Add an explicit-node step to code-test invoking the h2odb mutation-sensitivity
+      cell plus test_unmutated_target_is_green[h2odb] with -m "slow" -n 0 (mirroring
+      pr.yml:357). h2odb is the gate whose scale-fidelity #901 fixed; its build now
+      matches production (gate.scale_factor=0.01). Leave the full slow matrix where
+      it is. Confirm the exact parametrized node ids against the live test file.
+
+  - id: w3
+    summary: "Add the w2/w3 plan-capture-phase reproducers to a required develop-PR job (#909 F5)"
+    status: pending
+    needs: [w0]
+    notes: |
+      Add an explicit-node step to code-test:
+        uv run -- python -m pytest tests/integration/test_plan_capture_phase.py \
+          -m "medium" -n 0 -k "<identity/fencing/timeout selectors>" --tb=short -q
+      covering the connection-fencing (w2) and plan-identity (w3) reproducers.
+      Confirm the -k selectors against the actual test names before merge.
+
+  - id: w4
+    summary: "Prove each new required step is load-bearing (fails when its fix is reverted)"
+    status: pending
+    needs: [w1, w2, w3]
+    notes: |
+      For each added step, locally break the underlying fix and confirm the required
+      step goes red; restore. Record the manual break/restore evidence (command +
+      observed failure) in the PR body. Do NOT commit the breakage. This guards
+      against adding a vacuous required step that never fails.
+
+must_preserve:
+  - "No new always-on slow matrix in required CI — select only the load-bearing cells; keep wall-clock bounded."
+  - "Every added step lives in a job already in ci-required-result.needs and is not continue-on-error."
+  - "The existing positive-path gate behavior and the fast-lane test selection are unchanged."
+
+anti_patterns:
+  - "DO NOT add the reproducers as a new non-required job or with continue-on-error — that recreates the gap this item closes."
+  - "DO NOT promote entire slow/integration suites — cost-blow-up; promote the specific cells that prove the fixes."
+  - "DO NOT add a step without verifying it actually fails when the fix is reverted (w4)."
+
+verification:
+  - description: "Planted-defect negative test fails the gate"
+    command: "BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT=1 uv run -- python -m pytest tests/integration/test_plan_capture_gate.py -q"
+    expected_output: "non-zero exit; gate reports the dropped fingerprint (catch capability proven)"
+  - description: "Promoted mutation + plan-phase cells run under their explicit-node selectors"
+    command: "uv run -- python -m pytest tests/integration/test_plan_capture_phase.py -m medium -n 0 -q"
+    expected_output: "the w2/w3 reproducer cells are collected and pass"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/pr.yml"
+    - "Makefile"
+    - "tests/integration/test_plan_capture_gate.py"
+    - "tests/integration/test_plan_capture_phase.py"
+    - "tests/unit/equivalence/"
+    - "tests/"
+
+success_metrics:
+  - "Reverting any one of the three underlying fixes turns a required develop-PR check red (verified via w4)."
+  - "No PR introducing a plan-capture or mutation-catch reproducer can self-merge without that reproducer running in required CI."
+  - "Added required steps add bounded wall-clock (selected cells only), not a full slow/integration matrix."
+
+deferred:
+  - summary: "Broader audit of every non-required reproducer across the suite."
+    reason: "Scope this item to the three holistic-review instances; a full sweep is a separate hygiene pass."
+
+metadata:
+  tags: [ci, testing, regression-guard, plan-capture, cross-surface, holistic-review-followup]
+  estimated_effort: "Medium"
+  created_date: "2026-06-30"
+  last_updated: "2026-06-30T00:00:00"
