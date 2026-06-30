@@ -24,8 +24,8 @@ Following the **primitives benchmark pattern**, this benchmark:
 
 ## Benchmark Statistics
 
-- **Total Operations**: 117 (109 baseline + 8 sketch — TRANSACTION ops moved to transaction_primitives)
-- **Categories**: 7 (INSERT 12, UPDATE 15, DELETE 14, BULK_LOAD 36, MERGE 20, DDL 12, SKETCH 8)
+- **Total Operations**: 136 (112 baseline + 24 sketch — TRANSACTION ops moved to transaction_primitives)
+- **Categories**: 7 (INSERT 12, UPDATE 15, DELETE 14, BULK_LOAD 36, MERGE 23, DDL 12, SKETCH 24)
 - **Data Formats**: CSV, Parquet (uncompressed, gzip, zstd, snappy, bzip2)
 - **Scale Factors**: Flexible (0.01 to 10.0+)
 - **Platform Support**: All platforms via dialect translation + platform-specific overrides
@@ -74,7 +74,7 @@ Tests bulk loading from files with various formats and compression:
 - Parquet loads (12): uncompressed, snappy, gzip, zstd × (1K, 100K, 1M rows)
 - Special loads (12): column subset, transformations, error handling, parallel, upsert, append vs replace modes, custom delimiters, NULL handling, custom date formats
 
-### 5. MERGE Operations (18 operations)
+### 5. MERGE Operations (23 operations)
 
 Tests MERGE/UPSERT patterns including INSERT, UPDATE, and DELETE:
 - Simple UPSERT
@@ -88,6 +88,14 @@ Tests MERGE/UPSERT patterns including INSERT, UPDATE, and DELETE:
 - CTE sources
 - MERGE...RETURNING
 - Error handling (duplicate sources)
+- SCD Type 2 dimension maintenance — three ops that exercise history-retaining
+  merges via portable UPDATE-then-INSERT, keyed on a business key:
+  - `merge_scd_type2_basic` — canonical close-old-plus-insert-new for changed
+    and new keys
+  - `merge_scd_type2_no_change` — idempotency check: an unchanged batch closes
+    no rows and inserts no new versions
+  - `merge_scd_type2_new_keys_only` — insert-only path where every staged key is
+    brand-new, so no existing rows are closed
 
 ### 6. DDL Operations (12 operations)
 
@@ -109,12 +117,14 @@ Tests transaction control and isolation levels:
 - Nested SAVEPOINTs with partial rollback
 - Isolation levels (READ COMMITTED, SERIALIZABLE)
 
-### Sketch persistence operations (8 operations)
+### Sketch persistence operations (24 operations)
 
 Tests the **persist + merge + requery** lifecycle for Apache DataSketches
 sketch artifacts — the differentiated half of the modern approximate-
 analytics story (vendors compete on millisecond-merge across partitioned
 sketch columns, not on one-shot aggregate latency).
+
+**Core lifecycle (8 ops)** — Theta / KLL / Top-K families at default parameters:
 
 - `sketch_ddl_create_persistent_table` — CREATE/DROP overhead for a
   BINARY-column persistence table
@@ -131,10 +141,36 @@ sketch columns, not on one-shot aggregate latency).
   `approx_top_k_lineitem` in read_primitives)
 - `sketch_drop_persistent_table` — DROP overhead for a sketch-bearing table
 
-The three ★ ops are the **headline tests** that validate the
-"millisecond merge" claim. Validation contracts use tolerance-based
-`expected_value_min/max` because sketch outputs are non-deterministic
-across engines and runs.
+**Accuracy/size parameter sweeps (6 ops)** — same merge lifecycle at smaller
+and larger sketch sizes to expose the accuracy-vs-storage trade-off:
+
+- `sketch_query_theta_union_merge_lgk10` / `_lgk14` — Theta at lg_k=10
+  (~5KB, ~3.1% RSE) and lg_k=14 (~64KB, ~0.8% RSE)
+- `sketch_query_kll_quantiles_merge_k100` / `_k1000` — KLL at k=100
+  (~1.5KB, ~1.65% rank error) and k=1000 (~15KB, ~0.59% rank error)
+- `sketch_query_topk_combine_lgmm8` / `_lgmm10` — Top-K at lg_max_map_size=8
+  (256 buckets, ~600B) and lg_max_map_size=10 (1024 buckets, ~2KB)
+
+**Extended DuckDB-only families (8 ops)** — CPC (distinct) and REQ (quantile)
+sketches available through the `datasketches` community extension:
+
+- `sketch_cpc_create_persistent_table` / `sketch_cpc_insert_per_partition` /
+  ★ `sketch_cpc_query_union_merge` / `sketch_cpc_drop_persistent_table` —
+  CPC distinct-count lifecycle (union-merge + approximate distinct)
+- `sketch_req_create_persistent_table` / `sketch_req_insert_per_partition` /
+  ★ `sketch_req_query_quantile_merge` / `sketch_req_drop_persistent_table` —
+  REQ quantile lifecycle (merge + median extraction)
+
+**PySpark DataFrame headlines (2 ops)** — exercise the persist+merge cycle
+through the DataFrame API rather than SQL:
+
+- ★ `sketch_df_hll_persist_merge` — per-group HLL sketches, persist + merge
+- ★ `sketch_df_topk_persist_merge` — per-group Top-K, persist + merge
+  (Spark 4.1+ only — uses `F.approx_top_k`)
+
+The ★ ops are the **headline tests** that validate the "millisecond merge"
+claim. Validation contracts use tolerance-based `expected_value_min/max`
+because sketch outputs are non-deterministic across engines and runs.
 
 | Sketch family   | DataSketches binary-portable engines              | Native-but-distinct engines                    | No support       |
 |-----------------|---------------------------------------------------|-----------------------------------------------|------------------|
@@ -218,14 +254,14 @@ Operations use SQLGlot dialect translation by default, with `platform_overrides`
 a platform override is `null`, `_get_effective_write_sql()` returns a skip reason and
 the operation is recorded as `SKIPPED` in results.
 
-### DataFusion (v51.0.0) - 62 Skipped Operations
+### DataFusion (v51.0.0) - 64 Skipped Operations
 
 DataFusion is an Arrow-native query engine that operates on **immutable record batches**.
 This architecture provides excellent read/scan performance but means row-level mutation
 (UPDATE, DELETE) is not implemented - there is no write path for existing data. MERGE
 depends on UPDATE/DELETE and is therefore also unsupported.
 
-All 62 skips fall into categories dictated by this architectural constraint. None have
+All 64 skips fall into categories dictated by this architectural constraint. None have
 viable alternative SQL syntax within DataFusion's current capability set.
 
 #### UPDATE - 15 operations (queries 13-27)
@@ -243,12 +279,15 @@ rewrite vs. in-place update) and is therefore not substituted.
 Same architectural constraint as UPDATE. Includes the 2 GDPR-pattern deletes
 (queries 94-95) which also require DELETE.
 
-#### MERGE - 20 operations (queries 76-93, 96-97)
+#### MERGE - 23 operations (queries 76-93, 96-100)
 
 `NotImplemented("Unsupported SQL statement: MERGE INTO...")`
 
 MERGE requires UPDATE and/or DELETE capabilities, neither of which DataFusion supports.
 Covers all upsert patterns, conditional update/insert, ETL aggregation, and deduplication.
+Includes the 3 SCD Type 2 ops (queries 98-100: `merge_scd_type2_basic`,
+`merge_scd_type2_no_change`, `merge_scd_type2_new_keys_only`), which depend on
+UPDATE/INSERT against existing rows and carry explicit `datafusion: null` overrides.
 
 #### DDL Mutations - 8 operations
 
@@ -270,13 +309,12 @@ Covers all upsert patterns, conditional update/insert, ETL aggregation, and dedu
 | `insert_on_conflict_ignore` | `Plan("Insert-on clause not supported")` - no constraint enforcement makes ON CONFLICT meaningless |
 | `insert_returning_clause` | `Plan("Insert-returning clause not supported")` |
 
-#### BULK_LOAD Edge Cases - 3 operations
+#### BULK_LOAD Edge Cases - 2 operations
 
 | Operation | Reason |
 |-----------|--------|
 | `bulk_load_error_handling_skip_bad_rows` | DataFusion's CSV reader has no `IGNORE_ERRORS` equivalent; all rows must be valid |
 | `bulk_load_upsert_mode` | Requires MERGE INTO, which is unsupported |
-| `bulk_load_date_format_custom` | External table CSV options don't support `date_format`; non-ISO dates cause ArrowError cast failures |
 
 #### Upstream Tracking
 
@@ -298,7 +336,7 @@ benchbox/core/write_primitives/
 └── catalog/
     ├── __init__.py
     ├── loader.py                # YAML catalog loader
-    └── operations.yaml          # 113 operation definitions
+    └── operations.yaml          # 136 operation definitions
 ```
 
 ## License
