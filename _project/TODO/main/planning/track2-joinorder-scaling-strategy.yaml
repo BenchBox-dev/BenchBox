@@ -1,0 +1,73 @@
+id: track2-joinorder-scaling-strategy
+title: "Track-2: select and implement the JOB scaling strategy"
+worktree: main
+priority: Medium
+status: Identified
+category: Benchmark Development
+
+description: |
+  Track-2 (future) implementation TODO seeded by joinorder-track2-groundwork w4.
+  Lock in and implement the scaling strategy for a scaled JOB-derived workload.
+
+  Options analysis and the leading candidate are in
+  `_project/design/track2-joinorder-scaling-strategy.md` (authored by
+  joinorder-track2-groundwork w3). That doc scores five options (A correlated
+  synthetic, B sampled-from-real, C multi-snapshot real, D real+augmentation,
+  E stats-only at SF=1) against real-data fidelity, scalability axis, license
+  posture, implementation complexity, and JOB-literature comparability, and
+  recommends Option B (sampled-from-real with title-stratified preservation) as
+  the leading candidate without locking in.
+
+  This is a placeholder seed at status Identified. Final design and lock-in
+  happen when Track 2 is picked up; the work units below are summary-level. The
+  parallel decision framework
+  (`_project/decisions/joinorder-scale-stress-decision-2026-06-30.md`)
+  independently recommends replicated_imdb as the lowest-risk upward baseline;
+  Track-2 kickoff reconciles the sampling (down) and replication (up) directions.
+
+work:
+  - id: w1
+    summary: "Lock in the scaling strategy from the options analysis"
+    status: pending
+    notes: |
+      Confirm or revise the design doc's Option B recommendation against the
+      research question at Track-2 kickoff. Decide the scale direction
+      (sampled-down vs replicated-up vs both) and the scale-factor semantics.
+
+  - id: w2
+    summary: "Implement the chosen generator with a validation oracle"
+    needs: [w1]
+    status: pending
+    notes: |
+      Build the generator and the validation gate (FK integrity, predicate-domain
+      frequencies, cardinalities, q-error where available) before publishing any
+      derived archive. Non-empty checks are insufficient.
+
+  - id: w3
+    summary: "Define derived workload labels and result-bundle metadata"
+    needs: [w1]
+    status: pending
+    notes: |
+      Apply the workload labels (replicated_imdb / sampled / etc.) and required
+      derived-workload metadata (strategy, dataset version, generator version,
+      seed, stats protocol). Derived results never publish as canonical joinorder.
+
+must_preserve:
+  - "Canonical joinorder remains fixed to canonical_imdb SF=1 and is never replaced by a derived scale mode."
+  - "Any derived workload reports its data-generation strategy, dataset version, generator version, seed, and stats protocol."
+  - "The scaled prototype must not start until the statistics-phase requirement is satisfied or explicitly scoped out (see track2-joinorder-stats-phase)."
+
+approach: |
+  Plan-deepening is already done in the groundwork design doc. At kickoff, lock
+  the strategy, then implement generator + validation oracle + labels. Keep the
+  derived identity explicit and never conflate it with canonical JOB.
+
+metadata:
+  tags:
+    - joinorder
+    - track-2
+    - scaling-strategy
+    - benchmark-design
+    - seed
+  estimated_effort: "Medium"
+  created_date: "2026-06-30"

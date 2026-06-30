@@ -1,0 +1,84 @@
+id: track2-joinorder-stats-phase
+title: "Track-2: implement statistics-as-a-phase in the benchmark phase model"
+worktree: main
+priority: Medium
+status: Identified
+category: Benchmark Development
+
+description: |
+  Track-2 (future) implementation TODO seeded by joinorder-track2-groundwork w2.
+  Implements a first-class "statistics" phase between load and query so that
+  optimizer-statistics build time is measured separately from load and query
+  time. Without this separation, Track 2's research question — the interplay of
+  statistics maintenance and predicate selectivity — cannot be measured: an
+  engine with expensive auto-stats looks N seconds slower at load OR at
+  first-query, neither attribution being correct.
+
+  Implementation spec: `_project/design/track2-joinorder-stats-as-phase.md`
+  (authored by joinorder-track2-groundwork w1). That doc surveys the current
+  phase model, identifies the gap, proposes the load → statistics → query
+  ordering, and defines the migration strategy and open design questions.
+
+  This is a seed at status Identified. It stays in planning/ until Track 2 is
+  picked up; the work units below are summary-level, not a full implementation
+  plan.
+
+deps:
+  needs:
+    - joinorder-canonical-cutover
+
+work:
+  - id: w1
+    summary: "Add a statistics phase to the runner phase model (load -> statistics -> query)"
+    status: pending
+    notes: |
+      Schema change to the phase model and per-phase timing manifest. Default
+      legacy behavior (no explicit statistics phase) is preserved for existing
+      benchmarks. See the design doc's Proposed change and Migration strategy.
+
+  - id: w2
+    summary: "Add a per-engine ANALYZE / COMPUTE STATISTICS knob for the statistics phase"
+    needs: [w1]
+    status: pending
+    notes: |
+      Explicit ANALYZE call per platform adapter; where the engine auto-analyzes
+      during load, document it and report zero stats-phase wall-clock with
+      stats_mode: auto-on-load rather than double-building. Cover the engines in
+      the design doc's compatibility matrix.
+
+  - id: w3
+    summary: "Carry per-phase statistics timing in the result-bundle manifest"
+    needs: [w1]
+    status: pending
+    notes: |
+      Result-bundle field for statistics-phase timing and stats_mode metadata,
+      kept separate from load and query timing. Dataset/schema version
+      distinguishes pre- vs post-phase-model bundles.
+
+  - id: w4
+    summary: "Opt-in mechanism: enable the statistics phase for joinorder/tpch/tpcds"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Opt-in per benchmark so historical bundles remain interpretable. joinorder,
+      tpch, tpcds enable the new phase once this lands.
+
+must_preserve:
+  - "Existing benchmarks default to the legacy load-includes-stats behavior; no historical result bundle is invalidated."
+  - "The phase-model change lands after the joinorder rename + canonical wiring (cutover), per deps.needs."
+
+approach: |
+  Implement against the design doc spec. Land the phase-model schema change
+  first, then the per-engine ANALYZE knob and result-bundle field, then opt-in
+  per benchmark. Do not detect-and-disable engine auto-analyze; document it and
+  attribute zero wall-clock with stats_mode metadata (the design doc's lean).
+
+metadata:
+  tags:
+    - joinorder
+    - track-2
+    - statistics-phase
+    - phase-model
+    - seed
+  estimated_effort: "Medium"
+  created_date: "2026-06-30"

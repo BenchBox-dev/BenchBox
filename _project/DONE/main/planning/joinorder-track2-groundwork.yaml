@@ -2,7 +2,7 @@ id: joinorder-track2-groundwork
 title: "joinorder Track-2 groundwork: statistics-as-phase survey, scaling-strategy options, infra reuse guide"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Documentation
 
 description: |
@@ -44,7 +44,7 @@ description: |
 work:
   - id: w1
     summary: "Phase-model survey: document current phase boundaries and stats-as-phase gap"
-    status: pending
+    status: done
     notes: |
       Output: `_project/design/track2-joinorder-stats-as-phase.md`
 
@@ -99,7 +99,7 @@ work:
 
   - id: w2
     summary: "Seed Track-2 TODO: stats-as-phase implementation"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       File: `_project/TODO/main/planning/track2-joinorder-stats-phase.yaml`
@@ -118,7 +118,7 @@ work:
 
   - id: w3
     summary: "Scaling-strategy options for Track 2"
-    status: pending
+    status: done
     notes: |
       Output: `_project/design/track2-joinorder-scaling-strategy.md`
 
@@ -173,7 +173,7 @@ work:
 
   - id: w4
     summary: "Seed Track-2 TODO: scaling-strategy work"
-    status: pending
+    status: done
     needs: [w3]
     notes: |
       File: `_project/TODO/main/planning/track2-joinorder-scaling-strategy.yaml`
@@ -186,7 +186,7 @@ work:
 
   - id: w5
     summary: "Reusable data-fetch infrastructure reuse guide"
-    status: pending
+    status: done
     notes: |
       PRECONDITION: this is the only work unit in this TODO that
       consumes foundation outputs. Do not start w5 until
