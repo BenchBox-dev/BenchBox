@@ -9,6 +9,8 @@ fingerprints are stable, and write statements are not double-executed by capture
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -136,3 +138,49 @@ def test_plan_capture_gate_dml_is_not_double_executed(engine_case) -> None:
     assert result.failed == 0, f"{case.platform} failed to structurally capture DML"
     assert result.captured == 1
     assert result.fingerprints["insert"]
+
+
+def test_plan_capture_gate_catches_planted_defect() -> None:
+    """Standing negative test: the gate goes RED on a planted plan-capture defect.
+
+    #900 shipped the ``BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT=drop_fingerprint``
+    planting switch but nothing in CI ever set it, so the "gate catches a dropped
+    fingerprint" proof was a one-time manual demo with no standing guard. This runs
+    the gate's positive node in a subprocess with the defect planted and asserts the
+    gate FAILS on the dropped fingerprint -- regression-protecting the catch
+    capability itself, not just the happy path.
+
+    The subprocess targets only the positive node (not this test), so it cannot
+    recurse. This test is ``fast``-marked (module-level), so it runs in the required
+    plan-capture-gate job, which executes the whole file.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    node = (
+        "tests/integration/test_plan_capture_gate.py::"
+        "test_plan_capture_gate_parses_plans_and_stabilizes_fingerprints[duckdb]"
+    )
+    # Strip xdist/coverage coordination vars so this nested run (which executes
+    # under the fast lane's own xdist workers + coverage) does not try to attach to
+    # the parent controller or double-count coverage.
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(("PYTEST_XDIST", "COV_CORE")) and key != "PYTEST_CURRENT_TEST"
+    }
+    env["BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT"] = "drop_fingerprint"
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", node, "-n", "0", "-p", "no:cacheprovider", "-q"],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode != 0, (
+        "plan-capture gate PASSED with a planted dropped-fingerprint defect; "
+        f"the catch capability has regressed.\n{combined}"
+    )
+    assert "produced no fingerprint" in combined, (
+        "plan-capture gate failed for an unexpected reason rather than the dropped "
+        f"fingerprint; the negative test is no longer load-bearing.\n{combined}"
+    )
