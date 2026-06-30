@@ -4,7 +4,7 @@ worktree: main
 priority: Medium-High
 category: Core Functionality
 
-status: Not Started
+status: Completed
 
 description: |
   The isolated capture phase runs AFTER all timed queries, on the measurement
