@@ -2,7 +2,8 @@ id: dataframe-csv-empty-string-parity-coverage
 title: "Pin empty-string/null CSV parity across all DataFrame adapters, not just DataFusion+PySpark"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-06-30"
 category: Testing and Quality Assurance
 
 description: |
@@ -26,7 +27,7 @@ prior_art:
 work:
   - id: w0
     summary: "Re-confirm on fresh develop that the #904 test still covers only DataFusion+PySpark"
-    status: pending
+    status: done
     needs: []
     notes: |
       grep tests/integration/test_dataframe_csv_empty_string_null_semantics.py for
@@ -36,7 +37,7 @@ work:
 
   - id: w1
     summary: "Parametrize empty-string/null CSV semantics across pandas, polars, dask, modin (cudf availability-skipped)"
-    status: pending
+    status: done
     needs: [w0]
     notes: |
       Extend the existing test to assert, per adapter, that a quoted empty field
@@ -46,7 +47,7 @@ work:
 
   - id: w2
     summary: "Add a cross-surface CSV-path case (prefer_parquet=False) exercising SQL<->DataFrame parity"
-    status: pending
+    status: done
     needs: []
     notes: |
       Add at least one cross-surface equivalence case that forces the CSV load path
@@ -56,7 +57,7 @@ work:
 
   - id: w3
     summary: "Confirm the new cells run in the required fast lane"
-    status: pending
+    status: done
     needs: [w0, w1, w2]
     notes: |
       Ensure the parametrized cells are fast-marked and collected by the required
