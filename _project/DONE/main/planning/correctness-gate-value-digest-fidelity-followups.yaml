@@ -2,8 +2,27 @@ id: correctness-gate-value-digest-fidelity-followups
 title: "Harden the bounded-gate value digest: precision floor, type-stability, independence, and auditable regeneration"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-06-30"
 category: Testing and Quality Assurance
+
+completion_notes:
+  completed_by: "fix/correctness-gate-value-digest-fidelity-followups"
+  completed_date: "2026-06-30"
+  notes:
+    - "All six work units (w1-w6) were delivered by PR #888 (squash commit
+      9e707cf9a, ancestor of develop), which landed alongside the
+      oracle-coverage-map reference-independence disclosure. This TODO was never
+      moved out of planning/ at the time; this change is the close-out
+      bookkeeping only -- no code change."
+    - "Revalidated on develop @ 05d1986ab: tests/unit/test_correctness_gate_value_oracle.py
+      (14 passed) pins the precision floor and the value+type coupling.
+      _format_real uses relative significant-figure rounding (_DIGEST_FLOAT_SIGFIGS=6),
+      the floor #888 ultimately shipped; the squash message's 'keep absolute 4dp'
+      prose is from an earlier sub-commit, superseded by the landed code."
+    - "w3 regeneration target `make correctness-gate-digests-regen` +
+      regenerate_correctness_gate_digests.py present; w5 deferral recorded in
+      _project/analysis/value-digest-cross-engine-independence-decision.md."
 
 description: |
   An adversarial falsification review of the value-digest oracle (PR #867,
@@ -73,8 +92,8 @@ description: |
   does NOT re-do the digest emission, the strict arming, or the row-count work.
 
 prior_art:
-- "benchbox/core/results/result_digest.py:_format_real/_normalize_cell/_DIGEST_FLOAT_PRECISION — the absolute-precision
-  normalization to revisit for the precision-floor and type-stability work; extend, do not fork."
+- "benchbox/core/results/result_digest.py:_format_real/_normalize_cell/_DIGEST_FLOAT_PRECISION — the absolute-precision normalization
+  to revisit for the precision-floor and type-stability work; extend, do not fork."
 - "benchbox/core/tpchavoc/validation.py:calculate_checksum/_row_sort_key — the promoted single-result digest primitive and
   its None-safe sort; reuse for the None-coverage test, do not add a second hash."
 - "benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json — the hand-copied reference; the regeneration
@@ -85,16 +104,16 @@ prior_art:
   whose stream-0 digests become the reference; the regeneration target must reuse this configuration, not duplicate it."
 - "benchbox/platforms/base/sql_execution.py:80 + benchbox/platforms/duckdb.py:999 — the two emission sites; the engine-scope
   and cross-engine-independence decisions touch both."
-- "_project/DONE/main/planning/bounded-correctness-gate-value-oracle.yaml — the effort this hardens; w3 already proved
-  sensitivity to gross mutations, w1 chose absolute rounding as a non-gating open question. This item revisits that choice
-  with the reproduced floor quantified."
-- "_project/analysis/REVIEW-PROTOCOL.md — where the self-snapshot-vs-independent-oracle distinction should be documented so a
-  future reviewer does not over-read a green value gate."
+- "_project/DONE/main/planning/bounded-correctness-gate-value-oracle.yaml — the effort this hardens; w3 already proved sensitivity
+  to gross mutations, w1 chose absolute rounding as a non-gating open question. This item revisits that choice with the reproduced
+  floor quantified."
+- "_project/analysis/REVIEW-PROTOCOL.md — where the self-snapshot-vs-independent-oracle distinction should be documented so
+  a future reviewer does not over-read a green value gate."
 
 work:
 - id: w1
   summary: "Quantify the precision floor and decide absolute vs relative/significant-figure normalization"
-  status: pending
+  status: done
   notes: |
     Pin the reproduced floor as a test and make an explicit keep-or-change
     decision. The floor is 5e-5 ABSOLUTE per cell: invisible below, visible at/above
@@ -107,13 +126,15 @@ work:
     re-verify cross-build stability at the pinned seed and regenerate the reference
     (w4). Record the decision and its rationale next to _format_real.
   acceptance:
-  - "A unit test pins the exact sensitivity boundary (an error just below the floor is NOT caught; just above IS), referencing a real gate column."
-  - "An explicit keep-absolute-or-switch-to-relative decision is recorded with rationale; if switched, all 18 digests still reproduce deterministically across two runs."
+  - "A unit test pins the exact sensitivity boundary (an error just below the floor is NOT caught; just above IS), referencing
+    a real gate column."
+  - "An explicit keep-absolute-or-switch-to-relative decision is recorded with rationale; if switched, all 18 digests still
+    reproduce deterministically across two runs."
 
 - id: w2
   summary: "Make the digest stable across numeric TYPE representation (int vs float vs Decimal of equal value)"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Decide and implement: either canonicalize integer-valued numerics to one
     representation before hashing (so int 37734107, Decimal('37734107.00'), and
@@ -122,12 +143,14 @@ work:
     digest and is therefore DuckDB-pinned. Type-stability is a prerequisite for the
     cross-engine independence option in w5; if w5 is deferred, document instead.
   acceptance:
-  - "Either: equal-value cells of differing numeric type produce the SAME digest (tested); or: the value+type coupling is documented at the digest primitive and in the reference JSON provenance with the reason it is acceptable for a DuckDB-pinned oracle."
+  - "Either: equal-value cells of differing numeric type produce the SAME digest (tested); or: the value+type coupling is
+    documented at the digest primitive and in the reference JSON provenance with the reason it is acceptable for a DuckDB-pinned
+    oracle."
 
 - id: w3
   summary: "Add an auditable, one-command regeneration path that WRITES tpch_value_digests_sf1.json"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Replace the hand-copy described in the JSON provenance note with a script /
     make target (e.g. `make correctness-gate-digests-regen`) that runs the gate
@@ -137,13 +160,14 @@ work:
     the seed/scale/query-id list. The target must be idempotent on a clean tree
     (regenerate -> no diff) and must stamp the DuckDB version it ran under.
   acceptance:
-  - "`make correctness-gate-digests-regen` regenerates the reference JSON from a live gate run; on a clean tree it produces NO diff (idempotent)."
+  - "`make correctness-gate-digests-regen` regenerates the reference JSON from a live gate run; on a clean tree it produces
+    NO diff (idempotent)."
   - "The seed/scale/query-id set is read from one source shared with `make test-correctness-gate`, not re-hardcoded."
 
 - id: w4
   summary: "Document the oracle as a regression snapshot (not an independent correctness oracle) wherever it is described"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     The Makefile note, tests/README, the JSON provenance, and REVIEW-PROTOCOL.md
     should state plainly that the value digest detects CHANGE from a benchbox-on-
@@ -154,12 +178,13 @@ work:
     reference-independence axis in oracle-coverage-map-reference-independence-disclosure
     so the gate docs and the coverage map tell one consistent story.
   acceptance:
-  - "Every place the value digest is described names it a regression snapshot vs a DuckDB-pinned baseline, with the freeze-time-bug caveat stated explicitly."
+  - "Every place the value digest is described names it a regression snapshot vs a DuckDB-pinned baseline, with the freeze-time-bug
+    caveat stated explicitly."
 
 - id: w5
   summary: "Decide and scope an INDEPENDENT value cross-check (cross-engine digest agreement at SF=1)"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     The strongest available independence upgrade: once the digest is type-stable
     (w2), assert that a SECOND SQL engine already in CI (postgres or datafusion)
@@ -171,11 +196,12 @@ work:
     non-blocking sample gate or a deferred follow-up; do NOT widen this TODO into
     implementing a full cross-engine matrix.
   acceptance:
-  - "A decision is recorded: implement a bounded cross-engine digest-agreement check (naming the engine and its CI seam) OR defer it with the concrete blockers (type/date/NULL rendering) enumerated."
+  - "A decision is recorded: implement a bounded cross-engine digest-agreement check (naming the engine and its CI seam) OR
+    defer it with the concrete blockers (type/date/NULL rendering) enumerated."
 
 - id: w6
   summary: "Cover the None-safe / mixed-type sort path that the gate never exercises"
-  status: pending
+  status: done
   notes: |
     Reproduced: 0 of 18 SF=1 gate result sets contain NULL or mixed-type columns,
     so calculate_checksum's None-safe `_row_sort_key` branch is untested by the
@@ -184,21 +210,25 @@ work:
     raise, so a latent ordering bug in None handling cannot hide behind the gate's
     NULL-free inputs. Pure test addition — no production change.
   acceptance:
-  - "A unit test exercises calculate_checksum on NULL-bearing and mixed-type rows, asserting a stable, deterministic digest and no TypeError; the test fails if the None-safe surrogate is removed."
+  - "A unit test exercises calculate_checksum on NULL-bearing and mixed-type rows, asserting a stable, deterministic digest
+    and no TypeError; the test fails if the None-safe surrogate is removed."
 
 deferred:
 - summary: "Backfill value digests for benchmarks beyond tpch, or for scales above SF=1."
-  reason: "Out of scope; breadth is owned by benchmark-correctness-oracle-coverage-map. This item is about the FIDELITY of the
-    existing tpch SF=1 value oracle, not its breadth."
+  reason: "Out of scope; breadth is owned by benchmark-correctness-oracle-coverage-map. This item is about the FIDELITY of
+    the existing tpch SF=1 value oracle, not its breadth."
 - summary: "A full cross-engine value-equivalence matrix across all CI engines."
-  reason: "w5 decides whether to add ONE bounded cross-engine agreement check or defer; a full matrix is a separate, larger effort
-    (cf. tpchavoc-*-engine-equivalence-sampling)."
+  reason: "w5 decides whether to add ONE bounded cross-engine agreement check or defer; a full matrix is a separate, larger
+    effort (cf. tpchavoc-*-engine-equivalence-sampling)."
 
 must_preserve:
-- "The #867 value axis is unchanged: digest emission behind BENCHBOX_EMIT_RESULT_DIGEST, the strict arming (digest_evaluated == digest_reference_count), and the additive row-count check keep working exactly as today."
-- "`benchbox run` default behavior, payload shape, and cost stay unchanged when the digest flag is unset (digest emission stays gate-only)."
+- "The #867 value axis is unchanged: digest emission behind BENCHBOX_EMIT_RESULT_DIGEST, the strict arming (digest_evaluated
+  == digest_reference_count), and the additive row-count check keep working exactly as today."
+- "`benchbox run` default behavior, payload shape, and cost stay unchanged when the digest flag is unset (digest emission
+  stays gate-only)."
 - "The TPC-Havoc gates that share calculate_checksum stay green — reuse the one digest definition, never fork it."
-- "`make test-correctness-gate` stays green on a correct tree and on the required PR path after any normalization change (regenerate the reference in the same change)."
+- "`make test-correctness-gate` stays green on a correct tree and on the required PR path after any normalization change (regenerate
+  the reference in the same change)."
 
 approach: |
   Treat this as fidelity hardening of an already-shipped, CI-enforced oracle, not a
@@ -212,11 +242,17 @@ approach: |
   determinism, or the gate will go RED on a correct tree.
 
 anti_patterns:
-- "DO NOT switch to relative precision without re-verifying cross-build stability at the pinned seed and regenerating the reference — because a naive relative rounding near zero can be LESS stable than absolute — verify in w1, regenerate in the same change."
-- "DO NOT enable cross-engine digest comparison before w2 — because the int-vs-Decimal-vs-float and date/NULL rendering differences guarantee spurious mismatches — make the digest type/engine-stable first."
-- "DO NOT add a second hash or a per-engine digest variant — because calculate_checksum is the one shared definition the TPC-Havoc gates also use — extend the single primitive."
-- "DO NOT leave the reference regenerable only by hand-copy — because an oracle no one can reproduce is the fragility this effort claimed to remove — ship a deterministic writer."
-- "DO NOT describe the value digest as proving 'correctness' — because it is a regression snapshot vs a DuckDB baseline — call it that everywhere it is documented."
+- "DO NOT switch to relative precision without re-verifying cross-build stability at the pinned seed and regenerating the
+  reference — because a naive relative rounding near zero can be LESS stable than absolute — verify in w1, regenerate in the
+  same change."
+- "DO NOT enable cross-engine digest comparison before w2 — because the int-vs-Decimal-vs-float and date/NULL rendering differences
+  guarantee spurious mismatches — make the digest type/engine-stable first."
+- "DO NOT add a second hash or a per-engine digest variant — because calculate_checksum is the one shared definition the TPC-Havoc
+  gates also use — extend the single primitive."
+- "DO NOT leave the reference regenerable only by hand-copy — because an oracle no one can reproduce is the fragility this
+  effort claimed to remove — ship a deterministic writer."
+- "DO NOT describe the value digest as proving 'correctness' — because it is a regression snapshot vs a DuckDB baseline —
+  call it that everywhere it is documented."
 
 verification:
 - description: "Bounded gate stays green and the digest assertion still arms for all 18 queries after any normalization change"
@@ -241,21 +277,29 @@ scope_limit:
   - "docs/"
 
 success_metrics:
-- "The digest's value sensitivity is quantified and either uniform in relative terms or its small-ratio blind spot is documented with the worst exposed column named."
-- "Equal-value cells of differing numeric type either hash identically or the value+type coupling is documented as a DuckDB-pinned constraint."
+- "The digest's value sensitivity is quantified and either uniform in relative terms or its small-ratio blind spot is documented
+  with the worst exposed column named."
+- "Equal-value cells of differing numeric type either hash identically or the value+type coupling is documented as a DuckDB-pinned
+  constraint."
 - "The 18 reference digests are reproducible by one command that writes the file idempotently — no hand-copy."
-- "Every description of the value digest names it a regression snapshot vs a DuckDB baseline, not an independent correctness oracle."
+- "Every description of the value digest names it a regression snapshot vs a DuckDB baseline, not an independent correctness
+  oracle."
 - "A decision is recorded on whether a cross-engine independence check is added now or deferred with concrete blockers."
 
 open_questions:
-- question: "Absolute 4-decimal vs N-significant-figure normalization: the absolute floor is effectively perfect on large columns and only ~0.1%-relative coarse on small averaged ratios (Q1 avg_disc). Is the small-ratio exposure worth the cross-build-stability risk of relative rounding?"
+- question: "Absolute 4-decimal vs N-significant-figure normalization: the absolute floor is effectively perfect on large
+    columns and only ~0.1%-relative coarse on small averaged ratios (Q1 avg_disc). Is the small-ratio exposure worth the cross-build-stability
+    risk of relative rounding?"
   gating: true
   affects: ["w1 normalization decision", "w3 reference regeneration"]
-  default: "Keep absolute 4dp for stability and DOCUMENT the small-ratio blind spot (naming avg_disc) unless w1 finds a hybrid max(absolute, relative) that is provably as stable across the pinned DuckDB at the reference seed."
-- question: "Is a cross-engine (DuckDB vs postgres/datafusion) digest-agreement check the right independence upgrade, or does engine rendering divergence make it more noise than signal?"
+  default: "Keep absolute 4dp for stability and DOCUMENT the small-ratio blind spot (naming avg_disc) unless w1 finds a hybrid
+    max(absolute, relative) that is provably as stable across the pinned DuckDB at the reference seed."
+- question: "Is a cross-engine (DuckDB vs postgres/datafusion) digest-agreement check the right independence upgrade, or does
+    engine rendering divergence make it more noise than signal?"
   gating: false
   affects: ["w5 independence decision"]
-  default: "Decide in w5 after w2 makes the digest type-stable; if rendering divergence (dates, decimals, NULL-vs-NaN) cannot be normalized cheaply, defer with the blockers enumerated rather than shipping a flaky cross-engine gate."
+  default: "Decide in w5 after w2 makes the digest type-stable; if rendering divergence (dates, decimals, NULL-vs-NaN) cannot
+    be normalized cheaply, defer with the blockers enumerated rather than shipping a flaky cross-engine gate."
 
 # No hard deps.needs: w1-w3 (precision floor, type-stability, regeneration) are
 # independent of the coverage-map work and must not be blocked behind it. The only
