@@ -211,6 +211,10 @@ fix every finding — issues, considerations, AND nits — before `make pr-open`
 The review-fix loop is part of "implement", not optional polish; skip only
 when the user explicitly opts out (typo fix, already-reviewed change).
 
+A drift/pinning guard and its required-CI wiring must land in the SAME PR; an
+unwired guard is non-load-bearing (it cannot fail CI), so splitting them leaves
+an unpinned-gate window until the wiring lands separately.
+
 ## Planning & TODOs
 
 TODOs live in `_project/TODO/{worktree}/{phase}/{item}.yaml`; completed items

@@ -78,7 +78,14 @@ scope_limit:
   - "tests/"
 
 success_metrics:
-- "platforms/base/execution.py carries no literal TPC benchmark names in its dispatch path."
+# w1 here extracted ONLY the power-test dispatch path; the throughput/maintenance/combined dispatch
+# methods still carried literal benchmark_id branches afterward (the original wording overstated this
+# as the whole dispatch). The follow-up named below extends the same registry to all four and broadens
+# the guard test; this is the accurate power-path-scoped claim plus that cross-link.
+- "platforms/base/execution.py: the POWER-test dispatch path carries no literal TPC benchmark names
+  (#914 w1). The throughput/maintenance/combined dispatch methods are routed through the same
+  power_harnesses capability registry -- and the dispatch-literal guard test broadened to all four
+  methods -- by the follow-up execution-harness-extraction-throughput-maintenance-combined."
 - "cross_surface.py builders live per-benchmark and share one empty-table guard."
 
 metadata:
