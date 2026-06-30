@@ -96,9 +96,14 @@ scope_limit:
   - "tests/unit/test_auto_merge_soundness_paths.py"
 
 success_metrics:
-- "PRs touching the comparator or plan parsers cannot squash-auto-merge without a review; everything else stays on the fast
-  default."
-- "No PR creation path (make pr-open, gh pr create, GitHub UI, ready_for_review) can bypass the soundness-path review requirement."
+- "Code side complete: make pr-open and auto-merge-on-open.yml share auto_merge_soundness_paths.py (--no-renames) and WITHHOLD
+  auto-merge enablement for PRs touching the comparator or plan parsers; everything else stays on the fast default."
+- "No PR creation path (make pr-open, gh pr create, GitHub UI, ready_for_review) re-enables auto-merge for a soundness-path PR."
+- "The HARD repo-layer precondition -- the develop ruleset requiring an approving + code-owner review so a soundness-path PR
+  cannot be squash-merged with zero approvals -- is NOT met by the code side alone (the develop-squash-only ruleset still has
+  required_approving_review_count: 0 / require_code_owner_review: false). It is enforced by the ruleset change tracked in
+  auto-merge-review-gate-admin-enforcement (a deferred repo-admin action); this DONE item should not be read as claiming the
+  repo-layer gate is live."
 
 metadata:
   tags: [process, review, ci, auto-merge, soundness]

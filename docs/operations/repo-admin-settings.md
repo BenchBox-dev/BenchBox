@@ -98,6 +98,58 @@ gh api repos/joeharris76/BenchBox/rulesets/15611785 --jq '
   }'
 ```
 
+### Soundness-path review enforcement (pending admin action)
+
+The `develop-squash-only` ruleset's `pull_request` rule must require an approving
+review AND code-owner review so a PR touching the CODEOWNERS-owned soundness paths
+(`benchbox/core/equivalence/**`, `benchbox/core/query_plans/parsers/**`,
+`benchbox/core/**/validation.py`) cannot be squash-merged with zero approvals. The
+auto-merge code side already withholds auto-merge enablement for those paths
+(`_project/scripts/auto_merge_soundness_paths.py`), but withholding is only a
+precondition — without this ruleset requirement a soundness-path PR can still be
+squash-merged manually. Tracked by the `auto-merge-review-gate-admin-enforcement`
+TODO.
+
+Target state:
+
+```text
+required_approving_review_count: 1
+require_code_owner_review: true
+```
+
+Live state at this writing: `required_approving_review_count: 0`,
+`require_code_owner_review: false` — not yet enforced. Applying it is a deferred
+repo-admin action: the develop-PR `GITHUB_TOKEN` has no `administration` scope, so it
+can neither read nor write the ruleset; only an admin PAT can.
+
+Verify (manual or release-canary; needs a ruleset-read token such as
+`RULESET_DRIFT_TOKEN`):
+
+```bash
+gh api repos/joeharris76/BenchBox/rules/branches/develop \
+  | uv run --project _project/scripts -- python _project/scripts/ruleset_review_enforcement.py --rules-file -
+```
+
+The predicate exits non-zero and names the offending field while review enforcement
+is missing, and exits zero once the ruleset requires an approving + code-owner
+review. Its pinned logic is guarded by
+`tests/unit/release/test_ruleset_review_enforcement.py` in the required fast lane.
+
+Apply (admin only — the deferred action that closes the gap):
+
+```bash
+# Fetch the current ruleset, set the pull_request rule parameters
+#   required_approving_review_count: 1
+#   require_code_owner_review: true
+# then PUT it back.
+gh api repos/joeharris76/BenchBox/rulesets/15611785 > /tmp/develop-ruleset.json
+# edit /tmp/develop-ruleset.json (pull_request rule parameters), then:
+gh api -X PUT repos/joeharris76/BenchBox/rulesets/15611785 --input /tmp/develop-ruleset.json
+```
+
+After applying, re-run the Verify command (expect exit 0) and confirm a zero-approval
+soundness-path PR can no longer be squash-merged.
+
 History:
 
 - Switched required status check from
