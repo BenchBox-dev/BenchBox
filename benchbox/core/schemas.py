@@ -111,6 +111,7 @@ class RunConfig(BaseModel):
     # first-class --analyze-plans/--no-analyze-plans flag sets it True/False.
     analyze_plans: bool | None = None
     strict_plan_capture: bool = False
+    normalize_plan_literals: bool = False
     # PyPI distribution name (e.g. "psycopg", "duckdb") - no extras markers or version specifiers
     driver_package: Optional[str] = None
     driver_version: Optional[str] = None

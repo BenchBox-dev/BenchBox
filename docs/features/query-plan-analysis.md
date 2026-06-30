@@ -667,6 +667,33 @@ available through the API above and the metadata helper.
 - Cross-run regression detection: flag queries where the fingerprint changed between runs on the same engine version
 - Cross-platform comparison: use `compare-plans` for structural similarity; fingerprints will differ across platforms
 
+### Literal-Normalized Fingerprints
+
+By default the fingerprint includes literal constants (filter values, limits, etc.),
+so two queries that differ only in their parameter substitutions produce different
+fingerprints. Pass `--normalize-plan-literals` (together with `--capture-plans`) to
+*also* record a literal-normalized fingerprint that collapses such queries to the
+same value:
+
+```bash
+benchbox run --platform duckdb --benchmark tpch --capture-plans --normalize-plan-literals
+```
+
+When enabled, each captured plan in the `*.plans.json` companion file gains a
+`fingerprint_normalized` key alongside the default `fingerprint`. The default
+fingerprint is never changed. Literal normalization replaces string/date literals
+and standalone numeric literals (and `LIMIT`/`OFFSET` counts) with a placeholder
+while preserving identifiers, so structurally identical queries with different
+constants share a normalized fingerprint.
+
+The capability is also available programmatically:
+
+```python
+plan.plan_fingerprint          # literal-sensitive (default)
+plan.normalized_fingerprint    # literal-normalized
+plan.compute_plan_fingerprint(normalize_literals=True)
+```
+
 ### Comparison Algorithm
 
 The comparison engine uses:

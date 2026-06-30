@@ -1265,6 +1265,7 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
             **_strict_translation_config_entry(s),
+            "normalize_plan_literals": s.normalize_plan_literals,
             **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
@@ -1325,6 +1326,7 @@ def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManag
         "capture_plans": s.capture_plans,
         "strict_plan_capture": s.strict_plan_capture,
         "plan_queries": s.plan_queries,
+        "normalize_plan_literals": s.normalize_plan_literals,
         "execution_mode": s.resolved_mode,
     }
     if s.loaded_unified_config:
@@ -1385,6 +1387,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         "capture_plans": s.capture_plans,
         "strict_plan_capture": s.strict_plan_capture,
         "plan_queries": s.plan_queries,
+        "normalize_plan_literals": s.normalize_plan_literals,
         "execution_mode": s.resolved_mode,
     }
     if s.loaded_unified_config:
@@ -1469,6 +1472,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
             **_strict_translation_config_entry(s),
+            "normalize_plan_literals": s.normalize_plan_literals,
             **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
@@ -1606,6 +1610,7 @@ def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: Database
         "capture_plans": s.capture_plans,
         "strict_plan_capture": s.strict_plan_capture,
         "plan_queries": s.plan_queries,
+        "normalize_plan_literals": s.normalize_plan_literals,
         "execution_mode": s.resolved_mode,
     }
     if s.loaded_unified_config:
@@ -1721,6 +1726,7 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
             **_strict_translation_config_entry(s),
+            "normalize_plan_literals": s.normalize_plan_literals,
             **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
@@ -1980,6 +1986,7 @@ def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
             **_strict_translation_config_entry(s),
+            "normalize_plan_literals": s.normalize_plan_literals,
             **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
@@ -2606,6 +2613,17 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     default=None,
     help="Plan capture config: queries:1,6,17,strict:true (capture is once-per-query; use --analyze-plans for detail)",
 )
+@advanced_option(
+    "--normalize-plan-literals",
+    "normalize_plan_literals",
+    is_flag=True,
+    help=(
+        "Also record a literal-normalized plan fingerprint (plan_fingerprint_normalized) "
+        "alongside the default fingerprint when capturing plans. Plans that differ only in "
+        "literal constants (e.g. query parameter substitutions) collapse to the same "
+        "normalized fingerprint. Requires --capture-plans."
+    ),
+)
 # Compression
 @advanced_option(
     "--compression",
@@ -2732,6 +2750,7 @@ def run(
     show_plans: bool,
     strict_translation: bool,
     plan_config: PlanCaptureConfig | None,
+    normalize_plan_literals: bool,
     compression: CompressionConfig | None,
     table_format: TableFormatConfig | None,
     presort: str | None,
@@ -2791,6 +2810,7 @@ def run(
         show_plans=show_plans,
         strict_translation=strict_translation,
         plan_config=plan_config,
+        normalize_plan_literals=normalize_plan_literals,
         compression=compression,
         table_format=table_format,
         presort=presort,

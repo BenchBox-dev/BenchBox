@@ -73,6 +73,9 @@ class PlanCapturePhaseResult:
     Attributes:
         plans: query_id -> parsed ``QueryPlanDAG`` for queries captured.
         fingerprints: query_id -> structural ``plan_fingerprint``.
+        normalized_fingerprints: query_id -> literal-normalized fingerprint, only
+            populated when the adapter's ``normalize_plan_literals`` option is
+            enabled (see --normalize-plan-literals); absent otherwise.
         per_query_capture_ms: query_id -> wall-clock ms spent on that capture.
         total_capture_ms: wall-clock ms for the whole phase (incl. connection).
         captured: number of queries with a parsed plan.
@@ -81,6 +84,7 @@ class PlanCapturePhaseResult:
 
     plans: dict[str, Any] = field(default_factory=dict)
     fingerprints: dict[str, str] = field(default_factory=dict)
+    normalized_fingerprints: dict[str, str] = field(default_factory=dict)
     per_query_capture_ms: dict[str, float] = field(default_factory=dict)
     total_capture_ms: float = 0.0
     captured: int = 0
@@ -169,6 +173,8 @@ def run_plan_capture_phase(
             if plan is not None:
                 result.plans[query_id] = plan
                 result.fingerprints[query_id] = plan.plan_fingerprint
+                if getattr(adapter, "normalize_plan_literals", False):
+                    result.normalized_fingerprints[query_id] = plan.normalized_fingerprint
                 result.captured += 1
             else:
                 result.failed += 1

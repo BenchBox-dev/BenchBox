@@ -158,6 +158,7 @@ class QueryExecution:
     # Query plan capture (structured DAG representation)
     query_plan: QueryPlanDAG | None = None  # Captured query execution plan
     plan_fingerprint: str | None = None  # SHA256 hash for fast plan comparison
+    plan_fingerprint_normalized: str | None = None  # Literal-normalized fingerprint (opt-in)
     plan_capture_time_ms: float | None = None  # Time spent capturing plan (EXPLAIN + parse)
 
 

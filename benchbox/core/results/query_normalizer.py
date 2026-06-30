@@ -110,6 +110,7 @@ class QueryResultInput:
     # Query plan capture (passed through to BenchmarkResults.query_results for companion file)
     query_plan: Any | None = None
     plan_fingerprint: str | None = None
+    plan_fingerprint_normalized: str | None = None
     plan_capture_time_ms: float | None = None
     # Gate-only value-digest oracle (BENCHBOX_EMIT_RESULT_DIGEST): full-result
     # digest of a stream-0 query. None on a normal run (no payload change).
@@ -196,6 +197,7 @@ def normalize_query_result(
         dataframe_skip_summary=raw_result.get("dataframe_skip_summary"),
         query_plan=raw_result.get("query_plan"),
         plan_fingerprint=raw_result.get("plan_fingerprint"),
+        plan_fingerprint_normalized=raw_result.get("plan_fingerprint_normalized"),
         plan_capture_time_ms=raw_result.get("plan_capture_time_ms"),
         result_digest=raw_result.get("result_digest"),
     )
