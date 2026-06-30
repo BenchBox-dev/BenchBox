@@ -623,11 +623,44 @@ Plans are fingerprinted using SHA256 of the logical structure:
 | Adding an index the planner starts using | **May differ** — only when it changes the *logical* structure (e.g. an index join replacing a hash join). A pure scan-method switch (Seq Scan → Index Scan on the same table) keeps the **same fingerprint**, because scan variants normalize to a logical `Scan` and physical operator details are excluded from the hash. Use `compare-plans` or the physical-plan details to detect scan-method changes. |
 | Engine minor version upgrade with no plan change | **Usually same** — not guaranteed across major versions |
 | `analyze_plans=true` vs `analyze_plans=false` (DuckDB) | **Same fingerprint** — timing/cardinality excluded from hash |
+| Same query, **different benchmark seed** (data-driven filter literal) | **Differs by default** — filter/join/projection *literals* are part of the hash, so a seed-varied threshold (`l_quantity < 1234.56` vs `< 2345.67`) changes the fingerprint even though the plan shape is identical. Use literal normalization (below) for seed-independent comparison. |
 
 **What fingerprint equality does NOT guarantee:**
 - That query performance is the same (costs may differ with identical logical structure)
 - That the plan is optimal for the current data distribution
 - Stability across major engine version upgrades
+
+> **Cross-run comparison requires identical seeds (or literal normalization).**
+> Because the default fingerprint embeds filter expression literals, comparing
+> fingerprints across two runs that used *different* benchmark seeds produces false
+> positives: a query whose only change is a seed-driven filter value (e.g.
+> `customer_acctbal < 1234.56` → `< 2345.67`) appears "changed" when the plan shape
+> did not. Either hold the seed constant across the runs you compare, or use the
+> literal-normalized fingerprint below.
+
+#### Literal normalization (seed-independent fingerprints)
+
+Literal normalization is an **opt-in** structural fingerprint that masks numeric and
+single-quoted string literals in the filter, join, and projection predicates to
+`<NUM>` / `<STR>` before hashing. Two structurally identical plans whose only
+difference is a seed-varied literal then share a fingerprint, so cross-run
+regression detection stops flagging seed changes as plan changes. Identifier fields
+— table names, group-by / sort keys, aggregation functions, operator and join types
+— are **never** masked, so a genuine structural change still changes the fingerprint.
+
+Normalization is opt-in and never alters the default `plan_fingerprint` (which stays
+literal-sensitive, for users who intentionally track filter-threshold changes):
+
+- **API:** `QueryPlanDAG.normalized_fingerprint` (a lazily-computed, cached property)
+  or `compute_plan_fingerprint(normalize_literals=True)` returns the masked hash;
+  `LogicalOperator.get_structural_signature(normalize_literals=True)` exposes the
+  underlying signature.
+- **Cross-run metadata:** `create_plan_metadata_from_results(..., normalize_literals=True)`
+  records the normalized fingerprint per query for seed-independent comparison.
+
+A `benchbox run --normalize-plan-literals` flag to surface the normalized fingerprint
+directly in the result bundle is planned; today the normalized fingerprint is
+available through the API above and the metadata helper.
 
 **Recommended use:**
 - Within a single run: deduplicate identical plans across concurrent streams

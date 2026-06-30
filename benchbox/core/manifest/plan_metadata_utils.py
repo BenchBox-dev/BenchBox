@@ -13,6 +13,7 @@ def create_plan_metadata_from_results(
     results: Any,  # BenchmarkResults
     platform: str | None = None,
     platform_version: str | None = None,
+    normalize_literals: bool = False,
 ) -> PlanMetadata:
     """
     Create plan metadata from benchmark results.
@@ -23,6 +24,12 @@ def create_plan_metadata_from_results(
         results: BenchmarkResults instance with query plans
         platform: Platform name (defaults to results.platform)
         platform_version: Platform version (defaults to results.platform_version)
+        normalize_literals: When True, record each query's literal-normalized
+            fingerprint (``QueryPlanDAG.normalized_fingerprint``) instead of the
+            default literal-sensitive ``plan_fingerprint``. Use this when comparing
+            runs that may use different benchmark seeds: structurally identical plans
+            then share a fingerprint even when their filter literals differ. Default
+            False preserves the existing literal-sensitive behaviour.
 
     Returns:
         PlanMetadata with fingerprints and timestamps
@@ -34,14 +41,20 @@ def create_plan_metadata_from_results(
 
     timestamp = datetime.now(timezone.utc).isoformat()
 
-    # Extract fingerprints from all phase results
+    # Extract fingerprints from all phase results. When normalize_literals is set we
+    # read the literal-normalized fingerprint and never fall back to the
+    # literal-sensitive one — silently mixing the two would defeat the seed-stable
+    # comparison this option exists for (a plan lacking the normalized property is
+    # skipped rather than recorded under the wrong scheme).
+    attr = "normalized_fingerprint" if normalize_literals else "plan_fingerprint"
     for phase_results in getattr(results, "phases", {}).values():
         for execution in phase_results.queries:
             plan = getattr(execution, "query_plan", None)
-            if plan and hasattr(plan, "plan_fingerprint") and plan.plan_fingerprint:
+            fingerprint = getattr(plan, attr, None) if plan is not None else None
+            if fingerprint:
                 query_id = execution.query_id
                 if query_id not in metadata.plan_fingerprints:
-                    metadata.plan_fingerprints[query_id] = plan.plan_fingerprint
+                    metadata.plan_fingerprints[query_id] = fingerprint
                     metadata.plan_capture_timestamp[query_id] = timestamp
                     metadata.plan_versions[query_id] = 1  # Default to version 1
 
