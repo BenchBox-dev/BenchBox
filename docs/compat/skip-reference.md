@@ -109,7 +109,7 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_serializable | execution_filter | DuckDB rejects explicit SET TRANSACTION ISOLATION LEVEL syntax. | `execution_filter.duckdb.transaction_primitives.transaction_isolation_serializable` |
 | SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | execution_filter | DuckDB rejects SAVEPOINT syntax in transaction_primitives operations. | `execution_filter.duckdb.transaction_primitives.transaction_savepoint_deep_nesting` |
 | SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_nested | execution_filter | DuckDB rejects SAVEPOINT syntax in transaction_primitives operations. | `execution_filter.duckdb.transaction_primitives.transaction_savepoint_nested` |
-| SKIPPED_QUERY | benchmark=write_primitives, query=bulk_load_upsert_mode | execution_filter | DuckDB 1.3.2 rejects the catalog's MERGE statements; keep them explicit skips until the bundled driver supports MERGE. | `execution_filter.duckdb.write_primitives.bulk_load_upsert_mode` |
+| SKIPPED_QUERY | benchmark=write_primitives, query=bulk_load_upsert_mode | execution_filter | DuckDB 1.3.2 rejects the catalog's MERGE INTO statements; keep them explicit skips until the bundled driver supports MERGE. Portable merge operations written as UPDATE/INSERT run normally. | `execution_filter.duckdb.write_primitives.bulk_load_upsert_mode` |
 
 ### lakesail
 
