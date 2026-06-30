@@ -2,7 +2,7 @@ id: joinorder-scale-stress-decision-framework
 title: "Design the JOB scale-stress benchmark decision framework"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Benchmark Development
 
 description: |
@@ -38,7 +38,7 @@ context_sections:
 work:
   - id: w0
     summary: "Collect evidence for optimizer and statistics failures at scale"
-    status: pending
+    status: done
     notes: |
       Before choosing a scaled JOB-derived path, collect evidence that the target
       problem is real and distinct from canonical JOB. Include at least three of:
@@ -55,7 +55,7 @@ work:
   - id: w1
     summary: "Write the benchmark question and non-goals"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Produce a short decision note that separates:
         - canonical JOB comparability,
@@ -70,7 +70,7 @@ work:
   - id: w2
     summary: "Define scale semantics and workload labels"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Decide whether scale factor means total rows, title count, all major
       entity classes, bytes, or expected query cardinality. Define labels and
@@ -85,7 +85,7 @@ work:
   - id: w3
     summary: "Specify statistics-maintenance phases and measurements"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Decide whether BenchBox needs a first-class stats/analyze phase before
       scale-stress work can be meaningful. The decision must cover:
@@ -138,7 +138,7 @@ work:
   - id: w4
     summary: "Compare scale-up implementation options"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       Compare at least these options:
         - offset replication of canonical IMDB,
@@ -153,7 +153,7 @@ work:
   - id: w5
     summary: "Define validation gates for any scaled JOB-derived workload"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       The validation gate must include:
         - FK integrity,
@@ -170,7 +170,7 @@ work:
   - id: w6
     summary: "Decide fixed 113 queries versus parameterized JOB-like queries"
     needs: [w5]
-    status: pending
+    status: done
     notes: |
       Decide whether the first scaled workload should:
         - keep the fixed 113 JOB queries and study what happens as the database
@@ -183,7 +183,7 @@ work:
   - id: w7
     summary: "Produce a go/no-go recommendation and prototype scope"
     needs: [w6]
-    status: pending
+    status: done
     notes: |
       End with a written recommendation:
         - no scaled JOB for now,
@@ -220,7 +220,7 @@ work:
   - id: w8
     summary: "Pin the licensing decision for the recommended scale-up path"
     needs: [w7]
-    status: pending
+    status: done
     notes: |
       Output: `_project/decisions/joinorder-scale-stress-licensing-<date>.md`
 
@@ -307,7 +307,7 @@ verification:
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
     expected_output: "Graph validation passed"
   - description: "This item validates individually"
-    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/TODO/main/planning/joinorder-scale-stress-decision-framework.yaml"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/DONE/main/planning/joinorder-scale-stress-decision-framework.yaml"
     expected_output: "is valid"
 
 scope_limit:
