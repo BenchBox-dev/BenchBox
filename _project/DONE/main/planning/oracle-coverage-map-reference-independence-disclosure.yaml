@@ -2,8 +2,24 @@ id: oracle-coverage-map-reference-independence-disclosure
 title: "Add a REFERENCE-INDEPENDENCE axis to the oracle coverage map so 'value-level' does not over-promise"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-06-30"
 category: Testing and Quality Assurance
+
+completion_notes:
+  completed_by: "fix/oracle-coverage-map-reference-independence-disclosure"
+  completed_date: "2026-06-30"
+  notes:
+    - "All four work units (w1-w4) were delivered by PR #888 (squash commit
+      9e707cf9a, ancestor of develop), which landed alongside the value-digest
+      fidelity hardening. This TODO was never moved out of planning/ at the time;
+      this change is the close-out bookkeeping only -- no code change."
+    - "Revalidated on develop @ 05d1986ab: the generated _project/analysis/oracle-coverage-map.md
+      carries the reference-independence column and the SF>1 disclosure rendered
+      into the tpch row (value+cardinality SF=1 only; values UNGUARDED above SF=1);
+      provenance uses a squash-safe content hash. `make oracle-coverage-map-check`
+      reports up to date; tests/unit/test_oracle_coverage_map.py (14 passed) pins
+      the classifier-truth labels."
 
 description: |
   An adversarial falsification review of the oracle coverage-map disclosure work
@@ -81,7 +97,7 @@ prior_art:
 work:
 - id: w1
   summary: "Add a REFERENCE-INDEPENDENCE axis derived from live sources (independent vs self-referential/shared-spec)"
-  status: pending
+  status: done
   notes: |
     Classify each guarded oracle on a new axis orthogonal to Strength: does it
     compare against a reference INDEPENDENT of the system under test, or against
@@ -96,13 +112,14 @@ work:
     .json so a reader sees that "value-level" on ssb means "self-referential value
     comparison", not "values proven against an authority".
   acceptance:
-  - "The generated map shows a reference-independence column; cross-surface cells read self-referential, the tpch value digest reads self-referential (regression snapshot), derived from live sources not hard-coded per benchmark."
+  - "The generated map shows a reference-independence column; cross-surface cells read self-referential, the tpch value digest
+    reads self-referential (regression snapshot), derived from live sources not hard-coded per benchmark."
   - "The drift check (`make oracle-coverage-map-check`) is green on a clean tree with the new column."
 
 - id: w2
   summary: "Make the SF>1 value-blindness unmissable from a single table row"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     A reader scanning only the Strength column must not conclude tpch values are
     guarded generally. Make the row self-contained — e.g. render Strength as
@@ -111,12 +128,13 @@ work:
     or the prose. Keep it generated/derived (the loader already raises above SF=1),
     not a hand-typed caveat.
   acceptance:
-  - "The tpch row alone (without reading the Scale column or prose) makes clear that values are guarded only at SF=1 and unguarded above it."
+  - "The tpch row alone (without reading the Scale column or prose) makes clear that values are guarded only at SF=1 and unguarded
+    above it."
 
 - id: w3
   summary: "Make the provenance stamp survive squash-merge (no orphaned/unreachable SHA)"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Reproduced: the committed provenance `revision:` points to a pre-squash
     PR-branch commit that is unreachable after squash-merge. Replace the volatile
@@ -128,14 +146,17 @@ work:
     constraint). Record the squash-orphans-SHA lesson in REVIEW-PROTOCOL.md so
     future analysis artifacts and reviews do not pin a SHA that the squash discards.
   acceptance:
-  - "The coverage-map provenance stamp resolves to a commit reachable from develop (or is a content hash / regenerate-to-verify note), never a dangling PR-branch SHA."
-  - "`make oracle-coverage-map-check` still passes across two successive commits (the new stamp did not enter the drift-compared body)."
-  - "REVIEW-PROTOCOL.md documents that squash-merge orphans PR-branch SHAs, so provenance must use a develop-reachable or content-derived stamp."
+  - "The coverage-map provenance stamp resolves to a commit reachable from develop (or is a content hash / regenerate-to-verify
+    note), never a dangling PR-branch SHA."
+  - "`make oracle-coverage-map-check` still passes across two successive commits (the new stamp did not enter the drift-compared
+    body)."
+  - "REVIEW-PROTOCOL.md documents that squash-merge orphans PR-branch SHAs, so provenance must use a develop-reachable or
+    content-derived stamp."
 
 - id: w4
   summary: "Pin the new axes with classifier-truth tests so they cannot silently regress"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     Extend tests/unit/test_oracle_coverage_map.py the way #867 pinned Strength/Scale:
     assert the reference-independence label of each known oracle (cross-surface =
@@ -144,28 +165,31 @@ work:
     plus assert the SF>1 disclosure is present in the tpch row. This is the truth
     check the drift check lacks for the new axis.
   acceptance:
-  - "A classifier-truth test asserts the independence label of each known oracle and fails if a future change mislabels one or removes the SF>1 disclosure from the tpch row."
+  - "A classifier-truth test asserts the independence label of each known oracle and fails if a future change mislabels one
+    or removes the SF>1 disclosure from the tpch row."
 
 deferred:
 - summary: "Closing the 15 UNGUARDED benchmarks or adding new oracles."
   reason: "Owned by benchmark-correctness-oracle-coverage-map (breadth). This item improves DISCLOSURE quality of the already-guarded
     cells, not coverage."
 - summary: "The 'registered vs verified-green' (Enforced) axis."
-  reason: "Already shipped (#867) and coordinated with cross-surface-oracle-remediation; the independence axis is orthogonal and
-    must not overload or duplicate it."
+  reason: "Already shipped (#867) and coordinated with cross-surface-oracle-remediation; the independence axis is orthogonal
+    and must not overload or duplicate it."
 - summary: "Building an actual independent value oracle for any benchmark."
   reason: "This item only DISCLOSES the independence status; it does not change any oracle's strength. The closest scoped
-    upgrade is correctness-gate-value-digest-fidelity-followups w5 (cross-engine digest agreement, DuckDB vs
-    postgres/datafusion at SF=1) — but that is only SEMI-independent: both engines run the SAME BenchBox-authored SQL over the
-    SAME generated data, so a conceptual query bug or a data-generation bug agrees across both engines and is NOT caught by it.
-    A FULLY independent value oracle (an external answer key / spec-derived expected values that does not share BenchBox's
-    query implementation or generator) is distinct, currently-unowned work; it is recorded here as an explicit roadmap gap so
-    cross-engine agreement is never mistaken for it."
+    upgrade is correctness-gate-value-digest-fidelity-followups w5 (cross-engine digest agreement, DuckDB vs postgres/datafusion
+    at SF=1) — but that is only SEMI-independent: both engines run the SAME BenchBox-authored SQL over the SAME generated
+    data, so a conceptual query bug or a data-generation bug agrees across both engines and is NOT caught by it. A FULLY independent
+    value oracle (an external answer key / spec-derived expected values that does not share BenchBox's query implementation
+    or generator) is distinct, currently-unowned work; it is recorded here as an explicit roadmap gap so cross-engine agreement
+    is never mistaken for it."
 
 must_preserve:
 - "The map stays GENERATED from live sources — no hand-maintained classification — so it cannot drift from reality."
-- "The existing Strength/Scale/Enforced columns and the drift check stay exactly as #867 shipped them; the independence axis is an ADDITIVE column."
-- "The drift check (`make oracle-coverage-map-check`) stays green on a clean tree and on the required PR path; the new column and the new provenance stamp must regenerate deterministically and stay out of the drift-compared body."
+- "The existing Strength/Scale/Enforced columns and the drift check stay exactly as #867 shipped them; the independence axis
+  is an ADDITIVE column."
+- "The drift check (`make oracle-coverage-map-check`) stays green on a clean tree and on the required PR path; the new column
+  and the new provenance stamp must regenerate deterministically and stay out of the drift-compared body."
 
 approach: |
   Layer one orthogonal column (reference-independence) onto the existing generated
@@ -177,11 +201,16 @@ approach: |
   drift-compared body deterministic so `--check` does not churn.
 
 anti_patterns:
-- "DO NOT overload the Strength column with independence — because a value-level oracle can be independent OR self-referential — add a separate orthogonal column."
-- "DO NOT hand-label independence per benchmark — because it would rot like a hand-maintained doc — derive it from the gate identity (cross-surface = self-referential) and the digest provenance (frozen snapshot)."
-- "DO NOT put the provenance SHA in the drift-compared region — because `--check` would fail on every commit (the #867 constraint) — keep it in the ignored header."
-- "DO NOT re-stamp the volatile PR-branch HEAD — because squash-merge orphans it — use a develop-reachable SHA, a content hash, or a regenerate-to-verify note."
-- "DO NOT widen scope into closing UNGUARDED benchmarks or changing any oracle's actual strength — this item only DISCLOSES independence."
+- "DO NOT overload the Strength column with independence — because a value-level oracle can be independent OR self-referential
+  — add a separate orthogonal column."
+- "DO NOT hand-label independence per benchmark — because it would rot like a hand-maintained doc — derive it from the gate
+  identity (cross-surface = self-referential) and the digest provenance (frozen snapshot)."
+- "DO NOT put the provenance SHA in the drift-compared region — because `--check` would fail on every commit (the #867 constraint)
+  — keep it in the ignored header."
+- "DO NOT re-stamp the volatile PR-branch HEAD — because squash-merge orphans it — use a develop-reachable SHA, a content
+  hash, or a regenerate-to-verify note."
+- "DO NOT widen scope into closing UNGUARDED benchmarks or changing any oracle's actual strength — this item only DISCLOSES
+  independence."
 
 verification:
 - description: "Map shows the independence column and the self-contained SF>1 disclosure, and is internally consistent"
@@ -192,7 +221,8 @@ verification:
   expected_output: "tests pass; flipping a known oracle's independence label fails the new assertion"
 - description: "The new provenance stamp resolves on develop and does not churn the drift check"
   command: "make oracle-coverage-map-check"
-  expected_output: "up to date; the stamped revision is resolvable from origin/develop (or is a content hash / note, not a dangling SHA)"
+  expected_output: "up to date; the stamped revision is resolvable from origin/develop (or is a content hash / note, not a
+    dangling SHA)"
 
 scope_limit:
   only_modify:
@@ -206,14 +236,18 @@ success_metrics:
 - "Every guarded cell discloses whether its oracle is independent or self-referential, derived from live sources."
 - "A reader can no longer mistake a self-referential 'value-level' cell for proof of value correctness."
 - "The tpch row alone makes the SF>1 value gap unmissable, without cross-referencing the Scale cell."
-- "The coverage-map provenance stamp survives squash-merge (resolvable on develop or content-derived), and the protocol note records the lesson."
+- "The coverage-map provenance stamp survives squash-merge (resolvable on develop or content-derived), and the protocol note
+  records the lesson."
 - "A classifier-truth test fails if any new-axis label is wrong."
 
 open_questions:
-- question: "How should reference-independence be derived for cross-surface gates without hand-labelling — from the gate's identity (cross-surface implies shared-spec self-reference) or from a per-gate metadata flag?"
+- question: "How should reference-independence be derived for cross-surface gates without hand-labelling — from the gate's
+    identity (cross-surface implies shared-spec self-reference) or from a per-gate metadata flag?"
   gating: false
   affects: ["w1 independence derivation"]
-  default: "Derive from the oracle KIND (cross-surface / variant-equivalence -> self-referential; expected-results value digest -> self-referential snapshot; row-count answers -> semi-independent) so it tracks the classifier without a new hand-maintained field."
+  default: "Derive from the oracle KIND (cross-surface / variant-equivalence -> self-referential; expected-results value digest
+    -> self-referential snapshot; row-count answers -> semi-independent) so it tracks the classifier without a new hand-maintained
+    field."
 
 # No hard deps.needs: the generator already exists and this disclosure work is
 # independent of the breadth campaign (benchmark-correctness-oracle-coverage-map)
