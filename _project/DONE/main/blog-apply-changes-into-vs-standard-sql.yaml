@@ -3,7 +3,8 @@ title: Blog - Evaluate Databricks APPLY CHANGES INTO vs Standard SQL MERGE for S
 worktree: main
 category: Documentation
 priority: Low
-status: Not Started
+status: Completed
+completed_date: '2026-06-30'
 description: |
   Write a platform-deep-dive blog post that explicitly evaluates Databricks'
   declarative APPLY CHANGES INTO (DLT / Lakeflow Declarative Pipelines) against
@@ -116,7 +117,7 @@ deps:
 work:
   - id: w1
     summary: Research APPLY CHANGES INTO semantics and pipeline-context constraint
-    status: pending
+    status: done
     notes: |
       Databricks docs: APPLY CHANGES INTO / AUTO CDC, SCD TYPE 2, SEQUENCE BY,
       APPLY AS DELETE, COLUMNS/EXCEPT, the DLT/Lakeflow pipeline requirement.
@@ -124,14 +125,14 @@ work:
   - id: w2
     summary: Reconstruct equivalent standard MERGE and do honest LOC/edge-case count
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Reuse the merge_scd_type2 op. Count real lines and enumerate which edge
       cases (ordering, deletes, schema evolution) each form handles.
   - id: w3
     summary: Gather measurements - MERGE via BenchBox; APPLY CHANGES INTO externally if feasible
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       MERGE form across engines via BenchBox (runtime, rows versioned, $ where
       a cost model exists). APPLY CHANGES INTO only if a Databricks workspace is
@@ -139,11 +140,11 @@ work:
   - id: w4
     summary: Write outline
     needs: [w1, w2]
-    status: pending
+    status: done
   - id: w5
     summary: Write draft with side-by-side code and the measurements we have
     needs: [w3, w4]
-    status: pending
+    status: done
 
 deferred:
   - summary: "Benchmarking the DLT pipeline path inside the BenchBox harness"
