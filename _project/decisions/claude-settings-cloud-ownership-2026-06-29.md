@@ -91,3 +91,49 @@ fails the build if any of these become git-tracked.
   dedup; would mutate user-global config for no behavioral gain.
 - **Commit all hooks including the push-guard.** Rejected: breaks cloud pushes
   and encodes personal policy as a project invariant.
+
+## Addendum (2026-06-30): cloud activation reality — committed config is necessary but not sufficient
+
+A live validation in a fresh `claude.ai/code` cloud session, cross-checked
+against the official Claude Code docs, corrected an optimistic assumption baked
+into the original Decision (and into #895's commit message, which claimed "any
+environment auto-installs the same plugins"). **That claim is false for cloud.**
+
+What a fresh cloud clone actually realizes from committed `.claude/`:
+
+| Class | Cloud-activates from committed config? | Why |
+|---|---|---|
+| Skills (`.claude/skills/**`) | **Yes** | Passive data (prompt files); no trust/install needed. |
+| Commands (`.claude/commands/**`) | **Yes** | Same — passive prompt files. |
+| Plugins (`enabledPlugins` + `extraKnownMarketplaces`) | **No — by design** | Plugins execute arbitrary code. Per the docs (Claude Code ≥ v2.1.195), a plugin enabled only by a project's `.claude/settings.json` from an external source "doesn't load until the team member installs it." No setting, flag, or env var auto-installs project-declared marketplaces. |
+| Hooks (`hooks.PostToolUse`) | **No — empirically** | Docs say project hooks are *not* approval-gated and run by default locally, but are **silent on cloud web execution**; the validation proved the PostToolUse hook never fires in cloud (the command works when run manually). Likely the managed VM applies `allowManagedHooksOnly` or does not wire PostToolUse in the web runtime. |
+
+### Decision (cloud activation)
+
+- **Skills/commands are the real cloud-parity win** and require nothing further.
+- **Plugins**: provision via a setup script (`scripts/cloud-claude-setup.sh`)
+  that runs `claude plugin marketplace add` + `claude plugin install
+  <plugin>@<marketplace> --scope user`, deriving the marketplace/plugin list
+  from `.claude/settings.json` so it never drifts. Wire it as the BenchBox
+  `claude.ai/code` environment setup script. (The committed `enabledPlugins`
+  block stays — it remains correct for local trusted sessions and is the source
+  of truth the setup script reads.)
+- **Hooks**: deliberately **not** provisioned for cloud. The PostToolUse hooks
+  are an edit-time *convenience*; the same `ruff`/`ty` enforcement already runs
+  in CI (`make lint` / `make typecheck`) and `pr-preflight`. Injecting them into
+  the VM's user settings is unreliable (may be blocked by `allowManagedHooksOnly`)
+  and buys nothing CI doesn't already guarantee.
+
+### Evidence (2026-06-30 cloud validation)
+
+- Fresh cloud session: `.claude/skills/*` + `.claude/commands/*` loaded and
+  invocable; `blog` correctly absent. Settings parsed on disk.
+- Marketplace cache empty, `installed_plugins.json` = `{}`, no namespaced
+  plugin agents (`code-modernization:*`, `code-simplifier:*`, …) in the session.
+- PostToolUse hook live-test: a deliberately mis-formatted `.py` written via the
+  Write tool was **not** reformatted (cold and warm venv); `uv run ruff` applied
+  the same fix when run manually → hook inactive, command valid.
+- Docs: Discover/Install plugins, Hooks overview, web-quickstart (setup scripts
+  are the only documented cloud provisioning hook), admin-setup / permissions
+  (`allowManagedHooksOnly`, managed `enabledPlugins` are the only *guaranteed*
+  activation path, enterprise-only).
