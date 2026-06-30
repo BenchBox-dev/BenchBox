@@ -2,7 +2,8 @@ id: execution-harness-extraction-throughput-maintenance-combined
 title: "Extend capability-based power-harness dispatch to throughput, maintenance, and combined tests"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-06-30"
 category: Code Quality and Technical Debt
 
 description: |
@@ -34,7 +35,7 @@ prior_art:
 work:
   - id: w0
     summary: "Re-confirm the residual literals and the guard test scope on fresh develop"
-    status: pending
+    status: done
     needs: []
     notes: |
       Grep execution.py for `benchmark_id == "tpc` and record each method + line
@@ -44,7 +45,7 @@ work:
 
   - id: w1
     summary: "Extract throughput dispatch to capability resolution"
-    status: pending
+    status: done
     needs: [w0]
     notes: |
       Move the TPC-H/TPC-DS throughput bodies behind a resolve_*_harness lookup,
@@ -53,7 +54,7 @@ work:
 
   - id: w2
     summary: "Extract maintenance dispatch to capability resolution"
-    status: pending
+    status: done
     needs: [w0]
     notes: |
       Same treatment for _execute_maintenance_test, preserving the
@@ -61,7 +62,7 @@ work:
 
   - id: w3
     summary: "Extract combined dispatch to capability resolution"
-    status: pending
+    status: done
     needs: [w1, w2]
     notes: |
       _execute_combined_test composes power+throughput+maintenance; route it through
@@ -69,7 +70,7 @@ work:
 
   - id: w4
     summary: "Broaden the guard test to all four dispatch methods and restore the strong metric"
-    status: pending
+    status: done
     needs: [w3]
     notes: |
       Extend test_power_dispatch_path_has_no_literal_tpc_benchmark_names (or add a
