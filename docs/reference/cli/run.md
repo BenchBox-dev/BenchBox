@@ -367,6 +367,16 @@ These flags control monitoring, progress display, memory handling, and caching b
     been removed. On DuckDB the default `EXPLAIN (ANALYZE, FORMAT JSON)` re-runs each query once;
     use `--no-analyze-plans` for estimated plans without that overhead.
 
+> **Cross-run fingerprint comparison and benchmark seeds.** The default
+> `plan_fingerprint` embeds filter/join/projection literals, so comparing fingerprints
+> across runs that used *different* seeds yields false positives when only a
+> seed-driven filter value changed. Hold the seed constant across compared runs, or
+> use the opt-in **literal-normalized** fingerprint
+> (`QueryPlanDAG.normalized_fingerprint`,
+> `create_plan_metadata_from_results(..., normalize_literals=True)`), which masks
+> literals so seed-varied plans compare equal. See
+> [Query Plan Analysis → Literal normalization](../../features/query-plan-analysis.md#literal-normalization-seed-independent-fingerprints).
+
 ## Related
 
 - [Configuration](configuration.md) - Configuration files and environment variables

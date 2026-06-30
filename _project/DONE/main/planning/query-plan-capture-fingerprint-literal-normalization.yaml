@@ -2,7 +2,7 @@ id: query-plan-capture-fingerprint-literal-normalization
 title: "Add optional literal normalization to plan fingerprints for cross-run regression detection"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Core Functionality
 
 description: |

@@ -108,11 +108,32 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
 from benchbox.core.errors import SerializationError
+
+# Literal-masking patterns for normalize_literals fingerprints. Numeric literals
+# (including decimals) collapse to <NUM> and single-quoted string literals to <STR>
+# so that structurally identical plans whose only difference is a data-driven
+# parameter value (e.g. a seed-varied filter threshold) hash the same. Numbers are
+# masked first so digits inside a quoted literal are folded into the <STR> token.
+_LITERAL_NUM_RE = re.compile(r"\b\d+(?:\.\d+)?\b")
+_LITERAL_STR_RE = re.compile(r"'[^']*'")
+
+
+def _mask_literals(expression: str) -> str:
+    """Replace numeric and single-quoted string literals with stable placeholders.
+
+    Masks only concrete values, never identifiers: a trailing digit on a column or
+    alias (``l_orderkey1``, ``t1``) has no leading word boundary before the digit,
+    so it is left intact. Used for the opt-in literal-normalized structural
+    signature; the default fingerprint keeps literals verbatim.
+    """
+    return _LITERAL_STR_RE.sub("<STR>", _LITERAL_NUM_RE.sub("<NUM>", expression))
+
 
 logger = logging.getLogger(__name__)
 
@@ -371,9 +392,19 @@ class LogicalOperator:
             offset_count=data.get("offset_count"),
         )
 
-    def get_structural_signature(self) -> str:
+    def get_structural_signature(self, normalize_literals: bool = False) -> str:
         """
         Get structural signature for fingerprinting.
+
+        Args:
+            normalize_literals: When True, mask numeric/string literals in the
+                predicate fields (filter_expressions, join_conditions,
+                projection_expressions) to ``<NUM>``/``<STR>`` so that plans which
+                differ only by a data-driven parameter value (e.g. a seed-varied
+                filter threshold) produce the same signature. Default False keeps
+                literals verbatim (the established, literal-sensitive behaviour).
+                Column/identifier fields (table_name, group_by_keys, sort_keys,
+                aggregation_functions, etc.) are never masked.
 
         Returns only structural elements that affect query semantics:
         - operator_type: Type of logical operation
@@ -409,14 +440,21 @@ class LogicalOperator:
             join_type_str = get_join_type_str(self.join_type)
             signature_parts.append(f"join:{join_type_str}")
 
-        # Join conditions - sorted for set-like semantics (order doesn't affect result)
+        # Join conditions - sorted for set-like semantics (order doesn't affect result).
+        # Mask each predicate's literals before sorting so the set is seed-stable.
         if self.join_conditions:
-            conditions_str = ",".join(sorted(self.join_conditions))
+            conditions = (
+                [_mask_literals(c) for c in self.join_conditions] if normalize_literals else self.join_conditions
+            )
+            conditions_str = ",".join(sorted(conditions))
             signature_parts.append(f"join_cond:{conditions_str}")
 
         # Filter expressions - sorted for set-like semantics
         if self.filter_expressions:
-            filters_str = ",".join(sorted(self.filter_expressions))
+            filters = (
+                [_mask_literals(f) for f in self.filter_expressions] if normalize_literals else self.filter_expressions
+            )
+            filters_str = ",".join(sorted(filters))
             signature_parts.append(f"filters:{filters_str}")
 
         # Aggregation functions - sorted for set-like semantics
@@ -436,9 +474,15 @@ class LogicalOperator:
             sort_str = ",".join(str(sorted(sk.items())) for sk in self.sort_keys)
             signature_parts.append(f"sort:{sort_str}")
 
-        # Projection expressions - order preserved (affects output columns)
+        # Projection expressions - order preserved (affects output columns).
+        # Mask literals (e.g. computed constants) but keep column order/identifiers.
         if self.projection_expressions:
-            proj_str = ",".join(self.projection_expressions)
+            projections = (
+                [_mask_literals(p) for p in self.projection_expressions]
+                if normalize_literals
+                else self.projection_expressions
+            )
+            proj_str = ",".join(projections)
             signature_parts.append(f"proj:{proj_str}")
 
         # Limit count - affects result set size
@@ -452,7 +496,7 @@ class LogicalOperator:
         # Recursively include children signatures
         if self.children:
             for child in self.children:
-                signature_parts.append(child.get_structural_signature())
+                signature_parts.append(child.get_structural_signature(normalize_literals=normalize_literals))
 
         return "|".join(signature_parts)
 
@@ -493,24 +537,48 @@ class QueryPlanDAG:
 
     def __post_init__(self) -> None:
         """Compute plan fingerprint after initialization."""
+        # Lazy cache for the literal-normalized fingerprint. A plain attribute, not a
+        # dataclass field, so it stays out of asdict()/to_dict() serialization and
+        # __eq__ — the default plan_fingerprint remains the only persisted fingerprint.
+        self._normalized_fingerprint: str | None = None
         if self.plan_fingerprint is None:
             self.plan_fingerprint = self.compute_plan_fingerprint()
             self.fingerprint_integrity = FingerprintIntegrity.VERIFIED
 
-    def compute_plan_fingerprint(self) -> str:
+    def compute_plan_fingerprint(self, normalize_literals: bool = False) -> str:
         """
         Compute SHA256 hash of logical operator tree structure.
 
         Only includes structural elements (operator types, join types, table names).
         Excludes costs, row counts, operator IDs, and other non-structural properties.
 
+        Args:
+            normalize_literals: When True, mask numeric/string literals in predicate
+                fields before hashing, so structurally identical plans that differ
+                only by a data-driven parameter value hash the same. Default False
+                preserves the literal-sensitive fingerprint.
+
         Returns:
             Hexadecimal SHA256 hash string
         """
         if self.logical_root is None:
             return hashlib.sha256(b"EMPTY_PLAN").hexdigest()
-        structural_signature = self.logical_root.get_structural_signature()
+        structural_signature = self.logical_root.get_structural_signature(normalize_literals=normalize_literals)
         return hashlib.sha256(structural_signature.encode("utf-8")).hexdigest()
+
+    @property
+    def normalized_fingerprint(self) -> str:
+        """Literal-normalized structural fingerprint (computed lazily, then cached).
+
+        Equivalent to ``compute_plan_fingerprint(normalize_literals=True)`` but
+        memoised on first access, mirroring how ``plan_fingerprint`` is held once.
+        Stable across runs whose plans differ only by seed-varied literal values,
+        so it is the fingerprint to compare for cross-seed regression detection.
+        The default ``plan_fingerprint`` is left untouched (literal-sensitive).
+        """
+        if self._normalized_fingerprint is None:
+            self._normalized_fingerprint = self.compute_plan_fingerprint(normalize_literals=True)
+        return self._normalized_fingerprint
 
     def verify_fingerprint(self) -> bool:
         """
@@ -551,6 +619,7 @@ class QueryPlanDAG:
         """
         self.plan_fingerprint = self.compute_plan_fingerprint()
         self.fingerprint_integrity = FingerprintIntegrity.VERIFIED
+        self._normalized_fingerprint = None
 
     def apply_raw_output_policy(
         self,
@@ -699,7 +768,7 @@ class QueryPlanDAG:
         )
 
 
-def compute_plan_fingerprint(logical_root: LogicalOperator) -> str:
+def compute_plan_fingerprint(logical_root: LogicalOperator, normalize_literals: bool = False) -> str:
     """
     Compute SHA256 hash of logical operator tree structure.
 
@@ -708,11 +777,13 @@ def compute_plan_fingerprint(logical_root: LogicalOperator) -> str:
 
     Args:
         logical_root: Root of the logical operator tree
+        normalize_literals: When True, mask numeric/string literals in predicate
+            fields before hashing (see ``LogicalOperator.get_structural_signature``).
 
     Returns:
         Hexadecimal SHA256 hash string
     """
-    structural_signature = logical_root.get_structural_signature()
+    structural_signature = logical_root.get_structural_signature(normalize_literals=normalize_literals)
     return hashlib.sha256(structural_signature.encode("utf-8")).hexdigest()
 
 
