@@ -40,7 +40,12 @@ from benchbox.core.constants import (
 )
 from benchbox.core.errors import PlanCaptureError
 from benchbox.core.operations import OperationExecutor
-from benchbox.core.power_harnesses import resolve_power_harness
+from benchbox.core.power_harnesses import (
+    resolve_combined_harness,
+    resolve_maintenance_harness,
+    resolve_power_harness,
+    resolve_throughput_harness,
+)
 from benchbox.core.results.builder import benchmark_family, normalize_benchmark_id
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT, QUERY_RUN_TYPE_WARMUP
 from benchbox.core.tpch.platform_power import _power_query_result, _power_test_error_result
@@ -740,15 +745,13 @@ class TestDriversMixin:
         benchmark_name = self._resolve_benchmark_slug(benchmark, run_config)
         benchmark_id = normalize_benchmark_id(benchmark_name)
 
-        if benchmark_id == "tpch":
-            return self._execute_tpch_throughput_test(benchmark, connection, run_config)
-        elif benchmark_id == "tpcds":
-            return self._execute_tpcds_throughput_test(benchmark, connection, run_config)
-        else:
-            console.print(f"[yellow]⚠️ Throughput test not supported for benchmark: {benchmark_name}[/yellow]")
-            console.print("[yellow]  Falling back to standard query execution[/yellow]")
-            run_config["_effective_execution_type"] = "power"
-            return self._execute_all_queries(benchmark, connection, run_config)
+        harness = resolve_throughput_harness(benchmark_id)
+        if harness is not None:
+            return getattr(self, harness.adapter_method)(benchmark, connection, run_config)
+        console.print(f"[yellow]⚠️ Throughput test not supported for benchmark: {benchmark_name}[/yellow]")
+        console.print("[yellow]  Falling back to standard query execution[/yellow]")
+        run_config["_effective_execution_type"] = "power"
+        return self._execute_all_queries(benchmark, connection, run_config)
 
     def _execute_maintenance_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Execute TPC Maintenance Test with data maintenance operations."""
@@ -757,15 +760,13 @@ class TestDriversMixin:
         benchmark_name = self._resolve_benchmark_slug(benchmark, run_config)
         benchmark_id = normalize_benchmark_id(benchmark_name)
 
-        if benchmark_id == "tpch":
-            return self._execute_tpch_maintenance_test(benchmark, connection, run_config)
-        elif benchmark_id == "tpcds":
-            return self._execute_tpcds_maintenance_test(benchmark, connection, run_config)
-        else:
-            console.print(f"[yellow]⚠️ Maintenance test not supported for benchmark: {benchmark_name}[/yellow]")
-            console.print("[yellow]  Falling back to standard query execution[/yellow]")
-            run_config["_effective_execution_type"] = "power"
-            return self._execute_all_queries(benchmark, connection, run_config)
+        harness = resolve_maintenance_harness(benchmark_id)
+        if harness is not None:
+            return getattr(self, harness.adapter_method)(benchmark, connection, run_config)
+        console.print(f"[yellow]⚠️ Maintenance test not supported for benchmark: {benchmark_name}[/yellow]")
+        console.print("[yellow]  Falling back to standard query execution[/yellow]")
+        run_config["_effective_execution_type"] = "power"
+        return self._execute_all_queries(benchmark, connection, run_config)
 
     def _execute_combined_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Execute requested combined TPC phases.
@@ -781,61 +782,27 @@ class TestDriversMixin:
         benchmark_name = self._resolve_benchmark_slug(benchmark, run_config)
         benchmark_id = normalize_benchmark_id(benchmark_name)
 
-        if benchmark_id == "tpcds":
-            console.print("[blue]Running combined TPC-DS test[/blue]")
-
-            # Execute each test phase
-            all_results = []
-
-            # Phase 1: Power Test
-            if "power" in requested_phases:
-                console.print("[cyan]Phase: Power Test[/cyan]")
-                power_results = self._execute_tpcds_power_test(benchmark, connection, run_config)
-                all_results.extend(power_results)
-
-            # Phase 2: Throughput Test
-            if "throughput" in requested_phases:
-                console.print("[cyan]Phase: Throughput Test[/cyan]")
-                throughput_results = self._execute_tpcds_throughput_test(benchmark, connection, run_config)
-                all_results.extend(throughput_results)
-
-            # Phase 3: Maintenance Test
-            if "maintenance" in requested_phases:
-                console.print("[cyan]Phase: Maintenance Test[/cyan]")
-                maintenance_results = self._execute_tpcds_maintenance_test(benchmark, connection, run_config)
-                all_results.extend(maintenance_results)
-
-            return all_results
-        elif benchmark_id == "tpch":
-            console.print("[blue]Running combined TPC-H test[/blue]")
-
-            # Execute each test phase
-            all_results = []
-
-            # Phase 1: Power Test
-            if "power" in requested_phases:
-                console.print("[cyan]Phase: Power Test[/cyan]")
-                power_results = self._execute_tpch_power_test(benchmark, connection, run_config)
-                all_results.extend(power_results)
-
-            # Phase 2: Throughput Test
-            if "throughput" in requested_phases:
-                console.print("[cyan]Phase: Throughput Test[/cyan]")
-                throughput_results = self._execute_tpch_throughput_test(benchmark, connection, run_config)
-                all_results.extend(throughput_results)
-
-            # Phase 3: Maintenance Test
-            if "maintenance" in requested_phases:
-                console.print("[cyan]Phase: Maintenance Test[/cyan]")
-                maintenance_results = self._execute_tpch_maintenance_test(benchmark, connection, run_config)
-                all_results.extend(maintenance_results)
-
-            return all_results
-        else:
+        combined = resolve_combined_harness(benchmark_id)
+        if combined is None:
             console.print(f"[yellow]⚠️ Combined test not supported for benchmark: {benchmark_name}[/yellow]")
             console.print("[yellow]  Falling back to standard query execution[/yellow]")
             run_config["_effective_execution_type"] = "power"
             return self._execute_all_queries(benchmark, connection, run_config)
+
+        console.print(f"[blue]Running combined {combined.label} test[/blue]")
+
+        # Execute each requested phase in order (power -> throughput -> maintenance).
+        all_results: list[dict[str, Any]] = []
+        phases = (
+            ("power", "Power Test", combined.power_method),
+            ("throughput", "Throughput Test", combined.throughput_method),
+            ("maintenance", "Maintenance Test", combined.maintenance_method),
+        )
+        for phase_key, phase_label, method_name in phases:
+            if phase_key in requested_phases:
+                console.print(f"[cyan]Phase: {phase_label}[/cyan]")
+                all_results.extend(getattr(self, method_name)(benchmark, connection, run_config))
+        return all_results
 
     def _get_runtime_platform_version(self, connection: Any | None) -> str | None:
         """Return the current platform version for version-gated compat rules."""
