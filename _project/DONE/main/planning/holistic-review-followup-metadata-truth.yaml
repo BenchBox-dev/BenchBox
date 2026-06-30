@@ -2,7 +2,8 @@ id: holistic-review-followup-metadata-truth
 title: "Correct stale metadata, overstated metrics, and close-out discipline from the holistic-review effort"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-06-30"
 category: Documentation
 
 description: |
@@ -37,7 +38,7 @@ prior_art:
 work:
   - id: w1
     summary: "Fix the #909 scope_limit omission in its DONE YAML"
-    status: pending
+    status: done
     needs: []
     notes: |
       #909: add benchbox/core/plan_capture_phase.py to scope_limit.only_modify (the
@@ -46,7 +47,7 @@ work:
 
   - id: w2
     summary: "Reword the #914 power-path metric and cross-link the refactor follow-up"
-    status: pending
+    status: done
     needs: []
     notes: |
       Reword #914 w1 success_metric to "the power-dispatch path carries no literal
@@ -55,7 +56,7 @@ work:
 
   - id: w3
     summary: "Refresh the #906 Makefile STAGED/not-blocking comments to match actual enforcement"
-    status: pending
+    status: done
     needs: []
     notes: |
       Makefile:222-237 — drop the "STAGED gate / not a blocking CI gate yet" wording
@@ -64,7 +65,7 @@ work:
 
   - id: w4
     summary: "Add the guard+wiring close-out rule and verify no unpinned-gate window for #906"
-    status: pending
+    status: done
     needs: []
     notes: |
       Add to AGENTS.md: a drift/pinning guard and its required-CI wiring must land in
