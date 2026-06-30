@@ -423,6 +423,27 @@ jobs:
             tests/unit/test_standardized_test_commands.py::TestMakefileCommands::test_cross_surface_gates_are_pinned_in_make_and_ci \
             -m "medium" -n 0 --tb=short -q
 
+      - name: Run promoted h2odb mutation-catch reproducer (#901)
+        run: |
+          # #901's mutation-sensitivity catch assertions are slow-marked, so the
+          # fast-lane selection below skips them; invoke the h2odb cell (the gate
+          # whose scale fidelity #901 fixed: gate.scale_factor=0.01 matching
+          # production) explicitly so a regression in its mutation catch fails
+          # required CI instead of only at the main-release boundary (test.yml).
+          # Bounded: the single load-bearing gate cell, not the full slow matrix.
+          uv run -- python -m pytest \
+            tests/integration/test_cross_surface_mutation_sensitivity.py \
+            -m "slow" -n 0 -k "h2odb" --tb=short -q
+
+      - name: Run promoted plan-capture-phase reproducers (#909)
+        run: |
+          # #909's connection-fencing and plan-identity reproducers are
+          # medium-marked and otherwise run only in test.yml; invoke them here so
+          # they execute in the required develop-PR gate, not one ring out.
+          uv run -- python -m pytest \
+            tests/integration/test_plan_capture_phase.py \
+            -m "medium" -n 0 --tb=short -q
+
       - name: Run fast tests
         run: |
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)

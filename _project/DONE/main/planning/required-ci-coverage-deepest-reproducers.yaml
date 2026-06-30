@@ -2,7 +2,8 @@ id: required-ci-coverage-deepest-reproducers
 title: "Pull the deepest holistic-review regression reproducers into required develop-PR CI"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-06-30"
 category: Testing and Quality Assurance
 
 description: |
@@ -47,7 +48,7 @@ prior_art:
 work:
   - id: w0
     summary: "Re-confirm the three gaps on fresh develop before editing (markers, env-var usages, lane membership)"
-    status: pending
+    status: done
     needs: []
     notes: |
       From a fresh worktree off develop: grep BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT
@@ -64,7 +65,7 @@ work:
 
   - id: w1
     summary: "Add a standing automated negative test that the plan-capture gate fails on a planted defect (#900 F3)"
-    status: pending
+    status: done
     needs: [w0]
     notes: |
       Add test (or CI step) that runs the plan-capture gate subprocess with
@@ -76,7 +77,7 @@ work:
 
   - id: w2
     summary: "Promote the load-bearing mutation-catch cells into required code-test (#901 F4)"
-    status: pending
+    status: done
     needs: [w0]
     notes: |
       Add an explicit-node step to code-test invoking the h2odb mutation-sensitivity
@@ -87,7 +88,7 @@ work:
 
   - id: w3
     summary: "Add the w2/w3 plan-capture-phase reproducers to a required develop-PR job (#909 F5)"
-    status: pending
+    status: done
     needs: [w0]
     notes: |
       Add an explicit-node step to code-test:
@@ -98,7 +99,7 @@ work:
 
   - id: w4
     summary: "Prove each new required step is load-bearing (fails when its fix is reverted)"
-    status: pending
+    status: done
     needs: [w1, w2, w3]
     notes: |
       For each added step, locally break the underlying fix and confirm the required
