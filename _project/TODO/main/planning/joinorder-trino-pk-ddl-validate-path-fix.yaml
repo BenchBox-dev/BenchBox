@@ -1,0 +1,47 @@
+id: joinorder-trino-pk-ddl-validate-path-fix
+title: "chore(todo): repoint the completed trino-primary-key-ddl validate command to its DONE path"
+worktree: main
+priority: Low
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Adversarial review finding (2026-07-02, joinorder Track-2 review), Nit --
+  judgment call (a). The completed item
+  _project/DONE/main/planning/joinorder-trino-primary-key-ddl.yaml:62 still has
+  its own `validate` command point at the pre-move
+  `_project/TODO/main/planning/joinorder-trino-primary-key-ddl.yaml` path
+  (orphaned by an auto-merge race). Running that command now fails because the
+  file lives under DONE/. It is cosmetic -- no gate depends on it and check-graph
+  passes -- and ~20% of DONE items (51/248) share the stale-TODO-path convention,
+  so this is a consistency tidy, not a correctness fix. Captured per the review
+  request to record every finding; safe to batch with other low-priority tidies.
+
+work:
+  - id: w1
+    summary: "Repoint the DONE item's validate command (and files_affected path) to the DONE/ location"
+    status: pending
+    notes: |
+      Edit joinorder-trino-primary-key-ddl.yaml:62 (and the matching
+      files_affected entry at :89) to reference
+      _project/DONE/main/planning/joinorder-trino-primary-key-ddl.yaml, then
+      validate the file.
+
+verification:
+  - description: "The DONE item still validates after the path repoint"
+    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/DONE/main/planning/joinorder-trino-primary-key-ddl.yaml"
+    expected_output: "is valid"
+
+scope_limit:
+  only_modify:
+    - "_project/DONE/main/planning/joinorder-trino-primary-key-ddl.yaml"
+
+metadata:
+  tags:
+    - joinorder
+    - todo-hygiene
+    - trino
+    - review-finding
+    - nit
+  estimated_effort: "Small"
+  created_date: "2026-07-02"

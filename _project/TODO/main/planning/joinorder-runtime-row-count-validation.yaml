@@ -1,0 +1,110 @@
+id: joinorder-runtime-row-count-validation
+title: "joinorder: enforce exact per-table row counts in post-load validation"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Adversarial review finding (2026-07-02, joinorder Track-2 review), Medium.
+
+  The runtime post-load validator routes the canonical JoinOrder benchmark to
+  `GenericRowCountStrategy`, which only checks that each table is non-empty --
+  even though `benchbox/core/joinorder/data_manifest.toml` already carries the
+  exact per-table `row_count` for all 21 IMDb tables. A load into the SUT that
+  silently drops or duplicates rows (e.g. a partial COPY, a type-coercion drop)
+  leaves a non-empty but wrong-count table, which yields wrong join cardinalities
+  and a meaningless optimizer benchmark, undetected.
+
+  Evidence (re-runnable against the current tree):
+    - benchbox/platforms/base/validation.py:428 -- benchmark-name routing falls
+      through to `GenericRowCountStrategy` for anything not tpch/tpcds/ssb;
+      joinorder hits the `else`.
+    - benchbox/platforms/base/validation.py:351-356 --
+      `GenericRowCountStrategy.get_expected_range` returns None.
+    - benchbox/platforms/base/validation.py:456-458 -- with no expected range
+      the validator errors only when `actual_rows == 0`.
+    - benchbox/core/joinorder/benchmark.py:291-303 -- `get_table_row_count`
+      already surfaces the manifest's exact `row_count`, unused by the validator.
+
+  Severity is bounded because the source Parquet files are SHA256-verified at
+  fetch (benchbox/core/data_fetch/manager.py), so this gap is specifically about
+  load-into-SUT fidelity, not source corruption. But the exact counts are already
+  on hand, so closing it is cheap. This also retires finding #6 (the manifest
+  `row_count` field being decorative) for the joinorder path.
+
+  SOUNDNESS PATH: this touches the shared row-count validator used by other
+  benchmarks. Preserve tpch/tpcds/ssb behavior exactly and keep the non-empty
+  fallback for genuinely-unknown benchmarks.
+
+deps:
+  needs:
+    - joinorder-canonical-cutover
+
+work:
+  - id: w1
+    summary: "Add a manifest-driven exact row-count strategy for joinorder"
+    status: pending
+    notes: |
+      Add a JoinOrder row-count strategy following the existing per-benchmark
+      RowCountStrategy pattern. It reads the 21 exact per-table counts from the
+      loaded data_manifest.toml (via ParsedManifest / get_table_row_count) and
+      asserts equality (tolerance 0). Do not hardcode counts.
+  - id: w2
+    summary: "Route the joinorder benchmark to the exact strategy in validation.py"
+    needs: [w1]
+    status: pending
+    notes: |
+      Extend the benchmark-name dispatch at validation.py:~420-429 to select the
+      new strategy for joinorder. Leave the tpch/tpcds/ssb branches and the
+      GenericRowCountStrategy fallback untouched.
+  - id: w3
+    summary: "Unit-test exact and drifted row counts for joinorder validation"
+    needs: [w2]
+    status: pending
+    notes: |
+      In tests/unit/platforms/test_platform_validation.py assert a matching count
+      passes and a table short by N rows fails with a count-specific error (not
+      merely the empty-table error). Mirror the tpch/tpcds/ssb strategy tests.
+
+must_preserve:
+  - "TPCH/TPCDS/SSB RowCountStrategy selection and expected ranges are unchanged (benchbox/platforms/base/validation.py:423-427)."
+  - "GenericRowCountStrategy non-empty fallback still applies to benchmarks with no manifest counts."
+  - "No change to the joinorder fetch/SHA256 path in benchbox/core/data_fetch/."
+
+prior_art:
+  - "benchbox/platforms/base/validation.py:TPCHRowCountStrategy -- reuse the per-benchmark strategy subclass pattern for a JoinOrder strategy."
+  - "benchbox/core/joinorder/benchmark.py:get_table_row_count -- reuse to source exact per-table counts from the manifest rather than hardcoding."
+
+approach: |
+  Follow the existing RowCountStrategy subclass pattern (TPCH/TPCDS/SSB). The
+  joinorder strategy sources its expected counts from the parsed manifest, so it
+  is data-driven, not hardcoded. Wire it into the same benchmark-name dispatch
+  that already routes the other three, then add tests exercising both the
+  matching and the drifted case.
+
+anti_patterns:
+  - "DO NOT hardcode the 21 row counts in validation.py -- read them from the loaded manifest so a manifest bump stays authoritative."
+  - "DO NOT change the GenericRowCountStrategy fallback -- other benchmarks legitimately depend on non-empty-only."
+
+verification:
+  - description: "Platform validation unit tests pass (incl. new joinorder count test)"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_platform_validation.py -q"
+    expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/validation.py"
+    - "tests/unit/platforms/test_platform_validation.py"
+  do_not_modify:
+    - "benchbox/core/data_fetch/"
+
+metadata:
+  tags:
+    - joinorder
+    - validation
+    - row-count
+    - review-finding
+    - soundness-adjacent
+  estimated_effort: "Small"
+  created_date: "2026-07-02"
