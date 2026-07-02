@@ -1,0 +1,96 @@
+id: joinorder-strip-primary-keys-hardening
+title: "ddl_helpers: harden strip_primary_keys against leading-comma and string-literal edge cases"
+worktree: main
+priority: Low
+status: Not Started
+category: Core Functionality
+
+description: |
+  Adversarial review finding (2026-07-02, joinorder Track-2 review), Low -- two
+  latent (currently dormant) defects in the shared PRIMARY KEY stripping helper
+  used by the Presto/Trino DDL path (PR #917 / #674 lineage).
+
+  1. Leading-comma artifact. When a table-level PK is the FIRST item in the
+     column-defs paren, removal leaves invalid SQL:
+       strip_primary_keys("CREATE TABLE t (PRIMARY KEY (a), a INT)")
+         -> "CREATE TABLE t (, a INT)"
+     `_TRAILING_COMMA_RE` (benchbox/platforms/base/ddl_helpers.py:51) only cleans
+     `,)` before a closing paren, never `(,` after an opening paren.
+
+  2. String/COMMENT-literal false positive. The keyword gate
+     (`"PRIMARY KEY" in stmt.upper()`, ddl_helpers.py:135) plus the inline regex
+     (`_INLINE_PK_RE`, :108, applied :161) are not SQL-string-aware, so a comment
+     literal containing the words is corrupted:
+       "id INT COMMENT 'the PRIMARY KEY column'" -> "... 'the column' ..."
+     This mirrors the documented FK limitation (ddl_helpers.py:72-80), but the
+     strip_primary_keys docstring carries no such warning.
+
+  Live exposure is ZERO today: every BenchBox schema generator appends the PK
+  clause LAST (e.g. benchbox/core/ssb/schema.py:59 joined with ",\n"), and no
+  shipped schema uses such comment literals; all 137 existing tests pass. This is
+  defensive hardening of a helper shared across six adapters, not a live bug.
+
+work:
+  - id: w1
+    summary: "Clean a leading comma after the opening paren in strip_primary_keys"
+    status: pending
+    notes: |
+      Add a post-removal cleanup for `(<ws>,` -> `(` alongside the existing
+      trailing-comma cleanup (ddl_helpers.py:~164), symmetric with
+      _TRAILING_COMMA_RE. Keep it minimal.
+  - id: w2
+    summary: "Document the string-literal limitation on strip_primary_keys"
+    status: pending
+    notes: |
+      Add the same not-SQL-string-aware caveat the FK helper already carries
+      (ddl_helpers.py:72-80). Do NOT attempt a full SQL parser; a docstring
+      warning matching the FK helper is the accepted bar.
+  - id: w3
+    summary: "Add regression tests for both edge cases"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      In tests/unit/platforms/base/test_ddl_helpers.py: PK-first-in-paren yields
+      valid SQL (no leading comma); a COMMENT literal containing 'PRIMARY KEY' is
+      preserved OR the documented limitation is asserted. Extend
+      TestStripPrimaryKeys.
+
+must_preserve:
+  - "All current strip_primary_keys behaviors: inline PK, nested table-level PK balanced-paren walk, FK preservation, named CONSTRAINT PK, trailing-comma cleanup (137 tests across tests/unit/platforms/base/test_ddl_helpers.py + tests/unit/platforms/test_trino_adapter.py)."
+  - "Presto and Trino _optimize_table_definition ordering (strip PK before connector rewrites) is unchanged."
+
+prior_art:
+  - "benchbox/platforms/base/ddl_helpers.py:strip_foreign_keys -- reuse its documented string-literal caveat wording for the PK helper."
+  - "benchbox/platforms/base/ddl_helpers.py:_TRAILING_COMMA_RE -- extend with a symmetric leading-comma cleanup."
+
+approach: |
+  Both fixes stay inside strip_primary_keys and its module-level regexes. For
+  w1, add a leading-comma cleanup mirroring the existing _TRAILING_COMMA_RE
+  substitution right after PK removal. For w2, copy the strip_foreign_keys
+  string-literal caveat into the strip_primary_keys docstring. Land the tests
+  (w3) against both cases before considering the item done; no adapter or
+  connector-rewrite code changes.
+
+anti_patterns:
+  - "DO NOT add a full SQL parser -- the helper is regex-based by design; match the FK helper's documented-limitation bar instead."
+
+verification:
+  - description: "DDL helper + Trino adapter tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/base/test_ddl_helpers.py tests/unit/platforms/test_trino_adapter.py -q"
+    expected_output: "all pass (>=137), 0 failures"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/ddl_helpers.py"
+    - "tests/unit/platforms/base/test_ddl_helpers.py"
+
+metadata:
+  tags:
+    - joinorder
+    - ddl
+    - trino
+    - presto
+    - review-finding
+    - hardening
+  estimated_effort: "Small"
+  created_date: "2026-07-02"

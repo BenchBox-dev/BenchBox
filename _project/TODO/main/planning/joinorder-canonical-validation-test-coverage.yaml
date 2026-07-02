@@ -1,0 +1,118 @@
+id: joinorder-canonical-validation-test-coverage
+title: "test(joinorder): FK-integrity, full-archive cardinality, and encoding assertions for canonical data"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Adversarial review finding (2026-07-02, joinorder Track-2 review). The strong
+  JOB-grade assurances (FK integrity, 113-query reference cardinalities, UTF-8
+  fidelity) run only at BUILD time (_project/scripts/build_joinorder_data.py) and
+  against the 50-row tiny fixture (tests/unit/core/joinorder/
+  test_canonical_queries.py). No automated test reproduces them on the FULL
+  canonical archive a user actually loads; full-data reproduction is currently
+  gated only by manual UAT (cutover w17). Three specific gaps:
+
+    a. No FK referential-integrity test for canonical joinorder anywhere in
+       tests/. NOTE: schema.py:67-68 documents that the canonical data has
+       LEGITIMATE dangling references and FKs are opt-in -- so the test must pin
+       WHICH references are legitimately dangling vs corruption, using the build
+       pipeline's known set, not assert full closure.
+    b. No automated full-archive cardinality test. The 113-query oracle
+       (_project/joinorder/reference_cardinalities.json, an independent
+       PostgreSQL 16.2 oracle) is asserted only against the tiny fixture at
+       unit-test time.
+    c. No runtime encoding/normalization assertion on the full archive
+       (transitively covered by SHA256 today, but not directly tested).
+
+  These tests need the downloaded ~GB archive, so they REUSE the existing
+  opt-in markers (`slow` + `integration`, or `stress` for the heaviest;
+  registered in pyproject.toml:429-455, excluded from default CI) rather than
+  inventing a new marker, and live under tests/integration/. Intent: a
+  CI-gateable reproduction of the build-time assurances, replacing reliance on
+  manual UAT.
+
+deps:
+  needs:
+    - joinorder-canonical-cutover
+
+work:
+  - id: w1
+    summary: "Add an opt-in full-archive cardinality test against reference_cardinalities.json"
+    status: pending
+    notes: |
+      Load the canonical archive into DuckDB, run the 113 queries, assert
+      underlying/reference cardinalities match
+      _project/joinorder/reference_cardinalities.json (including the 5 known-zero
+      queries 2c/5a/5b/10b/32a). Mark with the existing `slow`+`integration`
+      markers (or `stress`); do not run by default. Mirror
+      test_canonical_queries.py assertions at full scale.
+  - id: w2
+    summary: "Add an FK referential-integrity test pinning the legitimate dangling-ref set"
+    needs: [w1]
+    status: pending
+    notes: |
+      Assert each declared FK resolves EXCEPT the documented legitimate dangling
+      references (schema.py:67-68). Source the allowed-dangling set from the build
+      pipeline's closure logic (build_joinorder_data.py) rather than re-deriving
+      it. Same existing opt-in markers.
+  - id: w3
+    summary: "Add a full-archive UTF-8 / NULL-vs-empty fidelity assertion"
+    needs: [w1]
+    status: pending
+    notes: |
+      Reproduce the build-time encoding round-trip check
+      (build_joinorder_data.py validate_encoding_round_trip) on the loaded
+      archive for the name/title tables. Same existing opt-in markers.
+
+must_preserve:
+  - "The default `uv run -- python -m pytest` unit run stays fast; the new tests are opt-in behind the existing slow/integration (or stress) markers and do not run by default."
+  - "The existing tiny-fixture oracle test tests/unit/core/joinorder/test_canonical_queries.py is unchanged."
+
+prior_art:
+  - "pyproject.toml:429-455:markers (slow/integration/stress) -- reuse the existing opt-in markers; DO NOT register a new one."
+  - "tests/integration/test_joinorder_synthetic_cross_surface_equivalence.py -- reuse the tests/integration/ location and marker style for the new full-archive tests."
+  - "tests/unit/core/joinorder/test_canonical_queries.py -- extend its cardinality/known-zero/null-empty assertions from the tiny fixture to the full archive."
+  - "_project/scripts/build_joinorder_data.py:validate_encoding_round_trip -- reuse the build-time fidelity check as the reference for w3."
+  - "_project/joinorder/reference_cardinalities.json -- reuse the independent PostgreSQL oracle as the expected values for w1."
+
+approach: |
+  Put the three checks in tests/integration/ (new file, e.g.
+  test_joinorder_full_archive.py), each marked @pytest.mark.slow +
+  @pytest.mark.integration and skipped unless the canonical archive is present.
+  Drive assertions off the committed reference artifacts under _project/joinorder/
+  and the build pipeline's known-dangling set, so the tests re-express build-time
+  guarantees at load time without re-implementing them.
+
+anti_patterns:
+  - "DO NOT assert full FK closure -- schema.py:67-68 documents legitimate dangling references; pin the known set instead."
+  - "DO NOT run these full-archive tests in the default unit suite -- they need the ~GB download; reuse the existing slow/integration/stress markers."
+  - "DO NOT register a new pytest marker -- the opt-in markers already exist in pyproject.toml."
+
+verification:
+  - description: "New full-archive tests are collected but skipped by default without the archive/marker"
+    command: "uv run -- python -m pytest tests/ -k joinorder_full_archive --collect-only -q"
+    expected_output: "tests collected; skipped by default without the archive/marker"
+  - description: "Default joinorder unit tests still pass and stay fast"
+    command: "uv run -- python -m pytest tests/unit/core/joinorder/ -q"
+    expected_output: "0 failures"
+
+scope_limit:
+  only_modify:
+    - "tests/integration/"
+    - "tests/unit/core/joinorder/"
+  do_not_modify:
+    - "benchbox/core/joinorder/"
+    - "pyproject.toml"
+
+metadata:
+  tags:
+    - joinorder
+    - testing
+    - fk-integrity
+    - cardinality
+    - encoding
+    - review-finding
+  estimated_effort: "Medium"
+  created_date: "2026-07-02"
