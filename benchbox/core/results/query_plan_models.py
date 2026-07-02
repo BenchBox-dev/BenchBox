@@ -168,7 +168,11 @@ _STRING_LITERAL_RE = re.compile(r"'(?:[^']|'')*'")
 # Match numeric literals that are standalone tokens. The negative lookbehind on
 # identifier characters keeps column names that embed digits intact (e.g. ``c1``,
 # ``l_orderkey``) while still collapsing real constants like ``1995`` or ``0.05``.
-_NUMERIC_LITERAL_RE = re.compile(r"(?<![A-Za-z0-9_.$])\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
+# ``#`` is excluded too: DuckDB (and others) emit ordinal column references like
+# ``#0``/``#1`` for projected/grouped columns, and without this exclusion every
+# ordinal collapses to the same ``#?`` placeholder, hiding a genuine structural
+# change (a different column referenced) behind what looks like a literal.
+_NUMERIC_LITERAL_RE = re.compile(r"(?<![A-Za-z0-9_.$#])\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
 _LITERAL_PLACEHOLDER = "?"
 
 

@@ -414,6 +414,88 @@ class TestTPCDSPowerTest:
         mock_cursor.fetchall.assert_called()
         mock_connection.commit.assert_called()
 
+    def test_execute_one_query_propagates_captured_plan_fields(self):
+        """--capture-plans / --normalize-plan-literals on TPC-DS power: the adapter's
+        captured plan/fingerprints live on cursor.platform_result, but _execute_one_query
+        only checked it for a FAILED status - it never copied query_plan/plan_fingerprint
+        into the query result, so plan capture stats reported zero captured plans and the
+        plans companion file never got the fingerprints (mirrors TPC-H power_test.py's
+        propagation)."""
+        from benchbox.core.tpcds.power_test import TPCDSPowerTestConfig, TPCDSPowerTestResult
+
+        mock_benchmark = self.create_mock_benchmark()
+        power_test = TPCDSPowerTest(benchmark=mock_benchmark, connection_string="sqlite::memory:")
+        power_test.config = TPCDSPowerTestConfig(scale_factor=1.0)
+
+        captured_plan = object()
+        mock_cursor = Mock()
+        mock_cursor.fetchall.return_value = [("row1",)]
+        mock_cursor.platform_result = {
+            "status": "SUCCESS",
+            "query_plan": captured_plan,
+            "plan_fingerprint": "abc123",
+            "plan_fingerprint_normalized": "def456",
+            "plan_capture_time_ms": 4.2,
+        }
+        mock_connection = Mock(spec=["execute", "commit"])
+        mock_connection.execute.return_value = mock_cursor
+
+        result = TPCDSPowerTestResult(
+            config=power_test.config,
+            start_time="",
+            end_time="",
+            total_time=0.0,
+            power_at_size=0.0,
+            queries_executed=0,
+            queries_successful=0,
+            query_results=[],
+            success=True,
+            errors=[],
+        )
+
+        power_test._execute_one_query(0, 1, mock_connection, stream_param_seed=1, result=result)
+
+        assert len(result.query_results) == 1
+        query_result = result.query_results[0]
+        assert query_result["success"] is True
+        assert query_result["query_plan"] is captured_plan
+        assert query_result["plan_fingerprint"] == "abc123"
+        assert query_result["plan_fingerprint_normalized"] == "def456"
+        assert query_result["plan_capture_time_ms"] == 4.2
+
+    def test_execute_one_query_omits_plan_fields_when_capture_disabled(self):
+        """No plan-capture keys on platform_result -> none copied (no-op propagation)."""
+        from benchbox.core.tpcds.power_test import TPCDSPowerTestConfig, TPCDSPowerTestResult
+
+        mock_benchmark = self.create_mock_benchmark()
+        power_test = TPCDSPowerTest(benchmark=mock_benchmark, connection_string="sqlite::memory:")
+        power_test.config = TPCDSPowerTestConfig(scale_factor=1.0)
+
+        mock_cursor = Mock()
+        mock_cursor.fetchall.return_value = [("row1",)]
+        mock_cursor.platform_result = {"status": "SUCCESS"}
+        mock_connection = Mock(spec=["execute", "commit"])
+        mock_connection.execute.return_value = mock_cursor
+
+        result = TPCDSPowerTestResult(
+            config=power_test.config,
+            start_time="",
+            end_time="",
+            total_time=0.0,
+            power_at_size=0.0,
+            queries_executed=0,
+            queries_successful=0,
+            query_results=[],
+            success=True,
+            errors=[],
+        )
+
+        power_test._execute_one_query(0, 1, mock_connection, stream_param_seed=1, result=result)
+
+        query_result = result.query_results[0]
+        assert "query_plan" not in query_result
+        assert "plan_fingerprint" not in query_result
+
     @patch("benchbox.core.tpcds.power_test.DatabaseConnection")
     def test_query_execution_error_handling(self, mock_db_connection):
         """Test error handling during query execution."""
