@@ -1594,6 +1594,81 @@ def test_get_effective_write_sql_duckdb_runs_portable_merge(fast_bench):
     assert sql == operation.write_sql
 
 
+class _FakeCountConnection:
+    """Minimal connection stand-in: SELECT COUNT(*) FROM <table> returns a canned count."""
+
+    def __init__(self, counts_by_table: dict[str, int]):
+        self._counts_by_table = counts_by_table
+
+    def execute(self, sql: str):
+        for table, count in self._counts_by_table.items():
+            if table in sql:
+                return SimpleNamespace(fetchone=lambda count=count: (count,))
+        raise RuntimeError(f"unexpected query in fake connection: {sql}")
+
+
+def test_get_effective_write_sql_skips_scd2_when_customer_staging_is_empty(fast_bench):
+    """A minimal fixture (orders/lineitem only, no customer) leaves
+    scd2_ops_dim_customer/scd2_ops_stage_customer empty; is_setup() still reports
+    True since those tables are not REQUIRED, so without this guard the SCD2 op
+    would execute its UPDATE/INSERT and anti-join validations against empty
+    tables and trivially report SUCCESS - corrupting coverage rather than
+    surfacing that the prerequisite is missing."""
+    operation = fast_bench.get_operation("merge_scd_type2_basic")
+    empty_connection = _FakeCountConnection({"scd2_ops_dim_customer": 0, "scd2_ops_stage_customer": 0})
+
+    sql, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb", connection=empty_connection)
+
+    assert sql is None
+    assert skip is not None
+    assert "empty" in skip.lower()
+    assert "scd2_ops_dim_customer" in skip or "scd2_ops_stage_customer" in skip
+
+
+def test_get_effective_write_sql_runs_scd2_when_customer_staging_is_populated(fast_bench):
+    """The common case (full 8-table load): staging tables are non-empty, op runs."""
+    operation = fast_bench.get_operation("merge_scd_type2_basic")
+    populated_connection = _FakeCountConnection({"scd2_ops_dim_customer": 40, "scd2_ops_stage_customer": 10})
+
+    sql, skip = fast_bench._get_effective_write_sql(
+        operation, platform_key="duckdb", connection=populated_connection
+    )
+
+    assert skip is None
+    assert sql == operation.write_sql
+
+
+def test_get_effective_write_sql_without_connection_does_not_check_staging_population(fast_bench):
+    """No connection supplied (e.g. a direct unit-test call) -> the emptiness check
+    is skipped rather than blocking, matching the existing tests in this file that
+    call _get_effective_write_sql with no connection at all."""
+    operation = fast_bench.get_operation("merge_scd_type2_basic")
+
+    sql, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb")
+
+    assert skip is None
+    assert sql == operation.write_sql
+
+
+def test_get_effective_write_sql_empty_supplier_staging_skips_gdpr_delete(fast_bench):
+    """The same emptiness guard covers delete_ops_supplier (GDPR deletion ops),
+    not just SCD2 - both are keyed in _OPTIONAL_WHEN_SOURCE_MISSING because both
+    lose their source table (supplier / customer) on a minimal fixture."""
+    operation = SimpleNamespace(
+        id="delete_gdpr_suppliers_5pct",
+        write_sql="DELETE FROM delete_ops_supplier WHERE s_suppkey <= 5",
+        platform_overrides={},
+        category="delete",
+    )
+    empty_connection = _FakeCountConnection({"delete_ops_supplier": 0})
+
+    sql, skip = fast_bench._get_effective_write_sql(operation, connection=empty_connection)
+
+    assert sql is None
+    assert skip is not None
+    assert "delete_ops_supplier" in skip
+
+
 def test_get_effective_write_sql_duckdb_gate_matches_catalog(fast_bench):
     """The real catalog: portable SCD2 ops run on DuckDB while legacy MERGE INTO ops skip."""
     portable_ops = (

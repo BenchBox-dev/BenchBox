@@ -9,9 +9,19 @@ enablement for PRs touching the soundness paths in
 a precondition: a soundness-path PR can still be squash-merged with zero approvals
 (manually, or by re-enabling auto-merge) unless the ``develop`` branch ruleset itself
 requires a review. This module pins that repo-layer rule -- the ``develop`` ruleset's
-``pull_request`` rule must require at least one approving review AND code-owner
-review -- so the soundness exception is enforceable at the repo layer, not just in
-code.
+``pull_request`` rule must require a code-owner review -- so the soundness exception
+is enforceable at the repo layer, not just in code.
+
+Checks ONLY ``require_code_owner_review``, never ``required_approving_review_count``:
+per GitHub's ``pull_request`` rule, ``required_approving_review_count`` applies to
+EVERY PR against the branch -- it is not scoped to CODEOWNERS-matched paths -- so
+asserting ``count >= 1`` here would push an admin toward requiring an approval on
+every develop PR, including non-soundness ones the fast squash-auto-merge default is
+meant to cover, defeating the point of a soundness-path-ONLY review gate.
+``require_code_owner_review=True`` is independently sufficient: GitHub still requires
+an owner's approval on a PR that touches a CODEOWNERS-matched soundness path
+regardless of ``required_approving_review_count``, while a PR that touches no
+CODEOWNERS-matched path is unaffected either way.
 
 The soundness path set is read from ``auto_merge_soundness_paths`` (single source of
 truth), so the narration here and the auto-merge withholding cannot drift apart.
@@ -74,8 +84,13 @@ def _pull_request_parameters(rules: list[dict[str, Any]]) -> dict[str, Any] | No
 def review_enforcement_findings(rules: list[dict[str, Any]]) -> list[str]:
     """Return human-readable reasons the ruleset fails to enforce a review.
 
-    Empty list == the ruleset enforces an approving + code-owner review, so a
-    soundness-path PR cannot be squash-merged with zero approvals.
+    Empty list == the ruleset requires a code-owner review, so a soundness-path PR
+    (CODEOWNERS-owned) cannot be squash-merged with zero approvals.
+
+    Checks ONLY ``require_code_owner_review`` -- see the module docstring for why
+    ``required_approving_review_count`` is deliberately NOT part of this check (it
+    is a branch-wide setting, not CODEOWNERS-scoped, so requiring it here would gate
+    every develop PR rather than just soundness-path ones).
     """
     params = _pull_request_parameters(rules)
     if params is None:
@@ -83,16 +98,12 @@ def review_enforcement_findings(rules: list[dict[str, Any]]) -> list[str]:
             "develop ruleset has no pull_request rule: a soundness-path PR "
             f"({', '.join(SOUNDNESS_PATH_GLOBS)}) can squash-auto-merge with zero reviews"
         ]
-    findings: list[str] = []
-    count = params.get("required_approving_review_count") or 0
-    if count < 1:
-        findings.append(f"required_approving_review_count={count} (need >= 1)")
     if not params.get("require_code_owner_review", False):
-        findings.append(
+        return [
             f"require_code_owner_review={params.get('require_code_owner_review', False)} (need true) "
             f"for CODEOWNERS-owned soundness paths: {', '.join(SOUNDNESS_PATH_GLOBS)}"
-        )
-    return findings
+        ]
+    return []
 
 
 def is_review_enforced(rules: list[dict[str, Any]]) -> bool:
@@ -147,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"- {finding}")
         return 1
     print(f"# Ruleset review enforcement ({args.branch}) - OK")
-    print(f"- approving + code-owner review required for {', '.join(SOUNDNESS_PATH_GLOBS)}")
+    print(f"- code-owner review required for {', '.join(SOUNDNESS_PATH_GLOBS)}")
     return 0
 
 

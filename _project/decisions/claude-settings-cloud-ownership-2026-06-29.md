@@ -124,6 +124,20 @@ What a fresh cloud clone actually realizes from committed `.claude/`:
   the VM's user settings is unreliable (may be blocked by `allowManagedHooksOnly`)
   and buys nothing CI doesn't already guarantee.
 
+### Known limitation: environment-build caching means the setup script is not per-session
+
+claude.ai/code caches environment setup scripts and runs `cloud-claude-setup.sh`
+once per environment **build**, not once per session. A later change to
+`.claude/settings.json` (adding/removing an `enabledPlugins` entry) does not
+retroactively re-run the script in sessions started from an already-built
+environment — those sessions keep whatever plugin set was installed at build
+time. Because project hooks are unreliable/blocked in cloud web execution (the
+PostToolUse evidence below), there is no supported per-session hook to detect
+and re-apply a settings-hash change either. The only remedy today is manually
+rebuilding the claude.ai/code environment after a plugin-config change and
+verifying with `claude plugin list` in the new session. This is a documented
+gap, not a defect in the script.
+
 ### Evidence (2026-06-30 cloud validation)
 
 - Fresh cloud session: `.claude/skills/*` + `.claude/commands/*` loaded and

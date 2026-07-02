@@ -40,10 +40,13 @@ work:
     status: done
     needs: [w0]
     notes: |
-      Extend the existing test to assert, per adapter, that a quoted empty field
-      loads as "" and a bare empty field loads as null, uniformly. Guard cudf and
-      any non-installed adapter with availability skips so the fast lane stays green
-      on a standard dev env.
+      Extend the existing test to assert, per adapter, the null-marker-dependent
+      contract: a bare empty field loads as "" when csv_null_marker is None, and
+      as null when csv_null_marker == "". This is not a single uniform outcome —
+      "uniform" means the same null-marker-conditioned rule holds identically
+      across adapters, not that a bare empty field always loads as null. Guard
+      cudf and any non-installed adapter with availability skips so the fast lane
+      stays green on a standard dev env.
 
   - id: w2
     summary: "Add a cross-surface CSV-path case (prefer_parquet=False) exercising SQL<->DataFrame parity"

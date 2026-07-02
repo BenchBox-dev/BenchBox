@@ -116,21 +116,44 @@ from typing import Any
 from benchbox.core.errors import SerializationError
 
 # Literal-masking patterns for normalize_literals fingerprints. Numeric literals
-# (including decimals) collapse to <NUM> and single-quoted string literals to <STR>
-# so that structurally identical plans whose only difference is a data-driven
-# parameter value (e.g. a seed-varied filter threshold) hash the same. Numbers are
-# masked first so digits inside a quoted literal are folded into the <STR> token.
-_LITERAL_NUM_RE = re.compile(r"\b\d+(?:\.\d+)?\b")
-_LITERAL_STR_RE = re.compile(r"'[^']*'")
+# (including decimals, and a tightly-adjacent sign like ``-5``) collapse to <NUM>
+# and single-quoted string literals to <STR> so that structurally identical plans
+# whose only difference is a data-driven parameter value (e.g. a seed-varied filter
+# threshold) hash the same. Numbers are masked first so digits inside a quoted
+# literal are folded into the <STR> token.
+#
+# The numeric pattern uses a negative lookbehind (rather than \b on both ends) so
+# it can also absorb a leading sign: \b requires a word/non-word transition
+# immediately before the sign, which does not exist between two non-word
+# characters (e.g. a space then ``-``), so a plain \b pattern could never match
+# the sign at all. Excluding identifier characters (letters, digits, ``_``,
+# ``.``, ``$``) keeps ``l_orderkey1``/``t1`` intact (the digit is preceded by a
+# letter) while still matching a tightly-adjacent sign (``col > -5``) as PART of
+# the same token. Absorbing the sign matters because without it, ``-5`` and
+# ``5`` (thresholds that cross zero across seeds) mask to ``-<NUM>`` and
+# ``<NUM>`` respectively - still distinct - instead of collapsing to the same
+# placeholder. A sign separated from its digit by whitespace (``a - b``, a
+# binary operator) is NOT absorbed: the pattern requires the sign and digit to
+# be adjacent with nothing in between. The trailing negative lookahead mirrors
+# the leading lookbehind (rather than a trailing \b) so a number is not matched
+# when immediately glued to more identifier-continuation characters either.
+_LITERAL_NUM_RE = re.compile(r"(?<![A-Za-z0-9_.$])[+-]?\d+(?:\.\d+)?(?![A-Za-z0-9_.$])")
+# ``(?:[^']|'')*`` (rather than ``[^']*``) treats a doubled single quote as an
+# escaped apostrophe INSIDE the literal rather than the end of the string, so
+# ``'O''Brien'`` masks to one <STR> token instead of splitting into two
+# (``'O'`` + ``'Brien'`` -> ``<STR><STR>``, which would leave the split itself
+# as residual value-dependent syntax in the "normalized" signature).
+_LITERAL_STR_RE = re.compile(r"'(?:[^']|'')*'")
 
 
 def _mask_literals(expression: str) -> str:
     """Replace numeric and single-quoted string literals with stable placeholders.
 
-    Masks only concrete values, never identifiers: a trailing digit on a column or
-    alias (``l_orderkey1``, ``t1``) has no leading word boundary before the digit,
-    so it is left intact. Used for the opt-in literal-normalized structural
-    signature; the default fingerprint keeps literals verbatim.
+    Masks only concrete values, never identifiers: a leading identifier character
+    immediately before a digit (a column or alias like ``l_orderkey1``, ``t1``)
+    excludes the match, so it is left intact. Used for the opt-in
+    literal-normalized structural signature; the default fingerprint keeps
+    literals verbatim.
     """
     return _LITERAL_STR_RE.sub("<STR>", _LITERAL_NUM_RE.sub("<NUM>", expression))
 

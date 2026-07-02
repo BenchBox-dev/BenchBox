@@ -47,11 +47,21 @@ framing and motivates a distinct workload identity rather than re-using `joinord
 
 "Scale factor" for a JOB-derived workload is defined as **integer multiplication
 of total IMDb row count across all 21 entity classes**, not bytes and not title
-count alone. SF=N means each canonical table is replicated/expanded to
-approximately N× its canonical row count with referential integrity preserved.
-Bytes and per-query cardinality are *derived* reporting fields, not the scale
-control, because byte size varies by engine encoding and per-query cardinality is
-exactly what the workload measures.
+count alone. SF=N means each canonical *replicated* entity/fact table (not small
+lookup tables — see below) is replicated/expanded to approximately N× its
+canonical row count with referential integrity preserved. Bytes and per-query
+cardinality are *derived* reporting fields, not the scale control, because byte
+size varies by engine encoding and per-query cardinality is exactly what the
+workload measures.
+
+Small lookup tables (e.g. `company_type`, `kind_type`, `role_type`) are excluded
+from this N× multiplication and remain single-copy: their domain values are
+referenced by FK from every replica, and duplicating them would only inflate
+lookup-table row counts without exercising any of the stats-stress or
+predicate-selectivity axes this workload measures. This matches the prototype's
+must-preserve guard (`joinorder-replicated-imdb-scale-prototype.yaml`: "Lookup
+tables must not be duplicated unless the schema contract explicitly requires
+it.").
 
 Workload labels and their comparability rules:
 
@@ -80,7 +90,7 @@ implementation):
 
 | Engine | Has explicit ANALYZE? | Auto-stats on load? | Sampled mode? | Stats-phase attribution |
 | --- | --- | --- | --- | --- |
-| DuckDB | yes (ANALYZE) | yes (background) | n/a | zero wall-clock; `stats_mode: auto-on-load` |
+| DuckDB | yes (ANALYZE) | yes (background) | n/a | explicit ANALYZE phase timed |
 | PostgreSQL | yes (ANALYZE) | no | yes (default_statistics_target) | explicit ANALYZE phase timed |
 | ClickHouse | partial (per-table) | yes (on insert) | n/a | zero wall-clock; `stats_mode: auto-on-load` |
 | StarRocks | yes (ANALYZE TABLE) | no | yes (sample size knob) | explicit ANALYZE phase timed |

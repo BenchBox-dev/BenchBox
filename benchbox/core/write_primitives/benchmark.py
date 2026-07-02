@@ -374,6 +374,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         operation: Any,
         platform_key: str | None = None,
         sql_override: str | None = None,
+        connection: DatabaseConnection | None = None,
     ) -> tuple[str | None, str | None]:
         """Resolve effective write SQL (including platform overrides) or return skip reason.
 
@@ -381,6 +382,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             operation: WriteOperation with write_sql and platform_overrides
             platform_key: Platform dialect key (e.g. 'datafusion', 'duckdb') passed by adapter
             sql_override: Pre-processed SQL from adapter (e.g. bulk_load rewrite)
+            connection: Live connection, used ONLY to check whether a staging table
+                the operation depends on was left empty because its TPC-H source was
+                absent at setup (see :meth:`_check_staging_table_population`). When
+                ``None`` (e.g. a direct unit-test call with no connection), that
+                check is skipped rather than blocking - the caller could not verify
+                emptiness either way, so this mirrors the fail-open behavior of
+                :meth:`_check_bulk_load_file_dependencies` for a missing files_dir.
 
         Returns:
             Tuple of (effective_sql, skip_reason). If skip_reason is not None,
@@ -428,7 +436,49 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 f"Operation '{operation.id}' is skipped because required bulk-load files are missing: {missing_file}"
             )
 
+        if (empty_reason := self._check_staging_table_population(effective_sql, connection)) is not None:
+            return None, f"Operation '{operation.id}' is skipped because {empty_reason}"
+
         return effective_sql, None
+
+    def _check_staging_table_population(self, write_sql: str, connection: DatabaseConnection | None) -> str | None:
+        """Return a skip reason if ``write_sql`` depends on a staging table that was
+        left EMPTY because its TPC-H source table was absent at setup.
+
+        A minimal fixture that loads only orders/lineitem (no customer/supplier)
+        makes ``setup()`` skip populating ``scd2_ops_dim_customer`` /
+        ``scd2_ops_stage_customer`` (SCD Type 2) and ``delete_ops_supplier`` (GDPR
+        deletion) - see ``_OPTIONAL_WHEN_SOURCE_MISSING`` - while ``is_setup()``
+        still reports True, since those tables are not REQUIRED for the overall
+        setup check. Without this guard, an operation referencing one of them would
+        run its write SQL and validation queries against an EMPTY table: the SCD2
+        anti-join/count-zero validations, and a DELETE with no matching rows, both
+        trivially pass on empty data, so the operation reports SUCCESS without
+        exercising anything - corrupting reported coverage instead of surfacing the
+        missing prerequisite. Checked live (row count), not from setup()'s
+        one-time population result, so a mid-run reset() or a differently-scoped
+        connection is still caught.
+
+        ``connection=None`` (e.g. a direct unit-test call with no connection) skips
+        this check rather than blocking - the caller could not verify emptiness
+        either way, mirroring :meth:`_check_bulk_load_file_dependencies`'s fail-open
+        behavior for a missing ``files_dir``.
+        """
+        if connection is None:
+            return None
+        for table_name, capability_note in _OPTIONAL_WHEN_SOURCE_MISSING.items():
+            if not re.search(rf"\b{re.escape(table_name)}\b", write_sql):
+                continue
+            try:
+                quoted = self._quote_identifier(table_name)
+                result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
+                row_count = result[0] if result else 0
+            except Exception:
+                # Table missing entirely (never created) is the same "unavailable" case.
+                row_count = 0
+            if row_count == 0:
+                return f"staging table '{table_name}' is empty (source data was unavailable at setup): {capability_note}"
+        return None
 
     def _check_bulk_load_file_dependencies(self, operation: Any) -> str | None:
         """Return a comma-separated list of missing file-dependency paths, if any.
@@ -1102,7 +1152,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
         try:
             effective_sql, skip_reason = self._get_effective_write_sql(
-                operation, platform_key=platform_key, sql_override=sql_override
+                operation, platform_key=platform_key, sql_override=sql_override, connection=connection
             )
             if skip_reason is not None:
                 self.log_verbose(f"Skipping operation {operation_id}: {skip_reason}")

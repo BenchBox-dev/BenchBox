@@ -100,7 +100,12 @@ WHERE s.change_type = 'new'
 This is portable standard SQL. It uses a business key (`c_custkey`), a current-version
 flag (`is_current`), validity timestamps (`valid_from` and `valid_to`), and a
 change-detection fingerprint (`row_hash`) to decide what changed. There is no
-engine-specific syntax, so it runs unchanged across the engines BenchBox targets.
+engine-specific syntax, so it runs unchanged across the engines named above
+(DuckDB, PostgreSQL, Snowflake, BigQuery, and ClickHouse) — not every engine
+BenchBox targets. DataFusion is a documented exception: BenchBox's Write
+Primitives catalog marks this exact operation unsupported there
+(`platform_overrides: {"datafusion": null}`)[^op], so it is skipped rather than
+run on that engine.
 
 ### The honest line count
 

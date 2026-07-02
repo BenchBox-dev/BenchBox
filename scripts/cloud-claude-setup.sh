@@ -17,6 +17,17 @@
 # _project/decisions/claude-settings-cloud-ownership-2026-06-29.md (cloud addendum).
 #
 # Idempotent and safe to re-run. No-op when the `claude` CLI or python is absent.
+#
+# Staleness caveat: claude.ai/code caches environment setup scripts and runs
+# them once per environment BUILD, not once per session. If .claude/settings.json
+# changes (plugin added/removed) after an environment was built, existing
+# sessions in that environment will NOT pick up the change automatically —
+# there is no supported per-session hook to bust this cache (project hooks are
+# unreliable/blocked in cloud web execution; see the cloud addendum in
+# _project/decisions/claude-settings-cloud-ownership-2026-06-29.md). Rebuild
+# the claude.ai/code environment (or otherwise force a fresh environment build)
+# after changing enabledPlugins/extraKnownMarketplaces, then verify with
+# `claude plugin list` in the new session.
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
