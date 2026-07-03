@@ -1,0 +1,199 @@
+id: tpchavoc-duckdb-gate-vacuity-guard
+title: "Close the DuckDB TPC-Havoc gate's vacuity/staleness gaps its sibling engine builders and the cross-surface gate already guard against"
+worktree: main
+priority: Medium-High
+status: "Not Started"
+category: "Testing and Quality Assurance"
+
+description: |
+  SOUNDNESS-CRITICAL COMPARATOR SURFACE: this TODO's work is in
+  benchbox/core/tpchavoc/equivalence.py, the blocking TPC-Havoc SQL equivalence
+  gate. It is adjacent to, and shares helpers with, benchbox/core/tpchavoc/validation.py
+  (covered by .github/CODEOWNERS as `benchbox/core/**/validation.py @joeharris76`)
+  and mirrors the discipline of benchbox/core/equivalence/cross_surface.py
+  (covered as `benchbox/core/equivalence/** @joeharris76`). Even though
+  `benchbox/core/tpchavoc/equivalence.py` itself is not literally matched by
+  either existing CODEOWNERS glob (verified: only `core/**/validation.py` and
+  `core/equivalence/**` are listed in .github/CODEOWNERS as of this writing),
+  it IS the hard, blocking correctness gate for TPC-Havoc and must be treated as
+  soundness-critical - request code-owner review on the PR explicitly rather
+  than relying on the glob to force it, and flag in the PR description that
+  CODEOWNERS coverage for this file may itself be worth extending.
+
+  Verified by reading benchbox/core/tpchavoc/equivalence.py on this branch:
+
+  - `build_postgres_with_tpch` (lines 370-431) verifies every TPC-H table loaded
+    >0 rows before sampling (lines 412-419: `table_stats.get(table, 0) <= 0`
+    raises `RuntimeError`), with the comment "A silent empty/partial load would
+    make every variant compare empty-vs-empty and report a FALSE green."
+  - `build_datafusion_with_tpch` (lines 588-618) has the identical guard (lines
+    611-614).
+  - `build_clickhouse_with_tpch` (lines 770-808) has the identical guard (lines
+    800-803).
+  - `build_duckdb_with_tpch` (lines 296-316), the BLOCKING gate builder that
+    every other engine's builder was modeled after, has NO such guard: it calls
+    `DuckDBAdapter(database=":memory:").load_data(tpchavoc, connection, data_dir)`
+    and returns immediately, never checking the load actually populated rows.
+    A silent partial/empty DuckDB load would make `find_divergences` compare
+    empty-vs-empty for every affected query and the hard gate would report a
+    FALSE green - the exact failure mode the three sibling engines were
+    explicitly hardened against.
+  - `find_divergences` (lines 198-274) has no per-query vacuity check: it never
+    inspects whether `original` (the canonical query's row count) is empty
+    before comparing to each variant. Compare this to
+    `benchbox/core/equivalence/cross_surface.py`'s `legitimately_empty` /
+    vacuous-cell handling (`CrossSurfaceGate.legitimately_empty`,
+    cross_surface.py:372-382, and the FAILURE line at cross_surface.py:1183-1187
+    `GATE FAILURE - vacuous empty-vs-empty queries ... not classified`), which
+    fails the gate on any unclassified 0-row reference rather than silently
+    passing an empty-vs-empty comparison.
+  - `_report` (lines 434-470), shared by every TPC-Havoc engine, returns
+    `1 if new else 0` (line 470) - it does NOT fail when `resolved` (a
+    previously-known divergence that no longer reproduces) is non-empty; it
+    only PRINTS a message to update the baseline (line 466-467). Compare this
+    to the cross-surface gate's own `_report`
+    (benchbox/core/equivalence/cross_surface.py:1188-1196), which explicitly
+    fails on `resolved`: "GATE FAILURE - previously-known divergences now
+    equivalent ... remove the stale baseline entry in a reviewed change" and
+    `return 1 if (new or resolved or missing_backends or unclassified_empty) else 0`.
+    So today a stale TPC-Havoc `KNOWN_DIVERGENCES`/`POSTGRES_KNOWN_DIVERGENCES`/
+    etc. entry (whose divergence has since been fixed) can sit indefinitely
+    without forcing anyone to prune it, unlike the cross-surface gate's
+    behavior.
+
+prior_art:
+  - "benchbox/core/tpchavoc/equivalence.py:412-419 (build_postgres_with_tpch), 611-614 (build_datafusion_with_tpch), 800-803 (build_clickhouse_with_tpch) - the three existing row-count guard implementations to mirror for build_duckdb_with_tpch."
+  - "benchbox/core/equivalence/cross_surface.py:372-382 CrossSurfaceGate.legitimately_empty and cross_surface.py:1183-1196 _report's vacuous/stale handling - the reference pattern for per-query vacuity classification and stale-baseline failure; port the DESIGN (explicit classification + fail-on-stale), do not fork the cross-surface code itself since TPC-Havoc's Divergence/known-divergence shapes differ (per-variant vs per-backend-cell)."
+  - "benchbox/core/tpchavoc/equivalence.py:198-274 find_divergences - the shared, engine-agnostic comparator loop; add the per-query empty check here so all four engines (DuckDB, Postgres, DataFusion, ClickHouse) benefit, not just DuckDB."
+  - "benchbox/core/tpchavoc/equivalence.py:434-470 _report - shared by every engine; the resolved-fails-the-gate change here also affects Postgres/DataFusion/ClickHouse samples, which is intentional (their baselines should not rot either) but must be verified non-disruptive to those non-blocking samples."
+
+work:
+  - id: w1
+    summary: "Add a row-count guard to build_duckdb_with_tpch mirroring the Postgres/DataFusion/ClickHouse builders"
+    status: pending
+    notes: |
+      After `DuckDBAdapter(...).load_data(tpchavoc, connection, data_dir)`, query
+      each of the 8 TPC-H tables (reuse `_TPCH_TABLES` at equivalence.py:349) for
+      its row count on `connection` and raise `RuntimeError` listing any table
+      with 0 rows, exactly mirroring the message shape used by the Postgres/
+      DataFusion/ClickHouse builders ("<Engine> TPC-H load failed - no rows in
+      {empty} (stats={table_stats})"). DuckDBAdapter.load_data's own return value
+      may already carry per-table stats (verify - the other three builders use
+      `table_stats, _, _ = adapter.load_data(...)`); if `DuckDBAdapter.load_data`
+      does not return stats in the same shape, run a `SELECT COUNT(*)` per table
+      instead rather than changing the adapter's return contract.
+
+  - id: w2
+    summary: "Add a per-query empty-vs-empty detection to find_divergences (or its callers), require explicit classification"
+    needs: [w1]
+    status: pending
+    notes: |
+      Decide the mechanism before implementing (see open_questions): either (a)
+      thread an optional `known_empty_queries: dict[int, str] | None` parameter
+      into `find_divergences` (mirroring `CrossSurfaceGate.legitimately_empty`'s
+      shape) that requires every canonical query returning 0 rows to be listed
+      with a rationale, failing loudly (as a `Divergence`) on an unclassified
+      empty canonical result; or (b) a simpler assertion in each `run_*_gate`/
+      `run_*_sample` caller that fails immediately if ANY of the 22 canonical
+      TPC-H queries (TPC-Havoc's gated query set) return 0 rows at
+      EQUIVALENCE_SCALE, since TPC-H canonical queries are not expected to be
+      legitimately empty at any bounded SF the way SSB's value-format-mismatch
+      queries were (see cross-surface-oracle-remediation.yaml's w4 SSB
+      discussion) - if (b) is evidenced as sufficient (no TPC-H canonical query
+      is EVER legitimately empty at SF=0.1), it is simpler and should be
+      preferred; only build the classification map (a) if a genuine empty
+      canonical query is found.
+
+  - id: w3
+    summary: "Make _report fail (not just print) on a stale/resolved known-divergence baseline, matching cross_surface.py's behavior"
+    needs: []
+    status: pending
+    notes: |
+      Change `_report`'s return statement (equivalence.py:470) from
+      `return 1 if new else 0` to also fail when `resolved` is non-empty,
+      mirroring cross_surface.py:1196's
+      `return 1 if (new or resolved or missing_backends or unclassified_empty) else 0`.
+      This function is shared by all four engines (DuckDB hard gate, Postgres/
+      DataFusion/ClickHouse samples) - verify after the change that none of the
+      four KNOWN_DIVERGENCES-family baselines (KNOWN_DIVERGENCES,
+      POSTGRES_KNOWN_DIVERGENCES, DATAFUSION_KNOWN_DIVERGENCES,
+      CLICKHOUSE_KNOWN_DIVERGENCES) currently contain a stale entry that would
+      newly fail after this change (run all four report modes and confirm they
+      are still green, or all `resolved` lists are empty, before landing).
+
+  - id: w4
+    summary: "Add negative tests for each of w1-w3 (vacuous load, vacuous query, stale baseline all fail the gate)"
+    needs: [w1, w2, w3]
+    status: pending
+    notes: |
+      Three focused tests, likely in tests/unit/core/tpchavoc/ or
+      tests/integration/: (1) mock/stub a DuckDB connection whose load leaves one
+      table at 0 rows and assert build_duckdb_with_tpch raises; (2) construct a
+      scenario where the canonical query for some query id returns 0 rows and
+      assert find_divergences (or the gate) fails rather than silently passing
+      every variant of that query; (3) seed a KNOWN_DIVERGENCES-shaped baseline
+      with one entry whose divergence no longer reproduces and assert `_report`
+      returns nonzero. Mark appropriately (fast/unit vs slow/integration) per
+      existing test-marker conventions in this test tree.
+
+deferred:
+  - summary: "Apply the same vacuity/staleness hardening pattern to any future fifth TPC-Havoc engine sample."
+    reason: "Out of scope; a future engine sample should copy the hardened build_duckdb_with_tpch/find_divergences/_report from this TODO, not require a repeat audit."
+
+must_preserve:
+  - "The DuckDB SQL equivalence gate stays the hard, blocking gate; `make tpchavoc-equivalence-report` reports `checked 220 variants - 0 divergent, 220 equivalent` (or the then-current true count) with exit 0 on a healthy tree, unchanged by this hardening."
+  - "The Postgres/DataFusion/ClickHouse samples (`make tpchavoc-equivalence-report-postgres/-datafusion/-clickhouse`) stay green; the shared `_report` change in w3 must not newly fail them on entries that are still live."
+  - "find_divergences, validate_variant_equivalence, and _report remain shared/engine-agnostic - no per-engine fork introduced by this hardening."
+
+approach: |
+  Port the row-count guard already proven on three sibling engine builders to
+  the fourth (w1), decide the cheapest correct per-query vacuity check for
+  TPC-Havoc's specific query set (w2, deciding between a full classification map
+  and a simpler "TPC-H canonical is never legitimately empty" assertion), align
+  the shared _report's stale-baseline behavior with the cross-surface gate's
+  precedent (w3), and lock all three in with negative tests (w4).
+
+anti_patterns:
+  - "DO NOT special-case DuckDB's row-count check differently in shape from the Postgres/DataFusion/ClickHouse guards - because a fifth engine author should be able to copy any one of the four verbatim."
+  - "DO NOT silently classify an unexpected empty canonical query as 'legitimately empty' to make w2's implementation easier - because that is exactly the coverage-theater w4 of cross-surface-oracle-remediation fixed for SSB; investigate and either fix the root cause or classify with a real, written rationale."
+  - "DO NOT change _report's stale-baseline behavior (w3) without first running all four report modes and confirming which currently-declared entries would newly fail - a surprise CI break in a non-blocking sample job is still a broken PR."
+  - "DO NOT fork find_divergences per engine to add the vacuity check - it is already engine-agnostic (takes connection/canonical_query/translate_variant as parameters); extend it in place."
+
+verification:
+  - description: "TPC-Havoc DuckDB hard gate stays green after all hardening lands"
+    command: "make tpchavoc-equivalence-report"
+    expected_output: "checked <N> variants - 0 divergent, <N> equivalent; exit 0"
+  - description: "Correctness gate (value-digest oracle) unaffected"
+    command: "make test-correctness-gate"
+    expected_output: "correctness gate guard: ran=1 skipped=0 failures=0 errors=0"
+  - description: "New negative tests catch each hardened failure mode"
+    command: "uv run -- python -m pytest tests/unit/core/tpchavoc/ -k vacuity -v"
+    expected_output: "vacuous-load, vacuous-query, and stale-baseline tests all pass (i.e. the gate correctly FAILS in each seeded scenario)"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpchavoc/equivalence.py"
+    - "tests/unit/core/tpchavoc/"
+    - "tests/integration/"
+    - "_project/TODO/"
+  do_not_modify:
+    - "benchbox/core/tpchavoc/validation.py"
+    - "benchbox/core/equivalence/cross_surface.py"
+
+open_questions:
+  - question: "For w2, is a full per-query legitimately-empty classification map warranted, or is a simpler blanket 'no TPC-H canonical query is ever empty at EQUIVALENCE_SCALE' assertion sufficient?"
+    gating: true
+    affects: ["w2 implementation shape"]
+    default: "Start with the blanket assertion (run all 22 gated canonical queries at EQUIVALENCE_SCALE and confirm none are empty); only build the classification map if a genuine legitimately-empty canonical query is found, since TPC-H (unlike SSB's value-format-mismatch bug) has no known empty-canonical-query case today."
+
+success_metrics:
+  - "build_duckdb_with_tpch fails loudly on a partial/empty load, matching its three sibling engine builders."
+  - "A canonical TPC-Havoc query returning 0 rows is either impossible-by-construction (documented) or explicitly classified, never silently compared empty-vs-empty."
+  - "A stale TPC-Havoc known-divergence baseline entry fails the gate, matching cross_surface.py's precedent, across all four engines' shared _report."
+
+metadata:
+  owners: [joeharris76]
+  tags: [tpchavoc, equivalence, correctness, vacuity, code-owner-review]
+  estimated_effort: "Medium"
+  created_date: "2026-07-03"
+  last_updated: "2026-07-03T00:00:00"

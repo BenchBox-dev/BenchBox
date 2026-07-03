@@ -1,0 +1,137 @@
+id: soundness-surface-widening
+title: "Widen the auto-merge soundness-review surface to cover oracle-adjacent assets"
+worktree: main
+priority: High
+status: Not Started
+category: Release Tooling
+
+description: |
+  The review-required soundness surface in `_project/scripts/auto_merge_soundness_paths.py`
+  (`SOUNDNESS_PREFIXES`, lines 11-15: `benchbox/core/equivalence/`,
+  `benchbox/core/query_plans/parsers/`, plus the `benchbox/core/**/validation.py`
+  regex) is mirrored 1:1 in `.github/CODEOWNERS`. It covers the comparator and
+  plan-parser code paths but omits several oracle-adjacent assets that define or
+  feed "correct" for the same soundness checks:
+
+  - `benchbox/core/expected_results/**` — the reference-value loader
+    (`benchbox/core/expected_results/loader.py`), registry, and the
+    hash-pinned digest fixtures themselves (e.g.
+    `benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json`).
+    A PR editing that JSON digest file today auto-merges with zero review, even
+    though it silently redefines what counts as a correct TPC-H result.
+  - `benchbox/sql_compat/**` — semantic query rewrites (rule registrations under
+    `benchbox/sql_compat/rules/`) that can change what SQL is actually executed
+    against a platform without touching the comparator itself. High-churn: most
+    files here are per-platform DDL/query-rewrite rules added routinely, so a
+    blanket prefix would create real merge friction.
+  - `benchbox/platforms/base/result_capture.py` — houses
+    `validate_loaded_data` / `validate_row_counts`, which delegate to
+    `ValidationService` / `DataValidator`, and the plan-capture pipeline
+    (`get_query_plan_parser`, `capture_query_plan`) that feeds the parsers in
+    `benchbox/core/query_plans/parsers/`. Currently outside the soundness set.
+  - `_project/scripts/auto_merge_soundness_paths.py` itself, and the workflows
+    that define or invoke the gate (`.github/workflows/auto-merge-on-open.yml`,
+    `pr.yml`, `release.yml`) — a PR editing the predicate or the workflow that
+    runs it can currently weaken its own gate without triggering owner review.
+    (This last point overlaps with auto-merge-predicate-base-ref-execution;
+    see deps below — do not implement self-protection in both places.)
+
+prior_art:
+  - "_project/scripts/auto_merge_soundness_paths.py:SOUNDNESS_PREFIXES — the single source of truth being widened; keep it the only place the prefix tuple is defined."
+  - ".github/CODEOWNERS — mirrors SOUNDNESS_PREFIXES 1:1 today; must stay in lockstep with any change here."
+  - "tests/unit/test_auto_merge_soundness_paths.py:test_codeowners_covers_soundness_paths — the pinned unit test asserting CODEOWNERS lines match the predicate; update it alongside the prefix change, do not let it silently start failing."
+  - "_project/scripts/ruleset_review_enforcement.py:SOUNDNESS_PATH_GLOBS — narration derived from SOUNDNESS_PREFIXES for the review-enforcement predicate; will pick up new prefixes automatically once SOUNDNESS_PREFIXES changes, but double-check the printed glob list still reads sensibly."
+
+work:
+  - id: w1
+    summary: "Decide the widened prefix/glob set, weighing review friction against oracle coverage"
+    status: pending
+    notes: |
+      Recommend at minimum: benchbox/core/expected_results/ (all of it — the
+      loader, registry, and digest fixtures together define correctness) and
+      benchbox/platforms/base/result_capture.py (single file, low churn). For
+      benchbox/sql_compat/, weigh whether to include the whole tree (high churn,
+      most edits are routine per-platform rule additions) versus a narrower
+      subset — e.g. only benchbox/sql_compat/rules/_registration.py and
+      benchbox/sql_compat/resolver.py/decision.py (the rule-dispatch core, where
+      a bug silently changes which rewrites apply) rather than every
+      rules/*_rewrites.py leaf. Decide and record the reasoning in the PR
+      description; do not widen sql_compat/ wholesale without weighing the
+      friction tradeoff explicitly.
+
+  - id: w2
+    summary: "Update SOUNDNESS_PREFIXES and CODEOWNERS in lockstep; keep the pinning test green"
+    needs: [w1]
+    status: pending
+    notes: |
+      Edit _project/scripts/auto_merge_soundness_paths.py:SOUNDNESS_PREFIXES and
+      .github/CODEOWNERS together in the same commit. Update
+      tests/unit/test_auto_merge_soundness_paths.py's parametrized
+      is_soundness_path cases (both matching and non-matching) and
+      test_codeowners_covers_soundness_paths to reflect the new set. Run the
+      full test file, not just the new cases, to catch regressions in the
+      existing equivalence/parsers/validation.py coverage.
+
+  - id: w3
+    summary: "Update ruleset_review_enforcement.py's narration and confirm it renders correctly"
+    needs: [w2]
+    status: pending
+    notes: |
+      SOUNDNESS_PATH_GLOBS in _project/scripts/ruleset_review_enforcement.py is
+      derived from SOUNDNESS_PREFIXES, so no code change should be needed, but
+      run its CLI against a fixture to eyeball that the expanded glob list in
+      its FAILED/OK output still reads clearly (it's user-facing text in the
+      runbook verify command's output).
+
+must_preserve:
+  - "The existing equivalence/, query_plans/parsers/, and **/validation.py coverage in SOUNDNESS_PREFIXES is unchanged (only additive widening)."
+  - "auto-merge-on-open.yml, make pr-open, and CODEOWNERS continue to read from the single SOUNDNESS_PREFIXES source of truth — no second hardcoded copy of the path list is introduced."
+  - "tests/unit/test_auto_merge_soundness_paths.py stays green (updated, not skipped or weakened)."
+
+anti_patterns:
+  - "DO NOT widen SOUNDNESS_PREFIXES without updating .github/CODEOWNERS in the same commit — they are asserted to match by test_codeowners_covers_soundness_paths, and a mismatch means require_code_owner_review silently does nothing for the new paths."
+  - "DO NOT add benchbox/sql_compat/ wholesale without recording the churn tradeoff — grep git log for recent commit volume under that tree before deciding, since it is explicitly called out as high-churn in the description."
+  - "DO NOT implement the workflow/predicate self-protection here AND in auto-merge-predicate-base-ref-execution — pick one owner for that concern (see deps.needs there) to avoid duplicated or conflicting logic."
+
+verification:
+  - description: "Soundness-path predicate unit tests pass with the widened set, including new true/false cases for expected_results and result_capture.py"
+    command: "uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -v"
+    expected_output: "all tests pass, including test_codeowners_covers_soundness_paths"
+  - description: "A PR path under the new prefixes is classified as soundness=true"
+    command: "printf 'benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json\\n' | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin"
+    expected_output: "true"
+
+scope_limit:
+  only_modify:
+    - "_project/scripts/auto_merge_soundness_paths.py"
+    - ".github/CODEOWNERS"
+    - "tests/unit/test_auto_merge_soundness_paths.py"
+    - "_project/scripts/ruleset_review_enforcement.py"
+  do_not_modify:
+    - "scripts/ruleset_drift_check.py"
+    - "benchbox/core/expected_results/"
+    - "benchbox/sql_compat/"
+    - "benchbox/platforms/base/result_capture.py"
+
+deps:
+  needs: []
+
+success_metrics:
+  - "A PR editing benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json is classified soundness=true and cannot squash-auto-merge without review."
+  - "SOUNDNESS_PREFIXES and .github/CODEOWNERS list the identical widened path set (asserted by the unit test)."
+  - "The decision on benchbox/sql_compat/ scope (whole tree vs. dispatch-core-only) is recorded with explicit reasoning, not left implicit."
+
+open_questions:
+  - question: "Should benchbox/sql_compat/ be included wholesale, or only its rule-dispatch core (resolver.py, decision.py, rules/_registration.py)?"
+    gating: true
+    affects: ["w1", "success_metrics: SOUNDNESS_PREFIXES widened set"]
+    default: "Narrow: only the rule-dispatch core, to avoid CODEOWNERS review friction on routine per-platform rewrite-rule additions."
+  - "Should the predicate/workflow self-protection (editing auto_merge_soundness_paths.py or the workflows that invoke it) be owned here or in auto-merge-predicate-base-ref-execution?"
+
+metadata:
+  owners:
+    - joeharris76
+  tags: [release, auto-merge, soundness, ci, governance, holistic-review-followup]
+  estimated_effort: "Medium"
+  created_date: "2026-07-03"
+  last_updated: "2026-07-03T00:00:00"

@@ -1,0 +1,116 @@
+id: github-token-approval-capability-followup
+title: "Re-evaluate can_approve_pull_request_reviews once review enforcement is live"
+worktree: main
+priority: Medium
+status: Not Started
+category: Release Tooling
+
+description: |
+  `docs/operations/repo-admin-settings.md:16-25` documents that
+  `can_approve_pull_request_reviews: true` is set at the repo level (alongside
+  `default_workflow_permissions: read`). The stated reason is that the
+  `develop-post-merge.yml` `auto-revert-on-failure` job needs it so a
+  `GITHUB_TOKEN`-driven `gh pr edit --add-reviewer` call can request review on
+  the auto-revert PR from the original PR author when the GraphQL author lookup
+  succeeds (confirmed: `develop-post-merge.yml` uses `--add-reviewer`, not an
+  approval call — the setting is currently unused for approvals, only enabling
+  the *capability*).
+
+  Once the review requirement from auto-merge-review-gate-admin-enforcement is
+  actually enforced at the ruleset layer (required_approving_review_count>=1,
+  require_code_owner_review=true), this dormant capability becomes a live
+  self-approval loophole: any workflow running with a `pull-requests: write`
+  `GITHUB_TOKEN` could, in principle, call the PR-review-approve API and satisfy
+  the review requirement without a human ever looking at the diff — including
+  for a soundness-path PR. Today the setting only enables *requesting* review,
+  not approving one, and no workflow in this repo currently calls the approve
+  endpoint — but the capability being switched on repo-wide means a future
+  workflow change (or a compromised/malicious workflow run) could exploit it
+  silently, with no code-level signal that it happened.
+
+prior_art:
+  - "docs/operations/repo-admin-settings.md:16-25 — the setting and its stated justification (auto-revert reviewer-request flow); this item re-evaluates whether that justification still requires the capability once review enforcement is live."
+  - ".github/workflows/develop-post-merge.yml (~lines 106, 244, 374, 420) — the auto-revert-on-failure job's GraphQL author lookup and `gh pr edit ... --add-reviewer` call; confirm this is the only consumer of the capability before deciding to flip it off."
+
+work:
+  - id: w1
+    summary: "Confirm no workflow calls the PR-approve API today (only reviewer-request)"
+    status: pending
+    notes: |
+      Grep .github/workflows/ for pull_request_review_write-equivalent gh api
+      calls (e.g. `gh api ... /pulls/.../reviews` with an APPROVE event, or
+      `gh pr review --approve`) to establish the current blast radius is zero.
+      Record the grep command and result in the PR body — this is the w0-style
+      evidence re-check this item's description leans on.
+
+  - id: w2
+    summary: "Re-evaluate whether the auto-revert flow actually needs can_approve_pull_request_reviews"
+    needs: [w1]
+    status: pending
+    notes: |
+      The GraphQL lookup + --add-reviewer call requests review, which per GitHub's
+      API does not itself require can_approve_pull_request_reviews (that setting
+      only gates the Actions token's ability to submit an approving/requesting
+      *review event* via the reviews API, not the lighter-weight reviewer
+      assignment via `gh pr edit --add-reviewer`, which uses the requested
+      reviewers list, not a review submission). Verify this distinction against
+      current GitHub Actions token permission docs before concluding the setting
+      is unnecessary — do not assume from the doc text alone.
+
+  - id: w3
+    summary: "Flip the setting off if unneeded, or document the accepted residual risk"
+    needs: [w2]
+    status: pending
+    notes: |
+      If w2 confirms the auto-revert flow does not need
+      can_approve_pull_request_reviews, apply
+      `gh api -X PUT repos/joeharris76/BenchBox/actions/permissions/workflow
+      -f default_workflow_permissions=read -F can_approve_pull_request_reviews=false`
+      (admin action — cannot be done by an agent PR, same class of deferred
+      action as the ruleset PUT in auto-merge-review-gate-admin-enforcement) and
+      update docs/operations/repo-admin-settings.md to reflect the new value and
+      history entry. If the flow genuinely needs it (or flipping it off is
+      infeasible for another reason), instead add an explicit "Accepted residual
+      risk" subsection to the runbook naming the self-approval loophole,
+      why it's accepted, and what would need to change to close it.
+
+must_preserve:
+  - "The develop-post-merge.yml auto-revert-on-failure job's reviewer-request behavior (requesting review from the original PR author) continues to work if the setting is flipped off — verify with a dry run or by re-reading the GraphQL/--add-reviewer code path before applying the PUT."
+  - "docs/operations/repo-admin-settings.md remains the single source of truth for this setting's current value — do not let the runbook and live repo config drift."
+
+anti_patterns:
+  - "DO NOT flip can_approve_pull_request_reviews off without first confirming (w1/w2) what actually depends on it — the auto-revert flow already exists and regressing its reviewer-request behavior would be a new incident, not a fix."
+  - "DO NOT treat this as blocking auto-merge-review-gate-admin-enforcement's admin action — this item is a followup once that enforcement is live, not a precondition for it."
+
+verification:
+  - description: "No workflow currently submits an approving review via GITHUB_TOKEN"
+    command: "grep -rn 'gh api.*reviews\\|gh pr review --approve\\|event.*APPROVE' .github/workflows/"
+    expected_output: "no matches (or only the documented --add-reviewer reviewer-request call, which is a different API surface)"
+  - description: "If flipped off, verify the live setting matches the runbook"
+    command: "gh api repos/joeharris76/BenchBox/actions/permissions/workflow"
+    expected_output: "can_approve_pull_request_reviews matches whatever value docs/operations/repo-admin-settings.md now documents"
+
+scope_limit:
+  only_modify:
+    - "docs/operations/repo-admin-settings.md"
+  do_not_modify:
+    - ".github/workflows/develop-post-merge.yml"
+
+deps:
+  needs:
+    - auto-merge-review-gate-admin-enforcement
+
+success_metrics:
+  - "docs/operations/repo-admin-settings.md states either (a) can_approve_pull_request_reviews is now false with confirmation the auto-revert flow still works, or (b) an explicit accepted-residual-risk note explaining why it stays true."
+  - "The self-approval loophole is a documented, deliberate decision rather than an unexamined side effect of the auto-revert flow's original justification."
+
+open_questions:
+  - "Does gh pr edit --add-reviewer actually require can_approve_pull_request_reviews, or was the setting enabled for a different reason during the 2026-04-30 change (see docs/operations/repo-admin-settings.md History) that no longer applies?"
+
+metadata:
+  owners:
+    - joeharris76
+  tags: [release, ci, governance, github-token, security, holistic-review-followup]
+  estimated_effort: "Small"
+  created_date: "2026-07-03"
+  last_updated: "2026-07-03T00:00:00"
