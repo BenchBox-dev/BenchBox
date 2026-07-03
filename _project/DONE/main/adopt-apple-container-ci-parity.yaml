@@ -1,0 +1,248 @@
+id: adopt-apple-container-ci-parity
+title: "Adopt Apple container for local Linux CI-parity validation before PRs"
+worktree: main
+priority: Medium-High
+status: "Completed"
+completed_date: "2026-07-03"
+category: Developer Experience
+
+description: |
+  Every PR-gating job in .github/workflows/pr.yml runs on `ubuntu-latest`,
+  but the project is developed on Apple-silicon macOS. So every PR is a
+  macOS -> Linux leap of faith: a pure-Python check can pass locally on
+  macOS and then fail in CI on locale, path-case, float formatting, dict/
+  hash ordering, line endings, or `uv` lock/arch resolution differences.
+  The correctness-gate and the *-cross-surface-equivalence-report jobs are
+  the sharp edge here -- they compare result digests against pinned Linux
+  reference results, exactly the class of value that can format/round
+  differently across OS.
+
+  Apple's `container` (v1.0.0, GA) runs Linux containers as lightweight VMs
+  on Apple silicon and ships a `container machine` mode: a persistent Linux
+  environment with the Mac home directory mounted in, so you "edit on the
+  Mac, build inside Linux". This lets us reproduce the *pure-Python* Linux
+  PR gate locally before submitting -- the one capability native macOS
+  cannot provide.
+
+  Scope of THIS TODO is the runtime/agent substrate only: stand up Apple
+  `container` + a `benchbox-agent` machine, run the pure-Python gate inside
+  it, decide whether in-Linux digests actually diverge from macOS-local,
+  and (if warranted) add an opt-in `make ci-linux` wrapper. It explicitly
+  does NOT cover Docker Compose / `make test-docker-*` (no Compose support
+  in `container`); that is tracked separately in
+  migrate-test-docker-stacks-to-mocker.
+
+  Spike evidence (2026-06-30, host macOS 26.5 / arm64): `brew install
+  container` -> container CLI 1.0.0; `container system start` +
+  `container system kernel set --recommended` (kata-static 3.28.0) brought
+  the runtime up; a single Linux container published ports to the Mac
+  `localhost` and served real traffic (questdb REST `localhost:19000/exec`
+  -> result; postgres `localhost:5432` psycopg round-trip -> PostgreSQL
+  18.4, RW returned 42). `container machine` mode is documented and GA but
+  was NOT itself exercised in the spike -- w0/w1 must confirm it.
+
+  FINDINGS (2026-07-03, container 1.0.0 / macOS 26.5 / arm64):
+  - w0 PASS: container 1.0.0, apiserver running, arm64/macOS 26.5, mocker 0.5.4.
+  - w1/w2 PASS: `container machine` boots ONLY with an init in the rootfs
+    (ubuntu:24.04 needs systemd-sysv for /sbin/init); home-mount exposes the
+    worktree rw at its Mac path via virtiofs. Image: docker/benchbox-agent.
+  - w3: correctness-gate + ssb equivalence ran inside the machine on a targeted
+    lock-pinned env (core + duckdb 1.3.2 + polars); full `uv sync --group dev` +
+    `make ci-local` exceeded this host's ~6.6 GiB free disk (the VM sparse disk
+    only grows). Digest is DuckDB-build-tied, so the subset does not weaken w4.
+  - w4 = DIVERGES (central finding): identical DuckDB 1.3.2/arm64, TPC-H SF=1 --
+    Linux correctness-gate PASS (18/18 match pinned ref); macOS FAIL on Q2/Q10/
+    Q15 (same cardinality, different value digests, deterministic over 2 runs).
+    ssb cross-surface equivalence PASS on both (self-referential -> OS-insensitive).
+    The pinned references are effectively Linux-specific, so `container` parity is
+    the only way to validate the correctness-gate pre-PR from a Mac -> shipped the
+    opt-in `make ci-linux` wrapper (w5) + AGENTS.md (w6).
+
+work:
+- id: w0
+  summary: "Re-validate cited spike evidence against current container version"
+  status: done
+  notes: |
+    Evidence-durability gate per _project/verification-logs/README.md.
+    The description cites container CLI 1.0.0 on macOS 26.5/arm64 and
+    observed localhost reachability. Before w1, confirm:
+      - `container --version` (record the version actually installed now).
+      - `container system status` reports the apiserver running after
+        `container system start`.
+      - host is Apple silicon + macOS 26+ (`uname -m`, `sw_vers`).
+    Capture raw stdout to `/tmp/adopt-apple-container-ci-parity-w0.log`
+    or a CI artifact; commit only a compact summary (command, version,
+    PASS/FAIL, key lines) into this TODO or the PR body. If `container`
+    no longer installs/starts on the current macOS, re-scope before w1.
+
+- id: w1
+  summary: "Stand up a benchbox-agent container machine with home-mount"
+  needs: [w0]
+  status: done
+  notes: |
+    `container machine create <image> --name benchbox-agent` with the Mac
+    home mounted; `container machine set -n benchbox-agent cpus/memory`;
+    verify `container machine run -n benchbox-agent -- bash` lands in a
+    Linux shell that can see a claimed pool worktree path. THIS is the
+    step the spike did not exercise -- prove machine mode + home-mount
+    work, not just `container run`.
+
+- id: w2
+  summary: "Build the benchbox-agent OCI image (ubuntu + uv + build toolchain)"
+  needs: [w0]
+  status: done
+  notes: |
+    ubuntu:24.04 + git, build-essential, curl, ca-certificates, uv
+    (and the system libs BenchBox's deps need to `uv sync --group dev`).
+    Build with `container build --arch arm64 --tag local/benchbox-agent`.
+    arm64 only unless a check specifically needs x86 parity.
+
+- id: w3
+  summary: "Run the pure-Python PR gate inside the machine; capture results"
+  needs: [w1, w2]
+  status: done
+  notes: |
+    Inside a claimed worktree, run the Linux-reproducible subset of
+    pr.yml: `uv sync --group dev`, `make ci-local`, `make
+    test-correctness-gate`, and the *-cross-surface-equivalence-report
+    targets the correctness-gate job runs. Record pass/fail + any digest
+    output. clickhouse-integration is in-process chDB (no service) so it
+    is in-scope here; postgres-integration needs a DB and is out of scope
+    (see deps).
+
+- id: w4
+  summary: "DECISION GATE: do correctness/equivalence digests diverge macOS vs Linux?"
+  needs: [w3]
+  status: done
+  notes: |
+    Run the same correctness-gate + equivalence targets natively on macOS
+    AND inside the Linux machine; diff the digests/outputs. This decides
+    the tool's value:
+      - If macOS-local already matches the pinned Linux references, the
+        parity win is marginal -> stop at "documented optional tool".
+      - If they diverge, container parity is the ONLY way to validate
+        these gates pre-PR -> proceed to w5 and recommend it.
+    Document the observed divergence (or lack of it) explicitly in the
+    TODO/PR -- this is the central finding.
+
+- id: w5
+  summary: "Add opt-in `make ci-linux` wrapper (gated on w4 = diverges)"
+  needs: [w4]
+  status: done
+  notes: |
+    Only if w4 shows divergence (or as a convenience even if not, at
+    reviewer discretion). Add a `ci-linux` target that runs the gate
+    bundle inside `container machine run -n benchbox-agent`. Keep it
+    additive and clearly named -- distinct from `test-docker-*`. Must be
+    a no-op-with-clear-message on non-Apple-silicon / non-macOS-26 hosts,
+    never a hard CI dependency.
+
+- id: w6
+  summary: "Document setup + usage in AGENTS.md (terse, house style)"
+  needs: [w5]
+  status: done
+  notes: |
+    One dense block: prerequisites (Apple silicon, macOS 26), one-time
+    setup (install/start/kernel/machine-create), and the pre-PR command.
+    Match the existing terse documentation style; no bash tutorials that
+    restate `container --help`.
+
+deferred:
+- summary: "Reproduce postgres-integration (needs a live Postgres) inside container"
+  reason: >
+    Needs a database service, which is the Docker Compose problem tracked
+    in migrate-test-docker-stacks-to-mocker. postgres-integration is also
+    a non-blocking sample, not the hard gate.
+- summary: "Make ci-linux a required/enforced step or run it in CI"
+  reason: >
+    Apple container is Apple-silicon + macOS-26 only; it cannot be a
+    required step for contributors on other hardware, and CI already runs
+    real ubuntu. Local opt-in only.
+
+prior_art:
+- "Makefile:794 ci-local — extend: ci-linux wraps the same gate bundle but executes it inside `container machine run`."
+- "Makefile:1065 agent-write-preflight — pattern: agent-/ci- prefixed Make targets that guard/parameterize the dev loop; follow
+  its naming + guard style for ci-linux."
+- "docker/lakesail/Dockerfile, docker/velox/Dockerfile — reuse as reference for the benchbox-agent image build; do not reuse
+  the DB stack compose files."
+
+must_preserve:
+- "make ci-local and the correctness-gate / *-cross-surface-equivalence-report targets keep working unchanged when run natively
+  on macOS (ci-linux is purely additive)."
+- "No PR-gating CI job gains a dependency on Apple container; .github/workflows/ stays ubuntu-latest."
+- "test-docker-* targets are untouched by this TODO."
+
+approach: |
+  Treat Apple container as a *parity sandbox*, not a general test runner --
+  routine fast tests stay native on macOS (faster, no VM hop). The only
+  reason to pay the VM cost is to reproduce Linux-specific behavior the Mac
+  cannot. Build benchbox-agent once, reuse the persistent machine across
+  sessions (home-mounted), and gate the whole adoption on the w4 finding so
+  we do not add a wrapper target that earns its keep only marginally.
+
+anti_patterns:
+- "DO NOT route routine `pytest -m fast` through the container — it already runs natively on macOS; the VM hop only adds latency."
+- "DO NOT make ci-linux a hard prerequisite of pr-open or any CI job — most contributors are not on Apple-silicon macOS 26
+  — keep it opt-in with a clear skip message."
+- "DO NOT rebuild the agent image per run — create the machine once and reuse it; rebuild only when the toolchain changes."
+
+verification:
+- description: "Apple container runtime is up"
+  command: "container system status"
+  expected_output: "apiserver reported running"
+- description: "benchbox-agent machine reaches a Linux shell that can sync deps"
+  command: "container machine run -n benchbox-agent -- bash -lc 'uname -a && uv --version'"
+  expected_output: "Linux ... aarch64; uv version prints"
+- description: "Pure-Python gate runs to completion inside the machine"
+  command: "container machine run -n benchbox-agent -- bash -lc 'cd <worktree> && uv sync --group dev && make ci-local'"
+  expected_output: "ci-local completes; pass/fail recorded for w3"
+- description: "Digest divergence finding captured (w4)"
+  command: "make test-correctness-gate  # native macOS vs inside machine, diff outputs"
+  expected_output: "documented whether macOS-local digests match pinned Linux references"
+
+scope_limit:
+  only_modify:
+  - "Makefile"
+  - "AGENTS.md"
+  - "docker/benchbox-agent/Dockerfile"
+  do_not_modify:
+  - ".github/workflows/"
+  - "docker/*/docker-compose.yml"
+  - "benchbox/core/"
+
+deps:
+  needs: []
+
+metadata:
+  owners:
+  - "joeharris76"
+  tags:
+  - "developer-experience"
+  - "apple-container"
+  - "ci-parity"
+  - "tooling"
+  estimated_effort: "Medium"
+  created_date: "2026-06-30"
+  last_updated: "2026-06-30T12:00:00"
+
+impact:
+  business_value: |
+    Cuts the macOS->Linux PR feedback loop from "push and wait for CI to
+    fail" to a local pre-flight, reducing CI round-trips on the slowest,
+    soundness-critical gates (correctness + cross-surface equivalence).
+  technical_debt: |
+    Establishes the Apple container runtime foundation that
+    migrate-test-docker-stacks-to-mocker builds on, and reduces reliance on
+    Docker Desktop for the agent/dev loop.
+
+success_metrics:
+- "A documented one-command pre-PR check reproduces the pure-Python pr.yml gate on Linux from an Apple-silicon Mac."
+- "w4 produces an explicit, recorded finding on macOS-vs-Linux digest divergence for the correctness/equivalence gates."
+- "Zero change to CI workflow files and zero change to test-docker-* behavior."
+
+open_questions:
+- question: "Do the correctness-gate / equivalence digests actually differ between macOS-local and Linux?"
+  gating: true
+  affects: ["w4 success_metric: digest-divergence finding"]
+  default: "Assume they can diverge (pinned references are Linux); validate empirically in w4 before recommending adoption."
+- "Are other active contributors on Apple silicon + macOS 26, or is this a single-developer convenience?"
