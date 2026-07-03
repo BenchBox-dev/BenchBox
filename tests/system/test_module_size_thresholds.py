@@ -22,7 +22,7 @@ MAX_LINES_DEFAULT = 1_200
 ALLOWLIST = {
     Path(
         "benchbox/cli/commands/run.py"
-    ): 2_828,  # CLI tuning + query subset + validation + visualization + help + compression + interactive wizard + post-run charts + driver_version/auto_install options + --publish flag + --benchmark-option + --iterations + explicit utf-8 encoding + run() McCabe 285 → <18 extraction helpers + benchmark-aware --scale defaulting (PR #351 review follow-up) + --strict-translation fail-closed policy + liquid_clustering_auto strategy wiring + propagate show_query_plans to interactive database_config + first-class --analyze-plans/--no-analyze-plans flag (canonical plan-capture knob)
+    ): 2_841,  # CLI tuning + query subset + validation + visualization + help + compression + interactive wizard + post-run charts + driver_version/auto_install options + --publish flag + --benchmark-option + --iterations + explicit utf-8 encoding + run() McCabe 285 → <18 extraction helpers + benchmark-aware --scale defaulting (PR #351 review follow-up) + --strict-translation fail-closed policy + liquid_clustering_auto strategy wiring + propagate show_query_plans to interactive database_config + first-class --analyze-plans/--no-analyze-plans flag (canonical plan-capture knob) + --normalize-plan-literals flag (PR #939; added footprint deduped via shared _strict_translation_config_entry/_plan_capture_override_entries helpers to minimize growth)
     Path("benchbox/core/tpcds/benchmark/runner.py"): 2_120,  # orchestrates all benchmark phases
     Path("benchbox/core/tpcdi/generator/data.py"): 1_600,  # generator coordination remains complex
 }

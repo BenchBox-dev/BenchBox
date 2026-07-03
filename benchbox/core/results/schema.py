@@ -103,6 +103,7 @@ def _normalize_query_result(qr: Any) -> dict[str, Any]:
         "error_type",
         "query_plan",
         "plan_fingerprint",
+        "plan_fingerprint_normalized",
         "dataframe_skip_summary",
         "result_digest",
     ):
@@ -1028,12 +1029,15 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
         query_id = str(qr.get("query_id", qr.get("id", "")))
         query_plan = qr.get("query_plan")
         plan_fingerprint = qr.get("plan_fingerprint")
+        plan_fingerprint_normalized = qr.get("plan_fingerprint_normalized")
         capture_time = qr.get("plan_capture_time_ms")
 
         if query_plan is not None:
             plan_entry: dict[str, Any] = {}
             if plan_fingerprint:
                 plan_entry["fingerprint"] = plan_fingerprint
+            if plan_fingerprint_normalized:
+                plan_entry["fingerprint_normalized"] = plan_fingerprint_normalized
             if capture_time:
                 plan_entry["capture_time_ms"] = round(capture_time, 1)
 

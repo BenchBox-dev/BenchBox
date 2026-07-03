@@ -160,6 +160,38 @@ def _mask_literals(expression: str) -> str:
 
 logger = logging.getLogger(__name__)
 
+# Literal-normalization patterns for normalized plan fingerprints.
+# A normalized fingerprint collapses queries that differ only in literal
+# constants (e.g. TPC-H parameter substitutions) to the same hash by replacing
+# string/date literals and standalone numeric literals with a placeholder.
+_STRING_LITERAL_RE = re.compile(r"'(?:[^']|'')*'")
+# Match numeric literals that are standalone tokens. The negative lookbehind on
+# identifier characters keeps column names that embed digits intact (e.g. ``c1``,
+# ``l_orderkey``) while still collapsing real constants like ``1995`` or ``0.05``.
+# ``#`` is excluded too: DuckDB (and others) emit ordinal column references like
+# ``#0``/``#1`` for projected/grouped columns, and without this exclusion every
+# ordinal collapses to the same ``#?`` placeholder, hiding a genuine structural
+# change (a different column referenced) behind what looks like a literal.
+_NUMERIC_LITERAL_RE = re.compile(r"(?<![A-Za-z0-9_.$#])\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
+_LITERAL_PLACEHOLDER = "?"
+
+
+def _normalize_literal_text(text: str) -> str:
+    """Replace SQL literal constants in an expression string with a placeholder.
+
+    Used to compute literal-normalized plan fingerprints so that queries which
+    differ only in constant values share a fingerprint. String/date literals are
+    replaced first, then standalone numeric literals. Identifiers containing
+    digits are preserved because the numeric pattern only matches digits not
+    immediately preceded by an identifier character.
+    """
+    if not text:
+        return text
+    normalized = _STRING_LITERAL_RE.sub(_LITERAL_PLACEHOLDER, text)
+    normalized = _NUMERIC_LITERAL_RE.sub(_LITERAL_PLACEHOLDER, normalized)
+    return normalized
+
+
 # Track unknown operator types that have been logged to avoid log flooding
 _logged_unknown_operator_types: set[str] = set()
 _logged_unknown_join_types: set[str] = set()
@@ -449,7 +481,16 @@ class LogicalOperator:
         - Expressions compared as unordered sets: join_conditions, filter_expressions, aggregation_functions
         - Expressions with order significance: group_by_keys, sort_keys, projection_expressions
         - Numeric values included directly: limit_count, offset_count
+
+        Args:
+            normalize_literals: When True, literal constants embedded in expressions
+                (and the limit/offset counts) are replaced with a placeholder so
+                that plans which differ only in constant values collapse to the
+                same signature. Identifiers are preserved.
         """
+        # Local literal normalizer (identity when normalization is disabled).
+        norm = _normalize_literal_text if normalize_literals else (lambda value: value)
+
         # Build signature from structural elements only
         operator_type_str = get_operator_type_str(self.operator_type)
         signature_parts = [operator_type_str]
@@ -482,19 +523,19 @@ class LogicalOperator:
 
         # Aggregation functions - sorted for set-like semantics
         if self.aggregation_functions:
-            aggs_str = ",".join(sorted(self.aggregation_functions))
+            aggs_str = ",".join(sorted(norm(a) for a in self.aggregation_functions))
             signature_parts.append(f"aggs:{aggs_str}")
 
         # Group by keys - order preserved (affects output row grouping)
         if self.group_by_keys:
-            group_str = ",".join(self.group_by_keys)
+            group_str = ",".join(norm(g) for g in self.group_by_keys)
             signature_parts.append(f"group:{group_str}")
 
         # Sort keys - order preserved (affects output ordering)
         if self.sort_keys:
             # Sort keys is a list of dicts, convert to deterministic string
             # Sort items within each dict for consistent representation
-            sort_str = ",".join(str(sorted(sk.items())) for sk in self.sort_keys)
+            sort_str = ",".join(norm(str(sorted(sk.items()))) for sk in self.sort_keys)
             signature_parts.append(f"sort:{sort_str}")
 
         # Projection expressions - order preserved (affects output columns).
@@ -508,13 +549,15 @@ class LogicalOperator:
             proj_str = ",".join(projections)
             signature_parts.append(f"proj:{proj_str}")
 
-        # Limit count - affects result set size
+        # Limit count - affects result set size (a literal constant when normalizing)
         if self.limit_count is not None:
-            signature_parts.append(f"limit:{self.limit_count}")
+            limit_repr = _LITERAL_PLACEHOLDER if normalize_literals else self.limit_count
+            signature_parts.append(f"limit:{limit_repr}")
 
-        # Offset count - affects which rows are returned
+        # Offset count - affects which rows are returned (a literal constant when normalizing)
         if self.offset_count is not None:
-            signature_parts.append(f"offset:{self.offset_count}")
+            offset_repr = _LITERAL_PLACEHOLDER if normalize_literals else self.offset_count
+            signature_parts.append(f"offset:{offset_repr}")
 
         # Recursively include children signatures
         if self.children:

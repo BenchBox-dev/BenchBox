@@ -993,7 +993,9 @@ class ResultCaptureMixin:
 
         No-op when ``capture_plans`` is False or ``result["status"]`` is not
         ``"SUCCESS"``. On success, sets ``query_plan`` and ``plan_fingerprint`` when
-        a plan was parsed, and always records ``plan_capture_time_ms`` when measured.
+        a plan was parsed (plus ``plan_fingerprint_normalized`` when the adapter's
+        ``normalize_plan_literals`` option is enabled), and always records
+        ``plan_capture_time_ms`` when measured.
 
         Args:
             result: Result dict to mutate in place.
@@ -1020,6 +1022,8 @@ class ResultCaptureMixin:
         if query_plan:
             result["query_plan"] = query_plan
             result["plan_fingerprint"] = query_plan.plan_fingerprint
+            if getattr(self, "normalize_plan_literals", False):
+                result["plan_fingerprint_normalized"] = query_plan.normalized_fingerprint
         if plan_capture_time_ms is not None:
             result["plan_capture_time_ms"] = plan_capture_time_ms
 

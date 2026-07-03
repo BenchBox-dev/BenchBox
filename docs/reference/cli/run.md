@@ -355,6 +355,9 @@ These flags control monitoring, progress display, memory handling, and caching b
   (estimated) plan with no re-execution. Write statements are never re-executed regardless (DML
   stays on a non-`ANALYZE` `EXPLAIN`).
 
+- `--normalize-plan-literals`: In addition to the default fingerprint, record a literal-normalized fingerprint (`fingerprint_normalized` in the plans companion file) that collapses queries differing only in literal constants (e.g. parameter substitutions) to the same value. Requires `--capture-plans`; the default `fingerprint` is left unchanged.
+  - Example: `--capture-plans --normalize-plan-literals`
+
 - `--plan-config TEXT`: Fine-grained control over query plan capture
   - Format: comma-separated key:value pairs
   - Keys:

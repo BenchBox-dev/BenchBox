@@ -971,6 +971,8 @@ class ResultBuilder:
                 result_dict["query_plan"] = result.query_plan
             if result.plan_fingerprint is not None:
                 result_dict["plan_fingerprint"] = result.plan_fingerprint
+            if result.plan_fingerprint_normalized is not None:
+                result_dict["plan_fingerprint_normalized"] = result.plan_fingerprint_normalized
             if result.plan_capture_time_ms is not None:
                 result_dict["plan_capture_time_ms"] = result.plan_capture_time_ms
             if result.result_digest is not None:

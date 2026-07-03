@@ -138,6 +138,9 @@ class PlatformAdapter(
         # estimated-plan-only capture with no re-execution overhead.
         self.analyze_plans: bool = config.get("analyze_plans", True)
         self.strict_plan_capture = config.get("strict_plan_capture", False)
+        # When True, also record a literal-normalized plan fingerprint alongside
+        # the default fingerprint during plan capture (see --normalize-plan-literals).
+        self.normalize_plan_literals = config.get("normalize_plan_literals", False)
         self.plan_capture_timeout_seconds = int(config.get("plan_capture_timeout_seconds", 30))
         # Plan capture query selection. plan_query_filter restricts capture to an
         # explicit set of query ids; it is orthogonal to the retired per-iteration /
@@ -465,6 +468,8 @@ class PlatformAdapter(
             self.analyze_plans = bool(run_config.get("analyze_plans"))
         if "strict_plan_capture" in run_config:
             self.strict_plan_capture = bool(run_config.get("strict_plan_capture"))
+        if "normalize_plan_literals" in run_config:
+            self.normalize_plan_literals = bool(run_config.get("normalize_plan_literals"))
         if "plan_capture_timeout_seconds" in run_config:
             self.plan_capture_timeout_seconds = int(run_config.get("plan_capture_timeout_seconds"))
 

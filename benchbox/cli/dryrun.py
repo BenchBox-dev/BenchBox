@@ -47,6 +47,7 @@ def generate_cli_command(
     analyze_plans: bool | None = None,
     show_plans: bool = False,
     strict_translation: bool = False,
+    normalize_plan_literals: bool = False,
     validation: str | None = None,
     verbose: int = 0,
     platform_options: dict[str, str] | None = None,
@@ -79,6 +80,7 @@ def generate_cli_command(
         official: TPC-compliant mode
         capture_plans: Capture query execution plans
         strict_translation: Fail when SQL dialect translation falls back
+        normalize_plan_literals: Also record a literal-normalized plan fingerprint
         validation: Validation mode (exact, loose, range, disabled, full)
         verbose: Verbosity level (0=off, 1=-v, 2=-vv)
         platform_options: Platform-specific key=value options
@@ -146,6 +148,7 @@ def generate_cli_command(
         (capture_plans, "--capture-plans"),
         (show_plans, "--show-plans"),
         (strict_translation, "--strict-translation"),
+        (normalize_plan_literals, "--normalize-plan-literals"),
         (global_cache, "--global-cache"),
         (publish, "--publish"),
     ]

@@ -67,12 +67,15 @@ class _CapturedPlan(NamedTuple):
     pre-mutation checkpoint and the final post-measurement pass can each contribute
     plans that are attached to result rows exactly once. ``plan`` is ``None`` when
     capture failed or the query was filtered out; ``capture_ms`` is recorded even
-    then so plan-capture timing is reported honestly.
+    then so plan-capture timing is reported honestly. ``normalized_fingerprint`` is
+    only populated when the adapter's ``normalize_plan_literals`` option is enabled
+    (see --normalize-plan-literals); otherwise it stays ``None``.
     """
 
     plan: Any
     fingerprint: str | None
     capture_ms: float | None
+    normalized_fingerprint: str | None = None
 
 
 class TestDriversMixin:
@@ -1262,6 +1265,7 @@ class TestDriversMixin:
                 plan=phase.plans.get(capture_key),
                 fingerprint=phase.fingerprints.get(capture_key),
                 capture_ms=phase.per_query_capture_ms.get(capture_key),
+                normalized_fingerprint=phase.normalized_fingerprints.get(capture_key),
             )
 
     def _attach_captured_plans(self, results: list[dict[str, Any]]) -> None:
@@ -1304,6 +1308,8 @@ class TestDriversMixin:
                 entry.plan.query_id = query_id
                 result["query_plan"] = entry.plan
                 result["plan_fingerprint"] = entry.fingerprint
+                if entry.normalized_fingerprint is not None:
+                    result["plan_fingerprint_normalized"] = entry.normalized_fingerprint
             if entry.capture_ms is not None:
                 result["plan_capture_time_ms"] = entry.capture_ms
 

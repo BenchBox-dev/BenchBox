@@ -707,6 +707,7 @@ def _build_run_config_from_options(
         capture_plans=benchmark_config.capture_plans,
         analyze_plans=getattr(benchmark_config, "analyze_plans", None),
         strict_plan_capture=benchmark_config.strict_plan_capture,
+        normalize_plan_literals=bool(options.get("normalize_plan_literals", False)),
         table_format=table_format,
         table_format_compression=str(options.get("table_format_compression", "snappy") or "snappy"),
         table_format_partition_cols=_parse_partition_cols(options.get("table_format_partition_cols")),

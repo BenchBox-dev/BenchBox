@@ -20,6 +20,7 @@ from benchbox.core.results.query_plan_models import (
     LogicalOperatorType,
     PhysicalOperator,
     QueryPlanDAG,
+    _normalize_literal_text,
     compute_plan_fingerprint,
 )
 
@@ -1168,6 +1169,94 @@ class TestFingerprintCoverage:
         )
 
         assert plan1.plan_fingerprint != plan2.plan_fingerprint
+
+
+class TestLiteralNormalization:
+    """Test the normalize_literals structural-signature / fingerprint option."""
+
+    def test_numeric_and_string_literals_are_masked(self) -> None:
+        assert _normalize_literal_text("l_quantity > 24") == "l_quantity > ?"
+        assert _normalize_literal_text("c_name = 'ALICE'") == "c_name = ?"
+
+    def test_ordinal_column_references_are_preserved(self) -> None:
+        """DuckDB (and others) emit ordinal refs like #0/#1 for projected/grouped
+        columns. Without excluding '#' from the numeric-literal lookbehind, every
+        ordinal collapses to the same '#?' placeholder, so plans that group/sort/
+        project DIFFERENT columns would spuriously fingerprint identically."""
+        assert _normalize_literal_text("#0") == "#0"
+        assert _normalize_literal_text("#1") == "#1"
+        assert _normalize_literal_text("group by #0, #1") == "group by #0, #1"
+        # A genuine numeric literal alongside an ordinal ref is still masked.
+        assert _normalize_literal_text("#0 > 24") == "#0 > ?"
+
+    def test_normalize_literals_distinguishes_different_ordinal_refs(self) -> None:
+        """End-to-end: two plans referencing different ordinal columns must NOT
+        collapse to the same normalized fingerprint."""
+        plan_col0 = QueryPlanDAG(
+            query_id="q1",
+            platform="duckdb",
+            logical_root=LogicalOperator(
+                operator_id="agg_1",
+                operator_type=LogicalOperatorType.AGGREGATE,
+                group_by_keys=["#0"],
+                children=[
+                    LogicalOperator(operator_id="scan_1", operator_type=LogicalOperatorType.SCAN, table_name="orders"),
+                ],
+            ),
+        )
+        plan_col1 = QueryPlanDAG(
+            query_id="q2",
+            platform="duckdb",
+            logical_root=LogicalOperator(
+                operator_id="agg_1",
+                operator_type=LogicalOperatorType.AGGREGATE,
+                group_by_keys=["#1"],
+                children=[
+                    LogicalOperator(operator_id="scan_1", operator_type=LogicalOperatorType.SCAN, table_name="orders"),
+                ],
+            ),
+        )
+
+        assert plan_col0.compute_plan_fingerprint(normalize_literals=True) != plan_col1.compute_plan_fingerprint(
+            normalize_literals=True
+        )
+
+    def test_normalize_literals_collapses_only_constant_differences(self) -> None:
+        """Plans differing only in a literal constant DO collapse under normalization,
+        while the default (literal-sensitive) fingerprint still distinguishes them."""
+        plan_a = QueryPlanDAG(
+            query_id="q1",
+            platform="duckdb",
+            logical_root=LogicalOperator(
+                operator_id="filter_1",
+                operator_type=LogicalOperatorType.FILTER,
+                filter_expressions=["l_quantity > 24"],
+                children=[
+                    LogicalOperator(
+                        operator_id="scan_1", operator_type=LogicalOperatorType.SCAN, table_name="lineitem"
+                    ),
+                ],
+            ),
+        )
+        plan_b = QueryPlanDAG(
+            query_id="q2",
+            platform="duckdb",
+            logical_root=LogicalOperator(
+                operator_id="filter_1",
+                operator_type=LogicalOperatorType.FILTER,
+                filter_expressions=["l_quantity > 30"],
+                children=[
+                    LogicalOperator(
+                        operator_id="scan_1", operator_type=LogicalOperatorType.SCAN, table_name="lineitem"
+                    ),
+                ],
+            ),
+        )
+
+        assert plan_a.plan_fingerprint != plan_b.plan_fingerprint
+        assert plan_a.compute_plan_fingerprint(normalize_literals=True) == plan_b.compute_plan_fingerprint(
+            normalize_literals=True
+        )
 
 
 class TestFingerprintVerification:

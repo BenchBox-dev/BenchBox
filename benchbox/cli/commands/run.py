@@ -650,10 +650,21 @@ def _platform_option_config_entries(s: types.SimpleNamespace) -> dict[str, Any]:
     return entries
 
 
-def _strict_translation_config_entry(s: types.SimpleNamespace) -> dict[str, bool]:
-    if not getattr(s, "strict_translation", False):
-        return {}
-    return {"strict_translation": True}
+def _strict_translation_config_entry(s: types.SimpleNamespace) -> dict[str, Any]:
+    entries: dict[str, Any] = {"normalize_plan_literals": s.normalize_plan_literals}
+    if getattr(s, "strict_translation", False):
+        entries["strict_translation"] = True
+    return entries
+
+
+def _plan_capture_override_entries(s: types.SimpleNamespace) -> dict[str, Any]:
+    return {
+        "capture_plans": s.capture_plans,
+        "strict_plan_capture": s.strict_plan_capture,
+        "plan_queries": s.plan_queries,
+        "normalize_plan_literals": s.normalize_plan_literals,
+        "execution_mode": s.resolved_mode,
+    }
 
 
 def _validate_non_interactive(s: types.SimpleNamespace) -> None:
@@ -1322,10 +1333,7 @@ def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManag
         **s.verbosity_payload,
         "tuning_enabled": s.tuning_enabled,
         "force_upload": bool(s.force_upload),
-        "capture_plans": s.capture_plans,
-        "strict_plan_capture": s.strict_plan_capture,
-        "plan_queries": s.plan_queries,
-        "execution_mode": s.resolved_mode,
+        **_plan_capture_override_entries(s),
     }
     if s.loaded_unified_config:
         overrides["unified_tuning_configuration"] = s.loaded_unified_config
@@ -1382,10 +1390,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         "show_query_plans": s.show_query_plans,
         "tuning_enabled": s.tuning_enabled,
         "force_upload": bool(s.force_upload),
-        "capture_plans": s.capture_plans,
-        "strict_plan_capture": s.strict_plan_capture,
-        "plan_queries": s.plan_queries,
-        "execution_mode": s.resolved_mode,
+        **_plan_capture_override_entries(s),
     }
     if s.loaded_unified_config:
         overrides["unified_tuning_configuration"] = s.loaded_unified_config
@@ -1603,10 +1608,7 @@ def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: Database
         "force_recreate": s.force_regenerate,
         "tuning_enabled": s.tuning_enabled,
         "force_upload": bool(s.force_upload),
-        "capture_plans": s.capture_plans,
-        "strict_plan_capture": s.strict_plan_capture,
-        "plan_queries": s.plan_queries,
-        "execution_mode": s.resolved_mode,
+        **_plan_capture_override_entries(s),
     }
     if s.loaded_unified_config:
         overrides["unified_tuning_configuration"] = s.loaded_unified_config
@@ -2606,6 +2608,15 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     default=None,
     help="Plan capture config: queries:1,6,17,strict:true (capture is once-per-query; use --analyze-plans for detail)",
 )
+@advanced_option(
+    "--normalize-plan-literals",
+    "normalize_plan_literals",
+    is_flag=True,
+    help=(
+        "Also record a literal-normalized fingerprint (plan_fingerprint_normalized) so queries "
+        "differing only in literal constants collapse to the same value. Requires --capture-plans."
+    ),
+)
 # Compression
 @advanced_option(
     "--compression",
@@ -2732,6 +2743,7 @@ def run(
     show_plans: bool,
     strict_translation: bool,
     plan_config: PlanCaptureConfig | None,
+    normalize_plan_literals: bool,
     compression: CompressionConfig | None,
     table_format: TableFormatConfig | None,
     presort: str | None,
@@ -2791,6 +2803,7 @@ def run(
         show_plans=show_plans,
         strict_translation=strict_translation,
         plan_config=plan_config,
+        normalize_plan_literals=normalize_plan_literals,
         compression=compression,
         table_format=table_format,
         presort=presort,
