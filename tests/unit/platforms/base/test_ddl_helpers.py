@@ -130,6 +130,14 @@ class TestStripPrimaryKeys:
         assert "PRIMARY KEY" not in result.upper()
         assert ",)" not in result
 
+    def test_table_level_pk_first_does_not_leave_leading_comma(self):
+        sql = "CREATE TABLE t (PRIMARY KEY (a), a INT)"
+        result = strip_primary_keys(sql)
+        assert result == "CREATE TABLE t (a INT)"
+
+    def test_comment_literal_primary_key_limitation_is_documented(self):
+        assert "string-literal false positive" in (strip_primary_keys.__doc__ or "")
+
 
 # ---------------------------------------------------------------------------
 # strip_foreign_keys (regression — ensure w4 fix still holds)

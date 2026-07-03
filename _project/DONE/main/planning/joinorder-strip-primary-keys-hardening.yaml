@@ -2,7 +2,7 @@ id: joinorder-strip-primary-keys-hardening
 title: "ddl_helpers: harden strip_primary_keys against leading-comma and string-literal edge cases"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
 category: Core Functionality
 
 description: |
@@ -33,14 +33,14 @@ description: |
 work:
   - id: w1
     summary: "Clean a leading comma after the opening paren in strip_primary_keys"
-    status: pending
+    status: done
     notes: |
       Add a post-removal cleanup for `(<ws>,` -> `(` alongside the existing
       trailing-comma cleanup (ddl_helpers.py:~164), symmetric with
       _TRAILING_COMMA_RE. Keep it minimal.
   - id: w2
     summary: "Document the string-literal limitation on strip_primary_keys"
-    status: pending
+    status: done
     notes: |
       Add the same not-SQL-string-aware caveat the FK helper already carries
       (ddl_helpers.py:72-80). Do NOT attempt a full SQL parser; a docstring
@@ -48,7 +48,7 @@ work:
   - id: w3
     summary: "Add regression tests for both edge cases"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       In tests/unit/platforms/base/test_ddl_helpers.py: PK-first-in-paren yields
       valid SQL (no leading comma); a COMMENT literal containing 'PRIMARY KEY' is

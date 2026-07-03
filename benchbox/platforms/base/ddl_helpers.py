@@ -106,6 +106,7 @@ def strip_foreign_keys(stmt: str) -> str:
 _CONSTRAINT_PREFIX = r"(?:CONSTRAINT\s+[`\"\w]+\s+)?"
 _TABLE_PK_RE = re.compile(rf",?\s*{_CONSTRAINT_PREFIX}PRIMARY\s+KEY\s*\(", re.IGNORECASE)
 _INLINE_PK_RE = re.compile(rf"\s+{_CONSTRAINT_PREFIX}PRIMARY\s+KEY\b", re.IGNORECASE)
+_LEADING_COMMA_RE = re.compile(r"(\()\s*,\s*")
 
 
 def strip_primary_keys(stmt: str) -> str:
@@ -125,6 +126,14 @@ def strip_primary_keys(stmt: str) -> str:
 
     Non-CREATE-TABLE statements and statements with no PRIMARY KEY keyword
     pass through unchanged.
+
+    Limitation - string-literal false positive:
+        The regexes are not SQL-string-aware. If a CREATE TABLE statement
+        contains the token ``PRIMARY KEY`` inside a string literal (for example
+        a column ``COMMENT``), that substring can be matched and stripped. All
+        current callers invoke this helper from benchmark CREATE TABLE
+        pipelines and no benchmark schema in the suite uses such literals, so
+        production exposure is zero.
 
     Args:
         stmt: A single SQL statement string.
@@ -162,6 +171,8 @@ def strip_primary_keys(stmt: str) -> str:
 
     # Clean up trailing commas before closing paren
     result = _TRAILING_COMMA_RE.sub(r"\1", result)
+    # Clean up leading commas after opening paren
+    result = _LEADING_COMMA_RE.sub(r"\1", result)
 
     return result
 
