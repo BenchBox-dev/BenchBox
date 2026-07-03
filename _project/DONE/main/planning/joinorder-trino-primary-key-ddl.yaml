@@ -59,7 +59,7 @@ verification:
     command: "uv run -- python -m pytest tests/unit/platforms/base/test_ddl_helpers.py -q"
     expected_output: "passes"
   - description: "TODO graph remains valid"
-    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/TODO/main/planning/joinorder-trino-primary-key-ddl.yaml"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/DONE/main/planning/joinorder-trino-primary-key-ddl.yaml"
     expected_output: "passes"
 
 prior_art:
@@ -86,7 +86,7 @@ scope_limit:
   only_modify:
     - "benchbox/platforms/trino.py"
     - "tests/unit/platforms/test_trino_adapter.py"
-    - "_project/TODO/main/planning/joinorder-trino-primary-key-ddl.yaml"
+    - "_project/DONE/main/planning/joinorder-trino-primary-key-ddl.yaml"
 
 metadata:
   tags:
