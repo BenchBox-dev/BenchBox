@@ -112,16 +112,20 @@ Stats phase gate: dependency:track2-joinorder-stats-phase
 
 | Option | Correlation fidelity | Impl. cost | Validation oracle | Stats-stress value | User-mislead risk |
 | --- | --- | --- | --- | --- | --- |
-| Offset replication of canonical IMDb (`replicated_imdb`) | Real correlations preserved within each replica | Low | Canonical oracle × replica count | Medium (stale-stats axis, modest predicate drift) | Low if labeled |
+| Offset replication of canonical IMDb (`replicated_imdb`) | Real correlations preserved within each replica | Low | Canonical final-result oracle unchanged; underlying/join-subgraph cardinalities × replica count | Medium (stale-stats axis, modest predicate drift) | Low if labeled |
 | Predicate-preserving augmentation | Real backbone, synthetic tail | Medium | Partial (synthetic part unverifiable) | Medium | Medium |
 | Profiled graph expansion (`expanded_imdb`) | Modeled, can destroy JOB signal | High | Weak | High if correct | High |
 | Parameterized JOB-like generation (`parameterized_imdb`) | Real data, sampled predicates | Medium | Per-generated-query oracle needed | High | Medium |
 | Newer real IMDb snapshot | Real, but not the JOB-paper dataset | Medium | None vs literature | Medium | High (looks canonical) |
 
 Offset replication is the lowest-risk first step: it preserves real intra-replica
-correlations, reuses the canonical oracle (reference cardinalities scale by the
-replica count for the subset of queries whose predicates do not cross replica
-boundaries), and exercises a stale-statistics axis without inventing correlations.
+correlations, reuses the canonical final-result oracle (the 113 JOB queries are
+scalar `MIN(...)` aggregates and therefore still return one aggregate row with
+the same value under value-identical offset replication), and exercises a
+stale-statistics axis without inventing correlations. The cardinalities that
+scale by the replica count are the underlying predicate-match counts and the
+important join-subgraph cardinalities used as measurement gates, not the final
+query-result row count or aggregate value.
 Its limitation — predicate selectivity drift is bounded because replicas are
 disjoint — is acceptable for a baseline and is explicitly documented rather than
 hidden. Offset replication is **not** chosen merely because it is easiest; it is
@@ -164,9 +168,10 @@ they publish under separate result labels.
 Recommendation: replicated_imdb baseline only
 
 Rationale: offset replication is the only option that (a) preserves real
-correlations, (b) reuses the canonical oracle for validation, and (c) exposes a
-genuine statistics-maintenance axis (stale stats after loading additional
-replicas), all at low implementation cost and low user-mislead risk when labeled.
+correlations, (b) reuses the canonical final-result oracle for validation, and
+(c) exposes a genuine statistics-maintenance axis (stale stats after loading
+additional replicas), all at low implementation cost and low user-mislead risk
+when labeled.
 It explicitly rejects **profiled graph expansion** for the first prototype:
 synthetic correlations can look plausible while destroying the very JOB signal the
 benchmark exists to measure, and graph expansion has no independent validation
@@ -175,14 +180,13 @@ literature comparability while *looking* canonical.
 
 Smallest next prototype and its verification criteria
 (`_project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml`,
-currently quiescent — status "Not Started", no in-progress work units, so this
-framework does not mutate it; the prototype owner wires the stats-phase dependency
-at its next checkpoint once `track2-joinorder-stats-phase` exists):
+currently quiescent — status "Not Started", no in-progress work units; the
+stats-phase dependency is recorded before any prototype coding starts):
 
 - Offset-replicate canonical IMDb at SF=2 with consistent PK/FK offsetting.
-- Validate via the canonical oracle scaled by replica count plus the full
+- Validate via the unchanged canonical final-result oracle plus the full
   validation-gate list above (FK integrity, predicate-domain frequencies,
-  cardinalities, q-error where available).
+  underlying and join-subgraph cardinalities, q-error where available).
 - Run the fixed 113 queries; report load, statistics, planning, and execution
   time as separate phases.
 - Gate: prototype must depend on `track2-joinorder-stats-phase` before any
