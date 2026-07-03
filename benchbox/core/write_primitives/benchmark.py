@@ -477,7 +477,9 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 # Table missing entirely (never created) is the same "unavailable" case.
                 row_count = 0
             if row_count == 0:
-                return f"staging table '{table_name}' is empty (source data was unavailable at setup): {capability_note}"
+                return (
+                    f"staging table '{table_name}' is empty (source data was unavailable at setup): {capability_note}"
+                )
         return None
 
     def _check_bulk_load_file_dependencies(self, operation: Any) -> str | None:

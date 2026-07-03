@@ -1630,9 +1630,7 @@ def test_get_effective_write_sql_runs_scd2_when_customer_staging_is_populated(fa
     operation = fast_bench.get_operation("merge_scd_type2_basic")
     populated_connection = _FakeCountConnection({"scd2_ops_dim_customer": 40, "scd2_ops_stage_customer": 10})
 
-    sql, skip = fast_bench._get_effective_write_sql(
-        operation, platform_key="duckdb", connection=populated_connection
-    )
+    sql, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb", connection=populated_connection)
 
     assert skip is None
     assert sql == operation.write_sql
