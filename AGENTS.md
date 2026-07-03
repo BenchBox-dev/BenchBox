@@ -41,6 +41,20 @@ guarded command. State the exception in the final response.
 through `uv run -- ...`. Do not use destructive git/filesystem commands or live
 cloud tests without explicit approval.
 
+## Apple container Linux CI parity
+
+Apple silicon + macOS 26 only. On macOS `make test-correctness-gate` FAILS on a
+correct tree -- DuckDB 1.3.2 emits different TPC-H Q2/Q10/Q15 value digests on
+macOS vs Linux and the pinned references are Linux-generated -- so validate that
+soundness gate (and other Linux-only behavior) pre-PR inside Apple `container`.
+One-time: `brew install container && container system start`; `container build
+--arch arm64 --tag local/benchbox-agent docker/benchbox-agent`; `container
+machine create local/benchbox-agent --name benchbox-agent --home-mount rw --cpus
+4 --memory 8G`. Then `make ci-linux` runs the gate inside the home-mounted
+machine (worktree visible at its Mac path); override via `CI_LINUX_CMD='make
+ci-local'`. The dev env syncs on first `uv run` (needs ample free disk). No-op
+off Apple-silicon/macOS-26; never a CI/pr-open dependency.
+
 ## Output Discipline
 
 Broad commands are final gates. Long output is an artifact, not chat, and

@@ -817,6 +817,41 @@ ci-local:
 	@echo "✅ All CI checks passed!"
 	@echo "========================================"
 
+# --- Apple container Linux CI-parity sandbox (opt-in; Apple silicon + macOS 26) ---
+# Reproduce the Linux pr.yml gate locally inside a `container machine`. Motivated by a
+# MEASURED macOS<->Linux divergence: on identical DuckDB 1.3.2/arm64, TPC-H Q2/Q10/Q15
+# value digests differ, so `make test-correctness-gate` FAILS on a correct tree on Apple
+# silicon (the pinned digest references are Linux-generated). This wrapper is the only way
+# to validate that soundness gate pre-PR from a Mac. Purely additive and opt-in: a no-op on
+# non-Apple-silicon / non-macOS-26 hosts, and NEVER a CI or pr-open dependency. One-time
+# setup + usage: AGENTS.md "Apple container Linux CI parity". Override the gate with
+# `make ci-linux CI_LINUX_CMD='make ci-local'`.
+CI_LINUX_MACHINE ?= benchbox-agent
+CI_LINUX_CMD ?= make test-correctness-gate
+.PHONY: ci-linux
+ci-linux:
+	@if [ "$$(uname -s)" != "Darwin" ] || [ "$$(uname -m)" != "arm64" ]; then \
+		echo "ci-linux: skipped -- Apple silicon macOS only (host $$(uname -s)/$$(uname -m)); no-op."; \
+		exit 0; \
+	fi; \
+	if [ "$$(sw_vers -productVersion | cut -d. -f1)" -lt 26 ]; then \
+		echo "ci-linux: skipped -- needs macOS 26+ (host $$(sw_vers -productVersion)); no-op."; \
+		exit 0; \
+	fi; \
+	if ! command -v container >/dev/null 2>&1; then \
+		echo "ci-linux: Apple 'container' not installed -> 'brew install container' (see AGENTS.md)."; \
+		exit 1; \
+	fi; \
+	if ! container machine list 2>/dev/null | awk 'NR>1{print $$1}' | grep -Fqx "$(CI_LINUX_MACHINE)"; then \
+		echo "ci-linux: machine '$(CI_LINUX_MACHINE)' not found. One-time setup (see AGENTS.md):"; \
+		echo "  container system start"; \
+		echo "  container build --arch arm64 --tag local/benchbox-agent docker/benchbox-agent"; \
+		echo "  container machine create local/benchbox-agent --name $(CI_LINUX_MACHINE) --home-mount rw --cpus 4 --memory 8G"; \
+		exit 1; \
+	fi; \
+	echo "==> ci-linux: '$(CI_LINUX_CMD)' inside container machine '$(CI_LINUX_MACHINE)'"; \
+	container machine run -n $(CI_LINUX_MACHINE) -- bash -lc 'cd "$(CURDIR)" && $(CI_LINUX_CMD)'
+
 # Type checking
 typecheck:
 	uv run ty check
@@ -2053,6 +2088,7 @@ help:
 	@echo "  make ci-lint         Lint + format check + type check (matches lint.yml)"
 	@echo "  make ci-test         Fast tests with coverage (matches test.yml)"
 	@echo "  make ci-docs         Build documentation (matches docs.yml)"
+	@echo "  make ci-linux        Reproduce the Linux pr.yml gate in Apple container (Apple silicon, opt-in)"
 	@echo "  make test-integration-smoke  Integration smoke tests"
 	@echo "  make test-package    Build and test package installation"
 	@echo "  make security-audit  Run pip-audit security check"
