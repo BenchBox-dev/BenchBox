@@ -2,7 +2,7 @@ id: joinorder-canonical-validation-test-coverage
 title: "test(joinorder): FK-integrity, full-archive cardinality, and encoding assertions for canonical data"
 worktree: main
 priority: Medium
-status: Not Started
+status: Blocked
 category: Testing and Quality Assurance
 
 description: |
@@ -42,20 +42,36 @@ description: |
   dangling set durable, reviewed, and re-runnable, or split that prerequisite
   into its own TODO.
 
+  Triage re-verification (2026-07-03, Track-2 review triage): all three gaps
+  (a/b/c) re-confirmed against develop. HOWEVER, implementation is currently
+  BLOCKED: the canonical archive is not downloadable -- the manifest URL
+  returns 404 because no GitHub Release exists at tag
+  data/joinorder-imdb-2013-v1 (see
+  joinorder-canonical-release-asset-restore). Full-archive tests must be
+  authored AND executed against the real archive before committing (the
+  reference cardinalities come from a PostgreSQL 16.2 oracle; DuckDB
+  agreement at full scale is asserted, not assumed, and w3's pinned
+  fidelity values can only be derived from the archive itself). w0's
+  prerequisite is split into joinorder-fk-allowed-dangling-artifact per its
+  own instruction; both new items are now deps.
+
 deps:
   needs:
     - joinorder-canonical-cutover
+    - joinorder-canonical-release-asset-restore
+    - joinorder-fk-allowed-dangling-artifact
 
 work:
   - id: w0
     summary: "Pin or create a durable source for legitimate full-archive dangling FKs"
-    status: pending
+    status: done
     notes: |
-      Before w2, verify whether a committed allowed-dangling set already exists.
-      Current re-review found only build-time FK closure machinery, not a
-      durable full-archive allowed-dangling artifact. If none exists, create a
-      prerequisite TODO to generate and review that compact artifact/helper; do
-      not hand-derive FK exceptions inside the integration test.
+      Done 2026-07-03: verified no committed allowed-dangling set exists
+      (searched _project/joinorder/ and the build pipeline; only tiny-fixture
+      FK closure machinery at build_joinorder_data.py:2651). Created the
+      prerequisite TODO joinorder-fk-allowed-dangling-artifact to generate and
+      review that artifact; it is now in this item's deps.needs and w2 must
+      source the allowed set from its committed artifact.
   - id: w1
     summary: "Add an opt-in full-archive cardinality test against reference_cardinalities.json"
     status: pending
