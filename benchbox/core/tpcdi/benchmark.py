@@ -2740,7 +2740,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 # Register benchmark-specific CLI option specs
 # ---------------------------------------------------------------------------
 
-from benchbox.cli.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
     parse_bool,

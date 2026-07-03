@@ -32,6 +32,73 @@ class TestVersionConsistency:
         assert "mismatch" in result.message.lower()
         assert result.sources["pyproject.toml"] == "9.9.9"
 
+    def test_init_source_reads_the_literal_statically(self):
+        """The "benchbox.__init__" source must be the __version__ literal
+        read from the benchbox/__init__.py source file (the value
+        scripts/update_version.py bumps at release cut and benchbox.__version__
+        exposes at runtime), read without importing the package root.
+        """
+        import benchbox
+
+        literal = version_utils.get_init_version()
+
+        assert literal is not None
+        assert literal == benchbox.__version__
+
+        result = version_utils.check_version_consistency()
+        assert result.sources["benchbox.__init__"] == literal
+
+    def test_check_version_consistency_detects_init_literal_drift(self, monkeypatch):
+        """A stale __version__ literal in benchbox/__init__.py (the exact
+        drift class that shipped the 0.3.0 wheel with __version__ = "0.2.1")
+        must flip the check to inconsistent.
+
+        Documentation sources are stubbed out so this stays a hermetic unit
+        test of the init-literal drift path, independent of the working
+        tree's README/doc release-marker state.
+        """
+
+        monkeypatch.setattr(version_utils, "_collect_documentation_versions", dict)
+        monkeypatch.setattr(version_utils, "get_init_version", lambda: "0.0.0")
+
+        result = version_utils.check_version_consistency()
+
+        assert not result.consistent
+        assert "mismatch" in result.message.lower()
+        assert result.sources["benchbox.__init__"] == "0.0.0"
+
+    def test_installed_dist_is_a_distinct_checked_source(self, monkeypatch):
+        """Installed dist metadata participates in consistency checking as
+        its own source, so dist-metadata drift (e.g. stale editable install)
+        is caught too."""
+
+        result = version_utils.check_version_consistency()
+        assert "installed-dist" in result.sources
+
+        monkeypatch.setattr(version_utils, "get_installed_dist_version", lambda: "8.8.8")
+        drifted = version_utils.check_version_consistency()
+
+        assert not drifted.consistent
+        assert "installed-dist" in drifted.mismatched_sources
+
+    def test_missing_installed_dist_is_not_an_inconsistency(self, monkeypatch):
+        """A bare source checkout without any installed benchbox dist is a
+        legitimate state: "installed-dist" being None must not flip the
+        check to inconsistent or appear in missing_sources.
+
+        Documentation sources are stubbed out so this stays a hermetic unit
+        test of the installed-dist exemption, independent of the working
+        tree's README/doc release-marker state.
+        """
+
+        monkeypatch.setattr(version_utils, "_collect_documentation_versions", dict)
+        monkeypatch.setattr(version_utils, "get_installed_dist_version", lambda: None)
+
+        result = version_utils.check_version_consistency()
+
+        assert result.consistent, result.message
+        assert "installed-dist" not in result.missing_sources
+
 
 @pytest.mark.unit
 class TestVersionCompatibility:

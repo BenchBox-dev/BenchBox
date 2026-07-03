@@ -122,6 +122,31 @@ class TestBenchmarkOptionSpec:
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True, scope="module")
+def _register_real_benchmark_specs():
+    """Import every benchmark module whose registry specs this file reads,
+    BEFORE the per-test `_clean_registry` snapshot below is first taken.
+
+    Module-level hook registration only runs once per interpreter (sys.modules
+    caching), while `_clean_registry` restores a pre-test registry snapshot
+    after every test. If a benchmark module is first imported INSIDE a test
+    body, its registration is wiped by that test's restore and can never
+    re-run - so any later test reading the same benchmark's specs fails
+    (e.g. TestRealBenchmarkSpecs::test_nyctaxi_taxi_types_parser, KeyError
+    'taxi_types'). Previously `import benchbox` eagerly imported some of
+    these modules (nyctaxi, tsbs_devops, tpch_skew), masking the problem;
+    NYCTaxi is now lazy (break-root-import-cycle w5), and joinorder/
+    vector_search were always lazy with the same latent hazard. Importing
+    them all here, module-scoped (runs before any function-scoped autouse
+    fixture), guarantees every snapshot/restore cycle includes their specs.
+    """
+    import benchbox.core.joinorder.benchmark  # noqa: F401
+    import benchbox.core.nyctaxi.benchmark  # noqa: F401
+    import benchbox.core.tpch_skew.benchmark  # noqa: F401
+    import benchbox.core.tsbs_devops.benchmark  # noqa: F401
+    import benchbox.core.vector_search.benchmark  # noqa: F401
+
+
 @pytest.fixture(autouse=True)
 def _clean_registry():
     """Save and restore registry state around each test."""

@@ -37,7 +37,7 @@ __all__ = [
 
 # Register CLI platform options
 try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry, PlatformOptionSpec
+    from benchbox.core.hooks.platform_hooks import PlatformHookRegistry, PlatformOptionSpec
 
     PlatformHookRegistry.register_option_specs(
         "influxdb",

@@ -590,7 +590,7 @@ def _make_lazy_config_builder(module_path: str, builder_name: str):
 
 
 try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry, PlatformOptionSpec, parse_bool
+    from benchbox.core.hooks.platform_hooks import PlatformHookRegistry, PlatformOptionSpec, parse_bool
 
     def _spec(name: str, help_text: str, **kwargs) -> PlatformOptionSpec:
         return PlatformOptionSpec(name=name, help=help_text, **kwargs)

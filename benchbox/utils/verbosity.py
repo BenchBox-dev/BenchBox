@@ -8,11 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-try:
-    from benchbox.utils.version import check_version_consistency, format_version_report
-except ImportError:  # pragma: no cover - optional dependency during bootstrapping
-    format_version_report = None
-    check_version_consistency = None
+from benchbox.utils.version import check_version_consistency, format_version_report
 
 
 @dataclass(frozen=True)

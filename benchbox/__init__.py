@@ -11,14 +11,10 @@ from importlib import import_module
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union
 
-# __version__ must be defined before `from . import platforms` because the
-# platforms import chain can circle back to benchbox.cli.app which reads
-# benchbox.__version__ at module level.
 __version__ = "0.2.1"
 
 from benchbox.base import BaseBenchmark
 from benchbox.flightdata import FlightData
-from benchbox.nyctaxi import NYCTaxi
 from benchbox.tpcds import TPCDS
 from benchbox.tpch import TPCH
 from benchbox.tpch_skew import TPCHSkew
@@ -51,7 +47,7 @@ if TYPE_CHECKING:
     from benchbox.coffeeshop import CoffeeShop
     from benchbox.h2odb import H2ODB
     from benchbox.joinorder import JoinOrder
-    from benchbox.nyctaxi import NYCTaxi as NYCTaxi_  # noqa: F401
+    from benchbox.nyctaxi import NYCTaxi
     from benchbox.read_primitives import ReadPrimitives
     from benchbox.ssb import SSB
     from benchbox.tpcdi import TPCDI
@@ -80,6 +76,7 @@ _BENCHMARK_REGISTRY: dict[str, _BenchmarkSpec] = {
     "WritePrimitives": _BenchmarkSpec("write_primitives", "WritePrimitives", ()),
     "TransactionPrimitives": _BenchmarkSpec("transaction_primitives", "TransactionPrimitives", ()),
     "JoinOrder": _BenchmarkSpec("joinorder", "JoinOrder", ("joinorder",)),
+    "NYCTaxi": _BenchmarkSpec("nyctaxi", "NYCTaxi", ()),
     "CoffeeShop": _BenchmarkSpec("coffeeshop", "CoffeeShop", ("coffeeshop",)),
     "DataVault": _BenchmarkSpec("datavault", "DataVault", ()),
     "TPCDSOBT": _BenchmarkSpec("tpcds_obt", "TPCDSOBT", ()),

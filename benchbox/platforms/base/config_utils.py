@@ -184,7 +184,7 @@ def make_registered_platform_config_builder(
         **kwargs,
     )
     try:
-        from benchbox.cli.platform_hooks import PlatformHookRegistry
+        from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
 
         PlatformHookRegistry.register_config_builder(registry_platform, builder)
     except ImportError:

@@ -2,7 +2,8 @@ id: relocate-cli-hook-registries
 title: "Relocate benchmark_hooks/platform_hooks registries out of benchbox.cli to fix core/platforms->cli layering inversion"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-03"
 category: Core Functionality
 
 description: |
@@ -36,54 +37,70 @@ description: |
 work:
   - id: w1
     summary: "Move benchmark_hooks.py and platform_hooks.py to benchbox/core/hooks/"
-    status: pending
+    status: done
     notes: |
-      Create `benchbox/core/hooks/` (or `benchbox/hooks/` if a review of
-      docs/architecture shows `core/` should stay benchmark-domain-only -
-      decide and note the choice) and move
-      `benchbox/cli/benchmark_hooks.py` and `benchbox/cli/platform_hooks.py`
-      there verbatim first (no logic changes), preserving all public names
-      (`BenchmarkOptionError`, `PlatformOptionError`, `PlatformHookRegistry`,
-      `PlatformOptionSpec`, `parse_bool`, etc.) so it is a pure relocation.
+      Used benchbox/core/hooks/ (not a top-level benchbox/hooks/) per the
+      default in open_questions - platforms consuming a core-owned registry
+      is consistent with utils < core < platforms < cli. Copied both files
+      byte-identical (verified with `diff`) into
+      benchbox/core/hooks/{benchmark_hooks,platform_hooks}.py plus a new
+      benchbox/core/hooks/__init__.py package docstring. All public names
+      (BenchmarkOptionError, BenchmarkOptionSpec, BenchmarkHookRegistry,
+      PlatformOptionError, PlatformOptionSpec, PlatformHookRegistry,
+      parse_bool, parse_int, parse_int_list, parse_str_list,
+      parse_enum_list, parse_datetime) preserved verbatim.
 
   - id: w2
     summary: "Add back-compat import shims in benchbox/cli/ for one release"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Leave `benchbox/cli/benchmark_hooks.py` and
-      `benchbox/cli/platform_hooks.py` as thin re-export shims
-      (`from benchbox.core.hooks.benchmark_hooks import *` plus explicit
-      `__all__`) so any external or internal caller still importing from the
-      old `cli.*` path keeps working for one release cycle. Check
-      docs/reference/public-contracts.md and docs/reference/backward-compatibility.md
-      for whether `cli.benchmark_hooks`/`cli.platform_hooks` are documented
-      public surface; if so, follow the documented deprecation-window process
-      instead of a silent shim.
+      benchbox/cli/benchmark_hooks.py and benchbox/cli/platform_hooks.py are
+      now thin re-export shims from benchbox.core.hooks.* with explicit
+      __all__ matching the original modules' __all__ (parse_bool stays
+      importable-but-not-in-__all__ for platform_hooks, matching prior
+      behavior). Checked docs/reference/public-contracts.md and
+      docs/reference/backward-compatibility.md - neither documented
+      benchbox.cli.benchmark_hooks/platform_hooks as public surface, so this
+      is an internal-only courtesy shim, not a documented deprecation
+      window. Added a row to backward-compatibility.md's Current Inventory
+      table noting the relocation and the shim's courtesy (non-guaranteed)
+      status per w4.
 
   - id: w3
     summary: "Update all core/platforms importers to the new location"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Update the 10 `core/*/benchmark.py` importers and
-      `benchbox/platforms/__init__.py:593` to import from
-      `benchbox.core.hooks.*` directly instead of the `cli.*` shim, so the
-      real dependency edges no longer point at `cli/`. Grep the whole tree
-      (not just the files named in the review) for `cli.benchmark_hooks` and
-      `cli.platform_hooks` / `cli import benchmark_hooks` /
-      `cli import platform_hooks` to catch any importer missed by the
-      original inventory.
+      Updated all 10 core/*/benchmark.py importers (flightdata,
+      tsbs_devops, tpcdi, nyctaxi, datavault, tpcds_obt, vector_search,
+      joinorder_synthetic, joinorder, tpch_skew) plus 5 benchbox/platforms/*
+      importers (platforms/__init__.py:593, trino.py, presto.py,
+      base/config_utils.py, influxdb/__init__.py - a wider set than the
+      review's single named platforms/__init__.py:593 line, found via the
+      full-tree grep the TODO asked for) to import from
+      benchbox.core.hooks.benchmark_hooks / benchbox.core.hooks.platform_hooks
+      directly. Left all other benchbox/cli/* internal callers
+      (orchestrator.py, benchmarks.py, commands/run.py, help.py,
+      database.py, platform_defaults.py, main.py) importing the old
+      cli.* path unchanged - out of this TODO's scope_limit (only
+      cli/benchmark_hooks.py and cli/platform_hooks.py are modifiable
+      within cli/) and harmless since cli->cli via the shim isn't a
+      layering violation. Verified with
+      `grep -rn 'cli.benchmark_hooks\|cli.platform_hooks\|...' benchbox/core benchbox/platforms`
+      returning zero matches (after clearing __pycache__ and rewording the
+      new package's docstring so it doesn't itself match the grep pattern).
 
   - id: w4
     summary: "Note the public-contract question and update docs if needed"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
-      If public-contracts.md lists these modules as public, add the move to
-      the backward-compatibility notes with a removal-of-shim target release;
-      otherwise note in the PR body that they are internal-only and the shim
-      is a courtesy, not a compatibility guarantee.
+      Neither module is listed in docs/reference/public-contracts.md, so
+      treated as internal-only. Added a Current Inventory row to
+      docs/reference/backward-compatibility.md documenting the shim as an
+      internal courtesy (not a guaranteed compatibility window) rather than
+      following the public deprecation-window process.
 
 metadata:
   owners:
