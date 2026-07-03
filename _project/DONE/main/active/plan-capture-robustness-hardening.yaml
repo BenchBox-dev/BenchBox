@@ -103,6 +103,7 @@ scope_limit:
   only_modify:
   - "benchbox/platforms/"
   - "benchbox/core/query_plans/"
+  - "benchbox/core/plan_capture_phase.py"
   - "docs/"
   - "tests/"
 

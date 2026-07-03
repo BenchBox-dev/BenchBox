@@ -1875,13 +1875,26 @@ class TestBenchmarkIdentityInExecutionMetadata:
 class TestTPCExecutionRouting:
     """Exercise benchmark-family routing for specialized TPC helpers."""
 
-    def test_power_dispatch_path_has_no_literal_tpc_benchmark_names(self):
+    def test_dispatch_paths_have_no_literal_tpc_benchmark_names(self):
+        """No dispatch method routes on a literal TPC benchmark name.
+
+        #914 extracted the power path; the throughput/maintenance/combined dispatch
+        now routes via the same capability registry, so the headline metric ("no
+        literal TPC names in execution.py dispatch") holds across all four methods,
+        not power-only.
+        """
         from benchbox.platforms.base.execution import TestDriversMixin
 
-        source = inspect.getsource(TestDriversMixin._execute_power_test)
-
-        assert '"tpch"' not in source
-        assert '"tpcds"' not in source
+        dispatch_methods = (
+            TestDriversMixin._execute_power_test,
+            TestDriversMixin._execute_throughput_test,
+            TestDriversMixin._execute_maintenance_test,
+            TestDriversMixin._execute_combined_test,
+        )
+        for method in dispatch_methods:
+            source = inspect.getsource(method)
+            assert '"tpch"' not in source, f"{method.__name__} routes on a literal benchmark name"
+            assert '"tpcds"' not in source, f"{method.__name__} routes on a literal benchmark name"
 
     def test_execute_power_test_routes_tpch_via_run_config_benchmark_name(self):
         # Routing now reads benchmark_name from run_config, not display_name sniffing.

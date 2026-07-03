@@ -9,6 +9,7 @@ from benchbox.core.constants import (
     TPCH_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     TPCH_POWER_DEFAULT_WARMUP_ITERATIONS,
 )
+from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
 
 TPCH_BENCHMARK_ID = "tpch"
 PowerConnectionAdapterFactory = Callable[[Any, str, float], Any]
@@ -40,6 +41,10 @@ def _power_query_result(
         platform_result["result_digest"] = query_result["result_digest"]
     if not query_result["success"]:
         platform_result["error"] = query_result.get("error", "Unknown error")
+    # Carry the internal _plan_capture_key (and any captured plan fields) through
+    # to the row _attach_captured_plans sees, so it can match by exact key instead
+    # of the ambiguous public-id fallback (see plan_capture_phase.py).
+    propagate_plan_capture_fields(query_result, platform_result)
     return platform_result
 
 

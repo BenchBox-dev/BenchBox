@@ -122,6 +122,39 @@ class TestStructuralSignatureNormalization:
         assert "table:orders" in normalized
         assert "group:o_orderstatus" in normalized
 
+    def test_escaped_apostrophe_string_literal_masks_as_one_token(self):
+        """A doubled single quote is an escaped apostrophe INSIDE the literal, not the
+        end of the string. Without treating '' as an escape, 'O''Brien' would split
+        into two adjacent string literals ('O' + 'Brien'), leaving <STR><STR> - the
+        split itself residual value-dependent syntax - in the "normalized" signature,
+        so two seed-varied names could still normalize to different signatures."""
+        op = _scan("c_name = 'O''Brien'")
+        normalized = op.get_structural_signature(normalize_literals=True)
+        assert normalized.count("<STR>") == 1, normalized
+        assert "<STR><STR>" not in normalized
+
+    def test_signed_numeric_literal_collapses_regardless_of_sign(self):
+        """A threshold that crosses zero across seeds (e.g. -5 vs 5) must still
+        normalize to the SAME signature. Masking only the digit run (leaving a bare
+        sign character outside the placeholder) would leave -<NUM> and <NUM> as
+        distinct tokens - literal-sensitive residue defeating the whole point of
+        cross-seed normalization."""
+        negative = _scan("l_tax_credit > -5")
+        positive = _scan("l_tax_credit > 5")
+
+        assert negative.get_structural_signature() != positive.get_structural_signature()
+        assert negative.get_structural_signature(normalize_literals=True) == positive.get_structural_signature(
+            normalize_literals=True
+        )
+
+    def test_spaced_minus_operator_is_not_absorbed_as_a_sign(self):
+        """A '-' separated from its operand by whitespace is a binary operator, not a
+        literal's sign, and must stay OUTSIDE the masked token (only the two numeric
+        operands are masked)."""
+        op = _scan("l_discount = 0.05 - 0.01")
+        normalized = op.get_structural_signature(normalize_literals=True)
+        assert normalized.endswith("<NUM> - <NUM>"), normalized
+
     def test_normalization_recurses_into_children(self):
         """Child operator literals are masked too (signature is recursive)."""
         a = LogicalOperator(

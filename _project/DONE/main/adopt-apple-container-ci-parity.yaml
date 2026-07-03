@@ -77,7 +77,7 @@ work:
 
 - id: w1
   summary: "Stand up a benchbox-agent container machine with home-mount"
-  needs: [w0]
+  needs: [w0, w2]
   status: done
   notes: |
     `container machine create <image> --name benchbox-agent` with the Mac
@@ -86,6 +86,9 @@ work:
     Linux shell that can see a claimed pool worktree path. THIS is the
     step the spike did not exercise -- prove machine mode + home-mount
     work, not just `container run`.
+    CONFIRMED (also flagged on develop): the machine is created FROM the w2
+    image, so w1 depends on w2; and `container machine` boots only when the
+    rootfs has /sbin/init (systemd-sysv), which minimal ubuntu lacks.
 
 - id: w2
   summary: "Build the benchbox-agent OCI image (ubuntu + uv + build toolchain)"

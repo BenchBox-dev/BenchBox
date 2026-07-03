@@ -1,0 +1,84 @@
+id: joinorder-scale-stress-oracle-correction
+title: "docs(scale-stress): fix replica-count oracle rule for scalar-MIN JOB queries and close prototype dep-trap"
+worktree: main
+priority: Medium
+status: Completed
+category: Documentation
+
+description: |
+  Adversarial review finding (2026-07-02, joinorder Track-2 review), Medium --
+  two coupled corrections around the `replicated_imdb` scale-stress prototype.
+
+  1. Oracle-scaling rule is wrong for all 113 JOB queries. The decision doc
+     states "Canonical oracle x replica count"
+     (_project/decisions/joinorder-scale-stress-decision-2026-06-30.md:115) and
+     "reference cardinalities scale by the replica count..." (:122-123). But
+     every one of the 113 JOB queries is a scalar `SELECT MIN(...)` with no
+     GROUP BY (re-runnable: load benchbox.core.joinorder.queries and count --
+     0/113 have GROUP BY, 0/113 have COUNT), so each returns exactly ONE row and
+     the MIN value is invariant under value-identical offset replication. The
+     final-result oracle therefore scales x1, not x replica count; only
+     intermediate/join-subgraph cardinalities scale by N. An implementer who
+     multiplies the canonical result oracle by replica count would build a
+     validation gate that fails on all 113 queries. The same doc's line 141-142
+     already distinguishes final-result from join-subgraph cardinalities, so it
+     is partially self-correcting -- reword the headline to match.
+
+  2. Latent dependency trap in the prototype seed. The prototype's own w1
+     verification (joinorder-replicated-imdb-scale-prototype.yaml:49-52) requires
+     that IF the decision note uses the
+     `Stats phase gate: dependency:track2-joinorder-stats-phase` gate (it does,
+     per the decision note), then `track2-joinorder-stats-phase` must be added to
+     the prototype's deps.needs before coding. Today the prototype's deps.needs
+     lists only `joinorder-scale-stress-decision-framework` (lines 17-19).
+     Harmless while Not Started, but it will trip whoever starts w1. Add the
+     missing dep now.
+
+  Mostly doc/metadata; no production code. If
+  joinorder-track2-scaling-direction-reconciliation flips the direction away from
+  replicated_imdb, w1 still applies (the stated rule is simply wrong as written);
+  w2 would become moot.
+
+deps:
+  needs:
+    - joinorder-scale-stress-decision-framework
+
+work:
+  - id: w1
+    summary: "Reword the decision doc's oracle-scaling rule to match scalar-MIN semantics"
+    status: done
+    notes: |
+      Fix decision-2026-06-30.md:115 and :122-123 so the FINAL-result oracle is
+      stated as invariant (x1) for the 113 scalar-MIN queries, and the
+      x-replica-count relationship is scoped to intermediate/join-subgraph
+      cardinalities (consistent with the same doc's line 141-142 gate list).
+  - id: w2
+    summary: "Add track2-joinorder-stats-phase to the replicated-prototype deps.needs"
+    status: done
+    notes: |
+      Edit joinorder-replicated-imdb-scale-prototype.yaml deps.needs to include
+      track2-joinorder-stats-phase, satisfying that item's own w1 verification
+      gate. Re-run check-graph afterward.
+
+verification:
+  - description: "Decision doc scopes the x-replica-count rule to join-subgraph, not final-result, cardinalities"
+    command: "grep -n 'replica count' _project/decisions/joinorder-scale-stress-decision-2026-06-30.md"
+    expected_output: "the x-replica-count relationship is qualified to join-subgraph cardinalities, final results stated invariant"
+  - description: "Prototype deps.needs includes the stats-phase item and the graph stays clean"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+    expected_output: "Graph validation passed; no dangling references"
+
+scope_limit:
+  only_modify:
+    - "_project/decisions/joinorder-scale-stress-decision-2026-06-30.md"
+    - "_project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml"
+
+metadata:
+  tags:
+    - joinorder
+    - track-2
+    - scale-stress
+    - docs
+    - review-finding
+  estimated_effort: "Small"
+  created_date: "2026-07-02"

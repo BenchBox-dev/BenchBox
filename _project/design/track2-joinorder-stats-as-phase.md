@@ -42,7 +42,7 @@ Where statistics land today, per engine:
 | PostgreSQL | `analyze_table()` (`benchbox/platforms/postgresql.py:799`) | No — `load_data()` (`postgresql.py:559`) never calls it | First-query planning, or a manual ANALYZE outside the run |
 | DuckDB | `analyze_tables()` (`benchbox/platforms/duckdb.py:1109`) | No | Background/auto-stats after load |
 | Spark | `analyze_table()` (`benchbox/platforms/spark.py:818`) | No | Not gathered unless invoked manually |
-| Redshift | `auto_analyze` config gating ANALYZE | Only in isolated vacuum/analyze maintenance, not load | Maintenance path or first-query |
+| Redshift | `auto_analyze` config gating ANALYZE | Yes — `auto_analyze` defaults `True`; `_load_table_via_s3()` (`benchbox/platforms/redshift.py:1531`) runs `ANALYZE` right after each table's `COPY`, inside `load_data()` | Folded into load |
 | ClickHouse | none found | n/a | Auto-statistics on insert |
 | StarRocks | none found | n/a | Relies on auto/manual ANALYZE TABLE |
 

@@ -48,12 +48,19 @@ work:
     status: done
     needs: [w0]
     notes: |
-      Add a step (in pr.yml lint or content-guard, alongside the existing drift
-      checks) that queries the live develop ruleset via gh api and FAILS if
-      required_approving_review_count < 1 OR require_code_owner_review != true.
-      Reuse auto_merge_soundness_paths.py SOUNDNESS_PREFIXES for the path set it
-      narrates. If a ruleset-read token is unavailable in CI, fall back to a
-      documented manual release-runbook checklist item and record that decision.
+      Add a step in an ALWAYS-required job (e.g. pr.yml lint / code-lint), never
+      content-guard: content-guard is gated by content-guard-needed and skipped for
+      code-only PRs (ci-required-result ignores it unless content paths changed), so
+      a check placed there would let a code-only PR pass while review enforcement is
+      absent - defeating this item's stated self-healing guarantee. The step queries
+      the live develop ruleset via gh api and FAILS if require_code_owner_review !=
+      true. required_approving_review_count is deliberately NOT part of this check:
+      it is branch-wide, not CODEOWNERS-scoped, so asserting it here would gate
+      every develop PR rather than just soundness-path ones (see
+      ruleset_review_enforcement.py's module docstring). Reuse
+      auto_merge_soundness_paths.py SOUNDNESS_PREFIXES for the path set it narrates.
+      If a ruleset-read token is unavailable in CI, fall back to a documented manual
+      release-runbook checklist item and record that decision.
 
   - id: w2
     summary: "Correct the DONE success_metric and document the admin runbook step"
@@ -99,12 +106,12 @@ scope_limit:
     - "_project/DONE/main/active/auto-merge-review-gate-soundness-paths.yaml"
 
 success_metrics:
-  - "develop ruleset shows required_approving_review_count >= 1 and require_code_owner_review true."
+  - "develop ruleset shows require_code_owner_review true (required_approving_review_count is deliberately not part of the target - it is branch-wide, not CODEOWNERS-scoped, so requiring it would gate every develop PR instead of just soundness-path ones)."
   - "A soundness-path PR with zero approvals cannot be squash-merged (w3 evidence)."
   - "The CI meta-check turns red if the ruleset enforcement is ever removed."
 
 deferred:
-  - summary: "Apply the develop ruleset change: required_approving_review_count>=1 + require_code_owner_review=true."
+  - summary: "Apply the develop ruleset change: require_code_owner_review=true."
     reason: "Requires a repo admin (gh api PUT on the ruleset); cannot be done by an agent PR. Tracked as the gating human action for w3."
 
 metadata:

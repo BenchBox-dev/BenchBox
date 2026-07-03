@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import Any, Callable, Optional
 
 from benchbox.core.connection import DatabaseConnection
+from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
 from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
 from benchbox.core.throughput.runner import StreamRunner
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -304,7 +305,9 @@ class TPCDSThroughputTest:
             query_id, seed=stream_seed, scale_factor=scale_factor, dialect=self.target_dialect
         )
 
-    def _run_single_stream_query(self, connection, query_text: str, query_display_id: str, stream_id: int) -> None:
+    def _run_single_stream_query(
+        self, connection, query_text: str, query_display_id: str, stream_id: int
+    ) -> dict[str, Any] | None:
         if hasattr(connection, "set_query_context"):
             connection.set_query_context(query_display_id, stream_id=stream_id)
         cursor = connection.execute(query_text)
@@ -312,6 +315,7 @@ class TPCDSThroughputTest:
             cursor.fetchall()
         if hasattr(connection, "commit"):
             connection.commit()
+        return getattr(cursor, "platform_result", None)
 
     def _execute_single_query(
         self,
@@ -342,10 +346,17 @@ class TPCDSThroughputTest:
             query_text = self._get_stream_query_text(query_id, variant, stream_seed, config.scale_factor)
             label = f"Stream_{stream_id}_Position_{position + 1}_Query_{query_display_id}"
             try:
-                self._run_single_stream_query(connection, query_text, query_display_id, stream_id)
+                platform_result = self._run_single_stream_query(connection, query_text, query_display_id, stream_id)
             finally:
                 with self._capture_lock:
                     self.captured_items.append((label, query_text))
+
+            if platform_result is not None:
+                # Propagate captured plan metadata (including the internal
+                # _plan_capture_key) so a combined power+throughput run can match
+                # this row by its exact key rather than the ambiguous public-id
+                # fallback in _attach_captured_plans.
+                propagate_plan_capture_fields(platform_result, query_result)
 
             query_result.update(
                 {
