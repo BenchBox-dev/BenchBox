@@ -60,6 +60,19 @@ PERCENTILE_CONT, where DuckDB returns the percentile at the source column's
 DECIMAL(8,2) scale - see ``_H2ODB_PERCENTILE_DECIMAL``). Additional dual-surface
 benchmarks are added by registering a :class:`CrossSurfaceGate` in :data:`GATES`.
 
+Waiver review policy. A ``known_divergences`` entry may carry an OPTIONAL
+``review_by`` date (a new field on :class:`ClassifiedDivergence`; bare-``str``
+entries cannot carry one - upgrade to ``ClassifiedDivergence`` to add a date).
+When ``review_by`` has passed, :func:`_report` prints a "WAIVER REVIEW DUE" line
+and WARNS - it does NOT fail the gate. This is a distinct signal from the
+existing stale-baseline (``resolved``) failure above: ``resolved`` means the
+divergence is GONE and the entry should be deleted; a past-due ``review_by``
+means the divergence may still be entirely correct, but enough time has passed
+(an engine version bump, a benchmark data/query change, or simply time) that a
+human should re-confirm the original rationale still holds. Leaving
+``review_by`` unset is always safe - it is opt-in, never required, and no
+existing waiver is forced to adopt one.
+
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.
@@ -70,6 +83,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -350,11 +364,24 @@ class ClassifiedDivergence:
     false only for a nondeterministic classification whose absence is not evidence
     of resolution (for example, an order-less LIMIT whose arbitrary top-N selection
     can occasionally line up across surfaces by chance).
+
+    ``review_by`` is an OPTIONAL forcing-function date for waivers whose divergence
+    is expected to stay LIVE indefinitely (so the ``resolved`` stale-baseline check
+    above never fires on its own). It is a different signal from ``resolved``:
+    ``resolved`` means the divergence is GONE and the entry should be deleted;
+    a past-due ``review_by`` means the divergence may still be entirely correct, but
+    enough time has passed that a human should re-look (the engine version that
+    produced the behavior may have changed, the benchmark's data/queries may have
+    evolved, or the original rationale may no longer hold). A past-due ``review_by``
+    only WARNS in :func:`_report` - it never fails the gate - so leaving it unset is
+    always safe and never migrates existing waivers. See the module docstring's
+    "waiver review policy" section for the full contract.
     """
 
     reason: str
     accepts: Callable[[SurfaceDivergence], bool]
     requires_live_divergence: bool = True
+    review_by: date | None = None
 
 
 @dataclass(frozen=True)
@@ -625,6 +652,13 @@ _CLICKBENCH_TIE_AMBIGUOUS = ClassifiedDivergence(
     reason=_CLICKBENCH_TIE_AMBIGUOUS_REASON,
     accepts=_is_clickbench_q18_arbitrary_topn,
     requires_live_divergence=False,
+    # Worked example of the optional review_by waiver policy (see the module
+    # docstring's "waiver review policy" section): this waiver's divergence is
+    # structural (no ORDER BY over ~97k groups) and will never resolve on its
+    # own, so `requires_live_divergence=False` above means the `resolved` check
+    # can never force a re-look either - review_by is the only forcing function
+    # that will. 6 months out from when this was added (2026-07-03).
+    review_by=date(2027, 1, 3),
 )
 
 # Two AMPLab queries return 0 reference rows at the bounded cell. Both end in a
@@ -1115,6 +1149,13 @@ def _report(
     The "compared N of M cells" line reports DISCRIMINATING cells only: a vacuous
     query's cells are excluded from the discriminating count and reported
     separately, so a report can never present empty-vs-empty passes as coverage.
+
+    Additionally WARNS (never fails the gate) when a :class:`ClassifiedDivergence`
+    entry carries a past-due ``review_by`` date - see the module's waiver review
+    policy docstring. This is independent of the ``resolved`` stale-baseline
+    failure above: ``resolved`` means the divergence is gone (delete the entry);
+    a past-due ``review_by`` means the divergence may still be entirely valid but
+    a human should re-look (the entry stays, the gate stays green).
     """
     legitimately_empty = legitimately_empty or {}
     reference_row_counts = reference_row_counts or {}
@@ -1127,6 +1168,19 @@ def _report(
     resolved = sorted(key for key, entry in known.items() if key not in found and _requires_live_divergence(entry))
     missing_backends = sorted(backend for backend, count in coverage.items() if count == 0)
     executed = sum(coverage.values())
+
+    # A DIFFERENT signal from `resolved`: a waiver whose divergence is still LIVE
+    # never trips `resolved` on its own, so it can sit correct-when-written but
+    # stale-in-spirit indefinitely. An optional `review_by` on a ClassifiedDivergence
+    # entry forces periodic re-examination even when the divergence never disappears.
+    # WARN only (see the module's waiver review policy docstring) - a past-due date
+    # is a prompt to re-look, not proof the waiver is wrong, so it never affects the
+    # exit code.
+    review_due = sorted(
+        key
+        for key, entry in known.items()
+        if isinstance(entry, ClassifiedDivergence) and entry.review_by is not None and entry.review_by < date.today()
+    )
 
     # A query is vacuous when its reference returned 0 rows; classify each as
     # legitimately-empty (tolerated, with a rationale) or unclassified (a gate
@@ -1190,6 +1244,11 @@ def _report(
             "GATE FAILURE - previously-known divergences now equivalent: "
             f"{resolved} - remove the stale baseline entry in a reviewed change"
         )
+    if review_due:
+        for key in review_due:
+            entry = known[key]
+            assert isinstance(entry, ClassifiedDivergence)  # narrowed by review_due's filter above
+            print(f"WAIVER REVIEW DUE - {key}: review_by {entry.review_by} has passed - {entry.reason}")
     if not new and not resolved and not missing_backends and not unclassified_empty:
         suffix = " (modulo classified exceptions)" if (known or classified_empty) else ""
         print(f"SQL and DataFrame surfaces are equivalent{suffix}.")

@@ -16,6 +16,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import inspect
+from datetime import date
 
 import pytest
 
@@ -618,6 +619,72 @@ def test_known_divergence_baseline_does_not_hide_new_unclassified_divergence(cap
     out = capsys.readouterr().out
     assert exit_code == 1
     assert "GATE FAILURE - unclassified cross-surface divergences: ['Q2_pandas']" in out
+
+
+def test_review_by_past_due_warns_but_does_not_fail_the_gate(capsys):
+    """A ClassifiedDivergence with a past-due review_by warns, never fails (w1's warn decision)."""
+    coverage = {"expression": 1, "pandas": 1}
+
+    exit_code = _report(
+        [SurfaceDivergence("Q1", "pandas", "accepted mismatch")],
+        total=2,
+        coverage=coverage,
+        known={
+            "Q1_pandas": ClassifiedDivergence(
+                reason="synthetic long-lived waiver",
+                accepts=lambda divergence: "accepted" in str(divergence.detail),
+                review_by=date(2020, 1, 1),  # far in the past
+            )
+        },
+        benchmark="fake",
+        reference_row_counts={"Q1": 5},
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 0  # a past-due review_by warns, it never fails the gate
+    assert "WAIVER REVIEW DUE - Q1_pandas: review_by 2020-01-01 has passed - synthetic long-lived waiver" in out
+
+
+def test_review_by_future_date_does_not_warn(capsys):
+    """A ClassifiedDivergence with a future (or absent) review_by produces no warning."""
+    coverage = {"expression": 1, "pandas": 1}
+
+    exit_code = _report(
+        [SurfaceDivergence("Q1", "pandas", "accepted mismatch")],
+        total=2,
+        coverage=coverage,
+        known={
+            "Q1_pandas": ClassifiedDivergence(
+                reason="synthetic waiver, not due",
+                accepts=lambda divergence: "accepted" in str(divergence.detail),
+                review_by=date(2099, 1, 1),
+            )
+        },
+        benchmark="fake",
+        reference_row_counts={"Q1": 5},
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "WAIVER REVIEW DUE" not in out
+
+
+def test_review_by_absent_by_default_produces_no_warning(capsys):
+    """A bare-string baseline entry (no review_by carrier) never warns - opt-in only."""
+    coverage = {"expression": 1, "pandas": 1}
+
+    exit_code = _report(
+        [SurfaceDivergence("Q1", "pandas", "accepted mismatch")],
+        total=2,
+        coverage=coverage,
+        known={"Q1_pandas": "documented test baseline"},
+        benchmark="fake",
+        reference_row_counts={"Q1": 5},
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "WAIVER REVIEW DUE" not in out
 
 
 def test_clickbench_and_joinorder_are_enforced_gates():

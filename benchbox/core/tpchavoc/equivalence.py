@@ -63,6 +63,20 @@ sides). Because canonical TPC-H queries carry a presentational ``ORDER BY ...
 LIMIT n`` top-N cut that the variant families treat inconsistently, the trailing
 ``LIMIT`` is stripped from both sides before comparison.
 
+Waiver review policy. A baseline entry (any key in ``KNOWN_DIVERGENCES``,
+``POSTGRES_KNOWN_DIVERGENCES``, ``DATAFUSION_KNOWN_DIVERGENCES``, or
+``CLICKHOUSE_KNOWN_DIVERGENCES``) may OPTIONALLY carry a ``review_by`` date via a
+same-keyed side-table (e.g. :data:`CLICKHOUSE_KNOWN_DIVERGENCES_REVIEW_BY`) passed
+into the shared :func:`_report`. When ``review_by`` has passed, ``_report`` prints
+a "WAIVER REVIEW DUE" line and WARNS - it does NOT fail the gate. This is a
+different signal from the stale-baseline (``resolved``) failure documented on
+:func:`_report`: ``resolved`` means the divergence is GONE and the entry should
+be deleted; a past-due ``review_by`` means the divergence may still be entirely
+correct, but enough time has passed (an engine version bump, a benchmark data/
+query change, or simply time) that a human should re-confirm the classification
+still holds. ``review_by`` is opt-in - a key with no side-table entry never
+warns, and no existing baseline is forced to adopt one.
+
 One consequence: NULL ordering/placement is deliberately NOT sampled by this
 oracle. Sorting both sides is what lets variants legitimately permute row order
 without being flagged, but it also normalizes away a difference that shows up only
@@ -101,6 +115,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -246,6 +261,24 @@ def find_divergences(
     Returns:
         One :class:`Divergence` per variant whose result is not equivalent to
         canonical TPC-H. Reuses :meth:`TPCHavocBenchmark.validate_variant_equivalence`.
+        A canonical query that returns 0 rows also yields exactly one
+        ``Divergence`` (variant id ``0``) instead of being silently compared
+        empty-vs-empty against every variant - see the vacuity note below.
+
+    Vacuity: no TPC-H canonical query is expected to return 0 rows at
+    :data:`EQUIVALENCE_SCALE` (the scale was deliberately chosen high enough that
+    every gated query is discriminating - see the module docstring). If a
+    canonical query nonetheless returns 0 rows, comparing it to each variant
+    would trivially "match" empty-vs-empty for every one of that query's
+    variants without checking anything, the same false-green risk the
+    cross-surface gate's ``legitimately_empty`` classification guards against
+    (:mod:`benchbox.core.equivalence.cross_surface`). Rather than fork a
+    classification map for a case that has never been observed here, an empty
+    canonical result is reported as an unclassified :class:`Divergence` so it
+    fails loudly and visibly instead of passing silently; that variant's ids are
+    then skipped (there is nothing meaningful to compare them against). Promote
+    this to a real classification mechanism only if a genuine legitimately-empty
+    canonical query is ever found.
     """
     ids = query_ids if query_ids is not None else benchmark.get_implemented_queries()
     render_variant = translate_variant if translate_variant is not None else _identity
@@ -257,6 +290,21 @@ def find_divergences(
             original = connection.execute(transform_for_engine(strip_top_n(canonical_query(query_id)))).fetchall()
         except Exception as exc:  # noqa: BLE001 - a diagnostic must report, not crash, on a bad query
             divergences.append(Divergence(query_id, 0, f"canonical query failed: {exc}"))
+            continue
+        if not original:
+            # A vacuous canonical result would compare empty-vs-empty for every
+            # variant of this query, trivially "passing" without discriminating
+            # anything (see the vacuity note in the docstring). Fail loudly
+            # instead of silently marking every variant equivalent.
+            divergences.append(
+                Divergence(
+                    query_id,
+                    0,
+                    "canonical query returned 0 rows - vacuous, would compare empty-vs-empty "
+                    "for every variant; no TPC-H canonical query is expected to be empty at "
+                    f"EQUIVALENCE_SCALE={EQUIVALENCE_SCALE}",
+                )
+            )
             continue
         for variant_id in range(1, 11):
             if f"{query_id}_v{variant_id}" in excluded:
@@ -297,7 +345,12 @@ def build_duckdb_with_tpch(scale_factor: float, output_dir: str | Path) -> tuple
     """Generate TPC-H data and return a populated in-memory DuckDB connection.
 
     Platform/generator imports are deferred so importing this module does not
-    pull DuckDB or the data generator into the core import graph.
+    pull DuckDB or the data generator into the core import graph. Mirrors the
+    Postgres/DataFusion/ClickHouse builders' row-count guard: each table's row
+    count is verified (>0) after loading so a silent partial/empty load cannot
+    produce a FALSE green by comparing empty-vs-empty for every variant of every
+    query - the exact failure mode this is the hard, blocking gate's builder and
+    must guard against first.
 
     Returns:
         ``(connection, tpchavoc_benchmark, tpch_benchmark)``.
@@ -309,10 +362,17 @@ def build_duckdb_with_tpch(scale_factor: float, output_dir: str | Path) -> tuple
     data_dir, tpchavoc, tpch = _generate_tpch(scale_factor, Path(output_dir))
 
     connection = duckdb.connect(":memory:")
-    for statement in tpchavoc.get_create_tables_sql(dialect="duckdb").strip().split(";"):
-        if statement.strip():
-            connection.execute(statement.strip())
-    DuckDBAdapter(database=":memory:").load_data(tpchavoc, connection, data_dir)
+    try:
+        for statement in tpchavoc.get_create_tables_sql(dialect="duckdb").strip().split(";"):
+            if statement.strip():
+                connection.execute(statement.strip())
+        table_stats, _, _ = DuckDBAdapter(database=":memory:").load_data(tpchavoc, connection, data_dir)
+        empty = [table for table in _TPCH_TABLES if table_stats.get(table, 0) <= 0]
+        if empty:
+            raise RuntimeError(f"DuckDB TPC-H load failed - no rows in {empty} (stats={table_stats})")
+    except Exception:
+        connection.close()
+        raise
     return connection, tpchavoc, tpch
 
 
@@ -438,15 +498,37 @@ def _report(
     *,
     engine_label: str,
     baseline_name: str,
+    review_by: dict[str, date] | None = None,
 ) -> int:
     """Print a categorized divergence report and return the gate exit code.
 
     Shared by every engine so the comparator/report is never forked. Returns
-    non-zero only when a divergence is unclassified (i.e. not in ``known``).
+    non-zero when a divergence is unclassified (i.e. not in ``known``), OR when
+    a previously-known divergence no longer reproduces (``resolved``) - matching
+    :func:`benchbox.core.equivalence.cross_surface._report`'s stale-baseline
+    failure. A resolved entry means the variant defect it documented was fixed
+    (or the classified engine-semantic difference stopped reproducing) without
+    anyone pruning the baseline; left unpruned, a stale entry could later mask a
+    genuinely different divergence that happens to land on the same key. This
+    applies uniformly to all four engines' baselines (``KNOWN_DIVERGENCES``,
+    ``POSTGRES_KNOWN_DIVERGENCES``, ``DATAFUSION_KNOWN_DIVERGENCES``,
+    ``CLICKHOUSE_KNOWN_DIVERGENCES``), so a stale entry in a non-blocking sample
+    is caught just as reliably as one in the hard DuckDB gate.
+
+    ``review_by`` is an OPTIONAL side-table (see the module's waiver review
+    policy docstring), keyed the SAME as ``known``, giving any baseline entry an
+    optional forcing-function date even though these baselines are plain
+    ``dict[str, str]`` (no ``ClassifiedDivergence``-equivalent exists here). A
+    past-due entry prints a "WAIVER REVIEW DUE" line and WARNS - it never fails
+    the gate, and is independent of the ``resolved`` check above: ``resolved``
+    means the divergence is GONE (delete the entry); a past-due ``review_by``
+    means the divergence may still be entirely valid but a human should re-look.
     """
     found = {d.key for d in divergences}
     new = sorted(found - set(known), key=_sort_key)
     resolved = sorted(set(known) - found, key=_sort_key)
+    review_by = review_by or {}
+    review_due = sorted(key for key, due in review_by.items() if key in known and due < date.today())
 
     print(f"TPC-Havoc variant equivalence vs canonical TPC-H @ SF={EQUIVALENCE_SCALE} ({engine_label})")
     print(f"  checked {total} variants - {len(divergences)} divergent, {total - len(divergences)} equivalent\n")
@@ -464,10 +546,16 @@ def _report(
     if new:
         print(f"GATE FAILURE - unclassified divergences from canonical TPC-H: {new}")
     if resolved:
-        print(f"Previously-known divergences now equivalent - update {baseline_name}: {resolved}")
+        print(
+            f"GATE FAILURE - previously-known divergences now equivalent - "
+            f"remove the stale baseline entry in {baseline_name}: {resolved}"
+        )
+    if review_due:
+        for key in review_due:
+            print(f"WAIVER REVIEW DUE - {key}: review_by {review_by[key]} has passed - {known[key]}")
     if not new and not resolved:
         print("All variants equivalent to canonical TPC-H (modulo classified exceptions).")
-    return 1 if new else 0
+    return 1 if (new or resolved) else 0
 
 
 def run_duckdb_gate() -> int:
@@ -766,6 +854,21 @@ CLICKHOUSE_KNOWN_DIVERGENCES: dict[str, str] = {
     "13_v1": "correlated-subquery-decorrelation",
 }
 
+# OPTIONAL waiver-review side-table, keyed by the SAME "<query>_v<variant>" key as
+# CLICKHOUSE_KNOWN_DIVERGENCES (see the module's waiver review policy docstring
+# section). CLICKHOUSE_KNOWN_DIVERGENCES's entries are plain strings (no
+# ClassifiedDivergence-equivalent exists for these dict[str, str] baselines), so a
+# side-table dict[str, date] carries an optional review_by date without retyping
+# every existing entry's value type. Entries are opt-in; a key with no side-table
+# entry never warns. Worked example: "1_v4" (decimal-division-truncation) is
+# unlikely to ever resolve on its own (it is inherent to ClickHouse's Decimal
+# arithmetic), so a review_by date is the only forcing function that will bring a
+# human back to re-confirm the rationale still holds. 6 months out from when this
+# was added (2026-07-03).
+CLICKHOUSE_KNOWN_DIVERGENCES_REVIEW_BY: dict[str, date] = {
+    "1_v4": date(2027, 1, 3),
+}
+
 
 def build_clickhouse_with_tpch(scale_factor: float, output_dir: str | Path) -> tuple[Any, TPCHavocBenchmark, TPCH]:
     """Generate TPC-H data and return a populated in-process ClickHouse connection.
@@ -899,6 +1002,7 @@ def run_clickhouse_sample() -> int:
         CLICKHOUSE_KNOWN_DIVERGENCES,
         engine_label="ClickHouse",
         baseline_name="CLICKHOUSE_KNOWN_DIVERGENCES",
+        review_by=CLICKHOUSE_KNOWN_DIVERGENCES_REVIEW_BY,
     )
 
 

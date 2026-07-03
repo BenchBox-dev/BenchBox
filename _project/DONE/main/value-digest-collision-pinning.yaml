@@ -2,7 +2,8 @@ id: value-digest-collision-pinning
 title: "Pin (or fix) the three verified separator/dtype collisions in calculate_checksum's raw str-join digest"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-03"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -68,67 +69,80 @@ prior_art:
 work:
   - id: w1
     summary: "Decide pin-vs-fix for the separator/dtype collisions and record the decision with rationale"
-    status: pending
+    status: done
     notes: |
-      Two real options, spelled out because fixing costs a regeneration:
-        (a) PIN ONLY: treat all three collisions as accepted properties, same as
-            the NULL-vs-"NULL" case, and move on to w2/w3. Cheapest, no digest
-            regeneration, but the type collision (str "1" vs int 1) is a real
-            correctness blind spot - a dtype regression on a text/numeric column
-            would not be caught by this digest, only by whatever ELSE compares
-            dtypes (if anything does, for the paths this digest guards).
-        (b) FIX: change calculate_checksum to render each cell with a type tag
-            and/or escape the separator characters (e.g. join on a control
-            character unlikely in results plus a `(type_name, value)` tuple
-            per cell, or a length-prefixed encoding) so none of the three
-            collisions exist. This invalidates
-            benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json
-            (its stored digests were computed with the OLD separator scheme) and
-            requires running `make correctness-gate-digests-regen` in the SAME
-            change (per Makefile:152-158's documented contract: "Run this
-            whenever the digest normalization changes ... in the SAME change").
-            It also changes `ResultValidator.validate_results_checksum`'s
-            comparator behavior for every live TPC-Havoc checksum-mode caller -
-            audit those callers before committing to (b).
-      Decide per the type-collision severity: if any live code path relies on
-      this digest to catch a dtype regression (check callers of
-      validate_results_checksum and the correctness-gate value-digest oracle's
-      actual use), (b) is likely warranted for at least the TYPE collision even
-      if the separator collisions are pinned as (a). Record the decision and
-      why in this TODO's notes before starting w2/w3.
+      DECISION (directed by the batch-implementation orchestrator as the strong
+      default for this batch, applied here after independently confirming it is
+      sound): PIN ALL THREE as documented-accepted-property tests, option (a) in
+      full - do not change calculate_checksum's join/render logic. Rationale,
+      including the w1 open_question's caller audit:
+        - Callers audited: `ResultValidator.validate_results_checksum`'s only
+          caller is `TPCHavocBenchmark.validate_variant_equivalence`
+          (benchbox/core/tpchavoc/benchmark.py:282); the correctness-gate
+          value-digest oracle path is `compute_result_digest` ->
+          `calculate_checksum` via `benchbox/core/results/result_digest.py`.
+          Neither path, nor anything else found searching the repo, independently
+          verifies cell DTYPE on the paths this digest guards - a str-vs-int
+          dtype regression is a real, currently-uncaught blind spot from this
+          digest ALONE.
+        - However, `result_digest._normalize_cell` already documents (and pins
+          in tests/unit/test_correctness_gate_value_oracle.py::
+          test_digest_couples_value_with_numeric_type) a closely analogous
+          accepted asymmetry: an int and a float/Decimal of the SAME numeric
+          value render DIFFERENTLY (int exact vs. float to N sig figs) purely
+          because the oracle is DuckDB-pinned and single-engine by design (see
+          _project/analysis/value-digest-cross-engine-independence-decision.md).
+          The str-vs-int collision here is the SAME class of accepted risk for
+          the SAME underlying reason (a single-engine, DuckDB-pinned regression
+          snapshot, not an independent correctness oracle) - fixing it would
+          require a type-tagged/escaped re-render of every cell, which changes
+          the digest for every existing row and forces a regeneration of
+          tpch_value_digests_sf1.json. That regeneration is real, auditable work
+          (must re-run the full SF=1 gate via `make correctness-gate-digests-regen`
+          and re-verify two-run determinism) that is out of safe scope for a
+          pin-only batch item - it is exactly the kind of change the TODO's own
+          anti_patterns flag as needing to land in the SAME reviewed change as
+          the render fix, not bundled opportunistically here.
+        - The two separator collisions (cross-cell `|`, cross-row `\n`) are
+          cosmetic string-join artifacts with no analogous type-fidelity
+          argument for fixing now; pinning them matches the existing
+          NULL-vs-"NULL" precedent exactly.
+      Net: all three pinned as accepted properties this batch; the type
+      collision is flagged above as the one worth a FUTURE follow-up TODO if a
+      real dtype-regression incident on this digest's guarded paths is ever
+      observed (deferred, not silently dropped).
 
   - id: w2
     summary: "At minimum, pin all three collisions as documented tests alongside the existing NULL pin"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Regardless of the w1 decision, add tests mirroring
-      test_calculate_checksum_collides_null_with_string_null's exact style
-      (docstring stating what is pinned and why, direct equality assertion) for
-      whichever collisions remain UNFIXED after w1:
-        - test_calculate_checksum_collides_across_cell_separator:
-          assert calculate_checksum([("a|b", "c")]) == calculate_checksum([("a", "b|c")])
-        - test_calculate_checksum_collides_across_row_separator:
-          assert calculate_checksum([("a\nb",)]) == calculate_checksum([("a",), ("b",)])
-        - test_calculate_checksum_collides_str_and_int_dtype:
-          assert calculate_checksum([("1",)]) == calculate_checksum([(1,)])
-      If w1 chooses to FIX any of these, replace the corresponding pin test with
-      a regression test asserting the values now DIFFER instead.
+      Added all three pin tests to
+      tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py, directly
+      after the existing NULL-vs-"NULL" pin, matching its exact style
+      (docstring naming what is pinned and why, direct equality assertion, no
+      attempt to "fix" inside the test):
+        - test_calculate_checksum_collides_across_cell_separator
+        - test_calculate_checksum_collides_across_row_separator
+        - test_calculate_checksum_collides_str_and_int_dtype
+      All three pin (not fix) per w1's decision. All 4 collision tests (incl.
+      the pre-existing NULL pin) pass:
+      `pytest tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py -k checksum -v`.
 
   - id: w3
     summary: "If w1 chose to fix any collision, regenerate the reference digest file via the make target and verify the correctness gate"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
-      DO NOT hand-edit tph_value_digests_sf1.json. Run
-      `make correctness-gate-digests-regen` (which re-runs the full DuckDB x
-      TPC-H SF=1 gate with BENCHBOX_EMIT_RESULT_DIGEST=1 and writes the
-      stream-0 per-query digests + provenance back to the JSON, per its
-      Makefile:150-158 documentation), commit the regenerated JSON, and then run
-      `make test-correctness-gate` to confirm the gate is green against the
-      freshly-regenerated reference. If nothing was fixed (pure pin, w1 chose
-      option (a) throughout), this work unit is a no-op - state that explicitly
-      rather than leaving it pending.
+      NO-OP, stated explicitly per this work unit's own instruction: w1 chose
+      pure pin (option (a)) for all three collisions, so calculate_checksum's
+      render logic is byte-for-byte unchanged and
+      tpch_value_digests_sf1.json needed no regeneration. Verified: `git status`
+      on the reference JSON shows no changes, and `make test-correctness-gate`
+      is green against the untouched, already-committed reference (correctness
+      gate guard: ran=1 skipped=0 failures=0 errors=0). The file was not
+      hand-edited and `make correctness-gate-digests-regen` was not run (nothing
+      to regenerate).
 
 deferred:
   - summary: "A fully collision-free digest scheme (e.g. hashing a length-prefixed, type-tagged, canonical serialization of each row) as the DEFAULT for all future callers."
