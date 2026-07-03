@@ -341,6 +341,30 @@ class SSBRowCountStrategy(RowCountStrategy):
         return ranges.get(table)
 
 
+class JoinOrderRowCountStrategy(RowCountStrategy):
+    """Exact row count validation strategy for canonical JoinOrder data."""
+
+    def __init__(self, scale_factor: float, benchmark_instance: Any):
+        """Initialize with the benchmark instance that owns the data manifest."""
+        super().__init__(scale_factor)
+        self.benchmark_instance = benchmark_instance
+
+    def get_sample_tables(self, available_tables: set[str]) -> list[str]:
+        """Validate all loaded JoinOrder tables against manifest counts."""
+        return list(available_tables)
+
+    def get_expected_range(self, table: str) -> tuple[float, float] | None:
+        """Get exact expected row count from the JoinOrder manifest."""
+        row_count_getter = getattr(self.benchmark_instance, "get_table_row_count", None)
+        if row_count_getter is None:
+            return None
+
+        expected_rows = int(row_count_getter(table))
+        if expected_rows <= 0:
+            return None
+        return (float(expected_rows), float(expected_rows))
+
+
 class GenericRowCountStrategy(RowCountStrategy):
     """Generic row count validation strategy for unknown benchmarks."""
 
@@ -425,6 +449,8 @@ class RowCountValidator(BaseValidator):
             return TPCDSRowCountStrategy(scale)
         elif "ssb" in benchmark_name:
             return SSBRowCountStrategy(scale)
+        elif "joinorder" in benchmark_name:
+            return JoinOrderRowCountStrategy(scale, benchmark_instance)
         else:
             return GenericRowCountStrategy(scale)
 
