@@ -1,0 +1,189 @@
+id: relocate-cli-hook-registries
+title: "Relocate benchmark_hooks/platform_hooks registries out of benchbox.cli to fix core/platforms->cli layering inversion"
+worktree: main
+priority: Medium
+status: "Not Started"
+category: Core Functionality
+
+description: |
+  Architecture review (Work Area E, structural remediation) found a layering
+  inversion: nine `benchbox/core/*/benchmark.py` modules import
+  `benchbox.cli.benchmark_hooks` at module level - e.g.
+  `benchbox/core/nyctaxi/benchmark.py:643`,
+  `benchbox/core/tpcdi/benchmark.py:2743`,
+  `benchbox/core/datavault/benchmark.py:477` (confirmed 10 importing modules
+  total: flightdata, tsbs_devops, tpcdi, nyctaxi, datavault, tpcds_obt,
+  vector_search, joinorder_synthetic, joinorder, tpch_skew) - and
+  `benchbox/platforms/__init__.py:593` imports `benchbox.cli.platform_hooks`,
+  which itself imports `benchbox.core.platform_registry` and
+  `benchbox.core.schemas` (`cli/platform_hooks.py:13-14`).
+
+  Both `benchbox/cli/benchmark_hooks.py` and `benchbox/cli/platform_hooks.py`
+  are dependency-free (or near-dependency-free) pure registries - lightweight
+  extension mechanisms letting benchmarks/platforms expose CLI option hooks
+  (`--benchmark-option K=V`) without changing core CLI code. Despite the
+  name/location, neither module actually depends on CLI parsing, click/argparse,
+  or terminal I/O; they are data-holding registries that `core/` and
+  `platforms/` should be able to depend on without reaching "up" into `cli/`.
+  Having `core -> cli` and `platforms -> cli` edges inverts the intended
+  `utils < core < platforms < cli` layering that `import-layering-enforcement`
+  (a separate TODO) will formalize.
+
+  This is a standalone structural fix, not a shrink-campaign item -
+  `_project/goal-shrink-core-code.md` scopes god-class/architecture
+  decompositions out of the autonomous shrink loop.
+
+work:
+  - id: w1
+    summary: "Move benchmark_hooks.py and platform_hooks.py to benchbox/core/hooks/"
+    status: pending
+    notes: |
+      Create `benchbox/core/hooks/` (or `benchbox/hooks/` if a review of
+      docs/architecture shows `core/` should stay benchmark-domain-only -
+      decide and note the choice) and move
+      `benchbox/cli/benchmark_hooks.py` and `benchbox/cli/platform_hooks.py`
+      there verbatim first (no logic changes), preserving all public names
+      (`BenchmarkOptionError`, `PlatformOptionError`, `PlatformHookRegistry`,
+      `PlatformOptionSpec`, `parse_bool`, etc.) so it is a pure relocation.
+
+  - id: w2
+    summary: "Add back-compat import shims in benchbox/cli/ for one release"
+    needs: [w1]
+    status: pending
+    notes: |
+      Leave `benchbox/cli/benchmark_hooks.py` and
+      `benchbox/cli/platform_hooks.py` as thin re-export shims
+      (`from benchbox.core.hooks.benchmark_hooks import *` plus explicit
+      `__all__`) so any external or internal caller still importing from the
+      old `cli.*` path keeps working for one release cycle. Check
+      docs/reference/public-contracts.md and docs/reference/backward-compatibility.md
+      for whether `cli.benchmark_hooks`/`cli.platform_hooks` are documented
+      public surface; if so, follow the documented deprecation-window process
+      instead of a silent shim.
+
+  - id: w3
+    summary: "Update all core/platforms importers to the new location"
+    needs: [w1]
+    status: pending
+    notes: |
+      Update the 10 `core/*/benchmark.py` importers and
+      `benchbox/platforms/__init__.py:593` to import from
+      `benchbox.core.hooks.*` directly instead of the `cli.*` shim, so the
+      real dependency edges no longer point at `cli/`. Grep the whole tree
+      (not just the files named in the review) for `cli.benchmark_hooks` and
+      `cli.platform_hooks` / `cli import benchmark_hooks` /
+      `cli import platform_hooks` to catch any importer missed by the
+      original inventory.
+
+  - id: w4
+    summary: "Note the public-contract question and update docs if needed"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      If public-contracts.md lists these modules as public, add the move to
+      the backward-compatibility notes with a removal-of-shim target release;
+      otherwise note in the PR body that they are internal-only and the shim
+      is a courtesy, not a compatibility guarantee.
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - import-layering
+    - structural-debt
+    - architecture-review
+    - cli
+    - core
+    - platforms
+  estimated_effort: "1-2 days"
+  created_date: "2026-07-03"
+  last_updated: "2026-07-03T00:00:00Z"
+
+impact:
+  business_value: |
+    Removes a core/platforms -> cli dependency inversion that blocks clean
+    import-layering enforcement and makes it possible to use
+    benchbox.core/benchbox.platforms without pulling in CLI-oriented code.
+  user_impact: |
+    No direct user-facing behavior change; CLI benchmark/platform options
+    continue to work identically via the same registries, now correctly
+    located.
+  technical_debt: |
+    Fixes a layering inversion flagged as a precondition for
+    import-layering-enforcement (contracts utils < core < platforms < cli
+    cannot be expressed truthfully while core/platforms import from cli).
+
+files_affected:
+  modified:
+    - "benchbox/core/nyctaxi/benchmark.py"
+    - "benchbox/core/tpcdi/benchmark.py"
+    - "benchbox/core/datavault/benchmark.py"
+    - "benchbox/core/flightdata/benchmark.py"
+    - "benchbox/core/tsbs_devops/benchmark.py"
+    - "benchbox/core/tpcds_obt/benchmark.py"
+    - "benchbox/core/vector_search/benchmark.py"
+    - "benchbox/core/joinorder_synthetic/benchmark.py"
+    - "benchbox/core/joinorder/benchmark.py"
+    - "benchbox/core/tpch_skew/benchmark.py"
+    - "benchbox/platforms/__init__.py"
+    - "benchbox/cli/benchmark_hooks.py"
+    - "benchbox/cli/platform_hooks.py"
+    - "docs/reference/backward-compatibility.md"
+  added:
+    - "benchbox/core/hooks/__init__.py"
+    - "benchbox/core/hooks/benchmark_hooks.py"
+    - "benchbox/core/hooks/platform_hooks.py"
+
+must_preserve:
+  - "CLI --benchmark-option and platform-option parsing behavior (PlatformHookRegistry, PlatformOptionSpec, parse_bool, BenchmarkOptionError) is byte-identical after the move."
+  - "Existing imports of benchbox.cli.benchmark_hooks / benchbox.cli.platform_hooks from any external caller keep working via the shim for at least one release."
+  - "All 10 core benchmark modules and platforms/__init__.py continue to register their hooks at the same point in the import/registration sequence."
+
+prior_art:
+  - "benchbox/cli/benchmark_hooks.py header comment ('Mirrors the platform_hooks.py pattern') - both registries already share a design pattern; relocate them together rather than one at a time to avoid a half-migrated state."
+  - "remove-or-integrate-legacy-cudf-platform-module.yaml - existing example of a relocation TODO in this same planning set that adds back-compat notes and a docs update step; follow its w0 (verify importers)/decide/update-docs shape."
+
+approach: |
+  Do the physical move first as a no-logic-change relocation (w1), add the
+  compat shim immediately after (w2) so nothing breaks mid-migration, then
+  update the real importers in core/ and platforms/ (w3) to point at the new
+  location so the dependency graph is actually fixed - the shim alone does
+  not fix layering, only the updated importers do. Treat the public-contract
+  question (w4) as a documentation/deprecation-window decision, not a design
+  blocker for the move itself.
+
+anti_patterns:
+  - "DO NOT update core/platforms importers to the new location without first adding the cli/ shim - a partially migrated state would break external callers still using the old cli.* path during the same PR window."
+  - "DO NOT change registry class names, method signatures, or hook registration order during the move - this is a location fix, not a redesign."
+  - "DO NOT silently drop the cli.* shim without checking docs/reference/public-contracts.md first - these may be documented as public import paths."
+
+verification:
+  - description: "All benchmark and platform CLI option hooks still work after relocation"
+    command: "uv run -- python -m pytest tests -k 'benchmark_hooks or platform_hooks or cli_options' --tb=short"
+    expected_output: "all hook-registry tests pass"
+  - description: "Old cli.* import paths still resolve via the shim"
+    command: "uv run -- python -c 'from benchbox.cli.benchmark_hooks import BenchmarkOptionError; from benchbox.cli.platform_hooks import PlatformHookRegistry; print(\"ok\")'"
+    expected_output: "ok"
+  - description: "No remaining core/platforms module imports benchbox.cli.* for hooks"
+    command: "grep -rn 'cli.benchmark_hooks\\|cli.platform_hooks\\|cli import benchmark_hooks\\|cli import platform_hooks' benchbox/core benchbox/platforms"
+    expected_output: "no matches (only benchbox/cli/*.py shim files reference the old names, if any)"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/"
+    - "benchbox/platforms/"
+    - "benchbox/cli/benchmark_hooks.py"
+    - "benchbox/cli/platform_hooks.py"
+    - "docs/reference/backward-compatibility.md"
+    - "docs/reference/public-contracts.md"
+  do_not_modify:
+    - "benchbox/cli/app.py"
+    - "benchbox/cli/main.py"
+
+success_metrics:
+  - "benchbox.core.* and benchbox.platforms.* no longer import from benchbox.cli for hook registries."
+  - "benchbox/cli/benchmark_hooks.py and benchbox/cli/platform_hooks.py are back-compat shims re-exporting from benchbox.core.hooks."
+  - "Public-contract status of the old import paths is explicitly documented (public with deprecation window, or internal-only)."
+
+open_questions:
+  - "Should the new home be benchbox/core/hooks/ or a top-level benchbox/hooks/, given that platform_hooks.py is consumed by benchbox/platforms/__init__.py rather than by core/ itself? Default to benchbox/core/hooks/ per the utils < core < platforms < cli ordering (platforms may depend on core) unless review finds a reason core itself must not own platform-facing hooks."

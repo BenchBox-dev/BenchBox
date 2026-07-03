@@ -1,0 +1,143 @@
+id: parity-check-develop-ring
+title: "Give make parity-check a CI ring on develop (currently main-only)"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  `make parity-check` (Makefile:930-937) regenerates the CLI↔explorer
+  visualization JSON fixtures under `tests/parity/fixtures/` and diffs them
+  against the checked-in copies, catching drift between the Python
+  implementations and the fixtures the Vitest suite asserts against. The
+  `parity` job in `test.yml` runs this (and the Vitest suite) but is
+  explicitly excluded from develop PRs by its own `if:` condition
+  (test.yml:450: `github.base_ref != 'develop'`), and it is not part of
+  `develop-post-merge.yml`'s auto-revert safety net either
+  (`develop-post-merge.yml` only runs `ci-lint`, `ci-test`, and
+  `explorer-tokens`, :20-69). So a viz/explorer change that drifts the
+  fixtures can land on develop and stay unblocked until the next release PR
+  to `main`, where `parity` finally runs.
+
+work:
+  - id: w1
+    summary: "Measure make parity-check runtime, then place it in the develop-PR gate or post-merge net"
+    status: pending
+    notes: |
+      Run `time make parity-check` to get a baseline. If it is cheap
+      (comparable to the existing `explorer-tokens` job, which is
+      stdlib-only and lint-fast), prefer path-filtering it into pr.yml as
+      a develop-PR-blocking job gated on results-explorer/viz path changes
+      (extend `scripts/path_filter_decision.py` /
+      `.github/path-filters.yml` the same way
+      pr-gate-package-and-audit-promotion does for packaging paths - reuse
+      that filter-group pattern rather than inventing a second one). If it
+      is expensive (needs a Python env sync plus Vitest/npm install), place
+      it in `develop-post-merge.yml` instead, mirroring the existing
+      `lint`/`fast-test` jobs (develop-post-merge.yml:20-56) - non-blocking
+      to the PR but caught immediately post-merge with the auto-revert
+      path.
+
+  - id: w2
+    summary: "If placed post-merge, add parity-check to the Makefile ci-test auto-revert mirror"
+    needs: [w1]
+    status: pending
+    notes: |
+      Only applies if w1 chose develop-post-merge.yml placement. Add a
+      `parity-check` job to `develop-post-merge.yml` calling
+      `make parity-check` directly (it is already a Makefile target,
+      Makefile:930-937 - no `ci-`-prefixed wrapper needed, unlike
+      `ci-lint`/`ci-test` which mirror workflow-specific pytest
+      invocations). Wire it into the same auto-revert trigger path the
+      `lint`/`fast-test` jobs use so a fixture drift on develop triggers a
+      revert, not silent accumulation until the next release.
+
+  - id: w3
+    summary: "If placed in pr.yml, wire into ci-required-result with skipped-counts-as-pass semantics"
+    needs: [w1]
+    status: pending
+    notes: |
+      Only applies if w1 chose PR-gate placement. Follow the same
+      conditional-job pattern as pr-gate-package-and-audit-promotion's w3
+      (pr.yml:789-793 pattern): add the job's result to
+      `ci-required-result`'s `needs:` and success-or-skipped check so
+      non-viz PRs are unaffected.
+
+deps:
+  needs: []
+
+must_preserve:
+  - "test.yml's parity job continues to run on the release/main PR path unchanged - this item adds a develop-side ring, it does not replace the existing main-release check."
+  - "develop-post-merge.yml's existing lint and fast-test jobs (develop-post-merge.yml:20-56) are unaffected if w1 chooses post-merge placement - parity-check is an additional job, not a replacement."
+  - "Release v* PRs keep skipping parity per the existing condition (test.yml:450) if that same skip logic is reused for the new job."
+
+approach: |
+  Start with the w1 timing measurement before committing to a placement -
+  the two options (PR-blocking-but-path-filtered vs post-merge-non-blocking)
+  have different cost/latency tradeoffs and the runtime number should drive
+  the choice, not a preference. If path-filtered into pr.yml, reuse the
+  path-filter-group mechanism being added by
+  pr-gate-package-and-audit-promotion rather than building a second,
+  divergent filtering mechanism.
+
+anti_patterns:
+  - "DO NOT add parity-check to every develop PR unconditionally if it is expensive - because most PRs never touch viz/explorer code - path-filter it or move it to post-merge."
+  - "DO NOT duplicate the path-filter-group mechanism - because pr-gate-package-and-audit-promotion is adding one already - extend the same classifier config rather than writing a parallel one."
+  - "DO NOT silently drop the Release v* PR skip when porting logic from test.yml:450 - because that condition exists so curation-only version-bump PRs aren't blocked on fixture regen - carry the same exemption into whichever new job you add."
+
+verification:
+  - description: "Baseline runtime measured before placement decision"
+    command: "time make parity-check"
+    expected_output: "wall-clock time recorded and cited in the PR/commit that implements w1"
+  - description: "A deliberately stale fixture is caught on develop (not just on release PRs)"
+    command: "On a scratch branch: touch a change to a viz-generating Python module without regenerating tests/parity/fixtures, open a PR against develop, check the new job/ring"
+    expected_output: "new job fails (PR-blocking) or triggers auto-revert (post-merge), depending on w1's placement choice"
+  - description: "Non-viz develop PRs are unaffected"
+    command: "gh pr checks <non-viz-develop-pr>"
+    expected_output: "no new required job runs, or it runs and passes trivially fast"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/pr.yml"
+    - ".github/workflows/develop-post-merge.yml"
+    - ".github/path-filters.yml"
+    - "scripts/path_filter_decision.py"
+  do_not_modify:
+    - ".github/workflows/test.yml"
+    - "tests/parity/fixtures/"
+    - "tests/parity/generate_visualization_fixtures.py"
+
+prior_art:
+  - "Makefile:930-937 parity-check target — reuse as-is, no new Make target needed"
+  - "test.yml:445-450 parity job condition (Release v* exemption) — reuse the exemption logic for whichever new job is added"
+  - "develop-post-merge.yml:20-56 lint/fast-test jobs — reuse as the post-merge placement pattern if w1 chooses that option"
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - ci
+    - parity
+    - explorer
+    - develop-pr-gate
+  estimated_effort: Medium
+  created_date: "2026-07-03"
+
+impact:
+  business_value: |
+    Closes the window where CLI/explorer visualization fixtures can drift
+    on develop for an arbitrary number of merges before the next release
+    PR to main catches it.
+  technical_debt: |
+    Prevents fixture-vs-implementation drift from compounding across
+    multiple develop merges before detection.
+
+success_metrics:
+  - "A fixture-drifting change is caught within one PR or one post-merge run on develop, not deferred to the next release PR."
+  - "Non-viz develop PRs see no material added latency."
+
+open_questions:
+  - question: "Is make parity-check cheap enough (npm/vitest install cost) to path-filter into the PR-blocking lane, or does it need post-merge placement?"
+    gating: true
+    affects: ["w1 placement decision"]
+    default: "Measure first (w1); default to post-merge non-blocking if runtime exceeds the explorer-tokens job's baseline by a wide margin."

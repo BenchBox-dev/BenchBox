@@ -1,0 +1,136 @@
+id: pr-gate-package-and-audit-promotion
+title: "Promote package build/install smoke and pip-audit to the develop-PR required lane"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  The develop-PR gate (`.github/workflows/pr.yml`, single required check
+  `ci-required-result` at pr.yml:757-819) never builds the wheel, never
+  installs it in isolation, and never runs `pip-audit`. Both checks exist
+  today but only run nightly (`nightly.yml` `test-package` job ~:261-308,
+  `pip-audit` step ~:111-118) or on `main` (`test.yml`, triggers only on
+  `push`/`pull_request` to `main`, test.yml:3-9). The nightly `test-package`
+  job's own comment (nightly.yml:300-303) states this exact minimal-import
+  contract's absence "let v0.3.0 ship a broken clean install" - i.e. this
+  gap has already caused a real regression that reached a release before
+  any CI lane caught it. A `pyproject.toml`/`MANIFEST.in`/`uv.lock` change
+  can land on develop today with zero build/install/audit signal until the
+  next nightly run or the `main` release PR.
+
+  This item path-filters both checks into the develop-PR required lane
+  using the existing classifier so unrelated PRs (e.g. a docs-only or
+  single-test-file change) pay no extra CI cost.
+
+work:
+  - id: w1
+    summary: "Path-filtered package build + isolated install + minimal-import smoke job in pr.yml"
+    status: pending
+    notes: |
+      Add a `package-smoke` job to pr.yml gated on a new path-filter output
+      (extend `scripts/path_filter_decision.py` / `.github/path-filters.yml`
+      with a `packaging` group covering `pyproject.toml`, `MANIFEST.in`,
+      `setup.py`/`setup.cfg`, `benchbox/__init__.py`, `uv.lock`). Reuse the
+      nightly `test-package` job's steps verbatim where possible: `uv build`,
+      assert exactly one wheel (nightly.yml:291-296), then the isolated
+      install + minimal-import assertion (nightly.yml:300-304): import
+      `benchbox` succeeds AND `importlib.util.find_spec('pandas') is None`,
+      plus `benchbox --help`. Single ubuntu-latest/3.12 leg is sufficient for
+      the PR gate; leave the full OS matrix (ubuntu + windows) to nightly.
+
+  - id: w2
+    summary: "Path-filtered pip-audit job in pr.yml"
+    status: pending
+    notes: |
+      Add a `dependency-audit` job gated on the same packaging path filter
+      (or a `pyproject.toml`/`uv.lock`-only subset if the classifier
+      distinguishes them) plus the `PIP_AUDIT_IGNORE_VULNS` escape hatch
+      already used in nightly.yml:111-118. Reuse that step body directly
+      rather than reimplementing the ignore-list parsing.
+
+  - id: w3
+    summary: "Wire package-smoke and dependency-audit into ci-required-result with skipped-counts-as-pass semantics"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      Follow the existing conditional-job pattern in `ci-required-result`
+      (pr.yml:789-793, the `AUDIT_SHA_RESULT` check: fail only if the result
+      is neither `success` nor `skipped`). Add
+      `PACKAGE_SMOKE_RESULT`/`DEPENDENCY_AUDIT_RESULT` env vars from
+      `needs.package-smoke.result` / `needs.dependency-audit.result`, add
+      both jobs to the `needs:` list at pr.yml:759, and add the same
+      success-or-skipped check before the final pass/fail block
+      (pr.yml:810-819). A PR that does not touch packaging files must still
+      pass with both jobs skipped.
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Non-packaging PRs see no new required job execution time (path filter must correctly skip both jobs)."
+  - "ci-required-result's existing skipped-counts-as-pass semantics for audit-sha (pr.yml:789-793) as the pattern to extend, not replace."
+  - "nightly.yml's test-package OS matrix (ubuntu + windows) and its own pip-audit step remain unchanged and continue running nightly independently of this PR-time addition."
+
+approach: |
+  Extend the classifier first (w1's path-filter group), then add jobs that
+  reuse nightly step bodies by copy (not by refactoring nightly.yml itself -
+  this TODO does not touch nightly.yml). Wire into ci-required-result last,
+  once both jobs exist and their `result` values are known-good in a scratch
+  run.
+
+anti_patterns:
+  - "DO NOT make package-smoke or dependency-audit run unconditionally on every PR - because most PRs never touch packaging metadata and the whole point is targeted, cheap promotion - path-filter both."
+  - "DO NOT refactor nightly.yml's test-package job into a shared reusable workflow as part of this change - because that's a larger, separable refactor - copy the step bodies into pr.yml and let them diverge if needed."
+  - "DO NOT let a skipped package-smoke/dependency-audit job silently pass ci-required-result on a PR that DID touch packaging files - because that reintroduces the exact gap this TODO closes - verify the path-filter output, not just the job result, gates the check."
+
+verification:
+  - description: "Breaking MANIFEST.in on a scratch branch turns package-smoke red"
+    command: "git checkout -b scratch/break-manifest && echo 'exclude benchbox/py.typed' >> MANIFEST.in && git commit -am 'scratch: break manifest' && gh pr create --fill --base develop && gh pr checks --watch"
+    expected_output: "package-smoke job fails; ci-required-result fails"
+  - description: "A docs-only PR skips both new jobs and still passes"
+    command: "gh pr checks <docs-only-pr-number>"
+    expected_output: "package-smoke and dependency-audit show skipped; ci-required-result succeeds"
+  - description: "pip-audit job fails on an intentionally vulnerable pinned dep in a scratch branch"
+    command: "uvx pip-audit"
+    expected_output: "matches nightly's existing pip-audit behavior when a known vuln is present"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/pr.yml"
+    - ".github/path-filters.yml"
+    - "scripts/path_filter_decision.py"
+  do_not_modify:
+    - ".github/workflows/nightly.yml"
+    - ".github/workflows/test.yml"
+    - "Makefile"
+
+prior_art:
+  - "nightly.yml:261-308 test-package job — reuse the build/install/minimal-import steps verbatim"
+  - "nightly.yml:111-118 pip-audit step — reuse the ignore-vuln parsing"
+  - "pr.yml:757-819 ci-required-result conditional-job pattern (audit-sha skipped-counts-as-pass) — extend with the same shape for the two new jobs"
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - ci
+    - packaging
+    - security
+    - develop-pr-gate
+  estimated_effort: Medium
+  created_date: "2026-07-03"
+
+impact:
+  business_value: |
+    Closes the exact gap that let a broken clean install (pulling pandas
+    into the core install) ship in v0.3.0 - the next such regression fails
+    the develop PR that introduces it instead of surfacing at the next
+    nightly run or during the main release PR.
+  technical_debt: |
+    Removes a class of "passes locally, breaks on install" bugs from the
+    develop branch instead of only main.
+
+success_metrics:
+  - "A packaging-metadata-breaking change fails ci-required-result on its PR, not just nightly."
+  - "Non-packaging PRs incur zero added required-job wall-clock time."

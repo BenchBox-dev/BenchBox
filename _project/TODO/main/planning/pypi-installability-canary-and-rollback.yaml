@@ -1,0 +1,177 @@
+id: pypi-installability-canary-and-rollback
+title: "Add a PyPI-latest installability canary and document the rollback runbook"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Release Tooling
+
+description: |
+  `v0.3.0` published to PyPI on 2026-05-16 with a broken clean import
+  (`ModuleNotFoundError: No module named 'pandas'`, reverified live via
+  `uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c
+  'import benchbox'` run from outside the repo tree so it doesn't shadow
+  against the local source tree). It sat as PyPI-latest, uncaught, for
+  over a month (through at least 2026-07-03, per `pip index versions
+  benchbox` still showing `LATEST: 0.3.0`).
+
+  This happened despite `.github/workflows/nightly.yml` already having a
+  `test-package` job (lines ~261-304) that builds a wheel and asserts a
+  clean, pandas-free import — but that job tests a wheel built fresh from
+  the current `develop` tree on every nightly run, not the artifact
+  actually sitting on PyPI. Once `0.3.0` published broken, nightly kept
+  testing `develop`'s (possibly already-fixed) source and never flagged
+  that the *public* PyPI-latest install was broken for real users running
+  `pip install benchbox` during that window.
+
+  This TODO adds the missing signal — a scheduled check against the real
+  published PyPI artifact — and documents what to do when it fires,
+  because PyPI versions are immutable and a "fix forward" is the only
+  option once a bad version ships.
+
+work:
+  - id: w1
+    summary: "Add a scheduled PyPI-latest installability canary"
+    status: pending
+    notes: |
+      Extend `.github/workflows/release-canary.yml` (which already runs on
+      a daily `cron: "0 8 * * *"` schedule against `develop`, see
+      `env.RELEASE_CANARY_REF` near the top of the file) with a new job,
+      e.g. `pypi-latest-installability`, that:
+        - does NOT check out the repo (or checks it out only to reuse the
+          uv-setup steps) — the point is to install the *published*
+          package, not build local source;
+        - runs from a directory outside any checked-out repo tree (to
+          avoid the exact same source-shadowing false-pass this
+          investigation hit: running `import benchbox` from inside
+          `/home/user/BenchBox` silently imports the local `benchbox/`
+          source directory instead of the installed wheel, because Python
+          adds the script's directory to `sys.path`);
+        - runs: `uv run --isolated --no-project --with benchbox -- python
+          -c "import importlib.util; import benchbox;
+          assert importlib.util.find_spec('pandas') is None, 'core
+          install must not pull pandas'; print(benchbox.__version__)"`
+          (mirrors the exact assertion already used in
+          `nightly.yml:303`, just against PyPI-latest instead of a
+          freshly built wheel — reuse that assertion string rather than
+          drifting a second copy of the "no pandas" contract);
+        - fails loudly (non-zero exit, clear step name) if the import (or
+          the pandas-absence assertion) fails, so `gh run list` /
+          notifications surface it distinctly from the existing
+          `credential-free-non-fast` canary job.
+      Do not gate this on any existing job in the file; it should run
+      independently so a PyPI-latest failure doesn't get masked by an
+      unrelated develop-canary failure or vice versa.
+
+  - id: w2
+    summary: "Document a rollback/.postN recovery runbook section"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add a new section to `docs/operations/release-guide.md` (currently
+      164 lines, ends with the release flow + pre-merge contract; no
+      existing rollback/yank/immutability guidance) titled something like
+      "## Recovering from a broken PyPI release". Cover:
+        - PyPI versions are immutable: you cannot re-upload or delete-and-
+          replace `X.Y.Z` once published (this is what `release-recovery-
+          v0-3-1`'s `must_preserve` already asserts for `0.3.0`
+          specifically — generalize that constraint into the permanent
+          runbook here rather than leaving it stated only inside one
+          recovery TODO).
+        - Two response options and when to use each:
+          (a) **yank** the broken version (`pip index` / PyPI UI "yank" —
+              hides it from default resolution without deleting it,
+              existing installs unaffected) when there's a safe prior
+              version to fall back to;
+          (b) **ship a `.postN` or the next patch** (this repo's actual
+              precedent: `v0.3.0` -> `v0.3.1` recovery, not a `.post`
+              suffix, per `release-recovery-v0-3-1`) when the fix is
+              ready quickly and a monotonic forward release is cleaner
+              than yanking.
+        - Reference `make release-cut VERSION=X.Y.Z` / `make
+          release-finalize VERSION=X.Y.Z` as the mechanism for the
+          forward-fix path — this runbook section should not invent a
+          separate recovery procedure, just point at the existing flow
+          plus the yank decision point.
+        - Cross-link `release-recovery-v0-3-1` as the applied precedent so
+          future incidents have a worked example, not just abstract
+          guidance.
+
+deferred:
+  - summary: "Automatic rollback/yank triggered by the canary itself"
+    reason: "Yanking is a judgment call (is there a safe fallback version, is a fix already close) that should stay a human decision per the runbook in w2, not an automated action off a single canary failure."
+  - summary: "Backfilling a canary check for the historical 0.3.0 window"
+    reason: "The gap already happened and is being addressed by release-recovery-v0-3-1; this TODO is about preventing recurrence, not retroactive detection."
+
+deps:
+  needs:
+    - release-recovery-v0-3-1
+
+must_preserve:
+  - "The existing credential-free-non-fast canary job in release-canary.yml and its 48h freshness-window usage by release-readiness tooling are unaffected by the new job."
+  - "nightly.yml's test-package job (lines ~261-304) keeps testing the freshly-built wheel from develop as-is; this TODO adds a second, independent signal against PyPI-latest rather than replacing that job."
+
+approach: |
+  Reuse the exact import+pandas-assertion command already proven correct
+  in nightly.yml:303 rather than writing a new assertion from scratch —
+  the only material change is swapping `--with "$wheel"` (local build
+  artifact) for `--with benchbox` (resolves from PyPI) and running from a
+  directory with no local `benchbox/` source tree in `sys.path`. Add the
+  new job to release-canary.yml since that file is already the scheduled,
+  develop-facing release-readiness canary and documents its own
+  concurrency/scheduling conventions; a fresh top-level workflow would
+  duplicate that scaffolding for no benefit.
+
+anti_patterns:
+  - "DO NOT run the PyPI-latest install check from inside the checked-out repo directory - because Python silently shadows the installed package with the local benchbox/ source tree and the check will falsely pass even when the real PyPI artifact is broken - this is the exact failure mode this investigation hit firsthand; run it from a directory (e.g. mktemp -d, or a job with no checkout step) that has no local benchbox/ package."
+  - "DO NOT write a second, slightly different pandas-absence assertion string - because nightly.yml:303 already has the canonical version of this check and drift between two copies of 'the contract' is exactly the kind of accounting gap this whole work area is about - copy/reuse that exact assertion."
+  - "DO NOT invent a new release-recovery procedure in the rollback runbook - because make release-cut/release-finalize (Makefile:977-1057) is already the maintainer-facing mechanism and release-recovery-v0-3-1 is the worked precedent - the runbook should route to those, not duplicate them."
+
+verification:
+  - description: "New PyPI-latest canary job exists in release-canary.yml and is scheduled independently"
+    command: "grep -n 'pypi-latest\\|schedule\\|cron' .github/workflows/release-canary.yml"
+    expected_output: "new job name present; existing cron schedule unaffected"
+  - description: "Canary correctly fails against a known-broken version (manual sanity check, not permanent CI)"
+    command: "cd /tmp && uv run --isolated --no-project --with 'benchbox==0.3.0' -- python -c \"import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'\""
+    expected_output: "ModuleNotFoundError: No module named 'pandas' (non-zero exit) — confirms the assertion pattern actually catches this class of failure before wiring it into CI"
+  - description: "release-guide.md documents the rollback/.postN runbook"
+    command: "grep -n 'Recovering from a broken PyPI release\\|yank' docs/operations/release-guide.md"
+    expected_output: "new section present, references release-recovery-v0-3-1 and make release-cut/release-finalize"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/release-canary.yml"
+    - "docs/operations/release-guide.md"
+  do_not_modify:
+    - ".github/workflows/nightly.yml"
+    - "Makefile"
+
+prior_art:
+  - "nightly.yml:285-304 'Test package installation' step (extend) — the pandas-absence + import assertion this canary reuses, currently scoped to a freshly built local wheel rather than the published PyPI artifact."
+  - "release-canary.yml credential-free-non-fast job's schedule/concurrency conventions (reuse) — new job should follow the same cron-triggered, non-blocking pattern rather than introducing a new workflow file."
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - release
+    - ci
+    - pypi
+    - monitoring
+  created_date: "2026-07-03"
+  estimated_effort: "Small"
+
+impact:
+  business_value: |
+    Closes the detection gap that let a broken PyPI-latest release go
+    unnoticed for over a month; new users running `pip install benchbox`
+    during that window got an immediate ImportError with no CI signal
+    anywhere pointing at the live public artifact.
+  technical_debt: |
+    Establishes the rollback/.postN runbook as a standing document instead
+    of leaving that knowledge implicit in one recovery TODO's must_preserve
+    list.
+
+success_metrics:
+  - "A scheduled job checks PyPI-latest installability independently of any local-source-based test."
+  - "The canary, run manually against the known-bad 0.3.0, correctly fails with the pandas ImportError."
+  - "docs/operations/release-guide.md has a rollback/.postN section referencing the actual release-cut/release-finalize mechanism and the v0.3.1 precedent."

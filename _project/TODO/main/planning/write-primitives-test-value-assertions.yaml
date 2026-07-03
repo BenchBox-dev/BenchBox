@@ -1,0 +1,224 @@
+id: write-primitives-test-value-assertions
+title: "Write Primitives / DataFrame runner tests: replace tautological and either-outcome assertions with real value checks"
+worktree: main
+priority: Medium
+status: "Not Started"
+category: "Testing and Quality Assurance"
+
+description: |
+  Test-strategy review of the write_primitives and dataframe-runner unit
+  suites found several places where tests assert shapes/mocks rather than
+  values, so they cannot catch real regressions:
+
+  1. `tests/unit/core/write_primitives/test_pyspark_sketch_factories.py`
+     mocks the whole PySpark API (`fake_pyspark_functions` fixture,
+     `MagicMock()` spark session) and mostly asserts call shapes (e.g.
+     lines ~92-96, ~106, ~146-147). The one apparent "value" assertion,
+     `TestPysparkHllMergeExtract.test_extractor_reads_state_and_chains_union_then_estimate`
+     (line ~117-130), configures `row.__getitem__.return_value = 14836.5`
+     and then asserts `result == 14836.5` — the assertion is tautological
+     because the value only ever flows out of the same mock it was injected
+     into; the extractor's real logic (indexing into the Row by a specific
+     column key) is never verified.
+
+  2. `tests/unit/core/write_primitives/test_benchmark_execution.py` has 7
+     tests (lines 206, 360, 374, 390, 404, 418, 591) that end on
+     `mock_conn.execute.assert_not_called()` with no accompanying positive
+     assertion about the resulting state (e.g. what error/skip/no-op result
+     was actually produced). "Execute was never called" alone doesn't
+     verify the surrounding code behaved correctly — a test that returns
+     early for the wrong reason still passes.
+
+  3. `tests/unit/core/runner/test_dataframe_runner.py:484`
+     (`test_standard_phase_does_not_raise`) asserts
+     `result.validation_status in ("PASSED", "FAILED")`. This is an
+     either-outcome assertion: both possible values pass, so a regression
+     that flips the actual outcome is invisible. Tracing the runner
+     (`benchbox/core/runner/dataframe_runner.py`): the result builder
+     defaults `_validation_status` to `"PASSED"`
+     (`benchbox/core/results/builder.py:261`) and only overwrites it to
+     `"FAILED"` in the runner's `except` branch (dataframe_runner.py:298-303)
+     or to `"PARTIAL"` when failed queries exist and status was still
+     `"PASSED"` (builder.py:598-600). Since this test runs with
+     `DataFramePhases(load=False, execute=False)` and a mocked adapter that
+     raises nothing, the only reachable outcome is `"PASSED"` — the
+     assertion should be pinned to that. (Note: the review that seeded this
+     TODO cited "lines ~464,486" for this pattern; only line 484 actually
+     contains it — line 464 is an unrelated `NotImplementedError` test and
+     line 486 (`test_power_phase_does_not_raise`) only checks
+     `isinstance(result, BenchmarkResults)`, not `validation_status`.)
+
+  4. `tests/unit/benchmarks/test_write_primitives_dataframe.py` has 12
+     in-body `try: from ... import X / except ImportError: pytest.skip(...)`
+     sites (e.g. lines ~566, 586, 610, 622, 639, 691, 758, 809, 862, 928,
+     950, 972), all guarding imports from
+     `benchbox.platforms.dataframe.pyspark_maintenance`. PySpark is a core
+     (non-optional) dependency of this project
+     (`pyspark>=3.5.0` in `pyproject.toml`'s main `dependencies` list, not
+     an extra), so it is installed in CI. These in-body skips mean that if
+     a future change breaks the import of the module under test (e.g. a
+     typo, a moved symbol, a real ImportError from a genuinely broken
+     dependency chain), the tests silently skip instead of failing — CI
+     stays green.
+
+  None of these are found-then-forgotten: they're passing tests today that
+  would keep passing through the regressions they're nominally guarding
+  against.
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - testing
+    - quality
+    - write-primitives
+    - dataframe-runner
+    - pyspark
+  estimated_effort: "Medium"
+  created_date: "2026-07-03"
+
+impact:
+  user_impact: |
+    None directly - test-only changes. Indirectly reduces the chance that a
+    real regression in sketch extraction, benchmark-execution error paths,
+    validation-status computation, or PySpark maintenance imports ships
+    without a failing test.
+  technical_debt: |
+    Removes several classes of false-confidence assertions (tautological
+    mock echoes, absence-only assertions, either-outcome assertions,
+    silently-degrading import guards) that make the suite's green checkmark
+    less trustworthy than it looks.
+
+work:
+  - id: w1
+    summary: "test_pyspark_sketch_factories.py: fix the tautological HLL-merge-extract value assertion"
+    status: pending
+    notes: |
+      In `TestPysparkHllMergeExtract.test_extractor_reads_state_and_chains_union_then_estimate`
+      (~line 113-130), the assertion `assert result == 14836.5` merely
+      echoes `row.__getitem__.return_value` set two lines earlier — replace
+      or strengthen it so the test verifies the extractor's actual logic:
+        - Assert `row.__getitem__.call_args == call(0)` (or whichever key/
+          index the extractor is documented to read) so the test would fail
+          if the extractor started reading the wrong column/index.
+        - Where the full-mock architecture makes a fully "real" value
+          assertion infeasible (no real PySpark Row available in this unit
+          test), use a small hand-built fake Row class (e.g. a
+          `dict`-backed object implementing `__getitem__`) instead of
+          `MagicMock`, so `result` is produced by genuine dict lookup logic
+          in the extractor rather than being an injected mock return value.
+      Apply the same "real/fake-backed value, not injected-mock-echo"
+      pattern to any other value-bearing assertions in this file that
+      exhibit the same tautology (skim the KLL and top-K merge-extract
+      tests for the same `row.__getitem__.return_value = X; assert result
+      == X` shape).
+      Leave the call-shape assertions (e.g. `assert_called_once_with(...)`)
+      as-is where they already verify real behavior (arguments, chaining).
+
+  - id: w2
+    summary: "test_benchmark_execution.py: add positive assertions alongside the 7 execute.assert_not_called() sites"
+    status: pending
+    notes: |
+      For each of the 7 tests ending on `mock_conn.execute.assert_not_called()`
+      (lines 206, 360, 374, 390, 404, 418, 591), read the surrounding test to
+      determine what SHOULD have happened instead of executing SQL (e.g. an
+      early-return value, a raised/logged error, a specific `OperationResult`
+      state, a skip reason). Add an assertion on that positive outcome so the
+      test fails if the code takes the "don't execute" path for the wrong
+      reason. Do not weaken or remove the `assert_not_called()` calls
+      themselves — they stay as a necessary (not sufficient) condition.
+
+  - id: w3
+    summary: "test_dataframe_runner.py:484: pin validation_status to PASSED for this fixture"
+    status: pending
+    notes: |
+      Replace `assert result.validation_status in ("PASSED", "FAILED")`
+      with `assert result.validation_status == "PASSED"` — per
+      `benchbox/core/results/builder.py:261,598-600` and
+      `benchbox/core/runner/dataframe_runner.py:298-303`, a mocked adapter
+      that raises nothing with `DataFramePhases(load=False, execute=False)`
+      can only reach `"PASSED"` (default, never overwritten to `"FAILED"`
+      since the except branch never runs, and never demoted to `"PARTIAL"`
+      since there are no query results at all). Scan the rest of the file
+      for the same `in ("PASSED", "FAILED")` or similar either-outcome
+      shape (only one other match was found during triage, at the same
+      line - re-check after w3 lands in case new copies appear from a
+      merge).
+
+  - id: w4
+    summary: "test_write_primitives_dataframe.py: replace in-body ImportError skips with module-level importorskip"
+    status: pending
+    notes: |
+      Replace the 12 in-body `try/except ImportError: pytest.skip(...)`
+      sites (~lines 566, 586, 610, 622, 639, 691, 758, 809, 862, 928, 950,
+      972) that guard imports from
+      `benchbox.platforms.dataframe.pyspark_maintenance` with a single
+      module-level `pyspark = pytest.importorskip("pyspark")`-style guard
+      (or, since the failure mode is specifically the BenchBox wrapper
+      module rather than the `pyspark` package itself, guard on
+      `benchbox.platforms.dataframe.pyspark_maintenance` directly) placed
+      once near the top of the file, alongside the existing module-level
+      `except ImportError` block at lines 21/29. This preserves "skip
+      cleanly on machines without PySpark installed" for local dev while
+      ensuring a genuine breakage of the module under test (which PySpark
+      IS installed to exercise in CI - see `pyproject.toml`'s core
+      `dependencies` list) fails the suite instead of silently skipping.
+      Keep the two existing legitimate module-level import guards (lines
+      21, 29) - only remove the in-body per-test duplicates.
+
+must_preserve:
+  - "Tests still skip cleanly (not error) on developer machines without PySpark installed, via the module-level importorskip/import-guard, not per-test try/except."
+  - "All 7 test_benchmark_execution.py assert_not_called() calls remain in place - only add assertions, don't remove existing ones."
+  - "No change to production code in benchbox/core/write_primitives/, benchbox/core/runner/, or benchbox/platforms/dataframe/ - this is a test-only TODO."
+
+approach: |
+  Work units are independent (different files) and can land in any order or
+  as separate small PRs. For w1, prefer strengthening the existing test
+  (assert the __getitem__ call args) over a full fake-Row rewrite unless the
+  fake is trivial to build - the goal is "not tautological," not "fully
+  integration-real." For w2, read each test's surrounding setup/mocks to
+  infer the intended positive outcome rather than guessing; if a test's
+  intended outcome is genuinely ambiguous from the code, treat that
+  ambiguity itself as a finding worth a one-line comment. For w3, the
+  builder/runner trace above is definitive - no further investigation
+  needed. For w4, mirror the existing module-level guard pattern already
+  used at the top of the same file (lines 21-29) rather than inventing a
+  new pattern.
+
+anti_patterns:
+  - "DO NOT delete the mock-based call-shape assertions in test_pyspark_sketch_factories.py - because they correctly verify chaining/argument behavior for a fully-mocked PySpark API - only fix the tautological value assertion(s), leave the rest."
+  - "DO NOT convert test_benchmark_execution.py's assert_not_called() tests into full integration tests with a real connection - because that's out of scope and would require live DB fixtures - keep them mock-based, just add a positive assertion on the mocked result/state."
+  - "DO NOT weaken test_dataframe_runner.py:484 further (e.g. to `is not None`) - because the whole point is pinning the actually-reachable value - assert the literal expected string."
+  - "DO NOT move the module-level importorskip for test_write_primitives_dataframe.py into conftest.py - because other test files in the same directory import unrelated platforms and would be needlessly skipped - keep the guard local to this file."
+
+verification:
+  - description: "PySpark sketch factory tests still pass after de-tautologizing the value assertion"
+    command: "uv run -- python -m pytest tests/unit/core/write_primitives/test_pyspark_sketch_factories.py -v"
+    expected_output: "All tests pass"
+  - description: "Benchmark execution tests still pass with added positive assertions"
+    command: "uv run -- python -m pytest tests/unit/core/write_primitives/test_benchmark_execution.py -v"
+    expected_output: "All tests pass"
+  - description: "DataFrame runner test passes with the pinned validation_status"
+    command: "uv run -- python -m pytest tests/unit/core/runner/test_dataframe_runner.py -v -k 'standard_phase_does_not_raise'"
+    expected_output: "Test passes with validation_status == PASSED"
+  - description: "Write-primitives dataframe tests still pass and no longer skip on PySpark import (since PySpark is installed)"
+    command: "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_dataframe.py -v -k PySpark"
+    expected_output: "Tests pass (not skipped) since pyspark is a core dependency and is installed"
+
+scope_limit:
+  only_modify:
+    - "tests/unit/core/write_primitives/test_pyspark_sketch_factories.py"
+    - "tests/unit/core/write_primitives/test_benchmark_execution.py"
+    - "tests/unit/core/runner/test_dataframe_runner.py"
+    - "tests/unit/benchmarks/test_write_primitives_dataframe.py"
+  do_not_modify:
+    - "benchbox/core/write_primitives/"
+    - "benchbox/core/runner/dataframe_runner.py"
+    - "benchbox/core/results/builder.py"
+    - "benchbox/platforms/dataframe/pyspark_maintenance.py"
+
+success_metrics:
+  - "Zero remaining tautological mock-value-echo assertions in test_pyspark_sketch_factories.py"
+  - "All 7 assert_not_called() sites in test_benchmark_execution.py have an accompanying positive-outcome assertion"
+  - "test_dataframe_runner.py:484 asserts a single pinned value, not an either-outcome tuple"
+  - "Zero in-body except ImportError: pytest.skip sites remain in test_write_primitives_dataframe.py's PySpark test classes"

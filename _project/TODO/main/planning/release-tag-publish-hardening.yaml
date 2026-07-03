@@ -1,0 +1,214 @@
+id: release-tag-publish-hardening
+title: "Harden release.yml so PyPI publish requires a validated, on-main tag"
+worktree: main
+priority: High
+status: Not Started
+category: Release Tooling
+
+description: |
+  `.github/workflows/release.yml:3-5` triggers the whole workflow on any
+  `v*` tag push:
+
+  ```yaml
+  on:
+    push:
+      tags: ['v*']
+  ```
+
+  There is no job that asserts the tagged commit is actually an ancestor of
+  `main` before the `build` (line ~52) and `publish` (line ~98) jobs run.
+  The in-repo comment at the top of the file even documents the assumed
+  invariant ("the tag fired here has already been CI-validated" via the
+  `main-release-only` ruleset + squash-merge to `main`), but that invariant
+  is enforced entirely by out-of-band process (an admin/maintainer only
+  ever pushing tags after `release-finalize` merges to `main`), not by the
+  workflow itself. Anyone (or any compromised token) with tag-push
+  permission on any ref can trigger a real PyPI publish today.
+
+  Separately, `workflow_dispatch` (lines 6-13) lets a human manually run the
+  workflow from *any* ref with `test_pypi` defaulting to `false`. The
+  `publish` job's real-PyPI step (line 120-125:
+  `if: github.event.inputs.test_pypi != 'true'`) is gated only on that
+  boolean input, not on the ref being a tag at all — a manual dispatch from
+  a branch (e.g. a feature branch) with the default input publishes to real
+  PyPI. Only the downstream `github-release` job (line ~140:
+  `if: startsWith(github.ref, 'refs/tags/v')`) checks the ref shape, and
+  that's after publish has already happened.
+
+  This TODO hardens the workflow itself so the *tooling* enforces the
+  on-main, validated-tag invariant, not just documented process + trust.
+
+work:
+  - id: w1
+    summary: "Add an ancestor-of-main assertion job that gates build/publish"
+    status: pending
+    notes: |
+      Add a new job (e.g. `verify-tag-on-main`) at the head of
+      `.github/workflows/release.yml`, before `dependency-bounds`/`build`.
+      It should:
+        - checkout with `fetch-depth: 0` (need full history for
+          merge-base checks)
+        - resolve `origin/main`
+        - for a tag-push trigger (`github.ref` starts with `refs/tags/v`):
+          assert `git merge-base --is-ancestor <tagged-sha> origin/main`
+        - for `workflow_dispatch`: assert the dispatched ref/sha is
+          `origin/main` itself (or an ancestor of it) — do not allow
+          dispatch from an arbitrary branch to reach publish.
+      Make `build` (and therefore `publish`, `github-release`) declare
+      `needs: [verify-tag-on-main, dependency-bounds]` (or fold the
+      assertion into `dependency-bounds` if that's a smaller diff) so a
+      failing assertion blocks the whole pipeline before any build/publish
+      work starts.
+
+  - id: w2
+    summary: "Gate the real-PyPI publish step on an actual tag ref, not just the test_pypi input"
+    needs: [w1]
+    status: pending
+    notes: |
+      Update the `Publish to PyPI` step's `if:` condition (currently
+      `github.event.inputs.test_pypi != 'true'` at release.yml:120) to
+      additionally require `startsWith(github.ref, 'refs/tags/v')`, e.g.:
+
+        if: github.event.inputs.test_pypi != 'true' && startsWith(github.ref, 'refs/tags/v')
+
+      This closes the workflow_dispatch-from-a-branch gap independently of
+      w1 (defense in depth: w1 stops it at the top of the pipeline, w2
+      stops the specific publish step even if w1 is ever bypassed or
+      miswired). Confirm the Test PyPI step's condition doesn't need the
+      same treatment (test-pypi publishes are lower-risk by design, but
+      note the decision either way).
+
+  - id: w3
+    summary: "Document and apply a tag ruleset restricting v* tag creation"
+    needs: [w1]
+    status: pending
+    notes: |
+      This is the "who can create a `v*` tag at all" half of the fix and
+      is an admin action outside repo-tree permissions, same pattern as
+      the existing pending-admin-action section in
+      `docs/operations/repo-admin-settings.md` (see
+      "### Soundness-path review enforcement (pending admin action)" at
+      line ~101, which documents target-state settings, live-state gap,
+      and a verify command since the develop-PR GITHUB_TOKEN lacks the
+      `administration` scope to read/write rulesets itself).
+
+      Add a new `### Tag creation restricted to release flow (pending
+      admin action)` section documenting:
+        - target state: a GitHub tag protection ruleset on `v*` restricting
+          tag creation to the release automation identity / specific
+          actors (not arbitrary collaborators), mirroring how
+          `develop-squash-only` restricts branch pushes;
+        - the verify command (`gh api repos/joeharris76/BenchBox/rules/tags/...`
+          or equivalent tag-ruleset read endpoint);
+        - live state at time of writing (no tag ruleset configured, so any
+          actor with push access can create a `v*` tag today);
+        - why this can't be applied by the write-task's own PR (no
+          `administration` scope), same disclaimer as the existing section.
+
+  - id: w4
+    summary: "Verify/require the pypi GitHub environment has required reviewers"
+    needs: [w1]
+    status: pending
+    notes: |
+      `release.yml:98-100` already scopes the publish job to a GitHub
+      `environment` (`pypi` or `test-pypi` depending on the dispatch
+      input), which is the correct mechanism for a required-reviewers
+      gate, but the workflow file alone doesn't prove the `pypi`
+      environment has `required_reviewers` configured on the repo side.
+      Verify via:
+
+        gh api repos/joeharris76/BenchBox/environments/pypi
+
+      Check the `protection_rules` for a `required_reviewers` entry. If
+      absent, this is another pending-admin-action item (same
+      documentation pattern as w3) — add it to
+      `docs/operations/repo-admin-settings.md` rather than silently
+      assuming it's set. If already configured, record the confirmed
+      state in the runbook instead (positive confirmation, not silence).
+
+deferred:
+  - summary: "Migrating publish from PyPI trusted-publishing OIDC to a different auth mechanism"
+    reason: "Out of scope; the OIDC trusted-publishing setup (release.yml:100-101 permissions: id-token: write) is sound and unrelated to the ref-validation gap this TODO fixes."
+
+deps:
+  needs:
+    - release-recovery-v0-3-1
+
+must_preserve:
+  - "The existing release-cut/release-finalize flow in Makefile:977-1057 keeps working end-to-end: git tag vX.Y.Z pushed from main after release-finalize's squash-merge still triggers a successful publish without extra manual steps."
+  - "Test PyPI publishing via workflow_dispatch with test_pypi=true continues to work for pre-release validation (this is a legitimate, lower-risk path and should not be blocked by the ancestor-of-main check unless it's also dispatched from a non-main ref, which should already be unusual for that use case)."
+  - "The github-release job's existing tag-ref check (startsWith(github.ref, 'refs/tags/v')) is unaffected."
+
+approach: |
+  Start with w2 (single-line if-condition change, immediately closes the
+  highest-severity gap: workflow_dispatch-from-a-branch to real PyPI).
+  Then w1 (the ancestor-of-main job), which is the general-case fix and
+  needs fetch-depth: 0 plus a merge-base check — model the job on
+  standard `actions/checkout@v4` + `git merge-base --is-ancestor` patterns
+  already used elsewhere in this org's workflows if any exist; otherwise
+  keep it minimal (a single shell step, no new custom action). w3 and w4
+  are documentation-first admin-action items, following the exact pattern
+  of the existing "pending admin action" section in
+  docs/operations/repo-admin-settings.md — read that section fully before
+  writing the new one so the tone/structure/verify-command style matches.
+
+anti_patterns:
+  - "DO NOT try to apply the tag ruleset or environment-reviewer settings directly from a PR - because the develop-PR GITHUB_TOKEN has no administration scope (same constraint documented for the existing soundness-path ruleset gap) - document the target/live state and let an admin apply it out of band, same as w3/w4 above."
+  - "DO NOT gate the ancestor-of-main check only on the tag-push trigger - because workflow_dispatch from an arbitrary branch is the more exploitable gap - w1's job must cover both trigger types explicitly, and w2 adds a second independent check on the publish step itself."
+  - "DO NOT remove or weaken the existing environment: pypi / test-pypi scoping on the publish job - because that's the correct mechanism for w4's required-reviewers gate - build on it, don't replace it."
+
+verification:
+  - description: "verify-tag-on-main job exists and runs before build"
+    command: "grep -n 'verify-tag-on-main\\|needs:' .github/workflows/release.yml"
+    expected_output: "new job present; build (and therefore publish) job's needs: includes verify-tag-on-main"
+  - description: "Real-PyPI publish step's if-condition requires a tag ref"
+    command: "grep -n -A2 'Publish to PyPI' .github/workflows/release.yml"
+    expected_output: "if: condition includes startsWith(github.ref, 'refs/tags/v') in addition to the test_pypi check"
+  - description: "release-guide/repo-admin-settings docs updated with the two new pending-admin-action sections"
+    command: "grep -n 'pending admin action' docs/operations/repo-admin-settings.md"
+    expected_output: "at least 3 matches: the existing soundness-path section plus the new tag-ruleset and pypi-environment-reviewers sections"
+  - description: "Existing release-cut/release-finalize flow is unaffected (dry-run reasoning, not a real release)"
+    command: "grep -n 'release-cut:\\|release-finalize:' Makefile"
+    expected_output: "targets unchanged; no modification needed to Makefile for this TODO"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/release.yml"
+    - "docs/operations/repo-admin-settings.md"
+  do_not_modify:
+    - "Makefile"
+    - ".github/workflows/nightly.yml"
+    - ".github/workflows/release-canary.yml"
+
+prior_art:
+  - "docs/operations/repo-admin-settings.md:101 '### Soundness-path review enforcement (pending admin action)' — extend with the same target-state/live-state/verify-command pattern for w3 and w4, rather than inventing a new documentation format."
+  - "release.yml:98-100 environment: pypi/test-pypi scoping — reuse/extend for w4's required-reviewers verification rather than adding a parallel gate mechanism."
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - release
+    - ci
+    - security
+    - pypi
+  created_date: "2026-07-03"
+  estimated_effort: "Medium"
+
+impact:
+  business_value: |
+    Closes a real supply-chain gap: today, tooling alone does not prevent
+    an unreviewed or unvalidated ref from publishing a real PyPI release
+    of benchbox. Hardening this reduces reliance on "nobody would do that"
+    process trust.
+  technical_debt: |
+    Brings release.yml's actual guarantees in line with what its own
+    top-of-file comment already claims is true.
+
+success_metrics:
+  - "A tag push or workflow_dispatch from a non-main-ancestor ref fails before reaching the build/publish jobs."
+  - "The real-PyPI publish step's if-condition requires both test_pypi != 'true' and a v* tag ref."
+  - "docs/operations/repo-admin-settings.md documents target/live state for both the v* tag ruleset and the pypi environment's required-reviewers setting."
+
+open_questions:
+  - "Should the ancestor-of-main check also reject a tag pushed to main but from a commit that isn't the tip of a squash-merged release-finalize PR (i.e., could someone tag an arbitrary earlier main commit)? w1's merge-base check alone would still pass for that case since any earlier main commit is an ancestor — decide if that's an acceptable residual risk or needs a stricter 'tag SHA == a release-finalize commit' check."

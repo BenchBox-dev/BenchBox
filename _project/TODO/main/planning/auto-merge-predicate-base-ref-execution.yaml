@@ -1,0 +1,113 @@
+id: auto-merge-predicate-base-ref-execution
+title: "Run the auto-merge soundness predicate from the base ref, not the PR's own checkout"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Release Tooling
+
+description: |
+  `.github/workflows/auto-merge-on-open.yml` (lines 31-48: the checkout, base-branch
+  fetch, and "Check soundness-critical paths" step) checks out the PR at its own
+  HEAD and then runs `_project/scripts/auto_merge_soundness_paths.py` *from that
+  same checkout*. For a same-repo (non-fork) PR — the normal case for this
+  single-maintainer-owned repo where contributors push branches directly — the
+  script executing the predicate is whatever version the PR itself introduces. A
+  PR that edits `auto_merge_soundness_paths.py` (e.g. narrows `SOUNDNESS_PREFIXES`,
+  or the workflow file itself) evaluates its own diff against its own modified
+  rules, so it can neutralize its review gate in the same commit that would
+  otherwise have triggered it.
+
+  Note honestly: with the repo-layer ruleset review requirement from
+  auto-merge-review-gate-admin-enforcement enforced (once its deferred admin
+  action lands), this workflow's withholding behavior is defense-in-depth, not
+  the primary control — the ruleset's `pull_request` rule would block a
+  zero-approval squash-merge regardless of what this workflow decides. This item
+  is still worth doing because (a) the ruleset enforcement is not yet live, and
+  (b) even once it is, a same-commit self-neutralization that quietly avoids
+  ever showing "review required" is a bad signal for reviewers relying on the
+  auto-merge state as a triage cue.
+
+prior_art:
+  - ".github/workflows/auto-merge-on-open.yml:31-48 — the checkout + soundness-check step being hardened; keep its step names and output contract (steps.soundness.outputs.soundness_path) stable so the enable/disable steps below it don't need changes."
+  - "_project/scripts/auto_merge_soundness_paths.py — the predicate being protected; do not fork or duplicate its logic, only change which copy of the file gets executed."
+  - "Makefile:pr-open (~line 1163) — also invokes the predicate via `uv run --project _project/scripts`; out of scope for this item's local-CLI flow (a developer running make pr-open locally already has arbitrary code execution), but keep the two invocations' semantics compatible."
+
+work:
+  - id: w1
+    summary: "Fetch and execute the base-ref copy of the predicate script instead of the PR's own checkout copy"
+    status: pending
+    notes: |
+      In the "Check soundness-critical paths" step, before running the predicate,
+      materialize the base-ref version: `git show
+      "origin/${{ github.base_ref }}:_project/scripts/auto_merge_soundness_paths.py"
+      > /tmp/predicate.py` (base branch is already fetched by the preceding
+      "Fetch base branch" step), then invoke `python /tmp/predicate.py --stdin
+      --format github-output` instead of the checked-out repo path. Confirm the
+      script has no relative imports or sibling-file dependencies that would
+      break when run standalone from /tmp (check the top of
+      auto_merge_soundness_paths.py — it currently has none, keep it that way or
+      copy siblings too if that changes).
+
+  - id: w2
+    summary: "Treat modification of the predicate or the workflow itself as soundness=true"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add an explicit check: if the PR's diff touches
+      _project/scripts/auto_merge_soundness_paths.py or
+      .github/workflows/auto-merge-on-open.yml, force soundness_path=true
+      regardless of what the base-ref predicate returns for the rest of the
+      diff. This closes the residual gap where a PR could still edit the
+      predicate to make future PRs unsafe, without itself needing owner review
+      under the base-ref-only check (base-ref execution alone stops the
+      predicate from judging its own diff leniently, but does not by itself
+      flag "this diff touches the predicate" as inherently review-worthy).
+
+  - id: w3
+    summary: "Update or add a workflow-level test exercising the base-ref execution path"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      Extend tests/unit/test_auto_merge_soundness_paths.py's
+      test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge (which
+      currently string-matches the workflow YAML) with assertions for the new
+      `git show origin/.../auto_merge_soundness_paths.py` line and the
+      predicate/workflow self-touch check, so a future edit that removes the
+      base-ref execution regresses a fast unit test rather than only being
+      caught by manual review.
+
+must_preserve:
+  - "The workflow's output contract (steps.soundness.outputs.soundness_path, consumed by the existing enable/disable auto-merge steps) is unchanged."
+  - "The synchronize-event re-evaluation behavior (a later push that newly touches a soundness path flips auto-merge back off) continues to work."
+  - "make pr-open's local invocation of the predicate is unaffected by this item (base-ref execution is CI-workflow-specific; a local developer already has full repo access)."
+
+anti_patterns:
+  - "DO NOT fork auto_merge_soundness_paths.py's logic into the workflow YAML as inline shell/python — keep executing the actual script file (from the base ref) so there is exactly one implementation to maintain."
+  - "DO NOT skip the base-branch fetch step's existing --no-tags behavior or change its shallow/full-history semantics; only add the base-ref file materialization after it."
+  - "DO NOT treat this as a substitute for the ruleset-layer review requirement — this is documented as defense-in-depth in the description; don't let this item's success_metrics imply it replaces auto-merge-review-gate-admin-enforcement."
+
+verification:
+  - description: "Backstop workflow tests still pass with the added base-ref and self-touch assertions"
+    command: "uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -v"
+    expected_output: "all tests pass, including the extended test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge"
+  - description: "A workflow_dispatch or manual trace confirms /tmp/predicate.py is materialized from origin/develop, not the PR's HEAD copy, before the predicate runs"
+    command: "gh run view <run-id> --log | grep -A3 'Check soundness-critical paths'"
+    expected_output: "log shows the git show origin/${{ github.base_ref }} step succeeding before the predicate invocation"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/auto-merge-on-open.yml"
+    - "tests/unit/test_auto_merge_soundness_paths.py"
+  do_not_modify:
+    - "_project/scripts/auto_merge_soundness_paths.py"
+    - "Makefile"
+
+deps:
+  needs:
+    - soundness-surface-widening
+
+open_questions:
+  - question: "Is predicate/workflow self-touch-as-soundness (w2 here) the sole owner of that concern, or does soundness-surface-widening also need to widen SOUNDNESS_PREFIXES to include the workflow/script paths directly?"
+    gating: true
+    affects: ["w2", "soundness-surface-widening open_questions: predicate/workflow self-protection ownership"]
+    default: "This item (w2) owns the self-touch check via workflow-level diff inspection, not via widening SOUNDNESS_PREFIXES to include .github/workflows/ or _project/scripts/ — keeps the path predicate itself scoped to product code paths."

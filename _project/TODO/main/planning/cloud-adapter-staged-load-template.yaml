@@ -1,0 +1,192 @@
+id: cloud-adapter-staged-load-template
+title: "Extract a shared staged-load template method for redshift/snowflake (and evaluate bigquery/databricks)"
+worktree: main
+priority: Medium
+status: "Not Started"
+category: Platform Expansion
+
+description: |
+  Architecture review (Work Area E, structural remediation) found that
+  `benchbox/platforms/redshift.py:load_data` (starts at line 1794) and
+  `benchbox/platforms/snowflake.py:load_data` (starts at line 762)
+  independently implement the same staged-load orchestration loop - resolve
+  data files per table, upload/stage, run the platform load command, record
+  per-table row counts, log success/failure - with behavioral drift between
+  the two copies rather than a shared abstraction:
+
+  - Key casing: redshift keys `table_stats` by `table_name.lower()`
+    (redshift.py:1817, 1828, 1838, 1849, 1859, 1870); snowflake keys by
+    `table_name.upper()` (snowflake.py:791, 806, 816).
+  - Error reporting on failure: redshift logs the full error text
+    (`error_message = str(e) or repr(e) or type(e).__name__`, then
+    `self.logger.error(f"Failed to load {table_name}: {error_message}")`);
+    snowflake truncates to `str(e)[:100]`
+    (`self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")`).
+    Same failure class, different diagnostic fidelity depending on which
+    platform hit it.
+
+  Similar near-identical duplication exists elsewhere in the same two files
+  plus databricks: `apply_unified_tuning` (redshift.py:2637 vs
+  snowflake.py:1748) and `close_connection`, which is actually triplicated
+  (redshift.py:2437, snowflake.py:1592,
+  `benchbox/platforms/databricks/adapter.py:2288`). This TODO focuses on the
+  staged-load loop first since it has observable behavioral drift (the key
+  casing difference could already be causing lookup bugs for any caller that
+  assumes a fixed case); the other duplications are cheaper copy-align fixes
+  once the load-loop template exists to model them on.
+
+  This is a targeted refactor, not a shrink-campaign item -
+  `_project/goal-shrink-core-code.md` explicitly scopes "dual-impl collapses
+  that trade correctness risk for lines" out of the autonomous shrink loop;
+  this work is done deliberately with adapter test coverage as the safety
+  net, not for line-count credit.
+
+work:
+  - id: w1
+    summary: "Extract a template-method staged-load skeleton in platforms/base"
+    status: pending
+    notes: |
+      Add a shared skeleton to `benchbox/platforms/base/data_loading.py` (or
+      a new `benchbox/platforms/base/staged_load.py` if data_loading.py is
+      already large) implementing: resolve data files via
+      `_resolve_data_files` -> per-table hook (upload/stage + platform-specific
+      load command, e.g. COPY/PUT+COPY INTO) -> collect stats -> aggregate
+      timing. The per-table load command and any platform-specific setup
+      (Redshift's S3 client + external schema, Snowflake's file formats +
+      query tag) stay as abstract hooks the subclass implements; only the
+      loop/bookkeeping/logging shape is shared.
+
+  - id: w2
+    summary: "Normalize table_stats key casing and document the choice"
+    needs: [w1]
+    status: pending
+    notes: |
+      Pick one casing convention (lower or upper) for the shared skeleton's
+      `table_stats` dict keys. Check every caller of `load_data`'s returned
+      `table_stats` (result capture, reporting, validation) for any
+      case-sensitive lookup before picking, since changing either platform's
+      casing could silently break a caller that currently works only because
+      of that platform's specific case. Document the chosen convention in
+      the base class docstring so future adapters do not reintroduce drift.
+
+  - id: w3
+    summary: "Migrate redshift.py and snowflake.py to the shared skeleton"
+    needs: [w2]
+    status: pending
+    notes: |
+      Reimplement `RedshiftAdapter.load_data` and `SnowflakeAdapter.load_data`
+      as thin per-table hooks over the new base skeleton, removing the
+      duplicated loop/logging code. Normalize the error-logging behavior to
+      one policy (recommend: log full error text like redshift currently
+      does, since truncating to 100 chars as snowflake does can hide the
+      actionable part of a load error) - state the choice and rationale in
+      the PR body.
+
+  - id: w4
+    summary: "Evaluate bigquery/databricks for the same template"
+    needs: [w3]
+    status: pending
+    notes: |
+      After redshift+snowflake prove the template out, check whether
+      `benchbox/platforms/bigquery.py` and
+      `benchbox/platforms/databricks/adapter.py` have a load_data loop
+      similar enough to migrate, or whether their staging model (e.g.
+      Databricks' different ingestion path) genuinely differs enough that
+      forcing them onto the same skeleton would hurt readability. Migrate
+      only if it is a clean fit; otherwise record why they are excluded.
+
+deferred:
+  - summary: "Deduplicate apply_unified_tuning (redshift.py:2637 vs snowflake.py:1748)"
+    reason: "Same duplication pattern as the load loop but a separate method; sequence after the staged-load template proves the extraction pattern works, to avoid landing two large simultaneous refactors in one PR."
+  - summary: "Deduplicate the triplicated close_connection (redshift.py:2437, snowflake.py:1592, databricks/adapter.py:2288)"
+    reason: "Smaller and lower-risk than the load loop; a good follow-up once platforms/base has an established place for shared connection-lifecycle helpers (see benchbox/platforms/base/connection_lifecycle.py, which may already be the right home)."
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - platforms
+    - redshift
+    - snowflake
+    - duplication
+    - structural-debt
+    - architecture-review
+  estimated_effort: "2-3 days"
+  created_date: "2026-07-03"
+  last_updated: "2026-07-03T00:00:00Z"
+
+impact:
+  business_value: |
+    Removes an active behavioral drift (table_stats key casing, error-message
+    truncation) between two cloud adapters that implement conceptually
+    identical load logic, reducing the chance that a future fix to one
+    platform is silently not applied to the other.
+  user_impact: |
+    Load failure diagnostics become consistently detailed across platforms
+    (no more truncated Snowflake error messages); table_stats casing becomes
+    predictable for any downstream consumer.
+  technical_debt: |
+    Collapses independently-maintained near-duplicate load loops into one
+    shared template, per the architecture review's identification of
+    apply_unified_tuning and close_connection as further copies of the same
+    pattern.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/snowflake.py"
+    - "benchbox/platforms/base/data_loading.py"
+  added:
+    - "benchbox/platforms/base/staged_load.py"
+
+must_preserve:
+  - "Per-platform load behavior (COPY vs PUT+COPY INTO, S3 staging vs Snowflake stage, file-format setup) verified by existing adapter tests continues to work identically after migration."
+  - "table_stats total row counts and the load_data return contract (tuple[dict[str, int], float, dict[str, Any] | None]) from benchbox/platforms/base/adapter.py:323 are unchanged."
+  - "Existing result-capture and reporting code that reads table_stats keys continues to find its expected keys after the casing normalization in w2."
+
+prior_art:
+  - "benchbox/platforms/base/adapter.py:323 load_data abstract method - the existing contract both adapters implement; the new skeleton must satisfy this same signature/return contract."
+  - "benchbox/platforms/base/data_loading.py - existing shared data-loading helpers (COPY/CTAS loaders with trailing-delimiter handling per datafusion-tbl-trailing-delimiter-load) already used as a common base by other adapters; extend this file's pattern rather than starting a parallel shared-helpers module."
+  - "benchbox/platforms/base/connection_lifecycle.py - likely existing home for the deferred close_connection deduplication; check before creating a new module for that follow-up."
+
+approach: |
+  Extract the skeleton (w1) before touching either adapter, so the interface
+  is designed against both existing implementations' actual needs rather
+  than generalized from just one. Resolve the casing question (w2) with a
+  grep across the codebase for table_stats consumers before choosing, since
+  this is the one place a wrong choice silently breaks a caller. Migrate
+  redshift and snowflake together in one PR (w3) so the drift is fixed
+  atomically rather than leaving one platform on the old pattern.
+
+anti_patterns:
+  - "DO NOT pick the casing convention without grepping downstream consumers of table_stats first - a blind choice can silently break result reporting for whichever platform's casing changes."
+  - "DO NOT collapse apply_unified_tuning or close_connection into the same PR as the load-loop extraction - each is a separate near-duplicate with its own risk surface; keep them as deferred follow-ups."
+  - "DO NOT force bigquery/databricks onto the shared skeleton if their staging model does not actually match - a forced-fit abstraction is worse than two adapters with an honest small duplication."
+
+verification:
+  - description: "Redshift and Snowflake adapter load-data tests pass after migration to the shared skeleton"
+    command: "uv run -- python -m pytest tests -k 'redshift or snowflake' -m 'not slow and not stress' --tb=short"
+    expected_output: "all redshift/snowflake adapter tests pass"
+  - description: "table_stats casing convention is consistent and documented"
+    command: "grep -n 'table_stats\\[' benchbox/platforms/redshift.py benchbox/platforms/snowflake.py"
+    expected_output: "both files use the same .lower() or .upper() convention on table_stats keys"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/snowflake.py"
+    - "benchbox/platforms/base/data_loading.py"
+    - "benchbox/platforms/base/staged_load.py"
+    - "benchbox/platforms/bigquery.py"
+    - "benchbox/platforms/databricks/adapter.py"
+  do_not_modify:
+    - "benchbox/core/"
+    - "benchbox/cli/"
+
+success_metrics:
+  - "redshift.py and snowflake.py load_data implementations share a common base-class loop instead of two independently-maintained copies."
+  - "table_stats key casing is consistent across the migrated adapters and documented in one place."
+  - "Error logging on load failure uses one consistent fidelity policy (not truncated on one platform and full-text on another)."
+
+open_questions:
+  - "Should bigquery.py and databricks/adapter.py be migrated in this same TODO (w4) or spun into a follow-up once redshift/snowflake are proven? Default: attempt w4 in this TODO but split into a new TODO if the staging models diverge enough to need skeleton changes."

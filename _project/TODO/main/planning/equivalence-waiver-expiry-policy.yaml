@@ -1,0 +1,222 @@
+id: equivalence-waiver-expiry-policy
+title: "Add an optional review_by expiry date to known-divergence waivers so live waivers are periodically forced back into review"
+worktree: main
+priority: Medium
+status: "Not Started"
+category: "Testing and Quality Assurance"
+
+description: |
+  SOUNDNESS-CRITICAL COMPARATOR SURFACE: this TODO's work touches
+  benchbox/core/equivalence/cross_surface.py (covered by .github/CODEOWNERS as
+  `benchbox/core/equivalence/** @joeharris76`) and
+  benchbox/core/tpchavoc/equivalence.py (adjacent to, and sharing the same
+  waiver-baseline discipline as, benchbox/core/tpchavoc/validation.py, which
+  IS covered as `benchbox/core/**/validation.py @joeharris76`; note that
+  tpchavoc/equivalence.py itself is not literally matched by an existing
+  CODEOWNERS glob - verified against the current 3-line .github/CODEOWNERS -
+  but should be treated as soundness-critical and reviewed by the code owner
+  regardless). Its PR will require code-owner review before merge.
+
+  Verified by reading both modules on this branch: no known-divergence waiver
+  entry, in either file, carries any date or expiry field.
+    - cross_surface.py's `known_divergences: dict[str, str | ClassifiedDivergence]`
+      (CrossSurfaceGate field, line 371) holds bare strings (e.g.
+      `_READ_PRIMITIVES_KNOWN_DIVERGENCES`, cross_surface.py:859-885) and
+      `ClassifiedDivergence` instances (cross_surface.py:338-357, e.g.
+      `_H2ODB_KNOWN_DIVERGENCES` at 813-816, `_CLICKBENCH_TIE_AMBIGUOUS` at
+      619-624+) - neither the `str` nor the `ClassifiedDivergence` dataclass
+      (fields: `reason`, `accepts`, `requires_live_divergence`) has a date field.
+    - equivalence.py's four engine-keyed baselines (`KNOWN_DIVERGENCES`,
+      `POSTGRES_KNOWN_DIVERGENCES`, `DATAFUSION_KNOWN_DIVERGENCES`,
+      `CLICKHOUSE_KNOWN_DIVERGENCES`, all `dict[str, str]`) are plain
+      key->reason-string maps with no date field either.
+
+  The only existing staleness signal in either module is "stale-baseline
+  failure": a waiver whose divergence has stopped reproducing is caught (in
+  cross_surface.py's `_report`, the `resolved` check at line ~1188-1192; in
+  equivalence.py's shared `_report`, a `resolved` PRINT only - see the sibling
+  TODO tpchavoc-duckdb-gate-vacuity-guard w3 for that gap). But a waiver whose
+  divergence is STILL LIVE (e.g. an "irreducible engine-semantic difference" or
+  an "approximate by construction" classification) never gets re-examined - it
+  can sit correct-when-written but stale-in-spirit indefinitely: the engine
+  version that produced the documented behavior may have changed, the
+  benchmark's data/queries may have evolved, or the original rationale may no
+  longer hold, and nothing forces a human to re-look.
+
+  This TODO adds a lightweight, OPTIONAL `review_by:` date to waiver entries
+  (both the bare-string form, by upgrading it to a small structured wrapper or
+  a side-table, and the `ClassifiedDivergence` form, as a new optional field),
+  and a warning-or-failure when a `review_by` date has passed, so long-lived
+  waivers are periodically forced back into review even when their divergence
+  never disappears on its own.
+
+prior_art:
+  - "benchbox/core/equivalence/cross_surface.py:338-357 ClassifiedDivergence - the dataclass to extend with an optional review_by field (or a documented decision not to, if the bare-string form is chosen as the carrier instead)."
+  - "benchbox/core/equivalence/cross_surface.py:371 CrossSurfaceGate.known_divergences: dict[str, str | ClassifiedDivergence] - the Union type that must accommodate whatever wrapper form w1 chooses for bare-string entries with a review_by date."
+  - "benchbox/core/equivalence/cross_surface.py:1173-1196 _report - where a new review_by warning/failure check is added, alongside the existing new/resolved/missing_backends/unclassified_empty checks."
+  - "benchbox/core/tpchavoc/equivalence.py:434-470 _report (KNOWN_DIVERGENCES/POSTGRES_KNOWN_DIVERGENCES/DATAFUSION_KNOWN_DIVERGENCES/CLICKHOUSE_KNOWN_DIVERGENCES, all dict[str, str]) - the second _report that needs the same review_by check, in a shape compatible with its plain string-valued dicts."
+  - "cross-surface-baseline-update-flag.yaml (planning) - a closely related, already-filed TODO for a --update-baseline flag to DROP resolved entries; this item is complementary (forcing review of LIVE entries) and should reuse its w0's re-confirm-the-live-file-and-lines discipline, not duplicate its writer."
+
+work:
+  - id: w1
+    summary: "Design the review_by carrier for both waiver shapes and decide warn-vs-fail on a past-due date"
+    status: pending
+    notes: |
+      Two open design questions to resolve before implementing:
+        (a) Carrier shape for cross_surface.py's bare-`str` waivers (the majority
+            of entries - see _READ_PRIMITIVES_KNOWN_DIVERGENCES, and any others
+            not yet converted to ClassifiedDivergence by the sibling TODO
+            read-primitives-waivers-classified-divergence). Options: (i) add
+            `review_by` as a THIRD optional field on `ClassifiedDivergence` and
+            require every review_by-bearing waiver to at least be wrapped in
+            `ClassifiedDivergence(reason=..., accepts=lambda _: True, review_by=...)`
+            even if it has no real predicate yet (accepts-everything is
+            explicit, not implicit, in this form) - this reuses one type instead
+            of two; or (ii) introduce a small side-table
+            `dict[str, date]` (e.g. `_REVIEW_BY: dict[str, date]`) keyed by the
+            same divergence key, checked independently of the waiver's own
+            shape - avoids touching the `known_divergences` Union type at all.
+            Prefer (i) if the sibling TODO's ClassifiedDivergence conversion is
+            expected to land first (fewer bare strings to carry the concern for
+            long-term); prefer (ii) if this item lands independently and should
+            not force every bare-string waiver into a dataclass. State and
+            justify the choice here.
+        (b) Same question for equivalence.py's plain `dict[str, str]` baselines
+            (KNOWN_DIVERGENCES et al.) - these have no ClassifiedDivergence
+            equivalent at all today, so a side-table (ii)-style
+            `dict[str, date]` per baseline, or a small `@dataclass` wrapper
+            (`KnownDivergence(reason: str, review_by: date | None = None)`)
+            replacing the bare `str` value type, is the realistic choice. Note
+            this is a wider blast radius (touches every existing baseline
+            entry's type) - if it proves too invasive for zero-value-change
+            entries, the side-table is likely the pragmatic default.
+        (c) Warn vs fail: decide in this work unit, do not defer. Given the
+            module already treats a stale-baseline `resolved` divergence as a
+            hard gate FAILURE in cross_surface.py (line ~1191), a past-due
+            `review_by` on a STILL-LIVE waiver is a weaker signal (the waiver
+            may still be entirely correct) - default to WARN (print prominently,
+            do not fail exit code) unless a strong case for FAIL emerges (e.g.
+            "the gate is meant to be a hard forcing function and a warning is
+            too easy to ignore"). Record the decision and rationale.
+
+  - id: w2
+    summary: "Implement the review_by field/side-table and wire the warning/failure check into cross_surface.py's _report"
+    needs: [w1]
+    status: pending
+    notes: |
+      Implement per w1's chosen carrier shape. In `_report`
+      (cross_surface.py:~1130-1196), add a check that walks every
+      `known_divergences` entry with a `review_by` date in the past and prints a
+      distinct, greppable line (e.g. "WAIVER REVIEW DUE - <key>: review_by
+      <date> has passed - <reason>"), following the existing message style of
+      the adjacent `GATE FAILURE` lines. Per w1(c)'s decision, either fold this
+      into the existing return-code logic or leave it a print-only warning.
+
+  - id: w3
+    summary: "Implement the review_by field/side-table and wire the equivalent check into equivalence.py's shared _report"
+    needs: [w1]
+    status: pending
+    notes: |
+      Same check, ported to equivalence.py's `_report` (lines 434-470), which is
+      SHARED across all four engines (DuckDB hard gate, Postgres/DataFusion/
+      ClickHouse samples) - verify the new check does not accidentally fail the
+      three non-blocking samples if w1(c) chose FAIL (prefer WARN here too,
+      consistent with cross_surface.py's choice, unless w1 explicitly decided
+      per-module).
+
+  - id: w4
+    summary: "Document the policy in both modules' docstrings"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Add a short paragraph to cross_surface.py's module docstring (near the
+      existing "known_divergences baseline" discussion, lines 1-60ish) and
+      equivalence.py's module docstring (lines 1-70ish, near the
+      KNOWN_DIVERGENCES/POSTGRES_KNOWN_DIVERGENCES discussion) stating: waivers
+      MAY carry an optional review_by date; a past-due date warns (or fails, per
+      w1's decision) the gate/report; this does not replace the existing
+      stale-baseline (resolved-divergence) check, it complements it by covering
+      waivers whose divergence never disappears on its own.
+
+  - id: w5
+    summary: "Retrofit review_by onto at least one existing long-lived waiver per module as a worked example, and add a test"
+    needs: [w2, w3, w4]
+    status: pending
+    notes: |
+      Pick one clearly long-lived, unlikely-to-resolve waiver per module (e.g.
+      cross_surface.py's `_READ_PRIMITIVES_APPROX` sketch-error class, or
+      `_CLICKBENCH_TIE_AMBIGUOUS`; equivalence.py's
+      `CLICKHOUSE_KNOWN_DIVERGENCES` decimal-division-truncation entry) and add
+      a `review_by` a reasonable distance out (e.g. 6-12 months from
+      created_date) as a concrete example future maintainers can copy. Add a
+      unit test per module that seeds a synthetic waiver with a `review_by` in
+      the PAST and asserts the report emits the due-for-review signal (and, per
+      w1(c), either does or does not affect the exit code).
+
+deferred:
+  - summary: "Automatically opening an issue/PR or paging an owner when a review_by date passes."
+    reason: "Out of scope; this item only adds the detectable signal (a warning/failure at report time). Automating a proactive nudge is a separate CI/scheduling concern."
+  - summary: "Requiring review_by on every existing waiver retroactively."
+    reason: "review_by is optional by design (per the task framing: 'Keep it lightweight'); mandating it on every existing entry is a larger migration this item does not need to force."
+
+must_preserve:
+  - "review_by is OPTIONAL - every existing waiver entry with no review_by continues to behave exactly as today (no forced migration, no new failure for entries that omit it)."
+  - "The existing stale-baseline (resolved-divergence) failure behavior in both modules' _report functions is unchanged by this addition - review_by is a new, independent check, not a replacement."
+  - "cross_surface.py's GATES stay green and equivalence.py's tpchavoc-equivalence-report* targets stay green after this lands (no waiver in either module should already have an accidentally-past-due review_by introduced by this change)."
+
+approach: |
+  Decide the carrier shape and warn-vs-fail policy first (w1), since it
+  determines whether cross_surface.py's known_divergences Union type or
+  equivalence.py's dict[str, str] baselines need a type change vs a
+  side-table. Implement the check in each module's _report (w2, w3), document
+  the policy in both module docstrings (w4), and retrofit one worked example
+  per module with a test proving the check fires (w5).
+
+anti_patterns:
+  - "DO NOT make review_by mandatory on every waiver - because most waivers (e.g. the h2odb Q9 DECIMAL-scale residue, an inherent engine behavior) may never need re-review and forcing a date on them is busywork, not signal - keep it opt-in."
+  - "DO NOT conflate review_by-past-due with the existing resolved-divergence stale-baseline failure - they are different signals (one means 'the divergence is GONE, prune the entry'; the other means 'the divergence may still be valid but a human should re-look') and must not share one code path or one message format that a reader could confuse."
+  - "DO NOT add review_by enforcement as a hard FAIL by default without checking it would not immediately break an existing gate - a surprise new failure mode on merge day for a benchmark whose owner is not in the room is worse than a warning."
+  - "DO NOT fork _report per module to add this - both modules already have their own _report; extend each in place, do not introduce a third shared helper unless the two are trivially unifiable (they are not - one keys on backend+query, the other on query+variant)."
+
+verification:
+  - description: "A synthetic past-due review_by waiver triggers the new signal in cross_surface.py's report"
+    command: "uv run -- python -m pytest tests/unit/equivalence/ -k review_by -v"
+    expected_output: "the seeded past-due waiver produces the documented warning (or failure, per w1) line; a future-dated or absent review_by does not"
+  - description: "A synthetic past-due review_by waiver triggers the new signal in equivalence.py's report"
+    command: "uv run -- python -m pytest tests/unit/core/tpchavoc/ -k review_by -v"
+    expected_output: "same behavior, ported to the TPC-Havoc engine-keyed baselines"
+  - description: "Existing gates stay green after the change lands"
+    command: "make ssb-cross-surface-equivalence-report && make read-primitives-cross-surface-equivalence-report && make tpchavoc-equivalence-report"
+    expected_output: "all three exit 0, unchanged from before this TODO"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/equivalence/cross_surface.py"
+    - "benchbox/core/tpchavoc/equivalence.py"
+    - "tests/unit/equivalence/"
+    - "tests/unit/core/tpchavoc/"
+    - "_project/TODO/"
+  do_not_modify:
+    - "benchbox/core/tpchavoc/validation.py"
+
+open_questions:
+  - question: "Should review_by live as a new ClassifiedDivergence field (cross_surface.py) / a small dataclass replacing the bare str (equivalence.py), or as an independent side-table keyed by the same divergence key?"
+    gating: true
+    affects: ["w1 carrier shape", "w2/w3 implementation"]
+    default: "Prefer extending ClassifiedDivergence with an optional review_by field in cross_surface.py (reuses the existing, already-adopted mechanism) and a small side-table dict[str, date] per baseline in equivalence.py (avoids retyping four existing dict[str, str] globals) - but confirm neither choice complicates the sibling read-primitives-waivers-classified-divergence conversion before finalizing."
+  - question: "Warn or fail the gate when a review_by date has passed?"
+    gating: true
+    affects: ["w1 policy", "w2/w3 exit-code behavior"]
+    default: "Warn (print prominently, do not change the exit code) - a past-due review is a prompt to re-look, not proof the waiver is wrong, and both modules' hard-gate exit codes should stay reserved for actual divergence/vacuity/staleness signals."
+
+success_metrics:
+  - "A waiver in either module can carry an optional review_by date, and a past-due date is surfaced distinctly in the gate's/report's output."
+  - "The policy is documented in both module docstrings."
+  - "At least one real, long-lived waiver per module carries a worked-example review_by, with a test proving the check fires when it is past-due."
+
+metadata:
+  owners: [joeharris76]
+  tags: [cross-surface, tpchavoc, equivalence, correctness, governance, code-owner-review]
+  estimated_effort: "Medium"
+  created_date: "2026-07-03"
+  last_updated: "2026-07-03T00:00:00"

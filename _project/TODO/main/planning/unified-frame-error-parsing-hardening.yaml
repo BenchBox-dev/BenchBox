@@ -1,0 +1,170 @@
+id: unified-frame-error-parsing-hardening
+title: "Replace DataFusion error-message-text parsing in unified_frame.py with a version/capability check"
+worktree: main
+priority: Medium
+status: "Not Started"
+category: Platform Expansion
+
+description: |
+  Architecture review (Work Area E, structural remediation) found that
+  `benchbox/platforms/dataframe/unified_frame.py:19-23`'s module docstring
+  self-admits a fragile design: DataFusion support "includes experimental
+  AST parsing for handling aggregate arithmetic expressions... tested with
+  DataFusion 43.0.0 and may not work with other versions if the error
+  message format changes."
+
+  The actual mechanism, `_get_datafusion_ast_string()`
+  (unified_frame.py:2313 onward), deliberately calls
+  `expr.rex_call_operator()` expecting it to THROW, then parses the AST
+  representation back out of the exception's string text (comment at
+  line ~2334: "the error message contains the AST like: 'Catch all
+  triggered in get_operator_name: Alias(BinaryExpr...)'"). It does a basic
+  sanity check (`"Alias" in error_str or "BinaryExpr" in error_str or
+  "AggregateFunction" in error_str`) before trusting the parsed text, and
+  falls back to passing expressions through unchanged if extraction fails
+  (per the module docstring) - which can then surface as a downstream
+  DataFusion error for unsupported aggregate-arithmetic patterns rather than
+  a clear, attributable failure at the point where the format assumption
+  broke.
+
+  This is a genuine upstream-coupling risk: a DataFusion release that
+  changes `rex_call_operator()`'s error text format would silently degrade
+  aggregate-arithmetic support without a clear signal pointing at this file.
+
+work:
+  - id: w0
+    summary: "Re-validate current DataFusion pinned/installed version against the tested format"
+    status: pending
+    notes: |
+      Run `uv run -- python -c "import datafusion; print(datafusion.__version__)"`
+      and check pyproject.toml's datafusion version constraint. Confirm
+      whether the installed/pinned version still matches "tested with
+      43.0.0" or has already drifted - if it has drifted, this TODO is more
+      urgent than Medium and the w1 sanity-check assertion should fail loudly
+      today, not just in a future upgrade.
+
+  - id: w1
+    summary: "Add a version-pinned guard that fails loudly on an unrecognized error format"
+    needs: [w0]
+    status: pending
+    notes: |
+      At minimum, make `_get_datafusion_ast_string()` raise a clear,
+      attributable exception (naming the installed DataFusion version and
+      the unrecognized error text) when the sanity check
+      ("Alias"/"BinaryExpr"/"AggregateFunction" in error_str) fails, instead
+      of silently returning None and falling through to unchanged-expression
+      behavior. This converts a silent correctness-adjacent degradation into
+      a loud, debuggable failure - the honest minimum bar even before a
+      better mechanism is built.
+
+  - id: w2
+    summary: "Investigate a capability probe or structural API replacing text parsing"
+    needs: [w1]
+    status: pending
+    notes: |
+      Check whether the installed `datafusion` Python package (or its
+      underlying Rust `datafusion-expr`/substrait bindings) exposes any
+      structural way to inspect an Expr's AST (e.g. a `to_variant()`,
+      `__repr__`-based structural parse, or a lower-level expr-tree walk)
+      that does not depend on triggering and parsing an intentional error.
+      If one exists for the currently pinned version, replace the
+      error-message parsing with it. If not, keep the w1 loud-failure guard
+      as the durable mitigation and record why a structural alternative
+      isn't available yet (open_questions).
+
+  - id: w3
+    summary: "Add a test simulating a changed DataFusion error-message format"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add a unit test that monkeypatches/mocks `expr.rex_call_operator()`
+      (or a stand-in double) to raise an exception with a DIFFERENT text
+      format (missing "Alias"/"BinaryExpr"/"AggregateFunction"), and asserts
+      `_get_datafusion_ast_string()` now raises the loud, attributable error
+      from w1 instead of silently returning None. This is the regression
+      test that proves the hardening actually fires when the upstream format
+      changes, without needing to wait for an actual DataFusion upgrade.
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - datafusion
+    - dataframe
+    - fragile-dependency
+    - structural-debt
+    - architecture-review
+  estimated_effort: "1-2 days"
+  created_date: "2026-07-03"
+  last_updated: "2026-07-03T00:00:00Z"
+
+impact:
+  business_value: |
+    Converts a silent, upstream-version-coupled correctness risk (aggregate
+    arithmetic on DataFusion silently falling back to unchanged expressions
+    when the AST-extraction hack breaks) into a loud, attributable failure,
+    so a future DataFusion upgrade that changes error-message text is caught
+    immediately rather than surfacing as a confusing downstream query error.
+  user_impact: |
+    DataFusion users running aggregate-arithmetic queries get either correct
+    results or a clear error naming the DataFusion version and unrecognized
+    format, instead of a silent behavior change or an opaque DataFusion-level
+    failure.
+  technical_debt: |
+    Addresses the module's own self-documented fragility
+    (unified_frame.py:19-23, "may not work if the error message format
+    changes") with either a structural replacement or, at minimum, a loud
+    failure mode plus regression test.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/dataframe/unified_frame.py"
+  added:
+    - "tests/unit/platforms/dataframe/test_unified_frame_datafusion_ast.py"
+
+must_preserve:
+  - "Aggregate-arithmetic expressions that currently work correctly against the pinned DataFusion version continue to produce identical results after the hardening change."
+  - "The fallback-to-unchanged-expression behavior for genuinely unsupported patterns (not a format-parsing failure) is preserved for cases where DataFusion itself does not support the pattern - only the format-mismatch case should now raise loudly, not every extraction miss."
+
+prior_art:
+  - "benchbox/platforms/dataframe/unified_frame.py:_get_datafusion_ast_string (2313) and its existing basic sanity check ('Alias'/'BinaryExpr'/'AggregateFunction' in error_str) - reuse and tighten this existing check into a hard assertion rather than adding a parallel validation path."
+  - "datafusion-tbl-trailing-delimiter-load.yaml - a prior TODO in this same platform area that replaced ad hoc/fragile per-caller logic with a shared, version-aware helper; follow its pattern of pinning behavior to a documented, tested version and adding a regression test for the failure mode."
+
+approach: |
+  Start by re-confirming the currently pinned DataFusion version still
+  matches the tested 43.0.0 format (w0) - if it has already drifted, treat
+  this as more urgent. Land the loud-failure guard (w1) first since it is
+  small, safe, and immediately converts a silent risk into a visible one.
+  Only then investigate whether a structural, non-text-parsing alternative
+  exists in the installed datafusion bindings (w2); if none exists, the loud
+  guard plus regression test (w1+w3) is an acceptable durable mitigation on
+  its own.
+
+anti_patterns:
+  - "DO NOT silently widen the sanity-check keyword list to accept more error formats speculatively - only change behavior in response to a confirmed installed-version format, verified by w0."
+  - "DO NOT remove the fallback-to-unchanged-expression behavior entirely - it is the correct response for genuinely unsupported aggregate-arithmetic patterns (a DataFusion limitation, not a parsing failure); only the format-mismatch branch should become a hard failure."
+  - "DO NOT couple the fix to a specific DataFusion patch version - pin the check to the sanity-check keywords and the tested major version documented in the module docstring, so minor version bumps within the same AST-format generation don't spuriously fail."
+
+verification:
+  - description: "Existing DataFusion aggregate-arithmetic tests still pass"
+    command: "uv run -- python -m pytest tests -k 'datafusion and aggregate' --tb=short"
+    expected_output: "all DataFusion aggregate-arithmetic tests pass"
+  - description: "New test proves a changed error format now fails loudly instead of silently degrading"
+    command: "uv run -- python -m pytest tests/unit/platforms/dataframe/test_unified_frame_datafusion_ast.py -v"
+    expected_output: "test passes: simulated format change raises an attributable error naming the DataFusion version"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/dataframe/unified_frame.py"
+    - "tests/unit/platforms/dataframe/"
+  do_not_modify:
+    - "benchbox/platforms/dataframe/expression_family.py"
+    - "benchbox/platforms/dataframe/protocol.py"
+
+success_metrics:
+  - "_get_datafusion_ast_string raises a clear, attributable error when the installed DataFusion version's error-message format does not match the expected sanity-check keywords, instead of silently falling back."
+  - "A regression test simulates a changed error-message format and asserts the loud failure fires."
+  - "The module docstring's fragility warning is updated to reflect the new failure mode (loud error vs. silent format-change risk) or removed if w2 replaces the text-parsing mechanism entirely."
+
+open_questions:
+  - "Does the installed datafusion Python package expose any structural (non-error-text) way to inspect an Expr's operator/AST that w2 could use instead of intentionally triggering and parsing an exception? Needs direct investigation of the installed datafusion version's Python API surface before deciding whether w2 is feasible now or remains future work."

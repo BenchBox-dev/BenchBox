@@ -1,0 +1,207 @@
+id: break-root-import-cycle
+title: "Break benchbox root-package import cycle pulled in by utils/version.py and utils/datagen_manifest.py"
+worktree: main
+priority: Medium-High
+status: "Not Started"
+category: Core Functionality
+
+description: |
+  Architecture review (Work Area E, structural remediation) found that
+  `benchbox/utils/version.py:27` and `benchbox/utils/datagen_manifest.py:23`
+  both do `import benchbox` at module scope (to read `__version__` and to
+  resolve project-root paths, respectively). Because
+  `benchbox/utils/verbosity.py:12` imports `benchbox.utils.version`, and
+  effectively every subsystem imports `verbosity` for its logging mixin, this
+  single edge pulls a large strongly-connected component (~61 modules per the
+  review) into one cycle rooted at the package `__init__`.
+
+  Live symptoms already visible in the code, not just theory:
+
+  - `benchbox/__init__.py:14-16` carries a load-order comment: "`__version__`
+    must be defined before `from . import platforms` because the platforms
+    import chain can circle back to benchbox.cli.app which reads
+    benchbox.__version__ at module level." That comment is a tell that the
+    root module's initialization order is load-bearing.
+  - `benchbox/utils/verbosity.py:11-15` wraps its `benchbox.utils.version`
+    import in `try/except ImportError` with the comment "optional dependency
+    during bootstrapping" - a defensive guard that exists only because the
+    cycle can make the import fail depending on where in package
+    initialization it is triggered.
+
+  This is a structural-debt item independent of the shrink campaign:
+  `_project/goal-shrink-core-code.md` explicitly scopes god-class
+  decompositions and similar risk-trading refactors out of the autonomous
+  shrink loop. This TODO is a targeted import-layering fix, not a shrink-loop
+  item, and should not be picked up by that loop.
+
+work:
+  - id: w1
+    summary: "Stop utils/version.py from importing the benchbox package root"
+    status: pending
+    notes: |
+      Replace `import benchbox` in benchbox/utils/version.py with
+      `importlib.metadata.version("benchbox")` for the installed-package case,
+      with a source-tree fallback (e.g. reading `pyproject.toml` via the
+      existing `_PYPROJECT_CACHE`/tomllib plumbing already in this file) for
+      editable/dev checkouts where package metadata may not reflect the
+      working tree. Alternatively, introduce a leaf `benchbox/_version.py`
+      holding only `__version__` (no other imports) and have both
+      `benchbox/__init__.py` and `utils/version.py` import from that leaf
+      module instead of each other. Pick whichever keeps
+      `validate_version_consistency()` semantics (must_preserve) intact with
+      the least surface change; document the choice in the PR body.
+
+  - id: w2
+    summary: "Stop utils/datagen_manifest.py from importing the benchbox package root"
+    needs: [w1]
+    status: pending
+    notes: |
+      benchbox/utils/datagen_manifest.py:23 imports `benchbox` solely to
+      resolve paths/metadata for the `_datagen_manifest.json` writer. Replace
+      with a direct import of whatever leaf helper it actually needs (e.g.
+      `benchbox.utils.path_utils` or the `_version`/leaf module from w1) so it
+      no longer round-trips through the package root. Confirm via `grep -n
+      "benchbox\."` in the file that the only remaining reference to the
+      package root, if any, does not create a cycle.
+
+  - id: w3
+    summary: "Remove the verbosity bootstrap guard and the __init__.py load-order comment"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      Once w1/w2 land, `benchbox/utils/verbosity.py:11-15`'s
+      `try/except ImportError` around `from benchbox.utils.version import
+      check_version_consistency, format_version_report` should no longer be
+      load-bearing - convert it to a plain top-level import (or keep the
+      guard only if a genuine optional-dependency reason remains, and say
+      which). Remove or rewrite the stale load-order comment at
+      benchbox/__init__.py:14-16 once `__version__` no longer needs special
+      placement relative to `from . import platforms`.
+
+  - id: w4
+    summary: "Add a regression test asserting utils.version does not import the package root"
+    needs: [w1, w2, w3]
+    status: pending
+    notes: |
+      Add a subprocess-isolated test (following the pattern in
+      tests/unit/test_import_isolation.py, which already runs
+      `import benchbox` and `import benchbox.cli.main` in fresh
+      subprocesses and checks stdlib/heavy-module leakage) asserting that
+      `import benchbox.utils.version` alone does NOT trigger
+      `sys.modules["benchbox"]` full package initialization (e.g. check that
+      `benchbox.platforms` or another deep submodule is absent from
+      sys.modules after that single import). Same for
+      `benchbox.utils.datagen_manifest`.
+
+  - id: w5
+    summary: "Make the eager NYCTaxi import in benchbox/__init__.py lazy like the other registry benchmarks"
+    needs: [w2]
+    status: pending
+    notes: |
+      benchbox/__init__.py:21 does an eager `from benchbox.nyctaxi import
+      NYCTaxi`, which chains through core/nyctaxi/benchmark.py:32 into
+      utils/datagen_manifest.py (the second root-import edge fixed in w2)
+      and eagerly imports numpy (core/nyctaxi/downloader.py:25,
+      core/nyctaxi/queries.py:23) on every `import benchbox` — the one
+      heavy library left on the cold-start path. Route NYCTaxi through the
+      existing lazy `_BENCHMARK_REGISTRY` / module `__getattr__` mechanism
+      (benchbox/__init__.py:72-174) like the other benchmarks. Verify with
+      tests/unit/test_import_isolation.py plus a check that numpy is absent
+      from sys.modules after bare `import benchbox`.
+
+deferred:
+  - summary: "Broader breakup of the ~61-module SCC beyond the version/datagen_manifest edges"
+    reason: "The review identified verbosity's fan-in as the multiplier, but a full SCC decomposition is a larger effort; this TODO targets the two root-importing leaf modules identified as the actual cycle cause. Re-scope separately if the cycle persists after this fix (see import-layering-enforcement, which adds tooling to detect any residual cycle)."
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - import-cycle
+    - structural-debt
+    - architecture-review
+    - core
+  estimated_effort: "1-2 days"
+  created_date: "2026-07-03"
+  last_updated: "2026-07-03T00:00:00Z"
+
+impact:
+  business_value: |
+    Removes a root-package import cycle that forces fragile load-order
+    assumptions and defensive except-ImportError bootstrapping, reducing the
+    risk of future circular-import regressions as the package grows.
+  user_impact: |
+    No direct user-facing change; reduces the chance of import-time errors
+    or inconsistent behavior depending on which module is imported first.
+  technical_debt: |
+    Eliminates a documented load-order hazard (benchbox/__init__.py:14-16)
+    and a bootstrap-guard workaround (utils/verbosity.py:11-15), both of
+    which are symptoms of the cycle rather than independent design choices.
+
+files_affected:
+  modified:
+    - "benchbox/utils/version.py"
+    - "benchbox/utils/datagen_manifest.py"
+    - "benchbox/utils/verbosity.py"
+    - "benchbox/__init__.py"
+  added:
+    - "benchbox/_version.py"
+    - "tests/unit/test_import_isolation.py"
+
+must_preserve:
+  - "validate_version_consistency() behavior in benchbox/__init__.py:30-46 (warns via UserWarning on RuntimeError, does not hard-fail import) is unchanged."
+  - "The wheel's reported version (importlib.metadata / `benchbox --version` equivalent) stays correct for both editable/dev installs and built wheels."
+  - "The lean-import guarantee already enforced by tests/unit/test_import_isolation.py (no heavy third-party modules like pandas/polars/pyarrow/duckdb on `import benchbox`) stays green."
+
+prior_art:
+  - "benchbox/utils/version.py:_PYPROJECT_CACHE and PROJECT_ROOT - existing tomllib-based pyproject parsing to reuse for the source-tree fallback rather than adding a second TOML reader."
+  - "tests/unit/test_import_isolation.py:_run_entrypoint - existing subprocess-isolation pattern to extend for the new w4 regression test, rather than inventing a new import-isolation harness."
+
+approach: |
+  Start from utils/version.py since it is the more clearly self-contained
+  fix (only needs a version string, not general benchbox internals). Decide
+  between importlib.metadata vs. a leaf benchbox/_version.py by checking
+  whether validate_version_consistency() needs anything else from the
+  package root; if not, importlib.metadata + tomllib fallback avoids adding
+  a new file. Apply the same fix to datagen_manifest.py once the pattern is
+  settled. Only then touch verbosity.py's guard and the __init__.py comment,
+  since removing them prematurely (before the cycle is actually broken) would
+  reintroduce the failure the guard exists to prevent.
+
+anti_patterns:
+  - "DO NOT remove the verbosity.py try/except ImportError guard before confirming w1+w2 actually eliminate the cycle - removing it first will surface the exact ImportError the guard was added to suppress."
+  - "DO NOT special-case version resolution per install method (editable vs wheel) with duplicated logic - reuse the existing _PYPROJECT_CACHE/tomllib fallback for the source-tree case."
+  - "DO NOT fold this into the shrink-campaign ledger - _project/goal-shrink-core-code.md scopes structural/god-class-style refactors out of that loop; this is a standalone architecture fix."
+
+verification:
+  - description: "Package still imports cleanly and lean-import isolation stays green"
+    command: "uv run -- python -m pytest tests/unit/test_import_isolation.py -v"
+    expected_output: "all import-isolation tests pass, 0 failures"
+  - description: "New regression test proves utils.version no longer imports the package root"
+    command: "uv run -- python -m pytest tests/unit/test_import_isolation.py -k version_no_root_import -v"
+    expected_output: "test passes"
+  - description: "Version consistency validation still runs at import time without hard-failing"
+    command: "uv run -- python -c 'import benchbox; print(benchbox.__version__)'"
+    expected_output: "prints the current version string with no traceback"
+
+scope_limit:
+  only_modify:
+    - "benchbox/utils/version.py"
+    - "benchbox/utils/datagen_manifest.py"
+    - "benchbox/utils/verbosity.py"
+    - "benchbox/__init__.py"
+    - "benchbox/_version.py"
+    - "tests/unit/test_import_isolation.py"
+  do_not_modify:
+    - "benchbox/cli/"
+    - "benchbox/platforms/"
+    - "benchbox/core/"
+
+success_metrics:
+  - "utils/version.py and utils/datagen_manifest.py no longer import the benchbox package root."
+  - "benchbox/__init__.py:14-16 load-order comment is removed or no longer applies."
+  - "utils/verbosity.py's bootstrap try/except ImportError guard is removed or justified for a different reason."
+  - "A regression test asserts import benchbox.utils.version does not trigger full benchbox package initialization."
+
+open_questions:
+  - "Does validate_version_consistency() need any other benchbox-root state besides __version__ and doc paths? If so, a leaf _version.py module may be insufficient and the doc-consistency check may need its own path resolution independent of the package import."
