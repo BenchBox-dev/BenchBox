@@ -25,6 +25,10 @@ description: |
   independently recommends replicated_imdb as the lowest-risk upward baseline;
   Track-2 kickoff reconciles the sampling (down) and replication (up) directions.
 
+deps:
+  needs:
+    - track2-joinorder-stats-phase
+
 work:
   - id: w1
     summary: "Lock in the scaling strategy from the options analysis"
@@ -42,6 +46,10 @@ work:
       Build the generator and the validation gate (FK integrity, predicate-domain
       frequencies, cardinalities, q-error where available) before publishing any
       derived archive. Non-empty checks are insufficient.
+
+      This is the scaled prototype starting: per must_preserve, do not begin until
+      track2-joinorder-stats-phase (see deps.needs) is satisfied or explicitly
+      scoped out.
 
   - id: w3
     summary: "Define derived workload labels and result-bundle metadata"

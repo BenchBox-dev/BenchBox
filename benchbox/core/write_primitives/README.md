@@ -254,15 +254,17 @@ Operations use SQLGlot dialect translation by default, with `platform_overrides`
 a platform override is `null`, `_get_effective_write_sql()` returns a skip reason and
 the operation is recorded as `SKIPPED` in results.
 
-### DataFusion (v51.0.0) - 64 Skipped Operations
+### DataFusion (v51.0.0) - 62 Skipped Operations
 
 DataFusion is an Arrow-native query engine that operates on **immutable record batches**.
 This architecture provides excellent read/scan performance but means row-level mutation
 (UPDATE, DELETE) is not implemented - there is no write path for existing data. MERGE
 depends on UPDATE/DELETE and is therefore also unsupported.
 
-All 64 skips fall into categories dictated by this architectural constraint. None have
-viable alternative SQL syntax within DataFusion's current capability set.
+All 62 skips fall into categories dictated by this architectural constraint. None have
+viable alternative SQL syntax within DataFusion's current capability set. (Two further
+BULK_LOAD operations carry a `datafusion: null` catalog override but are NOT part of
+this skip total - see "BULK_LOAD Edge Cases" below.)
 
 #### UPDATE - 15 operations (queries 13-27)
 
@@ -309,9 +311,18 @@ UPDATE/INSERT against existing rows and carry explicit `datafusion: null` overri
 | `insert_on_conflict_ignore` | `Plan("Insert-on clause not supported")` - no constraint enforcement makes ON CONFLICT meaningless |
 | `insert_returning_clause` | `Plan("Insert-returning clause not supported")` |
 
-#### BULK_LOAD Edge Cases - 2 operations
+#### BULK_LOAD Edge Cases - 2 operations (NOT counted in the 62-skip total)
 
-| Operation | Reason |
+These carry a `datafusion: null` `platform_overrides` entry in the catalog, but that
+entry is never consulted for DataFusion: `DataFusionAdapter.preprocess_operation_sql()`
+rewrites every `bulk_load`-category operation and passes the result as `sql_override`,
+and `_get_effective_write_sql()` returns `sql_override` before it ever checks
+`platform_overrides`. So on an actual DataFusion run these two are ATTEMPTED via the
+rewritten SQL, not surfaced as `SKIPPED` - the `datafusion: null` override is
+vestigial for this pair. Listed here for the catalog-metadata record, not as part of
+the 62-skip count above.
+
+| Operation | Catalog override reason (not applied at runtime) |
 |-----------|--------|
 | `bulk_load_error_handling_skip_bad_rows` | DataFusion's CSV reader has no `IGNORE_ERRORS` equivalent; all rows must be valid |
 | `bulk_load_upsert_mode` | Requires MERGE INTO, which is unsupported |

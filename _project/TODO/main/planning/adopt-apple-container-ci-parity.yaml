@@ -59,7 +59,7 @@ work:
 
   - id: w1
     summary: "Stand up a benchbox-agent container machine with home-mount"
-    needs: [w0]
+    needs: [w0, w2]
     status: pending
     notes: |
       `container machine create <image> --name benchbox-agent` with the Mac
@@ -67,7 +67,9 @@ work:
       verify `container machine run -n benchbox-agent -- bash` lands in a
       Linux shell that can see a claimed pool worktree path. THIS is the
       step the spike did not exercise -- prove machine mode + home-mount
-      work, not just `container run`.
+      work, not just `container run`. Depends on w2: `<image>` is the
+      benchbox-agent OCI image w2 builds, so the machine cannot be created
+      from it until the build exists.
 
   - id: w2
     summary: "Build the benchbox-agent OCI image (ubuntu + uv + build toolchain)"
@@ -91,6 +93,15 @@ work:
       output. clickhouse-integration is in-process chDB (no service) so it
       is in-scope here; postgres-integration needs a DB and is out of scope
       (see deps).
+
+      The worktree's `.venv` is on the home-mounted Mac filesystem shared
+      by both the macOS host and the Linux machine, so a plain `uv sync
+      --group dev` run inside the container would resolve/write Linux
+      wheels into the SAME `.venv` the macOS side uses, clobbering it for
+      the next native run. Either set `UV_PROJECT_ENVIRONMENT=.venv-linux`
+      for all `uv` invocations inside the machine (keeping the Linux venv
+      alongside, not overwriting, `.venv`), or claim a second, Linux-only
+      worktree so the two venvs never share a path.
 
   - id: w4
     summary: "DECISION GATE: do correctness/equivalence digests diverge macOS vs Linux?"

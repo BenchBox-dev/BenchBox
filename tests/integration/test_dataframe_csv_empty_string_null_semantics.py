@@ -144,6 +144,17 @@ def _make_pyspark() -> Any:
     return PySparkDataFrameAdapter(master="local[1]", driver_memory="1g", shuffle_partitions=1)
 
 
+def _make_dask() -> Any:
+    # DaskDataFrameAdapter defaults use_distributed=True, which starts a
+    # LocalCluster (worker processes) in the constructor -- BEFORE
+    # _adapter_context's scoped dask.config.set(scheduler="synchronous") can make
+    # the later .compute() calls local. This entire test file is marked `fast`, so
+    # a coverage-only check must not need worker processes (can fail or be slow on
+    # resource-constrained dev/CI hosts). use_distributed=False keeps Dask on the
+    # single-process synchronous/threaded path this fast lane requires.
+    return DaskDataFrameAdapter(use_distributed=False)
+
+
 def _java_17_plus_available() -> bool:
     """PySpark SQL mode needs Java 17/21; skip (not fail) on a Java-less dev env."""
     import re
@@ -165,7 +176,7 @@ _ADAPTER_CASES = [
     _AdapterCase("pyspark", PYSPARK_AVAILABLE and _java_17_plus_available(), _make_pyspark),
     _AdapterCase("pandas", PANDAS_AVAILABLE, PandasDataFrameAdapter),
     _AdapterCase("polars", POLARS_AVAILABLE, PolarsDataFrameAdapter),
-    _AdapterCase("dask", DASK_AVAILABLE, DaskDataFrameAdapter),
+    _AdapterCase("dask", DASK_AVAILABLE, _make_dask),
     _AdapterCase("modin", MODIN_AVAILABLE, ModinDataFrameAdapter),
     _AdapterCase("cudf", CUDF_AVAILABLE, CuDFDataFrameAdapter),
 ]

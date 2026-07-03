@@ -100,8 +100,8 @@ gh api repos/joeharris76/BenchBox/rulesets/15611785 --jq '
 
 ### Soundness-path review enforcement (pending admin action)
 
-The `develop-squash-only` ruleset's `pull_request` rule must require an approving
-review AND code-owner review so a PR touching the CODEOWNERS-owned soundness paths
+The `develop-squash-only` ruleset's `pull_request` rule must require a code-owner
+review so a PR touching the CODEOWNERS-owned soundness paths
 (`benchbox/core/equivalence/**`, `benchbox/core/query_plans/parsers/**`,
 `benchbox/core/**/validation.py`) cannot be squash-merged with zero approvals. The
 auto-merge code side already withholds auto-merge enablement for those paths
@@ -113,16 +113,24 @@ TODO.
 Target state:
 
 ```text
-required_approving_review_count: 1
 require_code_owner_review: true
 ```
 
-Live state at this writing: `required_approving_review_count: 0`,
-`require_code_owner_review: false` — not yet enforced. Applying it is a deferred
-repo-admin action: the develop-PR `GITHUB_TOKEN` has no `administration` scope, so it
-can neither read nor write the ruleset; only an admin PAT can.
+`required_approving_review_count` is deliberately NOT part of the target state:
+GitHub's `pull_request` rule applies that count to EVERY PR against the branch, not
+just CODEOWNERS-matched paths, so requiring `>= 1` would gate every develop PR
+instead of just soundness-path ones — defeating the fast squash-auto-merge default.
+`require_code_owner_review: true` is independently sufficient: GitHub still requires
+an owner's approval on a PR that touches a CODEOWNERS-matched soundness path
+regardless of the count setting.
 
-Verify (manual or release-canary; needs a ruleset-read token such as
+Live state at this writing: `require_code_owner_review: false` — not yet enforced.
+Applying it is a deferred repo-admin action: the develop-PR `GITHUB_TOKEN` has no
+`administration` scope, so it can neither read nor write the ruleset; only an admin
+PAT can.
+
+Verify (manual only — this check is NOT wired into `release-canary.yml`, which only
+runs `ruleset_drift_check.py`; needs a ruleset-read token such as
 `RULESET_DRIFT_TOKEN`):
 
 ```bash
@@ -131,15 +139,15 @@ gh api repos/joeharris76/BenchBox/rules/branches/develop \
 ```
 
 The predicate exits non-zero and names the offending field while review enforcement
-is missing, and exits zero once the ruleset requires an approving + code-owner
-review. Its pinned logic is guarded by
-`tests/unit/release/test_ruleset_review_enforcement.py` in the required fast lane.
+is missing, and exits zero once the ruleset requires a code-owner review. Its pinned
+logic is guarded by `tests/unit/release/test_ruleset_review_enforcement.py` in the
+required fast lane; the live-ruleset check above must be run by hand (or added to
+`release-canary.yml` as a follow-up) until it is wired into CI.
 
 Apply (admin only — the deferred action that closes the gap):
 
 ```bash
-# Fetch the current ruleset, set the pull_request rule parameters
-#   required_approving_review_count: 1
+# Fetch the current ruleset, set the pull_request rule parameter
 #   require_code_owner_review: true
 # then PUT it back.
 gh api repos/joeharris76/BenchBox/rulesets/15611785 > /tmp/develop-ruleset.json

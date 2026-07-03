@@ -55,19 +55,21 @@ def test_enforced_ruleset_passes() -> None:
     assert rre.review_enforcement_findings(rules) == []
 
 
-def test_unenforced_ruleset_fails_on_both_axes() -> None:
+def test_unenforced_ruleset_fails() -> None:
     # The live develop state at authoring time: zero approvals, no code-owner review.
     findings = rre.review_enforcement_findings(_pr_rule(count=0, code_owner=False))
     assert findings, "an unenforced ruleset must produce findings (it currently does not)"
-    blob = " ".join(findings)
-    assert "required_approving_review_count=0" in blob
-    assert "require_code_owner_review=False" in blob
+    assert "require_code_owner_review=False" in " ".join(findings)
 
 
-def test_zero_count_alone_fails() -> None:
-    findings = rre.review_enforcement_findings(_pr_rule(count=0, code_owner=True))
-    assert any("required_approving_review_count" in f for f in findings)
-    assert not any("require_code_owner_review" in f for f in findings)
+def test_required_approving_review_count_is_not_checked() -> None:
+    """required_approving_review_count is branch-wide, not CODEOWNERS-scoped, so
+    asserting it here would gate EVERY develop PR, not just soundness-path ones.
+    A ruleset with require_code_owner_review=True passes regardless of count -
+    including count=0, GitHub's live-state default."""
+    assert rre.review_enforcement_findings(_pr_rule(count=0, code_owner=True)) == []
+    assert rre.review_enforcement_findings(_pr_rule(count=1, code_owner=True)) == []
+    assert rre.review_enforcement_findings(_pr_rule(count=5, code_owner=True)) == []
 
 
 def test_missing_code_owner_alone_fails() -> None:

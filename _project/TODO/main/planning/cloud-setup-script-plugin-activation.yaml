@@ -46,7 +46,13 @@ work:
     status: pending
     notes: >
       Configured in the claude.ai/code environment settings (web UI), not a repo
-      file. Setup scripts are cached per environment.
+      file. Setup scripts are cached per environment BUILD, not per session: a
+      later change to .claude/settings.json enabledPlugins will not retroactively
+      reach sessions in an already-built environment, and there is no supported
+      per-session hook to bust that cache in cloud (project hooks are unreliable
+      there — see the cloud addendum's PostToolUse evidence). Document this as a
+      known limitation, not something w1 needs to solve; the manual remedy is
+      rebuilding the environment after a plugin-config change.
   - id: w2
     summary: "Verify in a fresh cloud session: claude plugin list shows the 7 plugins and namespaced agents/commands are available"
     needs: [w1]

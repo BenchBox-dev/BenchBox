@@ -202,3 +202,48 @@ def run_plan_capture_phase(
 
     result.total_capture_ms = (time.perf_counter() - phase_start) * 1000
     return result
+
+
+# ---------------------------------------------------------------------------
+# Plan-capture field propagation for the TPC power/throughput drivers
+# ---------------------------------------------------------------------------
+#
+# The TPC-H/TPC-DS power and throughput drivers execute queries directly via
+# ``connection.execute()`` (bypassing ``execute_query()``'s single chokepoint),
+# reading ``cursor.platform_result`` only to check for a FAILED validation
+# status. The adapter's own ``execute_query()`` (invoked under the covers by
+# ``PlatformAdapterConnection.execute()``) still records plan-capture metadata
+# on that result dict - including ``_plan_capture_key``, the exact internal key
+# ``_attach_captured_plans`` uses to match a captured plan back to its row - but
+# nothing copied it out of ``cursor.platform_result`` into the driver's own
+# result row, so it never reached the row that ``_attach_captured_plans``
+# eventually sees.
+#
+# Losing ``_plan_capture_key`` matters specifically in COMBINED mode (power then
+# throughput on the same public query ids): ``_attach_captured_plans`` falls
+# back to matching by PUBLIC id only when a row carries no exact key, and that
+# fallback deliberately refuses to guess when a public id captured more than one
+# distinct SQL variant (e.g. throughput re-executing q1 under a seed-varied SQL
+# digest). Without the exact key, a second (throughput) capture for the same
+# public id poisons the fallback for EVERY row sharing that id - including the
+# power-phase row, whose own pre-mutation checkpoint plan was perfectly
+# unambiguous on its own.
+PLAN_CAPTURE_PROPAGATION_KEYS = (
+    "_plan_capture_key",
+    "query_plan",
+    "plan_fingerprint",
+    "plan_fingerprint_normalized",
+    "plan_capture_time_ms",
+)
+
+
+def propagate_plan_capture_fields(source: Mapping[str, Any], target: dict[str, Any]) -> None:
+    """Copy plan-capture metadata (including the internal capture key) from
+    ``source`` into ``target``, when present. No-op for absent/None fields, so it
+    is safe to call unconditionally after every query execution regardless of
+    whether plan capture is enabled for the run.
+    """
+    for key in PLAN_CAPTURE_PROPAGATION_KEYS:
+        value = source.get(key)
+        if value is not None:
+            target[key] = value

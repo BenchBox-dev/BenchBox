@@ -40,6 +40,7 @@ from benchbox.core.constants import (
 )
 from benchbox.core.errors import PlanCaptureError
 from benchbox.core.operations import OperationExecutor
+from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
 from benchbox.core.power_harnesses import (
     resolve_combined_harness,
     resolve_maintenance_harness,
@@ -327,6 +328,11 @@ class TestDriversMixin:
                     }
                     if not query_result["success"]:
                         platform_result["error"] = query_result.get("error", "Unknown error")
+                    # Carry the internal _plan_capture_key (and any captured plan
+                    # fields) through to the row _attach_captured_plans sees, so a
+                    # combined power+throughput run matches by exact key instead of
+                    # the ambiguous public-id fallback.
+                    propagate_plan_capture_fields(query_result, platform_result)
                     query_results.append(platform_result)
 
             return query_results
@@ -421,6 +427,11 @@ class TestDriversMixin:
                     }
                     if not qr.get("success"):
                         platform_result["error"] = qr.get("error", "Unknown error")
+                    # Carry the internal _plan_capture_key (and any captured plan
+                    # fields) through to the row _attach_captured_plans sees, so a
+                    # combined power+throughput run matches by exact key instead of
+                    # the ambiguous public-id fallback.
+                    propagate_plan_capture_fields(qr, platform_result)
                     query_results.append(platform_result)
 
             return query_results

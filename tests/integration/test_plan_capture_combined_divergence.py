@@ -16,12 +16,18 @@ These exercise the resolution (query-plan-capture-post-measurement-divergence):
   plans are captured against the pre-mutation data state they were measured
   against, while the maintenance writes are captured once in the final pass.
 - Capture is driven by the recorded-query buffer (digest-keyed, SUCCESS-only),
-  and plans attach to result rows by exact capture key or, for the TPC
-  power/throughput drivers that rebuild rows WITHOUT the internal key, by the
-  bare public query_id. This is the production row shape — verified against the
-  real DuckDB TPC-H power path in ``test_real_tpch_power_capture_attaches_plans``
-  — so the tests below deliberately build rows the way the drivers do (no
-  ``_plan_capture_key``) rather than hand-injecting a field production drops.
+  and plans attach to result rows by exact capture key or, as a FALLBACK for a
+  row that carries no key at all, by the bare public query_id. The TPC
+  power/throughput drivers (``benchbox/core/{tpch,tpcds}/{power,throughput}_test.py``
+  + their ``platform_power.py`` row-shapers) now propagate the internal
+  ``_plan_capture_key`` from the adapter's ``execute_query()`` result all the
+  way through to the row ``_attach_captured_plans`` sees, specifically so a
+  COMBINED run (power then throughput on the same public query ids) matches
+  each row by its EXACT key instead of the public-id fallback — see
+  ``test_combined_power_then_throughput_same_public_id_different_sql`` below.
+  The public-id fallback below still exercises the general mechanism (e.g. for
+  a hypothetical driver that cannot supply a key), verified end-to-end against
+  the real DuckDB TPC-H power path in ``test_real_tpch_power_capture_attaches_plans``.
 
 They run against a real (file-based) DuckDB so EXPLAIN sees the live row counts.
 """
@@ -188,11 +194,14 @@ def test_read_only_combined_capture_attaches_via_public_id(file_adapter):
 
 
 def test_ambiguous_query_id_variants_not_misattached(file_adapter):
-    """A query_id that ran as two distinct SQL variants must not be mis-paired.
-
-    Throughput streams render the same query_id with different seeds. When the rows
-    carry no capture key, the public-id fallback cannot tell which row ran which
-    variant, so it must leave them unattached rather than attach a wrong plan.
+    """A query_id that ran as two distinct SQL variants must not be mis-paired
+    WHEN NEITHER ROW CARRIES A CAPTURE KEY (the public-id-fallback safety net, for
+    a driver that cannot supply one). Production TPC power/throughput rows DO carry
+    the key today (see test_combined_power_then_throughput_same_public_id_different_sql
+    below, which covers the real combined-mode case via the exact-key path instead),
+    but the fallback itself must still refuse to guess for a keyless row: it cannot
+    tell which row ran which variant, so it must leave them unattached rather than
+    attach a wrong plan.
     """
     conn = file_adapter.create_connection()
     try:
@@ -287,10 +296,11 @@ def test_checkpoint_is_noop_when_phase_inactive(file_adapter):
 def test_real_tpch_power_capture_attaches_plans(tmp_path):
     """End-to-end: the real TPC-H power driver path attaches captured plans to rows.
 
-    Regression guard for the production code path the method-level tests model:
-    the TPC-H power driver rebuilds result rows WITHOUT the internal capture key,
-    so capture must be buffer-driven and attachment must fall back to the public
-    query_id. Generates a tiny SF (data-gen marks this ``slow``).
+    Regression guard for the production code path the method-level tests model.
+    The TPC-H power driver now propagates the internal capture key through to its
+    result rows (see the module docstring), so this also confirms that
+    propagation does not break the ordinary single-run case. Generates a tiny SF
+    (data-gen marks this ``slow``).
     """
     from benchbox.core.tpch.benchmark import TPCHBenchmark
 
@@ -319,5 +329,61 @@ def test_real_tpch_power_capture_attaches_plans(tmp_path):
                 continue
             assert row.get("plan_fingerprint"), f"power row {row.get('query_id')} got no plan"
             assert row.get("query_plan") is not None
+    finally:
+        conn.close()
+
+
+@pytest.mark.slow
+def test_combined_power_then_throughput_same_public_id_different_sql(tmp_path):
+    """Regression for the P1 finding: a default combined run (power -> throughput)
+    executes the SAME public query ids twice, and throughput's per-stream seed
+    renders DIFFERENT SQL text for the SAME id, so the two executions capture under
+    DIFFERENT internal keys. Before the fix, neither TPC driver's rows carried
+    ``_plan_capture_key`` at all, so BOTH attached only via the public-id fallback -
+    and the fallback poisons ANY public id that captured more than one distinct SQL
+    variant, leaving BOTH the power row and the throughput row unattached (even
+    though the power row's own pre-mutation-checkpoint plan was perfectly
+    unambiguous on its own). With the fix, both rows carry their OWN exact capture
+    key, so each attaches its own plan regardless of the other phase's variant.
+    """
+    from benchbox.core.tpch.benchmark import TPCHBenchmark
+
+    db_path = str(tmp_path / "combined.duckdb")
+    adapter = DuckDBAdapter(database_path=db_path, capture_plans=True)
+    conn = adapter.create_connection()
+    try:
+        bench = TPCHBenchmark(scale_factor=0.01, output_dir=str(tmp_path / "data"))
+        bench.generate_data()
+        adapter.create_schema(bench, conn)
+        adapter.load_data(bench, conn, str(tmp_path / "data"))
+
+        run_config = {
+            "benchmark_name": "tpch",
+            "test_execution_type": "combined",
+            "scale_factor": 0.01,
+            "seed": 1,
+            "iterations": 1,
+            "warm_up_iterations": 0,
+            "num_streams": 2,
+            "query_subset": [6],  # Q6 has seed-parameterized date/discount predicates.
+            "options": {"requested_phases": ["power", "throughput"]},
+        }
+        results = adapter._execute_queries_by_type(bench, conn, run_config)
+
+        power_rows = [r for r in results if r.get("test_type") == "power" and r.get("status") == "SUCCESS"]
+        throughput_rows = [r for r in results if r.get("test_type") == "throughput" and r.get("status") == "SUCCESS"]
+        assert power_rows, "combined run produced no successful power rows"
+        assert throughput_rows, "combined run produced no successful throughput rows"
+
+        # Every successful row -- power AND throughput -- must have its own captured
+        # plan, regardless of whether the other phase captured the SAME public id
+        # under a different SQL variant.
+        for row in power_rows + throughput_rows:
+            assert row.get("plan_fingerprint"), (
+                f"{row.get('test_type')} row for query {row.get('query_id')} got no plan "
+                "(public-id ambiguity from the other phase must not poison this row)"
+            )
+            assert row.get("query_plan") is not None
+            assert "_plan_capture_key" not in row, "the internal key must be consumed, not leaked to the caller"
     finally:
         conn.close()
