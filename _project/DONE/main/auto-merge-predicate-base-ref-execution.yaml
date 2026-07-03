@@ -2,7 +2,7 @@ id: auto-merge-predicate-base-ref-execution
 title: "Run the auto-merge soundness predicate from the base ref, not the PR's own checkout"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Release Tooling
 
 description: |
@@ -35,7 +35,7 @@ prior_art:
 work:
   - id: w1
     summary: "Fetch and execute the base-ref copy of the predicate script instead of the PR's own checkout copy"
-    status: pending
+    status: done
     notes: |
       In the "Check soundness-critical paths" step, before running the predicate,
       materialize the base-ref version: `git show
@@ -51,7 +51,7 @@ work:
   - id: w2
     summary: "Treat modification of the predicate or the workflow itself as soundness=true"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Add an explicit check: if the PR's diff touches
       _project/scripts/auto_merge_soundness_paths.py or
@@ -66,7 +66,7 @@ work:
   - id: w3
     summary: "Update or add a workflow-level test exercising the base-ref execution path"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       Extend tests/unit/test_auto_merge_soundness_paths.py's
       test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge (which
@@ -111,3 +111,73 @@ open_questions:
     gating: true
     affects: ["w2", "soundness-surface-widening open_questions: predicate/workflow self-protection ownership"]
     default: "This item (w2) owns the self-touch check via workflow-level diff inspection, not via widening SOUNDNESS_PREFIXES to include .github/workflows/ or _project/scripts/ — keeps the path predicate itself scoped to product code paths."
+
+resolution_notes: |
+  All three work units implemented 2026-07-03.
+
+  OWNERSHIP REVISION (post-review): the open question's default ("w2 here
+  owns self-protection via workflow-level diff inspection, not via
+  SOUNDNESS_PREFIXES") was initially followed, then revised after review
+  flagged that for same-repo PRs GitHub executes the PR's OWN copy of a
+  pull_request-triggered workflow file - so this workflow's self-touch
+  check (and its base-ref predicate execution) can be deleted by the very
+  PR they are meant to catch. Both mechanisms here are therefore
+  best-effort defense-in-depth, not the primary control; the workflow
+  header now says this explicitly in an "HONESTY NOTE" comment. The
+  durable control is owned by soundness-surface-widening:
+  SOUNDNESS_PREFIXES / .github/CODEOWNERS now include
+  `_project/scripts/auto_merge_soundness_paths.py`,
+  `.github/workflows/auto-merge-on-open.yml`, and
+  `.github/workflows/release.yml` as exact-file entries, enforced at the
+  repo layer once the develop ruleset's require_code_owner_review admin
+  PUT lands (see that TODO's resolution_notes for the full decision,
+  including why .github/workflows/pr.yml was excluded). This TODO's w1/w2
+  remain valuable within that frame: base-ref execution keeps the
+  auto-merge triage signal honest for PRs that do NOT tamper with the
+  workflow itself, and the self-touch override gives an immediate in-run
+  signal without waiting for the ruleset layer.
+
+  - w1: the "Check soundness-critical paths" step in
+    .github/workflows/auto-merge-on-open.yml now materializes
+    `git show "origin/${{ github.base_ref }}:_project/scripts/auto_merge_soundness_paths.py"
+    > /tmp/predicate.py` (using the base-branch fetch the preceding step
+    already does) and runs `python3 /tmp/predicate.py --stdin --format
+    github-output` instead of executing the checked-out repo's copy
+    directly. Confirmed the script has no relative imports/sibling-file
+    dependencies (only stdlib argparse/re/sys/collections.abc), so running
+    it standalone from /tmp is safe. The step's output contract
+    (`steps.soundness.outputs.soundness_path`) is unchanged, so the
+    downstream enable/disable steps needed no changes.
+  - w2: added an explicit check - if the diff touches
+    `_project/scripts/auto_merge_soundness_paths.py` or
+    `.github/workflows/auto-merge-on-open.yml` - that forces
+    `soundness_path=true` regardless of what the base-ref predicate
+    returned for the rest of the diff.
+  - w3: updated
+    tests/unit/test_auto_merge_soundness_paths.py::test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge
+    (previously string-matched the old direct-invocation line) to assert
+    the new `git show origin/${{ github.base_ref }}:...` materialization
+    line, the `python3 /tmp/predicate.py ...` invocation, the two
+    self-touch `grep -qxF` checks, the `result="soundness_path=true"`
+    override, and a negative assertion that the old direct-invocation
+    string is no longer present anywhere in the workflow. Full file:
+    27/27 passed.
+
+  Manual end-to-end sanity check (not just string-matching): ran the
+  workflow's actual bash logic locally against this branch's real diff
+  against `origin/develop` (this branch already modifies both
+  `_project/scripts/auto_merge_soundness_paths.py` and
+  `.github/workflows/auto-merge-on-open.yml` as part of TODOs 5 and 6).
+  Materializing and running develop's base-ref predicate copy correctly
+  returned `soundness_path=true` on its own (this branch's diff also
+  touches benchbox/core/equivalence/cross_surface.py, already
+  soundness-critical even in the pre-widening base-ref predicate), and the
+  self-touch override independently also forced `soundness_path=true`.
+  Confirms both mechanisms work against real git state, not just fixture
+  strings.
+
+  Verification: `uv run -- python -m pytest
+  tests/unit/test_auto_merge_soundness_paths.py -v` -> 27 passed. YAML
+  syntax validated with `python -c "import yaml; yaml.safe_load(...)"`.
+  ruff check/format clean on the touched test file (the workflow YAML has
+  no Python to lint).

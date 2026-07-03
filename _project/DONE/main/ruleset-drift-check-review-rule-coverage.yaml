@@ -2,7 +2,7 @@ id: ruleset-drift-check-review-rule-coverage
 title: "Extend ruleset_drift_check.py to assert the develop pull_request review rule"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Release Tooling
 
 description: |
@@ -36,7 +36,7 @@ prior_art:
 work:
   - id: w1
     summary: "Decide sequencing: land review-rule drift coverage before or after the admin PUT lands"
-    status: pending
+    status: done
     notes: |
       If ruleset_drift_check.py starts asserting required_approving_review_count>=1
       and require_code_owner_review=true immediately, the daily canary goes
@@ -51,7 +51,7 @@ work:
   - id: w2
     summary: "Import ruleset_review_enforcement's predicate into ruleset_drift_check.py's compare_ruleset"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Add a call to `review_enforcement_findings` (from
       _project/scripts/ruleset_review_enforcement.py) inside or alongside
@@ -64,7 +64,7 @@ work:
   - id: w3
     summary: "Update the runbook and confirm both CI call sites surface the new failure mode"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Update docs/operations/repo-admin-settings.md's "Ruleset drift is checked
       by scripts/ruleset_drift_check.py" paragraph to say it now also asserts
@@ -78,7 +78,7 @@ work:
   - id: w4
     summary: "Extend or add unit coverage for the merged drift+review-enforcement path"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Add a fixture-based test (alongside tests/unit/release/test_ruleset_drift_check.py
       if it exists, else tests/unit/release/) asserting compare_ruleset now flags a
@@ -135,3 +135,63 @@ metadata:
   estimated_effort: "Small"
   created_date: "2026-07-03"
   last_updated: "2026-07-03T00:00:00"
+
+resolution_notes: |
+  All four work units implemented 2026-07-03, per the open_question's default
+  (WARN-until-enforced):
+
+  - w1: decision recorded as WARN-until-enforced (option b), matching the
+    stated default. Implemented via a module-level toggle,
+    `DEVELOP_REVIEW_RULE_ENFORCED = False`, in scripts/ruleset_drift_check.py.
+  - w2: compare_ruleset now imports `extract_rules` and
+    `review_enforcement_findings` from
+    `_project/scripts/ruleset_review_enforcement.py` (neither file touched,
+    per scope_limit) and, for `develop-squash-only` only, appends its
+    findings to the same findings list `render_summary`/the JSON `--output`
+    payload already use. While `DEVELOP_REVIEW_RULE_ENFORCED` is False,
+    those specific findings are prefixed `WARNING_PREFIX = "WARNING
+    (non-blocking): "`; a new `blocking_findings()` helper filters them out
+    when `main()` decides the exit code and the JSON `status` field, so they
+    render identically to other drift findings but do not fail the canary.
+    Flipping `DEVELOP_REVIEW_RULE_ENFORCED` to True later is the one-line
+    change referenced in both the code comment and the runbook.
+  - w3: updated both the "Soundness-path review enforcement" section and the
+    "Ruleset drift is checked by scripts/ruleset_drift_check.py" paragraph in
+    docs/operations/repo-admin-settings.md to describe the merged check, the
+    WARN-until-enforced decision, and that validate-main-pr.yml's bootstrap
+    invocation shares the same code path (confirmed by reading both
+    workflow files - neither needed a change, since both already call
+    `ruleset_drift_check.py` with `RULESET_DRIFT_TOKEN` and
+    `--require-bypass-actor-visibility`). Did not retire the manual verify
+    command (still useful standalone, e.g. for checking current live state
+    outside a canary run); clarified its relationship to the now-automated
+    path instead.
+  - w4: added tests/unit/release/test_ruleset_drift_review_coverage.py
+    (4 tests) covering: missing review enforcement -> non-blocking warning
+    by default; enforced ruleset -> no findings; `enforce_review_rule=True`
+    -> the same gap becomes blocking (proves the one-line-flip claim);
+    main-release-only is unaffected by the develop-only check.
+    tests/unit/release/test_ruleset_review_enforcement.py required no
+    changes and stays green (8/8). tests/unit/test_ruleset_drift.py's 5
+    pre-existing tests (main-release-only fixtures) also stay green
+    unchanged, confirming must_preserve.
+
+  Note on success_metrics: the first listed metric ("release-canary.yml's
+  ruleset-drift job fails when ... require_code_owner_review!=true")
+  describes the POST-enforcement end state, not the state landed by this
+  PR - by design, per the WARN-until-enforced decision this TODO's own
+  open_questions section defaults to. The canary will start failing on
+  that condition once `DEVELOP_REVIEW_RULE_ENFORCED` is flipped to True
+  (gated on auto-merge-review-gate-admin-enforcement's admin PUT landing,
+  per anti_patterns). Also note `required_approving_review_count` is not
+  checked at all, by design (see review_enforcement_findings' own
+  docstring) - the success metric's mention of it reflects the TODO
+  description's own paraphrase of GitHub's raw field names, not a gap in
+  this implementation.
+
+  Verification: `uv run -- python -m pytest tests/unit/release/ -k
+  ruleset_review_enforcement -q` -> 8 passed. `uv run -- python -m pytest
+  tests/unit/release/ -k ruleset_drift -q` -> 4 passed. Full
+  tests/unit/test_ruleset_drift.py + tests/unit/release/ +
+  tests/unit/test_release_infrastructure.py + tests/unit/test_release_readiness.py
+  -> 78 passed. ruff check/format clean on touched Python files.

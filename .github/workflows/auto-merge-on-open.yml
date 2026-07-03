@@ -13,6 +13,19 @@ name: Auto-enable auto-merge
 # only auto-disables auto-merge on push when the pusher lacks write access,
 # so in the normal same-repo/write-author flow a stale enabled auto-merge
 # would otherwise survive and merge after checks without review.
+#
+# HONESTY NOTE on the self-protection checks below (base-ref predicate
+# execution + self-touch override): they are BEST-EFFORT for same-repo PRs.
+# GitHub executes the PR's OWN copy of a pull_request-triggered workflow
+# file, so a PR that edits this workflow can delete these checks in the
+# same commit that would have triggered them. The durable control is the
+# CODEOWNERS entries covering this file and the predicate
+# (SOUNDNESS_PREFIXES in _project/scripts/auto_merge_soundness_paths.py
+# includes both, mirrored 1:1 into .github/CODEOWNERS) combined with the
+# develop ruleset's require_code_owner_review (pending admin action; see
+# docs/operations/repo-admin-settings.md). The checks below remain useful
+# as defense-in-depth and as an honest triage signal for PRs that don't
+# tamper with the workflow itself.
 
 on:
   pull_request:
@@ -43,9 +56,33 @@ jobs:
           # source path. With rename detection on, `git diff` reports only the
           # (unprotected) destination, so a PR that removes a soundness-critical
           # file via rename would slip past the gate.
-          git diff --name-only --no-renames "origin/${{ github.base_ref }}...HEAD" \
-            | _project/scripts/auto_merge_soundness_paths.py --stdin --format github-output \
-            >> "$GITHUB_OUTPUT"
+          diff_paths="$(git diff --name-only --no-renames "origin/${{ github.base_ref }}...HEAD")"
+
+          # Run the BASE-REF copy of the predicate, not the PR's own checkout
+          # copy. For a same-repo (non-fork) PR - the normal case here - the
+          # checked-out copy IS whatever the PR itself introduces, so a PR
+          # that edits auto_merge_soundness_paths.py (e.g. narrows
+          # SOUNDNESS_PREFIXES) would otherwise evaluate its own diff against
+          # its own modified rules, neutralizing its review gate in the same
+          # commit that would otherwise have triggered it. The base branch is
+          # already fetched by the preceding "Fetch base branch" step.
+          git show "origin/${{ github.base_ref }}:_project/scripts/auto_merge_soundness_paths.py" > /tmp/predicate.py
+
+          result="$(printf '%s\n' "$diff_paths" | python3 /tmp/predicate.py --stdin --format github-output)"
+
+          # Base-ref execution alone stops the predicate from judging its own
+          # diff leniently, but doesn't by itself flag "this diff touches the
+          # predicate (or the workflow that runs it)" as review-worthy - a PR
+          # could still edit the predicate to make FUTURE PRs unsafe without
+          # itself needing owner review. Force soundness_path=true whenever
+          # the diff touches either file, regardless of what the (correctly
+          # base-ref-evaluated) predicate says about the rest of the diff.
+          if printf '%s\n' "$diff_paths" | grep -qxF "_project/scripts/auto_merge_soundness_paths.py" \
+             || printf '%s\n' "$diff_paths" | grep -qxF ".github/workflows/auto-merge-on-open.yml"; then
+            result="soundness_path=true"
+          fi
+
+          echo "$result" >> "$GITHUB_OUTPUT"
 
       - name: Enable squash auto-merge
         if: steps.soundness.outputs.soundness_path != 'true'

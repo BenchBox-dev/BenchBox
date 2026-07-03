@@ -2,7 +2,7 @@ id: pypi-installability-canary-and-rollback
 title: "Add a PyPI-latest installability canary and document the rollback runbook"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Release Tooling
 
 description: |
@@ -31,7 +31,7 @@ description: |
 work:
   - id: w1
     summary: "Add a scheduled PyPI-latest installability canary"
-    status: pending
+    status: done
     notes: |
       Extend `.github/workflows/release-canary.yml` (which already runs on
       a daily `cron: "0 8 * * *"` schedule against `develop`, see
@@ -65,7 +65,7 @@ work:
   - id: w2
     summary: "Document a rollback/.postN recovery runbook section"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Add a new section to `docs/operations/release-guide.md` (currently
       164 lines, ends with the release flow + pre-merge contract; no
@@ -175,3 +175,35 @@ success_metrics:
   - "A scheduled job checks PyPI-latest installability independently of any local-source-based test."
   - "The canary, run manually against the known-bad 0.3.0, correctly fails with the pandas ImportError."
   - "docs/operations/release-guide.md has a rollback/.postN section referencing the actual release-cut/release-finalize mechanism and the v0.3.1 precedent."
+
+resolution_notes: |
+  Both work units implemented 2026-07-03:
+  - w1: added `pypi-latest-installability` job to release-canary.yml. No
+    checkout step at all (uv/python setup steps don't need one); the
+    install+import command additionally `cd`s into a `mktemp -d` scratch
+    directory before running, so there is no ambiguity about local source
+    shadowing. Reuses the exact `import benchbox; assert
+    importlib.util.find_spec('pandas') is None` assertion from
+    nightly.yml:303, only swapping `--with "$wheel"` for `--with benchbox`
+    (resolves from PyPI). The job has no `needs:` on the other canary jobs
+    and vice versa (release-canary-result depends on all three via
+    `if: always()`, so one job's failure doesn't hide another's, and the
+    overall workflow-run conclusion goes red if this job fails — which is
+    what scripts/release_readiness_check.py's freshness gate reads).
+  - Manually re-ran the assertion pattern against the real, known-bad
+    v0.3.0 from /tmp (outside the repo tree): confirmed it fails with
+    `ModuleNotFoundError: No module named 'pandas'`, non-zero exit,
+    validating the canary actually catches this failure class before
+    wiring it into CI.
+  - w2: added "## Recovering from a broken PyPI release" to
+    docs/operations/release-guide.md covering PyPI immutability, the
+    yank-vs-forward-fix decision, and pointing at the existing
+    release-cut/release-finalize flow plus release-recovery-v0-3-1 as the
+    worked precedent, per the anti_patterns constraint (no new recovery
+    procedure invented).
+
+  Updated tests/unit/test_release_infrastructure.py's
+  test_release_canary_workflow_contract (which pins release-canary.yml's
+  job set and release-canary-result's needs list) to include the new job;
+  it was failing that pin before the update. All 38 tests in
+  tests/unit/test_release_infrastructure.py pass after the change.

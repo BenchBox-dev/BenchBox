@@ -2,7 +2,7 @@ id: soundness-surface-widening
 title: "Widen the auto-merge soundness-review surface to cover oracle-adjacent assets"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Release Tooling
 
 description: |
@@ -45,7 +45,7 @@ prior_art:
 work:
   - id: w1
     summary: "Decide the widened prefix/glob set, weighing review friction against oracle coverage"
-    status: pending
+    status: done
     notes: |
       Recommend at minimum: benchbox/core/expected_results/ (all of it — the
       loader, registry, and digest fixtures together define correctness) and
@@ -62,7 +62,7 @@ work:
   - id: w2
     summary: "Update SOUNDNESS_PREFIXES and CODEOWNERS in lockstep; keep the pinning test green"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Edit _project/scripts/auto_merge_soundness_paths.py:SOUNDNESS_PREFIXES and
       .github/CODEOWNERS together in the same commit. Update
@@ -75,7 +75,7 @@ work:
   - id: w3
     summary: "Update ruleset_review_enforcement.py's narration and confirm it renders correctly"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       SOUNDNESS_PATH_GLOBS in _project/scripts/ruleset_review_enforcement.py is
       derived from SOUNDNESS_PREFIXES, so no code change should be needed, but
@@ -135,3 +135,95 @@ metadata:
   estimated_effort: "Medium"
   created_date: "2026-07-03"
   last_updated: "2026-07-03T00:00:00"
+
+resolution_notes: |
+  All three work units implemented 2026-07-03.
+
+  - w1 decision (both open questions resolved):
+    1. sql_compat scope: took the recommended DEFAULT - narrow (rule-dispatch
+       core only: resolver.py, decision.py, rules/_registration.py), not the
+       whole tree. Verified the churn tradeoff empirically before deciding
+       rather than assuming it: `git log --oneline --since="60 days ago" --
+       benchbox/sql_compat/` -> 15 commits; `.../rules/` -> 13 commits;
+       vs. the three dispatch-core files specifically -> 1 commit in the
+       same window. Confirms the description's "high churn" claim for the
+       tree as a whole and that gating just the dispatch core adds minimal
+       review friction while covering where a bug would silently change
+       which rewrites apply.
+    2. Predicate/workflow self-protection ownership: REVISED after review
+       (the first pass deferred this wholly to
+       auto-merge-predicate-base-ref-execution's workflow-level checks).
+       Review finding: for same-repo PRs GitHub executes the PR's OWN copy
+       of a pull_request-triggered workflow file, so any in-workflow
+       self-touch check is attacker-controlled - a PR editing
+       auto-merge-on-open.yml can delete the check (and the base-ref
+       predicate execution) in the same commit that would have triggered
+       it. The durable control must live at the CODEOWNERS + ruleset
+       layer. Final ownership split: THIS TODO owns the durable layer -
+       SOUNDNESS_PREFIXES and .github/CODEOWNERS now include the three
+       exact-file entries `_project/scripts/auto_merge_soundness_paths.py`,
+       `.github/workflows/auto-merge-on-open.yml`, and
+       `.github/workflows/release.yml` (the PyPI publisher; a PR editing
+       it can weaken publish gating) - while
+       auto-merge-predicate-base-ref-execution keeps its in-workflow
+       base-ref execution + self-touch override as best-effort
+       defense-in-depth (that workflow's header now carries an explicit
+       honesty note saying so). Exact-file entries work because
+       is_soundness_path uses startswith over SOUNDNESS_PREFIXES; a
+       negative test pins that `.github/workflows/release-canary.yml`
+       does not prefix-collide with the release.yml entry.
+    3. `.github/workflows/pr.yml` considered and EXCLUDED, using the same
+       churn methodology as the sql_compat decision: `git log --oneline
+       --since="60 days ago" -- .github/workflows/pr.yml` -> 32 commits
+       (vs 1 each for auto-merge-on-open.yml, release.yml, and the
+       predicate in the same window). pr.yml is arguably the same class
+       (it defines the ci-required-result umbrella job the develop ruleset
+       gates on, so editing it can weaken what the required check actually
+       runs), but it is routine-churn CI plumbing, and the required-check
+       CONTRACT (that the ci-required-result context must exist and pass)
+       is pinned by the develop ruleset + the daily ruleset-drift canary
+       rather than by file ownership. Requiring owner review on it would
+       put a large fraction of ordinary dev-loop work behind CODEOWNERS
+       review. Revisit if the required-check contract ever stops being
+       ruleset-pinned, or once the require_code_owner_review admin PUT has
+       landed and observed friction on the current set is tolerable.
+    Also included, per the "at minimum" recommendation:
+    benchbox/core/expected_results/ (whole tree - loader, registry, and
+    digest fixtures together define correctness) and
+    benchbox/platforms/base/result_capture.py (single file, low churn).
+
+  - w2: SOUNDNESS_PREFIXES (_project/scripts/auto_merge_soundness_paths.py)
+    and .github/CODEOWNERS updated together with matching comments
+    explaining the oracle-adjacent rationale and the sql_compat narrow-scope
+    reasoning. tests/unit/test_auto_merge_soundness_paths.py extended with
+    new true/false parametrized cases (expected_results, result_capture.py,
+    the three sql_compat dispatch files, plus negative cases for
+    sql_compat's non-dispatch files and a near-miss filename
+    `result_capture_helpers.py` to prove the exact-file prefixes don't
+    false-positive on prefix collisions) and a new
+    test_codeowners_matches_soundness_prefixes_1to1 test asserting CODEOWNERS
+    and SOUNDNESS_PREFIXES are exactly the same set, not just that specific
+    lines are present. Full file: 27/27 passed.
+
+  - w3: ran ruleset_review_enforcement.py's CLI against a fixture and found
+    its SOUNDNESS_PATH_GLOBS derivation (`f"{prefix}**"` unconditionally)
+    produced a misleading glob for the two new exact-file prefixes -
+    `benchbox/platforms/base/result_capture.py**` reads like a directory
+    glob for a file. Fixed the derivation to only append `**` to
+    directory-style prefixes (those ending in `/`) and render exact-file
+    prefixes as-is. This is a real (if cosmetic) bug the "eyeball the
+    output" instruction was specifically meant to catch - confirms doing
+    that step mattered. tests/unit/release/test_ruleset_review_enforcement.py
+    required no changes and stays green (8/8, including the generic
+    "every SOUNDNESS_PREFIXES entry appears in some glob" assertion).
+
+  Verification (after the review-driven self-protection widening):
+  `uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py
+  tests/unit/release/ tests/unit/test_release_infrastructure.py -q -n 0`
+  -> all passed. `printf '<path>\n' | uv run -- python
+  _project/scripts/auto_merge_soundness_paths.py --stdin` -> `true` for
+  benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json,
+  _project/scripts/auto_merge_soundness_paths.py,
+  .github/workflows/auto-merge-on-open.yml, and
+  .github/workflows/release.yml. ruff check/format clean on all touched
+  Python files.

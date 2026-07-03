@@ -324,9 +324,25 @@ class TestReleaseInfrastructure:
         assert workflow["env"]["RELEASE_CANARY_REF"] == "develop"
 
         jobs = workflow["jobs"]
-        assert set(jobs) == {"credential-free-non-fast", "ruleset-drift", "release-canary-result"}
+        assert set(jobs) == {
+            "credential-free-non-fast",
+            "ruleset-drift",
+            "pypi-latest-installability",
+            "release-canary-result",
+        }
         assert jobs["credential-free-non-fast"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
         assert jobs["ruleset-drift"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
+
+        # pypi-latest-installability must not gate on (or be gated by) the
+        # other canary jobs, and must not check out the repo (it installs
+        # the published PyPI artifact, not local source).
+        pypi_latest_job = jobs["pypi-latest-installability"]
+        assert "needs" not in pypi_latest_job
+        assert not any(step.get("uses", "").startswith("actions/checkout") for step in pypi_latest_job["steps"])
+        pypi_latest_text = _workflow_job_run_text("release-canary.yml", "pypi-latest-installability")
+        assert "uv run --isolated --no-project --with benchbox --" in pypi_latest_text
+        assert "importlib.util.find_spec('pandas') is None" in pypi_latest_text
+        assert "mktemp -d" in pypi_latest_text
 
         non_fast_text = _workflow_job_run_text("release-canary.yml", "credential-free-non-fast")
         assert RELEASE_CANARY_NON_FAST_EXPRESSION in non_fast_text
@@ -349,7 +365,11 @@ class TestReleaseInfrastructure:
 
         result_job = jobs["release-canary-result"]
         assert result_job["name"] == "release-canary-result"
-        assert set(result_job["needs"]) == {"credential-free-non-fast", "ruleset-drift"}
+        assert set(result_job["needs"]) == {
+            "credential-free-non-fast",
+            "ruleset-drift",
+            "pypi-latest-installability",
+        }
         result_text = _workflow_job_run_text("release-canary.yml", "release-canary-result")
         assert '"checked_ref": "develop"' in result_text
         assert '"commit_sha": "${CHECKED_SHA}"' in result_text

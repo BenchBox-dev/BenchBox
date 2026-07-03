@@ -148,6 +148,56 @@ release as if it had been blocked.
   fix the underlying issue, bump to the next patch version, and re-cut.
   Do **not** force-push or re-tag; the tag is already public.
 
+## Recovering from a broken PyPI release
+
+PyPI versions are **immutable**: once `X.Y.Z` is published you cannot
+re-upload or delete-and-replace it, even to fix a broken build. This is
+generalized guidance — `_project/TODO/main/active/release-recovery-v0-3-1.yaml`
+is the worked precedent (see below) for what happens when this bites in
+practice: `v0.3.0` published 2026-05-16 with a broken clean import
+(`ModuleNotFoundError: No module named 'pandas'`) and sat as PyPI-latest,
+uncaught, for over a month, because nightly's package-install test built a
+wheel from `develop` rather than checking the artifact actually on PyPI.
+(`.github/workflows/release-canary.yml`'s `pypi-latest-installability` job
+now closes that specific detection gap going forward — see "Release canary
+and ruleset drift" above.)
+
+Two response options once a bad version is confirmed on PyPI, and when to
+use each:
+
+- **Yank the broken version.** PyPI's "yank" (`pip index` / PyPI project UI)
+  hides a release from default dependency resolution without deleting it —
+  existing installs that already pinned the bad version are unaffected, but
+  new `pip install benchbox` resolutions skip it and fall back to the latest
+  non-yanked version. Use this when there is a safe prior version to fall
+  back to and the fix is not ready yet.
+- **Ship a `.postN` or the next patch.** This repo's actual precedent is a
+  full next patch release (`v0.3.0` -> `v0.3.1`), not a `.postN` suffix, per
+  `release-recovery-v0-3-1`. Use this when the fix is ready quickly and a
+  monotonic forward release is cleaner than yanking (e.g. there is no good
+  prior fallback version, or you want users who already resolved the bad
+  version to get the fix on their next install/upgrade rather than silently
+  falling back).
+
+Either path is a judgment call based on the incident (is there a safe
+fallback version, is a fix already close) — it is not automated by the
+canary itself; a canary failure is a signal to make that call, not a
+trigger for an automatic rollback action.
+
+The forward-fix path uses the same flow as any other release — there is no
+separate recovery procedure:
+
+```bash
+git checkout develop && git pull
+make release-cut VERSION=X.Y.Z
+# review the PR; wait for validate-base and release-required-result
+make release-finalize VERSION=X.Y.Z
+```
+
+See `release-recovery-v0-3-1` for the worked example of diagnosing a broken
+PyPI-latest release, confirming the fix on `develop`, and cutting the
+recovery version through this same flow.
+
 ## Reference
 
 - Makefile targets: `release-cut`, `release-finalize`.

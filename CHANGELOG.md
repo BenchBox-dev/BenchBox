@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.1] - 2026-05-30
+> **Accounting note:** the content below was previously (incorrectly) dated
+> as a released `[0.3.1] - 2026-05-30` section, but no `v0.3.1` git tag was
+> ever pushed and PyPI never served a `0.3.1` release — `0.3.0` (published
+> 2026-05-16) remains PyPI-latest as of 2026-07-03. `0.3.0` shipped with a
+> broken clean install (`ModuleNotFoundError: No module named 'pandas'` on
+> `import benchbox`); the fix is the "Clean install now imports" entry
+> below. This work is complete on `develop` but not yet published under a
+> released version. See `release-recovery-v0-3-1` for the recovery release
+> that will publish it, and `release-accounting-drift-correction` for this
+> bookkeeping fix.
 
 ### New
 
