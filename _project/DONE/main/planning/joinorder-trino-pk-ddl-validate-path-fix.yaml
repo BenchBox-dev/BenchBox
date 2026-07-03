@@ -2,7 +2,7 @@ id: joinorder-trino-pk-ddl-validate-path-fix
 title: "chore(todo): repoint the completed trino-primary-key-ddl validate command to its DONE path"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -20,7 +20,7 @@ description: |
 work:
   - id: w1
     summary: "Repoint the DONE item's validate command (and files_affected path) to the DONE/ location"
-    status: pending
+    status: done
     notes: |
       Edit joinorder-trino-primary-key-ddl.yaml:62 (and the matching
       files_affected entry at :89) to reference
