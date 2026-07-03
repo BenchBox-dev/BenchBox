@@ -2,7 +2,7 @@ id: joinorder-scale-stress-oracle-correction
 title: "docs(scale-stress): fix replica-count oracle rule for scalar-MIN JOB queries and close prototype dep-trap"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Documentation
 
 description: |
@@ -46,7 +46,7 @@ deps:
 work:
   - id: w1
     summary: "Reword the decision doc's oracle-scaling rule to match scalar-MIN semantics"
-    status: pending
+    status: done
     notes: |
       Fix decision-2026-06-30.md:115 and :122-123 so the FINAL-result oracle is
       stated as invariant (x1) for the 113 scalar-MIN queries, and the
@@ -54,7 +54,7 @@ work:
       cardinalities (consistent with the same doc's line 141-142 gate list).
   - id: w2
     summary: "Add track2-joinorder-stats-phase to the replicated-prototype deps.needs"
-    status: pending
+    status: done
     notes: |
       Edit joinorder-replicated-imdb-scale-prototype.yaml deps.needs to include
       track2-joinorder-stats-phase, satisfying that item's own w1 verification
