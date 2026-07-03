@@ -417,6 +417,28 @@ class TestExecuteOperation:
         assert "MERGE" in (result.skip_reason or "")
         mock_conn.execute.assert_not_called()
 
+    def test_scd2_merge_category_ops_are_not_skipped_on_duckdb(self, wp_benchmark):
+        """SCD Type 2 ops keep the ``merge`` category for taxonomy/reporting but
+        are portable UPDATE/INSERT, so DuckDB must NOT skip them under the
+        category-wide MERGE gap. Otherwise a real ``platform_key='duckdb'`` run
+        reports them skipped and loses the coverage the catalog adds (they run
+        fine when ``execute_operation`` is called without a platform key)."""
+        for op_id in (
+            "merge_scd_type2_basic",
+            "merge_scd_type2_no_change",
+            "merge_scd_type2_new_keys_only",
+        ):
+            operation = wp_benchmark.get_operation(op_id)
+            assert operation.category == "merge"  # still classified under merge
+            effective_sql, skip_reason = wp_benchmark._get_effective_write_sql(operation, platform_key="duckdb")
+            assert skip_reason is None, f"{op_id} was wrongly skipped on DuckDB: {skip_reason}"
+            assert effective_sql, f"{op_id} returned no effective SQL"
+
+        # A genuine MERGE-statement op in the same category is still skipped.
+        merge_op = wp_benchmark.get_operation("merge_simple_upsert_small")
+        _, merge_skip = wp_benchmark._get_effective_write_sql(merge_op, platform_key="duckdb")
+        assert merge_skip is not None and "MERGE" in merge_skip
+
     def test_execute_operation_uses_platform_override_when_available(self, wp_benchmark, monkeypatch):
         """Platform override SQL should be used instead of base write_sql."""
         operation = wp_benchmark.get_operation("insert_on_conflict_ignore")
