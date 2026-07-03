@@ -23,8 +23,8 @@ from benchbox.cli.config import ConfigManager
 from benchbox.cli.dryrun import generate_cli_command
 
 pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.fast,
+    pytest.mark.unit,
+    pytest.mark.medium,
 ]
 
 
