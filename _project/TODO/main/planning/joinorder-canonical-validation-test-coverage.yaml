@@ -33,11 +33,29 @@ description: |
   CI-gateable reproduction of the build-time assurances, replacing reliance on
   manual UAT.
 
+  Re-review correction (2026-07-03): the FK gap is confirmed, but this seed's
+  original w2 overstated implementation readiness. The current build pipeline
+  has FK closure logic for tiny-fixture construction, but no committed
+  allow-list artifact or helper that names the full canonical archive's
+  legitimate dangling references. Do not implement the FK assertion by burying a
+  newly-derived policy inside an integration test; first make the allowed
+  dangling set durable, reviewed, and re-runnable, or split that prerequisite
+  into its own TODO.
+
 deps:
   needs:
     - joinorder-canonical-cutover
 
 work:
+  - id: w0
+    summary: "Pin or create a durable source for legitimate full-archive dangling FKs"
+    status: pending
+    notes: |
+      Before w2, verify whether a committed allowed-dangling set already exists.
+      Current re-review found only build-time FK closure machinery, not a
+      durable full-archive allowed-dangling artifact. If none exists, create a
+      prerequisite TODO to generate and review that compact artifact/helper; do
+      not hand-derive FK exceptions inside the integration test.
   - id: w1
     summary: "Add an opt-in full-archive cardinality test against reference_cardinalities.json"
     status: pending
@@ -50,13 +68,14 @@ work:
       test_canonical_queries.py assertions at full scale.
   - id: w2
     summary: "Add an FK referential-integrity test pinning the legitimate dangling-ref set"
-    needs: [w1]
+    needs: [w0, w1]
     status: pending
     notes: |
       Assert each declared FK resolves EXCEPT the documented legitimate dangling
-      references (schema.py:67-68). Source the allowed-dangling set from the build
-      pipeline's closure logic (build_joinorder_data.py) rather than re-deriving
-      it. Same existing opt-in markers.
+      references (schema.py:67-68). Source the allowed-dangling set from a
+      committed artifact/helper produced or verified by w0; do not re-derive or
+      hardcode the exception policy directly in this test. Same existing opt-in
+      markers.
   - id: w3
     summary: "Add a full-archive UTF-8 / NULL-vs-empty fidelity assertion"
     needs: [w1]
@@ -82,8 +101,8 @@ approach: |
   test_joinorder_full_archive.py), each marked @pytest.mark.slow +
   @pytest.mark.integration and skipped unless the canonical archive is present.
   Drive assertions off the committed reference artifacts under _project/joinorder/
-  and the build pipeline's known-dangling set, so the tests re-express build-time
-  guarantees at load time without re-implementing them.
+  and a durable allowed-dangling FK source, so the tests re-express build-time
+  guarantees at load time without hiding policy in test code.
 
 anti_patterns:
   - "DO NOT assert full FK closure -- schema.py:67-68 documents legitimate dangling references; pin the known set instead."
