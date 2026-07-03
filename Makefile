@@ -435,6 +435,25 @@ test-docker-pg-extensions:
 DOCKER_PLATFORMS := clickhouse trino presto postgresql starrocks doris databend influxdb cedardb firebolt questdb singlestore
 DOCKER_TEST_STATE_DIR ?= /tmp/benchbox-docker-projects
 
+# Container engine for local test-docker-* compose stacks: `docker` (default,
+# and the ONLY engine CI uses) or `mocker` (Docker-compatible CLI over Apple
+# `container`; Apple-silicon/macOS-26 LOCAL DEV ONLY, MUST NOT run in CI). The
+# docker/*/docker-compose.yml files stay unmodified; only the driver swaps.
+# See AGENTS.md "Mocker as a local test-docker engine".
+CONTAINER_ENGINE ?= docker
+COMPOSE := $(CONTAINER_ENGINE) compose
+
+# `compose down -v` extended to also remove leaked named volumes on a SUCCESSFUL
+# down. mocker 0.5.4's `compose down -v` removes containers but LEAKS named
+# volumes (a stale-data risk across runs); this prunes any volume with the
+# project prefix afterward. A no-op beyond `down -v` on docker (which already
+# removes them). Scoped to the project so it never touches unrelated volumes.
+# Grepping the project-prefixed name directly avoids assuming `volume ls` emits a
+# header or a fixed column layout. $(1)=project $(2)=compose file.
+define compose_down_fresh
+$(COMPOSE) -p "$(1)" -f "$(2)" down -v; if [ "$(CONTAINER_ENGINE)" = "mocker" ]; then mocker volume ls 2>/dev/null | grep -oE "$(1)[-_][A-Za-z0-9._-]+" | while read -r _v; do mocker volume rm "$$_v" >/dev/null 2>&1 || true; done; fi
+endef
+
 test-docker-up-%:
 	@set -e; \
 		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
@@ -447,12 +466,12 @@ test-docker-up-%:
 		status=1; \
 		cleanup() { \
 			if [ $$status -ne 0 ]; then \
-				docker compose -p "$$project_name" -f docker/$*/docker-compose.yml down -v >/dev/null 2>&1 || true; \
+				{ $(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml) ; } >/dev/null 2>&1 || true; \
 				rm -f "$$project_file"; \
 			fi; \
 		}; \
 		trap cleanup EXIT INT TERM; \
-		docker compose -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
+		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
 		printf '%s\n' "$$project_name" > "$$project_file"; \
 		status=0
 
@@ -465,7 +484,7 @@ test-docker-down-%:
 			echo "No tracked Docker test stack for $*"; \
 			exit 0; \
 		fi; \
-		docker compose -p "$$project_name" -f docker/$*/docker-compose.yml down -v; \
+		$(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml); \
 		rm -f "$$project_file"
 
 # Explicit override: generic test-docker-% expands to -m "live_firebolt" (cloud tests).
@@ -474,18 +493,18 @@ test-docker-firebolt:
 	@echo "Running Firebolt Core Docker integration tests"
 	@set -e; \
 		project_name="benchbox-firebolt-test-$$(date +%s)-$$RANDOM"; \
-		cleanup() { docker compose -p "$$project_name" -f docker/firebolt/docker-compose.yml down -v || true; }; \
+		cleanup() { { $(call compose_down_fresh,$$project_name,docker/firebolt/docker-compose.yml) ; } || true; }; \
 		trap cleanup EXIT INT TERM; \
-		docker compose -p "$$project_name" -f docker/firebolt/docker-compose.yml up -d --wait; \
+		$(COMPOSE) -p "$$project_name" -f docker/firebolt/docker-compose.yml up -d --wait; \
 		uv run -- python -m pytest -m "live_firebolt_core" --tb=short -v -n 0
 
 test-docker-%:
 	@echo "Running $* Docker integration tests"
 	@set -e; \
 		project_name="benchbox-$*-test-$$(date +%s)-$$RANDOM"; \
-		cleanup() { docker compose -p "$$project_name" -f docker/$*/docker-compose.yml down -v || true; }; \
+		cleanup() { { $(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml) ; } || true; }; \
 		trap cleanup EXIT INT TERM; \
-		docker compose -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
+		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
 		uv run -- python -m pytest -m "live_$*" --tb=short -v -n 0
 
 test-docker-up-all:
@@ -501,7 +520,7 @@ test-docker-up-all:
 					project_file="$$state_dir/$$p.project"; \
 					project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
 					if [ -n "$$project_name" ]; then \
-						docker compose -p "$$project_name" -f docker/$$p/docker-compose.yml down -v >/dev/null 2>&1 || true; \
+						{ $(call compose_down_fresh,$$project_name,docker/$$p/docker-compose.yml) ; } >/dev/null 2>&1 || true; \
 						rm -f "$$project_file"; \
 					fi; \
 				done; \
@@ -516,7 +535,7 @@ test-docker-up-all:
 				printf '%s\n' "$$project_name" > "$$project_file"; \
 			fi; \
 			echo "Starting $$p..."; \
-			docker compose -p "$$project_name" -f docker/$$p/docker-compose.yml up -d --wait; \
+			$(COMPOSE) -p "$$project_name" -f docker/$$p/docker-compose.yml up -d --wait; \
 		done; \
 		status=0
 
@@ -531,7 +550,7 @@ test-docker-down-all:
 				continue; \
 			fi; \
 			echo "Stopping $$p..."; \
-			docker compose -p "$$project_name" -f docker/$$p/docker-compose.yml down -v; \
+			$(call compose_down_fresh,$$project_name,docker/$$p/docker-compose.yml); \
 			rm -f "$$project_file"; \
 		done
 
@@ -541,6 +560,18 @@ test-docker-all:
 		echo "=== Testing $$p ==="; \
 		$(MAKE) test-docker-$$p || exit 1; \
 	done
+
+# Compose-lifecycle parity acceptance test: asserts up --wait health-gating,
+# published-port reachability, and the down -v fresh-state guarantee (no leaked
+# container/volume) for the selected engine. Same asserts on docker and mocker so
+# parity is measured. Usage:
+#   make test-docker-parity                             # docker (default)
+#   make test-docker-parity CONTAINER_ENGINE=mocker     # Apple container backend
+#   make test-docker-parity PARITY_PLATFORMS="questdb postgresql doris"
+PARITY_PLATFORMS ?= questdb postgresql
+.PHONY: test-docker-parity
+test-docker-parity:
+	@bash _project/scripts/mocker_compose_parity.sh $(CONTAINER_ENGINE) $(PARITY_PLATFORMS)
 
 # Coverage commands using pytest
 coverage-fast:

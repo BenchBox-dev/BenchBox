@@ -55,6 +55,21 @@ machine (worktree visible at its Mac path); override via `CI_LINUX_CMD='make
 ci-local'`. The dev env syncs on first `uv run` (needs ample free disk). No-op
 off Apple-silicon/macOS-26; never a CI/pr-open dependency.
 
+## Mocker as a local test-docker engine
+
+Apple silicon + macOS 26, LOCAL DEV ONLY -- never CI (CI runs `test-docker-*` on
+ubuntu + real docker). `make test-docker-*` takes `CONTAINER_ENGINE` (default
+`docker`); `CONTAINER_ENGINE=mocker` runs the unchanged
+`docker/*/docker-compose.yml` on Apple `container` via Mocker, dropping Docker
+Desktop's always-on VM. mocker 0.5.4's `compose down -v` leaks named volumes (a
+stale-data risk); the Makefile teardown wrap prunes the project's volumes after
+`down -v` so fresh state is guaranteed (a no-op on docker). Measure parity with
+`make test-docker-parity CONTAINER_ENGINE=<docker|mocker>`. Validated on mocker:
+questdb + postgresql lifecycle parity and end-to-end `test-docker-questdb` (load +
+query). NOT validated: 3+ service stacks -- databend stays healthy on docker but
+minio exits on mocker, so use docker for multi-service (doris/starrocks are
+all-in-one single containers).
+
 ## Output Discipline
 
 Broad commands are final gates. Long output is an artifact, not chat, and

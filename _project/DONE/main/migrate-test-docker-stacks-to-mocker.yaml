@@ -1,0 +1,262 @@
+id: migrate-test-docker-stacks-to-mocker
+title: "Adopt Mocker as the local Compose backend for make test-docker-* stacks"
+worktree: main
+priority: Medium
+status: "Completed"
+completed_date: "2026-07-03"
+category: Developer Experience
+
+description: |
+  Goal: let `make test-docker-*` run on Apple `container` via Mocker (a
+  Docker-compatible CLI over Apple's Containerization framework) instead of
+  Docker Desktop, removing Docker Desktop's always-on VM -- the dominant
+  source of the "Docker Desktop overhead" this effort started from. Apple
+  `container` itself has NO Docker Compose support; Mocker is the wrapper
+  that adds it.
+
+  BenchBox's integration layer is Compose-native. The generic targets call
+  (Makefile:436 / Makefile:480 / Makefile:489-540):
+    docker compose -p <project> -f docker/<platform>/docker-compose.yml up -d --wait
+    docker compose -p <project> -f docker/<platform>/docker-compose.yml down -v
+  across DOCKER_PLATFORMS (Makefile:433): clickhouse trino presto postgresql
+  starrocks doris databend influxdb cedardb firebolt questdb singlestore.
+  Any backend must honor `-p`, `-f`, `up -d --wait` (healthcheck gating),
+  host->container port publishing, and `down -v` (named-volume removal).
+
+  Spike evidence (2026-06-30, host macOS 26.5 / arm64; container CLI 1.0.0;
+  Mocker 0.5.4 from us/tap) against UNMODIFIED docker/questdb (1 svc) and
+  docker/postgresql (2 svc, named volume):
+    PASS  `-p` project naming                     (container bbspike-questdb-questdb-1)
+    PASS  `up -d --wait` health gating            (-w/--wait + --wait-timeout real flags; up returned only once serving)
+    PASS  host->container reachability            (localhost:19000/exec -> result; psycopg localhost:5432 -> PG 18.4, RW=42)
+    PASS  `down` teardown                         (stopped+removed, ports closed)
+    PASS  `restart: unless-stopped` parse
+    FAIL  `down -v` named-volume removal          (-v documented but bbspike-pg-postgresql18-data SURVIVED; needed manual `mocker volume rm`)
+
+  The single blocker is the `down -v` volume leak: `make test-docker-down-*`
+  relies on `-v` for fresh state, so a leaked named volume means STALE DATA
+  carries across runs (e.g. a reused Postgres data dir) -- a correctness
+  risk for benchmarks, not a cosmetic one. Networking -- the feature every
+  Compose wrapper is reported to struggle with -- worked. Until `down -v`
+  is fixed or teardown is wrapped, Mocker is NOT safe as the default
+  test-docker-* backend.
+
+  FINDINGS (2026-07-03, mocker 0.5.4 / container 1.0.0 / macOS 26.5 arm64):
+  - w0: `down -v` still LEAKS the named volume (bbpg-postgresql18-data survived);
+    no upstream fix -> w4 = option (b) teardown-wrap.
+  - w1: _project/scripts/mocker_compose_parity.sh drives the real make targets and
+    asserts health-gated up, published-port reachability, no container/volume after
+    teardown; exposed via `make test-docker-parity`.
+  - Parity MEASURED: PASS on BOTH docker and mocker for questdb + postgresql,
+    including "no named volume after teardown" for postgres on mocker (the
+    compose_down_fresh wrap prunes the leaked volume).
+  - w3: `CONTAINER_ENGINE=mocker make test-docker-questdb` -> 3 live_questdb tests
+    (parquet load + query via connector) PASS; clean teardown.
+  - w2: databend multi-service -> mocker honors depends_on ordering (up --wait 4/4)
+    BUT the stack does not stay healthy (minio exits, databend :8000 empty reply);
+    the SAME stack on docker stays healthy and serves 200. So 3+ service stacks are
+    NOT reliable on mocker -> keep docker default; mocker opt-in for single-service.
+  - w5: CONTAINER_ENGINE var (default docker) + COMPOSE seam; docker/*/*.yml
+    unchanged; default NOT flipped. w6: AGENTS.md documents the CI boundary.
+
+work:
+- id: w0
+  summary: "Re-validate spike findings against current Mocker/container versions"
+  status: done
+  notes: |
+    Evidence-durability gate per _project/verification-logs/README.md.
+    The description pins Mocker 0.5.4 / container 1.0.0 and a specific
+    `down -v` bug. Before w1, re-run the minimal repro:
+      - `mocker --version`, `container --version` (record actuals).
+      - questdb up -d --wait; assert localhost:9003 -> HTTP 200.
+      - postgresql up -d --wait; `down -v`; then `mocker volume ls` and
+        assert whether the named volume is GONE (bug fixed) or PRESENT
+        (bug persists).
+    Capture raw stdout to `/tmp/migrate-test-docker-stacks-to-mocker-w0.log`
+    or a CI artifact; commit only a compact summary (versions, PASS/FAIL
+    per check). If `down -v` now removes the volume, w4's gate flips open.
+
+- id: w1
+  summary: "Build a Compose-lifecycle parity harness for questdb + postgresql"
+  needs: [w0]
+  status: done
+  notes: |
+    Add `_project/scripts/mocker_compose_parity.sh` with scripted
+    assertions over the exact Makefile invocation: up -d --wait returns
+    only when healthy, published port serves a real query, down -v leaves
+    NO container and NO named volume. Same script runs against Docker and
+    Mocker (engine as an arg) so parity is measured, not assumed. This
+    becomes the acceptance test reused for every stack in w2/w3.
+
+- id: w2
+  summary: "Validate multi-service stacks (doris=3, starrocks=3, databend=4)"
+  needs: [w1]
+  status: done
+  notes: |
+    depends_on ordering + --wait gating + inter-service networking on the
+    heavier stacks -- the spike only covered 1- and 2-service stacks.
+    IP-consistency / container-to-container networking is the documented
+    weak spot of the wrapper ecosystem; prove it or record the failure.
+
+- id: w3
+  summary: "Run a full end-to-end make test-docker-<platform> on Mocker"
+  needs: [w1]
+  status: done
+  notes: |
+    Not just compose lifecycle -- an actual `make test-docker-questdb`
+    (or -postgresql) that loads benchmark data and runs queries through
+    the BenchBox connector against the Mocker-hosted stack, and passes.
+    This is the real acceptance bar.
+
+- id: w4
+  summary: "DECISION GATE: down -v volume removal fixed, or teardown wrapped?"
+  needs: [w0, w2, w3]
+  status: done
+  notes: |
+    Hard gate. Resolve one of:
+      (a) a Mocker release removes the named volume on `down -v` (w0
+          confirms) -> proceed to default-eligible; OR
+      (b) wrap teardown in the Makefile with an explicit volume prune
+          after `down -v` (e.g. `mocker volume rm`/`prune` scoped to the
+          project) so fresh state is guaranteed regardless; OR
+      (c) neither acceptable at parity -> do NOT adopt Mocker as default;
+          fall back (see deferred: colima/OrbStack) and close this TODO
+          as "evaluated, not adopted" with the finding recorded.
+
+- id: w5
+  summary: "Wire opt-in engine selection into test-docker-* (default stays docker)"
+  needs: [w4]
+  status: done
+  notes: |
+    Introduce a CONTAINER_ENGINE (or COMPOSE_ENGINE) Make variable
+    defaulting to `docker`; `=mocker` swaps the compose driver. Do NOT
+    globally alias docker->mocker and do NOT change the default until w3
+    passes and w4 resolves (a) or (b). Keep docker/*/docker-compose.yml
+    files unchanged (they must stay portable Compose specs).
+
+- id: w6
+  summary: "Document Mocker-as-local-engine + the CI boundary in AGENTS.md"
+  needs: [w5]
+  status: done
+  notes: |
+    State explicitly: Mocker is Apple-silicon/macOS-26 LOCAL-DEV only and
+    MUST NOT run in CI (CI is ubuntu + real docker). Terse, house style.
+
+deferred:
+- summary: "colima or OrbStack as the lighter Compose engine instead of Mocker"
+  reason: >
+    User scope is explicitly Apple container + Mocker. colima/OrbStack are
+    mature drop-in `docker compose` backends that would also remove Docker
+    Desktop with zero Makefile change, and are the recommended FALLBACK if
+    w4 resolves (c). Recorded here so the rejected-for-now alternative is
+    not re-litigated.
+- summary: "Negative --wait test (a healthcheck that never passes)"
+  reason: >
+    Confirm `up --wait` actually fails/times out on an unhealthy service
+    rather than hanging or false-passing. Nice-to-have hardening, not on
+    the adoption critical path.
+
+prior_art:
+- "Makefile:436 test-docker-up-% / Makefile:480 test-docker-% — extend: parameterize the `docker compose` driver via CONTAINER_ENGINE
+  rather than forking the targets."
+- "Makefile:433 DOCKER_PLATFORMS — reuse: the engine swap must cover this exact platform list."
+- "docker/<platform>/docker-compose.yml — reuse UNCHANGED: backend must consume the existing Compose specs; do not author
+  Mocker-specific files."
+- "adopt-apple-container-ci-parity — extend: builds on the Apple container runtime that TODO stands up (Mocker delegates to
+  `container`)."
+
+must_preserve:
+- "Default `make test-docker-*` behavior on Docker is unchanged until the decision gate (w4) explicitly flips the default."
+- "docker/*/docker-compose.yml remain standard Compose files usable by Docker and CI."
+- "Fresh-state guarantee: after teardown, no named volume from the stack survives (the property the down -v bug breaks)."
+- "CI (.github/workflows/) continues to use docker on ubuntu; Mocker never enters CI."
+
+approach: |
+  Measure parity, do not assume it. Reuse the w1 harness as the acceptance
+  test for every stack and for the full end-to-end run, comparing Docker and
+  Mocker on identical compose files. Gate default adoption on the down -v
+  fix (or an explicit teardown wrap), because the failure mode is silent
+  stale-data corruption of benchmark results, not a visible error. Engine
+  selection is an opt-in Make variable so the migration is reversible and
+  CI is unaffected.
+
+anti_patterns:
+- "DO NOT globally alias `docker`->`mocker` — because CI and other tooling expect real docker — gate it behind an explicit
+  CONTAINER_ENGINE Make variable instead."
+- "DO NOT flip the test-docker-* default to Mocker before w3 passes and w4 resolves — because a leaked volume silently reuses
+  stale benchmark data — keep docker the default until proven."
+- "DO NOT run Mocker in CI — because it is Apple-silicon/macOS-only — restrict it to the local dev loop and assert that in
+  docs."
+- "DO NOT edit docker/*/docker-compose.yml to suit Mocker — because they must stay portable Compose specs for Docker + CI
+  — fix wiring in the Makefile."
+
+verification:
+- description: "down -v leaves no named volume (the gating property)"
+  command: "mocker compose -p bbtest -f docker/postgresql/docker-compose.yml up -d --wait && mocker compose -p bbtest -f docker/postgresql/docker-compose.yml
+    down -v && mocker volume ls"
+  expected_output: "no bbtest-* volume listed after down -v"
+- description: "Multi-service stack comes up healthy with dependency ordering"
+  command: "mocker compose -p bbtest -f docker/starrocks/docker-compose.yml up -d --wait"
+  expected_output: "all services started; --wait returns 0 only when healthy"
+- description: "Full end-to-end benchmark run against a Mocker-hosted stack"
+  command: "CONTAINER_ENGINE=mocker make test-docker-questdb"
+  expected_output: "data loads and queries run; target passes"
+- description: "Default engine unchanged"
+  command: "make test-docker-postgresql  # no CONTAINER_ENGINE set"
+  expected_output: "uses docker; behavior identical to today"
+
+scope_limit:
+  only_modify:
+  - "Makefile"
+  - "AGENTS.md"
+  - "_project/scripts/mocker_compose_parity.sh"
+  do_not_modify:
+  - "docker/"
+  - ".github/workflows/"
+  - "benchbox/"
+  - "tests/"
+
+deps:
+  needs:
+  - adopt-apple-container-ci-parity
+
+metadata:
+  owners:
+  - "joeharris76"
+  tags:
+  - "developer-experience"
+  - "apple-container"
+  - "mocker"
+  - "docker-compose"
+  - "tooling"
+  estimated_effort: "Medium-Large"
+  created_date: "2026-06-30"
+  last_updated: "2026-06-30T12:00:00"
+
+impact:
+  business_value: |
+    Removes Docker Desktop's always-on VM from the dev loop -- the dominant
+    overhead this effort targeted -- by hosting the integration stacks on
+    Apple container via Mocker, while keeping the Compose files and CI
+    untouched.
+  technical_debt: |
+    Adds an engine-selection seam to the Makefile. Risk concentrated in the
+    down -v fresh-state guarantee, which is explicitly gated.
+
+success_metrics:
+- "CONTAINER_ENGINE=mocker make test-docker-<platform> passes end-to-end for at least one representative platform, including
+  the down -v fresh-state guarantee."
+- "Multi-service stacks (doris/starrocks/databend) verified up healthy on Mocker, or their failure recorded as a blocker."
+- "Docker remains the default and CI is unchanged; Mocker adoption is reversible via the engine variable."
+- "Decision gate w4 resolved with a recorded outcome: adopt-default / wrap-teardown / not-adopted-fallback."
+
+open_questions:
+- question: "Does `down -v` remove named volumes in the Mocker version under evaluation?"
+  gating: true
+  affects: ["w4 success_metric: down -v fresh-state guarantee"]
+  default: "As of 0.5.4 it does NOT — treat as broken and require fix-or-wrap before defaulting to Mocker."
+- question: "Do 3+ service stacks get reliable container-to-container networking / IP consistency on Apple container?"
+  gating: true
+  affects: ["w2 success_metric: multi-service stacks verified"]
+  default: "Unproven beyond 2 services in the spike — validate in w2 before adoption."
+- "Should the engine variable be CONTAINER_ENGINE or COMPOSE_ENGINE for clarity vs existing Make conventions?"
