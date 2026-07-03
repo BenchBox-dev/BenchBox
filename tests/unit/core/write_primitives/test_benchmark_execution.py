@@ -430,9 +430,7 @@ class TestExecuteOperation:
         ):
             operation = wp_benchmark.get_operation(op_id)
             assert operation.category == "merge"  # still classified under merge
-            effective_sql, skip_reason = wp_benchmark._get_effective_write_sql(
-                operation, platform_key="duckdb"
-            )
+            effective_sql, skip_reason = wp_benchmark._get_effective_write_sql(operation, platform_key="duckdb")
             assert skip_reason is None, f"{op_id} was wrongly skipped on DuckDB: {skip_reason}"
             assert effective_sql, f"{op_id} returned no effective SQL"
 
