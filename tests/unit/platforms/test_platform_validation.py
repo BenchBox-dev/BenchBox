@@ -9,6 +9,7 @@ from benchbox.platforms.base.validation import (
     ConnectionValidator,
     DatabaseValidator,
     GenericRowCountStrategy,
+    JoinOrderRowCountStrategy,
     RowCountValidator,
     SchemaValidator,
     SSBRowCountStrategy,
@@ -375,6 +376,16 @@ class TestRowCountStrategies:
         strategy = GenericRowCountStrategy(scale_factor=1.0)
         assert strategy.get_expected_range("any_table") is None
 
+    def test_joinorder_strategy_exact_manifest_ranges(self):
+        """Test JoinOrder strategy returns exact per-table manifest ranges."""
+        mock_benchmark = Mock()
+        mock_benchmark.get_table_row_count = Mock(return_value=36_244_344)
+        strategy = JoinOrderRowCountStrategy(scale_factor=1.0, benchmark_instance=mock_benchmark)
+
+        assert strategy.get_sample_tables({"cast_info"}) == ["cast_info"]
+        assert strategy.get_expected_range("cast_info") == (36_244_344.0, 36_244_344.0)
+        mock_benchmark.get_table_row_count.assert_called_once_with("cast_info")
+
     def test_scale_factor_affects_ranges(self):
         """Test that scale factor affects row count ranges."""
         strategy1 = TPCHRowCountStrategy(scale_factor=1.0)
@@ -464,6 +475,55 @@ class TestRowCountValidator:
         strategy = validator._get_strategy()
 
         assert isinstance(strategy, GenericRowCountStrategy)
+
+    def test_get_strategy_joinorder(self):
+        """Test strategy selection for JoinOrder benchmark."""
+        mock_adapter = Mock()
+        mock_adapter.scale_factor = 1.0
+        mock_benchmark = Mock()
+        mock_benchmark.__class__.__name__ = "JoinOrderBenchmark"
+        mock_benchmark.get_table_row_count = Mock(return_value=36_244_344)
+        mock_adapter.benchmark_instance = mock_benchmark
+
+        validator = RowCountValidator(mock_adapter, {})
+        strategy = validator._get_strategy()
+
+        assert isinstance(strategy, JoinOrderRowCountStrategy)
+
+    def test_validate_joinorder_exact_row_count_passes(self):
+        """Test JoinOrder validation passes on exact manifest row count."""
+        mock_adapter = Mock()
+        mock_adapter.scale_factor = 1.0
+        mock_benchmark = Mock()
+        mock_benchmark.__class__.__name__ = "JoinOrderBenchmark"
+        mock_benchmark.get_table_row_count = Mock(return_value=36_244_344)
+        mock_adapter.benchmark_instance = mock_benchmark
+        mock_adapter.get_table_row_count = Mock(return_value=36_244_344)
+
+        validator = RowCountValidator(mock_adapter, {})
+        result = validator.validate(Mock(), {"cast_info"})
+
+        assert result.is_valid is True
+        assert result.errors == []
+
+    def test_validate_joinorder_drifted_row_count_fails(self):
+        """Test JoinOrder validation rejects non-empty tables with wrong counts."""
+        mock_adapter = Mock()
+        mock_adapter.scale_factor = 1.0
+        mock_benchmark = Mock()
+        mock_benchmark.__class__.__name__ = "JoinOrderBenchmark"
+        mock_benchmark.get_table_row_count = Mock(return_value=36_244_344)
+        mock_adapter.benchmark_instance = mock_benchmark
+        mock_adapter.get_table_row_count = Mock(return_value=36_244_300)
+
+        validator = RowCountValidator(mock_adapter, {})
+        result = validator.validate(Mock(), {"cast_info"})
+
+        assert result.is_valid is False
+        assert len(result.errors) == 1
+        assert "expected" in result.errors[0].lower()
+        assert "36,244,344" in result.errors[0]
+        assert "empty" not in result.errors[0].lower()
 
     def test_validate_table_row_count_within_range(self):
         """Test validation passes when row count is within expected range."""

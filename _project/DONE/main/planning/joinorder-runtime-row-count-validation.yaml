@@ -2,7 +2,7 @@ id: joinorder-runtime-row-count-validation
 title: "joinorder: enforce exact per-table row counts in post-load validation"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -44,7 +44,7 @@ deps:
 work:
   - id: w1
     summary: "Add a manifest-driven exact row-count strategy for joinorder"
-    status: pending
+    status: done
     notes: |
       Add a JoinOrder row-count strategy following the existing per-benchmark
       RowCountStrategy pattern. It reads the 21 exact per-table counts from the
@@ -53,7 +53,7 @@ work:
   - id: w2
     summary: "Route the joinorder benchmark to the exact strategy in validation.py"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Extend the benchmark-name dispatch at validation.py:~420-429 to select the
       new strategy for joinorder. Leave the tpch/tpcds/ssb branches and the
@@ -61,7 +61,7 @@ work:
   - id: w3
     summary: "Unit-test exact and drifted row counts for joinorder validation"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       In tests/unit/platforms/test_platform_validation.py assert a matching count
       passes and a table short by N rows fails with a count-specific error (not
