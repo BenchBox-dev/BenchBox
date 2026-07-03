@@ -2,7 +2,7 @@ id: joinorder-stats-phase-doc-fixes
 title: "docs(track2): correct Redshift stats-on-load claim and adapter count in stats-as-phase design"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Documentation
 
 description: |
@@ -36,7 +36,7 @@ description: |
 work:
   - id: w1
     summary: "Correct the Redshift row and tighten the lifecycle-gap framing"
-    status: pending
+    status: done
     notes: |
       Fix stats-as-phase.md:46 to state Redshift runs ANALYZE in the S3 load path
       by default (auto_analyze default True, redshift.py:175,1531), and narrow the
@@ -44,7 +44,7 @@ work:
       centralized runner call site (not "no engine gathers stats").
   - id: w2
     summary: "Correct the adapter count from 26+ to the verified 16 (or state the basis)"
-    status: pending
+    status: done
     notes: |
       Update stats-as-phase.md:49 to 16 defining files, or explicitly say
       "26+ adapter classes counting inherited methods; 16 files define it".

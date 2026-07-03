@@ -46,9 +46,9 @@ Where statistics land today, per engine:
 | ClickHouse | none found | n/a | Auto-statistics on insert |
 | StarRocks | none found | n/a | Relies on auto/manual ANALYZE TABLE |
 
-The pattern is consistent: `analyze_table()` exists in 26+ adapters but has **no
-centralized call site** in the runner. Statistics gathering is therefore
-scattered, optional, and unattributed.
+The pattern is consistent: `analyze_table()` / `analyze_tables()` is defined in
+16 platform files but has **no centralized call site** in the runner. Statistics
+gathering is therefore scattered, optional, and unattributed.
 
 ## Why this matters
 
