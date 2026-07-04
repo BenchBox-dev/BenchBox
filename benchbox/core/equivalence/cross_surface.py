@@ -84,8 +84,11 @@ import re
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
+from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+import yaml
 
 from benchbox.core.equivalence.builders import (
     CrossSurfaceData,
@@ -113,6 +116,25 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     # shared harness in dataframe_surface deliberately avoids it too), even though
     # importing the top-level benchbox package is heavy for unrelated reasons.
     from benchbox.core.tpchavoc.validation import ResultValidator
+
+
+def _load_known_divergences_baseline() -> dict[str, dict[str, str]]:
+    """Load the plain-string ``known_divergences`` baseline from its YAML file.
+
+    Only entries with no executable acceptance logic live in the YAML file (see
+    its header). A gate with no section in the file (or no file entries at all)
+    gets an empty dict here - merged with any in-code ``ClassifiedDivergence``
+    entries by the gate's own constant below, never a KeyError.
+    """
+    payload = yaml.safe_load(
+        resources.files("benchbox.core.equivalence").joinpath("cross_surface_baseline.yaml").read_text(encoding="utf-8")
+    )
+    if not isinstance(payload, dict):
+        raise RuntimeError("cross_surface_baseline.yaml must contain a top-level mapping")
+    return payload
+
+
+_KNOWN_DIVERGENCES_BASELINE: dict[str, dict[str, str]] = _load_known_divergences_baseline()
 
 # Smallest scale that is both discriminating and cheap; matches the TPC-Havoc
 # gates' SF=0.1 DuckDB cell so routine PRs stay cheap (one bounded cell per
@@ -844,10 +866,13 @@ def _h2odb_q9_decimal_residue(divergence: SurfaceDivergence) -> bool:
     return abs(orig - variant) <= _H2ODB_Q9_RESIDUE_MAX
 
 
-_H2ODB_KNOWN_DIVERGENCES: dict[str, str | ClassifiedDivergence] = dict.fromkeys(
-    ("Q9_expression", "Q9_pandas"),
-    ClassifiedDivergence(_H2ODB_PERCENTILE_DECIMAL, _h2odb_q9_decimal_residue),
-)
+_H2ODB_KNOWN_DIVERGENCES: dict[str, str | ClassifiedDivergence] = {
+    **_KNOWN_DIVERGENCES_BASELINE.get("h2odb", {}),
+    **dict.fromkeys(
+        ("Q9_expression", "Q9_pandas"),
+        ClassifiedDivergence(_H2ODB_PERCENTILE_DECIMAL, _h2odb_q9_decimal_residue),
+    ),
+}
 
 
 # Read Primitives classified cells. As a *primitives* benchmark it deliberately
@@ -1123,6 +1148,7 @@ def _read_primitives_polars_map_gap(divergence: SurfaceDivergence) -> bool:
 _READ_PRIMITIVES_SCALE = 0.05
 
 _READ_PRIMITIVES_KNOWN_DIVERGENCES: dict[str, str | ClassifiedDivergence] = {
+    **_KNOWN_DIVERGENCES_BASELINE.get("read_primitives", {}),
     **dict.fromkeys(
         (
             "approx_count_distinct_simple_expression",
@@ -1213,6 +1239,7 @@ GATES: dict[str, CrossSurfaceGate] = {
         name="clickbench",
         build=build_clickbench_duckdb,
         known_divergences={
+            **_KNOWN_DIVERGENCES_BASELINE.get("clickbench", {}),
             "Q18_expression": _CLICKBENCH_TIE_AMBIGUOUS,
             "Q18_pandas": _CLICKBENCH_TIE_AMBIGUOUS,
         },
@@ -1289,8 +1316,87 @@ def get_gate(name: str) -> CrossSurfaceGate:
     return STAGED_GATES[name]
 
 
-def run_gate(gate: CrossSurfaceGate) -> int:
-    """Run one benchmark's cross-surface gate and print a categorized report."""
+# Filesystem path the ``--update-baseline`` writer edits directly. Reads elsewhere
+# in this module go through ``importlib.resources`` (works from an installed
+# package); this is a real path because update-baseline is an explicit,
+# operator-only local dev tool that edits a tracked source file for the operator
+# to review and commit, never something that runs against an installed wheel.
+_BASELINE_YAML_PATH = Path(__file__).parent / "cross_surface_baseline.yaml"
+
+
+def _resolved_baseline_keys(
+    known: dict[str, str | ClassifiedDivergence], divergences: list[SurfaceDivergence]
+) -> list[str]:
+    """Known-divergence keys whose cell now matches (mirrors ``_report``'s own check)."""
+    found = {d.key for d in divergences}
+    return sorted(key for key, entry in known.items() if key not in found and _requires_live_divergence(entry))
+
+
+def _apply_baseline_update(
+    gate: CrossSurfaceGate,
+    divergences: list[SurfaceDivergence],
+    total: int,
+    coverage: dict[str, int],
+    reference_row_counts: dict[Any, int],
+    vacuous_cells: int,
+) -> int:
+    """Drop this gate's resolved known-divergence entries from the YAML baseline,
+    but ONLY when the run is otherwise completely clean.
+
+    Explicit, operator-driven affordance behind ``--update-baseline`` for the FAIL
+    that #903 added ("remove the stale baseline entry in a reviewed change"). Never
+    invoked by a normal blocking gate run.
+
+    Requires a fully clean run before writing anything: the report is computed
+    with the resolved keys already excluded from ``known`` (so their own
+    stale-baseline failure cannot block this check), and if any OTHER condition
+    still fails - an unclassified divergence, a vacuous unclassified query, a
+    missing backend - nothing is written at all. An operator hitting an unrelated
+    regression on the same run must fix it first, then re-run to prune; a resolved
+    entry is never pruned out of a still-failing run, so "baseline maintained"
+    can never be mistaken for "run is otherwise clean" when it is not.
+    """
+    from benchbox.cli.cross_surface_baseline import update_baseline_file
+
+    resolved = _resolved_baseline_keys(gate.known_divergences, divergences)
+    known_after_update = {key: entry for key, entry in gate.known_divergences.items() if key not in resolved}
+    exit_code = _report(
+        divergences,
+        total,
+        coverage,
+        known_after_update,
+        benchmark=gate.name,
+        reference_row_counts=reference_row_counts,
+        legitimately_empty=gate.legitimately_empty,
+        scale_factor=gate.scale_factor,
+        vacuous_cells=vacuous_cells,
+    )
+
+    if exit_code != 0:
+        print(f"{gate.name}: refusing to update baseline - gate reported other failure(s) above; nothing written.")
+        return exit_code
+
+    if not resolved:
+        print(f"{gate.name}: no resolved known-divergence entries; baseline unchanged.")
+        return exit_code
+
+    removed = update_baseline_file(_BASELINE_YAML_PATH, resolved, gate.name)
+    if removed:
+        print(f"{gate.name}: removed resolved known-divergence baseline entries: {removed}")
+    else:
+        print(f"{gate.name}: resolved entries {resolved} not in the YAML baseline (code-only entry); unchanged.")
+    return exit_code
+
+
+def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False) -> int:
+    """Run one benchmark's cross-surface gate and print a categorized report.
+
+    When ``update_baseline`` is set, any resolved known-divergence entries are
+    dropped from the YAML baseline (see :func:`_apply_baseline_update`), but ONLY
+    if the run is otherwise completely clean; any other gate-failure condition
+    (unclassified divergences, vacuous queries, missing backends) still fails the
+    command (non-zero exit) with nothing written.
+    """
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -1325,6 +1431,11 @@ def run_gate(gate: CrossSurfaceGate) -> int:
             connection.close()
 
     total = len(data.query_ids) * len(gate.backends)
+    vacuous_cells_total = sum(vacuous_cells.values())
+
+    if update_baseline:
+        return _apply_baseline_update(gate, divergences, total, coverage, reference_row_counts, vacuous_cells_total)
+
     return _report(
         divergences,
         total,
@@ -1334,7 +1445,7 @@ def run_gate(gate: CrossSurfaceGate) -> int:
         reference_row_counts=reference_row_counts,
         legitimately_empty=gate.legitimately_empty,
         scale_factor=gate.scale_factor,
-        vacuous_cells=sum(vacuous_cells.values()),
+        vacuous_cells=vacuous_cells_total,
     )
 
 
@@ -1504,8 +1615,19 @@ def main(argv: list[str] | None = None) -> int:
         default="ssb",
         help="Benchmark to gate (default: ssb). Staged gates run in report mode but may diverge.",
     )
+    parser.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help=(
+            "Explicit maintenance writer: drop any known-divergence entries that no longer "
+            "reproduce from this benchmark's YAML baseline (cross_surface_baseline.yaml). "
+            "Only writes when the run is otherwise completely clean - any other gate failure "
+            "(unclassified divergences, vacuous queries, missing backends) leaves the baseline "
+            "untouched and still fails the command (non-zero exit). Idempotent on a second run."
+        ),
+    )
     args = parser.parse_args(argv)
-    return run_gate(get_gate(args.benchmark))
+    return run_gate(get_gate(args.benchmark), update_baseline=args.update_baseline)
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point

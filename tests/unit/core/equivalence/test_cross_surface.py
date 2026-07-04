@@ -22,6 +22,8 @@ import pytest
 
 from benchbox.core.equivalence.cross_surface import (
     ClassifiedDivergence,
+    CrossSurfaceGate,
+    _apply_baseline_update,
     _bump_trailing_limit,
     _final_key_tied_beyond_limit,
     _report,
@@ -685,6 +687,142 @@ def test_review_by_absent_by_default_produces_no_warning(capsys):
     out = capsys.readouterr().out
     assert exit_code == 0
     assert "WAIVER REVIEW DUE" not in out
+
+
+def _make_gate(name: str, known_divergences: dict) -> CrossSurfaceGate:
+    return CrossSurfaceGate(name=name, build=lambda scale, tmp: None, known_divergences=known_divergences)
+
+
+def test_update_baseline_prunes_resolved_entry_when_nothing_else_is_wrong(monkeypatch, capsys):
+    """--update-baseline: a resolved entry with no other failure prunes and exits 0."""
+    gate = _make_gate("fake", {"Q1_pandas": "documented test baseline"})
+    calls = []
+    monkeypatch.setattr(
+        "benchbox.cli.cross_surface_baseline.update_baseline_file",
+        lambda path, resolved, gate_name: calls.append((sorted(resolved), gate_name)) or list(resolved),
+    )
+
+    exit_code = _apply_baseline_update(
+        gate,
+        divergences=[],  # Q1_pandas no longer reproduces -> resolved.
+        total=2,
+        coverage={"expression": 1, "pandas": 1},
+        reference_row_counts={"Q1": 5},
+        vacuous_cells=0,
+    )
+
+    assert exit_code == 0
+    assert calls == [(["Q1_pandas"], "fake")]
+    assert "removed resolved known-divergence baseline entries" in capsys.readouterr().out
+
+
+def test_update_baseline_refuses_to_write_on_an_unrelated_regression(monkeypatch, capsys):
+    """A resolved entry must NOT be pruned when an UNRELATED new unclassified
+    divergence rides along on the same run (e.g. one backend resolves while
+    another regresses outside its accepted residue) -- nothing is written until
+    the run is fully clean."""
+    gate = _make_gate("fake", {"Q1_pandas": "documented test baseline"})
+    calls = []
+    monkeypatch.setattr(
+        "benchbox.cli.cross_surface_baseline.update_baseline_file",
+        lambda path, resolved, gate_name: calls.append((sorted(resolved), gate_name)) or list(resolved),
+    )
+
+    exit_code = _apply_baseline_update(
+        gate,
+        # Q1_pandas no longer reproduces (resolved) but Q2_pandas is a brand-new,
+        # unrelated, unclassified divergence.
+        divergences=[SurfaceDivergence("Q2", "pandas", "new mismatch")],
+        total=4,
+        coverage={"expression": 2, "pandas": 2},
+        reference_row_counts={"Q1": 5, "Q2": 5},
+        vacuous_cells=0,
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert "GATE FAILURE - unclassified cross-surface divergences: ['Q2_pandas']" in out
+    assert "refusing to update baseline" in out
+    # Nothing was pruned even though Q1_pandas resolved on its own merits -- the
+    # writer must never be called while the run has any other failure.
+    assert calls == []
+
+
+def test_update_baseline_with_nothing_resolved_still_enforces_other_failures(monkeypatch, capsys):
+    """No resolved entries at all: --update-baseline must still fail on a genuine
+    unclassified divergence rather than silently printing "unchanged" and exiting 0."""
+    gate = _make_gate("fake", {})
+    monkeypatch.setattr(
+        "benchbox.cli.cross_surface_baseline.update_baseline_file",
+        lambda path, resolved, gate_name: pytest.fail("update_baseline_file must not be called"),
+    )
+
+    exit_code = _apply_baseline_update(
+        gate,
+        divergences=[SurfaceDivergence("Q2", "pandas", "new mismatch")],
+        total=2,
+        coverage={"expression": 1, "pandas": 1},
+        reference_row_counts={"Q2": 5},
+        vacuous_cells=0,
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert "GATE FAILURE - unclassified cross-surface divergences: ['Q2_pandas']" in out
+    assert "refusing to update baseline" in out
+
+
+def test_update_baseline_with_nothing_resolved_and_run_clean_is_a_noop(monkeypatch, capsys):
+    """A clean run with no resolved entries prints "unchanged" and exits 0,
+    without ever touching the writer."""
+    gate = _make_gate("fake", {})
+    monkeypatch.setattr(
+        "benchbox.cli.cross_surface_baseline.update_baseline_file",
+        lambda path, resolved, gate_name: pytest.fail("update_baseline_file must not be called"),
+    )
+
+    exit_code = _apply_baseline_update(
+        gate,
+        divergences=[],
+        total=2,
+        coverage={"expression": 1, "pandas": 1},
+        reference_row_counts={"Q1": 5},
+        vacuous_cells=0,
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "no resolved known-divergence entries; baseline unchanged." in out
+
+
+def test_update_baseline_code_only_entry_reports_unchanged(monkeypatch, capsys):
+    """A resolved key backed by a ClassifiedDivergence (never in the YAML file)
+    cannot be pruned by the writer; report it as unchanged, not as an error."""
+    gate = _make_gate(
+        "fake",
+        {
+            "Q9_expression": ClassifiedDivergence(
+                reason="code-only entry", accepts=lambda d: False, requires_live_divergence=True
+            )
+        },
+    )
+    monkeypatch.setattr(
+        "benchbox.cli.cross_surface_baseline.update_baseline_file",
+        lambda path, resolved, gate_name: [],  # not present in the YAML file
+    )
+
+    exit_code = _apply_baseline_update(
+        gate,
+        divergences=[],  # Q9_expression no longer reproduces -> resolved.
+        total=2,
+        coverage={"expression": 1, "pandas": 1},
+        reference_row_counts={"Q1": 5},
+        vacuous_cells=0,
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "not in the YAML baseline (code-only entry); unchanged" in out
 
 
 def test_clickbench_and_joinorder_are_enforced_gates():

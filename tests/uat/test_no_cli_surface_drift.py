@@ -32,6 +32,7 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/visualize.py",
     "benchbox/cli/composite_params.py",
     "benchbox/cli/config.py",
+    "benchbox/cli/cross_surface_baseline.py",
     "benchbox/cli/display.py",
     "benchbox/cli/dryrun.py",
     "benchbox/cli/help.py",

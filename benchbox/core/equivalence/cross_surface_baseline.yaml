@@ -1,0 +1,28 @@
+# Known-divergence baseline for the cross-surface SQL<->DataFrame equivalence
+# gates (benchbox/core/equivalence/cross_surface.py). Each entry documents a
+# deliberate, defensible presentational difference the gate tolerates for one
+# specific "<query>_<backend>" cell - it is NOT a general-purpose ignore list.
+# Adding an entry here mutes real regressions on that exact cell; do so only
+# for a difference that is understood, verified, and non-discriminating.
+#
+# #903 made the gate FAIL when an entry's cell stops reproducing the divergence
+# it documents (stale-baseline hygiene: an entry that no longer reproduces is
+# no longer evidence the gap still exists, and silently keeping it risks
+# masking a *different* future regression that happens to land on the same
+# key). Prune resolved entries with:
+#   make cross-surface-update-baseline BENCHMARK=<gate>
+# which only removes entries that no longer reproduce, in a reviewed change,
+# and refuses to write anything if the run has any OTHER failure.
+#
+# Only entries that tolerate ANY divergence on their key unconditionally
+# belong here, as a plain "<gate>: {<key>: <reason>}" mapping. An entry that
+# needs an executable acceptance predicate (a ClassifiedDivergence pinning the
+# tolerated difference to an exact signature - column position, numeric
+# bound, or execution-error text, so a genuinely wrong value on the same key
+# is still reported as an unclassified gate failure) cannot be expressed as
+# data and stays in cross_surface.py as code, next to its verification
+# rationale. Each gate's section here is merged with its own in-code
+# ClassifiedDivergence entries, so either source can carry part of a gate's
+# baseline.
+
+{}
