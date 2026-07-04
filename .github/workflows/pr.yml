@@ -287,6 +287,9 @@ jobs:
       - name: Validate test marker annotations
         run: make lint-markers
 
+      - name: Validate import layering
+        run: make lint-imports
+
       - name: Validate artifact hygiene
         run: make artifact-hygiene
 
