@@ -1356,7 +1356,7 @@ def _apply_baseline_update(
     entry is never pruned out of a still-failing run, so "baseline maintained"
     can never be mistaken for "run is otherwise clean" when it is not.
     """
-    from benchbox.cli.cross_surface_baseline import update_baseline_file
+    from benchbox.core.equivalence.known_divergences_baseline import update_baseline_file
 
     resolved = _resolved_baseline_keys(gate.known_divergences, divergences)
     known_after_update = {key: entry for key, entry in gate.known_divergences.items() if key not in resolved}

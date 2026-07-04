@@ -698,7 +698,7 @@ def test_update_baseline_prunes_resolved_entry_when_nothing_else_is_wrong(monkey
     gate = _make_gate("fake", {"Q1_pandas": "documented test baseline"})
     calls = []
     monkeypatch.setattr(
-        "benchbox.cli.cross_surface_baseline.update_baseline_file",
+        "benchbox.core.equivalence.known_divergences_baseline.update_baseline_file",
         lambda path, resolved, gate_name: calls.append((sorted(resolved), gate_name)) or list(resolved),
     )
 
@@ -724,7 +724,7 @@ def test_update_baseline_refuses_to_write_on_an_unrelated_regression(monkeypatch
     gate = _make_gate("fake", {"Q1_pandas": "documented test baseline"})
     calls = []
     monkeypatch.setattr(
-        "benchbox.cli.cross_surface_baseline.update_baseline_file",
+        "benchbox.core.equivalence.known_divergences_baseline.update_baseline_file",
         lambda path, resolved, gate_name: calls.append((sorted(resolved), gate_name)) or list(resolved),
     )
 
@@ -753,7 +753,7 @@ def test_update_baseline_with_nothing_resolved_still_enforces_other_failures(mon
     unclassified divergence rather than silently printing "unchanged" and exiting 0."""
     gate = _make_gate("fake", {})
     monkeypatch.setattr(
-        "benchbox.cli.cross_surface_baseline.update_baseline_file",
+        "benchbox.core.equivalence.known_divergences_baseline.update_baseline_file",
         lambda path, resolved, gate_name: pytest.fail("update_baseline_file must not be called"),
     )
 
@@ -777,7 +777,7 @@ def test_update_baseline_with_nothing_resolved_and_run_clean_is_a_noop(monkeypat
     without ever touching the writer."""
     gate = _make_gate("fake", {})
     monkeypatch.setattr(
-        "benchbox.cli.cross_surface_baseline.update_baseline_file",
+        "benchbox.core.equivalence.known_divergences_baseline.update_baseline_file",
         lambda path, resolved, gate_name: pytest.fail("update_baseline_file must not be called"),
     )
 
@@ -807,7 +807,7 @@ def test_update_baseline_code_only_entry_reports_unchanged(monkeypatch, capsys):
         },
     )
     monkeypatch.setattr(
-        "benchbox.cli.cross_surface_baseline.update_baseline_file",
+        "benchbox.core.equivalence.known_divergences_baseline.update_baseline_file",
         lambda path, resolved, gate_name: [],  # not present in the YAML file
     )
 

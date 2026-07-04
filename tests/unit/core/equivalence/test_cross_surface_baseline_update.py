@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from benchbox.cli.cross_surface_baseline import (
+from benchbox.core.equivalence.known_divergences_baseline import (
     BaselineUpdateError,
     load_baseline,
     prune_known_divergences,
