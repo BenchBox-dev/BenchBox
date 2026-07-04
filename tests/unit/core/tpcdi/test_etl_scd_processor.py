@@ -13,7 +13,7 @@ from benchbox.core.tpcdi.etl.scd_processor import EnhancedSCDType2Processor
 
 pytestmark = [
     pytest.mark.unit,
-    pytest.mark.medium,
+    pytest.mark.fast,
 ]
 
 

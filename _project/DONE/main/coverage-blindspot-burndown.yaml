@@ -2,7 +2,8 @@ id: coverage-blindspot-burndown
 title: "Coverage config hygiene: drop stale .coveragerc_core omits, add fast-lane tests for TPC-DI SCD processor and core/throughput"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-04"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -83,7 +84,13 @@ impact:
 work:
   - id: w1
     summary: "Remove the two stale .coveragerc_core omit entries for deleted files"
-    status: pending
+    status: done
+    completion_notes: |
+      Confirmed via `git log --all -- <path>` that both files' most recent
+      history is a deletion commit (0fbbd431 for transformations.py,
+      5b15277b for batch.py) and neither exists in the tree. Deleted both
+      lines from .coveragerc_core's omit list. Verified with
+      `grep -n 'transformations.py\|batch.py' .coveragerc_core` -> no matches.
     notes: |
       Delete the `benchbox/core/tpcdi/etl/transformations.py` and
       `benchbox/core/tpcdi/etl/batch.py` lines from `.coveragerc_core`'s
@@ -94,7 +101,13 @@ work:
 
   - id: w2
     summary: "Add fast-marked characterization tests for benchbox/core/tpcdi/etl/scd_processor.py"
-    status: pending
+    status: done
+    completion_notes: |
+      Measured actual runtime with `--durations=0 -n 0`: setup 0.51s
+      (import/session overhead), call 0.01s, total 0.65s for the single
+      existing test. Genuinely fast (option 1) - re-marked pytestmark from
+      `pytest.mark.medium` to `pytest.mark.fast` in place; no new test file
+      needed. Re-verified under `-m fast -n 0`: 1 passed in 0.83s.
     notes: |
       `tests/unit/core/tpcdi/test_etl_scd_processor.py` already exists and
       is well-scoped (104 lines) but marked `medium`, not `fast`. Two
@@ -113,7 +126,23 @@ work:
 
   - id: w3
     summary: "Add fast-marked characterization tests for benchbox/core/throughput/"
-    status: pending
+    status: done
+    completion_notes: |
+      Added tests/unit/core/throughput/__init__.py (empty, matching sibling
+      tests/unit/core/* subpackage convention) and
+      tests/unit/core/throughput/test_runner.py (fast-marked, 12 tests)
+      exercising StreamRunner.execute() (all-succeed, failed-stream,
+      exception-from-stream_fn, zero-queries-stream, single-thread fallback
+      when max_workers is None, verbose-logging no-op) and
+      StreamRunner.compute_metrics() (throughput/query-throughput math,
+      zero-queries edge case, no-stream-results elapsed-time fallback via
+      monkeypatched elapsed_seconds, zero-total-time division-skip branch),
+      plus ThroughputResult/ThroughputStreamResult default-shape checks.
+      Deliberately did not exercise real multi-threaded timeout behavior
+      (ThreadPoolExecutor's TimeoutError branch) since that needs
+      wall-clock-sensitive execution - left to the existing slow
+      integration test per the anti-pattern guidance. All 12 pass in
+      <1s combined (`-m fast -n 0`: 12 passed in 0.98s).
     notes: |
       `benchbox/core/throughput/runner.py` (163 lines) and `result.py`
       (72 lines) currently have no test coverage outside the slow-marked
@@ -134,7 +163,32 @@ work:
   - id: w4
     summary: "Remove the (now-clean) coveragerc omissions and document any remaining deliberate ones"
     needs: [w2, w3]
-    status: pending
+    status: done
+    completion_notes: |
+      Removed the scd_processor.py line from .coveragerc_core's omit list
+      now that w2 gives it fast-lane coverage. Added a one-line rationale
+      comment above each of the 7 remaining omit entries (tpcds/datavault/
+      nyctaxi/clickbench dataframe_queries/queries.py + tpcds rollup_helper/
+      channel_helper + experimental/concurrency executor.py/pool_tester.py),
+      based on grepping tests/ for each module's existing coverage (all 7
+      have dedicated unit/integration test files; experimental/concurrency
+      is additionally confirmed via grep to not be imported by any
+      production code path outside benchbox/experimental itself).
+      DISCOVERY (out of scope to fix, flagging for follow-up): the actual
+      CI gate in .github/workflows/pr.yml's "Run fast tests" step invokes
+      `pytest --cov=benchbox --cov-fail-under=70` with NO --cov-config flag,
+      so coverage.py auto-discovers pyproject.toml's [tool.coverage.run]
+      section (confirmed via `python -m coverage debug config` ->
+      config_files_read includes pyproject.toml, not .coveragerc_core).
+      pyproject.toml already has its own parallel omit list (with its own
+      pre-existing rationale comments, already omitting scd_processor.py).
+      .coveragerc_core is actually consumed by pytest-ci.ini's
+      `--cov-config=.coveragerc_core` (a separate/legacy CI profile) and by
+      tests/conftest.py's advisory 80%-warning coverage check. This TODO's
+      scope_limit explicitly excludes pyproject.toml and pr.yml, so this
+      change is correct as specified but does not by itself move the
+      production --cov-fail-under=70 gate's omit list - only the
+      pytest-ci.ini profile and the advisory check.
     notes: |
       Once w2/w3 land fast-lane coverage for scd_processor.py (and
       core/throughput if it turns out to need adding to the omit list

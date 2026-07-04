@@ -481,7 +481,12 @@ class TestMaintenancePhaseValidation:
         )
 
         assert result is not None
-        assert result.validation_status in ("PASSED", "FAILED")
+        # Mocked adapter raises nothing and DataFramePhases(load=False, execute=False)
+        # means the runner's except branch never runs (no "FAILED" overwrite) and there
+        # are no query results to demote status to "PARTIAL" - "PASSED" is the only
+        # reachable outcome (see builder.py's default and dataframe_runner.py's except
+        # branch).
+        assert result.validation_status == "PASSED"
 
     def test_power_phase_does_not_raise(self):
         """Test that power execution type works normally (queries only)."""

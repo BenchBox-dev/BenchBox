@@ -46,6 +46,20 @@ _PACKAGE_INIT_PATH = Path(__file__).parent.parent / "__init__.py"
 # Same pattern scripts/update_version.py uses to bump the literal at release cut.
 _INIT_VERSION_PATTERN = re.compile(r'__version__\s*=\s*["\']([^"\']+)["\']')
 
+# NOTE (packaging-config-hygiene w4): pyproject.toml's [project].version stays
+# a static literal rather than `dynamic = ["version"]` (attr: benchbox.__version__).
+# Reason: get_pyproject_version() below reads [project].version directly out of
+# the parsed TOML; going dynamic removes that key entirely, so the function
+# would return None and check_version_consistency() would report it as a
+# missing source - a real regression to fix well, not a one-line change. The
+# existing 5 tracked copies (this file, pyproject.toml, README.md,
+# docs/README.md, VERSION_MANAGEMENT.md) plus this runtime checker already
+# give solid drift detection, so collapsing one more copy isn't worth the
+# added complexity right now. The concrete problem that prompted this
+# question - pytest's meaningless `minversion = "0.2.1"` copy-paste in
+# pyproject.toml's [tool.pytest.ini_options] - is fixed independently by
+# deleting that dead block (see packaging-config-hygiene w3).
+
 # Version sources beyond package metadata that we validate for consistency
 _ADDITIONAL_VERSION_PATHS = (
     Path("README.md"),

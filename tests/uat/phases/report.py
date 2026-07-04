@@ -5,6 +5,38 @@ The TSV format mirrors the 2026-05-02 retrospective's
 
 Cross-scale coverage assertion is opt-in per the methodology spec's
 Finding 1 scoping (default OFF; sweep authors enable explicitly).
+
+Exit-code policy (uat-accounting-hardening w1, decided 2026-07-04)
+-------------------------------------------------------------------
+`ReportSummary.exit_code()` is default-strict: it returns `1` whenever
+`fail_count`, `timeout_count`, or `unreachable_count` is nonzero, in addition
+to the pre-existing `aborted` (2) and opt-in `cross_scale_floor_breached` (1)
+checks. This was option 1 of the two the planning TODO posed (default-strict
+vs. an additive `--strict` CLI flag). Evidence for picking option 1 over the
+lenient-by-default + `--strict`-flag alternative:
+
+- `tests/uat/_cli.py`'s `report` subcommand (the `make uat-report` entry
+  point) and the `Makefile`'s `uat-report` target were grepped for any
+  handling of the report's exit code beyond passing it straight through to
+  the shell - neither does anything special with a nonzero exit (no
+  `|| true`, no exit-code branching); there is no CI workflow under
+  `.github/workflows/` that parses or gates on this exit code either.
+- The UAT orchestrator (`tests/uat/orchestrator.py`, out of scope for this
+  change) already folds the report phase's `exit_code()` into its own
+  `SweepResult.exit_code()` via `max(phase_exit_codes.values())`, so making
+  report exit codes honest only makes sweep-level exit codes more honest too;
+  no orchestrator test asserts `exit_code() == 0` for a sweep containing an
+  actual fail/timeout/unreachable cell (only for all-passed or
+  aborted/cross-scale-floor-breached cases).
+- The one place that *did* rely on the old lenient default was this
+  module's own test suite (`tests/uat/test_report_accounting.py`), where two
+  fixtures with real failed/unreachable cells asserted `exit_code == 0`
+  simply because nobody had wired the check up yet - not because any
+  caller depended on that leniency. Those tests were updated alongside this
+  change rather than left pinning the stale behavior.
+
+Net: no real caller depends on "exit 0 despite failures," so the more
+honest default (option 1) was chosen over the additive `--strict` flag.
 """
 
 from __future__ import annotations
@@ -50,11 +82,14 @@ class ReportSummary(PhaseResult):
     cross_scale_clean_pairs: int
     cross_scale_floor: int | None
     cross_scale_floor_breached: bool
+    registry_pruned_count: int = 0
+    unreachable_count_is_estimated: bool = False
 
     def exit_code(self) -> int:
         if self.aborted:
             return 2
-        return 1 if self.cross_scale_floor_breached else 0
+        has_uncleared_cells = self.fail_count > 0 or self.timeout_count > 0 or self.unreachable_count > 0
+        return 1 if has_uncleared_cells or self.cross_scale_floor_breached else 0
 
 
 def render_row(
@@ -144,12 +179,31 @@ def write_report(
     compatibility_pruned_count: int = 0,
     early_stop_pruned_count: int = 0,
     skipped_unreachable_count: int = 0,
+    registry_pruned_count: int = 0,
+    unreachable_count_is_estimated: bool = False,
     source_info: SourceInfo | None = None,
     run_status: str = "COMPLETED",
     abort_phase: str | None = None,
     abort_reason: str | None = None,
 ) -> ReportSummary:
-    """Write the matrix summary TSV; optionally enforce a cross-scale floor."""
+    """Write the matrix summary TSV; optionally enforce a cross-scale floor.
+
+    `registry_pruned_count` is the count of cells dropped for registry
+    reasons - a benchmark id absent from the registry (w2) or a requested
+    scale outside a benchmark's declared `scale_options` (w3, "ladder
+    pruning") - as opposed to `compatibility_pruned_count`, which counts
+    platform/benchmark compatibility-RULE drops. Keep the two disjoint: a
+    caller should count any given pruned cell in exactly one of the two
+    buckets, never both, since both feed `total_defined_count` below.
+
+    `unreachable_count_is_estimated` marks whether `unreachable_count`
+    includes a confirmed sidecar-derived `skipped_unreachable_count` (False)
+    or was defaulted to 0 because the durable sweep's
+    `cells.jsonl.accounting.json` sidecar was missing (True) - see w5's
+    `_read_skipped_unreachable_sidecar` in `tests/uat/_cli.py`. It does not
+    change `unreachable_count` itself; it only flags whether that number is
+    confirmed or assumed.
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     rows = list(cells)
     executed_count = len(rows)
@@ -160,7 +214,7 @@ def write_report(
     row_skipped_count = sum(1 for r in rows if _is_skipped_status(r.status))
     row_unreachable_count = sum(1 for r in rows if _is_unreachable_status(r.status))
     attempted_count = executed_count - row_skipped_count - row_unreachable_count
-    skipped_count = row_skipped_count + compatibility_pruned_count + early_stop_pruned_count
+    skipped_count = row_skipped_count + compatibility_pruned_count + early_stop_pruned_count + registry_pruned_count
     unreachable_count = row_unreachable_count + skipped_unreachable_count
     total_defined_count = attempted_count + skipped_count + unreachable_count
     candidate_count = total_defined_count
@@ -187,16 +241,21 @@ def write_report(
             f"total_defined={total_defined_count} "
             f"passed={pass_count} "
             f"failed={fail_count} "
-            f"timed_out={timeout_count}\n"
+            f"timed_out={timeout_count} "
+            f"registry_pruned={registry_pruned_count}\n"
         )
         fh.write(
             "# "
             f"release_accounting passed={pass_count} failed={fail_count} timed_out={timeout_count} "
             f"attempted={attempted_count} skipped={skipped_count} unreachable={unreachable_count} "
-            f"total_defined={total_defined_count}\n"
+            f"total_defined={total_defined_count} registry_pruned={registry_pruned_count}\n"
         )
-        if unreachable_count:
-            fh.write(f"# UNREACHABLE_CELLS={unreachable_count} release_gate_attention=required\n")
+        if unreachable_count or unreachable_count_is_estimated:
+            attention = "required" if unreachable_count else "not_required"
+            fh.write(
+                f"# UNREACHABLE_CELLS={unreachable_count} release_gate_attention={attention} "
+                f"unreachable_is_estimated={str(unreachable_count_is_estimated).lower()}\n"
+            )
         footer = f"# run_status={run_status}"
         if source_info is not None:
             footer += f" source_commit_sha={source_info.commit_sha} source_dirty={str(source_info.dirty).lower()}"
@@ -231,6 +290,8 @@ def write_report(
         cross_scale_clean_pairs=clean_pairs,
         cross_scale_floor=cross_scale_floor,
         cross_scale_floor_breached=floor_breached,
+        registry_pruned_count=registry_pruned_count,
+        unreachable_count_is_estimated=unreachable_count_is_estimated,
         aborted=run_status in {"ABORTED", "BLOCKED"},
         abort_reason=abort_reason,
     )

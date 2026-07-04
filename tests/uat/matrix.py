@@ -282,6 +282,32 @@ def resolve_benchmarks(
     return [b for b in resolved if b not in excluded]
 
 
+def missing_benchmarks_from_include(
+    include: Iterable[str],
+    benchmarks: dict[str, BenchmarkInfo] | None = None,
+) -> list[str]:
+    """Return `include` entries naming a benchmark absent from the registry.
+
+    `resolve_benchmarks` silently drops `include` entries that are not keys of
+    `benchmarks` (so its group/exclude filtering never has to special-case an
+    unknown id) - which means a typo'd or removed benchmark id in a sweep
+    config's `benchmarks.include` list vanishes with zero signal before
+    `enumerate_cells_with_pruning` ever sees it. This exposes exactly which
+    requested ids were dropped for that reason, preserving request order and
+    de-duplicating, so callers can turn them into accounting rows instead of
+    a silent drop.
+    """
+    if benchmarks is None:
+        benchmarks = load_benchmarks()
+    seen: set[str] = set()
+    missing: list[str] = []
+    for bid in include:
+        if bid not in benchmarks and bid not in seen:
+            seen.add(bid)
+            missing.append(bid)
+    return missing
+
+
 def smoke_scale_for(benchmark_id: str, info: BenchmarkInfo | None = None) -> float:
     """Return the per-benchmark smoke-test scale.
 

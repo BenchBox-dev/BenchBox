@@ -2,7 +2,8 @@ id: ascii-golden-selfheal-fix
 title: "ASCII chart golden-output test: make a missing golden file a hard, non-self-healing failure"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-04"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -62,7 +63,7 @@ impact:
 work:
   - id: w1
     summary: "Make a missing golden file a hard failure that does not write anything"
-    status: pending
+    status: done
     notes: |
       In `test_golden_output` (tests/contracts/visualization/test_ascii_golden_output.py:336-355),
       change the `not golden_path.exists()` branch (lines 347-350) so it
@@ -87,7 +88,7 @@ work:
   - id: w2
     summary: "Add a test covering the missing-golden-file hard-fail path"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Add a test (in the same file, or a small standalone test module
       under tests/contracts/visualization/) that:

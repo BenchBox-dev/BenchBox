@@ -357,6 +357,8 @@ class TestExecuteOperation:
         assert result.status == "SKIPPED"
         assert result.success is True
         assert result.validation_passed is True
+        assert result.error is None
+        assert "unsupported on platform 'datafusion'" in (result.skip_reason or "")
         mock_conn.execute.assert_not_called()
 
     def test_execute_operation_skips_postgres_bulk_load_operation(self, wp_benchmark, monkeypatch):

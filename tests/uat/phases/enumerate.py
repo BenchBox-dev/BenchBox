@@ -10,9 +10,19 @@ from tests.uat.matrix import (
     BenchmarkInfo,
     filter_scales_by_registry,
     load_benchmarks,
+    missing_benchmarks_from_include,
     resolve_benchmarks,
     resolve_platforms,
 )
+
+# Rows recorded with this status are registry/ladder-derived accounting
+# entries rather than platform/benchmark compatibility-rule prunes (those use
+# `CompatibilityRule.status`, e.g. "blocked"). Reusing `CompatibilityPrunedCell`
+# for both keeps a single pruned-accounting shape (compatibility_pruned.jsonl)
+# per the anti-pattern this module avoids: inventing a second, differently
+# shaped accounting file for registry-derived drops.
+REGISTRY_PRUNE_STATUS = "pruned-registry"
+BENCHMARK_NOT_IN_REGISTRY_RULE_ID = "benchmark-not-in-registry"
 
 
 @dataclass(frozen=True)
@@ -85,18 +95,39 @@ def enumerate_cells_with_pruning(
         benchmarks=benchmarks,
     )
 
+    if config.scales.override is not None:
+        requested = [config.scales.override]
+    else:
+        requested = list(config.scales.rungs)
+
     cells: list[Cell] = []
     compatibility_pruned: list[CompatibilityPrunedCell] = []
     include_release_gate_runtime_envelopes = config.compatibility.release_gate_runtime_envelopes
+
+    # `resolve_benchmarks` silently drops `benchmarks.include` entries absent
+    # from the registry (see `missing_benchmarks_from_include`'s docstring) -
+    # so a typo'd/removed benchmark id never reaches `benchmark_list` below.
+    # Surface it here as a visible accounting row instead of a zero-signal
+    # drop, one row per platform x requested scale (mirrors the shape
+    # `_pruned_rows_for_rule` already uses for compatibility-rule prunes).
+    for missing_benchmark in missing_benchmarks_from_include(config.benchmarks.include, benchmarks):
+        for platform in platform_list:
+            compatibility_pruned.extend(
+                _registry_absent_rows(platform=platform, benchmark=missing_benchmark, requested=requested)
+            )
+
     for platform in platform_list:
         for benchmark in benchmark_list:
             info = benchmarks.get(benchmark)
             if info is None:
+                # Defensive: `benchmark_list` is built from `benchmarks` above,
+                # so this should be unreachable, but a config-benchmark id
+                # absent from the registry must never vanish silently -
+                # record the same accounting row rather than a bare continue.
+                compatibility_pruned.extend(
+                    _registry_absent_rows(platform=platform, benchmark=benchmark, requested=requested)
+                )
                 continue
-            if config.scales.override is not None:
-                requested = [config.scales.override]
-            else:
-                requested = list(config.scales.rungs)
             rule = compatibility_rule_for(
                 platform,
                 benchmark,
@@ -109,11 +140,73 @@ def enumerate_cells_with_pruning(
                 )
                 continue
             filtered = filter_scales_by_registry(benchmark, requested, info=info)
-            if not filtered and config.scales.override is None and info.min_scale is not None:
+            dropped = [scale for scale in requested if scale not in filtered]
+            uses_min_scale_fallback = not filtered and config.scales.override is None and info.min_scale is not None
+            if uses_min_scale_fallback:
+                # The whole requested ladder was outside scale_options (e.g.
+                # joinorder/tpcds_obt are single-scale-1.0-only benchmarks
+                # requested at the 0.01 smoke scale); the benchmark still
+                # runs, just at its canonical min_scale instead of vanishing,
+                # so this is a substitution, not a drop - no accounting row.
                 filtered = [info.min_scale]
+            elif dropped:
+                # Some, but not all, requested scales survived: the dropped
+                # ones truly do not run at any scale and must be visible in
+                # accounting output instead of silently shrinking the ladder.
+                compatibility_pruned.extend(
+                    _ladder_pruned_rows(platform=platform, benchmark=benchmark, dropped=dropped)
+                )
             for scale in filtered:
                 cells.append(Cell(platform=platform, benchmark=benchmark, scale=scale))
     return EnumerationResult(cells=tuple(cells), compatibility_pruned=tuple(compatibility_pruned))
+
+
+def _registry_absent_rows(
+    *,
+    platform: str,
+    benchmark: str,
+    requested: list[float],
+) -> list[CompatibilityPrunedCell]:
+    """Accounting rows for a benchmark id absent from the registry entirely."""
+    return [
+        CompatibilityPrunedCell(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            rule_id=BENCHMARK_NOT_IN_REGISTRY_RULE_ID,
+            status=REGISTRY_PRUNE_STATUS,
+            reason=(
+                f"Benchmark {benchmark!r} was requested in the config but is not present in the "
+                "benchmark registry (typo'd or removed benchmark id)."
+            ),
+            evidence="tests.uat.matrix.load_benchmarks() BENCHMARK_METADATA keys",
+        )
+        for scale in requested
+    ]
+
+
+def _ladder_pruned_rows(
+    *,
+    platform: str,
+    benchmark: str,
+    dropped: list[float],
+) -> list[CompatibilityPrunedCell]:
+    """Accounting rows for scales dropped by the registry scale-ladder filter."""
+    return [
+        CompatibilityPrunedCell(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            rule_id=f"uat.ladder.{benchmark}.scale-not-in-registry",
+            status=REGISTRY_PRUNE_STATUS,
+            reason=(
+                f"scale {scale} is outside {benchmark}'s registered scale_options and was dropped "
+                "by the scale-ladder registry filter."
+            ),
+            evidence="tests.uat.matrix.filter_scales_by_registry against benchmark registry scale_options",
+        )
+        for scale in dropped
+    ]
 
 
 def _pruned_rows_for_rule(
