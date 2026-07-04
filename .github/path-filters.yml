@@ -88,3 +88,29 @@ code-ci:
   - ".claude/commands/**"
   - ".gitignore"
   - ".gitattributes"
+
+# Extra path-filter groups (beyond the three core buckets above). Each key
+# here becomes a `<group>-needed` boolean output from ci-paths, computed by
+# path_filter_decision.py, so a pr.yml job can gate on
+# `needs.ci-paths.outputs.<group>-needed == 'true'` without inventing a
+# second classifier. Add a new group by adding a key here — no script
+# changes required.
+
+# Packaging-metadata changes: build/install/audit signal (package-smoke,
+# dependency-audit jobs in pr.yml) only needs to run when one of these
+# changed. See _project/TODO/main/planning/pr-gate-package-and-audit-promotion.yaml.
+packaging:
+  - "pyproject.toml"
+  - "MANIFEST.in"
+  - "setup.py"
+  - "setup.cfg"
+  - "benchbox/__init__.py"
+  - "uv.lock"
+
+# Results-explorer visualization / CLI<->explorer parity source changes:
+# gates the parity-check job in pr.yml. See
+# _project/TODO/main/planning/parity-check-develop-ring.yaml.
+viz:
+  - "results-explorer/**"
+  - "tests/parity/**"
+  - "_project/scripts/explorer_pipeline/**"

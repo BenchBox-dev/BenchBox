@@ -12,6 +12,11 @@ from pathlib import Path
 from typing import Iterable, cast
 
 DEFAULT_RULES = Path(".github/path-filters.yml")
+# The three buckets every ruleset must define. Any other top-level key in
+# path-filters.yml is treated as an "extra group" (see `extra_group_keys`)
+# and automatically grows a `<group>-needed` / `<group>-paths` output pair —
+# add a new gated job by adding a YAML key, not by touching this script.
+CORE_RULE_KEYS = {"safe-content", "content-guard", "code-ci"}
 LIST_NAMES = {
     "changed": "changed_paths",
     "content": "content_guard_paths",
@@ -75,6 +80,17 @@ def matches_any(path: str, patterns: Iterable[str]) -> bool:
     return any(pattern_matches(path, pattern) for pattern in patterns)
 
 
+def extra_group_keys(rules: dict[str, list[str]]) -> list[str]:
+    """Names of optional path-filter groups beyond the three core buckets.
+
+    Each name becomes a `<name>_paths` / `<name>_needed` decision key, a
+    `<name>-needed` GitHub Actions output, and a `<name>.txt` helper list —
+    all derived generically so a new gated job (e.g. `packaging`, `viz`)
+    only requires a new key in path-filters.yml, not a script change.
+    """
+    return [key for key in rules if key not in CORE_RULE_KEYS]
+
+
 def git_changed_paths(base_ref: str) -> list[str]:
     # Include deletions (D) so a PR that only deletes a code file is
     # still classified as a code change. Without D, removing a Python
@@ -130,7 +146,7 @@ def classify_paths(changed_paths: list[str], rules: dict[str, list[str]]) -> dic
     todo_paths = [path for path in yaml_paths if path.startswith("_project/TODO/") or path.startswith("_project/DONE/")]
     docs_paths = [path for path in content_paths if path.startswith("docs/")]
 
-    return {
+    decision: dict[str, object] = {
         "changed_paths": changed_paths,
         "safe_content_paths": safe_paths,
         "content_guard_paths": content_paths,
@@ -145,6 +161,18 @@ def classify_paths(changed_paths: list[str], rules: dict[str, list[str]]) -> dic
         "content_guard_needed": bool(content_paths),
         "estimated_runner_minutes_saved": 5 if safe_content_only else 0,
     }
+
+    group_keys = extra_group_keys(rules)
+    for group in group_keys:
+        group_id = group.replace("-", "_")
+        matched = [path for path in changed_paths if matches_any(path, rules[group])]
+        decision[f"{group_id}_paths"] = matched
+        decision[f"{group_id}_needed"] = bool(matched)
+    # Record which extra groups exist so downstream writers (GitHub output,
+    # helper lists) can loop over them without re-deriving from raw rules.
+    decision["extra_group_ids"] = [group.replace("-", "_") for group in group_keys]
+
+    return decision
 
 
 def bool_text(value: object) -> str:
@@ -162,6 +190,13 @@ def write_github_output(path: Path, decision: dict[str, object]) -> None:
         f"content-guard-needed={bool_text(decision['content_guard_needed'])}",
         f"estimated-runner-minutes-saved={decision['estimated_runner_minutes_saved']}",
     ]
+    # Extra path-filter groups (packaging, viz, ...): one `<group>-needed`
+    # boolean output per group defined in path-filters.yml, so pr.yml jobs
+    # can gate on `needs.ci-paths.outputs.<group>-needed` without this
+    # script hardcoding each group's name.
+    for group_id in cast(list[str], decision.get("extra_group_ids", [])):
+        output_name = group_id.replace("_", "-")
+        lines.append(f"{output_name}-needed={bool_text(decision[f'{group_id}_needed'])}")
     for key, decision_key in [
         ("changed-paths", "changed_paths"),
         ("content-paths", "content_guard_paths"),
@@ -195,7 +230,10 @@ def write_summary(path: Path, decision: dict[str, object]) -> None:
 
 def write_lists(directory: Path, decision: dict[str, object]) -> None:
     directory.mkdir(parents=True, exist_ok=True)
-    for filename, decision_key in LIST_NAMES.items():
+    list_names = dict(LIST_NAMES)
+    for group_id in cast(list[str], decision.get("extra_group_ids", [])):
+        list_names[group_id] = f"{group_id}_paths"
+    for filename, decision_key in list_names.items():
         with (directory / f"{filename}.txt").open("w", encoding="utf-8") as list_file:
             for path in path_list(decision, decision_key):
                 list_file.write(f"{path}\n")

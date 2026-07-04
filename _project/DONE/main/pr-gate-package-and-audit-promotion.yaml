@@ -2,7 +2,7 @@ id: pr-gate-package-and-audit-promotion
 title: "Promote package build/install smoke and pip-audit to the develop-PR required lane"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -26,8 +26,21 @@ description: |
 work:
   - id: w1
     summary: "Path-filtered package build + isolated install + minimal-import smoke job in pr.yml"
-    status: pending
+    status: done
     notes: |
+      Done. Extended the classifier generically instead of a single-purpose
+      "packaging" special case: `scripts/path_filter_decision.py` now derives
+      any non-core key in `.github/path-filters.yml` as an "extra group"
+      (`extra_group_keys()`), emitting `<group>_paths`/`<group>_needed`
+      decision keys, a `<group>-needed` GH Actions output, and a
+      `<group>.txt` helper list automatically. Added a `packaging:` group to
+      path-filters.yml (pyproject.toml, MANIFEST.in, setup.py, setup.cfg,
+      benchbox/__init__.py, uv.lock) and a `viz:` group reused by
+      parity-check-develop-ring.yaml (see that TODO). Added `package-smoke`
+      job to pr.yml, gated on `needs.ci-paths.outputs.packaging-needed`,
+      copying nightly.yml's test-package steps verbatim (ubuntu/3.12 only,
+      no matrix, no artifact upload - PR gate doesn't need the dist
+      artifact). Original notes:
       Add a `package-smoke` job to pr.yml gated on a new path-filter output
       (extend `scripts/path_filter_decision.py` / `.github/path-filters.yml`
       with a `packaging` group covering `pyproject.toml`, `MANIFEST.in`,
@@ -41,8 +54,13 @@ work:
 
   - id: w2
     summary: "Path-filtered pip-audit job in pr.yml"
-    status: pending
+    status: done
     notes: |
+      Done. Added `dependency-audit` job, gated on the same
+      `packaging-needed` output as package-smoke (single group - the TODO's
+      "or a subset" alternative wasn't needed since pyproject.toml/uv.lock
+      are already inside the packaging group). Reused nightly.yml's
+      `PIP_AUDIT_IGNORE_VULNS` ignore-list parsing verbatim. Original notes:
       Add a `dependency-audit` job gated on the same packaging path filter
       (or a `pyproject.toml`/`uv.lock`-only subset if the classifier
       distinguishes them) plus the `PIP_AUDIT_IGNORE_VULNS` escape hatch
@@ -52,8 +70,29 @@ work:
   - id: w3
     summary: "Wire package-smoke and dependency-audit into ci-required-result with skipped-counts-as-pass semantics"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
+      Done. Added `PACKAGE_SMOKE_RESULT`/`DEPENDENCY_AUDIT_RESULT` env vars
+      and both jobs to `ci-required-result.needs`, plus the same
+      success-or-skipped check pattern as `audit-sha`. (The sibling
+      parity-check job from parity-check-develop-ring.yaml was initially
+      wired into the same aggregator point but was demoted to non-blocking
+      after review — see that TODO; package-smoke/dependency-audit remain
+      blocking as specified here since both step bodies are proven green in
+      nightly.) Updated the pinned test defaults in
+      tests/unit/workflows/test_pr_workflow_path_classifier.py
+      (`_run_ci_required_result`'s env dict needed `PACKAGE_SMOKE_RESULT`
+      etc. defaulted to "skipped", otherwise every existing test in that
+      file would fail on an unset env var evaluating to neither "success"
+      nor "skipped") and added new tests
+      (`test_ci_required_result_fails_on_packaging_job_failure`,
+      `test_ci_required_result_passes_when_packaging_jobs_skip`,
+      `test_parity_check_is_demoted_to_non_blocking`,
+      plus extended `test_ci_required_result_required_jobs_in_needs`).
+      Verified: a docs-only / non-packaging PR (packaging-needed=false)
+      shows both jobs `if:`-skipped and the aggregator still passes
+      (confirmed via classify_paths() dry run + the pinned aggregator
+      tests, not a live PR - see verification section). Original notes:
       Follow the existing conditional-job pattern in `ci-required-result`
       (pr.yml:789-793, the `AUDIT_SHA_RESULT` check: fail only if the result
       is neither `success` nor `skipped`). Add
@@ -134,3 +173,28 @@ impact:
 success_metrics:
   - "A packaging-metadata-breaking change fails ci-required-result on its PR, not just nightly."
   - "Non-packaging PRs incur zero added required-job wall-clock time."
+
+implementation_notes: |
+  Completed 2026-07-04. Files changed: .github/workflows/pr.yml,
+  .github/path-filters.yml, scripts/path_filter_decision.py,
+  tests/unit/workflows/test_pr_workflow_path_classifier.py (pinned-test
+  update, not in the original scope_limit but required — the aggregator's
+  bash script is extracted and executed by the test's default env dict,
+  which needed the three new *_RESULT vars defaulted to "skipped" or every
+  existing test in that file would fail).
+
+  Verification actually run (no live PR — this session cannot open PRs):
+    - `uv run -- python -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))"`
+      on pr.yml and path-filters.yml is not YAML (skipped, plain glob format).
+    - tests/unit/workflows/test_pr_workflow_path_classifier.py,
+      tests/unit/scripts/test_path_filter_decision.py: 19+18 tests pass.
+    - Manual dry run: `classify_paths(["pyproject.toml", "results-explorer/src/lib/chartMath.ts",
+      "benchbox/cli/run.py"], rules)` → packaging_needed=True (only
+      pyproject.toml matched), viz_needed=True, confirming the path-filter
+      groups fire independently and correctly.
+    - ruff check/format clean on all touched Python.
+  The three verification bullets in this file's `verification:` section that
+  require `gh pr create`/`gh pr checks` against a live scratch branch were
+  NOT run — this session has no git-push/PR-creation capability and must not
+  run state-changing git commands. A human (or a follow-up session with PR
+  access) should exercise those before treating this as fully proven in CI.

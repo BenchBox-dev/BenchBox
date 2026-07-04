@@ -286,6 +286,39 @@ class TestMakefileCommands:
         assert "Correctness-relevant medium tests must be promoted" in readme_content
         assert "test-medium:" in makefile_content
 
+    def test_every_speed_marker_tier_has_a_ci_consumer(self):
+        """Guard against a speed-marker tier silently losing every CI consumer.
+
+        This is the general trip-wire medium-tier-ci-home.yaml asks for: the
+        `medium` marker itself had zero CI consumers (only two narrow,
+        explicitly-pinned nodes) before that TODO gave the full tier a home
+        in develop-post-merge.yml. Deriving the known marker set from
+        ``tests/unit/test_marker_strategy.py`` (the single source of truth
+        for the speed/e2e-quick marker vocabulary) and grepping the current
+        CI workflow YAMLs - rather than hardcoding today's marker-to-workflow
+        mapping - means this catches the *next* marker that loses every CI
+        reference, not just a frozen snapshot of the current one.
+        """
+        from tests.unit.test_marker_strategy import _E2E_QUICK_INCOMPATIBLE, _SPEED_MARKERS
+
+        known_markers = sorted(_SPEED_MARKERS | _E2E_QUICK_INCOMPATIBLE)
+        repo_root = Path.cwd()
+        workflow_paths = [
+            repo_root / ".github" / "workflows" / "pr.yml",
+            repo_root / ".github" / "workflows" / "test.yml",
+            repo_root / ".github" / "workflows" / "nightly.yml",
+            repo_root / ".github" / "workflows" / "develop-post-merge.yml",
+        ]
+        combined_text = "\n".join(path.read_text(encoding="utf-8") for path in workflow_paths)
+
+        unreferenced = [marker for marker in known_markers if not re.search(rf"\b{re.escape(marker)}\b", combined_text)]
+        assert not unreferenced, (
+            f"Speed marker(s) {unreferenced} have zero references across "
+            f"{[p.name for p in workflow_paths]}; give the tier a CI home "
+            "(path-filtered PR job, develop-post-merge job, or nightly job) "
+            "per medium-tier-ci-home.yaml."
+        )
+
     def test_makefile_correctness_gate_runs_expected_results_backed_matrix_slice(self):
         makefile_content = (Path.cwd() / "Makefile").read_text()
         gate_body = _makefile_target_body(makefile_content, "test-correctness-gate")
