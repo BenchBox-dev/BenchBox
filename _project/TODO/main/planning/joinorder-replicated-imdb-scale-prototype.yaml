@@ -94,8 +94,18 @@ work:
         - predicate-domain frequencies scale as expected for fixed values,
         - null counts scale for replicated tables and remain unchanged for
           lookup tables,
-        - fixed 113-query result cardinalities are either N times canonical
-          or explicitly documented exceptions.
+        - the fixed 113 JOB queries' final result stays UNCHANGED from the
+          canonical oracle (they are scalar MIN(...) aggregates, so
+          value-identical offset replication returns the same one-row
+          aggregate value -- do not expect an N-times final-result scaling),
+        - the underlying predicate-match counts and important join-subgraph
+          cardinalities (the actual measurement gates) scale by the replica
+          count instead.
+      Matches the decision framework's corrected oracle description
+      (`_project/decisions/joinorder-scale-stress-decision-2026-06-30.md`,
+      "Recommendation and prototype scope" / options table): "unchanged
+      canonical final-result oracle" plus "underlying and join-subgraph
+      cardinalities" scaling, not final-result cardinalities scaling N times.
       Use the canonical oracle artifacts produced by joinorder-canonical-foundation
       (specifically `_project/joinorder/reference_cardinalities.json` from foundation w11).
 

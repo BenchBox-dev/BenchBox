@@ -24,6 +24,8 @@ jobs:
       code-paths: ${{ steps.classify.outputs.code-paths }}
       unknown-paths: ${{ steps.classify.outputs.unknown-paths }}
       estimated-runner-minutes-saved: ${{ steps.classify.outputs.estimated-runner-minutes-saved }}
+      packaging-needed: ${{ steps.classify.outputs.packaging-needed }}
+      viz-needed: ${{ steps.classify.outputs.viz-needed }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -831,11 +833,16 @@ jobs:
 
       - name: Run security audit
         run: |
+          # `uvx pip-audit` runs pip-audit in its own isolated tool environment,
+          # auditing pip-audit's dependencies, not BenchBox's. `uv run --with` layers
+          # pip-audit onto the project environment `uv sync --group dev` just built,
+          # so the dependency graph actually audited is the one pyproject.toml/uv.lock
+          # produce.
           if [ -n "${PIP_AUDIT_IGNORE_VULNS}" ]; then
             IGNORE_ARGS=$(printf '%s' "${PIP_AUDIT_IGNORE_VULNS}" | tr ',' '\n' | sed '/^$/d;s/^[[:space:]]*//;s/[[:space:]]*$//;/^$/d;s/^/--ignore-vuln /' | tr '\n' ' ')
-            uvx pip-audit ${IGNORE_ARGS}
+            uv run --with pip-audit -- pip-audit ${IGNORE_ARGS}
           else
-            uvx pip-audit
+            uv run --with pip-audit -- pip-audit
           fi
 
   parity-check:
