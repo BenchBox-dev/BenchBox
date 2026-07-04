@@ -178,8 +178,14 @@ First-party section, all file:line citations, no external footnotes.
   `--benchmark-option skew_preset=heavy`, and its join-skew knobs target
   exactly the relationships skew-join splitting exists for
   (`skew_config.py:74-100`). The Spark adapter is plan-capture eligible
-  (`spark.py:199`), so plan diffs (AQE on vs off) are capturable, not just
-  timings.
+  (`spark.py:199`), so a static plan is capturable for both AQE on/off runs --
+  but `get_query_plan()` delegates to `get_spark_query_plan()`
+  (`_spark_helpers.py:113`), which runs a fresh `EXPLAIN EXTENDED <query>`
+  after measurement, not the measured query's actual executed/adaptive plan.
+  That captures the pre-adaptive plan shape, not runtime AQE decisions
+  (switched join strategy, coalesced partition counts) -- those require
+  Spark's final/executed-plan or event-log capture, which BenchBox does not
+  currently do. Correct this in section 6's deliverable framing.
 
 ## 6. Planned methodology: measuring AQE with BenchBox (300-400 words)
 
@@ -199,9 +205,14 @@ first sentence and again in Limitations.
 - Negative control: uniform SF10 (preset `none`), where we expect AQE close to
   neutral; a large win there would indicate a methodology problem, not an AQE
   win. State this expectation up front as falsifiable.
-- Deliverable: plan-capture diffs showing the switched join operators and
-  coalesced partition counts alongside timings, so readers can see what
-  changed, not just how long it took.
+- Deliverable: timings for every axis, plus BenchBox's captured static
+  `EXPLAIN EXTENDED` plan diffs (AQE on vs off) alongside them. The captured
+  plan is pre-adaptive, not the executed/adaptive plan, so it will NOT show
+  the actual switched join operator or coalesced partition count Spark chose
+  at runtime -- adding that requires Spark final-plan/event-log capture,
+  which is out of scope for this post and tracked as a follow-up TODO instead.
+  Readers get timings plus a caveat about what the plan diff can and cannot
+  show, not a claim of directly observing AQE's runtime decisions.
 
 ## 7. Methodology notes + Limitations (150-250 words)
 
@@ -215,6 +226,12 @@ first sentence and again in Limitations.
 - No BenchBox measurements exist yet; section 6 is a plan.
 - The survey covers documented GA behavior only; no engine's roadmap is
   speculated about.
+- Plan-capture caveat: BenchBox's Spark plan capture is a post-measurement
+  `EXPLAIN EXTENDED`, not the executed/adaptive plan, so the captured diffs
+  cannot show AQE's actual runtime join-strategy switch or partition
+  coalescing -- only that a static plan differs (or doesn't) between AQE
+  on/off. State this explicitly rather than imply the plan diff proves what
+  AQE did at runtime.
 
 ## 8. Conclusions + Next steps (150-250 words)
 

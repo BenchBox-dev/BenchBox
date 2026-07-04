@@ -449,7 +449,11 @@ class RowCountValidator(BaseValidator):
             return TPCDSRowCountStrategy(scale)
         elif "ssb" in benchmark_name:
             return SSBRowCountStrategy(scale)
-        elif "joinorder" in benchmark_name:
+        elif benchmark_name == "joinorderbenchmark":
+            # Exact match, not a substring check: JoinOrderSyntheticBenchmark also
+            # contains "joinorder" but reports scaled synthetic row counts (e.g.
+            # info_type stays 24 rows regardless of scale factor), which the
+            # canonical strategy's exact-count comparison would reject.
             return JoinOrderRowCountStrategy(scale, benchmark_instance)
         else:
             return GenericRowCountStrategy(scale)

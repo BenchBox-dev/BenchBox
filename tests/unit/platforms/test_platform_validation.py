@@ -490,6 +490,25 @@ class TestRowCountValidator:
 
         assert isinstance(strategy, JoinOrderRowCountStrategy)
 
+    def test_get_strategy_joinorder_synthetic_falls_back_to_generic(self):
+        """JoinOrderSyntheticBenchmark must NOT match the canonical strategy: its
+        generator writes scaled base_row_counts for most tables but a fixed 24
+        rows for lookup tables like info_type regardless of scale factor, so the
+        canonical JoinOrderRowCountStrategy's exact-count comparison would reject
+        a correctly loaded synthetic database. A substring check on "joinorder"
+        would incorrectly select the canonical strategy here since the class name
+        "JoinOrderSyntheticBenchmark" contains it."""
+        mock_adapter = Mock()
+        mock_adapter.scale_factor = 1.0
+        mock_benchmark = Mock()
+        mock_benchmark.__class__.__name__ = "JoinOrderSyntheticBenchmark"
+        mock_adapter.benchmark_instance = mock_benchmark
+
+        validator = RowCountValidator(mock_adapter, {})
+        strategy = validator._get_strategy()
+
+        assert isinstance(strategy, GenericRowCountStrategy)
+
     def test_validate_joinorder_exact_row_count_passes(self):
         """Test JoinOrder validation passes on exact manifest row count."""
         mock_adapter = Mock()

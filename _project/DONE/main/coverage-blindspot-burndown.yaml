@@ -225,8 +225,8 @@ anti_patterns:
 
 verification:
   - description: ".coveragerc_core no longer references deleted files"
-    command: "grep -n 'transformations.py\\|batch.py' .coveragerc_core"
-    expected_output: "No matches (empty output) after w1"
+    command: "! grep -n 'transformations.py\\|batch.py' .coveragerc_core"
+    expected_output: "Exit 0 (grep found no match; bare grep exits 1 on no-match, so it must be inverted for this to be a pass/fail gate)"
   - description: "New/re-marked fast tests for scd_processor.py pass and are collected in the fast lane"
     command: "uv run -- python -m pytest tests/unit/core/tpcdi/test_etl_scd_processor.py -m fast -v"
     expected_output: "Tests collected and pass under the fast marker"

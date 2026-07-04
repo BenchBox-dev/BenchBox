@@ -126,9 +126,9 @@ anti_patterns:
   - "DO NOT register a new pytest marker -- the opt-in markers already exist in pyproject.toml."
 
 verification:
-  - description: "New full-archive tests are collected but skipped by default without the archive/marker"
-    command: "uv run -- python -m pytest tests/ -k joinorder_full_archive --collect-only -q"
-    expected_output: "tests collected; skipped by default without the archive/marker"
+  - description: "New full-archive tests are deselected by default (slow marker), not merely collected -- a plain pytest run (no --collect-only) so a missing/wrong marker would actually execute and be caught, instead of only being importable"
+    command: "uv run -- python -m pytest tests/ -k joinorder_full_archive -q"
+    expected_output: "\"0 selected, N deselected\" (or \"no tests ran (N deselected)\") -- N equals the new full-archive test count; 0 tests actually execute"
   - description: "Default joinorder unit tests still pass and stay fast"
     command: "uv run -- python -m pytest tests/unit/core/joinorder/ -q"
     expected_output: "0 failures"
