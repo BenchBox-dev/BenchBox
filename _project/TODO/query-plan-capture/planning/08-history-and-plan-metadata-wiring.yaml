@@ -1,0 +1,96 @@
+id: "qpc-08-history-and-plan-metadata-wiring"
+title: "Make plan history real: fix dead attribute reads, wire add_run into the run path, sane ordering"
+worktree: "query-plan-capture"
+priority: "Medium"
+status: "Not Started"
+
+description: |
+  benchbox plan-history is dead end-to-end:
+  - PlanHistoryStorage.add_run reads results.run_id / results.start_time /
+    results.phases — none exist on BenchmarkResults (fields are execution_id
+    / timestamp; phases arrives with qpc-01) — so it warns and no-ops
+    (history.py:78-97). Same silent-empty pattern in
+    core/manifest/plan_metadata_utils.py:38.
+  - add_run has zero production callers; the CLI reads a store nothing
+    populates.
+  - query_plan_history sorts ISO timestamp strings lexicographically
+    (history.py:155) — mixed-offset timestamps misorder flap detection.
+  - detect_plan_flapping ignores platform: a history dir with two platforms
+    for one query id reports 100% flapping.
+
+  Findings: F1.2, F7.2, plus the platform-partitioning slice of F3.4.
+
+category: "Feature Completion"
+
+prior_art:
+- "benchbox/core/query_plans/history.py:71-156"
+- "benchbox/core/manifest/plan_metadata_utils.py:25-46"
+- "benchbox/cli/commands/plan_history.py"
+
+work:
+- id: w1
+  summary: >-
+    Create: fix attribute names (execution_id, timestamp) and read plans via
+    the qpc-01 accessor; replace getattr(..., {}) defaults with explicit
+    access so shape drift fails loudly; same fixes in plan_metadata_utils.
+  status: pending
+- id: w2
+  summary: >-
+    Create: wire add_run into the export/post-run path (single call site,
+    opt-in config for the history dir); parse timestamps with
+    datetime.fromisoformat for sorting; partition flap/version detection by
+    platform.
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: >-
+    Create: end-to-end test — run add_run on a real BenchmarkResults with
+    plans, then plan-history CLI via CliRunner shows the entry; flapping test
+    with mixed platforms asserts partitioning.
+  needs: [w2]
+  status: pending
+- id: w4
+  summary: "Review: adversarial code review (history dir lifecycle, cache staleness, fingerprint_version interaction with qpc-03)."
+  needs: [w3]
+  status: pending
+- id: w5
+  summary: "Fix: address review findings; re-run verification."
+  needs: [w4]
+  status: pending
+- id: w6
+  summary: "Submit PR referencing qpc-08."
+  needs: [w5]
+  status: pending
+
+must_preserve:
+- "Existing history-file JSON shape stays readable"
+- "plan-history CLI flags and output format"
+
+anti_patterns:
+- "DO NOT keep defensive getattr(..., default) for required attributes — it converted a wiring bug into permanently-empty output."
+- "DO NOT compare fingerprints across fingerprint_version or across platforms in flap detection."
+
+verification:
+- description: "add_run stores fingerprints from a real BenchmarkResults"
+  command: "uv run -- python -m pytest tests/unit/core/query_plans/test_plan_history.py -q"
+  expected_output: "all pass, including real-object add_run test"
+- description: "plan-history CLI end-to-end"
+  command: "uv run -- python -m pytest tests/unit/cli/commands/test_plan_history_coverage.py -q"
+  expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/query_plans/history.py"
+  - "benchbox/core/manifest/plan_metadata_utils.py"
+  - "benchbox/cli/commands/plan_history.py"
+  - "benchbox/core/results/exporter.py"
+  - "tests/"
+
+deps:
+  needs: ["qpc-01-plan-rehydration-and-phases-view"]
+
+metadata:
+  tags: ["query-plans", "history", "manifest", "cli"]
+  estimated_effort: "Medium"
+  created_date: "2026-07-04"
+  review_findings: ["F1.2", "F7.2", "F3.4-partial"]

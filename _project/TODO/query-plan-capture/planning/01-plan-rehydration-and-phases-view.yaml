@@ -1,0 +1,103 @@
+id: "qpc-01-plan-rehydration-and-phases-view"
+title: "Rehydrate .plans.json in the loader and give consumers a real phases/plan accessor"
+worktree: "query-plan-capture"
+priority: "Critical"
+status: "Not Started"
+
+description: |
+  The loader parses the .plans.json companion but uses only the two count
+  fields; per-query plan payloads are discarded (loader.py:153,221,
+  _extract_plans_info). BenchmarkResults has no `phases` attribute, yet every
+  plan consumer iterates `results.phases` — show-plan and compare-plans crash
+  on every real exported bundle ("'BenchmarkResults' object has no attribute
+  'phases'", reproduced), and history/plan_metadata_utils silently produce
+  empty output via getattr(results, "phases", {}).
+
+  Compounding key mismatch: builder stamps query_results with "Q1"
+  (builder.py:949 format_query_id) so companion keys are "Q1"
+  (schema.py:1061) while main-file query ids are normalized to "1"
+  (schema.py:378) — any join by id misses every plan.
+
+  Findings: F1.1, F1.3, F7.1, plus the keystone integration test from F8.1.
+
+category: "Bug Fix / Data Pipeline"
+
+prior_art:
+- "benchbox/core/results/loader.py:153-221 — companion loaded, only counts extracted"
+- "benchbox/cli/commands/show_plan.py:89, compare_plans.py:181,255, compare.py:1236, core/query_plans/comparison.py:579 — .phases consumers"
+- "benchbox/core/results/query_normalizer.py:normalize_query_id — the canonical id form"
+- "scratchpad repro repro_e2e.py from the 2026-07-04 review — 90% of the keystone test"
+
+work:
+- id: w1
+  summary: >-
+    Create: rehydrate plans in reconstruct_benchmark_results — walk
+    plans_data["queries"], QueryPlanDAG.from_dict(entry["plan"],
+    verify_fingerprint=True), attach query_plan/plan_fingerprint/
+    plan_capture_time_ms to matching query_results keyed by
+    normalize_query_id. Normalize companion keys in build_plans_payload
+    (schema.py:1061). Add a `phases` property on BenchmarkResults returning
+    {phase_name: view-with-.queries} derived from query_results (or migrate
+    the four consumers to read query_results directly — decide in-diff,
+    smaller change wins). Normalize --query-id lookups in show_plan.py and
+    compare_plans.py with normalize_query_id on both sides.
+  status: pending
+- id: w2
+  summary: >-
+    Create: keystone no-mock integration test
+    (tests/integration/test_plan_capture_e2e.py): build BenchmarkResults with
+    a parser-produced QueryPlanDAG, export_result to tmp, load_result_file,
+    run show-plan and compare-plans via CliRunner asserting rendered plan
+    output — zero monkeypatching.
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Review: adversarial code review of the diff (id normalization edge cases, multi-iteration attach semantics, .phases contract)."
+  needs: [w2]
+  status: pending
+- id: w4
+  summary: "Fix: address review findings; re-run full verification."
+  needs: [w3]
+  status: pending
+- id: w5
+  summary: "Submit PR referencing qpc-01; include repro-before/after in the PR body."
+  needs: [w4]
+  status: pending
+
+must_preserve:
+- "Companion schema stays readable for already-exported bundles (accept both 'Q1' and '1' keys on load)"
+- "load_result_file signature and (BenchmarkResults, raw dict) return contract"
+- "Existing 453 plan-related unit tests keep passing"
+
+anti_patterns:
+- "DO NOT satisfy the CLI by teaching tests to fake .phases — the CLIs must work against load_result_file output on disk."
+- "DO NOT key rehydration on raw query_id strings — normalize both sides."
+
+verification:
+- description: "Keystone round-trip passes without mocks"
+  command: "uv run -- python -m pytest tests/integration/test_plan_capture_e2e.py -q"
+  expected_output: "all pass"
+- description: "show-plan works on a real bundle (manual or scripted)"
+  command: "uv run -- python -m pytest tests/unit/cli/commands -q -k 'show_plan or compare_plans'"
+  expected_output: "all pass"
+- description: "Companion keys match main-file ids on a fresh export"
+  command: "uv run -- python -m pytest tests/unit/core/results/test_query_plan_serialization.py -q"
+  expected_output: "all pass, including new key-contract test"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/results/loader.py"
+  - "benchbox/core/results/models.py"
+  - "benchbox/core/results/schema.py"
+  - "benchbox/cli/commands/show_plan.py"
+  - "benchbox/cli/commands/compare_plans.py"
+  - "tests/"
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["query-plans", "loader", "cli", "round-trip"]
+  estimated_effort: "Medium"
+  created_date: "2026-07-04"
+  review_findings: ["F1.1", "F1.3", "F7.1", "F8.1-keystone"]

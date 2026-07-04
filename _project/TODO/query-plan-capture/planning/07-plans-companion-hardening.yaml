@@ -1,0 +1,109 @@
+id: "qpc-07-plans-companion-hardening"
+title: "Harden .plans.json: to_dict serialization, multi-iteration retention, anonymization, path arithmetic"
+worktree: "query-plan-capture"
+priority: "Medium"
+status: "Not Started"
+
+description: |
+  Four companion-file defects:
+  1. build_plans_payload checks is_dataclass BEFORE hasattr(to_dict)
+     (schema.py:1074-1083), so QueryPlanDAG always serializes via asdict —
+     bypassing the depth-guarded to_dict, leaking the internal
+     fingerprint_integrity field (reproduced), and drifting from the designed
+     serialization.
+  2. plans_by_query[query_id] = plan_entry is last-writer-wins: with multiple
+     iterations/streams only one plan per query survives, silently — plan
+     flapping across iterations is unobservable from a bundle.
+  3. The companion bypasses anonymization: raw_explain_output is exported
+     verbatim even when anonymize=True (exporter.py:224 vs 253) — absolute
+     paths/usernames leak from "anonymized" bundles.
+  4. _load_companion_file path arithmetic breaks on filenames with extra dots
+     (sf0.1) and the fallback str.replace(".json", ...) hits the first
+     occurrence anywhere in the path.
+
+  Findings: F1.5, F1.6, F1.7.
+
+category: "Data Integrity / Privacy"
+
+prior_art:
+- "benchbox/core/results/schema.py:1043-1104 build_plans_payload"
+- "benchbox/core/results/exporter.py:218-267 _export_json_v2 / _write_companion_files"
+- "benchbox/core/results/loader.py:165-179 _load_companion_file"
+- "benchbox/core/results/anonymization.py AnonymizationManager"
+
+work:
+- id: w1
+  summary: >-
+    Create: reorder serialization branches (to_dict first, asdict fallback);
+    assert fingerprint_integrity is absent from exported payloads.
+  status: pending
+- id: w2
+  summary: >-
+    Create: retain plans per (query_id, iteration, stream) — companion
+    entries become a list under each normalized query id with a
+    schema-version bump, or (minimum) keep first + emit plans_dropped count;
+    prefer the list. Loader accepts both shapes.
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: >-
+    Create: route the plans payload through AnonymizationManager when
+    anonymize=True (scrub paths/hostnames in raw_explain_output and operator
+    properties, or omit raw_explain_output for anonymized exports).
+  needs: [w2]
+  status: pending
+- id: w4
+  summary: >-
+    Create: fix companion path arithmetic — exact basename suffix
+    replacement (name[:-len('.json')] + suffix); regression test with sf0.1
+    style filenames.
+  needs: [w3]
+  status: pending
+- id: w5
+  summary: "Review: adversarial code review (companion schema-version handling on load, anonymization completeness)."
+  needs: [w4]
+  status: pending
+- id: w6
+  summary: "Fix: address review findings; re-run verification."
+  needs: [w5]
+  status: pending
+- id: w7
+  summary: "Submit PR referencing qpc-07."
+  needs: [w6]
+  status: pending
+
+must_preserve:
+- "Existing single-plan companions still load (backward-compatible reader)"
+- "canonical_json_text byte-stability"
+
+anti_patterns:
+- "DO NOT silently drop plans for repeated query ids — either retain or count what was dropped."
+- "DO NOT anonymize by mutating the in-memory result object — anonymize the payload copy only (mirror the main-file pattern)."
+
+verification:
+- description: "No internal fields leak; to_dict branch used"
+  command: "uv run -- python -m pytest tests/unit/core/results/test_query_plan_serialization.py -q"
+  expected_output: "all pass, including fingerprint_integrity-absent assertion"
+- description: "Multi-iteration plans retained"
+  command: "uv run -- python -m pytest tests/unit/core/results/test_query_plan_serialization.py -q -k iteration"
+  expected_output: "all pass"
+- description: "Anonymized export contains no absolute paths in companion"
+  command: "uv run -- python -m pytest tests/unit/core/results -q -k anonym"
+  expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/results/schema.py"
+  - "benchbox/core/results/exporter.py"
+  - "benchbox/core/results/loader.py"
+  - "benchbox/core/results/anonymization.py"
+  - "tests/"
+
+deps:
+  needs: ["qpc-01-plan-rehydration-and-phases-view"]
+
+metadata:
+  tags: ["query-plans", "companion-file", "anonymization", "serialization"]
+  estimated_effort: "Medium"
+  created_date: "2026-07-04"
+  review_findings: ["F1.5", "F1.6", "F1.7"]

@@ -1,0 +1,84 @@
+id: "qpc-11-plan-cli-test-democking"
+title: "De-mock plan CLI/consumer tests: fakes must not define attributes production objects lack"
+worktree: "query-plan-capture"
+priority: "Medium"
+status: "Not Started"
+
+description: |
+  All three plan CLI coverage suites monkeypatch load_result_file with
+  SimpleNamespace fakes that DEFINE .phases (test_show_plan_coverage.py:34-35,
+  test_compare_plans_coverage.py:85, test_plan_history_coverage.py) — the
+  suite stayed green while every real invocation crashed. The keystone
+  no-mock integration test lands with qpc-01; this item is the sweep: keep
+  fast fakes for flag/option coverage but derive their shape from the real
+  classes so attribute drift fails, and add the missing contract tests the
+  review identified (export->load->export byte equality lives in qpc-02;
+  adapter->parser contracts live in qpc-06).
+
+  Finding: F8.1 (sweep portion).
+
+category: "Testing and Quality Assurance"
+
+prior_art:
+- "tests/unit/cli/commands/test_show_plan_coverage.py:8-51 — the masking pattern"
+- "tests/unit/cli/commands/test_compare_plans_coverage.py, test_plan_history_coverage.py"
+- "benchbox/core/runner/dataframe_runner.py:66,98 — repo precedent for rejecting synthetic MagicMock attributes"
+
+work:
+- id: w1
+  summary: >-
+    Create: replace SimpleNamespace result fakes with real BenchmarkResults
+    instances (cheap to construct) or spec-constrained mocks
+    (create_autospec(BenchmarkResults)); where load_result_file is stubbed
+    for speed, add one companion test per CLI that exercises the real loader
+    on a tmp-file bundle.
+  status: pending
+- id: w2
+  summary: >-
+    Create: a guardrail test asserting plan CLI test modules do not
+    monkeypatch load_result_file without a sibling real-file test (pattern
+    mirror of tests/unit/test_todo_executable_docs.py guardrails), or a
+    lightweight lint in tests/conftest.
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Review: adversarial code review (did any test lose coverage in the swap; fake-shape drift actually fails now — mutate a field name and confirm red)."
+  needs: [w2]
+  status: pending
+- id: w4
+  summary: "Fix: address review findings; re-run verification."
+  needs: [w3]
+  status: pending
+- id: w5
+  summary: "Submit PR referencing qpc-11."
+  needs: [w4]
+  status: pending
+
+must_preserve:
+- "Test suite runtime stays in the fast lane (no benchmark execution; tmp-file bundles only)"
+- "Existing coverage of CLI flags/options"
+
+anti_patterns:
+- "DO NOT hand fakes attributes the production class lacks — that is the exact mechanism that masked the .phases crash."
+- "DO NOT convert everything to slow integration tests — one real-path test per CLI plus spec'd fakes is the target."
+
+verification:
+- description: "CLI suites pass against real loader output"
+  command: "uv run -- python -m pytest tests/unit/cli/commands/test_show_plan_coverage.py tests/unit/cli/commands/test_compare_plans_coverage.py tests/unit/cli/commands/test_plan_history_coverage.py -q"
+  expected_output: "all pass"
+- description: "Shape-drift canary: renaming a BenchmarkResults field used by CLIs breaks a test"
+  command: "manual: temporarily rename query_results locally, run the suites, restore"
+  expected_output: "at least one test fails"
+
+scope_limit:
+  only_modify:
+  - "tests/"
+
+deps:
+  needs: ["qpc-01-plan-rehydration-and-phases-view"]
+
+metadata:
+  tags: ["query-plans", "testing", "mocking", "guardrail"]
+  estimated_effort: "Small"
+  created_date: "2026-07-04"
+  review_findings: ["F8.1-sweep"]
