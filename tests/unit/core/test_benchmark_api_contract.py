@@ -50,7 +50,7 @@ CORE_ONLY_BENCHMARK_IDS = {"ai_primitives", "joinorder_synthetic"}
 BENCHMARK_API_COUNT_MARKER = (
     "Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; "
     "**22** public discovery entries; **21** top-level Python benchmark facades; "
-    "**14** lazy facades; **7** eager facades; **2** core-only benchmark IDs. "
+    "**15** lazy facades; **6** eager facades; **2** core-only benchmark IDs. "
     "Benchmark support status: **5** stable, **12** beta, **5** experimental, **1** repo-only, "
     "**0** deprecated, **0** document-only."
 )
@@ -164,8 +164,8 @@ def test_benchmark_registry_wrapper_and_loader_counts_match_contract_map() -> No
     assert len(list_loader_benchmark_ids()) == 23
     assert len(list_public_benchmark_ids()) == 22
     assert len(top_level_benchmark_exports) == 21
-    assert len(lazy_benchmark_exports) == 14
-    assert len(eager_benchmark_exports) == 7
+    assert len(lazy_benchmark_exports) == 15
+    assert len(eager_benchmark_exports) == 6
     assert core_only_benchmark_ids == CORE_ONLY_BENCHMARK_IDS
     assert set(list_loader_benchmark_ids()) == set(BENCHMARK_METADATA)
     assert set(list_public_benchmark_ids()) == set(BENCHMARK_METADATA) - {"joinorder_synthetic"}
