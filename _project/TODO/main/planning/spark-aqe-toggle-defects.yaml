@@ -79,6 +79,23 @@ work:
       adds configure_for_benchmark tests for adaptive_enabled=False and for a
       spark_config override surviving run time.
 
+  - id: w5
+    summary: "Register adaptive_enabled as a benchbox run platform option for spark"
+    needs: [w1]
+    status: done
+    notes: |
+      RESOLVED (found by Codex review on the PR): the argparse flag lives on a
+      secondary entry point (PlatformRegistry.add_platform_arguments); the
+      primary `benchbox run` CLI parses --platform-option pairs against
+      PlatformHookRegistry's option-spec table, which had no spark rows at
+      all, so even --platform-option adaptive_enabled=false was rejected.
+      Added the spark|adaptive_enabled spec row (parse_bool, default 'true',
+      mirroring the velox row) in benchbox/platforms/__init__.py; the
+      registered spark config builder already maps the field through to
+      SparkAdapter.from_config. Regression test in
+      tests/unit/cli/test_platform_hooks.py asserts the default and that
+      adaptive_enabled=false parses to Python False.
+
 deferred:
   - summary: "Port the same fixes to the sibling Spark-family adapters: lakesail.py (has defect 2 at ~292-295 and defect 3 at ~531-533; its CLI flag is already BooleanOptionalAction so --no-adaptive-enabled currently parses but is silently ineffective at run time) and velox.py (defect 2 at ~266-269), then audit the cloud Spark adapters (CloudSparkConfigMixin, Databricks, EMR/Glue/Dataproc/Synapse/Fabric)"
     reason: "Different adapters and config surfaces; needs its own pass with per-adapter verification rather than riding along here. Review found the AQE key literals duplicated across spark.py, lakesail.py, velox.py, and pyspark/session.py; consider hoisting _SPARK_AQE_KEYS (and the resolve-then-apply pattern) into _spark_helpers.py as part of that port."
