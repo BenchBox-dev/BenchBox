@@ -1,0 +1,109 @@
+id: fix-multistream-throughput-plan-attachment
+title: "Attach captured plans to multi-stream throughput/combined rows (and reconcile the console count)"
+worktree: main
+priority: High
+status: Not Started
+description: |
+  In any TPC throughput run with >= 2 streams (and in combined mode), every query
+  is captured (EXPLAINed, cost paid, counted) but ZERO plans are attached to result
+  rows.
+
+  Root cause: the inline chokepoint sets `_plan_capture_key` on the recorded dict,
+  but the TPC row converters rebuild rows WITHOUT it:
+    - benchbox/core/tpch/platform_power.py:25  (_power_query_result)
+    - benchbox/platforms/base/execution.py:315-325, 409-419  (throughput converters)
+  Attachment then falls back to the public query_id, and `_attach_captured_plans`
+  (benchbox/platforms/base/execution.py:1311-1314) maps an id to None whenever it has
+  >= 2 captured variants. Throughput streams are seed-varied by spec
+  (`stream_seed = seed + stream_id*1000 + position`, benchbox/core/tpch/throughput_test.py:221),
+  so every query is multi-variant with >= 2 streams -> all dropped. In combined mode
+  this also strips the power-phase plan for any id that later runs in throughput.
+
+  This is currently documented as a limitation (docs/features/query-plan-analysis.md:157)
+  and asserted-as-intended in a test (tests/integration/test_plan_capture_combined_divergence.py:213),
+  but seed variation is the NORMAL multi-stream configuration, not an edge case, and
+  the sibling test `test_standard_path_exact_key_attaches_each_variant` proves the
+  converters COULD carry the key and get per-variant fidelity.
+
+  Secondary reporting defect: the console summary (benchbox/platforms/base/result_capture.py:1744)
+  prints `self.query_plans_captured` (the per-variant counter) e.g. "Query plans: 88/88
+  captured", while the bundle's row-derived count (compute_plan_capture_stats,
+  benchbox/core/results/schema.py:940) is 0 and build_plans_payload writes no
+  .plans.json. The console claims success the artifact contradicts.
+
+  Related serialization defect: build_plans_payload (benchbox/core/results/schema.py:1028,1050)
+  keys plans_by_query by public query_id, so even when attachment succeeds, multiple
+  stream rows for one id collapse to a single last-writer-wins entry - contradicting
+  capture_query_plan's "one plan per (query_id, stream_id)" docstring.
+
+category: Core Functionality
+
+metadata:
+  tags: [query-plans, throughput, combined, tpc, stats]
+  estimated_effort: "Medium"
+  created_date: "2026-07-04"
+  source_review: "Query-plan-capture adversarial review (2026-07-04)"
+
+impact:
+  user_impact: |
+    Standard multi-stream TPC-H/TPC-DS throughput and combined runs with
+    --capture-plans produce bundles with no plans, despite paying full EXPLAIN cost,
+    while the console reports a positive capture count.
+
+must_preserve:
+  - "The isolated post-measurement capture contract: no EXPLAIN in the timed loop or a concurrent stream; writes never re-executed."
+  - "Per-variant fidelity for rows that already carry an exact _plan_capture_key (test_standard_path_exact_key_attaches_each_variant must stay green)."
+  - "query_plans_captured and the bundle plans_captured must agree after the fix."
+
+approach: |
+  Propagate `_plan_capture_key` through _power_query_result and the throughput
+  converters (it already exists on the inline-recorded dict), so multi-variant rows
+  attach by exact key instead of falling through the lossy public-id path. Where a row
+  must be keyed for serialization, use the capture key (or (query_id, stream_id)) so
+  per-stream provenance survives build_plans_payload. Reconcile the console summary to
+  the same row-derived count used for the bundle (compute_plan_capture_stats).
+
+anti_patterns:
+  - "DO NOT relax the public-id fallback to 'attach any variant' - because it pairs a row with another stream's plan - carry the exact key instead."
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpch/platform_power.py"
+    - "benchbox/platforms/base/execution.py"
+    - "benchbox/platforms/base/result_capture.py"
+    - "benchbox/core/results/schema.py"
+    - "tests/integration/test_plan_capture_combined_divergence.py"
+    - "tests/unit/platforms/"
+    - "docs/features/query-plan-analysis.md"
+
+work:
+  - id: w1
+    summary: "Carry _plan_capture_key through _power_query_result and the TPC-H/TPC-DS throughput converters"
+    status: pending
+  - id: w2
+    summary: "Key build_plans_payload entries so per-stream/per-variant provenance survives (not last-writer-wins on query_id)"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Reconcile the console 'Query plans: N/M' summary with the row-derived bundle count"
+    status: pending
+    needs: [w1]
+  - id: w4
+    summary: "Update the divergence test (line 213) and docs so multi-stream rows attach; keep the truly-ambiguous (no-key) case as the only unattached path"
+    status: pending
+    needs: [w1]
+
+verification:
+  - description: "A 2-stream throughput run attaches a plan to every successful row"
+    command: "uv run -- python -m pytest tests/unit/platforms/ tests/integration/ -k 'throughput and plan' -n 0 -q"
+    expected_output: "passed"
+  - description: "Existing exact-key and combined-divergence tests stay green"
+    command: "uv run -- python -m pytest tests/integration/test_plan_capture_combined_divergence.py -n 0 -q"
+    expected_output: "passed"
+
+deps:
+  needs: [fix-plan-consumption-phases-and-loader-reattach]
+
+deferred:
+  - summary: "Reproducing failing test captured under scratchpad/review-failing-tests/test_plan_attach_multivariant_review.py"
+    reason: "Staged locally (uncommitted); fold in as a w1 guard when implementing."

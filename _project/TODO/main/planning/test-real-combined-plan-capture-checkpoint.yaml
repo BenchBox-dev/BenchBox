@@ -1,0 +1,68 @@
+id: test-real-combined-plan-capture-checkpoint
+title: "Cover the real combined power->maintenance plan-capture checkpoint call site"
+worktree: main
+priority: Medium
+status: Not Started
+description: |
+  The post-measurement divergence fix depends on `_plan_capture_checkpoint(connection)`
+  firing at the top of `_execute_tpch_maintenance_test` (benchbox/platforms/base/execution.py:537)
+  and `_execute_tpcds_maintenance_test` (:445), so read-phase plans are captured against
+  pre-mutation data state. But tests/integration/test_plan_capture_combined_divergence.py
+  drives `_plan_capture_checkpoint` / `_capture_plans_post_measurement` BY HAND and never
+  routes through the production call site.
+
+  Proof of the blind spot: deleting the checkpoint call at execution.py:537 - i.e. fully
+  reverting the fix - leaves all of that file's tests green, because no test runs a real
+  `_execute_combined_test` -> `_execute_tpch_maintenance_test` lifecycle under
+  capture_plans=True. The slow regression guard (`test_real_tpch_power_capture_attaches_plans`)
+  runs power-only with a read-only query_subset and never reaches the checkpoint.
+
+  Add a real (DuckDB, in-memory or file-based, no external services) combined
+  power->maintenance run with --capture-plans that asserts a read-phase plan reflects
+  PRE-mutation cardinality (i.e. the checkpoint fired before the maintenance mutation),
+  so removing/reordering the checkpoint call actually fails a test.
+
+category: Testing & Quality
+
+metadata:
+  tags: [query-plans, testing, combined, maintenance, false-pass]
+  estimated_effort: "Small"
+  created_date: "2026-07-04"
+  source_review: "Query-plan-capture adversarial review (2026-07-04)"
+
+impact:
+  maintainer_impact: |
+    The divergence fix's production wiring is currently untested; a regression that
+    drops or misorders the checkpoint would ship green.
+
+must_preserve:
+  - "The test must exercise the real _execute_combined_test / _execute_*_maintenance_test path, not hand-built buffers."
+  - "No external services; DuckDB only; keep it in the fast/integration lane if runtime allows, else mark slow."
+
+approach: |
+  Build a minimal combined run whose maintenance phase measurably changes a table's
+  cardinality, capture a read query in the power/throughput phase, and assert the
+  captured plan (or a proxy such as an estimate visible only pre-mutation) reflects the
+  pre-mutation state. Use the existing spy pattern from the divergence test but wire it
+  through the real driver entry point rather than calling the checkpoint directly.
+
+scope_limit:
+  only_modify:
+    - "tests/integration/test_plan_capture_combined_divergence.py"
+    - "tests/integration/"
+
+work:
+  - id: w1
+    summary: "Add a real combined power->maintenance capture test that fails if the checkpoint call site is removed or reordered"
+    status: pending
+
+verification:
+  - description: "New test passes with the checkpoint in place"
+    command: "uv run -- python -m pytest tests/integration/test_plan_capture_combined_divergence.py -n 0 -q"
+    expected_output: "passed"
+  - description: "New test FAILS when the checkpoint call at execution.py:537 is temporarily removed (manual mutation check during implementation)"
+    command: "# temporarily delete the checkpoint call, run the new test, confirm it fails, then restore"
+    expected_output: "the new test fails"
+
+deps:
+  needs: [fix-multistream-throughput-plan-attachment]

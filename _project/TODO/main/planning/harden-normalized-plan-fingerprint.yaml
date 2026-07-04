@@ -1,0 +1,89 @@
+id: harden-normalized-plan-fingerprint
+title: "Harden normalized plan fingerprint: literal-masking gaps + cross-mode mixing marker"
+worktree: main
+priority: Medium
+status: Not Started
+description: |
+  The opt-in literal-normalized fingerprint (masks numeric/string literals for
+  seed-independent comparison) has correctness gaps. It is currently API-only - the
+  `--normalize-plan-literals` CLI flag is NOT shipped (docs correctly call it
+  "planned", docs/features/query-plan-analysis.md:661) - so impact is limited to API
+  callers, but these must be fixed before the flag ships.
+
+  1. Literal masking is wrong for several literal forms (benchbox/core/results/query_plan_models.py):
+     - `_LITERAL_NUM_RE = \b\d+(?:\.\d+)?\b` (line 123) misses scientific (1e5),
+       hex (0xFF), leading/trailing-dot (.5, 5.), underscore (1_000), and CORRUPTS
+       1.2E-3 into `<NUM>.2E-<NUM>`.  -> false "plan changed" when a seed emits 1e2
+       vs 100, or any hex/scientific threshold.
+     - `_LITERAL_STR_RE = '[^']*'` (line 124) does not understand SQL '' escaping, so
+       `'O''Brien'` masks to `<STR><STR>` (two tokens) instead of one. -> false "changed",
+       latent collision risk.
+     Verified clean and must stay so: digit-bearing identifiers (col_5, revenue_2024,
+     t1.col_5) are NOT masked; NULL/TRUE/FALSE/DATE literals behave correctly.
+
+  2. Cross-run mode mixing (reproduced). `update_plan_versions`
+     (benchbox/core/manifest/plan_metadata_utils.py:64) and `PlanMetadata.plan_fingerprints`
+     carry NO normalized-vs-literal marker. A run recorded with normalize_literals=False
+     compared to one with True yields different fingerprints for the same plan ->
+     false "version changed" on EVERY query; merge_plan_metadata silently mixes schemes.
+     The docstring's "never silently mixes" (plan_metadata_utils.py:44-48) holds only
+     within a single create_plan_metadata_from_results call, not across runs.
+
+category: Core Functionality
+
+metadata:
+  tags: [query-plans, fingerprint, normalization, manifest]
+  estimated_effort: "Medium"
+  created_date: "2026-07-04"
+  source_review: "Query-plan-capture adversarial review (2026-07-04)"
+
+impact:
+  user_impact: |
+    API users of normalized fingerprints (and any future --normalize-plan-literals
+    run) get spurious plan-version regressions from scientific/hex/escaped-quote
+    literals and from toggling the normalization mode between runs.
+
+must_preserve:
+  - "The default literal-sensitive plan_fingerprint is unchanged (normalization stays opt-in)."
+  - "Digit-bearing identifiers and NULL/boolean/DATE handling stay correct."
+  - "The structural fingerprint continues to exclude cost/cardinality/timing."
+
+approach: |
+  Broaden the numeric mask to a single well-formed SQL-numeric-literal regex
+  (integer/decimal/scientific/hex, with sign) that masks the whole token atomically;
+  make the string mask escaped-quote aware ('' inside a literal). Tag PlanMetadata
+  with the normalization mode (a scheme field) and make update_plan_versions /
+  merge_plan_metadata refuse or flag a cross-mode comparison instead of blindly
+  diffing fingerprints.
+
+anti_patterns:
+  - "DO NOT mask digit runs adjacent to identifier characters - because it corrupts columns like col_5 - keep the identifier-boundary guard."
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/results/query_plan_models.py"
+    - "benchbox/core/manifest/plan_metadata_utils.py"
+    - "benchbox/core/manifest/models.py"
+    - "tests/unit/core/query_plans/test_fingerprint_normalization.py"
+    - "tests/unit/core/manifest/"
+
+work:
+  - id: w1
+    summary: "Rewrite _LITERAL_NUM_RE/_LITERAL_STR_RE to atomically mask scientific/hex/dotted/underscore numerics and escaped-quote strings"
+    status: pending
+  - id: w2
+    summary: "Add a normalization-mode marker to PlanMetadata; make update_plan_versions/merge_plan_metadata reject or flag cross-mode comparison"
+    status: pending
+  - id: w3
+    summary: "Extend test_fingerprint_normalization.py with the adversarial literal corpus and a cross-mode-mixing regression"
+    status: pending
+    needs: [w1, w2]
+
+verification:
+  - description: "Normalization + manifest suites green with the new adversarial corpus"
+    command: "uv run -- python -m pytest tests/unit/core/query_plans/test_fingerprint_normalization.py tests/unit/core/manifest/ -n 0 -q"
+    expected_output: "passed"
+
+deferred:
+  - summary: "Shipping the --normalize-plan-literals CLI flag and surfacing the normalized fingerprint in the bundle"
+    reason: "Separate feature work; this TODO only hardens the underlying API so the flag is safe to ship."
