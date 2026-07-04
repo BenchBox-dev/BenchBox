@@ -157,7 +157,18 @@ class TestGetSparkConf:
 
         a = SparkAdapter(adaptive_enabled=False)
         conf = a._get_spark_conf()
-        assert "spark.sql.adaptive.enabled" not in conf
+        # Spark enables AQE by default since 3.2.0, so disabling must set the
+        # keys to "false" explicitly rather than omitting them.
+        assert conf["spark.sql.adaptive.enabled"] == "false"
+        assert conf["spark.sql.adaptive.coalescePartitions.enabled"] == "false"
+        assert conf["spark.sql.adaptive.skewJoin.enabled"] == "false"
+
+    def test_aqe_disabled_spark_config_still_wins(self, mock_pyspark):
+        from benchbox.platforms.spark import SparkAdapter
+
+        a = SparkAdapter(adaptive_enabled=False, spark_config={"spark.sql.adaptive.enabled": "true"})
+        conf = a._get_spark_conf()
+        assert conf["spark.sql.adaptive.enabled"] == "true"
 
     def test_aqe_enabled(self, mock_pyspark):
         from benchbox.platforms.spark import SparkAdapter
@@ -763,6 +774,29 @@ class TestConfigureForBenchmark:
 
         conf_calls = [str(c) for c in mock_session.conf.set.call_args_list]
         assert any("adaptive.enabled" in c for c in conf_calls)
+
+    def test_olap_respects_adaptive_disabled(self, mock_pyspark):
+        _, mock_session = mock_pyspark
+        from benchbox.platforms.spark import SparkAdapter
+
+        a = SparkAdapter(adaptive_enabled=False)
+        a.configure_for_benchmark(mock_session, "tpch")
+
+        mock_session.conf.set.assert_any_call("spark.sql.adaptive.enabled", "false")
+        mock_session.conf.set.assert_any_call("spark.sql.adaptive.coalescePartitions.enabled", "false")
+        mock_session.conf.set.assert_any_call("spark.sql.adaptive.skewJoin.enabled", "false")
+
+    def test_olap_respects_spark_config_aqe_override(self, mock_pyspark):
+        _, mock_session = mock_pyspark
+        from benchbox.platforms.spark import SparkAdapter
+
+        a = SparkAdapter(spark_config={"spark.sql.adaptive.enabled": "false"})
+        a.configure_for_benchmark(mock_session, "olap")
+
+        # The explicit spark_config entry must not be clobbered at run time.
+        mock_session.conf.set.assert_any_call("spark.sql.adaptive.enabled", "false")
+        # Keys without an override still follow adaptive_enabled (default True).
+        mock_session.conf.set.assert_any_call("spark.sql.adaptive.skewJoin.enabled", "true")
 
     def test_tpcds_sets_cbo(self, mock_pyspark):
         _, mock_session = mock_pyspark

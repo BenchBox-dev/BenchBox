@@ -13,6 +13,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import re
@@ -68,6 +69,11 @@ _MAX_COMPATIBLE_JAVA_VERSION = 22
 
 _logger = logging.getLogger(__name__)
 _SPARK_AUTO_BROADCAST_THRESHOLD = "spark.sql.autoBroadcastJoinThreshold"
+_SPARK_AQE_KEYS = (
+    "spark.sql.adaptive.enabled",
+    "spark.sql.adaptive.coalescePartitions.enabled",
+    "spark.sql.adaptive.skewJoin.enabled",
+)
 
 
 def _get_java_version(java_home: str | None = None) -> int | None:
@@ -297,7 +303,10 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             "--enable-hive", action="store_true", default=False, help="Enable Hive metastore support"
         )
         spark_group.add_argument(
-            "--adaptive-enabled", action="store_true", default=True, help="Enable Adaptive Query Execution (AQE)"
+            "--adaptive-enabled",
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help="Enable or disable Adaptive Query Execution (AQE)",
         )
 
     @classmethod
@@ -436,11 +445,12 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             "spark.sql.shuffle.partitions": str(self.shuffle_partitions),
         }
 
-        # Adaptive Query Execution
-        if self.adaptive_enabled:
-            conf["spark.sql.adaptive.enabled"] = "true"
-            conf["spark.sql.adaptive.coalescePartitions.enabled"] = "true"
-            conf["spark.sql.adaptive.skewJoin.enabled"] = "true"
+        # Adaptive Query Execution. Set explicitly in both directions: Spark
+        # enables AQE by default since 3.2.0, so omitting the keys would leave
+        # it on even when adaptive_enabled is False.
+        aqe_value = "true" if self.adaptive_enabled else "false"
+        for aqe_key in _SPARK_AQE_KEYS:
+            conf[aqe_key] = aqe_value
 
         # Broadcast threshold
         if self.broadcast_threshold is not None:
@@ -647,14 +657,17 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
         try:
             if benchmark_type.lower() in ["olap", "analytics", "tpch", "tpcds", "joinorder"]:
-                # OLAP-specific optimizations via Spark SQL settings
-                spark.conf.set("spark.sql.adaptive.enabled", "true")
-                spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
-                spark.conf.set("spark.sql.adaptive.skewJoin.enabled", "true")
+                # OLAP-specific optimizations via Spark SQL settings. Honor the
+                # adapter's AQE setting instead of force-enabling, and let an
+                # explicit spark_config entry win so session-build overrides
+                # are not clobbered at run time.
+                aqe_value = "true" if self.adaptive_enabled else "false"
+                for aqe_key in _SPARK_AQE_KEYS:
+                    spark.conf.set(aqe_key, self.spark_config.get(aqe_key, aqe_value))
 
-                # Cost-based optimization
-                spark.conf.set("spark.sql.cbo.enabled", "true")
-                spark.conf.set("spark.sql.cbo.joinReorder.enabled", "true")
+                # Cost-based optimization, with the same spark_config precedence
+                for cbo_key in ("spark.sql.cbo.enabled", "spark.sql.cbo.joinReorder.enabled"):
+                    spark.conf.set(cbo_key, self.spark_config.get(cbo_key, "true"))
 
                 self.logger.debug("Applied OLAP optimizations for Spark")
 

@@ -65,6 +65,18 @@ def test_parse_options_unknown_key_raises():
         PlatformHookRegistry.parse_options("clickhouse", [("unknown", "value")])
 
 
+def test_spark_platform_options_adaptive_enabled():
+    # Default is the registered spec-row string "true" (same convention as the
+    # velox row); it only needs to be truthy for the adapter default.
+    parsed = PlatformHookRegistry.parse_options("spark", [])
+    assert parsed["adaptive_enabled"] == "true"
+
+    # Explicit values go through parse_bool, so AQE-off runs are reachable via
+    # --platform-option adaptive_enabled=false.
+    parsed = PlatformHookRegistry.parse_options("spark", [("adaptive_enabled", "false")])
+    assert parsed["adaptive_enabled"] is False
+
+
 @pytest.mark.parametrize(
     ("platform", "expected_defaults"),
     [

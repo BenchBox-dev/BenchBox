@@ -787,6 +787,7 @@ datafusion-df|temp_dir|Temporary directory for disk spilling (default: system te
 sqlite|database_path|Path to the SQLite database file (auto-generated from --benchmark/--scale when omitted)|{}
 sqlite|timeout|SQLite connection timeout in seconds|{'parser': 'float', 'default': '30.0'}
 sqlite|check_same_thread|Enforce that connections are used on the creating thread only|{'parser': 'parse_bool', 'default': 'false'}
+spark|adaptive_enabled|Enable or disable Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
 velox|deployment|Deployment mode: 'local' (in-process SparkSession, Linux only) or 'remote' (Spark-Connect server)|{'choices': ('local', 'remote'), 'default': 'local'}
 velox|endpoint|Spark-Connect endpoint for remote mode (e.g., sc://localhost:50051)|{'default': 'sc://localhost:50051'}
 velox|gluten_jar_path|Absolute path to the Gluten Velox bundle jar (required for local mode)|{'aliases': ('jar',)}
