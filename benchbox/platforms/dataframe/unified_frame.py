@@ -17,8 +17,12 @@ Key API translations:
 
 DataFusion Compatibility Notes:
     The DataFusion support includes experimental AST parsing for handling
-    aggregate arithmetic expressions. This was tested with DataFusion 43.0.0
-    and may not work with other versions if the error message format changes.
+    aggregate arithmetic expressions. This was originally tested with
+    DataFusion 43.0.0 and re-validated against 53.0.0. If a future DataFusion
+    release changes the underlying error-message format this relies on,
+    `_get_datafusion_ast_string()` now raises `DataFusionASTFormatError`
+    (naming the installed DataFusion version and the unrecognized error
+    text) instead of silently falling back to unchanged-expression behavior.
     See _get_datafusion_ast_string() for details.
 
 Copyright 2026 Joe Harris / BenchBox Project
@@ -2302,12 +2306,54 @@ def _is_datafusion_expr(expr: Any) -> bool:
 # arithmetic and apply it after the aggregation.
 #
 # WARNING: This implementation uses error message parsing to extract AST
-# information, which is inherently fragile. Tested with DataFusion 43.0.0.
-# Future DataFusion versions may change error message formats.
+# information, which is inherently fragile. Originally tested with
+# DataFusion 43.0.0; re-validated against 53.0.0 as of the
+# unified-frame-error-parsing-hardening.yaml TODO (the pinned/installed
+# version has drifted well past 43.0.0, but the error format below is
+# unchanged as of 53.0.0).
 #
-# If AST extraction fails, the functions gracefully fall back to passing
-# expressions through unchanged (which may cause DataFusion errors for
-# unsupported aggregate arithmetic patterns).
+# `_get_datafusion_ast_string()` distinguishes two failure modes instead of
+# silently returning None for both:
+#   1. The expression's AST doesn't contain an Alias/BinaryExpr/
+#      AggregateFunction node (e.g. a plain Column, Literal, or unaliased
+#      aggregate) - this is a genuinely different expression shape that this
+#      module's aggregate-arithmetic extraction doesn't apply to. Falls back
+#      to passing the expression through unchanged, exactly as before.
+#   2. `rex_call_operator()`'s error text no longer even matches the
+#      "Catch all triggered in get_operator_name: <ast>" wrapper format this
+#      module depends on - this means the underlying error-message mechanism
+#      itself changed (not just the AST it happens to embed), which is the
+#      actual fragile-dependency risk the module docstring warns about.
+#      Raises DataFusionASTFormatError loudly instead of silently degrading.
+
+
+class DataFusionASTFormatError(RuntimeError):
+    """DataFusion's rex_call_operator() error text no longer matches the
+    "Catch all triggered in get_operator_name: <ast>" format this module
+    depends on to extract AST information for aggregate-arithmetic support.
+
+    This means a DataFusion release changed the underlying error-message
+    mechanism this module relies on (not merely the specific AST node it
+    happens to embed - see _DATAFUSION_AST_SANITY_KEYWORDS for that case,
+    which is handled separately and does not raise). Fix by re-validating
+    the current error format (see w0 in
+    unified-frame-error-parsing-hardening.yaml) and updating
+    _DATAFUSION_AST_ERROR_PREFIX / the AST-extraction regexes below to match.
+    """
+
+
+# The stable wrapper text DataFusion's rex_call_operator() uses to embed a
+# Rust Debug-formatted AST dump in its error message, regardless of the
+# wrapped expression's own node type (Column, Literal, Alias, BinaryExpr,
+# AggregateFunction, ...). Confirmed present for Column/Literal/
+# AggregateFunction/Alias(BinaryExpr(...)) shapes as of DataFusion 53.0.0.
+_DATAFUSION_AST_ERROR_PREFIX = "Catch all triggered in get_operator_name"
+
+# Node-type keywords that indicate this expression is the
+# Alias(BinaryExpr(...AggregateFunction...)) shape this module's arithmetic
+# extraction cares about, as opposed to some other expression shape that
+# legitimately doesn't need arithmetic extraction.
+_DATAFUSION_AST_SANITY_KEYWORDS = ("Alias", "BinaryExpr", "AggregateFunction")
 
 
 def _get_datafusion_ast_string(expr: DataFusionExpr) -> str | None:
@@ -2317,15 +2363,31 @@ def _get_datafusion_ast_string(expr: DataFusionExpr) -> str | None:
     DataFusion's rex_call_operator() method to extract AST information.
     This is fragile and may break with DataFusion version changes.
 
-    Tested with: DataFusion 43.0.0
+    Tested with: DataFusion 43.0.0 and 53.0.0.
     Expected error message format: "Catch all triggered in get_operator_name: Alias(BinaryExpr...)"
 
     Args:
         expr: A DataFusion expression
 
     Returns:
-        The AST string representation, or None if extraction failed
+        The AST string representation, or None if this expression's AST
+        doesn't contain an Alias/BinaryExpr/AggregateFunction node (a
+        genuinely different, unrelated expression shape - not an error).
+
+    Raises:
+        DataFusionASTFormatError: If DataFusion raised an error but its text
+            no longer matches the expected catch-all AST-dump wrapper format
+            at all, indicating the underlying mechanism this function
+            depends on has changed upstream.
     """
+    if not hasattr(expr, "rex_call_operator"):
+        # Not a real DataFusion Expr at all (e.g. a plain column-name string
+        # mixed into the same select()/agg() call as an aggregate
+        # expression) - this is a type mismatch in the caller's input, not a
+        # DataFusion error-format question, so it is definitely not the
+        # Alias/BinaryExpr/AggregateFunction pattern this caller looks for.
+        return None
+
     try:
         # rex_call_operator throws an error for Alias expressions,
         # but the error message contains the full AST
@@ -2335,10 +2397,34 @@ def _get_datafusion_ast_string(expr: DataFusionExpr) -> str | None:
         # The error message contains the AST like:
         # "Catch all triggered in get_operator_name: Alias(BinaryExpr...)"
         error_str = str(e)
-        # Verify we got the expected format (basic sanity check)
-        if "Alias" in error_str or "BinaryExpr" in error_str or "AggregateFunction" in error_str:
+
+        if _DATAFUSION_AST_ERROR_PREFIX not in error_str:
+            # The catch-all AST-dump wrapper itself is gone/changed - the
+            # mechanism this module depends on has broken upstream. This is
+            # the actual format-drift risk flagged in the module docstring;
+            # fail loudly and attributably rather than silently falling back
+            # to unchanged-expression behavior.
+            import datafusion
+
+            installed_version = getattr(datafusion, "__version__", "unknown")
+            raise DataFusionASTFormatError(
+                "DataFusion's rex_call_operator() error format has changed and no "
+                f"longer contains the expected '{_DATAFUSION_AST_ERROR_PREFIX}' "
+                "wrapper text that benchbox's aggregate-arithmetic AST extraction "
+                f"depends on. Installed DataFusion version: {installed_version}. "
+                f"Unrecognized error text: {error_str!r}"
+            ) from e
+
+        # Verify we got the expected format (basic sanity check): does this
+        # expression's own AST contain the Alias/BinaryExpr/AggregateFunction
+        # shape this caller is looking for?
+        if any(keyword in error_str for keyword in _DATAFUSION_AST_SANITY_KEYWORDS):
             return error_str
-        # Unexpected format - return None to trigger graceful fallback
+
+        # The catch-all wrapper is intact, but this expression is a
+        # genuinely different, unrelated shape (e.g. a plain Column, Literal,
+        # or unaliased aggregate) - not a format break. Return None so the
+        # caller falls back to passing the expression through unchanged.
         return None
 
 

@@ -179,10 +179,45 @@ jobs:
           echo "::error::Ruleset drift check failed."
           exit 1
 
+  pypi-latest-installability:
+    name: pypi-latest installability canary
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Deliberately no checkout step in this job: the point is to install
+      # the *published* PyPI artifact, not build or import against local
+      # source. Set up Python / uv here don't need a repo checkout.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install and import PyPI-latest benchbox (no local source in sys.path)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Run from a scratch directory with no benchbox/ source tree
+          # anywhere nearby. Running this from inside the checked-out repo
+          # would silently import the local benchbox/ source directory
+          # instead of the installed wheel (Python adds the script's
+          # directory to sys.path), producing a false pass even when the
+          # real PyPI artifact is broken -- exactly how v0.3.0's broken
+          # clean import (missing pandas guard) went undetected for over a
+          # month. See docs/operations/release-guide.md "Recovering from a
+          # broken PyPI release". This reuses the same import + pandas-
+          # absence assertion as nightly.yml's test-package job, just
+          # against PyPI-latest instead of a freshly built local wheel.
+          workdir=$(mktemp -d)
+          cd "$workdir"
+          uv run --isolated --no-project --with benchbox -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print(f'PyPI-latest BenchBox {benchbox.__version__} installed successfully (minimal import surface)')"
+
   release-canary-result:
     name: release-canary-result
     runs-on: ubuntu-latest
-    needs: [credential-free-non-fast, ruleset-drift]
+    needs: [credential-free-non-fast, ruleset-drift, pypi-latest-installability]
     if: always()
     steps:
       - name: Write release canary summary
@@ -190,6 +225,7 @@ jobs:
           CHECKED_SHA: ${{ needs.credential-free-non-fast.outputs.checked_sha }}
           NON_FAST_RESULT: ${{ needs.credential-free-non-fast.result }}
           RULESET_DRIFT_RESULT: ${{ needs.ruleset-drift.result }}
+          PYPI_LATEST_RESULT: ${{ needs.pypi-latest-installability.result }}
           NON_FAST_COUNT: ${{ needs.credential-free-non-fast.outputs.collected_count }}
         run: |
           mkdir -p release-canary-artifacts
@@ -204,6 +240,7 @@ jobs:
             "freshness_contract_hours": 48,
             "non_fast_result": "${NON_FAST_RESULT}",
             "ruleset_drift_result": "${RULESET_DRIFT_RESULT}",
+            "pypi_latest_installability_result": "${PYPI_LATEST_RESULT}",
             "non_fast_collected_count": "${NON_FAST_COUNT}"
           }
           EOF
@@ -219,12 +256,14 @@ jobs:
         env:
           NON_FAST_RESULT: ${{ needs.credential-free-non-fast.result }}
           RULESET_DRIFT_RESULT: ${{ needs.ruleset-drift.result }}
+          PYPI_LATEST_RESULT: ${{ needs.pypi-latest-installability.result }}
         run: |
           set -euo pipefail
           failed=0
           for pair in \
             "credential-free-non-fast=$NON_FAST_RESULT" \
-            "ruleset-drift=$RULESET_DRIFT_RESULT"; do
+            "ruleset-drift=$RULESET_DRIFT_RESULT" \
+            "pypi-latest-installability=$PYPI_LATEST_RESULT"; do
             name="${pair%%=*}"
             result="${pair#*=}"
             if [ "$result" != "success" ]; then

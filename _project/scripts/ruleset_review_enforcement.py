@@ -54,9 +54,12 @@ from auto_merge_soundness_paths import SOUNDNESS_PREFIXES  # noqa: E402
 
 # Human-readable globs for the CODEOWNERS-owned soundness surface, derived from the
 # shared predicate so this narration tracks the auto-merge withholding set exactly.
-SOUNDNESS_PATH_GLOBS: tuple[str, ...] = tuple(f"{prefix}**" for prefix in SOUNDNESS_PREFIXES) + (
-    "benchbox/core/**/validation.py",
-)
+# Directory prefixes (ending in "/") get a "**" suffix; exact-file prefixes
+# (e.g. benchbox/platforms/base/result_capture.py) are rendered as-is, since
+# appending "**" to a filename would misleadingly read as a directory glob.
+SOUNDNESS_PATH_GLOBS: tuple[str, ...] = tuple(
+    f"{prefix}**" if prefix.endswith("/") else prefix for prefix in SOUNDNESS_PREFIXES
+) + ("benchbox/core/**/validation.py",)
 
 
 def extract_rules(payload: Any) -> list[dict[str, Any]]:

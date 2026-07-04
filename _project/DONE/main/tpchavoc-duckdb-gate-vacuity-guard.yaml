@@ -2,7 +2,8 @@ id: tpchavoc-duckdb-gate-vacuity-guard
 title: "Close the DuckDB TPC-Havoc gate's vacuity/staleness gaps its sibling engine builders and the cross-surface gate already guard against"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-03"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -70,71 +71,79 @@ prior_art:
 work:
   - id: w1
     summary: "Add a row-count guard to build_duckdb_with_tpch mirroring the Postgres/DataFusion/ClickHouse builders"
-    status: pending
+    status: done
     notes: |
-      After `DuckDBAdapter(...).load_data(tpchavoc, connection, data_dir)`, query
-      each of the 8 TPC-H tables (reuse `_TPCH_TABLES` at equivalence.py:349) for
-      its row count on `connection` and raise `RuntimeError` listing any table
-      with 0 rows, exactly mirroring the message shape used by the Postgres/
-      DataFusion/ClickHouse builders ("<Engine> TPC-H load failed - no rows in
-      {empty} (stats={table_stats})"). DuckDBAdapter.load_data's own return value
-      may already carry per-table stats (verify - the other three builders use
-      `table_stats, _, _ = adapter.load_data(...)`); if `DuckDBAdapter.load_data`
-      does not return stats in the same shape, run a `SELECT COUNT(*)` per table
-      instead rather than changing the adapter's return contract.
+      Implemented exactly as scoped. Verified DuckDBAdapter.load_data already
+      returns `(table_stats, loading_time, None)` - the same 3-tuple shape the
+      Postgres/DataFusion/ClickHouse builders destructure via
+      `table_stats, _, _ = adapter.load_data(...)` - so no adapter contract
+      change was needed. build_duckdb_with_tpch now wraps schema creation + load
+      in try/except, raises `RuntimeError("DuckDB TPC-H load failed - no rows in
+      {empty} (stats={table_stats})")` on any 0-row table (identical message
+      shape to the three siblings), and closes the connection before re-raising
+      so a failed build never leaks a DuckDB handle. Verified live: 220 variants
+      still checked, 0 divergent after the change (make tpchavoc-equivalence-report).
 
   - id: w2
     summary: "Add a per-query empty-vs-empty detection to find_divergences (or its callers), require explicit classification"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Decide the mechanism before implementing (see open_questions): either (a)
-      thread an optional `known_empty_queries: dict[int, str] | None` parameter
-      into `find_divergences` (mirroring `CrossSurfaceGate.legitimately_empty`'s
-      shape) that requires every canonical query returning 0 rows to be listed
-      with a rationale, failing loudly (as a `Divergence`) on an unclassified
-      empty canonical result; or (b) a simpler assertion in each `run_*_gate`/
-      `run_*_sample` caller that fails immediately if ANY of the 22 canonical
-      TPC-H queries (TPC-Havoc's gated query set) return 0 rows at
-      EQUIVALENCE_SCALE, since TPC-H canonical queries are not expected to be
-      legitimately empty at any bounded SF the way SSB's value-format-mismatch
-      queries were (see cross-surface-oracle-remediation.yaml's w4 SSB
-      discussion) - if (b) is evidenced as sufficient (no TPC-H canonical query
-      is EVER legitimately empty at SF=0.1), it is simpler and should be
-      preferred; only build the classification map (a) if a genuine empty
-      canonical query is found.
+      Chose option (b), the simpler blanket assertion, per the open_questions
+      default: live DuckDB/DataFusion/ClickHouse runs (w1/w3 verification) and
+      the module's own docstring precedent (EQUIVALENCE_SCALE=0.1 was originally
+      chosen specifically so no gated query is vacuous - Q17 was the known
+      SF=0.01 vacuity case) both confirm no TPC-H canonical query is empty at
+      EQUIVALENCE_SCALE today, so no genuine legitimately-empty case exists to
+      justify a classification map. Implemented directly in `find_divergences`
+      (not per-caller) per the prior_art guidance ("add the per-query empty
+      check here so all four engines benefit") and the anti_pattern against
+      forking the comparator per engine: when the canonical query returns 0
+      rows, one `Divergence(query_id, 0, "...vacuous...")` is appended and the
+      variant loop for that query is skipped entirely (mirrors the existing
+      canonical-failure `except`+`continue` shape immediately above it) - no
+      variant of a vacuous-canonical query is ever silently marked equivalent.
+      No classification map was added since no legitimately-empty query exists
+      to require one; if one is ever found, promote to the dict[int, str]
+      shape described in option (a) at that point (documented in the
+      function's new docstring paragraph).
 
   - id: w3
     summary: "Make _report fail (not just print) on a stale/resolved known-divergence baseline, matching cross_surface.py's behavior"
     needs: []
-    status: pending
+    status: done
     notes: |
-      Change `_report`'s return statement (equivalence.py:470) from
-      `return 1 if new else 0` to also fail when `resolved` is non-empty,
-      mirroring cross_surface.py:1196's
-      `return 1 if (new or resolved or missing_backends or unclassified_empty) else 0`.
-      This function is shared by all four engines (DuckDB hard gate, Postgres/
-      DataFusion/ClickHouse samples) - verify after the change that none of the
-      four KNOWN_DIVERGENCES-family baselines (KNOWN_DIVERGENCES,
-      POSTGRES_KNOWN_DIVERGENCES, DATAFUSION_KNOWN_DIVERGENCES,
-      CLICKHOUSE_KNOWN_DIVERGENCES) currently contain a stale entry that would
-      newly fail after this change (run all four report modes and confirm they
-      are still green, or all `resolved` lists are empty, before landing).
+      Changed `_report`'s return statement to `return 1 if (new or resolved)
+      else 0` and upgraded the resolved-baseline print to a "GATE FAILURE -
+      ..." line (matching cross_surface.py's message class/wording, though the
+      two `_report`s remain separate functions per the anti_patterns - no
+      shared helper introduced). Verified live, post-change, all four report
+      modes: DuckDB hard gate (KNOWN_DIVERGENCES={}) 220/220 equivalent, exit 0;
+      DataFusion (DATAFUSION_KNOWN_DIVERGENCES={}) 206/206 equivalent, exit 0;
+      ClickHouse (CLICKHOUSE_KNOWN_DIVERGENCES has 7 live entries) - all 7 still
+      reproduce (none resolved), 195/202 equivalent, exit 0; Postgres could not
+      be run live (no reachable Postgres server in this environment - the
+      sample cleanly SKIPs with exit 0 on psycopg.OperationalError, unchanged by
+      this TODO), but POSTGRES_KNOWN_DIVERGENCES is the empty dict `{}`, so
+      `resolved` is trivially empty regardless of live results - confirmed by
+      code inspection, not just the skip path.
 
   - id: w4
     summary: "Add negative tests for each of w1-w3 (vacuous load, vacuous query, stale baseline all fail the gate)"
     needs: [w1, w2, w3]
-    status: pending
+    status: done
     notes: |
-      Three focused tests, likely in tests/unit/core/tpchavoc/ or
-      tests/integration/: (1) mock/stub a DuckDB connection whose load leaves one
-      table at 0 rows and assert build_duckdb_with_tpch raises; (2) construct a
-      scenario where the canonical query for some query id returns 0 rows and
-      assert find_divergences (or the gate) fails rather than silently passing
-      every variant of that query; (3) seed a KNOWN_DIVERGENCES-shaped baseline
-      with one entry whose divergence no longer reproduces and assert `_report`
-      returns nonzero. Mark appropriately (fast/unit vs slow/integration) per
-      existing test-marker conventions in this test tree.
+      Added tests/unit/core/tpchavoc/test_tpchavoc_vacuity_guard.py (fast/unit,
+      pure fakes, no real DuckDB data generation - mirrors
+      test_equivalence_execute_transform.py's style) with the three required
+      negative tests plus two small positive/regression guards:
+        - test_build_duckdb_with_tpch_vacuity_guard_raises_on_partial_load (w1)
+        - test_find_divergences_vacuity_guard_fails_on_empty_canonical_query (w2)
+        - test_find_divergences_vacuity_guard_does_not_flag_a_nonempty_canonical_query (w2 regression guard)
+        - test_report_vacuity_guard_fails_on_stale_resolved_baseline (w3)
+        - test_report_vacuity_guard_stays_green_with_no_new_or_resolved_entries (w3 regression guard)
+      All 5 pass under `pytest tests/unit/core/tpchavoc/ -k vacuity -v`, and the
+      full tests/unit/core/tpchavoc/ suite (78 tests) stays green.
 
 deferred:
   - summary: "Apply the same vacuity/staleness hardening pattern to any future fifth TPC-Havoc engine sample."

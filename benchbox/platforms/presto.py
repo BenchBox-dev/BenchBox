@@ -283,7 +283,7 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
 
 
 try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
+    from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
 
     PlatformHookRegistry.register_config_builder("presto", PrestoAdapter.build_platform_config)
 except ImportError:

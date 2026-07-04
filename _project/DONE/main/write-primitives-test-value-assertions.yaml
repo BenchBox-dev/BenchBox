@@ -2,7 +2,8 @@ id: write-primitives-test-value-assertions
 title: "Write Primitives / DataFrame runner tests: replace tautological and either-outcome assertions with real value checks"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-04"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -92,7 +93,23 @@ impact:
 work:
   - id: w1
     summary: "test_pyspark_sketch_factories.py: fix the tautological HLL-merge-extract value assertion"
-    status: pending
+    status: done
+    completion_notes: |
+      Added a module-level `_FakeRow` helper (dict/list-backed, implements
+      `__getitem__`) and used it in both
+      `TestPysparkHllMergeExtract.test_extractor_reads_state_and_chains_union_then_estimate`
+      and `TestPysparkTopkFactories.test_merge_extract_calls_combine_then_estimate_then_size`
+      (the latter had the identical tautology shape:
+      `row.__getitem__.return_value = 7; assert result == 7.0`, not called out
+      by name in the original description but caught by the "skim ... other
+      value-bearing assertions" instruction). `result` now comes from genuine
+      `row[0]` indexing against a real (non-mock) object; if the extractor
+      read the wrong index, `_FakeRow.__getitem__` would raise IndexError
+      instead of silently returning the mock's injected value.
+      No KLL sketch tests exist in this file (only HLL and top-K) - confirmed
+      via grep before starting, so "skim the KLL ... tests" had nothing to
+      apply to here.
+      Verification: `uv run -- python -m pytest tests/unit/core/write_primitives/test_pyspark_sketch_factories.py -v -n 0` -> 11 passed.
     notes: |
       In `TestPysparkHllMergeExtract.test_extractor_reads_state_and_chains_union_then_estimate`
       (~line 113-130), the assertion `assert result == 14836.5` merely
@@ -117,7 +134,31 @@ work:
 
   - id: w2
     summary: "test_benchmark_execution.py: add positive assertions alongside the 7 execute.assert_not_called() sites"
-    status: pending
+    status: done
+    completion_notes: |
+      Re-located the 7 `assert_not_called()` sites by search (lines had
+      drifted to 206, 360, 374, 390, 404, 418, 613 - one, at 613, was
+      `test_acquire_setup_lock_skips_lock_table_for_datafusion`, replacing
+      the originally-cited line 591). Found that 6 of the 7 already carry a
+      real positive assertion from prior commits on develop (the TODO itself
+      flagged this file as recently changed and warned line numbers may have
+      drifted): line 206's `test_table_exists_invalid_name` already asserts
+      `result is False`; line 613's `test_acquire_setup_lock_...` already
+      asserts `... is True`; lines 374/390/404/418 already assert
+      `result.status == "SKIPPED"`, `result.success is True`,
+      `result.error is None`, and a `skip_reason` substring. Only line 360's
+      `test_execute_operation_skips_unsupported_datafusion_category` was
+      missing the `error is None` and `skip_reason` content checks that its
+      sibling tests already had - added
+      `assert result.error is None` and
+      `assert "unsupported on platform 'datafusion'" in (result.skip_reason or "")`.
+      Confirmed the exact skip_reason text by running the test and reading
+      the actual `OperationResult.skip_reason` produced (came from the
+      `platform_overrides[platform_key] is None` branch in
+      `_get_effective_write_sql`, not the aggregate-state branch my first
+      guess assumed - corrected after the first assertion attempt failed).
+      All existing `assert_not_called()` calls left in place at every site.
+      Verification: `uv run -- python -m pytest tests/unit/core/write_primitives/test_benchmark_execution.py -v -n 0` -> 145 passed.
     notes: |
       For each of the 7 tests ending on `mock_conn.execute.assert_not_called()`
       (lines 206, 360, 374, 390, 404, 418, 591), read the surrounding test to
@@ -130,7 +171,17 @@ work:
 
   - id: w3
     summary: "test_dataframe_runner.py:484: pin validation_status to PASSED for this fixture"
-    status: pending
+    status: done
+    completion_notes: |
+      Confirmed `test_standard_phase_does_not_raise` (starts at line 464,
+      the `in ("PASSED", "FAILED")` assertion was at line 484) is the only
+      either-outcome assertion of this shape remaining in the file (grepped
+      for `validation_status` - all other 4 hits already assert a single
+      literal value). Replaced with
+      `assert result.validation_status == "PASSED"` plus a short comment
+      citing the builder/runner trace, per plan - no `is not None` weakening.
+      Verification: `uv run -- python -m pytest tests/unit/core/runner/test_dataframe_runner.py -v -n 0 -k standard_phase_does_not_raise` -> 1 passed;
+      full file `-n 0` -> 33 passed.
     notes: |
       Replace `assert result.validation_status in ("PASSED", "FAILED")`
       with `assert result.validation_status == "PASSED"` — per
@@ -147,7 +198,52 @@ work:
 
   - id: w4
     summary: "test_write_primitives_dataframe.py: replace in-body ImportError skips with module-level importorskip"
-    status: pending
+    status: done
+    completion_notes: |
+      Found and replaced all 12 in-body `try: from
+      benchbox.platforms.dataframe.pyspark_maintenance import X / except
+      ImportError: pytest.skip(...)` sites across 6 test classes
+      (TestPySparkCapabilities x2, TestPySparkMaintenanceInit x2,
+      TestPySparkInsertWithMock x1, TestPySparkBulkLoadWithMock x1,
+      TestPySparkDeltaOperationsWithMock x3, TestPySparkParquetLimitations
+      x3 - lines had drifted slightly from the cited ~566..972 but the same
+      12 sites were located via grep).
+      Added a single module-level try/except (pattern-matched to the
+      existing POLARS_AVAILABLE/PANDAS_AVAILABLE style at lines 17-31 of the
+      same file, per the approach note - not `pytest.importorskip`) that
+      imports all symbols the 12 sites needed
+      (PYSPARK_DELTA_CAPABILITIES, PYSPARK_PARQUET_CAPABILITIES,
+      PySparkMaintenanceOperations, get_pyspark_maintenance_operations,
+      PYSPARK_AVAILABLE, DELTA_SPARK_AVAILABLE) once, setting
+      PYSPARK_MAINTENANCE_AVAILABLE and capturing the real ImportError text
+      in PYSPARK_MAINTENANCE_IMPORT_ERROR (previously each in-body site
+      discarded the actual exception and always reported a generic static
+      skip reason, so a genuine wrapper-module breakage and a plain
+      "PySpark not installed" were indistinguishable in the skip message -
+      the new single skip reason now includes the real ImportError text).
+      Added a `pyspark_maintenance_skip = pytest.mark.skipif(not
+      PYSPARK_MAINTENANCE_AVAILABLE, reason=...)` mark applied as a
+      `@pyspark_maintenance_skip` class decorator to all 6 affected test
+      classes, replacing the removed in-body guards. Left the two
+      pre-existing module-level guards (polars, pandas) untouched, and left
+      the separate runtime `if not PYSPARK_AVAILABLE: pytest.skip(...)` /
+      `if not DELTA_SPARK_AVAILABLE: ...` in-body checks in place where they
+      already existed (those check actual runtime availability flags
+      exported by the wrapper module, not import success of the wrapper
+      itself, so they are a different concern from the import guard and
+      were out of scope to remove).
+      Deviation/finding: a true `pytest.importorskip`-based design cannot
+      make a broken wrapper module *fail* CI instead of skip (importorskip
+      only ever skips, regardless of why the import failed) - the
+      must_preserve constraint ("skip cleanly ... via module-level
+      importorskip/import-guard") and success_metric ("zero remaining
+      in-body except ImportError sites") are satisfiable together, but they
+      do not, by themselves, convert a wrapper-module breakage into a hard
+      CI failure; what changed is that the breakage's real cause is now
+      visible in the single skip reason instead of being swallowed by 12
+      duplicated generic strings.
+      Verification: `uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_dataframe.py -v -n 0 -k PySpark` -> 12 passed (not skipped);
+      full file `-n 0` -> 40 passed.
     notes: |
       Replace the 12 in-body `try/except ImportError: pytest.skip(...)`
       sites (~lines 566, 586, 610, 622, 639, 691, 758, 809, 862, 928, 950,

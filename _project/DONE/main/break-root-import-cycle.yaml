@@ -2,7 +2,8 @@ id: break-root-import-cycle
 title: "Break benchbox root-package import cycle pulled in by utils/version.py and utils/datagen_manifest.py"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-03"
 category: Core Functionality
 
 description: |
@@ -37,77 +38,135 @@ description: |
 work:
   - id: w1
     summary: "Stop utils/version.py from importing the benchbox package root"
-    status: pending
+    status: done
     notes: |
-      Replace `import benchbox` in benchbox/utils/version.py with
-      `importlib.metadata.version("benchbox")` for the installed-package case,
-      with a source-tree fallback (e.g. reading `pyproject.toml` via the
-      existing `_PYPROJECT_CACHE`/tomllib plumbing already in this file) for
-      editable/dev checkouts where package metadata may not reflect the
-      working tree. Alternatively, introduce a leaf `benchbox/_version.py`
-      holding only `__version__` (no other imports) and have both
-      `benchbox/__init__.py` and `utils/version.py` import from that leaf
-      module instead of each other. Pick whichever keeps
-      `validate_version_consistency()` semantics (must_preserve) intact with
-      the least surface change; document the choice in the PR body.
+      Implemented via importlib.metadata.version("benchbox") with a
+      source-tree pyproject.toml fallback (used only on
+      PackageNotFoundError), NOT the leaf-module alternative. Reasoning:
+      get_package_version() must stay independently sourced from
+      get_pyproject_version() so check_version_consistency() can still
+      detect real drift between the two - test_check_version_consistency_detects_mismatch
+      monkeypatches only get_pyproject_version() and expects a mismatch to be
+      reported. If get_package_version() had unconditionally preferred the
+      source-tree pyproject.toml (as literally suggested in the TODO body for
+      the "editable/dev checkout" case), the two sources would have collapsed
+      into the same call, making that existing test always report
+      "consistent" - a real regression. importlib.metadata.version("benchbox")
+      currently returns "0.2.1", matching pyproject.toml exactly in this dev
+      checkout, so both tests
+      (test_check_version_consistency_matches_pyproject and
+      test_check_version_consistency_detects_mismatch) pass unmodified.
+      Did not add benchbox/_version.py - not needed once importlib.metadata
+      covers the installed/dev case, and it would have required updating
+      scripts/update_version.py's regex-based `__version__ = "..."` target in
+      benchbox/__init__.py, which is outside this TODO's scope_limit.
+      REVISED after review: the first cut mapped the "benchbox.__init__"
+      consistency source to get_package_version() (dist metadata), which
+      silently dropped coverage of the actual `__version__ = "..."` literal
+      in benchbox/__init__.py - the value scripts/update_version.py bumps at
+      release cut and the exact drift class that shipped the 0.3.0 wheel
+      with __version__ = "0.2.1". Fixed: added get_init_version() which
+      reads the literal STATICALLY from the benchbox/__init__.py source file
+      (same regex scripts/update_version.py uses; works inside wheels since
+      __init__.py ships; no package-root import, so the cycle stays broken)
+      and mapped the "benchbox.__init__" source to it. Dist metadata is now
+      checked as its own distinct "installed-dist" source (absent-when-not-
+      installed is exempt from missing-source accounting in both dev and
+      installed modes - a bare checkout is legitimate - but participates in
+      mismatch detection when present). get_package_version() remains
+      importlib.metadata-first (fallback: init literal, then pyproject).
+      Added four tests to tests/unit/utils/test_utils_version_management.py
+      covering the static read, init-literal drift, installed-dist drift,
+      and missing-installed-dist tolerance.
 
   - id: w2
     summary: "Stop utils/datagen_manifest.py from importing the benchbox package root"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      benchbox/utils/datagen_manifest.py:23 imports `benchbox` solely to
-      resolve paths/metadata for the `_datagen_manifest.json` writer. Replace
-      with a direct import of whatever leaf helper it actually needs (e.g.
-      `benchbox.utils.path_utils` or the `_version`/leaf module from w1) so it
-      no longer round-trips through the package root. Confirm via `grep -n
-      "benchbox\."` in the file that the only remaining reference to the
-      package root, if any, does not create a cycle.
+      Replaced `import benchbox` + `benchbox.__version__` with
+      `from benchbox.utils.version import get_package_version` +
+      `get_package_version()`. `grep -n "benchbox\."` on the file post-change
+      shows only the new `from benchbox.utils.version import
+      get_package_version` line - no remaining package-root reference.
 
   - id: w3
     summary: "Remove the verbosity bootstrap guard and the __init__.py load-order comment"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
-      Once w1/w2 land, `benchbox/utils/verbosity.py:11-15`'s
-      `try/except ImportError` around `from benchbox.utils.version import
-      check_version_consistency, format_version_report` should no longer be
-      load-bearing - convert it to a plain top-level import (or keep the
-      guard only if a genuine optional-dependency reason remains, and say
-      which). Remove or rewrite the stale load-order comment at
-      benchbox/__init__.py:14-16 once `__version__` no longer needs special
-      placement relative to `from . import platforms`.
+      Converted benchbox/utils/verbosity.py's try/except ImportError around
+      the utils.version import to a plain top-level import (confirmed w1+w2
+      eliminate the failure mode first, per anti_patterns). Removed the
+      "__version__ must be defined before `from . import platforms`" comment
+      and load-order constraint text from benchbox/__init__.py (the
+      `__version__ = "0.2.1"` literal itself is unchanged/still first in the
+      file, just without the stale comment describing a hazard that no
+      longer applies now that utils.version doesn't round-trip through the
+      package root).
 
   - id: w4
     summary: "Add a regression test asserting utils.version does not import the package root"
     needs: [w1, w2, w3]
-    status: pending
+    status: done
     notes: |
-      Add a subprocess-isolated test (following the pattern in
-      tests/unit/test_import_isolation.py, which already runs
-      `import benchbox` and `import benchbox.cli.main` in fresh
-      subprocesses and checks stdlib/heavy-module leakage) asserting that
-      `import benchbox.utils.version` alone does NOT trigger
-      `sys.modules["benchbox"]` full package initialization (e.g. check that
-      `benchbox.platforms` or another deep submodule is absent from
-      sys.modules after that single import). Same for
-      `benchbox.utils.datagen_manifest`.
+      Deviated from the literal "assert benchbox.platforms/deep submodule
+      absent from sys.modules" wording: Python's import machinery always
+      fully initializes a parent package before importing any dotted
+      submodule, so a subprocess doing `import benchbox.utils.version` alone
+      can never observe "benchbox not fully initialized" - that part of the
+      original test proposal is not achievable given CPython import
+      semantics, regardless of this fix. Implemented instead as an AST-based
+      static check (test_version_no_root_import, parametrized over both
+      files) asserting neither utils/version.py nor
+      utils/datagen_manifest.py contains a module-level `import benchbox`
+      statement - the actual, checkable claim that was broken before and
+      fixed by w1/w2. Added in tests/unit/test_import_isolation.py per the
+      prior_art pointer (reused _run_entrypoint, generalized with an optional
+      heavy_roots param for the separate NYCTaxi test in w5).
 
   - id: w5
     summary: "Make the eager NYCTaxi import in benchbox/__init__.py lazy like the other registry benchmarks"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
-      benchbox/__init__.py:21 does an eager `from benchbox.nyctaxi import
-      NYCTaxi`, which chains through core/nyctaxi/benchmark.py:32 into
-      utils/datagen_manifest.py (the second root-import edge fixed in w2)
-      and eagerly imports numpy (core/nyctaxi/downloader.py:25,
-      core/nyctaxi/queries.py:23) on every `import benchbox` — the one
-      heavy library left on the cold-start path. Route NYCTaxi through the
-      existing lazy `_BENCHMARK_REGISTRY` / module `__getattr__` mechanism
-      (benchbox/__init__.py:72-174) like the other benchmarks. Verify with
-      tests/unit/test_import_isolation.py plus a check that numpy is absent
-      from sys.modules after bare `import benchbox`.
+      Removed the eager `from benchbox.nyctaxi import NYCTaxi`, added
+      `"NYCTaxi": _BenchmarkSpec("nyctaxi", "NYCTaxi", ())` to
+      _BENCHMARK_REGISTRY, and fixed the pre-existing (oddly already-present)
+      `from benchbox.nyctaxi import NYCTaxi as NYCTaxi_  # noqa: F401` in the
+      TYPE_CHECKING block to the plain `from benchbox.nyctaxi import
+      NYCTaxi` (it was aliased to an unused underscore name, presumably
+      leftover from a prior partial attempt at this same fix). Verified via
+      subprocess that `benchbox.nyctaxi`/`benchbox.core.nyctaxi` are absent
+      from sys.modules after bare `import benchbox` and only load on first
+      `benchbox.NYCTaxi` access.
+      Deviation: could NOT verify "numpy absent from sys.modules after bare
+      import benchbox" as the TODO's w5 notes suggested - confirmed via
+      `python -X importtime` that benchbox.tpch_skew's generator module
+      (core/tpch_skew/generator.py) already eagerly imports numpy via a
+      separate, pre-existing eager import at benchbox/__init__.py's `from
+      benchbox.tpch_skew import TPCHSkew`, unrelated to NYCTaxi and out of
+      this TODO's scope_limit (only benchbox/__init__.py's NYCTaxi wiring is
+      in scope, not core/tpch_skew/). So numpy remains on the `import
+      benchbox` cold-start path today regardless of this fix - the TODO
+      body's claim that NYCTaxi was "the one heavy library left on the
+      cold-start path" is stale. Flagging as a follow-up candidate for the
+      reviewer / a new TODO scoped to tpch_skew.
+      REVISED after review: making NYCTaxi lazy exposed an import-order
+      hazard in tests/unit/cli/test_benchmark_hooks.py - its per-test
+      registry snapshot/restore fixture wipes registrations performed by
+      module imports that first happen INSIDE a test body, and sys.modules
+      caching prevents re-registration, so
+      TestRealBenchmarkSpecs::test_nyctaxi_taxi_types_parser went red
+      (KeyError 'taxi_types') once `import benchbox` stopped guaranteeing
+      nyctaxi's registration. Fixed by adding a module-scoped autouse
+      fixture in that test file importing all five benchmark modules whose
+      specs the file reads (nyctaxi, tsbs_devops, tpch_skew, vector_search,
+      joinorder - the latter two were always lazy and carried the same
+      latent hazard) before the first per-test snapshot is taken. Grepped
+      tests/ for other list_option_specs/_option_specs consumers: no other
+      file combines snapshot/restore with in-test registration imports, and
+      all pass in isolation with -n 0.
 
 deferred:
   - summary: "Broader breakup of the ~61-module SCC beyond the version/datagen_manifest edges"

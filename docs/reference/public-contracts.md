@@ -121,7 +121,7 @@ separate `surface`/removal decision.
 
 ## Count and Drift Policy
 
-Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; **22** public discovery entries; **21** top-level Python benchmark facades; **14** lazy facades; **7** eager facades; **2** core-only benchmark IDs. Benchmark support status: **5** stable, **12** beta, **5** experimental, **1** repo-only, **0** deprecated, **0** document-only.
+Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; **22** public discovery entries; **21** top-level Python benchmark facades; **15** lazy facades; **6** eager facades; **2** core-only benchmark IDs. Benchmark support status: **5** stable, **12** beta, **5** experimental, **1** repo-only, **0** deprecated, **0** document-only.
 
 Evidence snapshot updated by `benchmark-support-status-and-discovery-policy`:
 
@@ -371,7 +371,7 @@ Checked SHA: `1d454632ba73911bc4ff0cf0a3fb8ec22227a7a8`
 | `benchbox/base.py` | Public `BaseBenchmark` remains the beta-public base for top-level wrappers and orchestration helpers; `run_with_platform()` remains the beta-public adapter execution hook. |
 | `benchbox/core/base_benchmark.py` | Deprecated internal compatibility base remains distinct; only `benchbox/core/datavault/benchmark.py` and `benchbox/core/tpcds_obt/benchmark.py` import it in production code. |
 | `tests/unit/test_wrapper_facades_fast.py` | Wrapper methods are asserted behavior and should not be treated as accidental duplicate reachability. |
-| `benchbox/__init__.py` | Top-level package exposes 21 benchmark facades: 7 eager imports and 14 lazy `_BENCHMARK_REGISTRY` entries. |
+| `benchbox/__init__.py` | Top-level package exposes 21 benchmark facades: 6 eager imports and 15 lazy `_BENCHMARK_REGISTRY` entries. |
 | `benchbox/core/benchmark_loader.py` | Loader is registry-backed and internal; it resolves 23 core benchmark families from `CORE_BENCHMARK_CLASS_NAMES`. |
 | `benchbox/core/benchmark_registry.py` | Registry has 23 benchmark metadata entries; public discovery hides only `joinorder_synthetic`, leaving 22 public entries. |
 | `docs/reference/backward-compatibility.md` | Compatibility row now records the legacy core base as a retained internal base with a migration target rather than a public extension path. |

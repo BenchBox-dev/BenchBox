@@ -48,6 +48,9 @@ codespell:
 pre-commit:
   reason: "Git hook and content-guard CLI; invoked as `uv run -- pre-commit`. Not imported."
 
+import-linter:
+  reason: "Import-layering CLI; invoked as `uv run -- lint-imports` (see `make lint-imports`). Configured via [tool.importlinter] in pyproject.toml. Not imported."
+
 # --------------------------------------------------------------------------
 # Sphinx and documentation build plugins - activated via docs/conf.py
 # extensions list or as theme packages.

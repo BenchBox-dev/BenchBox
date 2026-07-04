@@ -16,6 +16,30 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_RUNBOOK = REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md"
 
+# Make the sibling _project/scripts source-of-truth importable regardless of
+# how this module is loaded (script, package import, or out-of-tree test).
+sys.path.insert(0, str(REPO_ROOT / "_project" / "scripts"))
+
+from ruleset_review_enforcement import extract_rules, review_enforcement_findings  # noqa: E402
+
+# Findings with this prefix are surfaced (rendered, included in the JSON
+# `findings` list) exactly like any other drift finding, but do NOT flip the
+# exit code / `status` field to failed. Used for the develop review-rule gap
+# below while it is still a pending admin action.
+WARNING_PREFIX = "WARNING (non-blocking): "
+
+# Decision (ruleset-drift-check-review-rule-coverage, w1): WARN-until-enforced.
+# The live develop ruleset does not yet require a code-owner review
+# (docs/operations/repo-admin-settings.md's "Soundness-path review
+# enforcement" section - deferred admin action tracked by
+# auto-merge-review-gate-admin-enforcement). Flipping this straight to a
+# blocking check would make the daily release-canary.yml run (and the
+# validate-main-pr.yml bootstrap invocation) permanently red until that
+# admin PUT lands. Flip this constant to True once that TODO's w3 confirms
+# the PUT has landed - this is the one-line change referenced by that
+# decision; no other code here needs to change.
+DEVELOP_REVIEW_RULE_ENFORCED = False
+
 
 @dataclass(frozen=True)
 class ExpectedRuleset:
@@ -137,8 +161,22 @@ def compare_ruleset(
     live: dict[str, Any],
     *,
     require_bypass_actor_visibility: bool = False,
+    enforce_review_rule: bool = DEVELOP_REVIEW_RULE_ENFORCED,
 ) -> list[str]:
-    """Return human-readable drift findings for one ruleset."""
+    """Return human-readable drift findings for one ruleset.
+
+    For ``develop-squash-only`` only (``main-release-only`` has no equivalent
+    documented requirement), also runs the shared
+    ``ruleset_review_enforcement.review_enforcement_findings`` predicate
+    against the already-fetched live payload (via ``extract_rules`` - no
+    second API fetch) so a missing code-owner-review rule surfaces here too.
+    While ``enforce_review_rule`` is ``False`` (the default, driven by
+    ``DEVELOP_REVIEW_RULE_ENFORCED``), those findings are prefixed with
+    ``WARNING_PREFIX``: they render in the same findings list / JSON output
+    as any other drift finding, but the caller (``main``) excludes
+    ``WARNING_PREFIX``-prefixed entries when deciding the exit code, so the
+    canary does not go red for a gap that is still a pending admin action.
+    """
     findings: list[str] = []
     if live.get("enforcement") != "active":
         findings.append(f"{expected.name}: enforcement is {live.get('enforcement')!r}, expected 'active'")
@@ -177,6 +215,15 @@ def compare_ruleset(
             if bypass_actors:
                 actor_types = [actor.get("actor_type", "(unknown)") for actor in bypass_actors]
                 findings.append(f"{expected.name}: bypass actors {actor_types!r}, expected none")
+
+    if expected.name == "develop-squash-only":
+        review_findings = review_enforcement_findings(extract_rules(live))
+        if review_findings:
+            if enforce_review_rule:
+                findings.extend(review_findings)
+            else:
+                findings.extend(f"{WARNING_PREFIX}{finding}" for finding in review_findings)
+
     return findings
 
 
@@ -201,13 +248,22 @@ def _fetch_live_rulesets(repo: str, token: str) -> dict[str, dict[str, Any]]:
     return by_name
 
 
+def blocking_findings(findings: list[str]) -> list[str]:
+    """Findings that should fail the check (excludes WARNING_PREFIX entries)."""
+    return [finding for finding in findings if not finding.startswith(WARNING_PREFIX)]
+
+
 def render_summary(findings: list[str], expected: dict[str, ExpectedRuleset]) -> str:
-    if findings:
-        lines = ["# Ruleset Drift - FAILED", "", *[f"- {finding}" for finding in findings]]
+    blocking = blocking_findings(findings)
+    warnings = [finding for finding in findings if finding.startswith(WARNING_PREFIX)]
+    if blocking:
+        lines = ["# Ruleset Drift - FAILED", "", *[f"- {finding}" for finding in blocking]]
     else:
         lines = ["# Ruleset Drift - OK", ""]
         for ruleset in expected.values():
             lines.append(f"- {ruleset.name}: required checks {', '.join(ruleset.required_checks)}")
+    if warnings:
+        lines += ["", "## Non-blocking warnings", "", *[f"- {finding}" for finding in warnings]]
     return "\n".join(lines) + "\n"
 
 
@@ -265,14 +321,19 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
 
+    blocking = blocking_findings(findings)
     summary = render_summary(findings, expected)
     if args.output:
         args.output.write_text(
-            json.dumps({"status": "failed" if findings else "ok", "findings": findings}, indent=2) + "\n",
+            json.dumps(
+                {"status": "failed" if blocking else "ok", "findings": findings, "blocking_findings": blocking},
+                indent=2,
+            )
+            + "\n",
             encoding="utf-8",
         )
     print(summary)
-    return 1 if findings else 0
+    return 1 if blocking else 0
 
 
 if __name__ == "__main__":

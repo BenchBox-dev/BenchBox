@@ -37,6 +37,8 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "PLAN_CAPTURE_RESULT": "skipped",
         "EXPLORER_TOKENS_RESULT": "skipped",
         "AUDIT_SHA_RESULT": "skipped",
+        "PACKAGE_SMOKE_RESULT": "skipped",
+        "DEPENDENCY_AUDIT_RESULT": "skipped",
         "CONTENT_GUARD_NEEDED": "false",
         "NEEDS_CODE_CI": "false",
         "SAFE_CONTENT_ONLY": "true",
@@ -164,3 +166,61 @@ def test_ci_required_result_required_jobs_in_needs() -> None:
     assert "explorer-tokens" in needs
     assert "correctness-gate" in needs
     assert "plan-capture-gate" in needs
+    # Path-filtered packaging promotion (pr-gate-package-and-audit-promotion):
+    # each must be observed by the aggregator or a skipped-counts-as-pass
+    # result silently disappears from the gate.
+    assert "package-smoke" in needs
+    assert "dependency-audit" in needs
+
+
+def test_parity_check_is_demoted_to_non_blocking() -> None:
+    # parity-check is deliberately non-blocking for now: `make parity-check`
+    # fails locally with an unexplained 2e-13 float drift in
+    # tests/parity/fixtures/geomean_ms.json, so wiring it into
+    # ci-required-result would risk hard-blocking every viz-touching PR on
+    # arrival. Promotion criterion (parity-check-develop-ring.yaml): one
+    # green run on a real GitHub runner + a decision on the float drift
+    # (tolerance vs fixture regen). When promoting, flip this test to the
+    # package-smoke pattern: add parity-check to ci-required-result.needs,
+    # drop continue-on-error, and assert the aggregator observes
+    # PARITY_CHECK_RESULT.
+    workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    parity_job = workflow_yaml["jobs"]["parity-check"]
+    needs = workflow_yaml["jobs"]["ci-required-result"]["needs"]
+
+    assert parity_job.get("continue-on-error") is True
+    assert "viz-needed == 'true'" in parity_job["if"]
+    assert "parity-check" not in needs
+
+
+def test_ci_required_result_fails_on_packaging_job_failure() -> None:
+    # Skipped-counts-as-pass only applies when the path-filtered job didn't
+    # run at all; a real failure on a packaging PR must still fail the
+    # required gate.
+    for failing_var in ("PACKAGE_SMOKE_RESULT", "DEPENDENCY_AUDIT_RESULT"):
+        result = _run_ci_required_result(
+            NEEDS_CODE_CI="true",
+            SAFE_CONTENT_ONLY="false",
+            LINT_RESULT="success",
+            TEST_RESULT="success",
+            CORRECTNESS_RESULT="success",
+            PLAN_CAPTURE_RESULT="success",
+            EXPLORER_TOKENS_RESULT="success",
+            **{failing_var: "failure"},
+        )
+        assert result.returncode == 1, f"{failing_var}=failure should fail ci-required-result"
+
+
+def test_ci_required_result_passes_when_packaging_jobs_skip() -> None:
+    # A PR that touches no packaging paths sees both packaging jobs skipped
+    # and must still pass (matches the audit-sha pattern).
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+    )
+    assert result.returncode == 0

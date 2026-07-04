@@ -31,12 +31,24 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from datetime import date
 from pathlib import Path
 
 CLAUDE_TIMEOUT_SECONDS = 120
+
+# Matches a dated released-version CHANGELOG.md header, e.g. "## [0.3.0] - 2026-05-16".
+# Deliberately does not match "## [Unreleased]" (no version number) or an
+# undated "## [X.Y.Z]" header, since a dated header is this repo's convention
+# for a section that claims to be released (see CHANGELOG.md's own entries).
+_CHANGELOG_VERSION_HEADER_RE = re.compile(r"^## \[(?P<version>\d+\.\d+\.\d+)\] - ", re.MULTILINE)
+
+# Matches a release-cut branch name, e.g. "v0.3.1" or "v0.3.1-rc1". Mirrors
+# the HEAD_REF regex in .github/workflows/validate-main-pr.yml so the two
+# checks agree on what counts as an in-progress release branch.
+_RELEASE_BRANCH_RE = re.compile(r"^v(?P<version>\d+\.\d+\.\d+)(-[A-Za-z0-9.+-]+)?$")
 
 
 def _run_git(source: Path, *args: str, check: bool = False) -> subprocess.CompletedProcess[str]:
@@ -182,6 +194,88 @@ def _resolve_log_range(source: Path, since_ref: str | None, since_tag: str | Non
         print(f"  Since tag: {since_tag}")
 
     return f"{since_tag}..HEAD"
+
+
+def released_versions_in_changelog(changelog_text: str) -> list[str]:
+    """Return the X.Y.Z versions of every dated '## [X.Y.Z] - <date>' header.
+
+    Excludes '## [Unreleased]', which is not a released-version claim.
+    """
+    return [m.group("version") for m in _CHANGELOG_VERSION_HEADER_RE.finditer(changelog_text)]
+
+
+def existing_tags(source: Path) -> set[str]:
+    """Return the set of vX.Y.Z tag names visible to this checkout.
+
+    Prefers local tags (`git tag -l`), which is what
+    `_resolve_log_range`'s `git describe --tags` above also relies on.
+    Falls back to `git ls-remote --tags origin` when no local tags are
+    present (e.g. a shallow or tag-less local clone) so the guard doesn't
+    silently pass for lack of local tag data.
+    """
+    local = _run_git(source, "tag", "-l", "v*")
+    tags = {line.strip() for line in local.stdout.splitlines() if line.strip()}
+    if tags:
+        return tags
+    remote = _run_git(source, "ls-remote", "--tags", "origin", "refs/tags/v*")
+    for line in remote.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        ref = line.rsplit("\t", 1)[-1]
+        name = ref.rsplit("/", 1)[-1]
+        if name and not name.endswith("^{}"):
+            tags.add(name)
+    return tags
+
+
+def find_untagged_changelog_versions(
+    changelog_text: str,
+    tags: set[str],
+    *,
+    current_branch: str | None = None,
+) -> list[str]:
+    """Return dated CHANGELOG.md versions with no matching vX.Y.Z git tag.
+
+    `make release-cut` legitimately drafts a dated section for the version
+    being cut before its tag exists (the tag is pushed later, by
+    `release-finalize`, after squash-merge to main). So when
+    `current_branch` matches the release-branch shape recognised by
+    `.github/workflows/validate-main-pr.yml` (`vX.Y.Z[-suffix]`), the one
+    untagged version matching that branch's own version number is exempt.
+
+    Every other untagged dated section is flagged - in particular, any
+    untagged section found while on `develop`/`main` (current_branch does
+    not match the release-branch shape at all) is always flagged
+    regardless of version number. This is what would have caught the
+    `[0.3.1] - 2026-05-30` accounting drift: that section was committed to
+    `develop` directly, never on a `v0.3.1` release branch, and no
+    `v0.3.1` tag was ever pushed.
+    """
+    untagged = [v for v in released_versions_in_changelog(changelog_text) if f"v{v}" not in tags]
+    if not untagged:
+        return []
+    branch_match = _RELEASE_BRANCH_RE.match(current_branch) if current_branch else None
+    if branch_match:
+        drafted_version = branch_match.group("version")
+        untagged = [v for v in untagged if v != drafted_version]
+    return untagged
+
+
+def _current_branch(source: Path) -> str | None:
+    result = _run_git(source, "rev-parse", "--abbrev-ref", "HEAD")
+    branch = result.stdout.strip()
+    return branch if result.returncode == 0 and branch and branch != "HEAD" else None
+
+
+def check_tag_claims(source: Path) -> tuple[bool, list[str]]:
+    """Return (ok, untagged_versions) for CHANGELOG.md's tag-claim guard."""
+    changelog_path = source / "CHANGELOG.md"
+    text = changelog_path.read_text(encoding="utf-8")
+    tags = existing_tags(source)
+    branch = _current_branch(source)
+    untagged = find_untagged_changelog_versions(text, tags, current_branch=branch)
+    return (not untagged, untagged)
 
 
 def _diff_name_status(source: Path, since_ref: str) -> list[tuple[str, str]]:
@@ -408,8 +502,16 @@ def main() -> int:
         description="Generate a CHANGELOG.md entry from conventional commits since a release boundary."
     )
     parser.add_argument(
+        "--check-tag-claims",
+        action="store_true",
+        help=(
+            "Check CHANGELOG.md for dated released-version sections with no matching "
+            "vX.Y.Z git tag, then exit (skips entry generation; --version not required)."
+        ),
+    )
+    parser.add_argument(
         "--version",
-        required=True,
+        default=None,
         help="Version string for the new entry (without leading 'v'), e.g. 0.3.0",
     )
     parser.add_argument(
@@ -438,6 +540,19 @@ def main() -> int:
     if not (args.source / ".git").exists():
         print(f"  Error: {args.source} is not a git repository", file=sys.stderr)
         return 1
+
+    if args.check_tag_claims:
+        ok, untagged = check_tag_claims(args.source)
+        if not ok:
+            print("  CHANGELOG.md claims released version(s) with no matching git tag:")
+            for version in untagged:
+                print(f"    - {version} (expected tag v{version})")
+            return 1
+        print("  CHANGELOG.md tag-claim guard: OK")
+        return 0
+
+    if not args.version:
+        parser.error("--version is required unless --check-tag-claims is set")
 
     success = generate_changelog_entry(
         source=args.source,

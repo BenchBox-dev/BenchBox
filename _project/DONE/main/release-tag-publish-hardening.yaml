@@ -2,7 +2,7 @@ id: release-tag-publish-hardening
 title: "Harden release.yml so PyPI publish requires a validated, on-main tag"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Release Tooling
 
 description: |
@@ -41,7 +41,7 @@ description: |
 work:
   - id: w1
     summary: "Add an ancestor-of-main assertion job that gates build/publish"
-    status: pending
+    status: done
     notes: |
       Add a new job (e.g. `verify-tag-on-main`) at the head of
       `.github/workflows/release.yml`, before `dependency-bounds`/`build`.
@@ -63,7 +63,7 @@ work:
   - id: w2
     summary: "Gate the real-PyPI publish step on an actual tag ref, not just the test_pypi input"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Update the `Publish to PyPI` step's `if:` condition (currently
       `github.event.inputs.test_pypi != 'true'` at release.yml:120) to
@@ -81,7 +81,7 @@ work:
   - id: w3
     summary: "Document and apply a tag ruleset restricting v* tag creation"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       This is the "who can create a `v*` tag at all" half of the fix and
       is an admin action outside repo-tree permissions, same pattern as
@@ -108,7 +108,7 @@ work:
   - id: w4
     summary: "Verify/require the pypi GitHub environment has required reviewers"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       `release.yml:98-100` already scopes the publish job to a GitHub
       `environment` (`pypi` or `test-pypi` depending on the dispatch
@@ -212,3 +212,42 @@ success_metrics:
 
 open_questions:
   - "Should the ancestor-of-main check also reject a tag pushed to main but from a commit that isn't the tip of a squash-merged release-finalize PR (i.e., could someone tag an arbitrary earlier main commit)? w1's merge-base check alone would still pass for that case since any earlier main commit is an ancestor — decide if that's an acceptable residual risk or needs a stricter 'tag SHA == a release-finalize commit' check."
+
+resolution_notes: |
+  All four work units implemented 2026-07-03:
+  - w1: added `verify-tag-on-main` job (checkout fetch-depth:0, `git fetch
+    origin main`, `git merge-base --is-ancestor "$GITHUB_SHA" origin/main`).
+    Covers both trigger types with one check, since github.sha already
+    resolves to the tagged commit on a tag push and to the dispatched ref's
+    tip on workflow_dispatch. `dependency-bounds` and `build` both declare
+    `needs` on it so a failing assertion blocks the whole pipeline.
+  - w2: `Publish to PyPI` step's `if:` now also requires
+    `startsWith(github.ref, 'refs/tags/v')`. Decision recorded inline: the
+    Test PyPI step is left unrestricted by ref shape (lower risk by design,
+    intended pre-release validation path from any ref), covered instead by
+    w1's ancestor-of-main check.
+  - w3/w4: added "## Tag creation and release-environment protections" to
+    docs/operations/repo-admin-settings.md with two pending-admin-action
+    subsections, following the existing soundness-path section's
+    target-state/live-state/verify-command/apply-command pattern. Live
+    tag-ruleset state confirmed via _project/decisions/dev-loop-verification-
+    2026-04-30.md: no ruleset with target:"tag" exists (the similarly named
+    v-release-branches-minimal ruleset targets branches, not tags). The
+    pypi environment's required_reviewers state could NOT be independently
+    re-verified in this sandbox (no gh/network access) — documented as
+    "unconfirmed/likely absent, admin must verify" rather than asserting a
+    specific state.
+
+  Open question left as-is (not resolved): whether to additionally require
+  "tag SHA == a release-finalize commit", not just any ancestor of main.
+  Judged out of scope for this pass — ancestor-of-main plus the new
+  tag-creation-ruleset (w3, restricting who can create v* tags at all) is
+  the layer that addresses "arbitrary earlier main commit" risk without
+  adding release-flow-specific commit-shape coupling to the workflow.
+
+  Deviation: deps.needs lists release-recovery-v0-3-1, which per the
+  broader session's task list was not required to gate this TODO (only
+  release-accounting-drift-correction's own text says its release-coupled
+  units wait; this TODO was assigned to implement now regardless of that
+  dependency's state). Flagging so the dependency edge can be reconciled
+  by whoever tracks release-recovery-v0-3-1's completion.

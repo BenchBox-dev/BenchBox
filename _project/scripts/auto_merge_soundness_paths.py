@@ -11,6 +11,46 @@ from collections.abc import Iterable
 SOUNDNESS_PREFIXES = (
     "benchbox/core/equivalence/",
     "benchbox/core/query_plans/parsers/",
+    # Oracle-adjacent widening (soundness-surface-widening): these define or
+    # feed "correct" for the same soundness checks the comparator/parser
+    # paths above already gate, so a PR touching them should get the same
+    # review requirement.
+    #
+    # The reference-value loader, registry, and hash-pinned digest fixtures
+    # (e.g. reference_digests/tpch_value_digests_sf1.json) all live here.
+    # Editing any of them silently redefines what counts as a "correct"
+    # benchmark result.
+    "benchbox/core/expected_results/",
+    # validate_loaded_data / validate_row_counts (delegate to
+    # ValidationService / DataValidator) and the plan-capture pipeline
+    # (get_query_plan_parser, capture_query_plan) that feeds
+    # benchbox/core/query_plans/parsers/ live in this single file.
+    "benchbox/platforms/base/result_capture.py",
+    # benchbox/sql_compat/ as a whole is high-churn (routine per-platform
+    # DDL/query-rewrite rule additions), so only its rule-dispatch core is
+    # in scope, not the whole tree -- see soundness-surface-widening's
+    # decision. These three files decide WHICH rewrite rules apply to a
+    # given query/platform; a bug here silently changes what SQL actually
+    # executes without touching the comparator itself.
+    "benchbox/sql_compat/resolver.py",
+    "benchbox/sql_compat/decision.py",
+    "benchbox/sql_compat/rules/_registration.py",
+    # Self-protection: the review-gate machinery itself. The in-workflow
+    # base-ref execution + self-touch override in auto-merge-on-open.yml is
+    # best-effort only for same-repo PRs (GitHub runs the PR's OWN copy of a
+    # pull_request-triggered workflow file, so a PR editing that workflow can
+    # delete those checks in the same commit). The durable control is this
+    # prefix list mirrored into .github/CODEOWNERS plus the develop ruleset's
+    # require_code_owner_review (pending admin action; see
+    # docs/operations/repo-admin-settings.md). release.yml is included
+    # because it publishes to PyPI. .github/workflows/pr.yml is deliberately
+    # NOT included: it is high-churn (routine CI-lane edits), and the
+    # required-check contract it feeds (ci-required-result) is pinned by the
+    # develop ruleset + the daily ruleset-drift canary rather than by owner
+    # review -- see soundness-surface-widening's recorded decision.
+    "_project/scripts/auto_merge_soundness_paths.py",
+    ".github/workflows/auto-merge-on-open.yml",
+    ".github/workflows/release.yml",
 )
 _VALIDATION_RE = re.compile(r"^benchbox/core/(?:.+/)?validation\.py$")
 

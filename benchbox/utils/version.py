@@ -15,6 +15,7 @@ import re
 import sys
 from dataclasses import dataclass
 from functools import lru_cache
+from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Optional
 
@@ -24,10 +25,40 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as tomllib  # type: ignore[import-not-found]
 
-import benchbox
+# NOTE: This module intentionally does NOT `import benchbox`. Doing so used
+# to create a root-package import edge (this module is imported by
+# benchbox/utils/verbosity.py, which is imported by ~every subsystem),
+# pulling a large strongly-connected component into a cycle rooted at
+# benchbox/__init__.py. See _project/TODO/main/planning/break-root-import-cycle.yaml.
+# `get_package_version()` reads installed package metadata, and
+# `get_init_version()` reads the `__version__` literal STATICALLY from the
+# benchbox/__init__.py source file (no import) so the consistency checker
+# still covers the literal that scripts/update_version.py bumps at release
+# cut, without recreating the cycle.
 
 # Cache for parsed pyproject.toml to avoid repeated file reads
 _PYPROJECT_CACHE: Optional[dict] = None
+
+# benchbox/__init__.py, resolved relative to this file (benchbox/utils/version.py).
+# Ships inside wheels too, so the static read below works for installed packages.
+_PACKAGE_INIT_PATH = Path(__file__).parent.parent / "__init__.py"
+
+# Same pattern scripts/update_version.py uses to bump the literal at release cut.
+_INIT_VERSION_PATTERN = re.compile(r'__version__\s*=\s*["\']([^"\']+)["\']')
+
+# NOTE (packaging-config-hygiene w4): pyproject.toml's [project].version stays
+# a static literal rather than `dynamic = ["version"]` (attr: benchbox.__version__).
+# Reason: get_pyproject_version() below reads [project].version directly out of
+# the parsed TOML; going dynamic removes that key entirely, so the function
+# would return None and check_version_consistency() would report it as a
+# missing source - a real regression to fix well, not a one-line change. The
+# existing 5 tracked copies (this file, pyproject.toml, README.md,
+# docs/README.md, VERSION_MANAGEMENT.md) plus this runtime checker already
+# give solid drift detection, so collapsing one more copy isn't worth the
+# added complexity right now. The concrete problem that prompted this
+# question - pytest's meaningless `minversion = "0.2.1"` copy-paste in
+# pyproject.toml's [tool.pytest.ini_options] - is fixed independently by
+# deleting that dead block (see packaging-config-hygiene w3).
 
 # Version sources beyond package metadata that we validate for consistency
 _ADDITIONAL_VERSION_PATHS = (
@@ -215,13 +246,67 @@ def get_pyproject_version() -> Optional[str]:
     return _PYPROJECT_CACHE.get("project", {}).get("version")
 
 
-def get_package_version() -> str:
-    """Get version from package __init__.py.
+def get_init_version() -> Optional[str]:
+    """Statically read the ``__version__`` literal from benchbox/__init__.py.
+
+    This is the value ``scripts/update_version.py`` bumps at release cut and
+    that ``benchbox --version`` ultimately reports via ``benchbox.__version__``.
+    It is read from the source file with a regex (same pattern
+    scripts/update_version.py uses) rather than by importing the package
+    root, so the root-import cycle removed by break-root-import-cycle stays
+    broken. The file ships inside built wheels, so this also works for
+    installed (non-dev) packages.
 
     Returns:
-        Version string from benchbox.__version__.
+        The version literal, or None if the file or literal is unavailable.
     """
-    return benchbox.__version__
+    text = _read_text_safe(_PACKAGE_INIT_PATH)
+    if not text:
+        return None
+    match = _INIT_VERSION_PATTERN.search(text)
+    return match.group(1) if match else None
+
+
+def get_installed_dist_version() -> Optional[str]:
+    """Get the installed distribution's version from importlib.metadata.
+
+    Returns:
+        The installed dist version, or None when benchbox is not installed
+        as a distribution at all (e.g. running from a bare source checkout
+        without an editable install) - a legitimate state, not an error.
+    """
+    try:
+        return importlib_metadata.version("benchbox")
+    except importlib_metadata.PackageNotFoundError:
+        return None
+
+
+def get_package_version() -> str:
+    """Get the installed BenchBox package version.
+
+    Reads installed package metadata (``importlib.metadata``) instead of
+    importing the ``benchbox`` package root, which would recreate the
+    root-import cycle removed by break-root-import-cycle (this module is
+    imported by ``benchbox.utils.verbosity``, which is imported by nearly
+    every subsystem). Falls back to the static ``__version__`` literal in
+    benchbox/__init__.py, then the source-tree ``pyproject.toml`` version,
+    only when no installed package metadata is available at all (e.g.
+    running from a bare checkout without an editable install).
+
+    Note: this is intentionally NOT unified with ``get_init_version()`` /
+    ``get_pyproject_version()`` even though all three usually agree -
+    keeping them independently sourced lets ``check_version_consistency()``
+    actually detect drift between the installed dist metadata, the
+    __init__.py literal, and the working-tree pyproject.toml, rather than
+    the check becoming a tautology.
+
+    Returns:
+        Version string, or "unknown" if no source is available.
+    """
+    installed = get_installed_dist_version()
+    if installed is not None:
+        return installed
+    return get_init_version() or get_pyproject_version() or "unknown"
 
 
 def is_version_compatible(
@@ -262,11 +347,28 @@ def is_version_compatible(
     return True
 
 
+# Non-documentation source keys tracked by _gather_version_sources().
+_CORE_VERSION_SOURCE_KEYS = frozenset({"benchbox.__init__", "installed-dist", "pyproject.toml"})
+
+
 def _gather_version_sources() -> dict[str, Optional[str]]:
-    """Collect raw version strings from all tracked sources."""
+    """Collect raw version strings from all tracked sources.
+
+    Sources:
+    - "benchbox.__init__": the ``__version__ = "..."`` literal read
+      STATICALLY from benchbox/__init__.py (the value release tooling bumps
+      and ``benchbox --version`` reports). This is the drift class that
+      shipped the 0.3.0 wheel with ``__version__ = "0.2.1"``.
+    - "installed-dist": the installed distribution's version from
+      importlib.metadata (None when not installed as a dist - legitimate for
+      bare source checkouts, see check_version_consistency()).
+    - "pyproject.toml": the working-tree project version.
+    - documentation release markers (README.md etc.).
+    """
 
     versions: dict[str, Optional[str]] = {
-        "benchbox.__init__": get_package_version(),
+        "benchbox.__init__": get_init_version(),
+        "installed-dist": get_installed_dist_version(),
         "pyproject.toml": get_pyproject_version(),
     }
     versions.update(_collect_documentation_versions())
@@ -288,9 +390,16 @@ def check_version_consistency() -> VersionConsistencyResult:
     # In installed mode, missing files are expected - only count them if in dev mode
     is_dev = is_development_install()
     if is_dev:
-        missing_sources = tuple(source for source, value in normalized.items() if value is None)
+        # "installed-dist" is exempt from missing-source accounting even in
+        # dev mode: absence just means benchbox isn't installed as a
+        # distribution (e.g. a bare source checkout), which is legitimate.
+        # When present, it still participates in mismatch detection below.
+        missing_sources = tuple(
+            source for source, value in normalized.items() if value is None and source != "installed-dist"
+        )
     else:
         # In installed mode, only require benchbox.__init__ to have a version
+        # (the static __init__.py read works inside wheels too).
         missing_sources = () if normalized.get("benchbox.__init__") else ("benchbox.__init__",)
 
     # Determine the expected version from the first non-missing entry
@@ -339,9 +448,7 @@ def get_version_info() -> dict[str, object]:
     consistency = check_version_consistency()
 
     documentation_versions = {
-        source: consistency.sources[source]
-        for source in consistency.sources
-        if source not in {"benchbox.__init__", "pyproject.toml"}
+        source: consistency.sources[source] for source in consistency.sources if source not in _CORE_VERSION_SOURCE_KEYS
     }
 
     release_tag = f"v{benchbox_version}" if benchbox_version else "unknown"

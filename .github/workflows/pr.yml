@@ -287,6 +287,9 @@ jobs:
       - name: Validate test marker annotations
         run: make lint-markers
 
+      - name: Validate import layering
+        run: make lint-imports
+
       - name: Validate artifact hygiene
         run: make artifact-hygiene
 
@@ -579,10 +582,40 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
+      - name: Wait for PostgreSQL service to be reachable
+        run: |
+          # The live tests skip via skip_unless_docker_service when localhost:5432
+          # is unreachable, and pytest exits 0 on an all-skipped run. That would
+          # turn this non-blocking sample green without ever exercising PostgreSQL
+          # plan capture, indistinguishable from a real pass in the PR checks UI.
+          # Fail the step outright if the service container never came up so the
+          # continue-on-error job surfaces as visibly red instead.
+          for attempt in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U benchbox >/dev/null 2>&1; then
+              echo "PostgreSQL is reachable."
+              exit 0
+            fi
+            echo "Waiting for PostgreSQL (attempt ${attempt}/30)..."
+            sleep 2
+          done
+          echo "::error::PostgreSQL service never became reachable on localhost:5432; the live integration sample cannot be skipped silently."
+          exit 1
+
       - name: Run PostgreSQL live integration tests
         run: |
+          # --no-header keeps the summary line parseable; -p no:cacheprovider
+          # avoids a stale cache masking collection. The grep guard fails the
+          # step when the run collected/ran nothing but skips (e.g. every test
+          # skipped despite a reachable service), so an all-skipped run cannot
+          # silently render as green in the PR checks UI.
+          set -o pipefail
           uv run -- python -m pytest tests/integration/platforms/test_postgresql_live.py \
-            -m "live_postgresql" --tb=short -v
+            -m "live_postgresql" --tb=short -v -p no:cacheprovider \
+            | tee /tmp/pg_live_output.txt
+          if ! grep -Eq '[0-9]+ passed' /tmp/pg_live_output.txt; then
+            echo "::error::PostgreSQL live integration tests produced no passing tests (all skipped or none collected); refusing to report a silent pass."
+            exit 1
+          fi
 
       # Second-engine equivalence SAMPLE (non-blocking, see continue-on-error
       # above). The DuckDB SQL gate (correctness-gate job) stays the hard
@@ -597,9 +630,15 @@ jobs:
           PGPASSWORD: benchbox
           PGDATABASE: benchbox_test
         run: |
+          set -o pipefail
           uv run -- python -m pytest \
             tests/integration/platforms/test_tpchavoc_postgres_equivalence.py \
-            -m "live_postgresql" -n 0 --tb=short -v
+            -m "live_postgresql" -n 0 --tb=short -v -p no:cacheprovider \
+            | tee /tmp/pg_tpchavoc_output.txt
+          if ! grep -Eq '[0-9]+ passed' /tmp/pg_tpchavoc_output.txt; then
+            echo "::error::TPC-Havoc PostgreSQL variant-equivalence sample produced no passing tests (all skipped or none collected); refusing to report a silent pass."
+            exit 1
+          fi
 
   datafusion-integration:
     name: datafusion-integration
@@ -721,6 +760,122 @@ jobs:
         # does not pay a dependency-sync cost before deciding.
         run: make lint-site-theme-tokens
 
+  package-smoke:
+    name: package-smoke
+    needs: ci-paths
+    # Path-filtered: only runs when packaging metadata changed (pyproject.toml,
+    # MANIFEST.in, setup.py/cfg, benchbox/__init__.py, uv.lock). Steps below are
+    # copied from nightly.yml's test-package job (ubuntu/3.12 leg only - the
+    # full ubuntu+windows matrix stays nightly-only, see nightly.yml:261-311).
+    if: ${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build package
+        run: |
+          uv build
+
+      - name: Test package installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
+          if [ "$wheel_count" != "1" ]; then
+            echo "::error::Expected exactly one wheel, found $wheel_count"
+            find dist -maxdepth 1 -type f -print
+            exit 1
+          fi
+          wheel=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
+          tmpdir=$(mktemp -d)
+          cd "$tmpdir"
+          # Minimal-surface gate: a clean core install must import benchbox AND
+          # must not pull pandas (optional engine/DataFrame dep). This is the
+          # contract whose absence let v0.3.0 ship a broken clean install.
+          uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
+          uv run --isolated --no-project --with "$wheel" -- benchbox --help
+
+  dependency-audit:
+    name: dependency-audit
+    needs: ci-paths
+    # Path-filtered on the same packaging group as package-smoke (pyproject.toml
+    # / uv.lock changes are the common case that shifts the dependency graph).
+    if: ${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      PIP_AUDIT_IGNORE_VULNS: ""
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run security audit
+        run: |
+          if [ -n "${PIP_AUDIT_IGNORE_VULNS}" ]; then
+            IGNORE_ARGS=$(printf '%s' "${PIP_AUDIT_IGNORE_VULNS}" | tr ',' '\n' | sed '/^$/d;s/^[[:space:]]*//;s/[[:space:]]*$//;/^$/d;s/^/--ignore-vuln /' | tr '\n' ' ')
+            uvx pip-audit ${IGNORE_ARGS}
+          else
+            uvx pip-audit
+          fi
+
+  parity-check:
+    name: parity-check
+    needs: ci-paths
+    # Path-filtered on results-explorer/viz source changes (see
+    # _project/TODO/main/planning/parity-check-develop-ring.yaml). `make
+    # parity-check` is Python-only (no npm/vitest install), measured at well
+    # under a second locally, so it is cheap enough to block develop PRs.
+    #
+    # NON-BLOCKING FOR NOW (continue-on-error: true, deliberately NOT in
+    # ci-required-result.needs): `make parity-check` currently fails in at
+    # least one local environment with an unexplained 2e-13 last-bit float
+    # drift in tests/parity/fixtures/geomean_ms.json (likely libm
+    # transcendental-precision variance across environments). Promotion
+    # criterion to the required lane: (1) one green run of this job on a
+    # real GitHub runner, AND (2) a decision on the geomean_ms.json float
+    # drift (comparison tolerance vs fixture regen). Until both hold, a
+    # failure here shows red in the PR checks list but does not block merge.
+    if: ${{ needs.ci-paths.outputs.viz-needed == 'true' }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Verify parity fixtures match Python source
+        run: make parity-check
+
   audit-sha:
     name: audit-sha
     needs: ci-paths
@@ -756,7 +911,9 @@ jobs:
 
   ci-required-result:
     name: ci-required-result
-    needs: [ci-paths, content-guard, code-lint, code-test, correctness-gate, plan-capture-gate, explorer-tokens, audit-sha]
+    # parity-check is deliberately absent from this needs list while it is
+    # demoted to non-blocking (see the parity-check job's promotion criterion).
+    needs: [ci-paths, content-guard, code-lint, code-test, correctness-gate, plan-capture-gate, explorer-tokens, audit-sha, package-smoke, dependency-audit]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -770,6 +927,8 @@ jobs:
           PLAN_CAPTURE_RESULT: ${{ needs.plan-capture-gate.result }}
           EXPLORER_TOKENS_RESULT: ${{ needs.explorer-tokens.result }}
           AUDIT_SHA_RESULT: ${{ needs.audit-sha.result }}
+          PACKAGE_SMOKE_RESULT: ${{ needs.package-smoke.result }}
+          DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
           CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
           SAFE_CONTENT_ONLY: ${{ needs.ci-paths.outputs.safe-content-only }}
@@ -789,6 +948,27 @@ jobs:
           if [ "$AUDIT_SHA_RESULT" != "success" ] \
               && [ "$AUDIT_SHA_RESULT" != "skipped" ]; then
             echo "audit-sha=$AUDIT_SHA_RESULT"
+            exit 1
+          fi
+
+          # package-smoke/dependency-audit are gated on the packaging path
+          # filter. A "skipped" result (the filter did not match) counts as
+          # success - a PR that never touched packaging paths must still
+          # pass. A PR that DID touch those paths gets a real success/failure
+          # result from the job itself, so this cannot silently green a
+          # packaging regression (pr-gate-package-and-audit-promotion.yaml).
+          # parity-check (viz filter) is intentionally NOT checked here while
+          # demoted to non-blocking; see its job comment for the promotion
+          # criterion (parity-check-develop-ring.yaml).
+          if [ "$PACKAGE_SMOKE_RESULT" != "success" ] \
+              && [ "$PACKAGE_SMOKE_RESULT" != "skipped" ]; then
+            echo "package-smoke=$PACKAGE_SMOKE_RESULT"
+            exit 1
+          fi
+
+          if [ "$DEPENDENCY_AUDIT_RESULT" != "success" ] \
+              && [ "$DEPENDENCY_AUDIT_RESULT" != "skipped" ]; then
+            echo "dependency-audit=$DEPENDENCY_AUDIT_RESULT"
             exit 1
           fi
 

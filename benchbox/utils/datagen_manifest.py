@@ -20,8 +20,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
-import benchbox
 from benchbox.utils.cloud_storage import DatabricksPath, create_path_handler
+from benchbox.utils.version import get_package_version
 
 if TYPE_CHECKING:
     from cloudpathlib import CloudPath
@@ -333,7 +333,7 @@ class DataGenerationManifest:
             "compression": self._compression,
             "parallel": self._parallel,
             "created_at": _utc_now_iso(),
-            "generator_version": benchbox.__version__,
+            "generator_version": get_package_version(),
             "tables": tables_data,
         }
 

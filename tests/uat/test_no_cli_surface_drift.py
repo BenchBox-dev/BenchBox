@@ -13,6 +13,11 @@ pytestmark = pytest.mark.fast
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALLOWED_INTERNAL_CLI_FILES = {
+    # relocate-cli-hook-registries: these two are now thin back-compat
+    # re-export shims; the real registries live in benchbox/core/hooks/
+    # (outside the CLI surface this guard protects).
+    "benchbox/cli/benchmark_hooks.py",
+    "benchbox/cli/platform_hooks.py",
     "benchbox/cli/benchmarks.py",
     "benchbox/cli/commands/__init__.py",
     "benchbox/cli/commands/calculate_qphh.py",

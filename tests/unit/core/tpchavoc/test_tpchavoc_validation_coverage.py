@@ -141,6 +141,57 @@ def test_calculate_checksum_collides_null_with_string_null() -> None:
     assert calculate_checksum([(None,)]) == calculate_checksum([("NULL",)])
 
 
+def test_calculate_checksum_collides_across_cell_separator() -> None:
+    """A ``"|"`` cell-separator character embedded in a value can alias across row shapes.
+
+    ``calculate_checksum`` joins cells with ``"|"`` with no escaping, so a 2-column row
+    whose first cell contains a literal ``"|"`` renders to the SAME row string as a
+    genuinely different 2-column row: ``[("a|b", "c")]`` -> ``"a|b|c"`` and
+    ``[("a", "b|c")]`` -> ``"a|b|c"``. Accepted as a documented property of this
+    digest (see value-digest-collision-pinning.yaml): fixing it would require
+    escaping/tagging the render and regenerating the committed reference digest
+    (``benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json``),
+    which is out of scope for pinning alone. Pinned so a future change is conscious,
+    following the same discipline as the NULL-vs-"NULL" pin above.
+    """
+    assert calculate_checksum([("a|b", "c")]) == calculate_checksum([("a", "b|c")])
+
+
+def test_calculate_checksum_collides_across_row_separator() -> None:
+    """A ``"\\n"`` row-separator character embedded in a value can alias across row counts.
+
+    ``calculate_checksum`` joins rows with ``"\\n"`` with no escaping, so a single-row
+    result whose one cell contains a literal newline renders identically to a
+    genuinely different two-row result: ``[("a\\nb",)]`` and ``[("a",), ("b",)]``
+    both render to ``"a\\nb\\n"``. Accepted as a documented property of this digest
+    (see value-digest-collision-pinning.yaml) for the same reason as the cell-separator
+    pin above - fixing it requires a reference-digest regeneration out of scope here.
+    """
+    assert calculate_checksum([("a\nb",)]) == calculate_checksum([("a",), ("b",)])
+
+
+def test_calculate_checksum_collides_str_and_int_dtype() -> None:
+    """A string cell and an int cell of the same textual value hash identically.
+
+    ``calculate_checksum`` renders every non-None cell via ``str(val)``, so the string
+    ``"1"`` and the int ``1`` both render to the token ``"1"`` and the digest cannot
+    distinguish a genuine dtype regression (e.g. an INTEGER column silently becoming
+    VARCHAR) from an unchanged value. Audited per value-digest-collision-pinning.yaml
+    w1: no other check on the paths this digest guards (TPC-Havoc's
+    ``validate_results_checksum`` or the correctness gate's value-digest oracle in
+    ``benchbox.core.results.result_digest``) independently verifies cell dtype -
+    ``result_digest._normalize_cell`` already documents (and pins in
+    ``tests/unit/test_correctness_gate_value_oracle.py::test_digest_couples_value_with_numeric_type``)
+    an analogous accepted int-vs-float/Decimal rendering asymmetry for the SAME
+    DuckDB-pinned-oracle reason: fixing this collision would change the rendered form
+    of every cell and require regenerating the committed reference digest
+    (``tpch_value_digests_sf1.json``), which is out of safe scope for this pin-only
+    change. Pinned as an accepted property, consistent with the NULL-vs-"NULL" and
+    separator pins above.
+    """
+    assert calculate_checksum([("1",)]) == calculate_checksum([(1,)])
+
+
 def test_tie_aware_constant_column_is_not_a_boundary_key() -> None:
     """A constant/literal column must not qualify as the tie-boundary key.
 

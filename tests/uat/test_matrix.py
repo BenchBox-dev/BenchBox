@@ -9,6 +9,8 @@ import pytest
 from benchbox.core.benchmark_registry import CATEGORY_ORDER
 from benchbox.core.platform_registry import PlatformRegistry
 from tests.uat import compatibility, matrix
+from tests.uat.config import validate_config
+from tests.uat.phases import enumerate as enum_phase
 
 pytestmark = pytest.mark.fast
 
@@ -163,6 +165,109 @@ def test_filter_scales_by_registry_empty_options_passes_through():
     )
     out = matrix.filter_scales_by_registry("x", [0.5, 2.0], info=info)
     assert out == [0.5, 2.0]
+
+
+# ---------------------------------------------------------------------------
+# missing_benchmarks_from_include (uat-accounting-hardening w2).
+# ---------------------------------------------------------------------------
+
+
+def test_missing_benchmarks_from_include_flags_unknown_ids():
+    benchmarks = matrix.load_benchmarks()
+    out = matrix.missing_benchmarks_from_include(["tpch", "totally_bogus_benchmark_xyz"], benchmarks)
+    assert out == ["totally_bogus_benchmark_xyz"]
+
+
+def test_missing_benchmarks_from_include_dedupes_and_preserves_order():
+    benchmarks = matrix.load_benchmarks()
+    out = matrix.missing_benchmarks_from_include(["bogus_a", "tpch", "bogus_b", "bogus_a"], benchmarks)
+    assert out == ["bogus_a", "bogus_b"]
+
+
+def test_missing_benchmarks_from_include_empty_when_all_known():
+    benchmarks = matrix.load_benchmarks()
+    assert matrix.missing_benchmarks_from_include(["tpch", "tpcds"], benchmarks) == []
+
+
+def test_missing_benchmarks_from_include_matches_resolve_benchmarks_drop():
+    """`resolve_benchmarks` silently drops unknown `include` ids; this helper
+    must flag exactly the ids that drop causes, so accounting stays honest."""
+    benchmarks = matrix.load_benchmarks()
+    include = ["tpch", "totally_bogus_benchmark_xyz"]
+    resolved = matrix.resolve_benchmarks(include=include, benchmarks=benchmarks)
+    missing = matrix.missing_benchmarks_from_include(include, benchmarks)
+    assert set(include) == set(resolved) | set(missing)
+    assert set(resolved) & set(missing) == set()
+
+
+# ---------------------------------------------------------------------------
+# enumerate_cells_with_pruning registry/ladder accounting
+# (uat-accounting-hardening w2/w3): a typo'd benchmark id or a scale outside
+# the registry's declared scale_options must produce a visible accounting
+# row instead of a silent drop.
+# ---------------------------------------------------------------------------
+
+
+def _registry_cfg(payload: dict):
+    return validate_config({"name": "matrix-registry-test", **payload})
+
+
+def test_enumerate_with_pruning_records_registry_missing_benchmark():
+    raw = {
+        "platforms": {"include": ["duckdb", "sqlite"]},
+        "benchmarks": {"include": ["tpch", "totally_bogus_benchmark_xyz"]},
+        "scales": {"rungs": [0.01, 0.1]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_registry_cfg(raw))
+
+    assert {c.benchmark for c in result.cells} == {"tpch"}
+    missing_rows = [c for c in result.compatibility_pruned if c.rule_id == "benchmark-not-in-registry"]
+    # One row per platform x requested scale for the missing benchmark - it
+    # must be visible in accounting output, not silently absent.
+    assert {(c.platform, c.benchmark, c.scale) for c in missing_rows} == {
+        ("duckdb", "totally_bogus_benchmark_xyz", 0.01),
+        ("duckdb", "totally_bogus_benchmark_xyz", 0.1),
+        ("sqlite", "totally_bogus_benchmark_xyz", 0.01),
+        ("sqlite", "totally_bogus_benchmark_xyz", 0.1),
+    }
+    assert all(c.status == enum_phase.REGISTRY_PRUNE_STATUS for c in missing_rows)
+    assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
+
+
+def test_enumerate_with_pruning_records_ladder_pruned_scales():
+    raw = {
+        "platforms": {"include": ["duckdb"]},
+        "benchmarks": {"include": ["tpch"]},
+        # 50.0 is not one of tpch's declared scale_options (0.01, 0.1, 1.0,
+        # 10.0, 30.0, 100.0, 300.0, ...); it must be dropped AND recorded
+        # instead of vanishing from the denominator (PR #332 follow-up).
+        "scales": {"rungs": [0.01, 50.0]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_registry_cfg(raw))
+
+    assert {c.scale for c in result.cells} == {0.01}
+    ladder_rows = [c for c in result.compatibility_pruned if c.rule_id.startswith("uat.ladder.")]
+    assert len(ladder_rows) == 1
+    row = ladder_rows[0]
+    assert (row.platform, row.benchmark, row.scale) == ("duckdb", "tpch", 50.0)
+    assert row.status == enum_phase.REGISTRY_PRUNE_STATUS
+    assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
+
+
+def test_enumerate_with_pruning_ladder_scale_survives_when_in_registry():
+    """Sanity check: no spurious ladder-pruned row for an in-registry scale."""
+    raw = {
+        "platforms": {"include": ["duckdb"]},
+        "benchmarks": {"include": ["tpch"]},
+        "scales": {"rungs": [0.01, 0.1]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_registry_cfg(raw))
+
+    assert {c.scale for c in result.cells} == {0.01, 0.1}
+    assert result.compatibility_pruned == ()
 
 
 # ---------------------------------------------------------------------------

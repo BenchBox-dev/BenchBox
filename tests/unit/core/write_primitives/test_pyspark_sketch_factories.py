@@ -31,6 +31,24 @@ from benchbox.core.write_primitives.dataframe_operations import (
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
+class _FakeRow:
+    """Minimal stand-in for a PySpark ``Row``: supports positional indexing like the real thing.
+
+    Used instead of a ``MagicMock`` for merge-extract result rows so that
+    ``result`` is produced by genuine ``__getitem__`` lookup logic in the
+    extractor under test, rather than being an injected mock return value.
+    Indexing anywhere other than the populated position raises, so a test
+    using this fixture would fail if the extractor started reading the
+    wrong column/index.
+    """
+
+    def __init__(self, values):
+        self._values = list(values)
+
+    def __getitem__(self, key):
+        return self._values[key]
+
+
 @pytest.fixture()
 def fake_pyspark_functions(monkeypatch):
     """Install a fake pyspark.sql.functions module so the factories work without PySpark.
@@ -114,8 +132,7 @@ class TestPysparkHllMergeExtract:
         spark = MagicMock()
         state = MagicMock(name="state_df")
         spark.read.parquet.return_value = state
-        row = MagicMock()
-        row.__getitem__.return_value = 14836.5
+        row = _FakeRow([14836.5])
         state.agg.return_value.collect.return_value = [row]
 
         extractor = make_pyspark_hll_merge_extract(spark, sketch_col="user_sketch")
@@ -126,6 +143,9 @@ class TestPysparkHllMergeExtract:
         fake_pyspark_functions.hll_sketch_estimate.assert_called_once_with(
             fake_pyspark_functions.hll_union_agg.return_value
         )
+        # `result` is produced by real `row[0]` indexing on `_FakeRow`, not echoed
+        # from an injected mock return value - this would fail if the extractor
+        # started reading the wrong column/index.
         assert result == 14836.5
         assert isinstance(result, float)
 
@@ -150,8 +170,7 @@ class TestPysparkTopkFactories:
         spark = MagicMock()
         state = MagicMock()
         spark.read.parquet.return_value = state
-        row = MagicMock()
-        row.__getitem__.return_value = 7
+        row = _FakeRow([7])
         state.agg.return_value.collect.return_value = [row]
 
         extractor = make_pyspark_topk_merge_extract(spark, sketch_col="topk_sketch")
@@ -162,4 +181,6 @@ class TestPysparkTopkFactories:
             fake_pyspark_functions.approx_top_k_combine.return_value
         )
         fake_pyspark_functions.size.assert_called_once_with(fake_pyspark_functions.approx_top_k_estimate.return_value)
+        # `result` comes from real `row[0]` indexing on `_FakeRow`, not an
+        # injected mock echo.
         assert result == 7.0

@@ -2,7 +2,7 @@ id: release-accounting-drift-correction
 title: "Correct CHANGELOG/README release accounting drift and add a tag-claim guard"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Release Tooling
 
 description: |
@@ -44,7 +44,7 @@ description: |
 work:
   - id: w1
     summary: "Re-validate the cited drift facts before editing"
-    status: pending
+    status: done
     notes: |
       Capture compact evidence (do not commit raw logs):
         - `git ls-remote --tags origin 'refs/tags/v0.3.*'` -> only v0.3.0
@@ -63,7 +63,7 @@ work:
   - id: w2
     summary: "Fix CHANGELOG.md so the 0.3.1 section cannot be read as released"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Two acceptable outcomes depending on w1's findings; pick one and
       say which in the PR body:
@@ -85,7 +85,7 @@ work:
   - id: w3
     summary: "Fix README.md's current-release line to match PyPI-latest"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       `README.md:31` currently reads `Current release: v0.2.1`. Update it
       to name the actual PyPI-latest version (`v0.3.0` as of w1, pending
@@ -97,7 +97,7 @@ work:
   - id: w4
     summary: "Add a guard: a CHANGELOG released-version section requires a matching git tag"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Extend `scripts/generate_changelog_entry.py` (which already knows how
       to detect the latest `v*` tag via `git describe --tags --abbrev=0
@@ -197,3 +197,75 @@ success_metrics:
   - "CHANGELOG.md has no dated released-version section without a corresponding git tag."
   - "README.md's current-release line matches PyPI-latest at merge time."
   - "A CI-enforced check fails a future PR that reintroduces an untagged dated CHANGELOG section."
+
+resolution_notes: |
+  All four work units implemented 2026-07-03. w1's facts re-validated
+  unchanged: only v0.3.0 tagged/published; v0.3.0's clean import still
+  fails with ModuleNotFoundError: pandas (reverified from /tmp, outside
+  the repo tree); README still said v0.2.1.
+
+  - w2: CHANGELOG.md's `## [0.3.1] - 2026-05-30` section moved under
+    `## [Unreleased]` (outcome (a): v0.3.1 has not shipped), dated header
+    dropped, and an explicit accounting note added explaining the prior
+    mis-dating, that 0.3.0 (PyPI-latest) has the broken pandas import, and
+    that the fix is complete on develop pending release-recovery-v0-3-1.
+
+  - w3: DEVIATION from the literal success-metric wording ("README.md's
+    current-release line matches PyPI-latest"). Discovered mid-implementation
+    that benchbox/utils/version.py's check_version_consistency() (out of
+    scope to edit - it's in the benchbox/utils/ exclusion zone for this
+    session, owned by other in-flight work) hard-requires README.md's
+    "Current release: vX.Y.Z" line, parsed by _DOC_VERSION_PATTERN, to
+    literally equal benchbox.__version__ (develop's pyproject.toml/__init__.py
+    literal, currently 0.2.1 - frozen since release-cut/-finalize never
+    replay version bumps onto develop). tests/unit/test_version_management.py
+    ::test_check_version_consistency_reports_clean_state pins this and would
+    fail (missing/mismatched README marker) if the line stopped matching
+    0.2.1 or stopped matching the pattern at all (e.g. if reworded to point
+    only at `benchbox --version`/PyPI with no parseable version literal).
+    That test and version.py are both out of this TODO's scope_limit and
+    the session's cross-cutting file-ownership boundaries.
+
+    Resolution: kept the literal "Current release: v0.2.1." marker verbatim
+    (so the automated consistency check - which is really asserting
+    "docs agree with this checkout's own working-tree version," not "docs
+    agree with PyPI" - stays green and doesn't silently get weakened), and
+    added it now candidly explains what that marker actually means
+    ("mirrors pyproject.toml on develop... is NOT what pip install
+    benchbox gets you today"), immediately followed by a clearly-labeled,
+    prominent statement of the real PyPI-latest (v0.3.0) with the broken-
+    install caveat and a workaround (install from develop). This satisfies
+    the TODO's honesty intent (a reader is no longer misled into thinking
+    v0.2.1 is current) without breaking the pinned internal-consistency
+    test. Flagging as an open item: the checker's semantics (working-tree
+    version, not PyPI-latest) and this TODO's ask (README should reflect
+    PyPI-latest) are structurally in tension as long as develop's version
+    literal stays frozen between releases; a durable fix would need either
+    a version.py change (exempt README's PyPI-facing claim from the
+    strict-equality check) or a docs restructure (move the PyPI-latest
+    claim to a location version.py doesn't scan) - out of scope here.
+
+  - w4: added `released_versions_in_changelog`, `existing_tags`,
+    `find_untagged_changelog_versions`, `check_tag_claims`, and a
+    `--check-tag-claims` CLI flag to scripts/generate_changelog_entry.py
+    (single home for tag-detection logic, alongside `_resolve_log_range`'s
+    existing `git describe --tags` use). The guard exempts exactly the
+    dated section matching an in-progress release branch's own version
+    (`vX.Y.Z[-suffix]`, same shape validate-main-pr.yml accepts) per
+    must_preserve's constraint that it must not block release-cut's own
+    draft; every other untagged dated section is flagged regardless of
+    branch. New tests/unit/release/test_changelog_tag_guard.py (9 tests,
+    pytest.mark.fast) covers the fixture-based logic plus a live check
+    that this repo's actual CHANGELOG.md currently has zero untagged
+    claims on this branch. `existing_tags()` falls back to
+    `git ls-remote --tags origin` when local tags aren't fetched (true in
+    this sandbox checkout), so the guard doesn't silently pass for lack of
+    local tag data.
+
+  Verification: `uv run -- python -m pytest tests/unit/release/ -q` → 17
+  passed. `uv run -- python -m pytest tests/unit/test_version_management.py
+  tests/unit/utils/test_utils_version_management.py -q` → 16 passed
+  (confirms the w3 compromise keeps the pinned consistency check green).
+  `uv run -- python scripts/generate_changelog_entry.py --check-tag-claims`
+  → exit 0, "CHANGELOG.md tag-claim guard: OK". ruff check/format clean on
+  all touched Python files.

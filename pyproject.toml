@@ -422,64 +422,6 @@ possibly-missing-attribute = "warn"
 # Output configuration
 error-on-warning = false
 
-[tool.pytest.ini_options]
-minversion = "0.2.1"
-testpaths = ["tests"]
-python_files = "test_*.py"
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "fast: marks tests as fast (< 1 second execution time)",
-    "medium: marks tests as medium speed (1-10 seconds execution time)",
-    "unit: marks tests as unit tests",
-    "integration: marks tests as integration tests",
-    "performance: marks tests as performance tests",
-    "regression: marks tests for regression testing",
-    "monitoring: marks tests for monitoring functionality",
-    "database: marks tests that require database connections",
-    "duckdb: marks tests that use DuckDB",
-    "datafusion: marks tests that use DataFusion",
-    "firebolt: marks tests that use Firebolt",
-    "databend: marks tests that use Databend",
-    "sqlite: marks tests that require SQLite",
-    "tpch: marks TPC-H related tests",
-    "tpcds: marks TPC-DS related tests",
-    "tpcdi: marks TPC-DI related tests",
-    "tpchavoc: marks TPC-H AVOC related tests",
-    "ssb: marks Star Schema Benchmark tests",
-    "amplab: marks AMPLab Big Data Benchmark tests",
-    "clickbench: marks ClickBench related tests",
-    "h2odb: marks H2O Database benchmark tests",
-    "olap: marks tests for OLAP functionality",
-    "advanced_sql: marks tests for advanced SQL features",
-    "requires_table_formats: marks tests that require deltalake/pyiceberg table-format dependencies",
-    "stress: marks heavyweight stress tests (opt-in, excluded from default CI)",
-    "platform_smoke: marks lightweight platform smoke tests",
-    "live_integration: marks tests requiring live platform connections",
-    "docker_integration: marks tests requiring Docker services",
-    "live_snowflake: marks Snowflake live integration tests",
-    "live_bigquery: marks BigQuery live integration tests",
-    "live_databricks: marks Databricks live integration tests",
-    "live_redshift: marks Redshift live integration tests",
-    "live_athena: marks Athena live integration tests",
-    "live_lakesail: marks LakeSail live integration tests",
-    "live_clickhouse: marks ClickHouse Docker integration tests",
-    "live_trino: marks Trino Docker integration tests",
-    "live_presto: marks Presto Docker integration tests",
-    "live_postgresql: marks PostgreSQL Docker integration tests",
-    "live_starrocks: marks StarRocks Docker integration tests",
-    "live_doris: marks Doris Docker integration tests",
-    "live_databend: marks Databend Docker integration tests",
-    "live_influxdb: marks InfluxDB Docker integration tests",
-]
-filterwarnings = [
-    # TPC-DS supports unofficial subscale development runs via the patched generator.
-    # Tests use smaller factors (0.01, 0.1) for speed; warnings are expected, not errors.
-    "ignore::UserWarning:benchbox.core.tpcds.benchmark.runner",
-    "ignore::UserWarning:benchbox.base",
-    # PyICeberg deletes may not match records (expected behavior in tests)
-    "ignore::UserWarning:pyiceberg.table",
-]
-
 [dependency-groups]
 dev = [
     "ruff==0.11.13",  # pinned: preview = true is active globally; ruff upgrades may activate new rules
@@ -526,6 +468,7 @@ dev = [
     "presto-python-client>=0.8.4",
     "codespell>=2.4.2",
     "pre-commit>=4.6.0",
+    "import-linter>=2.13",
 ]
 
 [tool.mutmut]

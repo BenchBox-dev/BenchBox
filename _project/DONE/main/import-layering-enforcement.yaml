@@ -2,7 +2,8 @@ id: import-layering-enforcement
 title: "Add import-linter layering contracts (utils < core < platforms < cli; experimental/mcp isolated)"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-04"
 category: Core Functionality
 
 description: |
@@ -44,59 +45,87 @@ deps:
 work:
   - id: w1
     summary: "Add import-linter dependency and base config"
-    status: pending
+    status: done
     notes: |
-      Add `import-linter` as a dev dependency (uv-managed, same pattern as
-      other lint tools like ruff/ty in pyproject.toml). Add an
-      `[tool.importlinter]` section (or `.importlinter` file, whichever the
-      current import-linter version prefers) defining root package
-      `benchbox` and starting with zero contracts so the tool runs cleanly
-      before contracts are added.
+      Added `import-linter>=2.13` to `[dependency-groups].dev` in
+      pyproject.toml via `uv add --group dev import-linter` (pulls in
+      `grimp` transitively). Added `.importlinter` (v2.13 uses the classic
+      INI-style config file, not `[tool.importlinter]` in pyproject.toml)
+      with `root_package = benchbox` and zero contracts first - confirmed
+      `uv run -- lint-imports` runs clean (963 files, 2840 dependencies, 0
+      contracts) before adding any contract.
 
   - id: w2
     summary: "Add the layers contract: utils < core < platforms < cli"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Add a `type = "layers"` contract expressing
-      `benchbox.cli | benchbox.platforms | benchbox.core | benchbox.utils`
-      (import-linter layers are declared highest-to-lowest; lower layers must
-      not import from higher ones). Run `import-linter` locally first and
-      record actual current violations (there should be few to none left
-      after break-root-import-cycle and relocate-cli-hook-registries land) -
-      allowlist any residual violation explicitly by name in the contract
-      config with a one-line justification comment, do not silently pass by
-      loosening the contract.
+      Added the `layers` contract. Reality did not match the "few to none
+      left" expectation: running `lint-imports` with a zero-exception
+      layers contract surfaced ~46 real current violations (not just the
+      illustrative cudf/path_utils/format_selection/core-registry examples
+      cited when this TODO was filed) - see the parent TODO/session report
+      for the full enumerated list now encoded as named `ignore_imports`
+      entries in `.importlinter`, grouped into: utils->core (3 modules doing
+      a lazy `import benchbox` root-import fallback, cascading through
+      benchbox/__init__.py, plus one direct `path_utils -> core.runtime_paths`
+      edge), utils->cli (1 direct edge, `config_interface -> cli.config`),
+      utils->platforms (1 direct edge, `format_selection ->
+      platforms.base.format_capabilities`), and core->platforms (8 modules
+      with the same lazy root-import pattern + ~26 direct edges from the
+      platform-registry/factory/dispatch/equivalence-comparison call sites
+      in core.dryrun, core.runner.runner, core.platform_registry,
+      core.tpchavoc.equivalence, core.dataframe.maintenance_interface,
+      etc). Each entry has a one-line justification comment; none are
+      loosened via wildcards on the layer/package level. `lint-imports`
+      is GREEN with these allowlisted.
 
   - id: w3
     summary: "Add independence/isolation contracts for experimental and mcp"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
-      Add `type = "independence"` contracts asserting
-      `benchbox.core`, `benchbox.platforms`, `benchbox.cli`, `benchbox.utils`
-      do not import `benchbox.experimental`, with an explicit, named,
-      commented allowlist exception for `benchbox/platforms/cudf.py`'s import
-      of `benchbox.experimental.gpu` (cite
-      remove-or-integrate-legacy-cudf-platform-module as the tracked
-      resolution) - unless that TODO has already landed and removed the
-      import, in which case add the contract with zero exceptions. Add a
-      parallel `benchbox.mcp isolated` contract (mcp must not be imported by
-      core/platforms/cli/utils, and should not import them either unless
-      that is already an established, intentional dependency - verify with
+      Deviated from the literal `type = "independence"` instruction after
+      actually running it: independence forces ALL listed modules to be
+      mutually exclusive in both directions, so listing
+      core/platforms/cli/utils/experimental together immediately broke on
+      the legitimate cli->core, platforms->core, core->utils, etc. edges
+      that the layers contract above explicitly allows (core/platforms/
+      cli/utils are not independent of each other, only of experimental).
+      Used `type = "forbidden"` instead (source_modules =
+      core/platforms/cli/utils, forbidden_modules = experimental), which is
+      the correct one-directional primitive; kept the single named
+      allowlist exception for `benchbox/platforms/cudf.py ->
+      benchbox.experimental.gpu` citing
+      remove-or-integrate-legacy-cudf-platform-module (still not landed,
+      confirmed via `grep -rn "experimental" benchbox/platforms/cudf.py`).
+      For mcp: ran
       `grep -rn "benchbox.mcp" benchbox/core benchbox/platforms benchbox/cli benchbox/utils`
-      before writing the contract).
+      (zero hits - nothing in the lower layers imports mcp) and
+      `grep -rn "^from benchbox\|^import benchbox" benchbox/mcp/**/*.py`
+      (mcp extensively and legitimately imports core/utils to expose
+      benchmark data and execution via MCP tools, resolving this TODO's own
+      open_questions entry). A bidirectional independence contract would
+      have required re-allowlisting every one of those core/utils imports,
+      defeating the point, so mcp also uses `type = "forbidden"`
+      (source_modules = core/platforms/cli/utils, forbidden_modules = mcp)
+      with zero exceptions needed - it passes cleanly today.
 
   - id: w4
     summary: "Wire import-linter into make lint and pr.yml"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
-      Add a `make import-lint` (or fold into existing `make lint`) target
-      running `uv run -- lint-imports`, and add it as a step in
-      `.github/workflows/pr.yml`'s lint job alongside the existing
-      `make lint-markers` step (pr.yml:288 area) so a layering violation
-      fails CI the same way a marker violation does today.
+      Added a standalone `lint-imports:` Makefile target (mirrors the
+      `lint-markers` pattern exactly - a narrow, separately-invoked target,
+      not folded into `make lint`) running `uv run -- lint-imports`, added
+      it to `.PHONY` and the `make help` listing, and added a "Validate
+      import layering" step calling `make lint-imports` in
+      `.github/workflows/pr.yml`'s `code-lint` job immediately after the
+      existing "Validate test marker annotations" (`make lint-markers`)
+      step (pr.yml:288 area), per the cited prior art. `tests/unit/workflows/`
+      (21 tests, incl. `test_pr_workflow_path_classifier.py` which parses
+      pr.yml) still pass unmodified - no pin updates were needed.
 
 metadata:
   owners:
@@ -109,7 +138,7 @@ metadata:
     - structural-debt
   estimated_effort: "1-2 days"
   created_date: "2026-07-03"
-  last_updated: "2026-07-03T00:00:00Z"
+  last_updated: "2026-07-04T00:00:00Z"
 
 impact:
   business_value: |
@@ -179,4 +208,16 @@ success_metrics:
   - "CI fails on a newly introduced layering violation (verified by a throwaway local violation during implementation, reverted before merge)."
 
 open_questions:
-  - "Does benchbox.mcp currently have any legitimate dependency on core/platforms (e.g. to expose benchmark data via MCP tools)? If so the 'mcp isolated' contract needs to allow that direction (mcp -> core/platforms) while still forbidding the reverse (core/platforms -> mcp) - verify with a dependency grep before writing the contract in w3."
+  - "Does benchbox.mcp currently have any legitimate dependency on core/platforms (e.g. to expose benchmark data via MCP tools)? If so the 'mcp isolated' contract needs to allow that direction (mcp -> core/platforms) while still forbidding the reverse (core/platforms -> mcp) - verify with a dependency grep before writing the contract in w3.
+    ANSWERED: yes. `grep -rn \"^from benchbox\\|^import benchbox\" benchbox/mcp/**/*.py`
+    shows benchmark.py, discovery.py, analytics.py, visualization.py, results.py,
+    execution.py, cli.py, and resources/registry.py all import from
+    benchbox.core.* and benchbox.utils.* (benchmark_registry, results.exporter,
+    runtime_paths, printing, path_utils, clock, etc.) to expose benchmark
+    execution/results/discovery via MCP tools - an established, intentional
+    dependency. The reverse grep
+    (`grep -rn \"benchbox.mcp\" benchbox/core benchbox/platforms benchbox/cli benchbox/utils`)
+    is empty. Implemented as a one-directional `type = \"forbidden\"` contract
+    (source_modules = core/platforms/cli/utils, forbidden_modules = mcp)
+    rather than `type = \"independence\"`, since independence would also have
+    forbidden the legitimate mcp -> core/utils direction; see w3 notes."
