@@ -1,0 +1,122 @@
+id: spark-aqe-toggle-defects
+title: "Fix Spark adapter AQE toggle: CLI flag cannot disable, run-time config force-re-enables"
+worktree: main
+priority: Medium
+status: Completed
+category: Core Functionality
+
+description: |
+  The Spark adapter cannot actually run with Adaptive Query Execution (AQE)
+  disabled through the standard pipeline, which blocks the AQE on/off comparison
+  planned in the Spark AQE blog post (see
+  _blog/platform-deep-dives/outlines/spark-adaptive-query-execution.md and
+  research file entries B2/B4 in
+  _blog/platform-deep-dives/research/spark-aqe-verification-2026-07-04.md,
+  verified at commit 5fe58367). Three related defects:
+
+    1. CLI flag is enable-only: `--adaptive-enabled` was declared
+       `action="store_true", default=True` (benchbox/platforms/spark.py:300),
+       so passing the flag sets True and omitting it defaults to True. No CLI
+       spelling produces False.
+    2. Session-build disable was a no-op on modern Spark: _get_spark_conf only
+       set the three AQE keys when adaptive_enabled was True and omitted them
+       otherwise (spark.py:439-443). Spark enables AQE by default since 3.2.0,
+       so omission left AQE on even with adaptive_enabled=False.
+    3. Run-time force-re-enable: configure_for_benchmark unconditionally set
+       spark.sql.adaptive.enabled (and the coalesce/skewJoin keys) to "true"
+       for benchmark types olap/analytics/tpch/tpcds/joinorder
+       (spark.py:653-669, called from
+       benchbox/platforms/base/adapter.py:493-494 before query execution),
+       clobbering both adaptive_enabled=False and any spark_config override.
+
+prior_art:
+  - "benchbox/platforms/lakesail.py:207-212 - the same --adaptive-enabled flag already uses argparse.BooleanOptionalAction (--adaptive-enabled / --no-adaptive-enabled) with default=True; reuse this pattern for the Spark adapter."
+  - "benchbox/platforms/spark.py:_get_spark_conf - spark_config merges last (conf.update(self.spark_config)) so explicit user keys win at session build; the fix extends the same precedence to run time."
+  - "tests/unit/platforms/test_lakesail_adapter.py:test_add_cli_arguments_supports_disabling_adaptive - the CLI regression test shape to mirror."
+
+work:
+  - id: w1
+    summary: "Switch --adaptive-enabled to argparse.BooleanOptionalAction"
+    status: done
+    notes: |
+      RESOLVED: benchbox/platforms/spark.py now declares the flag with
+      action=argparse.BooleanOptionalAction, default=True, matching the
+      LakeSail adapter. --no-adaptive-enabled parses to False; the default
+      and the positive spelling stay True, so existing invocations are
+      unchanged.
+
+  - id: w2
+    summary: "Set AQE keys explicitly in both directions in _get_spark_conf"
+    needs: [w1]
+    status: done
+    notes: |
+      RESOLVED: _get_spark_conf sets the three AQE keys (module constant
+      _SPARK_AQE_KEYS) to "true" or "false" per adaptive_enabled, instead of
+      omitting them when disabled. Omission does not disable AQE on Spark
+      3.2.0+ where the upstream default is on. spark_config still merges
+      last, so explicit user overrides continue to win at session build.
+
+  - id: w3
+    summary: "Make configure_for_benchmark honor adaptive_enabled and spark_config"
+    needs: [w2]
+    status: done
+    notes: |
+      RESOLVED: for OLAP benchmark types, configure_for_benchmark now sets
+      each AQE key to spark_config.get(key, computed) where computed follows
+      adaptive_enabled. An explicit spark_config entry is no longer clobbered
+      at run time, and adaptive_enabled=False now survives the full
+      benchbox run pipeline. The CBO settings are unchanged.
+
+  - id: w4
+    summary: "Regression tests for all three defects"
+    needs: [w1, w2, w3]
+    status: done
+    notes: |
+      RESOLVED: tests/unit/platforms/test_spark_adapter.py gains a real-parser
+      CLI test (default/enabled/disabled spellings);
+      tests/unit/platforms/test_spark_coverage.py updates test_aqe_disabled to
+      assert explicit "false" keys (the old assertion encoded defect 2) and
+      adds configure_for_benchmark tests for adaptive_enabled=False and for a
+      spark_config override surviving run time.
+
+deferred:
+  - summary: "Port the same fixes to the sibling Spark-family adapters: lakesail.py (has defect 2 at ~292-295 and defect 3 at ~531-533; its CLI flag is already BooleanOptionalAction so --no-adaptive-enabled currently parses but is silently ineffective at run time) and velox.py (defect 2 at ~266-269), then audit the cloud Spark adapters (CloudSparkConfigMixin, Databricks, EMR/Glue/Dataproc/Synapse/Fabric)"
+    reason: "Different adapters and config surfaces; needs its own pass with per-adapter verification rather than riding along here. Review found the AQE key literals duplicated across spark.py, lakesail.py, velox.py, and pyspark/session.py; consider hoisting _SPARK_AQE_KEYS (and the resolve-then-apply pattern) into _spark_helpers.py as part of that port."
+  - summary: "Update the blog outline section 5 wording once this fix merges (the outline describes the defects in the present tense)"
+    reason: "The outline is redrafted during the drafting TODO anyway; the research file entry is a dated evidence log pinned to commit 5fe58367 and stays as written."
+
+must_preserve:
+  - "Default behavior is unchanged: AQE stays enabled by default (adaptive_enabled defaults True; the three keys are set to 'true')."
+  - "spark_config precedence: an explicit user key wins over adapter-computed values at session build AND at configure_for_benchmark time."
+  - "configure_for_benchmark continues to set spark.sql.cbo.enabled and spark.sql.cbo.joinReorder.enabled for OLAP benchmark types."
+  - "LakeSail adapter behavior untouched."
+
+anti_patterns:
+  - "DO NOT fix by adding a separate --disable-adaptive flag - because two flags for one boolean drift apart - use BooleanOptionalAction like the LakeSail adapter."
+  - "DO NOT drop the AQE keys from _get_spark_conf when disabled - because Spark 3.2.0+ defaults AQE on, so omission silently leaves it enabled - set 'false' explicitly."
+  - "DO NOT remove the configure_for_benchmark AQE block entirely - because plain sessions still benefit from the explicit OLAP settings - make it honor adaptive_enabled and spark_config instead."
+
+verification:
+  - description: "Spark adapter unit tests pass, including the new AQE toggle regressions"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_spark_adapter.py tests/unit/platforms/test_spark_coverage.py -q"
+    expected_output: "all pass except the pre-existing test_spark_in_platform_list isolation flake (fails identically on a clean tree; passes when run alone)"
+  - description: "--no-adaptive-enabled parses to False through a real ArgumentParser"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_spark_adapter.py -k disabling_adaptive -q"
+    expected_output: "1 passed"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/spark.py"
+    - "tests/unit/platforms/test_spark_adapter.py"
+    - "tests/unit/platforms/test_spark_coverage.py"
+    - "_project/TODO/"
+
+success_metrics:
+  - "benchbox run --platform spark ... --no-adaptive-enabled executes queries with spark.sql.adaptive.enabled=false end to end."
+  - "The AQE on/off comparison in the Spark AQE blog outline (section 6) is runnable without code changes."
+
+metadata:
+  tags: [spark, aqe, cli, configuration, bug]
+  estimated_effort: "Small"
+  created_date: "2026-07-04"
+  last_updated: "2026-07-04T13:30:00"

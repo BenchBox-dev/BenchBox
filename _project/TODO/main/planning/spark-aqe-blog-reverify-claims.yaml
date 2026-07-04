@@ -1,0 +1,102 @@
+id: spark-aqe-blog-reverify-claims
+title: "Re-verify search-derived claims in the Spark AQE research file against live primary sources"
+worktree: main
+priority: Medium
+status: Not Started
+category: Content
+
+description: |
+  The Spark AQE blog research file
+  (_blog/platform-deep-dives/research/spark-aqe-verification-2026-07-04.md,
+  merged in PR #954) was produced in a network environment whose egress policy
+  returned HTTP 403 for direct fetches to every vendor documentation site
+  (spark.apache.org, databricks.com, docs.oracle.com, learn.microsoft.com,
+  trino.io, docs.snowflake.com, cloud.google.com, and mirrors). Only the
+  official Apache doc mirrors (downloads.apache.org, archive.apache.org) were
+  reachable, so the Spark documentation claims (Part A1-A4) are verbatim and
+  primary-source verified, but everything else is labeled search-derived:
+  "as reported by search summary, not diffed against the live page".
+
+  Before the post is drafted and published, each search-derived entry must be
+  re-verified against the live primary page from an environment that can reach
+  it, and the provenance labels upgraded (to verbatim quotes with access dates)
+  or the claims softened/dropped. The research file's own Limitations section
+  and the outline's TODO list
+  (_blog/platform-deep-dives/outlines/spark-adaptive-query-execution.md)
+  call this out explicitly.
+
+  Entries to re-verify (see the research file for the intended primary URLs):
+    - A5: Spark 3.0 release notes framing and the release-wide 2x TPC-DS claim.
+    - A6: Databricks AQE blog (2020-05-29): materialization-point mechanism
+      description and the q77 8x / q5 2x / 26-queries-over-1.1x figures.
+    - C1: Oracle SQL Tuning Guide, adaptive query plans / statistics collector.
+    - C2: Microsoft Learn, batch mode adaptive joins and the IQP family
+      (2017 / compat level 140 / batch mode on rowstore in 2019).
+    - C3: Trino adaptive plan optimizations and fault-tolerant execution docs
+      (FTE-only gating, config property names, exchange spooling).
+    - C4: Snowflake SIGMOD 2016 paper (Cascades-style cost-based optimizer,
+      decisions postponed to execution time). Note the research file flags and
+      discards a "rule-based optimizer" search artifact; keep it discarded.
+    - C5: BigQuery query-plan documentation (runtime plan modification,
+      dynamic repartition/coalesce stages).
+    - C6/C7: DuckDB execution-model material; ClickHouse academic overview
+      (VLDB 2024 paper) for the operator-level runtime adaptivity claim.
+  Also spot-check the Spark 3.5.1-quoted config defaults against the current
+  4.x documentation in case defaults changed after 3.5.x.
+
+work:
+  - id: w1
+    summary: "Fetch each primary URL listed in research file entries A5, A6, and C1-C7; capture verbatim quotes with access dates"
+    status: pending
+
+  - id: w2
+    summary: "Update the research file: upgrade provenance labels for confirmed claims, soften or remove any claim the live page does not support, and refresh the cross-check table"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Spot-check Spark 4.x docs for changed AQE defaults and update A1-A4 version notes if needed"
+    needs: [w1]
+    status: pending
+
+  - id: w4
+    summary: "Update the outline TODO checklist and re-run markdownlint plus the em/en-dash scan on both files"
+    needs: [w2, w3]
+    status: pending
+
+must_preserve:
+  - "The research file's tiered provenance discipline: first-party (file:line), primary-source verbatim (with access date), search-derived (labeled) - never silently promote a claim."
+  - "No fabricated or implied BenchBox benchmark results; the measurement plan stays future tense until runs exist (tracked separately by the outline's own TODO list)."
+  - "Zero em-dashes and en-dashes in _blog content (STYLE_GUIDE.md punctuation rule)."
+
+anti_patterns:
+  - "DO NOT replace the dated 2026-07-04 entries in place without noting the re-verification date - because the file is a dated evidence log - append or annotate entries with the new access date."
+  - "DO NOT keep a claim just because removing it weakens the narrative - because the post's credibility rests on the verification file - soften or drop unsupported claims."
+
+verification:
+  - description: "Both blog files pass markdownlint and contain zero U+2013/U+2014 characters"
+    command: "npx --yes markdownlint-cli@0.43.0 --disable MD013 MD033 MD041 -- _blog/platform-deep-dives/outlines/spark-adaptive-query-execution.md _blog/platform-deep-dives/research/spark-aqe-verification-*.md"
+    expected_output: "exit 0; separate grep for em/en dashes returns nothing"
+  - description: "Every remaining search-derived label in the research file is intentional and explained"
+    command: "grep -n 'search-derived\\|SEARCH-DERIVED' _blog/platform-deep-dives/research/spark-aqe-verification-*.md"
+    expected_output: "each hit is either upgraded to a verbatim quote or carries a note explaining why it could not be verified"
+
+scope_limit:
+  only_modify:
+    - "_blog/platform-deep-dives/research/"
+    - "_blog/platform-deep-dives/outlines/spark-adaptive-query-execution.md"
+    - "_project/TODO/"
+
+technical_requirements:
+  constraints:
+    - "Requires a network environment that can reach vendor documentation sites directly (the 2026-07-04 session's egress policy could not)."
+
+success_metrics:
+  - "Every external claim in the research file is either primary-source verbatim with an access date or carries an explicit could-not-verify note."
+  - "The outline's re-verification TODO checkbox is closed and drafting is unblocked."
+
+metadata:
+  tags: [blog, spark, aqe, research, verification, content]
+  estimated_effort: "Small"
+  created_date: "2026-07-04"
+  last_updated: "2026-07-04T13:30:00"

@@ -210,6 +210,18 @@ cite file and line in the draft.
   Spark adapter participates in BenchBox's plan capture phase, which is the
   hook a future AQE post could use to show `EXPLAIN`-level plan differences
   (initial vs adaptively re-optimized plan) rather than timings alone.
+- CORRECTION (2026-07-04, post-merge review on PR #954, fixed in the outline
+  by PR #955): the capture hook is `get_spark_query_plan`
+  (`benchbox/platforms/_spark_helpers.py:112-131`), which runs a fresh
+  `EXPLAIN EXTENDED <query>`. That returns the static, pre-adaptive compile
+  plan, not the executed plan with AQE's runtime decisions applied, so plan
+  capture as it stands can show AQE-on vs AQE-off differences in the initial
+  plan only. Showing the actual switched join operators and coalesced
+  partition counts requires capturing the final adaptive plan (Spark event
+  logs or the post-execution `executedPlan`), which is follow-up work, not
+  an existing capability. The original expectation in the entry above is
+  retained for the record; the outline's section 5/6 wording was corrected
+  accordingly.
 
 ---
 

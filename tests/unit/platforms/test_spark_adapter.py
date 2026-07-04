@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 from unittest.mock import MagicMock, patch
 
@@ -852,6 +853,21 @@ class TestSparkAdapterCliArguments:
         assert any("--executor-cores" in c for c in add_arg_calls)
         assert any("--table-format" in c for c in add_arg_calls)
         assert any("--shuffle-partitions" in c for c in add_arg_calls)
+
+    def test_add_cli_arguments_supports_disabling_adaptive(self, mock_pyspark):
+        """CLI args should allow disabling AQE via --no-adaptive-enabled."""
+        from benchbox.platforms.spark import SparkAdapter
+
+        parser = argparse.ArgumentParser()
+        SparkAdapter.add_cli_arguments(parser)
+
+        default_args = parser.parse_args([])
+        enabled_args = parser.parse_args(["--adaptive-enabled"])
+        disabled_args = parser.parse_args(["--no-adaptive-enabled"])
+
+        assert default_args.adaptive_enabled is True
+        assert enabled_args.adaptive_enabled is True
+        assert disabled_args.adaptive_enabled is False
 
 
 class TestSparkAdapterCreateSession:
