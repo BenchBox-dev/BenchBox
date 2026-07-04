@@ -1068,7 +1068,7 @@ release-cut:
 	@# staged-for-add by a later git add.
 	@# Curation list: A3 of _project/decisions/single-repo-migration.md.
 	-git rm -rf _project _blog results-data results-explorer .claude .codex .gemini
-	-git rm -f .pre-commit-config.yaml todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
+	-git rm -f .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
 	-git rm -f .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
 	@# Stage only the files update_version.py + generate_changelog_entry.py write.
 	@# Explicit list (not `git add -A`) to avoid staging build/cache artifacts.
