@@ -2,8 +2,13 @@
 
 Date: 2026-06-30
 
-Status: Pinned for `replicated_imdb` (the path recommended by
-`_project/decisions/joinorder-scale-stress-decision-2026-06-30.md`).
+Status: Pinned for `replicated_imdb` (recommended by
+`_project/decisions/joinorder-scale-stress-decision-2026-06-30.md` at the time;
+that recommendation was superseded on 2026-07-04 by
+`joinorder-track2-scaling-direction-2026-07-04.md`, which defers
+`replicated_imdb` — this posture record stays pinned for whenever the deferred
+path is picked up, and its risk-parity reasoning is referenced by the
+superseding note for the sampled-from-real direction).
 
 This record pins the licensing posture for the recommended derived scale-up path
 so future archive publishers do not have to re-derive the analysis. It is scoped
@@ -20,10 +25,21 @@ replication of rows and keys) of the canonical IMDb-2013 Parquet archive. It add
 no new source data. Because the derived archive contains only duplicated canonical
 rows, it inherits the canonical archive's redistribution posture: the upstream
 IMDb terms limit the data to personal/non-commercial use, the Harvard Dataverse
-deposit is CC0 1.0, and CC0 does not override IMDb's retained rights. The
-transformation is **not material** to the licensing question (it does not launder
-the upstream terms), so redistribution of `replicated_imdb` carries the same
-residual risk that the project owner already accepted for canonical `joinorder`.
+deposit is CC0 1.0, and CC0 does not override IMDb's retained rights.
+
+Offset replication **is** an alteration under the upstream help-page term that
+IMDb data "must not be altered/republished/resold/repurposed"
+(`joinorder-canonical-data-licensing-2026-05-12.md`), and this record does not
+claim otherwise. The judgement here is an explicitly-argued **risk parity**
+(reworded 2026-07-04; the earlier phrasing "the transformation is not material"
+engaged only the laundering question and left the "altered" term unaddressed):
+the canonical archive's accepted posture already engages the alteration and
+republishing terms — the hosted canonical Parquet is itself a format conversion
+and re-hosting of the Dataverse deposit — and mechanical duplication of existing
+rows adds no new expressive content, does not launder the upstream terms, and
+creates no exposure of a different *kind*. Redistribution of `replicated_imdb`
+therefore carries the same accepted-not-cleared residual risk as canonical
+`joinorder`, and stands or falls with it (a takedown of one applies to both).
 
 If a future scale-up path adds genuinely new synthesized data (e.g.
 `expanded_imdb` profiled graph expansion or a fully `synthetic_schema`

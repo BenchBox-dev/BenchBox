@@ -2,7 +2,7 @@ id: joinorder-track2-scaling-direction-reconciliation
 title: "decision(track2): reconcile replicated_imdb vs sampled-from-real scaling and the stale-stats/licensing caveats"
 worktree: main
 priority: Medium
-status: Identified
+status: Completed
 category: Benchmark Development
 
 description: |
@@ -49,28 +49,48 @@ deps:
 work:
   - id: w1
     summary: "Reconcile replicated_imdb (scale-up) vs sampled-from-real (scale-down) into one decision"
-    status: pending
+    status: done
     notes: |
       Compare against the stated Track-2 research question (statistics
       maintenance x predicate selectivity). Record the pick and rationale as an
       update to, or supersession of, the 2026-06-30 decision note; update the
       scaling-strategy doc's "divergence to reconcile" section accordingly.
+      Done 2026-07-04: project-owner decision = sampled-from-real first,
+      replicated_imdb deferred (prototype stays gated). Recorded in
+      _project/decisions/joinorder-track2-scaling-direction-2026-07-04.md;
+      supersession banner + qualified Recommendation line added to the
+      2026-06-30 note (its anchored `^Recommendation:` gate line intentionally
+      no longer matches, keeping the replicated prototype blocked); resolution
+      note added to the scaling-strategy doc's divergence section.
   - id: w2
     summary: "Resolve whether the offset-replication stale-stats axis is worth pursuing"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Given value-identical disjoint replicas make selectivity scale-invariant,
       state explicitly what statistics signal replicated_imdb does/doesn't expose,
       and reconcile decision-doc lines 124-125 vs 168.
+      Done 2026-07-04: resolved as "not worth pursuing for the Track-2 research
+      question" -- the axis is a uniform xN row-count staleness signal only.
+      Stated explicitly in the superseding ADR's "Why sampled-from-real"
+      section, and the 2026-06-30 note's rationale paragraph now carries the
+      bounded-signal qualification instead of the unqualified "genuine
+      statistics-maintenance axis" claim.
   - id: w3
     summary: "Tighten the licensing 'transformation not material' argument against the 'altered' term"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Address joinorder-canonical-data-licensing-2026-05-12.md:46 ("must not be
       altered") directly in the scale-stress licensing ADR, or soften "not
       material" to an explicitly-argued risk-parity judgement.
+      Done 2026-07-04 (owner chose the soften-to-risk-parity option): the
+      Posture section now concedes replication IS an alteration under the
+      upstream term, drops the "not material" claim, and argues explicit risk
+      parity with the already-accepted canonical posture; the Status header
+      records that the recommendation it was pinned for is deferred but the
+      posture stays pinned, and the superseding ADR extends the same reasoning
+      to the sampled-from-real direction.
 
 verification:
   - description: "The updated/superseding decision names exactly one chosen Track-2 scaling direction"
@@ -83,6 +103,7 @@ open_questions:
     affects:
       - "w1"
     default: "Keep both as explicitly-separate tracks; do not mix into one baseline."
+    resolved_with: "Project-owner decision 2026-07-04: scale-down (sampled-from-real) as the single Track-2 direction; replicated_imdb deferred, prototype stays gated. Recorded in _project/decisions/joinorder-track2-scaling-direction-2026-07-04.md."
 
 metadata:
   tags:
