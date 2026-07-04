@@ -2,8 +2,18 @@
 
 Date: 2026-06-30
 
-Status: Accepted — `replicated_imdb` baseline recommended as the smallest next
-prototype; first-class statistics-phase accounting deferred to a dependency TODO.
+Status: Accepted framework; recommendation superseded 2026-07-04 (the
+`replicated_imdb` baseline pick was replaced by sampled-from-real in
+`joinorder-track2-scaling-direction-2026-07-04.md`); first-class
+statistics-phase accounting deferred to a dependency TODO.
+
+> **Recommendation superseded (2026-07-04):** the Track-2 scaling direction was
+> reconciled by project-owner decision in
+> `_project/decisions/joinorder-track2-scaling-direction-2026-07-04.md`, which
+> picks **sampled-from-real** and defers `replicated_imdb`. This framework's
+> options analysis, validation gates, fixed-vs-parameterized split, and CI-cost
+> model remain in force; only the `replicated_imdb baseline only` recommendation
+> below is superseded.
 
 This is a decision framework, not an implementation. It decides *whether and how*
 BenchBox should add a scaled JOB-derived workload for evaluating optimizer
@@ -175,13 +185,18 @@ they publish under separate result labels.
 
 ## Recommendation and prototype scope
 
-Recommendation: replicated_imdb baseline only
+Recommendation (superseded 2026-07-04 by
+`joinorder-track2-scaling-direction-2026-07-04.md`): replicated_imdb baseline only
 
 Rationale: offset replication is the only option that (a) preserves real
 correlations, (b) reuses the canonical final-result oracle for validation, and
-(c) exposes a genuine statistics-maintenance axis (stale stats after loading
-additional replicas), all at low implementation cost and low user-mislead risk
-when labeled.
+(c) exposes a statistics-maintenance axis (stale stats after loading additional
+replicas), all at low implementation cost and low user-mislead risk when
+labeled. That axis is, however, bounded to a uniform ×N row-count staleness
+signal: because replicas are value-identical and disjoint, per-predicate
+selectivity is scale-invariant, so replication does not exercise the
+correlated/skewed mis-estimation behavior the Track-2 research question
+targets — the deciding factor in the 2026-07-04 supersession.
 It explicitly rejects **profiled graph expansion** for the first prototype:
 synthetic correlations can look plausible while destroying the very JOB signal the
 benchmark exists to measure, and graph expansion has no independent validation

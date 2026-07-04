@@ -131,6 +131,14 @@ rather than sampling rows independently, which would shear the joins.
 
 This is a recommendation, not a lock-in.
 
+> **Resolved (2026-07-04):** the divergence described below was reconciled by
+> project-owner decision in
+> `_project/decisions/joinorder-track2-scaling-direction-2026-07-04.md`:
+> Track 2 pursues **Option B (sampled-from-real)** as its single scaling
+> direction; `replicated_imdb` is deferred (its prototype seed stays gated),
+> and the two directions are not run as parallel tracks. The paragraph below
+> is kept as the record of why the reconciliation was needed.
+
 A genuine divergence to reconcile at kickoff: the separate scale-stress
 *decision framework*
 (`_project/decisions/joinorder-scale-stress-decision-2026-06-30.md`) reaches a

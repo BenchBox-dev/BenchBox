@@ -18,12 +18,17 @@ description: |
   recommends Option B (sampled-from-real with title-stratified preservation) as
   the leading candidate without locking in.
 
-  This is a placeholder seed at status Identified. Final design and lock-in
-  happen when Track 2 is picked up; the work units below are summary-level. The
-  parallel decision framework
-  (`_project/decisions/joinorder-scale-stress-decision-2026-06-30.md`)
-  independently recommends replicated_imdb as the lowest-risk upward baseline;
-  Track-2 kickoff reconciles the sampling (down) and replication (up) directions.
+  This is a placeholder seed at status Identified. Final design happens when
+  Track 2 is picked up; the work units below are summary-level.
+
+  Direction resolved (2026-07-04): the sampling-vs-replication divergence was
+  reconciled by project-owner decision in
+  `_project/decisions/joinorder-track2-scaling-direction-2026-07-04.md` --
+  Track 2 implements **sampled-from-real (Option B)** as its single scaling
+  direction; replicated_imdb is deferred (its prototype seed stays gated) and
+  the 2026-06-30 decision framework's recommendation line is superseded. w1
+  below is therefore no longer a direction choice: it confirms scale-factor
+  semantics and prototype scope for the sampling axis only.
 
 deps:
   needs:
@@ -34,9 +39,11 @@ work:
     summary: "Lock in the scaling strategy from the options analysis"
     status: pending
     notes: |
-      Confirm or revise the design doc's Option B recommendation against the
-      research question at Track-2 kickoff. Decide the scale direction
-      (sampled-down vs replicated-up vs both) and the scale-factor semantics.
+      The scale direction is already decided (sampled-from-real; see the
+      2026-07-04 decision note in the description -- do not re-litigate it or
+      mix in replication). Remaining lock-in scope: scale-factor semantics for
+      the sampling axis (which fractions, how labeled), title-stratification
+      parameters, and the per-sample-point oracle regeneration plan.
 
   - id: w2
     summary: "Implement the chosen generator with a validation oracle"
