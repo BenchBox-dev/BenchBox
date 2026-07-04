@@ -2,7 +2,8 @@ id: read-primitives-waivers-classified-divergence
 title: "Convert Read Primitives' 17 bare-string known-divergence waivers to detail-bounded ClassifiedDivergence"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-04"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -65,7 +66,7 @@ prior_art:
 work:
   - id: w1
     summary: "Write and apply a sketch-error-bounded predicate for the approx_count_distinct_*/approx_quantile_* classes (6 keys)"
-    status: pending
+    status: done
     notes: |
       HyperLogLog / T-Digest have documented error bounds (HLL: ~2% relative
       error at BenchBox's precision; T-Digest: small relative error near the
@@ -77,9 +78,20 @@ work:
       measured empirical bound at this benchmark's cardinality) in the reason
       string.
 
+      DONE. `_read_primitives_sketch_residue` (cross_surface.py) pins each of
+      the 3 sub-queries to its documented result column(s) via
+      `_READ_PRIMITIVES_SKETCH_COLUMNS` (grouping-key columns excluded) and
+      bounds relative error to `_READ_PRIMITIVES_SKETCH_RELATIVE_ERROR_MAX =
+      0.15`, derived from measured residues at this cell: simple 4.2-4.6%,
+      groupby 10.0-10.6%, quantile 3.8% - bound is ~1.4x the largest observed,
+      documented HLL (~2% nominal at 12-bit precision) as the theoretical basis
+      with the empirical measurement as the actual derivation (per-group
+      cardinality pushes the residue above the textbook figure). Gate stays
+      green; predicate rejects wrong-column and >15%-off values (unit-tested).
+
   - id: w2
     summary: "Write and apply a DECIMAL-scale epsilon predicate for statistical_percentiles_* and optimizer_common_subexpression_* (4 keys)"
-    status: pending
+    status: done
     notes: |
       Reuse `_is_two_decimal_scale` (cross_surface.py:770-782) to confirm the SQL
       side is DECIMAL(15,2)-rounded, and bound `abs(orig - variant)` to a sub-cent
@@ -88,9 +100,22 @@ work:
       of predicate; write one helper parameterized by column index if the shapes
       allow it, or two small predicates if the value positions differ.
 
+      DONE. One shared helper `_read_primitives_decimal_scale_residue(column,
+      max_residue)` parameterizes both: `_read_primitives_percentile_decimal_residue`
+      pins statistical_percentiles' p95 (column 6) to
+      `_READ_PRIMITIVES_PERCENTILE_RESIDUE_MAX = 0.005 + 1e-6` (half-cent, same
+      derivation as h2odb Q9 - measured residue 0.004);
+      `_read_primitives_round_decimal_residue` pins
+      optimizer_common_subexpression's rounded_revenue (also column 6) to
+      `_READ_PRIMITIVES_ROUND_RESIDUE_MAX = 0.01 + 1e-6` (a full cent - DuckDB
+      ROUND() vs float rounding can flip a full unit at the boundary, measured
+      residue exactly 0.01, wider than the percentile class's sub-cent bound by
+      design). Both re-derived independently, not copied from
+      `_H2ODB_Q9_RESIDUE_MAX`, even where numerically identical.
+
   - id: w3
     summary: "Write and apply a tie-membership predicate for min_by_complex_* (2 keys)"
-    status: pending
+    status: done
     notes: |
       ARG_MIN ties: the predicate must confirm the value column (the price/metric
       being minimized) matches exactly across surfaces and only the tie-broken
@@ -100,9 +125,19 @@ work:
       picked names differ - never accept a divergence where the metric itself
       differs).
 
+      DONE (bounded predicate variant, not full tie-set lookup). Projection is
+      [p_brand(0), cheapest_part_name(1), cheapest_part_type(2), min_price(3)];
+      `_read_primitives_argmin_tie` accepts a Value-mismatch ONLY on columns 1-2
+      (the two ARG_MIN outputs), rejecting the p_brand grouping key (0) and
+      min_price (3) - so the metric itself must always match. Documented the
+      SAME residual blind spot as h2odb Q9 (comparator reports only the first
+      positional mismatch per row, so a simultaneous min_price bug behind an
+      accepted name/type tie-break would not be visible) rather than silently
+      accepting a wider guarantee than is actually enforced.
+
   - id: w4
     summary: "Write and apply a text-shape predicate for json_aggregates_* (2 keys)"
-    status: pending
+    status: done
     notes: |
       JSON_GROUP_ARRAY/OBJECT text vs native containers cannot be bounded
       numerically. Write a predicate that parses both sides' JSON, confirms they
@@ -112,9 +147,26 @@ work:
       value) - i.e. convert this from "match this label" to "match this
       structural equality after parsing," not merely narrow the string.
 
+      DONE, with a finding beyond the TODO's original framing: the two gated
+      cells diverge in DIFFERENT shapes, verified via a diagnostic probe of the
+      built cell (both backends return the SAME 25 TPC-H p_brand values as the
+      SQL reference - not a missing/extra group):
+        * json_aggregates_pandas is the anticipated "Value mismatch" (JSON text
+          vs native list/dict) - `_read_primitives_json_equivalent` parses both
+          sides (json.loads, falling back to ast.literal_eval) and compares
+          structurally (order-insensitive lists, number-format-insensitive
+          values via round(...,2)); a missing/added/wrong element compares
+          unequal and is rejected.
+        * json_aggregates_expression is instead an "ORDER BY key mismatch" -
+          the Polars expression aggregate does not sort its groups. Accepted
+          ONLY when both reported keys are members of TPC-H's fixed 25-value
+          p_brand domain (`_READ_PRIMITIVES_BRAND_DOMAIN`), so an out-of-domain
+          key (a genuinely wrong group) is still rejected. This is a narrower,
+          more defensible bound than "any ORDER BY key mismatch on this key."
+
   - id: w5
     summary: "Write and apply a dtype-gap predicate (or confirm no-comparison classification) for map_* (3 keys)"
-    status: pending
+    status: done
     notes: |
       The Map waivers are different in kind: `_READ_PRIMITIVES_POLARS_MAP`'s
       rationale is "no expression-surface result to compare" (the query is in
@@ -129,10 +181,22 @@ work:
       (e.g. pandas side is compared even though Polars is skipped), write a
       predicate mirroring w4's structural-equality approach for the pandas cells.
 
+      DONE (dtype-gap predicate variant). Confirmed: only the 3 "_expression"
+      keys ever appear in known_divergences (no "_pandas" counterparts are
+      declared) and the live baseline output shows exactly 3 divergent cells,
+      each an `error:` (execution failure), never a Value mismatch - pandas
+      supports dict natively and matches its SQL cleanly. Wrote
+      `_read_primitives_polars_map_gap`, which accepts ONLY a detail matching
+      the documented "not supported on Polars (no native Map dtype)" signature
+      (verified against both raise sites: expression_family.py's
+      map_from_entries and unified_frame.py's Map accessors) and rejects any
+      other execution error or a Value mismatch (which would mean Polars
+      started supporting Map but got it wrong).
+
   - id: w6
     summary: "Add a mutation probe per converted waiver class proving the gate goes red on an out-of-bounds divergence"
     needs: [w1, w2, w3, w4, w5]
-    status: pending
+    status: done
     notes: |
       Extend tests/integration/test_cross_surface_mutation_sensitivity.py's
       pattern (dataclasses.replace on the DataFrameQuery, drive
@@ -144,6 +208,20 @@ work:
       the old bare-string waiver). Also assert a value just INSIDE the bound
       still passes, so the predicate is not accidentally tightened into a new
       false-positive source.
+
+      DONE via the synthetic-unit style this TODO explicitly permits as an
+      alternative (cheaper than rebuilding read_primitives' SF=0.05 cell in the
+      heavy integration harness). Added to
+      tests/unit/core/equivalence/test_cross_surface.py: one predicate-level
+      test per converted class (sketch, percentile, round, argmin-tie,
+      json-aggregates, polars-map-gap), each asserting the documented in-bounds
+      detail is ACCEPTED and a synthetic out-of-bounds/wrong-column/wrong-error
+      detail is REJECTED; plus one end-to-end `_report`-level test
+      (`test_read_primitives_baseline_report_accepts_documented_cells_rejects_regressions`)
+      that replays the real 17-key baseline through `_report` (green) and then
+      swaps one key's divergence for a 10x-off sketch value (red, unclassified).
+      Did not additionally extend the integration mutation-sensitivity suite -
+      see deviations below.
 
 deferred:
   - summary: "Apply the same ClassifiedDivergence conversion to any bare-string waivers in other gated benchmarks beyond read_primitives (e.g. future additions to GATES)."
@@ -185,6 +263,45 @@ scope_limit:
   do_not_modify:
     - "benchbox/core/tpchavoc/"
     - "benchbox/core/read_primitives/"
+
+completion_notes: |
+  Files actually touched: benchbox/core/equivalence/cross_surface.py (the 17
+  waivers plus their new predicates/bound constants),
+  tests/unit/core/equivalence/test_cross_surface.py (predicate-level +
+  end-to-end `_report`-level tests), and this TODO file. No files under
+  benchbox/core/read_primitives/ or benchbox/core/tpchavoc/ were modified,
+  per scope_limit.
+
+  Deviations from the plan as written:
+    - w6's mutation probe was implemented as synthetic-unit tests in
+      tests/unit/core/equivalence/test_cross_surface.py rather than by
+      extending tests/integration/test_cross_surface_mutation_sensitivity.py.
+      The TODO's own w6 notes explicitly offer this as an alternative; it was
+      chosen because it is far cheaper (no SF=0.05 data build/load) and can
+      assert BOTH the in-bounds accept and the out-of-bounds reject directly
+      against each predicate, which the integration harness's single-mutation
+      pattern does not do per class. The `verification` section's second
+      command (`pytest ... -k read_primitives -m slow`) was NOT run/extended
+      as a result - it still only exercises the pre-existing `orderby_bigint`
+      target, unrelated to the 17 converted keys.
+    - json_aggregates_expression's live divergence is an "ORDER BY key
+      mismatch" (Polars' expression aggregate does not sort its groups),
+      not the "Value mismatch" (JSON-text-vs-container) shape the TODO's
+      description anticipated for both keys. Confirmed via a one-off
+      diagnostic script (not committed) that both backends return the SAME
+      25-brand set as the SQL reference, just reordered - so the predicate
+      accepts a reorder bounded to TPC-H's fixed p_brand domain rather than
+      forcing a JSON-parse comparison that does not apply to this cell's
+      actual failure mode. json_aggregates_pandas IS the anticipated
+      JSON-text-vs-container shape and is handled by structural JSON
+      comparison as originally envisioned.
+
+  Open question for the code-owner review: is the json_aggregates_expression
+  "missing ORDER BY in the Polars aggregate" itself worth a follow-up fix
+  (adding `.sort()` to the expression implementation) rather than a permanent
+  waiver? Read Primitives' benchbox/core/read_primitives/ is out of scope for
+  this TODO (scope_limit), so the underlying implementation was left
+  unchanged; the waiver is bounded (domain-checked) rather than removed.
 
 success_metrics:
   - "0 of the 17 read_primitives known_divergences entries remain a bare str; all are ClassifiedDivergence with a documented, bounded accepts predicate."

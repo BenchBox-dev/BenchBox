@@ -854,12 +854,70 @@ _H2ODB_KNOWN_DIVERGENCES: dict[str, str | ClassifiedDivergence] = dict.fromkeys(
 # exercises engine features that have no faithful exact DataFrame equivalent:
 # approximate sketches, DECIMAL-scale arithmetic, JSON text, and a Polars Map gap.
 # Each is the last-resort classification (with rationale), not a masked defect.
+# Every waiver below is a ClassifiedDivergence (not a bare string): a predicate
+# pins the accepted divergence to its documented signature (column position,
+# numeric bound, or execution-error text), mirroring _h2odb_q9_decimal_residue
+# and _is_clickbench_q18_arbitrary_topn, so a genuinely wrong value on the same
+# key is still reported as an unclassified gate failure.
 _READ_PRIMITIVES_APPROX = (
     "DuckDB APPROX_COUNT_DISTINCT (HyperLogLog) and APPROX_QUANTILE (T-Digest) are "
     "inherently approximate sketches; the DataFrame computes the exact distinct "
     "count / quantile, so the values differ by the sketch's error - approximate by "
     "construction, not a logic divergence."
 )
+# Sketch-error bound. DuckDB's APPROX_COUNT_DISTINCT uses HyperLogLog at its
+# default (12-bit, ~4096-register) precision, nominally ~2% relative standard
+# error at large cardinalities; APPROX_QUANTILE's T-Digest has a small error near
+# the middle of the distribution. Per-group cardinalities in this benchmark's
+# bounded SF=0.05 cell are far smaller than a full-table HLL estimate (tens of
+# thousands, split across a 2-column GROUP BY), which pushes the empirical
+# residue toward the tail of that error distribution - measured at this cell:
+#   approx_count_distinct_simple:    4969 vs 5210 (4.6%), 4990 vs 5210 (4.2%)
+#   approx_count_distinct_groupby:  32458 vs 36069 (10.0%), 32235 vs 36069 (10.6%)
+#   approx_quantile_groupby:          25.0 vs 26 (3.8%)
+# Bounded at 15% - about 1.4x the largest observed residue, comfortably wide
+# enough to absorb engine-version HLL/T-Digest implementation drift while still
+# rejecting a sketch off by an order of magnitude (a broken sketch merge), per
+# the mutation probe in tests/unit/core/equivalence/.
+_READ_PRIMITIVES_SKETCH_RELATIVE_ERROR_MAX = 0.15
+# Query-id substring -> result-column indices where the sketch value lives. The
+# grouping-key columns (l_returnflag/l_linestatus/l_shipmode) are deliberately
+# absent, so a wrong grouping key is still rejected as an unclassified mismatch.
+_READ_PRIMITIVES_SKETCH_COLUMNS: dict[str, tuple[int, ...]] = {
+    "approx_count_distinct_simple": (0,),
+    "approx_count_distinct_groupby": (2, 3),
+    "approx_quantile_groupby": (1,),
+}
+
+
+def _read_primitives_sketch_residue(divergence: SurfaceDivergence) -> bool:
+    """Accept only a bounded-relative-error sketch value in its documented column.
+
+    Rejects a row/column-count mismatch, an execution error, a grouping-key
+    mismatch, or a numeric difference beyond
+    :data:`_READ_PRIMITIVES_SKETCH_RELATIVE_ERROR_MAX`, so a broken sketch merge
+    (or an off-by-a-large-factor regression) is still reported as unclassified.
+    """
+    match = _VALUE_MISMATCH_RE.search(str(divergence.detail))
+    if match is None:
+        return False
+    query_id = str(divergence.query_id)
+    allowed_columns = next(
+        (columns for name, columns in _READ_PRIMITIVES_SKETCH_COLUMNS.items() if name in query_id),
+        None,
+    )
+    if allowed_columns is None or int(match.group("col")) not in allowed_columns:
+        return False
+    orig = _first_number(match.group("orig"))
+    variant = _first_number(match.group("variant"))
+    if orig is None or variant is None:
+        return False
+    denominator = abs(orig) if orig != 0 else abs(variant)
+    if denominator == 0:
+        return orig == variant
+    return abs(orig - variant) / denominator <= _READ_PRIMITIVES_SKETCH_RELATIVE_ERROR_MAX
+
+
 _READ_PRIMITIVES_DECIMAL_PERCENTILE = (
     "PERCENTILE_CONT over DECIMAL(15,2) returns a 2-decimal value on the SQL surface; "
     "the DataFrame interpolates in float64. Both use linear interpolation - only the "
@@ -870,27 +928,201 @@ _READ_PRIMITIVES_DECIMAL_ROUND = (
     "float64 (DataFrame) flips at a half-cent rounding boundary; a DECIMAL-vs-float "
     "presentational residue (every other column matches), not a logic divergence."
 )
+# Both bounds share _h2odb_q9_decimal_residue's derivation (a DECIMAL-scale
+# rounding residue pinned to one documented output column), applied to two
+# different read_primitives arithmetic paths with different maximum residues -
+# do not copy h2odb's constant blind, each is re-derived from this benchmark's
+# own measured cell:
+#   * statistical_percentiles' p95 column is a DECIMAL(15,2) PERCENTILE_CONT
+#     result (same shape as h2odb Q9): the residue is bounded by half the
+#     column's 0.01 unit (measured: 74356.28 vs 74356.28399999996, a 0.004 gap).
+#   * optimizer_common_subexpression's rounded_revenue is DuckDB's ROUND() of a
+#     DECIMAL product vs Python/NumPy rounding of the same product in float64;
+#     the two rounding rules can flip a FULL cent at a half-cent boundary, not
+#     just sub-cent (measured: 4721058.05 vs 4721058.04, exactly a 0.01 gap).
+_READ_PRIMITIVES_PERCENTILE_P95_COLUMN = 6
+_READ_PRIMITIVES_PERCENTILE_RESIDUE_MAX = 0.005 + 1e-6
+_READ_PRIMITIVES_ROUND_COLUMN = 6
+_READ_PRIMITIVES_ROUND_RESIDUE_MAX = 0.01 + 1e-6
+
+
+def _read_primitives_decimal_scale_residue(divergence: SurfaceDivergence, *, column: int, max_residue: float) -> bool:
+    """Shared DECIMAL(<=2)-scale residue check, pinned to one column and bound.
+
+    Mirrors :func:`_h2odb_q9_decimal_residue`: the SQL (Original) side must
+    already be at <=2-decimal scale (the rounding signature) and the numeric gap
+    must be within ``max_residue`` - a wrong value, a wrong column, or a
+    structural mismatch (row/column count, execution error) is rejected.
+    """
+    match = _VALUE_MISMATCH_RE.search(str(divergence.detail))
+    if match is None:
+        return False
+    if int(match.group("col")) != column:
+        return False
+    orig_text = match.group("orig")
+    orig = _first_number(orig_text)
+    variant = _first_number(match.group("variant"))
+    if orig is None or variant is None:
+        return False
+    if not _is_two_decimal_scale(orig_text):
+        return False
+    return abs(orig - variant) <= max_residue
+
+
+def _read_primitives_percentile_decimal_residue(divergence: SurfaceDivergence) -> bool:
+    """Accept only statistical_percentiles' p95 DECIMAL(15,2)-scale residue (column 6)."""
+    return _read_primitives_decimal_scale_residue(
+        divergence,
+        column=_READ_PRIMITIVES_PERCENTILE_P95_COLUMN,
+        max_residue=_READ_PRIMITIVES_PERCENTILE_RESIDUE_MAX,
+    )
+
+
+def _read_primitives_round_decimal_residue(divergence: SurfaceDivergence) -> bool:
+    """Accept only optimizer_common_subexpression's ROUND() half-cent flip (column 6)."""
+    return _read_primitives_decimal_scale_residue(
+        divergence,
+        column=_READ_PRIMITIVES_ROUND_COLUMN,
+        max_residue=_READ_PRIMITIVES_ROUND_RESIDUE_MAX,
+    )
+
+
 _READ_PRIMITIVES_ARGMIN_TIE = (
     "ARG_MIN(p_name, p_retailprice) is non-deterministic when several parts in a brand "
     "share the minimum retail price; DuckDB's tie pick is engine-defined and not "
     "reproducible by a fixed DataFrame tie-break (the min_price value matches exactly)."
 )
+# min_by_complex's projection is [p_brand(0), cheapest_part_name(1),
+# cheapest_part_type(2), min_price(3)]; only the two ARG_MIN-tie-broken columns
+# may differ. A p_brand (grouping key) or min_price mismatch - even a numerically
+# close one - is a real regression and is rejected.
+#
+# Residual blind spot (validator-imposed, the same shape as h2odb Q9's
+# documented one): the comparator reports only the FIRST positional mismatch per
+# row, so if cheapest_part_name (column 1) differs AND min_price (column 3) is
+# ALSO wrong on the same row, only the accepted column-1 tie-break is visible
+# here. Pinning to columns 1-2 only (never 0 or 3) minimizes, but cannot fully
+# close, that blind spot; closing it fully would require the validator to
+# surface every mismatch per row, not just the first.
+_READ_PRIMITIVES_ARGMIN_TIE_COLUMNS = (1, 2)
+
+
+def _read_primitives_argmin_tie(divergence: SurfaceDivergence) -> bool:
+    """Accept only a tie-broken name/type column mismatch, never the brand key or price."""
+    match = _VALUE_MISMATCH_RE.search(str(divergence.detail))
+    if match is None:
+        return False
+    return int(match.group("col")) in _READ_PRIMITIVES_ARGMIN_TIE_COLUMNS
+
+
 _READ_PRIMITIVES_JSON_TEXT = (
     "JSON_GROUP_ARRAY/JSON_GROUP_OBJECT return JSON *text* with engine-defined element/"
     "key order and number formatting; the DataFrame produces native list/dict "
     "containers. Representational difference, not a logic divergence."
 )
+# json_aggregates' two gated cells diverge in TWO different observed shapes, both
+# accepted here by structural (not textual) equivalence rather than a blanket
+# "match this label":
+#   * json_aggregates_pandas: a "Value mismatch" on column 1 (part_names, a
+#     JSON_GROUP_ARRAY) or column 2 (part_prices, a JSON_GROUP_OBJECT) - the SQL
+#     side is JSON *text*, the DataFrame side a native list/dict. Parse both and
+#     compare structurally (order-insensitive, number-format-insensitive); a
+#     missing/added/wrong element compares unequal and is rejected.
+#   * json_aggregates_expression: an "ORDER BY key mismatch" on the p_brand
+#     grouping column - verified (via a diagnostic probe of the built cell) that
+#     the Polars expression aggregate returns all 25 TPC-H p_brand values, the
+#     SAME set the SQL reference returns, in an engine-arbitrary (unsorted)
+#     order; it is not a missing/extra group. Accept a reordering only when BOTH
+#     reported keys are members of TPC-H's fixed 25-value p_brand domain, so a
+#     genuinely wrong grouping key (a value outside that domain) - or a group
+#     COUNT mismatch, which the validator reports as a different message and this
+#     predicate does not match - is still rejected as an unclassified mismatch.
+_READ_PRIMITIVES_BRAND_DOMAIN = frozenset(f"Brand#{m}{n}" for m in range(1, 6) for n in range(1, 6))
+_ORDER_KEY_MISMATCH_RE = re.compile(
+    r"Original key:\s*\('(?P<orig>[^']*)',\),\s*Variant key:\s*\('(?P<variant>[^']*)',\)"
+)
+
+
+def _read_primitives_json_parse(text: str) -> Any:
+    """Parse a JSON-text or Python-repr container into a comparable Python value."""
+    import ast
+    import json
+
+    try:
+        return json.loads(text)
+    except (ValueError, TypeError):
+        return ast.literal_eval(text)
+
+
+def _read_primitives_json_equivalent(original: str, variant: str) -> bool:
+    """True if two JSON-text/native-container reprs hold the same content.
+
+    Order-insensitive (JSON_GROUP_ARRAY element order and dict key order are
+    engine-defined) and number-format-insensitive (DECIMAL text vs float); a
+    genuinely missing/added/wrong element or value still compares unequal.
+    """
+
+    def normalize(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {str(key): normalize(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return sorted((normalize(item) for item in value), key=str)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return round(float(value), 2)
+        return value
+
+    try:
+        return normalize(_read_primitives_json_parse(original)) == normalize(_read_primitives_json_parse(variant))
+    except (ValueError, SyntaxError):
+        return False
+
+
+def _read_primitives_json_agg_accepts(divergence: SurfaceDivergence) -> bool:
+    """Accept the documented JSON-text-vs-container shape, structurally verified."""
+    detail = str(divergence.detail)
+    order_match = _ORDER_KEY_MISMATCH_RE.search(detail)
+    if order_match is not None:
+        return (
+            order_match.group("orig") in _READ_PRIMITIVES_BRAND_DOMAIN
+            and order_match.group("variant") in _READ_PRIMITIVES_BRAND_DOMAIN
+        )
+    value_match = _VALUE_MISMATCH_RE.search(detail)
+    if value_match is None:
+        return False
+    if int(value_match.group("col")) not in (1, 2):
+        return False
+    return _read_primitives_json_equivalent(value_match.group("orig"), value_match.group("variant"))
+
+
 _READ_PRIMITIVES_POLARS_MAP = (
     "Polars (the expression backend) has no native Map dtype, so MAP_FROM_ENTRIES is "
     "unsupported (the query is in the benchmark's SKIP_FOR_POLARS set); there is no "
     "expression-surface result to compare. The pandas surface matches its SQL."
 )
+# Confirmed (TODO w5): only the three "_expression" cells ever reach
+# known_divergences - the pandas cells are never classified here because pandas
+# supports dict natively and matches its SQL cleanly (no pandas key is declared
+# above, so a pandas divergence on these queries would surface as unclassified,
+# which is intended). Accept ONLY the documented "no native Map dtype" execution
+# error text (both raise sites use it verbatim - expression_family.py's
+# map_from_entries and unified_frame.py's Map accessors); a DIFFERENT execution
+# error, or a Value mismatch (Polars started supporting Map but produced a wrong
+# value), is rejected as unclassified.
+_READ_PRIMITIVES_POLARS_MAP_ERROR_SIGNATURE = "not supported on Polars (no native Map dtype)"
+
+
+def _read_primitives_polars_map_gap(divergence: SurfaceDivergence) -> bool:
+    """Accept only the documented Polars Map-dtype execution gap, nothing else."""
+    detail = str(divergence.detail)
+    return detail.startswith("error: ") and detail.endswith(_READ_PRIMITIVES_POLARS_MAP_ERROR_SIGNATURE)
+
+
 # Read Primitives bounded-cell scale. Its TPC-H generator base means SF=1.0 is
 # ~6M lineitem rows; SF=0.05 gives a ~300k-row cell that keeps the selective
 # filter/aggregate queries discriminating while staying a single bounded cell.
 _READ_PRIMITIVES_SCALE = 0.05
 
-_READ_PRIMITIVES_KNOWN_DIVERGENCES: dict[str, str] = {
+_READ_PRIMITIVES_KNOWN_DIVERGENCES: dict[str, str | ClassifiedDivergence] = {
     **dict.fromkeys(
         (
             "approx_count_distinct_simple_expression",
@@ -900,21 +1132,27 @@ _READ_PRIMITIVES_KNOWN_DIVERGENCES: dict[str, str] = {
             "approx_quantile_groupby_expression",
             "approx_quantile_groupby_pandas",
         ),
-        _READ_PRIMITIVES_APPROX,
+        ClassifiedDivergence(_READ_PRIMITIVES_APPROX, _read_primitives_sketch_residue),
     ),
     **dict.fromkeys(
         ("statistical_percentiles_expression", "statistical_percentiles_pandas"),
-        _READ_PRIMITIVES_DECIMAL_PERCENTILE,
+        ClassifiedDivergence(_READ_PRIMITIVES_DECIMAL_PERCENTILE, _read_primitives_percentile_decimal_residue),
     ),
     **dict.fromkeys(
         ("optimizer_common_subexpression_expression", "optimizer_common_subexpression_pandas"),
-        _READ_PRIMITIVES_DECIMAL_ROUND,
+        ClassifiedDivergence(_READ_PRIMITIVES_DECIMAL_ROUND, _read_primitives_round_decimal_residue),
     ),
-    **dict.fromkeys(("min_by_complex_expression", "min_by_complex_pandas"), _READ_PRIMITIVES_ARGMIN_TIE),
-    **dict.fromkeys(("json_aggregates_expression", "json_aggregates_pandas"), _READ_PRIMITIVES_JSON_TEXT),
+    **dict.fromkeys(
+        ("min_by_complex_expression", "min_by_complex_pandas"),
+        ClassifiedDivergence(_READ_PRIMITIVES_ARGMIN_TIE, _read_primitives_argmin_tie),
+    ),
+    **dict.fromkeys(
+        ("json_aggregates_expression", "json_aggregates_pandas"),
+        ClassifiedDivergence(_READ_PRIMITIVES_JSON_TEXT, _read_primitives_json_agg_accepts),
+    ),
     **dict.fromkeys(
         ("map_access_expression", "map_construction_expression", "map_keys_values_expression"),
-        _READ_PRIMITIVES_POLARS_MAP,
+        ClassifiedDivergence(_READ_PRIMITIVES_POLARS_MAP, _read_primitives_polars_map_gap),
     ),
 }
 _READ_PRIMITIVES_LEGITIMATELY_EMPTY: dict[Any, str] = {

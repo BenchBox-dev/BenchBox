@@ -866,3 +866,374 @@ def test_order_by_result_key_refuses_unmappable_keys():
     assert resolve("SELECT a FROM t ORDER BY b") is None  # ORDER BY a non-projected column
     assert resolve("SELECT a, b FROM t ORDER BY 5") is None  # out-of-range ordinal
     assert resolve("this is not sql ;;;") is None  # unparseable
+
+
+def test_read_primitives_known_divergences_are_all_classified():
+    """All 17 read_primitives waivers are ClassifiedDivergence, none a bare string.
+
+    Converts the previously bare-``str`` ``known_divergences`` (which tolerated
+    ANY divergence on the key) so a genuine regression on the same cell is still
+    reported as unclassified - see the module's read_primitives section.
+    """
+    from benchbox.core.equivalence.cross_surface import GATES
+
+    known = GATES["read_primitives"].known_divergences
+    assert len(known) == 17
+    assert all(isinstance(entry, ClassifiedDivergence) for entry in known.values())
+    assert set(known) == {
+        "approx_count_distinct_simple_expression",
+        "approx_count_distinct_simple_pandas",
+        "approx_count_distinct_groupby_expression",
+        "approx_count_distinct_groupby_pandas",
+        "approx_quantile_groupby_expression",
+        "approx_quantile_groupby_pandas",
+        "statistical_percentiles_expression",
+        "statistical_percentiles_pandas",
+        "optimizer_common_subexpression_expression",
+        "optimizer_common_subexpression_pandas",
+        "min_by_complex_expression",
+        "min_by_complex_pandas",
+        "json_aggregates_expression",
+        "json_aggregates_pandas",
+        "map_access_expression",
+        "map_construction_expression",
+        "map_keys_values_expression",
+    }
+
+
+def test_read_primitives_sketch_residue_predicate_accepts_bounded_rejects_wide():
+    """The HLL/T-Digest sketch predicate accepts <=15% relative error in its
+    documented column and rejects a wider gap, the wrong column, or a structural
+    mismatch - so a broken sketch merge (e.g. off by 10x) is unclassified."""
+    from benchbox.core.equivalence.cross_surface import _read_primitives_sketch_residue
+
+    def d(query: str, col: int, orig: str, variant: str) -> SurfaceDivergence:
+        return SurfaceDivergence(
+            f"Q{query}",
+            "expression",
+            f"Q{query}.0: Value mismatch at row 0, column {col}. Original: {orig}, Variant: {variant}",
+        )
+
+    # ACCEPT: the documented in-bounds residues, one per sketch key.
+    assert _read_primitives_sketch_residue(d("approx_count_distinct_simple", 0, "5210", "4969"))  # 4.6%
+    assert _read_primitives_sketch_residue(d("approx_count_distinct_groupby", 2, "36069", "32458"))  # 10.0%
+    assert _read_primitives_sketch_residue(d("approx_count_distinct_groupby", 3, "36069", "32458"))  # unique_parts col
+    assert _read_primitives_sketch_residue(d("approx_quantile_groupby", 1, "26", "25.0"))  # 3.8%
+
+    # ACCEPT: right at the 15% bound.
+    assert _read_primitives_sketch_residue(d("approx_count_distinct_simple", 0, "1000", "850.001"))
+
+    # REJECT: an out-of-bounds sketch value - a broken sketch merge off by 10x.
+    assert not _read_primitives_sketch_residue(d("approx_count_distinct_simple", 0, "5210", "521"))
+    assert not _read_primitives_sketch_residue(d("approx_count_distinct_groupby", 2, "36069", "3600"))
+    # REJECT: just past the 15% bound.
+    assert not _read_primitives_sketch_residue(d("approx_count_distinct_simple", 0, "1000", "849"))
+
+    # REJECT: the grouping-key columns (l_returnflag/l_linestatus/l_shipmode), even
+    # with a numerically tiny difference - a wrong group is a real regression.
+    assert not _read_primitives_sketch_residue(d("approx_count_distinct_groupby", 0, "R", "N"))
+    assert not _read_primitives_sketch_residue(d("approx_quantile_groupby", 0, "MAIL", "AIR"))
+
+    # REJECT: a query id not in the sketch map, a structural mismatch, and an error.
+    assert not _read_primitives_sketch_residue(
+        SurfaceDivergence("Qother", "expression", "Qother.0: Row count mismatch. Original: 6, Variant: 5")
+    )
+    assert not _read_primitives_sketch_residue(
+        SurfaceDivergence("Qapprox_quantile_groupby", "expression", "error: boom")
+    )
+
+
+def test_read_primitives_percentile_decimal_residue_predicate():
+    """statistical_percentiles' p95 (column 6) DECIMAL(15,2) residue is pinned like
+    h2odb Q9: only a sub-half-cent gap at the documented column and scale is accepted."""
+    from benchbox.core.equivalence.cross_surface import _read_primitives_percentile_decimal_residue as predicate
+
+    def d(col: int, orig: str, variant: str) -> SurfaceDivergence:
+        return SurfaceDivergence(
+            "Qstatistical_percentiles",
+            "expression",
+            f"Qstatistical_percentiles.0: Value mismatch at row 1, column {col}. Original: {orig}, Variant: {variant}",
+        )
+
+    # ACCEPT: the documented residue (measured: 74356.28 vs 74356.28399999996).
+    assert predicate(d(6, "74356.28", "74356.28399999996"))
+
+    # REJECT: a full-cent-or-more value bug in the p95 column.
+    assert not predicate(d(6, "74356.28", "74357.30"))
+    # REJECT: a sub-cent mismatch in the WRONG column (e.g. quantity_median, col 4).
+    assert not predicate(d(4, "25.00", "25.004"))
+    # REJECT: Original not at <=2-decimal scale (no DECIMAL-rounding signature).
+    assert not predicate(d(6, "74356.284", "74356.288"))
+    # REJECT: structural mismatches and execution errors.
+    assert not predicate(
+        SurfaceDivergence(
+            "Qstatistical_percentiles",
+            "expression",
+            "Qstatistical_percentiles.0: Row count mismatch. Original: 6, Variant: 5",
+        )
+    )
+    assert not predicate(SurfaceDivergence("Qstatistical_percentiles", "expression", "error: boom"))
+
+
+def test_read_primitives_round_decimal_residue_predicate():
+    """optimizer_common_subexpression's rounded_revenue (column 6) ROUND()
+    half-cent-boundary flip is pinned to a full-cent bound, wider than the
+    percentile class because DuckDB ROUND() vs float rounding can flip by 0.01."""
+    from benchbox.core.equivalence.cross_surface import _read_primitives_round_decimal_residue as predicate
+
+    def d(col: int, orig: str, variant: str) -> SurfaceDivergence:
+        return SurfaceDivergence(
+            "Qoptimizer_common_subexpression",
+            "expression",
+            f"Qoptimizer_common_subexpression.0: Value mismatch at row 0, column {col}. Original: {orig}, Variant: {variant}",
+        )
+
+    # ACCEPT: the documented residue (measured: 4721058.05 vs 4721058.04, exactly 0.01).
+    assert predicate(d(6, "4721058.05", "4721058.04"))
+
+    # REJECT: more than a full cent off - a genuine value bug, not a rounding flip.
+    assert not predicate(d(6, "4721058.05", "4721057.90"))
+    # REJECT: the wrong column (e.g. l_orderkey/l_partkey join-key columns).
+    assert not predicate(d(0, "100", "99"))
+    # REJECT: Original not at <=2-decimal scale.
+    assert not predicate(d(6, "4721058.051", "4721058.041"))
+    # REJECT: structural mismatches and execution errors.
+    assert not predicate(
+        SurfaceDivergence(
+            "Qoptimizer_common_subexpression",
+            "expression",
+            "Qoptimizer_common_subexpression.0: Column count mismatch at row 0. Original: 7, Variant: 6",
+        )
+    )
+    assert not predicate(SurfaceDivergence("Qoptimizer_common_subexpression", "expression", "error: boom"))
+
+
+def test_read_primitives_argmin_tie_predicate():
+    """min_by_complex's ARG_MIN tie-break predicate accepts only the tie-broken
+    name/type columns (1, 2), never the p_brand grouping key (0) or min_price (3)."""
+    from benchbox.core.equivalence.cross_surface import _read_primitives_argmin_tie as predicate
+
+    def d(col: int, orig: str, variant: str) -> SurfaceDivergence:
+        return SurfaceDivergence(
+            "Qmin_by_complex",
+            "expression",
+            f"Qmin_by_complex.0: Value mismatch at row 0, column {col}. Original: {orig}, Variant: {variant}",
+        )
+
+    # ACCEPT: the documented tie-break columns.
+    assert predicate(d(1, "seashell orange firebrick peach rose", "gainsboro snow indian frosted navy"))
+    assert predicate(d(2, "SMALL BRUSHED STEEL", "LARGE POLISHED TIN"))
+
+    # REJECT: the grouping key (p_brand, col 0) - a wrong group is a real bug.
+    assert not predicate(d(0, "Brand#11", "Brand#25"))
+    # REJECT: min_price itself (col 3) - the metric must match exactly.
+    assert not predicate(d(3, "901.00", "850.00"))
+    # REJECT: structural mismatches and execution errors.
+    assert not predicate(
+        SurfaceDivergence(
+            "Qmin_by_complex", "expression", "Qmin_by_complex.0: Row count mismatch. Original: 25, Variant: 24"
+        )
+    )
+    assert not predicate(SurfaceDivergence("Qmin_by_complex", "expression", "error: boom"))
+
+
+def test_read_primitives_json_agg_predicate_accepts_structural_match_only():
+    """json_aggregates' predicate accepts only a genuine reordering (expression,
+    within the fixed p_brand domain) or a structurally-equivalent JSON payload
+    (pandas), never a missing/added/wrong element or an out-of-domain key."""
+    from benchbox.core.equivalence.cross_surface import _read_primitives_json_agg_accepts as predicate
+
+    def order_mismatch(orig_key: str, variant_key: str) -> SurfaceDivergence:
+        return SurfaceDivergence(
+            "Qjson_aggregates",
+            "expression",
+            "Qjson_aggregates.0: ORDER BY key mismatch at position 0. "
+            f"Original key: ('{orig_key}',), Variant key: ('{variant_key}',) "
+            "(order-key columns [0]) - the returned order differs (e.g. a reversed ORDER BY).",
+        )
+
+    def value_mismatch(col: int, orig: str, variant: str) -> SurfaceDivergence:
+        return SurfaceDivergence(
+            "Qjson_aggregates",
+            "pandas",
+            f"Qjson_aggregates.0: Value mismatch at row 0, column {col}. Original: {orig}, Variant: {variant}",
+        )
+
+    # ACCEPT: a reorder within the fixed 25-value p_brand domain (Polars' expression
+    # aggregate does not sort its groups; the underlying set is unchanged).
+    assert predicate(order_mismatch("Brand#11", "Brand#51"))
+
+    # REJECT: a reported key outside the known p_brand domain - a genuinely wrong
+    # grouping key, not a reorder of the same set.
+    assert not predicate(order_mismatch("Brand#11", "NotABrand"))
+    assert not predicate(order_mismatch("NotABrand", "Brand#11"))
+
+    # ACCEPT: the JSON array (col 1) holds the same elements, order-insensitive.
+    assert predicate(value_mismatch(1, '["a","b","c"]', "['a', 'b', 'c']"))
+    assert predicate(value_mismatch(1, '["a","b","c"]', "['c', 'b', 'a']"))  # reordered, same multiset
+
+    # ACCEPT: the JSON object (col 2) holds the same mapping, number-format-insensitive.
+    assert predicate(value_mismatch(2, '{"1": 901.00, "2": 902.50}', "{'1': 901.0, '2': 902.5}"))
+
+    # REJECT: a genuinely missing element - not merely reordered/reformatted.
+    assert not predicate(value_mismatch(1, '["a","b","c"]', "['a', 'b']"))
+    # REJECT: a genuinely wrong value.
+    assert not predicate(value_mismatch(1, '["a","b","c"]', "['a', 'b', 'ZZZ']"))
+    assert not predicate(value_mismatch(2, '{"1": 901.00}', "{'1': 850.0}"))
+    # REJECT: the wrong column (e.g. p_brand or part_count, cols 0/3).
+    assert not predicate(value_mismatch(0, "Brand#11", "Brand#12"))
+    assert not predicate(value_mismatch(3, "5", "4"))
+    # REJECT: unparsable payloads and execution errors.
+    assert not predicate(value_mismatch(1, "not json", "also not json"))
+    assert not predicate(SurfaceDivergence("Qjson_aggregates", "expression", "error: boom"))
+
+
+def test_read_primitives_polars_map_gap_predicate():
+    """The Polars Map-dtype gap predicate accepts ONLY the documented
+    'no native Map dtype' execution error, never a different error or a value
+    mismatch (which would mean Polars started supporting Map but got it wrong)."""
+    from benchbox.core.equivalence.cross_surface import _read_primitives_polars_map_gap as predicate
+
+    # ACCEPT: both documented raise-site messages share the same dtype-gap signature.
+    assert predicate(
+        SurfaceDivergence(
+            "Qmap_access", "expression", "error: map_from_entries not supported on Polars (no native Map dtype)"
+        )
+    )
+    assert predicate(
+        SurfaceDivergence(
+            "Qmap_keys_values", "expression", "error: Map operations not supported on Polars (no native Map dtype)"
+        )
+    )
+
+    # REJECT: a different execution error - not the documented dtype gap.
+    assert not predicate(SurfaceDivergence("Qmap_access", "expression", "error: unexpected KeyError: 'foo'"))
+    # REJECT: a value mismatch - Polars would have to actually execute and diverge,
+    # which contradicts "no expression-surface result to compare".
+    assert not predicate(
+        SurfaceDivergence(
+            "Qmap_access", "expression", "Qmap_access.0: Value mismatch at row 0, column 1. Original: 1.0, Variant: 2.0"
+        )
+    )
+
+
+def _read_primitives_live_baseline_divergences() -> list[SurfaceDivergence]:
+    """One in-bounds :class:`SurfaceDivergence` per read_primitives known key.
+
+    Detail strings are the ACTUAL divergences observed from a real
+    ``make read-primitives-cross-surface-equivalence-report`` run (see the
+    TODO's before/after gate captures), so this fixture doubles as a
+    regression pin on the documented residues themselves, not just the
+    predicates' logic in isolation.
+    """
+    sketch_detail = {
+        "approx_count_distinct_simple": (0, "5210", "4969"),
+        "approx_count_distinct_groupby": (2, "36069", "32458"),
+        "approx_quantile_groupby": (1, "26", "25.0"),
+    }
+    divergences = []
+    for base, (col, orig, variant) in sketch_detail.items():
+        for cell in ("expression", "pandas"):
+            divergences.append(
+                SurfaceDivergence(
+                    base,
+                    cell,
+                    f"Q{base}.0: Value mismatch at row 0, column {col}. Original: {orig}, Variant: {variant}",
+                )
+            )
+    for cell in ("expression", "pandas"):
+        divergences.append(
+            SurfaceDivergence(
+                "statistical_percentiles",
+                cell,
+                "Qstatistical_percentiles.0: Value mismatch at row 1, column 6. "
+                "Original: 74356.28, Variant: 74356.28399999996",
+            )
+        )
+        divergences.append(
+            SurfaceDivergence(
+                "optimizer_common_subexpression",
+                cell,
+                "Qoptimizer_common_subexpression.0: Value mismatch at row 0, column 6. "
+                "Original: 4721058.05, Variant: 4721058.04",
+            )
+        )
+        divergences.append(
+            SurfaceDivergence(
+                "min_by_complex",
+                cell,
+                "Qmin_by_complex.0: Value mismatch at row 0, column 1. "
+                "Original: seashell orange firebrick peach rose, Variant: gainsboro snow indian frosted navy",
+            )
+        )
+    divergences.append(
+        SurfaceDivergence(
+            "json_aggregates",
+            "expression",
+            "Qjson_aggregates.0: ORDER BY key mismatch at position 0. Original key: ('Brand#11',), "
+            "Variant key: ('Brand#51',) (order-key columns [0]) - the returned order differs "
+            "(e.g. a reversed ORDER BY).",
+        )
+    )
+    divergences.append(
+        SurfaceDivergence(
+            "json_aggregates",
+            "pandas",
+            "Qjson_aggregates.0: Value mismatch at row 0, column 1. Original: [\"a\",\"b\"], Variant: ['a', 'b']",
+        )
+    )
+    for base in ("map_access", "map_construction", "map_keys_values"):
+        divergences.append(
+            SurfaceDivergence(
+                base, "expression", "error: map_from_entries not supported on Polars (no native Map dtype)"
+            )
+        )
+    return divergences
+
+
+def test_read_primitives_baseline_report_accepts_documented_cells_rejects_regressions(capsys):
+    """End-to-end through :func:`_report`: the documented residues pass for every
+    converted class, and a wider divergence on the SAME key fails the gate."""
+    from benchbox.core.equivalence.cross_surface import GATES
+
+    known = GATES["read_primitives"].known_divergences
+    documented = _read_primitives_live_baseline_divergences()
+    assert {f"{d.query_id}_{d.cell}" for d in documented} == set(known), (
+        "test fixture must cover every converted read_primitives waiver key exactly once"
+    )
+    coverage = {"expression": len(documented), "pandas": len(documented)}
+    assert (
+        _report(
+            documented,
+            total=len(documented),
+            coverage=coverage,
+            known=known,
+            benchmark="read_primitives",
+            reference_row_counts={},
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    # A wider, out-of-bounds sketch divergence on the SAME key is unclassified -
+    # replace the documented approx_count_distinct_simple entry with a 10x-off
+    # value; the rest of the baseline stays live so only this one regresses.
+    regression = [d for d in documented if f"{d.query_id}_{d.cell}" != "approx_count_distinct_simple_expression"]
+    regression.append(
+        SurfaceDivergence(
+            "approx_count_distinct_simple",
+            "expression",
+            "Qapprox_count_distinct_simple.0: Value mismatch at row 0, column 0. Original: 5210, Variant: 100",
+        )
+    )
+    assert (
+        _report(
+            regression,
+            total=len(regression),
+            coverage=coverage,
+            known=known,
+            benchmark="read_primitives",
+            reference_row_counts={},
+        )
+        == 1
+    )
