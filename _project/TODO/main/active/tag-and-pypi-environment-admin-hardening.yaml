@@ -2,7 +2,7 @@ id: tag-and-pypi-environment-admin-hardening
 title: "Apply the two remaining publish-path admin protections: v* tag-creation ruleset and pypi environment required reviewers"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "In Progress"
 category: "Release Tooling"
 
 description: |
@@ -71,7 +71,7 @@ work:
   - id: w3
     summary: "Extend the ruleset-drift check to flag a missing v*-tag ruleset (WARN-until-applied, then enforce)"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       In _project/scripts/ruleset_review_enforcement.py (or a sibling
       function it calls), assert a target="tag" ruleset covering

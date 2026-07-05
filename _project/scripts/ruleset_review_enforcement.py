@@ -114,6 +114,132 @@ def is_review_enforced(rules: list[dict[str, Any]]) -> bool:
     return not review_enforcement_findings(rules)
 
 
+# ---------------------------------------------------------------------------
+# v* tag-creation protection (tag-and-pypi-environment-admin-hardening w3)
+# ---------------------------------------------------------------------------
+
+# WARN-until-applied flag, mirroring ruleset_drift_check.DEVELOP_REVIEW_RULE_ENFORCED.
+# The v* tag-creation ruleset is a pending admin action (see
+# docs/operations/repo-admin-settings.md, "Tag creation restricted to release
+# flow"): the develop-PR GITHUB_TOKEN has no ``administration`` scope to POST a
+# ruleset. While this is False, ``tag_protection_findings`` are surfaced as
+# non-blocking warnings so the check can land BEFORE the admin acts without
+# turning the (eventual) canary red. Flip to True once the runbook's live-state
+# note records the applied ruleset id + conditions, exactly as
+# DEVELOP_REVIEW_RULE_ENFORCED is flipped for the develop review rule.
+TAG_RULESET_ENFORCED = False
+
+# The ref pattern the release flow tags with (make release-finalize pushes v*).
+TAG_REF_PATTERN = "refs/tags/v*"
+
+
+def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
+    """Reasons the live rulesets fail to restrict ``v*`` tag *creation*.
+
+    Empty list == at least one ACTIVE ruleset with ``target == "tag"`` whose
+    ref conditions cover ``refs/tags/v*`` (or ``~ALL``) AND that carries a
+    ``creation`` rule. That is the repo-admin layer closing the last
+    zero-human path to publish: ``release.yml``'s ``verify-tag-on-main`` only
+    stops a tag that does not point at a main-ancestor commit; it does nothing
+    to stop a collaborator with push access from creating a ``v*`` tag ON an
+    existing main commit out of band. A tag-creation ruleset restricts who may
+    mint the tag in the first place.
+
+    Accepts FULL ruleset objects (``GET /repos/{o}/{r}/rulesets/{id}``). The
+    list endpoint's summaries omit ``conditions`` / ``rules``, so a
+    summary-only payload correctly reports the detail as missing rather than
+    passing on absent evidence (never green on unverified input). Rulesets
+    that target branches (e.g. ``v-release-branches-minimal`` →
+    ``refs/heads/v*``) are ``target != "tag"`` and never count. An ``exclude``
+    that removes ``refs/tags/v*`` negates an otherwise-covering ``include``.
+
+    NOTE on ``bypass_actors``: this predicate deliberately does NOT treat a
+    non-empty bypass list as a structural failure. This TODO's must_preserve
+    REQUIRES a bypass path (``make release-finalize`` must still create ``v*``
+    tags), so demanding zero bypass actors would brick the release flow. A
+    broad/wrong bypass list is nonetheless a real hole, so it is surfaced via
+    :func:`tag_bypass_advisory` (rendered by ``main`` and required in the
+    runbook's live-state note) for human confirmation before
+    ``TAG_RULESET_ENFORCED`` is flipped — never passed silently.
+    """
+    tag_rulesets = [rs for rs in rulesets if isinstance(rs, dict) and rs.get("target") == "tag"]
+    if not tag_rulesets:
+        return [
+            "no ruleset with target='tag' exists: any collaborator with push access can "
+            f"create a {TAG_REF_PATTERN} tag on a main-ancestor commit and reach release.yml's "
+            "publish path with no human gate"
+        ]
+    problems: list[str] = []
+    for ruleset in tag_rulesets:
+        name = ruleset.get("name", "(unnamed)")
+        issues: list[str] = []
+        if ruleset.get("enforcement") != "active":
+            issues.append(f"enforcement={ruleset.get('enforcement')!r} (need 'active')")
+        ref_name = (ruleset.get("conditions") or {}).get("ref_name") or {}
+        include = tuple(ref_name.get("include") or ())
+        exclude = tuple(ref_name.get("exclude") or ())
+        if TAG_REF_PATTERN not in include and "~ALL" not in include:
+            issues.append(f"ref include={include!r} does not cover {TAG_REF_PATTERN}")
+        elif TAG_REF_PATTERN in exclude or "~ALL" in exclude:
+            issues.append(f"ref exclude={exclude!r} negates coverage of {TAG_REF_PATTERN}")
+        rule_types = {rule.get("type") for rule in ruleset.get("rules") or [] if isinstance(rule, dict)}
+        if "creation" not in rule_types:
+            issues.append("no 'creation' rule")
+        if not issues:
+            return []
+        problems.append(f"{name}: " + "; ".join(issues))
+    return [f"no active tag ruleset covers {TAG_REF_PATTERN} with a creation rule -- " + " | ".join(problems)]
+
+
+def tag_bypass_advisory(rulesets: list[dict[str, Any]]) -> list[str]:
+    """Bypass actors on the covering ``v*`` tag ruleset that a human must confirm.
+
+    Empty list == no protecting tag ruleset (see :func:`tag_protection_findings`)
+    or a protecting one with NO bypass actors. A non-empty result is NOT a
+    failure — it is the list the operator must confirm is release-flow-only
+    before flipping ``TAG_RULESET_ENFORCED`` (must_preserve: the release
+    identity legitimately needs bypass; a broad role in this list is the hole).
+    """
+    if tag_protection_findings(rulesets):
+        return []
+    for ruleset in rulesets:
+        if not isinstance(ruleset, dict) or ruleset.get("target") != "tag":
+            continue
+        if tag_protection_findings([ruleset]):
+            continue
+        actors = ruleset.get("bypass_actors") or []
+        if actors:
+            rendered = ", ".join(
+                f"{a.get('actor_type', '?')}:{a.get('actor_id', '?')}({a.get('bypass_mode', '?')})"
+                for a in actors
+                if isinstance(a, dict)
+            )
+            return [
+                f"{ruleset.get('name', '(unnamed)')} has bypass_actors [{rendered}] -- confirm these "
+                "are the release-finalize identity ONLY (not a broad Write/Admin role) before "
+                "enforcing; a wide bypass leaves v* tag creation open"
+            ]
+        return []
+    return []
+
+
+def is_tag_creation_protected(rulesets: list[dict[str, Any]]) -> bool:
+    """True when a ``v*`` tag-creation ruleset restricts out-of-band tagging."""
+    return not tag_protection_findings(rulesets)
+
+
+def _load_rulesets(raw_source: str) -> list[dict[str, Any]]:
+    """Load a JSON array of FULL ruleset objects from a file path or '-' (stdin)."""
+    raw = sys.stdin.read() if raw_source == "-" else Path(raw_source).read_text(encoding="utf-8")
+    payload = json.loads(raw)
+    if isinstance(payload, list):
+        return [rs for rs in payload if isinstance(rs, dict)]
+    if isinstance(payload, dict):
+        # Tolerate a single ruleset object as well as a bare list.
+        return [payload]
+    return []
+
+
 def _fetch_branch_rules(repo: str, branch: str, token: str) -> list[dict[str, Any]]:
     import urllib.request
 
@@ -151,7 +277,40 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", default="joeharris76/BenchBox", help="owner/repo for live fetch.")
     parser.add_argument("--branch", default="develop", help="Branch whose ruleset to check.")
     parser.add_argument("--token", default="", help="Ruleset-read token for live fetch (e.g. RULESET_DRIFT_TOKEN).")
+    parser.add_argument(
+        "--rulesets-file",
+        help=(
+            "Path to a JSON array of FULL ruleset objects (or '-' for stdin) to check "
+            "v* tag-creation protection; e.g. "
+            "`gh api repos/<owner>/<repo>/rulesets --jq '[.[] | .id] | map(...)'` -- see "
+            "docs/operations/repo-admin-settings.md for the exact fetch. When set, ONLY the "
+            "tag-protection check runs (the review-rule check needs branch rules, not tag rulesets)."
+        ),
+    )
     args = parser.parse_args(argv)
+
+    if args.rulesets_file:
+        rulesets = _load_rulesets(args.rulesets_file)
+        tag_findings = tag_protection_findings(rulesets)
+        if not tag_findings:
+            print("# Tag-creation ruleset - OK")
+            print(f"- {TAG_REF_PATTERN} creation restricted by an active tag ruleset")
+            for advisory in tag_bypass_advisory(rulesets):
+                # Not a failure (must_preserve requires a bypass path), but the
+                # operator must confirm the actor list before enforcing.
+                print(f"- CONFIRM before enforcing: {advisory}")
+            return 0
+        if TAG_RULESET_ENFORCED:
+            print("# Tag-creation ruleset - FAILED")
+            for finding in tag_findings:
+                print(f"- {finding}")
+            return 1
+        # WARN-until-applied: surface the gap without failing while the admin
+        # POST is still pending (mirrors DEVELOP_REVIEW_RULE_ENFORCED).
+        print("# Tag-creation ruleset - WARNING (non-blocking, pending admin action)")
+        for finding in tag_findings:
+            print(f"- WARNING (non-blocking): {finding}")
+        return 0
 
     rules = _load_rules(args)
     findings = review_enforcement_findings(rules)

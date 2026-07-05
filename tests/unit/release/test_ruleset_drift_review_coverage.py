@@ -24,6 +24,8 @@ actually landing).
 
 from __future__ import annotations
 
+import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
@@ -38,6 +40,37 @@ from scripts.ruleset_drift_check import (
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _load_review_enforcement():
+    """Load _project/scripts/ruleset_review_enforcement.py out of tree.
+
+    The v* tag-creation predicate lives beside the review-rule predicate in
+    the same single-source-of-truth module (this TODO's scope_limit); load it
+    the same way tests/unit/release/test_ruleset_review_enforcement.py does.
+    """
+    scripts_dir = REPO_ROOT / "_project" / "scripts"
+    sys.path.insert(0, str(scripts_dir))
+    spec = importlib.util.spec_from_file_location(
+        "ruleset_review_enforcement", scripts_dir / "ruleset_review_enforcement.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_rre = _load_review_enforcement()
+
+
+def _tag_ruleset(*, name="v-tag-restricted", enforcement="active", include=("refs/tags/v*",), rule_types=("creation",)):
+    return {
+        "name": name,
+        "target": "tag",
+        "enforcement": enforcement,
+        "conditions": {"ref_name": {"include": list(include), "exclude": []}},
+        "rules": [{"type": t} for t in rule_types],
+    }
 
 
 def _develop_expected():
@@ -135,3 +168,127 @@ def test_main_release_only_is_not_subject_to_the_review_rule_check():
     }
 
     assert compare_ruleset(expected, live) == []
+
+
+# ---------------------------------------------------------------------------
+# v* tag-creation ruleset coverage (tag-and-pypi-environment-admin-hardening w3)
+# ---------------------------------------------------------------------------
+
+
+def test_tag_protection_missing_when_no_tag_ruleset_exists():
+    # Live state 2026-07-03: only v-release-branches-minimal exists, which
+    # targets refs/heads/v* (branches), not tags -- must NOT count.
+    branch_ruleset = {
+        "name": "v-release-branches-minimal",
+        "target": "branch",
+        "enforcement": "active",
+        "conditions": {"ref_name": {"include": ["refs/heads/v*"], "exclude": []}},
+        "rules": [{"type": "creation"}],
+    }
+    findings = _rre.tag_protection_findings([branch_ruleset])
+    assert findings, "a branch ruleset must not satisfy the tag-creation requirement"
+    assert "target='tag'" in findings[0]
+    assert not _rre.is_tag_creation_protected([branch_ruleset])
+
+
+def test_tag_protection_satisfied_by_active_v_tag_creation_ruleset():
+    findings = _rre.tag_protection_findings([_tag_ruleset()])
+    assert findings == []
+    assert _rre.is_tag_creation_protected([_tag_ruleset()])
+
+
+def test_tag_protection_satisfied_when_ref_is_all_tags():
+    # A ~ALL tag ruleset covers refs/tags/v* too.
+    findings = _rre.tag_protection_findings([_tag_ruleset(include=("~ALL",))])
+    assert findings == []
+
+
+def test_tag_protection_flags_inactive_or_incomplete_tag_ruleset():
+    # Present but not active.
+    inactive = _rre.tag_protection_findings([_tag_ruleset(enforcement="evaluate")])
+    assert inactive and "enforcement='evaluate'" in inactive[0]
+    # Present and active but no creation rule (e.g. only update/deletion).
+    no_creation = _rre.tag_protection_findings([_tag_ruleset(rule_types=("deletion",))])
+    assert no_creation and "no 'creation' rule" in no_creation[0]
+    # Active with a creation rule but ref does not cover v*.
+    wrong_ref = _rre.tag_protection_findings([_tag_ruleset(include=("refs/tags/rc*",))])
+    assert wrong_ref and "does not cover refs/tags/v*" in wrong_ref[0]
+
+
+def test_tag_protection_summary_only_payload_does_not_pass():
+    # The list endpoint omits conditions/rules; a summary must not read as
+    # protected (never green on absent evidence).
+    summary = {"name": "v-tag-restricted", "target": "tag", "enforcement": "active"}
+    findings = _rre.tag_protection_findings([summary])
+    assert findings, "summary-only ruleset lacks a creation rule and must be flagged"
+
+
+def test_tag_check_is_warn_until_applied_by_default():
+    # Mirror DEVELOP_REVIEW_RULE_ENFORCED: the flag is False until the admin
+    # POST lands, so the check lands non-blocking.
+    assert _rre.TAG_RULESET_ENFORCED is False
+
+
+def test_tag_check_main_warns_non_blocking_when_missing(tmp_path, capsys):
+    import json as _json
+
+    payload = tmp_path / "rulesets.json"
+    payload.write_text(_json.dumps([]), encoding="utf-8")
+    rc = _rre.main(["--rulesets-file", str(payload)])
+    out = capsys.readouterr().out
+    assert rc == 0, "missing tag ruleset must be non-blocking while WARN-until-applied"
+    assert "WARNING (non-blocking):" in out
+    assert "target='tag'" in out
+
+
+def test_tag_check_main_passes_when_ruleset_present(tmp_path, capsys):
+    import json as _json
+
+    payload = tmp_path / "rulesets.json"
+    payload.write_text(_json.dumps([_tag_ruleset()]), encoding="utf-8")
+    rc = _rre.main(["--rulesets-file", str(payload)])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "Tag-creation ruleset - OK" in out
+
+
+def test_tag_protection_flags_exclude_that_negates_v_coverage():
+    # include covers v* (or ~ALL) but exclude removes it -> not protected.
+    negated = _rre.tag_protection_findings(
+        [
+            _tag_ruleset(include=("~ALL",))
+            | {"conditions": {"ref_name": {"include": ["~ALL"], "exclude": ["refs/tags/v*"]}}}
+        ]
+    )
+    assert negated and "negates coverage" in negated[0]
+
+
+def test_tag_bypass_advisory_surfaces_actors_without_failing_structure():
+    # A structurally-valid ruleset with bypass actors is still "protected"
+    # (must_preserve: the release identity needs bypass), but the advisory
+    # forces the operator to confirm the actor list before enforcing.
+    ruleset = _tag_ruleset() | {
+        "bypass_actors": [{"actor_type": "Integration", "actor_id": 42, "bypass_mode": "always"}]
+    }
+    assert _rre.is_tag_creation_protected([ruleset])  # structure OK
+    advisory = _rre.tag_bypass_advisory([ruleset])
+    assert advisory and "bypass_actors" in advisory[0]
+    assert "Integration:42" in advisory[0]
+
+
+def test_tag_bypass_advisory_empty_when_no_bypass_or_no_ruleset():
+    assert _rre.tag_bypass_advisory([_tag_ruleset()]) == []  # protected, no bypass
+    assert _rre.tag_bypass_advisory([]) == []  # nothing protecting
+
+
+def test_tag_check_main_prints_bypass_confirmation_on_ok(tmp_path, capsys):
+    import json as _json
+
+    ruleset = _tag_ruleset() | {"bypass_actors": [{"actor_type": "Team", "actor_id": 7, "bypass_mode": "pull_request"}]}
+    payload = tmp_path / "rulesets.json"
+    payload.write_text(_json.dumps([ruleset]), encoding="utf-8")
+    rc = _rre.main(["--rulesets-file", str(payload)])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "Tag-creation ruleset - OK" in out
+    assert "CONFIRM before enforcing:" in out
