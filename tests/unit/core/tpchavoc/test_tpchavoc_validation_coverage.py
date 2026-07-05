@@ -130,66 +130,103 @@ def test_calculate_checksum_mixed_type_column_does_not_raise() -> None:
     assert calculate_checksum(shuffled) == digest
 
 
-def test_calculate_checksum_collides_null_with_string_null() -> None:
-    """A real NULL (None -> 'NULL') and the literal string 'NULL' hash to the same cell text.
+def test_calculate_checksum_distinguishes_null_from_string_null() -> None:
+    """A real NULL and the literal string ``"NULL"`` hash DIFFERENTLY (fixed).
 
-    Documents the one ambiguity of the str-rendering primitive: a ``None`` cell and a
-    literal ``"NULL"`` string render to the same token. This is an accepted property of
-    the shared digest (the gate's reference is DuckDB-pinned and NULL-free), pinned so a
-    future change is a conscious one.
+    Historical collision: the pre-hardening renderer mapped ``None`` -> ``"NULL"``,
+    identical to the literal string. calculate-checksum-collision-hardening's
+    type-tagged rendering (``z:`` for NULL vs ``s:NULL`` for the string) makes
+    them distinct -- distinctness is now guaranteed, not an accepted ambiguity.
     """
-    assert calculate_checksum([(None,)]) == calculate_checksum([("NULL",)])
+    assert calculate_checksum([(None,)]) != calculate_checksum([("NULL",)])
 
 
-def test_calculate_checksum_collides_across_cell_separator() -> None:
-    """A ``"|"`` cell-separator character embedded in a value can alias across row shapes.
+def test_calculate_checksum_distinguishes_across_cell_separator() -> None:
+    """A ``"|"`` embedded in a value can no longer alias across column shapes (fixed).
 
-    ``calculate_checksum`` joins cells with ``"|"`` with no escaping, so a 2-column row
-    whose first cell contains a literal ``"|"`` renders to the SAME row string as a
-    genuinely different 2-column row: ``[("a|b", "c")]`` -> ``"a|b|c"`` and
-    ``[("a", "b|c")]`` -> ``"a|b|c"``. Accepted as a documented property of this
-    digest (see value-digest-collision-pinning.yaml): fixing it would require
-    escaping/tagging the render and regenerating the committed reference digest
-    (``benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json``),
-    which is out of scope for pinning alone. Pinned so a future change is conscious,
-    following the same discipline as the NULL-vs-"NULL" pin above.
+    Historical collision (pinned by value-digest-collision-pinning, fixed by
+    calculate-checksum-collision-hardening): unescaped ``"|"`` made
+    ``[("a|b", "c")]`` and ``[("a", "b|c")]`` render identically. The renderer
+    now backslash-escapes ``|`` inside payloads, so the shapes are distinct.
     """
-    assert calculate_checksum([("a|b", "c")]) == calculate_checksum([("a", "b|c")])
+    assert calculate_checksum([("a|b", "c")]) != calculate_checksum([("a", "b|c")])
 
 
-def test_calculate_checksum_collides_across_row_separator() -> None:
-    """A ``"\\n"`` row-separator character embedded in a value can alias across row counts.
+def test_calculate_checksum_distinguishes_across_row_separator() -> None:
+    """A ``"\\n"`` embedded in a value can no longer alias across row counts (fixed).
 
-    ``calculate_checksum`` joins rows with ``"\\n"`` with no escaping, so a single-row
-    result whose one cell contains a literal newline renders identically to a
-    genuinely different two-row result: ``[("a\\nb",)]`` and ``[("a",), ("b",)]``
-    both render to ``"a\\nb\\n"``. Accepted as a documented property of this digest
-    (see value-digest-collision-pinning.yaml) for the same reason as the cell-separator
-    pin above - fixing it requires a reference-digest regeneration out of scope here.
+    Historical collision (pinned by value-digest-collision-pinning, fixed by
+    calculate-checksum-collision-hardening): unescaped newlines made
+    ``[("a\\nb",)]`` and ``[("a",), ("b",)]`` render identically. The renderer
+    now escapes ``\\n`` inside payloads, so row-count aliasing is impossible.
     """
-    assert calculate_checksum([("a\nb",)]) == calculate_checksum([("a",), ("b",)])
+    assert calculate_checksum([("a\nb",)]) != calculate_checksum([("a",), ("b",)])
 
 
-def test_calculate_checksum_collides_str_and_int_dtype() -> None:
-    """A string cell and an int cell of the same textual value hash identically.
+def test_calculate_checksum_distinguishes_str_and_int_dtype() -> None:
+    """A string cell and an int cell of the same textual value hash DIFFERENTLY (fixed).
 
-    ``calculate_checksum`` renders every non-None cell via ``str(val)``, so the string
-    ``"1"`` and the int ``1`` both render to the token ``"1"`` and the digest cannot
-    distinguish a genuine dtype regression (e.g. an INTEGER column silently becoming
-    VARCHAR) from an unchanged value. Audited per value-digest-collision-pinning.yaml
-    w1: no other check on the paths this digest guards (TPC-Havoc's
-    ``validate_results_checksum`` or the correctness gate's value-digest oracle in
-    ``benchbox.core.results.result_digest``) independently verifies cell dtype -
-    ``result_digest._normalize_cell`` already documents (and pins in
-    ``tests/unit/test_correctness_gate_value_oracle.py::test_digest_couples_value_with_numeric_type``)
-    an analogous accepted int-vs-float/Decimal rendering asymmetry for the SAME
-    DuckDB-pinned-oracle reason: fixing this collision would change the rendered form
-    of every cell and require regenerating the committed reference digest
-    (``tpch_value_digests_sf1.json``), which is out of safe scope for this pin-only
-    change. Pinned as an accepted property, consistent with the NULL-vs-"NULL" and
-    separator pins above.
+    Historical collision (pinned by value-digest-collision-pinning, fixed by
+    calculate-checksum-collision-hardening): rendering every cell via ``str``
+    made ``"1"`` and ``1`` indistinguishable, so an INTEGER column silently
+    becoming VARCHAR was invisible to the digest. The type-tagged renderer
+    (``s:1`` vs ``i:1``) makes a dtype regression a digest change. NOTE: the
+    gate-side ``result_digest._normalize_cell`` int-vs-float rendering
+    asymmetry is a separate, still-pinned accepted property with its own
+    DuckDB-pinned-oracle rationale (see
+    tests/unit/test_correctness_gate_value_oracle.py).
     """
-    assert calculate_checksum([("1",)]) == calculate_checksum([(1,)])
+    assert calculate_checksum([("1",)]) != calculate_checksum([(1,)])
+
+
+def test_calculate_checksum_escape_character_round_trip() -> None:
+    """Payloads containing the escape character itself stay injective.
+
+    Exercises the escaping rather than just the happy path: a literal
+    backslash in a value must not be confusable with the renderer's own
+    escape sequences, and adjacent escape-char/separator combinations must
+    not alias across shapes.
+    """
+    # A literal backslash-n two-char sequence vs a real newline.
+    assert calculate_checksum([("a\\nb",)]) != calculate_checksum([("a\nb",)])
+    # A trailing literal backslash vs a backslash-escaped separator.
+    assert calculate_checksum([("a\\", "b")]) != calculate_checksum([("a\\|b",)])
+    # Doubled backslash vs single backslash.
+    assert calculate_checksum([("a\\\\b",)]) != calculate_checksum([("a\\b",)])
+    # Escape char before a separator across shapes.
+    assert calculate_checksum([("a\\", "c")]) != calculate_checksum([("a", "\\c")])
+
+
+def test_calculate_checksum_fallback_typename_cannot_forge_separators() -> None:
+    """The o:<typename> fallback escapes the typename and its ':' delimiter.
+
+    A dynamically created type can carry an arbitrary __name__; without
+    escaping, a name like "x:y|s" would render "o:x:y|s:w" -- byte-identical
+    to the two-cell row [obj-of-type-"x"-str-"y", "w"] -- reintroducing the
+    separator-forgery false-pass this hardening closes.
+    """
+
+    def make(name: str, text: str) -> object:
+        cls = type(name, (), {"__str__": lambda self: text, "__repr__": lambda self: text})
+        return cls()
+
+    forged = calculate_checksum([(make("x:y|s", "w"),)])
+    victim = calculate_checksum([(make("x", "y"), "w")])
+    assert forged != victim
+    # Newline in a typename must not alias a two-row shape either.
+    assert calculate_checksum([(make("a\nb", "c"),)]) != calculate_checksum([(make("a", ""), make("b", "c"))])
+
+
+def test_calculate_checksum_distinguishes_numeric_and_temporal_dtypes() -> None:
+    """Type tags separate bool/float/Decimal/date renderings of similar text."""
+    from datetime import date
+    from decimal import Decimal
+
+    assert calculate_checksum([(1.0,)]) != calculate_checksum([(Decimal("1.0"),)])
+    assert calculate_checksum([("2026-01-01",)]) != calculate_checksum([(date(2026, 1, 1),)])
+    # bool stays distinct from int (the pre-hardening str-renderer already
+    # distinguished them; over-distinguishing can only false-fail).
+    assert calculate_checksum([(True,)]) != calculate_checksum([(1,)])
 
 
 def test_tie_aware_constant_column_is_not_a_boundary_key() -> None:

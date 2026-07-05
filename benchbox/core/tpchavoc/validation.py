@@ -10,6 +10,7 @@ This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Tr
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import datetime
 import hashlib
 import math
 from collections.abc import Sequence
@@ -17,15 +18,75 @@ from decimal import Decimal
 from typing import Any, Optional, Union
 
 
+def _escape_cell_text(text: str) -> str:
+    r"""Escape the digest's structural characters inside a cell payload.
+
+    ``calculate_checksum`` joins cells with ``"|"`` and rows with ``"\n"``;
+    backslash-escaping those characters (and the escape character itself)
+    inside payloads makes the rendered stream injective, so a separator
+    embedded in a value can no longer alias a different row/column shape
+    (calculate-checksum-collision-hardening; previously pinned collisions
+    from value-digest-collision-pinning, PR #952).
+    """
+    return text.replace("\\", "\\\\").replace("|", "\\|").replace("\n", "\\n")
+
+
+def _render_cell(value: Any) -> str:
+    """Render one result cell as an escaped, type-tagged token.
+
+    One-byte type tags keep genuinely different cells distinct in the digest:
+
+    - ``z:``  NULL (fixes the historical NULL-vs-``"NULL"``-string collision)
+    - ``s:``  str
+    - ``b:``  bool (kept distinct from ``i:`` -- the pre-hardening renderer
+      already distinguished ``True`` from ``1`` via ``str``, and a digest
+      that distinguishes MORE than row-comparison equality can only
+      false-fail, never false-pass)
+    - ``i:``  int
+    - ``f:``  float
+    - ``d:``  Decimal
+    - ``t:``  date/time/datetime (ISO ``str()`` rendering)
+    - ``o:<typename>:``  anything else, rendered via ``str``
+
+    Payloads are escaped via :func:`_escape_cell_text` so the cell/row
+    separators cannot be forged from inside a value.
+    """
+    if value is None:
+        return "z:"
+    if isinstance(value, str):
+        return f"s:{_escape_cell_text(value)}"
+    if isinstance(value, bool):
+        return f"b:{value}"
+    if isinstance(value, int):
+        return f"i:{value}"
+    if isinstance(value, float):
+        return f"f:{value!r}"
+    if isinstance(value, Decimal):
+        return f"d:{value}"
+    if isinstance(value, (datetime.date, datetime.time)):  # datetime.datetime subclasses date
+        return f"t:{value}"
+    # Escape the typename too, including its ':' delimiter: a dynamically
+    # created type can carry an arbitrary __name__, and an unescaped '|',
+    # '\n', or boundary-shifting ':' inside it would re-open exactly the
+    # separator/boundary forgery this renderer exists to close (e.g. a type
+    # named "x:y|s" could alias a two-cell row).
+    type_name = _escape_cell_text(type(value).__name__).replace(":", "\\:")
+    return f"o:{type_name}:{_escape_cell_text(str(value))}"
+
+
 def calculate_checksum(results: list[tuple[Any, ...]]) -> str:
     """Calculate an order-normalized MD5 digest of a single result set.
 
     This is the canonical single-result digest primitive for BenchBox. Rows are
     sorted before hashing so unordered queries hash stably, and each cell is
-    rendered with ``str`` (``None`` -> ``"NULL"``). It backs both the TPC-Havoc
-    equivalence comparators (:meth:`ResultValidator.validate_results_checksum`)
-    and the bounded correctness gate's value-digest oracle, so SQL results and
-    the gate share exactly one digest definition.
+    rendered as an escaped, type-tagged token (:func:`_render_cell`) so that
+    separator characters embedded in values and same-text/different-dtype cells
+    cannot collide. It backs both the TPC-Havoc equivalence comparators
+    (:meth:`ResultValidator.validate_results_checksum`) and the bounded
+    correctness gate's value-digest oracle, so SQL results and the gate share
+    exactly one digest definition. Any change to the rendering REQUIRES
+    regenerating the committed reference digests in the same change
+    (``make correctness-gate-digests-regen``).
 
     Callers that need cross-build numeric stability (e.g. the gate, which stores
     a reference digest) should normalize numeric precision *before* calling this
@@ -42,7 +103,7 @@ def calculate_checksum(results: list[tuple[Any, ...]]) -> str:
     # (a caller would otherwise mislabel that as an execution "error:").
     result_str = ""
     for row in sorted(results, key=_row_sort_key):
-        row_str = "|".join(str(val) if val is not None else "NULL" for val in row)
+        row_str = "|".join(_render_cell(val) for val in row)
         result_str += row_str + "\n"
 
     return hashlib.md5(result_str.encode("utf-8")).hexdigest()
