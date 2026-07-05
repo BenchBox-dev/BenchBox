@@ -2,7 +2,8 @@ id: parity-check-promotion
 title: "Promote parity-check from non-blocking to the required develop-PR lane once its two recorded criteria hold"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-05"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -36,7 +37,7 @@ prior_art:
 work:
   - id: w0
     summary: "Observe (or force) the first real parity-check run on a GitHub runner and record the result"
-    status: pending
+    status: done
     notes: |
       Watch for the next viz-touching PR post-#955, or open a trivial
       viz-path-touching draft PR to trigger one. Record the run URL and
@@ -47,7 +48,7 @@ work:
   - id: w1
     summary: "Disposition the geomean_ms.json 2e-13 float drift: tolerance vs fixture regen"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Decide with evidence: if the runner reproduces the drift, prefer a
       bounded relative-tolerance comparison in the parity fixture check
@@ -57,11 +58,17 @@ work:
       the fixture README/comment and keep exact comparison. Regen the
       fixture only if the Python source is established as the intended
       truth.
+      DONE 2026-07-05: the runner MATCHED the committed fixtures exactly (the
+      2e-13 geomean_ms drift seen locally did NOT reproduce). Per this unit's
+      own rule, the drift is therefore a local-environment libm artifact -
+      exact comparison KEPT, and the drift is documented in the new
+      tests/parity/README.md (merged via #973). No tolerance widened, no
+      fixture regenerated.
 
   - id: w2
     summary: "Promote: aggregator wiring + test flip in one change"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       In .github/workflows/pr.yml: add parity-check to
       ci-required-result.needs, add PARITY_CHECK_RESULT env + the
@@ -71,6 +78,13 @@ work:
       replace test_parity_check_is_demoted_to_non_blocking with the
       promoted-shape assertions per its own comment. Run the aggregator
       bash-matrix tests to cover the new env var.
+      DONE 2026-07-05: pr.yml - parity-check added to ci-required-result.needs,
+      PARITY_CHECK_RESULT env + skipped-counts-as-pass check added, and
+      continue-on-error dropped; job comment records the promotion date +
+      evidence. test_pr_workflow_path_classifier.py - the demotion pin
+      replaced by test_parity_check_is_promoted_to_the_required_lane, plus
+      two aggregator bash-matrix tests (parity failure -> gate fails; parity
+      skipped -> gate passes). 15 classifier tests green; pr.yml parses.
 
 must_preserve:
   - "Path-filtering stays: parity-check keeps its viz-needed gate; promotion must not make every PR pay for it."
