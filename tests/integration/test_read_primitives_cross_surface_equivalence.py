@@ -46,6 +46,12 @@ pytestmark = [
 ]
 
 
+# Runs to completion but far exceeds the medium lane's 60s cap: timed out
+# on a clean GitHub runner (develop-post-merge run 28706929881, medium-test
+# job) and measured ~246s in a 4-core container (2026-07-05). The marker
+# overrides the CLI --timeout=60 (pytest-timeout marker precedence) so the
+# test keeps running in the medium lane instead of being killed mid-work.
+@pytest.mark.timeout(600)
 def test_read_primitives_dataframe_surface_equivalent_to_sql(tmp_path):
     """Every gateable Read Primitives DataFrame query (both backends) must match its own SQL."""
     gate = GATES["read_primitives"]

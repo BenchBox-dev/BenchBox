@@ -46,6 +46,16 @@ _PENDING_MIGRATION: frozenset[str] = frozenset(
         # Docstring examples in publishing module - pre-existing, not new violations
         "benchbox/core/publishing/__init__.py",
         "benchbox/core/publishing/bundle_publisher.py",
+        # Equivalence-report __main__ entrypoints (make *-equivalence-report):
+        # pre-existing raw print() report output, surfaced when the medium tier
+        # got its first CI consumer (develop-post-merge run 28706929881; see
+        # medium-tier-red-disposition-and-promotion). Migration to emit() is a
+        # follow-up; cross_surface.py is a CODEOWNERS soundness path, so that
+        # migration belongs in a reviewed comparator PR, not this test-only
+        # disposition.
+        "benchbox/core/equivalence/cross_surface.py",
+        "benchbox/core/tpchavoc/dataframe_equivalence.py",
+        "benchbox/core/tpchavoc/equivalence.py",
     }
 )
 

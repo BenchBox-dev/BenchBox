@@ -314,6 +314,26 @@ def pytest_collection_finish(session) -> None:
     _warn_on_unreasoned_skip_markers(session.items)
 
 
+@pytest.fixture(autouse=True)
+def _reset_global_quiet_state():
+    """Never let benchbox's global quiet flag leak across tests.
+
+    benchbox.utils.printing keeps module-global output state (_QUIET) that
+    tests toggle via set_quiet(True). A test that fails, times out, or forgets
+    its reset between set_quiet(True) and its cleanup poisons every later
+    test in the same xdist worker: emit() routes to the sink console and
+    capsys sees ''. Observed live on develop-post-merge run 28706929881,
+    where test_display_results failed with CaptureResult(out='') under -n 5
+    while passing in isolation (medium-tier-red-disposition-and-promotion).
+    Resetting AFTER each test (post-yield) contains the blast radius to the
+    leaking test itself.
+    """
+    yield
+    from benchbox.utils.printing import set_quiet
+
+    set_quiet(False)
+
+
 def pytest_runtest_setup(item) -> None:
     """Set up test-specific configurations based on markers."""
     # Set timeouts based on speed markers
