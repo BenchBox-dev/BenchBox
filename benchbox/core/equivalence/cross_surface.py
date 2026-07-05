@@ -804,18 +804,38 @@ _H2ODB_PERCENTILE_DECIMAL = (
 # of these checks, so Q9 stays guarded against real result regressions instead of the
 # bare key tolerating every Q9 difference.
 #
-# Residual blind spot (validator-imposed, documented): the validator reports only the
-# FIRST positional mismatch, so a SECOND, later Q9 bug behind an accepted p90 residue
-# cannot be seen from the detail string alone. Pinning the accepted cell to the exact
-# p90 column + sub-half-cent + 2-decimal-scale signature minimizes the surface of that
-# blind spot (only the documented cell is ever the "first" accepted mismatch); closing
-# it fully would require the validator to surface ALL mismatches, not one.
+# The former validator-imposed blind spot is now CLOSED: the validator reports every
+# mismatched column per row (validator-report-all-row-mismatches), and this predicate
+# requires the p90 column to be the ONLY mismatched column. A SECOND Q9 bug on the same
+# row as the accepted p90 residue makes the mismatched-column set != {2}, so the
+# divergence is unclassified (gate failure) instead of hidden behind the residue.
 _H2ODB_Q9_P90_COLUMN = 2
 _H2ODB_Q9_RESIDUE_MAX = 0.005 + 1e-6
 _VALUE_MISMATCH_RE = re.compile(
-    r"Value mismatch at row \d+, column (?P<col>\d+)\. Original:\s*(?P<orig>.+?),\s*Variant:\s*(?P<variant>.+)$"
+    r"Value mismatch at row \d+, column (?P<col>\d+)\. "
+    r"Original:\s*(?P<orig>.+?),\s*Variant:\s*(?P<variant>.+?)"
+    r"(?:; also columns \[(?P<also>[\d, ]*)\])?$"
 )
 _NUMBER_RE = re.compile(r"[-+]?\d*\.\d+|[-+]?\d+")
+
+
+def _mismatched_columns(match: re.Match[str]) -> set[int]:
+    """All mismatched column indices from a value-mismatch detail match.
+
+    The validator now reports every mismatched column on a divergent row (the
+    first column's values inline, the rest as a ``; also columns [...]``
+    index suffix - see benchbox/core/tpchavoc/validation.py). A column-pinned
+    waiver may accept a divergence ONLY when EVERY mismatched column is within
+    its accepted set; otherwise a genuinely wrong non-waived column that
+    happened to sort after an accepted one would ride through classified-green
+    (validator-report-all-row-mismatches). This returns that full set so each
+    predicate can enforce the contract with ``columns <= accepted_set``.
+    """
+    columns = {int(match.group("col"))}
+    also = match.group("also")
+    if also:
+        columns.update(int(token) for token in re.findall(r"\d+", also))
+    return columns
 
 
 def _first_number(text: str) -> float | None:
@@ -850,8 +870,10 @@ def _h2odb_q9_decimal_residue(divergence: SurfaceDivergence) -> bool:
     if match is None:
         return False
     # Only the p90 column (index 2) carries the documented residue; a grouping-key
-    # or median mismatch - sub-cent or not - is a real Q9 regression.
-    if int(match.group("col")) != _H2ODB_Q9_P90_COLUMN:
+    # or median mismatch - sub-cent or not - is a real Q9 regression. EVERY
+    # mismatched column on the row must be the p90 column, so a second wrong
+    # column on the same row is unclassified, not hidden behind the residue.
+    if _mismatched_columns(match) != {_H2ODB_Q9_P90_COLUMN}:
         return False
     orig_text = match.group("orig")
     variant_text = match.group("variant")
@@ -931,7 +953,12 @@ def _read_primitives_sketch_residue(divergence: SurfaceDivergence) -> bool:
         (columns for name, columns in _READ_PRIMITIVES_SKETCH_COLUMNS.items() if name in query_id),
         None,
     )
-    if allowed_columns is None or int(match.group("col")) not in allowed_columns:
+    # Every mismatched column must be a documented sketch column; a grouping-key
+    # or other non-sketch column diverging on the same row is unclassified. The
+    # magnitude bound below is checked on the reported (first) column; the live
+    # cells diverge on a single sketch column, so this matches today's behavior
+    # while closing the accepted+unaccepted-both-wrong blind spot.
+    if allowed_columns is None or not (_mismatched_columns(match) <= set(allowed_columns)):
         return False
     orig = _first_number(match.group("orig"))
     variant = _first_number(match.group("variant"))
@@ -982,7 +1009,8 @@ def _read_primitives_decimal_scale_residue(divergence: SurfaceDivergence, *, col
     match = _VALUE_MISMATCH_RE.search(str(divergence.detail))
     if match is None:
         return False
-    if int(match.group("col")) != column:
+    # The pinned column must be the ONLY mismatched column on the row.
+    if _mismatched_columns(match) != {column}:
         return False
     orig_text = match.group("orig")
     orig = _first_number(orig_text)
@@ -1022,13 +1050,12 @@ _READ_PRIMITIVES_ARGMIN_TIE = (
 # may differ. A p_brand (grouping key) or min_price mismatch - even a numerically
 # close one - is a real regression and is rejected.
 #
-# Residual blind spot (validator-imposed, the same shape as h2odb Q9's
-# documented one): the comparator reports only the FIRST positional mismatch per
-# row, so if cheapest_part_name (column 1) differs AND min_price (column 3) is
-# ALSO wrong on the same row, only the accepted column-1 tie-break is visible
-# here. Pinning to columns 1-2 only (never 0 or 3) minimizes, but cannot fully
-# close, that blind spot; closing it fully would require the validator to
-# surface every mismatch per row, not just the first.
+# The former validator-imposed blind spot is now CLOSED: the validator reports
+# every mismatched column per row (validator-report-all-row-mismatches), and
+# _read_primitives_argmin_tie requires EVERY mismatched column to be in {1, 2}.
+# So if cheapest_part_name (column 1) differs AND min_price (column 3) is also
+# wrong on the same row, the divergence is unclassified (gate failure), not
+# hidden behind the accepted tie-break.
 _READ_PRIMITIVES_ARGMIN_TIE_COLUMNS = (1, 2)
 
 
@@ -1037,7 +1064,10 @@ def _read_primitives_argmin_tie(divergence: SurfaceDivergence) -> bool:
     match = _VALUE_MISMATCH_RE.search(str(divergence.detail))
     if match is None:
         return False
-    return int(match.group("col")) in _READ_PRIMITIVES_ARGMIN_TIE_COLUMNS
+    # Every mismatched column must be an ARG_MIN tie-broken column (1 or 2): if
+    # min_price (col 3) or the brand key (col 0) is ALSO wrong on the same row,
+    # the divergence is unclassified, not accepted behind the tie-break.
+    return _mismatched_columns(match) <= set(_READ_PRIMITIVES_ARGMIN_TIE_COLUMNS)
 
 
 _READ_PRIMITIVES_JSON_TEXT = (
@@ -1114,7 +1144,9 @@ def _read_primitives_json_agg_accepts(divergence: SurfaceDivergence) -> bool:
     value_match = _VALUE_MISMATCH_RE.search(detail)
     if value_match is None:
         return False
-    if int(value_match.group("col")) not in (1, 2):
+    # Every mismatched column must be a JSON container column (1 or 2); a third
+    # column diverging on the same row is unclassified.
+    if not (_mismatched_columns(value_match) <= {1, 2}):
         return False
     return _read_primitives_json_equivalent(value_match.group("orig"), value_match.group("variant"))
 

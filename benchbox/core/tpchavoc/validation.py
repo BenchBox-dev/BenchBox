@@ -490,6 +490,42 @@ class ResultValidator:
             return _cell_sort_key(None)
         return _cell_sort_key(value)
 
+    def _row_value_mismatch_columns(
+        self,
+        orig_row: tuple[Any, ...],
+        var_row: tuple[Any, ...],
+        aggregation_columns: Optional[Sequence[int]] = None,
+    ) -> list[int]:
+        """Return EVERY mismatched column index in a row (equal-length rows).
+
+        Collects all differing columns, not just the first, so a column-pinned
+        waiver predicate downstream can see a second wrong column on the same
+        row (validator-report-all-row-mismatches). Columns listed in
+        ``aggregation_columns`` use the numeric-tolerance comparison; the rest
+        use strict ``_values_equal`` - identical per-column semantics to the
+        two emit sites this replaces.
+        """
+        agg = set(aggregation_columns or ())
+        mismatched: list[int] = []
+        for j, (orig_val, var_val) in enumerate(zip(orig_row, var_row)):
+            equal = self._numeric_values_equal(orig_val, var_val) if j in agg else self._values_equal(orig_val, var_val)
+            if not equal:
+                mismatched.append(j)
+        return mismatched
+
+    @staticmethod
+    def _also_columns_suffix(mismatched: list[int]) -> str:
+        """Parseable ``"; also columns [j, k]"`` suffix for the extra mismatches.
+
+        Empty when only one column mismatched (keeps the historical
+        single-column message shape as the degenerate case, so log consumers
+        and classified-baseline keys stay stable). Bounded output: indices
+        only for the additional columns - never their values - so a wide-row
+        divergence cannot bloat a committed gate report (anti_pattern).
+        """
+        extra = mismatched[1:]
+        return f"; also columns {extra}" if extra else ""
+
     def _first_positional_mismatch(
         self,
         original_sorted: list[tuple[Any, ...]],
@@ -497,11 +533,13 @@ class ResultValidator:
         query_id: int,
         variant_id: int,
     ) -> str | None:
-        """Return the first row/column mismatch detail, or None if equal.
+        """Return the first row's mismatch detail (all columns), or None if equal.
 
         Assumes the two lists have equal length and are already sorted. Reused by
         both the strict path and the tie-aware deterministic-remainder check so
         the comparison semantics (``_values_equal`` tolerance) stay identical.
+        The detail reports the first mismatched column's values plus a bounded
+        ``"; also columns [...]"`` suffix naming every other mismatched column.
         """
         for i, (orig_row, var_row) in enumerate(zip(original_sorted, variant_sorted)):
             if len(orig_row) != len(var_row):
@@ -509,12 +547,14 @@ class ResultValidator:
                     f"Q{query_id}.{variant_id}: Column count mismatch at row {i}. "
                     f"Original: {len(orig_row)}, Variant: {len(var_row)}"
                 )
-            for j, (orig_val, var_val) in enumerate(zip(orig_row, var_row)):
-                if not self._values_equal(orig_val, var_val):
-                    return (
-                        f"Q{query_id}.{variant_id}: Value mismatch at row {i}, column {j}. "
-                        f"Original: {orig_val}, Variant: {var_val}"
-                    )
+            mismatched = self._row_value_mismatch_columns(orig_row, var_row)
+            if mismatched:
+                j = mismatched[0]
+                return (
+                    f"Q{query_id}.{variant_id}: Value mismatch at row {i}, column {j}. "
+                    f"Original: {orig_row[j]}, Variant: {var_row[j]}"
+                    f"{self._also_columns_suffix(mismatched)}"
+                )
         return None
 
     def _is_boundary_tie_equivalent(
@@ -714,6 +754,7 @@ class ResultValidator:
         original_sorted = sorted(original_results, key=self._row_sort_key)
         variant_sorted = sorted(variant_results, key=self._row_sort_key)
 
+        agg_columns = set(aggregation_columns or ())
         for i, (orig_row, var_row) in enumerate(zip(original_sorted, variant_sorted)):
             if len(orig_row) != len(var_row):
                 raise ValidationError(
@@ -721,20 +762,24 @@ class ResultValidator:
                     f"Original: {len(orig_row)}, Variant: {len(var_row)}"
                 )
 
-            for j, (orig_val, var_val) in enumerate(zip(orig_row, var_row)):
-                # Use tolerance for aggregation columns if specified
-                if aggregation_columns and j in aggregation_columns:
-                    if not self._numeric_values_equal(orig_val, var_val):
-                        raise ValidationError(
-                            f"Q{query_id}.{variant_id}: Aggregation value mismatch at row {i}, column {j}. "
-                            f"Original: {orig_val}, Variant: {var_val}, Tolerance: {self.tolerance}"
-                        )
-                else:
-                    if not self._values_equal(orig_val, var_val):
-                        raise ValidationError(
-                            f"Q{query_id}.{variant_id}: Value mismatch at row {i}, column {j}. "
-                            f"Original: {orig_val}, Variant: {var_val}"
-                        )
+            mismatched = self._row_value_mismatch_columns(orig_row, var_row, aggregation_columns)
+            if not mismatched:
+                continue
+            # Report the first mismatched column's values with its
+            # tolerance/strict label, plus a bounded suffix naming every other
+            # mismatched column on the row (all-columns visibility for the
+            # cross-surface waiver contract).
+            j = mismatched[0]
+            suffix = self._also_columns_suffix(mismatched)
+            if j in agg_columns:
+                raise ValidationError(
+                    f"Q{query_id}.{variant_id}: Aggregation value mismatch at row {i}, column {j}. "
+                    f"Original: {orig_row[j]}, Variant: {var_row[j]}, Tolerance: {self.tolerance}{suffix}"
+                )
+            raise ValidationError(
+                f"Q{query_id}.{variant_id}: Value mismatch at row {i}, column {j}. "
+                f"Original: {orig_row[j]}, Variant: {var_row[j]}{suffix}"
+            )
 
         return True
 
