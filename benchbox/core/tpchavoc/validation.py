@@ -64,7 +64,7 @@ def _render_cell(value: Any) -> str:
     if isinstance(value, Decimal):
         return f"d:{value}"
     if isinstance(value, (datetime.date, datetime.time)):  # datetime.datetime subclasses date
-        return f"t:{value}"
+        return f"t:{_escape_cell_text(str(value))}"
     # Escape the typename too, including its ':' delimiter: a dynamically
     # created type can carry an arbitrary __name__, and an unescaped '|',
     # '\n', or boundary-shifting ':' inside it would re-open exactly the
