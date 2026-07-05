@@ -18,6 +18,18 @@ pytestmark = [
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
+# Matches dot and bracket reference forms for every segment of the chain
+# independently: needs.ci-paths.outputs.x, needs['ci-paths'].outputs.x,
+# needs.ci-paths.outputs['x'], needs['ci-paths']['outputs']['x'] (the fully
+# bracketed form GitHub Actions also accepts for hyphenated keys), and any
+# dot/bracket mix across the three segments. Shared by the lockstep test and
+# its own regex-behavior regression test below so they cannot drift apart.
+_CI_PATHS_SEG = r"(?:\.ci-paths|\[['\"]ci-paths['\"]\])"
+_OUTPUTS_SEG = r"(?:\.outputs|\[['\"]outputs['\"]\])"
+CI_PATHS_OUTPUT_REFERENCE_RE = (
+    r"needs" + _CI_PATHS_SEG + _OUTPUTS_SEG + r"(?:\.([A-Za-z0-9_-]+)|\[['\"]([A-Za-z0-9_-]+)['\"]\])"
+)
+
 
 def _load_path_filter_decision():
     """Load scripts/path_filter_decision.py the way the workflow uses it.
@@ -252,14 +264,7 @@ def test_every_referenced_ci_paths_output_is_declared() -> None:
     workflow_yaml = yaml.safe_load(workflow_text)
     declared_outputs = set(workflow_yaml["jobs"]["ci-paths"]["outputs"])
 
-    # Match dot and bracket reference forms: needs.ci-paths.outputs.x,
-    # needs['ci-paths'].outputs.x, needs.ci-paths.outputs['x'], and the
-    # fully bracketed combination (single or double quotes).
-    reference_re = (
-        r"needs(?:\.ci-paths|\[['\"]ci-paths['\"]\])"
-        r"\.outputs(?:\.([A-Za-z0-9_-]+)|\[['\"]([A-Za-z0-9_-]+)['\"]\])"
-    )
-    referenced = {dot or bracket for dot, bracket in re.findall(reference_re, workflow_text)}
+    referenced = {dot or bracket for dot, bracket in re.findall(CI_PATHS_OUTPUT_REFERENCE_RE, workflow_text)}
     assert referenced, "expected pr.yml to reference ci-paths outputs"
 
     undeclared = referenced - declared_outputs
@@ -268,6 +273,19 @@ def test_every_referenced_ci_paths_output_is_declared() -> None:
         "declare them in jobs.ci-paths.outputs or the referencing `if:` "
         "silently evaluates against an empty string (the PR #952 incident)."
     )
+
+
+def test_ci_paths_output_reference_regex_matches_fully_bracketed_form() -> None:
+    # Regression pin: the regex previously hardcoded a literal `.outputs`, so
+    # `needs['ci-paths']['outputs']['new-needed']` (GitHub Actions' fully
+    # bracketed index syntax, a common way to reference hyphenated keys) was
+    # invisible to Direction 2 -- an undeclared output referenced only in that
+    # form would silently bypass this lockstep guard. Exercised against
+    # synthetic text so this stays green even if pr.yml itself never happens
+    # to use the bracketed form.
+    synthetic = "if: ${{ needs['ci-paths']['outputs']['new-needed'] == 'true' }}"
+    matches = {dot or bracket for dot, bracket in re.findall(CI_PATHS_OUTPUT_REFERENCE_RE, synthetic)}
+    assert matches == {"new-needed"}
 
 
 def test_parity_check_is_demoted_to_non_blocking() -> None:

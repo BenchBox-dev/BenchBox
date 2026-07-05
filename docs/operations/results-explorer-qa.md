@@ -139,7 +139,7 @@ Test on at least Home and one ResultDetail.
 ## S2 — Home (`/results/`)
 
 ### S2.1 Stat cards
-- Three cards: Results / Benchmarks / Platforms. Numbers match the corpus (12 results, 2 benchmarks, 4 platforms expected).
+- Three cards: Results / Benchmarks / Platforms. Numbers match the corpus (11 results, 2 benchmarks, 7 platforms expected — confirmed by running `npm run test:e2e:fixtures` and querying the generated `results.duckdb`; re-verify if the generator's variant list changes).
 
 ### S2.2 MetaLeaderboard mode toggle (`?mode=`)
 - Three modes: **times** (default), **ranks**, **speedup**. Click each.
@@ -161,7 +161,7 @@ Test on at least Home and one ResultDetail.
 - Reload preserves selection.
 
 ### S2.5 Filter combinations
-- Apply 2+ filters that produce an empty set (e.g. `tpch` + sqlite-only by date window). Verify a clear "no results" empty state, not a blank page or stack trace.
+- Apply 2+ filters that produce an empty set (e.g. `star_schema` + Polars, since `star_schema` in this corpus only has a `duckdb` result). Verify a clear "no results" empty state, not a blank page or stack trace.
 - Apply filters that match exactly one cohort. Verify the table shrinks correctly and platform avg-rank recalculates.
 
 ### S2.6 Cohort and platform links
@@ -211,7 +211,7 @@ Test against `/results/tpch/` and `/results/star_schema/`.
 
 ## S4 — PlatformIndex (`/results/p/:platform/`)
 
-Test all four platforms: `duckdb`, `sqlite`, `datafusion`, `polars`. **Pass-1 found duckdb + polars rendered empty** — verify status on this branch.
+Test all three source platforms: `duckdb`, `datafusion`, `polars` (there is no `sqlite` bundle in this corpus — see the Corpus note at the top of this doc). The generator's variant platforms (`datafusion-partial`, `fixture-aws-sql`, `fixture-gcp-serverless`, `fixture-container-sql`) are additional single-result platforms worth spot-checking too, but the three source platforms are the priority. **Pass-1 found duckdb + polars rendered empty** — verify status on this branch.
 
 ### S4.1 Page renders for each platform
 - Title, breadcrumb, results table, charts.
@@ -237,14 +237,18 @@ Test all four platforms: `duckdb`, `sqlite`, `datafusion`, `polars`. **Pass-1 fo
 Result IDs embed a content hash and change whenever the fixtures regenerate, so
 **pick current IDs from the Browse view** (`/results/`) rather than pasting a
 stale one. Cover at least one `tpch` and one `star_schema`, and at least two
-platforms. The four base source-bundle IDs below exist in a freshly generated
-fixture corpus and are safe concrete starting points; the generator also
-produces derived records (SF 0.1 scale, community, tuned) whose IDs you should
-read off the Browse view:
-- `tpch-duckdb-sf0.01-20260403-7fe93365`
-- `tpch-datafusion-sf0.01-20260403-c0d4f3d9`
-- `tpch-polars-sf0.01-20260403-39bb1a7b`
-- `star_schema-duckdb-sf0.01-20260403-ac3ed9a9`
+platforms. Note: the pipeline recomputes `result_id` from the copied/normalized
+bundle JSON — it is **not** the source bundle's filename hash — so do not
+reuse the filenames under `results-explorer/test-fixtures/source/bundles/`
+verbatim. The four base-result IDs below were read from a freshly generated
+fixture corpus's `results.duckdb` (via `npm run test:e2e:fixtures`) and are
+safe concrete starting points as of this writing; the generator also produces
+derived records (SF 0.1 scale, community, tuned, environment variants) whose
+IDs you should read off the Browse view:
+- `tpch-duckdb-sf0.01-20260403-010ee756`
+- `tpch-datafusion-sf0.01-20260403-a6bb8a70`
+- `tpch-polars-sf0.01-20260403-a62d0d72`
+- `star_schema-duckdb-sf0.01-20260403-3cdeede0`
 
 ### S5.1 Header & badges
 - Trust badge and Tuning badge render with the right label/color for the bundle's metadata.
