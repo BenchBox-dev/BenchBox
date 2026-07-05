@@ -345,6 +345,16 @@ def publish_bundle(
     Returns:
         The durable reference string on success, or None on failure.
     """
+    # Guard: reject an out-of-vocabulary trust label with a clean message rather
+    # than letting it reach BundlePublisher (which raises) as a traceback. This
+    # is the programmatic entry point for `benchbox run --publish`, whose
+    # --publish-label option is not a click.Choice.
+    if label not in VALID_LABELS:
+        console.print(
+            f"[red]Publish refused:[/red] invalid trust label '{label}'. Must be one of: {', '.join(VALID_LABELS)}."
+        )
+        return None
+
     # Guard: unofficial TPC-DS results require the explicit unofficial-research label.
     _unofficial_classes = {"unofficial_nonstandard", "unofficial_subscale"}
     try:

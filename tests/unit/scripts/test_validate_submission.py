@@ -399,27 +399,31 @@ class TestValidateManifestHash:
         assert any("hash mismatch" in e.lower() for e in vr.errors)
         assert any("result.json" in e for e in vr.errors)
 
-    def test_missing_hash_field_warns(self, tmp_path: Path):
+    def test_missing_hash_field_errors(self, tmp_path: Path):
+        # A present manifest whose whole purpose is the bundle-hash contract
+        # must carry it. Missing bundle_hash is an ERROR (not a warning), so an
+        # empty/incomplete manifest cannot pass CI while still granting the
+        # sidecar-derived community-submission trust label.
         manifest = tmp_path / "submission-manifest.json"
         manifest.write_text(json.dumps({"bundle_file": "result.json"}), encoding="utf-8")
 
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, tmp_path, vr)
-        assert vr.ok
-        assert any("no bundle_hash" in w for w in vr.warnings)
+        assert not vr.ok
+        assert any("no bundle_hash" in e for e in vr.errors)
 
-    def test_missing_bundle_file_field_warns(self, tmp_path: Path):
+    def test_missing_bundle_file_field_errors(self, tmp_path: Path):
         manifest = tmp_path / "submission-manifest.json"
         manifest.write_text(json.dumps({"bundle_hash": "deadbeef" * 8}), encoding="utf-8")
 
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, tmp_path, vr)
-        assert vr.ok
-        assert any("no bundle_file" in w for w in vr.warnings)
+        assert not vr.ok
+        assert any("no bundle_file" in e for e in vr.errors)
 
     @pytest.mark.parametrize("bad_hash", [123, None, ["abc"], {"hash": "x"}])
-    def test_non_string_hash_warns(self, tmp_path: Path, bad_hash):
-        """Non-string bundle_hash values should warn, not crash."""
+    def test_non_string_hash_errors(self, tmp_path: Path, bad_hash):
+        """Non-string bundle_hash values should error (not crash, not pass)."""
         manifest = tmp_path / "submission-manifest.json"
         manifest.write_text(
             json.dumps({"bundle_file": "result.json", "bundle_hash": bad_hash}),
@@ -428,8 +432,8 @@ class TestValidateManifestHash:
 
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, tmp_path, vr)
-        assert vr.ok
-        assert any("no bundle_hash" in w for w in vr.warnings)
+        assert not vr.ok
+        assert any("no bundle_hash" in e for e in vr.errors)
 
     def test_companion_hash_mismatch_fails(self, tmp_path: Path):
         """A companion file with a wrong hash must surface a per-file error."""
@@ -602,6 +606,21 @@ class TestValidateBundles:
 
         assert len(results) == 1
         assert results[0].ok
+
+    def test_present_but_empty_manifest_fails_end_to_end(self, tmp_path: Path):
+        # A present-but-contentless sidecar must not pass: it would otherwise
+        # grant the sidecar-derived community-submission trust label while the
+        # bundle bytes are never hash-verified.
+        bundle = tmp_path / "result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        manifest = tmp_path / "result.manifest.json"
+        manifest.write_text(json.dumps({}), encoding="utf-8")
+
+        results = validate_bundles([bundle])
+
+        assert len(results) == 1
+        assert not results[0].ok
+        assert any("bundle_hash" in e or "bundle_file" in e for e in results[0].errors)
 
 
 # ---------------------------------------------------------------------------

@@ -588,7 +588,14 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
 
     # Surface ALL missing required fields in one pass so a contributor
     # whose manifest is missing both `bundle_file` and `bundle_hash`
-    # sees both warnings instead of having to fix-and-retry one at a time.
+    # sees both errors instead of having to fix-and-retry one at a time.
+    #
+    # These are ERRORs, not warnings: a present manifest whose whole purpose is
+    # the bundle-hash contract must actually carry it. When they were warnings,
+    # ValidationResult.ok ignored them, so a present-but-empty `.manifest.json`
+    # passed CI *and* — because the pipeline/inventory treat sidecar presence as
+    # the community-submission trust signal — granted the community label
+    # without the bundle bytes ever being hash-verified.
     bundle_file = manifest.get("bundle_file")
     expected_hash = manifest.get("bundle_hash")
     missing_fields: list[str] = []
@@ -598,7 +605,7 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
         missing_fields.append("bundle_hash")
     if missing_fields:
         for field in missing_fields:
-            vr.warn(f"Submission manifest has no {field} field")
+            vr.error(f"Submission manifest has no {field} field")
         return
 
     if not _is_safe_bundle_filename(bundle_file):
