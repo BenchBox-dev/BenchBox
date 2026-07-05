@@ -63,7 +63,8 @@ contents are fixed by allowlist; everything else is excluded.
 | `results-data/SEED_CORPUS_SPEC.md` | Maintainer-run seed lane spec. |
 | `results-data/validate_corpus.py` | The cohort-depth gate enforced by CI. |
 | `results-data/.gitignore` | Local-clone hygiene for the corpus directory. |
-| `scripts/validate_submission.py` | Per-bundle validator — must run inside the submission CI without shipping the rest of `benchbox/`. Vendored here as a self-contained standalone script. |
+| `scripts/validate_submission.py` | Per-bundle validator entrypoint — a thin CLI wrapper that must run inside the submission CI without shipping the rest of `benchbox/`. Imports the shared implementation from `benchbox/validation/bundle.py` (with an `importlib` file-loader fallback). |
+| `benchbox/validation/bundle.py` | The shared validator implementation used by both develop and this branch. Mirrored here (the single `benchbox/` file on the branch) so `validate_submission.py` runs without installing BenchBox; kept in sync by `sync-results-data-to-published.yml`. |
 | `scripts/generate_corpus_inventory.py` | Inventory generator — same rationale as above. |
 | `.github/workflows/validate-submission.yml` | The submission CI gate. |
 | `.gitignore` | Repository-root ignore — kept minimal. |
@@ -77,8 +78,10 @@ in the slim-down.
 
 ### Explicit exclusions (deleted in the slim-down)
 
-- `benchbox/` (the package source) — not needed to validate or display
-  bundles; the validator and inventory generator are vendored.
+- `benchbox/` (the package source) — **except** the single mirrored file
+  `benchbox/validation/bundle.py` (see the allowlist above). The rest of the
+  package is not needed to validate or display bundles; `validate_submission.py`
+  is a thin wrapper over that one shared module.
 - `tests/` — the develop-side test suite. The corpus depth and
   per-bundle validators run against `results-data/` directly.
 - `_project/` — TODO/DONE/handoffs/blind-spots. Project tracking
@@ -97,10 +100,14 @@ in the slim-down.
 
 ### Validator invocation contract
 
-`validate_submission.py` and `generate_corpus_inventory.py` are
-stdlib-only Python (`hashlib`, `json`, `sys`, `argparse`, `pathlib`,
-`decimal`, `collections`, `datetime` — no `benchbox.*` imports). They
-do not need any project metadata to run.
+`generate_corpus_inventory.py` is stdlib-only Python. `validate_submission.py`
+is a thin wrapper that imports the shared implementation from
+`benchbox/validation/bundle.py` (mirrored onto this branch), with an
+`importlib` file-loader fallback if `benchbox` is not importable; that shared
+module is itself stdlib-only (`hashlib`, `json`, `sys`, `argparse`, `pathlib`,
+`decimal`, `collections`, `datetime` — it does not import the rest of
+`benchbox.*`). CI invokes them with `uv run --no-project --python 3.11`, so
+neither needs project metadata or an installed BenchBox to run.
 
 The current `validate-submission.yml` invokes them via
 `uv run -- python scripts/<script>.py`, which expects a `pyproject.toml`
@@ -214,8 +221,8 @@ the canonical fix.
    one-time orphan-branch reset.
 5. **Drop `uv run` from `validate-submission.yml` and call `python3
    scripts/<script>.py` directly.** Stronger expression of slim intent
-   than the chosen approach: the validators are stdlib-only, so plain
-   `python3` works without `uv`, `pyproject.toml`, or `uv.lock`.
+   than the chosen approach: the validator's shared module is stdlib-only, so
+   plain `python3` works without `uv`, `pyproject.toml`, or `uv.lock`.
    *Considered but not chosen* because the project-wide convention
    (`CLAUDE.md` / `AGENTS.md`) is "always use `uv` for Python execution"
    and breaking that convention on a single workflow file would be
@@ -254,7 +261,7 @@ Re-review this ADR when:
 
 ## References
 
-- Parent TODO: `_project/TODO/main/active/published-results-slim-down-and-corpus-mirror.yaml`
+- Parent TODO: `_project/DONE/main/published-results-slim-down-and-corpus-mirror.yaml` (completed)
 - Originating handoff: `_project/handoffs/results-explorer-uat-corpus-integration-20260503.md`
 - Runbook: `docs/operations/results-phase-2-runbook.md`
 - Contributor guide: `docs/contributing-results.md`
