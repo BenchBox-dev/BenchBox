@@ -365,6 +365,16 @@ def _build_query_results_section(
         entry["stream"] = stream_id
         entry["run_type"] = run_type
         entry["status"] = status
+        # Additive, present only for phased runs (power/throughput/maintenance):
+        # a combined run executes the same public query_id in more than one
+        # phase, each with its own independent stream_id counter, so stream_id
+        # alone cannot always disambiguate which phase's .plans.json entry a
+        # reconstructed row belongs to (see build_plans_payload). Standard
+        # single-phase runs never set this, so their compact entries are
+        # unchanged.
+        test_type = qr.get("test_type")
+        if test_type:
+            entry["test_type"] = test_type
         # Gate-only value-digest oracle (BENCHBOX_EMIT_RESULT_DIGEST): present only
         # when the runner emitted a full-result digest, so a normal run's payload
         # shape is unchanged. Explicit None checks (not `or`) so a digest is never
@@ -1056,6 +1066,15 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
         ``query_id`` key (the common single-stream case, unchanged format), and
         a group with more than one row uses a ``"{query_id}#{stream_id}"``
         composite key per row so every stream's plan survives.
+
+        A combined run (e.g. power then throughput) executes the same public
+        query id in BOTH phases, and each phase's stream_id counter starts at
+        its own 0 - so a power row and a throughput row for the same query_id
+        can share the exact same stream_id too. When stream_id alone does not
+        disambiguate every row in a group, ``test_type`` (already carried on
+        every row - see ``_build_query_results_section``) is appended to the
+        composite key so cross-phase collisions never silently overwrite each
+        other, on top of the same-phase multi-stream case above.
     """
     if not result.query_plans_captured or result.query_plans_captured == 0:
         return None
@@ -1072,8 +1091,18 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
 
     for query_id, rows in rows_by_query_id.items():
         multi_stream = len(rows) > 1
+        stream_ids = [qr.get("stream_id", 0) for qr in rows]
+        # stream_id alone disambiguates the group only if every row's stream_id
+        # is distinct; a cross-phase collision (same query_id AND stream_id from
+        # two different test_types) needs test_type appended too.
+        stream_id_disambiguates = len(set(stream_ids)) == len(stream_ids)
         for qr in rows:
-            key = f"{query_id}#{qr.get('stream_id', 0)}" if multi_stream else query_id
+            if not multi_stream:
+                key = query_id
+            elif stream_id_disambiguates:
+                key = f"{query_id}#{qr.get('stream_id', 0)}"
+            else:
+                key = f"{query_id}#{qr.get('stream_id', 0)}:{qr.get('test_type', '')}"
             plans_by_query[key] = _build_plan_entry(qr)
 
     # Add plan capture errors
