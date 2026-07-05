@@ -55,6 +55,5 @@ def test_packaging_and_viz_gates_are_wired() -> None:
     declared = _declared_ci_paths_outputs()
     for required in ("packaging-needed", "viz-needed"):
         assert required in declared, (
-            f"ci-paths must declare `{required}` — package-smoke / "
-            "dependency-audit / parity-check gate on it."
+            f"ci-paths must declare `{required}` — package-smoke / dependency-audit / parity-check gate on it."
         )
