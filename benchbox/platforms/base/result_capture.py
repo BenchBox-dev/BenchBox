@@ -87,7 +87,13 @@ _DML_LEADING_RE = re.compile(r"^(?:INSERT|UPDATE|DELETE|MERGE|COPY|REPLACE|UPSER
 # A data-modifying verb anywhere — used only after a leading WITH to catch
 # CTE-prefixed DML (``WITH cte AS (...) INSERT INTO ...``). COPY is excluded:
 # it cannot appear inside a CTE, and its leading form is already caught above.
-_DML_AFTER_CTE_RE = re.compile(r"\b(?:INSERT|UPDATE|DELETE|MERGE|REPLACE|UPSERT)\b", re.IGNORECASE)
+# REPLACE requires a following INTO (unlike INSERT/UPDATE/DELETE/MERGE, which
+# match bare): REPLACE is also a common SQL string function
+# (``replace(col, 'a', 'b')``), so a bare-word match would false-positive on
+# any read-only CTE query that happens to call it, suppressing ANALYZE for a
+# statement that writes nothing. UPSERT has no such overloaded meaning, but is
+# held to the same ``INTO``-qualified form for consistency.
+_DML_AFTER_CTE_RE = re.compile(r"\b(?:INSERT|UPDATE|DELETE|MERGE)\b|\b(?:REPLACE|UPSERT)\s+INTO\b", re.IGNORECASE)
 # Write-producing DDL prefixes: CREATE TABLE ... AS <query> (CTAS) and
 # CREATE MATERIALIZED VIEW ... AS <query>. Both materialize the query's rows,
 # so EXPLAIN ANALYZE would write them a second time. The prefix alone is not

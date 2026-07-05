@@ -74,6 +74,8 @@ class TestIsDmlQueryHelper:
             "WITH cte AS (SELECT 1) SELECT * FROM cte",
             "SELECT copy_total, merge_flag FROM t",  # identifiers, not verbs (word boundary)
             "SELECT replacement_id, upserted_at FROM t",  # REPLACE/UPSERT identifiers, not verbs (word boundary)
+            "WITH cleaned AS (SELECT replace(name, 'a', 'b') FROM t) SELECT * FROM cleaned",  # REPLACE() string function, not the DML statement
+            "SELECT replace(name, 'a', 'b') FROM t",  # same function call, no CTE
             "CREATE TABLE t (id INT)",  # column DDL writes no rows
             "CREATE TABLE t (x INT GENERATED ALWAYS AS (x + 1) STORED)",  # generated column AS is not CTAS
             "CREATE TABLE t (note TEXT DEFAULT 'AS SELECT')",  # literal inside column DDL is not CTAS
