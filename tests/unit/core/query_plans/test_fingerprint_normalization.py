@@ -235,9 +235,8 @@ class TestComputePlanFingerprint:
 class TestPlanMetadataNormalization:
     @staticmethod
     def _results(query_plan: QueryPlanDAG) -> SimpleNamespace:
-        execution = SimpleNamespace(query_id=query_plan.query_id, query_plan=query_plan)
-        phase = SimpleNamespace(queries=[execution])
-        return SimpleNamespace(platform="duckdb", platform_version="1.0", phases={"power": phase})
+        query_result = {"query_id": query_plan.query_id, "query_plan": query_plan}
+        return SimpleNamespace(platform="duckdb", platform_version="1.0", query_results=[query_result])
 
     def test_metadata_default_uses_literal_sensitive_fingerprint(self):
         """Without the flag, two seeds record different fingerprints (the bug)."""

@@ -550,26 +550,20 @@ class TestCompareHelperFunctions:
         from benchbox.cli.commands.compare import _build_execution_map
 
         results = SimpleNamespace(
-            phases={
-                "power": SimpleNamespace(
-                    queries=[
-                        SimpleNamespace(query_id="Q1", execution_time_ms=10.0),
-                        SimpleNamespace(query_id="Q2", execution_time_ms=20.0),
-                    ]
-                ),
-                "throughput": SimpleNamespace(
-                    queries=[
-                        SimpleNamespace(query_id="Q1", execution_time_ms=99.0),
-                        SimpleNamespace(query_id="Q3", execution_time_ms=30.0),
-                    ]
-                ),
-            }
+            query_results=[
+                # "power" phase
+                {"query_id": "Q1", "execution_time_ms": 10.0},
+                {"query_id": "Q2", "execution_time_ms": 20.0},
+                # "throughput" phase
+                {"query_id": "Q1", "execution_time_ms": 99.0},
+                {"query_id": "Q3", "execution_time_ms": 30.0},
+            ]
         )
 
         execution_map = _build_execution_map(results)
 
         assert set(execution_map) == {"Q1", "Q2", "Q3"}
-        assert execution_map["Q1"].execution_time_ms == 10.0
+        assert execution_map["Q1"]["execution_time_ms"] == 10.0
 
     @patch("benchbox.core.query_plans.comparison.QueryPlanComparator")
     @patch("benchbox.core.query_plans.comparison.generate_plan_comparison_summary")
@@ -577,24 +571,16 @@ class TestCompareHelperFunctions:
         from benchbox.cli.commands.compare import _compare_plans
 
         baseline = SimpleNamespace(
-            phases={
-                "power": SimpleNamespace(
-                    queries=[
-                        SimpleNamespace(query_id="Q1", query_plan={"a": 1}, execution_time_ms=100.0),
-                        SimpleNamespace(query_id="Q2", query_plan={"b": 2}, execution_time_ms=50.0),
-                    ]
-                )
-            }
+            query_results=[
+                {"query_id": "Q1", "query_plan": {"a": 1}, "execution_time_ms": 100.0},
+                {"query_id": "Q2", "query_plan": {"b": 2}, "execution_time_ms": 50.0},
+            ]
         )
         current = SimpleNamespace(
-            phases={
-                "power": SimpleNamespace(
-                    queries=[
-                        SimpleNamespace(query_id="Q1", query_plan={"a": 2}, execution_time_ms=150.0),
-                        SimpleNamespace(query_id="Q2", query_plan={"b": 3}, execution_time_ms=55.0),
-                    ]
-                )
-            }
+            query_results=[
+                {"query_id": "Q1", "query_plan": {"a": 2}, "execution_time_ms": 150.0},
+                {"query_id": "Q2", "query_plan": {"b": 3}, "execution_time_ms": 55.0},
+            ]
         )
 
         mock_summary_fn.return_value = SimpleNamespace(plans_compared=2, plans_unchanged=0, plans_changed=2)

@@ -1,0 +1,56 @@
+id: harden-is-dml-query-replace-upsert
+title: "Defensively cover REPLACE INTO / UPSERT INTO in is_dml_query"
+worktree: main
+priority: Low
+status: Not Started
+description: |
+  `is_dml_query` (benchbox/platforms/base/result_capture.py:196; leading-verb regex
+  `_DML_LEADING_RE` at :82) guards EXPLAIN-ANALYZE plan capture against re-executing a
+  write. It covers INSERT/UPDATE/DELETE/MERGE/COPY (incl. CTE-prefixed), CTAS,
+  CREATE MATERIALIZED VIEW, and SELECT...INTO, but returns False for a bare
+  `REPLACE INTO ...` (MySQL/SingleStore/Doris family) and a bare `UPSERT INTO ...`.
+
+  Not currently exploitable: the three ANALYZE-capturing adapters (DuckDB, MotherDuck,
+  PostgreSQL) do not emit those forms, the MySQL-family adapters use plain non-ANALYZE
+  EXPLAIN, and no workload emits a bare REPLACE/UPSERT (the only occurrence is
+  `INSERT OR REPLACE INTO`, caught via the leading INSERT). This is a latent gap: if a
+  future ANALYZE-capturing engine or workload emits `REPLACE INTO`/`UPSERT INTO`, the
+  statement would be physically re-executed during capture, mutating data twice.
+
+  Add REPLACE and UPSERT to the leading-verb set so the guard is robust by construction.
+
+category: Core Functionality
+
+metadata:
+  tags: [query-plans, dml-guard, defensive, sql-dialects]
+  estimated_effort: "Small"
+  created_date: "2026-07-04"
+  source_review: "Query-plan-capture adversarial review (2026-07-04)"
+
+impact:
+  user_impact: |
+    None today; prevents a future double-mutation-during-capture regression if an
+    ANALYZE engine ever runs REPLACE/UPSERT.
+
+must_preserve:
+  - "No read statement (plain SELECT, CREATE VIEW, plain CREATE TABLE, TRUNCATE) starts returning True."
+  - "All currently-caught write shapes stay caught."
+
+approach: |
+  Extend `_DML_LEADING_RE` to include REPLACE and UPSERT as leading verbs; add both
+  (and lowercase/comment-prefixed variants) to the is_dml_query unit corpus.
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/result_capture.py"
+    - "tests/unit/platforms/"
+
+work:
+  - id: w1
+    summary: "Add REPLACE/UPSERT to _DML_LEADING_RE and extend the is_dml_query test corpus (incl. lowercase + comment-prefixed)"
+    status: pending
+
+verification:
+  - description: "is_dml_query tests pass, including new REPLACE/UPSERT cases and unchanged read/DDL cases"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -k 'dml or plan_capture' -n 0 -q"
+    expected_output: "passed"

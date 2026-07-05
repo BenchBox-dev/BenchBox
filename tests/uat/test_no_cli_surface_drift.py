@@ -23,6 +23,11 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/calculate_qphh.py",
     "benchbox/cli/commands/compare_dataframes.py",
     "benchbox/cli/commands/compare_plans.py",
+    # fix-plan-consumption-phases-and-loader-reattach: internal-only fix repointing
+    # the broken `results.phases` walk at the real `query_results` accessor; no
+    # command/option/argument surface changed.
+    "benchbox/cli/commands/compare.py",
+    "benchbox/cli/commands/show_plan.py",
     "benchbox/cli/commands/convert.py",
     "benchbox/cli/commands/df_tuning.py",
     "benchbox/cli/commands/run.py",

@@ -8,7 +8,8 @@ import click
 from benchbox.cli.shared import console
 from benchbox.core.query_plans.comparison import compare_query_plans, generate_plan_comparison_summary
 from benchbox.core.query_plans.visualization import render_comparison
-from benchbox.core.results.loader import load_result_file
+from benchbox.core.results.loader import iter_query_results, load_result_file
+from benchbox.core.results.query_normalizer import normalize_query_id
 
 
 @click.command("compare-plans", hidden=True, deprecated=True)
@@ -73,7 +74,7 @@ def _run_summary_mode(
 
 
 def _collect_query_ids(results) -> set[str]:
-    return {execution.query_id for phase in results.phases.values() for execution in phase.queries}
+    return {str(qr["query_id"]) for qr in iter_query_results(results) if qr.get("query_id") is not None}
 
 
 def _resolve_query_ids(query_id: str | None, results1, results2, ctx) -> list[str]:
@@ -96,8 +97,8 @@ def _build_comparisons(
         if not exec1 or not exec2:
             _warn_if_explicit(explicit_query_id, f"Query '{qid}' not found in both runs")
             continue
-        plan1 = getattr(exec1, "query_plan", None)
-        plan2 = getattr(exec2, "query_plan", None)
+        plan1 = exec1.get("query_plan")
+        plan2 = exec2.get("query_plan")
         if not plan1 or not plan2:
             _warn_if_explicit(explicit_query_id, f"Query '{qid}' missing plan in one or both runs")
             continue
@@ -125,7 +126,18 @@ def _emit_comparisons(comparisons, output_format, output_file, explicit_query_id
 
 
 def _find_query_execution(results, query_id: str):
-    return next((e for phase in results.phases.values() for e in phase.queries if e.query_id == query_id), None)
+    """Find a query result whose ID matches after normalization.
+
+    ``load_result_file`` returns already-normalized IDs from a real bundle's
+    compact ``queries[].id`` field (e.g. ``q05``/``Q05`` -> ``05``), so a raw
+    string comparison against the CLI's documented ``--query-id q05`` input
+    would report "not found" even when the plan is present.
+    """
+    normalized_target = normalize_query_id(query_id)
+    return next(
+        (qr for qr in iter_query_results(results) if normalize_query_id(qr.get("query_id", "")) == normalized_target),
+        None,
+    )
 
 
 def _output_text(comparisons: list, single_query: bool, return_string: bool = False) -> str | None:
