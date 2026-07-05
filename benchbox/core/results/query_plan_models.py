@@ -137,7 +137,22 @@ from benchbox.core.errors import SerializationError
 # be adjacent with nothing in between. The trailing negative lookahead mirrors
 # the leading lookbehind (rather than a trailing \b) so a number is not matched
 # when immediately glued to more identifier-continuation characters either.
-_LITERAL_NUM_RE = re.compile(r"(?<![A-Za-z0-9_.$])[+-]?\d+(?:\.\d+)?(?![A-Za-z0-9_.$])")
+#
+# The alternation covers every SQL numeric literal form atomically (a single
+# match spans the whole literal, never leaving a residual value-dependent
+# fragment like the old plain-decimal-only pattern's ``1.2E-<NUM>``):
+#   - hex: ``0xFF`` / ``0Xff``, with optional ``_`` digit-group separators
+#   - decimal: leading-dot (``.5``), trailing-dot (``5.``), or both-sided
+#     (``5.5``), each with an optional ``[eE][+-]?exponent`` suffix
+#   - plain integer (``123``) or scientific integer (``1e5``, ``1E-3``)
+#   - ``_`` digit-group separators anywhere in the integer/exponent part
+#     (``1_000``, DuckDB/PostgreSQL numeric-literal syntax)
+_HEX_LITERAL = r"0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*"
+_DECIMAL_LITERAL = (
+    r"(?:\d(?:_?\d)*(?:\.(?:\d(?:_?\d)*)?)?|\.\d(?:_?\d)*)"  # 123 | 123. | 123.456 | .456
+    r"(?:[eE][+-]?\d(?:_?\d)*)?"  # optional exponent: e5, E-3, e+10
+)
+_LITERAL_NUM_RE = re.compile(rf"(?<![A-Za-z0-9_.$])[+-]?(?:{_HEX_LITERAL}|{_DECIMAL_LITERAL})(?![A-Za-z0-9_.$])")
 # ``(?:[^']|'')*`` (rather than ``[^']*``) treats a doubled single quote as an
 # escaped apostrophe INSIDE the literal rather than the end of the string, so
 # ``'O''Brien'`` masks to one <STR> token instead of splitting into two
