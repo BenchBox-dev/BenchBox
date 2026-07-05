@@ -41,6 +41,7 @@ exercised two ways:
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import sys
 from pathlib import Path
@@ -133,6 +134,20 @@ TAG_RULESET_ENFORCED = False
 TAG_REF_PATTERN = "refs/tags/v*"
 
 
+def _tag_glob_covers(pattern: str) -> bool:
+    """True if a ref-name glob ``pattern`` matches every ``refs/tags/v*`` ref.
+
+    GitHub's ``ref_name`` condition patterns are fnmatch-style globs, so
+    ``refs/tags/*`` covers (or negates, in an ``exclude``) ``refs/tags/v*``
+    just as fully as the literal pattern. Fnmatch-ing ``TAG_REF_PATTERN``
+    itself against ``pattern`` answers that without enumerating concrete tag
+    names: every character in ``refs/tags/v*`` is literal except the trailing
+    ``*``, so a pattern matches it here exactly when that pattern's own
+    wildcard structure would match any real ``refs/tags/vX...`` ref too.
+    """
+    return fnmatch.fnmatchcase(TAG_REF_PATTERN, pattern)
+
+
 def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
     """Reasons the live rulesets fail to restrict ``v*`` tag *creation*.
 
@@ -150,17 +165,39 @@ def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
     summary-only payload correctly reports the detail as missing rather than
     passing on absent evidence (never green on unverified input). Rulesets
     that target branches (e.g. ``v-release-branches-minimal`` →
-    ``refs/heads/v*``) are ``target != "tag"`` and never count. An ``exclude``
-    that removes ``refs/tags/v*`` negates an otherwise-covering ``include``.
+    ``refs/heads/v*``) are ``target != "tag"`` and never count.
+
+    ``include``/``exclude`` ref-name conditions are GitHub fnmatch-style globs,
+    not exact strings: an ``include`` of ``refs/tags/*`` covers ``refs/tags/v*``
+    just as well as the literal pattern, and an ``exclude`` of ``refs/tags/*``
+    negates that coverage even though it is not byte-identical to
+    ``TAG_REF_PATTERN``. Coverage is therefore tested by fnmatch-ing
+    ``TAG_REF_PATTERN`` itself against each candidate pattern (every character
+    in ``refs/tags/v*`` is literal except the trailing ``*``, so this exactly
+    answers "does this pattern's wildcard structure swallow the whole
+    refs/tags/v* domain" without enumerating concrete tag names). ``~ALL`` is
+    GitHub's literal sentinel for "every ref" and is matched by exact string,
+    not fnmatch.
 
     NOTE on ``bypass_actors``: this predicate deliberately does NOT treat a
     non-empty bypass list as a structural failure. This TODO's must_preserve
     REQUIRES a bypass path (``make release-finalize`` must still create ``v*``
-    tags), so demanding zero bypass actors would brick the release flow. A
-    broad/wrong bypass list is nonetheless a real hole, so it is surfaced via
-    :func:`tag_bypass_advisory` (rendered by ``main`` and required in the
-    runbook's live-state note) for human confirmation before
-    ``TAG_RULESET_ENFORCED`` is flipped — never passed silently.
+    tags), so demanding zero bypass actors would brick the release flow. But an
+    explicitly-empty bypass list (``bypass_actors: []``, as returned by the full
+    ruleset GET when none are configured) is the OTHER failure mode of the same
+    requirement: a structurally-valid ruleset with no exception for the
+    release-finalize identity blocks ``make release-finalize``'s own
+    ``git push origin v$(VERSION)``, bricking releases outright. That case is a
+    finding here, not just an advisory. A MISSING ``bypass_actors`` key (as
+    opposed to a present-but-empty list) is left unasserted — it means the
+    caller didn't populate that field at all (e.g. a partial/synthetic
+    payload), not that GitHub confirmed there are zero bypass actors. A
+    non-empty bypass list is still not a structural failure (must_preserve
+    requires the bypass path to exist) but its actor list is a real hole if
+    too broad, so it is surfaced via :func:`tag_bypass_advisory` (rendered by
+    ``main`` and required in the runbook's live-state note) for human
+    confirmation before ``TAG_RULESET_ENFORCED`` is flipped — never passed
+    silently.
     """
     tag_rulesets = [rs for rs in rulesets if isinstance(rs, dict) and rs.get("target") == "tag"]
     if not tag_rulesets:
@@ -178,13 +215,19 @@ def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
         ref_name = (ruleset.get("conditions") or {}).get("ref_name") or {}
         include = tuple(ref_name.get("include") or ())
         exclude = tuple(ref_name.get("exclude") or ())
-        if TAG_REF_PATTERN not in include and "~ALL" not in include:
+        if not any(pattern == "~ALL" or _tag_glob_covers(pattern) for pattern in include):
             issues.append(f"ref include={include!r} does not cover {TAG_REF_PATTERN}")
-        elif TAG_REF_PATTERN in exclude or "~ALL" in exclude:
+        elif any(pattern == "~ALL" or _tag_glob_covers(pattern) for pattern in exclude):
             issues.append(f"ref exclude={exclude!r} negates coverage of {TAG_REF_PATTERN}")
         rule_types = {rule.get("type") for rule in ruleset.get("rules") or [] if isinstance(rule, dict)}
         if "creation" not in rule_types:
             issues.append("no 'creation' rule")
+        if ruleset.get("bypass_actors") == []:
+            issues.append(
+                "bypass_actors is empty -- `make release-finalize`'s `git push origin "
+                "v$(VERSION)` would be blocked with no exception for the release-finalize "
+                "identity; add a bypass actor for that identity before enforcing"
+            )
         if not issues:
             return []
         problems.append(f"{name}: " + "; ".join(issues))
@@ -194,11 +237,14 @@ def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
 def tag_bypass_advisory(rulesets: list[dict[str, Any]]) -> list[str]:
     """Bypass actors on the covering ``v*`` tag ruleset that a human must confirm.
 
-    Empty list == no protecting tag ruleset (see :func:`tag_protection_findings`)
-    or a protecting one with NO bypass actors. A non-empty result is NOT a
-    failure — it is the list the operator must confirm is release-flow-only
-    before flipping ``TAG_RULESET_ENFORCED`` (must_preserve: the release
-    identity legitimately needs bypass; a broad role in this list is the hole).
+    Empty list == no protecting tag ruleset, a protecting one with an
+    explicitly-empty ``bypass_actors: []`` (both already surfaced as findings
+    by :func:`tag_protection_findings`, so not repeated here), or a protecting
+    one where ``bypass_actors`` is simply absent from the payload. A non-empty
+    result is NOT a failure — it is the list the operator must confirm is
+    release-flow-only before flipping ``TAG_RULESET_ENFORCED`` (must_preserve:
+    the release identity legitimately needs bypass; a broad role in this list
+    is the hole).
     """
     if tag_protection_findings(rulesets):
         return []

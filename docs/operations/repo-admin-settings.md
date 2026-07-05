@@ -335,19 +335,31 @@ for id in $ids; do gh api repos/joeharris76/BenchBox/rulesets/$id; done \
 While `TAG_RULESET_ENFORCED` is `False` (until the POST above lands), a
 missing/incomplete `v*`-tag ruleset prints as `WARNING (non-blocking):` and
 exits 0 — the check ships before the admin acts without going red. The
-predicate flags a ruleset that is not `active`, whose `ref_name.include`
-does not cover `refs/tags/v*` (or `~ALL`), whose `exclude` negates that
-coverage, or that lacks a `creation` rule. It does NOT fail on a non-empty
-`bypass_actors` list — a bypass path is REQUIRED so `make release-finalize`
-can still tag — but it prints a `CONFIRM before enforcing:` line listing the
-bypass actors; verify that list is the release identity only (not a broad
-Write/Admin role) before flipping the flag. After applying the ruleset and
-confirming the bypass list, flip `TAG_RULESET_ENFORCED = True` (a one-line
-change, tested by `test_ruleset_drift_review_coverage.py`) so the gap becomes
-blocking. NOTE: this predicate is not yet wired into the live
-`release-canary.yml` run — that wiring is a follow-up and also depends on
-`release-canary-scheduled-activation` making the canary run at all; the
-predicate + tests land first per this TODO's scope.
+predicate flags a ruleset that is not `active`; whose `ref_name.include`
+does not cover `refs/tags/v*` (or `~ALL`) under GitHub's fnmatch ref-glob
+semantics (an `include`/`exclude` of `refs/tags/*` counts the same as the
+literal `refs/tags/v*`, not just a byte-identical string); that lacks a
+`creation` rule; or whose `bypass_actors` is explicitly `[]` (a
+structurally-valid ruleset with zero bypass actors would itself block
+`make release-finalize`'s `git push origin v$(VERSION)`, bricking releases —
+that is a finding, not just an advisory). A NON-empty `bypass_actors` list is
+not a structural failure (a bypass path is REQUIRED so `make release-finalize`
+can still tag) — instead it prints a `CONFIRM before enforcing:` line listing
+the bypass actors; verify that list is the release identity only (not a
+broad Write/Admin role) before flipping the flag. After applying the
+ruleset and confirming the bypass list, flip `TAG_RULESET_ENFORCED = True`
+(a one-line change, tested by `test_ruleset_drift_review_coverage.py`) so
+the gap becomes blocking.
+
+Wired into CI (landed alongside the fnmatch/bypass-empty hardening above):
+`scripts/ruleset_drift_check.py`'s `tag_creation_findings()` calls
+`tag_protection_findings()`/`tag_bypass_advisory()` against every ruleset
+`release-canary.yml`'s `ruleset-drift` job already fetches (the same
+`RULESET_DRIFT_TOKEN`-authenticated full-ruleset listing used for the
+`develop-squash-only`/`main-release-only` checks — no second API call), so
+the daily canary run itself surfaces tag-ruleset drift under the same
+WARN-until-applied gating as the develop review rule, with no dependency on
+`release-canary-scheduled-activation` beyond the canary running at all.
 
 Live-state note (fill in after applying — do not leave blank):
 

@@ -104,10 +104,16 @@ in the slim-down.
 is a thin wrapper that imports the shared implementation from
 `benchbox/validation/bundle.py` (mirrored onto this branch), with an
 `importlib` file-loader fallback if `benchbox` is not importable; that shared
-module is itself stdlib-only (`hashlib`, `json`, `sys`, `argparse`, `pathlib`,
-`decimal`, `collections`, `datetime` — it does not import the rest of
-`benchbox.*`). CI invokes them with `uv run --no-project --python 3.11`, so
-neither needs project metadata or an installed BenchBox to run.
+module's own dependencies are stdlib-only (`hashlib`, `json`, `sys`,
+`argparse`, `pathlib`, `decimal`, `collections`, `datetime`), but it also
+*tries* one `benchbox.*` import — `benchbox.core.results.schema_policy` — and
+falls back to a standalone policy check when that import fails (as it will on
+this slim branch, which has no installed BenchBox). That is an optional
+BenchBox import, not an absence of one: develop intentionally uses the
+central schema policy when `benchbox` is importable there, while
+`published-results` always takes the standalone fallback path. CI invokes
+both scripts with `uv run --no-project --python 3.11`, so neither needs
+project metadata or an installed BenchBox to run.
 
 The current `validate-submission.yml` invokes them via
 `uv run -- python scripts/<script>.py`, which expects a `pyproject.toml`

@@ -35,6 +35,7 @@ from scripts.ruleset_drift_check import (
     blocking_findings,
     compare_ruleset,
     parse_expected_rulesets,
+    tag_creation_findings,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -292,3 +293,98 @@ def test_tag_check_main_prints_bypass_confirmation_on_ok(tmp_path, capsys):
     assert rc == 0
     assert "Tag-creation ruleset - OK" in out
     assert "CONFIRM before enforcing:" in out
+
+
+# ---------------------------------------------------------------------------
+# Review-followup hardening: empty bypass_actors + fnmatch ref-glob matching
+# ---------------------------------------------------------------------------
+
+
+def test_tag_protection_flags_explicitly_empty_bypass_actors():
+    # A structurally-valid ruleset with bypass_actors: [] (GitHub's shape for
+    # "none configured") would itself block make release-finalize's own tag
+    # push, so it must NOT read as protected.
+    ruleset = _tag_ruleset() | {"bypass_actors": []}
+    findings = _rre.tag_protection_findings([ruleset])
+    assert findings and "bypass_actors is empty" in findings[0]
+    assert not _rre.is_tag_creation_protected([ruleset])
+    # No redundant advisory: the empty-bypass gap is already a finding above.
+    assert _rre.tag_bypass_advisory([ruleset]) == []
+
+
+def test_tag_protection_does_not_flag_missing_bypass_actors_key():
+    # A caller that never populated bypass_actors at all (vs. GitHub
+    # confirming zero via an explicit []) is left unasserted -- unlike a
+    # confirmed-empty list, absence isn't evidence of anything.
+    ruleset = _tag_ruleset()
+    assert "bypass_actors" not in ruleset
+    assert _rre.tag_protection_findings([ruleset]) == []
+
+
+def test_tag_protection_include_covers_via_broader_fnmatch_glob():
+    # refs/tags/* is a broader GitHub fnmatch glob that covers refs/tags/v*
+    # just as fully as the literal pattern -- not just an exact string match.
+    findings = _rre.tag_protection_findings([_tag_ruleset(include=("refs/tags/*",))])
+    assert findings == []
+
+
+def test_tag_protection_flags_exclude_that_negates_v_coverage_via_broader_glob():
+    # The bug this regression pins: a prior exact-string exclude check missed
+    # a broader-but-still-covering exclude glob like refs/tags/* (as opposed
+    # to the byte-identical refs/tags/v* already covered by the older test
+    # above), so an admin who wrote refs/tags/* saw a false "protected" OK.
+    negated = _rre.tag_protection_findings(
+        [
+            _tag_ruleset(include=("~ALL",))
+            | {"conditions": {"ref_name": {"include": ["~ALL"], "exclude": ["refs/tags/*"]}}}
+        ]
+    )
+    assert negated and "negates coverage" in negated[0]
+
+
+def test_tag_protection_narrower_exclude_does_not_negate_coverage():
+    # refs/tags/rc* (a disjoint, narrower glob) does not overlap refs/tags/v*
+    # at all, so it must not be treated as a negating exclude.
+    findings = _rre.tag_protection_findings(
+        [_tag_ruleset() | {"conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": ["refs/tags/rc*"]}}}]
+    )
+    assert findings == []
+
+
+# ---------------------------------------------------------------------------
+# scripts/ruleset_drift_check.py wiring (release-canary.yml's ruleset-drift
+# job) -- the tag predicate must actually run in CI, not just via the
+# standalone --rulesets-file CLI documented in the runbook.
+# ---------------------------------------------------------------------------
+
+
+def test_tag_creation_findings_warns_non_blocking_when_no_tag_ruleset_exists():
+    # Live state: only develop/main-release rulesets exist, no target='tag'
+    # ruleset yet -- must surface as a non-blocking warning by default
+    # (TAG_RULESET_ENFORCED is False), same WARN-until-applied pattern as the
+    # develop review rule.
+    all_live = [
+        _live_develop_ruleset(review_count=0, code_owner_review=False),
+    ]
+    findings = tag_creation_findings(all_live)
+    assert findings and all(f.startswith(WARNING_PREFIX) for f in findings)
+    assert blocking_findings(findings) == []
+    assert any("target='tag'" in f for f in findings)
+
+
+def test_tag_creation_findings_empty_when_ruleset_present_and_no_bypass_gap():
+    all_live = [
+        _tag_ruleset() | {"bypass_actors": [{"actor_type": "Integration", "actor_id": 1, "bypass_mode": "always"}]}
+    ]
+    findings = tag_creation_findings(all_live)
+    # A non-empty bypass list is an advisory, not a failure -- still non-blocking.
+    assert blocking_findings(findings) == []
+
+
+def test_tag_creation_findings_can_be_switched_to_blocking_explicitly():
+    # The one-line enforce switch: TAG_RULESET_ENFORCED=True would make this
+    # call with enforce_tag_rule=True instead, turning the same gap blocking.
+    findings = tag_creation_findings([], enforce_tag_rule=True)
+    assert findings, "expected a blocking finding once tag-rule enforcement is on"
+    assert not any(f.startswith(WARNING_PREFIX) for f in findings)
+    assert blocking_findings(findings) == findings
