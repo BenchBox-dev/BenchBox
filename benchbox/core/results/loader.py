@@ -456,7 +456,11 @@ def _reconstruct_query_results(
     changing the on-disk ``.plans.json`` format. A query ID that ran in more than
     one stream is written under ``"{query_id}#{stream_id}"`` composite keys (see
     ``build_plans_payload``); ``_index_plan_entries``/``_lookup_plan_entry`` below
-    resolve those back to the exact stream's entry.
+    resolve those back to the exact stream's entry. A combined run (e.g. power
+    then throughput) can have a power row and a throughput row share the same
+    query_id AND stream_id (each phase's stream counter starts at its own 0);
+    those are disambiguated with a further ``"{query_id}#{stream_id}:{test_type}"``
+    key, resolved via the row's own compact ``test_type`` field.
     """
     plan_entries = _index_plan_entries(plans_data)
     results: list[dict[str, Any]] = []
@@ -474,7 +478,12 @@ def _reconstruct_query_results(
             result["iteration"] = q["iter"]
         if q.get("stream"):
             result["stream_id"] = q["stream"]
-        _attach_plan(result, _lookup_plan_entry(plan_entries, query_id, q.get("stream", 0)))
+        if q.get("test_type"):
+            result["test_type"] = q["test_type"]
+        _attach_plan(
+            result,
+            _lookup_plan_entry(plan_entries, query_id, q.get("stream", 0), q.get("test_type")),
+        )
         results.append(result)
 
     # Add failed queries from errors
@@ -531,13 +540,20 @@ def _index_plan_entries(plans_data: dict[str, Any] | None) -> dict[str, Any]:
     return indexed
 
 
-def _lookup_plan_entry(plan_entries: dict[str, Any], query_id: Any, stream_id: Any) -> dict[str, Any] | None:
-    """Resolve the plan entry for ``query_id``, disambiguating by ``stream_id`` when needed."""
+def _lookup_plan_entry(
+    plan_entries: dict[str, Any], query_id: Any, stream_id: Any, test_type: Any = None
+) -> dict[str, Any] | None:
+    """Resolve the plan entry for ``query_id``, disambiguating by ``stream_id`` (and,
+    for a cross-phase collision, ``test_type``) when needed."""
     if query_id is None:
         return None
     entry = plan_entries.get(normalize_query_id(query_id))
     if entry is None or "plan" in entry:
         return entry
+    if test_type:
+        qualified = entry.get(f"{stream_id}:{test_type}")
+        if qualified is not None:
+            return qualified
     return entry.get(str(stream_id))
 
 

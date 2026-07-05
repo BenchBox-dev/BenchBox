@@ -23,6 +23,7 @@ query_key_order:
 - iter
 - stream
 - run_type
+- test_type
 - status
 - digest
 - dataframe_skip_summary

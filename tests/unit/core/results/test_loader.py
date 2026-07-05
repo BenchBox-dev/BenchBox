@@ -578,6 +578,53 @@ class TestReconstructBenchmarkResults:
         assert result.query_results[1]["stream_id"] == 2
         assert result.query_results[1]["plan_fingerprint"] == "b" * 64
 
+    def test_reconstruct_query_results_cross_phase_same_stream_id_reattach(self):
+        """A power row and a throughput row sharing the same query_id AND
+        stream_id (independent per-phase stream counters) are keyed in
+        .plans.json as "{query_id}#{stream_id}:{test_type}"; the loader must
+        resolve each row to its OWN phase's plan using the compact entry's
+        test_type field, not the other phase's.
+        """
+        data = make_v2_result_dict(
+            version="2.0",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=200,
+            streams=2,
+            total_queries=2,
+            passed_queries=2,
+            failed_queries=0,
+            total_ms=200,
+            queries=[
+                {"id": "6", "ms": 100.0, "rows": 4, "stream": 0, "test_type": "power"},
+                {"id": "6", "ms": 90.0, "rows": 4, "stream": 0, "test_type": "throughput"},
+            ],
+        )
+        plans_data = {
+            "queries": {
+                "6#0:power": {
+                    "fingerprint": "a" * 64,
+                    "plan": {"query_id": "6", "platform": "duckdb", "logical_root": None},
+                },
+                "6#0:throughput": {
+                    "fingerprint": "b" * 64,
+                    "plan": {"query_id": "6", "platform": "duckdb", "logical_root": None},
+                },
+            }
+        }
+
+        result = reconstruct_benchmark_results(data, plans_data=plans_data)
+
+        assert len(result.query_results) == 2
+        assert result.query_results[0]["test_type"] == "power"
+        assert result.query_results[0]["plan_fingerprint"] == "a" * 64
+        assert result.query_results[1]["test_type"] == "throughput"
+        assert result.query_results[1]["plan_fingerprint"] == "b" * 64
+
     def test_reconstruct_query_results_single_stream_bare_key_still_works(self):
         """A query_id captured in exactly one stream is keyed bare (no "#stream"
         suffix); this must keep working unchanged (the common case)."""

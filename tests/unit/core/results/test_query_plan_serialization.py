@@ -325,6 +325,60 @@ class TestSchemaV2ExportWithPlans:
         assert queries["q06#0"]["fingerprint"] == "a" * 64
         assert queries["q06#1"]["fingerprint"] == "b" * 64
 
+    def test_schema_v2_plans_companion_cross_phase_same_stream_id_disambiguated(self) -> None:
+        """A power row and a throughput row can share the SAME query_id AND
+        stream_id (each phase's stream counter independently starts at 0). The
+        stream_id-only composite key from the multi-stream fix would then
+        collide again (both rows landing on "q06#0"), so a cross-phase
+        collision must fall back to a further test_type-qualified key.
+        """
+
+        def _plan(fingerprint: str) -> QueryPlanDAG:
+            root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
+            return QueryPlanDAG(query_id="q06", platform="duckdb", logical_root=root, plan_fingerprint=fingerprint)
+
+        power_plan = _plan("a" * 64)
+        throughput_plan = _plan("b" * 64)
+
+        results = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="duckdb",
+            scale_factor=1.0,
+            execution_id="test_cross_phase",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            total_queries=2,
+            successful_queries=2,
+            query_plans_captured=2,
+            query_results=[
+                {
+                    "query_id": "q06",
+                    "status": "SUCCESS",
+                    "stream_id": 0,
+                    "test_type": "power",
+                    "query_plan": power_plan,
+                    "plan_fingerprint": power_plan.plan_fingerprint,
+                },
+                {
+                    "query_id": "q06",
+                    "status": "SUCCESS",
+                    "stream_id": 0,
+                    "test_type": "throughput",
+                    "query_plan": throughput_plan,
+                    "plan_fingerprint": throughput_plan.plan_fingerprint,
+                },
+            ],
+        )
+
+        plans_payload = build_plans_payload(results)
+
+        assert plans_payload is not None
+        assert plans_payload["plans_captured"] == 1
+        queries = plans_payload["queries"]
+        assert "q06#0" not in queries, "bare stream_id key must not be used once ambiguous across phases too"
+        assert queries["q06#0:power"]["fingerprint"] == "a" * 64
+        assert queries["q06#0:throughput"]["fingerprint"] == "b" * 64
+
     def test_schema_v2_export_complex_plan(self) -> None:
         """Test schema v2.0 export with complex query plan tree."""
         # Build: Join(orders, lineitem) -> [Scan(orders), Scan(lineitem)]
