@@ -30,6 +30,8 @@ from typing import Any
 
 import pytest
 
+from benchbox.utils.printing import set_quiet
+
 # Sphinx 11 deprecations in third-party extensions (sphinx_tags, myst_parser, ablog, napoleon).
 # Guarded because older Sphinx versions (e.g. on Python 3.10) lack this class,
 # and --strict-config in pytest.ini would abort on an unresolvable category.
@@ -312,6 +314,36 @@ def pytest_collection_modifyitems(session, config, items) -> None:
 def pytest_collection_finish(session) -> None:
     """Run read-only marker hygiene checks after collection completes."""
     _warn_on_unreasoned_skip_markers(session.items)
+
+
+@pytest.fixture(autouse=True)
+def _reset_global_quiet_state():
+    """Never let benchbox's global quiet flag leak across tests.
+
+    benchbox.utils.printing keeps module-global output state (_QUIET) that
+    tests toggle via set_quiet(True). A test that fails, times out, or forgets
+    its reset between set_quiet(True) and its cleanup poisons every later
+    test in the same xdist worker: emit() routes to the sink console and
+    capsys sees ''. Observed live on develop-post-merge run 28706929881,
+    where test_display_results failed with CaptureResult(out='') under -n 5
+    while passing in isolation (medium-tier-red-disposition-and-promotion).
+    Resetting AFTER each test (post-yield) contains the blast radius to the
+    leaking test itself.
+
+    ``set_quiet`` is imported at module scope (not lazily here in the
+    teardown body): this fixture is autouse, so its teardown runs after
+    EVERY test, including one that monkeypatches ``builtins.__import__``
+    for the duration of its own test body (e.g. the vortex-converter
+    "missing module" test). A lazy import here would route through that
+    patched ``__import__`` and raise the OTHER test's synthetic
+    ImportError, misattributed to this fixture's teardown, whenever pytest's
+    fixture-teardown ordering runs this after monkeypatch's own finalizer
+    (order is topology-dependent, hence intermittent). Importing once at
+    module load time, before any test's monkeypatch is active, avoids the
+    race entirely.
+    """
+    yield
+    set_quiet(False)
 
 
 def pytest_runtest_setup(item) -> None:

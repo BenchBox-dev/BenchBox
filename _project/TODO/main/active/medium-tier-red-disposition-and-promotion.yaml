@@ -2,7 +2,7 @@ id: medium-tier-red-disposition-and-promotion
 title: "Disposition the medium tier's live failures on develop, get medium-test green, then wire it into auto-revert per its recorded criterion"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "In Progress"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -36,7 +36,7 @@ prior_art:
 work:
   - id: w0
     summary: "Pull the authoritative failure list from the live red run (not a contended local run)"
-    status: pending
+    status: done
     notes: |
       Fetch the failing-test list from develop-post-merge run 28706929881's
       medium-test job logs (gh api / MCP get_job_logs), or trigger a fresh
@@ -44,11 +44,26 @@ work:
       module, with the one-line error per group, into this TODO's notes.
       This replaces the stale "14 failures / 44 errors under contention"
       figure with clean-runner truth.
+      DONE 2026-07-05 (mcp get_job_logs, job 85134046886, run 28706929881):
+      8 failed / 1282 passed / 5 skipped in 582.75s. Groups:
+        A. pytest-timeout >60s (6): amplab/coffeeshop/read-primitives
+           cross-surface dataframe-equivalence tests;
+           ssb/clickbench/h2odb TestX::test_generate_data. All are real
+           slow tests (data-gen loops / dual-surface execution), killed by
+           the medium lane's --timeout=60, not hangs.
+        B. real failures (2):
+           - test_no_new_raw_print_in_benchbox_runtime: raw print() in
+             cross_surface.py, tpchavoc/equivalence.py,
+             tpchavoc/dataframe_equivalence.py (report __main__ output)
+             not in _PENDING_MIGRATION;
+           - test_display_results: CaptureResult(out='') under -n 5 -
+             global set_quiet(True) leaked from an earlier test in the
+             same worker (reproduced + mutation-probed locally).
 
   - id: w1
     summary: "Disposition every failure: real bug, stale test, environment-dependency, or marker misplacement"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       For each failure group decide and act: fix small real bugs in-scope
       here; file separate TODOs for large ones (link them in deps of the
@@ -56,6 +71,26 @@ work:
       runner lacks (marker change, with justification); delete/repair stale
       assertions. Confirm whether test_committed_artifact_is_current now
       passes post-3d64c58e and strike prerequisite (1) if so.
+      DONE 2026-07-05:
+        - Group A (6 timeouts): per-test @pytest.mark.timeout markers
+          (300s for ssb/clickbench/amplab measured 42-58s; 600s for
+          h2odb/coffeeshop/read-primitives measured 246-257s in a 4-core
+          container). Kept IN the medium lane (not re-tiered to slow)
+          because the slow lane's only consumer, release-canary, is not
+          yet activated (release-canary-scheduled-activation w2 pending)
+          - re-tiering now would move them from red-but-visible to
+          not-run-at-all. Marker overrides the CLI --timeout=60 per
+          pytest-timeout precedence. Revisit tiering once the canary runs.
+        - Raw-print (1): the three report-entrypoint modules added to
+          _PENDING_MIGRATION with justification (pre-existing prints;
+          cross_surface.py is a CODEOWNERS soundness path, so the emit()
+          migration belongs in a reviewed comparator PR).
+        - Quiet-leak (1): autouse _reset_global_quiet_state fixture in
+          tests/conftest.py resets set_quiet(False) after every test;
+          leak scenario reproduced and mutation-probed (fixture off ->
+          exact CI failure; on -> green).
+        - Prerequisite (1) STRUCK: test_committed_artifact_is_current
+          passes on develop post-3d64c58e (verified 2026-07-05).
 
   - id: w2
     summary: "Demonstrate a green medium-test run on a real runner"
@@ -65,6 +100,19 @@ work:
       Evidence = a develop-post-merge run URL whose medium-test job
       concludes success (or `make test-medium` green in CI-equivalent
       conditions if timing a post-merge run is impractical — say which).
+      HANDOFF 2026-07-05 (REAL-RUNNER-ONLY): `make test-medium` cannot go
+      green in the agent sandbox — the egress proxy 403s the DuckDB `tpch`
+      extension download, forcing 44 setup ERRORS in
+      test_read_primitives_variant_parity.py regardless of code (plus 3
+      root-user permission-bypass FAILs and 1 PRE-EXISTING Makefile-pin
+      FAIL — test_test_ci_is_maintained_broad_local_profile, reproduced
+      identically on clean origin/develop, KeyError 'filterwarnings',
+      unrelated to this TODO). All 8 originally-dispositioned failures
+      from run 28706929881 are addressed by the w1 change; the residual
+      local failures are 100% environmental. w2 evidence must therefore
+      come from a develop-post-merge medium-test job on a GitHub runner
+      AFTER this PR merges — same real-runner-only pattern as
+      parity-check-promotion w0.
 
   - id: w3
     summary: "Promote: wire medium-test into auto-revert-on-failure and update the pinned tests"
@@ -77,6 +125,12 @@ work:
       assertions (grep tests/unit/workflows/ for medium-test). An
       auto-revert lane that reverts innocent merges is worse than none —
       w2's green run is a hard gate for this unit.
+      DEFERRED 2026-07-05: NOT done in this PR. w2's green-run evidence is
+      unobservable in the sandbox (see w2 handoff), and promoting a lane to
+      auto-revert without a confirmed green run is the exact anti_pattern
+      below. Promotion waits on a maintainer/real-runner green medium-test
+      job. This PR ships only the disposition (w0/w1); TODO stays in
+      active/ with w2/w3 as the runner-observation handoff.
 
 must_preserve:
   - "auto-revert-on-failure's current behavior for lint/fast-test/explorer-tokens (including its outputs consumed by metrics) — promotion adds a trigger, it must not restructure the job."

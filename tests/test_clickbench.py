@@ -29,6 +29,12 @@ class TestClickBench:
         """Create a ClickBench  ClickBenchBenchmark instance for testing."""
         return ClickBench(scale_factor=small_scale_factor, output_dir=temp_dir)
 
+    # Runs to completion but far exceeds the medium lane's 60s cap: timed out
+    # on a clean GitHub runner (develop-post-merge run 28706929881, medium-test
+    # job) and measured ~42s in a 4-core container (2026-07-05). The marker
+    # overrides the CLI --timeout=60 (pytest-timeout marker precedence) so the
+    # test keeps running in the medium lane instead of being killed mid-work.
+    @pytest.mark.timeout(300)
     def test_generate_data(self, clickbench: ClickBench) -> None:
         """Test that data generation produces expected files."""
         data_paths = clickbench.generate_data()

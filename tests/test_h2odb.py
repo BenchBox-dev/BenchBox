@@ -29,6 +29,12 @@ class TestH2ODB:
         """Create an H2ODB  H2ODBBenchmark instance for testing."""
         return H2ODB(scale_factor=small_scale_factor, output_dir=temp_dir)
 
+    # Runs to completion but far exceeds the medium lane's 60s cap: timed out
+    # on a clean GitHub runner (develop-post-merge run 28706929881, medium-test
+    # job) and measured ~257s in a 4-core container (2026-07-05). The marker
+    # overrides the CLI --timeout=60 (pytest-timeout marker precedence) so the
+    # test keeps running in the medium lane instead of being killed mid-work.
+    @pytest.mark.timeout(600)
     def test_generate_data(self, h2odb: H2ODB) -> None:
         """Test that data generation produces expected files."""
         data_paths = h2odb.generate_data()
