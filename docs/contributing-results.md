@@ -105,7 +105,7 @@ uv run -- python scripts/generate_corpus_inventory.py --write
 
 ### 5. Review and merge
 
-A maintainer reviews the submission for quality and environment consistency. Once approved and merged, the docs CI workflow automatically rebuilds the results explorer with the new data.
+A maintainer reviews the submission for quality and environment consistency. Once approved and merged into `published-results`, the bundle enters the public corpus. The results explorer rebuilds when the corpus reaches `main` through the develop → main release flow (the explorer builds and deploys from `main` via the docs CI workflow, not from `published-results` directly), so a merged submission appears on the site at the next release rather than immediately.
 
 ## What Makes a Good Submission
 
