@@ -3144,3 +3144,29 @@ class TestFromConfigDatabaseGeneration:
     def test_staging_root_non_s3_raises(self):
         with pytest.raises(ValueError, match="requires S3"):
             _make_adapter(staging_root="gs://gcs-bucket/path")
+
+
+class TestGatherStatistics:
+    """Statistics-phase hook: auto_analyze means stats were built during load."""
+
+    @pytest.fixture(autouse=True)
+    def _skip_cluster_state_check(self):
+        with patch.object(RedshiftAdapter, "_resolve_connect_timeout", return_value=10):
+            yield
+
+    def test_auto_analyze_reports_auto_on_load_without_rebuilding(self):
+        adapter = _make_adapter(auto_analyze=True)
+        connection = Mock()
+
+        assert adapter.gather_statistics(connection, ["title"]) == ("auto-on-load", 0)
+        connection.cursor.assert_not_called()
+
+    def test_disabled_auto_analyze_falls_back_to_explicit_analyze(self):
+        adapter = _make_adapter(auto_analyze=False)
+        connection = Mock()
+
+        stats_mode, tables_analyzed = adapter.gather_statistics(connection, ["title", "name"])
+
+        assert (stats_mode, tables_analyzed) == ("explicit", 2)
+        executed = [c.args[0] for c in connection.cursor.return_value.execute.call_args_list]
+        assert executed == ["ANALYZE title", "ANALYZE name"]

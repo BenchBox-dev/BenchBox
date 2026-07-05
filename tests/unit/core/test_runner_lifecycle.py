@@ -208,6 +208,75 @@ def test_load_only_mode_invokes_adapter_load(tmp_path):
 
 
 @pytest.mark.unit
+def test_load_only_mode_runs_statistics_phase_when_requested(tmp_path):
+    """--phases load,statistics runs the adapter statistics hook after load."""
+    from benchbox.core.results.models import StatisticsGatheringPhase
+
+    cfg = BenchmarkConfig(name="tpch", display_name="TPC-H", test_execution_type="load_only")
+    db = DatabaseConfig(type="duckdb", name="test")
+    bench = MagicMock()
+    bench.output_dir = tmp_path
+    bench.tables = None
+    captured_phases = {}
+
+    def _create_enhanced(platform, query_results, **kwargs):
+        captured_phases.update(kwargs.get("phases") or {})
+        return make_benchmark_results(
+            benchmark_name="TPC-H",
+            platform=platform,
+            execution_id="eid",
+            query_definitions={},
+            test_execution_type="load_only",
+        )
+
+    bench.create_enhanced_benchmark_result = _create_enhanced
+    bench.generate_data = MagicMock()
+
+    class DummyAdapter:
+        platform_name = "duckdb"
+
+        def __init__(self):
+            self.statistics_calls = []
+
+        def create_connection(self, **kwargs):
+            return Mock()
+
+        def close_connection(self, _conn):
+            pass
+
+        def create_schema(self, benchmark, connection):
+            return 0.1
+
+        def load_data(self, benchmark, connection, data_dir):
+            return {"table1": 10}, 0.5, None
+
+        def run_statistics_phase(self, benchmark, connection, *, benchmark_name="", table_names=None):
+            self.statistics_calls.append((benchmark_name, table_names))
+            return StatisticsGatheringPhase(duration_ms=7, status="COMPLETED", stats_mode="explicit", tables_analyzed=1)
+
+    adapter_instance = DummyAdapter()
+
+    with patch("benchbox.core.runner.runner.get_platform_adapter", return_value=adapter_instance):
+        run_benchmark_lifecycle(
+            benchmark_config=cfg,
+            database_config=db,
+            system_profile=_mk_system_profile(),
+            platform_config={"database_path": "test.duckdb"},
+            phases=LifecyclePhases(generate=False, load=True, execute=False, statistics=True),
+            output_root=str(tmp_path),
+            benchmark_instance=bench,
+        )
+
+    assert adapter_instance.statistics_calls == [("tpch", ["table1"])]
+    assert captured_phases["statistics"] == {
+        "status": "COMPLETED",
+        "duration_ms": 7,
+        "stats_mode": "explicit",
+        "tables_analyzed": 1,
+    }
+
+
+@pytest.mark.unit
 def test_load_only_mode_uses_dataframe_adapter_path(tmp_path):
     cfg = BenchmarkConfig(name="tpch", display_name="TPC-H", test_execution_type="standard")
     db = DatabaseConfig(type="datafusion", name="test")

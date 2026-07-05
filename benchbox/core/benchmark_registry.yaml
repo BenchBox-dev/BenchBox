@@ -114,6 +114,7 @@ benchmark_metadata:
     base_memory_gb: 1.0
     data_source: null
     supports_dataframe: true
+    supports_statistics_phase: true
   tpcds:
     display_name: TPC-DS
     description: Decision Support Benchmark
@@ -136,6 +137,7 @@ benchmark_metadata:
     base_memory_gb: 2.5
     data_source: null
     supports_dataframe: true
+    supports_statistics_phase: true
   tpcds_obt:
     display_name: TPC-DS-OBT
     description: Single-table TPC-DS (One Big Table) benchmark
@@ -383,6 +385,7 @@ benchmark_metadata:
     - 90
     base_memory_gb: 5.0
     supports_dataframe: true
+    supports_statistics_phase: true
     surface: public
     data_source: canonical
     data_manifest: benchbox/core/joinorder/data_manifest.toml

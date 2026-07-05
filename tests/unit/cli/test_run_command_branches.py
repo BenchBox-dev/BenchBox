@@ -924,6 +924,8 @@ class TestDeriveExecutionType:
             ["load"],
             ["generate", "load"],  # generate present but load present → not data_only
             ["load", "warmup"],
+            ["load", "statistics"],  # statistics is not a query phase → still load_only
+            ["generate", "load", "statistics"],
         ],
     )
     def test_load_only(self, phases):

@@ -391,6 +391,7 @@ def _execute_load_only_mode(
     platform_config: dict[str, Any] | None,
     validation_opts: ValidationOptions,
     table_mode: str = "native",
+    gather_statistics: bool = False,
 ) -> tuple[BenchmarkResults, ValidationResult | None]:
     """Execute load-only workflow using the core runner primitives."""
 
@@ -456,6 +457,22 @@ def _execute_load_only_mode(
                 "duration_ms": int(load_time * 1000),
             },
         }
+
+        run_statistics_phase = getattr(adapter, "run_statistics_phase", None)
+        if gather_statistics and callable(run_statistics_phase):
+            statistics_phase = run_statistics_phase(
+                benchmark,
+                connection,
+                benchmark_name=benchmark_config.name,
+                table_names=sorted(table_stats) if table_stats else None,
+            )
+            if statistics_phase is not None:
+                phases["statistics"] = {
+                    "status": statistics_phase.status,
+                    "duration_ms": statistics_phase.duration_ms,
+                    "stats_mode": statistics_phase.stats_mode,
+                    "tables_analyzed": statistics_phase.tables_analyzed,
+                }
 
         # Calculate total rows and data size
         total_rows = sum(table_stats.values()) if table_stats else 0
@@ -602,6 +619,9 @@ class LifecyclePhases:
     generate: bool = True
     load: bool = True
     execute: bool = True
+    # Opt-in statistics phase between load and query (off by default so
+    # legacy benchmarks keep load-includes-stats semantics).
+    statistics: bool = False
 
 
 @dataclass
@@ -667,6 +687,7 @@ def _build_run_config_from_options(
     verbosity_settings: VerbositySettings,
     test_type: str,
     table_format: str | None,
+    gather_statistics: bool = False,
 ) -> RunConfig:
     """Assemble the RunConfig passed to SQL adapters."""
     iterations = int(
@@ -708,6 +729,7 @@ def _build_run_config_from_options(
         analyze_plans=getattr(benchmark_config, "analyze_plans", None),
         strict_plan_capture=benchmark_config.strict_plan_capture,
         normalize_plan_literals=bool(options.get("normalize_plan_literals", False)),
+        gather_statistics=gather_statistics,
         table_format=table_format,
         table_format_compression=str(options.get("table_format_compression", "snappy") or "snappy"),
         table_format_partition_cols=_parse_partition_cols(options.get("table_format_partition_cols")),
@@ -886,6 +908,7 @@ def _run_load_only_mode(
     output_root: str | None,
     is_dataframe_adapter: bool,
     validation_records: list[tuple[str, ValidationResult]],
+    gather_statistics: bool = False,
 ) -> BenchmarkResults:
     """Execute the load-only branch for DataFrame or SQL adapters and record postload results."""
     if adapter is None:
@@ -926,6 +949,7 @@ def _run_load_only_mode(
         platform_config=platform_config,
         validation_opts=validation_opts,
         table_mode=table_mode,
+        gather_statistics=gather_statistics,
     )
     if postload_result is not None:
         validation_records.append(("post_load", postload_result))
@@ -1165,6 +1189,7 @@ def run_benchmark_lifecycle(
                 output_root=output_root,
                 is_dataframe_adapter=is_dataframe_adapter,
                 validation_records=validation_records,
+                gather_statistics=phases.statistics,
             )
         result_obj = _finalize_validation_metadata(result_obj, validation_records)
         result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
@@ -1199,6 +1224,7 @@ def run_benchmark_lifecycle(
         verbosity_settings=verbosity_settings,
         test_type=test_type,
         table_format=table_format,
+        gather_statistics=phases.statistics,
     )
 
     with sql_translation_context(strict=strict_translation) as translation_outcomes:

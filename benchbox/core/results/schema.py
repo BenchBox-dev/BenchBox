@@ -894,6 +894,18 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
                 "status": setup.validation.row_count_validation,
                 "duration_ms": setup.validation.duration_ms,
             }
+        # Opt-in statistics phase (omit when not run). stats_mode records where
+        # statistics time landed: explicit / auto-on-load / unsupported.
+        if setup.statistics_gathering:
+            stats = setup.statistics_gathering
+            phases["statistics"] = {
+                "status": stats.status,
+                "duration_ms": stats.duration_ms,
+                "stats_mode": stats.stats_mode,
+                "tables_analyzed": stats.tables_analyzed,
+            }
+            if stats.error_message:
+                phases["statistics"]["error_message"] = stats.error_message
 
     if result.execution_phases and result.execution_phases.power_test:
         power_test = result.execution_phases.power_test

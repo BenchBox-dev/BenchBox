@@ -17,6 +17,7 @@ from benchbox.core.results.models import (
     ExecutionPhases,
     SchemaCreationPhase,
     SetupPhase,
+    StatisticsGatheringPhase,
     TableCreationStats,
 )
 from benchbox.validation.bundle import ValidationResult, _validate_bundle
@@ -130,6 +131,52 @@ def test_exporter_serializes_execution_phases(tmp_path):
     assert payload["platform"]["name"] == "duckdb"
     # Successful phases won't create errors
     assert "errors" not in payload
+
+
+def test_exporter_serializes_statistics_phase(tmp_path):
+    """The opt-in statistics phase exports under phases.statistics with stats_mode."""
+    exporter = ResultExporter(output_dir=tmp_path, anonymize=False)
+
+    phases = ExecutionPhases(
+        setup=SetupPhase(
+            statistics_gathering=StatisticsGatheringPhase(
+                duration_ms=42,
+                status="COMPLETED",
+                stats_mode="explicit",
+                tables_analyzed=21,
+            ),
+        )
+    )
+    result = BenchmarkResults(
+        benchmark_name="TPCH",
+        platform="duckdb",
+        scale_factor=0.01,
+        execution_id="stats-run",
+        timestamp=datetime.now(),
+        duration_seconds=0.5,
+        total_queries=1,
+        successful_queries=1,
+        failed_queries=0,
+        query_results=[{"query_id": "Q1", "execution_time_ms": 1, "rows_returned": 4, "status": "SUCCESS"}],
+        execution_phases=phases,
+    )
+
+    with open(exporter.export_result(result, formats=["json"])["json"], encoding="utf-8") as f:
+        payload = json.load(f)
+
+    assert payload["phases"]["statistics"] == {
+        "status": "COMPLETED",
+        "duration_ms": 42,
+        "stats_mode": "explicit",
+        "tables_analyzed": 21,
+    }
+
+
+def test_exporter_omits_statistics_phase_when_not_run(tmp_path):
+    """Legacy runs (no statistics phase) must not grow a statistics block."""
+    payload = _export_payload(tmp_path, _minimal_result("duckdb"))
+
+    assert "statistics" not in payload["phases"]
 
 
 def test_canonical_bundle_export_serializes_primary_and_companions(monkeypatch, tmp_path):

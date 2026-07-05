@@ -2,7 +2,7 @@ id: track2-joinorder-stats-phase
 title: "Track-2: implement statistics-as-a-phase in the benchmark phase model"
 worktree: main
 priority: Medium
-status: Identified
+status: Completed
 category: Benchmark Development
 
 description: |
@@ -30,16 +30,21 @@ deps:
 work:
   - id: w1
     summary: "Add a statistics phase to the runner phase model (load -> statistics -> query)"
-    status: pending
+    status: done
     notes: |
       Schema change to the phase model and per-phase timing manifest. Default
       legacy behavior (no explicit statistics phase) is preserved for existing
       benchmarks. See the design doc's Proposed change and Migration strategy.
+      Done 2026-07-05: StatisticsGatheringPhase dataclass +
+      SetupPhase.statistics_gathering (core/results/models.py), CLI `statistics`
+      token (_parse_phases_list), LifecyclePhases.statistics, RunConfig
+      gather_statistics, call site between validation and query execution in
+      run_enhanced_benchmark plus the load-only lifecycle branch.
 
   - id: w2
     summary: "Add a per-engine ANALYZE / COMPUTE STATISTICS knob for the statistics phase"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Explicit ANALYZE call per platform adapter; where the engine auto-analyzes
       during load, document it and report zero stats-phase wall-clock with
@@ -49,7 +54,7 @@ work:
   - id: w3
     summary: "Carry per-phase statistics timing in the result-bundle manifest"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Result-bundle field for statistics-phase timing and stats_mode metadata,
       kept separate from load and query timing. Dataset/schema version
@@ -58,10 +63,21 @@ work:
   - id: w4
     summary: "Opt-in mechanism: enable the statistics phase for joinorder/tpch/tpcds"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       Opt-in per benchmark so historical bundles remain interpretable. joinorder,
       tpch, tpcds enable the new phase once this lands.
+      Done 2026-07-05: supports_statistics_phase flag in benchmark_registry.yaml
+      (joinorder/tpch/tpcds) + catalog_schema.py field; the adapter gates the
+      phase on it and reports a skip note for non-opted-in benchmarks. w2 done
+      via the base-adapter gather_statistics hook (analyze_tables ->
+      analyze_table -> unsupported resolution) with the Redshift auto-on-load
+      override; w3 done via phases.statistics {status, duration_ms, stats_mode,
+      tables_analyzed} in the exported result schema (schema.py +
+      schema_specs.yaml phase_key_order + public-contracts inventory row).
+      Verified end-to-end on DuckDB: tpch --phases generate,load,statistics,power
+      emits phases.statistics (explicit, 8 tables); default run emits no block;
+      ssb + statistics skips with a note.
 
 must_preserve:
   - "Existing benchmarks default to the legacy load-includes-stats behavior; no historical result bundle is invalidated."

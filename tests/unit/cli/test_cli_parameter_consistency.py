@@ -356,12 +356,13 @@ class TestPhaseValidationLogic:
     """Test phase validation logic in isolation."""
 
     def test_valid_phases_set(self):
-        """Test that valid phases are correctly defined."""
-        valid_phases = {"generate", "load", "warmup", "power", "throughput", "maintenance"}
+        """The documented phase vocabulary includes the opt-in statistics phase."""
+        valid_phases = {"generate", "load", "statistics", "warmup", "power", "throughput", "maintenance"}
 
         # Test all phases are valid
         for phase in valid_phases:
             assert phase in valid_phases
+        assert "statistics" in valid_phases
 
     def test_phase_parsing(self):
         """Test phase string parsing logic."""
@@ -478,3 +479,28 @@ class TestGlobalCacheCLIFlag:
         config = captured_config.get("benchmark_config")
         assert config is not None
         assert "cache_dir" not in config.options
+
+
+class TestStatisticsPhaseToken:
+    """The statistics phase token parses and maps to LifecyclePhases.statistics."""
+
+    def test_parse_phases_list_accepts_statistics(self):
+        import types
+
+        from benchbox.cli.commands.run import _parse_phases_list
+
+        s = types.SimpleNamespace(
+            phases="generate,load,statistics,power",
+            logger=None,
+            ctx=MagicMock(),
+        )
+        _parse_phases_list(s)
+
+        assert s.phases_to_run == ["generate", "load", "statistics", "power"]
+        s.ctx.exit.assert_not_called()
+
+    def test_lifecycle_phases_statistics_defaults_off(self):
+        from benchbox.core.runner import LifecyclePhases
+
+        assert LifecyclePhases().statistics is False
+        assert LifecyclePhases(statistics=True).statistics is True

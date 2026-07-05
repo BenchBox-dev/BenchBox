@@ -2405,6 +2405,18 @@ class RedshiftAdapter(PlatformAdapter):
         finally:
             cursor.close()
 
+    def gather_statistics(self, connection: Any, table_names: list[str]) -> tuple[str, int]:
+        """Statistics-phase hook: with auto_analyze, stats were already built during load.
+
+        The S3 load path runs ANALYZE right after each table's COPY when
+        auto_analyze is enabled (the default), so the statistics phase reports
+        that attribution instead of double-building. With auto_analyze
+        disabled, fall back to the explicit per-table ANALYZE default.
+        """
+        if self.auto_analyze:
+            return "auto-on-load", 0
+        return super().gather_statistics(connection, table_names)
+
     def vacuum_table(self, connection: Any, table_name: str) -> None:
         """Run VACUUM on table for space reclamation."""
         cursor = connection.cursor()

@@ -48,6 +48,7 @@ phase_key_order:
 - schema_creation
 - data_loading
 - validation
+- statistics
 - migration
 - power_test
 - throughput_test
