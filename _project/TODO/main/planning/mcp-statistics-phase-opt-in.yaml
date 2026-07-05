@@ -1,0 +1,105 @@
+id: mcp-statistics-phase-opt-in
+title: "feat(mcp): expose the statistics-phase opt-in through the MCP run_benchmark tool"
+worktree: main
+priority: Low
+status: Not Started
+category: Core Functionality
+
+description: |
+  Follow-up captured from the statistics-as-a-phase work (PR #980,
+  track2-joinorder-stats-phase). That change added an opt-in statistics phase
+  (load -> statistics -> query) reachable from the CLI via
+  `--phases ...,statistics`, which threads through
+  `LifecyclePhases.statistics` -> `RunConfig.gather_statistics` and is gated
+  per benchmark by the `supports_statistics_phase` registry flag
+  (joinorder/tpch/tpcds opt in).
+
+  The MCP `run_benchmark` tool does NOT yet expose this opt-in. Its phase
+  handling collapses the requested phases to a single `test_execution_type`
+  via `_map_phases_to_test_execution_type`
+  (benchbox/mcp/tools/benchmark.py:124) and then calls
+  `benchmark_instance.run_with_platform(adapter, ...,
+  test_execution_type=test_execution_type, capture_plans=...)`
+  (benchbox/mcp/tools/benchmark.py:~387) without passing a
+  `gather_statistics` flag. So an MCP caller that lists `statistics` in
+  `phases` gets it silently dropped: the token routes correctly for
+  execution-type purposes (`load,statistics` -> `load_only`, verified) but
+  the statistics phase never runs.
+
+  This is a feature gap, not a regression: the statistics phase is CLI-first
+  by design and MCP exposure was explicitly deferred in PR #980. This seed
+  makes that deferral durable and actionable rather than leaving it only in
+  the merged PR's description.
+
+deps:
+  needs:
+    - track2-joinorder-stats-phase
+
+work:
+  - id: w1
+    summary: "Thread a gather_statistics flag from MCP run_benchmark into run_with_platform"
+    status: pending
+    notes: |
+      Detect `statistics` in the tool's `phases` argument (independently of
+      `_map_phases_to_test_execution_type`, which intentionally ignores it)
+      and pass `gather_statistics=True` into
+      `benchmark_instance.run_with_platform(...)`. run_with_platform forwards
+      **run_config into run_enhanced_benchmark, whose statistics call site
+      already reads `run_config.get("gather_statistics")` (added in PR #980),
+      so no adapter change is needed. Preserve the existing per-benchmark
+      registry gate (`supports_statistics_phase`) so non-opted-in benchmarks
+      still skip the phase and the response is unchanged for them.
+  - id: w2
+    summary: "Confirm phases.statistics surfaces in the MCP response payload"
+    needs: [w1]
+    status: pending
+    notes: |
+      The MCP result payload is built from the same exporter path as the CLI
+      (`_export_and_build_payload`), so phases.statistics should already
+      appear once w1 runs the phase. Add a test asserting an MCP
+      `run_benchmark` call with `phases` including `statistics` on an
+      opted-in benchmark yields `phases.statistics` with a `stats_mode`, and
+      that a non-opted-in benchmark omits the block.
+
+must_preserve:
+  - "MCP callers that do NOT request the statistics phase get byte-identical responses to today (no statistics block)."
+  - "The per-benchmark `supports_statistics_phase` registry gate still governs whether the phase runs; MCP does not bypass it."
+  - "`_map_phases_to_test_execution_type` continues to ignore `statistics` for execution-type derivation (statistics is not a query phase)."
+
+prior_art:
+  - "benchbox/cli/orchestrator.py + benchbox/core/runner/runner.py (PR #980) -- the CLI precedent: LifecyclePhases.statistics -> RunConfig.gather_statistics; mirror the same flag threading for MCP."
+  - "benchbox/platforms/base/adapter.py:run_statistics_phase (PR #980) -- the registry-gated phase runner MCP will reuse unchanged via run_with_platform."
+  - "benchbox/mcp/tools/benchmark.py:124 _map_phases_to_test_execution_type, and the run_with_platform call that omits gather_statistics -- the exact edit site."
+
+anti_patterns:
+  - "DO NOT route the statistics opt-in through `test_execution_type` -- statistics is a lifecycle phase orthogonal to power/throughput/maintenance; overloading the execution type would misclassify runs."
+  - "DO NOT re-implement the analyze logic in the MCP layer -- reuse the base-adapter run_statistics_phase via run_with_platform's run_config."
+  - "DO NOT drop the per-benchmark registry gate for MCP callers."
+
+verification:
+  - description: "MCP run_benchmark with statistics phase on an opted-in benchmark emits phases.statistics"
+    command: "uv run -- python -m pytest tests/unit/mcp/ -k statistics -q"
+    expected_output: "tests pass; phases.statistics present with a stats_mode"
+  - description: "Statistics token still routes correctly through the MCP execution-type mapper"
+    command: "uv run -- python -c \"from benchbox.mcp.tools.benchmark import _map_phases_to_test_execution_type as m; assert m(['load','statistics'])=='load_only'; assert m(['generate','load','statistics','power'])=='power'; print('ok')\""
+    expected_output: "ok"
+
+scope_limit:
+  only_modify:
+    - "benchbox/mcp/"
+    - "tests/unit/mcp/"
+    - "_project/TODO/main/planning/mcp-statistics-phase-opt-in.yaml"
+  do_not_modify:
+    - "benchbox/platforms/base/adapter.py"
+    - "benchbox/core/runner/"
+    - "benchbox/core/results/"
+    - "benchbox/core/benchmark_registry.yaml"
+
+metadata:
+  tags:
+    - mcp
+    - statistics-phase
+    - track-2
+    - follow-up
+  estimated_effort: "Small"
+  created_date: "2026-07-05"
