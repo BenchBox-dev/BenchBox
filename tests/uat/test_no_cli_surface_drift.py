@@ -30,6 +30,7 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/show_plan.py",
     "benchbox/cli/commands/convert.py",
     "benchbox/cli/commands/df_tuning.py",
+    "benchbox/cli/commands/publish.py",
     "benchbox/cli/commands/run.py",
     "benchbox/cli/commands/run_official.py",
     "benchbox/cli/commands/submit.py",

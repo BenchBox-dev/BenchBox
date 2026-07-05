@@ -86,6 +86,19 @@ RANKING_ELIGIBLE_TRUST_LABELS: frozenset[str] = frozenset(
     }
 )
 
+# Unofficial TPC compliance classes must never receive an official rank, even
+# when the bundle carries a ranking-eligible trust label. `benchbox publish`
+# requires the `unofficial-research` label for these results, but the explorer
+# build derives trust from the sidecar contract, not the publish-time label, so
+# an unofficial result could otherwise inherit `maintainer-run` and be ranked.
+# Fail closed on the compliance signal the bundle carries itself.
+UNOFFICIAL_COMPLIANCE_CLASSES: frozenset[str] = frozenset(
+    {
+        "unofficial_nonstandard",
+        "unofficial_subscale",
+    }
+)
+
 
 class ManifestEntry(BaseModel):
     """One result row in the explorer browser read model."""
@@ -343,6 +356,7 @@ def is_ranking_eligible(entry: ManifestEntry) -> bool:
     return (
         entry.visibility in RANKING_ELIGIBLE_VISIBILITIES
         and entry.trust_label in RANKING_ELIGIBLE_TRUST_LABELS
+        and entry.compliance_class not in UNOFFICIAL_COMPLIANCE_CLASSES
         and entry.failed_query_count == 0
         and not validation_status_is_non_clean(entry.validation_status)
         and entry.comparison_exclusion_reason is None
@@ -355,6 +369,8 @@ def ranking_exclusion_reason(entry: ManifestEntry, primary_metric: str | None = 
         return "visibility_not_rankable"
     if entry.trust_label not in RANKING_ELIGIBLE_TRUST_LABELS:
         return "trust_not_rankable"
+    if entry.compliance_class in UNOFFICIAL_COMPLIANCE_CLASSES:
+        return "unofficial_compliance"
     if entry.failed_query_count != 0:
         return "failed_queries"
     if validation_status_is_non_clean(entry.validation_status):
@@ -571,6 +587,7 @@ __all__ = [
     "QueryTiming",
     "RankingConfig",
     "RANKING_ELIGIBLE_TRUST_LABELS",
+    "UNOFFICIAL_COMPLIANCE_CLASSES",
     "RANKING_ELIGIBLE_VISIBILITIES",
     "RANKING_METRIC_BY_FAMILY",
     "TimingEligibility",

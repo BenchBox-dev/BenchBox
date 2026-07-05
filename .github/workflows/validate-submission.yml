@@ -84,10 +84,22 @@ jobs:
       - name: Validate bundles
         if: steps.changed.outputs.has_bundles == 'true'
         id: validate
+        env:
+          # Maintainer corpus mirrors are opened by sync-results-data-to-published.yml
+          # on `auto/results-mirror-<sha>` branches and legitimately carry
+          # maintainer-run bundles with no sidecar. Every other PR is a community
+          # submission, which must include the manifest sidecar (its presence is
+          # the community-submission trust signal). Require the sidecar unless
+          # this is a maintainer mirror PR.
+          HEAD_REF: ${{ github.head_ref }}
         run: |
+          REQUIRE_MANIFEST="--require-manifest"
+          case "$HEAD_REF" in
+            auto/results-mirror-*) REQUIRE_MANIFEST="" ;;
+          esac
           # Validate and generate PR comment in a single invocation.
           # --pr-comment writes the Markdown file; exit code reflects validation result.
-          xargs -d '\n' uv run -- python scripts/validate_submission.py --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt \
+          xargs -d '\n' uv run -- python scripts/validate_submission.py $REQUIRE_MANIFEST --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt \
             | tee /tmp/validation_output.txt
 
       - name: Check corpus inventory

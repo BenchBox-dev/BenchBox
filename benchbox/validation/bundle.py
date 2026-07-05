@@ -588,7 +588,14 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
 
     # Surface ALL missing required fields in one pass so a contributor
     # whose manifest is missing both `bundle_file` and `bundle_hash`
-    # sees both warnings instead of having to fix-and-retry one at a time.
+    # sees both errors instead of having to fix-and-retry one at a time.
+    #
+    # These are ERRORs, not warnings: a present manifest whose whole purpose is
+    # the bundle-hash contract must actually carry it. When they were warnings,
+    # ValidationResult.ok ignored them, so a present-but-empty `.manifest.json`
+    # passed CI *and* — because the pipeline/inventory treat sidecar presence as
+    # the community-submission trust signal — granted the community label
+    # without the bundle bytes ever being hash-verified.
     bundle_file = manifest.get("bundle_file")
     expected_hash = manifest.get("bundle_hash")
     missing_fields: list[str] = []
@@ -598,7 +605,7 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
         missing_fields.append("bundle_hash")
     if missing_fields:
         for field in missing_fields:
-            vr.warn(f"Submission manifest has no {field} field")
+            vr.error(f"Submission manifest has no {field} field")
         return
 
     if not _is_safe_bundle_filename(bundle_file):
@@ -685,8 +692,18 @@ def _is_submission_manifest_path(path: Path) -> bool:
     return path.name == SUBMISSION_MANIFEST_FILENAME or path.name.endswith(SUBMISSION_MANIFEST_SUFFIX)
 
 
-def validate_bundles(paths: list[Path]) -> list[ValidationResult]:
-    """Validate a list of bundle files. Returns one ValidationResult per file."""
+def validate_bundles(paths: list[Path], require_manifest: bool = False) -> list[ValidationResult]:
+    """Validate a list of bundle files. Returns one ValidationResult per file.
+
+    When ``require_manifest`` is True, a primary bundle with no paired
+    submission manifest is an error. This is the community-submission contract:
+    the sidecar is what distinguishes a community submission from a
+    maintainer-run bundle (whose absence of a sidecar is intentional), so CI
+    passes this flag only for genuine contributor PRs — not for the maintainer
+    mirror PRs that sync develop's corpus onto ``published-results``. Without
+    it, a community bundle submitted without a sidecar would pass validation and
+    then inherit the ``maintainer-run`` trust label (and ranking eligibility).
+    """
     results = []
     for bundle_path in paths:
         if _is_submission_manifest_path(bundle_path):
@@ -724,6 +741,14 @@ def validate_bundles(paths: list[Path]) -> list[ValidationResult]:
         )
         if manifest_path is not None:
             _validate_manifest_hash(manifest_path, bundle_path.parent, vr)
+        elif require_manifest:
+            vr.error(
+                f"Submission manifest not found for {bundle_path.name}: expected "
+                f"{bundle_path.stem}{SUBMISSION_MANIFEST_SUFFIX} alongside the bundle. "
+                "Community submissions must include the manifest produced by "
+                "`benchbox submit` (it carries the bundle-hash contract and the "
+                "community-submission trust label)."
+            )
 
         results.append(vr)
     return results

@@ -85,7 +85,15 @@ class BundlePublisher:
         """
         self.destination = str(destination)
         self.store = store or PublicationStore()
-        self.label = label if label in VALID_LABELS else "maintainer-run"
+        # Fail loudly on an out-of-vocabulary label rather than silently
+        # coercing it to the MOST trusted tier. Silent coercion let a typo'd or
+        # caller-supplied bad label (e.g. "communtiy-submission", "unofficial")
+        # be recorded as "maintainer-run" — a truthful-looking but wrong
+        # provenance stamp. The CLI paths validate the label before reaching
+        # here; this guards programmatic/API callers.
+        if label not in VALID_LABELS:
+            raise ValueError(f"Invalid trust label {label!r}; must be one of {VALID_LABELS}.")
+        self.label = label
 
     def publish(self, source_bundle: str | Path) -> BundlePublishResult:
         """Publish a schema-v2 result bundle to the configured destination.

@@ -4,10 +4,53 @@ from __future__ import annotations
 
 import pytest
 
-from _project.scripts.explorer_pipeline.models import BenchmarkSummary, PlatformRow, RankingConfig
+from _project.scripts.explorer_pipeline.models import (
+    BenchmarkSummary,
+    ManifestEntry,
+    PlatformRow,
+    RankingConfig,
+    is_ranking_eligible,
+    ranking_exclusion_reason,
+)
 from _project.scripts.explorer_pipeline.ranking import rank_platforms
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+
+def _rankable_entry(**overrides) -> ManifestEntry:
+    """A ManifestEntry that is ranking-eligible unless an override breaks it."""
+    base = {
+        "result_id": "r1",
+        "benchmark": "tpch",
+        "scale_factor": 1.0,
+        "platform": "duckdb",
+        "driver_version": "1.0",
+        "run_date": "2026-01-01",
+        "power_score": 1.0,
+        "total_duration_s": 1.0,
+        "query_count": 22,
+        "display_geomean_ms": 100.0,
+        "trust_label": "maintainer-run",
+        "visibility": "public-curated",
+        "validation_status": "passed",
+    }
+    base.update(overrides)
+    return ManifestEntry(**base)
+
+
+def test_official_entry_is_ranking_eligible() -> None:
+    assert is_ranking_eligible(_rankable_entry())
+    assert ranking_exclusion_reason(_rankable_entry()) is None
+
+
+@pytest.mark.parametrize("compliance", ["unofficial_nonstandard", "unofficial_subscale"])
+def test_unofficial_compliance_is_never_ranked(compliance: str) -> None:
+    # Even with a ranking-eligible trust label, an unofficial-compliance result
+    # must be excluded from official rankings (fail-closed on the bundle's own
+    # compliance signal, independent of the sidecar-derived trust label).
+    entry = _rankable_entry(compliance_class=compliance)
+    assert not is_ranking_eligible(entry)
+    assert ranking_exclusion_reason(entry) == "unofficial_compliance"
 
 
 def _make_summary(

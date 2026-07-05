@@ -55,6 +55,7 @@ __all__ = [
 def main(argv: list[str] | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     pr_comment_path: Path | None = None
+    require_manifest = False
     positional: list[str] = []
     i = 0
     while i < len(args):
@@ -62,11 +63,18 @@ def main(argv: list[str] | None = None) -> int:
             pr_comment_path = Path(args[i + 1])
             i += 2
             continue
+        if args[i] == "--require-manifest":
+            require_manifest = True
+            i += 1
+            continue
         positional.append(args[i])
         i += 1
 
     if not positional:
-        print("Usage: validate_submission.py [--pr-comment <path>] <dir-or-files...>", file=sys.stderr)
+        print(
+            "Usage: validate_submission.py [--pr-comment <path>] [--require-manifest] <dir-or-files...>",
+            file=sys.stderr,
+        )
         return 1
 
     paths: list[Path] = []
@@ -83,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         print("No bundle files found.", file=sys.stderr)
         return 1
 
-    results = validate_bundles(paths)
+    results = validate_bundles(paths, require_manifest=require_manifest)
     print(format_summary(results))
 
     if pr_comment_path is not None:
