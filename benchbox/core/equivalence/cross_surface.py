@@ -1355,6 +1355,16 @@ def _apply_baseline_update(
     regression on the same run must fix it first, then re-run to prune; a resolved
     entry is never pruned out of a still-failing run, so "baseline maintained"
     can never be mistaken for "run is otherwise clean" when it is not.
+
+    A resolved key backed by a ``ClassifiedDivergence`` (code, not the YAML file)
+    cannot be surgically pruned here - it needs a human to edit
+    ``cross_surface.py`` in a reviewed change. That case still exits non-zero:
+    silently reporting success would leave a stale, no-longer-reproducing
+    predicate in place, which the very next normal (non-``--update-baseline``)
+    run of this gate would then correctly flag as a stale-baseline failure. The
+    maintenance command's success signal must match the run's actual end state,
+    so "some resolved entries could not be pruned" is a failure, not a quiet
+    no-op, even though every YAML-backed resolved entry was pruned successfully.
     """
     from benchbox.core.equivalence.known_divergences_baseline import update_baseline_file
 
@@ -1383,8 +1393,13 @@ def _apply_baseline_update(
     removed = update_baseline_file(_BASELINE_YAML_PATH, resolved, gate.name)
     if removed:
         print(f"{gate.name}: removed resolved known-divergence baseline entries: {removed}")
-    else:
-        print(f"{gate.name}: resolved entries {resolved} not in the YAML baseline (code-only entry); unchanged.")
+    code_only = sorted(set(resolved) - set(removed))
+    if code_only:
+        print(
+            f"{gate.name}: resolved entries {code_only} are code-only (ClassifiedDivergence) and cannot be "
+            "auto-pruned; remove them manually from cross_surface.py in a reviewed change."
+        )
+        return 1
     return exit_code
 
 

@@ -20,6 +20,7 @@ import yaml
 
 from benchbox.core.equivalence.known_divergences_baseline import (
     BaselineUpdateError,
+    _dump,
     load_baseline,
     prune_known_divergences,
     update_baseline_file,
@@ -183,3 +184,19 @@ def test_real_baseline_file_is_supported() -> None:
     assert "Q9_expression" not in data.get("h2odb", {})
     assert "Q18_expression" not in data.get("clickbench", {})
     assert "approx_count_distinct_simple_expression" not in data.get("read_primitives", {})
+
+
+def test_checked_in_baseline_file_is_a_fixed_point_of_the_writer() -> None:
+    """Regenerating the checked-in file through the writer's own ``_dump`` must
+    reproduce it byte-for-byte.
+
+    ``_FILE_HEADER`` is a hand-maintained copy of the checked-in file's header
+    (kept separate so a prune can always re-add it, since plain YAML
+    round-tripping drops comments) -- nothing else enforces the two stay in
+    sync. Without this golden test, editing one without the other would go
+    unnoticed until a real ``--update-baseline`` run silently overwrote the
+    file's own documentation with stale wording.
+    """
+    path = Path("benchbox/core/equivalence/cross_surface_baseline.yaml")
+    original = path.read_text(encoding="utf-8")
+    assert _dump(load_baseline(path)) == original

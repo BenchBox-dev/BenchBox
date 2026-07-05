@@ -795,9 +795,11 @@ def test_update_baseline_with_nothing_resolved_and_run_clean_is_a_noop(monkeypat
     assert "no resolved known-divergence entries; baseline unchanged." in out
 
 
-def test_update_baseline_code_only_entry_reports_unchanged(monkeypatch, capsys):
+def test_update_baseline_code_only_entry_cannot_be_pruned_and_fails(monkeypatch, capsys):
     """A resolved key backed by a ClassifiedDivergence (never in the YAML file)
-    cannot be pruned by the writer; report it as unchanged, not as an error."""
+    cannot be pruned by the writer -- and must NOT report success, since the
+    stale predicate is still in cross_surface.py and the next normal run of
+    this gate would correctly fail on it as a stale-baseline entry."""
     gate = _make_gate(
         "fake",
         {
@@ -821,8 +823,44 @@ def test_update_baseline_code_only_entry_reports_unchanged(monkeypatch, capsys):
     )
 
     out = capsys.readouterr().out
-    assert exit_code == 0
-    assert "not in the YAML baseline (code-only entry); unchanged" in out
+    assert exit_code == 1
+    assert "['Q9_expression'] are code-only (ClassifiedDivergence) and cannot be auto-pruned" in out
+    assert "remove them manually from cross_surface.py in a reviewed change" in out
+
+
+def test_update_baseline_prunes_yaml_entries_and_still_fails_on_remaining_code_only_entry(monkeypatch, capsys):
+    """When a gate has BOTH a prunable YAML entry and an unprunable code-only
+    entry resolved on the same run, the writer still prunes the YAML entry (no
+    reason to withhold a safe, successful prune), but the command's own exit
+    code reflects the code-only entry that could NOT be handled."""
+    gate = _make_gate(
+        "fake",
+        {
+            "Q1_pandas": "documented test baseline",
+            "Q9_expression": ClassifiedDivergence(
+                reason="code-only entry", accepts=lambda d: False, requires_live_divergence=True
+            ),
+        },
+    )
+    monkeypatch.setattr(
+        "benchbox.core.equivalence.known_divergences_baseline.update_baseline_file",
+        # Only the YAML-backed key is ever actually removable.
+        lambda path, resolved, gate_name: sorted(set(resolved) & {"Q1_pandas"}),
+    )
+
+    exit_code = _apply_baseline_update(
+        gate,
+        divergences=[],  # both Q1_pandas and Q9_expression no longer reproduce.
+        total=4,
+        coverage={"expression": 2, "pandas": 2},
+        reference_row_counts={"Q1": 5, "Q9": 5},
+        vacuous_cells=0,
+    )
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert "removed resolved known-divergence baseline entries: ['Q1_pandas']" in out
+    assert "['Q9_expression'] are code-only (ClassifiedDivergence) and cannot be auto-pruned" in out
 
 
 def test_clickbench_and_joinorder_are_enforced_gates():
