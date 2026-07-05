@@ -20,8 +20,8 @@ static explorer rebuild, and no hosted API is involved.
 
 ### 1.2 Maintainer-run additions (sync from develop)
 
-Maintainer-side corpus changes — the `seed-corpus.yml` workflow's quarterly
-refresh, ad-hoc UAT integrations like PR #164, validator updates — land on
+Maintainer-side corpus changes — the `seed-corpus.yml` workflow's on-demand
+(`workflow_dispatch`) refresh, ad-hoc UAT integrations like PR #164, validator updates — land on
 `develop` first because that is where the project's tooling and tests live.
 The
 [`sync-results-data-to-published.yml`](../../.github/workflows/sync-results-data-to-published.yml)
