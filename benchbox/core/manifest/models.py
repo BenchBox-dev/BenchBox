@@ -66,6 +66,15 @@ class ManifestV1:
     generator_version: str | None = None
 
 
+# PlanMetadata.normalization_scheme values. "literal" is the default,
+# literal-sensitive plan_fingerprint; "normalized" marks fingerprints recorded
+# via QueryPlanDAG.normalized_fingerprint (opt-in, seed-independent). Comparing
+# fingerprints recorded under different schemes is meaningless - see
+# update_plan_versions/merge_plan_metadata, which refuse to do so.
+PLAN_FINGERPRINT_SCHEME_LITERAL = "literal"
+PLAN_FINGERPRINT_SCHEME_NORMALIZED = "normalized"
+
+
 @dataclass
 class PlanMetadata:
     """Query plan fingerprint and version tracking.
@@ -79,6 +88,10 @@ class PlanMetadata:
     plan_capture_timestamp: dict[str, str] = field(default_factory=dict)  # query_id → ISO timestamp
     platform: str | None = None
     platform_version: str | None = None
+    # Which fingerprint scheme plan_fingerprints was recorded under - "literal"
+    # (default) or "normalized". update_plan_versions/merge_plan_metadata compare
+    # this before diffing fingerprints across two PlanMetadata instances.
+    normalization_scheme: str = PLAN_FINGERPRINT_SCHEME_LITERAL
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dictionary."""
@@ -93,6 +106,8 @@ class PlanMetadata:
             result["platform"] = self.platform
         if self.platform_version:
             result["platform_version"] = self.platform_version
+        if self.normalization_scheme != PLAN_FINGERPRINT_SCHEME_LITERAL:
+            result["normalization_scheme"] = self.normalization_scheme
         return result
 
     @classmethod
@@ -104,6 +119,7 @@ class PlanMetadata:
             plan_capture_timestamp=data.get("plan_capture_timestamp", {}),
             platform=data.get("platform"),
             platform_version=data.get("platform_version"),
+            normalization_scheme=data.get("normalization_scheme", PLAN_FINGERPRINT_SCHEME_LITERAL),
         )
 
 

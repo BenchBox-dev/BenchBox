@@ -18,7 +18,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from benchbox.core.manifest.plan_metadata_utils import create_plan_metadata_from_results
+from benchbox.core.manifest.models import PLAN_FINGERPRINT_SCHEME_NORMALIZED, PlanMetadata
+from benchbox.core.manifest.plan_metadata_utils import (
+    PlanFingerprintSchemeMismatchError,
+    create_plan_metadata_from_results,
+    merge_plan_metadata,
+    update_plan_versions,
+)
 from benchbox.core.results.query_plan_models import (
     LogicalOperator,
     LogicalOperatorType,
@@ -122,6 +128,42 @@ class TestStructuralSignatureNormalization:
         assert "table:orders" in normalized
         assert "group:o_orderstatus" in normalized
 
+    def test_aggregation_hex_literal_collapses_when_normalized(self):
+        """aggregation_functions/group_by_keys/sort_keys go through _normalize_literal_text,
+        a separate normalizer from _mask_literals (used by filter/join/projection). It must
+        share the same hardened numeric grammar - otherwise a hex/underscore/dotted literal
+        buried in an aggregate call masks in filter expressions but not here, and two
+        seed-varied hex constants still produce different normalized signatures."""
+        a = LogicalOperator(
+            operator_type=LogicalOperatorType.AGGREGATE,
+            operator_id="agg_1",
+            aggregation_functions=["sum(x + 0xFF)"],
+        )
+        b = LogicalOperator(
+            operator_type=LogicalOperatorType.AGGREGATE,
+            operator_id="agg_1",
+            aggregation_functions=["sum(x + 0x1A)"],
+        )
+        assert a.get_structural_signature() != b.get_structural_signature()
+        assert a.get_structural_signature(normalize_literals=True) == b.get_structural_signature(
+            normalize_literals=True
+        )
+
+    def test_ordinal_column_references_survive_normalization_in_group_by(self):
+        """DuckDB ordinal refs (#0/#1) in group_by_keys must not be masked - they point at
+        a specific (possibly differently-numbered) column, a genuine structural difference,
+        not a literal constant. (sort_keys wraps each entry in a Python dict repr before
+        normalizing, which quotes - and so fully masks - every field including ordinals;
+        that's a separate, pre-existing quirk unrelated to this hardening pass.)"""
+        op = LogicalOperator(
+            operator_type=LogicalOperatorType.AGGREGATE,
+            operator_id="agg_1",
+            group_by_keys=["#0", "#1"],
+        )
+        normalized = op.get_structural_signature(normalize_literals=True)
+        assert "#0" in normalized
+        assert "#1" in normalized
+
     def test_escaped_apostrophe_string_literal_masks_as_one_token(self):
         """A doubled single quote is an escaped apostrophe INSIDE the literal, not the
         end of the string. Without treating '' as an escape, 'O''Brien' would split
@@ -154,6 +196,42 @@ class TestStructuralSignatureNormalization:
         op = _scan("l_discount = 0.05 - 0.01")
         normalized = op.get_structural_signature(normalize_literals=True)
         assert normalized.endswith("<NUM> - <NUM>"), normalized
+
+    @pytest.mark.parametrize(
+        ("literal_a", "literal_b"),
+        [
+            pytest.param("l_quantity < 1e5", "l_quantity < 2e5", id="scientific-lower-e"),
+            pytest.param("l_quantity < 1E5", "l_quantity < 2E5", id="scientific-upper-e"),
+            pytest.param("l_quantity < 1.2E-3", "l_quantity < 3.4E-3", id="scientific-negative-exponent"),
+            pytest.param("l_flag = 0xFF", "l_flag = 0x1A", id="hex-literal"),
+            pytest.param("l_quantity < 1_000", "l_quantity < 2_000", id="underscore-grouped"),
+            pytest.param("l_discount < .5", "l_discount < .75", id="leading-dot"),
+            pytest.param("l_quantity < 5.", "l_quantity < 9.", id="trailing-dot"),
+        ],
+    )
+    def test_adversarial_numeric_literal_forms_collapse_when_normalized(self, literal_a, literal_b):
+        """Scientific/hex/underscore/dotted numeric literals mask atomically.
+
+        These forms previously escaped ``\\b\\d+(?:\\.\\d+)?\\b`` entirely (hex,
+        underscore, leading/trailing dot) or were corrupted mid-token (scientific,
+        e.g. ``1.2E-3`` -> ``<NUM>.2E-<NUM>``), leaving residual literal-dependent
+        text in the "normalized" signature.
+        """
+        a = _scan(literal_a)
+        b = _scan(literal_b)
+        assert a.get_structural_signature() != b.get_structural_signature()
+        normalized_a = a.get_structural_signature(normalize_literals=True)
+        normalized_b = b.get_structural_signature(normalize_literals=True)
+        assert normalized_a == normalized_b
+        assert normalized_a.count("<NUM>") == 1, normalized_a
+
+    def test_scientific_literal_masked_as_single_atomic_token(self):
+        """1.2E-3 must mask as ONE <NUM> token, not corrupt into <NUM>.2E-<NUM>."""
+        op = _scan("l_tax = 1.2E-3")
+        normalized = op.get_structural_signature(normalize_literals=True)
+        assert normalized.count("<NUM>") == 1, normalized
+        assert "1.2E-3" not in normalized
+        assert ".2E-" not in normalized
 
     def test_normalization_recurses_into_children(self):
         """Child operator literals are masked too (signature is recursive)."""
@@ -260,3 +338,73 @@ class TestPlanMetadataNormalization:
         default_meta = create_plan_metadata_from_results(self._results(plan))
         normalized_meta = create_plan_metadata_from_results(self._results(plan), normalize_literals=True)
         assert default_meta.plan_fingerprints["q1"] != normalized_meta.plan_fingerprints["q1"]
+
+    def test_metadata_records_its_normalization_scheme(self):
+        """PlanMetadata.normalization_scheme records which mode produced its fingerprints."""
+        plan = _dag(_scan("l_quantity < 1234.56"))
+        default_meta = create_plan_metadata_from_results(self._results(plan))
+        normalized_meta = create_plan_metadata_from_results(self._results(plan), normalize_literals=True)
+        assert default_meta.normalization_scheme == "literal"
+        assert normalized_meta.normalization_scheme == PLAN_FINGERPRINT_SCHEME_NORMALIZED
+
+
+class TestCrossModeMixingRegression:
+    """update_plan_versions/merge_plan_metadata must refuse to compare fingerprints
+    recorded under different normalization_scheme values - a literal-sensitive
+    fingerprint and a literal-normalized one for the SAME plan are different
+    values, so naively diffing them reports every query as "changed"
+    (update_plan_versions) or silently keeps whichever side wrote last
+    (merge_plan_metadata), neither of which is a real signal."""
+
+    @staticmethod
+    def _results(query_plan: QueryPlanDAG) -> SimpleNamespace:
+        query_result = {"query_id": query_plan.query_id, "query_plan": query_plan}
+        return SimpleNamespace(platform="duckdb", platform_version="1.0", query_results=[query_result])
+
+    def test_update_plan_versions_rejects_cross_scheme_comparison(self):
+        """Same plan, recorded once literal and once normalized -> mismatch error, not a false version bump."""
+        plan = _dag(_scan("l_quantity < 1234.56"))
+        literal_meta = create_plan_metadata_from_results(self._results(plan))
+        normalized_meta = create_plan_metadata_from_results(self._results(plan), normalize_literals=True)
+
+        with pytest.raises(PlanFingerprintSchemeMismatchError):
+            update_plan_versions(literal_meta, normalized_meta)
+
+    def test_merge_plan_metadata_rejects_cross_scheme_comparison(self):
+        """Merging a literal-scheme base with a normalized-scheme overlay must raise, not silently mix."""
+        plan = _dag(_scan("l_quantity < 1234.56"))
+        literal_meta = create_plan_metadata_from_results(self._results(plan))
+        normalized_meta = create_plan_metadata_from_results(self._results(plan), normalize_literals=True)
+
+        with pytest.raises(PlanFingerprintSchemeMismatchError):
+            merge_plan_metadata(literal_meta, normalized_meta)
+
+    def test_update_plan_versions_same_scheme_still_works(self):
+        """The mismatch guard doesn't block the common same-scheme case."""
+        prev = create_plan_metadata_from_results(self._results(_dag(_scan("l_quantity < 100"))))
+        current = create_plan_metadata_from_results(self._results(_dag(_scan("l_quantity < 999"))))
+        update_plan_versions(prev, current)
+        assert current.plan_versions["q1"] == 2
+
+    def test_merge_plan_metadata_same_scheme_still_works(self):
+        """The mismatch guard doesn't block merging two normalized-scheme metadata instances."""
+        base = create_plan_metadata_from_results(
+            self._results(_dag(_scan("l_quantity < 100"), query_id="q1")), normalize_literals=True
+        )
+        overlay = create_plan_metadata_from_results(
+            self._results(_dag(_scan("l_quantity < 999"), query_id="q2")), normalize_literals=True
+        )
+        merged = merge_plan_metadata(base, overlay)
+        assert merged.normalization_scheme == PLAN_FINGERPRINT_SCHEME_NORMALIZED
+        assert set(merged.plan_fingerprints) == {"q1", "q2"}
+
+    def test_mismatch_guard_skips_when_either_side_has_no_fingerprints(self):
+        """A fresh/empty accumulator's default scheme must not block combining with real data."""
+        empty = PlanMetadata()
+        real = create_plan_metadata_from_results(
+            self._results(_dag(_scan("l_quantity < 100"))), normalize_literals=True
+        )
+
+        update_plan_versions(empty, real)  # must not raise
+        merged = merge_plan_metadata(empty, real)  # must not raise
+        assert merged.plan_fingerprints == real.plan_fingerprints

@@ -137,7 +137,22 @@ from benchbox.core.errors import SerializationError
 # be adjacent with nothing in between. The trailing negative lookahead mirrors
 # the leading lookbehind (rather than a trailing \b) so a number is not matched
 # when immediately glued to more identifier-continuation characters either.
-_LITERAL_NUM_RE = re.compile(r"(?<![A-Za-z0-9_.$])[+-]?\d+(?:\.\d+)?(?![A-Za-z0-9_.$])")
+#
+# The alternation covers every SQL numeric literal form atomically (a single
+# match spans the whole literal, never leaving a residual value-dependent
+# fragment like the old plain-decimal-only pattern's ``1.2E-<NUM>``):
+#   - hex: ``0xFF`` / ``0Xff``, with optional ``_`` digit-group separators
+#   - decimal: leading-dot (``.5``), trailing-dot (``5.``), or both-sided
+#     (``5.5``), each with an optional ``[eE][+-]?exponent`` suffix
+#   - plain integer (``123``) or scientific integer (``1e5``, ``1E-3``)
+#   - ``_`` digit-group separators anywhere in the integer/exponent part
+#     (``1_000``, DuckDB/PostgreSQL numeric-literal syntax)
+_HEX_LITERAL = r"0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*"
+_DECIMAL_LITERAL = (
+    r"(?:\d(?:_?\d)*(?:\.(?:\d(?:_?\d)*)?)?|\.\d(?:_?\d)*)"  # 123 | 123. | 123.456 | .456
+    r"(?:[eE][+-]?\d(?:_?\d)*)?"  # optional exponent: e5, E-3, e+10
+)
+_LITERAL_NUM_RE = re.compile(rf"(?<![A-Za-z0-9_.$])[+-]?(?:{_HEX_LITERAL}|{_DECIMAL_LITERAL})(?![A-Za-z0-9_.$])")
 # ``(?:[^']|'')*`` (rather than ``[^']*``) treats a doubled single quote as an
 # escaped apostrophe INSIDE the literal rather than the end of the string, so
 # ``'O''Brien'`` masks to one <STR> token instead of splitting into two
@@ -165,14 +180,17 @@ logger = logging.getLogger(__name__)
 # constants (e.g. TPC-H parameter substitutions) to the same hash by replacing
 # string/date literals and standalone numeric literals with a placeholder.
 _STRING_LITERAL_RE = re.compile(r"'(?:[^']|'')*'")
-# Match numeric literals that are standalone tokens. The negative lookbehind on
-# identifier characters keeps column names that embed digits intact (e.g. ``c1``,
-# ``l_orderkey``) while still collapsing real constants like ``1995`` or ``0.05``.
-# ``#`` is excluded too: DuckDB (and others) emit ordinal column references like
+# Shares _HEX_LITERAL/_DECIMAL_LITERAL with _LITERAL_NUM_RE (see _mask_literals)
+# so aggregation/group/sort expressions get the same atomic scientific/hex/
+# underscore/dotted numeric masking as join/filter/projection expressions -
+# without it, a seed-varying literal buried in e.g. an aggregation_functions
+# entry (``sum(x + 0xFF)`` vs ``sum(x + 0x1A)``) would still produce a
+# different normalized_fingerprint. ``#`` is additionally excluded from both
+# boundaries: DuckDB (and others) emit ordinal column references like
 # ``#0``/``#1`` for projected/grouped columns, and without this exclusion every
 # ordinal collapses to the same ``#?`` placeholder, hiding a genuine structural
 # change (a different column referenced) behind what looks like a literal.
-_NUMERIC_LITERAL_RE = re.compile(r"(?<![A-Za-z0-9_.$#])\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
+_NUMERIC_LITERAL_RE = re.compile(rf"(?<![A-Za-z0-9_.$#])[+-]?(?:{_HEX_LITERAL}|{_DECIMAL_LITERAL})(?![A-Za-z0-9_.$#])")
 _LITERAL_PLACEHOLDER = "?"
 
 

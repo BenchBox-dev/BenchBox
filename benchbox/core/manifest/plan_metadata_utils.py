@@ -6,8 +6,24 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from benchbox.core.manifest.models import PlanMetadata
+from benchbox.core.manifest.models import (
+    PLAN_FINGERPRINT_SCHEME_LITERAL,
+    PLAN_FINGERPRINT_SCHEME_NORMALIZED,
+    PlanMetadata,
+)
 from benchbox.core.results.loader import iter_query_results
+
+
+class PlanFingerprintSchemeMismatchError(ValueError):
+    """Raised when comparing/merging PlanMetadata recorded under different
+    normalization_scheme values (literal-sensitive vs literal-normalized).
+
+    A fingerprint recorded under one scheme is not comparable to one recorded
+    under the other - they hash different input (raw vs literal-masked plan
+    text) for the same logical plan, so a naive diff reports every query as
+    "changed" (update_plan_versions) or silently keeps whichever side happened
+    to write last (merge_plan_metadata), neither of which is a real signal.
+    """
 
 
 def create_plan_metadata_from_results(
@@ -30,7 +46,10 @@ def create_plan_metadata_from_results(
             default literal-sensitive ``plan_fingerprint``. Use this when comparing
             runs that may use different benchmark seeds: structurally identical plans
             then share a fingerprint even when their filter literals differ. Default
-            False preserves the existing literal-sensitive behaviour.
+            False preserves the existing literal-sensitive behaviour. The returned
+            metadata's ``normalization_scheme`` records which mode was used, so
+            ``update_plan_versions``/``merge_plan_metadata`` can refuse to compare
+            metadata recorded under different modes.
 
     Returns:
         PlanMetadata with fingerprints and timestamps
@@ -38,6 +57,9 @@ def create_plan_metadata_from_results(
     metadata = PlanMetadata(
         platform=platform or getattr(results, "platform", None),
         platform_version=platform_version or getattr(results, "platform_version", None),
+        normalization_scheme=PLAN_FINGERPRINT_SCHEME_NORMALIZED
+        if normalize_literals
+        else PLAN_FINGERPRINT_SCHEME_LITERAL,
     )
 
     timestamp = datetime.now(timezone.utc).isoformat()
@@ -61,6 +83,24 @@ def create_plan_metadata_from_results(
     return metadata
 
 
+def _require_matching_scheme(a: PlanMetadata, b: PlanMetadata, *, operation: str) -> None:
+    """Raise if ``a`` and ``b`` were recorded under different fingerprint schemes.
+
+    Skipped when either side has no recorded fingerprints yet (a fresh/empty
+    accumulator's default scheme shouldn't block combining it with real data).
+    """
+    if not a.plan_fingerprints or not b.plan_fingerprints:
+        return
+    if a.normalization_scheme != b.normalization_scheme:
+        raise PlanFingerprintSchemeMismatchError(
+            f"Cannot {operation} PlanMetadata recorded under different normalization "
+            f"schemes ({a.normalization_scheme!r} vs {b.normalization_scheme!r}). "
+            "Fingerprints from a literal-sensitive run and a literal-normalized run "
+            "are not comparable - re-record both under the same normalize_literals "
+            "setting."
+        )
+
+
 def update_plan_versions(
     prev_metadata: PlanMetadata | None,
     current_metadata: PlanMetadata,
@@ -73,12 +113,21 @@ def update_plan_versions(
     Args:
         prev_metadata: Previous run's plan metadata (None for first run)
         current_metadata: Current run's plan metadata to update
+
+    Raises:
+        PlanFingerprintSchemeMismatchError: if ``prev_metadata`` and
+            ``current_metadata`` were recorded under different
+            ``normalization_scheme`` values (both non-empty) - their
+            fingerprints are not comparable, so diffing them would report every
+            query as "changed" regardless of whether the plan actually did.
     """
     if not prev_metadata:
         # First run: all versions = 1
         for query_id in current_metadata.plan_fingerprints:
             current_metadata.plan_versions[query_id] = 1
         return
+
+    _require_matching_scheme(prev_metadata, current_metadata, operation="diff")
 
     for query_id, current_fp in current_metadata.plan_fingerprints.items():
         prev_fp = prev_metadata.plan_fingerprints.get(query_id)
@@ -144,12 +193,21 @@ def merge_plan_metadata(
 
     Returns:
         New PlanMetadata with merged values
+
+    Raises:
+        PlanFingerprintSchemeMismatchError: if ``base`` and ``overlay`` were
+            recorded under different ``normalization_scheme`` values (both
+            non-empty) - merging would silently mix the two schemes under
+            whichever ``normalization_scheme`` value happens to win below.
     """
+    _require_matching_scheme(base, overlay, operation="merge")
+
     merged = PlanMetadata(
         plan_fingerprints={**base.plan_fingerprints, **overlay.plan_fingerprints},
         plan_versions={**base.plan_versions, **overlay.plan_versions},
         plan_capture_timestamp={**base.plan_capture_timestamp, **overlay.plan_capture_timestamp},
         platform=overlay.platform or base.platform,
         platform_version=overlay.platform_version or base.platform_version,
+        normalization_scheme=overlay.normalization_scheme if overlay.plan_fingerprints else base.normalization_scheme,
     )
     return merged
