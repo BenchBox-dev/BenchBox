@@ -2,7 +2,8 @@ id: harden-normalized-plan-fingerprint
 title: "Harden normalized plan fingerprint: literal-masking gaps + cross-mode mixing marker"
 worktree: main
 priority: Medium
-status: Not Started
+status: "Completed"
+completed_date: "2026-07-05"
 description: |
   The opt-in literal-normalized fingerprint (masks numeric/string literals for
   seed-independent comparison) has correctness gaps. It is currently API-only - the
@@ -44,9 +45,9 @@ impact:
     literals and from toggling the normalization mode between runs.
 
 must_preserve:
-  - "The default literal-sensitive plan_fingerprint is unchanged (normalization stays opt-in)."
-  - "Digit-bearing identifiers and NULL/boolean/DATE handling stay correct."
-  - "The structural fingerprint continues to exclude cost/cardinality/timing."
+- "The default literal-sensitive plan_fingerprint is unchanged (normalization stays opt-in)."
+- "Digit-bearing identifiers and NULL/boolean/DATE handling stay correct."
+- "The structural fingerprint continues to exclude cost/cardinality/timing."
 
 approach: |
   Broaden the numeric mask to a single well-formed SQL-numeric-literal regex
@@ -57,33 +58,37 @@ approach: |
   diffing fingerprints.
 
 anti_patterns:
-  - "DO NOT mask digit runs adjacent to identifier characters - because it corrupts columns like col_5 - keep the identifier-boundary guard."
+- "DO NOT mask digit runs adjacent to identifier characters - because it corrupts columns like col_5 - keep the identifier-boundary
+  guard."
 
 scope_limit:
   only_modify:
-    - "benchbox/core/results/query_plan_models.py"
-    - "benchbox/core/manifest/plan_metadata_utils.py"
-    - "benchbox/core/manifest/models.py"
-    - "tests/unit/core/query_plans/test_fingerprint_normalization.py"
-    - "tests/unit/core/manifest/"
+  - "benchbox/core/results/query_plan_models.py"
+  - "benchbox/core/manifest/plan_metadata_utils.py"
+  - "benchbox/core/manifest/models.py"
+  - "tests/unit/core/query_plans/test_fingerprint_normalization.py"
+  - "tests/unit/core/manifest/"
 
 work:
-  - id: w1
-    summary: "Rewrite _LITERAL_NUM_RE/_LITERAL_STR_RE to atomically mask scientific/hex/dotted/underscore numerics and escaped-quote strings"
-    status: pending
-  - id: w2
-    summary: "Add a normalization-mode marker to PlanMetadata; make update_plan_versions/merge_plan_metadata reject or flag cross-mode comparison"
-    status: pending
-  - id: w3
-    summary: "Extend test_fingerprint_normalization.py with the adversarial literal corpus and a cross-mode-mixing regression"
-    status: pending
-    needs: [w1, w2]
+- id: w1
+  summary: "Rewrite _LITERAL_NUM_RE/_LITERAL_STR_RE to atomically mask scientific/hex/dotted/underscore numerics and escaped-quote
+    strings"
+  status: done
+- id: w2
+  summary: "Add a normalization-mode marker to PlanMetadata; make update_plan_versions/merge_plan_metadata reject or flag
+    cross-mode comparison"
+  status: done
+- id: w3
+  summary: "Extend test_fingerprint_normalization.py with the adversarial literal corpus and a cross-mode-mixing regression"
+  status: done
+  needs: [w1, w2]
 
 verification:
-  - description: "Normalization + manifest suites green with the new adversarial corpus"
-    command: "uv run -- python -m pytest tests/unit/core/query_plans/test_fingerprint_normalization.py tests/unit/core/manifest/ -n 0 -q"
-    expected_output: "passed"
+- description: "Normalization + manifest suites green with the new adversarial corpus"
+  command: "uv run -- python -m pytest tests/unit/core/query_plans/test_fingerprint_normalization.py tests/unit/core/manifest/
+    -n 0 -q"
+  expected_output: "passed"
 
 deferred:
-  - summary: "Shipping the --normalize-plan-literals CLI flag and surfacing the normalized fingerprint in the bundle"
-    reason: "Separate feature work; this TODO only hardens the underlying API so the flag is safe to ship."
+- summary: "Shipping the --normalize-plan-literals CLI flag and surfacing the normalized fingerprint in the bundle"
+  reason: "Separate feature work; this TODO only hardens the underlying API so the flag is safe to ship."

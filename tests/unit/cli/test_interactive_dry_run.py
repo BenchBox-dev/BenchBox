@@ -787,7 +787,10 @@ class TestPromptPhases:
             (["3"], ["generate"]),
             (["4"], ["load"]),
             (["5"], ["generate", "load", "warmup", "power", "throughput", "maintenance"]),
-            (["6", "1,2,4"], ["generate", "load", "power"]),
+            # Numeric menu after statistics was inserted at position 3:
+            # 1=generate 2=load 3=statistics 4=warmup 5=power.
+            (["6", "1,2,5"], ["generate", "load", "power"]),
+            (["6", "1,2,3"], ["generate", "load", "statistics"]),
             (["6", "generate,power,throughput"], ["generate", "power", "throughput"]),
             (["6", "power,power,load,power"], ["power", "load"]),
             (["6", ""], ["power"]),

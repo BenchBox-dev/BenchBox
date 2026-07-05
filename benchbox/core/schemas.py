@@ -112,6 +112,11 @@ class RunConfig(BaseModel):
     analyze_plans: bool | None = None
     strict_plan_capture: bool = False
     normalize_plan_literals: bool = False
+    # Opt-in statistics phase between load and query (CLI --phases ...,statistics).
+    # The adapter additionally gates on the benchmark's registry
+    # supports_statistics_phase flag so legacy benchmarks keep
+    # load-includes-stats semantics.
+    gather_statistics: bool = False
     # PyPI distribution name (e.g. "psycopg", "duckdb") - no extras markers or version specifiers
     driver_package: Optional[str] = None
     driver_version: Optional[str] = None

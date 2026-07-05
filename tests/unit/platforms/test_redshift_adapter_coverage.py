@@ -1840,14 +1840,18 @@ class TestAnalyzeAndVacuumTable:
         adapter.analyze_table(mock_conn, "lineitem")
         mock_cursor.execute.assert_called_once_with("ANALYZE lineitem")
 
-    def test_analyze_table_swallows_exception(self):
+    def test_analyze_table_raises_on_failure(self):
+        """Must raise (not swallow) so gather_statistics()'s caller can detect
+        and record a real failure as status=FAILED."""
         adapter = _make_adapter()
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.execute.side_effect = Exception("permission denied")
 
-        adapter.analyze_table(mock_conn, "lineitem")
+        with pytest.raises(Exception, match="permission denied"):
+            adapter.analyze_table(mock_conn, "lineitem")
+        mock_cursor.close.assert_called_once()
 
     def test_vacuum_table_executes_vacuum(self):
         adapter = _make_adapter()

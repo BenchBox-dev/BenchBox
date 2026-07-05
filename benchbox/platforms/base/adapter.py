@@ -33,6 +33,7 @@ from benchbox.platforms.base.dialect_translation import DialectTranslationMixin
 from benchbox.platforms.base.execution import TestDriversMixin
 from benchbox.platforms.base.models import (
     SetupPhase,
+    StatisticsGatheringPhase,
 )
 from benchbox.platforms.base.phase_tracking import (
     PhaseTrackingMixin,
@@ -380,6 +381,75 @@ class PlatformAdapter(
             benchmark_type: Type of benchmark (e.g., "olap", "oltp", "analytics")
         """
 
+    def gather_statistics(self, connection: Any, table_names: list[str]) -> tuple[str, int]:
+        """Run the platform's explicit statistics build for the statistics phase.
+
+        Returns (stats_mode, tables_analyzed). The default resolves the
+        adapter's existing analyze surface: whole-database ``analyze_tables``
+        when available, else per-table ``analyze_table``, else
+        ``("unsupported", 0)``. Engines whose statistics are built during load
+        (e.g. Redshift with auto_analyze) override this to report
+        ``("auto-on-load", 0)`` instead of double-building.
+        """
+        analyze_tables = getattr(self, "analyze_tables", None)
+        if callable(analyze_tables):
+            analyze_tables(connection)
+            return "explicit", len(table_names)
+        analyze_table = getattr(self, "analyze_table", None)
+        if callable(analyze_table):
+            for table_name in table_names:
+                analyze_table(connection, table_name)
+            return "explicit", len(table_names)
+        return "unsupported", 0
+
+    def run_statistics_phase(
+        self,
+        benchmark: Any,
+        connection: Any,
+        *,
+        benchmark_name: str = "",
+        table_names: list[str] | None = None,
+    ) -> StatisticsGatheringPhase | None:
+        """Run the opt-in statistics phase between load and query execution.
+
+        Returns None (phase not run) when the benchmark has not opted in via
+        the registry's ``supports_statistics_phase`` flag, so legacy
+        benchmarks keep load-includes-stats semantics and their historical
+        bundles stay comparable. Failures are recorded on the phase rather
+        than aborting the run - queries remain meaningful on unanalyzed data.
+        """
+        from benchbox.core.benchmark_registry import get_benchmark_metadata
+
+        slug = (benchmark_name or "").lower()
+        metadata = get_benchmark_metadata(slug) if slug else None
+        if not (metadata or {}).get("supports_statistics_phase"):
+            quiet_console.print(
+                f"⏭️  Statistics phase requested but benchmark '{slug or 'unknown'}' has not opted in; "
+                "skipping (load keeps legacy statistics semantics)"
+            )
+            return None
+
+        names = table_names or _resolve_benchmark_table_names(benchmark)
+        quiet_console.print("Gathering optimizer statistics...")
+        start_time = mono_time()
+        try:
+            stats_mode, tables_analyzed = self.gather_statistics(connection, names)
+        except Exception as exc:
+            self.logger.warning(f"Statistics phase failed: {exc}")
+            return StatisticsGatheringPhase(
+                duration_ms=int(elapsed_seconds(start_time) * 1000),
+                status="FAILED",
+                stats_mode="explicit",
+                tables_analyzed=0,
+                error_message=str(exc),
+            )
+        return StatisticsGatheringPhase(
+            duration_ms=int(elapsed_seconds(start_time) * 1000),
+            status="COMPLETED",
+            stats_mode=stats_mode,
+            tables_analyzed=tables_analyzed,
+        )
+
     @abstractmethod
     def execute_query(
         self,
@@ -541,6 +611,17 @@ class PlatformAdapter(
             benchmark_type = run_config.get("benchmark_type", "olap")
             self.configure_for_benchmark(connection, benchmark_type)
 
+            # Opt-in statistics phase: load -> statistics -> query, so
+            # stats-build wall-clock is attributed to neither load nor query.
+            statistics_phase = None
+            if run_config.get("gather_statistics"):
+                statistics_phase = self.run_statistics_phase(
+                    benchmark,
+                    connection,
+                    benchmark_name=run_config.get("benchmark_name", ""),
+                    table_names=sorted(table_stats) if table_stats else None,
+                )
+
             test_execution_type = run_config.get("test_execution_type", "standard")
             quiet_console.print(f"Executing benchmark queries ({test_execution_type} mode)...")
             self._last_throughput_test_result = None
@@ -565,6 +646,7 @@ class PlatformAdapter(
                 schema_creation=schema_creation_phase,
                 data_loading=data_loading_phase,
                 validation=validation_phase,
+                statistics_gathering=statistics_phase,
             )
 
             execution_phases, total_exec_time, power_test_phase, throughput_test_phase = self._build_execution_phases(

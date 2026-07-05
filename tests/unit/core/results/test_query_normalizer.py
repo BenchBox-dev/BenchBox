@@ -306,6 +306,35 @@ class TestNormalizeQueryResult:
         assert result.iteration == 5
         assert result.stream_id == 2
 
+    def test_normalize_preserves_test_type(self) -> None:
+        """test_type (the combined-run phase discriminator stamped by platform
+        adapters, e.g. benchbox/platforms/base/execution.py) must survive
+        normalization - it's how build_plans_payload disambiguates a power row
+        and a throughput row for the same query_id/stream_id in a combined run."""
+        raw = {
+            "query_id": "Q1",
+            "execution_time_seconds": 1.5,
+            "rows_returned": 100,
+            "status": "SUCCESS",
+            "test_type": "throughput",
+        }
+        result = normalize_query_result(raw)
+
+        assert result.test_type == "throughput"
+
+    def test_normalize_test_type_defaults_to_none(self) -> None:
+        """Standard single-phase runs never set test_type; normalization must not
+        invent a value."""
+        raw = {
+            "query_id": "Q1",
+            "execution_time_seconds": 1.5,
+            "rows_returned": 100,
+            "status": "SUCCESS",
+        }
+        result = normalize_query_result(raw)
+
+        assert result.test_type is None
+
 
 class TestNormalizeQueryResults:
     """Tests for normalize_query_results function."""

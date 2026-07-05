@@ -229,6 +229,34 @@ def test_calculate_checksum_distinguishes_numeric_and_temporal_dtypes() -> None:
     assert calculate_checksum([(True,)]) != calculate_checksum([(1,)])
 
 
+def test_calculate_checksum_escapes_temporal_payloads() -> None:
+    """Temporal cells (``t:`` tag) must be escaped like every other cell type.
+
+    A date/time subclass with a forged ``__str__`` containing a row separator
+    would otherwise render byte-identical to two separate temporal rows,
+    reopening the exact separator-forgery false-pass this hardening closes for
+    every other dtype (str, the ``o:`` fallback, etc.).
+    """
+    from datetime import date
+
+    class ForgedDate(date):
+        def __str__(self) -> str:
+            return "a\nt:b"
+
+    forged = calculate_checksum([(ForgedDate(2026, 1, 1),)])
+
+    class LiteralA(date):
+        def __str__(self) -> str:
+            return "a"
+
+    class LiteralB(date):
+        def __str__(self) -> str:
+            return "b"
+
+    two_rows = calculate_checksum([(LiteralA(2026, 1, 1),), (LiteralB(2026, 1, 2),)])
+    assert forged != two_rows
+
+
 def test_tie_aware_constant_column_is_not_a_boundary_key() -> None:
     """A constant/literal column must not qualify as the tie-boundary key.
 

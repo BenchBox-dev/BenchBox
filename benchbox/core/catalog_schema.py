@@ -58,6 +58,9 @@ class BenchmarkMeta(BaseModel):
     min_scale: float | None = None
     surface: Surface | None = None
     data_manifest: str | None = None
+    # Opt-in: the runner inserts an explicit statistics phase between load and
+    # query for this benchmark when the user requests --phases ...,statistics.
+    supports_statistics_phase: bool = False
 
     @field_validator("estimated_time_range")
     @classmethod

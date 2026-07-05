@@ -20,7 +20,13 @@ DEFAULT_RUNBOOK = REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md"
 # how this module is loaded (script, package import, or out-of-tree test).
 sys.path.insert(0, str(REPO_ROOT / "_project" / "scripts"))
 
-from ruleset_review_enforcement import extract_rules, review_enforcement_findings  # noqa: E402
+from ruleset_review_enforcement import (  # noqa: E402
+    TAG_RULESET_ENFORCED,
+    extract_rules,
+    review_enforcement_findings,
+    tag_bypass_advisory,
+    tag_protection_findings,
+)
 
 # Findings with this prefix are surfaced (rendered, included in the JSON
 # `findings` list) exactly like any other drift finding, but do NOT flip the
@@ -227,6 +233,42 @@ def compare_ruleset(
     return findings
 
 
+def tag_creation_findings(
+    all_live_rulesets: list[dict[str, Any]],
+    *,
+    enforce_tag_rule: bool = TAG_RULESET_ENFORCED,
+) -> list[str]:
+    """Findings for the ``v*`` tag-creation ruleset (release-flow hardening).
+
+    Delegates entirely to ``ruleset_review_enforcement.tag_protection_findings``/
+    ``tag_bypass_advisory`` (single source of truth, shared with the standalone
+    ``--rulesets-file`` CLI documented in ``docs/operations/repo-admin-settings.md``).
+    Unlike the per-name ``compare_ruleset`` checks above, this scans ALL fetched
+    rulesets (not one by expected name) because the tag-creation ruleset has no
+    fixed expected name — any ruleset with ``target: "tag"`` that covers
+    ``refs/tags/v*`` with a ``creation`` rule counts.
+
+    Mirrors the ``DEVELOP_REVIEW_RULE_ENFORCED`` WARN-until-applied pattern:
+    while ``enforce_tag_rule`` is ``False`` (the default, driven by
+    ``TAG_RULESET_ENFORCED``), a missing/incomplete tag ruleset is a
+    ``WARNING_PREFIX``-prefixed finding — visible, non-blocking — until the
+    admin POST lands and the flag is flipped.
+    """
+    findings: list[str] = []
+    protection_findings = tag_protection_findings(all_live_rulesets)
+    if protection_findings:
+        if enforce_tag_rule:
+            findings.extend(protection_findings)
+        else:
+            findings.extend(f"{WARNING_PREFIX}{finding}" for finding in protection_findings)
+    else:
+        findings.extend(
+            f"{WARNING_PREFIX}CONFIRM before enforcing: {advisory}"
+            for advisory in tag_bypass_advisory(all_live_rulesets)
+        )
+    return findings
+
+
 def _override_active(env: dict[str, str]) -> tuple[bool, str]:
     sha = env.get("RELEASE_READINESS_OVERRIDE_SHA", "").strip()
     reason = env.get("RELEASE_READINESS_OVERRIDE_REASON", "").strip()
@@ -320,6 +362,7 @@ def main(argv: list[str] | None = None) -> int:
                 require_bypass_actor_visibility=args.require_bypass_actor_visibility,
             )
         )
+    findings.extend(tag_creation_findings(list(live_by_name.values())))
 
     blocking = blocking_findings(findings)
     summary = render_summary(findings, expected)

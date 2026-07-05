@@ -854,22 +854,23 @@ jobs:
     name: parity-check
     needs: ci-paths
     # Path-filtered on results-explorer/viz source changes (see
-    # _project/TODO/main/planning/parity-check-develop-ring.yaml). `make
-    # parity-check` is Python-only (no npm/vitest install), measured at well
-    # under a second locally, so it is cheap enough to block develop PRs.
+    # _project/DONE/main/parity-check-develop-ring.yaml). `make parity-check`
+    # is Python-only (no npm/vitest install), measured at well under a second
+    # locally, so it is cheap enough to block develop PRs.
     #
-    # NON-BLOCKING FOR NOW (continue-on-error: true, deliberately NOT in
-    # ci-required-result.needs): `make parity-check` currently fails in at
-    # least one local environment with an unexplained 2e-13 last-bit float
-    # drift in tests/parity/fixtures/geomean_ms.json (likely libm
-    # transcendental-precision variance across environments). Promotion
-    # criterion to the required lane: (1) one green run of this job on a
-    # real GitHub runner, AND (2) a decision on the geomean_ms.json float
-    # drift (comparison tolerance vs fixture regen). Until both hold, a
-    # failure here shows red in the PR checks list but does not block merge.
+    # PROMOTED TO THE REQUIRED LANE 2026-07-05 (parity-check-promotion): the
+    # job is now observed by ci-required-result via PARITY_CHECK_RESULT with
+    # the package-smoke skipped-counts-as-pass rule, and continue-on-error is
+    # dropped. Both promotion criteria met: (1) one green run on a real
+    # GitHub runner (PR #973, run 28742318825 job 85227174150 - the runner's
+    # `make parity-check` printed "fixtures match Python source"); (2) the
+    # geomean_ms 2e-13 last-bit drift seen locally did NOT reproduce on the
+    # runner, so it is a local libm transcendental-precision artifact, not a
+    # fixture error - exact comparison is kept and the drift is documented in
+    # tests/parity/README.md. Path-filtering stays: a non-viz PR skips this
+    # job and passes via skipped-counts-as-pass.
     if: ${{ needs.ci-paths.outputs.viz-needed == 'true' }}
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -923,9 +924,7 @@ jobs:
 
   ci-required-result:
     name: ci-required-result
-    # parity-check is deliberately absent from this needs list while it is
-    # demoted to non-blocking (see the parity-check job's promotion criterion).
-    needs: [ci-paths, content-guard, code-lint, code-test, correctness-gate, plan-capture-gate, explorer-tokens, audit-sha, package-smoke, dependency-audit]
+    needs: [ci-paths, content-guard, code-lint, code-test, correctness-gate, plan-capture-gate, explorer-tokens, audit-sha, package-smoke, dependency-audit, parity-check]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -941,6 +940,7 @@ jobs:
           AUDIT_SHA_RESULT: ${{ needs.audit-sha.result }}
           PACKAGE_SMOKE_RESULT: ${{ needs.package-smoke.result }}
           DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
+          PARITY_CHECK_RESULT: ${{ needs.parity-check.result }}
           CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
           SAFE_CONTENT_ONLY: ${{ needs.ci-paths.outputs.safe-content-only }}
@@ -969,9 +969,6 @@ jobs:
           # pass. A PR that DID touch those paths gets a real success/failure
           # result from the job itself, so this cannot silently green a
           # packaging regression (pr-gate-package-and-audit-promotion.yaml).
-          # parity-check (viz filter) is intentionally NOT checked here while
-          # demoted to non-blocking; see its job comment for the promotion
-          # criterion (parity-check-develop-ring.yaml).
           if [ "$PACKAGE_SMOKE_RESULT" != "success" ] \
               && [ "$PACKAGE_SMOKE_RESULT" != "skipped" ]; then
             echo "package-smoke=$PACKAGE_SMOKE_RESULT"
@@ -981,6 +978,18 @@ jobs:
           if [ "$DEPENDENCY_AUDIT_RESULT" != "success" ] \
               && [ "$DEPENDENCY_AUDIT_RESULT" != "skipped" ]; then
             echo "dependency-audit=$DEPENDENCY_AUDIT_RESULT"
+            exit 1
+          fi
+
+          # parity-check is gated on the viz path filter with the same
+          # skipped-counts-as-pass rule (promoted 2026-07-05,
+          # parity-check-promotion): a non-viz PR skips it and passes, a
+          # viz-touching PR gets a real success/failure so a CLI-vs-explorer
+          # numeric parity regression now blocks merge instead of showing
+          # red-but-mergeable.
+          if [ "$PARITY_CHECK_RESULT" != "success" ] \
+              && [ "$PARITY_CHECK_RESULT" != "skipped" ]; then
+            echo "parity-check=$PARITY_CHECK_RESULT"
             exit 1
           fi
 

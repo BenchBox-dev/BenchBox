@@ -10,6 +10,8 @@ from benchbox.core.manifest.io import (
     write_manifest,
 )
 from benchbox.core.manifest.models import (
+    PLAN_FINGERPRINT_SCHEME_LITERAL,
+    PLAN_FINGERPRINT_SCHEME_NORMALIZED,
     ConvertedFileEntry,
     FileEntry,
     ManifestV1,
@@ -18,6 +20,7 @@ from benchbox.core.manifest.models import (
     TableFormats,
 )
 from benchbox.core.manifest.plan_metadata_utils import (
+    PlanFingerprintSchemeMismatchError,
     create_plan_metadata_from_results,
     merge_plan_metadata,
     update_plan_versions,
@@ -30,6 +33,8 @@ from benchbox.core.manifest.preferences import (
 
 __all__ = [
     # Models
+    "PLAN_FINGERPRINT_SCHEME_LITERAL",
+    "PLAN_FINGERPRINT_SCHEME_NORMALIZED",
     "ConvertedFileEntry",
     "FileEntry",
     "ManifestV1",
@@ -45,6 +50,7 @@ __all__ = [
     "get_files_for_format",
     "get_preferred_format",
     # Plan Metadata Utils
+    "PlanFingerprintSchemeMismatchError",
     "create_plan_metadata_from_results",
     "merge_plan_metadata",
     "update_plan_versions",

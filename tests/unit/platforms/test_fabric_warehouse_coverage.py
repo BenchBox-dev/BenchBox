@@ -305,13 +305,17 @@ class TestAnalyzeTable:
         mock_cursor.execute.assert_called_once()
         assert "UPDATE STATISTICS" in str(mock_cursor.execute.call_args)
 
-    def test_silences_pyodbc_error(self, adapter, _fabric_stubs):
+    def test_raises_on_pyodbc_error(self, adapter, _fabric_stubs):
+        """Must raise (not swallow) so gather_statistics()'s caller can detect
+        and record a real failure as status=FAILED."""
         mock_cursor = MagicMock()
         mock_cursor.execute.side_effect = _fabric_stubs.Error("stats failed")
         mock_conn = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
 
-        adapter.analyze_table(mock_conn, "lineitem")  # should not raise
+        with pytest.raises(_fabric_stubs.Error, match="stats failed"):
+            adapter.analyze_table(mock_conn, "lineitem")
+        mock_cursor.close.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

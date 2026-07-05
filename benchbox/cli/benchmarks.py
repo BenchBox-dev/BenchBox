@@ -919,7 +919,7 @@ def prompt_phases(default_phases: list[str] | None = None) -> list[str]:
         return selected_phases
 
     # Custom selection
-    valid_phases = ["generate", "load", "warmup", "power", "throughput", "maintenance"]
+    valid_phases = ["generate", "load", "statistics", "warmup", "power", "throughput", "maintenance"]
     unique_phases = _prompt_custom_phases(valid_phases)
 
     console.print(f"[green]✓ Selected phases: {', '.join(unique_phases)}[/green]")
@@ -936,6 +936,7 @@ def _prompt_custom_phases(valid_phases: list[str]) -> list[str]:
     descriptions = {
         "generate": "Generate benchmark data files",
         "load": "Load data into the database",
+        "statistics": "Gather optimizer statistics (opt-in; supported benchmarks only)",
         "warmup": "Warm up the database cache",
         "power": "Execute power test (single stream)",
         "throughput": "Execute throughput test (concurrent streams)",
@@ -944,8 +945,8 @@ def _prompt_custom_phases(valid_phases: list[str]) -> list[str]:
     for i, phase in enumerate(valid_phases, 1):
         console.print(f"  {i}. {phase} - {descriptions[phase]}")
 
-    console.print("\n[dim]Enter comma-separated numbers or phase names (e.g., '1,2,4' or 'generate,load,power')[/dim]")
-    custom_input = Prompt.ask("Phases", default="1,2,4")
+    console.print("\n[dim]Enter comma-separated numbers or phase names (e.g., '1,2' or 'generate,load,power')[/dim]")
+    custom_input = Prompt.ask("Phases", default="generate,load,power")
 
     selected = _parse_phase_input(custom_input, valid_phases)
     if not selected:

@@ -1153,13 +1153,18 @@ class AzureSynapseAdapter(PlatformAdapter):
         return AzureSynapseQueryPlanParser()
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Update statistics for query optimization."""
+        """Update statistics for query optimization.
+
+        Raises on failure (does not swallow) so the opt-in statistics phase's
+        gather_statistics() -> run_statistics_phase() caller can detect and
+        record a real failure as status=FAILED. apply_table_tunings' own
+        best-effort call site wraps this to preserve its log-and-continue
+        semantics.
+        """
         cursor = connection.cursor()
         try:
             cursor.execute(f"UPDATE STATISTICS [{self.schema}].[{table_name}]")
             self.logger.info(f"Updated statistics for {table_name}")
-        except Exception as e:
-            self.logger.warning(f"Failed to update statistics for {table_name}: {e}")
         finally:
             cursor.close()
 
@@ -1229,8 +1234,14 @@ class AzureSynapseAdapter(PlatformAdapter):
         table_name = table_tuning.table_name
         self.logger.info(f"Azure Synapse tunings for {table_name} applied during table creation")
 
-        # Update statistics after tuning
-        self.analyze_table(connection, table_name)
+        # Update statistics after tuning. Best-effort here (unlike the opt-in
+        # statistics phase's gather_statistics() caller): a post-tuning stats
+        # refresh failing should not abort table setup, so analyze_table's
+        # exception is caught and logged rather than propagated.
+        try:
+            self.analyze_table(connection, table_name)
+        except Exception as e:
+            self.logger.warning(f"Failed to update statistics for {table_name}: {e}")
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to Azure Synapse."""

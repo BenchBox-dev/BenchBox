@@ -128,6 +128,27 @@ class ValidationPhase:
 
 
 @dataclass
+class StatisticsGatheringPhase:
+    """Optimizer-statistics build between load and query (opt-in).
+
+    stats_mode attributes where the statistics time landed:
+    - "explicit": the phase ran the platform's ANALYZE and duration_ms is the
+      measured wall-clock of that build.
+    - "auto-on-load": the engine already gathered statistics during load
+      (e.g. Redshift auto_analyze); nothing is re-built and duration_ms is 0
+      so load timing keeps the cost exactly once.
+    - "unsupported": the platform exposes no statistics-build hook;
+      duration_ms is 0.
+    """
+
+    duration_ms: int
+    status: str
+    stats_mode: str
+    tables_analyzed: int = 0
+    error_message: str | None = None
+
+
+@dataclass
 class SetupPhase:
     """Setup phase metrics grouped by lifecycle stage."""
 
@@ -135,6 +156,7 @@ class SetupPhase:
     schema_creation: SchemaCreationPhase | None = None
     data_loading: DataLoadingPhase | None = None
     validation: ValidationPhase | None = None
+    statistics_gathering: StatisticsGatheringPhase | None = None
 
 
 @dataclass
