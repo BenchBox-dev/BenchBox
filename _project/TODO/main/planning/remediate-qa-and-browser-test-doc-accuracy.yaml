@@ -1,0 +1,96 @@
+id: remediate-qa-and-browser-test-doc-accuracy
+title: "Fix Results Explorer QA doc: false S7.6 security claim, non-existent sample IDs, stale URL-sync notes"
+worktree: main
+priority: Medium
+status: Not Started
+category: Documentation
+
+description: |
+  Source: _project/audits/results-explorer-publication-adversarial-review.md
+  (develop_sha fddedf26), findings §2.17 (Advisory) and §2.18 (Advisory; the
+  sample-ID part borders on Required — the section is unusable as written).
+
+  §2.17 — results-explorer-qa.md:331 tells the tester to "confirm bench.results
+  is a view." It is a TABLE (duckdb_builder.py:371,:282); the real protection is
+  the read-only attach (results-explorer/src/db.ts:278
+  `ATTACH 'results.duckdb' AS bench (READ_ONLY)`), and there is no SQL statement
+  filtering (Query.tsx:608-617 passes raw SQL). DDL/DML against bench.* is
+  rejected because the attach is read-only, but CREATE/SET against the in-memory
+  catalog succeed transiently — so "no-op" is the wrong word. The security
+  property holds; the doc's stated mechanism does not exist.
+
+  §2.18 — results-explorer-qa.md:5 claims the fixture corpus spans
+  duckdb/sqlite/datafusion/polars with 12 results, but there is no sqlite
+  fixture anywhere and 5 of 6 sample result IDs in §S5 do not exist in the tree
+  (only tpch-duckdb-sf0.01-20260403-7fe93365 is real). §S3.1 ("view mode not
+  URL-synced") and §S3.4 ("trust filter not URL-synced") are both stale —
+  BenchmarkIndex.tsx:211 and the facet URL-state hook show both ARE URL-synced.
+  results-explorer-browser-testing.md:70-72 overstates the push trigger as
+  "every push" (it is branches:[main] only).
+
+work:
+  - id: w1
+    summary: "Reword S7.6 to describe the real read-only-attach protection"
+    status: pending
+    notes: |
+      Replace the "is it a view?" check with: "the bench database is attached
+      READ_ONLY (db.ts:278); writes to bench.* error; writes to the in-memory
+      catalog succeed but are tab-local and transient and cannot alter the
+      published snapshot." Reference the pinning e2e test
+      (results-explorer/e2e/routes/query.spec.ts:153-168).
+
+  - id: w2
+    summary: "Regenerate the §S5 sample result IDs and the corpus-surface description from the actual fixtures"
+    status: pending
+    notes: |
+      Derive real IDs from results-explorer/test-fixtures/source/bundles/;
+      drop the non-existent sqlite surface (or add a fixture if it is intended);
+      correct the result count.
+
+  - id: w3
+    summary: "Delete the stale 'not URL-synced' notes (§S3.1, §S3.4) and fix the browser-testing trigger claim"
+    status: pending
+    notes: |
+      Update results-explorer-qa.md §S3.1/§S3.4 to reflect that view mode and
+      trust filter are URL-synced; correct
+      results-explorer-browser-testing.md:70-72 push trigger to branches:[main].
+
+prior_art:
+  - "results-explorer/e2e/routes/query.spec.ts:153-168 — cite this existing test as the evidence for the reworded S7.6 claim."
+  - "results-explorer/test-fixtures/source/bundles/ — the source of truth for real sample IDs (w2)."
+
+must_preserve:
+  - "The QA plan's overall structure and section numbering (only the inaccurate content changes)."
+
+anti_patterns:
+  - "DO NOT assert bench.results is a view to make the doc 'true' - because it is a table - describe the read-only attach that actually provides the property."
+  - "DO NOT invent sample IDs - because that recreates the current defect - derive them from the committed fixtures."
+
+verification:
+  - description: "S7.6 no longer claims a view"
+    command: "grep -n 'is a view' docs/operations/results-explorer-qa.md"
+    expected_output: "no match; wording describes READ_ONLY attach"
+  - description: "Every §S5 sample ID exists in the fixtures"
+    command: "for id in $(grep -oE '[a-z0-9-]+-sf[0-9.]+-[0-9]{8}-[0-9a-f]{8}' docs/operations/results-explorer-qa.md); do ls results-explorer/test-fixtures/source/bundles/ | grep -q \"$id\" || echo MISSING:$id; done"
+    expected_output: "no MISSING lines"
+
+scope_limit:
+  only_modify:
+    - "docs/operations/results-explorer-qa.md"
+    - "docs/development/results-explorer-browser-testing.md"
+  do_not_modify:
+    - "results-explorer/"
+
+metadata:
+  owners:
+    - "joeharris76"
+  tags:
+    - "results-explorer-publication-remediation"
+    - "docs"
+    - "qa"
+  estimated_effort: "Small"
+  created_date: "2026-07-04"
+
+success_metrics:
+  - "A tester following S7.6 checks a property that actually exists."
+  - "Every documented sample ID and corpus surface resolves in the fixtures."

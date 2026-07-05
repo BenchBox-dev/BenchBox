@@ -1,0 +1,103 @@
+id: remediate-explorer-trust-label-vocabulary
+title: "Unify trust-label vocabulary across publisher and explorer; stop hiding the badge on empty labels"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Documentation
+
+description: |
+  Source: _project/audits/results-explorer-publication-adversarial-review.md
+  (develop_sha fddedf26), findings §2.20 (Advisory) and §2.21 (Advisory).
+
+  §2.20 — The publisher's canonical set is
+  benchbox/core/publishing/bundle_publisher.py:30
+  VALID_LABELS = (maintainer-run, community-submission, ci, local,
+  unofficial-research). But the explorer's TrustBadge config keys are
+  ci-verified, ci-validated, local-run
+  (results-explorer/src/components/TrustBadge.tsx:19-43) and ranking
+  eligibility is {maintainer-run, ci-verified} (models.py:82-89). So a bundle
+  labeled `ci` or `local` by the publisher renders under the "unrecognised —
+  contact maintainers" fallback and (for `ci`) is not ranking-eligible despite
+  the publisher treating it as first-class; `unofficial-research` has no
+  explorer badge at all. The two halves of the platform disagree on the label
+  vocabulary.
+
+  §2.21 — TrustBadge.tsx:64 `if (!trustLabel) return null;` hides the badge
+  entirely on an empty label instead of showing an explicit "unknown" (moot
+  today because the snapshot schema makes trust_label NOT NULL, but the
+  component contract is hide-on-missing).
+
+work:
+  - id: w1
+    summary: "Define one canonical trust-label vocabulary shared by the publisher, pipeline, and explorer"
+    status: pending
+    notes: |
+      Pick the single source of truth (publisher VALID_LABELS vs explorer
+      TRUST_CONFIG) and reconcile ci↔ci-verified and local↔local-run
+      explicitly. Ensure unofficial-research has an explorer badge. Document the
+      canonical list where both sides reference it.
+
+  - id: w2
+    summary: "Map every publisher label to an explorer badge (no silent 'unrecognised' for a valid label)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Update results-explorer/src/components/TrustBadge.tsx TRUST_CONFIG so
+      every VALID_LABELS value renders a curated badge; keep the fallback only
+      for genuinely unknown strings.
+
+  - id: w3
+    summary: "Render an explicit 'unknown' badge on empty trust label instead of returning null"
+    needs: [w1]
+    status: pending
+    notes: |
+      TrustBadge.tsx:64 — render DEFAULT_CONFIG/'unknown' on empty rather than
+      hiding the trust dimension. Update the pinning tests
+      (results-explorer/src/components/__tests__/).
+
+deps:
+  needs:
+    - remediate-submission-trust-label-enforcement
+
+prior_art:
+  - "benchbox/core/publishing/bundle_publisher.py:30 VALID_LABELS — reuse as (or reconcile toward) the canonical vocabulary."
+  - "results-explorer/src/components/TrustBadge.tsx:TRUST_CONFIG — extend to cover every canonical label."
+  - "results-explorer/src/lib/displayLabels.ts:formatTrustLabel — reuse the existing 'unknown' rendering for the empty-state fix."
+
+must_preserve:
+  - "is_ranking_eligible semantics: community-submission and local stay excluded from official rankings."
+  - "Existing curated badge tones for maintainer-run and ci-verified."
+
+anti_patterns:
+  - "DO NOT add a third divergent label set - because there are already two - collapse to one canonical vocabulary referenced by both sides."
+
+verification:
+  - description: "Every publisher VALID_LABELS value has a non-fallback explorer badge"
+    command: "uv run -- npm --prefix results-explorer test -- TrustBadge"
+    expected_output: "no valid label falls through to the 'unrecognised' path; empty → 'unknown'"
+  - description: "Label vocabulary is single-sourced"
+    command: "grep -rn 'ci-verified\\|VALID_LABELS' benchbox/core/publishing results-explorer/src _project/scripts/explorer_pipeline"
+    expected_output: "one canonical definition, referenced (not re-declared divergently)"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/components/TrustBadge.tsx"
+    - "results-explorer/src/components/__tests__/"
+    - "results-explorer/src/lib/displayLabels.ts"
+    - "benchbox/core/publishing/bundle_publisher.py"
+    - "_project/scripts/explorer_pipeline/models.py"
+  do_not_modify:
+    - "benchbox/validation/bundle.py"
+
+metadata:
+  owners:
+    - "joeharris76"
+  tags:
+    - "results-explorer-publication-remediation"
+    - "explorer"
+  estimated_effort: "Medium"
+  created_date: "2026-07-04"
+
+success_metrics:
+  - "A bundle published with any VALID_LABELS value renders a meaningful, correctly-ranked badge in the explorer."
+  - "An empty trust label shows 'unknown', never nothing."

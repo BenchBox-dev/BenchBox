@@ -1,0 +1,151 @@
+id: remediate-governance-and-doc-drift
+title: "Retire the stale prune-publishing doc and fix governance/doc drift that misdirects maintainers"
+worktree: main
+priority: High
+status: Not Started
+category: Documentation
+
+description: |
+  Source: _project/audits/results-explorer-publication-adversarial-review.md
+  (develop_sha fddedf26), findings §2.12 (Critical), §2.16 (Required), §2.18b
+  (Advisory, grouped), plus the ADR-index gap and §2.22 test-dir relocation.
+
+  §2.12 (Critical) — docs/design/future-state/prune-publishing-subsystem/README.md
+  :31-33 says the publishing module has "zero consumers … no CLI integration"
+  and is "High priority (dead code removal)" (docs/design/future-state/index.md:43,
+  in the Sphinx toctree). Reality: benchbox/cli/commands/__init__.py:33 registers
+  `publish`, publish.py imports benchbox.core.publishing, run --publish uses it,
+  and 33 tests cover it. The doc was written 2026-04-01 about the OLD generic
+  layer, which was deleted in 0182c955 (2026-04-27) — the same commit that added
+  the current bundle_publisher.py/store.py at the same path. Following the doc
+  today deletes live, shipped code.
+
+  §2.16 (Required) — results-explorer-qa.md is billed as the maintained,
+  reusable QA plan (:7-10) but hardcodes saving findings to the sealed
+  pass-2 file (:95,:392), says to update the completed pass-1 TODO (:369,:392),
+  and points screenshots at a non-existent _project/audits/screenshots/ (:114).
+
+  §2.18b (Advisory, grouped) — benchbox-results-platform-strategy.md:480 cites
+  publishing/artifacts.py + permalink.py (deleted 2026-04-27) as current
+  evidence; adr-explorer-cli-surface.md:38-41 and
+  results-explorer-browser-testing.md:70-72 misstate the docs.yml / browser
+  workflow triggers; results-explorer-token-scan.md:135-137 omits medium-test
+  from the jq filter; repo-admin-settings.md:58-59 says ci-required-result
+  aggregates 4 jobs (it needs 10, pr.yml:916); results-phase-2-runbook.md:29-30
+  says the sync watches "two vendored validators" (three code files) and calls
+  seed-corpus.yml a "quarterly refresh" (it is workflow_dispatch only).
+
+  Also: docs/development/adr/README.md indexes only 4 of the ADRs, omitting the
+  three Accepted ADRs with the most operational teeth (datasketches-vendoring,
+  explorer-cli-surface, published-results-slim-corpus-branch). And §2.22: the
+  explorer tests live under misleading paths (tests/unit/core/explorer_pipeline/
+  imports _project.scripts.explorer_pipeline; tests/unit/cli/test_explorer_build_contract.py
+  tests no CLI command) — a naming residue from the completed migration.
+
+work:
+  - id: w1
+    summary: "Retire / correct the prune-publishing future-state doc (Critical hazard)"
+    status: pending
+    notes: |
+      Move docs/design/future-state/prune-publishing-subsystem/ to an _archive
+      (or rewrite it to state the prune completed in v0.2.1), remove it from
+      docs/design/future-state/index.md and the toctree, and note that the path
+      now hosts the live bundle-publish subsystem. This is the highest-urgency
+      unit: the current text is an instruction to delete shipped code.
+
+  - id: w2
+    summary: "Make the QA plan reusable: parameterize the pass number, drop the closed pass-1 TODO reference, fix the screenshots path"
+    status: pending
+    notes: |
+      results-explorer-qa.md — replace the hardcoded pass-2 file with
+      "results-explorer-qa-pass<N>-findings.md, next unused N"; remove the
+      pass-1 TODO update instruction; either create _project/audits/screenshots/
+      or change the retention line to match the "not retained in git" reality
+      the pass-2 findings already record.
+
+  - id: w3
+    summary: "Fix the grouped §2.18b doc drifts against current YAML/tree"
+    status: pending
+    notes: |
+      Strategy doc deleted-file evidence row (:480); ADR/browser-testing trigger
+      claims; token-scan jq (add medium-test); repo-admin-settings aggregator
+      count (4→10); runbook §1.2 validator count + seed-corpus cadence.
+
+  - id: w4
+    summary: "Add the three missing Accepted ADRs to docs/development/adr/README.md"
+    status: pending
+    notes: |
+      Index adr-duckdb-datasketches-vendoring, adr-explorer-cli-surface,
+      adr-published-results-slim-corpus-branch so they are discoverable.
+
+  - id: w5
+    summary: "Relocate the mislabeled explorer tests to mirror the migrated source layout"
+    status: pending
+    notes: |
+      git mv tests/unit/core/explorer_pipeline/ → tests/unit/scripts/explorer_pipeline/
+      and tests/unit/cli/test_explorer_build_contract.py →
+      tests/unit/scripts/. Update any import/collection config. Behavior
+      unchanged (260 tests already pass); this is a naming fix only.
+
+deferred:
+  - summary: "§2.17/§2.18 QA-doc S7.6 wording and fixture/route accuracy"
+    reason: "Content-accuracy of the QA doc body; tracked in remediate-qa-and-browser-test-doc-accuracy."
+
+prior_art:
+  - "docs/design/future-state/ existing _archive convention — reuse for w1 rather than deleting outright."
+  - "docs/development/adr/README.md existing table format — extend with the three missing rows (w4)."
+  - "_project/DONE/main/ completed-item conventions — model for how a superseded future-state doc is annotated."
+
+must_preserve:
+  - "The live benchbox/core/publishing/ subsystem and its tests remain untouched (this item only edits docs and moves tests)."
+  - "The 260 explorer_pipeline tests keep passing after the git mv (imports resolve via namespace packages)."
+  - "audit-sha frontmatter contract on _project/audits/ files."
+
+anti_patterns:
+  - "DO NOT delete benchbox/core/publishing/ - because the prune doc is stale, not correct - retire the doc instead."
+  - "DO NOT hand-edit generated _project/TODO/_indexes/ - regenerate via the todo CLI / make todo-reindex."
+
+verification:
+  - description: "Prune doc no longer presents live code as removable dead code"
+    command: "grep -rn 'zero consumers\\|dead code removal' docs/design/future-state/prune-publishing-subsystem/ docs/design/future-state/index.md"
+    expected_output: "removed or reworded to 'completed in v0.2.1'"
+  - description: "QA plan has no hardcoded pass-2/pass-1 references"
+    command: "grep -n 'pass2-findings\\|pass-1 TODO' docs/operations/results-explorer-qa.md"
+    expected_output: "pass number parameterized; closed-TODO reference gone"
+  - description: "ADR index lists all Accepted ADRs"
+    command: "grep -c 'adr-' docs/development/adr/README.md"
+    expected_output: ">= 7 ADR entries"
+  - description: "Relocated tests still pass"
+    command: "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline/ -q"
+    expected_output: "all pass at the new path"
+
+scope_limit:
+  only_modify:
+    - "docs/design/future-state/"
+    - "docs/operations/results-explorer-qa.md"
+    - "docs/development/benchbox-results-platform-strategy.md"
+    - "docs/development/adr/"
+    - "docs/development/results-explorer-browser-testing.md"
+    - "docs/operations/results-explorer-token-scan.md"
+    - "docs/operations/repo-admin-settings.md"
+    - "docs/operations/results-phase-2-runbook.md"
+    - "tests/unit/core/explorer_pipeline/"
+    - "tests/unit/scripts/"
+    - "tests/unit/cli/test_explorer_build_contract.py"
+  do_not_modify:
+    - "benchbox/core/publishing/"
+
+metadata:
+  owners:
+    - "joeharris76"
+  tags:
+    - "results-explorer-publication-remediation"
+    - "governance"
+    - "docs"
+  estimated_effort: "Medium"
+  created_date: "2026-07-04"
+
+success_metrics:
+  - "No published doc instructs deletion of the live publishing subsystem."
+  - "A future QA pass writes to its own findings file, not a sealed one."
+  - "All Accepted ADRs are discoverable from the ADR index."
