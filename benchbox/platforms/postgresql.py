@@ -797,7 +797,13 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         return result
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE on a table to update statistics."""
+        """Run ANALYZE on a table to update statistics.
+
+        Raises on failure (does not swallow) so the opt-in statistics phase's
+        gather_statistics() -> run_statistics_phase() caller can detect and
+        record a real ANALYZE failure as status=FAILED, instead of the phase
+        being marked COMPLETED with no statistics actually built.
+        """
         if not self._validate_identifier(table_name):
             self.logger.warning(f"Invalid table identifier: {table_name}")
             return
@@ -808,8 +814,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         try:
             cursor.execute(f"ANALYZE {qualified_table}")
             connection.commit()
-        except Exception as e:
-            self.logger.warning(f"ANALYZE failed for {table_name}: {e}")
         finally:
             cursor.close()
 

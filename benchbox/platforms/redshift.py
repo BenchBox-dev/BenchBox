@@ -2396,12 +2396,17 @@ class RedshiftAdapter(PlatformAdapter):
             cursor.close()
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE on table for query optimization."""
+        """Run ANALYZE on table for query optimization.
+
+        Raises on failure (does not swallow) so the opt-in statistics phase's
+        gather_statistics() -> run_statistics_phase() caller can detect and
+        record a real failure as status=FAILED. Not reached when auto_analyze
+        is enabled - gather_statistics() overrides to report "auto-on-load"
+        before this method is ever called.
+        """
         cursor = connection.cursor()
         try:
             cursor.execute(f"ANALYZE {table_name.lower()}")
-        except Exception as e:
-            self.logger.warning(f"Failed to analyze table {table_name}: {e}")
         finally:
             cursor.close()
 

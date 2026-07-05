@@ -1578,14 +1578,17 @@ class SnowflakeAdapter(PlatformAdapter):
         return metadata
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Trigger table analysis for better query optimization."""
+        """Trigger table analysis for better query optimization.
+
+        Raises on failure (does not swallow) so the opt-in statistics phase's
+        gather_statistics() -> run_statistics_phase() caller can detect and
+        record a real failure as status=FAILED.
+        """
         cursor = connection.cursor()
         try:
             # Snowflake automatically maintains statistics, but we can trigger clustering
             cursor.execute(f"ALTER TABLE {table_name.upper()} RECLUSTER")
             self.logger.info(f"Triggered reclustering for table {table_name.upper()}")
-        except Exception as e:
-            self.logger.warning(f"Failed to recluster table {table_name}: {e}")
         finally:
             cursor.close()
 

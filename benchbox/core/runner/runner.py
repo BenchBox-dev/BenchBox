@@ -458,6 +458,7 @@ def _execute_load_only_mode(
             },
         }
 
+        statistics_time_seconds = 0.0
         run_statistics_phase = getattr(adapter, "run_statistics_phase", None)
         if gather_statistics and callable(run_statistics_phase):
             statistics_phase = run_statistics_phase(
@@ -473,6 +474,12 @@ def _execute_load_only_mode(
                     "stats_mode": statistics_phase.stats_mode,
                     "tables_analyzed": statistics_phase.tables_analyzed,
                 }
+                # Fold the phase's own wall-clock into the load-only result's
+                # duration_seconds so it isn't underreported relative to the
+                # emitted phases.statistics.duration_ms (ANALYZE can be
+                # substantial; omitting it here would disagree with the phase
+                # block for exactly the runs this feature enables).
+                statistics_time_seconds = (statistics_phase.duration_ms or 0) / 1000.0
 
         # Calculate total rows and data size
         total_rows = sum(table_stats.values()) if table_stats else 0
@@ -487,7 +494,7 @@ def _execute_load_only_mode(
         result_obj = benchmark.create_enhanced_benchmark_result(
             platform=getattr(adapter, "platform_name", "load_only"),
             query_results=[],
-            duration_seconds=schema_time + load_time,
+            duration_seconds=schema_time + load_time + statistics_time_seconds,
             phases=phases,
             execution_metadata={"mode": "load_only"},
             schema_creation_time=schema_time,

@@ -219,8 +219,11 @@ def test_load_only_mode_runs_statistics_phase_when_requested(tmp_path):
     bench.tables = None
     captured_phases = {}
 
+    captured_kwargs = {}
+
     def _create_enhanced(platform, query_results, **kwargs):
         captured_phases.update(kwargs.get("phases") or {})
+        captured_kwargs.update(kwargs)
         return make_benchmark_results(
             benchmark_name="TPC-H",
             platform=platform,
@@ -252,7 +255,11 @@ def test_load_only_mode_runs_statistics_phase_when_requested(tmp_path):
 
         def run_statistics_phase(self, benchmark, connection, *, benchmark_name="", table_names=None):
             self.statistics_calls.append((benchmark_name, table_names))
-            return StatisticsGatheringPhase(duration_ms=7, status="COMPLETED", stats_mode="explicit", tables_analyzed=1)
+            # A substantial ANALYZE duration (5s) so an omission from
+            # duration_seconds would be obvious, not lost in rounding.
+            return StatisticsGatheringPhase(
+                duration_ms=5000, status="COMPLETED", stats_mode="explicit", tables_analyzed=1
+            )
 
     adapter_instance = DummyAdapter()
 
@@ -270,10 +277,15 @@ def test_load_only_mode_runs_statistics_phase_when_requested(tmp_path):
     assert adapter_instance.statistics_calls == [("tpch", ["table1"])]
     assert captured_phases["statistics"] == {
         "status": "COMPLETED",
-        "duration_ms": 7,
+        "duration_ms": 5000,
         "stats_mode": "explicit",
         "tables_analyzed": 1,
     }
+    # P2 regression: the load-only result's duration_seconds must fold in the
+    # statistics phase's own wall-clock (schema 0.1s + load 0.5s + stats 5.0s),
+    # not just schema_time + load_time -- otherwise a load,statistics run
+    # underreports duration and disagrees with phases.statistics.duration_ms.
+    assert captured_kwargs["duration_seconds"] == pytest.approx(5.6)
 
 
 @pytest.mark.unit

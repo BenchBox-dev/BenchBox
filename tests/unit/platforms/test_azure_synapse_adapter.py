@@ -907,8 +907,11 @@ class TestSynapseUncoveredMethods:
         assert "UPDATE STATISTICS" in executed
         assert "orders" in executed
 
-    def test_analyze_table_handles_exception(self, synapse_stubs):
-        """analyze_table should not raise when UPDATE STATISTICS fails."""
+    def test_analyze_table_raises_on_failure(self, synapse_stubs):
+        """analyze_table must raise (not swallow) when UPDATE STATISTICS fails, so
+        the opt-in statistics phase's gather_statistics() caller can detect and
+        record a real failure as status=FAILED instead of reporting COMPLETED
+        with no statistics actually built."""
         adapter = AzureSynapseAdapter(
             server="test.sql.azuresynapse.net",
             username="admin",
@@ -919,8 +922,29 @@ class TestSynapseUncoveredMethods:
         mock_cursor.execute.side_effect = Exception("Statistics update failed")
         mock_conn.cursor.return_value = mock_cursor
 
-        # Should not raise
-        adapter.analyze_table(mock_conn, "orders")
+        with pytest.raises(Exception, match="Statistics update failed"):
+            adapter.analyze_table(mock_conn, "orders")
+        mock_cursor.close.assert_called_once()  # cursor still closed via finally
+
+    def test_apply_table_tunings_swallows_analyze_table_failure(self, synapse_stubs):
+        """apply_table_tunings' post-tuning stats refresh stays best-effort even
+        though analyze_table itself now raises: a stats-refresh failure must not
+        abort table setup."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+        )
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.execute.side_effect = Exception("Statistics update failed")
+        mock_conn.cursor.return_value = mock_cursor
+        table_tuning = Mock()
+        table_tuning.has_any_tuning.return_value = True
+        table_tuning.table_name = "orders"
+
+        # Should not raise despite analyze_table failing internally.
+        adapter.apply_table_tunings(table_tuning, mock_conn)
 
     def test_close_connection_calls_close(self, synapse_stubs):
         """close_connection should call close() on the connection."""
