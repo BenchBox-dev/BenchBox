@@ -317,6 +317,47 @@ Why this can't be applied by the write-task's own PR: same as the
 soundness-path section above — the develop-PR `GITHUB_TOKEN` has no
 `administration` scope to read or write repository rulesets.
 
+Drift detection (landed 2026-07-05, tag-and-pypi-environment-admin-hardening
+w3): `_project/scripts/ruleset_review_enforcement.py` now carries a
+`tag_protection_findings()` predicate and a `TAG_RULESET_ENFORCED`
+warn-until-applied flag, mirroring `ruleset_drift_check.py`'s
+`DEVELOP_REVIEW_RULE_ENFORCED`. Feed it the live tag rulesets to check:
+
+```bash
+# Fetch each ruleset in full (the list endpoint omits conditions/rules,
+# which the predicate correctly treats as "not protected"):
+ids=$(gh api repos/joeharris76/BenchBox/rulesets --jq '.[].id')
+for id in $ids; do gh api repos/joeharris76/BenchBox/rulesets/$id; done \
+  | jq -s '.' \
+  | uv run -- python _project/scripts/ruleset_review_enforcement.py --rulesets-file -
+```
+
+While `TAG_RULESET_ENFORCED` is `False` (until the POST above lands), a
+missing/incomplete `v*`-tag ruleset prints as `WARNING (non-blocking):` and
+exits 0 — the check ships before the admin acts without going red. The
+predicate flags a ruleset that is not `active`, whose `ref_name.include`
+does not cover `refs/tags/v*` (or `~ALL`), whose `exclude` negates that
+coverage, or that lacks a `creation` rule. It does NOT fail on a non-empty
+`bypass_actors` list — a bypass path is REQUIRED so `make release-finalize`
+can still tag — but it prints a `CONFIRM before enforcing:` line listing the
+bypass actors; verify that list is the release identity only (not a broad
+Write/Admin role) before flipping the flag. After applying the ruleset and
+confirming the bypass list, flip `TAG_RULESET_ENFORCED = True` (a one-line
+change, tested by `test_ruleset_drift_review_coverage.py`) so the gap becomes
+blocking. NOTE: this predicate is not yet wired into the live
+`release-canary.yml` run — that wiring is a follow-up and also depends on
+`release-canary-scheduled-activation` making the canary run at all; the
+predicate + tests land first per this TODO's scope.
+
+Live-state note (fill in after applying — do not leave blank):
+
+```text
+# Tag-creation ruleset live state
+# checked: <YYYY-MM-DD>  by: <admin>
+# ruleset id: <id>  enforcement: <active?>  conditions.ref_name.include: <...>
+# rules: <creation, ...>  bypass_actors: <...>
+```
+
 ### `pypi` environment required-reviewers gate (verify/pending admin action)
 
 `release.yml`'s `publish` job already scopes the real-PyPI publish to the
