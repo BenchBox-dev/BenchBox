@@ -9,6 +9,7 @@ from benchbox.cli.shared import console
 from benchbox.core.query_plans.comparison import compare_query_plans, generate_plan_comparison_summary
 from benchbox.core.query_plans.visualization import render_comparison
 from benchbox.core.results.loader import iter_query_results, load_result_file
+from benchbox.core.results.query_normalizer import normalize_query_id
 
 
 @click.command("compare-plans", hidden=True, deprecated=True)
@@ -125,7 +126,18 @@ def _emit_comparisons(comparisons, output_format, output_file, explicit_query_id
 
 
 def _find_query_execution(results, query_id: str):
-    return next((qr for qr in iter_query_results(results) if qr.get("query_id") == query_id), None)
+    """Find a query result whose ID matches after normalization.
+
+    ``load_result_file`` returns already-normalized IDs from a real bundle's
+    compact ``queries[].id`` field (e.g. ``q05``/``Q05`` -> ``05``), so a raw
+    string comparison against the CLI's documented ``--query-id q05`` input
+    would report "not found" even when the plan is present.
+    """
+    normalized_target = normalize_query_id(query_id)
+    return next(
+        (qr for qr in iter_query_results(results) if normalize_query_id(qr.get("query_id", "")) == normalized_target),
+        None,
+    )
 
 
 def _output_text(comparisons: list, single_query: bool, return_string: bool = False) -> str | None:

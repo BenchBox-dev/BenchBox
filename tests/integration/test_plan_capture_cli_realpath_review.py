@@ -26,13 +26,13 @@ pytestmark = [
 ]
 
 _QUERIES = [
-    ("1", "SELECT i FROM range(5) t(i) WHERE i > 2"),
-    ("2", "SELECT count(*) AS c FROM range(5) t(i)"),
+    ("q1", "SELECT i FROM range(5) t(i) WHERE i > 2"),
+    ("q2", "SELECT count(*) AS c FROM range(5) t(i)"),
 ]
-# Query IDs are bare numerals (not "q1"/"q2"): the compact export format normalizes
-# IDs (query_normalizer.normalize_query_id strips a leading "Q"/"q"), so a bare
-# numeral round-trips unchanged and keeps this test focused on plan reattachment
-# rather than the separate, pre-existing query-ID-format lookup behavior.
+# Query IDs use the documented "q1"/"q2" style deliberately: the compact export
+# format normalizes IDs (query_normalizer.normalize_query_id strips a leading
+# "Q"/"q", so "q1" round-trips through a bundle as "1"), which exercises the
+# --query-id normalization fix in show_plan.py/compare_plans.py below.
 
 
 def _run_queries(capture_plans: bool) -> dict[str, dict]:
@@ -103,7 +103,7 @@ class TestPlanCaptureCLIRealpath:
         from benchbox.cli.commands.show_plan import show_plan
 
         main_json = _export_bundle(tmp_path / "run1", "run1")
-        result = CliRunner().invoke(show_plan, ["--run", str(main_json), "--query-id", "1"])
+        result = CliRunner().invoke(show_plan, ["--run", str(main_json), "--query-id", "q1"])
 
         assert result.exit_code == 0, result.output
         assert "no attribute" not in result.output.lower()
@@ -114,10 +114,24 @@ class TestPlanCaptureCLIRealpath:
         from benchbox.cli.commands.show_plan import show_plan
 
         main_json = _export_bundle(tmp_path / "run1", "run1")
-        result = CliRunner().invoke(show_plan, ["--run", str(main_json), "--query-id", "2", "--format", "json"])
+        result = CliRunner().invoke(show_plan, ["--run", str(main_json), "--query-id", "q2", "--format", "json"])
 
         assert result.exit_code == 0, result.output
-        assert '"query_id": "2"' in result.output
+        # The emitted plan is the QueryPlanDAG captured at execution time, whose own
+        # query_id field retains the original "q2" (not the reconstructed result
+        # dict's separately-normalized "query_id" of "2").
+        assert '"query_id": "q2"' in result.output
+
+    @pytest.mark.parametrize("requested_id", ["q1", "Q1", "1"])
+    def test_show_plan_query_id_normalization(self, tmp_path, requested_id):
+        """--query-id accepts any documented format (q1/Q1/1) against a normalized real bundle."""
+        from benchbox.cli.commands.show_plan import show_plan
+
+        main_json = _export_bundle(tmp_path / "run1", "run1")
+        result = CliRunner().invoke(show_plan, ["--run", str(main_json), "--query-id", requested_id])
+
+        assert result.exit_code == 0, result.output
+        assert "not found" not in result.output.lower()
 
     def test_compare_plans_summary_from_real_bundles(self, tmp_path):
         """The deprecated `compare-plans --summary` path must work against real bundles."""
@@ -133,6 +147,21 @@ class TestPlanCaptureCLIRealpath:
 
         assert result.exit_code == 0, result.output
         assert "no attribute" not in result.output.lower()
+
+    def test_compare_plans_explicit_query_id_normalization(self, tmp_path):
+        """`compare-plans --query-id q1` must match a bundle whose reloaded ID normalized to "1"."""
+        from benchbox.cli.commands.compare_plans import compare_plans
+
+        run1 = _export_bundle(tmp_path / "run1", "run1")
+        run2 = _export_bundle(tmp_path / "run2", "run2")
+
+        result = CliRunner().invoke(
+            compare_plans,
+            ["--run1", str(run1), "--run2", str(run2), "--query-id", "q1"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "missing plan" not in result.output.lower()
 
     def test_compare_include_plans_from_real_bundles(self, tmp_path):
         """`benchbox compare <run1> <run2> --include-plans` - the recommended path - must exit 0."""

@@ -15,6 +15,22 @@ from benchbox.core.query_plans.visualization import (
     render_summary,
 )
 from benchbox.core.results.loader import iter_query_results, load_result_file
+from benchbox.core.results.query_normalizer import normalize_query_id
+
+
+def _find_query(results, query_id: str):
+    """Find a query result whose ID matches after normalization.
+
+    ``load_result_file`` returns already-normalized IDs from a real bundle's
+    compact ``queries[].id`` field (e.g. ``q05``/``Q05`` -> ``05``), so a raw
+    string comparison against the CLI's documented ``--query-id q05`` input
+    would report "not found" even when the plan is present.
+    """
+    normalized_target = normalize_query_id(query_id)
+    return next(
+        (qr for qr in iter_query_results(results) if normalize_query_id(qr.get("query_id", "")) == normalized_target),
+        None,
+    )
 
 
 @click.command("show-plan")
@@ -85,10 +101,7 @@ def show_plan(
         results, _ = load_result_file(run_path)
 
         # Find query execution
-        query_exec = next(
-            (qr for qr in iter_query_results(results) if qr.get("query_id") == query_id),
-            None,
-        )
+        query_exec = _find_query(results, query_id)
 
         if not query_exec:
             console.print(f"[red]Error:[/red] Query '{query_id}' not found in results")
