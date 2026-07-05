@@ -674,6 +674,15 @@ lint-site-theme-tokens:
 lint-explorer-stale-theme:
 	python3 _project/scripts/scan_explorer_stale_theme.py
 
+# Validate a built Results Explorer read model against the snapshot invariants
+# (required columns, ranking/compare eligibility). Point SNAPSHOT at the built
+# .duckdb; defaults to the path docs.yml's pipeline writes. CI runs the same
+# script in .github/workflows/docs.yml after the explorer data build.
+SNAPSHOT ?= results-explorer/public/data/results.duckdb
+.PHONY: explorer-snapshot-check
+explorer-snapshot-check:
+	uv run -- python _project/scripts/results_explorer_snapshot_invariants.py "$(SNAPSHOT)"
+
 artifact-hygiene:
 	uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
 
@@ -897,9 +906,10 @@ typecheck:
 # Backward-compatible alias for older local notes/scripts.
 typecheck-uv: typecheck
 
-# Import validation
-validate-imports:
-	uv run -- python scripts/validate_imports.py
+# Import validation. Alias for the import-linter gate (lint-imports); the
+# previously-referenced scripts/validate_imports.py never existed, so the bare
+# target failed with file-not-found. CI uses lint-imports directly.
+validate-imports: lint-imports
 
 # Field-level schema validation for migrated YAML catalogs (see benchbox/core/catalog_schema.py).
 catalog-schema-check:
