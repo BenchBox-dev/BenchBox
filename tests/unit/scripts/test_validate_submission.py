@@ -622,6 +622,49 @@ class TestValidateBundles:
         assert not results[0].ok
         assert any("bundle_hash" in e or "bundle_file" in e for e in results[0].errors)
 
+    def test_missing_sidecar_passes_by_default(self, valid_bundle_file: Path):
+        # Default (maintainer path): no sidecar is fine — absence of a sidecar
+        # is how a maintainer-run bundle is distinguished.
+        results = validate_bundles([valid_bundle_file])
+        assert results[0].ok
+
+    def test_require_manifest_errors_on_missing_sidecar(self, valid_bundle_file: Path):
+        # Community path: the sidecar is mandatory.
+        results = validate_bundles([valid_bundle_file], require_manifest=True)
+        assert len(results) == 1
+        assert not results[0].ok
+        assert any("manifest not found" in e.lower() for e in results[0].errors)
+
+    def test_require_manifest_passes_when_sidecar_present(self, tmp_path: Path):
+        bundle = tmp_path / "result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        manifest = tmp_path / "result.manifest.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "bundle_file": bundle.name,
+                    "bundle_hash": hashlib.sha256(bundle.read_bytes()).hexdigest(),
+                }
+            ),
+            encoding="utf-8",
+        )
+        results = validate_bundles([bundle], require_manifest=True)
+        assert results[0].ok
+
+
+class TestRequireManifestCli:
+    def test_cli_require_manifest_flag_fails_missing_sidecar(self, tmp_path: Path, capsys):
+        bundle = tmp_path / "result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        rc = main([str(bundle), "--require-manifest"])
+        assert rc == 1
+
+    def test_cli_without_flag_allows_missing_sidecar(self, tmp_path: Path, capsys):
+        bundle = tmp_path / "result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        rc = main([str(bundle)])
+        assert rc == 0
+
 
 # ---------------------------------------------------------------------------
 # format_summary / format_pr_comment
