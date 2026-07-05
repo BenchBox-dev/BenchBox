@@ -21,6 +21,30 @@ jobs:
         with:
           fetch-depth: 0 # Need full history for diff
 
+      - name: Reject validator or workflow changes in a submission PR
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Self-green defense: a corpus submission PR must only touch corpus
+          # data. If it also modifies the validator, its shared implementation,
+          # the inventory generator, or this workflow, it could run its OWN
+          # doctored validator and pass itself. Validator/workflow changes belong
+          # on develop (they reach this branch only via a maintainer-reviewed
+          # mirror), never in a contributor submission PR.
+          CHANGED_GUARD=$(git diff --name-only "$BASE_SHA"...HEAD -- \
+            scripts/validate_submission.py \
+            benchbox/validation/bundle.py \
+            scripts/generate_corpus_inventory.py \
+            .github/workflows/validate-submission.yml \
+            || true)
+          if [ -n "$CHANGED_GUARD" ]; then
+            echo "::error::This submission PR modifies validator/workflow files, which is not allowed:"
+            printf '%s\n' "$CHANGED_GUARD"
+            echo "Revert these files and open a separate develop PR for validator/workflow changes."
+            exit 1
+          fi
+          echo "No validator/workflow files changed - proceeding."
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
@@ -41,6 +65,35 @@ jobs:
             | grep -v '\.manifest\.json$' \
             | grep -v 'submission-manifest\.json$' \
             || true)
+
+          # Detect changed manifest files separately. A manifest-only PR skips
+          # both validate_submission.py and the corpus inventory check because
+          # CHANGED stays empty — but manifests carry the bundle hash contract,
+          # so a bad manifest edit can merge without verifying the hash. For each
+          # changed manifest, derive its paired bundle path and add it to CHANGED
+          # so the existing validation step covers manifest-only PRs too.
+          # Include deletions (D): removing a manifest while leaving its paired
+          # bundle is a contract change that must still trip validation and the
+          # corpus inventory drift check, so a manifest removal cannot bypass it.
+          CHANGED_MANIFESTS=$(git diff --name-only --diff-filter=ACMRD \
+            ${{ github.event.pull_request.base.sha }}...HEAD -- \
+            'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
+            | grep '\.manifest\.json$' \
+            || true)
+          if [ -n "$CHANGED_MANIFESTS" ]; then
+            while IFS= read -r manifest; do
+              bundle="${manifest%.manifest.json}.json"
+              # Only add if the paired bundle exists and is not already in CHANGED.
+              # For a deleted manifest whose bundle remains, the bundle still
+              # exists at HEAD and is added; if both were removed, there is no
+              # bundle to validate (the bundle deletion is covered on its own).
+              if git cat-file -e "HEAD:${bundle}" 2>/dev/null \
+                  && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
+                CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"
+              fi
+            done <<< "$CHANGED_MANIFESTS"
+          fi
+
           if [ -z "$CHANGED" ]; then
             echo "No bundle files changed."
             echo "has_bundles=false" >> "$GITHUB_OUTPUT"
@@ -55,14 +108,22 @@ jobs:
       - name: Validate bundles
         if: steps.changed.outputs.has_bundles == 'true'
         id: validate
+        env:
+          # Maintainer corpus mirrors are opened by sync-results-data-to-published.yml
+          # on `auto/results-mirror-<sha>` branches and legitimately carry
+          # maintainer-run bundles with no sidecar. Every other PR is a community
+          # submission, which must include the manifest sidecar (its presence is
+          # the community-submission trust signal). Require the sidecar unless
+          # this is a maintainer mirror PR.
+          HEAD_REF: ${{ github.head_ref }}
         run: |
+          REQUIRE_MANIFEST="--require-manifest"
+          case "$HEAD_REF" in
+            auto/results-mirror-*) REQUIRE_MANIFEST="" ;;
+          esac
           # Validate and generate PR comment in a single invocation.
           # --pr-comment writes the Markdown file; exit code reflects validation result.
-          # The slim published-results branch has no pyproject.toml/uv.lock by
-          # design (see docs/development/adr/adr-published-results-slim-corpus-branch.md
-          # on develop). Pass --no-project to skip uv's project discovery, and
-          # --python 3.11 to pin the interpreter.
-          xargs -d '\n' uv run --no-project --python 3.11 -- python scripts/validate_submission.py --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt \
+          xargs -d '\n' uv run --no-project --python 3.11 -- python scripts/validate_submission.py $REQUIRE_MANIFEST --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt \
             | tee /tmp/validation_output.txt
 
       - name: Check corpus inventory
