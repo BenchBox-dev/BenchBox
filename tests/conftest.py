@@ -30,6 +30,8 @@ from typing import Any
 
 import pytest
 
+from benchbox.utils.printing import set_quiet
+
 # Sphinx 11 deprecations in third-party extensions (sphinx_tags, myst_parser, ablog, napoleon).
 # Guarded because older Sphinx versions (e.g. on Python 3.10) lack this class,
 # and --strict-config in pytest.ini would abort on an unresolvable category.
@@ -327,10 +329,20 @@ def _reset_global_quiet_state():
     while passing in isolation (medium-tier-red-disposition-and-promotion).
     Resetting AFTER each test (post-yield) contains the blast radius to the
     leaking test itself.
+
+    ``set_quiet`` is imported at module scope (not lazily here in the
+    teardown body): this fixture is autouse, so its teardown runs after
+    EVERY test, including one that monkeypatches ``builtins.__import__``
+    for the duration of its own test body (e.g. the vortex-converter
+    "missing module" test). A lazy import here would route through that
+    patched ``__import__`` and raise the OTHER test's synthetic
+    ImportError, misattributed to this fixture's teardown, whenever pytest's
+    fixture-teardown ordering runs this after monkeypatch's own finalizer
+    (order is topology-dependent, hence intermittent). Importing once at
+    module load time, before any test's monkeypatch is active, avoids the
+    race entirely.
     """
     yield
-    from benchbox.utils.printing import set_quiet
-
     set_quiet(False)
 
 
