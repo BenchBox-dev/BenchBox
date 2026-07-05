@@ -56,6 +56,16 @@ work:
       case (594-602) from warn to error. Keep the existing traversal/symlink
       hardening. Ensure validate-submission.yml surfaces the new error.
 
+      Do NOT make this a blanket rule inside validate_bundles() itself:
+      `benchbox submit --dry-run` calls that same shared validator on the
+      SOURCE bundle before its `<bundle>.manifest.json` sidecar is generated,
+      so a valid local dry-run would start failing the no-sidecar check too.
+      Scope the new hard error to the submission-corpus CI entrypoint
+      (scripts/validate_submission.py, now in scope_limit below) — e.g. an
+      explicit flag/mode passed into validate_bundles(), or a corpus-only
+      wrapper check in validate_submission.py itself — so `benchbox submit
+      --dry-run` keeps working on a bundle whose sidecar doesn't exist yet.
+
   - id: w2
     summary: "Carry per-bundle provenance into the explorer pipeline instead of stamping one build-wide label"
     needs: [w0]
@@ -103,6 +113,7 @@ must_preserve:
   - "Existing manifest-hash traversal and symlink defenses in bundle.py."
   - "Already-merged community bundles keep their community-submission label (legacy singleton submission-manifest.json still honored)."
   - "The maintainer-run local publish flow (benchbox publish with a valid label) is unaffected."
+  - "`benchbox submit --dry-run` still succeeds against a source bundle whose `<bundle>.manifest.json` sidecar does not exist yet -- the new missing-sidecar hard error is scoped to the submission-corpus CI path, not validate_bundles() unconditionally."
 
 anti_patterns:
   - "DO NOT infer trust from build-time CLI defaults - because a missing sidecar then silently means maintainer-run - fail closed to community-submission on the submission path."
@@ -125,6 +136,7 @@ scope_limit:
     - "benchbox/core/publishing/bundle_publisher.py"
     - "_project/scripts/explorer_pipeline/"
     - "scripts/generate_corpus_inventory.py"
+    - "scripts/validate_submission.py"
     - "tests/unit/validation/"
     - "tests/unit/core/publishing/"
     - "tests/unit/core/explorer_pipeline/"

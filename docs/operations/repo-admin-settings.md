@@ -417,7 +417,11 @@ Live state observed 2026-07-05 (release-canary-scheduled-activation TODO, w0):
   `origin/main`, so its schedule has never fired either. The liveness
   guard below will name it alongside release-canary; the admin should
   land it on `main` in the same pass (or deliberately remove its
-  schedule and record that decision here).
+  schedule and record that decision here). Its `review` job now checks out
+  `develop` explicitly via a `PHASE3_REVIEW_REF` env var (the same
+  `RELEASE_CANARY_REF` shell pattern release-canary.yml uses), so landing
+  the file on `main` does not leave a scheduled run checking out `main`'s
+  stripped tree (no `_project/` or `scripts/phase2_metrics.py`) by default.
 
 GitHub runs `on.schedule` workflows only from the default branch (`main`).
 Activation options considered (w1):

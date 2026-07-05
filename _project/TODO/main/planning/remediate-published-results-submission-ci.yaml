@@ -62,6 +62,13 @@ work:
       a documented mirror mechanism. Whichever is chosen, the manifest-only
       bypass must be closed on published-results.
 
+      Propagation note: `sync-results-data-to-published.yml` opens a DRAFT PR
+      against `published-results` on a develop push -- it never auto-merges
+      (maintainers flip it ready by hand). So merging THIS TODO's PR into
+      develop does not, by itself, make `origin/published-results` reflect
+      the fix; a maintainer must still review and merge the resulting mirror
+      PR. Do not treat "merged into develop" as "live on published-results".
+
   - id: w2
     summary: "Fix fork-PR comment posting so a passing validation never shows red for external contributors"
     needs: [w0]
@@ -89,6 +96,18 @@ work:
       "stdlib-only / no benchbox.*" statement to describe the shared
       implementation + importlib fallback; fix the DONE TODO path reference.
 
+  - id: w5
+    summary: "Post-merge: merge the resulting mirror PR into published-results and confirm the branch is live"
+    needs: [w1, w3, w4]
+    status: pending
+    notes: |
+      This TODO's develop-side PR only prepares the fix; it does not put it on
+      published-results by itself. After it merges to develop,
+      sync-results-data-to-published.yml opens (or updates) a draft PR against
+      published-results -- review and merge that PR, then re-run the
+      published-results-branch verification command below against the
+      now-current branch.
+
 prior_art:
   - ".github/workflows/validate-main-pr.yml — reuse its trusted-policy checkout pattern for w1 option (a)."
   - ".github/workflows/sync-results-data-to-published.yml — extend its allowlist for w1 option (b)."
@@ -104,9 +123,15 @@ anti_patterns:
   - "DO NOT run fork-PR code with pull_request_target checked out at the PR head - because that executes untrusted code with a writable token - check out the base's validator only."
 
 verification:
-  - description: "published-results validate-submission covers manifest-only PRs"
+  - description: "The checked-out (develop-side) validate-submission.yml covers manifest-only PRs -- run this on the PR that implements w1, BEFORE it merges"
+    command: "grep -c CHANGED_MANIFESTS .github/workflows/validate-submission.yml"
+    expected_output: ">= 1"
+  - description: "The sync workflow's allowlist will carry the fixed workflow file to published-results on the next mirror PR (if w1 chose option b)"
+    command: "grep -n 'validate-submission.yml' .github/workflows/sync-results-data-to-published.yml"
+    expected_output: "present in the trigger paths, so a develop push after this PR opens/updates a mirror PR carrying the fix"
+  - description: "POST-MERGE ONLY (w5): published-results validate-submission covers manifest-only PRs, once the mirror PR has been reviewed and merged"
     command: "git show origin/published-results:.github/workflows/validate-submission.yml | grep -c CHANGED_MANIFESTS"
-    expected_output: ">= 1 (guard present on the branch that actually runs the workflow for contributor PRs)"
+    expected_output: ">= 1 -- run this ONLY after w5's mirror-PR merge, not as a gate on this TODO's own develop-side PR (the branch cannot reflect the fix until that separate merge happens)"
   - description: "Validation runs from a trusted ref (closes the self-green vector), or errors on validator edits"
     command: "grep -nE 'pull_request_target|base\\.sha|base\\.ref|actions/checkout' .github/workflows/validate-submission.yml"
     expected_output: "validator runs from the base ref (not the PR head), OR a step fails the job when the PR modifies scripts/validate_submission.py / benchbox/validation/bundle.py"

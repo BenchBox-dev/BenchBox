@@ -26,6 +26,15 @@ concurrency:
   group: phase3-promotion-review
   cancel-in-progress: false
 
+env:
+  # If this workflow file ever lands on `main` (scheduled workflows only run
+  # from the default branch), a scheduled run's implicit checkout ref is
+  # `main`, not `develop` -- and `scripts/phase2_metrics.py` /
+  # `_project/analysis/phase-3-promotion-metrics.md` only exist on `develop`
+  # (release-cut strips `_project/` and dev-tooling scripts from `main`).
+  # Same pattern as release-canary.yml's RELEASE_CANARY_REF.
+  PHASE3_REVIEW_REF: develop
+
 jobs:
   # First-Monday guard. Scheduled runs proceed only on Monday; manual
   # dispatch always proceeds.
@@ -57,6 +66,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ env.PHASE3_REVIEW_REF }}
           fetch-depth: 0  # full history so we can branch and push
 
       - name: Set up Python
