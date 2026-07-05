@@ -131,8 +131,8 @@ The post-merge `explorer-tokens` job feeds three downstream consumers in
    merge.
 2. **`metrics`** — the `post_merge_red` shell flag flips true; the
    `develop_red_detected_at` jq filter selects the earliest
-   `completed_at` across `lint`, `fast-test`, and `explorer-tokens` as
-   the red-detection timestamp.
+   `completed_at` across `lint`, `fast-test`, `explorer-tokens`, and
+   `medium-test` as the red-detection timestamp.
 3. The dev-loop metrics row is emitted to the `metrics` artifact under
    `dev-loop-metrics/<sha>.json`.
 
