@@ -1,0 +1,116 @@
+id: medium-tier-red-disposition-and-promotion
+title: "Disposition the medium tier's live failures on develop, get medium-test green, then wire it into auto-revert per its recorded criterion"
+worktree: main
+priority: Medium-High
+status: "Not Started"
+category: "Testing and Quality Assurance"
+
+description: |
+  medium-tier-ci-home (DONE, PR #952) gave the ~81-file medium speed tier its
+  first CI consumer: the `medium-test` job in
+  .github/workflows/develop-post-merge.yml (lines ~74-113), deliberately
+  visibility-only (`continue-on-error: true`, excluded from
+  auto-revert-on-failure's needs/if) because the tier was known-red. The
+  recorded promotion criterion: a full clean green run of `make test-medium`,
+  with two named prerequisites — (1) regenerate the stale
+  cross-surface-applicability artifact (DONE: PR #952 commit 3d64c58e
+  regenerated it, so tests/unit/test_cross_surface_applicability.py::
+  test_committed_artifact_is_current may already pass), and (2) a
+  clean-environment re-measurement to disposition the "14 failures / 44
+  errors" previously observed only under a contended sandbox.
+
+  LIVE EVIDENCE the tier is still red on clean develop: on the #952 squash
+  itself (fddedf26, develop-post-merge run 28706929881, 2026-07-04), the
+  medium-test job FAILED on a real GitHub runner (job 85134046869-series,
+  "Run medium speed tier" step failure at 13:07 UTC) while lint and
+  fast-test passed. The job behaved exactly as designed (no block, no
+  auto-revert), but the promotion criterion is now measurably unmet on
+  uncontended hardware — so the remaining work is real failure disposition,
+  not just re-measurement.
+
+prior_art:
+  - ".github/workflows/develop-post-merge.yml:medium-test job comment — reuse: it prescribes the exact promotion mechanics (drop continue-on-error, add medium-test to auto-revert-on-failure's needs + if, mirroring lint/fast-test)."
+  - "_project/DONE/main/medium-tier-ci-home.yaml — the measurement history and known-red inventory this TODO dispositions; extend its accounting rather than re-deriving it."
+  - "tests/unit/workflows/test_develop_post_merge_metrics.py — extend: the pinned tests for develop-post-merge wiring; promotion must update whichever assertions pin medium-test's exclusion from auto-revert."
+
+work:
+  - id: w0
+    summary: "Pull the authoritative failure list from the live red run (not a contended local run)"
+    status: pending
+    notes: |
+      Fetch the failing-test list from develop-post-merge run 28706929881's
+      medium-test job logs (gh api / MCP get_job_logs), or trigger a fresh
+      run's logs if expired. Summarize: N failures / M errors, grouped by
+      module, with the one-line error per group, into this TODO's notes.
+      This replaces the stale "14 failures / 44 errors under contention"
+      figure with clean-runner truth.
+
+  - id: w1
+    summary: "Disposition every failure: real bug, stale test, environment-dependency, or marker misplacement"
+    needs: [w0]
+    status: pending
+    notes: |
+      For each failure group decide and act: fix small real bugs in-scope
+      here; file separate TODOs for large ones (link them in deps of the
+      promotion unit); re-tier tests that genuinely need resources the
+      runner lacks (marker change, with justification); delete/repair stale
+      assertions. Confirm whether test_committed_artifact_is_current now
+      passes post-3d64c58e and strike prerequisite (1) if so.
+
+  - id: w2
+    summary: "Demonstrate a green medium-test run on a real runner"
+    needs: [w1]
+    status: pending
+    notes: |
+      Evidence = a develop-post-merge run URL whose medium-test job
+      concludes success (or `make test-medium` green in CI-equivalent
+      conditions if timing a post-merge run is impractical — say which).
+
+  - id: w3
+    summary: "Promote: wire medium-test into auto-revert-on-failure and update the pinned tests"
+    needs: [w2]
+    status: pending
+    notes: |
+      Per the job comment: drop continue-on-error, add medium-test to
+      auto-revert-on-failure's needs and if-expression alongside
+      lint/fast-test, update the workflow comments, and flip any pinning
+      assertions (grep tests/unit/workflows/ for medium-test). An
+      auto-revert lane that reverts innocent merges is worse than none —
+      w2's green run is a hard gate for this unit.
+
+must_preserve:
+  - "auto-revert-on-failure's current behavior for lint/fast-test/explorer-tokens (including its outputs consumed by metrics) — promotion adds a trigger, it must not restructure the job."
+  - "The medium tier's ~18-minute runtime envelope: dispositions must not quietly move slow tests INTO the fast (PR-blocking) tier as a shortcut."
+
+anti_patterns:
+  - "DO NOT promote with continue-on-error still set 'to be safe' - because a non-blocking auto-revert trigger is a contradiction (the if-expression would never see failure) - the two flips go together or not at all."
+  - "DO NOT disposition failures by blanket-adding skip markers - because that converts known-red into invisible-red - every skip/re-tier needs a one-line justification naming what would make it runnable."
+
+scope_limit:
+  do_not_modify:
+    - "Makefile"
+    - "pytest.ini"
+
+verification:
+  - description: "Medium tier green"
+    command: "make test-medium"
+    expected_output: "exit 0, no failures/errors"
+  - description: "Promotion wiring pinned"
+    command: "uv run -- python -m pytest tests/unit/workflows/ -q"
+    expected_output: "all pass with medium-test asserted inside auto-revert-on-failure's needs/if"
+
+metadata:
+  owners:
+    - "joeharris76"
+  tags:
+    - "ci"
+    - "medium-tier"
+    - "verification-review-followup"
+  estimated_effort: "Medium (disposition volume unknown until w0)"
+  created_date: "2026-07-04"
+
+impact:
+  business_value: |
+    ~81 test files currently run nowhere that anyone must look. Green +
+    auto-revert makes the medium tier a real regression net for develop
+    instead of a red badge everyone has learned to scroll past.

@@ -1,0 +1,118 @@
+id: pr-gate-path-filter-output-lockstep-test
+title: "Pin ci-paths job-level outputs to the path-filter groups so a missing output mapping can never silently disable a gate again"
+worktree: main
+priority: Medium-High
+status: "Not Started"
+category: "Testing and Quality Assurance"
+
+description: |
+  INDEPENDENT-VERIFICATION FINDING (2026-07-04 review of PR #952): the
+  "package-smoke + dependency-audit now BLOCK develop PRs" remediation
+  shipped inert. The classify step wrote `packaging-needed`/`viz-needed` to
+  GITHUB_OUTPUT (scripts/path_filter_decision.py:186-199), and the gated
+  jobs' `if:` conditions referenced `needs.ci-paths.outputs.<group>-needed`,
+  but the `ci-paths` JOB's `outputs:` block never mapped those step outputs.
+  GitHub Actions only exposes job outputs that are explicitly declared, so
+  the `if:` expressions always saw an empty string and package-smoke,
+  dependency-audit, and parity-check skipped on EVERY PR — with
+  ci-required-result's skip-counts-as-pass rule rendering that green.
+  Empirical proof: PR #952's own CI skipped both packaging jobs while the PR
+  changed pyproject.toml, uv.lock, and benchbox/__init__.py.
+
+  The wiring itself was fixed in PR #955 (commit 8652d135: `packaging-needed`
+  and `viz-needed` added to the ci-paths outputs block, pr.yml:27-28 on
+  current develop). What is STILL missing is the regression pin: #955 added
+  no workflow test for the mapping, and the existing pinned tests
+  (tests/unit/workflows/test_pr_workflow_path_classifier.py:160-233) check
+  the aggregator env plumbing and the `if:` STRINGS but never that the
+  referenced outputs are actually declared — exactly the blind spot the bug
+  lived in. path-filters.yml is designed to grow new groups ("Add a new
+  group by adding a key here — no script changes required"), so the same
+  bug re-arms every time a group is added unless the lockstep is pinned.
+
+prior_art:
+  - "tests/unit/test_auto_merge_soundness_paths.py::test_codeowners_covers_soundness_paths — reuse: the repo's established two-files-in-lockstep pinning pattern (SOUNDNESS_PREFIXES vs CODEOWNERS), applied here to path-filters.yml groups vs pr.yml job outputs."
+  - "tests/unit/workflows/test_pr_workflow_path_classifier.py:160-193 — extend: already yaml.safe_load's pr.yml and asserts needs-list/if-string wiring; add the missing outputs-declaration axis to this same file rather than creating a new test module."
+  - "scripts/path_filter_decision.py:extra_group_keys — reuse: derive the expected group list from the same function/rules file the classifier uses, so the test tracks path-filters.yml automatically instead of hardcoding today's two groups."
+
+work:
+  - id: w0
+    summary: "Re-validate the #955 fix is present on develop before pinning it"
+    status: pending
+    notes: |
+      `grep -n 'packaging-needed\|viz-needed' .github/workflows/pr.yml` —
+      expect the two job-level `outputs:` mappings (currently pr.yml:27-28)
+      plus the three `if:` references. Record the line numbers in the test's
+      docstring-adjacent comment or PR body. If absent (revert/refactor),
+      restore the mapping first in the same change.
+
+  - id: w1
+    summary: "Add the lockstep test: every referenced <group>-needed output is declared on the ci-paths job"
+    needs: [w0]
+    status: pending
+    notes: |
+      In tests/unit/workflows/test_pr_workflow_path_classifier.py: load
+      .github/path-filters.yml groups via the same logic as
+      scripts/path_filter_decision.py (import extra_group_keys if cleanly
+      importable; otherwise parse the YAML with the same core-bucket
+      exclusions). Assert BOTH directions:
+        (1) for every extra group `<g>`, `jobs.ci-paths.outputs` contains
+            key `<g>-needed` mapped to `steps.classify.outputs.<g>-needed`;
+        (2) every `needs.ci-paths.outputs.*` reference found in any job's
+            `if:` string names an output key that ci-paths declares (catches
+            a future job referencing a never-declared output even outside
+            the extra-group convention).
+      Include a comment naming the #952/#955 incident so the test's reason
+      survives.
+
+  - id: w2
+    summary: "Mutation-probe the new test"
+    needs: [w1]
+    status: pending
+    notes: |
+      Locally (uncommitted): delete the `packaging-needed:` mapping line from
+      pr.yml, run the new test, confirm it FAILS with a message naming the
+      missing key; restore the file (`git checkout -- .github/workflows/pr.yml`)
+      and confirm green. Record the probe result in the PR body — a lockstep
+      test that cannot go red is the same bug one level up.
+
+must_preserve:
+  - "Existing assertions in test_pr_workflow_path_classifier.py (aggregator needs-list, parity-check demotion pin, skip-counts-as-pass semantics) keep passing unchanged."
+  - "The 'add a new group with no script changes' contract of path-filters.yml: the new test must derive groups from the rules file, not freeze today's {packaging, viz} set."
+
+anti_patterns:
+  - "DO NOT hardcode ['packaging', 'viz'] in the test - because the whole point is catching the NEXT group's missing mapping - derive the list from path-filters.yml/extra_group_keys."
+  - "DO NOT assert on raw YAML text/regex for the outputs block - because formatting drift would false-positive - use yaml.safe_load structure like the neighboring tests do."
+
+verification:
+  - description: "New lockstep test passes on the fixed tree"
+    command: "uv run -- python -m pytest tests/unit/workflows/test_pr_workflow_path_classifier.py -q"
+    expected_output: "all tests pass, including the new outputs-lockstep test"
+  - description: "Mutation probe goes red"
+    command: "sed -i '/packaging-needed: \\${{ steps.classify.outputs.packaging-needed }}/d' .github/workflows/pr.yml && uv run -- python -m pytest tests/unit/workflows/test_pr_workflow_path_classifier.py -q; git checkout -- .github/workflows/pr.yml"
+    expected_output: "test run fails naming packaging-needed while the mapping is deleted; tree restored afterward"
+
+scope_limit:
+  only_modify:
+    - "tests/unit/workflows/test_pr_workflow_path_classifier.py"
+    - ".github/workflows/pr.yml"
+  do_not_modify:
+    - "scripts/path_filter_decision.py"
+    - ".github/path-filters.yml"
+
+metadata:
+  owners:
+    - "joeharris76"
+  tags:
+    - "ci"
+    - "workflow-tests"
+    - "verification-review-followup"
+  estimated_effort: "Small"
+  created_date: "2026-07-04"
+
+impact:
+  business_value: |
+    The #952 incident showed a one-line missing output mapping can turn a
+    "blocking" gate into a permanent no-op that reads as green. This pin
+    converts that failure mode from silent to test-red for every current and
+    future path-filter group.
