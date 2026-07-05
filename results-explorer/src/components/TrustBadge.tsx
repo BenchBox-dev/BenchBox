@@ -4,9 +4,16 @@
 // Tone semantics:
 //   maintainer-run       → success  (verified by project maintainers)
 //   community-submission → info     (user-submitted, explicitly disclosed)
-//   ci-verified          → neutral  (automated pipeline, no human review)
-//   local-run            → neutral  (developer machine, no CI validation)
-//   unknown              → neutral  (fallback for unrecognised values)
+//   ci / ci-verified     → neutral  (automated pipeline, no human review)
+//   local / local-run    → neutral  (developer machine, no CI validation)
+//   unofficial-research  → warning  (non-standard config, not comparable)
+//   unknown / empty      → neutral  (fallback for unrecognised / missing values)
+//
+// The keys below cover BOTH the explorer pipeline's trust labels
+// (ci-verified, local-run) AND the publisher vocabulary in
+// benchbox/core/publishing/bundle_publisher.py:VALID_LABELS
+// (ci, local, unofficial-research), so a valid label never falls through to the
+// "unrecognised" fallback. Keep the two in sync.
 //
 // Tones meet WCAG AA contrast (light background + dark text in each tier).
 // Do NOT de-emphasise community results - show them prominently with their
@@ -36,10 +43,25 @@ const TRUST_CONFIG: Record<string, { label: string; tone: StatusTone; title: str
     tone: "neutral",
     title: "Validated by automated CI pipeline",
   },
+  ci: {
+    label: "CI",
+    tone: "neutral",
+    title: "Validated by automated CI pipeline",
+  },
   "local-run": {
     label: "Local",
     tone: "neutral",
     title: "Run on a developer machine - environment may vary",
+  },
+  local: {
+    label: "Local",
+    tone: "neutral",
+    title: "Run on a developer machine - environment may vary",
+  },
+  "unofficial-research": {
+    label: "Unofficial",
+    tone: "warning",
+    title: "Unofficial / non-standard configuration - not comparable and excluded from official rankings",
   },
 };
 
@@ -61,13 +83,20 @@ interface ValidationBadgeProps {
 }
 
 export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
-  if (!trustLabel) return null;
-  const known = TRUST_CONFIG[trustLabel];
-  const config = known ?? {
-    ...DEFAULT_CONFIG,
-    label: trustLabel,
-    title: `Trust tier: ${trustLabel} (unrecognised - contact maintainers)`,
-  };
+  // Render an explicit "Unknown" badge for a missing label rather than hiding
+  // the trust dimension entirely: a silently-absent badge reads as "no opinion"
+  // instead of "provenance not recorded". (trust_label is NOT NULL in the
+  // snapshot schema today, so this is a defensive contract, not a hot path.)
+  const known = trustLabel ? TRUST_CONFIG[trustLabel] : undefined;
+  const config =
+    known ??
+    (trustLabel
+      ? {
+          ...DEFAULT_CONFIG,
+          label: trustLabel,
+          title: `Trust tier: ${trustLabel} (unrecognised - contact maintainers)`,
+        }
+      : DEFAULT_CONFIG);
   const text = compact ? (config.label.split(" ")[0] ?? config.label) : config.label;
   return (
     <StatusBadge role="trust" tone={config.tone} title={config.title}>

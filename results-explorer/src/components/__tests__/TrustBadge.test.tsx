@@ -93,9 +93,37 @@ describe("TrustBadge", () => {
     expect(title).toContain("unrecognised");
   });
 
-  it("empty trustLabel renders nothing", () => {
+  it("empty trustLabel renders an explicit Unknown badge (not nothing)", () => {
     const { container } = render(<TrustBadge trustLabel="" />);
-    expect(container.querySelector(".badge")).toBeNull();
+    const badge = container.querySelector(".badge");
+    expect(badge).not.toBeNull();
+    expect(badge?.textContent).toBe("Unknown");
+    expect(badge?.getAttribute("data-tone")).toBe("neutral");
+  });
+
+  // Mirror of bundle_publisher.py VALID_LABELS; keep in sync.
+  const PUBLISHER_VALID_LABELS = [
+    "maintainer-run",
+    "community-submission",
+    "ci",
+    "local",
+    "unofficial-research",
+  ] as const;
+
+  it.each(PUBLISHER_VALID_LABELS)("publisher label %s renders a curated (non-unrecognised) badge", (label) => {
+    const { container } = render(<TrustBadge trustLabel={label} />);
+    const badge = container.querySelector(".badge");
+    expect(badge).not.toBeNull();
+    expect(badge?.getAttribute("title") ?? "").not.toContain("unrecognised");
+    // Curated labels never echo the raw slug back as their visible text.
+    expect(badge?.textContent).not.toBe(label);
+  });
+
+  it("unofficial-research uses a cautionary warning tone", () => {
+    const { container } = render(<TrustBadge trustLabel="unofficial-research" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
+    expect(badge?.textContent).toBe("Unofficial");
   });
 
   // -----------------------------------------------------------------------
