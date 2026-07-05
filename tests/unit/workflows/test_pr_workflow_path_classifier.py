@@ -26,7 +26,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 # its own regex-behavior regression test below so they cannot drift apart.
 _CI_PATHS_SEG = r"(?:\.ci-paths|\[['\"]ci-paths['\"]\])"
 _OUTPUTS_SEG = r"(?:\.outputs|\[['\"]outputs['\"]\])"
-CI_PATHS_OUTPUT_REFERENCE_RE = r"needs" + _CI_PATHS_SEG + _OUTPUTS_SEG + r"(?:\.([A-Za-z0-9_-]+)|\[['\"]([A-Za-z0-9_-]+)['\"]\])"
+CI_PATHS_OUTPUT_REFERENCE_RE = (
+    r"needs" + _CI_PATHS_SEG + _OUTPUTS_SEG + r"(?:\.([A-Za-z0-9_-]+)|\[['\"]([A-Za-z0-9_-]+)['\"]\])"
+)
 
 
 def _load_path_filter_decision():
