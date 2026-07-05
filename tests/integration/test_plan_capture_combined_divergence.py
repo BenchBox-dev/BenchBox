@@ -34,6 +34,8 @@ They run against a real (file-based) DuckDB so EXPLAIN sees the live row counts.
 
 from __future__ import annotations
 
+import random
+
 import pytest
 
 from benchbox.platforms.base.result_capture import _plan_capture_key
@@ -427,11 +429,30 @@ def test_real_combined_power_maintenance_checkpoint_captures_pre_mutation_plan(t
         baseline_lineitem_count = conn.execute("SELECT COUNT(*) FROM lineitem").fetchone()[0]
         # RF2 (delete) targets the single oldest order at scale factor 0.01 (see
         # TPCHMaintenanceTest._identify_old_orders / num_to_delete). Recording its
-        # key now, before the run, gives a deterministic post-run check that the
-        # mutation actually happened - unlike a net lineitem-row-count delta, which
-        # can coincidentally net to zero (RF1's random insert count happening to
-        # match RF2's delete count for that specific order).
+        # key AND its current lineitem count now, before the run, lets the mutation
+        # below be made deterministic (see the random.randint patch): RF1's insert
+        # count is otherwise `random.randint(1, 7)`, which could coincidentally
+        # equal the oldest order's own lineitem count, netting the total lineitem
+        # row count back to the baseline regardless of whether the checkpoint fired.
         oldest_order_key = conn.execute("SELECT O_ORDERKEY FROM orders ORDER BY O_ORDERDATE ASC LIMIT 1").fetchone()[0]
+        oldest_order_lineitem_count = conn.execute(
+            "SELECT COUNT(*) FROM lineitem WHERE L_ORDERKEY = ?", [oldest_order_key]
+        ).fetchone()[0]
+
+        # Force RF1's insert count to be provably different from what RF2 is about
+        # to delete, so the net lineitem row count is guaranteed to move (not just
+        # usually move) - only the maintenance test's own num_items roll (its one
+        # `randint(1, 7)` call site) is intercepted; every other random call in the
+        # maintenance test (order dates, keys, prices, ...) is untouched.
+        forced_insert_count = oldest_order_lineitem_count + 1
+        original_randint = random.randint
+
+        def _deterministic_randint(a, b):
+            if (a, b) == (1, 7):
+                return forced_insert_count
+            return original_randint(a, b)
+
+        monkeypatch.setattr(random, "randint", _deterministic_randint)
 
         # Record the lineitem row count visible at the instant Q1's SELECT plan is
         # captured. RF1's own INSERT statements never match this filter (not a
@@ -473,6 +494,13 @@ def test_real_combined_power_maintenance_checkpoint_captures_pre_mutation_plan(t
         assert remaining == 0, "RF2 did not delete the identified oldest order - test setup invalid"
 
         post_run_lineitem_count = conn.execute("SELECT COUNT(*) FROM lineitem").fetchone()[0]
+        # Guaranteed by the forced insert count above, not a probabilistic hope -
+        # this is the invariant the whole test depends on to distinguish a
+        # pre-mutation capture from a post-mutation one.
+        assert post_run_lineitem_count != baseline_lineitem_count, (
+            "lineitem row count did not change net of the mutation - test setup invalid"
+        )
+
         assert captured_counts == [baseline_lineitem_count], (
             f"expected Q1's plan captured exactly once, at the pre-mutation row count "
             f"{baseline_lineitem_count}, but got {captured_counts} (post-mutation count is "
