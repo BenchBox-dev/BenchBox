@@ -508,7 +508,18 @@ class ResultValidator:
         agg = set(aggregation_columns or ())
         mismatched: list[int] = []
         for j, (orig_val, var_val) in enumerate(zip(orig_row, var_row)):
-            equal = self._numeric_values_equal(orig_val, var_val) if j in agg else self._values_equal(orig_val, var_val)
+            if j in agg:
+                try:
+                    equal = self._numeric_values_equal(orig_val, var_val)
+                except (TypeError, ValueError):
+                    # A malformed/non-numeric aggregation cell (e.g. a variant
+                    # returning a string where a number was expected) is itself
+                    # a mismatch, not a crash: scanning every column must never
+                    # raise where the old short-circuiting loop would have
+                    # cleanly reported an earlier column's mismatch first.
+                    equal = False
+            else:
+                equal = self._values_equal(orig_val, var_val)
             if not equal:
                 mismatched.append(j)
         return mismatched

@@ -367,6 +367,32 @@ def test_validate_aggregation_results_uses_tolerance_for_numeric_columns() -> No
     )
 
 
+def test_validate_aggregation_results_reports_clean_key_mismatch_despite_malformed_agg_cell() -> None:
+    """A malformed non-numeric aggregation cell must not crash the all-columns scan.
+
+    Scanning every column (validator-report-all-row-mismatches) means an
+    earlier key-column mismatch no longer short-circuits before a later
+    aggregation column is compared. If that later column holds a
+    non-numeric value (e.g. a variant returning a string where a number was
+    expected), the numeric-tolerance comparison must report it as a mismatch,
+    not raise, so the caller still gets the clean ValidationError the old
+    short-circuiting loop reported for the key-column mismatch alone.
+    """
+    validator = ResultValidator()
+
+    original = [("A", "F", 5)]
+    variant = [("B", "F", "bad")]
+
+    with pytest.raises(ValidationError, match="Value mismatch at row 0, column 0"):
+        validator.validate_aggregation_results(
+            original,
+            variant,
+            query_id=1,
+            variant_id=3,
+            aggregation_columns=[2],
+        )
+
+
 def test_validate_query1_results_delegates_aggregation_columns(monkeypatch: pytest.MonkeyPatch) -> None:
     validator = ResultValidator()
     captured: dict[str, object] = {}
