@@ -67,9 +67,11 @@ and are both gitignored.
 ## What CI gates
 
 [`.github/workflows/results-explorer-browser.yml`](../../.github/workflows/results-explorer-browser.yml)
-runs on every push and pull request that touches `results-explorer/`,
+runs on **pull requests** (to `main` or `develop`) that touch `results-explorer/`,
 `_project/scripts/explorer_pipeline/`, `_project/scripts/explorer_publish.py`,
-`results-data/`, or the workflow file itself.
+`results-data/`, or the workflow file itself, and on **pushes to `main`** that
+touch those paths. Pushes to `develop` do not run it (the post-merge lane runs
+only the token/theme scans and unit/fast tests).
 
 - **Blocking:** `chromium` job - full suite must pass.
 - **Non-blocking:** `firefox-smoke` and `webkit-smoke` jobs - `@smoke`-tagged
