@@ -539,6 +539,74 @@ class TestReconstructBenchmarkResults:
         assert result.query_results[0]["stream_id"] == 1
         assert result.query_results[1]["stream_id"] == 2
 
+    def test_reconstruct_query_results_multi_stream_plans_reattach_per_stream(self):
+        """A query_id captured in multiple streams is keyed in .plans.json as
+        "{query_id}#{stream_id}" (build_plans_payload); the loader must resolve
+        each row to its OWN stream's plan, not the other stream's or none at all.
+        """
+        data = make_v2_result_dict(
+            version="2.0",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=200,
+            streams=2,
+            total_queries=2,
+            passed_queries=2,
+            failed_queries=0,
+            total_ms=200,
+            queries=[
+                {"id": "1", "ms": 100.0, "rows": 4, "stream": 1},
+                {"id": "1", "ms": 90.0, "rows": 4, "stream": 2},
+            ],
+        )
+        plans_data = {
+            "queries": {
+                "1#1": {"fingerprint": "a" * 64, "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None}},
+                "1#2": {"fingerprint": "b" * 64, "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None}},
+            }
+        }
+
+        result = reconstruct_benchmark_results(data, plans_data=plans_data)
+
+        assert len(result.query_results) == 2
+        assert result.query_results[0]["stream_id"] == 1
+        assert result.query_results[0]["plan_fingerprint"] == "a" * 64
+        assert result.query_results[1]["stream_id"] == 2
+        assert result.query_results[1]["plan_fingerprint"] == "b" * 64
+
+    def test_reconstruct_query_results_single_stream_bare_key_still_works(self):
+        """A query_id captured in exactly one stream is keyed bare (no "#stream"
+        suffix); this must keep working unchanged (the common case)."""
+        data = make_v2_result_dict(
+            version="2.0",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=100,
+            total_queries=1,
+            passed_queries=1,
+            failed_queries=0,
+            total_ms=100,
+            queries=[{"id": "1", "ms": 100.0, "rows": 4}],
+        )
+        plans_data = {
+            "queries": {
+                "1": {"fingerprint": "c" * 64, "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None}},
+            }
+        }
+
+        result = reconstruct_benchmark_results(data, plans_data=plans_data)
+
+        assert len(result.query_results) == 1
+        assert result.query_results[0]["plan_fingerprint"] == "c" * 64
+
     def test_reconstruct_with_errors(self):
         """Test that errors array is properly reconstructed."""
         data = make_v2_result_dict(

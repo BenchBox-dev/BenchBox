@@ -2,7 +2,22 @@ id: fix-multistream-throughput-plan-attachment
 title: "Attach captured plans to multi-stream throughput/combined rows (and reconcile the console count)"
 worktree: main
 priority: High
-status: Not Started
+status: "Completed"
+completed_date: "2026-07-05"
+completion_note: |
+  Freshness re-validation at implementation time (develop had moved ~75 commits
+  since this TODO was filed): w1 (carry _plan_capture_key through the TPC-H/
+  TPC-DS power+throughput converters) and w4 (update the divergence test +
+  docs) were ALREADY implemented by unrelated prior work (the
+  query-plan-capture-canonical-isolation effort) - confirmed via
+  test_combined_power_then_throughput_same_public_id_different_sql, which
+  already existed, passed, and documents "production TPC power/throughput rows
+  DO carry the key today". Only w2 (build_plans_payload last-writer-wins on
+  query_id for multi-stream rows) and w3 (console summary using the per-variant
+  counter instead of the row-derived count) were still real, live defects; this
+  PR implements those two. w2's fix required also touching loader.py (out of
+  the original scope_limit) to keep the .plans.json reattachment TODO1 fixed
+  working for the new composite-keyed multi-stream case.
 description: |
   In any TPC throughput run with >= 2 streams (and in combined mode), every query
   is captured (EXPLAINed, cost paid, counted) but ZERO plans are attached to result
@@ -51,9 +66,10 @@ impact:
     while the console reports a positive capture count.
 
 must_preserve:
-  - "The isolated post-measurement capture contract: no EXPLAIN in the timed loop or a concurrent stream; writes never re-executed."
-  - "Per-variant fidelity for rows that already carry an exact _plan_capture_key (test_standard_path_exact_key_attaches_each_variant must stay green)."
-  - "query_plans_captured and the bundle plans_captured must agree after the fix."
+- "The isolated post-measurement capture contract: no EXPLAIN in the timed loop or a concurrent stream; writes never re-executed."
+- "Per-variant fidelity for rows that already carry an exact _plan_capture_key (test_standard_path_exact_key_attaches_each_variant
+  must stay green)."
+- "query_plans_captured and the bundle plans_captured must agree after the fix."
 
 approach: |
   Propagate `_plan_capture_key` through _power_query_result and the throughput
@@ -64,46 +80,48 @@ approach: |
   the same row-derived count used for the bundle (compute_plan_capture_stats).
 
 anti_patterns:
-  - "DO NOT relax the public-id fallback to 'attach any variant' - because it pairs a row with another stream's plan - carry the exact key instead."
+- "DO NOT relax the public-id fallback to 'attach any variant' - because it pairs a row with another stream's plan - carry
+  the exact key instead."
 
 scope_limit:
   only_modify:
-    - "benchbox/core/tpch/platform_power.py"
-    - "benchbox/platforms/base/execution.py"
-    - "benchbox/platforms/base/result_capture.py"
-    - "benchbox/core/results/schema.py"
-    - "tests/integration/test_plan_capture_combined_divergence.py"
-    - "tests/unit/platforms/"
-    - "docs/features/query-plan-analysis.md"
+  - "benchbox/core/tpch/platform_power.py"
+  - "benchbox/platforms/base/execution.py"
+  - "benchbox/platforms/base/result_capture.py"
+  - "benchbox/core/results/schema.py"
+  - "tests/integration/test_plan_capture_combined_divergence.py"
+  - "tests/unit/platforms/"
+  - "docs/features/query-plan-analysis.md"
 
 work:
-  - id: w1
-    summary: "Carry _plan_capture_key through _power_query_result and the TPC-H/TPC-DS throughput converters"
-    status: pending
-  - id: w2
-    summary: "Key build_plans_payload entries so per-stream/per-variant provenance survives (not last-writer-wins on query_id)"
-    status: pending
-    needs: [w1]
-  - id: w3
-    summary: "Reconcile the console 'Query plans: N/M' summary with the row-derived bundle count"
-    status: pending
-    needs: [w1]
-  - id: w4
-    summary: "Update the divergence test (line 213) and docs so multi-stream rows attach; keep the truly-ambiguous (no-key) case as the only unattached path"
-    status: pending
-    needs: [w1]
+- id: w1
+  summary: "Carry _plan_capture_key through _power_query_result and the TPC-H/TPC-DS throughput converters"
+  status: done
+- id: w2
+  summary: "Key build_plans_payload entries so per-stream/per-variant provenance survives (not last-writer-wins on query_id)"
+  status: done
+  needs: [w1]
+- id: w3
+  summary: "Reconcile the console 'Query plans: N/M' summary with the row-derived bundle count"
+  status: done
+  needs: [w1]
+- id: w4
+  summary: "Update the divergence test (line 213) and docs so multi-stream rows attach; keep the truly-ambiguous (no-key)
+    case as the only unattached path"
+  status: done
+  needs: [w1]
 
 verification:
-  - description: "A 2-stream throughput run attaches a plan to every successful row"
-    command: "uv run -- python -m pytest tests/unit/platforms/ tests/integration/ -k 'throughput and plan' -n 0 -q"
-    expected_output: "passed"
-  - description: "Existing exact-key and combined-divergence tests stay green"
-    command: "uv run -- python -m pytest tests/integration/test_plan_capture_combined_divergence.py -n 0 -q"
-    expected_output: "passed"
+- description: "A 2-stream throughput run attaches a plan to every successful row"
+  command: "uv run -- python -m pytest tests/unit/platforms/ tests/integration/ -k 'throughput and plan' -n 0 -q"
+  expected_output: "passed"
+- description: "Existing exact-key and combined-divergence tests stay green"
+  command: "uv run -- python -m pytest tests/integration/test_plan_capture_combined_divergence.py -n 0 -q"
+  expected_output: "passed"
 
 deps:
   needs: [fix-plan-consumption-phases-and-loader-reattach]
 
 deferred:
-  - summary: "Reproducing failing test captured under scratchpad/review-failing-tests/test_plan_attach_multivariant_review.py"
-    reason: "Staged locally (uncommitted); fold in as a w1 guard when implementing."
+- summary: "Reproducing failing test captured under scratchpad/review-failing-tests/test_plan_attach_multivariant_review.py"
+  reason: "Staged locally (uncommitted); fold in as a w1 guard when implementing."

@@ -150,19 +150,20 @@ and plans are attached to result rows once, at the end. The checkpoint runs stri
 never inside a timed query or a concurrent throughput stream — so measured timings are unaffected.
 
 Capture is driven by the recorded-query buffer (every distinct query that succeeded during the timed
-run), and each captured plan is attached to its result row by the exact recorded query, or — for the
-TPC power/throughput drivers, whose result rows carry only the query id — by that query id when it
-maps to a single executed SQL variant.
+run), and each captured plan is attached to its result row by the exact recorded query - including the
+TPC power/throughput drivers, which carry the recorded query's key through their result rows, so each
+seed-varied stream attaches its own plan rather than falling back to an id-only match. A row that
+somehow lacks the key (a bespoke driver that cannot supply one) falls back to matching by bare query id,
+which only succeeds when that id maps to a single executed SQL variant.
 
-> **Seed-varied throughput streams and bespoke DML query sets.** When one query id runs as *several*
-> distinct SQL variants in the same run (e.g. throughput streams rendered with different seeds), a
-> result row that carries only the query id cannot be matched to the specific variant it ran, so its
-> plan is left unattached rather than risk pairing it with another variant's plan (literal-normalized
-> fingerprints, tracked separately, make these variants structurally equal). Likewise, a *bespoke*
-> query set that runs an `INSERT`/`UPDATE`/`DELETE` partway through and then more `SELECT`s has no
-> maintenance phase boundary, so the isolated model captures those later reads against the end-of-run
-> state. Keep data-mutating steps in a maintenance phase (or a separate run) when you need read-query
-> fingerprints to reflect their measured data state.
+Multi-stream runs persist one plan record per `(query_id, stream_id)` in the `.plans.json` companion -
+streams are never deduplicated or last-writer-wins collapsed, so every stream's plan and fingerprint
+survive a result-file round trip (`show-plan`, `compare-plans`).
+
+> **Bespoke DML query sets.** A *bespoke* query set that runs an `INSERT`/`UPDATE`/`DELETE` partway
+> through and then more `SELECT`s has no maintenance phase boundary, so the isolated model captures
+> those later reads against the end-of-run state. Keep data-mutating steps in a maintenance phase (or a
+> separate run) when you need read-query fingerprints to reflect their measured data state.
 
 ### Captured Fields
 

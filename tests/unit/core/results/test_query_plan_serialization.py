@@ -273,6 +273,58 @@ class TestSchemaV2ExportWithPlans:
         assert plans_payload["plans_captured"] == 1
         assert "q01" in plans_payload["queries"]
 
+    def test_schema_v2_plans_companion_multi_stream_keys_per_stream(self) -> None:
+        """A query_id captured in more than one stream must not collapse to one
+        last-writer-wins entry: capture_query_plan's contract is one plan record
+        per (query_id, stream_id), so each stream's plan must survive under its
+        own key.
+        """
+
+        def _plan(fingerprint: str) -> QueryPlanDAG:
+            root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
+            return QueryPlanDAG(query_id="q06", platform="duckdb", logical_root=root, plan_fingerprint=fingerprint)
+
+        plan_stream0 = _plan("a" * 64)
+        plan_stream1 = _plan("b" * 64)
+
+        results = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="duckdb",
+            scale_factor=1.0,
+            execution_id="test_multi_stream",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            total_queries=2,
+            successful_queries=2,
+            query_plans_captured=2,
+            query_results=[
+                {
+                    "query_id": "q06",
+                    "status": "SUCCESS",
+                    "stream_id": 0,
+                    "query_plan": plan_stream0,
+                    "plan_fingerprint": plan_stream0.plan_fingerprint,
+                },
+                {
+                    "query_id": "q06",
+                    "status": "SUCCESS",
+                    "stream_id": 1,
+                    "query_plan": plan_stream1,
+                    "plan_fingerprint": plan_stream1.plan_fingerprint,
+                },
+            ],
+        )
+
+        plans_payload = build_plans_payload(results)
+
+        assert plans_payload is not None
+        # Top-level count is unique query IDs, not per-stream row count.
+        assert plans_payload["plans_captured"] == 1
+        queries = plans_payload["queries"]
+        assert "q06" not in queries, "bare query_id key must not be used once ambiguous across streams"
+        assert queries["q06#0"]["fingerprint"] == "a" * 64
+        assert queries["q06#1"]["fingerprint"] == "b" * 64
+
     def test_schema_v2_export_complex_plan(self) -> None:
         """Test schema v2.0 export with complex query plan tree."""
         # Build: Join(orders, lineitem) -> [Scan(orders), Scan(lineitem)]
