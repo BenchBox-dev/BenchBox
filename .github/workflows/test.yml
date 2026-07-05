@@ -141,7 +141,10 @@ jobs:
     env:
       # Comma-separated GHSA/CVE IDs for temporarily accepted false positives.
       # Keep empty unless triage is documented in the TODO item.
-      PIP_AUDIT_IGNORE_VULNS: ""
+      # PYSEC-2026-87 (lxml): redshift-connector==2.1.13 pins lxml<=6.0.2, so
+      # the fixed lxml 6.1.0 can't be resolved until upstream relaxes that
+      # bound. See _project/TODO/main/planning/lxml-cve-pysec-2026-87-blocked-by-redshift-connector.yaml
+      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-87"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
