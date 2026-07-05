@@ -2,7 +2,7 @@ id: release-canary-scheduled-activation
 title: "Get release-canary.yml actually firing: the workflow is not on the default branch, so its daily schedule has never run"
 worktree: main
 priority: High
-status: "Not Started"
+status: "In Progress"
 category: "Release Tooling"
 
 description: |
@@ -53,7 +53,7 @@ prior_art:
 work:
   - id: w0
     summary: "Re-validate the finding: release-canary.yml still absent from origin/main and unregistered"
-    status: pending
+    status: done
     notes: |
       Run `git fetch origin main && git ls-tree origin/main --name-only
       .github/workflows/` (expect: no release-canary.yml) and
@@ -62,11 +62,15 @@ work:
       one-line results in the PR/TODO notes. If either now shows the
       workflow, re-scope this TODO against the new live state instead of
       proceeding blind.
+      DONE 2026-07-05: `git ls-tree origin/main --name-only .github/workflows/`
+      -> 14 files, NO release-canary.yml; Actions list-workflows API -> 19
+      workflows, release-canary absent. Finding re-validated; recorded in
+      docs/operations/repo-admin-settings.md "Scheduled activation" section.
 
   - id: w1
     summary: "Decide the activation mechanism with the maintainer"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Options, with the trade-off each carries:
         (a) Admin cherry-picks/pushes the current release-canary.yml to main
@@ -84,6 +88,13 @@ work:
       Recommendation: (a) + (c) together — land the shell form on main once,
       keep logic on develop. Record the decision in
       docs/operations/repo-admin-settings.md.
+      DONE 2026-07-05: options + recommendation (a)+(c) recorded in the
+      runbook's new "Scheduled activation of release-canary.yml" section.
+      Key observation: the current release-canary.yml ALREADY IS the (c)
+      shell (test/drift jobs check out develop via RELEASE_CANARY_REF;
+      pypi job needs no checkout), so (a) = cherry-pick the current file
+      verbatim. Final sign-off on the mechanism rests with the maintainer
+      at execution time (w2).
 
   - id: w2
     summary: "Land the chosen form on main (admin/release-flow action) and confirm registration"
@@ -96,6 +107,11 @@ work:
       canary RED with pypi-latest-installability failing on 0.3.0's broken
       import — record that run URL as proof-of-life, and cross-link it in
       release-recovery-v0-3-1 as live pressure for the recovery release.
+      MAINTAINER HANDOFF (2026-07-05): this unit is admin-only (main is
+      push-restricted; agents never push main). Exact steps are enumerated
+      in docs/operations/repo-admin-settings.md "Scheduled activation of
+      release-canary.yml (pending admin action)" — land the file, confirm
+      registration, dispatch, record the (expected-RED) run URL.
 
   - id: w3
     summary: "Add a scheduled-workflow liveness guard so this class of gap cannot recur silently"

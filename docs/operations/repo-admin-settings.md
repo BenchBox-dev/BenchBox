@@ -398,6 +398,68 @@ stale/red canary evidence instead of silently trusting comments.
 script with the identical token, so the same review-rule coverage is reachable
 from both CI call sites without a separate code path.
 
+### Scheduled activation of `release-canary.yml` (pending admin action)
+
+Live state observed 2026-07-05 (release-canary-scheduled-activation TODO, w0):
+
+- `git ls-tree origin/main --name-only .github/workflows/` does **not**
+  contain `release-canary.yml` — the file exists only on `develop`.
+- The Actions list-workflows API returns 19 registered workflows and
+  release-canary is not among them (a workflow absent from the default
+  branch with zero historical runs is never registered), so its
+  `on.schedule` cron has **never fired** and none of its jobs
+  (pypi-latest-installability, ruleset-drift, credential-free-non-fast,
+  plus the release-canary-result aggregator) has ever executed.
+- Same class, second instance: `phase3-promotion-review.yml` (quarterly
+  cron `0 9 1-7 1,4,7,10 *`) is also on `develop` but absent from
+  `origin/main`, so its schedule has never fired either. The liveness
+  guard below will name it alongside release-canary; the admin should
+  land it on `main` in the same pass (or deliberately remove its
+  schedule and record that decision here).
+
+GitHub runs `on.schedule` workflows only from the default branch (`main`).
+Activation options considered (w1):
+
+- **(a) Admin lands the current `release-canary.yml` on `main` out-of-band**
+  (cherry-pick/push through the documented admin flow; `main` is
+  push-restricted, so admin-only). Fastest path; content on `main` then
+  goes stale between release-cuts unless (c) also holds.
+- **(b) Wait for the next release-cut to carry it.** Zero extra action, but
+  the canary stays dead until v0.3.1 ships — the exact window it guards.
+- **(c) Keep `main`'s copy a minimal stable scheduled shell that checks out
+  `develop` for current logic.** The file already follows this shape: the
+  test and drift jobs check out `develop` via `RELEASE_CANARY_REF`, and
+  pypi-latest-installability needs no checkout at all. Only future
+  *workflow-structure* edits (job graph, permissions, schedule) need
+  re-landing on `main`; test/drift *content* tracks `develop` automatically.
+
+**Recommendation (recorded 2026-07-05): (a) + (c) together** — land the
+current `develop` copy of `release-canary.yml` on `main` once (it already is
+the (c) shell), keep logic on `develop`.
+
+Admin steps (w2 — maintainer action, never an agent push):
+
+1. Land `develop`'s `.github/workflows/release-canary.yml` on `main` via the
+   admin/release flow.
+2. Confirm registration: the workflow appears in
+   `gh api repos/joeharris76/BenchBox/actions/workflows --jq '.workflows[].path'`.
+3. Trigger `workflow_dispatch` (or wait for the next 08:00 UTC cron) and
+   record the run URL here as proof-of-life.
+4. **Expected first result: RED** — pypi-latest-installability correctly
+   fails on the broken 0.3.0 PyPI release (`ModuleNotFoundError: pandas` on
+   clean install). That is the canary working; cross-link the red run in
+   `release-recovery-v0-3-1` as live pressure for the recovery release. Do
+   not weaken the canary to get a green first run.
+
+Once the canary is live, the `scheduled-workflow-liveness` job in
+`nightly.yml` (added 2026-07-05, executes once its copy reaches `main`)
+asserts daily that every workflow in the `develop` tree declaring
+`on.schedule` has a recent run of `event=schedule` within a
+cadence-derived window (3 days for daily crons, up to 100 days for
+quarterly ones), so this dead-scheduled-workflow class cannot recur
+silently. Deliberate consequence: a scheduled workflow newly authored on
+`develop` reads red in that guard until its file lands on `main`.
+
 Emergency override is intentionally explicit and SHA-scoped. Admins may set
 both repository variables below, then remove them after the release:
 

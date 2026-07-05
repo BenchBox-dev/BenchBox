@@ -361,6 +361,151 @@ jobs:
         run: npm test -- --reporter=verbose
         working-directory: results-explorer
 
+  scheduled-workflow-liveness:
+    # Guard for the release-canary-scheduled-activation TODO's failure class:
+    # a workflow that declares `on.schedule` but is not on the DEFAULT branch
+    # never registers and never runs — nothing red appears anywhere (this is
+    # exactly how release-canary.yml sat dead while the repo's safety story
+    # leaned on it). This job scans the DEVELOP tree (where scheduled
+    # workflows are authored) and fails when any of them has no SCHEDULED
+    # run within its cadence-derived window. It executes from main's copy of
+    # nightly.yml, so it takes effect once this file reaches main.
+    # DELIBERATE: a scheduled workflow newly authored on develop goes red
+    # here until it lands on main — that lag is exactly the silent gap this
+    # guard converts to a loud one; land the file (admin/release flow) or
+    # remove the schedule.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout develop (scheduled workflows are authored there first)
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Assert every scheduled workflow in the tree has a recent scheduled run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Bare python3 is intentional: stdlib-only, no uv sync needed for a
+        # pure API check (same precedent as pr.yml's path classifier). The
+        # schedule detection regex is scoped to the `on:` block to stay
+        # stdlib-only without a YAML parser.
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          import time
+          import urllib.error
+          import urllib.request
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          wf_dir = Path(os.environ.get("WORKFLOWS_DIR", ".github/workflows"))
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ.get("GITHUB_TOKEN", "")
+          api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
+
+          # `on:` block = from a top-level `on:` line to the next top-level key.
+          on_block_re = re.compile(r"(?ms)^(?:\"on\"|'on'|on):[^\n]*\n(.*?)(?=^\S|\Z)")
+          schedule_re = re.compile(r"(?m)^ {1,4}schedule:\s*(#.*)?$")
+          cron_re = re.compile(r"(?m)^\s*-\s*cron:\s*['\"]?([^'\"#\n]+)")
+
+          def cadence_window_days(cron_exprs: list[str]) -> int:
+              """Generous liveness window from the most frequent cron.
+
+              Daily-or-better -> 3 days; weekly (day-of-week bound) -> 9;
+              monthly (day-of-month bound) -> 35; sparser (month bound,
+              e.g. quarterly) -> 100. Coarse on purpose: this guard flags
+              dead schedules, it does not audit punctuality.
+              """
+              windows = []
+              for expr in cron_exprs:
+                  fields = expr.split()
+                  if len(fields) != 5:
+                      continue
+                  _minute, _hour, dom, month, dow = fields
+                  if month != "*":
+                      windows.append(100)
+                  elif dom != "*":
+                      windows.append(35)
+                  elif dow != "*":
+                      windows.append(9)
+                  else:
+                      windows.append(3)
+              return min(windows) if windows else 3
+
+          def latest_scheduled_run(workflow_file: str):
+              """Latest schedule-event run, [] if none, None-sentinel via ValueError."""
+              url = (
+                  f"{api}/repos/{repo}/actions/workflows/{workflow_file}/runs"
+                  "?per_page=1&event=schedule"
+              )
+              headers = {
+                  "Accept": "application/vnd.github+json",
+                  "User-Agent": "benchbox-scheduled-workflow-liveness",
+              }
+              if token:
+                  headers["Authorization"] = f"Bearer {token}"
+              last_err = None
+              for attempt in range(3):
+                  try:
+                      with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as resp:
+                          return json.load(resp).get("workflow_runs", [])
+                  except urllib.error.HTTPError as err:
+                      if err.code == 404:
+                          # Never registered => never ran (absent from default branch).
+                          return []
+                      if err.code in (401, 403):
+                          print(f"::error::GitHub API auth/rate-limit failure ({err.code}) for {url}; cannot assess liveness.")
+                          sys.exit(1)
+                      last_err = err
+                  except urllib.error.URLError as err:
+                      last_err = err
+                  time.sleep(5 * (attempt + 1))
+              print(f"::error::GitHub API unreachable after retries for {url}: {last_err}")
+              sys.exit(1)
+
+          dead: list[str] = []
+          checked = 0
+          for path in sorted(wf_dir.glob("*.yml")) + sorted(wf_dir.glob("*.yaml")):
+              text = path.read_text(encoding="utf-8")
+              on_block = on_block_re.search(text)
+              if not on_block or not schedule_re.search(on_block.group(1)):
+                  continue
+              checked += 1
+              window_days = cadence_window_days(cron_re.findall(on_block.group(1)))
+              runs = latest_scheduled_run(path.name)
+              if not runs:
+                  dead.append(
+                      f"{path.name}: no scheduled runs at all -- absent from the "
+                      "default branch, or its cron is disabled/never fires"
+                  )
+                  continue
+              created = datetime.fromisoformat(runs[0]["created_at"].replace("Z", "+00:00"))
+              if datetime.now(timezone.utc) - created > timedelta(days=window_days):
+                  dead.append(
+                      f"{path.name}: latest scheduled run {runs[0]['created_at']} is "
+                      f"older than its {window_days}-day cadence window"
+                  )
+          if checked == 0:
+              print("::error::No scheduled workflows found in the checked-out tree; the liveness scan itself is broken.")
+              sys.exit(1)
+          if dead:
+              print(
+                  "::error::Scheduled workflow(s) with no recent scheduled run detected "
+                  "(see TODO release-canary-scheduled-activation and "
+                  "docs/operations/repo-admin-settings.md 'Scheduled activation'):"
+              )
+              for line in dead:
+                  print(f"::error::  {line}")
+              sys.exit(1)
+          print(f"All {checked} scheduled workflow(s) alive within their cadence windows.")
+          PY
+
   pyspark-tests:
     runs-on: ubuntu-latest
     continue-on-error: true
