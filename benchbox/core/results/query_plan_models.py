@@ -180,14 +180,17 @@ logger = logging.getLogger(__name__)
 # constants (e.g. TPC-H parameter substitutions) to the same hash by replacing
 # string/date literals and standalone numeric literals with a placeholder.
 _STRING_LITERAL_RE = re.compile(r"'(?:[^']|'')*'")
-# Match numeric literals that are standalone tokens. The negative lookbehind on
-# identifier characters keeps column names that embed digits intact (e.g. ``c1``,
-# ``l_orderkey``) while still collapsing real constants like ``1995`` or ``0.05``.
-# ``#`` is excluded too: DuckDB (and others) emit ordinal column references like
+# Shares _HEX_LITERAL/_DECIMAL_LITERAL with _LITERAL_NUM_RE (see _mask_literals)
+# so aggregation/group/sort expressions get the same atomic scientific/hex/
+# underscore/dotted numeric masking as join/filter/projection expressions -
+# without it, a seed-varying literal buried in e.g. an aggregation_functions
+# entry (``sum(x + 0xFF)`` vs ``sum(x + 0x1A)``) would still produce a
+# different normalized_fingerprint. ``#`` is additionally excluded from both
+# boundaries: DuckDB (and others) emit ordinal column references like
 # ``#0``/``#1`` for projected/grouped columns, and without this exclusion every
 # ordinal collapses to the same ``#?`` placeholder, hiding a genuine structural
 # change (a different column referenced) behind what looks like a literal.
-_NUMERIC_LITERAL_RE = re.compile(r"(?<![A-Za-z0-9_.$#])\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
+_NUMERIC_LITERAL_RE = re.compile(rf"(?<![A-Za-z0-9_.$#])[+-]?(?:{_HEX_LITERAL}|{_DECIMAL_LITERAL})(?![A-Za-z0-9_.$#])")
 _LITERAL_PLACEHOLDER = "?"
 
 

@@ -128,6 +128,42 @@ class TestStructuralSignatureNormalization:
         assert "table:orders" in normalized
         assert "group:o_orderstatus" in normalized
 
+    def test_aggregation_hex_literal_collapses_when_normalized(self):
+        """aggregation_functions/group_by_keys/sort_keys go through _normalize_literal_text,
+        a separate normalizer from _mask_literals (used by filter/join/projection). It must
+        share the same hardened numeric grammar - otherwise a hex/underscore/dotted literal
+        buried in an aggregate call masks in filter expressions but not here, and two
+        seed-varied hex constants still produce different normalized signatures."""
+        a = LogicalOperator(
+            operator_type=LogicalOperatorType.AGGREGATE,
+            operator_id="agg_1",
+            aggregation_functions=["sum(x + 0xFF)"],
+        )
+        b = LogicalOperator(
+            operator_type=LogicalOperatorType.AGGREGATE,
+            operator_id="agg_1",
+            aggregation_functions=["sum(x + 0x1A)"],
+        )
+        assert a.get_structural_signature() != b.get_structural_signature()
+        assert a.get_structural_signature(normalize_literals=True) == b.get_structural_signature(
+            normalize_literals=True
+        )
+
+    def test_ordinal_column_references_survive_normalization_in_group_by(self):
+        """DuckDB ordinal refs (#0/#1) in group_by_keys must not be masked - they point at
+        a specific (possibly differently-numbered) column, a genuine structural difference,
+        not a literal constant. (sort_keys wraps each entry in a Python dict repr before
+        normalizing, which quotes - and so fully masks - every field including ordinals;
+        that's a separate, pre-existing quirk unrelated to this hardening pass.)"""
+        op = LogicalOperator(
+            operator_type=LogicalOperatorType.AGGREGATE,
+            operator_id="agg_1",
+            group_by_keys=["#0", "#1"],
+        )
+        normalized = op.get_structural_signature(normalize_literals=True)
+        assert "#0" in normalized
+        assert "#1" in normalized
+
     def test_escaped_apostrophe_string_literal_masks_as_one_token(self):
         """A doubled single quote is an escaped apostrophe INSIDE the literal, not the
         end of the string. Without treating '' as an escape, 'O''Brien' would split
