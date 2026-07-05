@@ -1008,6 +1008,33 @@ def compute_plan_capture_stats(
     return plans_captured, len(failed_ids), capture_errors
 
 
+def _build_plan_entry(qr: dict[str, Any]) -> dict[str, Any]:
+    """Serialize a single query result's captured plan into a `.plans.json` entry."""
+    query_plan = qr.get("query_plan")
+    plan_fingerprint = qr.get("plan_fingerprint")
+    plan_fingerprint_normalized = qr.get("plan_fingerprint_normalized")
+    capture_time = qr.get("plan_capture_time_ms")
+
+    plan_entry: dict[str, Any] = {}
+    if plan_fingerprint:
+        plan_entry["fingerprint"] = plan_fingerprint
+    if plan_fingerprint_normalized:
+        plan_entry["fingerprint_normalized"] = plan_fingerprint_normalized
+    if capture_time:
+        plan_entry["capture_time_ms"] = round(capture_time, 1)
+
+    if is_dataclass(query_plan):
+        plan_entry["plan"] = asdict(query_plan)
+    elif isinstance(query_plan, dict):
+        plan_entry["plan"] = query_plan
+    elif hasattr(query_plan, "to_dict"):
+        plan_entry["plan"] = query_plan.to_dict()
+    else:
+        plan_entry["plan"] = str(query_plan)
+
+    return plan_entry
+
+
 def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     """Build companion plans file payload.
 
@@ -1018,40 +1045,36 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
 
     Returns:
         Dictionary for plans companion file, or None if no plans.
+
+    Multi-stream keying:
+        ``capture_query_plan``'s documented contract is one plan record per
+        ``(query_id, stream_id)`` - streams are NOT deduplicated, so a query_id
+        that ran in more than one stream has more than one captured-plan row.
+        Keying this payload by bare ``query_id`` alone would collapse those rows
+        to a single last-writer-wins entry. Rows are grouped by ``query_id``
+        first; a group with exactly one plan-bearing row keeps the simple bare
+        ``query_id`` key (the common single-stream case, unchanged format), and
+        a group with more than one row uses a ``"{query_id}#{stream_id}"``
+        composite key per row so every stream's plan survives.
     """
     if not result.query_plans_captured or result.query_plans_captured == 0:
         return None
 
+    rows_by_query_id: dict[str, list[dict[str, Any]]] = {}
+    for qr in result.query_results or []:
+        if qr.get("query_plan") is None:
+            continue
+        query_id = str(qr.get("query_id", qr.get("id", "")))
+        rows_by_query_id.setdefault(query_id, []).append(qr)
+
     plans_by_query: dict[str, Any] = {}
     errors_list: list[dict[str, Any]] = []
 
-    for qr in result.query_results or []:
-        query_id = str(qr.get("query_id", qr.get("id", "")))
-        query_plan = qr.get("query_plan")
-        plan_fingerprint = qr.get("plan_fingerprint")
-        plan_fingerprint_normalized = qr.get("plan_fingerprint_normalized")
-        capture_time = qr.get("plan_capture_time_ms")
-
-        if query_plan is not None:
-            plan_entry: dict[str, Any] = {}
-            if plan_fingerprint:
-                plan_entry["fingerprint"] = plan_fingerprint
-            if plan_fingerprint_normalized:
-                plan_entry["fingerprint_normalized"] = plan_fingerprint_normalized
-            if capture_time:
-                plan_entry["capture_time_ms"] = round(capture_time, 1)
-
-            # Serialize the plan
-            if is_dataclass(query_plan):
-                plan_entry["plan"] = asdict(query_plan)
-            elif isinstance(query_plan, dict):
-                plan_entry["plan"] = query_plan
-            elif hasattr(query_plan, "to_dict"):
-                plan_entry["plan"] = query_plan.to_dict()
-            else:
-                plan_entry["plan"] = str(query_plan)
-
-            plans_by_query[query_id] = plan_entry
+    for query_id, rows in rows_by_query_id.items():
+        multi_stream = len(rows) > 1
+        for qr in rows:
+            key = f"{query_id}#{qr.get('stream_id', 0)}" if multi_stream else query_id
+            plans_by_query[key] = _build_plan_entry(qr)
 
     # Add plan capture errors
     for error in result.plan_capture_errors or []:
@@ -1068,7 +1091,7 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     return {
         "version": SCHEMA_VERSION,
         "run_id": result.execution_id,
-        "plans_captured": len(plans_by_query),
+        "plans_captured": len(rows_by_query_id),
         "capture_failures": result.plan_capture_failures or 0,
         "queries": plans_by_query,
         "errors": errors_list if errors_list else None,

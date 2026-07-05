@@ -89,3 +89,54 @@ class TestMergePlanCaptureIntoResult:
         result = {"status": "SUCCESS"}
         ret = host._merge_plan_capture_into_result(result, "conn", "SELECT 1", "q1")
         assert ret is None, "helper mutates in place and must not return the dict"
+
+
+class _SummaryHost(ResultCaptureMixin):
+    """Minimal ResultCaptureMixin host for _log_plan_capture_summary."""
+
+    def __init__(self, capture_plans=True):
+        self.capture_plans = capture_plans
+        self.plan_capture_errors = []
+        self.logger = MagicMock()
+
+
+def _qr(query_id, status="SUCCESS", run_type="measurement", query_plan=None, stream_id=0):
+    row = {"query_id": query_id, "status": status, "run_type": run_type, "stream_id": stream_id}
+    if query_plan is not None:
+        row["query_plan"] = query_plan
+    return row
+
+
+class TestLogPlanCaptureSummary:
+    """The console summary must match the row-derived, unique-query-id count that
+    ends up in BenchmarkResults.query_plans_captured / the .plans.json companion -
+    not the per-variant self.query_plans_captured counter, which legitimately
+    exceeds it on any multi-stream run.
+    """
+
+    def test_single_stream_all_captured_logs_info_with_matching_counts(self):
+        host = _SummaryHost()
+        query_results = [_qr("q1", query_plan=_make_plan()), _qr("q2", query_plan=_make_plan())]
+        host._log_plan_capture_summary(query_results)
+        host.logger.info.assert_called_once_with("Query plans: 2/2 captured")
+        host.logger.warning.assert_not_called()
+
+    def test_multi_stream_same_query_id_not_double_counted(self):
+        """2 streams of the same query_id must report 1/1, not 1/2 or 2/2 -
+        the per-variant capture count must not leak into this unique-id summary.
+        """
+        host = _SummaryHost()
+        plan = _make_plan()
+        query_results = [
+            _qr("q1", query_plan=plan, stream_id=0),
+            _qr("q1", query_plan=plan, stream_id=1),
+        ]
+        host._log_plan_capture_summary(query_results)
+        host.logger.info.assert_called_once_with("Query plans: 1/1 captured")
+
+    def test_capture_failure_logs_warning_with_failed_suffix(self):
+        host = _SummaryHost()
+        query_results = [_qr("q1", query_plan=_make_plan()), _qr("q2", query_plan=None)]
+        host._log_plan_capture_summary(query_results)
+        host.logger.warning.assert_called_once_with("Query plans: 1/2 captured, 1 failed")
+        host.logger.info.assert_not_called()

@@ -1731,6 +1731,29 @@ class ResultCaptureMixin:
             return True
         return False
 
+    def _log_plan_capture_summary(self, query_results: list[dict[str, Any]]) -> None:
+        """Log a "Query plans: N/M captured" summary using the same row-derived,
+        unique-query-id stat that ends up in ``BenchmarkResults.query_plans_captured``
+        and the ``.plans.json`` companion (see ``adapter.py``'s canonical
+        ``compute_plan_capture_stats`` call site).
+
+        ``self.query_plans_captured`` is a per-variant counter (one increment per
+        distinct captured SQL text, e.g. once per seed-varied stream), so it
+        legitimately exceeds the unique-query-id count on any multi-stream run;
+        printing it here would contradict what the bundle actually contains.
+        """
+        from benchbox.core.results.schema import compute_plan_capture_stats
+
+        plans_captured, capture_failures, _errors = compute_plan_capture_stats(
+            query_results, self.capture_plans, existing_errors=list(self.plan_capture_errors)
+        )
+        total_queries = plans_captured + capture_failures
+        summary_message = f"Query plans: {plans_captured}/{total_queries} captured"
+        if capture_failures:
+            summary_message = f"{summary_message}, {capture_failures} failed"
+        log_fn = self.logger.warning if capture_failures else self.logger.info
+        log_fn(summary_message)
+
     def _build_execution_phases(self, query_results, query_executions, run_config, setup_phase) -> tuple:
         """Build power/throughput test phases and return execution phases with metrics.
 
@@ -1744,12 +1767,7 @@ class ResultCaptureMixin:
         avg_time = total_exec_time / max(successful_queries, 1)
 
         if self.capture_plans:
-            total_queries_executed = len(query_results)
-            summary_message = f"Query plans: {self.query_plans_captured}/{total_queries_executed} captured"
-            if self.plan_capture_failures:
-                summary_message = f"{summary_message}, {self.plan_capture_failures} failed"
-            log_fn = self.logger.warning if self.plan_capture_failures else self.logger.info
-            log_fn(summary_message)
+            self._log_plan_capture_summary(query_results)
 
         # When a fallback occurred (e.g. throughput requested but unsupported),
         # _effective_execution_type reflects the actual execution shape.
