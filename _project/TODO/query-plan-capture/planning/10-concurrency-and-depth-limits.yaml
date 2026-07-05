@@ -1,0 +1,103 @@
+id: "qpc-10-concurrency-and-depth-limits"
+title: "Thread-safe capture stats under throughput mode; explicit depth-limit truncation"
+worktree: "query-plan-capture"
+priority: "Low"
+status: "Not Started"
+
+description: |
+  Concurrency: throughput streams run on a ThreadPoolExecutor
+  (tpc_patterns.py:664) against one shared adapter; capture mutates
+  plan_capture_failures += 1, plan_capture_errors.append,
+  _plan_capture_iteration_counts, query_plans_captured += 1 with no lock
+  (result_capture.py:541-542,591-592,700). Exported headline stats are
+  recomputed iteration-stably (builder.py:498) so main-file numbers are
+  mostly immune; the damage is live progress logs, plan_capture_errors
+  ordering/loss, and plan_first_n over/under-capture. Strict-mode
+  PlanCaptureError raised in a stream thread surfaces as a generic stream
+  failure instead of aborting the run.
+
+  Depth limits: plans deeper than 50 are dropped whole (to_dict raises,
+  estimate_serialized_size -> serialization_error failure); the 50-depth and
+  100KB thresholds are hardcoded; the "consider external plan storage" hint
+  references a feature that does not exist.
+
+  Findings: F6.1, F5.3.
+
+category: "Reliability / Concurrency"
+
+prior_art:
+- "benchbox/platforms/base/result_capture.py:541-542,591-592,682-700"
+- "benchbox/core/tpc_patterns.py:655-690 stream executor"
+- "benchbox/core/results/query_plan_models.py:155-158,406-418 depth guard"
+- "benchbox/core/results/builder.py:498 stats recomputation"
+
+work:
+- id: w1
+  summary: >-
+    Create: one threading.Lock in the capture mixin around the three mutation
+    sites (rare, contention-free); make plan_first_n check-and-increment
+    atomic under the lock.
+  status: pending
+- id: w2
+  summary: >-
+    Create: define and implement strict-mode semantics under throughput
+    (recommended: abort the run — propagate PlanCaptureError distinctly from
+    generic stream failure); document the choice.
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: >-
+    Create: deep plans serialize with a truncated_at_depth marker instead of
+    being dropped; make plan_max_depth configurable.
+  notes: >-
+    Fingerprint computed over the full in-memory tree with the fingerprint
+    marked partial-safe; expose plan_max_depth in adapter config next to
+    plan_capture_timeout_seconds; remove the dangling "external plan
+    storage" hint.
+  needs: [w2]
+  status: pending
+- id: w4
+  summary: "Review: adversarial code review (lock scope vs EXPLAIN duration — never hold the lock across I/O; truncation-marker round-trip)."
+  needs: [w3]
+  status: pending
+- id: w5
+  summary: "Fix: address review findings; re-run verification."
+  needs: [w4]
+  status: pending
+- id: w6
+  summary: "Submit PR referencing qpc-10."
+  needs: [w5]
+  status: pending
+
+must_preserve:
+- "compute_plan_capture_stats iteration-stable semantics"
+- "No lock held during get_query_plan (EXPLAIN I/O)"
+
+anti_patterns:
+- "DO NOT serialize captures globally — lock only the counter/list mutations."
+- "DO NOT fingerprint a truncated tree as if complete — mark it."
+
+verification:
+- description: "Concurrent capture stress test keeps counts exact"
+  command: "uv run -- python -m pytest tests/unit/core/results/test_plan_capture_stats.py tests/unit/platforms/test_plan_capture_errors.py -q"
+  expected_output: "all pass, including new concurrency test"
+- description: "Deep plan exports with truncation marker instead of disappearing"
+  command: "uv run -- python -m pytest tests/unit/core/results/test_query_plan_models.py -q -k depth"
+  expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/base/result_capture.py"
+  - "benchbox/platforms/base/adapter.py"
+  - "benchbox/core/results/query_plan_models.py"
+  - "benchbox/core/tpc_patterns.py"
+  - "tests/"
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["query-plans", "concurrency", "throughput", "limits"]
+  estimated_effort: "Medium"
+  created_date: "2026-07-04"
+  review_findings: ["F6.1", "F5.3"]

@@ -1,0 +1,91 @@
+id: "qpc-02-loader-roundtrip-fidelity"
+title: "Make export -> load -> export lossless: stop corrupting status/iteration/run_type and destroying plans"
+worktree: "query-plan-capture"
+priority: "High"
+status: "Not Started"
+
+description: |
+  A load/re-export cycle corrupts bundles (all reproduced):
+  1. Plans destroyed: loaded results carry counts but no plan payloads, so
+     re-export writes no .plans.json (partially fixed by qpc-01; this item
+     asserts the property end-to-end).
+  2. Warmup rows become measurement rows: exporter writes iter: 0, loader
+     keeps iteration only `if q.get("iter"):` (loader.py:448) — 0 is falsy —
+     so re-export defaults iteration=1/run_type=measurement and warmup times
+     pollute summary stats.
+  3. FAILED queries duplicate as phantom successes: loader hardcodes
+     "status": "SUCCESS" for every queries[] entry (loader.py:446) and also
+     appends a FAILED row from errors[].
+  Loader also drops run_type, stream 0, plan_fingerprint, plan_capture_time_ms.
+
+  Findings: F1.4 (and the `if capture_time:` 0.0-drop from F1.5).
+
+category: "Bug Fix / Data Pipeline"
+
+prior_art:
+- "benchbox/core/results/loader.py:426-466 _reconstruct_query_results"
+- "benchbox/core/results/schema.py:376-423 _build_queries (writes iter/stream/run_type/status unconditionally)"
+- "benchbox/core/results/canonical_json.py — byte-stable form enables byte-equality round-trip test"
+
+work:
+- id: w1
+  summary: >-
+    Create: fix _reconstruct_query_results to honor status/run_type, keep
+    iter/stream 0, dedupe errors[], and carry plan fields through.
+  notes: >-
+    Use `is not None` checks for iter/stream; reconstruct FAILED rows from
+    queries[] alone and use errors[] only for legacy bundles whose queries[]
+    lack status. In build_plans_payload use `if capture_time is not None:`.
+  status: pending
+- id: w2
+  summary: >-
+    Create: round-trip property test — export, load, re-export must be
+    byte-identical for both main file and plans companion.
+  notes: >-
+    Compare via canonical_json_text. Include warmup (iter 0), FAILED, and
+    stream>0 rows in the fixture.
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Review: adversarial code review (legacy-bundle branch, errors[] dedup rules, summary-stat recomputation)."
+  needs: [w2]
+  status: pending
+- id: w4
+  summary: "Fix: address review findings; re-run verification."
+  needs: [w3]
+  status: pending
+- id: w5
+  summary: "Submit PR referencing qpc-02."
+  needs: [w4]
+  status: pending
+
+must_preserve:
+- "Legacy bundles (queries[] without status/run_type keys) still load without error"
+- "compute_plan_capture_stats measurement-only semantics"
+
+anti_patterns:
+- "DO NOT drop errors[] from the export format — it is the legacy-load fallback; dedup on load instead."
+- "DO NOT 'fix' by making the exporter omit warmup rows — warmup data is part of the record."
+
+verification:
+- description: "Byte-equality round trip"
+  command: "uv run -- python -m pytest tests/unit/core/results/test_loader.py -q -k roundtrip"
+  expected_output: "all pass"
+- description: "No phantom SUCCESS rows for failed queries"
+  command: "uv run -- python -m pytest tests/unit/core/results/test_loader.py -q"
+  expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/results/loader.py"
+  - "benchbox/core/results/schema.py"
+  - "tests/"
+
+deps:
+  needs: ["qpc-01-plan-rehydration-and-phases-view"]
+
+metadata:
+  tags: ["query-plans", "loader", "round-trip", "data-integrity"]
+  estimated_effort: "Medium"
+  created_date: "2026-07-04"
+  review_findings: ["F1.4", "F1.5-capture-time-zero"]

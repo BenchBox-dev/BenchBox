@@ -1,0 +1,121 @@
+id: "qpc-06-cross-platform-capture-wiring"
+title: "Wire structured plan capture beyond DuckDB: shared SQL path, PG JSON format, DataFrame DAGs"
+worktree: "query-plan-capture"
+priority: "High"
+status: "Not Started"
+
+description: |
+  The structured capture pipeline is DuckDB-only: capture_query_plan is
+  called solely from duckdb.py:969 and only DuckDB overrides
+  get_query_plan_parser. The PostgreSQL/Redshift/DataFusion/SQLite parsers
+  are complete, tested, and unreachable. --capture-plans on any other SQL
+  platform silently does nothing.
+
+  Contract breaks to fix on the way:
+  - postgresql.py emits EXPLAIN ... FORMAT TEXT (line 722) but the PG parser
+    accepts only JSON (reproduced: "Invalid JSON in EXPLAIN output").
+  - DataFrame platforms store profiling.QueryPlan (text+hints, no DAG, no
+    fingerprint) into the same query_plan slot (benchmark_mixin.py:1035),
+    silently forking the companion schema by platform family.
+  - Fingerprints are platform-scoped by construction; document that and keep
+    cross-platform comparison at the operator-type tree level.
+
+  Findings: F3.1, F3.2, F3.3, F3.4.
+
+category: "Feature Completion / Architecture"
+
+prior_art:
+- "benchbox/platforms/base/execution.py:_execute_single_query — the choke point for shared wiring"
+- "benchbox/platforms/duckdb.py:915-1075 — the one working reference implementation"
+- "benchbox/core/query_plans/parsers/{postgresql,redshift,datafusion,sqlite}.py + registry.py"
+- "benchbox/core/dataframe/profiling.py:70-85 QueryPlan (text-only model)"
+
+work:
+- id: w1
+  summary: >-
+    Create: move capture invocation into the shared SQL execute path;
+    parserless platforms warn once per run instead of staying silent.
+  notes: >-
+    Every adapter with a parser captures structured plans; platforms without
+    a parser emit ONE prominent run-level warning ("plan capture not
+    supported on X").
+  status: pending
+- id: w2
+  summary: >-
+    Create: PostgreSQL — capture-path EXPLAIN uses FORMAT JSON (display path
+    keeps TEXT); add get_query_plan_parser override; same for any platform
+    whose parser exists (redshift, sqlite where applicable).
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: >-
+    Create: per-platform adapter-EXPLAIN -> parser contract tests; add a
+    plan_format discriminator to companion entries.
+  notes: >-
+    The adapter's own EXPLAIN output (fixture) fed to the platform's
+    registered parser must produce a QueryPlanDAG.
+  needs: [w2]
+  status: pending
+- id: w4
+  summary: >-
+    Create: DataFrame plans become QueryPlanDAGs via registered parsers,
+    with text-only fallback tagged by plan_format.
+  notes: >-
+    Route captured plan text through the registered parsers (DataFusion
+    first); preserve plan_text as raw_explain_output; keep text-only
+    QueryPlan as fallback with explicit plan_format so consumers fail
+    informatively.
+  needs: [w3]
+  status: pending
+- id: w5
+  summary: >-
+    Create: docs — fingerprints are platform-scoped; cross-platform
+    comparison uses tree comparison, never fingerprint equality.
+  needs: [w4]
+  status: pending
+- id: w6
+  summary: "Review: adversarial code review (per-platform EXPLAIN dialects, DML/refresh paths must NOT be captured with ANALYZE, connection reuse)."
+  needs: [w5]
+  status: pending
+- id: w7
+  summary: "Fix: address review findings; re-run verification."
+  needs: [w6]
+  status: pending
+- id: w8
+  summary: "Submit PR referencing qpc-06 (consider splitting SQL wiring and DataFrame wiring into two PRs if the diff exceeds review size)."
+  needs: [w7]
+  status: pending
+
+must_preserve:
+- "DuckDB capture behavior and its existing tests"
+- "Refresh/maintenance operations (OperationExecutor path) are never re-executed by plan capture"
+- "Platforms without parsers keep working with a warning, not a failure (unless strict_plan_capture)"
+
+anti_patterns:
+- "DO NOT copy the capture block into each adapter — wire it once in the shared path."
+- "DO NOT let two platform families write differently-shaped 'plan' objects without a discriminator field."
+
+verification:
+- description: "Adapter-output -> parser contract per platform"
+  command: "uv run -- python -m pytest tests/unit/core/query_plans/parsers tests/unit/platforms -q -k 'plan'"
+  expected_output: "all pass, including new contract tests"
+- description: "PG capture produces a DAG from FORMAT JSON fixture"
+  command: "uv run -- python -m pytest tests/unit/platforms -q -k 'postgres and plan'"
+  expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/"
+  - "benchbox/core/query_plans/"
+  - "benchbox/core/results/schema.py"
+  - "docs/"
+  - "tests/"
+
+deps:
+  needs: ["qpc-01-plan-rehydration-and-phases-view", "qpc-03-fingerprint-signature-v2"]
+
+metadata:
+  tags: ["query-plans", "cross-platform", "parsers", "dataframe"]
+  estimated_effort: "Large"
+  created_date: "2026-07-04"
+  review_findings: ["F3.1", "F3.2", "F3.3", "F3.4"]
