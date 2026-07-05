@@ -32,6 +32,7 @@ from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.loader import (
     ResultLoadError,
     UnsupportedSchemaError,
+    iter_query_results,
     load_result_file,
 )
 
@@ -1224,9 +1225,10 @@ def _check_regression_threshold(comparison: dict[str, Any], regression_threshold
 def _build_execution_map(results: Any) -> dict[str, Any]:
     """Collect the first execution per query ID across all phases."""
     execution_map: dict[str, Any] = {}
-    for phase_results in results.phases.values():
-        for execution in phase_results.queries:
-            execution_map.setdefault(execution.query_id, execution)
+    for execution in iter_query_results(results):
+        query_id = execution.get("query_id")
+        if query_id is not None:
+            execution_map.setdefault(query_id, execution)
     return execution_map
 
 
@@ -1280,8 +1282,8 @@ def _compare_plans(
         baseline_exec = baseline_map[query_id]
         current_exec = current_map[query_id]
 
-        baseline_plan = getattr(baseline_exec, "query_plan", None)
-        current_plan = getattr(current_exec, "query_plan", None)
+        baseline_plan = baseline_exec.get("query_plan")
+        current_plan = current_exec.get("query_plan")
 
         if not baseline_plan or not current_plan:
             continue
@@ -1295,8 +1297,8 @@ def _compare_plans(
             continue
 
         # Get performance change for this query
-        baseline_time = getattr(baseline_exec, "execution_time_ms", 0.0) or 0.0
-        current_time = getattr(current_exec, "execution_time_ms", 0.0) or 0.0
+        baseline_time = baseline_exec.get("execution_time_ms", 0.0) or 0.0
+        current_time = current_exec.get("execution_time_ms", 0.0) or 0.0
         perf_change_pct = 0.0
         if baseline_time > 0:
             perf_change_pct = ((current_time - baseline_time) / baseline_time) * 100

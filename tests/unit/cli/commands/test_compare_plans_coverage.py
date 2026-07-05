@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import importlib
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from click.testing import CliRunner
+
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 cp = importlib.import_module("benchbox.cli.commands.compare_plans")
 
@@ -68,21 +70,15 @@ class _Summary:
         return {"baseline": self.baseline_run_id, "current": self.current_run_id}
 
 
-@dataclass
-class _Exec:
-    query_id: str
-    query_plan: object | None = field(default_factory=object)
-
-
-class _Phase:
-    def __init__(self, queries):
-        self.queries = queries
-
-
-class _Results:
-    def __init__(self, ids=("q1",), with_plans=True):
-        qp = object() if with_plans else None
-        self.phases = {"power": _Phase([_Exec(qid, qp) for qid in ids])}
+def _Results(ids=("q1",), with_plans=True):
+    """Build a real BenchmarkResults instance (not a fabricated `.phases` fake)."""
+    query_results = []
+    for qid in ids:
+        entry: dict = {"query_id": qid}
+        if with_plans:
+            entry["query_plan"] = object()
+        query_results.append(entry)
+    return make_benchmark_results(query_results=query_results)
 
 
 def _write_json(path: Path) -> None:

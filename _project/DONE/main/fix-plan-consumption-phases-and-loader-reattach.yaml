@@ -2,7 +2,8 @@ id: fix-plan-consumption-phases-and-loader-reattach
 title: "Fix broken plan-consumption surface (BenchmarkResults.phases + loader plan reattachment)"
 worktree: main
 priority: Critical
-status: Not Started
+status: "Completed"
+completed_date: "2026-07-05"
 description: |
   Adversarial review of the query-plan-capture subsystem found the entire
   read/consume side is non-functional on real exported bundles. Two layered
@@ -56,9 +57,9 @@ impact:
     turning a crash into silent data loss.
 
 must_preserve:
-  - "Bundles that legitimately have no plans still load and render without error."
-  - "The .plans.json companion file format is unchanged (loader adapts to it, not vice versa)."
-  - "Non-plan fields of reconstruct_benchmark_results keep their current values."
+- "Bundles that legitimately have no plans still load and render without error."
+- "The .plans.json companion file format is unchanged (loader adapts to it, not vice versa)."
+- "Non-plan fields of reconstruct_benchmark_results keep their current values."
 
 approach: |
   Introduce a single accessor that walks execution over `execution_phases` and/or
@@ -70,43 +71,45 @@ approach: |
   add a real bundle round-trip test.
 
 anti_patterns:
-  - "DO NOT add a `phases` compatibility property that fabricates the old shape - because it hides which real field (execution_phases vs query_results) each consumer needs - repoint consumers explicitly."
-  - "DO NOT rely on getattr(results, 'phases', {}) defaults anywhere - because they convert a hard error into silent empty output."
+- "DO NOT add a `phases` compatibility property that fabricates the old shape - because it hides which real field (execution_phases
+  vs query_results) each consumer needs - repoint consumers explicitly."
+- "DO NOT rely on getattr(results, 'phases', {}) defaults anywhere - because they convert a hard error into silent empty output."
 
 scope_limit:
   only_modify:
-    - "benchbox/core/results/loader.py"
-    - "benchbox/cli/commands/show_plan.py"
-    - "benchbox/cli/commands/compare_plans.py"
-    - "benchbox/cli/commands/compare.py"
-    - "benchbox/core/query_plans/comparison.py"
-    - "benchbox/core/manifest/plan_metadata_utils.py"
-    - "benchbox/core/query_plans/history.py"
-    - "tests/unit/cli/commands/test_show_plan_coverage.py"
-    - "tests/unit/cli/commands/test_compare_plans_coverage.py"
-    - "tests/integration/"
+  - "benchbox/core/results/loader.py"
+  - "benchbox/cli/commands/show_plan.py"
+  - "benchbox/cli/commands/compare_plans.py"
+  - "benchbox/cli/commands/compare.py"
+  - "benchbox/core/query_plans/comparison.py"
+  - "benchbox/core/manifest/plan_metadata_utils.py"
+  - "benchbox/core/query_plans/history.py"
+  - "tests/unit/cli/commands/test_show_plan_coverage.py"
+  - "tests/unit/cli/commands/test_compare_plans_coverage.py"
+  - "tests/integration/"
 
 work:
-  - id: w1
-    summary: "Thread plans_data into _reconstruct_query_results so query_plan/plan_fingerprint are rehydrated on load"
-    status: pending
-  - id: w2
-    summary: "Repoint the 6 results.phases consumers at execution_phases/query_results (no fabricated phases shim)"
-    status: pending
-    needs: [w1]
-  - id: w3
-    summary: "Replace the mocked load_result_file in show/compare coverage tests with the real reconstructed object; add a real DuckDB bundle -> load_result_file -> show-plan/compare-plans round-trip test"
-    status: pending
-    needs: [w2]
+- id: w1
+  summary: "Thread plans_data into _reconstruct_query_results so query_plan/plan_fingerprint are rehydrated on load"
+  status: done
+- id: w2
+  summary: "Repoint the 6 results.phases consumers at execution_phases/query_results (no fabricated phases shim)"
+  status: done
+  needs: [w1]
+- id: w3
+  summary: "Replace the mocked load_result_file in show/compare coverage tests with the real reconstructed object; add a real
+    DuckDB bundle -> load_result_file -> show-plan/compare-plans round-trip test"
+  status: done
+  needs: [w2]
 
 verification:
-  - description: "show-plan renders a plan from a real exported DuckDB bundle (exit 0)"
-    command: "uv run -- python -m pytest tests/integration/ -k 'plan and (show or compare or realpath)' -n 0 -q"
-    expected_output: "passed"
-  - description: "Full plan suites stay green"
-    command: "uv run -- python -m pytest tests/unit/cli/commands/ tests/unit/core/results/ tests/integration/ -k plan -n 0 -q"
-    expected_output: "passed"
+- description: "show-plan renders a plan from a real exported DuckDB bundle (exit 0)"
+  command: "uv run -- python -m pytest tests/integration/ -k 'plan and (show or compare or realpath)' -n 0 -q"
+  expected_output: "passed"
+- description: "Full plan suites stay green"
+  command: "uv run -- python -m pytest tests/unit/cli/commands/ tests/unit/core/results/ tests/integration/ -k plan -n 0 -q"
+  expected_output: "passed"
 
 deferred:
-  - summary: "Reproducing failing tests were captured during review under scratchpad/review-failing-tests/"
-    reason: "Staged locally (uncommitted); fold test_plan_capture_cli_realpath_review.py in as the w3 guard when implementing."
+- summary: "Reproducing failing tests were captured during review under scratchpad/review-failing-tests/"
+  reason: "Staged locally (uncommitted); fold test_plan_capture_cli_realpath_review.py in as the w3 guard when implementing."

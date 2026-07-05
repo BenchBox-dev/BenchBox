@@ -14,7 +14,7 @@ from benchbox.core.query_plans.visualization import (
     render_plan,
     render_summary,
 )
-from benchbox.core.results.loader import load_result_file
+from benchbox.core.results.loader import iter_query_results, load_result_file
 
 
 @click.command("show-plan")
@@ -85,26 +85,22 @@ def show_plan(
         results, _ = load_result_file(run_path)
 
         # Find query execution
-        query_exec = None
-        for phase_name, phase_results in results.phases.items():
-            for exec_result in phase_results.queries:
-                if exec_result.query_id == query_id:
-                    query_exec = exec_result
-                    break
-            if query_exec:
-                break
+        query_exec = next(
+            (qr for qr in iter_query_results(results) if qr.get("query_id") == query_id),
+            None,
+        )
 
         if not query_exec:
             console.print(f"[red]Error:[/red] Query '{query_id}' not found in results")
             ctx.exit(1)
 
         # Check if plan was captured
-        if not hasattr(query_exec, "query_plan") or query_exec.query_plan is None:
+        if query_exec.get("query_plan") is None:
             console.print(f"[yellow]Warning:[/yellow] No query plan captured for query '{query_id}'")
             console.print("Run benchmark with --capture-plans flag to capture query plans")
             ctx.exit(1)
 
-        plan = query_exec.query_plan
+        plan = query_exec["query_plan"]
 
         # Handle different output formats
         if output_format == "json":

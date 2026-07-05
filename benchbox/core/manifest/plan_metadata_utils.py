@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from benchbox.core.manifest.models import PlanMetadata
+from benchbox.core.results.loader import iter_query_results
 
 
 def create_plan_metadata_from_results(
@@ -47,16 +48,15 @@ def create_plan_metadata_from_results(
     # comparison this option exists for (a plan lacking the normalized property is
     # skipped rather than recorded under the wrong scheme).
     attr = "normalized_fingerprint" if normalize_literals else "plan_fingerprint"
-    for phase_results in getattr(results, "phases", {}).values():
-        for execution in phase_results.queries:
-            plan = getattr(execution, "query_plan", None)
-            fingerprint = getattr(plan, attr, None) if plan is not None else None
-            if fingerprint:
-                query_id = execution.query_id
-                if query_id not in metadata.plan_fingerprints:
-                    metadata.plan_fingerprints[query_id] = fingerprint
-                    metadata.plan_capture_timestamp[query_id] = timestamp
-                    metadata.plan_versions[query_id] = 1  # Default to version 1
+    for execution in iter_query_results(results):
+        plan = execution.get("query_plan")
+        fingerprint = getattr(plan, attr, None) if plan is not None else None
+        if fingerprint:
+            query_id = execution.get("query_id")
+            if query_id not in metadata.plan_fingerprints:
+                metadata.plan_fingerprints[query_id] = fingerprint
+                metadata.plan_capture_timestamp[query_id] = timestamp
+                metadata.plan_versions[query_id] = 1  # Default to version 1
 
     return metadata
 

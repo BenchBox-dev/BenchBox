@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
 import pytest
 
 from benchbox.core.query_plans.comparison import (
@@ -25,20 +23,9 @@ pytestmark = [
 ]
 
 
-@dataclass
-class MockQueryExecution:
-    """Mock query execution for testing."""
-
-    query_id: str
-    execution_time_ms: float = 100.0
-    query_plan: QueryPlanDAG | None = None
-
-
-@dataclass
-class MockPhaseResults:
-    """Mock phase results for testing."""
-
-    queries: list[MockQueryExecution] = field(default_factory=list)
+def _qr(query_id: str, execution_time_ms: float = 100.0, query_plan: QueryPlanDAG | None = None) -> dict:
+    """Build a query_results dict matching the real BenchmarkResults.query_results shape."""
+    return {"query_id": query_id, "execution_time_ms": execution_time_ms, "query_plan": query_plan}
 
 
 def _create_simple_plan(query_id: str, table_name: str = "orders") -> QueryPlanDAG:
@@ -162,11 +149,11 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)])},
+            query_results=[_qr("q1", 100.0, plan1)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan2)])},
+            query_results=[_qr("q1", 100.0, plan2)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current)
@@ -184,11 +171,11 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)])},
+            query_results=[_qr("q1", 100.0, plan1)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan2)])},
+            query_results=[_qr("q1", 100.0, plan2)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current)
@@ -209,25 +196,11 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={
-                "power": MockPhaseResults(
-                    queries=[
-                        MockQueryExecution("q1", 100.0, plan1a),
-                        MockQueryExecution("q2", 200.0, plan2a),
-                    ]
-                )
-            },
+            query_results=[_qr("q1", 100.0, plan1a), _qr("q2", 200.0, plan2a)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={
-                "power": MockPhaseResults(
-                    queries=[
-                        MockQueryExecution("q1", 100.0, plan1b),
-                        MockQueryExecution("q2", 200.0, plan2b),
-                    ]
-                )
-            },
+            query_results=[_qr("q1", 100.0, plan1b), _qr("q2", 200.0, plan2b)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current)
@@ -243,16 +216,12 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)])},
+            query_results=[_qr("q1", 100.0, plan1)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={
-                "power": MockPhaseResults(
-                    # 150% slower (from 100ms to 250ms)
-                    queries=[MockQueryExecution("q1", 250.0, plan2)]
-                )
-            },
+            # 150% slower (from 100ms to 250ms)
+            query_results=[_qr("q1", 250.0, plan2)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current, regression_threshold_pct=20.0)
@@ -274,16 +243,12 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)])},
+            query_results=[_qr("q1", 100.0, plan1)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={
-                "power": MockPhaseResults(
-                    # Slower but plan unchanged
-                    queries=[MockQueryExecution("q1", 200.0, plan2)]
-                )
-            },
+            # Slower but plan unchanged
+            query_results=[_qr("q1", 200.0, plan2)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current, regression_threshold_pct=20.0)
@@ -301,16 +266,12 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)])},
+            query_results=[_qr("q1", 100.0, plan1)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={
-                "power": MockPhaseResults(
-                    # 15% slower - below 20% threshold but above 10%
-                    queries=[MockQueryExecution("q1", 115.0, plan2)]
-                )
-            },
+            # 15% slower - below 20% threshold but above 10%
+            query_results=[_qr("q1", 115.0, plan2)],
         )
 
         # With 20% threshold - not a regression
@@ -327,25 +288,11 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={
-                "power": MockPhaseResults(
-                    queries=[
-                        MockQueryExecution("q1", 100.0, plan),
-                        MockQueryExecution("q2", 100.0, None),  # No plan
-                    ]
-                )
-            },
+            query_results=[_qr("q1", 100.0, plan), _qr("q2", 100.0, None)],  # q2: no plan
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={
-                "power": MockPhaseResults(
-                    queries=[
-                        MockQueryExecution("q1", 100.0, plan),
-                        MockQueryExecution("q2", 100.0, None),
-                    ]
-                )
-            },
+            query_results=[_qr("q1", 100.0, plan), _qr("q2", 100.0, None)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current)
@@ -359,11 +306,11 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)])},
+            query_results=[_qr("q1", 100.0, plan1)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q2", 100.0, plan2)])},
+            query_results=[_qr("q2", 100.0, plan2)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current)
@@ -371,23 +318,17 @@ class TestGeneratePlanComparisonSummary:
         assert summary.plans_compared == 0  # No common queries
 
     def test_multiple_phases(self) -> None:
-        """Test that queries from multiple phases are collected."""
+        """Test that all queries in query_results are collected regardless of phase."""
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_simple_plan("q2", "customers")
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={
-                "warmup": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)]),
-                "power": MockPhaseResults(queries=[MockQueryExecution("q2", 200.0, plan2)]),
-            },
+            query_results=[_qr("q1", 100.0, plan1), _qr("q2", 200.0, plan2)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={
-                "warmup": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)]),
-                "power": MockPhaseResults(queries=[MockQueryExecution("q2", 200.0, plan2)]),
-            },
+            query_results=[_qr("q1", 100.0, plan1), _qr("q2", 200.0, plan2)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current)

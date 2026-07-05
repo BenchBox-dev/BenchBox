@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import importlib
-import json
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from click.testing import CliRunner
+
+from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 mod = importlib.import_module("benchbox.cli.commands.show_plan")
 
@@ -18,24 +19,16 @@ pytestmark = [
 ]
 
 
-class _Exec:
-    def __init__(self, qid: str, plan=None):
-        self.query_id = qid
-        self.query_plan = plan
+def _make_results(query_id: str = "q1", has_plan: bool = True):
+    """Build a real BenchmarkResults instance (not a fabricated `.phases` fake)."""
+    plan = SimpleNamespace(to_dict=lambda: {"node": "scan"}) if has_plan else None
+    query_result: dict = {"query_id": query_id}
+    if plan is not None:
+        query_result["query_plan"] = plan
+    return make_benchmark_results(query_results=[query_result])
 
 
-class _Phase:
-    def __init__(self, queries):
-        self.queries = queries
-
-
-class _Results:
-    def __init__(self, query_id="q1", has_plan=True):
-        plan = SimpleNamespace(to_dict=lambda: {"node": "scan"}) if has_plan else None
-        self.phases = {"power": _Phase([_Exec(query_id, plan)])}
-
-
-def _make_load(results: _Results):
+def _make_load(results):
     """Return a load_result_file stub yielding (results, {})."""
     return lambda _p: (results, {})
 
@@ -47,7 +40,7 @@ def _write(path: Path, payload: str = "{}") -> None:
 def test_show_plan_tree_summary_and_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     p = tmp_path / "r.json"
     _write(p)
-    monkeypatch.setattr(mod, "load_result_file", _make_load(_Results()))
+    monkeypatch.setattr(mod, "load_result_file", _make_load(_make_results()))
     monkeypatch.setattr(mod, "render_plan", lambda *_a, **_k: "TREE")
     monkeypatch.setattr(mod, "render_summary", lambda *_a, **_k: "SUMMARY")
 
@@ -68,7 +61,7 @@ def test_show_plan_uses_load_result_file(monkeypatch: pytest.MonkeyPatch, tmp_pa
 
     def _spy(path):
         calls.append(path)
-        return (_Results(), {})
+        return (_make_results(), {})
 
     monkeypatch.setattr(mod, "load_result_file", _spy)
     monkeypatch.setattr(mod, "render_plan", lambda *_a, **_k: "TREE")
@@ -80,11 +73,11 @@ def test_show_plan_missing_query_and_plan(monkeypatch: pytest.MonkeyPatch, tmp_p
     p = tmp_path / "r.json"
     _write(p)
 
-    monkeypatch.setattr(mod, "load_result_file", _make_load(_Results(query_id="q2", has_plan=True)))
+    monkeypatch.setattr(mod, "load_result_file", _make_load(_make_results(query_id="q2", has_plan=True)))
     miss_q = CliRunner().invoke(mod.show_plan, ["--run", str(p), "--query-id", "q1"])
     assert miss_q.exit_code == 1
 
-    monkeypatch.setattr(mod, "load_result_file", _make_load(_Results(query_id="q1", has_plan=False)))
+    monkeypatch.setattr(mod, "load_result_file", _make_load(_make_results(query_id="q1", has_plan=False)))
     miss_p = CliRunner().invoke(mod.show_plan, ["--run", str(p), "--query-id", "q1"])
     assert miss_p.exit_code == 1
 
@@ -98,7 +91,7 @@ def test_show_plan_load_error_and_verbose_exception(monkeypatch: pytest.MonkeyPa
 
     p = tmp_path / "ok.json"
     _write(p)
-    monkeypatch.setattr(mod, "load_result_file", _make_load(_Results(query_id="q1", has_plan=True)))
+    monkeypatch.setattr(mod, "load_result_file", _make_load(_make_results(query_id="q1", has_plan=True)))
     monkeypatch.setattr(mod, "render_plan", lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")))
     res = CliRunner().invoke(mod.show_plan, ["--run", str(p), "--query-id", "q1"], obj={"verbose": True})
     assert res.exit_code == 1

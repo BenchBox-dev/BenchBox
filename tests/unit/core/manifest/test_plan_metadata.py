@@ -31,30 +31,19 @@ pytestmark = [
 ]
 
 
-@dataclass
-class MockQueryExecution:
-    """Mock query execution for testing."""
-
-    query_id: str
-    execution_time_ms: float = 100.0
-    query_plan: QueryPlanDAG | None = None
-
-
-@dataclass
-class MockPhaseResults:
-    """Mock phase results for testing."""
-
-    queries: list[MockQueryExecution] = field(default_factory=list)
+def _mock_query_result(query_id: str, execution_time_ms: float = 100.0, query_plan: QueryPlanDAG | None = None) -> dict:
+    """Build a query_results dict matching the real BenchmarkResults.query_results shape."""
+    return {"query_id": query_id, "execution_time_ms": execution_time_ms, "query_plan": query_plan}
 
 
 @dataclass
 class MockBenchmarkResults:
-    """Mock benchmark results for testing."""
+    """Mock benchmark results for testing (matches the real query_results flattened list)."""
 
     run_id: str = "test_run"
     platform: str = "duckdb"
     platform_version: str = "0.9.0"
-    phases: dict[str, MockPhaseResults] = field(default_factory=dict)
+    query_results: list[dict] = field(default_factory=list)
 
 
 def _create_plan_with_fingerprint(query_id: str, fingerprint: str) -> QueryPlanDAG:
@@ -231,14 +220,10 @@ class TestCreatePlanMetadataFromResults:
         results = MockBenchmarkResults(
             platform="duckdb",
             platform_version="0.9.0",
-            phases={
-                "power": MockPhaseResults(
-                    queries=[
-                        MockQueryExecution("q1", 100.0, plan1),
-                        MockQueryExecution("q2", 200.0, plan2),
-                    ]
-                )
-            },
+            query_results=[
+                _mock_query_result("q1", 100.0, plan1),
+                _mock_query_result("q2", 200.0, plan2),
+            ],
         )
 
         metadata = create_plan_metadata_from_results(results)
@@ -255,14 +240,10 @@ class TestCreatePlanMetadataFromResults:
         plan1 = _create_plan_with_fingerprint("q1", "a" * 64)
 
         results = MockBenchmarkResults(
-            phases={
-                "power": MockPhaseResults(
-                    queries=[
-                        MockQueryExecution("q1", 100.0, plan1),
-                        MockQueryExecution("q2", 200.0, None),  # No plan
-                    ]
-                )
-            },
+            query_results=[
+                _mock_query_result("q1", 100.0, plan1),
+                _mock_query_result("q2", 200.0, None),  # No plan
+            ],
         )
 
         metadata = create_plan_metadata_from_results(results)
@@ -272,7 +253,7 @@ class TestCreatePlanMetadataFromResults:
 
     def test_handles_empty_results(self) -> None:
         """Test handling results with no executions."""
-        results = MockBenchmarkResults(phases={})
+        results = MockBenchmarkResults(query_results=[])
 
         metadata = create_plan_metadata_from_results(results)
 

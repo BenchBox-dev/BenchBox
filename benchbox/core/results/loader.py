@@ -23,6 +23,8 @@ from benchbox.core.results.models import (
     NativeComparisonEntry,
     SetupPhase,
 )
+from benchbox.core.results.query_normalizer import normalize_query_id
+from benchbox.core.results.query_plan_models import QueryPlanDAG
 from benchbox.core.results.schema_policy import LOADER_SCHEMA_POLICY, is_loader_supported_result_schema
 
 logger = logging.getLogger(__name__)
@@ -205,7 +207,7 @@ def reconstruct_benchmark_results(
     execution_section = data.get("execution", {})
 
     timestamp = _parse_timestamp(run_section.get("timestamp", ""))
-    query_results = _reconstruct_query_results(data.get("queries", []), data.get("errors", []))
+    query_results = _reconstruct_query_results(data.get("queries", []), data.get("errors", []), plans_data)
 
     timing = _extract_timing_metrics(summary_section)
     tpc = _extract_tpc_metrics(summary_section)
@@ -433,6 +435,7 @@ def _extract_plans_info(plans_data: dict[str, Any] | None) -> tuple[int, int]:
 def _reconstruct_query_results(
     queries_list: list[dict[str, Any]],
     errors_list: list[dict[str, Any]],
+    plans_data: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Reconstruct query results from compact v2.0 format.
 
@@ -441,13 +444,26 @@ def _reconstruct_query_results(
 
     To internal format:
         {"query_id": "Q1", "execution_time_ms": 632.9, "rows_returned": 100, "status": "SUCCESS"}
+
+    When ``plans_data`` (the loaded ``.plans.json`` companion) carries an entry for a
+    query ID, rehydrate ``query_plan`` as a real ``QueryPlanDAG`` plus its fingerprint
+    fields, so plans survive a load -> show-plan/compare-plans round-trip.
+
+    ``build_plans_payload`` keys its ``queries`` map by the raw, pre-normalization
+    query ID (e.g. ``"q1"``), while the compact ``queries`` list here carries the
+    already-normalized ID (e.g. ``"1"``) written by ``_build_query_results_section``.
+    Normalize both sides for the lookup so the two companion files agree without
+    changing the on-disk ``.plans.json`` format.
     """
+    raw_plan_entries: dict[str, Any] = (plans_data or {}).get("queries") or {}
+    plan_entries: dict[str, Any] = {normalize_query_id(k): v for k, v in raw_plan_entries.items()}
     results: list[dict[str, Any]] = []
 
     # Process successful queries
     for q in queries_list:
+        query_id = q.get("id")
         result: dict[str, Any] = {
-            "query_id": q.get("id"),
+            "query_id": query_id,
             "execution_time_ms": q.get("ms"),
             "rows_returned": q.get("rows"),
             "status": "SUCCESS",
@@ -456,6 +472,7 @@ def _reconstruct_query_results(
             result["iteration"] = q["iter"]
         if q.get("stream"):
             result["stream_id"] = q["stream"]
+        _attach_plan(result, plan_entries.get(normalize_query_id(query_id)) if query_id is not None else None)
         results.append(result)
 
     # Add failed queries from errors
@@ -471,6 +488,37 @@ def _reconstruct_query_results(
             )
 
     return results
+
+
+def _attach_plan(result: dict[str, Any], plan_entry: dict[str, Any] | None) -> None:
+    """Rehydrate a ``.plans.json`` entry onto a reconstructed query result dict."""
+    if not plan_entry:
+        return
+
+    plan_dict = plan_entry.get("plan")
+    if plan_dict is not None:
+        result["query_plan"] = QueryPlanDAG.from_dict(plan_dict)
+    if plan_entry.get("fingerprint"):
+        result["plan_fingerprint"] = plan_entry["fingerprint"]
+    if plan_entry.get("fingerprint_normalized"):
+        result["plan_fingerprint_normalized"] = plan_entry["fingerprint_normalized"]
+    if plan_entry.get("capture_time_ms") is not None:
+        result["plan_capture_time_ms"] = plan_entry["capture_time_ms"]
+
+
+def iter_query_results(results: Any) -> list[dict[str, Any]]:
+    """Return the flattened per-query result dicts for a ``BenchmarkResults`` instance.
+
+    ``query_results`` is the canonical per-query source: ``ResultBuilder`` populates it
+    identically for freshly executed results and ``reconstruct_benchmark_results``
+    populates it the same way for bundles reloaded from disk (including rehydrated
+    ``query_plan``/``plan_fingerprint`` values from the ``.plans.json`` companion).
+    ``execution_phases`` is not a reliable per-query source once reconstructed from a
+    bundle - only phase-level summaries survive that round-trip - so consumers that
+    need per-query plan/fingerprint data should use this accessor instead of walking
+    ``execution_phases``.
+    """
+    return list(getattr(results, "query_results", None) or [])
 
 
 def _reconstruct_execution_phases(phases_section: dict[str, Any]) -> ExecutionPhases | None:
@@ -543,6 +591,7 @@ def _reconstruct_native_comparison(comparisons_section: dict[str, Any]) -> Nativ
 
 __all__ = [
     "find_latest_result",
+    "iter_query_results",
     "load_result_file",
     "reconstruct_benchmark_results",
     "ResultLoadError",

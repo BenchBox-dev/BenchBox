@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.results.loader import iter_query_results
+
 logger = logging.getLogger(__name__)
 
 
@@ -94,16 +96,15 @@ class PlanHistory:
         }
 
         # Extract plan fingerprints from all phases
-        for phase_results in getattr(results, "phases", {}).values():
-            for execution in phase_results.queries:
-                plan = getattr(execution, "query_plan", None)
-                if plan and hasattr(plan, "plan_fingerprint") and plan.plan_fingerprint:
-                    query_id = execution.query_id
-                    history_entry["plan_fingerprints"][query_id] = {
-                        "fingerprint": plan.plan_fingerprint,
-                        "estimated_cost": getattr(plan, "estimated_cost", None),
-                        "execution_time_ms": getattr(execution, "execution_time_ms", 0.0) or 0.0,
-                    }
+        for execution in iter_query_results(results):
+            plan = execution.get("query_plan")
+            if plan and hasattr(plan, "plan_fingerprint") and plan.plan_fingerprint:
+                query_id = execution.get("query_id")
+                history_entry["plan_fingerprints"][query_id] = {
+                    "fingerprint": plan.plan_fingerprint,
+                    "estimated_cost": getattr(plan, "estimated_cost", None),
+                    "execution_time_ms": execution.get("execution_time_ms", 0.0) or 0.0,
+                }
 
         # Write to storage
         history_file = self.storage_path / f"{run_id}.json"
