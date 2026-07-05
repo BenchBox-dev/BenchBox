@@ -69,6 +69,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "AUDIT_SHA_RESULT": "skipped",
         "PACKAGE_SMOKE_RESULT": "skipped",
         "DEPENDENCY_AUDIT_RESULT": "skipped",
+        "PARITY_CHECK_RESULT": "skipped",
         "CONTENT_GUARD_NEEDED": "false",
         "NEEDS_CODE_CI": "false",
         "SAFE_CONTENT_ONLY": "true",
@@ -288,24 +289,32 @@ def test_ci_paths_output_reference_regex_matches_fully_bracketed_form() -> None:
     assert matches == {"new-needed"}
 
 
-def test_parity_check_is_demoted_to_non_blocking() -> None:
-    # parity-check is deliberately non-blocking for now: `make parity-check`
-    # fails locally with an unexplained 2e-13 float drift in
-    # tests/parity/fixtures/geomean_ms.json, so wiring it into
-    # ci-required-result would risk hard-blocking every viz-touching PR on
-    # arrival. Promotion criterion (parity-check-develop-ring.yaml): one
-    # green run on a real GitHub runner + a decision on the float drift
-    # (tolerance vs fixture regen). When promoting, flip this test to the
-    # package-smoke pattern: add parity-check to ci-required-result.needs,
-    # drop continue-on-error, and assert the aggregator observes
-    # PARITY_CHECK_RESULT.
-    workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+def test_parity_check_is_promoted_to_the_required_lane() -> None:
+    # parity-check was promoted from non-blocking to required (2026-07-05,
+    # parity-check-promotion) once both criteria held: (1) one green run on a
+    # real GitHub runner (PR #973), and (2) the 2e-13 geomean_ms drift did NOT
+    # reproduce on the runner (a local libm artifact, not a fixture error), so
+    # exact comparison is kept. This is the package-smoke pattern: the job
+    # keeps its viz path-filter, drops continue-on-error, is in
+    # ci-required-result.needs, and the aggregator observes PARITY_CHECK_RESULT
+    # with skipped-counts-as-pass.
+    workflow_text = (REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8")
+    workflow_yaml = yaml.safe_load(workflow_text)
     parity_job = workflow_yaml["jobs"]["parity-check"]
-    needs = workflow_yaml["jobs"]["ci-required-result"]["needs"]
+    aggregator = workflow_yaml["jobs"]["ci-required-result"]
+    needs = aggregator["needs"]
 
-    assert parity_job.get("continue-on-error") is True
-    assert "viz-needed == 'true'" in parity_job["if"]
-    assert "parity-check" not in needs
+    # Promoted shape: blocking, observed, still path-filtered.
+    assert parity_job.get("continue-on-error") is None, "continue-on-error must be dropped on promotion"
+    assert "viz-needed == 'true'" in parity_job["if"], "path-filtering must stay (non-viz PRs skip)"
+    assert "parity-check" in needs, "aggregator must depend on parity-check to observe its result"
+
+    # The aggregator must read PARITY_CHECK_RESULT and apply skipped-counts-as-pass.
+    agg_step = next(s for s in aggregator["steps"] if s.get("name") == "Aggregate required result")
+    assert agg_step["env"].get("PARITY_CHECK_RESULT") == "${{ needs.parity-check.result }}"
+    run = agg_step["run"]
+    assert 'PARITY_CHECK_RESULT" != "success"' in run
+    assert 'PARITY_CHECK_RESULT" != "skipped"' in run
 
 
 def test_ci_required_result_fails_on_packaging_job_failure() -> None:
@@ -337,5 +346,37 @@ def test_ci_required_result_passes_when_packaging_jobs_skip() -> None:
         CORRECTNESS_RESULT="success",
         PLAN_CAPTURE_RESULT="success",
         EXPLORER_TOKENS_RESULT="success",
+    )
+    assert result.returncode == 0
+
+
+def test_ci_required_result_fails_on_parity_check_failure() -> None:
+    # Promotion (parity-check-promotion): a viz-touching PR whose parity-check
+    # job fails must now fail the required gate (was non-blocking before).
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+        PARITY_CHECK_RESULT="failure",
+    )
+    assert result.returncode == 1
+
+
+def test_ci_required_result_passes_when_parity_check_skips() -> None:
+    # A non-viz PR skips parity-check (path-filtered) and must still pass -
+    # the skipped-counts-as-pass contract the promotion preserves.
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+        PARITY_CHECK_RESULT="skipped",
     )
     assert result.returncode == 0
