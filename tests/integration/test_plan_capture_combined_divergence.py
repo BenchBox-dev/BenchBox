@@ -387,3 +387,97 @@ def test_combined_power_then_throughput_same_public_id_different_sql(tmp_path):
             assert "_plan_capture_key" not in row, "the internal key must be consumed, not leaked to the caller"
     finally:
         conn.close()
+
+
+@pytest.mark.slow
+def test_real_combined_power_maintenance_checkpoint_captures_pre_mutation_plan(tmp_path, monkeypatch):
+    """Regression for the real production checkpoint call site.
+
+    The hand-driven tests above (``test_combined_maintenance_mutation_captures_read_plan_before_mutation``
+    etc.) exercise ``_plan_capture_checkpoint``/``_capture_plans_post_measurement`` by
+    calling them directly, never through the real
+    ``_execute_combined_test`` -> ``_execute_tpch_maintenance_test`` lifecycle. Proof of
+    the blind spot: deleting the checkpoint call at the top of
+    ``_execute_tpch_maintenance_test`` (``self._plan_capture_checkpoint(connection)``) -
+    i.e. fully reverting the divergence fix - leaves every test in this file green,
+    because none of them drives a real combined power->maintenance run under
+    ``capture_plans=True``.
+
+    This test does: a real (file-based) DuckDB TPC-H combined run, power phase then
+    maintenance phase, through the actual ``_execute_queries_by_type`` entry point.
+    RF1 inserts new rows into ``lineitem`` (and ``orders``); Q1 (a plain lineitem scan)
+    is the power-phase query. A spy on ``capture_query_plan`` records the ``lineitem``
+    row count visible at the instant Q1's plan is EXPLAINed. If the checkpoint fires
+    where it should - before RF1's mutation - that count equals the PRE-mutation
+    (post-load) row count. If the checkpoint call is removed or reordered, Q1's plan
+    is instead captured in the final post-measurement pass, AFTER RF1 has already
+    mutated the table, and this assertion fails.
+    """
+    from benchbox.core.tpch.benchmark import TPCHBenchmark
+
+    db_path = str(tmp_path / "combined_maintenance.duckdb")
+    adapter = DuckDBAdapter(database_path=db_path, capture_plans=True)
+    conn = adapter.create_connection()
+    try:
+        bench = TPCHBenchmark(scale_factor=0.01, output_dir=str(tmp_path / "data"))
+        bench.generate_data()
+        adapter.create_schema(bench, conn)
+        adapter.load_data(bench, conn, str(tmp_path / "data"))
+
+        baseline_lineitem_count = conn.execute("SELECT COUNT(*) FROM lineitem").fetchone()[0]
+        # RF2 (delete) targets the single oldest order at scale factor 0.01 (see
+        # TPCHMaintenanceTest._identify_old_orders / num_to_delete). Recording its
+        # key now, before the run, gives a deterministic post-run check that the
+        # mutation actually happened - unlike a net lineitem-row-count delta, which
+        # can coincidentally net to zero (RF1's random insert count happening to
+        # match RF2's delete count for that specific order).
+        oldest_order_key = conn.execute("SELECT O_ORDERKEY FROM orders ORDER BY O_ORDERDATE ASC LIMIT 1").fetchone()[0]
+
+        # Record the lineitem row count visible at the instant Q1's SELECT plan is
+        # captured. RF1's own INSERT statements never match this filter (not a
+        # SELECT), so a non-empty list unambiguously means Q1's plan.
+        captured_counts: list[int] = []
+        original_capture_query_plan = adapter.capture_query_plan
+
+        def _spy(connection, sql, capture_key):
+            if sql.strip().upper().startswith("SELECT") and "lineitem" in sql.lower():
+                captured_counts.append(connection.execute("SELECT COUNT(*) FROM lineitem").fetchone()[0])
+            return original_capture_query_plan(connection, sql, capture_key)
+
+        monkeypatch.setattr(adapter, "capture_query_plan", _spy)
+
+        run_config = {
+            "benchmark_name": "tpch",
+            "test_execution_type": "combined",
+            "scale_factor": 0.01,
+            "iterations": 1,
+            "warm_up_iterations": 0,
+            "query_subset": [1],  # Q1: a plain lineitem scan, no seed-varied predicates needed
+            "maintenance_pairs": 1,
+            "rf1_interval": 0.0,
+            "rf2_interval": 0.0,
+            "validate_integrity": False,
+            "output_dir": str(tmp_path / "maintenance_output"),
+            "options": {"requested_phases": ["power", "maintenance"]},
+        }
+        results = adapter._execute_queries_by_type(bench, conn, run_config)
+
+        power_rows = [r for r in results if r.get("test_type") == "power" and r.get("status") == "SUCCESS"]
+        assert power_rows, "combined run produced no successful power rows"
+        assert power_rows[0].get("plan_fingerprint"), "Q1's power-phase plan was never captured"
+
+        # RF2 must have actually deleted the pre-identified oldest order, or the
+        # pre/post comparison below would be vacuously true regardless of whether
+        # the checkpoint fired.
+        remaining = conn.execute("SELECT COUNT(*) FROM orders WHERE O_ORDERKEY = ?", [oldest_order_key]).fetchone()[0]
+        assert remaining == 0, "RF2 did not delete the identified oldest order - test setup invalid"
+
+        post_run_lineitem_count = conn.execute("SELECT COUNT(*) FROM lineitem").fetchone()[0]
+        assert captured_counts == [baseline_lineitem_count], (
+            f"expected Q1's plan captured exactly once, at the pre-mutation row count "
+            f"{baseline_lineitem_count}, but got {captured_counts} (post-mutation count is "
+            f"{post_run_lineitem_count}) - the pre-maintenance checkpoint did not fire "
+            "before RF1's mutation"
+        )
+    finally:
+        conn.close()
