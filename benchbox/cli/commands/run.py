@@ -677,7 +677,8 @@ def _validate_non_interactive(s: types.SimpleNamespace) -> None:
 
     phase_list = [p.strip() for p in s.phases.split(",") if p.strip()]
     is_data_only = phase_list == ["generate"] or (
-        "generate" in phase_list and not set(phase_list) & {"load", "warmup", "power", "throughput", "maintenance"}
+        "generate" in phase_list
+        and not set(phase_list) & {"load", "statistics", "warmup", "power", "throughput", "maintenance"}
     )
 
     missing_args = []
@@ -697,7 +698,7 @@ def _validate_non_interactive(s: types.SimpleNamespace) -> None:
 
 def _parse_phases_list(s: types.SimpleNamespace) -> None:
     """Parse and validate the --phases list into phases_to_run."""
-    valid_phases = {"generate", "load", "warmup", "power", "throughput", "maintenance"}
+    valid_phases = {"generate", "load", "statistics", "warmup", "power", "throughput", "maintenance"}
     phase_list = [p.strip() for p in s.phases.split(",") if p.strip()]
 
     invalid_phases = set(phase_list) - valid_phases
@@ -2514,7 +2515,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--phases",
     type=str,
     default="power",
-    help="Phases: generate,load,warmup,power,throughput,maintenance",
+    help="Phases: generate,load,statistics,warmup,power,throughput,maintenance",
 )
 @click.option(
     "--queries",

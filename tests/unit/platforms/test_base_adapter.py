@@ -3329,3 +3329,135 @@ class TestDialectQuerySelection:
                 benchmark_slug="tpch",
                 connection=Mock(name="strict_translation_connection"),
             )
+
+
+class TestStatisticsPhase:
+    """Tests for the opt-in statistics phase (load -> statistics -> query)."""
+
+    def test_gather_statistics_prefers_whole_database_analyze(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_tables = Mock()
+        connection = Mock()
+
+        stats_mode, tables_analyzed = adapter.gather_statistics(connection, ["a", "b"])
+
+        adapter.analyze_tables.assert_called_once_with(connection)
+        assert (stats_mode, tables_analyzed) == ("explicit", 2)
+
+    def test_gather_statistics_falls_back_to_per_table_analyze(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        connection = Mock()
+
+        stats_mode, tables_analyzed = adapter.gather_statistics(connection, ["a", "b"])
+
+        assert adapter.analyze_table.call_args_list == [((connection, "a"),), ((connection, "b"),)]
+        assert (stats_mode, tables_analyzed) == ("explicit", 2)
+
+    def test_gather_statistics_reports_unsupported_without_analyze_surface(self):
+        adapter = MockPlatformAdapter()
+
+        assert adapter.gather_statistics(Mock(), ["a"]) == ("unsupported", 0)
+
+    def test_run_statistics_phase_skips_benchmark_without_opt_in(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+
+        phase = adapter.run_statistics_phase(Mock(), Mock(), benchmark_name="ssb", table_names=["customer"])
+
+        assert phase is None
+        adapter.analyze_table.assert_not_called()
+
+    def test_run_statistics_phase_completed_for_opted_in_benchmark(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+
+        phase = adapter.run_statistics_phase(Mock(), Mock(), benchmark_name="joinorder", table_names=["title", "name"])
+
+        assert phase is not None
+        assert phase.status == "COMPLETED"
+        assert phase.stats_mode == "explicit"
+        assert phase.tables_analyzed == 2
+        assert phase.error_message is None
+
+    def test_run_statistics_phase_records_failure_without_raising(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock(side_effect=RuntimeError("ANALYZE exploded"))
+
+        phase = adapter.run_statistics_phase(Mock(), Mock(), benchmark_name="tpch", table_names=["lineitem"])
+
+        assert phase is not None
+        assert phase.status == "FAILED"
+        assert phase.tables_analyzed == 0
+        assert "ANALYZE exploded" in (phase.error_message or "")
+
+    def test_run_statistics_phase_resolves_table_names_from_benchmark(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        benchmark = Mock()
+        benchmark.get_table_names = Mock(return_value=["lineitem", "orders"])
+
+        phase = adapter.run_statistics_phase(benchmark, Mock(), benchmark_name="tpch")
+
+        assert phase is not None and phase.tables_analyzed == 2
+        assert adapter.analyze_table.call_count == 2
+
+    def test_run_benchmark_gathers_statistics_between_load_and_query(self, mock_benchmark, tmp_path):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        mock_benchmark.output_dir = tmp_path
+        mock_benchmark.create_enhanced_benchmark_result.return_value = make_benchmark_results(
+            benchmark_name="tpch",
+            platform="mock",
+            scale_factor=1.0,
+            execution_id="stats_001",
+            duration_seconds=1.0,
+            total_queries=2,
+            successful_queries=2,
+            total_execution_time=0.2,
+            average_query_time=0.1,
+            data_loading_time=0.5,
+            schema_creation_time=0.1,
+            total_rows_loaded=100,
+            data_size_mb=1.0,
+            table_statistics={"table1": 100},
+        )
+
+        adapter.run_benchmark(mock_benchmark, gather_statistics=True, benchmark_name="tpch")
+
+        # load_data returns {"table1": 100}, so the phase analyzes exactly that table.
+        adapter.analyze_table.assert_called_once()
+        assert adapter.analyze_table.call_args[0][1] == "table1"
+        phases = mock_benchmark.create_enhanced_benchmark_result.call_args.kwargs["phases"]
+        stats = phases.setup.statistics_gathering
+        assert stats is not None
+        assert stats.status == "COMPLETED"
+        assert stats.stats_mode == "explicit"
+        assert stats.tables_analyzed == 1
+
+    def test_run_benchmark_without_flag_keeps_legacy_semantics(self, mock_benchmark, tmp_path):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        mock_benchmark.output_dir = tmp_path
+        mock_benchmark.create_enhanced_benchmark_result.return_value = make_benchmark_results(
+            benchmark_name="tpch",
+            platform="mock",
+            scale_factor=1.0,
+            execution_id="stats_002",
+            duration_seconds=1.0,
+            total_queries=2,
+            successful_queries=2,
+            total_execution_time=0.2,
+            average_query_time=0.1,
+            data_loading_time=0.5,
+            schema_creation_time=0.1,
+            total_rows_loaded=100,
+            data_size_mb=1.0,
+            table_statistics={"table1": 100},
+        )
+
+        adapter.run_benchmark(mock_benchmark, benchmark_name="tpch")
+
+        adapter.analyze_table.assert_not_called()
+        phases = mock_benchmark.create_enhanced_benchmark_result.call_args.kwargs["phases"]
+        assert phases.setup.statistics_gathering is None

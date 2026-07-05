@@ -1125,13 +1125,15 @@ class FabricWarehouseAdapter(PlatformAdapter):
         Args:
             connection: Active database connection.
             table_name: Name of table to analyze.
+
+        Raises on failure (does not swallow) so the opt-in statistics phase's
+        gather_statistics() -> run_statistics_phase() caller can detect and
+        record a real failure as status=FAILED.
         """
         cursor = connection.cursor()
         try:
             cursor.execute(f"UPDATE STATISTICS [{self.schema}].[{table_name}]")
             self.logger.debug(f"Updated statistics for {table_name}")
-        except pyodbc.Error as e:
-            self.logger.warning(f"Could not update statistics for {table_name}: {e}")
         finally:
             cursor.close()
 

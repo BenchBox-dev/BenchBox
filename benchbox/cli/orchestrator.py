@@ -283,9 +283,11 @@ class BenchmarkOrchestrator:
                     generate="generate" in phases_to_run,
                     load="load" in phases_to_run,
                     execute=any(p in phases_to_run for p in ["warmup", "power", "throughput", "maintenance"]),
+                    statistics="statistics" in phases_to_run,
                 )
             else:
-                # Default to standard lifecycle (generate + load + execute)
+                # Default to standard lifecycle (generate + load + execute);
+                # the statistics phase stays opt-in.
                 phases = LifecyclePhases(generate=True, load=True, execute=True)
 
             # Validate phase combinations and warn about potential issues

@@ -597,7 +597,12 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             return False
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE on a table when supported by the selected catalog."""
+        """Run ANALYZE on a table when supported by the selected catalog.
+
+        Raises on failure (does not swallow) so the opt-in statistics phase's
+        gather_statistics() -> run_statistics_phase() caller can detect and
+        record a real failure as status=FAILED.
+        """
         if self.table_format == "memory":
             self.logger.debug(f"ANALYZE not supported for memory catalog - skipping {table_name}")
             return
@@ -614,8 +619,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         cursor = connection.cursor()
         try:
             cursor.execute(f"ANALYZE {target_table}")
-        except Exception as e:
-            self.logger.warning(f"Failed to analyze table {table_name}: {e}")
         finally:
             cursor.close()
 
