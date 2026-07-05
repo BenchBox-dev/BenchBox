@@ -24,6 +24,7 @@ query_key_order:
 - stream
 - run_type
 - status
+- test_type
 - digest
 - dataframe_skip_summary
 config_key_order:

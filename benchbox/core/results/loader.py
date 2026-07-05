@@ -454,9 +454,9 @@ def _reconstruct_query_results(
     already-normalized ID (e.g. ``"1"``) written by ``_build_query_results_section``.
     Normalize both sides for the lookup so the two companion files agree without
     changing the on-disk ``.plans.json`` format. A query ID that ran in more than
-    one stream is written under ``"{query_id}#{stream_id}"`` composite keys (see
-    ``build_plans_payload``); ``_index_plan_entries``/``_lookup_plan_entry`` below
-    resolve those back to the exact stream's entry.
+    one stream is written under ``"{query_id}#{test_type}#{stream_id}"`` composite
+    keys (see ``build_plans_payload``); ``_index_plan_entries``/``_lookup_plan_entry``
+    below resolve those back to the exact row's entry.
     """
     plan_entries = _index_plan_entries(plans_data)
     results: list[dict[str, Any]] = []
@@ -474,7 +474,9 @@ def _reconstruct_query_results(
             result["iteration"] = q["iter"]
         if q.get("stream"):
             result["stream_id"] = q["stream"]
-        _attach_plan(result, _lookup_plan_entry(plan_entries, query_id, q.get("stream", 0)))
+        if q.get("test_type"):
+            result["test_type"] = q["test_type"]
+        _attach_plan(result, _lookup_plan_entry(plan_entries, query_id, q.get("test_type", ""), q.get("stream", 0)))
         results.append(result)
 
     # Add failed queries from errors
@@ -512,33 +514,42 @@ def _index_plan_entries(plans_data: dict[str, Any] | None) -> dict[str, Any]:
     """Index a ``.plans.json`` ``queries`` map for lookup by normalized query ID.
 
     A query ID that ran in more than one stream is written under
-    ``"{query_id}#{stream_id}"`` composite keys (see ``build_plans_payload``); this
-    splits those apart so the reader doesn't need to know the writer's key format.
-    Each normalized query ID maps to either a single entry dict (the common
-    bare-key, single-stream case) or a ``{stream_id_str: entry}`` dict (the
-    multi-stream case) - distinguished in ``_lookup_plan_entry`` by the presence
-    of a ``"plan"`` key, which a stream-keyed bucket never has.
+    ``"{query_id}#{test_type}#{stream_id}"`` composite keys (see
+    ``build_plans_payload``); this splits those apart on the FIRST ``#`` (query IDs
+    are plain alphanumeric and never contain one, but the ``test_type#stream_id``
+    remainder legitimately does) so the reader doesn't need to know the writer's
+    key format. Each normalized query ID maps to either a single entry dict (the
+    common bare-key, single-stream case) or a ``{"test_type#stream_id": entry}``
+    dict (the multi-stream case) - distinguished in ``_lookup_plan_entry`` by the
+    presence of a ``"plan"`` key, which a variant-keyed bucket never has.
     """
     raw_entries: dict[str, Any] = (plans_data or {}).get("queries") or {}
     indexed: dict[str, Any] = {}
     for key, entry in raw_entries.items():
         if "#" in key:
-            base_id, _, stream_id = key.rpartition("#")
+            base_id, _, variant_key = key.partition("#")
             bucket = indexed.setdefault(normalize_query_id(base_id), {})
-            bucket[stream_id] = entry
+            bucket[variant_key] = entry
         else:
             indexed[normalize_query_id(key)] = entry
     return indexed
 
 
-def _lookup_plan_entry(plan_entries: dict[str, Any], query_id: Any, stream_id: Any) -> dict[str, Any] | None:
-    """Resolve the plan entry for ``query_id``, disambiguating by ``stream_id`` when needed."""
+def _lookup_plan_entry(
+    plan_entries: dict[str, Any], query_id: Any, test_type: Any, stream_id: Any
+) -> dict[str, Any] | None:
+    """Resolve the plan entry for ``query_id``, disambiguating by ``(test_type, stream_id)``
+    when needed. ``test_type`` is required alongside ``stream_id``: a power
+    measurement stream and a throughput stream in the same combined run can both
+    be numbered ``0`` (independent counters that legitimately collide), so
+    ``stream_id`` alone cannot tell those rows apart.
+    """
     if query_id is None:
         return None
     entry = plan_entries.get(normalize_query_id(query_id))
     if entry is None or "plan" in entry:
         return entry
-    return entry.get(str(stream_id))
+    return entry.get(f"{test_type or ''}#{stream_id}")
 
 
 def iter_query_results(results: Any) -> list[dict[str, Any]]:

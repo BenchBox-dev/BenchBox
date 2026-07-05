@@ -301,6 +301,7 @@ class TestSchemaV2ExportWithPlans:
                 {
                     "query_id": "q06",
                     "status": "SUCCESS",
+                    "test_type": "throughput",
                     "stream_id": 0,
                     "query_plan": plan_stream0,
                     "plan_fingerprint": plan_stream0.plan_fingerprint,
@@ -308,6 +309,7 @@ class TestSchemaV2ExportWithPlans:
                 {
                     "query_id": "q06",
                     "status": "SUCCESS",
+                    "test_type": "throughput",
                     "stream_id": 1,
                     "query_plan": plan_stream1,
                     "plan_fingerprint": plan_stream1.plan_fingerprint,
@@ -322,8 +324,62 @@ class TestSchemaV2ExportWithPlans:
         assert plans_payload["plans_captured"] == 1
         queries = plans_payload["queries"]
         assert "q06" not in queries, "bare query_id key must not be used once ambiguous across streams"
-        assert queries["q06#0"]["fingerprint"] == "a" * 64
-        assert queries["q06#1"]["fingerprint"] == "b" * 64
+        assert queries["q06#throughput#0"]["fingerprint"] == "a" * 64
+        assert queries["q06#throughput#1"]["fingerprint"] == "b" * 64
+
+    def test_schema_v2_plans_companion_power_and_throughput_same_stream_id_not_collapsed(self) -> None:
+        """P1 regression: a combined run's power measurement stream and a
+        throughput stream can both be numbered stream_id=0 for the SAME
+        query_id (power's stream numbering is a serial iteration index,
+        throughput's is a concurrent stream lane - independent counters that
+        legitimately collide). stream_id alone must not be the only
+        disambiguator, or one phase's plan silently overwrites the other's.
+        """
+
+        def _plan(fingerprint: str) -> QueryPlanDAG:
+            root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
+            return QueryPlanDAG(query_id="q06", platform="duckdb", logical_root=root, plan_fingerprint=fingerprint)
+
+        power_plan = _plan("a" * 64)
+        throughput_plan = _plan("b" * 64)
+
+        results = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="duckdb",
+            scale_factor=1.0,
+            execution_id="test_combined_same_stream",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            total_queries=2,
+            successful_queries=2,
+            query_plans_captured=2,
+            query_results=[
+                {
+                    "query_id": "q06",
+                    "status": "SUCCESS",
+                    "test_type": "power",
+                    "stream_id": 0,
+                    "query_plan": power_plan,
+                    "plan_fingerprint": power_plan.plan_fingerprint,
+                },
+                {
+                    "query_id": "q06",
+                    "status": "SUCCESS",
+                    "test_type": "throughput",
+                    "stream_id": 0,
+                    "query_plan": throughput_plan,
+                    "plan_fingerprint": throughput_plan.plan_fingerprint,
+                },
+            ],
+        )
+
+        plans_payload = build_plans_payload(results)
+
+        assert plans_payload is not None
+        queries = plans_payload["queries"]
+        assert len(queries) == 2, f"power and throughput rows must not collapse to one entry: {list(queries)}"
+        assert queries["q06#power#0"]["fingerprint"] == "a" * 64
+        assert queries["q06#throughput#0"]["fingerprint"] == "b" * 64
 
     def test_schema_v2_export_complex_plan(self) -> None:
         """Test schema v2.0 export with complex query plan tree."""

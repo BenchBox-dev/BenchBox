@@ -156,9 +156,12 @@ seed-varied stream attaches its own plan rather than falling back to an id-only 
 somehow lacks the key (a bespoke driver that cannot supply one) falls back to matching by bare query id,
 which only succeeds when that id maps to a single executed SQL variant.
 
-Multi-stream runs persist one plan record per `(query_id, stream_id)` in the `.plans.json` companion -
-streams are never deduplicated or last-writer-wins collapsed, so every stream's plan and fingerprint
-survive a result-file round trip (`show-plan`, `compare-plans`).
+Multi-stream runs persist one plan record per `(query_id, test_type, stream_id)` in the `.plans.json`
+companion - streams are never deduplicated or last-writer-wins collapsed, so every stream's plan and
+fingerprint survive a result-file round trip (`show-plan`, `compare-plans`). `test_type` (power /
+throughput / maintenance) is part of that key, not just `stream_id`: a combined run's power measurement
+stream and a throughput stream are independent counters that can both be numbered `0`, so `stream_id`
+alone cannot tell those rows apart.
 
 > **Bespoke DML query sets.** A *bespoke* query set that runs an `INSERT`/`UPDATE`/`DELETE` partway
 > through and then more `SELECT`s has no maintenance phase boundary, so the isolated model captures

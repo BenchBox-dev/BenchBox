@@ -541,8 +541,9 @@ class TestReconstructBenchmarkResults:
 
     def test_reconstruct_query_results_multi_stream_plans_reattach_per_stream(self):
         """A query_id captured in multiple streams is keyed in .plans.json as
-        "{query_id}#{stream_id}" (build_plans_payload); the loader must resolve
-        each row to its OWN stream's plan, not the other stream's or none at all.
+        "{query_id}#{test_type}#{stream_id}" (build_plans_payload); the loader
+        must resolve each row to its OWN stream's plan, not the other stream's
+        or none at all.
         """
         data = make_v2_result_dict(
             version="2.0",
@@ -559,14 +560,20 @@ class TestReconstructBenchmarkResults:
             failed_queries=0,
             total_ms=200,
             queries=[
-                {"id": "1", "ms": 100.0, "rows": 4, "stream": 1},
-                {"id": "1", "ms": 90.0, "rows": 4, "stream": 2},
+                {"id": "1", "ms": 100.0, "rows": 4, "stream": 1, "test_type": "throughput"},
+                {"id": "1", "ms": 90.0, "rows": 4, "stream": 2, "test_type": "throughput"},
             ],
         )
         plans_data = {
             "queries": {
-                "1#1": {"fingerprint": "a" * 64, "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None}},
-                "1#2": {"fingerprint": "b" * 64, "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None}},
+                "1#throughput#1": {
+                    "fingerprint": "a" * 64,
+                    "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None},
+                },
+                "1#throughput#2": {
+                    "fingerprint": "b" * 64,
+                    "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None},
+                },
             }
         }
 
@@ -577,6 +584,52 @@ class TestReconstructBenchmarkResults:
         assert result.query_results[0]["plan_fingerprint"] == "a" * 64
         assert result.query_results[1]["stream_id"] == 2
         assert result.query_results[1]["plan_fingerprint"] == "b" * 64
+
+    def test_reconstruct_query_results_power_and_throughput_same_stream_id_not_confused(self):
+        """P1 regression: a power row and a throughput row for the same query_id
+        can share stream_id (independent counters that legitimately collide).
+        test_type must disambiguate them; without it, one phase's plan would
+        silently resolve to the other phase's entry.
+        """
+        data = make_v2_result_dict(
+            version="2.0",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=200,
+            total_queries=2,
+            passed_queries=2,
+            failed_queries=0,
+            total_ms=200,
+            queries=[
+                {"id": "1", "ms": 100.0, "rows": 4, "stream": 0, "test_type": "power"},
+                {"id": "1", "ms": 90.0, "rows": 4, "stream": 0, "test_type": "throughput"},
+            ],
+        )
+        plans_data = {
+            "queries": {
+                "1#power#0": {
+                    "fingerprint": "a" * 64,
+                    "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None},
+                },
+                "1#throughput#0": {
+                    "fingerprint": "b" * 64,
+                    "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None},
+                },
+            }
+        }
+
+        result = reconstruct_benchmark_results(data, plans_data=plans_data)
+
+        assert len(result.query_results) == 2
+        power_row, throughput_row = result.query_results
+        assert power_row["test_type"] == "power"
+        assert power_row["plan_fingerprint"] == "a" * 64
+        assert throughput_row["test_type"] == "throughput"
+        assert throughput_row["plan_fingerprint"] == "b" * 64
 
     def test_reconstruct_query_results_single_stream_bare_key_still_works(self):
         """A query_id captured in exactly one stream is keyed bare (no "#stream"

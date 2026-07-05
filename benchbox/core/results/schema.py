@@ -365,6 +365,13 @@ def _build_query_results_section(
         entry["stream"] = stream_id
         entry["run_type"] = run_type
         entry["status"] = status
+        # Additive: distinguishes rows from different phases (power/throughput/
+        # maintenance) that can otherwise share both query_id and stream (a power
+        # measurement stream and a throughput stream can both be numbered 0), which
+        # matters for build_plans_payload's per-stream plan keying below.
+        test_type = qr.get("test_type")
+        if test_type:
+            entry["test_type"] = test_type
         # Gate-only value-digest oracle (BENCHBOX_EMIT_RESULT_DIGEST): present only
         # when the runner emitted a full-result digest, so a normal run's payload
         # shape is unchanged. Explicit None checks (not `or`) so a digest is never
@@ -1054,8 +1061,15 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
         to a single last-writer-wins entry. Rows are grouped by ``query_id``
         first; a group with exactly one plan-bearing row keeps the simple bare
         ``query_id`` key (the common single-stream case, unchanged format), and
-        a group with more than one row uses a ``"{query_id}#{stream_id}"``
-        composite key per row so every stream's plan survives.
+        a group with more than one row uses a
+        ``"{query_id}#{test_type}#{stream_id}"`` composite key per row so every
+        row's plan survives. ``test_type`` (power/throughput/maintenance) is
+        required in the key, not just ``stream_id``: a combined run's power
+        measurement stream and a throughput stream can both be numbered ``0``
+        (power's stream numbering is a serial iteration index, throughput's is a
+        concurrent stream lane - they are independent counters that legitimately
+        collide), so ``stream_id`` alone would silently re-collapse two different
+        phases' rows for the same query_id.
     """
     if not result.query_plans_captured or result.query_plans_captured == 0:
         return None
@@ -1073,7 +1087,10 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     for query_id, rows in rows_by_query_id.items():
         multi_stream = len(rows) > 1
         for qr in rows:
-            key = f"{query_id}#{qr.get('stream_id', 0)}" if multi_stream else query_id
+            if multi_stream:
+                key = f"{query_id}#{qr.get('test_type', '')}#{qr.get('stream_id', 0)}"
+            else:
+                key = query_id
             plans_by_query[key] = _build_plan_entry(qr)
 
     # Add plan capture errors
