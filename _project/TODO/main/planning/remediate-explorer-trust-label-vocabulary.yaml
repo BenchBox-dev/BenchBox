@@ -72,12 +72,12 @@ anti_patterns:
   - "DO NOT add a third divergent label set - because there are already two - collapse to one canonical vocabulary referenced by both sides."
 
 verification:
-  - description: "Every publisher VALID_LABELS value has a non-fallback explorer badge"
-    command: "uv run -- npm --prefix results-explorer test -- TrustBadge"
-    expected_output: "no valid label falls through to the 'unrecognised' path; empty → 'unknown'"
-  - description: "Label vocabulary is single-sourced"
-    command: "grep -rn 'ci-verified\\|VALID_LABELS' benchbox/core/publishing results-explorer/src _project/scripts/explorer_pipeline"
-    expected_output: "one canonical definition, referenced (not re-declared divergently)"
+  - description: "Every publisher VALID_LABELS value renders a non-fallback badge; empty renders 'unknown'"
+    command: "npm --prefix results-explorer test -- TrustBadge"
+    expected_output: "new/updated test asserts each VALID_LABELS value maps to a curated badge (not the 'unrecognised' fallback) and empty → 'unknown'; suite passes"
+  - description: "The ci↔ci-verified / local↔local-run mappings are covered by a test, not just a grep"
+    command: "npm --prefix results-explorer test -- TrustBadge -t 'vocabulary'"
+    expected_output: "a test enumerates the canonical labels and asserts each resolves; fails if a VALID_LABELS value is unmapped"
 
 scope_limit:
   only_modify:

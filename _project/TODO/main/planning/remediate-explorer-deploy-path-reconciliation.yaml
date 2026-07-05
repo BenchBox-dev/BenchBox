@@ -94,9 +94,12 @@ verification:
   - description: "No doc claims an automated explorer rebuild that the wiring cannot perform"
     command: "grep -n 'automatically rebuilds\\|built from .main.' docs/operations/results-phase-2-runbook.md docs/contributing-results.md"
     expected_output: "remaining statements match the decided, wired reality"
-  - description: "Default-branch docs do not reference paths stripped by release-cut"
-    command: "review release-cut output vs docs references (results-explorer/, _project/scripts/, _project/audits/)"
-    expected_output: "no unexecutable references, or an explicit develop-only banner"
+  - description: "release-cut still strips the explorer/results paths (confirms the constraint the docs must respect)"
+    command: "make -n release-cut | grep -nE 'git rm .*results-(data|explorer)'"
+    expected_output: "the strip line is present (or, if the decision changed the wiring, it is intentionally gone)"
+  - description: "Default-branch docs do not send readers to paths absent on main"
+    command: "git show origin/main:docs/operations/results-explorer-qa.md | grep -cE 'results-explorer/|_project/scripts/|_project/audits/'"
+    expected_output: "0 (references removed or gated behind an explicit develop-only banner)"
 
 scope_limit:
   only_modify:

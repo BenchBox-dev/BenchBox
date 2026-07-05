@@ -105,11 +105,11 @@ anti_patterns:
 
 verification:
   - description: "published-results validate-submission covers manifest-only PRs"
-    command: "git show <mirror-branch>:.github/workflows/validate-submission.yml | grep -c CHANGED_MANIFESTS"
-    expected_output: ">= 1 (guard present on the branch that runs it)"
-  - description: "A validator-modifying submission PR cannot self-green"
-    command: "review the workflow: validation runs from a trusted ref or errors on validator edits"
-    expected_output: "self-green vector closed"
+    command: "git show origin/published-results:.github/workflows/validate-submission.yml | grep -c CHANGED_MANIFESTS"
+    expected_output: ">= 1 (guard present on the branch that actually runs the workflow for contributor PRs)"
+  - description: "Validation runs from a trusted ref (closes the self-green vector), or errors on validator edits"
+    command: "grep -nE 'pull_request_target|base\\.sha|base\\.ref|actions/checkout' .github/workflows/validate-submission.yml"
+    expected_output: "validator runs from the base ref (not the PR head), OR a step fails the job when the PR modifies scripts/validate_submission.py / benchbox/validation/bundle.py"
   - description: "ADR allowlist includes the vendored validator"
     command: "grep -n 'benchbox/validation/bundle.py' docs/development/adr/adr-published-results-slim-corpus-branch.md"
     expected_output: "listed in the allowlist; stdlib-only claim corrected"

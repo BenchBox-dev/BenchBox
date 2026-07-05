@@ -90,7 +90,9 @@ work:
 
 deferred:
   - summary: "§2.20 label-vocabulary unification and §2.21 TrustBadge empty-state"
-    reason: "Explorer-render concerns; tracked in remediate-explorer-trust-label-vocabulary (depends on the canonical enum defined here)."
+    reason: "Explorer-render concerns; tracked in remediate-explorer-trust-label-vocabulary, whose w1 defines the canonical vocabulary (that item deps.needs this one so the fail-closed trust derivation lands first)."
+  - summary: "§2.5 optional dedup-string normalization and 0.0-republish scale_factor nit"
+    reason: "Audit rates §2.5 'verified — no defect'; optional robustness only. Recorded here so the audit item is not silently dropped; fix opportunistically if touching store.py."
 
 prior_art:
   - "benchbox/validation/bundle.py:_is_safe_bundle_filename / symlink guard — reuse the existing attacker-facing hardening; extend, do not replace."
@@ -123,7 +125,10 @@ scope_limit:
     - "benchbox/core/publishing/bundle_publisher.py"
     - "_project/scripts/explorer_pipeline/"
     - "scripts/generate_corpus_inventory.py"
-    - "tests/unit/"
+    - "tests/unit/validation/"
+    - "tests/unit/core/publishing/"
+    - "tests/unit/core/explorer_pipeline/"
+    - "tests/unit/scripts/"
   do_not_modify:
     - "results-explorer/src/"
     - ".github/workflows/"

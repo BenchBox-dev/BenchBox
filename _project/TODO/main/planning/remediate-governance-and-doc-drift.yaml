@@ -1,5 +1,5 @@
 id: remediate-governance-and-doc-drift
-title: "Retire the stale prune-publishing doc and fix governance/doc drift that misdirects maintainers"
+title: "Fix governance/doc drift: QA plan overwrite hazard, stale evidence, ADR index, test relocation"
 worktree: main
 priority: High
 status: Not Started
@@ -7,18 +7,11 @@ category: Documentation
 
 description: |
   Source: _project/audits/results-explorer-publication-adversarial-review.md
-  (develop_sha fddedf26), findings §2.12 (Critical), §2.16 (Required), §2.18b
-  (Advisory, grouped), plus the ADR-index gap and §2.22 test-dir relocation.
+  (develop_sha fddedf26), findings §2.16 (Required), §2.18b (Advisory, grouped),
+  plus the ADR-index gap and §2.22 test-dir relocation.
 
-  §2.12 (Critical) — docs/design/future-state/prune-publishing-subsystem/README.md
-  :31-33 says the publishing module has "zero consumers … no CLI integration"
-  and is "High priority (dead code removal)" (docs/design/future-state/index.md:43,
-  in the Sphinx toctree). Reality: benchbox/cli/commands/__init__.py:33 registers
-  `publish`, publish.py imports benchbox.core.publishing, run --publish uses it,
-  and 33 tests cover it. The doc was written 2026-04-01 about the OLD generic
-  layer, which was deleted in 0182c955 (2026-04-27) — the same commit that added
-  the current bundle_publisher.py/store.py at the same path. Following the doc
-  today deletes live, shipped code.
+  (§2.12 Critical — the prune-publishing doc hazard — was split into its own
+  Critical item remediate-prune-publishing-doc-hazard; it is NOT covered here.)
 
   §2.16 (Required) — results-explorer-qa.md is billed as the maintained,
   reusable QA plan (:7-10) but hardcodes saving findings to the sealed
@@ -43,16 +36,6 @@ description: |
   tests no CLI command) — a naming residue from the completed migration.
 
 work:
-  - id: w1
-    summary: "Retire / correct the prune-publishing future-state doc (Critical hazard)"
-    status: pending
-    notes: |
-      Move docs/design/future-state/prune-publishing-subsystem/ to an _archive
-      (or rewrite it to state the prune completed in v0.2.1), remove it from
-      docs/design/future-state/index.md and the toctree, and note that the path
-      now hosts the live bundle-publish subsystem. This is the highest-urgency
-      unit: the current text is an instruction to delete shipped code.
-
   - id: w2
     summary: "Make the QA plan reusable: parameterize the pass number, drop the closed pass-1 TODO reference, fix the screenshots path"
     status: pending
@@ -90,25 +73,27 @@ work:
 deferred:
   - summary: "§2.17/§2.18 QA-doc S7.6 wording and fixture/route accuracy"
     reason: "Content-accuracy of the QA doc body; tracked in remediate-qa-and-browser-test-doc-accuracy."
+  - summary: "§2.19 optional 'publish disambiguation' note in AGENTS.md / CLI docs"
+    reason: "Advisory nicety; the substantive publish-naming hazard is remediate-prune-publishing-doc-hazard. Left as a small follow-up so the audit item is not silently dropped."
+
+deps:
+  needs:
+    - remediate-submission-trust-label-enforcement
 
 prior_art:
-  - "docs/design/future-state/ existing _archive convention — reuse for w1 rather than deleting outright."
   - "docs/development/adr/README.md existing table format — extend with the three missing rows (w4)."
-  - "_project/DONE/main/ completed-item conventions — model for how a superseded future-state doc is annotated."
+  - "_project/DONE/main/ completed-item conventions — model for how a relocated/annotated item is recorded."
 
 must_preserve:
-  - "The live benchbox/core/publishing/ subsystem and its tests remain untouched (this item only edits docs and moves tests)."
   - "The 260 explorer_pipeline tests keep passing after the git mv (imports resolve via namespace packages)."
   - "audit-sha frontmatter contract on _project/audits/ files."
+  - "Any trust tests added by remediate-submission-trust-label-enforcement (which lands first) are moved along with the rest of tests/unit/core/explorer_pipeline/."
 
 anti_patterns:
-  - "DO NOT delete benchbox/core/publishing/ - because the prune doc is stale, not correct - retire the doc instead."
   - "DO NOT hand-edit generated _project/TODO/_indexes/ - regenerate via the todo CLI / make todo-reindex."
+  - "DO NOT run w5 before remediate-submission-trust-label-enforcement merges - because that item adds tests under tests/unit/core/explorer_pipeline/ - the deps.needs edge enforces ordering so the move captures those tests too."
 
 verification:
-  - description: "Prune doc no longer presents live code as removable dead code"
-    command: "grep -rn 'zero consumers\\|dead code removal' docs/design/future-state/prune-publishing-subsystem/ docs/design/future-state/index.md"
-    expected_output: "removed or reworded to 'completed in v0.2.1'"
   - description: "QA plan has no hardcoded pass-2/pass-1 references"
     command: "grep -n 'pass2-findings\\|pass-1 TODO' docs/operations/results-explorer-qa.md"
     expected_output: "pass number parameterized; closed-TODO reference gone"
@@ -121,7 +106,6 @@ verification:
 
 scope_limit:
   only_modify:
-    - "docs/design/future-state/"
     - "docs/operations/results-explorer-qa.md"
     - "docs/development/benchbox-results-platform-strategy.md"
     - "docs/development/adr/"
@@ -134,6 +118,7 @@ scope_limit:
     - "tests/unit/cli/test_explorer_build_contract.py"
   do_not_modify:
     - "benchbox/core/publishing/"
+    - "docs/design/future-state/"
 
 metadata:
   owners:
@@ -146,6 +131,6 @@ metadata:
   created_date: "2026-07-04"
 
 success_metrics:
-  - "No published doc instructs deletion of the live publishing subsystem."
   - "A future QA pass writes to its own findings file, not a sealed one."
   - "All Accepted ADRs are discoverable from the ADR index."
+  - "The mislabeled explorer tests live under a path that matches their imported source."
