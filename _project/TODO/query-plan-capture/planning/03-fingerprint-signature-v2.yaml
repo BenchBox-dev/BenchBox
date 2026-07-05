@@ -32,17 +32,22 @@ prior_art:
 work:
 - id: w1
   summary: >-
-    Create: rewrite the signature to be unambiguous — recursive form
-    op(child1,child2,...) with scalar fields JSON-encoded (json.dumps of the
-    parts list is simplest). Add fingerprint_version field to QueryPlanDAG,
-    to_dict/from_dict, and the companion payload; version bump to 2.
+    Create: rewrite the structural signature to encode tree shape and escape
+    fields; add fingerprint_version=2 to model and companion payload.
+  notes: >-
+    Recursive form op(child1,child2,...) with scalar fields JSON-encoded
+    (json.dumps of the parts list is simplest). Add fingerprint_version to
+    QueryPlanDAG, to_dict/from_dict, and the companion payload.
   status: pending
 - id: w2
   summary: >-
-    Create: integrity semantics — from_dict with absent stored fingerprint
-    sets RECOMPUTED (not VERIFIED); comparison fast path requires matching
-    fingerprint_version AND trusted integrity, else full tree walk; document
-    that integrity states verify internal consistency, not provenance.
+    Create: honest integrity semantics — missing stored fingerprint yields
+    RECOMPUTED; comparator fast path requires version match + trust.
+  notes: >-
+    from_dict with absent stored fingerprint sets RECOMPUTED (not VERIFIED);
+    comparison fast path requires matching fingerprint_version AND trusted
+    integrity, else full tree walk; document that integrity states verify
+    internal consistency, not provenance.
   needs: [w1]
   status: pending
 - id: w3

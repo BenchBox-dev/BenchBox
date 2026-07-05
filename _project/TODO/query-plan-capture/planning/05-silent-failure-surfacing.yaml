@@ -39,10 +39,12 @@ work:
   status: pending
 - id: w2
   summary: >-
-    Create: _load_companion_file logs WARNING with path+error and load_result_file
-    surfaces a plans_load_error field; show-plan/compare-plans print
-    "plans file exists but failed to load: <reason>" instead of
-    "no plans captured".
+    Create: corrupt companion files surface as warnings and a
+    plans_load_error field; CLIs report load failure, not "no plans".
+  notes: >-
+    _load_companion_file logs WARNING with path+error; load_result_file
+    surfaces plans_load_error; show-plan/compare-plans print "plans file
+    exists but failed to load: <reason>" instead of "no plans captured".
   needs: [w1]
   status: pending
 - id: w3
@@ -54,9 +56,12 @@ work:
   status: pending
 - id: w4
   summary: >-
-    Create: DuckDB text parser joins box continuation lines (unbalanced-paren
-    heuristic) before splitting expressions; regression test with the
-    DUCKDB_0_9_FILTER_SCAN fixture asserting one filter expression.
+    Create: DuckDB text parser joins box continuation lines before splitting
+    expressions, with a wrapped-filter regression test.
+  notes: >-
+    Use an unbalanced-paren heuristic to detect continuations; regression
+    test with the DUCKDB_0_9_FILTER_SCAN fixture asserting one filter
+    expression.
   needs: [w3]
   status: pending
 - id: w5

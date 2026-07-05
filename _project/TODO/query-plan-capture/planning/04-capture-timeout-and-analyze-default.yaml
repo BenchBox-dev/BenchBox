@@ -31,18 +31,22 @@ prior_art:
 work:
 - id: w1
   summary: >-
-    Create: on timeout, executor.shutdown(wait=False) and mark the connection
-    for recycling (the leaked thread may still be using it); where the engine
+    Create: make the capture timeout bound wall-clock — non-blocking executor
+    shutdown, connection recycling, server-side bounds where supported.
+  notes: >-
+    On timeout, executor.shutdown(wait=False) and mark the connection for
+    recycling (the leaked thread may still be using it); where the engine
     supports it prefer a server-side bound (DuckDB interrupt API /
     SET statement_timeout for PG-family) over the thread dance. Log the true
     elapsed time if the straggler eventually completes.
   status: pending
 - id: w2
   summary: >-
-    Create: flip analyze_plans default to False (estimated plans); emit a
-    one-line run-level notice when ANALYZE capture is explicitly enabled
-    ("plan capture re-executes each query; timings are not comparable to
-    non-capture runs").
+    Create: flip analyze_plans default to False; print a run-level notice
+    when ANALYZE capture is explicitly enabled.
+  notes: >-
+    Notice wording: plan capture re-executes each query; timings are not
+    comparable to non-capture runs.
   needs: [w1]
   status: pending
 - id: w3

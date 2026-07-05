@@ -31,21 +31,25 @@ prior_art:
 work:
 - id: w1
   summary: >-
-    Create: rehydrate plans in reconstruct_benchmark_results — walk
-    plans_data["queries"], QueryPlanDAG.from_dict(entry["plan"],
+    Create: rehydrate companion plans in the loader, normalize companion
+    keys, and add a phases accessor (or migrate consumers to query_results).
+  notes: >-
+    Walk plans_data["queries"], QueryPlanDAG.from_dict(entry["plan"],
     verify_fingerprint=True), attach query_plan/plan_fingerprint/
     plan_capture_time_ms to matching query_results keyed by
     normalize_query_id. Normalize companion keys in build_plans_payload
     (schema.py:1061). Add a `phases` property on BenchmarkResults returning
-    {phase_name: view-with-.queries} derived from query_results (or migrate
+    {phase_name: view-with-.queries} derived from query_results, or migrate
     the four consumers to read query_results directly — decide in-diff,
-    smaller change wins). Normalize --query-id lookups in show_plan.py and
+    smaller change wins. Normalize --query-id lookups in show_plan.py and
     compare_plans.py with normalize_query_id on both sides.
   status: pending
 - id: w2
   summary: >-
-    Create: keystone no-mock integration test
-    (tests/integration/test_plan_capture_e2e.py): build BenchmarkResults with
+    Create: keystone no-mock integration test covering export -> load ->
+    show-plan/compare-plans on real files.
+  notes: >-
+    tests/integration/test_plan_capture_e2e.py: build BenchmarkResults with
     a parser-produced QueryPlanDAG, export_result to tmp, load_result_file,
     run show-plan and compare-plans via CliRunner asserting rendered plan
     output — zero monkeypatching.

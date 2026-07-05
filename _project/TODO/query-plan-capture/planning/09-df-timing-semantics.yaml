@@ -25,18 +25,21 @@ prior_art:
 work:
 - id: w1
   summary: >-
-    Create: add a plan_capture timed phase to QueryProfileContext (like
-    planning/collect); define execution_time_ms to exclude capture time —
-    either sum-of-measured-phases minus capture, or collect-time as the
+    Create: add a plan_capture timed phase to QueryProfileContext and define
+    execution_time_ms to exclude capture time.
+  notes: >-
+    Either sum-of-measured-phases minus capture, or collect-time as the
     canonical query time. Document which segments count in the profile
     docstring.
   status: pending
 - id: w2
   summary: >-
-    Create: timing contract test — same fake query profiled with and without
-    capture_plan must report execution_time_ms within tolerance; capture time
-    surfaced as its own field (plan_capture_time_ms) matching the SQL-side
-    field name.
+    Create: timing contract test — capture on/off must report equal
+    execution_time_ms; capture time gets its own field.
+  notes: >-
+    Same fake query profiled with and without capture_plan must report
+    execution_time_ms within tolerance; capture time surfaced as
+    plan_capture_time_ms matching the SQL-side field name.
   needs: [w1]
   status: pending
 - id: w3

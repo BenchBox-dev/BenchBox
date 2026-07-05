@@ -28,17 +28,20 @@ work:
 - id: w1
   summary: >-
     Create: replace SimpleNamespace result fakes with real BenchmarkResults
-    instances (cheap to construct) or spec-constrained mocks
-    (create_autospec(BenchmarkResults)); where load_result_file is stubbed
-    for speed, add one companion test per CLI that exercises the real loader
-    on a tmp-file bundle.
+    or spec-constrained mocks; add one real-loader test per CLI.
+  notes: >-
+    Real instances are cheap to construct; otherwise
+    create_autospec(BenchmarkResults). Where load_result_file is stubbed for
+    speed, add one companion test per CLI that exercises the real loader on
+    a tmp-file bundle.
   status: pending
 - id: w2
   summary: >-
-    Create: a guardrail test asserting plan CLI test modules do not
-    monkeypatch load_result_file without a sibling real-file test (pattern
-    mirror of tests/unit/test_todo_executable_docs.py guardrails), or a
-    lightweight lint in tests/conftest.
+    Create: guardrail preventing load_result_file monkeypatching without a
+    sibling real-file test.
+  notes: >-
+    Pattern mirror of tests/unit/test_todo_executable_docs.py guardrails, or
+    a lightweight lint in tests/conftest.
   needs: [w1]
   status: pending
 - id: w3

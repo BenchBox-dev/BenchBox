@@ -30,16 +30,21 @@ prior_art:
 work:
 - id: w1
   summary: >-
-    Create: fix attribute names (execution_id, timestamp) and read plans via
-    the qpc-01 accessor; replace getattr(..., {}) defaults with explicit
-    access so shape drift fails loudly; same fixes in plan_metadata_utils.
+    Create: fix dead attribute reads in history and plan_metadata_utils;
+    make shape drift fail loudly instead of getattr defaults.
+  notes: >-
+    Fix attribute names (execution_id, timestamp) and read plans via the
+    qpc-01 accessor; replace getattr(..., {}) defaults with explicit access;
+    same fixes in plan_metadata_utils.
   status: pending
 - id: w2
   summary: >-
-    Create: wire add_run into the export/post-run path (single call site,
-    opt-in config for the history dir); parse timestamps with
-    datetime.fromisoformat for sorting; partition flap/version detection by
-    platform.
+    Create: wire add_run into the export/post-run path; timestamp-parse
+    sorting; partition flap detection by platform.
+  notes: >-
+    Single call site, opt-in config for the history dir; parse timestamps
+    with datetime.fromisoformat for sorting; partition flap/version
+    detection by platform.
   needs: [w1]
   status: pending
 - id: w3

@@ -39,17 +39,21 @@ work:
   status: pending
 - id: w2
   summary: >-
-    Create: retain plans per (query_id, iteration, stream) — companion
-    entries become a list under each normalized query id with a
+    Create: retain plans per (query_id, iteration, stream) in the companion
+    instead of last-writer-wins; loader accepts both shapes.
+  notes: >-
+    Companion entries become a list under each normalized query id with a
     schema-version bump, or (minimum) keep first + emit plans_dropped count;
-    prefer the list. Loader accepts both shapes.
+    prefer the list.
   needs: [w1]
   status: pending
 - id: w3
   summary: >-
-    Create: route the plans payload through AnonymizationManager when
-    anonymize=True (scrub paths/hostnames in raw_explain_output and operator
-    properties, or omit raw_explain_output for anonymized exports).
+    Create: anonymize the plans payload when anonymize=True (paths/hostnames
+    in raw_explain_output and operator properties).
+  notes: >-
+    Route through AnonymizationManager, or omit raw_explain_output entirely
+    for anonymized exports.
   needs: [w2]
   status: pending
 - id: w4

@@ -47,12 +47,13 @@ work:
   status: pending
 - id: w3
   summary: >-
-    Create: depth handling — serialize to max_depth with a
-    truncated_at_depth marker instead of dropping the plan; fingerprint
-    computed over the full in-memory tree with the fingerprint marked
-    partial-safe; expose plan_max_depth in adapter config next to
-    plan_capture_timeout_seconds; remove the dangling "external plan storage"
-    hint.
+    Create: deep plans serialize with a truncated_at_depth marker instead of
+    being dropped; make plan_max_depth configurable.
+  notes: >-
+    Fingerprint computed over the full in-memory tree with the fingerprint
+    marked partial-safe; expose plan_max_depth in adapter config next to
+    plan_capture_timeout_seconds; remove the dangling "external plan
+    storage" hint.
   needs: [w2]
   status: pending
 - id: w4

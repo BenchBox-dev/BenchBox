@@ -33,10 +33,12 @@ prior_art:
 work:
 - id: w1
   summary: >-
-    Create: move the capture invocation into the shared SQL execute path so
-    every adapter with a parser captures structured plans; platforms without
+    Create: move capture invocation into the shared SQL execute path;
+    parserless platforms warn once per run instead of staying silent.
+  notes: >-
+    Every adapter with a parser captures structured plans; platforms without
     a parser emit ONE prominent run-level warning ("plan capture not
-    supported on X") instead of silence.
+    supported on X").
   status: pending
 - id: w2
   summary: >-
@@ -47,17 +49,22 @@ work:
   status: pending
 - id: w3
   summary: >-
-    Create: per-platform contract tests — the adapter's own EXPLAIN output
-    (fixture) fed to the platform's registered parser must produce a
-    QueryPlanDAG; add plan_format discriminator to companion entries.
+    Create: per-platform adapter-EXPLAIN -> parser contract tests; add a
+    plan_format discriminator to companion entries.
+  notes: >-
+    The adapter's own EXPLAIN output (fixture) fed to the platform's
+    registered parser must produce a QueryPlanDAG.
   needs: [w2]
   status: pending
 - id: w4
   summary: >-
-    Create: DataFrame family — route captured plan text through the
-    registered parsers (DataFusion first) to produce QueryPlanDAG with
-    plan_text preserved as raw_explain_output; keep text-only QueryPlan as
-    fallback with explicit plan_format so consumers fail informatively.
+    Create: DataFrame plans become QueryPlanDAGs via registered parsers,
+    with text-only fallback tagged by plan_format.
+  notes: >-
+    Route captured plan text through the registered parsers (DataFusion
+    first); preserve plan_text as raw_explain_output; keep text-only
+    QueryPlan as fallback with explicit plan_format so consumers fail
+    informatively.
   needs: [w3]
   status: pending
 - id: w5

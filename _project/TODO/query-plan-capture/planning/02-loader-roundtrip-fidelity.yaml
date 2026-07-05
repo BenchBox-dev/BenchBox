@@ -30,18 +30,20 @@ prior_art:
 work:
 - id: w1
   summary: >-
-    Create: in _reconstruct_query_results honor q["status"] and q["run_type"];
-    use `is not None` checks for iter/stream; reconstruct FAILED rows from
+    Create: fix _reconstruct_query_results to honor status/run_type, keep
+    iter/stream 0, dedupe errors[], and carry plan fields through.
+  notes: >-
+    Use `is not None` checks for iter/stream; reconstruct FAILED rows from
     queries[] alone and use errors[] only for legacy bundles whose queries[]
-    lack status; carry plan fields through. In build_plans_payload use
-    `if capture_time is not None:`.
+    lack status. In build_plans_payload use `if capture_time is not None:`.
   status: pending
 - id: w2
   summary: >-
-    Create: round-trip property test — export, load, export again; assert the
-    two main files are byte-identical via canonical_json_text and the two
-    .plans.json companions are byte-identical. Include warmup (iter 0),
-    FAILED, and stream>0 rows in the fixture.
+    Create: round-trip property test — export, load, re-export must be
+    byte-identical for both main file and plans companion.
+  notes: >-
+    Compare via canonical_json_text. Include warmup (iter 0), FAILED, and
+    stream>0 rows in the fixture.
   needs: [w1]
   status: pending
 - id: w3
