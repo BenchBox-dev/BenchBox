@@ -201,6 +201,38 @@ class TestNormalizeQueryResult:
         assert result.stream_id == 0
         assert result.run_type == "warmup"
 
+    def test_normalize_preserves_test_type(self) -> None:
+        """test_type (power/throughput/maintenance) must survive normalization.
+
+        P1 regression: without this, a combined run's power and throughput rows
+        for the same query_id/stream_id become indistinguishable once they reach
+        BenchmarkResults.query_results, and build_plans_payload's per-stream
+        .plans.json keying silently collapses one phase's plan into the other's.
+        """
+        raw = {
+            "query_id": "Q6",
+            "execution_time_seconds": 1.5,
+            "rows_returned": 100,
+            "status": "SUCCESS",
+            "stream_id": 0,
+            "test_type": "power",
+        }
+        result = normalize_query_result(raw)
+
+        assert result.test_type == "power"
+
+    def test_normalize_test_type_defaults_to_none(self) -> None:
+        """A raw result with no test_type field must not fabricate one."""
+        raw = {
+            "query_id": "Q1",
+            "execution_time_seconds": 1.5,
+            "rows_returned": 100,
+            "status": "SUCCESS",
+        }
+        result = normalize_query_result(raw)
+
+        assert result.test_type is None
+
     def test_normalize_execution_time_from_ms(self) -> None:
         """Test normalizing execution time from milliseconds."""
         raw = {

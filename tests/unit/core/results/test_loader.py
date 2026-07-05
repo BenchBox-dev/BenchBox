@@ -631,6 +631,46 @@ class TestReconstructBenchmarkResults:
         assert throughput_row["test_type"] == "throughput"
         assert throughput_row["plan_fingerprint"] == "b" * 64
 
+    def test_reconstruct_query_results_legacy_two_part_key_still_reattaches(self):
+        """P2 regression: a bundle written between the multi-stream fix landing
+        (composite keys introduced) and test_type being added used the legacy
+        "{query_id}#{stream_id}" 2-part key (no test_type segment at all, and
+        the compact queries[] entries have no "test_type" field either).
+        Reloading one of those older bundles with the current reader must
+        still reattach each stream's plan via the fallback bare-stream_id key.
+        """
+        data = make_v2_result_dict(
+            version="2.0",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=200,
+            streams=2,
+            total_queries=2,
+            passed_queries=2,
+            failed_queries=0,
+            total_ms=200,
+            queries=[
+                {"id": "1", "ms": 100.0, "rows": 4, "stream": 0},  # no test_type - legacy shape
+                {"id": "1", "ms": 90.0, "rows": 4, "stream": 1},
+            ],
+        )
+        legacy_plans_data = {
+            "queries": {
+                "1#0": {"fingerprint": "a" * 64, "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None}},
+                "1#1": {"fingerprint": "b" * 64, "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None}},
+            }
+        }
+
+        result = reconstruct_benchmark_results(data, plans_data=legacy_plans_data)
+
+        assert len(result.query_results) == 2
+        assert result.query_results[0]["plan_fingerprint"] == "a" * 64
+        assert result.query_results[1]["plan_fingerprint"] == "b" * 64
+
     def test_reconstruct_query_results_single_stream_bare_key_still_works(self):
         """A query_id captured in exactly one stream is keyed bare (no "#stream"
         suffix); this must keep working unchanged (the common case)."""

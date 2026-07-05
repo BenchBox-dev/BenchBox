@@ -115,6 +115,11 @@ class QueryResultInput:
     # Gate-only value-digest oracle (BENCHBOX_EMIT_RESULT_DIGEST): full-result
     # digest of a stream-0 query. None on a normal run (no payload change).
     result_digest: str | None = None
+    # Phase discriminator (power/throughput/maintenance). Needed alongside
+    # stream_id to key multi-stream plan-capture rows: a power measurement
+    # stream and a throughput stream are independent counters that can both be
+    # numbered 0 (see build_plans_payload in core.results.schema).
+    test_type: str | None = None
 
 
 def normalize_query_result(
@@ -200,6 +205,7 @@ def normalize_query_result(
         plan_fingerprint_normalized=raw_result.get("plan_fingerprint_normalized"),
         plan_capture_time_ms=raw_result.get("plan_capture_time_ms"),
         result_digest=raw_result.get("result_digest"),
+        test_type=raw_result.get("test_type"),
     )
 
 

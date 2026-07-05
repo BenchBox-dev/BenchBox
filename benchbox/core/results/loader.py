@@ -543,13 +543,22 @@ def _lookup_plan_entry(
     measurement stream and a throughput stream in the same combined run can both
     be numbered ``0`` (independent counters that legitimately collide), so
     ``stream_id`` alone cannot tell those rows apart.
+
+    Falls back to the legacy bare ``str(stream_id)`` bucket key when the
+    3-part lookup misses: bundles written between the multi-stream fix landing
+    (composite keys introduced) and ``test_type`` being added to both the
+    compact export and the ``.plans.json`` writer used only ``stream_id``, so
+    reloading one of those older bundles must still find its per-stream plan.
     """
     if query_id is None:
         return None
     entry = plan_entries.get(normalize_query_id(query_id))
     if entry is None or "plan" in entry:
         return entry
-    return entry.get(f"{test_type or ''}#{stream_id}")
+    found = entry.get(f"{test_type or ''}#{stream_id}")
+    if found is not None:
+        return found
+    return entry.get(str(stream_id))
 
 
 def iter_query_results(results: Any) -> list[dict[str, Any]]:

@@ -14,7 +14,7 @@ from benchbox.core.results.builder import (
     normalize_benchmark_id,
 )
 from benchbox.core.results.platform_info import PlatformInfoInput
-from benchbox.core.results.query_normalizer import QueryResultInput
+from benchbox.core.results.query_normalizer import QueryResultInput, normalize_query_result
 
 pytestmark = [
     pytest.mark.unit,
@@ -177,6 +177,44 @@ class TestResultBuilder:
         assert result.successful_queries == 1
         assert result.failed_queries == 1
         assert result.validation_status == "PARTIAL"
+
+    def test_build_preserves_test_type_through_real_pipeline(self) -> None:
+        """P1 regression: test_type must survive the REAL production pipeline -
+        raw dict -> normalize_query_result -> ResultBuilder.add_query_result ->
+        build() -> BenchmarkResults.query_results - not just a synthetic
+        QueryResultInput constructed directly in a test. Without this, a combined
+        run's power and throughput rows for the same query_id/stream_id are
+        indistinguishable by the time build_plans_payload sees them, and its
+        per-stream .plans.json keying silently collapses one phase's plan into
+        the other's.
+        """
+        builder = self.create_builder()
+        power_raw = {
+            "query_id": "Q6",
+            "execution_time_seconds": 1.0,
+            "rows_returned": 100,
+            "status": "SUCCESS",
+            "stream_id": 0,
+            "test_type": "power",
+        }
+        throughput_raw = {
+            "query_id": "Q6",
+            "execution_time_seconds": 1.5,
+            "rows_returned": 100,
+            "status": "SUCCESS",
+            "stream_id": 0,
+            "test_type": "throughput",
+        }
+        builder.add_query_result(normalize_query_result(power_raw))
+        builder.add_query_result(normalize_query_result(throughput_raw))
+
+        result = builder.build()
+
+        assert len(result.query_results) == 2
+        test_types = {qr["test_type"] for qr in result.query_results}
+        assert test_types == {"power", "throughput"}, (
+            f"test_type dropped somewhere in the pipeline: {result.query_results}"
+        )
 
     def test_build_calculates_tpc_metrics(self) -> None:
         """Test that TPC metrics are calculated."""
