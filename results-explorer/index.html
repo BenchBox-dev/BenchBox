@@ -2,6 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Content-Security-Policy: the explorer is a fully static, self-contained
+      SPA. `connect-src 'self'` is the load-bearing directive — it confines all
+      network access (including anything duckdb-wasm's httpfs could attempt) to
+      the app's own origin, closing the remote-fetch/exfil channel. wasm-unsafe-eval
+      + worker-src blob: are required for the duckdb-wasm module and its worker.
+      GitHub Pages cannot set response headers, so this ships as a <meta> tag.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    />
     <link rel="icon" type="image/svg+xml" href="/results/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="BenchBox Results Explorer - browse, compare, and analyze public benchmark results across platforms." />
