@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -15,6 +17,22 @@ pytestmark = [
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _load_path_filter_decision():
+    """Load scripts/path_filter_decision.py the way the workflow uses it.
+
+    tests/unit/scripts/ has a conftest sys.path shim; here we load by file
+    path so the lockstep test derives group names from the same
+    `load_rules` + `extra_group_keys` logic the classify step runs (output
+    naming additionally mirrors write_github_output's `_`→`-` mapping).
+    """
+    script = REPO_ROOT / "scripts" / "path_filter_decision.py"
+    spec = importlib.util.spec_from_file_location("path_filter_decision_lockstep", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _ci_required_result_script() -> str:
@@ -171,6 +189,85 @@ def test_ci_required_result_required_jobs_in_needs() -> None:
     # result silently disappears from the gate.
     assert "package-smoke" in needs
     assert "dependency-audit" in needs
+
+
+def test_ci_paths_job_outputs_declare_every_path_filter_group() -> None:
+    # Incident pin (PR #952 → fixed in PR #955 commit 8652d135): the classify
+    # step wrote `packaging-needed`/`viz-needed` to GITHUB_OUTPUT and the
+    # gated jobs' `if:` referenced `needs.ci-paths.outputs.<group>-needed`,
+    # but the ci-paths JOB `outputs:` block never mapped those step outputs.
+    # GitHub Actions only exposes job outputs that are explicitly declared,
+    # so every `if:` saw "" and package-smoke / dependency-audit /
+    # parity-check silently skipped on EVERY PR — reading green via the
+    # aggregator's skip-counts-as-pass rule. path-filters.yml is designed to
+    # grow new groups without script changes, so this lockstep must be
+    # derived from the rules file, never a hardcoded group list.
+    # (Mapping currently lives at pr.yml jobs.ci-paths.outputs, lines ~27-28.)
+    pfd = _load_path_filter_decision()
+    groups = pfd.extra_group_keys(pfd.load_rules(REPO_ROOT / ".github" / "path-filters.yml"))
+    assert groups, "expected at least one extra path-filter group (e.g. packaging, viz)"
+
+    workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    declared_outputs = workflow_yaml["jobs"]["ci-paths"]["outputs"]
+
+    # Direction 1 (both ways): the set of `*-needed` outputs declared on the
+    # ci-paths job must equal the classify step's `*-needed` emissions —
+    # one per extra group (write_github_output normalizes the rules key
+    # `_`→`-`) plus the always-emitted core `content-guard-needed`. A
+    # missing declaration silently disables a gate (the #952 incident); a
+    # stale declaration after a group is removed/renamed feeds "" to the
+    # gated job's `if:` — the same silent skip from the other side.
+    expected_needed = {f"{group.replace('_', '-')}-needed" for group in groups}
+    expected_needed.add("content-guard-needed")
+    declared_needed = {key for key in declared_outputs if key.endswith("-needed")}
+    assert declared_needed == expected_needed, (
+        "jobs.ci-paths.outputs `*-needed` keys must stay in lockstep with "
+        "path-filters.yml groups (plus core content-guard-needed). "
+        f"Missing declarations: {sorted(expected_needed - declared_needed)}; "
+        f"stale declarations (no classify emission behind them): "
+        f"{sorted(declared_needed - expected_needed)}. Either way the gated "
+        "job's `if:` sees an empty string and silently skips (PR #952)."
+    )
+
+    for key in sorted(expected_needed):
+        # Whitespace-insensitive: `${{steps.classify.outputs.x}}` and
+        # `${{ steps.classify.outputs.x }}` behave identically in Actions.
+        actual = re.sub(r"\s+", "", str(declared_outputs[key]))
+        assert actual == f"${{{{steps.classify.outputs.{key}}}}}", (
+            f"jobs.ci-paths.outputs.{key} must map steps.classify.outputs.{key}"
+        )
+
+
+def test_every_referenced_ci_paths_output_is_declared() -> None:
+    # Direction 2 of the lockstep: any `needs.ci-paths.outputs.<key>`
+    # reference anywhere in pr.yml (job `if:`, step `if:`, env, run) must
+    # name an output the ci-paths job actually declares. Catches a future
+    # job referencing a never-declared output even outside the extra-group
+    # `<group>-needed` convention.
+    # Scanning the raw text (rather than walking parsed YAML) deliberately
+    # covers every usage site — job/step `if:`, env, run blocks. Trade-off:
+    # a comment naming a dropped output would fail this test too; that is a
+    # loud false-fail, preferred over a silent skip.
+    workflow_text = (REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8")
+    workflow_yaml = yaml.safe_load(workflow_text)
+    declared_outputs = set(workflow_yaml["jobs"]["ci-paths"]["outputs"])
+
+    # Match dot and bracket reference forms: needs.ci-paths.outputs.x,
+    # needs['ci-paths'].outputs.x, needs.ci-paths.outputs['x'], and the
+    # fully bracketed combination (single or double quotes).
+    reference_re = (
+        r"needs(?:\.ci-paths|\[['\"]ci-paths['\"]\])"
+        r"\.outputs(?:\.([A-Za-z0-9_-]+)|\[['\"]([A-Za-z0-9_-]+)['\"]\])"
+    )
+    referenced = {dot or bracket for dot, bracket in re.findall(reference_re, workflow_text)}
+    assert referenced, "expected pr.yml to reference ci-paths outputs"
+
+    undeclared = referenced - declared_outputs
+    assert not undeclared, (
+        f"pr.yml references undeclared ci-paths outputs {sorted(undeclared)}; "
+        "declare them in jobs.ci-paths.outputs or the referencing `if:` "
+        "silently evaluates against an empty string (the PR #952 incident)."
+    )
 
 
 def test_parity_check_is_demoted_to_non_blocking() -> None:

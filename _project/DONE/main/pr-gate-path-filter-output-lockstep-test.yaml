@@ -2,7 +2,8 @@ id: pr-gate-path-filter-output-lockstep-test
 title: "Pin ci-paths job-level outputs to the path-filter groups so a missing output mapping can never silently disable a gate again"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-05"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -38,18 +39,21 @@ prior_art:
 work:
   - id: w0
     summary: "Re-validate the #955 fix is present on develop before pinning it"
-    status: pending
+    status: done
     notes: |
       `grep -n 'packaging-needed\|viz-needed' .github/workflows/pr.yml` —
       expect the two job-level `outputs:` mappings (currently pr.yml:27-28)
       plus the three `if:` references. Record the line numbers in the test's
       docstring-adjacent comment or PR body. If absent (revert/refactor),
       restore the mapping first in the same change.
+      DONE 2026-07-05: mappings present at pr.yml:27-28; `if:` references
+      at pr.yml:772 (package-smoke), :814 (dependency-audit), :865
+      (parity-check). Fix confirmed present on origin/develop 7c59f574.
 
   - id: w1
     summary: "Add the lockstep test: every referenced <group>-needed output is declared on the ci-paths job"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       In tests/unit/workflows/test_pr_workflow_path_classifier.py: load
       .github/path-filters.yml groups via the same logic as
@@ -68,7 +72,7 @@ work:
   - id: w2
     summary: "Mutation-probe the new test"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Locally (uncommitted): delete the `packaging-needed:` mapping line from
       pr.yml, run the new test, confirm it FAILS with a message naming the
