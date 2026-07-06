@@ -1,0 +1,169 @@
+id: remediate-ci-required-gate-integrity
+title: "Restore the develop-PR required gate: undeclared ci-paths outputs make three jobs no-op"
+worktree: main
+priority: Critical
+status: "Completed"
+completed_date: "2026-07-06"
+category: Testing and Quality Assurance
+
+description: |
+  Source: _project/audits/results-explorer-publication-adversarial-review.md
+  (develop_sha fddedf26), findings §2.9 (Critical), §2.10 (Required), §2.11
+  (Advisory).
+
+  §2.9 — The `ci-paths` job in `.github/workflows/pr.yml` declares only 7
+  outputs (pr.yml:20-26: safe-content-only, needs-code-ci,
+  content-guard-needed, changed-paths, code-paths, unknown-paths,
+  estimated-runner-minutes-saved). But `package-smoke` (pr.yml:770) and
+  `dependency-audit` (pr.yml:812) gate on
+  `needs.ci-paths.outputs.packaging-needed == 'true'`, and `parity-check`
+  (pr.yml:858) gates on `needs.ci-paths.outputs.viz-needed == 'true'`. The
+  classifier emits these only as STEP outputs
+  (scripts/path_filter_decision.py:196-200), never re-exported at the JOB
+  level, so `needs.ci-paths.outputs.packaging-needed`/`viz-needed` resolve to
+  the empty string and the `== 'true'` conditions are permanently false. All
+  three jobs are always skipped, and `ci-required-result` counts skipped as
+  pass (pr.yml:963-973). This directly defeats the work completed in
+  _project/DONE/main/pr-gate-package-and-audit-promotion.yaml, whose w1 notes
+  claim it emits "a `<group>-needed` GH Actions output" — it added the step
+  output and job gating but not the job-level `outputs:` declaration.
+
+  §2.10 — `_project/scripts/results_explorer_snapshot_invariants.py` enforces
+  12 read-model invariants and its docstring says it exists "so release gates
+  can run it," but nothing invokes it (grep across Makefile/.github/tests
+  returns only its own definition). docs.yml:110-118 builds the snapshot then
+  runs `npm run build` with no validation between, so a malformed snapshot
+  deploys ungated.
+
+  §2.11 — `make validate-imports` runs `scripts/validate_imports.py`, which
+  does not exist (the real gate is `make lint-imports` → `lint-imports`, used
+  by CI). A maintainer running the advertised target gets file-not-found.
+
+work:
+- id: w0
+  summary: "Re-validate all three defects still reproduce at current develop tip"
+  status: done
+  notes: |
+    Confirm the audit still holds before changing anything. Capture stdout
+    to /tmp/remediate-ci-gate-w0.log (do not commit) and summarize here:
+      1. Assert packaging-needed/viz-needed are NOT in the ci-paths outputs
+         block: `sed -n '/^  ci-paths:/,/steps:/p' .github/workflows/pr.yml`
+         — expect neither key present.
+      2. Assert the gates reference them:
+         `grep -n "packaging-needed\|viz-needed" .github/workflows/pr.yml`
+         — expect the step-output emit + the three job `if:` lines.
+      3. Assert no snapshot_invariants caller:
+         `grep -rn snapshot_invariants Makefile .github/workflows tests`
+         — expect only the script's own path.
+      4. Assert missing script: `test -f scripts/validate_imports.py` → non-zero.
+
+- id: w1
+  summary: "Declare packaging-needed/viz-needed (and every extra <group>-needed) in the ci-paths job outputs map"
+  needs: [w0]
+  status: done
+  notes: |
+    In pr.yml `ci-paths.outputs`, add
+      packaging-needed: ${{ steps.classify.outputs.packaging-needed }}
+      viz-needed: ${{ steps.classify.outputs.viz-needed }}
+    (and any other `<group>-needed` the classifier emits per
+    .github/path-filters.yml extra groups). Keep the generic-classifier
+    idiom from pr-gate-package-and-audit-promotion — do not special-case.
+
+- id: w2
+  summary: "Add a meta-test asserting every needs.ci-paths.outputs.* referenced in pr.yml is declared in the ci-paths outputs
+    map"
+  needs: [w1]
+  status: done
+  notes: |
+    New test under tests/unit/scripts/ (e.g. test_pr_workflow_outputs.py):
+    parse .github/workflows/pr.yml, collect every
+    `needs.ci-paths.outputs.<name>` reference and every key declared in the
+    ci-paths `outputs:` map, assert references ⊆ declarations. This backstops
+    the whole `<group>-needed` pattern (also relied on by the planning item
+    explorer-tokens-path-classifier-output.yaml).
+
+- id: w3
+  summary: "Invoke results_explorer_snapshot_invariants.py in docs.yml after the snapshot build; expose a make target"
+  needs: [w0]
+  status: done
+  notes: |
+    Add a step in docs.yml between "Build explorer data" (:112) and
+    "Build results-explorer" (:117) that runs the invariants script against
+    results-explorer/public/data/ and fails on violation. Add a matching
+    `make` target (e.g. explorer-snapshot-check) so it is runnable locally.
+    Gate on the same hashFiles('results-explorer/package.json') sentinel the
+    surrounding explorer steps use.
+
+- id: w4
+  summary: "Repoint make validate-imports at the real import-linter gate (or remove the stale target)"
+  needs: [w0]
+  status: done
+  notes: |
+    Point `validate-imports` at `lint-imports` (uv run -- lint-imports) or
+    delete the target. Confirm no docs still tell a reader to run
+    `make validate-imports` against the missing script.
+
+deferred:
+- summary: "§2.7 validate-submission self-green and broader submission-CI hardening"
+  reason: "Tracked in remediate-published-results-submission-ci."
+
+prior_art:
+- ".github/workflows/pr.yml:audit-sha job — reuse its success-or-skipped ci-required-result pattern (already correct) as the
+  model for w2's declaration contract."
+- "scripts/path_filter_decision.py:extra_group_keys — extend/verify the existing generic <group>-needed emission; do not add
+  a per-group special case."
+- "_project/DONE/main/pr-gate-package-and-audit-promotion.yaml — supersede: this item completes the job-output wiring that
+  TODO left latent."
+
+must_preserve:
+- "ci-required-result's skipped-counts-as-pass semantics for genuinely path-filtered-out jobs (a docs-only PR must still not
+  pay packaging/viz cost)."
+- "Existing 7 ci-paths outputs and their consumers remain unchanged."
+- "docs.yml explorer steps remain gated on hashFiles('results-explorer/package.json') so main builds stay a deliberate no-op."
+
+anti_patterns:
+- "DO NOT make package-smoke/dependency-audit/parity-check unconditionally required - because unrelated PRs would pay the
+  cost - fix the output plumbing so the path filter actually reaches the gate."
+- "DO NOT hardcode packaging-needed as a bespoke output - because the classifier already derives extra groups generically
+  - re-export whatever <group>-needed keys the classifier emits."
+
+verification:
+- description: "packaging-needed and viz-needed are declared job outputs"
+  command: "sed -n '/^  ci-paths:/,/^    steps:/p' .github/workflows/pr.yml | grep -E 'packaging-needed:|viz-needed:'"
+  expected_output: "both keys present in the outputs block"
+- description: "Meta-test catches an undeclared referenced output"
+  command: "uv run -- python -m pytest tests/unit/scripts/test_pr_workflow_outputs.py -q"
+  expected_output: "passes; fails if any needs.ci-paths.outputs.* is undeclared"
+- description: "Snapshot invariants run in the docs build"
+  command: "grep -n 'results_explorer_snapshot_invariants' .github/workflows/docs.yml"
+  expected_output: "a step invokes the script after the snapshot build"
+- description: "make validate-imports resolves"
+  command: "make -n validate-imports"
+  expected_output: "resolves to lint-imports (or target removed); no reference to missing scripts/validate_imports.py"
+
+scope_limit:
+  only_modify:
+  - ".github/workflows/pr.yml"
+  - ".github/workflows/docs.yml"
+  - ".github/path-filters.yml"
+  - "scripts/path_filter_decision.py"
+  - "Makefile"
+  - "tests/unit/scripts/"
+  do_not_modify:
+  - "benchbox/"
+  - "_project/scripts/results_explorer_snapshot_invariants.py"
+
+metadata:
+  owners:
+  - "joeharris76"
+  tags:
+  - "results-explorer-publication-remediation"
+  - "ci"
+  - "critical"
+  estimated_effort: "Medium"
+  created_date: "2026-07-04"
+
+success_metrics:
+- "package-smoke, dependency-audit, and parity-check execute (not skip) on a PR that touches pyproject.toml / a viz fixture."
+- "A regression that undeclares a referenced ci-paths output fails the new meta-test."
+- "A malformed explorer snapshot fails the docs build before deploy."

@@ -1,0 +1,139 @@
+id: remediate-explorer-deploy-path-reconciliation
+title: "Reconcile the 'explorer is built/served from main' docs with the release curation that strips it"
+worktree: main
+priority: High
+status: "In Progress"
+category: Documentation
+
+description: |
+  Source: _project/audits/results-explorer-publication-adversarial-review.md
+  (develop_sha fddedf26), findings §2.13 (Required) and §2.14 (Required).
+
+  §2.13 — results-phase-2-runbook.md:41-47 says the explorer "is built from
+  main via docs.yml … publishes from main's view of results-data/," and
+  contributing-results.md:108 promises an automatic explorer rebuild after a
+  merge. But: docs.yml has no trigger on published-results and its deploy job
+  requires push to main (:193), so §6's `gh workflow run docs.yml`
+  (workflow_dispatch) builds but never deploys; Makefile:1070-1072 (release-cut)
+  `git rm -rf results-data results-explorer` from every release branch, so those
+  paths can never reach main; and docs.yml:79-84 documents that on main the
+  explorer steps are a deliberate no-op (hashFiles empty). Net: a merged
+  submission never reaches the public explorer via any automated path, and there
+  is no automated flow from published-results back to develop/main.
+
+  §2.14 — On the default branch (main), docs/operations/results-explorer-qa.md,
+  adr-explorer-cli-surface.md, and a Makefile audit-sha-check target reference
+  results-explorer/, _project/scripts/, _project/audits/ — all stripped from
+  main by release-cut — and README.md:66 links benchbox.dev/results/. A reader
+  landing on the default branch follows docs pointing at absent infrastructure.
+  (CONTRIBUTING.md:44 does correctly say develop is the dev branch — the one
+  mitigation that passes.)
+
+  This item is decision-first: the fix depends on where the explorer is actually
+  intended to build and deploy from. It cannot be a mechanical doc edit until
+  that is settled (see open_questions).
+
+work:
+- id: w0
+  summary: "Re-derive the current deploy reality and settle the intended source-of-truth branch for the explorer"
+  status: done
+  notes: |
+    Confirm: (1) results-explorer/ has never existed on main
+    (`git log origin/main -- results-explorer/` empty); (2) docs.yml deploy is
+    main-push-only; (3) release-cut strips the paths. Then get the maintainer
+    decision recorded in this item (open_questions) before any doc/workflow
+    edit. Capture findings to /tmp and summarize.
+
+- id: w1
+  summary: "Make the runbook + contributing-results describe the real trigger and deploy path"
+  needs: [w0]
+  status: done
+  notes: |
+    Rewrite results-phase-2-runbook.md §1.3/§6 and
+    contributing-results.md:108 to match the decided reality: state which
+    branch builds and deploys the explorer, that workflow_dispatch builds but
+    does not deploy, and how (or whether) a merged submission reaches the site.
+
+- id: w2
+  summary: "Fix the wiring so the documented path is actually achievable (if the decision requires it)"
+  needs: [w0]
+  status: pending
+  notes: |
+    Depending on w0's decision: either (a) stop stripping
+    results-data/results-explorer in release-cut and let docs.yml deploy from
+    main, or (b) add a deploy trigger/source for the branch that genuinely
+    holds the explorer, or (c) document explicitly that the explorer is
+    pre-launch / served out-of-band. Only one of these lands.
+
+- id: w3
+  summary: "Stop the default branch from shipping docs that reference stripped paths"
+  needs: [w0]
+  status: pending
+  notes: |
+    Either exclude the develop-only operations/QA docs and the
+    audit-sha-check Make target from release-cut curation (as
+    results-explorer/ and _project/ already are), or add a prominent
+    "describes develop-only tooling" banner, or gate the README results link
+    until the site is live. Keep only docs whose referenced paths survive
+    release-cut.
+
+prior_art:
+- "Makefile:1070-1072 release-cut curation list — extend the exclusion set (or stop excluding) per the decision, rather than
+  adding a parallel curation mechanism."
+- "docs.yml:79-84 — the inline dormancy comment is the accurate description; align the runbook to it (or change the wiring),
+  not vice versa."
+- "docs/operations/release-guide.md + _project/decisions/single-repo-migration.md — the authoritative curation rationale;
+  reconcile the docs against these."
+
+must_preserve:
+- "The single-repo migration model (develop is authoritative, main is release-only)."
+- "Whatever the decision, CONTRIBUTING.md's correct 'develop is the dev branch' statement stays."
+
+anti_patterns:
+- "DO NOT edit the runbook to a new happy-path story without fixing the wiring - because the contradiction is between docs
+  AND pipeline - reconcile both or the drift returns."
+- "DO NOT unconditionally ship all operations docs on main - because they reference develop-only paths - curate or banner
+  them."
+
+verification:
+- description: "No doc claims an automated explorer rebuild that the wiring cannot perform"
+  command: "grep -n 'automatically rebuilds\\|built from .main.' docs/operations/results-phase-2-runbook.md docs/contributing-results.md"
+  expected_output: "remaining statements match the decided, wired reality"
+- description: "release-cut still strips the explorer/results paths (confirms the constraint the docs must respect)"
+  command: "make -n release-cut | grep -nE 'git rm .*results-(data|explorer)'"
+  expected_output: "the strip line is present (or, if the decision changed the wiring, it is intentionally gone)"
+- description: "Default-branch docs do not send readers to paths absent on main"
+  command: "git show origin/main:docs/operations/results-explorer-qa.md | grep -cE 'results-explorer/|_project/scripts/|_project/audits/'"
+  expected_output: "0 (references removed or gated behind an explicit develop-only banner)"
+
+scope_limit:
+  only_modify:
+  - "docs/operations/results-phase-2-runbook.md"
+  - "docs/contributing-results.md"
+  - "docs/operations/results-explorer-qa.md"
+  - "Makefile"
+  - ".github/workflows/docs.yml"
+  do_not_modify:
+  - "benchbox/"
+  - "results-explorer/"
+
+metadata:
+  owners:
+  - "joeharris76"
+  tags:
+  - "results-explorer-publication-remediation"
+  - "docs"
+  - "release"
+  estimated_effort: "Medium"
+  created_date: "2026-07-04"
+
+open_questions:
+- question: "From which branch is benchbox.dev/results/ intended to build and deploy, and is it live today?"
+  gating: true
+  affects: ["w1", "w2", "w3"]
+  default: "Assume main is the intended source but the explorer is pre-launch (never yet deployed); document that state and
+    fix the auto-rebuild promise, deferring any release-cut change to an explicit maintainer decision."
+
+success_metrics:
+- "The runbook and contributor guide describe a deploy path that the workflows can actually perform."
+- "A reader on the default branch is not sent to paths that do not exist there."
