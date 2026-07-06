@@ -34,7 +34,7 @@ import duckdb
 import pytest
 
 from _project.scripts.explorer_pipeline.pipeline import ExplorerPipeline
-from tests.unit.core.explorer_pipeline.conftest import MINIMAL_BUNDLE
+from tests.unit.scripts.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
