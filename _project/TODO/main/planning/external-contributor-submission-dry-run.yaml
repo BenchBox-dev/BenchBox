@@ -135,8 +135,39 @@ work:
       - `base_branch: published-results`
       - `merged_at: <ISO timestamp>`
       - `trust_label: community-submission`
+      - `s28_fork_comment_verified: true | blocked-on-#993`   # see w6
     The existing 2026-04-28 and 2026-04-29 agent-proxy retrospectives are
     useful prior evidence but must not satisfy this TODO's verification.
+
+- id: w6
+  summary: "Verify the §2.8 fork-PR validation-comment path on the real fork PR"
+  needs: [w4]
+  status: pending
+  notes: |
+    The dry-run PR is (by design) a FORK PR to published-results — the only way
+    to exercise the §2.8 fork-PR comment fix against reality. Every
+    maintainer/mirror PR is same-repo, and the repo has 0 forks today, so §2.8
+    was implemented (PRs #1000 develop + #1001 published-results) but NEVER
+    verified end-to-end. This unit closes that gap using w4's real external
+    fork PR.
+
+    HARD PRECONDITION: only meaningful once the repo default_branch is
+    `develop` (PR #993 + the manual default switch in
+    docs/operations/branch-rename-runbook.md). A `workflow_run` companion fires
+    only from the DEFAULT branch, so validate-submission-comment.yml does not
+    run until develop is the default. If the dry-run runs before that switch,
+    record w6 as blocked-on-#993 in the retrospective, do not mark it done.
+
+    Observe and record in the retrospective evidence block:
+      - The fork PR's `Validate Submission` check is GREEN when the bundle
+        validates (the read-only-token 403 on the inline "Post PR comment
+        (same-repo fast path)" step did NOT redden it — continue-on-error held).
+      - The `Submission Validation Comment` workflow_run companion ran and the
+        comment (marker `## Submission Validation`) is present, posted by
+        github-actions[bot], with NO duplicate.
+      - `s28_fork_comment_verified: true | blocked-on-#993`
+    If the companion did not post but the artifact uploaded, capture the
+    workflow_run logs URL for follow-up debugging.
 
 verification:
 - description: "Human-specific retrospective exists and lists at least 3 captured friction items"
@@ -147,6 +178,10 @@ verification:
   command: |
     pr="$(rg -o 'https://github.com/joeharris76/BenchBox/pull/[0-9]+' _project/handoffs/external-human-dry-run-retrospective-*.md | tail -1 | sed 's#.*/##')"; test -n "$pr"; gh pr view "$pr" --repo joeharris76/BenchBox --json baseRefName,mergedAt,labels --jq 'select(.baseRefName == "published-results" and .mergedAt != null and ([.labels[].name] | index("community-submission"))) | "ok"'
   expected_output: "ok"
+- description: "w6: the §2.8 fork-PR comment path was exercised (verified, or explicitly blocked-on-#993) in the retrospective"
+  command: |
+    rg -n 's28_fork_comment_verified:\s*(true|blocked-on-#993)' _project/handoffs/external-human-dry-run-retrospective-*.md
+  expected_output: "one match — true once the default-branch switch (#993) is live and the companion posted; blocked-on-#993 if the dry-run ran before the switch"
 
 prior_art:
 - "_project/handoffs/external-dry-run-retrospective-2026-04-28.md — agent-proxy retrospective format; REUSE the compact friction-summary style but do not count this file as human evidence"
