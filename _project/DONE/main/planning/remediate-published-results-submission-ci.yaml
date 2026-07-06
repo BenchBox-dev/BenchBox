@@ -2,7 +2,8 @@ id: remediate-published-results-submission-ci
 title: "Harden published-results submission CI: on-branch drift, self-green, fork-PR comments, ADR allowlist"
 worktree: main
 priority: High
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-07-06"
 category: Testing and Quality Assurance
 
 description: |
@@ -72,19 +73,21 @@ work:
 - id: w2
   summary: "Fix fork-PR comment posting so a passing validation never shows red for external contributors"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     If §2.8 confirmed: move commenting to a workflow_run/pull_request_target
     companion running with the base token, or skip commenting gracefully when
     the token is read-only. Do not weaken the read-only posture for fork code.
 
-    2026-07-06 status: IMPLEMENTED, landing. develop PR #1000 adds the
-    workflow_run companion (validate-submission-comment.yml) + artifact upload
-    + continue-on-error on the inline post; published-results mirror is PR
-    #1001. NOTE: the companion only fires from the DEFAULT branch, so it stays
-    inert until the develop default-switch (#993) lands; and the repo has 0
-    forks, so §2.8 could not be verified against a real fork-PR run. Close this
-    unit once #1000/#1001 merge; leave the item open on w5 until then.
+    2026-07-06 DONE: develop PR #1000 (merged) adds the workflow_run companion
+    (validate-submission-comment.yml) + artifact upload + continue-on-error on
+    the inline post; published-results mirror #1001 (merged) carries the
+    artifact-upload + continue-on-error half. NOTE (documented, not blocking):
+    the companion only fires from the DEFAULT branch, so it stays inert until
+    the develop default-switch (#993) lands; and the repo has 0 forks, so §2.8
+    could not be verified against a real fork-PR run — built to the documented
+    GitHub mechanism. The continue-on-error change already removes the red-X
+    harm on published-results now.
 
 - id: w3
   summary: "Neutralize the self-green vector (§2.7)"
@@ -107,7 +110,7 @@ work:
 - id: w5
   summary: "Post-merge: merge the resulting mirror PR into published-results and confirm the branch is live"
   needs: [w1, w3, w4]
-  status: pending
+  status: done
   notes: |
     This TODO's develop-side PR only prepares the fix; it does not put it on
     published-results by itself. After it merges to develop,
