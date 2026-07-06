@@ -2450,6 +2450,8 @@ def _interactive_show_preview(s: types.SimpleNamespace) -> None:
         sorted_ingestion_method=s.sorted_ingestion_method,
         global_cache=s.global_cache,
         strict_translation=s.strict_translation,
+        stats_reset=getattr(s, "stats_reset", None),
+        stats_per_table_timing=bool(getattr(s, "stats_per_table_timing", False)),
         benchmark_options=dict(s.benchmark_option_pairs) if s.benchmark_option_pairs else None,
     )
 

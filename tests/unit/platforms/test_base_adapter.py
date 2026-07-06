@@ -3530,6 +3530,50 @@ class TestStatisticsPhase:
         assert phase.per_table_ms is None
         adapter.analyze_tables.assert_called_once()
 
+    def test_run_statistics_phase_per_table_timing_unavailable_when_gather_statistics_overridden(self):
+        """Adapters that override gather_statistics with platform-specific
+        routing (e.g. Redshift's auto-on-load special case) must keep deciding
+        stats_mode themselves: the per-table loop guard defers to their
+        gather_statistics and leaves per_table_ms unset, so it can never
+        double-run ANALYZE or bypass the auto-on-load attribution."""
+
+        class AutoOnLoadAdapter(MockPlatformAdapter):
+            def gather_statistics(self, connection, table_names):
+                return "auto-on-load", 0
+
+        adapter = AutoOnLoadAdapter()
+        adapter.analyze_table = Mock()
+
+        phase = adapter.run_statistics_phase(
+            Mock(),
+            Mock(),
+            benchmark_name="joinorder",
+            table_names=["title", "name"],
+            collect_per_table_timing=True,
+        )
+
+        assert phase is not None
+        assert phase.per_table_ms is None
+        assert phase.stats_mode == "auto-on-load"
+        # The per-table loop must not have run behind the override's back.
+        adapter.analyze_table.assert_not_called()
+
+    def test_run_statistics_phase_failed_build_still_records_reset_marker(self):
+        """When a reset was requested and the subsequent statistics build fails,
+        the FAILED phase must still carry the stats_lifecycle marker so a bundle
+        records which control produced the (failed) measurement."""
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock(side_effect=RuntimeError("ANALYZE exploded"))
+        adapter.reset_statistics = Mock(return_value="reset")
+
+        phase = adapter.run_statistics_phase(
+            Mock(), Mock(), benchmark_name="joinorder", table_names=["title"], reset=True
+        )
+
+        assert phase is not None
+        assert phase.status == "FAILED"
+        assert phase.stats_lifecycle == "reset"
+
     def test_run_benchmark_gathers_statistics_between_load_and_query(self, mock_benchmark, tmp_path):
         adapter = MockPlatformAdapter()
         adapter.analyze_table = Mock()

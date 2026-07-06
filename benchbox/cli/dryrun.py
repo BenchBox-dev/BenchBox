@@ -232,6 +232,8 @@ def display_interactive_preview(
     capture_plans: bool = False,
     analyze_plans: bool | None = None,
     strict_translation: bool = False,
+    stats_reset: bool | None = None,
+    stats_per_table_timing: bool = False,
     validation: str | None = None,
     verbose: int = 0,
     console_obj: Console | None = None,
@@ -260,6 +262,8 @@ def display_interactive_preview(
         official: TPC-compliant mode
         capture_plans: Capture query execution plans
         strict_translation: Fail when SQL dialect translation falls back
+        stats_reset: Cold-stats vs warm-stats control for the statistics phase
+        stats_per_table_timing: Record a per-table statistics-build timing breakdown
         validation: Validation mode
         verbose: Verbosity level (0=off, 1=-v, 2=-vv)
         console_obj: Rich console for output
@@ -378,6 +382,8 @@ def display_interactive_preview(
         capture_plans=capture_plans,
         analyze_plans=analyze_plans,
         strict_translation=strict_translation,
+        stats_reset=stats_reset,
+        stats_per_table_timing=stats_per_table_timing,
         validation=validation,
         verbose=verbose,
         platform_options=platform_options,
