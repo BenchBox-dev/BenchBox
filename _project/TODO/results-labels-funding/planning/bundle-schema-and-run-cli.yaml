@@ -50,22 +50,25 @@ work:
       Add funding: str | None (default None) and result_source: str | None to
       BenchmarkResults; ensure result_factory/aggregation paths pass them through
       without requiring them.
-    status: todo
+    status: pending
   - id: w2
     summary: >-
-      In schema.py, emit an optional 'provenance' section only when funding or
-      source is present; normalize funding via provenance.normalize_funding();
-      add 'provenance' to CANONICAL_KEY_ORDER; keep bundle byte-identical when
-      absent.
+      In schema.py, emit an optional 'provenance' section only when funding
+      or source is present; keep the bundle byte-identical when absent.
+    notes: >-
+      Normalize funding via provenance.normalize_funding(); add 'provenance'
+      to CANONICAL_KEY_ORDER.
     needs: [w1]
-    status: todo
+    status: pending
   - id: w3
     summary: >-
-      Add `benchbox run --funding` (Choice from FUNDING_SOURCES, default
-      'unspecified' -> emitted only if explicitly set) and maintainer-only
-      `--result-source` advisory hint; plumb into the result. Update run --help.
+      Add `benchbox run --funding` (Choice from FUNDING_SOURCES) and a
+      maintainer-only `--result-source` advisory hint; update run --help.
+    notes: >-
+      Default 'unspecified' -> emitted only if explicitly set; plumb into
+      the result.
     needs: [w1, w2]
-    status: todo
+    status: pending
 
 must_preserve:
   - "MINIMAL_BUNDLE and all existing schema-v2 fixtures validate unchanged (no provenance block required)."
@@ -129,7 +132,7 @@ delivery_loop:
   create: "Implement w1-w3 within scope_limit; additive optional block only."
   review: "/code-review; run verification + make pr-preflight; confirm canonical-byte stability."
   fix: "Resolve findings; re-run verification."
-  submit_pr: "PR vs main using PULL_REQUEST_TEMPLATE.md (Type: New feature)."
+  submit_pr: "PR vs develop using PULL_REQUEST_TEMPLATE.md (Type: New feature)."
 
 metadata:
   tags: ["explorer", "provenance", "funding", "schema-v2", "cli"]

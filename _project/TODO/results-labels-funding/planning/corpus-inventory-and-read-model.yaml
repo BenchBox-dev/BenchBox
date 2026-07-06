@@ -55,28 +55,35 @@ prior_art:
 work:
   - id: w1
     summary: >-
-      In generate_corpus_inventory.py, resolve trust_label via the item-1 mapping
-      and the item-3 vendor signal (not just community-vs-default); extract
-      funding from the bundle provenance block / manifest; add funding to each
-      entry and a by_funding counter to the summary. Import constants from
-      provenance.py (retire the local COMMUNITY/DEFAULT literals).
-    status: todo
+      In generate_corpus_inventory.py, resolve trust_label via the item-1
+      mapping and the item-3 vendor signal, and extract funding from the
+      bundle. Import constants from provenance.py.
+    notes: >-
+      Resolve via item-1 mapping + item-3 vendor signal (not just
+      community-vs-default); extract funding from the bundle provenance
+      block/manifest; add funding to each entry and a by_funding counter to
+      the summary; retire the local COMMUNITY/DEFAULT literals.
+    status: pending
   - id: w2
     summary: >-
       Add `funding VARCHAR NOT NULL` to the `results` table in
-      browser-duckdb-schema.sql and propagate it into benchmark_rankings and
-      cohort_metadata where trust_label already travels; ensure the vendor
-      visibility state is treated as ranking-eligible in the is_ranking_eligible
-      derivation (computed in Python per the G-11 views-are-bare-columns rule).
+      browser-duckdb-schema.sql and propagate it where trust_label travels.
+    notes: >-
+      Propagate into benchmark_rankings and cohort_metadata; ensure the
+      vendor visibility state is treated as ranking-eligible in the
+      is_ranking_eligible derivation (computed in Python per the G-11
+      views-are-bare-columns rule).
     needs: [w1]
-    status: todo
+    status: pending
   - id: w3
     summary: >-
-      Update the read-model contract tests + corpus-inventory tests for the new
-      column/summary and the vendor/funding cases; record the required
-      read_model_version bump as an explicit obligation passed to item 5.
+      Update the read-model contract tests + corpus-inventory tests for the
+      new column/summary and the vendor/funding cases.
+    notes: >-
+      Record the required read_model_version bump as an explicit obligation
+      passed to item 5.
     needs: [w2]
-    status: todo
+    status: pending
 
 must_preserve:
   - "corpus-inventory.json remains deterministic (sorted, timestamp-normalized in --check)."
@@ -149,7 +156,7 @@ delivery_loop:
   create: "Resolve G-FUNDING-PRIVACY; implement w1-w3 within scope_limit."
   review: "/code-review; run verification + make pr-preflight; verify inventory determinism."
   fix: "Resolve findings; re-run verification and --check."
-  submit_pr: "PR vs main using PULL_REQUEST_TEMPLATE.md (Type: New feature); flag the read_model_version obligation for item 5 in Notes."
+  submit_pr: "PR vs develop using PULL_REQUEST_TEMPLATE.md (Type: New feature); flag the read_model_version obligation for item 5 in Notes."
 
 metadata:
   tags: ["explorer", "read-model", "duckdb", "corpus-inventory", "provenance", "funding", "ranking"]

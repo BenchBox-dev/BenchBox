@@ -71,7 +71,7 @@ loop:
    item, which parses attacker-controlled PR JSON); run the item's
    `verification` commands and `make pr-preflight`.
 3. **fix** — address review findings and any failing gate; re-run verification.
-4. **submit-pr** — open a PR against `main` using
+4. **submit-pr** — open a PR against `develop` using
    `.github/PULL_REQUEST_TEMPLATE.md`, linking this work item; on merge move the
    item's YAML from `_project/TODO/results-labels-funding/planning/` to
    `_project/DONE/results-labels-funding/planning/` and set

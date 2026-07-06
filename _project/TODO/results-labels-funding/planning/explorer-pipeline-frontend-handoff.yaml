@@ -42,27 +42,32 @@ prior_art:
 work:
   - id: w1
     summary: >-
-      PIPELINE (private): BundleTransformer/ExplorerPipeline read provenance.funding
-      + the maintainer vendor signal, write funding + vendor-supplied trust_label +
-      public-vendor-reported visibility + is_ranking_eligible=true into the
-      results/benchmark_rankings/cohort_metadata tables. Bump
-      EXPLORER_READ_MODEL_VERSION in contract.py.
-    status: todo
+      PIPELINE (private): BundleTransformer/ExplorerPipeline write funding +
+      vendor-supplied trust_label + visibility + ranking-eligibility into
+      the read-model tables; bump EXPLORER_READ_MODEL_VERSION.
+    notes: >-
+      Read provenance.funding + the maintainer vendor signal; write funding +
+      vendor-supplied trust_label + public-vendor-reported visibility +
+      is_ranking_eligible=true into the results/benchmark_rankings/
+      cohort_metadata tables. Bump EXPLORER_READ_MODEL_VERSION in contract.py.
+    status: pending
   - id: w2
     summary: >-
-      FRONTEND (private): render the vendor badge in a distinct approved accent
-      token (separate from curated primary + self-reported muted), a funding chip
-      on result cards/detail, a legend row for both, and keep per-row badges in
-      mixed compare views. Vendor rows appear in ranked tables with the badge.
+      FRONTEND (private): render the vendor badge in a distinct accent token,
+      a funding chip on result cards/detail, and a legend row for both.
+    notes: >-
+      Separate from curated primary + self-reported muted; keep per-row
+      badges in mixed compare views. Vendor rows appear in ranked tables
+      with the badge.
     needs: [w1]
-    status: todo
+    status: pending
   - id: w3
     summary: >-
       Add/adjust e2e coverage (results-explorer/e2e/) for the vendor badge +
       funding chip + legend; update any Playwright smoke that asserts the legend
       set.
     needs: [w2]
-    status: todo
+    status: pending
 
 must_preserve:
   - "test_explorer_build_contract.py stays green: version bump + declared outputs move together."

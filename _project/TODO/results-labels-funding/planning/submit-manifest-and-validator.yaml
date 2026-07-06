@@ -48,32 +48,35 @@ prior_art:
 work:
   - id: w1
     summary: >-
-      Add --funding (Choice from FUNDING_SOURCES) and --notes (<=500 chars) to
-      benchbox submit; thread into _build_submission_manifest. Default funding
-      inherits from the bundle's provenance.funding when present, else
-      'unspecified'.
-    status: todo
+      Add --funding (Choice from FUNDING_SOURCES) and --notes (<=500 chars)
+      to benchbox submit; thread into _build_submission_manifest.
+    notes: >-
+      Default funding inherits from the bundle's provenance.funding when
+      present, else 'unspecified'.
+    status: pending
   - id: w2
     summary: >-
       Add funding, result_source (default 'community' for the submit path), and
       submission_notes to the manifest envelope; keep field order deterministic
       (canonical JSON).
     needs: [w1]
-    status: todo
+    status: pending
   - id: w3
     summary: >-
       In validate_submission.py, strictly validate funding in FUNDING_SOURCES and
       result_source in {internal, community, vendor}; reject unknown values.
     needs: [w2]
-    status: todo
+    status: pending
   - id: w4
     summary: >-
-      Enforce G-VENDOR-SIGNAL: a bundle claiming vendor provenance is only valid
-      via the maintainer-controlled path (per the resolved gate); a self-asserted
-      vendor label in an ordinary community submission is a hard validation error
-      with a clear message.
+      Enforce G-VENDOR-SIGNAL: vendor provenance is only valid via the
+      maintainer-controlled path; a self-asserted vendor label is a hard
+      validation error.
+    notes: >-
+      Per the resolved gate: a self-asserted vendor label in an ordinary
+      community submission is a hard validation error with a clear message.
     needs: [w3]
-    status: todo
+    status: pending
 
 must_preserve:
   - "The bundle_hash / companion_hashes contract and path-traversal + symlink defenses in _validate_manifest_hash are unchanged."
@@ -143,7 +146,7 @@ delivery_loop:
   create: "Resolve G-VENDOR-SIGNAL first, then implement w1-w4 within scope_limit."
   review: "/code-review AND /security-review (validator parses hostile PR JSON); run verification + make pr-preflight."
   fix: "Resolve findings; add regression tests for any bypass found."
-  submit_pr: "PR vs main using PULL_REQUEST_TEMPLATE.md (Type: New feature); call out the governance rule in Notes."
+  submit_pr: "PR vs develop using PULL_REQUEST_TEMPLATE.md (Type: New feature); call out the governance rule in Notes."
 
 metadata:
   tags: ["explorer", "provenance", "funding", "submission", "validation", "security", "governance"]

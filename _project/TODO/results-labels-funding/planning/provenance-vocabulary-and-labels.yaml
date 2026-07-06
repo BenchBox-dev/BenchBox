@@ -2,7 +2,7 @@ id: "provenance-vocabulary-and-labels"
 title: "Canonical result-source + funding vocabulary and the vendor-supplied trust label"
 worktree: "results-labels-funding"
 priority: "High"
-status: "Ready"
+status: "Not Started"
 description: |
   Establish a single source of truth for two provenance concepts before any
   producer, submit, inventory, or read-model code references them. Today the
@@ -56,27 +56,33 @@ prior_art:
 work:
   - id: w1
     summary: >-
-      Add benchbox/core/results/provenance.py defining RESULT_SOURCE, the
-      source->trust_label->visibility->ranking_eligible mapping, FUNDING_SOURCES,
-      and normalize_funding()/is_valid_funding()/trust_label_for_source()/
-      visibility_for_label() helpers. Pure data + functions, no I/O, no
-      CLI/platform imports (avoid cycles, same rule as models.py).
-    status: todo
+      Add benchbox/core/results/provenance.py: RESULT_SOURCE, the
+      source->trust_label->visibility->ranking_eligible mapping,
+      FUNDING_SOURCES, and normalize/validate/lookup helper functions.
+    notes: >-
+      Helpers: normalize_funding()/is_valid_funding()/trust_label_for_source()/
+      visibility_for_label(). Pure data + functions, no I/O, no CLI/platform
+      imports (avoid cycles, same rule as models.py).
+    status: pending
   - id: w2
     summary: >-
-      Add 'vendor-supplied' to VALID_LABELS in bundle_publisher.py and re-source
-      the community/default label constants from the new module where trivially
-      safe. Do NOT change publish default (stays 'maintainer-run').
+      Add 'vendor-supplied' to VALID_LABELS in bundle_publisher.py and
+      re-source the community/default label constants from the new module.
+    notes: >-
+      Re-source community/default label constants from the new module where
+      trivially safe. Do NOT change publish default (stays 'maintainer-run').
     needs: [w1]
-    status: todo
+    status: pending
   - id: w3
     summary: >-
-      Update the governance contract of record (hosted-results-contract.md) and
-      contributing-results.md + strategy doc: add the vendor-supplied label row,
-      the public-vendor-reported visibility state, ranking-eligibility change,
-      and a Funding disclosure subsection listing the enum. Add CHANGELOG entry.
+      Update the governance contract of record (hosted-results-contract.md),
+      contributing-results.md, and the strategy doc for the new vocabulary.
+    notes: >-
+      Add the vendor-supplied label row, the public-vendor-reported visibility
+      state, ranking-eligibility change, and a Funding disclosure subsection
+      listing the enum. Add CHANGELOG entry.
     needs: [w1]
-    status: todo
+    status: pending
 
 must_preserve:
   - "Existing VALID_LABELS entries (ci, local, unofficial-research) keep working; publish --label default stays 'maintainer-run'."
@@ -147,7 +153,7 @@ delivery_loop:
   create: "Implement w1-w3 within scope_limit; no emitters change yet."
   review: "/code-review; run verification + make pr-preflight."
   fix: "Resolve findings; re-run verification."
-  submit_pr: "PR vs main using PULL_REQUEST_TEMPLATE.md (Type: New feature + Documentation)."
+  submit_pr: "PR vs develop using PULL_REQUEST_TEMPLATE.md (Type: New feature + Documentation)."
 
 metadata:
   tags: ["explorer", "provenance", "trust-labels", "funding", "governance"]
