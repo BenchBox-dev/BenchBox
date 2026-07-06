@@ -45,7 +45,11 @@ work:
           hosted derived-data workflow;
         - any required first-class stats/analyze phase TODO is completed or this
           prototype is explicitly narrowed to a measurement smoke that does not
-          claim stats-maintenance conclusions;
+          claim stats-maintenance conclusions; NOTE "completed" for
+          publication-quality stale-stats conclusions means BOTH
+          track2-joinorder-stats-phase (phase mechanics, DONE) AND
+          track2-joinorder-stats-phase-controls (the reset/persist control) --
+          the mechanics seed alone only supports the measurement-smoke path;
         - the scale-stress decision note contains exactly one `Stats phase gate:
           completed`, `Stats phase gate: smoke-only`, or `Stats phase gate:
           dependency:track2-joinorder-stats-phase` line; if the
