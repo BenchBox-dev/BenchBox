@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from benchbox.platforms.duckdb import DuckDBAdapter
+from benchbox.utils.printing import set_quiet
 
 pytestmark = [
     pytest.mark.unit,
@@ -295,10 +296,10 @@ class TestDuckDBPlanCapture:
         assert parser.platform_name == "duckdb"
 
     def test_plan_capture_when_enabled(self, adapter_with_capture):
-        """Test that plan is captured with actual timing when capture_plans=True.
+        """Test that a plan is captured when capture_plans=True.
 
-        Default behavior uses EXPLAIN (ANALYZE, FORMAT JSON) so captured plans include
-        actual per-operator timing and cardinality from real execution.
+        Default behavior (analyze_plans=False) uses plain EXPLAIN (FORMAT JSON), so
+        captured plans are estimated-only: no re-execution, no per-operator timing.
         """
         connection = adapter_with_capture.create_connection()
 
@@ -316,14 +317,41 @@ class TestDuckDBPlanCapture:
             plan = result["query_plan"]
             assert plan is not None
             assert plan.logical_root is not None
-            # Default capture uses EXPLAIN (ANALYZE, FORMAT JSON) - physical operator must carry timing
+            # Default capture uses plain EXPLAIN (FORMAT JSON) - no ANALYZE timing.
+            phys = plan.logical_root.physical_operator
+            assert phys is not None, "physical_operator should always be present"
+            timing = phys.properties.get("timing")
+            assert timing is None or timing == 0, f"Expected no timing with default analyze_plans=False, got {timing}"
+
+        finally:
+            adapter_with_capture.close_connection(connection)
+
+    def test_plan_capture_analyze_plans_true_populates_timing(self):
+        """With analyze_plans=True (opt-in), captured plans carry actual timing.
+
+        Regression guard for the default flip: EXPLAIN ANALYZE is still fully
+        functional and available for users who explicitly opt in.
+        """
+        adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
+        connection = adapter.create_connection()
+
+        try:
+            result = adapter.execute_query(
+                connection=connection,
+                query="SELECT 1 as test_column",
+                query_id="test_q1_analyze",
+                validate_row_count=False,
+            )
+
+            plan = result["query_plan"]
+            assert plan is not None
             phys = plan.logical_root.physical_operator
             assert phys is not None, "physical_operator should always be present"
             assert phys.properties.get("timing") is not None, "EXPLAIN ANALYZE should populate timing"
             assert phys.properties["timing"] >= 0, "timing should be non-negative"
 
         finally:
-            adapter_with_capture.close_connection(connection)
+            adapter.close_connection(connection)
 
     def test_plan_not_captured_when_disabled(self, adapter_without_capture):
         """Test that plan is not captured when capture_plans=False."""
@@ -399,8 +427,8 @@ class TestDuckDBPlanCapture:
         """get_query_plan must use EXPLAIN (ANALYZE, FORMAT JSON), not the text/box format.
 
         The text-box parser rejects branching structures (JOINs) and would
-        produce incorrect fingerprints. JSON format handles all query shapes.
-        EXPLAIN ANALYZE adds actual timing and cardinality data to the captured plan.
+        produce incorrect fingerprints. JSON format handles all query shapes,
+        regardless of whether ANALYZE (opt-in) is used.
         """
         connection = adapter_with_capture.create_connection()
         try:
@@ -510,6 +538,76 @@ class TestDuckDBPlanCapture:
 
         finally:
             adapter.close_connection(connection)
+
+    def test_default_adapter_analyze_plans_is_false(self):
+        """analyze_plans defaults to False on a fresh adapter (no explicit override)."""
+        adapter = DuckDBAdapter(capture_plans=True)
+        assert adapter.analyze_plans is False
+
+    def test_default_get_query_plan_issues_plain_explain_no_analyze(self):
+        """Default capture (no analyze_plans override) must not run EXPLAIN ANALYZE.
+
+        Verifies the executed SQL directly rather than inferring it from parsed
+        timing fields, so the assertion holds even if the parser's timing
+        extraction changes.
+        """
+        adapter = DuckDBAdapter(capture_plans=True)
+        connection = MagicMock()
+        connection.execute.return_value.fetchall.return_value = [("physical_plan", "{}")]
+
+        adapter.get_query_plan(connection, "SELECT 1")
+
+        called_sql = connection.execute.call_args[0][0].upper()
+        assert "ANALYZE" not in called_sql, f"Default capture must not run EXPLAIN ANALYZE: {called_sql}"
+        assert "FORMAT JSON" in called_sql
+
+    def test_analyze_plans_notice_printed_once_per_run(self, capsys):
+        """A one-time notice is printed the first time analyze_plans=True actually captures.
+
+        The notice must not repeat on subsequent captures within the same run, and
+        must not appear at all when analyze_plans is left at its False default.
+        """
+        set_quiet(False)
+        adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
+        connection = adapter.create_connection()
+
+        try:
+            connection.execute("CREATE TABLE notice_test (id INTEGER)")
+            connection.execute("INSERT INTO notice_test VALUES (1)")
+
+            adapter.capture_query_plan(connection, "SELECT * FROM notice_test", "notice_q1")
+            first_output = capsys.readouterr().out
+            assert "re-executes each query" in first_output, "Expected the analyze_plans notice on first capture"
+
+            adapter.capture_query_plan(connection, "SELECT * FROM notice_test", "notice_q2")
+            second_output = capsys.readouterr().out
+            assert "re-executes each query" not in second_output, "Notice must print only once per run"
+
+            # A fresh run (stats reset) gets its own notice.
+            adapter._reset_plan_capture_stats()
+            adapter.capture_query_plan(connection, "SELECT * FROM notice_test", "notice_q3")
+            third_output = capsys.readouterr().out
+            assert "re-executes each query" in third_output, "Notice must reprint after a stats reset (new run)"
+        finally:
+            adapter.close_connection(connection)
+            set_quiet(False)
+
+    def test_no_notice_when_analyze_plans_default(self, capsys):
+        """No re-execution notice is printed when analyze_plans stays at its False default."""
+        set_quiet(False)
+        adapter = DuckDBAdapter(capture_plans=True)
+        connection = adapter.create_connection()
+
+        try:
+            connection.execute("CREATE TABLE no_notice_test (id INTEGER)")
+            connection.execute("INSERT INTO no_notice_test VALUES (1)")
+
+            adapter.capture_query_plan(connection, "SELECT * FROM no_notice_test", "no_notice_q1")
+            output = capsys.readouterr().out
+            assert "re-executes each query" not in output
+        finally:
+            adapter.close_connection(connection)
+            set_quiet(False)
 
 
 class TestDuckDBFingerprintIntegration:

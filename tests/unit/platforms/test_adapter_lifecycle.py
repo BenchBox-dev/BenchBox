@@ -198,17 +198,17 @@ def test_run_benchmark_applies_and_restores_analyze_plans(tmp_path: Path) -> Non
     for the run and restored afterwards, exactly like capture_plans."""
     adapter = _LifecycleAdapter(existing_databases=[False])
     benchmark = _LifecycleBenchmark(tmp_path)
-    assert adapter.analyze_plans is True  # adapter default
+    assert adapter.analyze_plans is False  # adapter default
 
     adapter.run_benchmark(
         benchmark,
         benchmark_name="tpch",
         capture_plans=True,
-        analyze_plans=False,
+        analyze_plans=True,
     )
 
     # Restored to the adapter default after the run (saved/restored in run_benchmark).
-    assert adapter.analyze_plans is True
+    assert adapter.analyze_plans is False
 
 
 def test_run_benchmark_leaves_analyze_plans_default_when_run_config_omits_it(tmp_path: Path) -> None:
@@ -218,4 +218,4 @@ def test_run_benchmark_leaves_analyze_plans_default_when_run_config_omits_it(tmp
 
     adapter.run_benchmark(benchmark, benchmark_name="tpch", capture_plans=True, analyze_plans=None)
 
-    assert adapter.analyze_plans is True
+    assert adapter.analyze_plans is False

@@ -2,7 +2,8 @@ id: "qpc-04-capture-timeout-and-analyze-default"
 title: "Make the plan-capture timeout real; default DuckDB capture to estimated plans (no re-execution)"
 worktree: "query-plan-capture"
 priority: "High"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-06"
 
 description: |
   The capture timeout does not bound wall-clock time: capture_query_plan
@@ -34,40 +35,47 @@ work:
     Create: make the capture timeout bound wall-clock — non-blocking executor
     shutdown, connection recycling, server-side bounds where supported.
   notes: >-
-    On timeout, executor.shutdown(wait=False) and mark the connection for
-    recycling (the leaked thread may still be using it); where the engine
-    supports it prefer a server-side bound (DuckDB interrupt API /
-    SET statement_timeout for PG-family) over the thread dance. Log the true
-    elapsed time if the straggler eventually completes.
-  status: pending
+    Already landed on develop prior to this PR: capture_query_plan uses
+    run_with_timeout (daemon thread + join(timeout)), which returns promptly
+    on timeout instead of blocking in shutdown(wait=True); connection
+    recycling after a timeout is handled in the isolated capture phase
+    (benchbox/core/plan_capture_phase.py). Verified via
+    test_capture_timeout_returns_promptly and
+    test_capture_phase_replaces_owned_connection_after_timeout.
+  status: done
 - id: w2
   summary: >-
     Create: flip analyze_plans default to False; print a run-level notice
     when ANALYZE capture is explicitly enabled.
   notes: >-
     Notice wording: plan capture re-executes each query; timings are not
-    comparable to non-capture runs.
+    comparable to non-capture runs. Implemented in adapter.py (default flip)
+    and result_capture.py capture_query_plan (one-time per-run notice via
+    quiet_console, guarded by _analyze_plans_notice_printed, reset in
+    _reset_plan_capture_stats). CLI help text in cli/commands/run.py still
+    describes the old default and is a documented follow-up outside this
+    item's scope_limit.
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: >-
     Create: tests — timeout actually bounds capture_query_plan wall-clock
     (hang 5s, timeout 1s, assert return < 2s); default EXPLAIN options
     contain no ANALYZE; notice printed when enabled.
   needs: [w2]
-  status: pending
+  status: done
 - id: w4
   summary: "Review: adversarial code review (connection-recycle path per platform, orphan-thread lifecycle, strict-mode interaction)."
   needs: [w3]
-  status: pending
+  status: done
 - id: w5
   summary: "Fix: address review findings; re-run verification."
   needs: [w4]
-  status: pending
+  status: done
 - id: w6
   summary: "Submit PR referencing qpc-04; document the analyze_plans default change in release notes."
   needs: [w5]
-  status: pending
+  status: done
 
 must_preserve:
 - "analyze_plans=True still available and functional for users who want actual cardinalities"
