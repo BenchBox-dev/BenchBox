@@ -116,11 +116,11 @@ from typing import Any
 from benchbox.core.errors import SerializationError
 
 # Literal-masking patterns for normalize_literals fingerprints. Numeric literals
-# (including decimals, and a tightly-adjacent sign like ``-5``) collapse to <NUM>
-# and single-quoted string literals to <STR> so that structurally identical plans
-# whose only difference is a data-driven parameter value (e.g. a seed-varied filter
-# threshold) hash the same. Numbers are masked first so digits inside a quoted
-# literal are folded into the <STR> token.
+# (including decimals, and a tightly-adjacent sign like ``-5``) collapse to a
+# placeholder and single-quoted string literals to another, so that structurally
+# identical plans whose only difference is a data-driven parameter value (e.g. a
+# seed-varied filter threshold) hash the same. Numbers are masked first so digits
+# inside a quoted literal are folded into the string token.
 #
 # The numeric pattern uses a negative lookbehind (rather than \b on both ends) so
 # it can also absorb a leading sign: \b requires a word/non-word transition
@@ -129,14 +129,19 @@ from benchbox.core.errors import SerializationError
 # the sign at all. Excluding identifier characters (letters, digits, ``_``,
 # ``.``, ``$``) keeps ``l_orderkey1``/``t1`` intact (the digit is preceded by a
 # letter) while still matching a tightly-adjacent sign (``col > -5``) as PART of
-# the same token. Absorbing the sign matters because without it, ``-5`` and
-# ``5`` (thresholds that cross zero across seeds) mask to ``-<NUM>`` and
-# ``<NUM>`` respectively - still distinct - instead of collapsing to the same
-# placeholder. A sign separated from its digit by whitespace (``a - b``, a
-# binary operator) is NOT absorbed: the pattern requires the sign and digit to
-# be adjacent with nothing in between. The trailing negative lookahead mirrors
-# the leading lookbehind (rather than a trailing \b) so a number is not matched
-# when immediately glued to more identifier-continuation characters either.
+# the same token. ``#`` is excluded on both boundaries too, so ordinal column
+# references (``#0``/``#1``, emitted by DuckDB and others for projected/grouped
+# columns) stay structural instead of collapsing to an indistinguishable masked
+# token - otherwise two plans that reference GENUINELY DIFFERENT positional
+# columns (``proj:#0,#1`` vs ``proj:#0,#2``) would hash the same, hiding a real
+# structural change behind what looks like a literal. Absorbing the sign matters
+# because without it, ``-5`` and ``5`` (thresholds that cross zero across seeds)
+# mask to distinct signed/unsigned placeholders instead of collapsing to the
+# same one. A sign separated from its digit by whitespace (``a - b``, a binary
+# operator) is NOT absorbed: the pattern requires the sign and digit to be
+# adjacent with nothing in between. The trailing negative lookahead mirrors the
+# leading lookbehind (rather than a trailing \b) so a number is not matched when
+# immediately glued to more identifier-continuation characters either.
 #
 # The alternation covers every SQL numeric literal form atomically (a single
 # match spans the whole literal, never leaving a residual value-dependent
@@ -147,18 +152,27 @@ from benchbox.core.errors import SerializationError
 #   - plain integer (``123``) or scientific integer (``1e5``, ``1E-3``)
 #   - ``_`` digit-group separators anywhere in the integer/exponent part
 #     (``1_000``, DuckDB/PostgreSQL numeric-literal syntax)
+#
+# ONE canonical numeric pattern is shared by BOTH maskers below. They previously
+# used two separately-compiled patterns that drifted: only the normalized-text
+# masker excluded ``#``, so the ordinal-collision protection above applied to
+# aggregation/group/sort expressions but NOT to join/filter/projection ones.
+# A single source of truth keeps every surface consistent.
 _HEX_LITERAL = r"0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*"
 _DECIMAL_LITERAL = (
     r"(?:\d(?:_?\d)*(?:\.(?:\d(?:_?\d)*)?)?|\.\d(?:_?\d)*)"  # 123 | 123. | 123.456 | .456
     r"(?:[eE][+-]?\d(?:_?\d)*)?"  # optional exponent: e5, E-3, e+10
 )
-_LITERAL_NUM_RE = re.compile(rf"(?<![A-Za-z0-9_.$])[+-]?(?:{_HEX_LITERAL}|{_DECIMAL_LITERAL})(?![A-Za-z0-9_.$])")
+_NUMERIC_LITERAL_RE = re.compile(rf"(?<![A-Za-z0-9_.$#])[+-]?(?:{_HEX_LITERAL}|{_DECIMAL_LITERAL})(?![A-Za-z0-9_.$#])")
 # ``(?:[^']|'')*`` (rather than ``[^']*``) treats a doubled single quote as an
 # escaped apostrophe INSIDE the literal rather than the end of the string, so
-# ``'O''Brien'`` masks to one <STR> token instead of splitting into two
-# (``'O'`` + ``'Brien'`` -> ``<STR><STR>``, which would leave the split itself
-# as residual value-dependent syntax in the "normalized" signature).
-_LITERAL_STR_RE = re.compile(r"'(?:[^']|'')*'")
+# ``'O''Brien'`` masks to one token instead of splitting into two (``'O'`` +
+# ``'Brien'``, which would leave the split itself as residual value-dependent
+# syntax in the "normalized" signature).
+_STRING_LITERAL_RE = re.compile(r"'(?:[^']|'')*'")
+_LITERAL_PLACEHOLDER = "?"
+
+logger = logging.getLogger(__name__)
 
 
 def _mask_literals(expression: str) -> str:
@@ -166,32 +180,13 @@ def _mask_literals(expression: str) -> str:
 
     Masks only concrete values, never identifiers: a leading identifier character
     immediately before a digit (a column or alias like ``l_orderkey1``, ``t1``)
-    excludes the match, so it is left intact. Used for the opt-in
-    literal-normalized structural signature; the default fingerprint keeps
-    literals verbatim.
+    excludes the match, and ordinal column references (``#0``/``#1``) are likewise
+    preserved via the shared ``#`` boundary exclusion, so they are left intact.
+    Used for the opt-in literal-normalized structural signature
+    (join/filter/projection expressions); the default fingerprint keeps literals
+    verbatim.
     """
-    return _LITERAL_STR_RE.sub("<STR>", _LITERAL_NUM_RE.sub("<NUM>", expression))
-
-
-logger = logging.getLogger(__name__)
-
-# Literal-normalization patterns for normalized plan fingerprints.
-# A normalized fingerprint collapses queries that differ only in literal
-# constants (e.g. TPC-H parameter substitutions) to the same hash by replacing
-# string/date literals and standalone numeric literals with a placeholder.
-_STRING_LITERAL_RE = re.compile(r"'(?:[^']|'')*'")
-# Shares _HEX_LITERAL/_DECIMAL_LITERAL with _LITERAL_NUM_RE (see _mask_literals)
-# so aggregation/group/sort expressions get the same atomic scientific/hex/
-# underscore/dotted numeric masking as join/filter/projection expressions -
-# without it, a seed-varying literal buried in e.g. an aggregation_functions
-# entry (``sum(x + 0xFF)`` vs ``sum(x + 0x1A)``) would still produce a
-# different normalized_fingerprint. ``#`` is additionally excluded from both
-# boundaries: DuckDB (and others) emit ordinal column references like
-# ``#0``/``#1`` for projected/grouped columns, and without this exclusion every
-# ordinal collapses to the same ``#?`` placeholder, hiding a genuine structural
-# change (a different column referenced) behind what looks like a literal.
-_NUMERIC_LITERAL_RE = re.compile(rf"(?<![A-Za-z0-9_.$#])[+-]?(?:{_HEX_LITERAL}|{_DECIMAL_LITERAL})(?![A-Za-z0-9_.$#])")
-_LITERAL_PLACEHOLDER = "?"
+    return _STRING_LITERAL_RE.sub("<STR>", _NUMERIC_LITERAL_RE.sub("<NUM>", expression))
 
 
 def _normalize_literal_text(text: str) -> str:
@@ -200,8 +195,8 @@ def _normalize_literal_text(text: str) -> str:
     Used to compute literal-normalized plan fingerprints so that queries which
     differ only in constant values share a fingerprint. String/date literals are
     replaced first, then standalone numeric literals. Identifiers containing
-    digits are preserved because the numeric pattern only matches digits not
-    immediately preceded by an identifier character.
+    digits and ordinal column references (``#0``/``#1``) are preserved because the
+    shared numeric pattern excludes those boundary characters.
     """
     if not text:
         return text
