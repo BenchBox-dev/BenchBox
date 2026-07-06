@@ -1,13 +1,31 @@
 id: remediate-explorer-deploy-path-reconciliation
 title: "Reconcile the 'explorer is built/served from main' docs with the release curation that strips it"
 worktree: main
-priority: High
+priority: Low
 status: "In Progress"
 category: Documentation
 
 description: |
   Source: _project/audits/results-explorer-publication-adversarial-review.md
   (develop_sha fddedf26), findings §2.13 (Required) and §2.14 (Required).
+
+  2026-07-06 RE-EVALUATION against PR #993 (branch-strategy migration):
+  §2.14 / w3 was predicated on "the DEFAULT branch is the stripped release
+  branch (main)". #993 Decision A switches the repo default_branch to `develop`,
+  and Decision B renames main -> release. On `develop` the full tree exists
+  (results-explorer/, _project/audits/, _project/scripts/ all present and their
+  results-explorer-qa.md references resolve — verified 2026-07-06), so a reader
+  on the default branch is NO LONGER sent to absent paths. The success metric
+  "A reader on the default branch is not sent to paths that do not exist there"
+  is satisfied by the default switch itself — no doc edit required. w3's fix is
+  #993, not a curation change here. Priority dropped High -> Low accordingly.
+  What remains is a LOW, optional residual: the QA doc still SHIPS to the
+  (non-default) release branch referencing stripped paths — release-cut still
+  `git rm -rf ... results-explorer`, and docs/operations/ is not stripped. Add
+  operations/QA docs to release-cut's curation only if a clean release artifact
+  is wanted; it is not a default-branch hazard. Close this item once #993 merges
+  and the default_branch=develop switch (branch-rename-runbook.md step 2) is
+  applied.
 
   §2.13 — results-phase-2-runbook.md:41-47 says the explorer "is built from
   main via docs.yml … publishes from main's view of results-data/," and
@@ -77,6 +95,17 @@ work:
     until the site is live. Keep only docs whose referenced paths survive
     release-cut.
 
+    2026-07-06 RE-EVALUATION vs #993: the DEFAULT-branch half of this unit is
+    resolved by #993 Decision A (default_branch -> develop): on develop every
+    referenced path exists, so the default-branch reader is no longer misled.
+    Effective once #993 merges and the manual default switch is applied. The
+    only remaining piece is the OPTIONAL, Low residual: dev-only operations/QA
+    docs still ship to the non-default `release` branch referencing stripped
+    paths. If that clean-artifact cleanup is wanted, add
+    `docs/operations/results-explorer-qa.md` (and peers) to release-cut's
+    `git rm` curation list — but it is not a user-facing hazard once the
+    default is develop.
+
 prior_art:
 - "Makefile:1070-1072 release-cut curation list — extend the exclusion set (or stop excluding) per the decision, rather than
   adding a parallel curation mechanism."
@@ -102,9 +131,12 @@ verification:
 - description: "release-cut still strips the explorer/results paths (confirms the constraint the docs must respect)"
   command: "make -n release-cut | grep -nE 'git rm .*results-(data|explorer)'"
   expected_output: "the strip line is present (or, if the decision changed the wiring, it is intentionally gone)"
-- description: "Default-branch docs do not send readers to paths absent on main"
-  command: "git show origin/main:docs/operations/results-explorer-qa.md | grep -cE 'results-explorer/|_project/scripts/|_project/audits/'"
-  expected_output: "0 (references removed or gated behind an explicit develop-only banner)"
+- description: "Post-#993: the DEFAULT branch (now develop) contains the trees the QA doc references (unlike the stripped release branch)"
+  command: "for d in results-explorer _project/audits _project/scripts; do git cat-file -e origin/develop:$d 2>/dev/null && echo present:$d || echo ABSENT:$d; done"
+  expected_output: "all present — on develop (the post-#993 default) the results-explorer/ and _project/ trees exist, so the default-branch reader is not sent to absent paths"
+- description: "Residual only (Low, optional): the QA doc still ships to the non-default release branch referencing stripped paths"
+  command: "git show origin/main:docs/operations/results-explorer-qa.md 2>/dev/null | grep -cE 'results-explorer/|_project/scripts/|_project/audits/' || echo 'release branch not present locally'"
+  expected_output: "non-zero is acceptable post-#993 (release branch is not the default); only fix if a clean release artifact is wanted via release-cut curation"
 
 scope_limit:
   only_modify:
