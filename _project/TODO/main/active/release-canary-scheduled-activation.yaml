@@ -95,6 +95,15 @@ work:
       pypi job needs no checkout), so (a) = cherry-pick the current file
       verbatim. Final sign-off on the mechanism rests with the maintainer
       at execution time (w2).
+      ADDENDUM 2026-07-06 (option d, from the PR #993 branching-strategy
+      review): a fourth option supersedes (a)/(b)/(c) — make `develop` the
+      GitHub DEFAULT branch (see branch-default-switch-to-develop). GitHub
+      runs on.schedule workflows from the default branch's copy; since
+      release-canary.yml already lives on develop, flipping the default
+      registers and fires it with ZERO per-release re-landing on main. If
+      that item lands, w2 (land on main) becomes moot and w3 (liveness guard)
+      still applies. Recommended resolution; sequence behind Decision A. Soft
+      cross-link, not a hard dep — do not block this item on it.
 
   - id: w2
     summary: "Land the chosen form on main (admin/release-flow action) and confirm registration"
@@ -112,6 +121,9 @@ work:
       in docs/operations/repo-admin-settings.md "Scheduled activation of
       release-canary.yml (pending admin action)" — land the file, confirm
       registration, dispatch, record the (expected-RED) run URL.
+      NOTE 2026-07-06: if branch-default-switch-to-develop lands first, this
+      unit is MOOT (develop-as-default registers the canary directly). Prefer
+      that path; keep this only as the fallback if Decision A is declined.
 
   - id: w3
     summary: "Add a scheduled-workflow liveness guard so this class of gap cannot recur silently"
