@@ -297,6 +297,7 @@ def build_result_payload(result: BenchmarkResults) -> dict[str, Any]:
     _add_comparisons_section(payload, result)
     _add_cost_section(payload, result)
     _add_execution_section(payload, result, driver_metadata)
+    _add_provenance_section(payload, result)
 
     return order_dict(payload, CANONICAL_KEY_ORDER)
 
@@ -613,6 +614,30 @@ def _normalized_cost_allows_direct_total(normalized_cost: Any) -> bool:
     if normalized_cost.get("cost_status") not in {"normalized", "not_applicable_local"}:
         return False
     return normalized_cost.get("normalized_cost_usd") is not None
+
+
+def _add_provenance_section(payload: dict[str, Any], result: BenchmarkResults) -> None:
+    """Add an optional provenance block (funding / source) to the payload.
+
+    Emitted only when the result declares funding or a source hint, mirroring the
+    other optional sections (environment/tables/errors). When neither is present
+    the payload is byte-identical to a pre-provenance run, so existing bundles and
+    fixtures are unaffected. Values are normalized through the canonical
+    vocabulary so an out-of-band value can never reach the bundle.
+    """
+    from benchbox.core.results.provenance import normalize_funding, normalize_source
+
+    funding = getattr(result, "funding", None)
+    source = getattr(result, "result_source", None)
+    if not funding and not source:
+        return
+
+    block: dict[str, Any] = {}
+    if funding:
+        block["funding"] = normalize_funding(funding)
+    if source:
+        block["source"] = normalize_source(source)
+    payload["provenance"] = block
 
 
 def _add_execution_section(payload: dict[str, Any], result: BenchmarkResults, driver_metadata: dict[str, Any]) -> None:

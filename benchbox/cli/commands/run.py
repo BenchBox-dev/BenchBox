@@ -64,6 +64,7 @@ from benchbox.cli.tuning_runtime import (
 from benchbox.core.benchmark_registry import get_benchmark_default_scale
 from benchbox.core.config import DatabaseConfig
 from benchbox.core.platform_registry import PlatformRegistry
+from benchbox.core.results.provenance import FUNDING_SOURCES, RESULT_SOURCES
 from benchbox.core.results.status import result_non_clean_reason
 from benchbox.core.schemas import ExecutionContext
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
@@ -363,9 +364,18 @@ def _export_orchestrated_result(
     mode_label: str,
     quiet: bool,
     export_formats: list[str] | None = None,
+    funding: str | None = None,
+    result_source: str | None = None,
 ) -> dict[str, Any]:
     """Export a canonical run result using directory-manager naming."""
     from datetime import datetime
+
+    # Attach declared provenance before export so it lands in the bundle. Absent
+    # values leave the result untouched (no provenance block emitted).
+    if funding:
+        result.funding = funding
+    if result_source:
+        result.result_source = result_source
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     result_path = orchestrator.directory_manager.get_result_path(
@@ -1542,6 +1552,8 @@ def _direct_handle_result(
             mode_label=s.resolved_mode,
             quiet=bool(s.quiet),
             export_formats=["json"],
+            funding=getattr(s, "funding", None),
+            result_source=getattr(s, "result_source", None),
         )
 
         if s.quiet:
@@ -1811,6 +1823,8 @@ def _data_or_load_handle_result(
             mode_label=mode_label,
             quiet=bool(s.quiet),
             export_formats=["json"],
+            funding=getattr(s, "funding", None),
+            result_source=getattr(s, "result_source", None),
         )
 
         operation_status, operation_name = _data_or_load_operation_status(result, s.execution_mode)
@@ -2449,6 +2463,8 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
             mode_label=s.resolved_mode,
             quiet=bool(s.quiet),
             export_formats=export_formats,
+            funding=getattr(s, "funding", None),
+            result_source=getattr(s, "result_source", None),
         )
 
         if s.quiet:
@@ -2718,7 +2734,30 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--publish-label",
     default="maintainer-run",
     show_default=True,
-    help="Trust label for --publish (maintainer-run, community-submission, ci, local).",
+    help=(
+        "Trust label for --publish (maintainer-run, community-submission, "
+        "vendor-supplied, ci, local, unofficial-research)."
+    ),
+)
+@click.option(
+    "--funding",
+    type=click.Choice(FUNDING_SOURCES, case_sensitive=False),
+    default=None,
+    help=(
+        "Disclose how this run was funded (employer, personal, free-trial, "
+        "vendor-sponsored, grant, unspecified). Recorded in the bundle's "
+        "provenance block; omitted when not set."
+    ),
+)
+@click.option(
+    "--result-source",
+    type=click.Choice(RESULT_SOURCES, case_sensitive=False),
+    default=None,
+    help=(
+        "Advisory producer hint (internal, community, vendor) recorded in the "
+        "bundle's provenance block. NOT the authoritative trust label — the "
+        "vendor label is assigned downstream under maintainer control."
+    ),
 )
 @click.pass_context
 def run(
@@ -2761,6 +2800,8 @@ def run(
     publish: bool,
     publish_target: str,
     publish_label: str,
+    funding: str | None,
+    result_source: str | None,
 ) -> None:
     """Run benchmarks.
 
@@ -2821,6 +2862,8 @@ def run(
         publish=publish,
         publish_target=publish_target,
         publish_label=publish_label,
+        funding=funding,
+        result_source=result_source,
     )
     _prepare_run_state(s)
 
