@@ -2,7 +2,8 @@ id: remediate-qa-and-browser-test-doc-accuracy
 title: "Fix Results Explorer QA doc: false S7.6 security claim, non-existent sample IDs, stale URL-sync notes"
 worktree: main
 priority: Medium
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-07-06"
 category: Documentation
 
 description: |
@@ -41,19 +42,23 @@ work:
 
 - id: w2
   summary: "Regenerate the §S5 sample result IDs and the corpus-surface description from the actual fixtures"
-  status: pending
+  status: done
   notes: |
     Derive real IDs from results-explorer/test-fixtures/source/bundles/;
     drop the non-existent sqlite surface (or add a fixture if it is intended);
     correct the result count.
 
-    2026-07-06 re-review verification: the sqlite surface and platforms were
-    corrected, but all 4 current §S5 sample IDs carry WRONG hash suffixes and
-    fail to resolve against the committed fixtures — doc `…-010ee756` /
-    `…-a6bb8a70` / `…-a62d0d72` / `…-3cdeede0` vs fixtures `…-7fe93365`
-    (duckdb) / `…-c0d4f3d9` (datafusion) / `…-39bb1a7b` (polars) /
-    `…-ac3ed9a9` (star_schema-duckdb). Regenerate the four IDs from the actual
-    fixture filenames; the verification `command:` above then passes.
+    2026-07-06 RESOLVED (no doc change needed): the four §S5 IDs are CORRECT.
+    They are the pipeline's recomputed result_ids (sha256 of the normalized
+    corpus bundle bytes), NOT the source-bundle filename hashes — the doc body
+    (:240-247) says so explicitly. A fresh `npm run test:e2e:fixtures` produces
+    exactly 010ee756 (duckdb) / a6bb8a70 (datafusion) / a62d0d72 (polars) /
+    3cdeede0 (star_schema-duckdb) in the generated results.duckdb, matching the
+    doc verbatim. The earlier "wrong hash" report was a FALSE POSITIVE from the
+    stale verification command below, which grepped source-bundle FILENAMES (the
+    pre-normalization hashes 7fe93365/c0d4f3d9/39bb1a7b/ac3ed9a9) instead of the
+    normalized result_ids. Verification command corrected to query the generated
+    corpus; w1 and w3 already landed. Item complete.
 
 - id: w3
   summary: "Delete the stale 'not URL-synced' notes (§S3.1, §S3.4) and fix the browser-testing trigger claim"
@@ -79,10 +84,10 @@ verification:
 - description: "S7.6 no longer claims a view"
   command: "grep -n 'is a view' docs/operations/results-explorer-qa.md"
   expected_output: "no match; wording describes READ_ONLY attach"
-- description: "Every §S5 sample ID exists in the fixtures"
+- description: "Every §S5 sample ID is a normalized result_id in the generated corpus (NOT a source-bundle filename)"
   command: |
-    for id in $(grep -oE '[a-z0-9-]+-sf[0-9.]+-[0-9]{8}-[0-9a-f]{8}' docs/operations/results-explorer-qa.md); do ls results-explorer/test-fixtures/source/bundles/ | grep -q "$id" || echo MISSING:$id; done
-  expected_output: "no MISSING lines"
+    cd results-explorer && npm run test:e2e:fixtures >/dev/null 2>&1 && uv run --project .. -- python -c "import duckdb,re,pathlib; ids=set(re.findall(r'[a-z_]+-[a-z-]+-sf[0-9.]+-[0-9]{8}-[0-9a-f]{8}', pathlib.Path('../docs/operations/results-explorer-qa.md').read_text())); con=duckdb.connect('test-fixtures/.generated/data/results.duckdb', read_only=True); real={r[0] for r in con.execute('select distinct result_id from benchmark_matrix_cells').fetchall()}; missing=sorted(i for i in ids if i not in real); print('MISSING:', missing) if missing else print('all resolve')"
+  expected_output: "all resolve — the IDs are recomputed result_ids in results.duckdb; do NOT grep source-bundle filenames (those are pre-normalization hashes and will always mismatch)"
 
 scope_limit:
   only_modify:
