@@ -9,10 +9,15 @@
       the app's own origin, closing the remote-fetch/exfil channel. wasm-unsafe-eval
       + worker-src blob: are required for the duckdb-wasm module and its worker.
       GitHub Pages cannot set response headers, so this ships as a <meta> tag.
+      NOTE: `frame-ancestors` is intentionally NOT set here — per the CSP spec it
+      is ignored when delivered via <meta>, so it would provide no clickjacking
+      protection. Framing protection must be applied as an HTTP response header
+      (X-Frame-Options: DENY or a header-delivered frame-ancestors) at the
+      hosting/CDN layer; it cannot be expressed in this file.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'"
     />
     <link rel="icon" type="image/svg+xml" href="/results/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
