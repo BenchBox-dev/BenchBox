@@ -129,11 +129,11 @@ class TestStructuralSignatureNormalization:
         assert "group:o_orderstatus" in normalized
 
     def test_aggregation_hex_literal_collapses_when_normalized(self):
-        """aggregation_functions/group_by_keys/sort_keys go through _normalize_literal_text,
-        a separate normalizer from _mask_literals (used by filter/join/projection). It must
-        share the same hardened numeric grammar - otherwise a hex/underscore/dotted literal
-        buried in an aggregate call masks in filter expressions but not here, and two
-        seed-varied hex constants still produce different normalized signatures."""
+        """aggregation_functions/group_by_keys/sort_keys and filter/join/projection now share
+        ONE canonical numeric pattern (_NUMERIC_LITERAL_RE), applied via _normalize_literal_text
+        and _mask_literals respectively. A hex/underscore/dotted literal buried in an aggregate
+        call must mask exactly as it does in a filter expression, so two seed-varied hex
+        constants produce the same normalized signature on every surface."""
         a = LogicalOperator(
             operator_type=LogicalOperatorType.AGGREGATE,
             operator_id="agg_1",
@@ -163,6 +163,37 @@ class TestStructuralSignatureNormalization:
         normalized = op.get_structural_signature(normalize_literals=True)
         assert "#0" in normalized
         assert "#1" in normalized
+
+    def test_ordinal_column_references_survive_normalization_in_projection_and_filter(self):
+        """DuckDB ordinal refs (#0/#1) in projection/filter expressions (the _mask_literals
+        surface) must not be masked either: two plans that project or filter on GENUINELY
+        DIFFERENT positional columns are a real structural change, not a literal difference,
+        and must NOT collapse to the same normalized signature. Regression for the gap where
+        only the aggregation/group/sort surface excluded '#' from the numeric boundary, so
+        projection ordinals '#0,#1' and '#0,#2' hashed identically under normalization."""
+        proj_a = LogicalOperator(
+            operator_type=LogicalOperatorType.PROJECT,
+            operator_id="proj_1",
+            projection_expressions=["#0", "#1"],
+        )
+        proj_b = LogicalOperator(
+            operator_type=LogicalOperatorType.PROJECT,
+            operator_id="proj_1",
+            projection_expressions=["#0", "#2"],
+        )
+        norm_a = proj_a.get_structural_signature(normalize_literals=True)
+        assert "#0" in norm_a and "#1" in norm_a
+        assert norm_a != proj_b.get_structural_signature(normalize_literals=True), (
+            "genuinely different projection ordinals must not collapse under normalization"
+        )
+
+        # Same protection on the filter surface, while an actual literal still normalizes.
+        filt_a = _scan("#0 > 5")
+        filt_b = _scan("#1 > 5")
+        assert filt_a.get_structural_signature(normalize_literals=True) != filt_b.get_structural_signature(
+            normalize_literals=True
+        )
+        assert "> <NUM>" in filt_a.get_structural_signature(normalize_literals=True)
 
     def test_escaped_apostrophe_string_literal_masks_as_one_token(self):
         """A doubled single quote is an escaped apostrophe INSIDE the literal, not the
