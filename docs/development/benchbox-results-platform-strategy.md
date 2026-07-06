@@ -429,7 +429,11 @@ can handle. That threshold is unlikely in the first year of a results platform.
 - `benchbox submit` command to package and submit results to the public corpus
 - Submission manifest schema (contributor, context, notes)
 - CI validation workflow for the data repository
-- Trust labels in explorer: "maintainer" vs "community-submitted"
+- Trust labels in explorer: "maintainer", "community-submitted", and
+  "vendor-supplied" (vendor-produced results, ranked but distinctly badged and
+  maintainer-assigned so they cannot be self-asserted)
+- Funding disclosure (employer / personal / free-trial / vendor-sponsored /
+  grant / unspecified), orthogonal to the trust label
 - Contributor guidelines documentation
 
 ## Phase 3: Hosted Platform (Deferred)

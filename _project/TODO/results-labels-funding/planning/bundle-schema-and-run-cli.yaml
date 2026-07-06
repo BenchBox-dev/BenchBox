@@ -41,6 +41,7 @@ prior_art:
   - "benchbox/core/results/schema.py:40-58 CANONICAL_KEY_ORDER + :311-353 payload build — extend (add 'provenance' as an optional, canonically-ordered section like 'environment')"
   - "benchbox/core/results/models.py:268-383 BenchmarkResults — extend (add funding + optional result_source fields, defaulted so no call site breaks)"
   - "benchbox/cli/commands/run.py:2655-2666 --publish-target/--publish-label options — reference (mirror option style; --funding lives next to these run-scoped options)"
+  - "benchbox/cli/commands/run.py:2721 --publish-label help string — extend (already stale: omits unofficial-research, now also vendor-supplied; refresh while adding --funding here). Found by item-1 code review."
   - "benchbox/core/results/provenance.py (item 1) — reference (funding enum + normalize; the ONLY source of valid values)"
   - "tests/unit/core/explorer_pipeline/conftest.py:15-84 MINIMAL_BUNDLE — reference (must still validate with no provenance block)"
 

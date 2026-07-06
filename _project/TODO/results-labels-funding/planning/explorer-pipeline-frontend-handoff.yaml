@@ -38,6 +38,7 @@ prior_art:
   - "docs/reference/hosted-results-contract.md:601-616 trust-label rendering rules — extend (add vendor badge color + funding chip + legend row)"
   - "docs/development/browser-duckdb-schema.sql (item 4) — reference (the funding column + vendor ranking eligibility the pipeline must populate)"
   - "docs/development/results-explorer-brand-ownership.md + results-explorer-token-scan.md — reference (badge color must use an approved design token; token scan gate)"
+  - "results-explorer/src/components/TrustBadge.tsx:25-68 TRUST_CONFIG + __tests__/TrustBadge.test.tsx:104-120 PUBLISHER_VALID_LABELS mirror — extend (no vendor-supplied key -> falls through to DEFAULT_CONFIG 'unrecognised'; add mapping AND the test mirror). Found by item-1 code review."
 
 work:
   - id: w1
