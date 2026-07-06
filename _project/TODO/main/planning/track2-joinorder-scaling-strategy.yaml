@@ -33,6 +33,7 @@ description: |
 deps:
   needs:
     - track2-joinorder-stats-phase
+    - track2-joinorder-stats-phase-controls
 
 work:
   - id: w1
@@ -55,8 +56,12 @@ work:
       derived archive. Non-empty checks are insufficient.
 
       This is the scaled prototype starting: per must_preserve, do not begin until
-      track2-joinorder-stats-phase (see deps.needs) is satisfied or explicitly
-      scoped out.
+      the statistics-phase requirement is satisfied or explicitly scoped out.
+      NOTE: track2-joinorder-stats-phase (DONE, PR #980) delivered only the phase
+      mechanics; the stale-stats axis this study needs requires the reset/persist
+      control in track2-joinorder-stats-phase-controls (see deps.needs). Treat the
+      stats requirement as satisfied only when BOTH are done, or explicitly scope
+      the stale-stats axis out.
 
   - id: w3
     summary: "Define derived workload labels and result-bundle metadata"
@@ -70,7 +75,7 @@ work:
 must_preserve:
   - "Canonical joinorder remains fixed to canonical_imdb SF=1 and is never replaced by a derived scale mode."
   - "Any derived workload reports its data-generation strategy, dataset version, generator version, seed, and stats protocol."
-  - "The scaled prototype must not start until the statistics-phase requirement is satisfied or explicitly scoped out (see track2-joinorder-stats-phase)."
+  - "The scaled prototype must not start until the statistics-phase requirement is satisfied or explicitly scoped out. This means BOTH track2-joinorder-stats-phase (phase mechanics, DONE) AND track2-joinorder-stats-phase-controls (the reset/persist control the stale-stats axis depends on) -- not the mechanics seed alone."
 
 approach: |
   Plan-deepening is already done in the groundwork design doc. At kickoff, lock
