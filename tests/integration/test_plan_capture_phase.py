@@ -214,7 +214,8 @@ class TestIntegratedCapturePhase:
         timing. It must now honour the adapter's analyze_plans.
         """
         _seed_table(file_adapter)
-        assert file_adapter.analyze_plans is True  # DuckDB default
+        # analyze_plans defaults to False; opt in explicitly for this regression test.
+        file_adapter.analyze_plans = True
         conn = file_adapter.create_connection()
         try:
             benchmark = _FakeBenchmark({"q": "SELECT id, SUM(val) FROM t GROUP BY id"})

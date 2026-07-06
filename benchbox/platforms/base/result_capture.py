@@ -508,6 +508,9 @@ class ResultCaptureMixin:
         # recorded queries can never leak into the next.
         self._plan_capture_phase_active = False
         self._phase_recorded_queries: dict[str, str] = {}
+        # Guards the one-time analyze_plans=True re-execution notice in
+        # capture_query_plan; reset per run so each run gets its own notice.
+        self._analyze_plans_notice_printed = False
         # The lock is created in PlatformAdapter.__init__; create it defensively
         # for hosts that reset stats without going through __init__ (e.g. tests
         # that mix in this class directly). Reset runs before any worker threads
@@ -788,10 +791,14 @@ class ResultCaptureMixin:
         Calls get_query_plan() to obtain EXPLAIN output and parses it into a QueryPlanDAG.
         Returns timing information for observability of capture overhead.
 
-        By default (analyze_plans=True), DuckDB uses EXPLAIN (ANALYZE, FORMAT JSON) which
-        re-executes the query to capture actual per-operator timing and cardinality.
-        Set analyze_plans=False in the adapter config to use plain EXPLAIN (FORMAT JSON)
-        for estimated-plan-only capture with no re-execution overhead.
+        By default (analyze_plans=False), DuckDB uses plain EXPLAIN (FORMAT JSON), which
+        captures the estimated plan without re-executing the query. Set
+        analyze_plans=True in the adapter config to opt into EXPLAIN (ANALYZE, FORMAT
+        JSON), which re-executes every captured SELECT once to include actual
+        per-operator timing and cardinality -- roughly 2x wall-clock cost for a
+        --capture-plans run and perturbed cache state. The first time this method
+        actually captures a plan with analyze_plans enabled for a run, it prints a
+        one-time notice (see the ``_analyze_plans_notice_printed`` guard below).
 
         Plan fingerprints exclude timing/cardinality by design - structural comparisons
         are unaffected by this setting. See the plan fingerprint stability contract in
@@ -802,9 +809,9 @@ class ResultCaptureMixin:
             All adapters capture the plan AFTER the timed execution block (the
             "post-execution" plan). This is intentional and is the supported
             default:
-              - With ``analyze_plans=True`` it yields the *actual* plan that ran,
-                including real per-operator timing/cardinality (EXPLAIN ANALYZE) —
-                the most useful artifact for profiling.
+              - With ``analyze_plans=True`` (opt-in) it yields the *actual* plan that
+                ran, including real per-operator timing/cardinality (EXPLAIN ANALYZE) —
+                the most useful artifact for profiling, at the cost of re-execution.
               - The structural fingerprint is unaffected by post- vs. pre-execution
                 timing, because it excludes costs and row estimates. A plan captured
                 before vs. after execution hashes to the same fingerprint as long as
@@ -860,6 +867,19 @@ class ResultCaptureMixin:
             query_id not in self.plan_query_filter and _plan_capture_public_id(query_id) not in self.plan_query_filter
         ):
             return None, 0.0
+
+        # ANALYZE re-execution is an explicit opt-in (analyze_plans defaults to
+        # False): print a one-time run-level notice the first time this path is
+        # about to actually capture a plan with it enabled, so a user who set
+        # analyze_plans=True is not surprised that --capture-plans runs now cost
+        # ~2x wall-clock and perturb cache state. Guarded by a per-run flag reset
+        # in _reset_plan_capture_stats so a fresh run gets its own notice.
+        if self.analyze_plans and not getattr(self, "_analyze_plans_notice_printed", False):
+            self._analyze_plans_notice_printed = True
+            quiet_console.print(
+                "[bold yellow]Notice:[/bold yellow] plan capture re-executes each query "
+                "(analyze_plans=True); timings are not comparable to non-capture runs."
+            )
 
         start_time = time.perf_counter()
 

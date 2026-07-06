@@ -183,8 +183,10 @@ class TestPostgreSQLPlanCapture:
         assert "ANALYZE" not in call_args.upper(), f"EXPLAIN ANALYZE must not be used for write DDL: {write_ddl!r}"
         assert "FORMAT JSON" in call_args.upper()
 
-    def test_get_query_plan_select_uses_analyze(self, adapter):
-        """SELECT queries must still use EXPLAIN ANALYZE for actual timing data."""
+    def test_get_query_plan_select_uses_analyze(self, monkeypatch):
+        """SELECT queries use EXPLAIN ANALYZE for actual timing data when opted in (analyze_plans=True)."""
+        monkeypatch.setattr("benchbox.platforms.postgresql.psycopg", MagicMock())
+        adapter = PostgreSQLAdapter(capture_plans=True, analyze_plans=True)
         cursor = MagicMock()
         cursor.fetchall.return_value = [('{"Plan":{}}',)]
         conn = MagicMock()

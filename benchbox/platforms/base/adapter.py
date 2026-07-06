@@ -134,10 +134,16 @@ class PlatformAdapter(
         self.force_recreate = config.get("force_recreate", False)
         self.show_query_plans = config.get("show_query_plans", False)
         self.capture_plans = config.get("capture_plans", False)
-        # When True (default), plan capture uses EXPLAIN (ANALYZE, FORMAT JSON) to include actual
-        # per-operator timing and cardinality. Set to False to use plain EXPLAIN (FORMAT JSON) for
-        # estimated-plan-only capture with no re-execution overhead.
-        self.analyze_plans: bool = config.get("analyze_plans", True)
+        # When False (default), plan capture uses plain EXPLAIN (FORMAT JSON) for
+        # estimated-plan-only capture with no re-execution overhead: fingerprints are
+        # structure-only, so estimated plans lose nothing for structural comparison.
+        # Set to True to opt into EXPLAIN (ANALYZE, FORMAT JSON), which re-executes
+        # every captured SELECT once to include actual per-operator timing and
+        # cardinality -- roughly 2x wall-clock for a --capture-plans run and
+        # perturbed cache state. A one-time run-level notice is printed the first
+        # time a plan is actually captured with this enabled (see
+        # ResultCaptureMixin.capture_query_plan).
+        self.analyze_plans: bool = config.get("analyze_plans", False)
         self.strict_plan_capture = config.get("strict_plan_capture", False)
         # When True, also record a literal-normalized plan fingerprint alongside
         # the default fingerprint during plan capture (see --normalize-plan-literals).

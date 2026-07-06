@@ -1036,17 +1036,20 @@ class DuckDBAdapter(PlatformAdapter):
                 connection.execute("PRAGMA disable_profiling")
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get DuckDB query execution plan using EXPLAIN (ANALYZE, FORMAT JSON).
+        """Get DuckDB query execution plan using EXPLAIN (FORMAT JSON).
 
-        Uses EXPLAIN (ANALYZE, FORMAT JSON) by default (PostgreSQL-style combined syntax)
-        to capture actual per-operator timing and cardinality from real query execution.
-        The ANALYZE format uses different field names than plain EXPLAIN (FORMAT JSON):
-        operator_timing/operator_cardinality/operator_name vs timing/cardinality/name.
-        DuckDBQueryPlanParser handles both schemas transparently.
+        Uses plain EXPLAIN (FORMAT JSON) by default (self.analyze_plans=False) to
+        capture the estimated plan with no re-execution overhead: plan fingerprints
+        are structure-only, so estimated plans lose nothing for structural comparison.
 
-        When self.analyze_plans is False, falls back to EXPLAIN (FORMAT JSON) which
-        captures estimated plans only (timing/cardinality fields absent). Use this
-        opt-out when plan capture overhead must be minimised.
+        When self.analyze_plans is True (opt-in), uses EXPLAIN (ANALYZE, FORMAT JSON)
+        (PostgreSQL-style combined syntax) to capture actual per-operator timing and
+        cardinality from real query execution. The ANALYZE format uses different field
+        names than plain EXPLAIN (FORMAT JSON): operator_timing/operator_cardinality/
+        operator_name vs timing/cardinality/name. DuckDBQueryPlanParser handles both
+        schemas transparently. capture_query_plan() prints a one-time run-level notice
+        the first time this opt-in actually captures a plan, since it roughly doubles
+        wall-clock cost for a --capture-plans run and perturbs cache state.
 
         Note: EXPLAIN (ANALYZE, ...) re-executes the query, adding ~1× query cost to the
         capture step. Plan fingerprints are unaffected - compute_plan_fingerprint()

@@ -930,25 +930,25 @@ class TestDuckDBAdapter:
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
-        # Default (analyze_plans=True): uses EXPLAIN (ANALYZE, FORMAT JSON)
+        # Default (analyze_plans=False): uses EXPLAIN (FORMAT JSON) - estimated plan only
+        estimated_payload = '{"name": "SEQ_SCAN", "timing": null}'
+        mock_connection.execute.return_value.fetchall.return_value = [("explain_key", estimated_payload)]
+        adapter_default = DuckDBAdapter()
+        plan = adapter_default.get_query_plan(mock_connection, "SELECT * FROM test")
+        assert plan == estimated_payload
+        call_sql = mock_connection.execute.call_args[0][0]
+        assert "ANALYZE" not in call_sql
+        assert "FORMAT JSON" in call_sql
+
+        # analyze_plans=True (opt-in): uses EXPLAIN (ANALYZE, FORMAT JSON)
+        mock_connection.execute.reset_mock()
         json_payload = '{"operator_type": "SEQ_SCAN", "operator_timing": 0.001}'
         mock_connection.execute.return_value.fetchall.return_value = [("explain_key", json_payload)]
-        adapter = DuckDBAdapter()
+        adapter = DuckDBAdapter(analyze_plans=True)
         plan = adapter.get_query_plan(mock_connection, "SELECT * FROM test")
         assert plan == json_payload
         call_sql = mock_connection.execute.call_args[0][0]
         assert "ANALYZE" in call_sql
-        assert "FORMAT JSON" in call_sql
-
-        # analyze_plans=False: uses EXPLAIN (FORMAT JSON) - estimated plan only
-        mock_connection.execute.reset_mock()
-        estimated_payload = '{"name": "SEQ_SCAN", "timing": null}'
-        mock_connection.execute.return_value.fetchall.return_value = [("explain_key", estimated_payload)]
-        adapter_no_analyze = DuckDBAdapter(analyze_plans=False)
-        plan = adapter_no_analyze.get_query_plan(mock_connection, "SELECT * FROM test")
-        assert plan == estimated_payload
-        call_sql = mock_connection.execute.call_args[0][0]
-        assert "ANALYZE" not in call_sql
         assert "FORMAT JSON" in call_sql
 
         # Exception during EXPLAIN → returns None
