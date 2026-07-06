@@ -1699,3 +1699,105 @@ class TestUnknownTypeWarnings:
         assert result is False
         # Should not trigger warnings during comparison
         assert "Unknown operator type" not in caplog.text
+
+
+class TestPlanDepthTruncation:
+    """qpc-10: deep plans serialize with a truncated_at_depth marker, not dropped."""
+
+    @staticmethod
+    def _linear_chain(depth: int) -> LogicalOperator:
+        """Build a linear operator chain ``depth`` levels below a SCAN leaf.
+
+        Returns the root; the chain is root -> child -> ... -> scan, so the deepest
+        node sits at ``current_depth == depth``.
+        """
+        node = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_leaf", table_name="t")
+        for level in range(depth):
+            node = LogicalOperator(
+                operator_type=LogicalOperatorType.FILTER,
+                operator_id=f"filter_{level}",
+                filter_expressions=[f"c > {level}"],
+                children=[node],
+            )
+        return node
+
+    def test_to_dict_emits_truncation_marker_beyond_max_depth(self) -> None:
+        root = self._linear_chain(6)
+
+        serialized = root.to_dict(max_depth=3)
+
+        # Walk down; at depth 4 (first node with current_depth > max_depth=3) we
+        # must hit a truncation marker instead of a raise or a dropped plan.
+        node = serialized
+        depth = 0
+        while "truncated_at_depth" not in node:
+            assert node["children"], f"reached a leaf at depth {depth} before truncation"
+            node = node["children"][0]
+            depth += 1
+        assert node["truncated_at_depth"] == 4
+        assert node["children_omitted"] >= 1
+        # The marker node carries operator identity but no recursed children key.
+        assert node["operator_id"].startswith(("filter_", "scan_"))
+        assert "children" not in node
+
+    def test_to_dict_no_truncation_when_within_max_depth(self) -> None:
+        root = self._linear_chain(3)
+        serialized = root.to_dict(max_depth=50)
+
+        # Full tree present, no marker anywhere.
+        node = serialized
+        while node.get("children"):
+            assert "truncated_at_depth" not in node
+            node = node["children"][0]
+        assert node["operator_id"] == "scan_leaf"
+
+    def test_deep_plan_serializes_instead_of_raising(self) -> None:
+        # A plan deeper than the default cap must NOT raise / disappear; it must
+        # produce a bounded serialization carrying the marker.
+        root = self._linear_chain(60)
+        plan = QueryPlanDAG(query_id="deep_q", platform="duckdb", logical_root=root)
+
+        size = plan.estimate_serialized_size()  # default max_depth
+        assert size > 0
+        payload = plan.to_json()
+        assert "truncated_at_depth" in payload
+
+    def test_truncation_marker_round_trips_as_leaf(self) -> None:
+        root = self._linear_chain(5)
+        serialized = root.to_dict(max_depth=2)
+        restored = LogicalOperator.from_dict(serialized)
+
+        # Traverse to the deepest restored node: it is a childless leaf (the
+        # marker's omitted children are not reconstructed).
+        node = restored
+        while node.children:
+            node = node.children[0]
+        assert node.children == []
+
+    def test_fingerprint_unaffected_by_serialization_truncation(self) -> None:
+        # The fingerprint is computed over the FULL in-memory tree, so shrinking
+        # the serialization depth must not change it (anti-pattern: never
+        # fingerprint a truncated tree as complete).
+        root = self._linear_chain(60)
+        plan = QueryPlanDAG(query_id="fp_q", platform="duckdb", logical_root=root)
+
+        fp = plan.plan_fingerprint
+        # Recompute after a shallow serialization round-trip of the size guard.
+        plan.estimate_serialized_size(max_depth=3)
+        assert plan.plan_fingerprint == fp
+        # And equals a fresh full-tree fingerprint (depth cap plays no role).
+        assert plan.compute_plan_fingerprint() == fp
+
+    def test_configurable_max_depth_changes_truncation_point(self) -> None:
+        root = self._linear_chain(10)
+
+        def _first_truncated_depth(md: int) -> int:
+            node = root.to_dict(max_depth=md)
+            depth = 0
+            while "truncated_at_depth" not in node:
+                node = node["children"][0]
+                depth += 1
+            return depth
+
+        assert _first_truncated_depth(2) == 3
+        assert _first_truncated_depth(5) == 6

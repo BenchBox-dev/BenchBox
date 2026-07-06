@@ -519,6 +519,29 @@ class TestAdapterPlanCaptureGaps:
 
         assert plan == mock_plan
         assert "Large query plan" in caplog.text
+        # No dangling "external plan storage" advice (that feature does not exist).
+        assert "external plan storage" not in caplog.text
+
+    def test_plan_max_depth_defaults_and_is_configurable(self):
+        from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
+
+        assert _TrackingAdapter().plan_max_depth == DEFAULT_PLAN_MAX_DEPTH
+        assert _TrackingAdapter(plan_max_depth=12).plan_max_depth == 12
+
+    def test_capture_query_plan_sizes_with_configured_plan_max_depth(self):
+        adapter = _TrackingAdapter(plan_max_depth=7)
+        adapter.capture_plans = True
+        adapter.get_query_plan = Mock(return_value="SOME PLAN")
+        mock_parser = Mock()
+        mock_plan = Mock()
+        mock_plan.estimate_serialized_size.return_value = 1024
+        mock_parser.parse_explain_output.return_value = mock_plan
+        adapter.get_query_plan_parser = Mock(return_value=mock_parser)
+
+        adapter.capture_query_plan(Mock(), "SELECT 1", "Q1")
+
+        # The configured plan_max_depth is threaded into the size estimate.
+        mock_plan.estimate_serialized_size.assert_called_once_with(max_depth=7)
 
 
 class TestAdapterValidationGaps:
