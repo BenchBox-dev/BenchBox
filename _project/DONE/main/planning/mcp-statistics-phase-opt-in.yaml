@@ -2,7 +2,7 @@ id: mcp-statistics-phase-opt-in
 title: "feat(mcp): expose the statistics-phase opt-in through the MCP run_benchmark tool"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
 category: Core Functionality
 
 description: |
@@ -38,7 +38,7 @@ deps:
 work:
   - id: w1
     summary: "Thread a gather_statistics flag from MCP run_benchmark into run_with_platform"
-    status: pending
+    status: done
     notes: |
       Detect `statistics` in the tool's `phases` argument (independently of
       `_map_phases_to_test_execution_type`, which intentionally ignores it)
@@ -49,10 +49,22 @@ work:
       so no adapter change is needed. Preserve the existing per-benchmark
       registry gate (`supports_statistics_phase`) so non-opted-in benchmarks
       still skip the phase and the response is unchanged for them.
+
+      Implementation note (found while implementing, not in the original
+      notes): `run_statistics_phase(benchmark, connection, benchmark_name=...)`
+      looks up the registry gate via `get_benchmark_metadata(run_config.get
+      ("benchmark_name", ""))`. Since MCP never populated `benchmark_name` in
+      run_config, the slug was always empty and the gate would treat every
+      benchmark as "not opted in" -- gather_statistics=True alone is
+      insufficient. Fixed by also forwarding `benchmark_name=benchmark_lower`
+      in the same conditional block (only when `statistics` is requested, so
+      must_preserve #1 -- byte-identical responses when it isn't -- still
+      holds). Verified against a real duckdb TPC-H SF=0.01 run: phases.
+      statistics only appears with this pairing.
   - id: w2
     summary: "Confirm phases.statistics surfaces in the MCP response payload"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       The MCP result payload is built from the same exporter path as the CLI
       (`_export_and_build_payload`), so phases.statistics should already
@@ -60,6 +72,18 @@ work:
       `run_benchmark` call with `phases` including `statistics` on an
       opted-in benchmark yields `phases.statistics` with a `stats_mode`, and
       that a non-opted-in benchmark omits the block.
+
+      Implemented in tests/unit/mcp/test_mcp_statistics_phase.py using the
+      existing mocked run_with_platform pattern (real duckdb runs take
+      ~3-12s each -- too slow for the "fast" lane, which `make test-fast`
+      documents as sub-second per test). Covers: gather_statistics/
+      benchmark_name forwarded when `statistics` is requested and omitted
+      otherwise (call_kwargs-level), test_execution_type unaffected, and
+      phases.statistics pass-through in the response for both the
+      present and gate-skipped (absent) cases. The registry gate itself
+      (supports_statistics_phase true/false) is exercised at the adapter
+      level in tests/unit/platforms/test_base_adapter.py (PR #980); this
+      file only locks down that MCP doesn't bypass it.
 
 must_preserve:
   - "MCP callers that do NOT request the statistics phase get byte-identical responses to today (no statistics block)."
