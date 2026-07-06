@@ -149,8 +149,13 @@ jobs:
       # context. Fork PRs run this workflow with a read-only GITHUB_TOKEN, so the
       # inline "Post PR comment" step below 403s for them — the companion is the
       # path that actually delivers the comment for external contributors.
-      # workflow_run's github.event.workflow_run.pull_requests is empty for fork
-      # PRs, so we persist the PR number in the artifact for the companion to read.
+      #
+      # This artifact carries ONLY the comment body. It intentionally does NOT
+      # carry a PR number: this workflow runs PR-supplied code before this step
+      # (the validator/workflow-edit guard above is not exhaustive), so anything
+      # written here is attacker-influenced, and the companion posts with a
+      # writable token. The companion instead derives the target PR from
+      # GitHub's own record of which PR the run's head commit belongs to.
       - name: Stage validation comment artifact
         if: steps.changed.outputs.has_bundles == 'true' && always()
         run: |
@@ -158,7 +163,6 @@ jobs:
           if [ -f /tmp/pr_comment.md ]; then
             cp /tmp/pr_comment.md /tmp/pr-comment-artifact/pr_comment.md
           fi
-          echo "${{ github.event.pull_request.number }}" > /tmp/pr-comment-artifact/pr_number.txt
 
       - name: Upload validation comment artifact
         if: steps.changed.outputs.has_bundles == 'true' && always()

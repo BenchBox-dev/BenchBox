@@ -470,6 +470,14 @@ class TestRankingEligibility:
         entry = self._make_entry("ci-verified", "public-verified")
         assert is_ranking_eligible(entry) is True
 
+    def test_ci_public_verified_is_eligible(self) -> None:
+        # "ci" (not "ci-verified") is the label bundle_publisher.VALID_LABELS
+        # actually accepts and produces - the publisher rejects "ci-verified"
+        # outright (test_bundle_publisher_label.py). A CI-produced bundle must
+        # be ranking-eligible under its real, reachable label.
+        entry = self._make_entry("ci", "public-verified")
+        assert is_ranking_eligible(entry) is True
+
     def test_community_submission_self_reported_is_not_eligible(self) -> None:
         entry = self._make_entry("community-submission", "public-self-reported")
         assert is_ranking_eligible(entry) is False
@@ -508,6 +516,7 @@ class TestRankingEligibility:
     def test_ranking_eligible_trust_labels_constant(self) -> None:
         assert "maintainer-run" in RANKING_ELIGIBLE_TRUST_LABELS
         assert "ci-verified" in RANKING_ELIGIBLE_TRUST_LABELS
+        assert "ci" in RANKING_ELIGIBLE_TRUST_LABELS
 
 
 # ---------------------------------------------------------------------------

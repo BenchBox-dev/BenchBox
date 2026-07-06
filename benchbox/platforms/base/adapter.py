@@ -615,10 +615,17 @@ class PlatformAdapter(
             # stats-build wall-clock is attributed to neither load nor query.
             statistics_phase = None
             if run_config.get("gather_statistics"):
+                # Prefer a dedicated statistics-only slug over "benchmark_name"
+                # when the caller set one. Some callers (the MCP run_benchmark
+                # tool) need the registry gate to resolve correctly without also
+                # setting "benchmark_name" itself, which _resolve_benchmark_slug
+                # reads to route power/throughput/maintenance/combined tests to
+                # TPC-specialized harnesses vs the generic handler - requesting
+                # the statistics phase must not also change which harness runs.
                 statistics_phase = self.run_statistics_phase(
                     benchmark,
                     connection,
-                    benchmark_name=run_config.get("benchmark_name", ""),
+                    benchmark_name=run_config.get("statistics_benchmark_name") or run_config.get("benchmark_name", ""),
                     table_names=sorted(table_stats) if table_stats else None,
                 )
 

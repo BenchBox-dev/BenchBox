@@ -217,11 +217,18 @@ def test_close_orphaned_prs_waits_for_post_merge_validation_success() -> None:
     # Closing superseded PRs is only safe after the post-merge validation
     # jobs have passed. Otherwise a failing develop push can be auto-reverted
     # after ancestor PRs were already closed as superseded.
+    #
+    # medium-test joined this list 2026-07-06 (review-followup-sweep):
+    # medium-test was promoted into the blocking auto-revert signal (see
+    # test_medium_test_is_promoted_to_auto_revert_trigger above) but this job
+    # still only waited on lint/fast-test/explorer-tokens, so a medium-test
+    # failure alongside three passing jobs could close orphaned PRs before
+    # the develop push was classified red and a revert PR opened.
     workflow_yaml = yaml.safe_load(
         (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
     )
     close_orphaned_prs = workflow_yaml["jobs"]["close-orphaned-prs"]
-    assert close_orphaned_prs["needs"] == ["lint", "fast-test", "explorer-tokens"]
+    assert close_orphaned_prs["needs"] == ["lint", "fast-test", "explorer-tokens", "medium-test"]
     assert close_orphaned_prs.get("if") is None
 
 

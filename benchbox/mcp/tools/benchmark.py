@@ -385,26 +385,27 @@ def _run_benchmark_impl(
 
         # Opt-in statistics phase (`statistics` in `phases`): threaded independently
         # of `_map_phases_to_test_execution_type`, which intentionally ignores the
-        # token for execution-type derivation. `benchmark_name` is required here so
-        # the base-adapter's `run_statistics_phase` can resolve the per-benchmark
+        # token for execution-type derivation. The base-adapter's
+        # `run_statistics_phase` needs a benchmark slug to resolve the per-benchmark
         # `supports_statistics_phase` registry gate; omitting it would make the gate
-        # look up an empty slug and always skip. Only set when requested, so callers
-        # that don't ask for statistics keep byte-identical `run_config` and responses.
+        # look up an empty slug and always skip.
         #
-        # Coupling note: `benchmark_name` is not gate-only downstream. In
-        # `run_enhanced_benchmark` it also seeds query dialect-family selection
-        # (`_get_dialect_queries` -> `get_tpc_base_dialect`, currently uniform across
-        # families) and the query-level `benchmark_type` that gates row-count
-        # validation (only when `enable_validation` is set, which the MCP adapter
-        # leaves False). Both are inert today, so setting `benchmark_name` only in
-        # this branch changes no observable behavior; but if a family-aware base
-        # dialect or MCP-side validation ever lands, requesting `statistics` would
-        # then also shift query SQL / validation. Revisit this conditional (pass the
-        # slug unconditionally) if either consumer becomes active.
+        # Deliberately NOT `benchmark_name`: that run_config key also feeds
+        # `_resolve_benchmark_slug`, which the power/throughput/maintenance/combined
+        # dispatchers use to route TPC benchmarks to specialized harnesses instead of
+        # the generic handler (and, in `run_enhanced_benchmark`, query dialect-family
+        # selection and the row-count-validation `benchmark_type` gate). Setting it
+        # only when `statistics` is requested would make requesting the phase also
+        # change which harness/dialect/validation path runs, so a stats-opt-in MCP
+        # run would no longer be comparable to the same run without it.
+        # `statistics_benchmark_name` is a dedicated key `run_enhanced_benchmark`
+        # reads only for the statistics gate, leaving `benchmark_name` unset (and
+        # routing/dialect/validation behavior identical) whether or not `statistics`
+        # is requested.
         statistics_run_config: dict[str, Any] = {}
         if "statistics" in phases_list:
             statistics_run_config["gather_statistics"] = True
-            statistics_run_config["benchmark_name"] = benchmark_lower
+            statistics_run_config["statistics_benchmark_name"] = benchmark_lower
 
         with silence_output(enabled=True):
             result = benchmark_instance.run_with_platform(

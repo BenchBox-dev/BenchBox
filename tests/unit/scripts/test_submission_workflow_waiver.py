@@ -58,14 +58,40 @@ def test_waiver_gates_manifest_skip_on_fork_check() -> None:
 
     # The block that clears REQUIRE_MANIFEST (the sidecar waiver) must be
     # guarded by the fork variable resolving to the same-repo ("false") case.
-    # We require the fork guard and the branch pattern to co-occur with the
-    # empty-string assignment that drops --require-manifest.
     assert re.search(rf'\[\s*"\${fork_var}"\s*=\s*"false"\s*\]', run), (
         "The manifest waiver must be nested under an "
         f'[ "${fork_var}" = "false" ] guard; a fork PR must never reach the '
         "REQUIRE_MANIFEST='' branch."
     )
     assert "auto/results-mirror-*" in run, "The waiver should still narrow to the mirror branch pattern."
+
+    # Presence alone doesn't prove NESTING: a future edit could leave the fork
+    # check in the step but move the mirror-branch waiver back outside it,
+    # reintroducing the fork-branch spoofing bypass while both substrings
+    # above still individually appear somewhere in `run`. Extract the actual
+    # `then ... fi` body guarded by the fork check and require BOTH the
+    # branch pattern and the empty-REQUIRE_MANIFEST assignment to be inside
+    # it, not just present anywhere in the step.
+    guard_match = re.search(
+        rf'\[\s*"\${fork_var}"\s*=\s*"false"\s*\]\s*;\s*then\n(.*?)\nfi\b',
+        run,
+        re.DOTALL,
+    )
+    assert guard_match is not None, (
+        f'Could not find a `if [ "${fork_var}" = "false" ]; then ... fi` block to inspect - '
+        "the fork guard must wrap a then/fi body, not just appear in a condition."
+    )
+    guarded_body = guard_match.group(1)
+    assert "auto/results-mirror-*" in guarded_body, (
+        "The mirror branch pattern check must be NESTED inside the "
+        f'[ "${fork_var}" = "false" ] guard body, not merely present elsewhere in the step - '
+        "otherwise a same-named branch on a fork PR could still reach the waiver."
+    )
+    assert re.search(r'REQUIRE_MANIFEST\s*=\s*""', guarded_body), (
+        'The REQUIRE_MANIFEST="" assignment (the actual waiver) must be NESTED inside the '
+        f'[ "${fork_var}" = "false" ] guard body, not merely present elsewhere in the step - '
+        "otherwise a fork PR could reach the waiver regardless of the fork check's outcome."
+    )
 
 
 def test_default_requires_manifest() -> None:
