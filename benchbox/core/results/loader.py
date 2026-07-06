@@ -205,6 +205,7 @@ def reconstruct_benchmark_results(
     platform_section = data.get("platform", {})
     summary_section = data.get("summary", {})
     execution_section = data.get("execution", {})
+    provenance_section = data.get("provenance", {})
 
     timestamp = _parse_timestamp(run_section.get("timestamp", ""))
     query_results = _reconstruct_query_results(data.get("queries", []), data.get("errors", []), plans_data)
@@ -276,6 +277,8 @@ def reconstruct_benchmark_results(
         dataset_version=benchmark_section.get("dataset_version"),
         manifest_hash=benchmark_section.get("manifest_hash"),
         data_archive_hash=benchmark_section.get("data_archive_hash"),
+        funding=provenance_section.get("funding"),
+        result_source=provenance_section.get("source"),
     )
 
 

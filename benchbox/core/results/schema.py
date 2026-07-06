@@ -143,6 +143,7 @@ class SchemaV2Validator:
         "export",
         "tuning",
         "execution",
+        "provenance",
         "config",
         "phases",
         "comparisons",
