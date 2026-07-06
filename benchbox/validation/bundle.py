@@ -22,6 +22,19 @@ try:
 except ImportError:  # pragma: no cover - exercised on the slim published-results branch.
     PUBLIC_SUBMISSION_SCHEMA_POLICY = None
 
+# Canonical provenance vocabulary. Import from the one source of truth when the
+# full package is present; fall back to inline literals on the slim
+# published-results branch mirror (which ships this module without benchbox/).
+# Keep the fallback in lockstep with benchbox/core/results/provenance.py.
+try:
+    from benchbox.core.results.provenance import FUNDING_SOURCES, RESULT_SOURCES
+except ImportError:  # pragma: no cover - slim published-results branch mirror.
+    FUNDING_SOURCES = ("employer", "personal", "free-trial", "vendor-sponsored", "grant", "unspecified")
+    RESULT_SOURCES = ("internal", "community", "vendor")
+
+# Max length for the optional free-text submission_notes manifest field.
+SUBMISSION_NOTES_MAX_LEN = 500
+
 # ---------------------------------------------------------------------------
 # Schema-v2 required top-level keys
 # ---------------------------------------------------------------------------
@@ -626,6 +639,8 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
         vr.error(f"Bundle file declared in manifest not found in PR: {bundle_file}")
         return
 
+    _validate_manifest_provenance(manifest, primary_path, vr)
+
     actual_hash = _hash_file(primary_path)
     if actual_hash != expected_hash:
         vr.error(
@@ -658,6 +673,44 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
                 f"Companion hash mismatch for {comp_name}: manifest says "
                 f"{comp_expected[:16]}..., computed {comp_actual[:16]}..."
             )
+
+
+def _validate_manifest_provenance(manifest: dict[str, Any], primary_path: Path, vr: ValidationResult) -> None:
+    """Validate the optional provenance fields on a submission manifest.
+
+    Runs on attacker-controlled PR JSON, so every value is checked against the
+    canonical allowlists and unknown values are hard errors (not warnings).
+
+    Governance: ``result_source == "vendor"`` (the ranking-eligible vendor tier)
+    is only valid for bundles under a maintainer-controlled ``vendor/`` subtree
+    (``results-data/bundles/vendor/...``, gated by CODEOWNERS on the
+    published-results branch). A community PR that self-asserts the vendor label
+    on a bundle outside that subtree is rejected — the vendor label cannot be
+    self-granted through the public submission path.
+    """
+    funding = manifest.get("funding")
+    if funding is not None and funding not in FUNDING_SOURCES:
+        vr.error(f"Invalid manifest funding {funding!r}: must be one of {sorted(FUNDING_SOURCES)}")
+
+    notes = manifest.get("submission_notes")
+    if notes is not None:
+        if not isinstance(notes, str):
+            vr.error("Manifest submission_notes must be a string")
+        elif len(notes) > SUBMISSION_NOTES_MAX_LEN:
+            vr.error(f"Manifest submission_notes exceeds {SUBMISSION_NOTES_MAX_LEN} characters ({len(notes)})")
+
+    result_source = manifest.get("result_source")
+    if result_source is None:
+        return
+    if result_source not in RESULT_SOURCES:
+        vr.error(f"Invalid manifest result_source {result_source!r}: must be one of {sorted(RESULT_SOURCES)}")
+        return
+    if result_source == "vendor" and "vendor" not in primary_path.parent.parts:
+        vr.error(
+            "Manifest result_source 'vendor' is only valid for bundles under a "
+            "maintainer-controlled results-data/bundles/vendor/ path; a community "
+            "submission cannot self-assert the vendor-supplied label."
+        )
 
 
 # ---------------------------------------------------------------------------
