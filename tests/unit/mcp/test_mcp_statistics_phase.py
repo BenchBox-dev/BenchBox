@@ -95,20 +95,32 @@ def _mock_run(
 
 
 class TestStatisticsPhaseFlagThreading:
-    """gather_statistics/benchmark_name threading into run_with_platform."""
+    """gather_statistics/statistics_benchmark_name threading into run_with_platform."""
 
     def test_statistics_in_phases_forwards_gather_statistics_flag(self, tool_functions, tmp_path):
-        """`statistics` in phases sets gather_statistics=True and benchmark_name for the registry gate."""
+        """`statistics` in phases sets gather_statistics=True and statistics_benchmark_name
+        for the registry gate."""
         _, call_kwargs = _mock_run(tool_functions, tmp_path, phases="load,statistics,power")
 
         assert call_kwargs.get("gather_statistics") is True
-        assert call_kwargs.get("benchmark_name") == "tpch"
+        assert call_kwargs.get("statistics_benchmark_name") == "tpch"
+
+    def test_statistics_never_sets_benchmark_name(self, tool_functions, tmp_path):
+        """Requesting statistics must not set `benchmark_name` itself: that key also
+        drives power/throughput/maintenance/combined harness routing (and, in
+        run_enhanced_benchmark, dialect selection / validation gating), so setting it
+        only here would make a stats-opt-in run incomparable to the same run without
+        the opt-in."""
+        _, call_kwargs = _mock_run(tool_functions, tmp_path, phases="load,statistics,power")
+
+        assert "benchmark_name" not in call_kwargs
 
     def test_statistics_absent_from_phases_omits_the_flag(self, tool_functions, tmp_path):
         """Callers that don't request statistics get an unchanged run_config (must_preserve)."""
         _, call_kwargs = _mock_run(tool_functions, tmp_path, phases="load,power")
 
         assert "gather_statistics" not in call_kwargs
+        assert "statistics_benchmark_name" not in call_kwargs
         assert "benchmark_name" not in call_kwargs
 
     def test_statistics_does_not_change_test_execution_type(self, tool_functions, tmp_path):

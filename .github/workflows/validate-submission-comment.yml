@@ -6,9 +6,15 @@ name: Submission Validation Comment
 # an external contributor's PR. This workflow runs on `workflow_run` completion
 # in the TRUSTED base-repository context with a writable `pull-requests` token,
 # downloads the comment artifact the validation run uploaded, and posts (or
-# updates) the comment. It never checks out or executes any PR-supplied code —
-# it only reads the artifact and calls the issue-comment API — so granting the
-# write permission here is safe.
+# updates) the comment. It never checks out or executes any PR-supplied code.
+#
+# The artifact is still attacker-influenced (produced by a run of PR-supplied
+# code), so it is trusted for the comment BODY only, never for identifying
+# WHICH PR to post to — a workflow_run follower gets a writable token even
+# when the triggering run could not, so trusting an artifact-supplied PR
+# number would let any submission PR redirect the comment to an arbitrary PR.
+# The target PR is instead derived from GitHub's own record of which PR the
+# run's trusted head_sha belongs to (`listPullRequestsAssociatedWithCommit`).
 #
 # ACTIVATION PREREQUISITES (this workflow is inert until both hold):
 #   1. A `workflow_run` companion only fires when its file is on the repository's
@@ -57,17 +63,41 @@ jobs:
             const fs = require('fs');
 
             // The validation run only uploads this artifact when bundles changed.
-            // If it is absent or malformed there is nothing to post — exit cleanly.
-            if (!fs.existsSync('artifact/pr_comment.md') || !fs.existsSync('artifact/pr_number.txt')) {
+            // If it is absent there is nothing to post — exit cleanly.
+            if (!fs.existsSync('artifact/pr_comment.md')) {
               core.info('No submission-validation comment artifact; nothing to post.');
               return;
             }
 
-            const prNumber = parseInt(fs.readFileSync('artifact/pr_number.txt', 'utf8').trim(), 10);
-            if (!Number.isInteger(prNumber) || prNumber <= 0) {
-              core.setFailed(`Invalid PR number in artifact: ${prNumber}`);
+            // Do NOT trust artifact/pr_number.txt for the comment target. The
+            // artifact is produced by validate-submission.yml, which runs
+            // PR-supplied code (the guard against validator/workflow edits is
+            // not exhaustive — e.g. benchbox/validation/__init__.py still runs
+            // during `from benchbox.validation.bundle import ...`) before the
+            // artifact is uploaded, so its contents are attacker-influenced.
+            // workflow_run followers get a writable token even when the
+            // triggering run could not, so trusting an attacker-chosen PR
+            // number here would let any submission PR redirect this bot's
+            // comment (posted with a write token) to an arbitrary PR.
+            //
+            // Instead, derive the target PR from GitHub's own record of which
+            // PR(s) the run's head commit belongs to — head_sha comes from the
+            // workflow_run event payload itself (populated by GitHub, not from
+            // anything the PR run wrote), so it cannot be forged by PR-supplied
+            // code.
+            const headSha = context.payload.workflow_run.head_sha;
+            const { data: associatedPRs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: headSha,
+            });
+            if (associatedPRs.length !== 1) {
+              core.setFailed(
+                `Expected exactly one PR associated with commit ${headSha}, found ${associatedPRs.length}; refusing to guess the comment target.`
+              );
               return;
             }
+            const prNumber = associatedPRs[0].number;
 
             const body = fs.readFileSync('artifact/pr_comment.md', 'utf8');
             const marker = '## Submission Validation';

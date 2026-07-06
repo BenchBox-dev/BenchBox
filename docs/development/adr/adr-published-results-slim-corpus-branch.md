@@ -176,6 +176,30 @@ remains authoritative — `published-results` copies are treated as
 read-only mirrors, and any develop-side bug fix in the validators is
 the canonical fix.
 
+### The workflow file itself is NOT auto-mirrored — this is permanent, not a gap to close
+
+`sync-results-data-to-published.yml`'s automated mirror only covers
+`scripts/validate_submission.py`, `benchbox/validation/bundle.py`, and
+`scripts/generate_corpus_inventory.py` (the vendored *scripts*). It
+deliberately does **not** include
+`.github/workflows/validate-submission.yml` itself, and never will:
+`GITHUB_TOKEN` cannot push changes under `.github/workflows/` regardless
+of the `permissions:` block granted to it — this is a hard-coded GitHub
+Actions restriction (the token needs an actual `workflows` OAuth scope,
+which `GITHUB_TOKEN` never carries), not a configuration choice that
+could be relaxed by editing the sync workflow.
+
+Practical effect: whenever `validate-submission.yml` changes on develop
+(new CI logic, a new guard step, an invocation change), a maintainer
+must **manually** diff and re-apply it onto `published-results`
+(`git diff origin/develop:.github/workflows/validate-submission.yml
+origin/published-results:.github/workflows/validate-submission.yml`),
+preserving the slim-branch's `--no-project --python 3.11` invocation —
+exactly the one-time sync PR #985 did. There is no automated drift
+alarm for this specific file; treat every develop-side PR that touches
+`validate-submission.yml` as carrying an implicit "and re-sync
+published-results by hand" follow-up.
+
 ## Consequences
 
 **Positive**

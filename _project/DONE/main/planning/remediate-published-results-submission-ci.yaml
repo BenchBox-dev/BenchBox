@@ -70,6 +70,23 @@ work:
     the fix; a maintainer must still review and merge the resulting mirror
     PR. Do not treat "merged into develop" as "live on published-results".
 
+    2026-07-06 CLARIFICATION (review-followup-sweep): the chosen
+    implementation was NEITHER pure option (a) nor (b) -- the workflow
+    stayed `pull_request` (not `pull_request_target`) and instead added an
+    explicit self-green guard step that fails any submission PR touching
+    the validator/workflow files (closes w3 separately). The vendored
+    *scripts* (`validate_submission.py`, `bundle.py`,
+    `generate_corpus_inventory.py`) DO auto-mirror via the sync workflow's
+    existing allowlist. `.github/workflows/validate-submission.yml` itself
+    does NOT and never will auto-mirror -- `GITHUB_TOKEN` cannot push
+    `.github/workflows/**` changes regardless of `permissions:`, a
+    hard-coded GitHub restriction, not a config gap. This is now documented
+    as a permanent manual-resync requirement in
+    `docs/development/adr/adr-published-results-slim-corpus-branch.md`
+    ("The workflow file itself is NOT auto-mirrored"). "Done" here means
+    the decided mechanism landed and is durably documented, not that the
+    workflow-file sync gap was automated away -- it cannot be.
+
 - id: w2
   summary: "Fix fork-PR comment posting so a passing validation never shows red for external contributors"
   needs: [w0]

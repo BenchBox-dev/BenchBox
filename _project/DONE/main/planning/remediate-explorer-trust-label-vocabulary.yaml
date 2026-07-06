@@ -38,6 +38,23 @@ work:
     explicitly. Ensure unofficial-research has an explorer badge. Document the
     canonical list where both sides reference it.
 
+    2026-07-06 FOLLOW-UP FIX (review-followup-sweep): the ci↔ci-verified
+    reconciliation only landed on the explorer badge side (TrustBadge.tsx
+    got a distinct `ci` entry alongside `ci-verified`) -- the ranking side
+    was missed. `bundle_publisher.VALID_LABELS` has never accepted
+    "ci-verified" as a label (it's parametrized as a bad/invalid case in
+    test_bundle_publisher_label.py); the publisher's real spelling is "ci".
+    But `RANKING_ELIGIBLE_TRUST_LABELS` in
+    `_project/scripts/explorer_pipeline/models.py` only listed
+    "ci-verified", so every bundle the publisher could actually produce
+    with the ci label was structurally excluded from official rankings --
+    the exact §2.20 defect this TODO was opened to close, still live.
+    Fixed by adding "ci" to RANKING_ELIGIBLE_TRUST_LABELS (kept
+    "ci-verified" too, since TrustBadge.tsx still renders it distinctly for
+    any historical data using that spelling). Added
+    test_ci_public_verified_is_eligible and extended
+    test_ranking_eligible_trust_labels_constant.
+
 - id: w2
   summary: "Map every publisher label to an explorer badge (no silent 'unrecognised' for a valid label)"
   needs: [w1]

@@ -79,9 +79,19 @@ RANKING_ELIGIBLE_VISIBILITIES: frozenset[str] = frozenset(
 
 # Excluded trust labels: "community-submission", "local" - results from
 # unverified sources are displayed but excluded from official rankings.
+#
+# "ci" is bundle_publisher.VALID_LABELS' actual spelling for an automated-CI
+# result - the publisher has never accepted "ci-verified" as a valid label
+# (see tests/unit/core/publishing/test_bundle_publisher_label.py's bad-label
+# parametrization), so a set containing only "ci-verified" made every
+# CI-produced bundle structurally unrankable despite the publisher treating
+# "ci" as first-class. "ci-verified" is kept alongside it (rather than
+# replaced) only because TrustBadge.tsx still renders it as a distinct,
+# reachable-from-historical-data label; no current producer emits it.
 RANKING_ELIGIBLE_TRUST_LABELS: frozenset[str] = frozenset(
     {
         "maintainer-run",
+        "ci",
         "ci-verified",
     }
 )

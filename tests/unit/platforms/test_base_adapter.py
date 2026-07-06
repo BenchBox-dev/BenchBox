@@ -3435,6 +3435,42 @@ class TestStatisticsPhase:
         assert stats.stats_mode == "explicit"
         assert stats.tables_analyzed == 1
 
+    def test_run_benchmark_statistics_benchmark_name_gates_without_setting_benchmark_name(
+        self, mock_benchmark, tmp_path
+    ):
+        """A caller (the MCP run_benchmark tool) can gate the statistics phase via the
+        dedicated `statistics_benchmark_name` key without ever setting `benchmark_name`
+        itself - that key also drives harness routing (_resolve_benchmark_slug) and
+        must not change based on whether statistics was requested."""
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        mock_benchmark.output_dir = tmp_path
+        mock_benchmark.create_enhanced_benchmark_result.return_value = make_benchmark_results(
+            benchmark_name="tpch",
+            platform="mock",
+            scale_factor=1.0,
+            execution_id="stats_003",
+            duration_seconds=1.0,
+            total_queries=2,
+            successful_queries=2,
+            total_execution_time=0.2,
+            average_query_time=0.1,
+            data_loading_time=0.5,
+            schema_creation_time=0.1,
+            total_rows_loaded=100,
+            data_size_mb=1.0,
+            table_statistics={"table1": 100},
+        )
+
+        adapter.run_benchmark(mock_benchmark, gather_statistics=True, statistics_benchmark_name="tpch")
+
+        adapter.analyze_table.assert_called_once()
+        phases = mock_benchmark.create_enhanced_benchmark_result.call_args.kwargs["phases"]
+        stats = phases.setup.statistics_gathering
+        assert stats is not None
+        assert stats.status == "COMPLETED"
+        assert stats.tables_analyzed == 1
+
     def test_run_benchmark_without_flag_keeps_legacy_semantics(self, mock_benchmark, tmp_path):
         adapter = MockPlatformAdapter()
         adapter.analyze_table = Mock()
