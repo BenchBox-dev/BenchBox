@@ -92,7 +92,7 @@ If a step's "expected" behavior is unclear or seems wrong on its face, mark it `
 
 ## Reporting format
 
-After the required `develop_sha:` frontmatter, append one block per finding to a new file at `_project/audits/results-explorer-qa-pass2-findings.md`. **One finding per block, no prose between them.** Use this exact template — I parse it:
+After the required `develop_sha:` frontmatter, append one block per finding to a **new** findings file for this pass at `_project/audits/results-explorer-qa-pass<N>-findings.md`, where `<N>` is the next unused pass number (pass-2 and pass-3 files already exist — do **not** append to a sealed prior-pass file; its `develop_sha` stamp describes that pass only). **One finding per block, no prose between them.** Use this exact template — I parse it:
 
 ```yaml
 - id: <STABLE_ID from this plan, e.g. S2.3, U1, F4>
@@ -111,7 +111,7 @@ After the required `develop_sha:` frontmatter, append one block per finding to a
       <paste any console output, or "none">
     network: |
       <paste any non-2xx responses with URL + status, or "none">
-    screenshot: <relative path under _project/audits/screenshots/, or "none">
+    screenshot: "none"   # screenshots are not retained in git; keep them locally and reference "none" here unless a durable path is agreed
   severity: <blocker | major | minor | nit>   # only for F and Q; omit for P
   notes: |
     <anything else — repro flakiness, only-on-cold-load, etc.>
@@ -374,7 +374,7 @@ For every URL-synced control found in S2–S7:
 
 ## S11 — Pass-1 confirmed bugs (must re-test)
 
-Re-run these verbatim and report status. They drive the `results-explorer-qa-pass1-fixes` TODO.
+Re-run these verbatim and report status. (The original `results-explorer-qa-pass1-fixes` TODO is complete — file any new regressions as fresh findings in this pass's findings file.)
 
 - **B1** — PlatformIndex `<th>` headers don't sort. Confirm on every platform page.
 - **B2** — `/results/p/duckdb/` and `/results/p/polars/` render empty. Hard refresh + warm reload + 30s wait.
@@ -397,4 +397,4 @@ Do not file findings for these — they're tracked separately:
 
 ## When you're done
 
-Save findings at `_project/audits/results-explorer-qa-pass2-findings.md` and reply with just: "pass-2 findings ready, N=<count>". I'll read the file, triage, and either patch directly or update the existing pass-1 TODO.
+Save findings at `_project/audits/results-explorer-qa-pass<N>-findings.md` (next unused pass number) and reply with just: "pass-<N> findings ready, N=<count>". I'll read the file and triage.
