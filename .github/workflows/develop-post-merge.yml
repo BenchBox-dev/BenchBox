@@ -79,19 +79,22 @@ jobs:
     # the develop-PR-blocking lane, so it lands here for visibility/metrics.
     # See _project/TODO/main/planning/medium-tier-ci-home.yaml.
     #
-    # PROMOTED 2026-07-06 (medium-tier-red-disposition-and-promotion): the
-    # tier ran clean (green) on the real runner - develop-post-merge run
-    # 28763663703, job 85283671051, "Run medium speed tier" success - once
-    # its dispositioned failures were fixed: timeout markers for the 6 slow
-    # data-gen/cross-surface tests (#977) and the pytest-ci.ini
-    # filterwarnings marker sync (#994, the last remaining runner failure).
-    # It is now a blocking post-merge lane wired into auto-revert-on-failure's
-    # trigger, same as lint/fast-test/explorer-tokens (continue-on-error
-    # dropped). The 44 tpch-extension "errors" reported earlier were
-    # sandbox-only (egress proxy 403 on the extension download) and do not
-    # occur on the runner.
+    # VISIBILITY-ONLY FOR NOW (continue-on-error: true, deliberately EXCLUDED
+    # from auto-revert-on-failure's trigger): the tier has at least one
+    # known-red test on clean develop
+    # (tests/unit/test_cross_surface_applicability.py::test_committed_artifact_is_current,
+    # stale committed artifact) plus 14 failures / 44 errors observed under a
+    # contended sandbox measurement that have not been dispositioned. Wiring
+    # this into auto-revert now would open a revert PR against the first
+    # innocent merge. Promotion criterion: a full clean (green) run of the
+    # medium tier - prerequisites are (1) regenerating the stale
+    # cross-surface-applicability artifact and (2) a clean-environment
+    # re-measurement to disposition the other observed failures/errors. When
+    # promoting, drop continue-on-error and add medium-test to
+    # auto-revert-on-failure's needs + if, mirroring lint/fast-test.
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -231,12 +234,12 @@ jobs:
   auto-revert-on-failure:
     name: auto-revert-on-failure
     runs-on: ubuntu-latest
-    # medium-test promoted into this trigger 2026-07-06 (see the medium-test
-    # job's promotion note): the tier ran clean on the real runner after its
-    # dispositioned failures were fixed (#977, #994), so a medium-test failure
-    # now opens a (reviewable) revert PR, same as lint/fast-test/explorer-tokens.
-    needs: [lint, fast-test, explorer-tokens, medium-test]
-    if: ${{ always() && (needs.lint.result == 'failure' || needs.fast-test.result == 'failure' || needs.explorer-tokens.result == 'failure' || needs.medium-test.result == 'failure') }}
+    # medium-test is deliberately absent from this needs/if while the medium
+    # tier has known-red tests (see the medium-test job's promotion criterion)
+    # - an auto-revert must never fire against an innocent merge because of a
+    # pre-existing tier failure.
+    needs: [lint, fast-test, explorer-tokens]
+    if: ${{ always() && (needs.lint.result == 'failure' || needs.fast-test.result == 'failure' || needs.explorer-tokens.result == 'failure') }}
     outputs:
       auto-revert-pr-opened-at: ${{ steps.open-revert.outputs.auto-revert-pr-opened-at }}
       auto-revert-pr-url: ${{ steps.open-revert.outputs.auto-revert-pr-url }}

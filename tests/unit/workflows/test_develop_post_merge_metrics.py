@@ -191,26 +191,25 @@ def test_auto_revert_triggers_on_explorer_tokens_failure() -> None:
     assert "needs.explorer-tokens.result == 'failure'" in auto_revert["if"]
 
 
-def test_medium_test_is_promoted_to_auto_revert_trigger() -> None:
-    # PROMOTED 2026-07-06 (medium-tier-red-disposition-and-promotion): after
-    # the medium tier ran clean (green) on the real runner - develop-post-merge
-    # run 28763663703, job 85283671051 - once its dispositioned failures were
-    # fixed (#977 timeout markers, #994 pytest-ci.ini filterwarnings marker
-    # sync), medium-test was promoted to a blocking post-merge lane on the
-    # explorer-tokens pattern: no continue-on-error, present in
-    # auto-revert-on-failure's needs + if:failure trigger. This is the inverse
-    # of the former visibility-only pin; a regression here means the promotion
-    # was silently undone and a medium-test failure would no longer open a
-    # revert PR.
+def test_medium_test_is_visibility_only_not_auto_revert_trigger() -> None:
+    # The medium tier has known-red tests on clean develop (stale
+    # cross-surface-applicability artifact, plus undispositioned failures
+    # observed under a contended sandbox measurement — see
+    # medium-tier-ci-home.yaml). Until a full clean run of the tier is
+    # green, medium-test must be visibility-only: continue-on-error and
+    # EXCLUDED from the auto-revert-on-failure trigger, so an innocent
+    # merge can never be auto-reverted for a pre-existing tier failure.
+    # When promoting, flip these assertions to the explorer-tokens pattern
+    # (needs + if:failure trigger, no continue-on-error).
     workflow_yaml = yaml.safe_load(
         (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
     )
     medium_test = workflow_yaml["jobs"]["medium-test"]
     auto_revert = workflow_yaml["jobs"]["auto-revert-on-failure"]
 
-    assert "continue-on-error" not in medium_test
-    assert "medium-test" in auto_revert["needs"]
-    assert "needs.medium-test.result == 'failure'" in auto_revert["if"]
+    assert medium_test.get("continue-on-error") is True
+    assert "medium-test" not in auto_revert["needs"]
+    assert "needs.medium-test.result" not in auto_revert["if"]
 
 
 def test_close_orphaned_prs_waits_for_post_merge_validation_success() -> None:
