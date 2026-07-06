@@ -1129,6 +1129,10 @@ class BenchmarkExecutionMixin:
                     raw_result = dict(raw_result)
                     if profile.query_plan is not None:
                         raw_result["query_plan"] = profile.query_plan
+                    # Surface capture cost separately (excluded from execution time),
+                    # matching the SQL platforms' plan_capture_time_ms field.
+                    if profile.plan_capture_time_ms:
+                        raw_result["plan_capture_time_ms"] = profile.plan_capture_time_ms
                 else:
                     raw_result = self.execute_query(ctx, query)
                     raw_result = dict(raw_result)

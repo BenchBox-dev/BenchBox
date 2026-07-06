@@ -1427,14 +1427,19 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             if isinstance(lazy_result, UnifiedLazyFrame):
                 lazy_result = lazy_result.native
 
-            # Capture query plan before collect if enabled
+            # Capture query plan before collect if enabled. Timed as its own phase
+            # so capture cost is excluded from execution_time_ms and reported
+            # separately as plan_capture_time_ms (matching the SQL platforms).
             if capture_plan:
+                profile_ctx.start_plan_capture()
                 try:
                     plan = capture_query_plan(lazy_result, self.platform_name)
                     if plan:
                         profile_ctx.set_query_plan(plan)
                 except Exception as e:
                     logger.debug(f"Plan capture failed for {qid}: {e}")
+                finally:
+                    profile_ctx.end_plan_capture()
 
             # Phase 2: Collection (materialize results)
             profile_ctx.start_collect()
