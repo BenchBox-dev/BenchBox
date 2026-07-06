@@ -383,12 +383,36 @@ def _run_benchmark_impl(
 
         test_execution_type = _map_phases_to_test_execution_type(phases_list)
 
+        # Opt-in statistics phase (`statistics` in `phases`): threaded independently
+        # of `_map_phases_to_test_execution_type`, which intentionally ignores the
+        # token for execution-type derivation. `benchmark_name` is required here so
+        # the base-adapter's `run_statistics_phase` can resolve the per-benchmark
+        # `supports_statistics_phase` registry gate; omitting it would make the gate
+        # look up an empty slug and always skip. Only set when requested, so callers
+        # that don't ask for statistics keep byte-identical `run_config` and responses.
+        #
+        # Coupling note: `benchmark_name` is not gate-only downstream. In
+        # `run_enhanced_benchmark` it also seeds query dialect-family selection
+        # (`_get_dialect_queries` -> `get_tpc_base_dialect`, currently uniform across
+        # families) and the query-level `benchmark_type` that gates row-count
+        # validation (only when `enable_validation` is set, which the MCP adapter
+        # leaves False). Both are inert today, so setting `benchmark_name` only in
+        # this branch changes no observable behavior; but if a family-aware base
+        # dialect or MCP-side validation ever lands, requesting `statistics` would
+        # then also shift query SQL / validation. Revisit this conditional (pass the
+        # slug unconditionally) if either consumer becomes active.
+        statistics_run_config: dict[str, Any] = {}
+        if "statistics" in phases_list:
+            statistics_run_config["gather_statistics"] = True
+            statistics_run_config["benchmark_name"] = benchmark_lower
+
         with silence_output(enabled=True):
             result = benchmark_instance.run_with_platform(
                 adapter,
                 query_subset=query_subset,
                 test_execution_type=test_execution_type,
                 capture_plans=capture_plans,
+                **statistics_run_config,
             )
 
         if result is not None:
