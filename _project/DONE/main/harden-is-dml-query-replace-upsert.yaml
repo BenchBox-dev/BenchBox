@@ -2,7 +2,8 @@ id: harden-is-dml-query-replace-upsert
 title: "Defensively cover REPLACE INTO / UPSERT INTO in is_dml_query"
 worktree: main
 priority: Low
-status: Not Started
+status: "Completed"
+completed_date: "2026-07-05"
 description: |
   `is_dml_query` (benchbox/platforms/base/result_capture.py:196; leading-verb regex
   `_DML_LEADING_RE` at :82) guards EXPLAIN-ANALYZE plan capture against re-executing a
@@ -33,8 +34,8 @@ impact:
     ANALYZE engine ever runs REPLACE/UPSERT.
 
 must_preserve:
-  - "No read statement (plain SELECT, CREATE VIEW, plain CREATE TABLE, TRUNCATE) starts returning True."
-  - "All currently-caught write shapes stay caught."
+- "No read statement (plain SELECT, CREATE VIEW, plain CREATE TABLE, TRUNCATE) starts returning True."
+- "All currently-caught write shapes stay caught."
 
 approach: |
   Extend `_DML_LEADING_RE` to include REPLACE and UPSERT as leading verbs; add both
@@ -42,15 +43,15 @@ approach: |
 
 scope_limit:
   only_modify:
-    - "benchbox/platforms/base/result_capture.py"
-    - "tests/unit/platforms/"
+  - "benchbox/platforms/base/result_capture.py"
+  - "tests/unit/platforms/"
 
 work:
-  - id: w1
-    summary: "Add REPLACE/UPSERT to _DML_LEADING_RE and extend the is_dml_query test corpus (incl. lowercase + comment-prefixed)"
-    status: pending
+- id: w1
+  summary: "Add REPLACE/UPSERT to _DML_LEADING_RE and extend the is_dml_query test corpus (incl. lowercase + comment-prefixed)"
+  status: done
 
 verification:
-  - description: "is_dml_query tests pass, including new REPLACE/UPSERT cases and unchanged read/DDL cases"
-    command: "uv run -- python -m pytest tests/unit/platforms/ -k 'dml or plan_capture' -n 0 -q"
-    expected_output: "passed"
+- description: "is_dml_query tests pass, including new REPLACE/UPSERT cases and unchanged read/DDL cases"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -k 'dml or plan_capture' -n 0 -q"
+  expected_output: "passed"

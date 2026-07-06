@@ -79,11 +79,21 @@ except ImportError:  # pragma: no cover - validation always present in real inst
 
 # A data-changing verb at the very start of the statement (word-bounded so an
 # identifier like ``COPYRIGHTS`` or ``MERGEABLE`` is not misread as DML).
-_DML_LEADING_RE = re.compile(r"^(?:INSERT|UPDATE|DELETE|MERGE|COPY)\b", re.IGNORECASE)
+# REPLACE and UPSERT (MySQL/SingleStore/Doris family ``REPLACE INTO``/
+# ``UPSERT INTO``) are included defensively: no current ANALYZE-capturing
+# adapter emits a bare form of either today, but a future one would otherwise
+# be physically re-executed during capture, mutating data twice.
+_DML_LEADING_RE = re.compile(r"^(?:INSERT|UPDATE|DELETE|MERGE|COPY|REPLACE|UPSERT)\b", re.IGNORECASE)
 # A data-modifying verb anywhere — used only after a leading WITH to catch
 # CTE-prefixed DML (``WITH cte AS (...) INSERT INTO ...``). COPY is excluded:
 # it cannot appear inside a CTE, and its leading form is already caught above.
-_DML_AFTER_CTE_RE = re.compile(r"\b(?:INSERT|UPDATE|DELETE|MERGE)\b", re.IGNORECASE)
+# REPLACE requires a following INTO (unlike INSERT/UPDATE/DELETE/MERGE, which
+# match bare): REPLACE is also a common SQL string function
+# (``replace(col, 'a', 'b')``), so a bare-word match would false-positive on
+# any read-only CTE query that happens to call it, suppressing ANALYZE for a
+# statement that writes nothing. UPSERT has no such overloaded meaning, but is
+# held to the same ``INTO``-qualified form for consistency.
+_DML_AFTER_CTE_RE = re.compile(r"\b(?:INSERT|UPDATE|DELETE|MERGE)\b|\b(?:REPLACE|UPSERT)\s+INTO\b", re.IGNORECASE)
 # Write-producing DDL prefixes: CREATE TABLE ... AS <query> (CTAS) and
 # CREATE MATERIALIZED VIEW ... AS <query>. Both materialize the query's rows,
 # so EXPLAIN ANALYZE would write them a second time. The prefix alone is not
@@ -201,9 +211,9 @@ def is_dml_query(query: str) -> bool:
     re-run the statement, so a data-writing query would mutate data twice.
     Callers downgrade to a non-ANALYZE ``EXPLAIN`` for these statements.
 
-    Detection covers the data-modifying verbs INSERT/UPDATE/DELETE/MERGE/COPY
-    (including when they are preceded by a leading ``WITH`` CTE clause) and the
-    write-producing DDL shapes that materialize a query's rows:
+    Detection covers the data-modifying verbs INSERT/UPDATE/DELETE/MERGE/COPY/
+    REPLACE/UPSERT (including when they are preceded by a leading ``WITH`` CTE
+    clause) and the write-producing DDL shapes that materialize a query's rows:
 
     - ``CREATE [OR REPLACE] TABLE ... AS <query>`` (CTAS)
     - ``CREATE [OR REPLACE] MATERIALIZED VIEW ... AS <query>``

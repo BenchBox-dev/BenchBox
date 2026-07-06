@@ -27,6 +27,13 @@ class TestIsDmlQueryHelper:
             "  DELETE FROM t",
             "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = 1",
             "COPY t FROM 'f.csv'",
+            "REPLACE INTO t VALUES (1)",
+            "upsert into t values (1)",
+            "UPSERT INTO t SELECT * FROM s",
+            "/* banner */ REPLACE INTO t VALUES (1)",
+            "-- c\nUPSERT INTO t VALUES (1)",
+            "WITH s AS (SELECT 1) REPLACE INTO t SELECT * FROM s",
+            "WITH s AS (SELECT 1) UPSERT INTO t SELECT * FROM s",
             "/* banner */ INSERT INTO t VALUES (1)",
             "-- c\nUPDATE t SET x = 1",
             "WITH s AS (SELECT 1) INSERT INTO t SELECT * FROM s",
@@ -66,6 +73,9 @@ class TestIsDmlQueryHelper:
             "SELECT 1",
             "WITH cte AS (SELECT 1) SELECT * FROM cte",
             "SELECT copy_total, merge_flag FROM t",  # identifiers, not verbs (word boundary)
+            "SELECT replacement_id, upserted_at FROM t",  # REPLACE/UPSERT identifiers, not verbs (word boundary)
+            "WITH cleaned AS (SELECT replace(name, 'a', 'b') FROM t) SELECT * FROM cleaned",  # REPLACE() string function, not the DML statement
+            "SELECT replace(name, 'a', 'b') FROM t",  # same function call, no CTE
             "CREATE TABLE t (id INT)",  # column DDL writes no rows
             "CREATE TABLE t (x INT GENERATED ALWAYS AS (x + 1) STORED)",  # generated column AS is not CTAS
             "CREATE TABLE t (note TEXT DEFAULT 'AS SELECT')",  # literal inside column DDL is not CTAS
