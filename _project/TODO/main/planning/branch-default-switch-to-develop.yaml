@@ -1,0 +1,109 @@
+id: branch-default-switch-to-develop
+title: "Make develop the GitHub default branch (Decision A of the branching-strategy review)"
+worktree: main
+priority: High
+status: "Not Started"
+category: "Release Tooling"
+
+description: |
+  BRANCHING-STRATEGY REVIEW (2026-07-06, session on PR #993). The repo already
+  treats `develop` as the integration branch — all PRs target it, the
+  develop-squash-only ruleset and develop-post-merge auto-revert live there —
+  but GitHub's default_branch is still `main` (confirmed via
+  `gh api repos/joeharris76/BenchBox --jq .default_branch` -> "main"). This
+  item flips the default to `develop`.
+
+  Decision A is deliberately separated from the main->release rename
+  (Decision B, see rename-release-branch-main-to-release): A is a low-risk,
+  reversible, one-call admin change and captures most of the value on its own.
+
+  KEY INTERACTION — this resolves an open High/In-Progress TODO. GitHub runs
+  on.schedule workflows ONLY from the default branch's copy of the file.
+  release-canary.yml lives on develop, not main, so its daily cron has never
+  fired (see release-canary-scheduled-activation, whose w1 menu proposes
+  landing the file on main as options (a)/(b)/(c)). Making develop the default
+  dissolves that problem: the canary — and any future scheduled workflow
+  authored on develop — registers and fires with no per-release re-landing.
+  Cross-link and re-scope that item when this lands.
+
+  Verified safe (documented in the session's branch-rename runbook draft):
+  PyPI trusted publishing is branch-independent (keyed on repo + workflow
+  filename release.yml + environment pypi, never a branch), and GitHub Pages
+  deploys via deploy-pages (source = "GitHub Actions", not a branch). Neither
+  is affected by changing the default branch.
+
+prior_art:
+  - "_project/TODO/main/active/release-canary-scheduled-activation.yaml — the open item this resolves; its w1 option menu (a/b/c) predates and omits the develop-as-default option. Re-scope its w2/w3 once this lands."
+  - ".github/workflows/nightly.yml — the scheduled workflow currently on main that DOES fire; after the default flips, scheduled workflows fire from develop instead, so confirm nightly still triggers as expected."
+  - "docs/operations/repo-admin-settings.md — the admin-state runbook; its 'Scheduled activation' section is written under the main-as-default premise and must be updated to reflect develop-as-default."
+
+work:
+  - id: w1
+    summary: "ADMIN: set default_branch=develop"
+    status: pending
+    notes: |
+      `gh api -X PATCH repos/joeharris76/BenchBox -f default_branch=develop`.
+      Admin-only. Reversible: re-run with default_branch=main to roll back.
+      Record the dated before/after in repo-admin-settings.md.
+  - id: w2
+    summary: "Verify scheduled workflows now register and fire from develop"
+    needs: [w1]
+    status: pending
+    notes: |
+      After the flip, confirm release-canary.yml is registered:
+      `gh api repos/joeharris76/BenchBox/actions/workflows --jq '.workflows[].path'`
+      now includes .github/workflows/release-canary.yml, and
+      `gh api .../actions/workflows/release-canary.yml/runs` no longer 404s.
+      Dispatch once (workflow_dispatch) to prove liveness; expected first
+      result is RED on 0.3.0's broken import (that is the canary working —
+      see release-recovery-v0-3-1). Confirm nightly.yml still fires from the
+      new default.
+  - id: w3
+    summary: "Update repo-admin-settings.md: the default-branch premise inverts"
+    needs: [w1]
+    status: pending
+    notes: |
+      The 'Scheduled activation of release-canary.yml' section and any text
+      asserting 'the default branch is main' become stale. Rewrite to reflect
+      develop-as-default; several (a)/(b)/(c) workarounds for the canary
+      become unnecessary. Record the new live state with a date.
+
+must_preserve:
+  - "main stays release-only and push-restricted regardless of the default-branch setting — the default flip changes clone/PR/UI defaults and scheduled-workflow source, not the release gating."
+  - "PyPI trusted publishing and GitHub Pages config — both branch-independent; do not touch them as part of this change."
+
+anti_patterns:
+  - "DO NOT bundle the main->release rename into this item - because Decision B has real functional blast radius (verify-tag-on-main, test.yml base_ref gates) and Decision A's value plus low risk should not wait on it - keep them separate PRs/items."
+
+verification:
+  - description: "Default branch is develop"
+    command: "gh api repos/joeharris76/BenchBox --jq .default_branch"
+    expected_output: "develop"
+  - description: "Scheduled canary now registered"
+    command: "gh api repos/joeharris76/BenchBox/actions/workflows --jq '.workflows[].path' | grep release-canary"
+    expected_output: ".github/workflows/release-canary.yml present"
+
+scope_limit:
+  only_modify:
+    - "docs/operations/repo-admin-settings.md"
+  do_not_modify:
+    - ".github/workflows/release.yml"
+    - ".github/workflows/docs.yml"
+
+metadata:
+  owners:
+    - "joeharris76"
+  tags:
+    - "release"
+    - "governance"
+    - "admin-action"
+    - "branching-strategy"
+  estimated_effort: "Tiny (one admin API call + doc update)"
+  created_date: "2026-07-06"
+
+impact:
+  business_value: |
+    Aligns the repo's front door (clone/PR/UI defaults) with how work actually
+    flows, and — more concretely — activates the daily release canary and
+    ruleset-drift checks that have never run because they live on develop
+    while the default is main. Low risk, reversible in one call.
