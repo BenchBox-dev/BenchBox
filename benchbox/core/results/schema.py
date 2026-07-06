@@ -942,6 +942,14 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
             }
             if stats.error_message:
                 phases["statistics"]["error_message"] = stats.error_message
+            # Opt-in cold-stats vs warm-stats control and per-table timing
+            # breakdown (both additive/omitted-when-empty; absent entirely
+            # when the reset/persist knob was not used or no breakdown was
+            # collected, so unmodified runs stay byte-identical).
+            if stats.stats_lifecycle:
+                phases["statistics"]["stats_lifecycle"] = stats.stats_lifecycle
+            if stats.per_table_ms:
+                phases["statistics"]["per_table_ms"] = stats.per_table_ms
 
     if result.execution_phases and result.execution_phases.power_test:
         power_test = result.execution_phases.power_test

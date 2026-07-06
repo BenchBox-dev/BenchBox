@@ -415,6 +415,31 @@ class PlatformAdapter(
             return "explicit", len(table_names)
         return "unsupported", 0
 
+    def reset_statistics(self, connection: Any, table_names: list[str]) -> str:
+        """Reset (drop/invalidate) optimizer statistics ahead of a cold-stats rebuild.
+
+        Sibling of ``gather_statistics`` for the reset/persist control (opt-in
+        via the statistics phase's ``reset=True``). Returns a stats_lifecycle
+        marker: ``"reset"`` when statistics were actually cleared, or
+        ``"unsupported"`` when this adapter has no generic drop-stats
+        primitive it's safe to run generically.
+
+        The base default is a documented no-op that always returns
+        ``"unsupported"``: engines must never have this method force an
+        operation that could fail or corrupt state on a platform it wasn't
+        vetted for. This is a safe fallback rather than a regression - the
+        statistics phase's subsequent ``gather_statistics()`` call still runs
+        a full ANALYZE/rebuild that reflects current data, so a cold-stats
+        study remains meaningful even without an explicit reset step.
+        Platform adapters that support a real drop-stats operation should
+        override this method.
+        """
+        self.logger.debug(
+            f"reset_statistics not implemented for {self.__class__.__name__}; "
+            "no generic drop-stats primitive, deferring to the gather_statistics rebuild"
+        )
+        return "unsupported"
+
     def run_statistics_phase(
         self,
         benchmark: Any,
@@ -422,6 +447,8 @@ class PlatformAdapter(
         *,
         benchmark_name: str = "",
         table_names: list[str] | None = None,
+        reset: bool | None = None,
+        collect_per_table_timing: bool = False,
     ) -> StatisticsGatheringPhase | None:
         """Run the opt-in statistics phase between load and query execution.
 
@@ -430,6 +457,19 @@ class PlatformAdapter(
         benchmarks keep load-includes-stats semantics and their historical
         bundles stay comparable. Failures are recorded on the phase rather
         than aborting the run - queries remain meaningful on unanalyzed data.
+
+        Args:
+            reset: Cold-stats vs warm-stats control. None (default) leaves
+                statistics untouched and records no stats_lifecycle marker,
+                exactly matching the PR #980 shipped behavior. True resets
+                statistics via ``reset_statistics()`` before rebuilding
+                (cold-stats). False explicitly records a "persist" marker
+                (warm-stats) without changing behavior.
+            collect_per_table_timing: When True and this adapter's statistics
+                build falls back to a per-table ANALYZE loop (no whole-database
+                analyze hook, and gather_statistics is not overridden with
+                platform-specific routing), record a per-table wall-clock
+                breakdown on the returned phase. Left None otherwise.
         """
         from benchbox.core.benchmark_registry import get_benchmark_metadata
 
@@ -445,8 +485,42 @@ class PlatformAdapter(
         names = table_names or _resolve_benchmark_table_names(benchmark)
         quiet_console.print("Gathering optimizer statistics...")
         start_time = mono_time()
+
+        stats_lifecycle: str | None = None
+        if reset:
+            try:
+                stats_lifecycle = self.reset_statistics(connection, names) or "unsupported"
+            except Exception as exc:
+                self.logger.warning(f"Statistics reset failed, continuing with rebuild: {exc}")
+                stats_lifecycle = "unsupported"
+        elif reset is False:
+            # The control was explicitly exercised in persist mode (warm-stats
+            # study): record the marker even though behavior matches default.
+            stats_lifecycle = "persist"
+
+        # Per-table timing is only safe to collect by looping analyze_table()
+        # ourselves when gather_statistics() is the unmodified base
+        # implementation - platform overrides (e.g. Redshift's auto-on-load
+        # routing) must keep deciding stats_mode themselves, so we defer to
+        # gather_statistics() and leave per_table_ms unset for those adapters.
+        per_table_ms: dict[str, int] | None = None
+        use_per_table_loop = (
+            collect_per_table_timing
+            and type(self).gather_statistics is PlatformAdapter.gather_statistics
+            and callable(getattr(self, "analyze_table", None))
+            and not callable(getattr(self, "analyze_tables", None))
+        )
         try:
-            stats_mode, tables_analyzed = self.gather_statistics(connection, names)
+            if use_per_table_loop:
+                per_table_ms = {}
+                analyze_table = self.analyze_table  # type: ignore[attr-defined]
+                for table_name in names:
+                    table_start = mono_time()
+                    analyze_table(connection, table_name)
+                    per_table_ms[table_name] = int(elapsed_seconds(table_start) * 1000)
+                stats_mode, tables_analyzed = "explicit", len(names)
+            else:
+                stats_mode, tables_analyzed = self.gather_statistics(connection, names)
         except Exception as exc:
             self.logger.warning(f"Statistics phase failed: {exc}")
             return StatisticsGatheringPhase(
@@ -455,12 +529,15 @@ class PlatformAdapter(
                 stats_mode="explicit",
                 tables_analyzed=0,
                 error_message=str(exc),
+                stats_lifecycle=stats_lifecycle,
             )
         return StatisticsGatheringPhase(
             duration_ms=int(elapsed_seconds(start_time) * 1000),
             status="COMPLETED",
             stats_mode=stats_mode,
             tables_analyzed=tables_analyzed,
+            stats_lifecycle=stats_lifecycle,
+            per_table_ms=(per_table_ms or None),
         )
 
     @abstractmethod
@@ -640,6 +717,8 @@ class PlatformAdapter(
                     connection,
                     benchmark_name=run_config.get("statistics_benchmark_name") or run_config.get("benchmark_name", ""),
                     table_names=sorted(table_stats) if table_stats else None,
+                    reset=run_config.get("stats_reset"),
+                    collect_per_table_timing=bool(run_config.get("stats_per_table_timing", False)),
                 )
 
             test_execution_type = run_config.get("test_execution_type", "standard")

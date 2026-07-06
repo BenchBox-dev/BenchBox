@@ -466,6 +466,8 @@ def _execute_load_only_mode(
                 connection,
                 benchmark_name=benchmark_config.name,
                 table_names=sorted(table_stats) if table_stats else None,
+                reset=getattr(benchmark_config, "stats_reset", None),
+                collect_per_table_timing=bool(getattr(benchmark_config, "stats_per_table_timing", False)),
             )
             if statistics_phase is not None:
                 phases["statistics"] = {
@@ -474,6 +476,13 @@ def _execute_load_only_mode(
                     "stats_mode": statistics_phase.stats_mode,
                     "tables_analyzed": statistics_phase.tables_analyzed,
                 }
+                # Opt-in reset/persist marker and per-table breakdown: both
+                # additive/omitted-when-empty so unmodified load-only runs
+                # stay byte-identical to the PR #980 payload.
+                if statistics_phase.stats_lifecycle:
+                    phases["statistics"]["stats_lifecycle"] = statistics_phase.stats_lifecycle
+                if statistics_phase.per_table_ms:
+                    phases["statistics"]["per_table_ms"] = statistics_phase.per_table_ms
                 # Fold the phase's own wall-clock into the load-only result's
                 # duration_seconds so it isn't underreported relative to the
                 # emitted phases.statistics.duration_ms (ANALYZE can be
@@ -737,6 +746,8 @@ def _build_run_config_from_options(
         strict_plan_capture=benchmark_config.strict_plan_capture,
         normalize_plan_literals=bool(options.get("normalize_plan_literals", False)),
         gather_statistics=gather_statistics,
+        stats_reset=getattr(benchmark_config, "stats_reset", None),
+        stats_per_table_timing=bool(getattr(benchmark_config, "stats_per_table_timing", False)),
         table_format=table_format,
         table_format_compression=str(options.get("table_format_compression", "snappy") or "snappy"),
         table_format_partition_cols=_parse_partition_cols(options.get("table_format_partition_cols")),

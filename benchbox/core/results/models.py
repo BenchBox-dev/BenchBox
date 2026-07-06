@@ -139,6 +139,23 @@ class StatisticsGatheringPhase:
       so load timing keeps the cost exactly once.
     - "unsupported": the platform exposes no statistics-build hook;
       duration_ms is 0.
+
+    stats_lifecycle records the cold-stats vs warm-stats reset/persist
+    control (opt-in; None when the control was not used, keeping bundles
+    byte-identical to the PR #980 shipped behavior):
+    - "reset": statistics were dropped/invalidated before this build (cold-stats).
+    - "unsupported": a reset was requested but this adapter has no generic
+      drop-stats primitive; the build below still ran a full rebuild.
+    - "persist": the caller explicitly requested warm-stats (no reset),
+      recorded even though it matches the default so a bundle can say the
+      control was deliberately exercised.
+
+    per_table_ms is an OPTIONAL per-table wall-clock breakdown (milliseconds)
+    for the statistics build, populated only when the caller opted in AND
+    this adapter's build fell back to a per-table ANALYZE loop (whole-database
+    analyze hooks and "auto-on-load"/"unsupported" modes cannot provide a
+    breakdown and leave this None). Omitted from the serialized payload when
+    None/empty so schema-v2's additive/omit-empty rule holds.
     """
 
     duration_ms: int
@@ -146,6 +163,8 @@ class StatisticsGatheringPhase:
     stats_mode: str
     tables_analyzed: int = 0
     error_message: str | None = None
+    stats_lifecycle: str | None = None
+    per_table_ms: dict[str, int] | None = None
 
 
 @dataclass

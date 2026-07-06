@@ -1258,6 +1258,8 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
         capture_plans=s.capture_plans,
         analyze_plans=s.analyze_plans,
         strict_plan_capture=s.strict_plan_capture,
+        stats_reset=s.stats_reset,
+        stats_per_table_timing=s.stats_per_table_timing,
         options={
             **s.verbosity_payload,
             "estimated_time_range": benchmark_info["estimated_time_range"],
@@ -1457,6 +1459,8 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         capture_plans=s.capture_plans,
         analyze_plans=s.analyze_plans,
         strict_plan_capture=s.strict_plan_capture,
+        stats_reset=s.stats_reset,
+        stats_per_table_timing=s.stats_per_table_timing,
         options={
             **s.verbosity_payload,
             "estimated_time_range": benchmark_info["estimated_time_range"],
@@ -1709,6 +1713,8 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
         capture_plans=s.capture_plans,
         analyze_plans=s.analyze_plans,
         strict_plan_capture=s.strict_plan_capture,
+        stats_reset=s.stats_reset,
+        stats_per_table_timing=s.stats_per_table_timing,
         options={
             **s.verbosity_payload,
             "estimated_time_range": benchmark_info["estimated_time_range"],
@@ -2634,6 +2640,30 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
         "differing only in literal constants collapse to the same value. Requires --capture-plans."
     ),
 )
+# Statistics Phase (requires --phases ...,statistics)
+@advanced_option(
+    "--stats-reset/--no-stats-reset",
+    "stats_reset",
+    default=None,
+    help=(
+        "With --phases ...,statistics: control cold-stats vs warm-stats. "
+        "--stats-reset drops/invalidates statistics before the rebuild for a "
+        "cold-stats measurement (adapters with no drop-stats primitive fall "
+        "back to a safe no-op and record that in the result); --no-stats-reset "
+        "explicitly records a warm-stats/persist run. Omit entirely for the "
+        "default PR #980 behavior (bundle stays byte-identical when unset)."
+    ),
+)
+@advanced_option(
+    "--stats-per-table-timing",
+    "stats_per_table_timing",
+    is_flag=True,
+    help=(
+        "With --phases ...,statistics: record a per-table wall-clock breakdown "
+        "in the result payload (only available when the platform's statistics "
+        "build falls back to a per-table ANALYZE loop; omitted otherwise)."
+    ),
+)
 # Compression
 @advanced_option(
     "--compression",
@@ -2784,6 +2814,8 @@ def run(
     strict_translation: bool,
     plan_config: PlanCaptureConfig | None,
     normalize_plan_literals: bool,
+    stats_reset: bool | None,
+    stats_per_table_timing: bool,
     compression: CompressionConfig | None,
     table_format: TableFormatConfig | None,
     presort: str | None,
@@ -2846,6 +2878,8 @@ def run(
         strict_translation=strict_translation,
         plan_config=plan_config,
         normalize_plan_literals=normalize_plan_literals,
+        stats_reset=stats_reset,
+        stats_per_table_timing=stats_per_table_timing,
         compression=compression,
         table_format=table_format,
         presort=presort,
