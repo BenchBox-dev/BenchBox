@@ -2,7 +2,8 @@ id: explorer-csp-frame-ancestors-meta-cleanup
 title: "Remove the inert frame-ancestors directive from the explorer CSP meta tag"
 worktree: main
 priority: Low
-status: Not Started
+status: "Completed"
+completed_date: "2026-07-06"
 category: Security
 
 description: |
@@ -29,7 +30,7 @@ description: |
 work:
 - id: w1
   summary: "Drop the inert frame-ancestors from the meta CSP; document the header-layer requirement"
-  status: pending
+  status: done
   notes: |
     In results-explorer/index.html: remove `frame-ancestors 'none'` from the
     `<meta http-equiv="Content-Security-Policy">` content string, leaving every
@@ -52,8 +53,10 @@ verification:
   expected_output: "all specs pass — removing an inert directive is behaviorally a no-op, so this confirms nothing else broke"
 
 prior_art:
-- "results-explorer/index.html:6-15 — the existing CSP meta + head comment; EDIT in place, preserve all non-frame-ancestors directives."
-- "_project/DONE/main/planning/remediate-explorer-csp-hardening.yaml — the item that added the CSP; SUPERSEDE its noted 'frame-ancestors inert in meta' caveat by actually removing the directive."
+- "results-explorer/index.html:6-15 — the existing CSP meta + head comment; EDIT in place, preserve all non-frame-ancestors
+  directives."
+- "_project/DONE/main/planning/remediate-explorer-csp-hardening.yaml — the item that added the CSP; SUPERSEDE its noted 'frame-ancestors
+  inert in meta' caveat by actually removing the directive."
 
 scope_limit:
   only_modify:
@@ -64,10 +67,12 @@ scope_limit:
 
 must_preserve:
 - "connect-src 'self' — the load-bearing egress confinement; must not change."
-- "The duckdb-wasm-compatible directives (script-src 'wasm-unsafe-eval', worker-src blob:) — removing these would break the explorer."
+- "The duckdb-wasm-compatible directives (script-src 'wasm-unsafe-eval', worker-src blob:) — removing these would break the
+  explorer."
 
 anti_patterns:
-- "DO NOT try to make frame-ancestors work by keeping it in meta — because the CSP spec ignores it there; the fix is a header at the host layer, out of this file's scope."
+- "DO NOT try to make frame-ancestors work by keeping it in meta — because the CSP spec ignores it there; the fix is a header
+  at the host layer, out of this file's scope."
 
 metadata:
   tags:
