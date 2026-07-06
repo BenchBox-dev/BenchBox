@@ -1,0 +1,151 @@
+id: "submit-manifest-and-validator"
+title: "Carry funding + result_source in the submission manifest; enforce vendor label governance"
+worktree: "results-labels-funding"
+priority: "High"
+status: "Blocked"
+description: |
+  Extend the submission path so contributors disclose funding and so the
+  authoritative vendor-supplied label can only be applied under maintainer
+  control. Today _build_submission_manifest (benchbox/cli/commands/submit.py:153-175)
+  writes submission_tool_version, submitted_at, bundle/companion hashes,
+  benchmark, platform, scale_factor, phase, submission_path, submitted_by — no
+  funding, no source, and (a pre-existing drift) no submission_notes even though
+  the contract (hosted-results-contract.md:5.1) lists it.
+
+  scripts/validate_submission.py runs in CI on attacker-controlled PR JSON. It
+  must strictly validate the new enum fields and, critically, refuse a
+  self-asserted vendor-supplied label so a vendor cannot open a community PR that
+  lands in the ranking-eligible vendor tier without maintainer sign-off.
+
+category: "Feature"
+
+decision_gates:
+  - id: G-VENDOR-SIGNAL
+    gate: >-
+      What maintainer-controlled mechanism assigns the vendor-supplied trust
+      label, such that it cannot be self-asserted in a community PR? Options:
+      (A) a dedicated results-data/bundles/vendor/ subtree that only maintainers
+      can add to (enforced via CODEOWNERS on that path); (B) a manifest field
+      result_source: vendor that the validator accepts ONLY when the PR is
+      authored/approved by a maintainer (checked in CI against an allowlist);
+      (C) a separate maintainer-only sidecar (e.g. <stem>.provenance.json) not
+      writable by the submit CLI.
+    blocks: [w3, w4]
+    outcome: >-
+      PROPOSED default: Option A (vendor subtree + CODEOWNERS) — simplest,
+      git-native, matches the existing "trust derived from where the bundle
+      lives / which sidecar is present" model, and needs no identity check in the
+      validator. The validator treats a vendor hint in a normal community bundle
+      as an ERROR. CONFIRM before implementing w3/w4.
+
+prior_art:
+  - "benchbox/cli/commands/submit.py:153-175 _build_submission_manifest — extend (add funding, result_source, submission_notes)"
+  - "benchbox/cli/commands/submit.py:455-523 submit options — extend (add --funding, --notes; reuse existing --submitted-by/--visibility style)"
+  - "scripts/validate_submission.py:33-37 REQUIRED_* key sets + :517-603 _validate_manifest_hash — extend (add manifest field validation; the hash/path-traversal defenses are the security baseline to preserve)"
+  - "docs/reference/hosted-results-contract.md:5.1 submission manifest schema — reference (add funding/result_source; submission_notes already specified there)"
+  - "benchbox/core/results/provenance.py (item 1) — reference (FUNDING_SOURCES / validators)"
+
+work:
+  - id: w1
+    summary: >-
+      Add --funding (Choice from FUNDING_SOURCES) and --notes (<=500 chars) to
+      benchbox submit; thread into _build_submission_manifest. Default funding
+      inherits from the bundle's provenance.funding when present, else
+      'unspecified'.
+    status: todo
+  - id: w2
+    summary: >-
+      Add funding, result_source (default 'community' for the submit path), and
+      submission_notes to the manifest envelope; keep field order deterministic
+      (canonical JSON).
+    needs: [w1]
+    status: todo
+  - id: w3
+    summary: >-
+      In validate_submission.py, strictly validate funding in FUNDING_SOURCES and
+      result_source in {internal, community, vendor}; reject unknown values.
+    needs: [w2]
+    status: todo
+  - id: w4
+    summary: >-
+      Enforce G-VENDOR-SIGNAL: a bundle claiming vendor provenance is only valid
+      via the maintainer-controlled path (per the resolved gate); a self-asserted
+      vendor label in an ordinary community submission is a hard validation error
+      with a clear message.
+    needs: [w3]
+    status: todo
+
+must_preserve:
+  - "The bundle_hash / companion_hashes contract and path-traversal + symlink defenses in _validate_manifest_hash are unchanged."
+  - "Existing manifests (no funding/result_source/submission_notes) still validate — new fields are optional except where the vendor gate requires them."
+  - "The pinned submit checklist regression test (tests/unit/cli/commands/test_submit.py) keeps its four required tokens."
+  - "Unofficial-compliance and non-clean-run refusals in submit.py stay in force."
+
+approach: |
+  Reuse the item-1 validators so the validator and CLI share one allowlist.
+  Default the submit path's result_source to 'community' (that is what the submit
+  CLI is for); the vendor label never originates from the public submit CLI.
+  For the vendor gate, implement the resolved option (default A): detect vendor
+  provenance by bundle location/sidecar, and have the validator ERROR if a
+  community-located bundle asserts vendor. Add targeted unit tests that feed the
+  validator hostile manifests (unknown funding, injected vendor label,
+  oversized notes) and assert rejection.
+
+anti_patterns:
+  - "DO NOT let the public submit CLI or a community PR self-assert vendor-supplied — that defeats the whole governance point."
+  - "DO NOT weaken or reorder the existing hash/path-traversal validation to slot in new checks."
+  - "DO NOT make funding REQUIRED for community submissions (default 'unspecified'); DO require an explicit funding on the maintainer vendor path if the gate resolution says so."
+  - "DO NOT duplicate the enum in validate_submission.py — import from provenance.py."
+
+verification:
+  - description: "Submit dry-run emits a manifest with funding + result_source"
+    command: "uv run -- benchbox submit --last --funding free-trial --dry-run"
+    expected_output: "dry-run preview shows funding=free-trial; no bytes sent"
+  - description: "Validator accepts a valid community manifest with funding"
+    command: "uv run -- python scripts/validate_submission.py <fixture-bundle-with-manifest>"
+    expected_output: "validation passes"
+  - description: "Validator REJECTS a self-asserted vendor label in a community bundle"
+    command: "uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py -k vendor -q"
+    expected_output: "test asserting hard rejection passes"
+  - description: "Validator rejects unknown funding + oversized notes"
+    command: "uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py -k 'funding or notes' -q"
+    expected_output: "all pass"
+  - description: "Submit contract + hash tests still pass"
+    command: "uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q"
+    expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/cli/commands/submit.py"
+    - "scripts/validate_submission.py"
+    - "tests/unit/cli/commands/test_submit.py"
+    - "tests/unit/scripts/test_validate_submission.py"
+    - ".github/CODEOWNERS (only if resolved gate = Option A)"
+  do_not_modify:
+    - "benchbox/core/results/schema.py"
+    - "scripts/generate_corpus_inventory.py"
+    - "docs/development/browser-duckdb-schema.sql"
+
+impact:
+  technical_debt: |
+    Closes the manifest/contract drift (submission_notes) and gives the corpus a
+    trustworthy, non-self-assertable vendor signal — the precondition for putting
+    vendor results into ranking-eligible tables (item 4).
+
+success_metrics:
+  - "A community PR cannot produce a vendor-supplied result; CI errors clearly if it tries."
+  - "Funding disclosure round-trips from submit CLI into the manifest and passes CI validation."
+
+deps:
+  needs: ["provenance-vocabulary-and-labels"]
+
+delivery_loop:
+  create: "Resolve G-VENDOR-SIGNAL first, then implement w1-w4 within scope_limit."
+  review: "/code-review AND /security-review (validator parses hostile PR JSON); run verification + make pr-preflight."
+  fix: "Resolve findings; add regression tests for any bypass found."
+  submit_pr: "PR vs main using PULL_REQUEST_TEMPLATE.md (Type: New feature); call out the governance rule in Notes."
+
+metadata:
+  tags: ["explorer", "provenance", "funding", "submission", "validation", "security", "governance"]
+  estimated_effort: "Medium"
+  created_date: "2026-07-06"

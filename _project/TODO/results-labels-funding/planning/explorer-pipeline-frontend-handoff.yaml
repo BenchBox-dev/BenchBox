@@ -1,0 +1,132 @@
+id: "explorer-pipeline-frontend-handoff"
+title: "Hand-off spec: populate funding + vendor label in the pipeline and render them in the frontend"
+worktree: "results-labels-funding"
+priority: "High"
+status: "Blocked"
+description: |
+  The remaining changes live in two trees that are gitignored and NOT present in
+  this checkout: the build pipeline `_project/scripts/explorer_pipeline/`
+  (BundleTransformer, ExplorerPipeline, contract.py with EXPLORER_READ_MODEL_VERSION)
+  and the Vite/TypeScript frontend `results-explorer/`. This item is a precise
+  hand-off spec + patch checklist to be executed wherever that source is
+  maintained (e.g. a separate branch such as published-results, or maintainer-
+  local tooling), plus the read_model_version coordination. It is intentionally a
+  spec, not code, in this repo.
+
+  Its own tests, however, ARE in this repo (tests/unit/core/explorer_pipeline/,
+  tests/unit/cli/test_explorer_build_contract.py) and pin the contract, so the
+  spec is exact and the change is verifiable once applied.
+
+category: "Documentation"
+
+decision_gates:
+  - id: G-READMODEL-COORD
+    gate: >-
+      How is the read_model_version bump + private-tree edit coordinated so the
+      DDL (item 4), the pipeline contract.py, and the deployed DB never disagree?
+    blocks: [w1, w2, w3]
+    outcome: >-
+      PROPOSED: bump EXPLORER_READ_MODEL_VERSION and the DDL comment in the SAME
+      change that adds the pipeline populate logic; the build-contract test
+      (test_explorer_build_contract.py) is the tripwire that fails if version and
+      outputs drift. Land pipeline+frontend together behind that version bump.
+      CONFIRM the location/branch of the private trees before starting.
+
+prior_art:
+  - "tests/unit/core/explorer_pipeline/test_pipeline.py + test_transformer.py — reference (define the exact ExplorerPipeline.run/BundleTransformer.to_manifest_entry surface the populate change must satisfy)"
+  - "tests/unit/cli/test_explorer_build_contract.py:EXPLORER_BUILD_CONTRACT / read_model_version — reference (version + outputs tripwire)"
+  - "docs/reference/hosted-results-contract.md:601-616 trust-label rendering rules — extend (add vendor badge color + funding chip + legend row)"
+  - "docs/development/browser-duckdb-schema.sql (item 4) — reference (the funding column + vendor ranking eligibility the pipeline must populate)"
+  - "docs/development/results-explorer-brand-ownership.md + results-explorer-token-scan.md — reference (badge color must use an approved design token; token scan gate)"
+
+work:
+  - id: w1
+    summary: >-
+      PIPELINE (private): BundleTransformer/ExplorerPipeline read provenance.funding
+      + the maintainer vendor signal, write funding + vendor-supplied trust_label +
+      public-vendor-reported visibility + is_ranking_eligible=true into the
+      results/benchmark_rankings/cohort_metadata tables. Bump
+      EXPLORER_READ_MODEL_VERSION in contract.py.
+    status: todo
+  - id: w2
+    summary: >-
+      FRONTEND (private): render the vendor badge in a distinct approved accent
+      token (separate from curated primary + self-reported muted), a funding chip
+      on result cards/detail, a legend row for both, and keep per-row badges in
+      mixed compare views. Vendor rows appear in ranked tables with the badge.
+    needs: [w1]
+    status: todo
+  - id: w3
+    summary: >-
+      Add/adjust e2e coverage (results-explorer/e2e/) for the vendor badge +
+      funding chip + legend; update any Playwright smoke that asserts the legend
+      set.
+    needs: [w2]
+    status: todo
+
+must_preserve:
+  - "test_explorer_build_contract.py stays green: version bump + declared outputs move together."
+  - "Existing trust-badge rendering (curated primary, self-reported muted) is unchanged."
+  - "The DuckDB-in-browser read-only attach + bare-column view rule is unchanged."
+  - "Design-token / stale-theme scans (results-explorer-token-scan.md) pass — no ad-hoc badge colors."
+
+approach: |
+  Treat this repo's explorer_pipeline + explorer build-contract tests as the
+  executable specification. Apply w1 in the private pipeline tree so those tests
+  (which are runnable here) pass, then w2/w3 in results-explorer/. Because the
+  DDL and contract tests live in-repo, the private change is fully verifiable
+  from this repo's test suite even though the source edited is elsewhere.
+
+anti_patterns:
+  - "DO NOT bump read_model_version without the populate logic (or vice versa) — the tripwire test exists to stop exactly that."
+  - "DO NOT introduce a new badge color outside the approved design tokens (token scan will fail)."
+  - "DO NOT collapse vendor into the self-reported muted badge — D1/D2 require a distinct, ranking-eligible treatment."
+  - "DO NOT re-implement label->visibility mapping in TS — mirror provenance.py's table (kept in sync via the contract doc)."
+
+verification:
+  - description: "Explorer build-contract + pipeline tests pass with the version bump"
+    command: "uv run -- python -m pytest tests/unit/cli/test_explorer_build_contract.py tests/unit/core/explorer_pipeline/ -q"
+    expected_output: "all pass; read_model_version matches contract"
+  - description: "Built DB exposes funding + vendor rows"
+    command: "<in private tree> run ExplorerPipeline build on a corpus containing a vendor bundle; query results.funding + trust_label"
+    expected_output: "vendor-supplied rows present with funding populated and is_ranking_eligible=true"
+  - description: "Frontend e2e shows vendor badge + funding chip + legend"
+    command: "<in results-explorer/> npm run test:e2e -- --grep 'vendor|funding'"
+    expected_output: "badge, chip, and legend entries render; vendor row shown in ranked table"
+  - description: "Design-token scan passes"
+    command: "uv run -- python -m pytest tests/unit/scripts/test_scan_explorer_tokens.py -q"
+    expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+    - "_project/scripts/explorer_pipeline/ (private, not in this checkout)"
+    - "results-explorer/ (private, not in this checkout)"
+    - "docs/reference/hosted-results-contract.md (rendering-rules subsection only, if not already covered by item 1)"
+  do_not_modify:
+    - "benchbox/ (producer + CLI are items 1-3)"
+    - "scripts/generate_corpus_inventory.py (item 4)"
+    - "docs/development/browser-duckdb-schema.sql (item 4)"
+
+impact:
+  technical_debt: |
+    Completes the feature end-to-end and makes the one unavoidable cross-repo
+    coupling (read_model_version) explicit and test-guarded, instead of an
+    undocumented tribal step.
+
+success_metrics:
+  - "A vendor-supplied result renders with its distinct badge in a ranked table and shows its funding chip."
+  - "read_model_version, the DDL, and the deployed DB agree; the contract test proves it."
+
+deps:
+  needs: ["corpus-inventory-and-read-model"]
+
+delivery_loop:
+  create: "Confirm G-READMODEL-COORD + private-tree location; apply w1-w3 there behind the version bump."
+  review: "/code-review on the pipeline diff; visual/e2e review of badge + chip; token scan."
+  fix: "Resolve findings; re-run explorer contract + e2e."
+  submit_pr: "PR(s) in the tree(s) that host the private source; cross-link this work item and item 4's PR."
+
+metadata:
+  tags: ["explorer", "pipeline", "frontend", "read-model-version", "handoff", "vendor", "funding"]
+  estimated_effort: "Medium-High"
+  created_date: "2026-07-06"
