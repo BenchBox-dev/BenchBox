@@ -2,7 +2,7 @@ id: harden-auto-merge-on-open-stranding
 title: "Diagnose + guard the auto-merge-on-open stranding that orphaned 3 remediation fixes"
 worktree: main
 priority: Low
-status: Not Started
+status: "In Progress"
 category: Testing and Quality Assurance
 
 description: |
@@ -31,7 +31,7 @@ description: |
 work:
 - id: w0
   summary: "Forensically reconstruct why each of the 3 stranded fixes did not reach develop"
-  status: pending
+  status: done
   notes: |
     For each of §2.7 (#986), §2.16 (#996, stranded cf394466), §2.22 (#997,
     stranded 4865a2f2/33687637), reconstruct from git + GitHub history: the
@@ -65,15 +65,32 @@ work:
         whose unique commits never appear on develop.
     Keep it minimal and targeted at the confirmed cause; add a test.
 
+    DEFERRED 2026-07-06 (w0 landed via the forensic PR without w1): w0's
+    verdict (_project/analysis/auto-merge-stranding-forensic.md) rules OUT
+    the first two candidate mechanisms above — in all 3 confirmed cases there
+    was no open PR at merge time for the stranded commit to race against, so
+    neither a merged-tree-vs-PR-head assertion in develop-post-merge.yml nor
+    a stale-base guard in auto-merge-on-open.yml would have caught any of
+    them. Only the third candidate (a scheduled orphaned-fix-commit detector
+    that diffs each closed-PR branch's current tip against develop) matches
+    the confirmed mechanism. That detector needs a NEW scheduled workflow
+    file, which this item's scope_limit.only_modify does not currently list
+    (it names only the two existing workflow files) — widening scope and
+    picking a concrete cadence/permissions design is a judgment call left for
+    a human decision before implementing, per the orchestrator's instruction
+    to prefer a clean w0 PR over a speculative guard. w1 stays pending.
+
 prior_art:
 - ".github/workflows/auto-merge-on-open.yml — the flow under investigation; the guard in w1 extends or gates this (CODEOWNERS-protected)."
-- ".github/workflows/develop-post-merge.yml — existing post-merge hook; the natural home for a merged-tree-vs-PR-head assertion (w1 option a)."
+- ".github/workflows/develop-post-merge.yml — existing post-merge hook; the natural home for a merged-tree-vs-PR-head assertion
+  (w1 option a)."
 - "PRs #986 / #996 / #997 — the three re-landings; their diffs are the ground truth for what was stranded (w0 forensic input)."
 
 verification:
 - description: "w0: a committed forensic file records a per-case merged-vs-head verdict for all 3 stranded fixes"
   command: "test -f _project/analysis/auto-merge-stranding-forensic.md && grep -cE '#986|#996|#997' _project/analysis/auto-merge-stranding-forensic.md"
-  expected_output: ">= 3 (the file exists with a verdict block per case; absent until w0 is done, so this fails-closed before then)"
+  expected_output: ">= 3 (the file exists with a verdict block per case; absent until w0 is done, so this fails-closed before
+    then)"
 - description: "w1: a guard/detector plus a test exists for the confirmed mechanism"
   command: "git grep -lE 'stranded|orphan|merged.*head|head.*merged' -- .github/workflows/ _project/scripts/ tests/ 2>/dev/null"
   expected_output: "at least one guard/detector implementation + test (once w1 lands)"
@@ -95,7 +112,8 @@ must_preserve:
 
 anti_patterns:
 - "DO NOT disable auto-merge-on-open to 'fix' this — because the flow is high-value; add detection, not a process regression."
-- "DO NOT guess the mechanism and build a guard for it — because 4 distinct causes are plausible; w0's forensic verdict gates w1."
+- "DO NOT guess the mechanism and build a guard for it — because 4 distinct causes are plausible; w0's forensic verdict gates
+  w1."
 
 metadata:
   tags:
@@ -106,4 +124,5 @@ metadata:
   created_date: "2026-07-06"
 
 success_metrics:
-- "The mechanism that stranded §2.7/§2.16/§2.22 is documented, and a fix landing without its content is detected automatically rather than by a later adversarial re-review."
+- "The mechanism that stranded §2.7/§2.16/§2.22 is documented, and a fix landing without its content is detected automatically
+  rather than by a later adversarial re-review."
