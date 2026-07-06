@@ -93,11 +93,27 @@ class QueryPlan:
 class QueryExecutionProfile:
     """Profile of a single query execution.
 
+    Timing semantics:
+        ``execution_time_ms`` is the query's own work time and EXCLUDES the plan
+        capture phase, so enabling ``--capture-plans`` does not change the reported
+        per-query time. It covers the segments that make up executing the query
+        itself -- planning (building the lazy query), collect/materialize, and the
+        surrounding result-shaping overhead (row count, first-row fetch, memory
+        tracker stop) -- but not the ``capture_query_plan`` call, whose measured
+        duration is reported separately as ``plan_capture_time_ms``. This aligns
+        DataFrame timing with the SQL platforms, which capture plans after the timed
+        block and likewise surface capture cost as ``plan_capture_time_ms``. The
+        capture time is measured explicitly (a timed phase in QueryProfileContext),
+        never estimated and subtracted.
+
     Attributes:
         query_id: Query identifier
-        execution_time_ms: Total execution time in milliseconds
+        execution_time_ms: Query execution time in milliseconds, EXCLUDING plan
+            capture time (see Timing semantics above)
         planning_time_ms: Time spent in query planning (lazy platforms)
         collect_time_ms: Time spent in collect/materialize phase
+        plan_capture_time_ms: Time spent capturing the query plan (0.0 when capture
+            was disabled or no plan was captured); excluded from execution_time_ms
         rows_processed: Number of rows in result
         peak_memory_mb: Peak memory usage in MB
         query_plan: Captured query plan if available
@@ -110,6 +126,7 @@ class QueryExecutionProfile:
     execution_time_ms: float
     planning_time_ms: float = 0.0
     collect_time_ms: float = 0.0
+    plan_capture_time_ms: float = 0.0
     rows_processed: int = 0
     peak_memory_mb: float = 0.0
     query_plan: QueryPlan | None = None
@@ -141,6 +158,8 @@ class QueryProfileContext:
         self._planning_time: float = 0.0
         self._collect_start: float = 0.0
         self._collect_time: float = 0.0
+        self._plan_capture_start: float = 0.0
+        self._plan_capture_time: float = 0.0
         self._rows: int = 0
         self._query_plan: QueryPlan | None = None
         self._peak_memory: float = 0.0
@@ -166,6 +185,22 @@ class QueryProfileContext:
         if self._collect_start > 0:
             self._collect_time = (time.perf_counter() - self._collect_start) * 1000
 
+    def start_plan_capture(self) -> None:
+        """Mark start of the plan-capture phase (excluded from execution_time_ms)."""
+        self._plan_capture_start = time.perf_counter()
+
+    def end_plan_capture(self) -> None:
+        """Mark end of the plan-capture phase.
+
+        The measured duration is accumulated into ``plan_capture_time_ms`` and
+        subtracted from ``execution_time_ms`` in :meth:`get_profile`, so plan
+        capture never inflates the reported query time. Accumulates across calls in
+        case capture happens in more than one segment.
+        """
+        if self._plan_capture_start > 0:
+            self._plan_capture_time += (time.perf_counter() - self._plan_capture_start) * 1000
+            self._plan_capture_start = 0.0
+
     def set_rows(self, rows: int) -> None:
         """Set number of rows processed."""
         self._rows = rows
@@ -183,14 +218,23 @@ class QueryProfileContext:
         self._metrics[name] = value
 
     def get_profile(self) -> QueryExecutionProfile:
-        """Get the execution profile."""
-        execution_time = (time.perf_counter() - self._start_time) * 1000
+        """Get the execution profile.
+
+        ``execution_time_ms`` is the wall-clock span since the context started with
+        the measured plan-capture phase subtracted out, so capture on/off report the
+        same query time. The subtracted amount is the value measured by
+        ``start_plan_capture``/``end_plan_capture`` -- never an estimate. Clamped at
+        0.0 to defend against clock noise if capture somehow exceeds the window.
+        """
+        wall_ms = (time.perf_counter() - self._start_time) * 1000
+        execution_time = max(0.0, wall_ms - self._plan_capture_time)
 
         return QueryExecutionProfile(
             query_id=self.query_id,
             execution_time_ms=execution_time,
             planning_time_ms=self._planning_time,
             collect_time_ms=self._collect_time,
+            plan_capture_time_ms=self._plan_capture_time,
             rows_processed=self._rows,
             peak_memory_mb=self._peak_memory,
             query_plan=self._query_plan,
@@ -872,15 +916,19 @@ def profile_query_execution(
         lazy_result = query_fn()
         ctx.end_planning()
 
-        # Capture query plan before collect if possible
+        # Capture query plan before collect if possible. Timed as its own phase so
+        # it is excluded from execution_time_ms (see QueryProfileContext timing).
         query_plan = None
         if plan_capture_fn is not None:
+            ctx.start_plan_capture()
             try:
                 query_plan = plan_capture_fn(lazy_result)
                 if query_plan:
                     ctx.set_query_plan(query_plan)
             except Exception as e:
                 logger.debug(f"Plan capture failed: {e}")
+            finally:
+                ctx.end_plan_capture()
 
         # Phase 2: Collect/materialize results
         if collect_fn is not None:

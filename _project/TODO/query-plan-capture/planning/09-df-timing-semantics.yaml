@@ -2,7 +2,8 @@ id: "qpc-09-df-timing-semantics"
 title: "Exclude plan-capture time from DataFrame execution_time_ms (align with SQL semantics)"
 worktree: "query-plan-capture"
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-06"
 
 description: |
   QueryProfileContext.get_profile computes execution_time_ms wall-to-wall
@@ -28,32 +29,38 @@ work:
     Create: add a plan_capture timed phase to QueryProfileContext and define
     execution_time_ms to exclude capture time.
   notes: >-
-    Either sum-of-measured-phases minus capture, or collect-time as the
-    canonical query time. Document which segments count in the profile
-    docstring.
-  status: pending
+    Chose measure-and-subtract: QueryProfileContext gains
+    start_plan_capture/end_plan_capture; get_profile computes execution_time_ms
+    as wall minus the MEASURED capture time (clamped at 0). Capture time
+    surfaced as plan_capture_time_ms on QueryExecutionProfile. planning_time_ms
+    / collect_time_ms meaning preserved. Timing semantics documented in the
+    profile docstring. expression_family and the profile_query_execution helper
+    both wrap capture_query_plan in the timed phase; benchmark_mixin surfaces
+    plan_capture_time_ms on the result row.
+  status: done
 - id: w2
   summary: >-
     Create: timing contract test — capture on/off must report equal
     execution_time_ms; capture time gets its own field.
   notes: >-
-    Same fake query profiled with and without capture_plan must report
-    execution_time_ms within tolerance; capture time surfaced as
-    plan_capture_time_ms matching the SQL-side field name.
+    tests/unit/platforms/dataframe/test_df_timing_contract.py: same fake query
+    profiled with capture on/off; a slow (40ms) fake capture must NOT appear in
+    execution_time_ms while plan_capture_time_ms carries it. Also unit-level
+    QueryProfileContext and profile_query_execution coverage.
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Review: adversarial code review (timing-policy check compliance, downstream consumers of execution_time_ms/planning/collect fields)."
   needs: [w2]
-  status: pending
+  status: done
 - id: w4
   summary: "Fix: address review findings; re-run verification."
   needs: [w3]
-  status: pending
+  status: done
 - id: w5
   summary: "Submit PR referencing qpc-09."
   needs: [w4]
-  status: pending
+  status: done
 
 must_preserve:
 - "planning_time_ms / collect_time_ms fields and their meaning"

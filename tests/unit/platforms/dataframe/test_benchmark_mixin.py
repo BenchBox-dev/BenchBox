@@ -74,7 +74,7 @@ class DummyPandasProfiledAdapter(DummyAdapter):
             "execution_time_seconds": 0.01,
             "rows_returned": 1,
         }
-        profile = SimpleNamespace(query_plan=self._query_plan)
+        profile = SimpleNamespace(query_plan=self._query_plan, plan_capture_time_ms=0.0)
         return result, profile
 
 
