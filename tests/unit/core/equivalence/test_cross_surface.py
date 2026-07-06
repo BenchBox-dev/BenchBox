@@ -1413,3 +1413,84 @@ def test_read_primitives_baseline_report_accepts_documented_cells_rejects_regres
         )
         == 1
     )
+
+
+# ---------------------------------------------------------------------------
+# validator-report-all-row-mismatches: the validator now reports EVERY
+# mismatched column per row, and column-pinned waivers require every
+# mismatched column to fall in their accepted set.
+# ---------------------------------------------------------------------------
+
+
+def _sd(query_id: str, detail: str) -> SurfaceDivergence:
+    return SurfaceDivergence(query_id, "pandas", detail)
+
+
+def test_validator_reports_all_mismatched_columns_in_detail():
+    # A row diverging on two columns must name both: the first inline, the
+    # rest in the "; also columns [...]" suffix (indices only, bounded).
+    validator = ResultValidator()
+    detail = validator._first_positional_mismatch(
+        [("brandX", "nameA", "typeA", 10.0)],
+        [("brandX", "nameB", "typeA", 99.0)],
+        query_id=1,
+        variant_id=1,
+    )
+    assert detail is not None
+    assert "column 1" in detail  # first mismatch inline
+    assert "; also columns [3]" in detail  # min_price (col 3) also wrong
+    # The first column's values are inline; the extra column's value (99.0) is
+    # NOT dumped - the suffix is index-only and bounded.
+    inline = detail.split("; also columns")[0]
+    assert "nameA" in inline and "nameB" in inline  # col-1 values inline
+    assert "99.0" not in detail  # col-3 value never dumped
+    assert detail.endswith("[3]")  # suffix is index-only
+
+
+def test_mismatched_columns_helper_parses_suffix():
+    from benchbox.core.equivalence.cross_surface import _VALUE_MISMATCH_RE, _mismatched_columns
+
+    single = _VALUE_MISMATCH_RE.search("Q1.1: Value mismatch at row 0, column 2. Original: 1.00, Variant: 1.003")
+    assert _mismatched_columns(single) == {2}
+    multi = _VALUE_MISMATCH_RE.search(
+        "Q1.1: Value mismatch at row 0, column 1. Original: a, Variant: b; also columns [3, 5]"
+    )
+    assert _mismatched_columns(multi) == {1, 3, 5}
+
+
+def test_argmin_tie_accepts_single_waived_column_but_not_a_second_wrong_column():
+    from benchbox.core.equivalence.cross_surface import _read_primitives_argmin_tie
+
+    # Only the tie-broken name column (1) diverges -> accepted (unchanged live behavior).
+    accepted = _sd(
+        "min_by_complex_pandas",
+        "Q1.1: Value mismatch at row 0, column 1. Original: nameA, Variant: nameB",
+    )
+    assert _read_primitives_argmin_tie(accepted) is True
+
+    # Headline blind-spot closure: the waived name column (1) AND the non-waived
+    # min_price column (3) are both wrong on the same row -> unclassified.
+    both_wrong = _sd(
+        "min_by_complex_pandas",
+        "Q1.1: Value mismatch at row 0, column 1. Original: nameA, Variant: nameB; also columns [3]",
+    )
+    assert _read_primitives_argmin_tie(both_wrong) is False
+
+
+def test_h2odb_q9_residue_requires_p90_to_be_the_only_mismatched_column():
+    from benchbox.core.equivalence.cross_surface import _h2odb_q9_decimal_residue
+
+    # Sole p90 (col 2) sub-half-cent DECIMAL-scale residue -> accepted.
+    accepted = _sd("Q9_pandas", "Q9.1: Value mismatch at row 0, column 2. Original: 1.00, Variant: 1.003")
+    assert _h2odb_q9_decimal_residue(accepted) is True
+
+    # A second wrong column on the same row (grouping key col 0), whichever
+    # sorts first -> unclassified, both orderings.
+    also_zero = _sd(
+        "Q9_pandas", "Q9.1: Value mismatch at row 0, column 2. Original: 1.00, Variant: 1.003; also columns [0]"
+    )
+    assert _h2odb_q9_decimal_residue(also_zero) is False
+    zero_first = _sd(
+        "Q9_pandas", "Q9.1: Value mismatch at row 0, column 0. Original: gA, Variant: gB; also columns [2]"
+    )
+    assert _h2odb_q9_decimal_residue(zero_first) is False

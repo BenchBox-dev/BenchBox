@@ -2,7 +2,8 @@ id: validator-report-all-row-mismatches
 title: "Close the first-mismatch-per-row comparator blind spot so column-pinned waiver predicates can see a second wrong column"
 worktree: main
 priority: Low
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-05"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -41,7 +42,7 @@ prior_art:
 work:
   - id: w1
     summary: "Make the validator collect and report every mismatched column per divergent row"
-    status: pending
+    status: done
     notes: |
       Shared helper used by both emit sites in validation.py. Keep the
       existing single-column message shape as the degenerate case (one
@@ -54,7 +55,7 @@ work:
   - id: w2
     summary: "Update _VALUE_MISMATCH_RE parsing and enforce the all-columns-accepted waiver contract"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       cross_surface.py: parse the full mismatched-column set; a predicate's
       acceptance now requires every mismatched column to fall in its
@@ -66,7 +67,7 @@ work:
   - id: w3
     summary: "Mutation-probe the closed blind spot and re-run the affected gates"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       New probes: (a) row with column 1 (waived) + column 3 (unwaived) both
       wrong → unclassified; (b) row with only column 1 wrong → still
