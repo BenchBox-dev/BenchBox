@@ -1,0 +1,161 @@
+id: "provenance-vocabulary-and-labels"
+title: "Canonical result-source + funding vocabulary and the vendor-supplied trust label"
+worktree: "results-labels-funding"
+priority: "High"
+status: "Not Started"
+description: |
+  Establish a single source of truth for two provenance concepts before any
+  producer, submit, inventory, or read-model code references them. Today the
+  trust-label vocabulary is split and partial: VALID_LABELS lives in
+  benchbox/core/publishing/bundle_publisher.py:26
+  ("maintainer-run", "community-submission", "ci", "local",
+  "unofficial-research") but the explorer only ever distinguishes two labels,
+  inferred from submission-manifest-sidecar presence
+  (scripts/generate_corpus_inventory.py:41 _bundle_trust_label). There is no
+  "vendor-supplied" tier and no funding concept anywhere.
+
+  This item introduces one module that defines: the result_source enum and its
+  source -> trust_label -> visibility -> ranking-eligibility mapping, and the
+  funding enum, with normalize/validate helpers. It adds "vendor-supplied" to
+  VALID_LABELS and updates the governance contract of record. No behavior
+  changes for existing bundles yet (nothing emits the new fields until the
+  bundle/run item lands); this item is the vocabulary + docs foundation every
+  later item imports.
+
+category: "Architecture"
+
+decision_gates:
+  - id: G1-vendor-modeling
+    gate: >-
+      DECISION (RESOLVED 2026-07-06): vendor-supplied is a new *trust-label
+      value*, not a separate orthogonal flag. It maps to a new visibility state
+      "public-vendor-reported" and is ranking-eligible with a distinct badge.
+    blocks: []
+    outcome: >-
+      RESOLVED. RESULT_SOURCE = {internal, community, vendor}; source->label:
+      internal->maintainer-run, community->community-submission,
+      vendor->vendor-supplied. label->visibility: maintainer-run->public-curated,
+      community-submission->public-self-reported,
+      vendor-supplied->public-vendor-reported. Ranking-eligible: curated,
+      verified (reserved), AND vendor-reported = true; self-reported = false.
+  - id: G2-funding-enum
+    gate: >-
+      DECISION (RESOLVED 2026-07-06): funding vocabulary.
+    blocks: []
+    outcome: >-
+      RESOLVED. FUNDING_SOURCES = ("employer", "personal", "free-trial",
+      "vendor-sponsored", "grant", "unspecified"). "unspecified" is the default
+      when a producer does not declare funding.
+
+prior_art:
+  - "benchbox/core/publishing/bundle_publisher.py:26 VALID_LABELS — extend (add 'vendor-supplied'; keep ci/local/unofficial-research untouched)"
+  - "scripts/generate_corpus_inventory.py:21-22 COMMUNITY_TRUST_LABEL/DEFAULT_TRUST_LABEL — reference (these constants must be re-sourced from the new module in item 4, not redefined)"
+  - "docs/reference/hosted-results-contract.md:181-233 Trust Labels / visibility / ranking eligibility — extend (this doc is the contract of record; the new module must match it exactly)"
+  - "benchbox/core/results/status.py — reference (existing small result-vocabulary module; mirror its style/placement)"
+
+work:
+  - id: w1
+    summary: >-
+      Add benchbox/core/results/provenance.py: RESULT_SOURCE, the
+      source->trust_label->visibility->ranking_eligible mapping,
+      FUNDING_SOURCES, and normalize/validate/lookup helper functions.
+    notes: >-
+      Helpers: normalize_funding()/is_valid_funding()/trust_label_for_source()/
+      visibility_for_label(). Pure data + functions, no I/O, no CLI/platform
+      imports (avoid cycles, same rule as models.py).
+    status: pending
+  - id: w2
+    summary: >-
+      Add 'vendor-supplied' to VALID_LABELS in bundle_publisher.py and
+      re-source the community/default label constants from the new module.
+    notes: >-
+      Re-source community/default label constants from the new module where
+      trivially safe. Do NOT change publish default (stays 'maintainer-run').
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: >-
+      Update the governance contract of record (hosted-results-contract.md),
+      contributing-results.md, and the strategy doc for the new vocabulary.
+    notes: >-
+      Add the vendor-supplied label row, the public-vendor-reported visibility
+      state, ranking-eligibility change, and a Funding disclosure subsection
+      listing the enum. Add CHANGELOG entry.
+    needs: [w1]
+    status: pending
+
+must_preserve:
+  - "Existing VALID_LABELS entries (ci, local, unofficial-research) keep working; publish --label default stays 'maintainer-run'."
+  - "The new module imports nothing from benchbox.cli or benchbox.platforms (no import cycle)."
+  - "hosted-results-contract.md remains internally consistent: every label has a visibility state and a ranking-eligibility rule."
+
+approach: |
+  Model result_source and funding as plain string enums (tuples + frozenset)
+  plus a dict-backed mapping, mirroring status.py's lightweight style rather
+  than introducing Enum classes the rest of the result layer does not use.
+  Expose the mapping as data so item 4's DuckDB DDL and item 5's frontend can be
+  derived from the same table rather than re-deriving label->visibility in three
+  places. Keep helpers total: unknown/empty source -> 'internal'; unknown/empty
+  funding -> 'unspecified' (never raise in the producer path; strict rejection
+  is the validator's job in item 3).
+
+anti_patterns:
+  - "DO NOT redefine label/funding string literals in generate_corpus_inventory.py, submit.py, or the DDL — import from the one module."
+  - "DO NOT wire vendor-supplied into inference-by-sidecar — vendor is maintainer-applied (item 3 gate G-VENDOR-SIGNAL), never inferred here."
+  - "DO NOT bump read_model_version in this item — no read-model column changes here (that is item 4)."
+  - "DO NOT introduce Enum classes if tuples/frozensets match the surrounding result-layer style."
+
+verification:
+  - description: "New module imports cleanly with only core deps and has no cycle"
+    command: "uv run -- python -c 'import benchbox.core.results.provenance as p; print(sorted(p.FUNDING_SOURCES)); print(p.trust_label_for_source(\"vendor\"))'"
+    expected_output: "funding list printed; prints 'vendor-supplied'"
+  - description: "vendor-supplied is a valid publish label"
+    command: "uv run -- python -c 'from benchbox.core.publishing.bundle_publisher import VALID_LABELS; assert \"vendor-supplied\" in VALID_LABELS'"
+    expected_output: "no assertion error"
+  - description: "Unit tests for the vocabulary + mapping pass"
+    command: "uv run -- python -m pytest tests/unit/core/results/test_provenance.py -q"
+    expected_output: "all pass"
+  - description: "Contract doc still parses / links check (repo doc lint)"
+    command: "make docs-check || true"
+    expected_output: "no new failures attributable to this change"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/results/provenance.py (new)"
+    - "benchbox/core/publishing/bundle_publisher.py"
+    - "tests/unit/core/results/test_provenance.py (new)"
+    - "docs/reference/hosted-results-contract.md"
+    - "docs/contributing-results.md"
+    - "docs/development/benchbox-results-platform-strategy.md"
+    - "CHANGELOG.md"
+  do_not_modify:
+    - "benchbox/core/results/schema.py"
+    - "benchbox/cli/"
+    - "scripts/generate_corpus_inventory.py"
+    - "scripts/validate_submission.py"
+    - "docs/development/browser-duckdb-schema.sql"
+
+impact:
+  technical_debt: |
+    Removes the split-brain trust-label vocabulary (constants duplicated between
+    bundle_publisher.py and generate_corpus_inventory.py) by giving downstream
+    items one module to import, and closes the gap between the shipped labels and
+    the governance contract.
+
+success_metrics:
+  - "Every later work item imports label/funding constants from provenance.py; grep finds no new duplicated literals."
+  - "hosted-results-contract.md documents vendor-supplied + funding and matches the module exactly."
+
+deps:
+  needs: []
+
+delivery_loop:
+  create: "Implement w1-w3 within scope_limit; no emitters change yet."
+  review: "/code-review; run verification + make pr-preflight."
+  fix: "Resolve findings; re-run verification."
+  submit_pr: "PR vs develop using PULL_REQUEST_TEMPLATE.md (Type: New feature + Documentation)."
+
+metadata:
+  tags: ["explorer", "provenance", "trust-labels", "funding", "governance"]
+  estimated_effort: "Small-Medium"
+  created_date: "2026-07-06"

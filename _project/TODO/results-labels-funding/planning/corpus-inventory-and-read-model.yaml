@@ -1,0 +1,164 @@
+id: "corpus-inventory-and-read-model"
+title: "Surface vendor-supplied label + funding in the corpus inventory and DuckDB read model"
+worktree: "results-labels-funding"
+priority: "High"
+status: "Blocked"
+description: |
+  Integrate the two new signals into the explorer's ingest layer so they reach
+  the browser. Two in-repo surfaces change: (1) scripts/generate_corpus_inventory.py,
+  which today derives trust_label from submission-manifest-sidecar presence
+  (_bundle_trust_label, :41-52) and emits per-bundle metadata + a
+  by_trust_label summary; (2) docs/development/browser-duckdb-schema.sql, the
+  frozen read-model DDL that already defines trust_label, visibility, and
+  is_ranking_eligible on the `results` table and carries trust_label into
+  benchmark_rankings and cohort_metadata.
+
+  This item teaches the inventory to recognize the maintainer-controlled vendor
+  signal (from item 3) and the funding value (from item 2's provenance block /
+  item 3's manifest), adds a `funding` column to the read-model DDL and the
+  ranking/cohort projections, and sets is_ranking_eligible = true for
+  vendor-supplied per decision D2. It records the required read_model_version
+  bump as a hand-off obligation for item 5 (the pipeline that writes the DB is
+  not in this checkout).
+
+category: "Feature"
+
+decision_gates:
+  - id: G-FUNDING-PRIVACY
+    gate: >-
+      Is funding a public, non-redactable field, and is 'unspecified' acceptable
+      on public-curated (maintainer) results?
+    blocks: [w2]
+    outcome: >-
+      PROPOSED: funding is PUBLIC and non-redactable (it is a disclosure, and the
+      contract's redactable set is about PII/host details, not provenance);
+      'unspecified' is allowed on any result. Add funding to the §4.1 public-field
+      list in item 1's contract edit if not already. CONFIRM before adding the
+      column to public read model.
+  - id: G-vendor-ranking
+    gate: >-
+      Confirm vendor-supplied rows are is_ranking_eligible = true (D2) rather than
+      browse-only.
+    blocks: [w2]
+    outcome: >-
+      RESOLVED (D2): true — vendor-supplied is ranking-eligible with a distinct
+      badge. visibility 'public-vendor-reported' joins curated/verified as
+      ranking-eligible; 'public-self-reported' remains ineligible.
+
+prior_art:
+  - "scripts/generate_corpus_inventory.py:41-52 _bundle_trust_label + :63-140 extract_metadata/generate_inventory — extend (add vendor detection, funding extraction, by_funding summary)"
+  - "docs/development/browser-duckdb-schema.sql results table (trust_label/visibility/is_ranking_eligible) + benchmark_rankings + cohort_metadata — extend (add funding column; wire vendor visibility into ranking eligibility)"
+  - "tests/unit/core/explorer_pipeline/test_pipeline.py:279-465 trust-label sidecar override tests — extend (add vendor + funding cases)"
+  - "tests/unit/core/explorer_pipeline/test_read_model_contract.py + tests/unit/cli/test_explorer_build_contract.py — extend (read_model_version + column set)"
+  - "benchbox/core/results/provenance.py (item 1) — reference (mapping + funding enum, imported not duplicated)"
+
+work:
+  - id: w1
+    summary: >-
+      In generate_corpus_inventory.py, resolve trust_label via the item-1
+      mapping and the item-3 vendor signal, and extract funding from the
+      bundle. Import constants from provenance.py.
+    notes: >-
+      Resolve via item-1 mapping + item-3 vendor signal (not just
+      community-vs-default); extract funding from the bundle provenance
+      block/manifest; add funding to each entry and a by_funding counter to
+      the summary; retire the local COMMUNITY/DEFAULT literals.
+    status: pending
+  - id: w2
+    summary: >-
+      Add `funding VARCHAR NOT NULL` to the `results` table in
+      browser-duckdb-schema.sql and propagate it where trust_label travels.
+    notes: >-
+      Propagate into benchmark_rankings and cohort_metadata; ensure the
+      vendor visibility state is treated as ranking-eligible in the
+      is_ranking_eligible derivation (computed in Python per the G-11
+      views-are-bare-columns rule).
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: >-
+      Update the read-model contract tests + corpus-inventory tests for the
+      new column/summary and the vendor/funding cases.
+    notes: >-
+      Record the required read_model_version bump as an explicit obligation
+      passed to item 5.
+    needs: [w2]
+    status: pending
+
+must_preserve:
+  - "corpus-inventory.json remains deterministic (sorted, timestamp-normalized in --check)."
+  - "Bundles with no provenance/funding default to funding='unspecified' and today's trust_label derivation is unchanged for internal/community."
+  - "DuckDB views keep projecting only bare columns (no arithmetic/CASE/window in views); all derivation stays in the pipeline (Python)."
+  - "corpus-inventory schema_version is bumped if the entry shape changes (currently '2.2')."
+
+approach: |
+  Keep the inventory's sidecar-presence inference for internal vs community, and
+  layer the vendor signal on top exactly as the item-3 gate resolves it (e.g.
+  bundle under results-data/bundles/vendor/ -> vendor-supplied). Read funding
+  from the bundle's provenance.funding first, then the manifest, defaulting to
+  'unspecified'. For the DDL, funding is a plain column; is_ranking_eligible is
+  already a precomputed boolean, so the only change is which visibility states
+  map to true — encode that from provenance.py's mapping so the DDL, inventory,
+  and pipeline agree. Because the pipeline that POPULATES the DB is gitignored,
+  this item changes the SCHEMA + tests + inventory only and hands the populate
+  logic + read_model_version bump to item 5.
+
+anti_patterns:
+  - "DO NOT put the vendor/funding derivation logic in a DuckDB view (violates the bare-column G-11 rule) — it belongs in the pipeline/Python."
+  - "DO NOT bump read_model_version in the DDL comment without the matching pipeline change — record it as an item-5 obligation to avoid a half-applied version."
+  - "DO NOT re-derive label->visibility here; import the mapping from provenance.py."
+  - "DO NOT make funding NULLable in the read model — default 'unspecified' keeps the badge/chip logic total."
+
+verification:
+  - description: "Inventory includes funding + by_funding and vendor labels"
+    command: "uv run -- python scripts/generate_corpus_inventory.py --write && uv run -- python -c \"import json; inv=json.load(open('results-data/corpus-inventory.json')); assert 'by_funding' in inv['summary']; assert all('funding' in b for b in inv['bundles'])\""
+    expected_output: "no assertion error"
+  - description: "Inventory --check is stable after --write"
+    command: "uv run -- python scripts/generate_corpus_inventory.py --check"
+    expected_output: "OK: corpus-inventory.json is up-to-date"
+  - description: "Read-model + explorer pipeline contract tests pass with the new column"
+    command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ tests/unit/explorer/ -q"
+    expected_output: "all pass (or documented xfails pending item 5 pipeline change)"
+  - description: "DDL parses"
+    command: "uv run -- python -c \"import duckdb; con=duckdb.connect(); con.execute(open('docs/development/browser-duckdb-schema.sql').read())\""
+    expected_output: "no error"
+
+scope_limit:
+  only_modify:
+    - "scripts/generate_corpus_inventory.py"
+    - "docs/development/browser-duckdb-schema.sql"
+    - "results-data/corpus-inventory.json (regenerated)"
+    - "tests/unit/core/explorer_pipeline/"
+    - "tests/unit/explorer/"
+    - "tests/unit/scripts/ (corpus inventory tests)"
+  do_not_modify:
+    - "_project/scripts/explorer_pipeline/ (not in checkout; item 5)"
+    - "results-explorer/ (not in checkout; item 5)"
+    - "benchbox/cli/commands/submit.py"
+
+impact:
+  technical_debt: |
+    Brings the read-model schema and the public inventory in line with the new
+    provenance model, and makes explicit the one cross-tree coupling
+    (read_model_version) so it cannot be silently half-applied.
+
+success_metrics:
+  - "corpus-inventory.json shows vendor-supplied bundles and a funding breakdown."
+  - "The read-model DDL carries funding and marks vendor rows ranking-eligible; contract tests pin it."
+
+deps:
+  needs:
+    - "provenance-vocabulary-and-labels"
+    - "bundle-schema-and-run-cli"
+    - "submit-manifest-and-validator"
+
+delivery_loop:
+  create: "Resolve G-FUNDING-PRIVACY; implement w1-w3 within scope_limit."
+  review: "/code-review; run verification + make pr-preflight; verify inventory determinism."
+  fix: "Resolve findings; re-run verification and --check."
+  submit_pr: "PR vs develop using PULL_REQUEST_TEMPLATE.md (Type: New feature); flag the read_model_version obligation for item 5 in Notes."
+
+metadata:
+  tags: ["explorer", "read-model", "duckdb", "corpus-inventory", "provenance", "funding", "ranking"]
+  estimated_effort: "Medium"
+  created_date: "2026-07-06"
