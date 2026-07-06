@@ -1,0 +1,99 @@
+name: Submission Validation Comment
+
+# Companion to `validate-submission.yml`. Fork PRs run that workflow with a
+# read-only GITHUB_TOKEN (GitHub caps the token for PRs from forks), so its
+# inline "Post PR comment" step 403s and cannot post the validation result to
+# an external contributor's PR. This workflow runs on `workflow_run` completion
+# in the TRUSTED base-repository context with a writable `pull-requests` token,
+# downloads the comment artifact the validation run uploaded, and posts (or
+# updates) the comment. It never checks out or executes any PR-supplied code —
+# it only reads the artifact and calls the issue-comment API — so granting the
+# write permission here is safe.
+#
+# ACTIVATION PREREQUISITES (this workflow is inert until both hold):
+#   1. A `workflow_run` companion only fires when its file is on the repository's
+#      DEFAULT branch. The default branch is being moved from the release branch
+#      to `develop` (see docs/operations/branch-rename-runbook.md / PR #993);
+#      until that switch lands, GitHub will not trigger this workflow.
+#   2. The artifact-upload half lives in `validate-submission.yml`, which runs on
+#      the `published-results` branch. That branch's copy must be synced from
+#      develop (the sync bot cannot mirror workflow files; see
+#      submission-validator-drift-check.yml) before a real contributor PR uploads
+#      the artifact this workflow consumes.
+
+on:
+  workflow_run:
+    workflows: ["Validate Submission"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+jobs:
+  comment:
+    name: Post validation comment from trusted context
+    runs-on: ubuntu-latest
+    # Only PR-triggered validation runs carry a comment artifact.
+    if: github.event.workflow_run.event == 'pull_request'
+    steps:
+      - name: Download validation comment artifact
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: submission-validation-comment
+          path: artifact
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post or update the comment
+        if: steps.download.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // The validation run only uploads this artifact when bundles changed.
+            // If it is absent or malformed there is nothing to post — exit cleanly.
+            if (!fs.existsSync('artifact/pr_comment.md') || !fs.existsSync('artifact/pr_number.txt')) {
+              core.info('No submission-validation comment artifact; nothing to post.');
+              return;
+            }
+
+            const prNumber = parseInt(fs.readFileSync('artifact/pr_number.txt', 'utf8').trim(), 10);
+            if (!Number.isInteger(prNumber) || prNumber <= 0) {
+              core.setFailed(`Invalid PR number in artifact: ${prNumber}`);
+              return;
+            }
+
+            const body = fs.readFileSync('artifact/pr_comment.md', 'utf8');
+            const marker = '## Submission Validation';
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+            const existing = comments.find(c =>
+              c.body.trimStart().startsWith(marker) &&
+              (c.user.type === 'Bot' || c.user.login === 'github-actions[bot]')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: body,
+              });
+            }
