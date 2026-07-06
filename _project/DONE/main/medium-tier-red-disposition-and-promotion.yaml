@@ -2,7 +2,8 @@ id: medium-tier-red-disposition-and-promotion
 title: "Disposition the medium tier's live failures on develop, get medium-test green, then wire it into auto-revert per its recorded criterion"
 worktree: main
 priority: Medium-High
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-07-06"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -95,8 +96,17 @@ work:
   - id: w2
     summary: "Demonstrate a green medium-test run on a real runner"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
+      DONE 2026-07-06: medium-test concluded GREEN on the real runner —
+      develop-post-merge run 28763663703, job 85283671051, "Run medium speed
+      tier" success (26m, on develop 382311b6 which includes both the w1
+      dispositions #977 and the #994 filterwarnings-marker fix). Trajectory
+      across the three post-merge runs: 8 failures (pre-w1) -> 1 (the
+      Makefile-pin, which turned out to be a real pytest-ci.ini config-drift,
+      not "pre-existing/unrelated" as the w1 note assumed — fixed in #994) ->
+      0. The 44 tpch-extension "errors" were confirmed sandbox-only.
+    notes_original: |
       Evidence = a develop-post-merge run URL whose medium-test job
       concludes success (or `make test-medium` green in CI-equivalent
       conditions if timing a post-merge run is impractical — say which).
@@ -117,8 +127,19 @@ work:
   - id: w3
     summary: "Promote: wire medium-test into auto-revert-on-failure and update the pinned tests"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
+      DONE 2026-07-06 (this PR): dropped continue-on-error from the
+      medium-test job, added medium-test to auto-revert-on-failure's needs +
+      if:failure trigger (alongside lint/fast-test/explorer-tokens), updated
+      both job comments, and flipped the pinning test
+      test_medium_test_is_visibility_only_not_auto_revert_trigger ->
+      test_medium_test_is_promoted_to_auto_revert_trigger (asserts no
+      continue-on-error, medium-test in needs + if). 11 workflow pin tests
+      pass; YAML parses; make lint green. auto-revert opens a REVIEWABLE
+      revert PR (not a silent revert), so a future tier flake surfaces as a
+      dismissable PR rather than a forced revert.
+    notes_original: |
       Per the job comment: drop continue-on-error, add medium-test to
       auto-revert-on-failure's needs and if-expression alongside
       lint/fast-test, update the workflow comments, and flip any pinning
