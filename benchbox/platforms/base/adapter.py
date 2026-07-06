@@ -18,6 +18,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
 from benchbox.platforms.base.connection_lifecycle import ConnectionLifecycleMixin
 from benchbox.platforms.base.connection_wrappers import (
@@ -143,6 +144,12 @@ class PlatformAdapter(
         # the default fingerprint during plan capture (see --normalize-plan-literals).
         self.normalize_plan_literals = config.get("normalize_plan_literals", False)
         self.plan_capture_timeout_seconds = int(config.get("plan_capture_timeout_seconds", 30))
+        # Maximum logical-tree depth serialized when a captured plan is written to
+        # the results bundle / size-checked. Nodes deeper than this become a
+        # truncation marker instead of dropping the whole plan (see
+        # query_plan_models.DEFAULT_PLAN_MAX_DEPTH). The structural fingerprint is
+        # computed over the full in-memory tree, so it is unaffected by this cap.
+        self.plan_max_depth = int(config.get("plan_max_depth", DEFAULT_PLAN_MAX_DEPTH))
         # Plan capture query selection. plan_query_filter restricts capture to an
         # explicit set of query ids; it is orthogonal to the retired per-iteration /
         # per-stream sampling machinery (plan_first_n / plan_sampling_rate), which the

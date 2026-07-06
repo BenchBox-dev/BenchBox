@@ -113,8 +113,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from benchbox.core.errors import SerializationError
-
 # Literal-masking patterns for normalize_literals fingerprints. Numeric literals
 # (including decimals, and a tightly-adjacent sign like ``-5``) collapse to a
 # placeholder and single-quoted string literals to another, so that structurally
@@ -240,6 +238,15 @@ RAW_OUTPUT_POLICIES = frozenset({RAW_OUTPUT_FULL, RAW_OUTPUT_TRUNCATED, RAW_OUTP
 # useful for debugging.
 DEFAULT_RAW_OUTPUT_POLICY = RAW_OUTPUT_TRUNCATED
 DEFAULT_RAW_OUTPUT_MAX_BYTES = 16 * 1024
+
+# Default maximum logical-tree depth serialized by ``QueryPlanDAG.to_dict`` /
+# ``to_json`` / ``estimate_serialized_size``. Nodes deeper than this are replaced by
+# a truncation marker (``truncated_at_depth``) in the serialized output rather than
+# dropping the whole plan, so a pathologically deep plan still round-trips its upper
+# levels instead of failing capture outright. The in-memory tree and the structural
+# ``plan_fingerprint`` are computed over the FULL tree and are unaffected by this
+# serialization cap. Configurable per-adapter via ``plan_max_depth``.
+DEFAULT_PLAN_MAX_DEPTH = 50
 
 
 def normalize_raw_output_policy(policy: str | None) -> str:
@@ -391,14 +398,35 @@ class LogicalOperator:
     offset_count: int | None = None
 
     def to_dict(self, max_depth: int | None = None, current_depth: int = 0) -> dict[str, Any]:
-        """Convert to JSON-serializable dictionary with optional depth guard."""
-        if max_depth is not None and current_depth > max_depth:
-            raise SerializationError(f"Max depth {max_depth} exceeded")
+        """Convert to JSON-serializable dictionary with optional depth guard.
 
+        When ``max_depth`` is set and this node sits beyond it, the node is
+        serialized as a shallow truncation marker (carrying ``truncated_at_depth``
+        and the count of omitted children) instead of raising and discarding the
+        whole plan. This bounds the serialized size of a pathologically deep tree
+        while preserving everything down to the limit. The in-memory tree and the
+        structural ``plan_fingerprint`` are computed over the FULL tree, so this
+        serialization-only truncation never changes fingerprint equality — a
+        truncated serialized plan is explicitly marked rather than silently passed
+        off as complete.
+        """
         # Handle enum conversion
         operator_type_value = (
             self.operator_type.value if isinstance(self.operator_type, LogicalOperatorType) else self.operator_type
         )
+
+        if max_depth is not None and current_depth > max_depth:
+            # Depth guard: emit a marker node instead of dropping the plan. Keep the
+            # operator identity so the truncation point is legible; omit children and
+            # the value-bearing fields (they are what the depth cap is protecting
+            # against). ``from_dict`` reconstructs this as a childless leaf.
+            return {
+                "operator_type": operator_type_value,
+                "operator_id": self.operator_id,
+                "truncated_at_depth": current_depth,
+                "children_omitted": len(self.children),
+            }
+
         join_type_value = self.join_type.value if isinstance(self.join_type, JoinType) else self.join_type
 
         return {
@@ -750,8 +778,13 @@ class QueryPlanDAG:
             f"of {original_bytes} bytes under '{RAW_OUTPUT_TRUNCATED}' policy]"
         )
 
-    def to_dict(self, max_depth: int | None = 50) -> dict[str, Any]:
-        """Convert to JSON-serializable dictionary with depth protection."""
+    def to_dict(self, max_depth: int | None = DEFAULT_PLAN_MAX_DEPTH) -> dict[str, Any]:
+        """Convert to JSON-serializable dictionary with depth protection.
+
+        Nodes deeper than ``max_depth`` are replaced by a ``truncated_at_depth``
+        marker (see ``LogicalOperator.to_dict``) rather than raising; the stored
+        ``plan_fingerprint`` reflects the full in-memory tree regardless.
+        """
         return {
             "query_id": self.query_id,
             "platform": self.platform,
@@ -813,12 +846,12 @@ class QueryPlanDAG:
 
         return plan
 
-    def to_json(self, indent: int | None = 2, *, max_depth: int | None = 50) -> str:
+    def to_json(self, indent: int | None = 2, *, max_depth: int | None = DEFAULT_PLAN_MAX_DEPTH) -> str:
         """Serialize to JSON string."""
         return json.dumps(self.to_dict(max_depth=max_depth), indent=indent)
 
-    def estimate_serialized_size(self, *, max_depth: int | None = 50) -> int:
-        """Estimate JSON serialized size in bytes."""
+    def estimate_serialized_size(self, *, max_depth: int | None = DEFAULT_PLAN_MAX_DEPTH) -> int:
+        """Estimate JSON serialized size in bytes (deep nodes truncated, not dropped)."""
         return len(json.dumps(self.to_dict(max_depth=max_depth), indent=None))
 
     @classmethod

@@ -49,6 +49,7 @@ from benchbox.core.results.builder import (
 )
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT
 from benchbox.core.results.query_plan_models import (
+    DEFAULT_PLAN_MAX_DEPTH,
     DEFAULT_RAW_OUTPUT_MAX_BYTES,
     DEFAULT_RAW_OUTPUT_POLICY,
 )
@@ -964,14 +965,18 @@ class ResultCaptureMixin:
         plan.apply_raw_output_policy(raw_output_policy, raw_output_max_bytes)
 
         try:
-            size_kb = plan.estimate_serialized_size() / 1024
+            # Size the plan as it will actually be serialized: deep nodes past
+            # plan_max_depth become a truncation marker rather than dropping the plan.
+            size_kb = plan.estimate_serialized_size(max_depth=getattr(self, "plan_max_depth", DEFAULT_PLAN_MAX_DEPTH))
+            size_kb /= 1024
             if size_kb > 100:
                 # Only suggest a stricter raw-output policy when raw text is still
-                # retained; if it is already dropped the bloat is the structured DAG.
+                # retained; if it is already dropped the bloat is the structured DAG,
+                # which a smaller plan_max_depth bounds.
                 hint = (
-                    " Consider a stricter plan_raw_output policy (full|truncated|none) or external plan storage."
+                    " Consider a stricter plan_raw_output policy (full|truncated|none)."
                     if plan.raw_explain_output
-                    else " The structured plan tree itself is large; consider external plan storage."
+                    else " The structured plan tree itself is large; consider a smaller plan_max_depth."
                 )
                 self.logger.warning("Large query plan for %s: %.1f KB.%s", query_id, size_kb, hint)
         except SerializationError as exc:
