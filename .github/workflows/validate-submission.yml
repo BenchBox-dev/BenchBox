@@ -115,12 +115,26 @@ jobs:
           # submission, which must include the manifest sidecar (its presence is
           # the community-submission trust signal). Require the sidecar unless
           # this is a maintainer mirror PR.
+          #
+          # The waiver gates on TWO signals, and `head.repo.fork` is the load-bearing
+          # one: `github.head_ref` is attacker-controlled on fork PRs, so a branch
+          # name alone (`auto/results-mirror-*`) is spoofable — anyone could open a
+          # fork PR from a branch so named and drop `--require-manifest`, laundering
+          # a community bundle into a maintainer-run (ranking-eligible) stamp. The
+          # branch pattern only narrows *which* same-repo PRs qualify; the
+          # `head.repo.fork == false` check (unforgeable — a fork PR cannot present
+          # itself as same-repo) is what actually confines the waiver to the trusted
+          # sync bot, whose mirror branches live on this repo. If both aren't
+          # satisfied we fail closed and require the sidecar.
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
           HEAD_REF: ${{ github.head_ref }}
         run: |
           REQUIRE_MANIFEST="--require-manifest"
-          case "$HEAD_REF" in
-            auto/results-mirror-*) REQUIRE_MANIFEST="" ;;
-          esac
+          if [ "$IS_FORK" = "false" ]; then
+            case "$HEAD_REF" in
+              auto/results-mirror-*) REQUIRE_MANIFEST="" ;;
+            esac
+          fi
           # Validate and generate PR comment in a single invocation.
           # --pr-comment writes the Markdown file; exit code reflects validation result.
           xargs -d '\n' uv run --no-project --python 3.11 -- python scripts/validate_submission.py $REQUIRE_MANIFEST --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt \
