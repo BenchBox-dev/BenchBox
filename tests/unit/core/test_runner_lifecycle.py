@@ -253,7 +253,16 @@ def test_load_only_mode_runs_statistics_phase_when_requested(tmp_path):
         def load_data(self, benchmark, connection, data_dir):
             return {"table1": 10}, 0.5, None
 
-        def run_statistics_phase(self, benchmark, connection, *, benchmark_name="", table_names=None):
+        def run_statistics_phase(
+            self,
+            benchmark,
+            connection,
+            *,
+            benchmark_name="",
+            table_names=None,
+            reset=None,
+            collect_per_table_timing=False,
+        ):
             self.statistics_calls.append((benchmark_name, table_names))
             # A substantial ANALYZE duration (5s) so an omission from
             # duration_seconds would be obvious, not lost in rounding.
