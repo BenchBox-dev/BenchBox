@@ -347,10 +347,19 @@ class QueryPlanComparator:
         # Check if fingerprints can be trusted for fast-path comparison
         left_trusted = plan_left.is_fingerprint_trusted()
         right_trusted = plan_right.is_fingerprint_trusted()
+        # Fingerprints are only comparable within the same encoding version: a
+        # v1 and a v2 fingerprint hash different encodings of the same logical
+        # plan, so equality across versions is meaningless. When versions
+        # differ (e.g. an old bundle vs a freshly captured plan) we must fall
+        # through to the full tree walk (qpc-03 anti-pattern: never compare
+        # across fingerprint_version for equality).
+        same_version = getattr(plan_left, "fingerprint_version", None) == getattr(
+            plan_right, "fingerprint_version", None
+        )
 
-        # Quick fingerprint check (only if both are trusted)
+        # Quick fingerprint check (only if both are trusted AND same-version)
         fingerprints_match = False
-        if left_trusted and right_trusted:
+        if left_trusted and right_trusted and same_version:
             fingerprints_match = (
                 plan_left.plan_fingerprint == plan_right.plan_fingerprint
                 if plan_left.plan_fingerprint and plan_right.plan_fingerprint
@@ -361,6 +370,12 @@ class QueryPlanComparator:
             if fingerprints_match:
                 return self._create_identical_comparison(plan_left, plan_right)
         else:
+            if not same_version:
+                logger.debug(
+                    f"Plan {plan_left.query_id} fingerprint_version "
+                    f"{getattr(plan_left, 'fingerprint_version', None)} != "
+                    f"{getattr(plan_right, 'fingerprint_version', None)}; using full comparison"
+                )
             # Log a warning about untrusted fingerprints
             if not left_trusted:
                 logger.debug(
@@ -811,11 +826,29 @@ def generate_plan_comparison_summary(
 
         plans_compared += 1
 
-        # Compare fingerprints first (fast path)
+        # Compare fingerprints first (fast path) - but ONLY when they are
+        # actually comparable: same encoding version and both trusted. A v1 vs
+        # v2 fingerprint (or a stale/tampered one) must never be equality-tested
+        # to decide "changed", or a pure encoding bump would be misreported as a
+        # plan flap (qpc-03 anti-pattern). When not comparable, fall through to
+        # the full tree walk and let it decide.
         baseline_fp = getattr(baseline_plan, "plan_fingerprint", None)
         current_fp = getattr(current_plan, "plan_fingerprint", None)
+        same_version = getattr(baseline_plan, "fingerprint_version", None) == getattr(
+            current_plan, "fingerprint_version", None
+        )
+        fingerprints_comparable = (
+            bool(baseline_fp)
+            and bool(current_fp)
+            and same_version
+            and baseline_plan.is_fingerprint_trusted()
+            and current_plan.is_fingerprint_trusted()
+        )
 
-        plan_changed = baseline_fp != current_fp
+        # "Unchanged" is only assertable from comparable, equal fingerprints;
+        # anything else (different, or not comparable across version/trust) is
+        # treated as changed and routed through the full tree walk.
+        plan_changed = not (fingerprints_comparable and baseline_fp == current_fp)
 
         if not plan_changed:
             plans_unchanged += 1

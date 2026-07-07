@@ -1040,6 +1040,14 @@ def _build_plan_entry(qr: dict[str, Any]) -> dict[str, Any]:
     plan_entry: dict[str, Any] = {}
     if plan_fingerprint:
         plan_entry["fingerprint"] = plan_fingerprint
+        # Surface the fingerprint encoding version at the entry level (not only
+        # buried in the nested plan dict) so a consumer reading the companion
+        # entry can tell whether two fingerprints are comparable without
+        # rehydrating the full plan (qpc-03). Sourced from the plan object when
+        # present; a bare fingerprint with no plan object is left unversioned.
+        fingerprint_version = getattr(query_plan, "fingerprint_version", None)
+        if fingerprint_version is not None:
+            plan_entry["fingerprint_version"] = fingerprint_version
     if plan_fingerprint_normalized:
         plan_entry["fingerprint_normalized"] = plan_fingerprint_normalized
     if capture_time is not None:

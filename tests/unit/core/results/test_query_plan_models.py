@@ -14,7 +14,10 @@ import json
 import pytest
 
 from benchbox.core.results.query_plan_models import (
+    FINGERPRINT_VERSION,
+    LEGACY_FINGERPRINT_VERSION,
     AggregateFunction,
+    FingerprintIntegrity,
     JoinType,
     LogicalOperator,
     LogicalOperatorType,
@@ -28,6 +31,148 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def _scan(table: str, operator_id: str = "scan") -> LogicalOperator:
+    return LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id=operator_id, table_name=table)
+
+
+class TestFingerprintV2Encoding:
+    """qpc-03: the v2 structural encoding closes the F2.1 collision classes and
+    versions fingerprints so cross-version equality is never assumed."""
+
+    def test_sibling_children_vs_nested_chain_are_distinguished(self) -> None:
+        """F2.1 tree shape: Join[Scan(t1), Scan(t2)] (two siblings) and
+        Join[Scan(t1) -> Scan(t2)] (a nested chain) must NOT collide. The v1
+        pipe-joined encoding produced ``Join|Scan|table:t1|Scan|table:t2`` for
+        both."""
+        siblings = LogicalOperator(
+            operator_type=LogicalOperatorType.JOIN,
+            operator_id="j",
+            children=[_scan("t1", "s1"), _scan("t2", "s2")],
+        )
+        nested_inner = _scan("t1", "s1")
+        nested_inner.children = [_scan("t2", "s2")]
+        nested = LogicalOperator(operator_type=LogicalOperatorType.JOIN, operator_id="j", children=[nested_inner])
+
+        assert siblings.get_structural_signature() != nested.get_structural_signature()
+        assert compute_plan_fingerprint(siblings) != compute_plan_fingerprint(nested)
+
+    def test_filter_list_separator_injection_is_distinguished(self) -> None:
+        """F2.1 separator injection: two filters ["a","b"] must NOT collide with
+        a single filter ["a,b"] (the v1 ``,``-join made both ``filters:a,b``)."""
+        two = LogicalOperator(operator_type=LogicalOperatorType.FILTER, operator_id="f", filter_expressions=["a", "b"])
+        one = LogicalOperator(operator_type=LogicalOperatorType.FILTER, operator_id="f", filter_expressions=["a,b"])
+
+        assert two.get_structural_signature() != one.get_structural_signature()
+
+    def test_table_name_field_injection_is_distinguished(self) -> None:
+        """F2.1 separator injection: a table_name that embeds the v1 field
+        syntax (``x|filters:y``) must NOT collide with table ``x`` + filter
+        ``y``."""
+        crafted = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="s", table_name="x|filters:y")
+        genuine = LogicalOperator(
+            operator_type=LogicalOperatorType.SCAN, operator_id="s", table_name="x", filter_expressions=["y"]
+        )
+
+        assert crafted.get_structural_signature() != genuine.get_structural_signature()
+
+    def test_signature_is_canonical_json(self) -> None:
+        """The v2 signature is parseable canonical JSON with structural keys."""
+        op = LogicalOperator(
+            operator_type=LogicalOperatorType.JOIN,
+            operator_id="j",
+            join_type=JoinType.INNER,
+            children=[_scan("t1"), _scan("t2")],
+        )
+        parsed = json.loads(op.get_structural_signature())
+        assert parsed["op"] == "Join"
+        assert parsed["join"] == "inner"
+        assert [c["table"] for c in parsed["children"]] == ["t1", "t2"]
+
+    def test_set_like_fields_stay_order_independent(self) -> None:
+        """join_cond / filters / aggs remain set-like (sorted), so reordering
+        them does not change the fingerprint."""
+        a = LogicalOperator(
+            operator_type=LogicalOperatorType.FILTER, operator_id="f", filter_expressions=["a", "b", "c"]
+        )
+        b = LogicalOperator(
+            operator_type=LogicalOperatorType.FILTER, operator_id="f", filter_expressions=["c", "a", "b"]
+        )
+        assert a.get_structural_signature() == b.get_structural_signature()
+
+    def test_ordered_fields_are_order_sensitive(self) -> None:
+        """proj / group / sort preserve order (they affect output), so a
+        reorder DOES change the fingerprint."""
+        a = LogicalOperator(
+            operator_type=LogicalOperatorType.PROJECT, operator_id="p", projection_expressions=["x", "y"]
+        )
+        b = LogicalOperator(
+            operator_type=LogicalOperatorType.PROJECT, operator_id="p", projection_expressions=["y", "x"]
+        )
+        assert a.get_structural_signature() != b.get_structural_signature()
+
+
+class TestFingerprintVersioningAndIntegrity:
+    """qpc-03 / F2.2: honest integrity states and version handling on load."""
+
+    def test_fresh_plan_is_current_version_and_verified(self) -> None:
+        plan = QueryPlanDAG(query_id="q", platform="duckdb", logical_root=_scan("t"))
+        assert plan.fingerprint_version == FINGERPRINT_VERSION
+        assert plan.fingerprint_integrity == FingerprintIntegrity.VERIFIED
+        assert plan.is_fingerprint_trusted()
+
+    def test_to_dict_carries_fingerprint_version(self) -> None:
+        plan = QueryPlanDAG(query_id="q", platform="duckdb", logical_root=_scan("t"))
+        assert plan.to_dict()["fingerprint_version"] == FINGERPRINT_VERSION
+
+    def test_from_dict_roundtrips_version_and_verifies(self) -> None:
+        plan = QueryPlanDAG(query_id="q", platform="duckdb", logical_root=_scan("t"))
+        restored = QueryPlanDAG.from_dict(plan.to_dict())
+        assert restored.fingerprint_version == FINGERPRINT_VERSION
+        assert restored.fingerprint_integrity == FingerprintIntegrity.VERIFIED
+
+    def test_from_dict_absent_fingerprint_is_recomputed_not_verified(self) -> None:
+        """F2.2 trust laundering: deleting the stored fingerprint must yield
+        RECOMPUTED (untrusted-for-provenance), NOT VERIFIED -- otherwise
+        dropping the field bypasses stale-tamper detection."""
+        data = QueryPlanDAG(query_id="q", platform="duckdb", logical_root=_scan("t")).to_dict()
+        data.pop("plan_fingerprint")
+
+        restored = QueryPlanDAG.from_dict(data)
+
+        assert restored.fingerprint_integrity == FingerprintIntegrity.RECOMPUTED
+        # RECOMPUTED is still "trusted" for internal consistency (it was just
+        # computed from the tree), but it is explicitly NOT VERIFIED.
+        assert restored.fingerprint_integrity != FingerprintIntegrity.VERIFIED
+
+    def test_from_dict_tampered_fingerprint_is_stale(self) -> None:
+        data = QueryPlanDAG(query_id="q", platform="duckdb", logical_root=_scan("t")).to_dict()
+        data["plan_fingerprint"] = "deadbeef" * 8  # does not match the tree
+
+        restored = QueryPlanDAG.from_dict(data)
+
+        assert restored.fingerprint_integrity == FingerprintIntegrity.STALE
+        assert not restored.is_fingerprint_trusted()
+
+    def test_legacy_bundle_without_version_loads_as_v1_and_is_stale(self) -> None:
+        """must_preserve: an old bundle (v1 fingerprint, no fingerprint_version)
+        still LOADS. Its stored v1 fingerprint recomputes to a different v2
+        value, so it lands STALE (untrusted) and will compare via tree walk --
+        never via cross-version fingerprint equality."""
+        legacy = {
+            "query_id": "q",
+            "platform": "duckdb",
+            "logical_root": _scan("t").to_dict(),
+            "plan_fingerprint": "Scan|table:t",  # a v1-style pipe-joined stand-in
+            # no fingerprint_version key
+        }
+
+        restored = QueryPlanDAG.from_dict(legacy)
+
+        assert restored.fingerprint_version == LEGACY_FINGERPRINT_VERSION
+        assert restored.fingerprint_integrity == FingerprintIntegrity.STALE
+        assert not restored.is_fingerprint_trusted()
 
 
 class TestPhysicalOperator:
@@ -420,8 +565,11 @@ class TestLogicalOperator:
 
         signature = op.get_structural_signature()
 
-        assert "Scan" in signature
-        assert "table:orders" in signature
+        # v2 encoding is canonical JSON (qpc-03): the operator type and table
+        # appear as structured fields rather than pipe-joined tokens.
+        parsed = json.loads(signature)
+        assert parsed["op"] == "Scan"
+        assert parsed["table"] == "orders"
 
     def test_structural_signature_excludes_non_structural(self) -> None:
         """Test that structural signature excludes costs, IDs, etc."""
@@ -469,8 +617,8 @@ class TestLogicalOperator:
 
         # Different join types should produce different signatures
         assert inner_join.get_structural_signature() != left_join.get_structural_signature()
-        assert "join:inner" in inner_join.get_structural_signature()
-        assert "join:left" in left_join.get_structural_signature()
+        assert json.loads(inner_join.get_structural_signature())["join"] == "inner"
+        assert json.loads(left_join.get_structural_signature())["join"] == "left"
 
 
 class TestQueryPlanDAG:
