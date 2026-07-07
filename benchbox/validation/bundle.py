@@ -682,11 +682,14 @@ def _validate_manifest_provenance(manifest: dict[str, Any], primary_path: Path, 
     canonical allowlists and unknown values are hard errors (not warnings).
 
     Governance: ``result_source == "vendor"`` (the ranking-eligible vendor tier)
-    is only valid for bundles under a maintainer-controlled ``vendor/`` subtree
-    (``results-data/bundles/vendor/...``, gated by CODEOWNERS on the
-    published-results branch). A community PR that self-asserts the vendor label
-    on a bundle outside that subtree is rejected — the vendor label cannot be
-    self-granted through the public submission path.
+    is only valid for a bundle whose immediate parent directory is ``vendor/``
+    (``results-data/bundles/vendor/...``). The ENFORCED control is CODEOWNERS on
+    that path on the submission branch — a community contributor cannot create a
+    file under ``vendor/`` without maintainer review. This validator check is an
+    advisory consistency guard: it rejects a community-located bundle that
+    self-asserts the vendor label, but the authoritative label is derived from
+    the (CODEOWNERS-gated) path by generate_corpus_inventory.py, not from this
+    field.
     """
     funding = manifest.get("funding")
     if funding is not None and funding not in FUNDING_SOURCES:
@@ -705,11 +708,11 @@ def _validate_manifest_provenance(manifest: dict[str, Any], primary_path: Path, 
     if result_source not in RESULT_SOURCES:
         vr.error(f"Invalid manifest result_source {result_source!r}: must be one of {sorted(RESULT_SOURCES)}")
         return
-    if result_source == "vendor" and "vendor" not in primary_path.parent.parts:
+    if result_source == "vendor" and primary_path.parent.name != "vendor":
         vr.error(
-            "Manifest result_source 'vendor' is only valid for bundles under a "
-            "maintainer-controlled results-data/bundles/vendor/ path; a community "
-            "submission cannot self-assert the vendor-supplied label."
+            "Manifest result_source 'vendor' is only valid for bundles directly "
+            "under a maintainer-controlled results-data/bundles/vendor/ path; a "
+            "community submission cannot self-assert the vendor-supplied label."
         )
 
 

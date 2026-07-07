@@ -42,12 +42,17 @@ def _minimal_bundle(*, benchmark_id: str = "tpch", scale_factor: float = 0.01, p
 
 
 def _write_bundle(
-    path: Path, *, benchmark_id: str = "tpch", scale_factor: float = 0.01, platform: str = "DuckDB"
+    path: Path,
+    *,
+    benchmark_id: str = "tpch",
+    scale_factor: float = 0.01,
+    platform: str = "DuckDB",
+    provenance: dict | None = None,
 ) -> None:
-    path.write_text(
-        json.dumps(_minimal_bundle(benchmark_id=benchmark_id, scale_factor=scale_factor, platform=platform)),
-        encoding="utf-8",
-    )
+    bundle = _minimal_bundle(benchmark_id=benchmark_id, scale_factor=scale_factor, platform=platform)
+    if provenance is not None:
+        bundle["provenance"] = provenance
+    path.write_text(json.dumps(bundle), encoding="utf-8")
 
 
 class TestGenerateInventory:
@@ -61,6 +66,7 @@ class TestGenerateInventory:
             "by_benchmark": {},
             "by_platform": {},
             "by_trust_label": {},
+            "by_funding": {},
         }
 
     def test_sidecar_sets_community_trust_label(self, tmp_path: Path) -> None:
@@ -82,6 +88,41 @@ class TestGenerateInventory:
         inventory = script.generate_inventory(tmp_path)
 
         assert inventory["bundles"][0]["trust_label"] == "community-submission"
+
+    def test_top_level_vendor_subtree_sets_vendor_label(self, tmp_path: Path) -> None:
+        bundle_dir = tmp_path / "vendor"
+        bundle_dir.mkdir(parents=True)
+        _write_bundle(bundle_dir / "result.json")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["bundles"][0]["trust_label"] == "vendor-supplied"
+
+    def test_nested_vendor_dir_does_not_grant_vendor_label(self, tmp_path: Path) -> None:
+        # Anchored: only the top-level vendor/ subtree counts. A nested directory
+        # named 'vendor' must NOT self-grant the ranking-eligible vendor label.
+        bundle_dir = tmp_path / "community" / "vendor"
+        bundle_dir.mkdir(parents=True)
+        _write_bundle(bundle_dir / "result.json")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["bundles"][0]["trust_label"] == "maintainer-run"
+
+    def test_funding_from_bundle_provenance(self, tmp_path: Path) -> None:
+        _write_bundle(tmp_path / "result.json", provenance={"funding": "free-trial"})
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["bundles"][0]["funding"] == "free-trial"
+
+    def test_funding_defaults_to_unspecified(self, tmp_path: Path) -> None:
+        _write_bundle(tmp_path / "result.json")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["bundles"][0]["funding"] == "unspecified"
+        assert "by_funding" in inventory["summary"]
 
     def test_excludes_companions_and_sorts_deterministically(self, tmp_path: Path) -> None:
         bundle_dir = tmp_path / "bundles"

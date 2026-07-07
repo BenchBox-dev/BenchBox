@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import ast
+from pathlib import Path
+
 import pytest
 
 from benchbox.core.publishing.bundle_publisher import VALID_LABELS
@@ -104,6 +107,52 @@ class TestFunding:
 
     def test_unknown_is_invalid_but_normalizes(self) -> None:
         assert p.is_valid_funding("crowdfunded") is False
+
+
+def _except_import_literals(source_path: Path) -> dict[str, object]:
+    """Extract module-level assignments made inside an `except ImportError` block.
+
+    These are the offline fallback copies of the provenance vocabulary shipped to
+    the slim published-results branch (where benchbox/ is absent). They are
+    hand-maintained, so this lets us assert they never drift from provenance.py.
+    """
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    found: dict[str, object] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Try):
+            continue
+        for handler in node.handlers:
+            for stmt in handler.body:
+                if isinstance(stmt, ast.Assign):
+                    for target in stmt.targets:
+                        if isinstance(target, ast.Name):
+                            try:
+                                found[target.id] = ast.literal_eval(stmt.value)
+                            except ValueError:
+                                pass
+    return found
+
+
+class TestFallbackLockstep:
+    """The offline mirror copies of the vocabulary must equal provenance.py."""
+
+    @pytest.mark.parametrize(
+        "rel_path",
+        [
+            "benchbox/validation/bundle.py",
+            "scripts/generate_corpus_inventory.py",
+        ],
+    )
+    def test_fallback_enums_match_source_of_truth(self, rel_path: str) -> None:
+        repo_root = Path(__file__).resolve().parents[4]
+        literals = _except_import_literals(repo_root / rel_path)
+        assert literals.get("FUNDING_SOURCES") == p.FUNDING_SOURCES
+        # generate_corpus_inventory mirrors SOURCE_TO_TRUST_LABEL; bundle.py
+        # mirrors RESULT_SOURCES. Assert whichever it carries.
+        if "RESULT_SOURCES" in literals:
+            assert literals["RESULT_SOURCES"] == p.RESULT_SOURCES
+        if "SOURCE_TO_TRUST_LABEL" in literals:
+            assert literals["SOURCE_TO_TRUST_LABEL"] == p.SOURCE_TO_TRUST_LABEL
 
 
 class TestPublishLabelIntegration:

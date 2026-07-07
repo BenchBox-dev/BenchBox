@@ -1,6 +1,6 @@
 {
-  "schema_version": "2.2",
-  "generated_at": "2026-05-13T02:51:35.549675+00:00",
+  "schema_version": "2.3",
+  "generated_at": "2026-07-07T12:12:56.177827+00:00",
   "bundles": [
     {
       "file": "ai_primitives_sf001_doris_sql_20260506_133640_6e90e5e7.json",
@@ -12,6 +12,7 @@
       "timestamp": "2026-05-06T13:36:40.167516",
       "query_count": 48,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ff049c4d53d212dbc91c61d9d9800985fd3a6dcf8d2d1fdc80d7a10dedc02f81"
     },
     {
@@ -24,6 +25,7 @@
       "timestamp": "2026-05-05T20:39:04.440484",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "076e467dd7a1c086d357103dcc985ddac81a448317937626e390197f09942559"
     },
     {
@@ -36,6 +38,7 @@
       "timestamp": "2026-05-05T20:39:07.135013",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "81f4343cfe8641e0a0e387a094bf8c1f951b91083c516fb433394d6132aa6448"
     },
     {
@@ -48,6 +51,7 @@
       "timestamp": "2026-05-05T20:39:10.063280",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9d1f4c69459f95bd497417445aa4ece1d2cf66d1127cd4c911f660afbe51811d"
     },
     {
@@ -60,6 +64,7 @@
       "timestamp": "2026-05-05T19:52:37.792326",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "86a9b429c3a1504e1df721bf2a2c12ce448d17210d848ec7da0c02b75106e9d8"
     },
     {
@@ -72,6 +77,7 @@
       "timestamp": "2026-05-06T13:13:14.081137",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "19ea1ec4026a1734c023a6f0a8f660b085f3d0a75f0cafa0970c95b0d53f2e4e"
     },
     {
@@ -84,6 +90,7 @@
       "timestamp": "2026-05-06T13:13:20.603839",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a5fab624cd4024ead7c84beb04a062233e459c8ff37b11714f382c1c69b054bf"
     },
     {
@@ -96,6 +103,7 @@
       "timestamp": "2026-05-06T08:49:00.489014",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "38704cd432975685688bcf068e7484efb97765424da14317920da255b91d040e"
     },
     {
@@ -108,6 +116,7 @@
       "timestamp": "2026-05-06T08:49:04.782227",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ad8084083c0b6516bdaece5b1eec8a49451ed20bd458234865dd879b6decd246"
     },
     {
@@ -120,6 +129,7 @@
       "timestamp": "2026-05-06T11:26:06.193450",
       "query_count": 48,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8aba5c07ac82f64a91696aa141fad6e6b624186248dad9f167b27bd68d413dbe"
     },
     {
@@ -132,6 +142,7 @@
       "timestamp": "2026-05-06T11:26:10.765172",
       "query_count": 48,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "47087f28aacadd817ff2ab576faa0979ab22cd6c0c2a0a2ed28115ac56e84ebb"
     },
     {
@@ -144,6 +155,7 @@
       "timestamp": "2026-05-06T11:26:24.463971",
       "query_count": 48,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d772ee4cc2af35c1d10d5a89f94f28be969ac84803a89d2f4ba65fa7d6debdf3"
     },
     {
@@ -156,6 +168,7 @@
       "timestamp": "2026-05-06T13:35:52.772890",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f561166dba8c94c212a6699c71e11837708f9ba6ac1b1acbb9a3b60916be2ea0"
     },
     {
@@ -168,6 +181,7 @@
       "timestamp": "2026-05-06T13:35:55.815020",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f3fd374b3464e7aaa044b3f5602b4eda038e3b16c31b585292d8c990d876a2d7"
     },
     {
@@ -180,6 +194,7 @@
       "timestamp": "2026-05-06T13:36:09.281454",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d41e034b9da7c8e7fda6897e55e83b50e03ec56792dd6916e25e805cb5deb85f"
     },
     {
@@ -192,6 +207,7 @@
       "timestamp": "2026-05-05T20:36:53.652329",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8533fc37aeb07a7eaaab4731a86e97089c618be16847e103762ebbee226b650f"
     },
     {
@@ -204,6 +220,7 @@
       "timestamp": "2026-05-05T20:36:55.807842",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d828af3fdb9d3c8335372381d7d9bf2d7fac0be2dd2ca2ad7d8af0d4a783b6bd"
     },
     {
@@ -216,6 +233,7 @@
       "timestamp": "2026-05-05T20:37:00.828393",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "567f005574e099119ce9253e6dcecf38af4954acd850a4d84c9567fa1243a217"
     },
     {
@@ -228,6 +246,7 @@
       "timestamp": "2026-05-06T10:37:02.094753",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d3126bb3649d312303c958baf9c127b0021004dde47d4cf51139478043045319"
     },
     {
@@ -240,6 +259,7 @@
       "timestamp": "2026-05-06T10:37:06.662220",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f8ba7019b3e5d71ca5ef7e0e6f14034541ee2593a1a478c6fa16668ef0a14d77"
     },
     {
@@ -252,6 +272,7 @@
       "timestamp": "2026-05-06T10:37:09.567198",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "75ecd4e62772aee035ca27ee571b738b5f3c6b086558a1e87ea7a2571bc4a3b7"
     },
     {
@@ -264,6 +285,7 @@
       "timestamp": "2026-05-02T18:28:15.463513",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8d75e48ef3e8b0ed5f32b618bda720134dc4640aae73d079aad8b62f12fe1521"
     },
     {
@@ -276,6 +298,7 @@
       "timestamp": "2026-05-02T22:33:31.743258",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "96de71a59be2442fe74ae807a4043a0d0809924f2036125d819486458256ba2a"
     },
     {
@@ -288,6 +311,7 @@
       "timestamp": "2026-05-05T20:26:41.367303",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0f878570c9481f4348fa5691d4d1f942d8be70ffde70f12e2835ed2bfd9a0eb0"
     },
     {
@@ -300,6 +324,7 @@
       "timestamp": "2026-05-06T11:01:29.421670",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "db0be5dfa6ab2297d4d37ebef085d4b60e344399d213a2b68476ec62479af189"
     },
     {
@@ -312,6 +337,7 @@
       "timestamp": "2026-05-02T22:33:35.043719",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7714ec0db5b2178c70cc35d84b86b53aea8c95a62d59ab7944fd67004bb17221"
     },
     {
@@ -324,6 +350,7 @@
       "timestamp": "2026-05-05T20:26:43.380391",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9e337b515669508da23e218b3949eae02382a20342e07fcc1acd906021dccb7d"
     },
     {
@@ -336,6 +363,7 @@
       "timestamp": "2026-05-02T22:33:36.642369",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f2dfb7511135b7e1bc884108d4bbf81a3e6926cd3f9a7e9f376699da3cd106b8"
     },
     {
@@ -348,6 +376,7 @@
       "timestamp": "2026-05-05T20:26:47.956659",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c03d3f6e39dc16b36ed392f454ce5a156b7a0af1785e1043bfbcf0fa1d226cb5"
     },
     {
@@ -360,6 +389,7 @@
       "timestamp": "2026-05-05T19:51:33.396513",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "26360d184c132e1559c3250098d9107417bbeb5f303ce099c7464be788722a03"
     },
     {
@@ -372,6 +402,7 @@
       "timestamp": "2026-05-05T19:51:37.578338",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "1ab629150fc0f4b26994035644bdd0ffc2fc03c8f589e473dea90fd29642b902"
     },
     {
@@ -384,6 +415,7 @@
       "timestamp": "2026-05-05T19:52:02.427840",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bf1323751eba199ae63c45c8a288565658e05324906a008f741d41714fc17bbc"
     },
     {
@@ -396,6 +428,7 @@
       "timestamp": "2026-05-06T09:48:36.694866",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "1e6000736761cf525e34653ee50af1d578c2d7ba75f8fa47b19c469c2fb792d6"
     },
     {
@@ -408,6 +441,7 @@
       "timestamp": "2026-05-06T09:48:40.027798",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "fdb1bfea39d53bee561e4b0f3ed78d1f69eeaf88ce01a58eec47c555012c9b9a"
     },
     {
@@ -420,6 +454,7 @@
       "timestamp": "2026-05-06T09:48:41.813764",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "86855594a2fa9c96e3caa90b8414b15a5734ec72339653fd9f4a2074deb0cdb2"
     },
     {
@@ -432,6 +467,7 @@
       "timestamp": "2026-05-02T21:12:46.778233",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bd2b57b40f21bb2b7f8528538b65c2a147306c5efcc972445d6c34a601356270"
     },
     {
@@ -444,6 +480,7 @@
       "timestamp": "2026-05-06T09:41:39.779681",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a999a20afb296a99d1fb28db709d50631011df6e833c5a29d416d724725de904"
     },
     {
@@ -456,6 +493,7 @@
       "timestamp": "2026-05-02T21:12:50.114941",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7d2942f51601f628dde4e8c1e001dcb3ab59eeba6cfff6e2d04a89827aa7355f"
     },
     {
@@ -468,6 +506,7 @@
       "timestamp": "2026-05-06T09:41:43.202616",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e451845bb4da965ef0dbd671bc1d8deee2f68fdd20a9daf8c920d5bb74777775"
     },
     {
@@ -480,6 +519,7 @@
       "timestamp": "2026-05-02T21:12:51.733156",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b45cf9893a85aafccdc643cee06080e59e2ea05474ad86feaff8693948bdd6bd"
     },
     {
@@ -492,6 +532,7 @@
       "timestamp": "2026-05-06T09:41:44.842865",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "de80c9719d22dd80766f319a505d0c4722d8d78746cee21a464f6d0db5b85a8a"
     },
     {
@@ -504,6 +545,7 @@
       "timestamp": "2026-05-02T21:46:39.957880",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "de6143c7170416c0e4dd780945317dbf1d856ea4ac469c062931e7e3695edaf4"
     },
     {
@@ -516,6 +558,7 @@
       "timestamp": "2026-05-06T10:00:40.740825",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e4814f7910cadc4240b672c49248e7f3b8b0172723dee595a7abadde9c9c8a73"
     },
     {
@@ -528,6 +571,7 @@
       "timestamp": "2026-05-02T21:46:47.079034",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "85472fcd85ede504a519248ed6d2c3ff0e3b2827fbfdafa246bd491aab6439f9"
     },
     {
@@ -540,6 +584,7 @@
       "timestamp": "2026-05-06T10:00:48.513211",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2db8528fd961c5cdff5a76caab16694ab6294237ff712d09ca0f380d47301905"
     },
     {
@@ -552,6 +597,7 @@
       "timestamp": "2026-05-02T21:46:52.514237",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "705c85e6745d7fc727fcc59c2f1372b82cc83a995a888c137d1f7340dfe317cd"
     },
     {
@@ -564,6 +610,7 @@
       "timestamp": "2026-05-06T10:00:54.286140",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e2c5e6d6fd947c3549c6fd56b2b30e4be675acd8f0792ee4e3af705a338010d0"
     },
     {
@@ -576,6 +623,7 @@
       "timestamp": "2026-05-02T19:57:11.062910",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bd2413c6f3809c83bdb8bed817ec74696702980a5b8bea0ee96d03495633df85"
     },
     {
@@ -588,6 +636,7 @@
       "timestamp": "2026-05-06T08:47:47.869097",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f880740fc92bfea765f7156d2e7a6217b6cce21a7cb281cf7a5a10e2df287c11"
     },
     {
@@ -600,6 +649,7 @@
       "timestamp": "2026-05-02T19:57:16.945541",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a6cf4101cee54cdbe6a199a07643a6d31d57f0bce10bbfaa5faaeafb3190a539"
     },
     {
@@ -612,6 +662,7 @@
       "timestamp": "2026-05-06T08:47:53.778222",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "594f174c3bafb176bb0f733aead94aa54d10f2de1b00ba88eeee6c6797756ed2"
     },
     {
@@ -624,6 +675,7 @@
       "timestamp": "2026-05-02T19:57:46.691493",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d2e04a96b0865172da31a6ca639912d6aee69c64d99d63e93d48e705d671290c"
     },
     {
@@ -636,6 +688,7 @@
       "timestamp": "2026-05-06T08:48:24.040463",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8cea7d3491b61e0aee2e701361f0ac0ea0f2b4cbcd1f622fe9b36ff8068c207c"
     },
     {
@@ -648,6 +701,7 @@
       "timestamp": "2026-05-02T20:46:55.358496",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7bd79f618d06cacd28aee2e31a84e5f84865d12c51e56c4f77a775d1800fa364"
     },
     {
@@ -660,6 +714,7 @@
       "timestamp": "2026-05-06T09:21:51.888559",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e1fa24e2c6993be2b1a7c738670cf1039b2e36efb97e5ca37a9f895eda57f6ed"
     },
     {
@@ -672,6 +727,7 @@
       "timestamp": "2026-05-02T20:47:08.743846",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c1ec6a7dc1787de3adab233462bca9b0976f3e975f139a4f993e80d4b38a2eb8"
     },
     {
@@ -684,6 +740,7 @@
       "timestamp": "2026-05-06T09:22:05.349848",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6f1a1f8519e6b7db16a1b70f34bbf7b777bc0161a2beb81300812f9bad1a81ef"
     },
     {
@@ -696,6 +753,7 @@
       "timestamp": "2026-05-02T20:47:35.598543",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c6bc94de608356288529bcea47f4afd913a85016ca18e3033962814efe348254"
     },
     {
@@ -708,6 +766,7 @@
       "timestamp": "2026-05-06T09:22:32.876507",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "039326f19136a03802c19a273fd57f4bba6d44a588e7f05efedd0858cac1a6c1"
     },
     {
@@ -720,6 +779,7 @@
       "timestamp": "2026-05-06T11:25:11.458313",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ef88bb31ae2a6aa3d38038b6c1ab8254e612d812f089412f934b256703bdd7c6"
     },
     {
@@ -732,6 +792,7 @@
       "timestamp": "2026-05-06T11:25:14.903312",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d4c37361b70bd3664c7a865f96823f9a2e11af9c2b9667db6c9b4f3dac9c839c"
     },
     {
@@ -744,6 +805,7 @@
       "timestamp": "2026-05-06T11:25:29.971078",
       "query_count": 24,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "428d8aeeda8e80bb1567ec980dd835ca1b903c95652597edf26fb6d0c4567eb4"
     },
     {
@@ -756,6 +818,7 @@
       "timestamp": "2026-05-06T13:35:47.561386",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9173b1f9288d6766d57ac004b8462875453b1c2ea0b1da35710648906191d0b8"
     },
     {
@@ -768,6 +831,7 @@
       "timestamp": "2026-05-05T20:36:37.228021",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c54460b19398d54bf8bda55d7059fa823c017618a61b45afad57e6156fc8b4ae"
     },
     {
@@ -780,6 +844,7 @@
       "timestamp": "2026-05-02T18:27:47.251424",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bbd5a02185b4cb54bcc5d6ac914a475270ed6ce2c3a86fde5d8d21abea8161b9"
     },
     {
@@ -792,6 +857,7 @@
       "timestamp": "2026-05-02T22:32:59.030902",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bdc5d9eee06feb017c96c11002c2b40211e4679028e405ad3748323a5816b9b4"
     },
     {
@@ -804,6 +870,7 @@
       "timestamp": "2026-05-05T20:26:22.876641",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "33c6486f4bd4c1781d9b77341715c320d932bb0c5945b91e3b69e00bcaf8d679"
     },
     {
@@ -816,6 +883,7 @@
       "timestamp": "2026-05-06T11:01:13.298782",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bd6ebf703df3767ecf6ff4bed5b08c6c09061b6bb970836afa6d4fa7ca959d35"
     },
     {
@@ -828,6 +896,7 @@
       "timestamp": "2026-05-05T19:49:08.629203",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "28c38939c0d9787fae06d87de4f7936af8dec7572c73339054b2396e9d90d725"
     },
     {
@@ -840,6 +909,7 @@
       "timestamp": "2026-05-02T21:12:06.669214",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "aa5bb1896947dee8ae371e9d37704ae398969216a661d44f946757a0f783257e"
     },
     {
@@ -852,6 +922,7 @@
       "timestamp": "2026-05-02T21:44:42.887215",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e60093c483b0b41e90bedb4de37b758d18fde21173098fa5aa0f63ce1cddc199"
     },
     {
@@ -864,6 +935,7 @@
       "timestamp": "2026-05-02T19:38:42.509570",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8ae68310d810f17ccf8473f879b56c69efd9d43ec150a9999fb2aec4dc2feb25"
     },
     {
@@ -876,6 +948,7 @@
       "timestamp": "2026-05-02T20:40:10.895527",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ccd321ab0330092fd16c845049e319d7b59eaf1ce32f20947e1a542f99c1c034"
     },
     {
@@ -888,6 +961,7 @@
       "timestamp": "2026-05-06T09:20:03.741843",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "efd720608cadfd18d7e5778ed63c90f2a3c2171842a7b9545bb46a8ce31caec3"
     },
     {
@@ -900,6 +974,7 @@
       "timestamp": "2026-05-06T11:24:15.754332",
       "query_count": 129,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6369da296d3d2f7ce5b985882d13dd8275d03ab13e7a22df72dec12b8bdec594"
     },
     {
@@ -912,6 +987,7 @@
       "timestamp": "2026-05-06T13:37:05.320825",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "64b84439ba657311a016f6b36d5440a6e48045abf66b3088fc5d433293c43c73"
     },
     {
@@ -924,6 +1000,7 @@
       "timestamp": "2026-05-06T13:37:10.148418",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "75bc292767306f2d93338efa1a70d08fe62dcca006e41e2704ee4b96bec73f88"
     },
     {
@@ -936,6 +1013,7 @@
       "timestamp": "2026-05-06T13:37:36.049259",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c60e488b94f5315eef6d49e3fdc61102f155b68d3be2c8b0f127c5e91e67c17f"
     },
     {
@@ -948,6 +1026,7 @@
       "timestamp": "2026-05-05T20:39:23.401468",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e3dd71235e7bd300b63ebc2ae5b807ee5d9bedfc2a21eb12bfbc0f4ff0ed62ca"
     },
     {
@@ -960,6 +1039,7 @@
       "timestamp": "2026-05-05T20:39:26.813183",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "80ab4de49ba061157e9d9f5e8014ee335637f5b78364b5e7e8afe5718a089d9b"
     },
     {
@@ -972,6 +1052,7 @@
       "timestamp": "2026-05-05T20:39:37.035236",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "780f2e756f2e90d2c3234f411e754996ff641f3d99a189972a6444be2116a575"
     },
     {
@@ -984,6 +1065,7 @@
       "timestamp": "2026-05-06T10:39:21.919510",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ba67c568a8a813747b164bdc7c4c3d1547b1018e5ed7953c97255492cb83a605"
     },
     {
@@ -996,6 +1078,7 @@
       "timestamp": "2026-05-06T10:39:27.893778",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "20f731eb7bf0abcc6b451a28faa2c295eca24c59a6e2b55f5f963cac98cb6038"
     },
     {
@@ -1008,6 +1091,7 @@
       "timestamp": "2026-05-06T10:39:30.966000",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "5c9843915c36a9766210f72c77c48b66d8dd07413a1404b7145756c129b6ac2a"
     },
     {
@@ -1020,6 +1104,7 @@
       "timestamp": "2026-05-02T18:28:03.743568",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "22409a7648966e2507552d8653c75859ab55a0c459d9a174e2ab3df83e7fedc6"
     },
     {
@@ -1032,6 +1117,7 @@
       "timestamp": "2026-05-02T22:33:17.045033",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f7da8cb3c7f79f81633a79878e76d0790e4444aad793eeb029b1d122492ae80b"
     },
     {
@@ -1044,6 +1130,7 @@
       "timestamp": "2026-05-05T20:27:08.174284",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8d6454aed88e3a73cf00cb2e55f15f55c49593df1ae494e698e23452f606c733"
     },
     {
@@ -1056,6 +1143,7 @@
       "timestamp": "2026-05-06T11:01:49.988161",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "65cc95648cdeb26f5b73faa25ed62c290c0b3e8e0d9274a7d3d2b397fa3f1e84"
     },
     {
@@ -1068,6 +1156,7 @@
       "timestamp": "2026-05-02T22:33:21.780042",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "61a3cf1d6cd79b345739bdcbb2d4f5718fe069434e2397e7a0f40107801ab884"
     },
     {
@@ -1080,6 +1169,7 @@
       "timestamp": "2026-05-05T20:27:10.685035",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "122ef078c4388774ba82f4ed2d42439974a54b4454e439bace6faf0aa13e7886"
     },
     {
@@ -1092,6 +1182,7 @@
       "timestamp": "2026-05-02T22:33:23.430041",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "cc8a963351fdcfdad64f7374edfb99bf151473a94a51bd01aa3c52118b482bf2"
     },
     {
@@ -1104,6 +1195,7 @@
       "timestamp": "2026-05-05T20:27:20.141811",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8aded79d5dec1094360e7451bbb27ab5b044f187988bb18c219c7c28b4b43de6"
     },
     {
@@ -1116,6 +1208,7 @@
       "timestamp": "2026-05-05T19:53:03.868429",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "72dd47ba8e711a453d3cebb0afb953ff51309d157ead79bcc790cc159a559850"
     },
     {
@@ -1128,6 +1221,7 @@
       "timestamp": "2026-05-05T19:53:11.130454",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0322c4fe38790651dc9ec389e6f344e47d6afcc5f8cdca39b34e8eef692534fd"
     },
     {
@@ -1140,6 +1234,7 @@
       "timestamp": "2026-05-05T19:53:58.587673",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4e33f3071d498c19b8df29a2cb6e8f47f906b8e2082d1986c2f96510fcad14bb"
     },
     {
@@ -1152,6 +1247,7 @@
       "timestamp": "2026-05-06T09:49:04.061695",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3b632b17d8713c9fea265041f7f44b46a8b47b4c62ec43fe79e5a2cafe8575d9"
     },
     {
@@ -1164,6 +1260,7 @@
       "timestamp": "2026-05-06T09:49:08.882938",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4044f5dcf5baeffc13320908be18e7b97ecde024d6ce81fe51d5623d397be292"
     },
     {
@@ -1176,6 +1273,7 @@
       "timestamp": "2026-05-06T09:49:10.768750",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2b5846d3f632dad18a5f9059851c83b586695be24361fbef673086f8a4871086"
     },
     {
@@ -1188,6 +1286,7 @@
       "timestamp": "2026-05-02T21:12:30.130944",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e07ea1db986e2173cb215afbf2efa56f2b8a52a04572d31ee9c046a8a0cbd49e"
     },
     {
@@ -1200,6 +1299,7 @@
       "timestamp": "2026-05-06T09:42:04.704701",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3c92369e7e3737cb85d8ab6b58462068bf8b8b01fe18855dae2a89c7a6c6a866"
     },
     {
@@ -1212,6 +1312,7 @@
       "timestamp": "2026-05-02T21:12:34.868799",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2ce81150a1c5c68a21a0182903657744ca625a922c4c7a46851e3c1987bc51c8"
     },
     {
@@ -1224,6 +1325,7 @@
       "timestamp": "2026-05-06T09:42:09.408913",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "38bb9b1f0eb4872d963e02d9635ca20e2b7bddf6535f841800949ff2d7f53b65"
     },
     {
@@ -1236,6 +1338,7 @@
       "timestamp": "2026-05-02T21:12:36.528797",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8bf8579eae4e5035bf004b5519e0d3615c863b3fbc96e61deb0af619fd2a97fb"
     },
     {
@@ -1248,6 +1351,7 @@
       "timestamp": "2026-05-06T09:42:11.132666",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3920515720d9aa5791a3545912e76ebad4f89897c77fc6c01926fee12822595f"
     },
     {
@@ -1260,6 +1364,7 @@
       "timestamp": "2026-05-06T11:59:39.111704",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "12dd3040945283a52c6679b2303a4b38b0c0bf04b2b4a747b1999f9eb09c66dd"
     },
     {
@@ -1272,6 +1377,7 @@
       "timestamp": "2026-05-06T12:00:02.971335",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "dd8a569b377648bbab1b2cb5dd1e5202a3bbdb2e6d0ea9d5d6c5244b3b8d7467"
     },
     {
@@ -1284,6 +1390,7 @@
       "timestamp": "2026-05-06T12:04:28.806326",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "53a2af54bffcb308110d5b1a600c31ac8628d9f98cdceba6ba236bd5cb8628ec"
     },
     {
@@ -1296,6 +1403,7 @@
       "timestamp": "2026-05-02T19:42:31.783870",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f8625c53924f39b64b5e5811f4ed72f8a89078ef5d5ff901e9359c0a087ff38c"
     },
     {
@@ -1308,6 +1416,7 @@
       "timestamp": "2026-05-02T19:43:25.742913",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0ba251394f9e57e8f87984893e3ec084e9316901ebeb579f54b30975d3fee04f"
     },
     {
@@ -1320,6 +1429,7 @@
       "timestamp": "2026-05-02T19:51:45.404706",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "80a734a9f4b3fa5f4e597f923050c4b17874258e53fb2fc01b50ed5e8d4e5789"
     },
     {
@@ -1332,6 +1442,7 @@
       "timestamp": "2026-05-02T20:42:03.405617",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3ab8951af944f6136aa2a583aa02dcdba046ddb573fb81e3477fd8519deaed06"
     },
     {
@@ -1344,6 +1455,7 @@
       "timestamp": "2026-05-06T09:29:34.838240",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a401213b2d44d0bb704f2e35dda9d0c9dba746f0ab188ce2763cb3b430e8e58a"
     },
     {
@@ -1356,6 +1468,7 @@
       "timestamp": "2026-05-02T20:42:40.297970",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ca309ca1515ea8179c6c229f55a4d47b68fbd172f840652f5f7f6c3d14b5fded"
     },
     {
@@ -1368,6 +1481,7 @@
       "timestamp": "2026-05-06T09:30:17.098526",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "24b94b50ad59dc8c59c898b14e0320192666884a2c7031a6e189c39bff3b430c"
     },
     {
@@ -1380,6 +1494,7 @@
       "timestamp": "2026-05-02T20:45:40.966523",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b6a09dd3ea76fb0f49273cc5a6f1fcf4629612e8c57e8c34e246b84a6f2158c0"
     },
     {
@@ -1392,6 +1507,7 @@
       "timestamp": "2026-05-06T09:33:35.220326",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e2a64622b9d165fe1da4b066b68503794275f05a38bd11aab621d0e1dd3ac68d"
     },
     {
@@ -1404,6 +1520,7 @@
       "timestamp": "2026-05-06T11:27:21.438769",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c62949ca3617c4de5a264a3aed8971522cf88713c55c556f18409bb73fbfd065"
     },
     {
@@ -1416,6 +1533,7 @@
       "timestamp": "2026-05-06T11:27:29.452714",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2fe8908ad104bd7c4167ef061c22a4929eefd43fcac03634ddac1255c3fed982"
     },
     {
@@ -1428,6 +1546,7 @@
       "timestamp": "2026-05-06T11:28:29.031356",
       "query_count": 33,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b731294e76bee000bec6cea23bf2a6917c8032eac72c8bfdc5cd8db353d63ff5"
     },
     {
@@ -1440,6 +1559,7 @@
       "timestamp": "2026-05-06T13:44:05.777132",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "040ccbe151cc94fb4eed3997ac95e4684ee6142841f19205b66ea51afd43a065"
     },
     {
@@ -1452,6 +1572,7 @@
       "timestamp": "2026-05-06T13:44:20.866923",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c7c51b92f54d238a43b240b69c432a171672e08eaa21ebb5f0e91740991a03d4"
     },
     {
@@ -1464,6 +1585,7 @@
       "timestamp": "2026-05-06T13:46:42.390643",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a5ac64e3348828a23772c94d61f7568fbdfb89d3d09efd27b10f1cce5d2e86d8"
     },
     {
@@ -1476,6 +1598,7 @@
       "timestamp": "2026-05-06T08:19:14.751878",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "eb98a2eeb21a9558d22625f0fefa6d3aacea668887bb44c138fc5b79f91904cc"
     },
     {
@@ -1488,6 +1611,7 @@
       "timestamp": "2026-05-06T08:19:19.404312",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "059ebf4f49c36735fe870c3ea184f0514e37fc4cbddbca0da8006a5d9afb50d3"
     },
     {
@@ -1500,6 +1624,7 @@
       "timestamp": "2026-05-06T08:19:38.989570",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b3f4c9c088e8465da7e497486b74c36432c92c013a1051a89845f109ddf09e1f"
     },
     {
@@ -1512,6 +1637,7 @@
       "timestamp": "2026-05-02T18:38:15.785494",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9369e1e10624e29b0d9ff6203aa07ca46c706d937692d3998189086a883d2742"
     },
     {
@@ -1524,6 +1650,7 @@
       "timestamp": "2026-05-02T18:38:19.861125",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "68efb77ca0caaaa3e27e9f01baaef37e0b6396386f966b29c4363990d71ea50b"
     },
     {
@@ -1536,6 +1663,7 @@
       "timestamp": "2026-05-02T18:38:41.841575",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "858eb8c026e47aefd4f27ba4dd742f6a2e3376f3efe0f3cbfe88a07de92e60dd"
     },
     {
@@ -1548,6 +1676,7 @@
       "timestamp": "2026-05-02T18:22:36.042308",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a9fd01fe2c92cf92595dc771a7dbe53da6e830d74e2fdf5a980ba706171e67a2"
     },
     {
@@ -1560,6 +1689,7 @@
       "timestamp": "2026-05-05T20:21:18.597392",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "be1160940f589a2d24fab2cb25f64f87a5a2ae5ef654a2aa6eec34e17e082da3"
     },
     {
@@ -1572,6 +1702,7 @@
       "timestamp": "2026-05-02T18:22:49.822706",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6681d41a7bdf867dc95d7e67881bdd589dbfcd0c953b0cd040cc1bf50f5b8519"
     },
     {
@@ -1584,6 +1715,7 @@
       "timestamp": "2026-05-05T20:21:33.309548",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bb484f2b1d10524d00b994f4ba32f415882bc6bf44e1e6b179ebe471c2be2277"
     },
     {
@@ -1596,6 +1728,7 @@
       "timestamp": "2026-05-02T18:24:29.787215",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d61ba3aca1516724b4cd84d6242b557c2fa0d67ccc8c190dce0165355bee4d94"
     },
     {
@@ -1608,6 +1741,7 @@
       "timestamp": "2026-05-05T20:23:56.503241",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "fdf41a8b996d410e8bcdf526ef46509a4071bc758ed0bc4e0ef229e31f8d41ab"
     },
     {
@@ -1620,6 +1754,7 @@
       "timestamp": "2026-05-02T21:58:44.578346",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "51d6c655e834ca81754e6ff3b27afd1e63026db92bbb3c4275095de2f6466d10"
     },
     {
@@ -1632,6 +1767,7 @@
       "timestamp": "2026-05-02T21:58:51.337828",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b48c9166c21f0425353be8fae25e1a5cc4acac63dcd9919145dd2b0067f3cc6d"
     },
     {
@@ -1644,6 +1780,7 @@
       "timestamp": "2026-05-02T21:58:58.053921",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "49ac7cae9e4f618f73d3fcf00e3bd342d4cc0448222a804d9148aa10cb4cec1f"
     },
     {
@@ -1656,6 +1793,7 @@
       "timestamp": "2026-05-06T11:38:01.464607",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "fe64512c79a408665547466c18797d0ab9521f16749d991913b0ae6b28104524"
     },
     {
@@ -1668,6 +1806,7 @@
       "timestamp": "2026-05-06T11:38:18.801670",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "30abcf1269a3769e36bd076385dce60cde860513577082d6856472fe4e0be89a"
     },
     {
@@ -1680,6 +1819,7 @@
       "timestamp": "2026-05-06T11:41:41.321045",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e54742210bfca5370fdd409dcc1f57a0982ba35d109d3ddd09eb5fff7e556153"
     },
     {
@@ -1692,6 +1832,7 @@
       "timestamp": "2026-05-06T13:38:32.941380",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9a1cb75cdc5d25f2eab2df02229e0d2169615bdd2d05fe7da34a2e970db51325"
     },
     {
@@ -1704,6 +1845,7 @@
       "timestamp": "2026-05-06T13:43:58.896751",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d781009d69e2fd1a1df022983aedd04784e5256514e049ec7c7311a769af9f11"
     },
     {
@@ -1716,6 +1858,7 @@
       "timestamp": "2026-05-06T08:13:31.695749",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e8f412c6996304f94958aca0322d5ee6e3a9fadaf8d84c27a6b4d2640fc691d1"
     },
     {
@@ -1728,6 +1871,7 @@
       "timestamp": "2026-05-06T08:16:56.657022",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "1d4f018c59a509bc5c33a5c6e935fbea2899efe9dce6649ea58e7c399238836a"
     },
     {
@@ -1740,6 +1884,7 @@
       "timestamp": "2026-05-06T08:19:11.447049",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "66edeba15c273e88277915014f5995f80ddbca67ac155fb4b68eedc8d8040dd2"
     },
     {
@@ -1752,6 +1897,7 @@
       "timestamp": "2026-05-02T22:33:48.047670",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "81ce4e11debf6c7a64a2f914fe4c822589900ab19a820f0da35d4479d0c9fdde"
     },
     {
@@ -1764,6 +1910,7 @@
       "timestamp": "2026-05-02T22:33:49.832967",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6c29fbcf3c2cf2785a2be7dc0bf98cd167843c4720baebe8bdbb360564e8055b"
     },
     {
@@ -1776,6 +1923,7 @@
       "timestamp": "2026-05-05T20:09:24.394200",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b4e822643263557f10e40ee70c596d30082c70e7268ccd0f1a779d015b01daa4"
     },
     {
@@ -1788,6 +1936,7 @@
       "timestamp": "2026-05-05T20:11:07.215183",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "1dcc8aa9a3fa3561951aa7d5a692ebe6cd8f32cff30d16adeed288ad18f706fe"
     },
     {
@@ -1800,6 +1949,7 @@
       "timestamp": "2026-05-02T21:13:09.480689",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d75b9aa322d2fa46e8573a3a9edc63a47a81914d7f1d92a2be03d3c1b29668dd"
     },
     {
@@ -1812,6 +1962,7 @@
       "timestamp": "2026-05-06T09:43:33.002388",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f9536a4bd7a600d8592a38cacbaf55e5a505ad1903dbd8bda9443609b3037007"
     },
     {
@@ -1824,6 +1975,7 @@
       "timestamp": "2026-05-02T21:13:13.276010",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7a4b2fa152be6ae0dbfb19cf4ec1f4ca96086fdaab83eeed031281a4e2777d81"
     },
     {
@@ -1836,6 +1988,7 @@
       "timestamp": "2026-05-06T09:46:50.001109",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c770345653b95baeb5402121dfb41f48c40657f0950165e4196f2942d0375353"
     },
     {
@@ -1848,6 +2001,7 @@
       "timestamp": "2026-05-02T21:47:34.066912",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0b8b6f98932e9ab3264ff5851beb2148a3de22cb743f8bb96274b7931d87d520"
     },
     {
@@ -1860,6 +2014,7 @@
       "timestamp": "2026-05-02T21:47:44.199310",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0a6e301ba02d1b9f454e01b8119c0e1c46fc259df30600a880c4c2f7e9f103f9"
     },
     {
@@ -1872,6 +2027,7 @@
       "timestamp": "2026-05-06T11:33:54.701057",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "cc5abf9e7a804a0a6cbdffffff782c3c52ed94d9b60e39e275c033f096601164"
     },
     {
@@ -1884,6 +2040,7 @@
       "timestamp": "2026-05-06T11:37:53.641090",
       "query_count": 60,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7eca562d5ed9991b0f5218130d8135ab3cd5fc3cd0231e035accbc80d9ee7ad0"
     },
     {
@@ -1896,6 +2053,7 @@
       "timestamp": "2026-05-05T20:36:39.246060",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bc96cebb7164ed169daeac3a31de7789c5dc1425e7110f930bd5dc85ddf2544b"
     },
     {
@@ -1908,6 +2066,7 @@
       "timestamp": "2026-05-05T20:36:41.753698",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "14326c10abd64a8c435c26e9a4863725451bed04f295782346da19964876b36c"
     },
     {
@@ -1920,6 +2079,7 @@
       "timestamp": "2026-05-05T20:36:50.962169",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "76691b57b75ba2016fe4546eeadb53a1c3ed38305b9d14fcec4c74c623e74375"
     },
     {
@@ -1932,6 +2092,7 @@
       "timestamp": "2026-05-06T10:36:41.890358",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "795f8f83deb2e18e726f112d0c548cd08143fa64094294e6c44671c92b066921"
     },
     {
@@ -1944,6 +2105,7 @@
       "timestamp": "2026-05-06T10:36:56.034367",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "343be579066c29a469ebd468a6cfc11304356545c2db9187ac934cb614cd5940"
     },
     {
@@ -1956,6 +2118,7 @@
       "timestamp": "2026-05-06T10:36:59.437342",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7a62a66d63761a91bf2946f7acddea7b48f0ca48d9d2413ec3f2f73f6fdb45dc"
     },
     {
@@ -1968,6 +2131,7 @@
       "timestamp": "2026-05-02T18:27:48.858830",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2b6448373b9911ea25334e5289559876e3e866322e299b94001f01989aea9668"
     },
     {
@@ -1980,6 +2144,7 @@
       "timestamp": "2026-05-02T22:33:00.556347",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c75d0f4a6f74eccc67f880666bf3267309f46edadddf1064a7267735b00ea6d5"
     },
     {
@@ -1992,6 +2157,7 @@
       "timestamp": "2026-05-05T20:26:24.547198",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "98f4a8c6e8efa4b2fb4f476cd0858f7585294afe6a713fdf27244bb70f2d053c"
     },
     {
@@ -2004,6 +2170,7 @@
       "timestamp": "2026-05-06T11:01:14.885638",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b4d8d5e172a74da2fd2c3d86577885a181d7bdaae734e4b23422d6107b51a63d"
     },
     {
@@ -2016,6 +2183,7 @@
       "timestamp": "2026-05-02T22:33:13.780616",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "67f86fca5ccc0602a37ab971713746f1bf5361e526025a1cb04e7f3aa8a34fc1"
     },
     {
@@ -2028,6 +2196,7 @@
       "timestamp": "2026-05-05T20:26:26.888881",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "efc0d8b6dedd4ae388b8cbb45891adf8c70c14eb5328d1428a18fb5cea7e81eb"
     },
     {
@@ -2040,6 +2209,7 @@
       "timestamp": "2026-05-02T22:33:15.608203",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0db7956613463e978ff4f610701eed2e597c7069dd142200e3fc1d43f0f9cd14"
     },
     {
@@ -2052,6 +2222,7 @@
       "timestamp": "2026-05-05T20:26:39.609079",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "54f18f4bc989a15f0a5309ee13887e31ba953baee69c8f58fa92082e146b8e0b"
     },
     {
@@ -2064,6 +2235,7 @@
       "timestamp": "2026-05-05T19:49:11.641096",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "627025b9cd00511640d00aee03f7fc99ac18d9cc2a2125a48e3ed39d360cab93"
     },
     {
@@ -2076,6 +2248,7 @@
       "timestamp": "2026-05-05T19:49:26.535298",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4e3c6e3d7d034d71f7836a53ed44fbfcf700876d230eec4daff5ec365224da8d"
     },
     {
@@ -2088,6 +2261,7 @@
       "timestamp": "2026-05-05T19:51:31.413383",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "723bb0fce309be6cb953b8bc661f96062f0f86d520a41a842b9a17f1dcb8f6fe"
     },
     {
@@ -2100,6 +2274,7 @@
       "timestamp": "2026-05-06T09:48:09.081297",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7c3533b0faa26672f7227d67e48ef733fe22aaddfe69eb9977db9ea25339d086"
     },
     {
@@ -2112,6 +2287,7 @@
       "timestamp": "2026-05-06T09:48:22.409398",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "25d85174d5520aa90f227f9035117407d23bce58e63096dc4ae537fec1feab9a"
     },
     {
@@ -2124,6 +2300,7 @@
       "timestamp": "2026-05-06T09:48:24.807423",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2a86623773279e4738452878db19d837b8ac2dc9b2a8ff2411362a4b1cc7609f"
     },
     {
@@ -2136,6 +2313,7 @@
       "timestamp": "2026-05-02T21:12:13.394773",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "af790c12e0bcd466326e42d67745b61a98f79e0f5725246b13329da12271fa7f"
     },
     {
@@ -2148,6 +2326,7 @@
       "timestamp": "2026-05-06T09:41:23.131264",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f56a225e81e3de65d9bb323e8d3d6fb56dc12773f333ada532d1833446a0d99a"
     },
     {
@@ -2160,6 +2339,7 @@
       "timestamp": "2026-05-02T21:12:26.807863",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c873b6ccd297e1f7098a3289df1125672c7702dde35ab9700aa6150dfc03040f"
     },
     {
@@ -2172,6 +2352,7 @@
       "timestamp": "2026-05-06T09:41:36.425564",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "1e42fd5e9ad3be4a5859fe2a6f4f51354fca592348c794eb45cc77d15438c637"
     },
     {
@@ -2184,6 +2365,7 @@
       "timestamp": "2026-05-02T21:12:28.656034",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f517ff7236590d6a163f1ea4d4b3f6e2516a29c04acbe961a920da28f62ce0d1"
     },
     {
@@ -2196,6 +2378,7 @@
       "timestamp": "2026-05-06T09:41:38.288846",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "39e92016cf274a63736fc79621d10aa04c9d42549249e2b711eb5f0d0b7f684a"
     },
     {
@@ -2208,6 +2391,7 @@
       "timestamp": "2026-05-06T11:55:14.640753",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d751f1a7f8ad453516aadc624daa97f5da1bcbf5bc237ae4510886a9213d8a21"
     },
     {
@@ -2220,6 +2404,7 @@
       "timestamp": "2026-05-06T11:55:22.744644",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2fe4f0f02c12808b5ee8d449457a62a7a04bb803550c7daefa360b457b5ebce6"
     },
     {
@@ -2232,6 +2417,7 @@
       "timestamp": "2026-05-06T11:56:37.976443",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "5fd627ac321b399c3fbfb2498145e29d94eec52ea0e378ce4740fac4d1ae1205"
     },
     {
@@ -2244,6 +2430,7 @@
       "timestamp": "2026-05-02T21:45:49.866444",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "839b5d804a3dc518a4d8598e84db392ead8e0efc07f80b3aa09afddc60383331"
     },
     {
@@ -2256,6 +2443,7 @@
       "timestamp": "2026-05-06T10:00:09.291666",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "cc5d8864bba712942284b813ff77318bfbe64b37c350c6138b2f6162830fe210"
     },
     {
@@ -2268,6 +2456,7 @@
       "timestamp": "2026-05-02T21:46:06.621384",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "630b722157b195ef99a30df3101971a0de7c94bd08c384b2d009ee0cc441454f"
     },
     {
@@ -2280,6 +2469,7 @@
       "timestamp": "2026-05-06T10:00:26.958433",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "dce38818a4e510fec029b1953f1b2b6d15708a9e6f8bf477658b58344da44633"
     },
     {
@@ -2292,6 +2482,7 @@
       "timestamp": "2026-05-02T21:46:11.740970",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f56783d2f6cd7052ed868729f8ccf7ca08ac603c20c4dc0e407bd8550ba6991c"
     },
     {
@@ -2304,6 +2495,7 @@
       "timestamp": "2026-05-06T10:00:33.414615",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "49bf409ee2439652c2cf053ba819f59d19abc58a65026a4bbeecb1ec58c6a9b0"
     },
     {
@@ -2316,6 +2508,7 @@
       "timestamp": "2026-05-02T19:38:45.433061",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "524b76b18d45e2010850c082259c80b57e787440ace0825cd6abd9457f6aba00"
     },
     {
@@ -2328,6 +2521,7 @@
       "timestamp": "2026-05-02T19:39:14.534277",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "28722c5e1520e9b0530b9de9a58648a4a5e832116efd1958f2f27c397f7fe639"
     },
     {
@@ -2340,6 +2534,7 @@
       "timestamp": "2026-05-02T19:42:25.062947",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "99b9207fd9173b49776b5674ee6e74c0e6076ecbc8aa50b0059d0fd9f33a7b61"
     },
     {
@@ -2352,6 +2547,7 @@
       "timestamp": "2026-05-02T20:40:21.461956",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a19d19e7066453444fc3173372de8bb23f8696daaeb75a6834dc1da0110f7b09"
     },
     {
@@ -2364,6 +2560,7 @@
       "timestamp": "2026-05-06T09:20:15.307733",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bbc0f070e47be91fcf01052122ee980287d5d5705526195cd0f9e39503f86f43"
     },
     {
@@ -2376,6 +2573,7 @@
       "timestamp": "2026-05-02T20:40:49.507150",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "156facfaa7b53900497630d3dfb0be512df5c5ff403e713c25d88416f739fc20"
     },
     {
@@ -2388,6 +2586,7 @@
       "timestamp": "2026-05-06T09:20:42.906468",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b02b7901fef7efe56ea1512ba355e1cd08fa194f3b0c678bdea77cf7795ff5a4"
     },
     {
@@ -2400,6 +2599,7 @@
       "timestamp": "2026-05-02T20:41:45.712511",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "44177ac11ccb29bf5574423716b7f77b53ee220d39316ea86b3fe831b8e1d3a6"
     },
     {
@@ -2412,6 +2612,7 @@
       "timestamp": "2026-05-06T09:21:41.111796",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f49c1480eba0e9177e655cd16311b973d795329fad33315d40ae2309d2e59faf"
     },
     {
@@ -2424,6 +2625,7 @@
       "timestamp": "2026-05-06T11:24:18.660879",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "95f5d1d2f89ff8bee6aec68959962b69627fdc1af3dd968fe157b23d01ad8c57"
     },
     {
@@ -2436,6 +2638,7 @@
       "timestamp": "2026-05-06T11:24:24.997621",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "de6f0e305effa9b84bc6834508d748e8d58cc79586e093bbb0ae3588cc580144"
     },
     {
@@ -2448,6 +2651,7 @@
       "timestamp": "2026-05-06T11:25:08.176801",
       "query_count": 30,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9f7174cc782ee538c8bc2a11d816e5942b753e9e4b49e88fa5e7845fec45b5b3"
     },
     {
@@ -2460,6 +2664,7 @@
       "timestamp": "2026-05-12T22:38:43.847548",
       "query_count": 339,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "205f3514747a6394269729501cfe80fa4717752deb39e25b82f90823486ed62c"
     },
     {
@@ -2472,6 +2677,7 @@
       "timestamp": "2026-05-12T20:21:35.354716",
       "query_count": 339,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c03c8511ff5ba2971db955082b8ff264b7f8b3fd14db78017ebbc3607c5a883c"
     },
     {
@@ -2484,6 +2690,7 @@
       "timestamp": "2026-05-12T22:50:22.895687",
       "query_count": 339,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "19bdde6910fbe187f1119db9d13d550c8856de9187f6480dce29d2307f7c80c3"
     },
     {
@@ -2496,6 +2703,7 @@
       "timestamp": "2026-05-02T18:27:30.557009",
       "query_count": 153,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "fa1dd2998c46aeb7e4a93c4038e58c28cf4f3a6d511db7beb6c93df2458d3afc"
     },
     {
@@ -2508,6 +2716,7 @@
       "timestamp": "2026-05-05T19:52:32.866588",
       "query_count": 177,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a3419c1675b43573f826c034f90442be1fe6cc3cd0d116be22c8017be7a81232"
     },
     {
@@ -2520,6 +2729,7 @@
       "timestamp": "2026-05-06T09:48:57.510050",
       "query_count": 48,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2d5bc63a604d5335be3a07f17175c7e27ca6a98b1b9564d2c112c02d7ea63dbb"
     },
     {
@@ -2532,6 +2742,7 @@
       "timestamp": "2026-05-02T21:12:03.750932",
       "query_count": 48,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2057518a08e6fdc9733731adb7bd481be2b4a7268a19bb2580afd7a7c1dedb98"
     },
     {
@@ -2544,6 +2755,7 @@
       "timestamp": "2026-05-06T09:42:00.186930",
       "query_count": 48,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9990ee44761b10e624d48eaa22a80229d2c7c018a87059707f88de1e8b5c3d4e"
     },
     {
@@ -2556,6 +2768,7 @@
       "timestamp": "2026-05-02T21:44:28.447885",
       "query_count": 50,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a96f5a485044a76e18644d8a567ec2ee1eae34dcd170eba0b0df93f6f89c7426"
     },
     {
@@ -2568,6 +2781,7 @@
       "timestamp": "2026-05-06T10:05:00.003819",
       "query_count": 50,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "392b2bccabeb6cfad9fa171cf6c6dd93ffebe13469ee3ba1430e7d9d559dd592"
     },
     {
@@ -2580,6 +2794,7 @@
       "timestamp": "2026-05-06T11:25:54.329183",
       "query_count": 174,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "54a63f2613e2de1686a16fce9d528cff5fcc173262fb02e1df27fdb72af8f740"
     },
     {
@@ -2592,6 +2807,7 @@
       "timestamp": "2026-05-06T10:49:44.764150",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a65b98f313e2b5b76a8c40a21e59721ae19b82098b7ab9d8484e60616e088de2"
     },
     {
@@ -2604,6 +2820,7 @@
       "timestamp": "2026-05-06T10:49:47.410084",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4cdc66e83887a7725986e6140c8bd1505d5acc93cc45a0f9ecd0d258ad83cfc6"
     },
     {
@@ -2616,6 +2833,7 @@
       "timestamp": "2026-05-06T10:49:50.105488",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "55cfb90c547c5139135181886faba4cc17e9f11edf0d4c5e65f0635b3e110336"
     },
     {
@@ -2628,6 +2846,7 @@
       "timestamp": "2026-05-02T22:33:43.787051",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8aa3acf7fa6946e64a7a4d1e9e86c3eeb1ec919ed59e01a436a27bc1bbfca67c"
     },
     {
@@ -2640,6 +2859,7 @@
       "timestamp": "2026-05-02T22:33:45.205408",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4c75ce8d8f96cde7a1b2991f7bcdb5112cca3b6f97a025d1c4ba905197122b36"
     },
     {
@@ -2652,6 +2872,7 @@
       "timestamp": "2026-05-02T22:33:46.621146",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0902333661523ecf7f3f9331ec4038ac0a8f71692e8d1e461eb7e9709a7d1318"
     },
     {
@@ -2664,6 +2885,7 @@
       "timestamp": "2026-05-05T19:58:04.155839",
       "query_count": 75,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "29958f0971ec7e91a3352339c6247b8fdb51d23e4ccc539469dd34e3307ef2ff"
     },
     {
@@ -2676,6 +2898,7 @@
       "timestamp": "2026-05-05T19:59:16.258015",
       "query_count": 75,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9e19c36c3325d84ceac78602f1949276d7425a16f6206750190ab4a1c3342b4c"
     },
     {
@@ -2688,6 +2911,7 @@
       "timestamp": "2026-05-06T09:49:38.479930",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4af45dc1267f0b72f6ff96a72b60f50f90ce29461cc83f9d97e429e304a1d485"
     },
     {
@@ -2700,6 +2924,7 @@
       "timestamp": "2026-05-06T09:49:39.968756",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3ffb6857a9144c63690154602302606d5d94bce031a9382d8a8c60af2430ab18"
     },
     {
@@ -2712,6 +2937,7 @@
       "timestamp": "2026-05-06T09:49:42.131332",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d5d0f66e91f7de4bd0baa2aa492a432c5309d7ff2bde798903db31e245b94848"
     },
     {
@@ -2724,6 +2950,7 @@
       "timestamp": "2026-05-02T21:13:02.263993",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "34d00ad5d13624771770a447599bc33df61bdddfd8fa1a53521024e332d42efa"
     },
     {
@@ -2736,6 +2963,7 @@
       "timestamp": "2026-05-06T09:43:27.952109",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "77807dc4e3f04bd8bb55b769819a3c60b2e83954c9f494eeeaa2eb070e3ab7d5"
     },
     {
@@ -2748,6 +2976,7 @@
       "timestamp": "2026-05-02T21:13:03.740320",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "833962baf53201844ba5319b8ea9998ad5a399e5fac972c280dfc7d5d6f25112"
     },
     {
@@ -2760,6 +2989,7 @@
       "timestamp": "2026-05-06T09:43:29.408816",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4217faa441aabc50d29e5103d5564bc629b5eb6aac3c905048742faccfbc12fc"
     },
     {
@@ -2772,6 +3002,7 @@
       "timestamp": "2026-05-02T21:13:05.455627",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f86542c156b47f98193321489316cf2936e27c6b02a9f8b1ff69f4a47582050b"
     },
     {
@@ -2784,6 +3015,7 @@
       "timestamp": "2026-05-06T09:43:30.888751",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e2adaaa1f2c99807722db2e2cc4c87a406334e6532141c222d8ae9545ea1f92a"
     },
     {
@@ -2796,6 +3028,7 @@
       "timestamp": "2026-05-06T12:28:08.225599",
       "query_count": 75,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9da6f59b434fc261a63f854bf6f364a3b955b8cd256b9aa70ba2dddfbd2df470"
     },
     {
@@ -2808,6 +3041,7 @@
       "timestamp": "2026-05-06T12:28:16.854234",
       "query_count": 75,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b758a21c9d62401973821558c05698ddf4484e55427b154210b57bd98f30c483"
     },
     {
@@ -2820,6 +3054,7 @@
       "timestamp": "2026-05-06T12:30:16.729316",
       "query_count": 75,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "46f67b39f76428c7da3ad83db5a8c7363fdeb61cdc8a35ad625cec9b609d1b2f"
     },
     {
@@ -2832,6 +3067,7 @@
       "timestamp": "2026-05-02T21:47:19.096339",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ac0ad7b3589db1f57ac4d6cec5d449d3e537394680b7197c954a82fa75c4ba99"
     },
     {
@@ -2844,6 +3080,7 @@
       "timestamp": "2026-05-06T10:16:00.961539",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "569a567af5f5c3b38d60131f0a3ec307787a2ac2cbd6e13bb9814067c3afa6b5"
     },
     {
@@ -2856,6 +3093,7 @@
       "timestamp": "2026-05-02T21:47:23.668269",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a68a22017f4d71d6acbd361468540bff2cd44f098f6fc159f83ff218b8f57a64"
     },
     {
@@ -2868,6 +3106,7 @@
       "timestamp": "2026-05-06T10:16:06.172092",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "5e094f67c1767fdc508fa35832c94002d999a9aa4a1f497705f30f506adf8eb3"
     },
     {
@@ -2880,6 +3119,7 @@
       "timestamp": "2026-05-02T21:47:28.866922",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "463ddb95ba1619ba280b286efda5e5837dbc2df0f3a982057d31611d4dd46d6d"
     },
     {
@@ -2892,6 +3132,7 @@
       "timestamp": "2026-05-06T10:16:11.422770",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "812a3fd8583fb50be4f8162d93b9a591c93e59c92ba362d43729fdb2eb6a7cf7"
     },
     {
@@ -2904,6 +3145,7 @@
       "timestamp": "2026-05-06T11:32:51.511241",
       "query_count": 75,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "41caedec23a80712628befa3e339fcf701876cdcd5f69e61162ff46aa7fb812f"
     },
     {
@@ -2916,6 +3158,7 @@
       "timestamp": "2026-05-06T11:32:58.140545",
       "query_count": 75,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d1bbec1ececda3ac6b06b337f6978e04eb704191882fda38f400aa3f61bb7ccf"
     },
     {
@@ -2928,6 +3171,7 @@
       "timestamp": "2026-05-06T11:33:43.511306",
       "query_count": 75,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "5666efdef02c0980ee043ab40d081940916e1890b3ae4d45767d6eb33830b926"
     },
     {
@@ -2940,6 +3184,7 @@
       "timestamp": "2026-05-05T20:37:08.753802",
       "query_count": 447,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e4c8e138f549705d548260883ef9427f1a09bfd4953476400a154534b82e49ad"
     },
     {
@@ -2952,6 +3197,7 @@
       "timestamp": "2026-05-05T20:38:39.727493",
       "query_count": 447,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d65315a71f25162d3c0c183e44b45514cfcf9709491154648c54c81a2aaa3396"
     },
     {
@@ -2964,6 +3210,7 @@
       "timestamp": "2026-05-02T18:26:50.077395",
       "query_count": 414,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b4a5e7b42f9e22bb557c0bdbf0d65de2c78b76e9d262a02f2c170c307963a257"
     },
     {
@@ -2976,6 +3223,7 @@
       "timestamp": "2026-05-02T22:29:33.782844",
       "query_count": 438,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "555b7af4c62f5f0e2034fe39b02ab5d58fcbdb451735b9c7634ff1b57fceac97"
     },
     {
@@ -2988,6 +3236,7 @@
       "timestamp": "2026-05-05T20:26:51.145963",
       "query_count": 414,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ce8e7e4e3b73b6ff153bd993f3fdb9a8b8840f4d4bf35f844a4b2467d3d05d83"
     },
     {
@@ -3000,6 +3249,7 @@
       "timestamp": "2026-05-06T11:01:35.468937",
       "query_count": 414,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3d6faa4a0d520e73c592bc413a019bee851a5eb7cb2f15114a807edc684be40f"
     },
     {
@@ -3012,6 +3262,7 @@
       "timestamp": "2026-05-02T18:26:54.844861",
       "query_count": 414,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e96901400c3918df95969255901b938109de9edccf912a3c670b84bac904b404"
     },
     {
@@ -3024,6 +3275,7 @@
       "timestamp": "2026-05-02T22:29:36.813795",
       "query_count": 438,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "1a9fddece9cce158d3e3cee586d10d70e8126e91a9094fbe83e078b860d1adb3"
     },
     {
@@ -3036,6 +3288,7 @@
       "timestamp": "2026-05-05T20:26:56.196091",
       "query_count": 414,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "be235891a77fb0c472b4d988da19299118cf5a580bdab6f8eea100e38addcbcc"
     },
     {
@@ -3048,6 +3301,7 @@
       "timestamp": "2026-05-06T11:01:40.173930",
       "query_count": 414,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3c568b25a62e415a95ab53bfc0524b27bca37e8477994f37cf92a67b8a853f9d"
     },
     {
@@ -3060,6 +3314,7 @@
       "timestamp": "2026-05-05T19:52:06.887001",
       "query_count": 459,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a495d1faf384d41c522765699e5dbb21ce4d88b9d10c4b3a3629d1b9fa801ac5"
     },
     {
@@ -3072,6 +3327,7 @@
       "timestamp": "2026-05-05T19:52:23.796502",
       "query_count": 459,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "1a9913b669ba192aa02b4c3053d2fd7486fca2870afcbb6b748a23f9dec01fcd"
     },
     {
@@ -3084,6 +3340,7 @@
       "timestamp": "2026-05-02T21:08:38.627661",
       "query_count": 441,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9a2cd0a3af77e80e1c760788155eeb0e95a6b1fb5649ed8529ae04a5e3d64cc9"
     },
     {
@@ -3096,6 +3353,7 @@
       "timestamp": "2026-05-06T09:41:46.368667",
       "query_count": 447,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b88680de51e494bf2f23ff7a5ba39b0d580bdc7929820c82f283a7dd420f3b28"
     },
     {
@@ -3108,6 +3366,7 @@
       "timestamp": "2026-05-02T21:08:41.010166",
       "query_count": 441,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6a693ea7db7eac675f4ec0bb4c241e265dd88761aecb5904233bfcfbb8522037"
     },
     {
@@ -3120,6 +3379,7 @@
       "timestamp": "2026-05-02T21:35:01.822619",
       "query_count": 444,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "de944641de4db258422dc0841d35f732820277fa31dcc653d345b0fe2823f9ed"
     },
     {
@@ -3132,6 +3392,7 @@
       "timestamp": "2026-05-02T21:37:56.198032",
       "query_count": 444,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ff5ab6ae4750a5d8c6bd17928e8fd04c9b9f697dfbb4cf73b17386b566d8d2af"
     },
     {
@@ -3144,6 +3405,7 @@
       "timestamp": "2026-05-02T19:15:34.908804",
       "query_count": 456,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2fda5f09799262e4339177968ad918d1c2379a12eda8ebc11a88be6a1c147495"
     },
     {
@@ -3156,6 +3418,7 @@
       "timestamp": "2026-05-06T13:35:08.888264",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c760c3a947d8f82c8d3b85448d1978c478e521d0f2b9d5e3d7e7f91406e37e7a"
     },
     {
@@ -3168,6 +3431,7 @@
       "timestamp": "2026-05-06T13:35:14.173061",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7ce2602a8bb7477bc12edffb7f8e2072774574573680947c56257342a31c8737"
     },
     {
@@ -3180,6 +3444,7 @@
       "timestamp": "2026-05-06T13:35:31.927645",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "705fed4934304bef704d1b89038800a7603f8a1b5ddb02d9dfce4c5080d2ef7d"
     },
     {
@@ -3192,6 +3457,7 @@
       "timestamp": "2026-05-05T20:36:21.591288",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "1d8bfab5fb9fcd8fa9255ada28fd0fa886cec0c02fe29b8b6d6a8879dbdc4ccb"
     },
     {
@@ -3204,6 +3470,7 @@
       "timestamp": "2026-05-05T20:36:23.977855",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "637abfa001dafeb3086ca256fc439284dffa39b3d5d9c5dff423989dccc8716f"
     },
     {
@@ -3216,6 +3483,7 @@
       "timestamp": "2026-05-05T20:36:30.801042",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8afd4a8dac9957846cb00c1c79296b3cad7c318089d9f5fde2e50bfb0aa22801"
     },
     {
@@ -3228,6 +3496,7 @@
       "timestamp": "2026-05-06T10:26:30.509544",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "36422af2ccadc76c82c2a1be9b8a3d71c3764c107eb916e6955b1abb17f7a8db"
     },
     {
@@ -3240,6 +3509,7 @@
       "timestamp": "2026-05-06T10:26:35.732843",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ae85a89454388289b181c7d24dc264313d77c58aea50149a4b5f84c4dd8c8827"
     },
     {
@@ -3252,6 +3522,7 @@
       "timestamp": "2026-05-06T10:26:38.941312",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d82d2194beb1f70dd19dd26cd66d86aa3fa4ff16caf829c85c689f915e17ceb0"
     },
     {
@@ -3264,6 +3535,7 @@
       "timestamp": "2026-05-02T18:28:10.134450",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "91f9db5977e48f534a23d1fa4b68f48ab6790f3bbfdb6069c164affdf0b93f90"
     },
     {
@@ -3276,6 +3548,7 @@
       "timestamp": "2026-05-02T22:33:24.865647",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "66a5c9ac9d7ea29e6b8508290683ea2d879dcbf6d4a3ea72e99900f112c78d7a"
     },
     {
@@ -3288,6 +3561,7 @@
       "timestamp": "2026-05-05T20:26:09.207335",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "029974c253a9daf334c1082ca26d6665ce6c30ff1f6db50baf1d87ae2ca624ca"
     },
     {
@@ -3300,6 +3574,7 @@
       "timestamp": "2026-05-06T11:01:03.002855",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "5c0d0ca3323b7c52c11ed1a370da12e0fdc691d31c15d92d1963f74cb0be737e"
     },
     {
@@ -3312,6 +3587,7 @@
       "timestamp": "2026-05-02T22:33:28.638840",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "82b58d31f7cc5044f15c1cfd6b2934481bf1201fa953856cea656552b337d294"
     },
     {
@@ -3324,6 +3600,7 @@
       "timestamp": "2026-05-05T20:26:11.366043",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a083673c14dff7143721bb9d5b3791f4d927aa074ea8d40ce1e3adfb5f2b0cb1"
     },
     {
@@ -3336,6 +3613,7 @@
       "timestamp": "2026-05-02T22:33:30.305374",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7c85bf5a89e53ccdb53ea93cdf2faed5259f10f07d859c623a3883f8853909fe"
     },
     {
@@ -3348,6 +3626,7 @@
       "timestamp": "2026-05-05T20:26:15.884697",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "046612a9c0f10093a45c4ef67e2e83dbec4e403a3a6d87aee3d21ef4472b1e42"
     },
     {
@@ -3360,6 +3639,7 @@
       "timestamp": "2026-05-05T19:48:05.226488",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "aadecb8b7baca97d150e0a174fd0f09b5f7593914e13fb41b1952dff8b832330"
     },
     {
@@ -3372,6 +3652,7 @@
       "timestamp": "2026-05-05T19:48:09.907075",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ac7dd57a64fce671718d7e915aed767bc814423d62cbd5a45dfaeb5eb7d5527c"
     },
     {
@@ -3384,6 +3665,7 @@
       "timestamp": "2026-05-05T19:48:37.550300",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "43073a0c0ab3215d6f29e55c17a88ddd4d4f95dab2aa3104d81291379f20f71e"
     },
     {
@@ -3396,6 +3678,7 @@
       "timestamp": "2026-05-06T09:47:52.991369",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bb95793cc395773f173fddbbfc2c6c3c62c8bfe029a8528c8be46b24bcc702bf"
     },
     {
@@ -3408,6 +3691,7 @@
       "timestamp": "2026-05-06T09:47:56.794821",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "03e67c1378030a85c89e06b7ee900f5ef15ebf3d1698ea9c188916d79d682ff7"
     },
     {
@@ -3420,6 +3704,7 @@
       "timestamp": "2026-05-06T09:47:58.520005",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8302b21588c43753bde7ec7d596303b80ab8fbe80f067d4d886f48d60bd968f6"
     },
     {
@@ -3432,6 +3717,7 @@
       "timestamp": "2026-05-02T21:12:39.858610",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ffec533a741dc62ede2364951b99d4c1ada22ea9621bc5060b108cd36965a1f7"
     },
     {
@@ -3444,6 +3730,7 @@
       "timestamp": "2026-05-06T09:41:10.689908",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0f99c3b3c1bc48970c13ad743c19e2cdac5d8a214786727d55f1c0fd1bf4368b"
     },
     {
@@ -3456,6 +3743,7 @@
       "timestamp": "2026-05-02T21:12:43.650509",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "61ffe2ea999a570988a726cb90be130cd6f4a58d74cf118bd1fc734ca817c8cc"
     },
     {
@@ -3468,6 +3756,7 @@
       "timestamp": "2026-05-06T09:41:14.658050",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7fc5b3bb10cd1e852e13dd7eee75d1bb608ddebb837edbcda117bbcb7681a561"
     },
     {
@@ -3480,6 +3769,7 @@
       "timestamp": "2026-05-02T21:12:45.327317",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "45b18d232e1c5159e2201be8feed5a070f31fbbe53f237dabbef5555b98ad13e"
     },
     {
@@ -3492,6 +3782,7 @@
       "timestamp": "2026-05-06T09:41:16.437753",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "85835c3fedd80e09e00304b00eefea0d87cd660099426b54668ed36215d388ca"
     },
     {
@@ -3504,6 +3795,7 @@
       "timestamp": "2026-05-06T11:54:42.406078",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e9ed85e6df4a651da0dc4a540f2de9ac548b79c84471bb393210c54572a32f51"
     },
     {
@@ -3516,6 +3808,7 @@
       "timestamp": "2026-05-06T11:54:45.732714",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "43e499855fc4c737436ee5338670181cef0dd5c954acba210410406661a3cbec"
     },
     {
@@ -3528,6 +3821,7 @@
       "timestamp": "2026-05-06T11:55:05.237634",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "41ca8a996fb99506e14ad82713294d6a2a657676e7d811e9b3dce9401ea5bb17"
     },
     {
@@ -3540,6 +3834,7 @@
       "timestamp": "2026-05-02T21:46:21.672398",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "01545eb89c3cdcab8f0bbca677a365c29fc1c1252850ac2462f621290ba3fdd8"
     },
     {
@@ -3552,6 +3847,7 @@
       "timestamp": "2026-05-06T09:58:32.104550",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2a468d8ca753e2b758a445e5a8722be75095cb9825e1c570da850bbbbe34df6c"
     },
     {
@@ -3564,6 +3860,7 @@
       "timestamp": "2026-05-02T21:46:29.236021",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c0b28ea27a45f6aa56b974e2a53b7715bff1dd93eb236e52f9f41c9baf7519f3"
     },
     {
@@ -3576,6 +3873,7 @@
       "timestamp": "2026-05-06T09:58:39.804574",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6526ed5950c38a7dbf7444c40f5a5d5494dc97bbf74506663b2798ebd7342be2"
     },
     {
@@ -3588,6 +3886,7 @@
       "timestamp": "2026-05-02T21:46:34.723487",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "864e4697f2cf84e411efd8df73d9e47e980f5765cf30e253a17b09dbbb172a66"
     },
     {
@@ -3600,6 +3899,7 @@
       "timestamp": "2026-05-06T09:58:45.419622",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "441a25066fdb40af7c6c34dadb56c6f45031686e1bb211ff92e925ce42f35004"
     },
     {
@@ -3612,6 +3912,7 @@
       "timestamp": "2026-05-02T19:51:49.537683",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4fc22d6198e7543256d452d6474ed1e4ab639c3b2e31031927ab5ce075e88f0f"
     },
     {
@@ -3624,6 +3925,7 @@
       "timestamp": "2026-05-06T08:40:41.037342",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2393454cf202035a089e00fd2d2729477404701634a6bb99855dfdb9f0e70f6c"
     },
     {
@@ -3636,6 +3938,7 @@
       "timestamp": "2026-05-02T19:52:17.502051",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4b4695e85b99275ef3616d9d33108f46ab6a6aed8ecafe7d221d9ff07c45f54c"
     },
     {
@@ -3648,6 +3951,7 @@
       "timestamp": "2026-05-06T08:41:13.174646",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "1ffb346f7e4d72fb3d9e31871504fb7770309138fae5266f262eb6e956c7a0ea"
     },
     {
@@ -3660,6 +3964,7 @@
       "timestamp": "2026-05-02T19:57:09.335726",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d2578c8d982b58e9d78786469d97620018e764fd3f466e12bddc7dff6820cabf"
     },
     {
@@ -3672,6 +3977,7 @@
       "timestamp": "2026-05-06T08:46:16.030282",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "459ed3bb3817fca80bdc8a11d3ede389be4a5e66af47fb953a4fb7ef3f2b9661"
     },
     {
@@ -3684,6 +3990,7 @@
       "timestamp": "2026-05-02T20:45:53.800040",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "75a2a6b5020bc84a6242f48efe4885785a76834d18d7b36748f01750e0e99fe6"
     },
     {
@@ -3696,6 +4003,7 @@
       "timestamp": "2026-05-06T09:18:07.591743",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4e07fdc0519e8c0e37739750b0a2acc1d2c6b879c5948ae74b7227fcab2c5648"
     },
     {
@@ -3708,6 +4016,7 @@
       "timestamp": "2026-05-02T20:46:10.961504",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "418fdfbac107f0c3b33af97ae7153d50093b843bc68d39912710da630a2d2d9f"
     },
     {
@@ -3720,6 +4029,7 @@
       "timestamp": "2026-05-06T09:18:24.561182",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "32fbbe66ba3ac150b996c8b0cf463dcad96ec9a011cc644d2ba57ad373978c50"
     },
     {
@@ -3732,6 +4042,7 @@
       "timestamp": "2026-05-02T20:46:45.433275",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "206566c6ed8ed4a35d24a680daa15f7dc72dc42a604c3a8281261f61b0b09e44"
     },
     {
@@ -3744,6 +4055,7 @@
       "timestamp": "2026-05-06T09:18:58.387543",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0ccd714117eb4adf5086b284850b2259699223f434172b41472fc05f6bbdfc08"
     },
     {
@@ -3756,6 +4068,7 @@
       "timestamp": "2026-05-06T11:23:31.644334",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "56dbaf283a05b9bc87fb8451a8cfcbc5b65d25dbbf7d0168de8be0eb6ab5c1b0"
     },
     {
@@ -3768,6 +4081,7 @@
       "timestamp": "2026-05-06T11:23:36.730218",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "52af1b6141138049fe00e51fd7849ba925edf4c983f68415aa6689fd8cc6cdcd"
     },
     {
@@ -3780,6 +4094,7 @@
       "timestamp": "2026-05-06T11:24:02.552293",
       "query_count": 39,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f31201a69ec560ef0cebb5d36230e60669a33a5a63d689e4b5fb7e2231654513"
     },
     {
@@ -3792,6 +4107,7 @@
       "timestamp": "2026-04-03T09:38:17.113904",
       "query_count": 52,
       "trust_label": "maintainer-run",
+      "funding": "unspecified",
       "bundle_sha256": "13498306803facad459eda7672b5813889267286c75ca564f7176d4cf2ac8afc"
     },
     {
@@ -3804,6 +4120,7 @@
       "timestamp": "2026-04-04T19:18:27.851837",
       "query_count": 39,
       "trust_label": "maintainer-run",
+      "funding": "unspecified",
       "bundle_sha256": "775b48a666dad05334b79823be327468b1a104240297d993ce726eddc3d5d12b"
     },
     {
@@ -3816,6 +4133,7 @@
       "timestamp": "2026-04-03T09:38:09.093147",
       "query_count": 52,
       "trust_label": "maintainer-run",
+      "funding": "unspecified",
       "bundle_sha256": "3bd97430fff944da9f7e6c7bb183ea2cb483f9cc9f968dc3fac8da2b1e9ef2bc"
     },
     {
@@ -3828,6 +4146,7 @@
       "timestamp": "2026-04-04T19:18:19.606115",
       "query_count": 39,
       "trust_label": "maintainer-run",
+      "funding": "unspecified",
       "bundle_sha256": "78ed9fa468adc8ddfcc19a275699ed8db82973d681be5bbb58fd561e761cfeb4"
     },
     {
@@ -3840,6 +4159,7 @@
       "timestamp": "2026-04-03T09:39:02.697816",
       "query_count": 52,
       "trust_label": "maintainer-run",
+      "funding": "unspecified",
       "bundle_sha256": "4f2788f5ca3999142786699d2dddbcd908133d683fa48c89483790e842007140"
     },
     {
@@ -3852,6 +4172,7 @@
       "timestamp": "2026-04-04T19:18:55.010121",
       "query_count": 39,
       "trust_label": "maintainer-run",
+      "funding": "unspecified",
       "bundle_sha256": "cf3e76d318999eedb05b94ecaf9e607e4142b1c8714e39b140ad2b0e4df723d7"
     },
     {
@@ -3864,6 +4185,7 @@
       "timestamp": "2026-05-06T13:34:37.628995",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "721243adf15211772c642b0041413aaa557fe4ebfb03fce57d60e361e0a9b63a"
     },
     {
@@ -3876,6 +4198,7 @@
       "timestamp": "2026-05-06T13:34:47.820512",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a36fb2f54d8bec1a7a1092dd8568376d27aaf9d0c037fced329abf9fe70f661b"
     },
     {
@@ -3888,6 +4211,7 @@
       "timestamp": "2026-05-06T13:35:04.380312",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9a622d9ed99d47315c81c2b81b3e3212a3eb6bb0d090724b827377b3785a3dfb"
     },
     {
@@ -3900,6 +4224,7 @@
       "timestamp": "2026-05-02T18:26:42.101340",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "760f54ac366637a702d8b710ce3cf2703f88866b70454b1424c072fbadc9344a"
     },
     {
@@ -3912,6 +4237,7 @@
       "timestamp": "2026-05-02T18:26:44.242177",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "acfa4150374ed385992843079082823aefa4f17b62b4ac3265aa43cad215c65e"
     },
     {
@@ -3924,6 +4250,7 @@
       "timestamp": "2026-05-02T18:26:47.231169",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ec4b3924197d7dcd1695258354c015019e51ed6b6b43dc16586113e9c81f6d0c"
     },
     {
@@ -3936,6 +4263,7 @@
       "timestamp": "2026-05-05T19:46:56.708604",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b2032a07c7228ba6a426d492b4bbec18157ec60f6550a0852b50c5a72de8dc79"
     },
     {
@@ -3948,6 +4276,7 @@
       "timestamp": "2026-05-05T19:47:23.698630",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c0cabbfb52a6991552340de2ebfc3a6d1a29141f387d9e9af76b42ee632ffc95"
     },
     {
@@ -3960,6 +4289,7 @@
       "timestamp": "2026-05-05T19:48:03.078328",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bf5a4c08cb2b2bc4eed4af5f76b4b8dcb91c0f68b4316b4d5d786205f355f441"
     },
     {
@@ -3972,6 +4302,7 @@
       "timestamp": "2026-05-02T19:13:50.632304",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "df771f26ab6f3f09e938ac60878e9b09481acc920c1feff07b5b541a29df3351"
     },
     {
@@ -3984,6 +4315,7 @@
       "timestamp": "2026-05-02T19:13:58.065999",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3c9ab5d2a9efd11cb12b4036ba19390ea723862b1246c05bf65b85cefcdd95c2"
     },
     {
@@ -3996,6 +4328,7 @@
       "timestamp": "2026-05-02T19:15:15.055730",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f159a4254ea03f87c189fd3ffbe7a7be519c8c8db7d084d80a7d877c0916eeec"
     },
     {
@@ -4008,6 +4341,7 @@
       "timestamp": "2026-05-02T20:37:58.881677",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "fbe4df3ba64fde172ba930cb38926a957649379884650996ba3e9f70c4d4d56a"
     },
     {
@@ -4020,6 +4354,7 @@
       "timestamp": "2026-05-02T20:38:18.031667",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ef2b550d518762f4b5a0353058ba3b7b9bc3a5253b5934a38fba5e754884431c"
     },
     {
@@ -4032,6 +4367,7 @@
       "timestamp": "2026-05-02T20:38:44.042670",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b5e575da4c51c830939c20770e94ec828fcfa3b3295146c069caa247a216ee39"
     },
     {
@@ -4044,6 +4380,7 @@
       "timestamp": "2026-05-06T11:23:05.085486",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "5907c79456948b011ea121ab07cf883d1f824873679532d4ee2d1066dad4f52a"
     },
     {
@@ -4056,6 +4393,7 @@
       "timestamp": "2026-05-06T11:23:13.656435",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3111aee81f3d46e3eb60c9d88c45ebc57552f5d1bbd1636944f1ea88d68455fc"
     },
     {
@@ -4068,6 +4406,7 @@
       "timestamp": "2026-05-06T11:23:28.038191",
       "query_count": 114,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c89e13d07cbb7b1a02acfc85c33d62497eae419287f93638b43d69a938eeefa7"
     },
     {
@@ -4080,6 +4419,7 @@
       "timestamp": "2026-05-06T09:39:53.498725",
       "query_count": 309,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "74ebf0a50b4ef797cc03553ba6b1667f0e20beb3fadfe64c73b242590f7c1f20"
     },
     {
@@ -4092,6 +4432,7 @@
       "timestamp": "2026-05-06T09:40:06.906818",
       "query_count": 309,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "db5b7a1fb53c6ebc72894c2e84682faf7b62b6a2b36fd4c56fd52153c6ed544f"
     },
     {
@@ -4104,6 +4445,7 @@
       "timestamp": "2026-05-06T09:40:22.570524",
       "query_count": 309,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "be759f1db78d915befc970e028d23027ee69bf96574f24728e57fdb88f0ec34e"
     },
     {
@@ -4116,6 +4458,7 @@
       "timestamp": "2026-05-02T18:29:06.403128",
       "query_count": 267,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "52f30436443d86c7be0b39c0ecf7090a5221c323ef0a8894fd34186f505caa92"
     },
     {
@@ -4128,6 +4471,7 @@
       "timestamp": "2026-05-02T22:33:54.468256",
       "query_count": 9,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f968158780afb2d0d144397c4763cbe37ab6a9d92a8417613f4afdbaaa4a312e"
     },
     {
@@ -4140,6 +4484,7 @@
       "timestamp": "2026-05-02T18:10:39.218930",
       "query_count": 267,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4c6cbf5582319a0980fb654b6ee5549ffb8a9bea3453d04b2b9efaa589715e27"
     },
     {
@@ -4152,6 +4497,7 @@
       "timestamp": "2026-05-05T19:46:47.755524",
       "query_count": 267,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "06a419e88f347dc439aea729756aa2e57af7e1471e8905c99a460b1d551cd817"
     },
     {
@@ -4164,6 +4510,7 @@
       "timestamp": "2026-05-06T09:47:11.819685",
       "query_count": 9,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2a0c4941876e9267c7466cbed6821fff57da815de4991f3e15a978cc6f01658c"
     },
     {
@@ -4176,6 +4523,7 @@
       "timestamp": "2026-05-02T21:13:23.906043",
       "query_count": 9,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9d57d455a1b2b6aa8aa8f88bcafe2b070d5bc9ad94496aaa2432b2670b73b243"
     },
     {
@@ -4188,6 +4536,7 @@
       "timestamp": "2026-05-06T09:41:07.383435",
       "query_count": 9,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f9c43f7a709476bdb6846971ecabeed9ff172a3b7aa9448d9c0f1852ea631618"
     },
     {
@@ -4200,6 +4549,7 @@
       "timestamp": "2026-05-02T21:48:17.971424",
       "query_count": 9,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f0cb2dda5d0065d6e5c964a5a5865f6d6806da1e8e581b72918707b715be9069"
     },
     {
@@ -4212,6 +4562,7 @@
       "timestamp": "2026-05-06T09:58:19.573260",
       "query_count": 9,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4e8e3e9a72148d667d019c7ae4df2a285a795a7bc53b3d09dc38b65091e30970"
     },
     {
@@ -4224,6 +4575,7 @@
       "timestamp": "2026-05-06T11:05:27.995845",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4a48967305eb0f783464f4893cc43b3205de6856f7456bea52a9dc1c8e30ebdd"
     },
     {
@@ -4236,6 +4588,7 @@
       "timestamp": "2026-05-06T11:05:32.616751",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b68a0b0e03955003abfd43d3cf0de161c028a38243171f98a5f4a89a974426f7"
     },
     {
@@ -4248,6 +4601,7 @@
       "timestamp": "2026-05-06T11:05:48.271698",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "074c518c8810e324ac5393c96b477cd138d8bacff961d8d42e33af811908c642"
     },
     {
@@ -4260,6 +4614,7 @@
       "timestamp": "2026-05-05T20:28:40.073074",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6a0c8cfcea1fb18442843d80800edfa296caa86e4bc5b1bee3c2c9b978bbc862"
     },
     {
@@ -4272,6 +4627,7 @@
       "timestamp": "2026-05-05T20:28:45.889522",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "faa4124697b861ce8e4e8c9eceed510ee9068cbf360a629f39f044cbc138154d"
     },
     {
@@ -4284,6 +4640,7 @@
       "timestamp": "2026-05-05T20:29:11.734403",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8843cc1adaa7d75fcf756d706279b32cd93e2ea840f1dc7f212ef08e9b0cb085"
     },
     {
@@ -4296,6 +4653,7 @@
       "timestamp": "2026-05-06T10:16:36.008770",
       "query_count": 63,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7c7292f86935bea531f49fff32add11d66d96d2b16c58ca4d567369fd0bd0c81"
     },
     {
@@ -4308,6 +4666,7 @@
       "timestamp": "2026-05-06T10:17:40.938003",
       "query_count": 63,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "864576114937f3c0d82d9a511bd8358f0cdbe30aa282cde9c4cd8e44516945a8"
     },
     {
@@ -4320,6 +4679,7 @@
       "timestamp": "2026-05-06T10:18:48.698319",
       "query_count": 63,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "040010b5f0e508e84ffd08da5d4200268531691c1e554486a3556f079273da95"
     },
     {
@@ -4332,6 +4692,7 @@
       "timestamp": "2026-04-03T09:37:31.892124",
       "query_count": 88,
       "trust_label": "maintainer-run",
+      "funding": "unspecified",
       "bundle_sha256": "2feccca03f6a384f98df1470b164c94f5a801cc72ee74ecafdad2f3e1483207b"
     },
     {
@@ -4344,6 +4705,7 @@
       "timestamp": "2026-05-02T18:24:33.406402",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "eabb7b14ddb871af80200e3244df806dc9c041e6257238edbe7cf8393f678ff3"
     },
     {
@@ -4356,6 +4718,7 @@
       "timestamp": "2026-05-02T22:27:59.358721",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ea4087625a300d59c83c96112e3768d688d8d4781929c246d3c855f1122eb1a3"
     },
     {
@@ -4368,6 +4731,7 @@
       "timestamp": "2026-05-05T20:24:56.997961",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "77daf86d94768731e43bcf3db21bf84ab0a92b481ee8d520b96b894fb2f6b5b3"
     },
     {
@@ -4380,6 +4744,7 @@
       "timestamp": "2026-05-06T10:59:56.664650",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "51d39a73b50d40c809f328c23fe9ed44fd9aa78bd14cf33d7f844eaa544bf96a"
     },
     {
@@ -4392,6 +4757,7 @@
       "timestamp": "2026-04-04T19:18:14.925342",
       "query_count": 66,
       "trust_label": "maintainer-run",
+      "funding": "unspecified",
       "bundle_sha256": "4fb71bf9c1caf9f97bb3057f4264ac50dec300879f3f92dce7d789fb5d41a6cb"
     },
     {
@@ -4404,6 +4770,7 @@
       "timestamp": "2026-05-02T18:24:37.323996",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0ee5996103f0d843fe24133869a79e3972ea4714c0064d927c729787942d2877"
     },
     {
@@ -4416,6 +4783,7 @@
       "timestamp": "2026-05-02T22:28:01.682655",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c21d05004a6e3dc596dd7aad58899d2688d5a7c5c3191c843f62399952be003f"
     },
     {
@@ -4428,6 +4796,7 @@
       "timestamp": "2026-05-05T20:25:01.395385",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c02bca015763e52a2ce6b3f0be0186ed31493a7767c0389b14786eede454e6c2"
     },
     {
@@ -4440,6 +4809,7 @@
       "timestamp": "2026-05-06T11:00:00.614859",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9069b436673351f2b30b9aef2940bf45e96de09db3c8aa9bb0fda1592c2e66e3"
     },
     {
@@ -4452,6 +4822,7 @@
       "timestamp": "2026-05-02T18:24:46.927517",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "61ffa803aac89d5859f3b1a47f46e851378d88fdcef693259ddcd7c7f18610f2"
     },
     {
@@ -4464,6 +4835,7 @@
       "timestamp": "2026-05-02T22:28:04.176852",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "de0d3de4c0d514e316f3bb98391d98943b1a24a54bfc3c21e0c8ab90623c871b"
     },
     {
@@ -4476,6 +4848,7 @@
       "timestamp": "2026-05-05T20:25:11.126369",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9b764fc44586247419c61ca7d2d60b6da25f4d3c954899656989d1f17dec9e1f"
     },
     {
@@ -4488,6 +4861,7 @@
       "timestamp": "2026-05-06T11:00:10.471491",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9ad9d7e5ddc905164091a06958c93629213998ea1a5814973508b5dca0ba36a1"
     },
     {
@@ -4500,6 +4874,7 @@
       "timestamp": "2026-04-03T09:36:53.773505",
       "query_count": 88,
       "trust_label": "maintainer-run",
+      "funding": "unspecified",
       "bundle_sha256": "5105c9d199f9ad1bac711109e09b01b6f9ebcd0b4a73a9ecb894f293465c59e4"
     },
     {
@@ -4512,6 +4887,7 @@
       "timestamp": "2026-05-05T19:44:06.679638",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "aa175739971b85cfd7a6a026720a8870fa3195766192b4d8285728a53606e136"
     },
     {
@@ -4524,6 +4900,7 @@
       "timestamp": "2026-04-04T19:18:03.752203",
       "query_count": 66,
       "trust_label": "maintainer-run",
+      "funding": "unspecified",
       "bundle_sha256": "0181f607adda2ec26942f87c618e12dbb09f78b198866739c6fed185d7aae293"
     },
     {
@@ -4536,6 +4913,7 @@
       "timestamp": "2026-05-05T19:44:10.479387",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "1a6fdaa23dd8b79fed8793e5136ba64841829f8f4051f5436999c7d3454c6824"
     },
     {
@@ -4548,6 +4926,7 @@
       "timestamp": "2026-05-05T19:44:16.348623",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ce1de7709b98fad16f7c836bf89da52d90b3e7b15cb259630eafca1b1944d096"
     },
     {
@@ -4560,6 +4939,7 @@
       "timestamp": "2026-04-03T09:37:41.437051",
       "query_count": 88,
       "trust_label": "maintainer-run",
+      "funding": "unspecified",
       "bundle_sha256": "ef163f67c5d7973ea489f70a093f8bf5ee7fe128c1c5282e6aad93419cdefed6"
     },
     {
@@ -4572,6 +4952,7 @@
       "timestamp": "2026-05-02T21:07:12.653353",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7d3a768a8edc7abdd46f16343e1e2d45a92739310f2b535585ae79b145f7197e"
     },
     {
@@ -4584,6 +4965,7 @@
       "timestamp": "2026-05-06T09:39:43.359098",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d7799f0b0a203463fe9e5711c99515d4086c3abab8d361eafd1f9de6f4fe687f"
     },
     {
@@ -4596,6 +4978,7 @@
       "timestamp": "2026-04-04T19:17:27.711283",
       "query_count": 66,
       "trust_label": "maintainer-run",
+      "funding": "unspecified",
       "bundle_sha256": "895f5ef1ae581139eddc9d17f801e3c2aeedda6bf60a00b52c8d4caecca7db3b"
     },
     {
@@ -4608,6 +4991,7 @@
       "timestamp": "2026-05-02T21:07:14.666419",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "85546f8e4de263cf02b33a546872f1796f6f09909359e5fadfcb8af8a70c9b5e"
     },
     {
@@ -4620,6 +5004,7 @@
       "timestamp": "2026-05-06T09:39:45.288131",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2c2a373a334531f5de6ecc4aaa592688ee2f34be21442baef6b2ae70d542f990"
     },
     {
@@ -4632,6 +5017,7 @@
       "timestamp": "2026-05-02T21:07:17.336844",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ef04a50069e5fe2d03c65e3741ddc2fe2ed65bb966a910ab798056344ee45171"
     },
     {
@@ -4644,6 +5030,7 @@
       "timestamp": "2026-05-06T09:39:47.480188",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a26f3b763a39b9fb243bdd9c0b82616a9d1fd7a3340bc3cd8c7b3eeabfd9dccf"
     },
     {
@@ -4656,6 +5043,7 @@
       "timestamp": "2026-05-06T11:44:29.298921",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7b989f3a727e5f91f834c9b8cb8624fca4116f66e532e7b04bfd8fe95b3debdf"
     },
     {
@@ -4668,6 +5056,7 @@
       "timestamp": "2026-05-06T12:42:38.459229",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e3775aa95f88792b261aa91397bfbf3e1c9a595d9dd0614d841d08fe53874e23"
     },
     {
@@ -4680,6 +5069,7 @@
       "timestamp": "2026-05-02T21:28:34.887473",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3b39ce856a5939bc06db88a4067cf91ced956f8adb97c61532c29653e7117e1f"
     },
     {
@@ -4692,6 +5082,7 @@
       "timestamp": "2026-05-06T09:50:23.136781",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "75e6d82d9479ad50b32e092024c185a630b4099412a4a7b32401ee0ac4ed34f8"
     },
     {
@@ -4704,6 +5095,7 @@
       "timestamp": "2026-05-02T21:29:52.502865",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "95f7ca25128f2cbea24a702e13c7e3cc7a23f6f29e570d6fd84d658219590b3f"
     },
     {
@@ -4716,6 +5108,7 @@
       "timestamp": "2026-05-06T09:51:55.792943",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e51777354ac9e545dad460476f7a169beba3322dfb46f5df303b10f5e152e0cf"
     },
     {
@@ -4728,6 +5121,7 @@
       "timestamp": "2026-05-02T21:31:27.683868",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a3c2ab58dc7b0e1038f88d3e4707850a4d7a9e9b87adcaca79e8a2d781a051d5"
     },
     {
@@ -4740,6 +5134,7 @@
       "timestamp": "2026-05-06T09:54:13.693076",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6ccbd74d8bac38174d8eab9754e9198aed4f500c953e890a3601b545ddeb467c"
     },
     {
@@ -4752,6 +5147,7 @@
       "timestamp": "2026-05-02T19:12:08.299046",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "53b68324ecf9433cf885137bcbfedc8ab9ff5eaa7e25049215f91163635e97a3"
     },
     {
@@ -4764,6 +5160,7 @@
       "timestamp": "2026-05-06T08:22:38.582584",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0ef93662e32513c447c30fb1558a25cff836f0855463ab13df619431f053ceb0"
     },
     {
@@ -4776,6 +5173,7 @@
       "timestamp": "2026-05-02T20:26:34.524960",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b369a7471b4f6b9f23c64161c2291764ebf2a190511e2589c9e7f6354db54b2f"
     },
     {
@@ -4788,6 +5186,7 @@
       "timestamp": "2026-05-06T09:12:51.480981",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "5e0675fd8dcbff1283ad5765a065a6610d24459b006df7516a906312e7196b56"
     },
     {
@@ -4800,6 +5199,7 @@
       "timestamp": "2026-05-02T20:27:20.681636",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "931f0e1b5f8acd1cb8133ee41a91a2e5712366b3870b272f01c424510ba227d8"
     },
     {
@@ -4812,6 +5212,7 @@
       "timestamp": "2026-05-06T09:13:38.296789",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9218b6aee04159e1d91c875faed1947330bac1857c6e765b10101042b2913eb0"
     },
     {
@@ -4824,6 +5225,7 @@
       "timestamp": "2026-05-02T20:29:15.702763",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8287187ce952f0cf6bcb278027ad2c2272e4fb35d8d578b7232ae24902166584"
     },
     {
@@ -4836,6 +5238,7 @@
       "timestamp": "2026-05-06T09:15:34.186414",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "45fddd283a6af8b2c97498335012cbe79c120fb6f4263d75ade9422efb9f4ec2"
     },
     {
@@ -4848,6 +5251,7 @@
       "timestamp": "2026-05-06T11:08:48.467517",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "006c2bb3985b0cb0965caea574c756d5dadf675637d8d564922af82902b165a9"
     },
     {
@@ -4860,6 +5264,7 @@
       "timestamp": "2026-05-06T11:08:57.512322",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "938cb2c5059df4c4c9086da5d83fb11ab38aa0ce256544a31ae0608f0408de39"
     },
     {
@@ -4872,6 +5277,7 @@
       "timestamp": "2026-05-06T11:09:36.714428",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3601b343462c18ef2274e3262e4ee43744e19406052aafd6a5aefadaf1c5d6bb"
     },
     {
@@ -4884,6 +5290,7 @@
       "timestamp": "2026-05-05T20:39:58.222836",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9f557860a88baa89b1cc614b935d8a98ccfdd5e5c02885dfee043dd946a3ecc6"
     },
     {
@@ -4896,6 +5303,7 @@
       "timestamp": "2026-05-05T20:40:02.890138",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "36eb992cca25ce9cd4d0bccc2fe413699e203889cd7aab79d36ca208c575b137"
     },
     {
@@ -4908,6 +5316,7 @@
       "timestamp": "2026-05-05T20:40:26.281188",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "088543349203a13a7d0c482dd85593dcc6da8682068ba34fdf02257526beb5b3"
     },
     {
@@ -4920,6 +5329,7 @@
       "timestamp": "2026-05-02T18:37:59.419254",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7953f2942845aeb61199d96f3c64abdaf65f5aa397f913d5fbe7fea803e7f0f0"
     },
     {
@@ -4932,6 +5342,7 @@
       "timestamp": "2026-05-02T22:35:01.444363",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b12ead4ff74f8a3b589529852e196e9cb1a0a3c875a8412df37faf1d66c713af"
     },
     {
@@ -4944,6 +5355,7 @@
       "timestamp": "2026-05-05T20:27:33.996530",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bfbe125c7b13c15bc17eb635503dda3d94a80d47a407ebef48fd505995e55501"
     },
     {
@@ -4956,6 +5368,7 @@
       "timestamp": "2026-05-06T11:02:06.953758",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6d192b34ee246ff2575e8b4f741553dfab844d4e5a437fe857b27c03a9924ccc"
     },
     {
@@ -4968,6 +5381,7 @@
       "timestamp": "2026-05-02T18:38:02.616164",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "ece702f57d1408b02e5091914dd868f42810fd77b609ac08c36c07350b28c74b"
     },
     {
@@ -4980,6 +5394,7 @@
       "timestamp": "2026-05-02T22:35:02.902475",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "13b43895d01fe4fdbee656797a22cad7da5b5f738b1493902e38017c0f220850"
     },
     {
@@ -4992,6 +5407,7 @@
       "timestamp": "2026-05-05T20:27:37.391956",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "dff52f703a6f7370d5f3696417855ae3a6767be9439eb7392b16f0aa296ec93b"
     },
     {
@@ -5004,6 +5420,7 @@
       "timestamp": "2026-05-06T11:02:10.063593",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c0149e8ce1faf00e20ff54e9cd41a08523bd22c10ba4563a6edb406001d2726f"
     },
     {
@@ -5016,6 +5433,7 @@
       "timestamp": "2026-05-02T18:38:13.871473",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "da386d29edb0258fccfe7adc28ed9e8be038dc9aabb78ff1b0237435e96f58fc"
     },
     {
@@ -5028,6 +5446,7 @@
       "timestamp": "2026-05-02T22:35:04.356067",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6dd83bb72016c660eca55e1f0e8a6fa480293a0ad95522e17fca6d7442e5b13f"
     },
     {
@@ -5040,6 +5459,7 @@
       "timestamp": "2026-05-05T20:27:49.493815",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9c1471955e99bba1eb71db597b8e33d67c81a56f32dd74dc6c859f94c4be36de"
     },
     {
@@ -5052,6 +5472,7 @@
       "timestamp": "2026-05-06T11:02:21.169461",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e81d0b2502fe498c556ca3d332512f7c8ac225915b4b3fca6a7077f9a8f05697"
     },
     {
@@ -5064,6 +5485,7 @@
       "timestamp": "2026-05-02T18:21:32.251585",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c997dade8bd01b7cd9d185d5b42fab1df253e3aaf0847c90862f0ea59e5de83c"
     },
     {
@@ -5076,6 +5498,7 @@
       "timestamp": "2026-05-05T19:54:24.917792",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c155d7f3037797e5c6ef707190c247bb0b36961a26692ebd0a763bb2cb6dfe7e"
     },
     {
@@ -5088,6 +5511,7 @@
       "timestamp": "2026-05-02T18:21:44.338570",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bc4b7de9e95f841bfa77d1029e2f16567eed272d00ddd66f73056d001be9ccf0"
     },
     {
@@ -5100,6 +5524,7 @@
       "timestamp": "2026-05-05T19:54:36.047979",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "33d578c4eef4a67ade1ab0e0d849dc8fc9711ab3bd0a9e5e550be4012bed98b2"
     },
     {
@@ -5112,6 +5537,7 @@
       "timestamp": "2026-05-02T18:22:32.326423",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "dd424d213372cc915cc81c426d48ec5b9e97b742694704e8928118ad2806c212"
     },
     {
@@ -5124,6 +5550,7 @@
       "timestamp": "2026-05-05T19:55:57.495729",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0d70db21b014751ab0148ffc78e45c8c6d625b46d2b34a4d57f313e6a5c20390"
     },
     {
@@ -5136,6 +5563,7 @@
       "timestamp": "2026-05-06T09:49:18.234804",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d128a6f0ac83fc66718a653a3ec2d38203378f39ee3720ad7e9a83f5d0bcb457"
     },
     {
@@ -5148,6 +5576,7 @@
       "timestamp": "2026-05-06T09:49:19.742830",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "11dc4643a4b7724d3602f595c2a06c24fa4de2c81b2859157f2e777ffb6ce5b0"
     },
     {
@@ -5160,6 +5589,7 @@
       "timestamp": "2026-05-06T09:49:21.754084",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "59d687bb9355ee52f3410f600daec3653822accce3d5dbec396de84b97ed95bf"
     },
     {
@@ -5172,6 +5602,7 @@
       "timestamp": "2026-05-02T21:14:24.596467",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d1e45adfe88562b74401bd7c61aaf72f277cc611df172f16e4faa85c25a286ed"
     },
     {
@@ -5184,6 +5615,7 @@
       "timestamp": "2026-05-06T09:42:16.891364",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9d69efccb70d039b13589de763957f4df48a2d9553e85a9985197bf75ea864df"
     },
     {
@@ -5196,6 +5628,7 @@
       "timestamp": "2026-05-02T21:14:26.102488",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7c2db6b13cc0c90bae6714240ea6434697d0963172bee8494033481ce4d9ec98"
     },
     {
@@ -5208,6 +5641,7 @@
       "timestamp": "2026-05-06T09:42:18.440633",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "151975d0289740c640b2c463352ba925d7a47c709d062ae83ebf2ad8df3790f3"
     },
     {
@@ -5220,6 +5654,7 @@
       "timestamp": "2026-05-02T21:14:27.920906",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "dc5279c32d25ee3ac18da958c63ad098309c6f8a64f80f9e917a6cfb2dc00a8e"
     },
     {
@@ -5232,6 +5667,7 @@
       "timestamp": "2026-05-06T09:42:20.235705",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0e4d42eefcb0e777ba883ca1e8afe6bcabf2dfee41f12a4476ca0ae76220d1d7"
     },
     {
@@ -5244,6 +5680,7 @@
       "timestamp": "2026-05-06T12:15:43.602161",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "206ff2799afe078c8faaeda301003dd80bf71942e294dbb0644b293cdbe485e3"
     },
     {
@@ -5256,6 +5693,7 @@
       "timestamp": "2026-05-02T21:58:28.796386",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9d61e325a2a6c7176d9eaf2f21e1ba8f18eabced17cf9cf4c45a1ab116de35fa"
     },
     {
@@ -5268,6 +5706,7 @@
       "timestamp": "2026-05-06T10:15:28.015048",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6be20ff4295c5aa0b9763855c93dd6d06de47fe59651d25d8ef71276edf0a396"
     },
     {
@@ -5280,6 +5719,7 @@
       "timestamp": "2026-05-02T21:58:34.170019",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "238e8e3863048fbe6ade5c7453dfa2f47697147d6efb9c980838d0bc2dae0b94"
     },
     {
@@ -5292,6 +5732,7 @@
       "timestamp": "2026-05-06T10:15:34.280800",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "04b516ed2731523ce00591a6205cfe49a41077a13e617dcbb7168784047bc917"
     },
     {
@@ -5304,6 +5745,7 @@
       "timestamp": "2026-05-02T21:58:39.381191",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8cff437a52abd80bf462f4e4c8fbf8b0469c8806b9de01f4a769a97d0771d0df"
     },
     {
@@ -5316,6 +5758,7 @@
       "timestamp": "2026-05-06T10:15:39.483477",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f589bb44ca52d7fb8a3487846f3f81817755ac457c211392df873d1023305bcf"
     },
     {
@@ -5328,6 +5771,7 @@
       "timestamp": "2026-05-02T20:25:59.991391",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "89521a09ec681d7340a8fae1216a8d48108fa1a98ad125405cbd1109b227ca8a"
     },
     {
@@ -5340,6 +5784,7 @@
       "timestamp": "2026-05-06T09:01:57.882584",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0fa3f5b2bc67a7e0b4ab36514d808d68c3d4f4031e7b5e1b2ce35fc6959e6d59"
     },
     {
@@ -5352,6 +5797,7 @@
       "timestamp": "2026-05-02T21:05:03.629935",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "23227ee61ebc4119e9b4b57636b974cddb3819531eea477b2372edc51d299a8b"
     },
     {
@@ -5364,6 +5810,7 @@
       "timestamp": "2026-05-06T09:36:34.772887",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d4576bc3f8761eb3d473b8e139c777093fc6b00b454ae6acae80bf6063190d69"
     },
     {
@@ -5376,6 +5823,7 @@
       "timestamp": "2026-05-02T21:05:36.234155",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d7e9ed3f1e47423ef31b3cb69e4244992e7fa6e690e96247e048ddd9734f12a4"
     },
     {
@@ -5388,6 +5836,7 @@
       "timestamp": "2026-05-06T09:37:13.161848",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "05d446c0a74ab7ceefa9c878608cf7d1b7b960f140baaeb011206094ba1ea1bd"
     },
     {
@@ -5400,6 +5849,7 @@
       "timestamp": "2026-05-02T21:06:57.377953",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "57768d76c24aea0cf820ac9077cad1e3b33de6417ebc7554faaab115f3b84444"
     },
     {
@@ -5412,6 +5862,7 @@
       "timestamp": "2026-05-06T09:39:15.786731",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0704d89d267676e5732af8e53319a3780289fa895f04f387438d515869cdef67"
     },
     {
@@ -5424,6 +5875,7 @@
       "timestamp": "2026-05-06T11:29:07.394421",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "454583b49638952f36ef0efcd2deedcda1bc7817422d32db8997a45e7517bfd7"
     },
     {
@@ -5436,6 +5888,7 @@
       "timestamp": "2026-05-06T11:29:21.811984",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "959dcbe2083250fa8c9f37f5e280ba579f8123108817db484c4c8e0d49ac1713"
     },
     {
@@ -5448,6 +5901,7 @@
       "timestamp": "2026-05-06T11:30:47.044610",
       "query_count": 66,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c26e0e9699196076775fedb58a00a1fe301938358a7f64c04f274a5308d53726"
     },
     {
@@ -5460,6 +5914,7 @@
       "timestamp": "2026-05-02T18:29:16.809800",
       "query_count": 660,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2c26c22e87d9eb96657ce941f7ca741901e3e06f4a77ba2653760550a9cc489d"
     },
     {
@@ -5472,6 +5927,7 @@
       "timestamp": "2026-05-02T22:33:56.063184",
       "query_count": 660,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b68ae83d1cc95da8df21e3949a49aa1b5877ef4b5390680b468d9a724e4098b2"
     },
     {
@@ -5484,6 +5940,7 @@
       "timestamp": "2026-05-02T18:29:35.088229",
       "query_count": 660,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "5e79a07d15eff3f13c2622ab41281a3f7231c1871e9051ab97507bd112a38b10"
     },
     {
@@ -5496,6 +5953,7 @@
       "timestamp": "2026-05-02T22:34:04.217687",
       "query_count": 660,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "862b5a360da4a8253bb66c109c738e43c633040224c7ee07e9d14ed3da346681"
     },
     {
@@ -5508,6 +5966,7 @@
       "timestamp": "2026-05-02T18:04:25.712264",
       "query_count": 660,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "7390e29ad2d2297eb962766ee2cfe75cd8dba3836f784ba4de5e494cfe6d24e8"
     },
     {
@@ -5520,6 +5979,7 @@
       "timestamp": "2026-05-02T18:11:23.327789",
       "query_count": 660,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c362aa03ea79becacab7db38240e41184ac3c00ea6f346c7392c172e03b9f67c"
     },
     {
@@ -5532,6 +5992,7 @@
       "timestamp": "2026-05-02T21:13:25.522479",
       "query_count": 660,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "654c522d8c21c70c72dabed202bb0d157a90acff0160a0228e8eef4240b95c43"
     },
     {
@@ -5544,6 +6005,7 @@
       "timestamp": "2026-05-02T21:13:29.628744",
       "query_count": 660,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e9acc839fd7436b2905ebe44c1e5bd932d1cb66568aff4be8818b3ecd19db0f2"
     },
     {
@@ -5556,6 +6018,7 @@
       "timestamp": "2026-05-02T20:55:15.956108",
       "query_count": 660,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6c839ef335da1667b7fd184859925ded056a624680c9d6a88206cb1820974025"
     },
     {
@@ -5568,6 +6031,7 @@
       "timestamp": "2026-05-02T21:04:40.475770",
       "query_count": 660,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "30f1abb12b8bc5617fadd2ea76b9ff04b8ae0fc0b1f4385634785c85229f0aa6"
     },
     {
@@ -5580,6 +6044,7 @@
       "timestamp": "2026-05-06T08:12:22.349749",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "a8cbe777c36739f9020d38af0b4f5889165ed3d59c14ce79129fee3aebba7ac3"
     },
     {
@@ -5592,6 +6057,7 @@
       "timestamp": "2026-05-06T08:12:29.581880",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c0f57bc2132b70d946d6b59ca687798a87ec8dbc5b6f5333786e787eb4c68da1"
     },
     {
@@ -5604,6 +6070,7 @@
       "timestamp": "2026-05-06T08:13:22.514672",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9d8207a1e75e8489e6e0484469cec65dece4b9b008cb7e09aef740373e7842fd"
     },
     {
@@ -5616,6 +6083,7 @@
       "timestamp": "2026-05-06T10:49:36.692626",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "36135aa753d1db74fa47082839dd7ec00da8defc0ce5ed0f56467991385830a4"
     },
     {
@@ -5628,6 +6096,7 @@
       "timestamp": "2026-05-06T10:49:39.389568",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "746fec50e2d528e6bb3ff99b2e64ccfb3b51ab60abf77c72f286a91eed3d1711"
     },
     {
@@ -5640,6 +6109,7 @@
       "timestamp": "2026-05-06T10:49:42.070444",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3dc7ee9f1a02a401eec0517734eb4042a71812a1379fde6f61546241da718953"
     },
     {
@@ -5652,6 +6122,7 @@
       "timestamp": "2026-05-02T22:33:39.515242",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "89d85163ac0b0e7c00b2c3421b0024bd26ce4297210fd4c450003770aa22f0fb"
     },
     {
@@ -5664,6 +6135,7 @@
       "timestamp": "2026-05-02T22:33:40.942363",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8371de6fa5329bfce0d85c12458944de7c614032c41ad7da82e1d60d8971af76"
     },
     {
@@ -5676,6 +6148,7 @@
       "timestamp": "2026-05-02T22:33:42.362839",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bb2b6ed864c7a5a47611298395112c83b9cab1c44e04ebfb3f8522491e65a09b"
     },
     {
@@ -5688,6 +6161,7 @@
       "timestamp": "2026-05-05T19:56:07.471714",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "427c757a42b1dbedd1d101e82bcf6f2926216f432361d077d88224079a29b44f"
     },
     {
@@ -5700,6 +6174,7 @@
       "timestamp": "2026-05-05T19:56:16.918660",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "69f6ceade0b7f1f1d4ecd1e638fb3fcc214ae4bd2e69d4cc9dd4644e1bb4a011"
     },
     {
@@ -5712,6 +6187,7 @@
       "timestamp": "2026-05-05T19:57:18.748525",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9e65ed02bd2dcee3432e407d8d0b2af30d86647d28a78d38193051eb5a4f0127"
     },
     {
@@ -5724,6 +6200,7 @@
       "timestamp": "2026-05-06T09:49:28.997752",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3cdad0929ab7db278ef5841cfa519def85684f70fb7cbeebf35aefc36101b844"
     },
     {
@@ -5736,6 +6213,7 @@
       "timestamp": "2026-05-06T09:49:30.867840",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c959ff3d6c94d5df420785c0b287ec3b91f159924e18da8ebcccc82ee4ae3d54"
     },
     {
@@ -5748,6 +6226,7 @@
       "timestamp": "2026-05-06T09:49:32.719052",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "05e4d3c981a29ee8265254ac43cd1ae852b64951df5e96897c6646f0e071821b"
     },
     {
@@ -5760,6 +6239,7 @@
       "timestamp": "2026-05-02T21:12:54.683863",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "313a4b368a7aa2c964bee7d105db750c0abe4d51514b8f0a6351fbe15d4e0349"
     },
     {
@@ -5772,6 +6252,7 @@
       "timestamp": "2026-05-06T09:42:25.133750",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9c2ab81897fabcb3da1b77775282dbe04056d386f6bc8ad8334da9a853f8be07"
     },
     {
@@ -5784,6 +6265,7 @@
       "timestamp": "2026-05-02T21:12:56.454188",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "fbc5f0ac04d705d600a3a640dd220bc4bc4c8a61b5767444d4a46ccefa3f04cb"
     },
     {
@@ -5796,6 +6278,7 @@
       "timestamp": "2026-05-06T09:42:31.945087",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "9a0dd84228446c14fd896221fe8911d8420654d860c590d6c80dbf1a7ba04536"
     },
     {
@@ -5808,6 +6291,7 @@
       "timestamp": "2026-05-02T21:12:58.232461",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "22075d3c9b2c9abeee61812344e78eece00ae9405f76ec44733ed659a01e00ae"
     },
     {
@@ -5820,6 +6304,7 @@
       "timestamp": "2026-05-06T09:43:23.850244",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "6063fac269ff951f850567bf559b8b744741f9374c6e2c460fa0b4f359ec3a14"
     },
     {
@@ -5832,6 +6317,7 @@
       "timestamp": "2026-05-06T12:25:53.656060",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c11a331d21b1b31fcbe0a35e7c8417d51c33953ace2c6820440b8ea8638c581b"
     },
     {
@@ -5844,6 +6330,7 @@
       "timestamp": "2026-05-06T12:26:03.724816",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "01a9d013f57a2ddf56da95eb352cda8d4f68fb422464a19048754fe3dac3f9ff"
     },
     {
@@ -5856,6 +6343,7 @@
       "timestamp": "2026-05-06T12:28:03.157846",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "1114949a59603be0476e2a39d3d9eb3f12af4e83b7f55a8865772386ea56d917"
     },
     {
@@ -5868,6 +6356,7 @@
       "timestamp": "2026-05-02T21:47:03.412093",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "47dc8b9a743d15dd79493506a2cde95af1cd2e3e591a9c039f7dc1a246e92b29"
     },
     {
@@ -5880,6 +6369,7 @@
       "timestamp": "2026-05-06T10:15:45.233006",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "903e5159f32cc984c150a1265c42d2eee6a5f488cc44f6e4aa1c181d42d24cd8"
     },
     {
@@ -5892,6 +6382,7 @@
       "timestamp": "2026-05-02T21:47:08.654098",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "37e628dc1b5a4f672b8e64109e635ed5730a0660b752bbb43eb7692c6b328f99"
     },
     {
@@ -5904,6 +6395,7 @@
       "timestamp": "2026-05-06T10:15:50.468314",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "14828b0449e96af8af1da434413e1d501cb6b7d58b47e957702b8f4759797003"
     },
     {
@@ -5916,6 +6408,7 @@
       "timestamp": "2026-05-02T21:47:13.877127",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "e03c0a9b81f4f83575bcbb88d42b0d754dcef2e88d2f45f09c9e316bf70a6367"
     },
     {
@@ -5928,6 +6421,7 @@
       "timestamp": "2026-05-06T10:15:55.731978",
       "query_count": 0,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "4eb1e2b44c2ff290b9b43bb8727e3d5ae4b005a9079f46a6df46f38ba82d3ca8"
     },
     {
@@ -5940,6 +6434,7 @@
       "timestamp": "2026-05-02T19:59:23.581794",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3a55ddd81055af0bf5df3b5dce56047dac1480c10e6285b0d9b70647792079a5"
     },
     {
@@ -5952,6 +6447,7 @@
       "timestamp": "2026-05-02T19:59:28.950947",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0cd2613e3b220b502bce220c4ae491aef7ebd08c2bed12169389b4f213d0069c"
     },
     {
@@ -5964,6 +6460,7 @@
       "timestamp": "2026-05-02T20:00:33.384199",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "21ceac58de5274c329cdccf68a1b7ad5ad40b32855c7767a41abba8ba09fe39c"
     },
     {
@@ -5976,6 +6473,7 @@
       "timestamp": "2026-05-06T11:31:00.064027",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f2a0d81894ff964e73afd00d14542a9ac1d77b2b6ede049f98529fd96327ac27"
     },
     {
@@ -5988,6 +6486,7 @@
       "timestamp": "2026-05-06T11:31:12.598826",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c13347e0b45f490edefbd4854a3d62fb4fd3a22f6aebcff30daca65ac31334b9"
     },
     {
@@ -6000,6 +6499,7 @@
       "timestamp": "2026-05-06T11:32:47.619384",
       "query_count": 54,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d6e6ece882eeab164926ea8380b92b1c0f19ec389e20e06bf583c2fe72e606ca"
     },
     {
@@ -6012,6 +6512,7 @@
       "timestamp": "2026-05-06T08:19:45.614115",
       "query_count": 18,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "1901089e8776fd6af7cbdd83a304425fe06bdd91ad1fa3f02e3257c69e2d01e9"
     },
     {
@@ -6024,6 +6525,7 @@
       "timestamp": "2026-05-06T08:19:52.570983",
       "query_count": 18,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "3f49cedfc85a50c007930687edc412478c54e5f3faa50ffa14e4b16eecbb0b71"
     },
     {
@@ -6036,6 +6538,7 @@
       "timestamp": "2026-05-06T08:20:49.504572",
       "query_count": 18,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b90c04330c79e24d6e2b030688e465d4f69bafbd9f7ed1e7e9aba99dd6c9da97"
     },
     {
@@ -6048,6 +6551,7 @@
       "timestamp": "2026-05-05T20:23:59.728218",
       "query_count": 18,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "f32f977b54c956847612c934cd69b11d7750bc0a5b0c26f98caccf887551233b"
     },
     {
@@ -6060,6 +6564,7 @@
       "timestamp": "2026-05-05T20:24:06.204205",
       "query_count": 18,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "8aae474090607f380f25dd1036ab0235603a599da3454c35e5c657e393251de4"
     },
     {
@@ -6072,6 +6577,7 @@
       "timestamp": "2026-05-05T20:24:53.232805",
       "query_count": 18,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "03c16eac52a409c8e1d35d740a9bcac354a887fb0300961f0e301f3c99ee3e0a"
     },
     {
@@ -6084,6 +6590,7 @@
       "timestamp": "2026-05-06T11:41:46.407096",
       "query_count": 18,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "96a39a2bd8ba665dc7661cc0897c1bfa79f16623c5637719e4ece926516a0223"
     },
     {
@@ -6096,6 +6603,7 @@
       "timestamp": "2026-05-06T11:41:54.447670",
       "query_count": 18,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "de04d329f5d475964e899af874b7affda551e3b0dafb0550fc3f208c5e969c70"
     },
     {
@@ -6108,6 +6616,7 @@
       "timestamp": "2026-05-06T11:43:04.889903",
       "query_count": 18,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b1ca25648fcbb142536b416a3d406e8a021961e10ec583d3a5a89f5395e91919"
     },
     {
@@ -6120,6 +6629,7 @@
       "timestamp": "2026-05-02T18:27:20.473109",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c863747aa49300201eca027a91aae4bd9a2471681cf8e1c3eac7d1e15522b91a"
     },
     {
@@ -6132,6 +6642,7 @@
       "timestamp": "2026-05-02T22:30:01.455830",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0210bcccc995cc337637d7ad3a8caf12b4b5aa7217f4baa9237f75b39801c27a"
     },
     {
@@ -6144,6 +6655,7 @@
       "timestamp": "2026-05-02T18:27:23.071625",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b98c3ef9ee0bbfa30378e2acf9c4162a68c3aa719d22f1c93007d51f6e6f384d"
     },
     {
@@ -6156,6 +6668,7 @@
       "timestamp": "2026-05-02T22:30:10.041715",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "acc9da2d0f5ccd7d27113d0f49b051006890241f6c0f29a11862b6eedff86019"
     },
     {
@@ -6168,6 +6681,7 @@
       "timestamp": "2026-05-02T18:27:28.858615",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "d02416b4cd0a2858f5c3538fb947019653bcfdc8ee274af15fb3152b34c45fa5"
     },
     {
@@ -6180,6 +6694,7 @@
       "timestamp": "2026-05-02T22:30:37.070104",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "377fb3694929d0bcc7dd021074648fd5289762addae9bf19e9d0e64e2c30fb50"
     },
     {
@@ -6192,6 +6707,7 @@
       "timestamp": "2026-05-02T21:09:09.829462",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "705dac41c8b22dd6c728e57c9fdfd619b1a6730584b679916a567e6fbb36de80"
     },
     {
@@ -6204,6 +6720,7 @@
       "timestamp": "2026-05-02T21:09:18.551803",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "761eb5f21702d43e6499e408454d8ce44b88db09a0ab6fd383ace0ace10230a6"
     },
     {
@@ -6216,6 +6733,7 @@
       "timestamp": "2026-05-02T21:09:45.597597",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "bc32f6ae9714648cae835720f3e23d80a21561de444476d60ea8ceb484ddbc32"
     },
     {
@@ -6228,6 +6746,7 @@
       "timestamp": "2026-05-02T21:41:32.929340",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "0ceb6d037270aae0b5da45df3f25f578d8ffaf65fccbe256cde3078c7132a3ce"
     },
     {
@@ -6240,6 +6759,7 @@
       "timestamp": "2026-05-02T21:41:41.585004",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "c76b0e1618732dc8e60dfa0a23c8e1aed46b3fa4a957eb15a97a306eea3c45e4"
     },
     {
@@ -6252,6 +6772,7 @@
       "timestamp": "2026-05-02T21:42:08.605930",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "fc7bc40c576b44013ee48aac4541fe0736240c8187ad0dd49609e6f4053fd881"
     },
     {
@@ -6264,6 +6785,7 @@
       "timestamp": "2026-05-02T19:25:40.405808",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "b3655f0f9c2eb685ce1cf472fc7839d174bf8bcee7b6873156974ca9a41e0481"
     },
     {
@@ -6276,6 +6798,7 @@
       "timestamp": "2026-05-02T19:26:23.642014",
       "query_count": 351,
       "trust_label": "community-submission",
+      "funding": "unspecified",
       "bundle_sha256": "2008880a6cead5eb34cf8ba1bb7bc252011864d44c7b672e3c17f27b5e88b72a"
     }
   ],
@@ -6815,6 +7338,9 @@
     "by_trust_label": {
       "community-submission": 511,
       "maintainer-run": 12
+    },
+    "by_funding": {
+      "unspecified": 523
     }
   }
 }

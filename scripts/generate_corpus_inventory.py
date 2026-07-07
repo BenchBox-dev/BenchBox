@@ -18,8 +18,37 @@ SKIP_NAMES = {"corpus-inventory.json", "submission-manifest.json"}
 COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
 SUBMISSION_MANIFEST = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
-COMMUNITY_TRUST_LABEL = "community-submission"
-DEFAULT_TRUST_LABEL = "maintainer-run"
+
+# Canonical provenance vocabulary. Import the one source of truth when the full
+# package is available; fall back to inline literals on the slim
+# published-results branch (which runs this script without benchbox/). Keep the
+# fallback in lockstep with benchbox/core/results/provenance.py.
+try:
+    from benchbox.core.results.provenance import DEFAULT_FUNDING, FUNDING_SOURCES, SOURCE_TO_TRUST_LABEL
+except ImportError:  # pragma: no cover - slim published-results branch.
+    FUNDING_SOURCES = ("employer", "personal", "free-trial", "vendor-sponsored", "grant", "unspecified")
+    DEFAULT_FUNDING = "unspecified"
+    SOURCE_TO_TRUST_LABEL = {
+        "internal": "maintainer-run",
+        "community": "community-submission",
+        "vendor": "vendor-supplied",
+    }
+
+DEFAULT_TRUST_LABEL = SOURCE_TO_TRUST_LABEL["internal"]
+COMMUNITY_TRUST_LABEL = SOURCE_TO_TRUST_LABEL["community"]
+VENDOR_TRUST_LABEL = SOURCE_TO_TRUST_LABEL["vendor"]
+
+# A bundle whose path lives under this directory component is maintainer-curated
+# vendor-supplied output (gated by CODEOWNERS on the published-results branch);
+# the submission validator enforces that only such bundles may carry the vendor
+# result_source. See benchbox/validation/bundle.py::_validate_manifest_provenance.
+VENDOR_SUBTREE_COMPONENT = "vendor"
+
+
+def _normalize_funding(value: object) -> str:
+    """Return a known funding value, defaulting unknown/empty to 'unspecified'."""
+    token = str(value).strip().lower() if value is not None else ""
+    return token if token in FUNDING_SOURCES else DEFAULT_FUNDING
 
 
 def discover_bundles(bundles_dir: Path) -> list[Path]:
@@ -38,18 +67,65 @@ def _bundle_hash(bundle_path: Path) -> str:
     return hashlib.sha256(bundle_path.read_bytes()).hexdigest()
 
 
-def _bundle_trust_label(bundle_path: Path) -> str:
-    """Resolve trust label using the established sidecar-presence contract.
+def _is_vendor_subtree(bundle_path: Path, bundles_dir: Path) -> bool:
+    """True when the bundle lives directly under the top-level ``vendor/`` subtree.
 
-    Prefers the per-bundle name (`<stem>.manifest.json`); falls back to the
-    legacy singleton (`submission-manifest.json`) so already-merged
-    submissions keep their community label.
+    Anchored to ``<bundles_dir>/vendor/...`` (the first path component under the
+    bundles root), NOT any nested directory that merely happens to be named
+    ``vendor`` — so the label surface matches a CODEOWNERS prefix of
+    ``/results-data/bundles/vendor/``. This is the maintainer-controlled path;
+    CODEOWNERS on the submission branch gates who may add to it (that gate is the
+    enforced control — the trust label here is derived from the resulting path).
     """
+    try:
+        rel = bundle_path.relative_to(bundles_dir)
+    except ValueError:
+        return False
+    return len(rel.parts) >= 2 and rel.parts[0] == VENDOR_SUBTREE_COMPONENT
+
+
+def _bundle_trust_label(bundle_path: Path, bundles_dir: Path) -> str:
+    """Resolve trust label from the bundle's location and sidecar presence.
+
+    Precedence:
+      1. vendor-supplied — bundle under the maintainer-controlled top-level
+         ``vendor/`` subtree (see :func:`_is_vendor_subtree`).
+      2. community-submission — a submission-manifest sidecar is present. Prefers
+         the per-bundle name (`<stem>.manifest.json`); falls back to the legacy
+         singleton (`submission-manifest.json`) so already-merged submissions
+         keep their community label.
+      3. maintainer-run — the default for maintainer-committed bundles.
+    """
+    if _is_vendor_subtree(bundle_path, bundles_dir):
+        return VENDOR_TRUST_LABEL
     per_bundle = bundle_path.parent / f"{bundle_path.stem}{SUBMISSION_MANIFEST_SUFFIX}"
     legacy = bundle_path.parent / SUBMISSION_MANIFEST
     if per_bundle.is_file() or legacy.is_file():
         return COMMUNITY_TRUST_LABEL
     return DEFAULT_TRUST_LABEL
+
+
+def _bundle_funding(bundle_path: Path, data: dict) -> str:
+    """Resolve the funding value for a bundle.
+
+    Precedence: the bundle's own ``provenance.funding`` block, then the
+    submission manifest sidecar's ``funding`` field, then ``unspecified``.
+    """
+    provenance = data.get("provenance")
+    if isinstance(provenance, dict) and provenance.get("funding"):
+        return _normalize_funding(provenance.get("funding"))
+
+    for name in (f"{bundle_path.stem}{SUBMISSION_MANIFEST_SUFFIX}", SUBMISSION_MANIFEST):
+        sidecar = bundle_path.parent / name
+        if sidecar.is_file():
+            try:
+                manifest = json.loads(sidecar.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                break
+            if isinstance(manifest, dict) and manifest.get("funding"):
+                return _normalize_funding(manifest.get("funding"))
+            break
+    return DEFAULT_FUNDING
 
 
 def _query_count(bundle_data: dict) -> int:
@@ -81,7 +157,8 @@ def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:
         "scale_factor": benchmark.get("scale_factor", 0),
         "timestamp": run.get("timestamp"),
         "query_count": _query_count(data),
-        "trust_label": _bundle_trust_label(bundle_path),
+        "trust_label": _bundle_trust_label(bundle_path, bundles_dir),
+        "funding": _bundle_funding(bundle_path, data),
         "bundle_sha256": _bundle_hash(bundle_path),
     }
 
@@ -126,9 +203,10 @@ def generate_inventory(bundles_dir: Path) -> dict:
     by_benchmark = Counter(entry["benchmark"] for entry in entries)
     by_platform = Counter(entry["platform"] for entry in entries)
     by_trust_label = Counter(entry["trust_label"] for entry in entries)
+    by_funding = Counter(entry["funding"] for entry in entries)
 
     return {
-        "schema_version": "2.2",
+        "schema_version": "2.3",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "bundles": entries,
         "cohorts": cohorts,
@@ -137,6 +215,7 @@ def generate_inventory(bundles_dir: Path) -> dict:
             "by_benchmark": dict(sorted(by_benchmark.items())),
             "by_platform": dict(sorted(by_platform.items())),
             "by_trust_label": dict(sorted(by_trust_label.items())),
+            "by_funding": dict(sorted(by_funding.items())),
         },
     }
 
