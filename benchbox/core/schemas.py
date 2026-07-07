@@ -117,6 +117,21 @@ class RunConfig(BaseModel):
     # supports_statistics_phase flag so legacy benchmarks keep
     # load-includes-stats semantics.
     gather_statistics: bool = False
+    # Cold-stats vs warm-stats control for the statistics phase (CLI
+    # --stats-reset/--no-stats-reset). Tri-state, mirroring analyze_plans:
+    # None = knob not used, so the phase behaves exactly as PR #980 shipped
+    # (byte-identical bundles); True = reset/drop statistics before the
+    # rebuild for a cold-stats measurement (adapters with no drop-stats
+    # primitive fall back to a safe no-op and record that in the payload);
+    # False = explicitly persist existing statistics (warm-stats study) -
+    # recorded even though the resulting behavior matches the default so a
+    # bundle can say the control was deliberately exercised.
+    stats_reset: Optional[bool] = None
+    # Opt-in per-table statistics-build timing breakdown (CLI
+    # --stats-per-table-timing). Additive/omitted-when-empty in the
+    # phases.statistics payload; only populated when this adapter's
+    # statistics-build falls back to a per-table ANALYZE loop.
+    stats_per_table_timing: bool = False
     # PyPI distribution name (e.g. "psycopg", "duckdb") - no extras markers or version specifiers
     driver_package: Optional[str] = None
     driver_version: Optional[str] = None
@@ -260,6 +275,10 @@ class BenchmarkConfig(BaseModel):
     # See RunConfig.analyze_plans: tri-state capture-detail knob (None = adapter default).
     analyze_plans: bool | None = None
     strict_plan_capture: bool = False
+    # See RunConfig.stats_reset / RunConfig.stats_per_table_timing: opt-in
+    # statistics-phase reset/persist control and per-table timing breakdown.
+    stats_reset: Optional[bool] = None
+    stats_per_table_timing: bool = False
     options: dict[str, Any] = Field(default_factory=dict)
     compress_data: bool = False
     compression_type: str = "zstd"

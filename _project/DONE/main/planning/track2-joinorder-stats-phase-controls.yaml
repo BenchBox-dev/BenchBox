@@ -1,0 +1,148 @@
+id: track2-joinorder-stats-phase-controls
+title: "Track-2: statistics-phase reset/persist control, per-table breakdown, and idempotence check"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-07-06"
+category: Benchmark Development
+
+description: |
+  Follow-up captured from the statistics-as-a-phase work (track2-joinorder-stats-phase,
+  landed via PR #980). That work delivered the first-class statistics phase
+  (load -> statistics -> query): the StatisticsGatheringPhase dataclass
+  (benchbox/core/results/models.py:131), the per-engine ANALYZE knob
+  (benchbox/platforms/base/adapter.py:384 gather_statistics / :405
+  run_statistics_phase, with the Redshift auto-on-load override), phases.statistics
+  serialization, and the per-benchmark supports_statistics_phase opt-in.
+
+  It resolved exactly ONE of the four "Open design questions" in
+  _project/design/track2-joinorder-stats-as-phase.md (detect-and-disable vs
+  document auto-analyze -> "document", via stats_mode: auto-on-load). The
+  other three were NOT implemented and were not recorded as deferred on the
+  now-DONE seed, so this seed logs them:
+
+    1. (REQUIRED for Track 2) Cold-stats vs warm-stats reset/persist control.
+       The design doc states Track 2 needs BOTH fresh-stats and
+       stale-stats-after-additional-load modes to study statistics maintenance,
+       "so the phase must support an explicit reset/persist control". PR #980's
+       phase only runs ANALYZE once after load; there is no way to reset stats,
+       or to load more data and re-measure with deliberately stale stats. Without
+       this, the replicated/sampled scale-stress work cannot exercise the
+       stale-statistics axis at all.
+    2. (OPTIONAL) Per-table stats-build breakdown. PR #980 reports an aggregate
+       phase duration_ms plus a tables_analyzed count; the design doc's lean was
+       "aggregate phase total with optional per-table breakdown in
+       timing_breakdown". The optional per-table breakdown was not added.
+    3. (SANITY CHECK) Idempotence. Re-running ANALYZE on already-analyzed data
+       should produce the same plan -- the check that the phase measures stats
+       build, not incidental cache warmth. No such assertion exists.
+
+  Consequence being corrected here: track2-joinorder-scaling-strategy's
+  deps.needs and must_preserve treat track2-joinorder-stats-phase (now DONE) as
+  "the statistics-phase requirement satisfied". That is only true for the phase
+  mechanics; the reset/persist control the stale-stats study depends on lives in
+  THIS seed. track2-joinorder-scaling-strategy is updated to also depend on this
+  item so the stats-axis-ready signal is honest.
+
+deps:
+  needs:
+  - track2-joinorder-stats-phase
+
+work:
+- id: w1
+  summary: "Add an explicit reset/persist control to the statistics phase (cold vs warm stats)"
+  status: done
+  notes: |
+    Give the statistics phase a mode/knob controlling whether optimizer
+    statistics are reset (dropped/recomputed for a cold-stats measurement) or
+    persisted across runs so a subsequent additional load leaves stats stale.
+    Add a per-adapter reset hook (sibling of gather_statistics at
+    benchbox/platforms/base/adapter.py:384) with a safe default for engines
+    that cannot drop stats, surfaced through the same LifecyclePhases/RunConfig
+    path that PR #980 used for gather_statistics, and recorded in the
+    phases.statistics payload (e.g. a stats_lifecycle / reset field) so a bundle
+    says which mode produced it. Do NOT change default behavior: absent the
+    knob, the phase behaves exactly as PR #980 shipped.
+- id: w2
+  summary: "Optional per-table stats-build breakdown in the statistics phase payload"
+  needs: [w1]
+  status: done
+  notes: |
+    Extend StatisticsGatheringPhase (benchbox/core/results/models.py:131) and
+    its serializer with an OPTIONAL per-table timing breakdown (the design
+    doc's timing_breakdown lean), omitted when not collected so existing
+    bundles stay byte-identical. Aggregate duration_ms/tables_analyzed remain
+    the primary fields.
+- id: w3
+  summary: "Idempotence sanity check: re-ANALYZE yields the same plan"
+  needs: [w1]
+  status: done
+  notes: |
+    Add a test (opt-in / local engine, e.g. DuckDB or PostgreSQL) asserting
+    that running the statistics phase twice on unchanged data produces the same
+    plan shape / cardinality estimates, so the phase is measuring stats build
+    rather than incidental cache warmth. Mirrors the design doc's idempotence
+    sanity check.
+
+must_preserve:
+- "Default behavior is unchanged from PR #980: without the new reset/persist knob, the statistics phase runs ANALYZE once
+  after load exactly as shipped, and bundles that don't use the control stay byte-identical."
+- "The per-benchmark supports_statistics_phase opt-in gate still governs whether any statistics phase runs; this seed does
+  not make it run by default."
+- "Any new phases.statistics field is additive and omitted-when-empty (the schema-v2 omit-empty rule)."
+
+prior_art:
+- "_project/design/track2-joinorder-stats-as-phase.md 'Open design questions' -- the source list; item 1 (auto-analyze) is
+  done, items 2-4 are this seed's w1-w3."
+- "benchbox/platforms/base/adapter.py:384 gather_statistics / :405 run_statistics_phase (PR #980) -- extend alongside these;
+  the reset hook is their sibling."
+- "benchbox/core/results/models.py:131 StatisticsGatheringPhase (PR #980) -- extend additively for the reset-mode marker (w1)
+  and optional per-table breakdown (w2)."
+- "benchbox/core/runner/runner.py + benchbox/core/schemas.py (PR #980, LifecyclePhases.statistics / RunConfig.gather_statistics)
+  -- the flag-threading precedent for the new reset/persist knob."
+
+anti_patterns:
+- "DO NOT change the default statistics-phase behavior -- the reset/persist control is opt-in; a bare `--phases ...,statistics`
+  run must stay identical to PR #980."
+- "DO NOT force-drop statistics on engines that cannot reset them -- provide a safe no-op/documented fallback and record it
+  in stats_mode/payload rather than failing the run."
+- "DO NOT block on the joinorder data archive -- this is runner/adapter mechanics testable on any opted-in benchmark (tpch/tpcds);
+  it is NOT archive-gated."
+
+verification:
+- description: "Default statistics run is unchanged when the reset/persist control is not requested"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_base_adapter.py -k statistics -q"
+  expected_output: "existing statistics-phase tests still pass"
+- description: "Reset/persist control is exercised and recorded in the payload"
+  command: "uv run -- python -m pytest tests/ -k 'statistics and (reset or persist or stale)' -q"
+  expected_output: "new reset/persist tests pass"
+- description: "This item keeps the TODO graph valid"
+  command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+  expected_output: "Graph validation passed"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/base/"
+  - "benchbox/platforms/"
+  - "benchbox/core/runner/"
+  - "benchbox/core/schemas.py"
+  - "benchbox/core/results/models.py"
+  - "benchbox/core/results/schema.py"
+  - "benchbox/core/results/schema_specs.yaml"
+  - "benchbox/cli/"
+  - "tests/"
+  - "docs/reference/public-contracts.md"
+  - "_project/TODO/main/planning/track2-joinorder-stats-phase-controls.yaml"
+  do_not_modify:
+  - "benchbox/core/joinorder/"
+  - "benchbox/core/benchmark_registry.yaml"
+
+metadata:
+  tags:
+  - joinorder
+  - track-2
+  - statistics-phase
+  - stale-stats
+  - follow-up
+  estimated_effort: "Medium"
+  created_date: "2026-07-06"
