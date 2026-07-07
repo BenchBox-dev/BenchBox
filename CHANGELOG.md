@@ -11,13 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New
 
-- **Query plan capture, hardened** - Plan capture now runs as an explicit
-  isolated phase with a single knob. Plans are keyed correctly across streams
-  and phases, read-phase plans are captured before mid-run mutation, captured
-  plans are reattached when results are loaded, and plan-capture time is
-  excluded from reported query times. Estimated `EXPLAIN` is the default;
-  `ANALYZE` is an explicit opt-in. Deep plans truncate at a configurable
-  `plan_max_depth`.
+- **Query plan capture** - Benchmark runs can now capture query execution
+  plans across supported platforms (DuckDB, PostgreSQL, ClickHouse,
+  DataFusion, and more) and inspect or compare them from the CLI and MCP
+  tools. Capture runs as an explicit isolated phase with a single knob:
+  plans are keyed correctly across streams and phases, read-phase plans are
+  captured before mid-run mutation, captured plans are reattached when
+  results are loaded, and plan-capture time is excluded from reported query
+  times. Estimated `EXPLAIN` is the default; `ANALYZE` is an explicit
+  opt-in. Deep plans truncate at a configurable `plan_max_depth`.
 - **Plan fingerprinting with literal normalization** - Normalized plan
   fingerprints support structural plan comparison, and the new
   `--normalize-plan-literals` flag masks literals (while protecting ordinal
@@ -59,6 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **JoinOrder across engines** - SQLite now indexes JoinOrder tables, Spark
   disables broadcast joins for the fixed dataset, and Presto/Spark run paths
   were corrected for more reliable JoinOrder runs.
+- **DataFusion TPC file ingest** - DataFusion now ingests trailing-delimiter
+  TPC `.tbl`/`.dat` files, with type-aware date-column inference.
 - **Submission validation** - Result submissions now reject invalid trust
   labels and fail on incomplete submission manifests.
 - **Concurrent data fetch** - Archive downloads are guarded against
