@@ -2,7 +2,7 @@ id: "corpus-inventory-and-read-model"
 title: "Surface vendor-supplied label + funding in the corpus inventory and DuckDB read model"
 worktree: "results-labels-funding"
 priority: "High"
-status: "Blocked"
+status: "Under Review"
 description: |
   Integrate the two new signals into the explorer's ingest layer so they reach
   the browser. Two in-repo surfaces change: (1) scripts/generate_corpus_inventory.py,
@@ -51,6 +51,7 @@ prior_art:
   - "tests/unit/core/explorer_pipeline/test_pipeline.py:279-465 trust-label sidecar override tests — extend (add vendor + funding cases)"
   - "tests/unit/core/explorer_pipeline/test_read_model_contract.py + tests/unit/cli/test_explorer_build_contract.py — extend (read_model_version + column set)"
   - "benchbox/core/results/provenance.py (item 1) — reference (mapping + funding enum, imported not duplicated)"
+  - "_project/scripts/explorer_pipeline/models.py:73-97 RANKING_ELIGIBLE_VISIBILITIES + RANKING_ELIGIBLE_TRUST_LABELS — supersede (hardcoded sets OMIT public-vendor-reported/vendor-supplied; reconcile with provenance.py so vendor rows rank per D2). Found by item-1 code review."
 
 work:
   - id: w1
@@ -63,7 +64,7 @@ work:
       community-vs-default); extract funding from the bundle provenance
       block/manifest; add funding to each entry and a by_funding counter to
       the summary; retire the local COMMUNITY/DEFAULT literals.
-    status: pending
+    status: done
   - id: w2
     summary: >-
       Add `funding VARCHAR NOT NULL` to the `results` table in
@@ -74,7 +75,7 @@ work:
       is_ranking_eligible derivation (computed in Python per the G-11
       views-are-bare-columns rule).
     needs: [w1]
-    status: pending
+    status: done
   - id: w3
     summary: >-
       Update the read-model contract tests + corpus-inventory tests for the
@@ -83,7 +84,7 @@ work:
       Record the required read_model_version bump as an explicit obligation
       passed to item 5.
     needs: [w2]
-    status: pending
+    status: done
 
 must_preserve:
   - "corpus-inventory.json remains deterministic (sorted, timestamp-normalized in --check)."

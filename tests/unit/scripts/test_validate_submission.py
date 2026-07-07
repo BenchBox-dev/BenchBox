@@ -9,9 +9,11 @@ from pathlib import Path
 import pytest
 
 from benchbox.validation.bundle import (
+    SUBMISSION_NOTES_MAX_LEN,
     ValidationResult,
     _validate_bundle,
     _validate_manifest_hash,
+    _validate_manifest_provenance,
     discover_bundles,
     format_pr_comment,
     format_summary,
@@ -23,6 +25,61 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+class TestManifestProvenance:
+    """Provenance/funding validation + vendor-label governance (item 3)."""
+
+    def _run(self, manifest: dict, bundle_name: str = "tpch_result.json", subdir: str = "bundles") -> ValidationResult:
+        vr = ValidationResult("test")
+        primary_path = Path("/repo") / "results-data" / subdir / bundle_name
+        _validate_manifest_provenance(manifest, primary_path, vr)
+        return vr
+
+    def test_absent_provenance_fields_ok(self):
+        assert self._run({"bundle_file": "x", "bundle_hash": "y"}).ok
+
+    def test_valid_funding_ok(self):
+        assert self._run({"funding": "free-trial"}).ok
+
+    def test_invalid_funding_rejected(self):
+        vr = self._run({"funding": "crowdfunded"})
+        assert not vr.ok
+        assert any("funding" in e for e in vr.errors)
+
+    def test_notes_too_long_rejected(self):
+        vr = self._run({"submission_notes": "x" * (SUBMISSION_NOTES_MAX_LEN + 1)})
+        assert not vr.ok
+        assert any("submission_notes" in e for e in vr.errors)
+
+    def test_notes_non_string_rejected(self):
+        vr = self._run({"submission_notes": 123})
+        assert not vr.ok
+
+    def test_notes_at_limit_ok(self):
+        assert self._run({"submission_notes": "x" * SUBMISSION_NOTES_MAX_LEN}).ok
+
+    def test_community_source_ok(self):
+        assert self._run({"result_source": "community"}).ok
+
+    def test_internal_source_ok(self):
+        assert self._run({"result_source": "internal"}).ok
+
+    def test_invalid_source_rejected(self):
+        vr = self._run({"result_source": "partner"})
+        assert not vr.ok
+        assert any("result_source" in e for e in vr.errors)
+
+    def test_self_asserted_vendor_outside_vendor_subtree_rejected(self):
+        # The core governance check: a community bundle cannot claim vendor.
+        vr = self._run({"result_source": "vendor"}, subdir="bundles")
+        assert not vr.ok
+        assert any("vendor" in e and "self-assert" in e for e in vr.errors)
+
+    def test_vendor_allowed_under_vendor_subtree(self):
+        vr = self._run({"result_source": "vendor"}, subdir="bundles/vendor")
+        assert vr.ok
+
 
 # ---------------------------------------------------------------------------
 # Fixtures

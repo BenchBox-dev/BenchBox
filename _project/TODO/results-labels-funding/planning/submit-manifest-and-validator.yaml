@@ -2,7 +2,7 @@ id: "submit-manifest-and-validator"
 title: "Carry funding + result_source in the submission manifest; enforce vendor label governance"
 worktree: "results-labels-funding"
 priority: "High"
-status: "Blocked"
+status: "Under Review"
 description: |
   Extend the submission path so contributors disclose funding and so the
   authoritative vendor-supplied label can only be applied under maintainer
@@ -53,20 +53,20 @@ work:
     notes: >-
       Default funding inherits from the bundle's provenance.funding when
       present, else 'unspecified'.
-    status: pending
+    status: done
   - id: w2
     summary: >-
       Add funding, result_source (default 'community' for the submit path), and
       submission_notes to the manifest envelope; keep field order deterministic
       (canonical JSON).
     needs: [w1]
-    status: pending
+    status: done
   - id: w3
     summary: >-
       In validate_submission.py, strictly validate funding in FUNDING_SOURCES and
       result_source in {internal, community, vendor}; reject unknown values.
     needs: [w2]
-    status: pending
+    status: done
   - id: w4
     summary: >-
       Enforce G-VENDOR-SIGNAL: vendor provenance is only valid via the
@@ -76,7 +76,7 @@ work:
       Per the resolved gate: a self-asserted vendor label in an ordinary
       community submission is a hard validation error with a clear message.
     needs: [w3]
-    status: pending
+    status: done
 
 must_preserve:
   - "The bundle_hash / companion_hashes contract and path-traversal + symlink defenses in _validate_manifest_hash are unchanged."

@@ -31,6 +31,7 @@ from benchbox.core.results.loader import (
     find_latest_result,
     load_result_file,
 )
+from benchbox.core.results.provenance import FUNDING_SOURCES, normalize_funding
 from benchbox.core.results.status import result_non_clean_reason
 from benchbox.core.results.submission_history import record_hosted_submission
 from benchbox.core.results.submit_classification import (
@@ -39,6 +40,7 @@ from benchbox.core.results.submit_classification import (
 )
 from benchbox.validation.bundle import (
     COMPANION_SUFFIXES,
+    SUBMISSION_NOTES_MAX_LEN,
     _hash_bytes,
     _hash_file,
     format_summary,
@@ -151,10 +153,21 @@ def _build_submission_manifest(
     result,
     submitted_by: str | None,
     submission_path: str,
+    funding: str | None = None,
+    submission_notes: str | None = None,
 ) -> dict:
-    """Build the shared submission manifest envelope for PR and hosted modes."""
+    """Build the shared submission manifest envelope for PR and hosted modes.
 
-    return {
+    ``result_source`` is hard-coded to ``community``: the public submit CLI is the
+    community contribution path and must never self-assert the ``vendor`` label
+    (that is applied downstream under maintainer control). Funding precedence:
+    explicit ``--funding`` > the bundle's declared ``provenance.funding`` >
+    ``unspecified``.
+    """
+
+    resolved_funding = normalize_funding(funding or getattr(result, "funding", None))
+
+    manifest = {
         "submission_tool_version": f"benchbox/{benchbox.__version__}",
         "submitted_at": datetime.now(timezone.utc).isoformat(),
         "bundle_file": source_path.name,
@@ -166,7 +179,12 @@ def _build_submission_manifest(
         "phase": _SUBMISSION_PHASE,
         "submission_path": submission_path,
         "submitted_by": _resolve_submitted_by(submitted_by),
+        "result_source": "community",
+        "funding": resolved_funding,
     }
+    if submission_notes:
+        manifest["submission_notes"] = submission_notes
+    return manifest
 
 
 def _validate_submission_bundle_for_dry_run(ctx: click.Context, source_path: Path) -> None:
@@ -203,6 +221,8 @@ def _dispatch_service_mode(
     wait: bool,
     dry_run: bool,
     submitted_by: str | None,
+    funding: str | None = None,
+    submission_notes: str | None = None,
 ) -> None:
     """Phase 3 hosted-API submission path.
 
@@ -268,6 +288,8 @@ def _dispatch_service_mode(
             companions=upload_companions,
             result=result,
             submitted_by=submitted_by,
+            funding=funding,
+            submission_notes=submission_notes,
             submission_path="hosted-service",
         )
         bundle_hash = manifest["bundle_hash"]
@@ -472,6 +494,22 @@ def _print_submission_summary(
         "Precedence: this flag > git config user.name > empty (with warning)."
     ),
 )
+@click.option(
+    "--funding",
+    type=click.Choice(FUNDING_SOURCES, case_sensitive=False),
+    default=None,
+    help=(
+        "Disclose how this run was funded. Precedence: this flag > the bundle's "
+        "declared provenance.funding > 'unspecified'."
+    ),
+)
+@click.option(
+    "--notes",
+    "submission_notes",
+    type=str,
+    default=None,
+    help=f"Optional free-text submission notes (max {SUBMISSION_NOTES_MAX_LEN} characters).",
+)
 @click.pass_context
 def submit(
     ctx,
@@ -486,6 +524,8 @@ def submit(
     wait,
     dry_run,
     submitted_by,
+    funding,
+    submission_notes,
 ):
     """Submit a benchmark result bundle to the BenchBox results platform.
 
@@ -525,6 +565,14 @@ def submit(
     Note: benchbox submit shares results publicly. To copy a result to
     storage you control (local path, S3, etc.), use 'benchbox publish'.
     """
+    if submission_notes is not None and len(submission_notes) > SUBMISSION_NOTES_MAX_LEN:
+        console.print(
+            f"[red]--notes exceeds {SUBMISSION_NOTES_MAX_LEN} characters "
+            f"({len(submission_notes)}). Shorten the note and retry.[/red]"
+        )
+        ctx.exit(1)
+        return
+
     if result_file:
         source_path = Path(result_file)
     elif last:
@@ -633,6 +681,8 @@ def submit(
             wait=wait,
             dry_run=dry_run,
             submitted_by=submitted_by,
+            funding=funding,
+            submission_notes=submission_notes,
         )
         return
 
@@ -674,6 +724,8 @@ def submit(
         companions=packaged_companions,
         result=result,
         submitted_by=submitted_by,
+        funding=funding,
+        submission_notes=submission_notes,
         submission_path="PR-based",
     )
 

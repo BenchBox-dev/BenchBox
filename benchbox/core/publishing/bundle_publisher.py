@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from benchbox.core.results.loader import load_result_file
+from benchbox.core.results.provenance import SOURCE_TO_TRUST_LABEL
 from benchbox.core.results.status import bundle_non_clean_reason, result_non_clean_reason
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 
@@ -27,7 +28,10 @@ from .store import PublicationRecord, PublicationStore, build_reference
 
 logger = logging.getLogger(__name__)
 
-VALID_LABELS = ("maintainer-run", "community-submission", "ci", "local", "unofficial-research")
+# Provenance-derived trust labels (maintainer-run, community-submission,
+# vendor-supplied) come from the canonical provenance vocabulary; the remaining
+# labels are publish-only workflow tags with no result_source counterpart.
+VALID_LABELS = (*SOURCE_TO_TRUST_LABEL.values(), "ci", "local", "unofficial-research")
 
 
 @dataclass

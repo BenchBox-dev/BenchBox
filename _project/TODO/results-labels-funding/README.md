@@ -28,11 +28,13 @@ Give every result in the results explorer two provenance signals it lacks today:
 
 ## Open decision gates (resolved inside the owning work item)
 
-| Gate | Work item | Question |
+| Gate | Work item | Status |
 |---|---|---|
-| G-VENDOR-SIGNAL | `submit-manifest-and-validator` | Exact maintainer-controlled mechanism that applies `vendor-supplied` at merge so it cannot be self-asserted in a community PR. |
-| G-FUNDING-PRIVACY | `corpus-inventory-and-read-model` | Whether `funding` is a public, non-redactable field (proposed: yes — it is a disclosure) and whether `unspecified` is allowed on curated results. |
-| G-READMODEL-COORD | `explorer-pipeline-frontend-handoff` | How the `read_model_version` bump + private `explorer_pipeline`/`results-explorer` edits are coordinated, since that source is not in this checkout. |
+| G-VENDOR-SIGNAL | `submit-manifest-and-validator` | Resolved (Option A: vendor subtree) — but the *enforced* CODEOWNERS half is split out to item 6, still open. |
+| G-FUNDING-PRIVACY | `corpus-inventory-and-read-model` | Resolved — funding is public, non-redactable; `unspecified` allowed. |
+| G-READMODEL-COORD | `explorer-pipeline-frontend-handoff` | Resolved (PR #1021) — version bumped with the populate logic; contract tests guard it. |
+| **G-CODEOWNERS-MECHANISM** | `vendor-label-codeowners-governance` | **Open** — how to add the vendor owner rule given the CODEOWNERS↔SOUNDNESS_PREFIXES 1:1 mirror test. |
+| **G-CODEOWNERS-BRANCH** | `vendor-label-codeowners-governance` | **Open** — which branch(es) (develop / published-results) must carry the vendor owner rule. |
 
 ## Design in one paragraph
 
@@ -48,17 +50,26 @@ validator, and read model agree.
 
 ## Sequenced work items (each shipped via the delivery loop below)
 
-| Order | Item | Depends on | In-repo? |
+| Order | Item | Depends on | Status (2026-07-07) |
 |---|---|---|---|
-| 1 | `provenance-vocabulary-and-labels` | — | Yes |
-| 2 | `bundle-schema-and-run-cli` | 1 | Yes |
-| 3 | `submit-manifest-and-validator` | 1 | Yes |
-| 4 | `corpus-inventory-and-read-model` | 1, 2, 3 | Yes (DDL + inventory) |
-| 5 | `explorer-pipeline-frontend-handoff` | 4 | **No** — spec only; `_project/scripts/explorer_pipeline/` and `results-explorer/` are gitignored and absent from this checkout. |
+| 1 | `provenance-vocabulary-and-labels` | — | ✅ done (PR #1021) |
+| 2 | `bundle-schema-and-run-cli` | 1 | ✅ done (PR #1021) |
+| 3 | `submit-manifest-and-validator` | 1 | ✅ done (PR #1021) |
+| 4 | `corpus-inventory-and-read-model` | 1, 2, 3 | ✅ done (PR #1021) |
+| 5 | `explorer-pipeline-frontend-handoff` | 4 | 🟡 pipeline + badge done; funding **view projection + chip + legend + e2e** remain |
+| 6 | `vendor-label-codeowners-governance` | 3 | ⛔ blocked — enforced CODEOWNERS control for the vendor label (needs a maintainer decision) |
 
-Items 1–3 are independent of each other after item 1 lands and can proceed in
-parallel. Item 4 integrates them into the explorer ingest. Item 5 is a
-hand-off spec because the code it changes lives in maintainer-private trees.
+**Correction:** item 5 was originally scoped as a hand-off spec on the assumption
+that `_project/scripts/explorer_pipeline/` and `results-explorer/` were absent;
+they are in fact present in the checkout, so item 5 is real in-repo code — the
+pipeline half (funding column, vendor derivation, read_model_version bump) and the
+vendor badge are done; the funding **disclosure surface** (view projection → chip
+→ legend → e2e) remains.
+
+**Item 6** was added after the item-3 security review found that the vendor label's
+*enforced* control (CODEOWNERS on `results-data/bundles/vendor/`) does not yet
+exist — only the advisory validator guard does. It is blocked on a maintainer
+decision (it couples to the auto-merge soundness-mirror machinery).
 
 ## Standard delivery loop (per work item)
 

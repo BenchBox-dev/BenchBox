@@ -406,6 +406,13 @@ class BenchmarkResults:
     dataset_version: str | None = None
     manifest_hash: str | None = None
     data_archive_hash: str | None = None
+    # Result provenance (see benchbox.core.results.provenance). funding = how the
+    # run was paid for; result_source = an advisory producer hint (internal/
+    # community/vendor). Both optional; absent -> no provenance block in the bundle.
+    # The authoritative vendor trust label is assigned downstream under maintainer
+    # control, never from result_source here.
+    funding: str | None = None
+    result_source: str | None = None
 
     @property
     def benchmark_id(self) -> str:

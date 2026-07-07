@@ -309,6 +309,37 @@ def test_submit_manifest_contains_bundle_hash(monkeypatch: pytest.MonkeyPatch, t
     assert "submitted_by" in manifest  # Phase 2: optional, may be empty string
 
 
+def test_submit_manifest_provenance_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    CliRunner().invoke(
+        sub.submit,
+        [str(src), "--output", str(out_dir), "--funding", "free-trial", "--notes", "ran on a laptop"],
+    )
+
+    manifest = json.loads((out_dir / "tpch_duckdb.manifest.json").read_text(encoding="utf-8"))
+    # The public submit CLI is the community path and never self-asserts vendor.
+    assert manifest["result_source"] == "community"
+    assert manifest["funding"] == "free-trial"
+    assert manifest["submission_notes"] == "ran on a laptop"
+
+
+def test_submit_manifest_funding_defaults_to_unspecified(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+
+    manifest = json.loads((out_dir / "tpch_duckdb.manifest.json").read_text(encoding="utf-8"))
+    assert manifest["funding"] == "unspecified"
+    assert "submission_notes" not in manifest  # omitted when not provided
+
+
 # ---------------------------------------------------------------------------
 # 6. Bad file → user-friendly error, exit 1
 # ---------------------------------------------------------------------------

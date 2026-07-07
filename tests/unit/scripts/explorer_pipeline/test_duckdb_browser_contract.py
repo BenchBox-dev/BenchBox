@@ -76,6 +76,7 @@ class TestG1SchemaContract:
             "ranking_exclusion_reason",
             "trust_label",
             "visibility",
+            "funding",
             "platform_version",
             "execution_mode",
             "tuning_mode",

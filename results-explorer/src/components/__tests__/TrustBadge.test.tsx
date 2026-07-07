@@ -105,6 +105,7 @@ describe("TrustBadge", () => {
   const PUBLISHER_VALID_LABELS = [
     "maintainer-run",
     "community-submission",
+    "vendor-supplied",
     "ci",
     "local",
     "unofficial-research",

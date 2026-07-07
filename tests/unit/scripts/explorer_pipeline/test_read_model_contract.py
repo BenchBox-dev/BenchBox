@@ -478,6 +478,12 @@ class TestRankingEligibility:
         entry = self._make_entry("ci", "public-verified")
         assert is_ranking_eligible(entry) is True
 
+    def test_vendor_supplied_is_eligible(self) -> None:
+        # Decision D2: vendor-supplied results are ranked (with a distinct badge),
+        # not demoted to browse-only like community submissions.
+        entry = self._make_entry("vendor-supplied", "public-vendor-reported")
+        assert is_ranking_eligible(entry) is True
+
     def test_community_submission_self_reported_is_not_eligible(self) -> None:
         entry = self._make_entry("community-submission", "public-self-reported")
         assert is_ranking_eligible(entry) is False

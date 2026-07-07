@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS results (
     ranking_exclusion_reason    VARCHAR,
     trust_label          VARCHAR  NOT NULL,
     visibility           VARCHAR  NOT NULL,
+    funding              VARCHAR  NOT NULL,
     platform_version     VARCHAR,
     execution_mode       VARCHAR,
     tuning_mode          VARCHAR,

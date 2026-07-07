@@ -2,7 +2,7 @@ id: "bundle-schema-and-run-cli"
 title: "Emit a provenance block (funding) in schema-v2 bundles and add run --funding"
 worktree: "results-labels-funding"
 priority: "High"
-status: "Blocked"
+status: "Under Review"
 description: |
   Make funding a declared property of a run, captured where the run happens.
   Today the schema-v2 bundle (benchbox/core/results/schema.py, CANONICAL_KEY_ORDER
@@ -41,6 +41,7 @@ prior_art:
   - "benchbox/core/results/schema.py:40-58 CANONICAL_KEY_ORDER + :311-353 payload build — extend (add 'provenance' as an optional, canonically-ordered section like 'environment')"
   - "benchbox/core/results/models.py:268-383 BenchmarkResults — extend (add funding + optional result_source fields, defaulted so no call site breaks)"
   - "benchbox/cli/commands/run.py:2655-2666 --publish-target/--publish-label options — reference (mirror option style; --funding lives next to these run-scoped options)"
+  - "benchbox/cli/commands/run.py:2721 --publish-label help string — extend (already stale: omits unofficial-research, now also vendor-supplied; refresh while adding --funding here). Found by item-1 code review."
   - "benchbox/core/results/provenance.py (item 1) — reference (funding enum + normalize; the ONLY source of valid values)"
   - "tests/unit/core/explorer_pipeline/conftest.py:15-84 MINIMAL_BUNDLE — reference (must still validate with no provenance block)"
 
@@ -50,7 +51,7 @@ work:
       Add funding: str | None (default None) and result_source: str | None to
       BenchmarkResults; ensure result_factory/aggregation paths pass them through
       without requiring them.
-    status: pending
+    status: done
   - id: w2
     summary: >-
       In schema.py, emit an optional 'provenance' section only when funding
@@ -59,7 +60,7 @@ work:
       Normalize funding via provenance.normalize_funding(); add 'provenance'
       to CANONICAL_KEY_ORDER.
     needs: [w1]
-    status: pending
+    status: done
   - id: w3
     summary: >-
       Add `benchbox run --funding` (Choice from FUNDING_SOURCES) and a
@@ -68,7 +69,7 @@ work:
       Default 'unspecified' -> emitted only if explicitly set; plumb into
       the result.
     needs: [w1, w2]
-    status: pending
+    status: done
 
 must_preserve:
   - "MINIMAL_BUNDLE and all existing schema-v2 fixtures validate unchanged (no provenance block required)."

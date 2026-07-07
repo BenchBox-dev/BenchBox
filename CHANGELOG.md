@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New
 
+- **Result provenance vocabulary** - Added a canonical
+  `benchbox.core.results.provenance` module defining the result-source →
+  trust-label → visibility mapping (including the new `vendor-supplied` label
+  for vendor-produced results) and a funding-disclosure vocabulary
+  (`employer` / `personal` / `free-trial` / `vendor-sponsored` / `grant` /
+  `unspecified`). `vendor-supplied` is a valid publish label and is
+  ranking-eligible with a distinct badge. Foundation for surfacing vendor vs
+  internal vs community provenance and run funding in the results explorer.
 - **Databricks Liquid Clustering** - Added TPC-H and TPC-DS tuning profiles that
   apply Databricks Liquid Clustering for more representative runs.
 

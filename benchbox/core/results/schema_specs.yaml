@@ -13,6 +13,7 @@ canonical_key_order:
 - cost
 - normalized_cost
 - execution
+- provenance
 - environment
 - export
 - errors

@@ -153,6 +153,7 @@ search indexes or compare views.
 | `private` | Submitter only | No | Phase 3 |
 | `unlisted` | Anyone with the direct URL | No | Phase 3 |
 | `public-self-reported` | Everyone | Yes | Phase 2+ |
+| `public-vendor-reported` | Everyone | Yes | Phase 2+ |
 | `public-curated` | Everyone | Yes | Phase 1+ |
 | `public-verified` | Everyone | Yes | Future (reserved) |
 
@@ -168,6 +169,16 @@ specific audience. Not available before Phase 3.
 **`public-self-reported`** - Fully public and indexed. Results submitted via
 community PR (Phase 2) or self-service API (Phase 3) start in this state.
 The result carries a "Self-Reported" label (see Section 2.2).
+
+**`public-vendor-reported`** - Fully public and indexed. Results produced by the
+platform vendor itself (rather than BenchBox maintainers or an arms-length
+community contributor). The vendor has a direct interest in the outcome, so the
+result carries a distinct "Vendor Supplied" label (see Section 2.2). Unlike
+`public-self-reported`, vendor-reported results are ranking-eligible (see
+Section 3.4): the conflict of interest is disclosed via the badge rather than by
+excluding the result from ranked tables. The vendor label is applied under
+maintainer control at publication and cannot be self-asserted through the
+community submission path.
 
 **`public-curated`** - Fully public and indexed. Results generated and
 committed by BenchBox maintainers carry this visibility. This is the only
@@ -185,12 +196,40 @@ and manifest index cards.
 | Label | Display text | Visibility state | Meaning |
 |---|---|---|---|
 | `maintainer-run` | "Maintainer Run" | `public-curated` | Run by BenchBox maintainers in a controlled environment |
-| `community-submission` | "Community Submission" | `public-self-reported` | Submitted by a community contributor via PR or API |
+| `community-submission` | "Community Submission" | `public-self-reported` | Submitted by an arms-length community contributor via PR or API |
+| `vendor-supplied` | "Vendor Supplied" | `public-vendor-reported` | Produced by the platform vendor itself; applied under maintainer control, never self-asserted |
 | `verified` | "Verified" | `public-verified` | Attested by a third party (reserved, not yet in use) |
 
 Trust labels are informational. They do not imply that one result is more
 accurate than another; they communicate who ran the benchmark and under what
 level of review.
+
+The trust label is derived from a result's `result_source` (`internal` →
+`maintainer-run`, `community` → `community-submission`, `vendor` →
+`vendor-supplied`). This mapping, the visibility states, and the funding
+vocabulary (Section 2.4) are defined once in
+`benchbox/core/results/provenance.py`; the CLI, submission validator, corpus
+inventory, and explorer read model all import it rather than re-deriving the
+strings.
+
+### 2.4 Funding Disclosure
+
+Independent of `result_source`, every result may declare how the run was funded.
+Funding is orthogonal to provenance — a vendor-supplied result may be
+employer-funded, and a community result may be on a free trial. Funding is a
+public, informational disclosure; it does not affect ranking eligibility.
+
+| Funding value | Meaning |
+|---|---|
+| `employer` | Paid for by the runner's employer |
+| `personal` | Paid for out of pocket by an individual |
+| `free-trial` | Run on a free trial or promotional credits |
+| `vendor-sponsored` | The platform vendor paid for or sponsored the run |
+| `grant` | Funded by a research or institutional grant |
+| `unspecified` | Not disclosed (the default when no funding is declared) |
+
+Funding is declared by the producer at run time and carried through submission;
+`unspecified` is always a valid value.
 
 ### 2.3 Phase-by-Phase Display Rules
 
@@ -279,6 +318,7 @@ leaderboard views within a cohort.
 | Visibility state | Eligible for ranked tables |
 |---|---|
 | `public-curated` | Yes |
+| `public-vendor-reported` | Yes (badged) |
 | `public-verified` | Yes (reserved) |
 | `public-self-reported` | No |
 | `unlisted` | No |
@@ -288,6 +328,10 @@ leaderboard views within a cohort.
 pairwise comparison, but they are excluded from any sorted table that is
 presented as a ranking. This prevents unverified results from affecting the
 official leaderboard within a cohort.
+
+`public-vendor-reported` results **are** ranking-eligible, but always render
+with the distinct "Vendor Supplied" badge so the conflict of interest is
+visible in the ranked table. The disclosure is the badge, not exclusion.
 
 Ranking totals and cohort-relative speedups count only ranking-eligible rows
 with non-null primary metrics. Visible rows that are not eligible keep their
@@ -318,6 +362,7 @@ admin.
 | `validation_status` | Per-query validation result (passed/failed/skipped) |
 | `submission_date` | Date the result was published to the corpus |
 | `trust_label` | The trust label assigned at publication |
+| `funding` | How the run was funded (see Section 2.4); `unspecified` when not declared |
 | `public_result_id` | The stable permalink slug |
 | `query_subset` | Which queries were run (full set or named subset) |
 | `tuning_mode` | Whether platform tuning was applied |
