@@ -166,6 +166,24 @@ def test_compare_plans_real_loader_compares_bundles(tmp_path: Path) -> None:
     assert '"property_mismatches": 1' in result.output
 
 
+def test_compare_plans_reports_corrupt_companion_distinctly(tmp_path: Path) -> None:
+    """qpc-05 / F4.3: when one run's .plans.json exists but is corrupt,
+    compare-plans (explicit --query-id) must say the plans file failed to load,
+    NOT the generic 'missing plan in one or both runs'. Real loader, no
+    monkeypatch."""
+    p1 = tmp_path / "r1.json"
+    p2 = tmp_path / "r2.json"
+    _write_real_bundle(p1, execution_id="run1", query_id="1", table_name="lineitem")
+    _write_real_bundle(p2, execution_id="run2", query_id="1", table_name="orders")
+    # Corrupt run2's companion.
+    (tmp_path / "r2.plans.json").write_text("{ not valid json", encoding="utf-8")
+
+    result = CliRunner().invoke(cp.compare_plans, ["--run1", str(p1), "--run2", str(p2), "--query-id", "1"])
+
+    assert result.exit_code == 0, result.output
+    assert "failed to load" in result.output
+
+
 def test_compare_plans_uses_load_result_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """compare-plans must use load_result_file for both runs."""
     p1 = tmp_path / "r1.json"

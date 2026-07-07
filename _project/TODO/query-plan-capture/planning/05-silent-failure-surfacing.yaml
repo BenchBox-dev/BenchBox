@@ -2,7 +2,8 @@ id: "qpc-05-silent-failure-surfacing"
 title: "Surface capture/load failures: no more errors converted into absence"
 worktree: "query-plan-capture"
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-07"
 
 description: |
   Four places convert failures into silent absence or garbage:
@@ -36,46 +37,63 @@ work:
     Create: get_query_plan_from_cursor returns None on failure and logs the
     exception; callers (trino/presto/athena/firebolt/azure_synapse display
     paths) handle None.
-  status: pending
+  notes: >-
+    Helper now returns str | None (None + WARNING on failure), no longer the
+    error text as plan. azure_synapse/firebolt annotations updated to
+    str | None (the only helper delegators); display path already handled None.
+    Out of scope: athena/presto/velox/_spark_helpers keep their own inline
+    error-string impls (same F4.2 bug, tracked as a follow-up sweep).
+  status: done
 - id: w2
   summary: >-
     Create: corrupt companion files surface as warnings and a
     plans_load_error field; CLIs report load failure, not "no plans".
   notes: >-
-    _load_companion_file logs WARNING with path+error; load_result_file
-    surfaces plans_load_error; show-plan/compare-plans print "plans file
-    exists but failed to load: <reason>" instead of "no plans captured".
+    _load_companion_file returns (data, error); load_result_file sets
+    result.plans_load_error; show-plan/compare-plans print "plans file exists
+    but failed to load: <reason>" vs the no-plan guidance. Absent companion
+    keeps plans_load_error None (unchanged guidance).
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: >-
     Create: DataFrame capture failures recorded into a per-run capture-error
     list (mirroring _record_plan_capture_failure) so companion errors carry
     the real exception; warn once per run.
+  notes: >-
+    expression_family records failures on self.plan_capture_errors + carries
+    plan_capture_error on the query row, warned once per run. Scope-limited
+    partial: threading the cause into the persisted .plans.json errors[]
+    (normalize_query_result drop + benchmark_mixin existing_errors) and a
+    per-run reset are out-of-scope follow-ups.
   needs: [w2]
-  status: pending
+  status: done
 - id: w4
   summary: >-
     Create: DuckDB text parser joins box continuation lines before splitting
     expressions, with a wrapped-filter regression test.
   notes: >-
-    Use an unbalanced-paren heuristic to detect continuations; regression
-    test with the DUCKDB_0_9_FILTER_SCAN fixture asserting one filter
-    expression.
+    _join_wrapped_expressions (paren-balance heuristic) rejoins box-wrapped
+    fragments into one expression before recording; regression test on
+    DUCKDB_0_9_FILTER_SCAN asserts one balanced filter expression.
   needs: [w3]
-  status: pending
+  status: done
 - id: w5
   summary: "Review: adversarial code review (message wording reachable from CLIs, no new crash paths on None plans)."
   needs: [w4]
-  status: pending
+  notes: >-
+    Opus review: CLEAN PASS, no code edits. Verified all four surfaces with
+    adversarial probes; all four guard tests go red on revert; 310 passed;
+    ruff/ty clean. Recorded out-of-scope follow-ups in the PR.
+  status: done
 - id: w6
   summary: "Fix: address review findings; re-run verification."
   needs: [w5]
-  status: pending
+  status: done
 - id: w7
   summary: "Submit PR referencing qpc-05."
   needs: [w6]
-  status: pending
+  status: done
 
 must_preserve:
 - "Display path (show_query_plans) stays best-effort: failures never abort query execution"

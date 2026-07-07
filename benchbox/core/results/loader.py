@@ -148,8 +148,8 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
         raise UnsupportedSchemaError(version_decision.error_message())
 
     # Load companion files if they exist
-    plans_data = _load_companion_file(filepath_obj, ".plans.json")
-    tuning_data = _load_companion_file(filepath_obj, ".tuning.json")
+    plans_data, plans_load_error = _load_companion_file(filepath_obj, ".plans.json")
+    tuning_data, _tuning_load_error = _load_companion_file(filepath_obj, ".tuning.json")
 
     # Reconstruct BenchmarkResults
     try:
@@ -157,15 +157,31 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
     except Exception as e:
         raise ResultLoadError(f"Failed to reconstruct BenchmarkResults: {e}") from e
 
+    # Surface a plans-companion load failure so consumers can distinguish "no
+    # plans were captured" from "a .plans.json exists but could not be read"
+    # (qpc-05 / F4.3). Attached as an attribute rather than swallowed at DEBUG.
+    result.plans_load_error = plans_load_error
+
     return result, data
 
 
-def _load_companion_file(main_file: Path, suffix: str) -> dict[str, Any] | None:
+def _load_companion_file(main_file: Path, suffix: str) -> tuple[dict[str, Any] | None, str | None]:
     """Load a companion file if it exists.
 
-    Computed as an exact basename suffix swap (``name[:-len(".json")] + suffix``)
-    rather than ``Path.with_suffix()`` chained twice or a path-wide
-    ``str.replace(".json", suffix)``: both of those break on a scale-factor
+    Returns ``(data, error)``:
+      - ``(dict, None)`` when the companion loaded successfully;
+      - ``(None, None)`` when no companion file exists (the common case);
+      - ``(None, "<reason>")`` when the companion EXISTS but could not be read
+        or parsed.
+
+    The exists-but-unreadable case is a user-actionable problem (a corrupt or
+    unreadable ``.plans.json``), so it is logged at WARNING and returned as an
+    error string rather than swallowed at DEBUG and reported downstream as "no
+    plans captured" (qpc-05 / F4.3).
+
+    Path arithmetic: an exact basename suffix swap (``name[:-len(".json")] +
+    suffix``) rather than ``Path.with_suffix()`` chained twice or a path-wide
+    ``str.replace(".json", suffix)`` -- both of those break on a scale-factor
     filename like ``result_sf0.1.json`` -- ``with_suffix("")`` leaves
     ``result_sf0.1``, whose OWN suffix is then read as ``.1`` (stripped by
     the second ``with_suffix()`` call, corrupting the basename to
@@ -177,14 +193,15 @@ def _load_companion_file(main_file: Path, suffix: str) -> dict[str, Any] | None:
     companion_name = name[: -len(".json")] + suffix if name.endswith(".json") else name + suffix
     companion_path = main_file.with_name(companion_name)
 
-    if companion_path.exists():
-        try:
-            with open(companion_path, encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError) as e:
-            logger.debug(f"Could not load companion file {companion_path}: {e}")
+    if not companion_path.exists():
+        return None, None
 
-    return None
+    try:
+        with open(companion_path, encoding="utf-8") as f:
+            return json.load(f), None
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Companion file %s exists but could not be loaded: %s", companion_path, e)
+        return None, f"{companion_path.name}: {e}"
 
 
 def reconstruct_benchmark_results(

@@ -259,6 +259,44 @@ class TestLoadResultFile:
         with pytest.raises(FileNotFoundError):
             load_result_file(Path("/nonexistent/file.json"))
 
+    def test_corrupt_plans_companion_sets_plans_load_error(self, tmp_path, caplog):
+        """qpc-05 / F4.3: a .plans.json that exists but is corrupt must surface
+        as result.plans_load_error (and a WARNING), NOT be swallowed and later
+        reported as 'no plans captured'."""
+        import logging
+
+        result_file = tmp_path / "r.json"
+        write_v2_result_file(
+            result_file,
+            version="2.0",
+            platform="DuckDB",
+            queries=[{"id": "1", "ms": 100.0, "rows": 4}],
+        )
+        # A companion that exists but is not valid JSON.
+        (tmp_path / "r.plans.json").write_text("{ not valid json", encoding="utf-8")
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.core.results.loader"):
+            result, _raw = load_result_file(result_file)
+
+        assert result.plans_load_error is not None
+        assert "r.plans.json" in result.plans_load_error
+        assert any("could not be loaded" in rec.getMessage() for rec in caplog.records)
+
+    def test_no_plans_companion_leaves_plans_load_error_none(self, tmp_path):
+        """A run with no .plans.json at all is NOT an error: plans_load_error
+        stays None so consumers say 'no plans captured', not 'failed to load'."""
+        result_file = tmp_path / "r.json"
+        write_v2_result_file(
+            result_file,
+            version="2.0",
+            platform="DuckDB",
+            queries=[{"id": "1", "ms": 100.0, "rows": 4}],
+        )
+
+        result, _raw = load_result_file(result_file)
+
+        assert result.plans_load_error is None
+
     def test_load_result_file_invalid_json(self, tmp_path):
         """Test loading invalid JSON raises ResultLoadError."""
         result_file = tmp_path / "invalid.json"

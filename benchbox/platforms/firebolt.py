@@ -1295,8 +1295,12 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         return statement
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
-        """Get query execution plan for analysis."""
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get query execution plan for analysis.
+
+        Returns ``None`` on EXPLAIN failure (never an error string; see
+        ``get_query_plan_from_cursor``).
+        """
         from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
 
         return get_query_plan_from_cursor(connection, query)

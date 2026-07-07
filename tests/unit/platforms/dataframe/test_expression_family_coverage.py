@@ -162,6 +162,42 @@ class TestExpressionFamilyCoverage:
         assert stats["lineitem"] == 1
         assert "missing" not in stats
 
+    def test_plan_capture_failure_records_real_cause_and_warns_once(self, monkeypatch, caplog):
+        """qpc-05 / F4.4: a DataFrame plan-capture exception must not be
+        swallowed at DEBUG. The real cause is recorded on the (successful) query
+        row and on a per-run plan_capture_errors list, and surfaced ONCE per run
+        at WARNING."""
+        import logging
+
+        import benchbox.platforms.dataframe.expression_family as ef
+
+        def _boom(_df, _platform):
+            raise RuntimeError("capture exploded")
+
+        monkeypatch.setattr(ef, "capture_query_plan", _boom)
+
+        adapter = CoverageExpressionAdapter()
+        ctx = adapter.create_context()
+
+        q_a = DataFrameQuery(query_id="QA", query_name="a", description="a", expression_impl=lambda c: {"rows": 1})
+        q_b = DataFrameQuery(query_id="QB", query_name="b", description="b", expression_impl=lambda c: {"rows": 1})
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.dataframe.expression_family"):
+            result_a, _ = adapter.execute_query_profiled(ctx, q_a, track_memory=False, capture_plan=True)
+            result_b, _ = adapter.execute_query_profiled(ctx, q_b, track_memory=False, capture_plan=True)
+
+        # The query itself still succeeds; capture failure is not fatal.
+        assert result_a["status"] == "SUCCESS"
+        # Real cause carried on the row, not lost.
+        assert result_a["plan_capture_error"] == "capture exploded"
+        assert result_b["plan_capture_error"] == "capture exploded"
+        # Per-run list accumulates every failure with the real cause.
+        assert [e["query_id"] for e in adapter.plan_capture_errors] == ["QA", "QB"]
+        assert all(e["error"] == "capture exploded" for e in adapter.plan_capture_errors)
+        # WARNING is emitted exactly once per run (further failures go to DEBUG).
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING and "capture exploded" in r.getMessage()]
+        assert len(warnings) == 1
+
     def test_execute_query_profiled_success_and_failure(self):
         adapter = CoverageExpressionAdapter(verbose=True)
         ctx = adapter.create_context()

@@ -583,8 +583,15 @@ class DuckDBQueryPlanParser(QueryPlanParser):
                 kwargs["table_name"] = table_name
 
         elif logical_type == LogicalOperatorType.FILTER:
-            # Extract filter expressions
-            filter_exprs = [d for d in details if d and not d.startswith("Filters:")]
+            # Extract filter expressions. DuckDB's text/box format wraps a long
+            # predicate across box-width-sized lines, splitting it mid-token
+            # (e.g. "(l_shipdate <= CAST(" / "'1998-12-01' AS DATE))"). Left as
+            # separate details, each fragment became its OWN filter expression,
+            # so the fingerprint depended on the box wrap width (qpc-05 / F2.3).
+            # Rejoin continuation fragments first so one predicate is one
+            # expression regardless of wrapping.
+            raw_exprs = [d for d in details if d and not d.startswith("Filters:")]
+            filter_exprs = self._join_wrapped_expressions(raw_exprs)
             if filter_exprs:
                 kwargs["filter_expressions"] = filter_exprs
 
@@ -636,6 +643,38 @@ class DuckDBQueryPlanParser(QueryPlanParser):
             physical_operator=physical_op,
             **kwargs,
         )
+
+    @staticmethod
+    def _join_wrapped_expressions(fragments: list[str]) -> list[str]:
+        """Rejoin box-wrapped predicate fragments into whole expressions.
+
+        DuckDB's text/box EXPLAIN wraps a long predicate across fixed-width box
+        lines, splitting it mid-token. Each fragment arrives as a separate
+        detail line; concatenating them back into one expression makes the
+        parsed filter (and thus the plan fingerprint) independent of the box
+        wrap width (qpc-05 / F2.3).
+
+        Heuristic: a fragment whose parentheses are not yet balanced (more ``(``
+        than ``)`` accumulated so far) is a continuation, so the following
+        fragment(s) are appended until the running paren balance returns to
+        zero. Fragments are joined with no separator because DuckDB breaks
+        mid-token at the box edge (trailing pad is stripped), so inserting a
+        separator would corrupt a split token. A trailing unbalanced fragment
+        (never closed) is still emitted so nothing is dropped.
+        """
+        joined: list[str] = []
+        buffer = ""
+        depth = 0
+        for fragment in fragments:
+            buffer += fragment
+            depth += fragment.count("(") - fragment.count(")")
+            if depth <= 0:
+                joined.append(buffer)
+                buffer = ""
+                depth = 0
+        if buffer:
+            joined.append(buffer)
+        return joined
 
     def _harmonize_duckdb_operator(self, duckdb_operator: str) -> LogicalOperatorType:
         """

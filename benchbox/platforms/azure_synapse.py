@@ -1136,11 +1136,12 @@ class AzureSynapseAdapter(PlatformAdapter):
 
         return platform_info
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
         """Get query execution plan for analysis.
 
         Azure Synapse Dedicated SQL pool ``EXPLAIN`` returns the distributed
-        query plan as a single XML cell.
+        query plan as a single XML cell. Returns ``None`` on EXPLAIN failure
+        (never an error string; see ``get_query_plan_from_cursor``).
         """
         from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
 

@@ -1406,6 +1406,10 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         profile_ctx = QueryProfileContext(qid, self.platform_name)
         profile_ctx._start_time = mono_time()
 
+        # Real cause of a plan-capture failure, if any (qpc-05 / F4.4); attached
+        # to the successful query row below so it is not silently lost.
+        plan_capture_error: str | None = None
+
         # Start memory tracking if enabled
         memory_tracker: MemoryTracker | None = None
         if track_memory:
@@ -1437,7 +1441,12 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                     if plan:
                         profile_ctx.set_query_plan(plan)
                 except Exception as e:
-                    logger.debug(f"Plan capture failed for {qid}: {e}")
+                    # Do not swallow the real cause at DEBUG (qpc-05 / F4.4).
+                    # Record it on a per-run list, surface it once per run at
+                    # WARNING, and carry it on the query row so the failure has
+                    # a concrete cause instead of a generic "not captured".
+                    plan_capture_error = str(e)
+                    self._record_dataframe_plan_capture_failure(qid, plan_capture_error)
                 finally:
                     profile_ctx.end_plan_capture()
 
@@ -1481,6 +1490,10 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 row_count=row_count,
                 first_row=first_row,
             )
+            if plan_capture_error is not None:
+                # Carry the concrete plan-capture failure cause on the (otherwise
+                # successful) query row instead of losing it (qpc-05 / F4.4).
+                result_dict["plan_capture_error"] = plan_capture_error
 
             return result_dict, profile
 
@@ -1625,6 +1638,31 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             First row as tuple, or None
         """
         return None
+
+    def _record_dataframe_plan_capture_failure(self, query_id: str, message: str) -> None:
+        """Record a DataFrame plan-capture failure (qpc-05 / F4.4).
+
+        Mirrors the SQL adapter's ``_record_plan_capture_failure`` pattern: the
+        real exception is appended to a per-run list (``plan_capture_errors``,
+        available for inspection/aggregation) and surfaced ONCE per run at
+        WARNING, instead of being swallowed silently at DEBUG. The list and the
+        warn-once flag are lazily initialized so no ``__init__`` change is
+        needed; a fresh adapter per run gets its own clean state.
+        """
+        if not hasattr(self, "plan_capture_errors"):
+            self.plan_capture_errors: list[dict[str, Any]] = []
+        self.plan_capture_errors.append({"query_id": query_id, "error": message})
+
+        if not getattr(self, "_plan_capture_warning_emitted", False):
+            self._plan_capture_warning_emitted = True
+            logger.warning(
+                "Query plan capture failed for %s on %s: %s (further capture failures this run are logged at debug)",
+                query_id,
+                self.platform_name,
+                message,
+            )
+        else:
+            logger.debug("Query plan capture failed for %s: %s", query_id, message)
 
     def _log_verbose(self, message: str) -> None:
         """Log a verbose message if verbose mode is enabled."""
