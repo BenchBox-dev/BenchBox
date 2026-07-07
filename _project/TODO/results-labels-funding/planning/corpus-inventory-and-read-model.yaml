@@ -2,7 +2,7 @@ id: "corpus-inventory-and-read-model"
 title: "Surface vendor-supplied label + funding in the corpus inventory and DuckDB read model"
 worktree: "results-labels-funding"
 priority: "High"
-status: "In Progress"
+status: "Under Review"
 description: |
   Integrate the two new signals into the explorer's ingest layer so they reach
   the browser. Two in-repo surfaces change: (1) scripts/generate_corpus_inventory.py,
@@ -75,7 +75,7 @@ work:
       is_ranking_eligible derivation (computed in Python per the G-11
       views-are-bare-columns rule).
     needs: [w1]
-    status: pending
+    status: done
   - id: w3
     summary: >-
       Update the read-model contract tests + corpus-inventory tests for the
@@ -84,7 +84,7 @@ work:
       Record the required read_model_version bump as an explicit obligation
       passed to item 5.
     needs: [w2]
-    status: pending
+    status: done
 
 must_preserve:
   - "corpus-inventory.json remains deterministic (sorted, timestamp-normalized in --check)."

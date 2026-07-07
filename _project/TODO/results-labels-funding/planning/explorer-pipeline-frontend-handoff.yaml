@@ -51,7 +51,7 @@ work:
       vendor-supplied trust_label + public-vendor-reported visibility +
       is_ranking_eligible=true into the results/benchmark_rankings/
       cohort_metadata tables. Bump EXPLORER_READ_MODEL_VERSION in contract.py.
-    status: pending
+    status: done
   - id: w2
     summary: >-
       FRONTEND (private): render the vendor badge in a distinct accent token,
