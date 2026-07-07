@@ -2,7 +2,8 @@ id: "qpc-03-fingerprint-signature-v2"
 title: "Fingerprint v2: encode tree shape, escape separators, honest integrity states"
 worktree: "query-plan-capture"
 priority: "High"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-07"
 
 description: |
   PARTIAL as of 2026-07-06 (still OPEN): the ADJACENT literal-normalization work
@@ -51,40 +52,49 @@ work:
     Create: rewrite the structural signature to encode tree shape and escape
     fields; add fingerprint_version=2 to model and companion payload.
   notes: >-
-    Recursive form op(child1,child2,...) with scalar fields JSON-encoded
-    (json.dumps of the parts list is simplest). Add fingerprint_version to
-    QueryPlanDAG, to_dict/from_dict, and the companion payload.
-  status: pending
+    get_structural_signature now emits canonical JSON via a recursive
+    _structural_signature_obj: children nested as a "children" list (tree shape
+    encoded) and list fields kept as JSON arrays (no ,/| injection). Added
+    FINGERPRINT_VERSION=2 + fingerprint_version field on QueryPlanDAG, in
+    to_dict/from_dict and surfaced at the companion entry level.
+  status: done
 - id: w2
   summary: >-
     Create: honest integrity semantics — missing stored fingerprint yields
     RECOMPUTED; comparator fast path requires version match + trust.
   notes: >-
-    from_dict with absent stored fingerprint sets RECOMPUTED (not VERIFIED);
-    comparison fast path requires matching fingerprint_version AND trusted
-    integrity, else full tree walk; document that integrity states verify
-    internal consistency, not provenance.
+    from_dict: absent stored fp -> RECOMPUTED (not VERIFIED); legacy v1 fp (no
+    version) loads as v1 and lands STALE on recompute. compare_plans and the
+    summary flap path both require matching fingerprint_version AND trusted
+    integrity before any fp-equality fast path, else full tree walk. Documented
+    that integrity states are internal consistency, not provenance.
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: >-
     Create: regression tests from the review repros — sibling-vs-nested
     collision, separator injection, deleted-fingerprint trust, version
     mismatch falls back to tree walk.
+  notes: >-
+    Added TestFingerprintV2Encoding (sibling-vs-nested, filter/table separator
+    injection, canonical-JSON, set-vs-ordered fields),
+    TestFingerprintVersioningAndIntegrity (fresh/roundtrip/absent-fp-RECOMPUTED/
+    tampered-STALE/legacy-v1-STALE) and TestFingerprintVersionMismatchInComparison
+    (cross-version equal-string falls back to tree walk; same-version control).
   needs: [w2]
-  status: pending
+  status: done
 - id: w4
   summary: "Review: adversarial code review (hash stability across Python versions, unicode expressions, empty-list vs None fields)."
   needs: [w3]
-  status: pending
+  status: done
 - id: w5
   summary: "Fix: address review findings; re-run verification."
   needs: [w4]
-  status: pending
+  status: done
 - id: w6
   summary: "Submit PR referencing qpc-03; call out the fingerprint-version break loudly in the PR body."
   needs: [w5]
-  status: pending
+  status: done
 
 must_preserve:
 - "Old bundles (no fingerprint_version / v1 fingerprints) still load; they compare via tree walk, never via cross-version fingerprint equality"

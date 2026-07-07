@@ -529,87 +529,119 @@ class LogicalOperator:
                 that plans which differ only in constant values collapse to the
                 same signature. Identifiers are preserved.
         """
-        # Local literal normalizer (identity when normalization is disabled).
+        return json.dumps(
+            self._structural_signature_obj(normalize_literals=normalize_literals),
+            separators=(",", ":"),
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+
+    def _structural_signature_obj(self, normalize_literals: bool = False) -> dict[str, Any]:
+        """Build the canonical, JSON-serializable structural node (v2 encoding).
+
+        Two collision classes present in the v1 pipe-joined encoding are closed
+        here (see qpc-03 / F2.1):
+
+        1. Tree shape: children are nested as a ``"children"`` list of child
+           node objects, so ``Join[Scan(t1), Scan(t2)]`` (two siblings) and
+           ``Join[Scan(t1) -> Scan(t2)]`` (a nested chain) produce structurally
+           different JSON and therefore different fingerprints. The v1 form
+           flattened every part - scalars and children alike - with the same
+           ``|`` separator, so both collapsed to the same string.
+        2. Separator injection: list-valued fields stay JSON arrays (e.g.
+           ``["a","b"]``) instead of being ``,``-joined into one string, and
+           every value is JSON-encoded, so ``filters=["a","b"]`` no longer
+           collides with ``filters=["a,b"]`` and a ``table_name`` of
+           ``"x|filters:y"`` no longer collides with table ``x`` + filter ``y``.
+
+        Set-like fields (join_cond, filters, aggs) are sorted; order-significant
+        fields (group, sort, proj, children) preserve order. Only structural
+        elements are included - never costs, row estimates, or operator ids -
+        so fingerprints remain structure-only.
+        """
         norm = _normalize_literal_text if normalize_literals else (lambda value: value)
 
-        # Build signature from structural elements only
-        operator_type_str = get_operator_type_str(self.operator_type)
-        signature_parts = [operator_type_str]
+        node: dict[str, Any] = {"op": get_operator_type_str(self.operator_type)}
 
-        # Table name for Scan operators
         if self.table_name:
-            signature_parts.append(f"table:{self.table_name}")
+            node["table"] = self.table_name
 
-        # Join type for Join operators
         if self.join_type:
-            join_type_str = get_join_type_str(self.join_type)
-            signature_parts.append(f"join:{join_type_str}")
+            node["join"] = get_join_type_str(self.join_type)
 
-        # Join conditions - sorted for set-like semantics (order doesn't affect result).
-        # Mask each predicate's literals before sorting so the set is seed-stable.
+        # Join conditions - set-like (order doesn't affect result); mask literals
+        # before sorting so the set is seed-stable when normalizing.
         if self.join_conditions:
             conditions = (
-                [_mask_literals(c) for c in self.join_conditions] if normalize_literals else self.join_conditions
+                [_mask_literals(c) for c in self.join_conditions] if normalize_literals else list(self.join_conditions)
             )
-            conditions_str = ",".join(sorted(conditions))
-            signature_parts.append(f"join_cond:{conditions_str}")
+            node["join_cond"] = sorted(conditions)
 
-        # Filter expressions - sorted for set-like semantics
+        # Filter expressions - set-like.
         if self.filter_expressions:
             filters = (
-                [_mask_literals(f) for f in self.filter_expressions] if normalize_literals else self.filter_expressions
+                [_mask_literals(f) for f in self.filter_expressions]
+                if normalize_literals
+                else list(self.filter_expressions)
             )
-            filters_str = ",".join(sorted(filters))
-            signature_parts.append(f"filters:{filters_str}")
+            node["filters"] = sorted(filters)
 
-        # Aggregation functions - sorted for set-like semantics
+        # Aggregation functions - set-like.
         if self.aggregation_functions:
-            aggs_str = ",".join(sorted(norm(a) for a in self.aggregation_functions))
-            signature_parts.append(f"aggs:{aggs_str}")
+            node["aggs"] = sorted(norm(a) for a in self.aggregation_functions)
 
-        # Group by keys - order preserved (affects output row grouping)
+        # Group by keys - order preserved (affects output row grouping).
         if self.group_by_keys:
-            group_str = ",".join(norm(g) for g in self.group_by_keys)
-            signature_parts.append(f"group:{group_str}")
+            node["group"] = [norm(g) for g in self.group_by_keys]
 
-        # Sort keys - order preserved (affects output ordering)
+        # Sort keys - order preserved (affects output ordering). Each dict's
+        # items are sorted for a deterministic per-key representation.
         if self.sort_keys:
-            # Sort keys is a list of dicts, convert to deterministic string
-            # Sort items within each dict for consistent representation
-            sort_str = ",".join(norm(str(sorted(sk.items()))) for sk in self.sort_keys)
-            signature_parts.append(f"sort:{sort_str}")
+            node["sort"] = [norm(str(sorted(sk.items()))) for sk in self.sort_keys]
 
         # Projection expressions - order preserved (affects output columns).
-        # Mask literals (e.g. computed constants) but keep column order/identifiers.
         if self.projection_expressions:
-            projections = (
+            node["proj"] = (
                 [_mask_literals(p) for p in self.projection_expressions]
                 if normalize_literals
-                else self.projection_expressions
+                else list(self.projection_expressions)
             )
-            proj_str = ",".join(projections)
-            signature_parts.append(f"proj:{proj_str}")
 
-        # Limit count - affects result set size (a literal constant when normalizing)
+        # Limit / offset - literal constants when normalizing.
         if self.limit_count is not None:
-            limit_repr = _LITERAL_PLACEHOLDER if normalize_literals else self.limit_count
-            signature_parts.append(f"limit:{limit_repr}")
-
-        # Offset count - affects which rows are returned (a literal constant when normalizing)
+            node["limit"] = _LITERAL_PLACEHOLDER if normalize_literals else self.limit_count
         if self.offset_count is not None:
-            offset_repr = _LITERAL_PLACEHOLDER if normalize_literals else self.offset_count
-            signature_parts.append(f"offset:{offset_repr}")
+            node["offset"] = _LITERAL_PLACEHOLDER if normalize_literals else self.offset_count
 
-        # Recursively include children signatures
+        # Children nested as objects (NOT flattened) so tree shape is encoded.
         if self.children:
-            for child in self.children:
-                signature_parts.append(child.get_structural_signature(normalize_literals=normalize_literals))
+            node["children"] = [
+                child._structural_signature_obj(normalize_literals=normalize_literals) for child in self.children
+            ]
 
-        return "|".join(signature_parts)
+        return node
+
+
+# Version of the structural-fingerprint encoding produced by
+# ``LogicalOperator.get_structural_signature``. Bumped to 2 when the encoding
+# moved from a flat ``|``-joined string to the tree-shape-encoding, JSON-escaped
+# form (qpc-03 / F2.1). A v1 fingerprint and a v2 fingerprint are NOT comparable
+# for equality even for the same logical plan (they hash different encodings), so
+# consumers must gate any fingerprint-equality fast path on matching
+# fingerprint_version and fall back to a full tree walk across versions. Legacy
+# bundles that predate the field are treated as version 1.
+FINGERPRINT_VERSION = 2
+LEGACY_FINGERPRINT_VERSION = 1
 
 
 class FingerprintIntegrity:
-    """Fingerprint verification states."""
+    """Fingerprint verification states.
+
+    These states describe INTERNAL consistency (does the stored fingerprint
+    match a recomputation of the current tree?), not provenance/authenticity -
+    a trusted state means the fingerprint is self-consistent, not that it came
+    from a trusted source.
+    """
 
     VERIFIED = "verified"  # Fingerprint matches current tree structure
     STALE = "stale"  # Stored fingerprint doesn't match tree (possibly corrupted/tampered)
@@ -631,6 +663,9 @@ class QueryPlanDAG:
         plan_fingerprint: SHA256 hash of logical structure for fast comparison
         raw_explain_output: Original EXPLAIN output for debugging (optional)
         fingerprint_integrity: Verification state of the fingerprint
+        fingerprint_version: Encoding version of ``plan_fingerprint`` (see
+            ``FINGERPRINT_VERSION``). Fingerprints are only comparable within
+            the same version.
     """
 
     query_id: str
@@ -641,6 +676,7 @@ class QueryPlanDAG:
     plan_fingerprint: str | None = None
     raw_explain_output: str | None = None
     fingerprint_integrity: str = field(default=FingerprintIntegrity.UNVERIFIED)
+    fingerprint_version: int = field(default=FINGERPRINT_VERSION)
 
     def __post_init__(self) -> None:
         """Compute plan fingerprint after initialization."""
@@ -651,6 +687,8 @@ class QueryPlanDAG:
         if self.plan_fingerprint is None:
             self.plan_fingerprint = self.compute_plan_fingerprint()
             self.fingerprint_integrity = FingerprintIntegrity.VERIFIED
+            # A freshly computed fingerprint is always the current encoding.
+            self.fingerprint_version = FINGERPRINT_VERSION
 
     def compute_plan_fingerprint(self, normalize_literals: bool = False) -> str:
         """
@@ -726,6 +764,8 @@ class QueryPlanDAG:
         """
         self.plan_fingerprint = self.compute_plan_fingerprint()
         self.fingerprint_integrity = FingerprintIntegrity.VERIFIED
+        # The recomputed fingerprint uses the current encoding version.
+        self.fingerprint_version = FINGERPRINT_VERSION
         self._normalized_fingerprint = None
 
     def apply_raw_output_policy(
@@ -794,6 +834,7 @@ class QueryPlanDAG:
             "estimated_cost": self.estimated_cost,
             "estimated_rows": self.estimated_rows,
             "plan_fingerprint": self.plan_fingerprint,
+            "fingerprint_version": self.fingerprint_version,
             "raw_explain_output": self.raw_explain_output,
         }
 
@@ -816,9 +857,31 @@ class QueryPlanDAG:
 
         Returns:
             QueryPlanDAG instance with fingerprint_integrity set appropriately
+
+        Integrity semantics (qpc-03 / F2.2):
+            - A stored fingerprint that recomputes to the same value is VERIFIED.
+            - A stored fingerprint that does NOT recompute (stale/tampered) is
+              STALE, or RECOMPUTED when ``refresh_on_mismatch`` is set.
+            - An ABSENT stored fingerprint is RECOMPUTED, never VERIFIED:
+              deleting the field must not launder an unauthenticated plan into
+              a trusted state (the old code let ``__post_init__`` mark a
+              freshly computed fingerprint VERIFIED, so dropping the field
+              bypassed stale-tamper detection).
+            A legacy bundle whose stored fingerprint predates the v2 encoding
+            recomputes to a different (v2) value and therefore lands STALE
+            (untrusted) - so it compares via a full tree walk, never via
+            cross-version fingerprint equality.
         """
         logical_root_data = data.get("logical_root")
         stored_fingerprint = data.get("plan_fingerprint")
+        # A stored fingerprint with no recorded version predates versioning, so
+        # it is a legacy v1 fingerprint. When there is no stored fingerprint we
+        # will recompute one below, which is always the current encoding.
+        stored_version = (
+            data.get("fingerprint_version", LEGACY_FINGERPRINT_VERSION)
+            if stored_fingerprint is not None
+            else FINGERPRINT_VERSION
+        )
 
         # Build the plan without setting fingerprint yet
         plan = cls(
@@ -830,19 +893,25 @@ class QueryPlanDAG:
             plan_fingerprint=stored_fingerprint,
             raw_explain_output=data.get("raw_explain_output"),
             fingerprint_integrity=FingerprintIntegrity.UNVERIFIED,
+            fingerprint_version=stored_version,
         )
 
-        # Verify fingerprint if requested
-        if verify_fingerprint and stored_fingerprint is not None:
+        if stored_fingerprint is None:
+            # __post_init__ computed a fresh v2 fingerprint and optimistically
+            # marked it VERIFIED; downgrade to RECOMPUTED so an absent stored
+            # fingerprint is never treated as authenticated.
+            plan.fingerprint_integrity = FingerprintIntegrity.RECOMPUTED
+        elif verify_fingerprint:
             computed = plan.compute_plan_fingerprint()
             if computed == stored_fingerprint:
                 plan.fingerprint_integrity = FingerprintIntegrity.VERIFIED
+            elif refresh_on_mismatch:
+                plan.plan_fingerprint = computed
+                plan.fingerprint_integrity = FingerprintIntegrity.RECOMPUTED
+                # The recomputed value uses the current encoding.
+                plan.fingerprint_version = FINGERPRINT_VERSION
             else:
-                if refresh_on_mismatch:
-                    plan.plan_fingerprint = computed
-                    plan.fingerprint_integrity = FingerprintIntegrity.RECOMPUTED
-                else:
-                    plan.fingerprint_integrity = FingerprintIntegrity.STALE
+                plan.fingerprint_integrity = FingerprintIntegrity.STALE
 
         return plan
 

@@ -525,6 +525,53 @@ class TestFingerprintIntegrityInComparison:
         assert result.similarity.overall_similarity == 1.0
 
 
+class TestFingerprintVersionMismatchInComparison:
+    """qpc-03: the fingerprint fast path must require matching fingerprint_version
+    AND trust; across versions it must fall back to the full tree walk and never
+    assert identity from cross-version fingerprint equality."""
+
+    def _plan(self, table: str = "orders") -> QueryPlanDAG:
+        return QueryPlanDAG(
+            query_id="q1",
+            platform="duckdb",
+            logical_root=LogicalOperator(
+                operator_id="scan_1", operator_type=LogicalOperatorType.SCAN, table_name=table
+            ),
+        )
+
+    def test_version_mismatch_falls_back_to_tree_walk_even_if_fingerprints_equal(self):
+        """Two trusted plans whose fingerprint STRINGS happen to be equal but
+        whose fingerprint_version differs must NOT be declared identical via the
+        fast path -- equality across versions is meaningless."""
+        plan1 = self._plan()
+        plan2 = self._plan()
+        # Force equal fingerprint strings but different versions.
+        plan2.plan_fingerprint = plan1.plan_fingerprint
+        plan1.fingerprint_version = 2
+        plan2.fingerprint_version = 1
+        assert plan1.is_fingerprint_trusted() and plan2.is_fingerprint_trusted()
+
+        result = compare_query_plans(plan1, plan2)
+
+        # Fast path suppressed: not declared identical purely from the equal
+        # strings; the tree walk ran (and here the trees do match structurally).
+        assert result.plans_identical is False
+        assert result.fingerprints_match is False
+        assert result.similarity.overall_similarity == 1.0
+
+    def test_same_version_trusted_equal_fingerprints_uses_fast_path(self):
+        """Control: same version + trusted + equal fingerprints still fast-paths
+        to identical (the optimization is preserved within a version)."""
+        plan1 = self._plan()
+        plan2 = self._plan()
+        assert plan1.fingerprint_version == plan2.fingerprint_version
+
+        result = compare_query_plans(plan1, plan2)
+
+        assert result.plans_identical is True
+        assert result.fingerprints_match is True
+
+
 class TestStringOperatorTypeHandling:
     """Test comparison with string operator types (unknown/unmapped operators)."""
 
