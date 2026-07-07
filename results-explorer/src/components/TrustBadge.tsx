@@ -4,6 +4,7 @@
 // Tone semantics:
 //   maintainer-run       → success  (verified by project maintainers)
 //   community-submission → info     (user-submitted, explicitly disclosed)
+//   vendor-supplied      → warning  (vendor-produced; ranked but conflict of interest)
 //   ci / ci-verified     → neutral  (automated pipeline, no human review)
 //   local / local-run    → neutral  (developer machine, no CI validation)
 //   unofficial-research  → warning  (non-standard config, not comparable)
@@ -32,6 +33,12 @@ const TRUST_CONFIG: Record<string, { label: string; tone: StatusTone; title: str
     label: "Community",
     tone: "info",
     title: "Submitted by a community member - see result detail for provenance",
+  },
+  "vendor-supplied": {
+    label: "Vendor",
+    tone: "warning",
+    title:
+      "Produced by the platform vendor - ranked, but the vendor has a direct interest in the outcome; verify against independent results",
   },
   "ci-verified": {
     label: "CI",

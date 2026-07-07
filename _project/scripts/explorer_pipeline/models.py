@@ -74,6 +74,10 @@ RANKING_ELIGIBLE_VISIBILITIES: frozenset[str] = frozenset(
     {
         "public-curated",
         "public-verified",
+        # Vendor-supplied results ARE ranked (decision D2), with a distinct badge
+        # rather than exclusion — the conflict of interest is disclosed, not
+        # hidden. Kept in lockstep with provenance.RANKING_ELIGIBLE_VISIBILITIES.
+        "public-vendor-reported",
     }
 )
 
@@ -93,6 +97,9 @@ RANKING_ELIGIBLE_TRUST_LABELS: frozenset[str] = frozenset(
         "maintainer-run",
         "ci",
         "ci-verified",
+        # Vendor-produced results are ranked with a distinct "Vendor Supplied"
+        # badge (decision D2). See provenance.SOURCE_TO_TRUST_LABEL.
+        "vendor-supplied",
     }
 )
 
