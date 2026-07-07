@@ -14,6 +14,7 @@ default behaviour and all identifier fields untouched.
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -125,8 +126,10 @@ class TestStructuralSignatureNormalization:
             children=[_scan("o_totalprice > 1000")],
         )
         normalized = op.get_structural_signature(normalize_literals=True)
-        assert "table:orders" in normalized
-        assert "group:o_orderstatus" in normalized
+        # v2 encoding (qpc-03): identifiers survive as structured field values.
+        parsed = json.loads(normalized)
+        assert parsed["table"] == "orders"
+        assert parsed["group"] == ["o_orderstatus"]
 
     def test_aggregation_hex_literal_collapses_when_normalized(self):
         """aggregation_functions/group_by_keys/sort_keys and filter/join/projection now share
@@ -226,7 +229,9 @@ class TestStructuralSignatureNormalization:
         operands are masked)."""
         op = _scan("l_discount = 0.05 - 0.01")
         normalized = op.get_structural_signature(normalize_literals=True)
-        assert normalized.endswith("<NUM> - <NUM>"), normalized
+        # v2 encoding (qpc-03): the masked predicate is a filter field value.
+        parsed = json.loads(normalized)
+        assert parsed["filters"] == ["l_discount = <NUM> - <NUM>"], normalized
 
     @pytest.mark.parametrize(
         ("literal_a", "literal_b"),

@@ -36,11 +36,17 @@ def _create_simple_plan(query_id: str, table_name: str = "orders") -> QueryPlanD
         table_name=table_name,
         children=[],
     )
+    # No explicit plan_fingerprint: let it compute the real structural
+    # fingerprint so the plan is VERIFIED/trusted and versioned. The summary
+    # fast path now (qpc-03) requires trusted, same-version fingerprints, so a
+    # fixture with a fabricated non-matching fingerprint left UNVERIFIED would
+    # no longer be eligible for the unchanged fast path. The real fingerprint
+    # still distinguishes tables (orders vs customers) and matches identical
+    # structures, preserving each test's intent.
     return QueryPlanDAG(
         query_id=query_id,
         platform="test",
         logical_root=root,
-        plan_fingerprint=f"fp_{query_id}_{table_name}",
         raw_explain_output="test",
     )
 
@@ -64,11 +70,11 @@ def _create_join_plan(query_id: str) -> QueryPlanDAG:
         operator_type=LogicalOperatorType.JOIN,
         children=[left_scan, right_scan],
     )
+    # See _create_simple_plan: compute the real fingerprint (trusted, versioned).
     return QueryPlanDAG(
         query_id=query_id,
         platform="test",
         logical_root=root,
-        plan_fingerprint=f"fp_join_{query_id}",
         raw_explain_output="test",
     )
 
