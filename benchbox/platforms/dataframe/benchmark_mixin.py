@@ -48,6 +48,7 @@ from benchbox.core.results.models import (
     BenchmarkResults,
     TableLoadingStats,
 )
+from benchbox.core.results.query_plan_models import QueryPlanDAG
 from benchbox.core.results.schema import compute_plan_capture_stats
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 from benchbox.platforms.base.adapter import DriverIsolationCapability
@@ -1128,7 +1129,9 @@ class BenchmarkExecutionMixin:
                         raw_result, profile = profiled_runner(ctx, query)
                     raw_result = dict(raw_result)
                     if profile.query_plan is not None:
-                        raw_result["query_plan"] = profile.query_plan
+                        raw_result["query_plan"] = self._structure_dataframe_plan(
+                            profile.query_plan, str(query.query_id)
+                        )
                     # Surface capture cost separately (excluded from execution time),
                     # matching the SQL platforms' plan_capture_time_ms field.
                     if profile.plan_capture_time_ms:
@@ -1153,6 +1156,53 @@ class BenchmarkExecutionMixin:
             with monitor.time_operation(f"query_{query.query_id}_iter{iteration}"):
                 return _run()
         return _run()
+
+    def _structure_dataframe_plan(self, captured_plan: Any, query_id: str) -> Any:
+        """Promote a captured DataFrame plan to a structured QueryPlanDAG when a
+        registered parser can parse its text (qpc-06 w4 / F3.2).
+
+        DataFrame profiling captures a text-only ``QueryPlan`` (platform,
+        plan_text, hints) which — stored verbatim into the ``query_plan`` slot —
+        silently forks the companion schema by platform family (text blob vs the
+        SQL adapters' structured DAG). Here the captured ``plan_text`` is routed
+        through the platform's registered parser (DataFusion is the one with a
+        DataFrame-native parser today); on success the real ``QueryPlanDAG`` is
+        returned with ``plan_text`` preserved as ``raw_explain_output``. When no
+        parser is registered for the platform or parsing fails, the original
+        text-only plan is returned unchanged as an explicit fallback — the
+        ``plan_format`` discriminator on the companion entry (see
+        ``_build_plan_entry``) then marks it ``text`` so consumers fail
+        informatively rather than mis-reading it as a DAG.
+        """
+        # Already structured (defensive: a future adapter may capture a DAG).
+        if isinstance(captured_plan, QueryPlanDAG):
+            return captured_plan
+
+        plan_text = getattr(captured_plan, "plan_text", None)
+        platform = getattr(captured_plan, "platform", None) or self.platform_name
+        if not plan_text or not platform:
+            return captured_plan
+
+        from benchbox.core.query_plans.parsers.registry import get_parser_for_platform
+
+        parser = get_parser_for_platform(str(platform).lower().replace("-df", ""))
+        if parser is None:
+            return captured_plan
+
+        try:
+            dag = parser.parse_explain_output(query_id, plan_text)
+        except Exception as exc:  # noqa: BLE001 - parser failure must fall back, never abort
+            logger.debug("DataFrame plan parse failed for %s on %s: %s", query_id, platform, exc)
+            return captured_plan
+
+        if dag is None:
+            return captured_plan
+
+        # Preserve the original plan text for debugging without clobbering any
+        # raw output the parser already set.
+        if getattr(dag, "raw_explain_output", None) is None:
+            dag.raw_explain_output = plan_text
+        return dag
 
     def _append_skip_summary(
         self,
