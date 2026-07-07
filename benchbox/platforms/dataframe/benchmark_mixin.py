@@ -1183,6 +1183,16 @@ class BenchmarkExecutionMixin:
         if not plan_text or not platform:
             return captured_plan
 
+        # Capture failures are recorded as a sentinel QueryPlan (plan_type
+        # "error", or plan_text like "Plan capture not available"/"Could not
+        # capture plan: ..."). A parser's fallback path can accept
+        # operator-looking lines as an OTHER node, silently promoting a
+        # failed capture into a fake plan_format="dag" entry - skip parsing
+        # and fall back to the text-only plan instead.
+        plan_type = getattr(captured_plan, "plan_type", None)
+        if plan_type == "error" or plan_text.startswith(("Plan capture not available", "Could not capture plan:")):
+            return captured_plan
+
         from benchbox.core.query_plans.parsers.registry import get_parser_for_platform
 
         parser = get_parser_for_platform(str(platform).lower().replace("-df", ""))
