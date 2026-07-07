@@ -2,7 +2,8 @@ id: "qpc-08-history-and-plan-metadata-wiring"
 title: "Make plan history real: fix dead attribute reads, wire add_run into the run path, sane ordering"
 worktree: "query-plan-capture"
 priority: "Medium"
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-07-07"
 
 description: |
   benchbox plan-history is dead end-to-end:
@@ -58,15 +59,25 @@ work:
 - id: w4
   summary: "Review: adversarial code review (history dir lifecycle, cache staleness, fingerprint_version interaction with qpc-03)."
   needs: [w3]
-  status: pending
+  notes: >-
+    Opus review: flagged that add_run still used getattr(..., None) for the
+    now-required execution_id/timestamp (spec-forbidden anti-pattern) and that
+    the mixed-offset sort test did not actually distinguish lexicographic from
+    chronological order. Out-of-scope forward-ref noted: flap detection
+    compares raw fingerprints — revisit when qpc-03's fingerprint_version lands.
+  status: done
 - id: w5
   summary: "Fix: address review findings; re-run verification."
   needs: [w4]
-  status: pending
+  notes: >-
+    Changed add_run to direct results.execution_id/results.timestamp access;
+    rewrote the mixed-offset timestamp sort test to genuinely fail under a
+    lexicographic sort. 88 passed, ruff/ty clean.
+  status: done
 - id: w6
   summary: "Submit PR referencing qpc-08."
   needs: [w5]
-  status: pending
+  status: done
 
 must_preserve:
 - "Existing history-file JSON shape stays readable"
