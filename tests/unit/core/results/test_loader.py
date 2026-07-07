@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from benchbox.core.results.canonical_json import canonical_json_text
 from benchbox.core.results.loader import (
     ResultLoadError,
     UnsupportedSchemaError,
@@ -16,8 +17,9 @@ from benchbox.core.results.loader import (
     reconstruct_benchmark_results,
 )
 from benchbox.core.results.models import BenchmarkResults
-from benchbox.core.results.schema import build_result_payload
-from tests.fixtures.result_dict_fixtures import make_v2_result_dict, write_v2_result_file
+from benchbox.core.results.query_plan_models import LogicalOperator, LogicalOperatorType, QueryPlanDAG
+from benchbox.core.results.schema import build_plans_payload, build_result_payload
+from tests.fixtures.result_dict_fixtures import make_benchmark_results, make_v2_result_dict, write_v2_result_file
 
 pytestmark = [
     pytest.mark.unit,
@@ -684,3 +686,182 @@ class TestReconstructBenchmarkResults:
         assert len(failed_query) == 1
         assert failed_query[0]["query_id"] == "2"
         assert failed_query[0]["error_type"] == "QueryError"
+
+    def test_reconstruct_does_not_duplicate_current_format_failure(self):
+        """A current-format bundle duplicates a failure into BOTH queries[]
+        (status="FAILED") and errors[] (see schema.py _build_query_results_section).
+        The loader must reconstruct exactly one row for it, not a phantom
+        second row synthesized from errors[] (qpc-02 / F1.4).
+        """
+        data = make_v2_result_dict(
+            version="2.1",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=100,
+            total_queries=2,
+            passed_queries=1,
+            failed_queries=1,
+            total_ms=100,
+            queries=[
+                {
+                    "id": "1",
+                    "ms": 100.0,
+                    "rows": 4,
+                    "iter": 1,
+                    "stream": 0,
+                    "run_type": "measurement",
+                    "status": "SUCCESS",
+                },
+                {"id": "2", "iter": 1, "stream": 0, "run_type": "measurement", "status": "FAILED"},
+            ],
+            errors=[
+                {"phase": "query", "query_id": "2", "type": "QueryError", "message": "Syntax error"},
+            ],
+        )
+
+        result = reconstruct_benchmark_results(data)
+
+        failed_rows = [q for q in result.query_results if q.get("status") == "FAILED"]
+        assert len(result.query_results) == 2
+        assert len(failed_rows) == 1
+        assert failed_rows[0]["query_id"] == "2"
+        assert failed_rows[0]["error_type"] == "QueryError"
+        assert failed_rows[0]["error_message"] == "Syntax error"
+
+    def test_reconstruct_preserves_warmup_iteration_zero_and_stream_zero(self):
+        """iter/stream of 0 are falsy and must not be dropped by a truthy `if`
+        check (qpc-02 / F1.4): warmup rows (iter=0) and the first stream
+        (stream=0) must survive reconstruction.
+        """
+        data = make_v2_result_dict(
+            version="2.1",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=100,
+            total_queries=1,
+            passed_queries=1,
+            failed_queries=0,
+            total_ms=100,
+            queries=[
+                {
+                    "id": "1",
+                    "ms": 90.0,
+                    "rows": 4,
+                    "iter": 0,
+                    "stream": 0,
+                    "run_type": "warmup",
+                    "status": "SUCCESS",
+                },
+            ],
+        )
+
+        result = reconstruct_benchmark_results(data)
+
+        assert len(result.query_results) == 1
+        row = result.query_results[0]
+        assert row["iteration"] == 0
+        assert row["stream_id"] == 0
+        assert row["run_type"] == "warmup"
+
+
+class TestExportLoadReexportRoundtrip:
+    """Byte-equality property test (qpc-02): export -> load -> re-export must
+    reproduce both the main result file and the .plans.json companion
+    exactly, for a fixture spanning warmup rows (iter 0), a failure, and a
+    stream > 0 row.
+    """
+
+    def test_export_load_reexport_roundtrip_byte_identical(self):
+        root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
+        plan = QueryPlanDAG(query_id="2", platform="duckdb", logical_root=root)
+
+        query_results = [
+            # Warmup row: iteration 0 and stream 0 are both falsy -- must not
+            # be dropped by the loader.
+            {
+                "query_id": "1",
+                "status": "SUCCESS",
+                "execution_time_ms": 120.0,
+                "rows_returned": 4,
+                "iteration": 0,
+                "stream_id": 0,
+                "run_type": "warmup",
+            },
+            {
+                "query_id": "1",
+                "status": "SUCCESS",
+                "execution_time_ms": 100.0,
+                "rows_returned": 4,
+                "iteration": 1,
+                "stream_id": 0,
+                "run_type": "measurement",
+            },
+            # Second stream, with a captured plan whose capture_time_ms is
+            # exactly 0.0 (also falsy -- must not be dropped either).
+            {
+                "query_id": "2",
+                "status": "SUCCESS",
+                "execution_time_ms": 200.0,
+                "rows_returned": 8,
+                "iteration": 1,
+                "stream_id": 1,
+                "run_type": "measurement",
+                "query_plan": plan,
+                "plan_fingerprint": plan.plan_fingerprint,
+                "plan_capture_time_ms": 0.0,
+            },
+            # A FAILED query, duplicated into errors[] the way
+            # build_result_payload's _build_query_results_section does.
+            {
+                "query_id": "3",
+                "status": "FAILED",
+                "iteration": 1,
+                "stream_id": 0,
+                "run_type": "measurement",
+                "error_type": "QueryError",
+                "error_message": "Syntax error",
+            },
+        ]
+
+        original = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="duckdb",
+            scale_factor=1.0,
+            execution_id="roundtrip-001",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            duration_seconds=10.0,
+            total_queries=4,
+            successful_queries=3,
+            failed_queries=1,
+            query_plans_captured=1,
+            query_results=query_results,
+        )
+
+        exported = build_result_payload(original)
+        plans_payload = build_plans_payload(original)
+        assert plans_payload is not None
+
+        # Guard the schema.py `if capture_time is not None:` fix (F1.5): a
+        # capture time of exactly 0.0 is falsy, so a truthy check would drop
+        # it from the plans payload entirely. Byte-equality alone cannot catch
+        # that regression -- both the export and re-export would omit the field
+        # symmetrically and still compare equal -- so assert the 0.0 actually
+        # survives the initial export here.
+        assert plans_payload["queries"]["2"]["capture_time_ms"] == 0.0
+
+        reimported = reconstruct_benchmark_results(exported, plans_data=plans_payload)
+        re_exported = build_result_payload(reimported)
+        re_plans_payload = build_plans_payload(reimported)
+
+        assert canonical_json_text(exported) == canonical_json_text(re_exported)
+        assert re_plans_payload is not None
+        assert canonical_json_text(plans_payload) == canonical_json_text(re_plans_payload)

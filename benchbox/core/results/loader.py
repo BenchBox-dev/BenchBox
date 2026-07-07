@@ -461,42 +461,81 @@ def _reconstruct_query_results(
     query_id AND stream_id (each phase's stream counter starts at its own 0);
     those are disambiguated with a further ``"{query_id}#{stream_id}:{test_type}"``
     key, resolved via the row's own compact ``test_type`` field.
+
+    Current-format bundles write ``status``/``run_type`` on every compact entry
+    (including failures, which are ALSO duplicated into ``errors[]`` for the
+    legacy fallback below) and use ``iter``/``stream`` 0 for warmup rows / the
+    first stream. Legacy bundles predate those per-entry fields entirely: their
+    ``queries[]`` entries carry only successful queries (no ``status`` key at
+    all) and failures live solely in ``errors[]``. Both shapes must round-trip:
+    an entry's own ``status`` (when present) is authoritative; ``errors[]`` is
+    only used to (a) attach ``error_type``/``error_message`` detail onto a
+    compact entry that already reports non-SUCCESS, and (b) synthesize a
+    standalone FAILED row for a query_id that never appears in ``queries[]``
+    at all (the legacy shape).
     """
     plan_entries = _index_plan_entries(plans_data)
     results: list[dict[str, Any]] = []
 
-    # Process successful queries
+    query_error_by_id: dict[str, dict[str, Any]] = {}
+    for error in errors_list:
+        if error.get("phase") != "query":
+            continue
+        qid = error.get("query_id")
+        if qid is None:
+            continue
+        query_error_by_id.setdefault(normalize_query_id(qid), error)
+
+    ids_in_queries_list: set[str] = {normalize_query_id(q["id"]) for q in queries_list if q.get("id") is not None}
+
     for q in queries_list:
         query_id = q.get("id")
+        status = q.get("status", "SUCCESS")
         result: dict[str, Any] = {
             "query_id": query_id,
             "execution_time_ms": q.get("ms"),
             "rows_returned": q.get("rows"),
-            "status": "SUCCESS",
+            "status": status,
         }
-        if q.get("iter"):
+        if q.get("iter") is not None:
             result["iteration"] = q["iter"]
-        if q.get("stream"):
+        if q.get("stream") is not None:
             result["stream_id"] = q["stream"]
+        if q.get("run_type") is not None:
+            result["run_type"] = q["run_type"]
         if q.get("test_type"):
             result["test_type"] = q["test_type"]
+
+        if status not in ("SUCCESS", "SKIPPED") and query_id is not None:
+            error = query_error_by_id.get(normalize_query_id(query_id))
+            if error is not None:
+                result["error_type"] = error.get("type")
+                result["error_message"] = error.get("message")
+
         _attach_plan(
             result,
             _lookup_plan_entry(plan_entries, query_id, q.get("stream", 0), q.get("test_type")),
         )
         results.append(result)
 
-    # Add failed queries from errors
+    # Legacy fallback: synthesize a FAILED row only for query_ids that never
+    # appear in queries[] at all. Current-format bundles duplicate every
+    # failure into queries[] too (handled above); re-adding it here would
+    # produce a phantom second row for the same failure.
     for error in errors_list:
-        if error.get("phase") == "query":
-            results.append(
-                {
-                    "query_id": error.get("query_id"),
-                    "status": "FAILED",
-                    "error_type": error.get("type"),
-                    "error_message": error.get("message"),
-                }
-            )
+        if error.get("phase") != "query":
+            continue
+        qid = error.get("query_id")
+        if qid is not None and normalize_query_id(qid) in ids_in_queries_list:
+            continue
+        results.append(
+            {
+                "query_id": qid,
+                "status": "FAILED",
+                "error_type": error.get("type"),
+                "error_message": error.get("message"),
+            }
+        )
 
     return results
 
