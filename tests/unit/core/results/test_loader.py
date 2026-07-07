@@ -197,13 +197,28 @@ class TestLoadResultFile:
         assert raw_data["version"] == "2.0"
 
     def test_load_result_file_loads_companion_with_extra_dots_in_basename(self, tmp_path):
-        """qpc-07 w4: a scale-factor filename like ``result_sf0.1.json`` has a
-        dot in the basename itself. The old companion-path arithmetic chained
-        ``Path.with_suffix("")`` twice, which strips ``.1`` as a second
-        "suffix" and corrupts the plans companion path to
-        ``result_sf0.plans.json`` instead of ``result_sf0.1.plans.json``.
+        """qpc-07 w4: exercise BOTH companion-path defects at once so a revert of
+        either half of the fix fails this test.
+
+        The result lives in a parent directory whose name itself contains
+        ``.json`` (``bundle.json``) and has a scale-factor basename with an extra
+        dot (``result_sf0.1.json``). This defeats both old code paths:
+
+        * ``main_file.with_suffix("").with_suffix(suffix)`` reads ``.1`` as a
+          second suffix and strips it, corrupting the basename to
+          ``result_sf0.plans.json``; and
+        * the ``str(main_file).replace(".json", suffix)`` fallback rewrites the
+          FIRST ``.json`` in the whole path -- here the ``bundle.json`` parent
+          directory -- producing ``bundle.plans.json/result_sf0.1.plans.json``.
+
+        Neither corrupted path exists, so only the exact-basename swap
+        (``name[:-len(".json")] + suffix`` via ``with_name``) resolves the real
+        companion. (With a plain ``tmp_path`` parent the buggy fallback happens
+        to rescue the extra-dot basename, which is why the parent name matters.)
         """
-        result_file = tmp_path / "result_sf0.1.json"
+        bundle_dir = tmp_path / "bundle.json"
+        bundle_dir.mkdir()
+        result_file = bundle_dir / "result_sf0.1.json"
         write_v2_result_file(
             result_file,
             version="2.0",
@@ -211,7 +226,7 @@ class TestLoadResultFile:
             scale_factor=0.1,
             queries=[{"id": "1", "ms": 100.0, "rows": 4}],
         )
-        plans_file = tmp_path / "result_sf0.1.plans.json"
+        plans_file = bundle_dir / "result_sf0.1.plans.json"
         with open(plans_file, "w", encoding="utf-8") as f:
             json.dump(
                 {
@@ -228,11 +243,11 @@ class TestLoadResultFile:
                 },
                 f,
             )
-        # The wrong basename this bug used to compute must NOT exist, so a
-        # false pass (loader stumbling onto the right file some other way)
-        # can't mask the regression.
-        wrong_path = tmp_path / "result_sf0.plans.json"
-        assert not wrong_path.exists()
+        # The corrupted paths both buggy branches used to compute must NOT
+        # exist, so a false pass (loader stumbling onto the right file some
+        # other way) can't mask the regression.
+        assert not (bundle_dir / "result_sf0.plans.json").exists()  # double-with_suffix corruption
+        assert not (tmp_path / "bundle.plans.json").exists()  # str.replace-hits-parent corruption
 
         result, _raw_data = load_result_file(result_file)
 
