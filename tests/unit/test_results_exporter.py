@@ -202,6 +202,85 @@ def test_canonical_bundle_export_serializes_primary_and_companions(monkeypatch, 
     _assert_canonical_json_file(tmp_path / f"{primary_path.stem}.tuning.json")
 
 
+def test_canonical_bundle_export_anonymizes_plans_raw_explain_output(monkeypatch, tmp_path):
+    """qpc-07 w3: the plans companion bypassed anonymization entirely, so
+    raw_explain_output (opaque per-platform EXPLAIN text that can embed
+    absolute paths/hostnames/usernames) leaked verbatim even when
+    anonymize=True. It must be stripped from an anonymized export.
+    """
+    monkeypatch.setattr(
+        exporter_module,
+        "build_plans_payload",
+        lambda _result: {
+            "version": "2.1",
+            "run_id": "cost-duckdb",
+            "plans_captured": 1,
+            "capture_failures": 0,
+            "queries": {
+                "1": {
+                    "fingerprint": "a" * 64,
+                    "plan": {
+                        "query_id": "1",
+                        "platform": "duckdb",
+                        "logical_root": None,
+                        "raw_explain_output": "SEQ_SCAN /Users/alice/data/lineitem.parquet",
+                    },
+                }
+            },
+        },
+    )
+
+    exported = ResultExporter(output_dir=tmp_path, anonymize=True).export_result(
+        _minimal_result("duckdb"),
+        formats=["json"],
+    )
+    primary_path = exported["json"]
+    plans_path = tmp_path / f"{primary_path.stem}.plans.json"
+
+    with open(plans_path, encoding="utf-8") as handle:
+        plans_data = json.load(handle)
+
+    assert plans_data["queries"]["1"]["plan"]["raw_explain_output"] is None
+
+
+def test_canonical_bundle_export_keeps_plans_raw_explain_output_when_not_anonymized(monkeypatch, tmp_path):
+    """Companion behavior is unchanged for non-anonymized exports (the common
+    local-dev path): raw_explain_output round-trips verbatim."""
+    monkeypatch.setattr(
+        exporter_module,
+        "build_plans_payload",
+        lambda _result: {
+            "version": "2.1",
+            "run_id": "cost-duckdb",
+            "plans_captured": 1,
+            "capture_failures": 0,
+            "queries": {
+                "1": {
+                    "fingerprint": "a" * 64,
+                    "plan": {
+                        "query_id": "1",
+                        "platform": "duckdb",
+                        "logical_root": None,
+                        "raw_explain_output": "SEQ_SCAN /Users/alice/data/lineitem.parquet",
+                    },
+                }
+            },
+        },
+    )
+
+    exported = ResultExporter(output_dir=tmp_path, anonymize=False).export_result(
+        _minimal_result("duckdb"),
+        formats=["json"],
+    )
+    primary_path = exported["json"]
+    plans_path = tmp_path / f"{primary_path.stem}.plans.json"
+
+    with open(plans_path, encoding="utf-8") as handle:
+        plans_data = json.load(handle)
+
+    assert plans_data["queries"]["1"]["plan"]["raw_explain_output"] == "SEQ_SCAN /Users/alice/data/lineitem.parquet"
+
+
 def test_exporter_omits_direct_total_for_unavailable_normalized_cost(tmp_path):
     payload = _export_payload(tmp_path, _minimal_result("snowflake"))
 

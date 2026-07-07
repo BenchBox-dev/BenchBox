@@ -13,6 +13,7 @@ Schema v2.0 Companion Files:
 
 from __future__ import annotations
 
+import copy
 import csv
 import io
 import json
@@ -254,6 +255,8 @@ class ResultExporter:
         # Plans companion file
         plans_payload = build_plans_payload(result)
         if plans_payload:
+            if self.anonymize and self.anonymization_manager:
+                plans_payload = self._anonymize_plans_payload(plans_payload)
             plans_path = self._create_file_path(f"{filename_base}.plans.json")
             self._write_file(plans_path, canonical_json_text(plans_payload))
             self.console.print(f"[dim]Exported plans: {plans_path}[/dim]")
@@ -299,6 +302,37 @@ class ResultExporter:
                 client_host_block["machine_id"] = effective_machine_id
         elif not captured_machine_id:
             env_block["client_host"] = {"machine_id": effective_machine_id}
+
+    def _anonymize_plans_payload(self, plans_payload: dict[str, Any]) -> dict[str, Any]:
+        """Strip raw EXPLAIN text from the plans companion for anonymized exports.
+
+        The `.plans.json` companion is built independently of the main payload
+        (see ``_write_companion_files``) and never passes through
+        ``_apply_anonymization``, so an "anonymized" bundle previously still
+        leaked ``raw_explain_output`` verbatim -- opaque, platform-specific
+        EXPLAIN text that can embed absolute file paths, hostnames, or
+        usernames (e.g. a scan operator's file source). None of the existing
+        `AnonymizationManager` helpers (path/PII patterns tuned for structured
+        fields) can safely scrub arbitrary per-platform EXPLAIN text, so this
+        drops the field outright for anonymized exports rather than risk a
+        false sense of safety from a partial regex scrub.
+
+        Operates on a deep copy; the caller's ``plans_payload`` (and the
+        in-memory ``BenchmarkResults``/``QueryPlanDAG`` it was built from) are
+        never mutated, mirroring the main-file anonymize-a-copy pattern in
+        ``_apply_anonymization``.
+        """
+        sanitized = copy.deepcopy(plans_payload)
+        queries = sanitized.get("queries")
+        if not isinstance(queries, dict):
+            return sanitized
+        for entry in queries.values():
+            if not isinstance(entry, dict):
+                continue
+            plan = entry.get("plan")
+            if isinstance(plan, dict) and plan.get("raw_explain_output") is not None:
+                plan["raw_explain_output"] = None
+        return sanitized
 
     def _convert_datetimes_to_iso(self, obj: Any) -> Any:
         """Convert datetime objects to ISO format strings."""
