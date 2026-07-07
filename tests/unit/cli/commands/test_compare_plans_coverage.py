@@ -5,12 +5,16 @@ from __future__ import annotations
 import importlib
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from click.testing import CliRunner
 
+from benchbox.core.results.canonical_json import canonical_json_text
+from benchbox.core.results.query_plan_models import LogicalOperator, LogicalOperatorType, QueryPlanDAG
+from benchbox.core.results.schema import build_plans_payload, build_result_payload
 from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 cp = importlib.import_module("benchbox.cli.commands.compare_plans")
@@ -93,6 +97,73 @@ def _make_load_seq(*results_list):
         return (seq.pop(0), {})
 
     return _load
+
+
+def _write_real_bundle(path: Path, *, execution_id: str, query_id: str, table_name: str) -> None:
+    """Write a REAL on-disk v2 bundle (main file + .plans.json companion) with a
+    genuine QueryPlanDAG, for the no-monkeypatch real-loader test (qpc-11 w1)."""
+    root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name=table_name)
+    plan = QueryPlanDAG(query_id=query_id, platform="duckdb", logical_root=root)
+    results = make_benchmark_results(
+        benchmark_id="tpch",
+        benchmark_name="tpch",
+        platform="duckdb",
+        scale_factor=1.0,
+        execution_id=execution_id,
+        timestamp=datetime(2025, 1, 1, 12, 0, 0),
+        duration_seconds=1.0,
+        total_queries=1,
+        successful_queries=1,
+        query_plans_captured=1,
+        query_results=[
+            {
+                "query_id": query_id,
+                "status": "SUCCESS",
+                "execution_time_ms": 100.0,
+                "rows_returned": 4,
+                "query_plan": plan,
+                "plan_fingerprint": plan.plan_fingerprint,
+            }
+        ],
+    )
+    path.write_text(canonical_json_text(build_result_payload(results)), encoding="utf-8")
+    plans_payload = build_plans_payload(results)
+    assert plans_payload is not None
+    companion = path.with_name(path.name[: -len(".json")] + ".plans.json")
+    companion.write_text(canonical_json_text(plans_payload), encoding="utf-8")
+
+
+def test_compare_plans_real_loader_compares_bundles(tmp_path: Path) -> None:
+    """End-to-end through the REAL loader for BOTH runs: no load_result_file
+    monkeypatch. Two bundles share query id "1" but scan different tables, so
+    the loader rehydrates real QueryPlanDAGs and the comparator must report the
+    property difference (qpc-11 w1: one real-loader test per CLI).
+
+    Asserts on the emitted comparison, not just exit code: with only
+    ``exit_code == 0`` this would be a false green, because ``--threshold 0.0``
+    plus an explicit ``--query-id`` filters every comparison out of the result
+    list, so the command exits 0 having printed "No plans available for
+    comparison" without ever rehydrating or comparing a plan. ``--threshold
+    1.0`` admits the (non-identical) comparison so the real compare path runs,
+    and the JSON assertions below fail unless both plans were genuinely
+    rehydrated and the differing table was detected.
+    """
+    p1 = tmp_path / "r1.json"
+    p2 = tmp_path / "r2.json"
+    _write_real_bundle(p1, execution_id="run1", query_id="1", table_name="lineitem")
+    _write_real_bundle(p2, execution_id="run2", query_id="1", table_name="orders")
+
+    result = CliRunner().invoke(
+        cp.compare_plans,
+        ["--run1", str(p1), "--run2", str(p2), "--query-id", "1", "--threshold", "1.0", "--output", "json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert '"query_id": "1"' in result.output
+    assert '"plans_identical": false' in result.output
+    # The one property difference is the differing scanned table (lineitem vs
+    # orders) -- proves both plans were rehydrated and structurally compared.
+    assert '"property_mismatches": 1' in result.output
 
 
 def test_compare_plans_uses_load_result_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
