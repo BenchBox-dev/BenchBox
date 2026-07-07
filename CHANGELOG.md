@@ -7,24 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-> **Accounting note:** the content below was previously (incorrectly) dated
-> as a released `[0.3.1] - 2026-05-30` section, but no `v0.3.1` git tag was
-> ever pushed and PyPI never served a `0.3.1` release — `0.3.0` (published
-> 2026-05-16) remains PyPI-latest as of 2026-07-03. `0.3.0` shipped with a
-> broken clean install (`ModuleNotFoundError: No module named 'pandas'` on
-> `import benchbox`); the fix is the "Clean install now imports" entry
-> below. This work is complete on `develop` but not yet published under a
-> released version. See `release-recovery-v0-3-1` for the recovery release
-> that will publish it, and `release-accounting-drift-correction` for this
-> bookkeeping fix.
+## [0.3.1] - 2026-07-07
 
 ### New
 
-- **Databricks Liquid Clustering** - Added TPC-H and TPC-DS tuning profiles that
-  apply Databricks Liquid Clustering for more representative runs.
+- **Query plan capture, hardened** - Plan capture now runs as an explicit
+  isolated phase with a single knob. Plans are keyed correctly across streams
+  and phases, read-phase plans are captured before mid-run mutation, captured
+  plans are reattached when results are loaded, and plan-capture time is
+  excluded from reported query times. Estimated `EXPLAIN` is the default;
+  `ANALYZE` is an explicit opt-in. Deep plans truncate at a configurable
+  `plan_max_depth`.
+- **Plan fingerprinting with literal normalization** - Normalized plan
+  fingerprints support structural plan comparison, and the new
+  `--normalize-plan-literals` flag masks literals (while protecting ordinal
+  references) so plans can be compared across data seeds.
+- **Statistics phase** - Benchmarks can now run a first-class statistics
+  phase between load and query, opt-in from the CLI and the MCP
+  `run_benchmark` tool.
+- **Databricks Liquid Clustering** - Added TPC-H and TPC-DS tuning profiles
+  that apply Databricks Liquid Clustering for more representative runs.
 
 ### Added
 
+- **SCD Type 2 write primitives** - `write_primitives` now covers SCD Type 2
+  dimension maintenance, including portable merge operations on DuckDB.
 - **Benchmark support-status diagnostics** - You can now check which benchmarks
   and platforms are supported, and why a given combination is gated, from
   registry-backed metadata instead of inferring it from docs.
@@ -38,11 +45,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without pulling pandas. Optional engine and DataFrame imports (ClickHouse
   local, DataFrame mode) are now loaded lazily, so the base install stays
   minimal. This resolves the v0.3.0 clean-install failure.
-- **Trino table creation** - JoinOrder `CREATE TABLE` no longer emits
-  primary-key clauses that Trino rejects.
+- **Dependency security bumps** - Bumped transitive dependencies to resolve
+  33 known CVEs.
+- **SSB query discrimination** - The SSB data generator now emits canonical
+  dimension values, so 6 queries that previously returned empty results
+  discriminate correctly.
+- **Spark AQE toggle** - Adaptive Query Execution is now genuinely toggleable
+  end to end instead of silently staying on.
+- **DataFrame CSV semantics** - Empty-string vs null CSV handling is now
+  uniform across all DataFrame adapters.
+- **JoinOrder validation** - Row counts are validated exactly after load, and
+  `CREATE TABLE` no longer emits primary-key clauses that Trino rejects.
 - **JoinOrder across engines** - SQLite now indexes JoinOrder tables, Spark
   disables broadcast joins for the fixed dataset, and Presto/Spark run paths
   were corrected for more reliable JoinOrder runs.
+- **Submission validation** - Result submissions now reject invalid trust
+  labels and fail on incomplete submission manifests.
+- **Concurrent data fetch** - Archive downloads are guarded against
+  concurrent `fetch_data` callers clobbering each other.
 - **Spark warehouse location** - Spark now writes its warehouse to the run's
   database directory instead of the current working directory.
 - **Chart rendering** - Power-run charts render for benchmarks without TPC
@@ -58,7 +78,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Registry-derived platform lists** - Landing and prompt pages now derive
   their platform and command examples from the live registry, so the lists stay
   in sync with actually supported platforms.
-
+- **DuckDB dependency cap raised** - The `duckdb` upper bound is now
+  `<2.0.0`.
 ## [0.3.0] - 2026-05-16
 
 ### New

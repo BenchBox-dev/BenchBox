@@ -1,9 +1,0 @@
-id: implement-clickhouse-embedded-mode-support-via-chdb
-title: ✅ Implement ClickHouse Embedded Mode Support via chDB
-category: Core Functionality
-sections:
-  Notes: '- "**Expected Impact**:"'
-worktree: unknown
-priority: Medium
-status: Completed
-description: '- "**Expected Impact**:"'
