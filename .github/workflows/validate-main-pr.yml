@@ -63,6 +63,14 @@ jobs:
           RELEASE_READINESS_OVERRIDE_SHA: ${{ vars.RELEASE_READINESS_OVERRIDE_SHA }}
           RELEASE_READINESS_OVERRIDE_REASON: ${{ vars.RELEASE_READINESS_OVERRIDE_REASON }}
         run: |
+          if [ ! -f scripts/release_readiness_check.py ]; then
+            # Trusted-base bootstrap: the readiness script ships to main with
+            # this release, so the base checkout cannot have it yet. Mirror the
+            # missing-workflow bootstrap path and run inline release evidence.
+            echo "bootstrap_required=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::scripts/release_readiness_check.py is not on the trusted base yet; running inline release evidence."
+            exit 0
+          fi
           set +e
           uv run -- python scripts/release_readiness_check.py \
             --head-sha "${{ github.event.pull_request.head.sha }}" \
@@ -77,6 +85,15 @@ jobs:
           fi
           echo "bootstrap_required=true" >> "$GITHUB_OUTPUT"
           echo "::warning::release-canary.yml is not on the default branch yet; running inline release evidence."
+
+      - name: Checkout release head for bootstrap evidence
+        if: steps.release-readiness.outputs.bootstrap_required == 'true'
+        uses: actions/checkout@v4
+        with:
+          # Inline bootstrap evidence must run against the release content
+          # being validated; the trusted base cannot supply it while the
+          # canary tooling has not shipped to main yet.
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Bootstrap non-fast release evidence
         if: steps.release-readiness.outputs.bootstrap_required == 'true'
