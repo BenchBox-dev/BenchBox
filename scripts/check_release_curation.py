@@ -85,7 +85,8 @@ def parse_curation_list(makefile: Path) -> set[str]:
         rm_match = re.search(r"git rm (?:-rf|-f)(?: --ignore-unmatch)? (.+?)$", line.strip())
         if not rm_match:
             continue
-        paths.update(rm_match.group(1).split())
+        # Skip option tokens such as --ignore-unmatch; only pathspecs count.
+        paths.update(p for p in rm_match.group(1).split() if not p.startswith("-"))
     return paths
 
 
