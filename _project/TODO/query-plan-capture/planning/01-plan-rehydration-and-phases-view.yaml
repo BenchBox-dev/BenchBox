@@ -2,9 +2,19 @@ id: "qpc-01-plan-rehydration-and-phases-view"
 title: "Rehydrate .plans.json in the loader and give consumers a real phases/plan accessor"
 worktree: "query-plan-capture"
 priority: "Critical"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-06"
 
 description: |
+  RECONCILED 2026-07-06: landed via PR #967 (fix-plan-consumption-phases-and-
+  loader-reattach), verified on develop. The loader now rehydrates .plans.json
+  via `iter_query_results` + `_attach_plan`/`QueryPlanDAG.from_dict`; the six
+  plan consumers read `iter_query_results(results)` instead of a non-existent
+  `.phases`; companion/main query IDs are normalized on both sides; and the
+  keystone no-mock e2e test exists (tests/integration/test_plan_capture_e2e.py,
+  11 passed). This item was filed before #967 landed and was never closed.
+
+
   The loader parses the .plans.json companion but uses only the two count
   fields; per-query plan payloads are discarded (loader.py:153,221,
   _extract_plans_info). BenchmarkResults has no `phases` attribute, yet every
@@ -43,7 +53,7 @@ work:
     the four consumers to read query_results directly — decide in-diff,
     smaller change wins. Normalize --query-id lookups in show_plan.py and
     compare_plans.py with normalize_query_id on both sides.
-  status: pending
+  status: done
 - id: w2
   summary: >-
     Create: keystone no-mock integration test covering export -> load ->
@@ -54,19 +64,19 @@ work:
     run show-plan and compare-plans via CliRunner asserting rendered plan
     output — zero monkeypatching.
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Review: adversarial code review of the diff (id normalization edge cases, multi-iteration attach semantics, .phases contract)."
   needs: [w2]
-  status: pending
+  status: done
 - id: w4
   summary: "Fix: address review findings; re-run full verification."
   needs: [w3]
-  status: pending
+  status: done
 - id: w5
   summary: "Submit PR referencing qpc-01; include repro-before/after in the PR body."
   needs: [w4]
-  status: pending
+  status: done
 
 must_preserve:
 - "Companion schema stays readable for already-exported bundles (accept both 'Q1' and '1' keys on load)"
