@@ -159,46 +159,52 @@ class TestPlanHistory:
             assert entries[2].run_id == "run2"
 
     def test_query_plan_history_sorts_mixed_offset_timestamps_chronologically(self) -> None:
-        """qpc-08 / F7.2: a lexicographic string sort misorders timestamps that
-        mix representations (naive vs. explicit UTC offset) even when they are
-        chronologically unambiguous once parsed.
+        """qpc-08 / F7.2: mixed-offset timestamps must be ordered by the instant
+        they denote, not by lexicographic string comparison.
+
+        The earlier instant here is deliberately arranged to sort LATER by both
+        of the axes a naive implementation might rely on -- filename/glob order
+        and raw-string order -- so only a parse-based sort recovers the true
+        chronological order. A regression to ``history.sort(key=lambda x:
+        x.timestamp)`` (lexicographic) turns this test red.
         """
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
-            # Naive-looking "Z" timestamp that sorts AFTER an explicit "+00:00"
-            # offset lexicographically ('Z' > '+') despite being the earlier
-            # instant once parsed.
-            plan_a = _create_plan_with_fingerprint("q1", "a" * 64)
-            plan_b = _create_plan_with_fingerprint("q1", "b" * 64)
-            history.add_run(
-                make_benchmark_results(
-                    execution_id="early",
-                    timestamp=datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
-                    query_results=[_qr("q1", 100.0, plan_a)],
-                )
+            # run-a: 2024-03-10 02:30 UTC.
+            # run-b: 2024-03-10 06:30 +08:00 == 2024-03-09 22:30 UTC -- the
+            # EARLIER instant. Yet its filename ("run-b" > "run-a") AND its raw
+            # timestamp string ("06:30" > "02:30") both sort it AFTER run-a, so
+            # a lexicographic (or glob-order) sort yields the wrong [run-a,
+            # run-b]; only parsing yields the correct [run-b, run-a]. Explicit
+            # offsets (not "Z") keep this valid on every supported Python,
+            # including 3.10 where ``fromisoformat`` rejects a trailing "Z".
+            stored_timestamps = (
+                ("run-a", "2024-03-10T02:30:00+00:00"),
+                ("run-b", "2024-03-10T06:30:00+08:00"),
             )
-            history.add_run(
-                make_benchmark_results(
-                    execution_id="late",
-                    timestamp=datetime(2024, 1, 2, 0, 0, 0, tzinfo=timezone.utc),
-                    query_results=[_qr("q1", 100.0, plan_b)],
+            for exec_id, iso_timestamp in stored_timestamps:
+                plan = _create_plan_with_fingerprint("q1", "a" * 64)
+                history.add_run(
+                    make_benchmark_results(
+                        execution_id=exec_id,
+                        query_results=[_qr("q1", 100.0, plan)],
+                    )
                 )
-            )
-            # Directly corrupt "early"'s stored timestamp representation to a
-            # lexicographically-larger-but-chronologically-earlier string, the
-            # way a naive-vs-aware mix would in practice.
-            early_file = Path(tmpdir) / "early.json"
-            with open(early_file, encoding="utf-8") as f:
-                data = json.load(f)
-            data["timestamp"] = "2024-01-01T00:00:00Z"
-            with open(early_file, "w", encoding="utf-8") as f:
-                json.dump(data, f)
+                # Overwrite the stored timestamp with the exact mixed-offset
+                # representation under test (add_run would otherwise write the
+                # fixture's naive now()).
+                entry_file = Path(tmpdir) / f"{exec_id}.json"
+                with open(entry_file, encoding="utf-8") as f:
+                    data = json.load(f)
+                data["timestamp"] = iso_timestamp
+                with open(entry_file, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
             history._cache.clear()
 
             entries = history.query_plan_history("q1")
 
-            assert [e.run_id for e in entries] == ["early", "late"]
+            assert [e.run_id for e in entries] == ["run-b", "run-a"]
 
     def test_query_plan_history_empty(self) -> None:
         """Test history for non-existent query."""

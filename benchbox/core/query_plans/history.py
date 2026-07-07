@@ -99,14 +99,18 @@ class PlanHistory:
         """
         # BenchmarkResults has no `run_id`/`start_time` attributes -- the real
         # fields are `execution_id`/`timestamp` (qpc-08 / F1.2). Reading the
-        # wrong names made this a permanent, silent no-op: `getattr(...,
-        # default)` never raised, it just always returned the default.
-        execution_id = getattr(results, "execution_id", None)
+        # wrong names made this a permanent, silent no-op. Access the required
+        # attributes DIRECTLY rather than via `getattr(..., default)`: the
+        # original bug was silent precisely because getattr never raised on a
+        # missing/renamed attribute, it just returned the default. Direct
+        # access makes a future shape drift fail loudly (AttributeError, caught
+        # and logged by the single caller) instead of silently no-op'ing again.
+        execution_id = results.execution_id
         if not execution_id:
             logger.warning("Cannot add run without execution_id")
             return
 
-        timestamp_value = getattr(results, "timestamp", None)
+        timestamp_value = results.timestamp
         if isinstance(timestamp_value, datetime):
             timestamp = timestamp_value.isoformat()
         elif timestamp_value:
