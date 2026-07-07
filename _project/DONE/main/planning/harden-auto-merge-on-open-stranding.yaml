@@ -2,7 +2,8 @@ id: harden-auto-merge-on-open-stranding
 title: "Diagnose + guard the auto-merge-on-open stranding that orphaned 3 remediation fixes"
 worktree: main
 priority: Low
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-07-06"
 category: Testing and Quality Assurance
 
 description: |
@@ -53,7 +54,7 @@ work:
 - id: w1
   summary: "Add a guard/detector so a stranded fix cannot merge-then-vanish silently"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Design AFTER w0 identifies the mechanism. Candidate mechanisms (pick per
     root cause, do not implement all):
@@ -80,6 +81,27 @@ work:
     a human decision before implementing, per the orchestrator's instruction
     to prefer a clean w0 PR over a speculative guard. w1 stays pending.
 
+    DONE 2026-07-06: implemented the scheduled orphaned-fix-commit detector (the
+    only candidate matching w0's verdict). SCOPE WIDENED (approved this turn) to
+    add ONE new workflow file — a fresh `.github/workflows/orphaned-commit-detector.yml`,
+    which is NOT CODEOWNERS-gated (CODEOWNERS covers only auto-merge-on-open.yml
+    and release.yml), so no code-owner review is required and it can auto-merge.
+    Deliverables:
+      - _project/scripts/detect_orphaned_commits.py: for every branch whose PR
+        merged, flags commits in `<merged-PR-head>..origin/<branch>` not on
+        develop (squash-proof — compares against the API-reported pre-squash
+        head, never patch-ids). Pure logic split out for unit testing.
+      - _project/analysis/known-stranded-commits.txt: allowlist of the 4
+        historical resolved orphans (43c4f689/cf394466/4865a2f2/33687637) so the
+        detector fails only on NEW occurrences.
+      - .github/workflows/orphaned-commit-detector.yml: weekly + dispatch +
+        on-change; fetches all branches and runs the detector with a read-only
+        pull-requests token.
+      - tests/unit/workflows/test_detect_orphaned_commits.py: 12 tests pinning
+        allowlist parsing + new-vs-acknowledged classification.
+    Verified locally: with the governance branch's merged head, the detector
+    returns exactly the two §2.22 orphans, which the allowlist then suppresses.
+
 prior_art:
 - ".github/workflows/auto-merge-on-open.yml — the flow under investigation; the guard in w1 extends or gates this (CODEOWNERS-protected)."
 - ".github/workflows/develop-post-merge.yml — existing post-merge hook; the natural home for a merged-tree-vs-PR-head assertion
@@ -99,8 +121,9 @@ scope_limit:
   only_modify:
   - ".github/workflows/auto-merge-on-open.yml"
   - ".github/workflows/develop-post-merge.yml"
+  - ".github/workflows/orphaned-commit-detector.yml"  # w1: new detector (scope widened 2026-07-06; not CODEOWNERS-gated)
   - "_project/scripts/"
-  - "_project/analysis/"  # w0 forensic summary
+  - "_project/analysis/"  # w0 forensic summary + w1 allowlist
   - "tests/unit/workflows/"
   do_not_modify:
   - "benchbox/"
