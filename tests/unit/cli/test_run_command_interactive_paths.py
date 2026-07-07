@@ -227,6 +227,129 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
     assert save_kwargs["phases"] == ["generate", "load", "power"]
 
 
+def test_interactive_stats_controls_reach_benchmark_config(tmp_path: Path):
+    """--stats-reset/--stats-per-table-timing are parsed onto `s` regardless of
+    interactive vs. non-interactive mode, but the interactive wizard builds
+    s.benchmark_config via bench_manager.select_benchmark(), which knows nothing
+    about them - the direct/load-only paths pass them at BenchmarkConfig
+    construction time instead. The interactive preview showed the flags (proving
+    they parsed), but the object handed to _execute_orchestrated_run never got
+    them, so the actual run silently used the defaults. This pins that
+    _interactive_preflight_and_execute copies both onto s.benchmark_config
+    before executing."""
+    runner = CliRunner()
+
+    profiler = Mock()
+    profiler.get_system_profile.return_value = SimpleNamespace(
+        cpu_cores_logical=8,
+        memory_total_gb=32,
+        architecture="x86_64",
+        os_type="darwin",
+    )
+    profiler.display_profile.return_value = None
+
+    db_manager = Mock()
+    database_config = SimpleNamespace(type="duckdb", options={}, execution_mode=None)
+    db_manager.prompt_execution_style.return_value = "sql-local"
+    db_manager.select_database.return_value = database_config
+
+    benchmark_config = BenchmarkConfig(
+        name="tpch",
+        display_name="TPC-H",
+        scale_factor=0.01,
+        queries=None,
+        concurrency=1,
+        options={},
+    )
+    assert benchmark_config.stats_reset is None
+    assert benchmark_config.stats_per_table_timing is False
+
+    bench_manager = Mock()
+    bench_manager.benchmarks = {
+        "tpch": {
+            "display_name": "TPC-H",
+            "estimated_time_range": (2, 10),
+            "complexity": "medium",
+            "num_queries": 22,
+        }
+    }
+    bench_manager.select_benchmark.return_value = benchmark_config
+
+    orchestrator = Mock()
+    result_payload = SimpleNamespace(validation_status="PASSED", execution_id="exec-456", query_results=[])
+    guided_config = _tuned_unified_config()
+
+    with ExitStack() as stack:
+        stack.enter_context(patch.object(_run_module, "sys", _interactive_sys()))
+        stack.enter_context(patch.object(_run_module, "SystemProfiler", return_value=profiler))
+        stack.enter_context(patch.object(_run_module, "DatabaseManager", return_value=db_manager))
+        stack.enter_context(patch.object(_run_module, "BenchmarkManager", return_value=bench_manager))
+        stack.enter_context(patch.object(_run_module, "BenchmarkOrchestrator", return_value=orchestrator))
+        stack.enter_context(patch.object(_run_module, "display_system_recommendations"))
+        mock_caps = stack.enter_context(patch.object(_run_module.PlatformRegistry, "get_platform_capabilities"))
+        stack.enter_context(patch.object(_run_module.PlatformRegistry, "requires_cloud_storage", return_value=False))
+        stack.enter_context(
+            patch.object(_run_module, "normalize_output_root", return_value=str(tmp_path / "normalized"))
+        )
+        mock_execute = stack.enter_context(
+            patch.object(_run_module, "_execute_orchestrated_run", return_value=result_payload)
+        )
+        stack.enter_context(
+            patch.object(
+                _run_module,
+                "_export_orchestrated_result",
+                return_value={"json": str(tmp_path / "results.json")},
+            )
+        )
+        stack.enter_context(patch.object(_run_module, "_render_post_run_charts"))
+        stack.enter_context(patch("benchbox.cli.onboarding.check_and_run_first_time_setup", return_value=False))
+        stack.enter_context(patch("benchbox.cli.preferences.load_last_run_config", return_value=None))
+        stack.enter_context(patch("benchbox.cli.preferences.save_last_run_config"))
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_table_mode", return_value="native"))
+        stack.enter_context(
+            patch.object(_benchmarks_module, "prompt_phases", return_value=["generate", "load", "statistics", "power"])
+        )
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_query_subset", return_value=None))
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_official_mode", return_value=(False, None)))
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_seed", return_value=None))
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_force_regeneration", return_value=None))
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_validation_mode", return_value="exact"))
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_capture_plans", return_value=False))
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_output_location", return_value=None))
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_table_format", return_value=(None, None)))
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_verbose_output", return_value=0))
+        stack.enter_context(patch.object(_benchmarks_module, "prompt_platform_options", return_value=None))
+        stack.enter_context(patch("benchbox.cli.tuning.run_tuning_wizard", return_value=guided_config))
+        stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
+        mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
+        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+
+        def _confirm_side_effect(prompt, default=False):
+            text = str(prompt)
+            if "configure tuning options" in text:
+                return False
+            if "Proceed with execution?" in text:
+                return True
+            return default
+
+        mock_confirm.side_effect = _confirm_side_effect
+
+        result = runner.invoke(
+            run,
+            ["--stats-reset", "--stats-per-table-timing"],
+            obj=_run_obj(),
+        )
+
+    assert result.exit_code == 0, result.output
+    mock_execute.assert_called_once()
+    # The exact object bench_manager.select_benchmark() returned - proving the
+    # fields were set on the SAME BenchmarkConfig instance handed to the
+    # runner, not merely read into a preview that never wired back.
+    assert mock_execute.call_args.args[1] is benchmark_config
+    assert benchmark_config.stats_reset is True
+    assert benchmark_config.stats_per_table_timing is True
+
+
 def test_interactive_execution_type_derived_from_phases(tmp_path: Path):
     """After the dead 'Test Execution Type' prompt was removed, execution type must
     follow the phases selected in the wizard (single source of truth)."""

@@ -2329,6 +2329,16 @@ def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile:
     ctx = s.ctx
     assert s.database_config is not None
     assert s.benchmark_config is not None
+    # The interactive wizard builds s.benchmark_config in _interactive_normal_flow
+    # (bench_manager.select_benchmark()) / _interactive_try_quick_restart, neither
+    # of which knows about --stats-reset/--stats-per-table-timing - those are
+    # collected onto `s` afterward via _interactive_collect_flags. The direct and
+    # load-only paths pass them at BenchmarkConfig construction time; mirror that
+    # here so the actual run (runner.py reads benchmark_config.stats_reset /
+    # .stats_per_table_timing, not s.stats_reset) honors what the preview below
+    # already shows the user, instead of silently running with the defaults.
+    s.benchmark_config.stats_reset = getattr(s, "stats_reset", None)
+    s.benchmark_config.stats_per_table_timing = bool(getattr(s, "stats_per_table_timing", False))
     if PlatformRegistry.requires_cloud_storage(s.database_config.type) and not s.output:
         console.print()
         console.print("[red]❌ Error: Cloud platform requires --output parameter[/red]")
