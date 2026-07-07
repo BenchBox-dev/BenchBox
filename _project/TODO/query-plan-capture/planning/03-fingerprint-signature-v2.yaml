@@ -5,6 +5,22 @@ priority: "High"
 status: "Not Started"
 
 description: |
+  PARTIAL as of 2026-07-06 (still OPEN): the ADJACENT literal-normalization work
+  landed via #987 (harden-normalized-plan-fingerprint) + #1008 (ordinal
+  protection) — atomic numeric grammar, `#` ordinal preservation, and a
+  `normalization_scheme` + PlanFingerprintSchemeMismatchError guard. But this
+  item's TWO CORE findings are STILL REPRODUCIBLE on develop and remain open:
+    - F2.1 tree-shape collision: `Join[Scan(t1),Scan(t2)]` (two children) and
+      `Join[Scan(t1)->Scan(t2)]` (nested chain) both yield the signature
+      `Join|Scan|table:t1|Scan|table:t2` and hash identically — children are
+      still joined flat with `|`, so tree shape is NOT encoded. Verified
+      2026-07-06.
+    - F2.2 trust laundering: a plan with its stored fingerprint field removed is
+      recomputed and marked VERIFIED/trusted in __post_init__, so dropping the
+      field bypasses STALE tamper-detection. Verified 2026-07-06.
+  The tree-shape re-encoding (`op(child1,...)`), field escaping, fingerprint_version,
+  and the integrity-trust fix below are the remaining work.
+
   get_structural_signature flattens children with the same '|' separator as
   scalar fields, so tree shape is not encoded: Join[Scan(t1), Scan(t2)] and
   Join[Scan(t1) -> Scan(t2)] produce identical SHA256 fingerprints
