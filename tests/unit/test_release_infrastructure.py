@@ -586,6 +586,19 @@ class TestReleaseInfrastructure:
         assert add_match, "expected explicit git add line in release-cut"
         assert "uv.lock" in add_match.group(1).split(), "uv.lock must be staged with the release commit"
 
+    def test_release_cut_commit_skips_hooks_after_curation_removes_them(self):
+        """The curation `git rm` lines delete .pre-commit-config.yaml and
+        _project/scripts/ (the repo:local hook entrypoints) from the working
+        tree before the release commit. The installed pre-commit git hook
+        would otherwise run against a now-missing config/entrypoints and
+        abort the commit, breaking every release cut."""
+        recipe = _make_target_recipe("release-cut")
+        commit_match = re.search(r"^\tgit commit (.+?)$", recipe, re.MULTILINE)
+        assert commit_match, "expected a git commit line in release-cut"
+        assert "--no-verify" in commit_match.group(1).split(), (
+            f"release commit must skip hooks (curation already deleted the hook config): {commit_match.group(1)}"
+        )
+
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""
         templates_dir = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"

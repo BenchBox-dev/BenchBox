@@ -828,6 +828,81 @@ class TestReconstructBenchmarkResults:
         assert failed_rows[0]["error_type"] == "QueryError"
         assert failed_rows[0]["error_message"] == "Syntax error"
 
+    def test_reconstruct_attaches_distinct_error_to_each_repeated_failure(self):
+        """#1022 review: a query_id that fails more than once (e.g. across
+        iterations) must have EACH failing row get its own error detail from
+        errors[], in write order - not every repeat sharing the first error
+        seen for that query_id (the old dict.setdefault behavior)."""
+        data = make_v2_result_dict(
+            version="2.1",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=100,
+            total_queries=2,
+            passed_queries=0,
+            failed_queries=2,
+            total_ms=100,
+            queries=[
+                {"id": "1", "iter": 1, "stream": 0, "run_type": "measurement", "status": "FAILED"},
+                {"id": "1", "iter": 2, "stream": 0, "run_type": "measurement", "status": "FAILED"},
+            ],
+            errors=[
+                {"phase": "query", "query_id": "1", "type": "TimeoutError", "message": "iteration 1 timed out"},
+                {"phase": "query", "query_id": "1", "type": "MemoryError", "message": "iteration 2 ran out of memory"},
+            ],
+        )
+
+        result = reconstruct_benchmark_results(data)
+
+        failed_rows = [q for q in result.query_results if q.get("status") == "FAILED"]
+        assert len(failed_rows) == 2
+        assert failed_rows[0]["iteration"] == 1
+        assert failed_rows[0]["error_type"] == "TimeoutError"
+        assert failed_rows[0]["error_message"] == "iteration 1 timed out"
+        assert failed_rows[1]["iteration"] == 2
+        assert failed_rows[1]["error_type"] == "MemoryError"
+        assert failed_rows[1]["error_message"] == "iteration 2 ran out of memory"
+
+    def test_reconstruct_legacy_failure_not_suppressed_by_successful_same_id_row(self):
+        """#1022 review: a legacy-shape error whose query_id ALSO appears
+        elsewhere in queries[] as a successful (different-iteration) row must
+        still be synthesized as a standalone FAILED row - the old check
+        ("query_id anywhere in queries[]") incorrectly suppressed it."""
+        data = make_v2_result_dict(
+            version="2.0",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=100,
+            total_queries=2,
+            passed_queries=1,
+            failed_queries=1,
+            total_ms=100,
+            queries=[
+                # Legacy shape: only successful queries appear here, no status key.
+                {"id": "1", "ms": 100.0, "rows": 4},
+            ],
+            errors=[
+                {"phase": "query", "query_id": "1", "type": "QueryError", "message": "iteration 2 failed"},
+            ],
+        )
+
+        result = reconstruct_benchmark_results(data)
+
+        failed_rows = [q for q in result.query_results if q.get("status") == "FAILED"]
+        assert len(result.query_results) == 2
+        assert len(failed_rows) == 1
+        assert failed_rows[0]["query_id"] == "1"
+        assert failed_rows[0]["error_type"] == "QueryError"
+        assert failed_rows[0]["error_message"] == "iteration 2 failed"
+
     def test_reconstruct_preserves_warmup_iteration_zero_and_stream_zero(self):
         """iter/stream of 0 are falsy and must not be dropped by a truthy `if`
         check (qpc-02 / F1.4): warmup rows (iter=0) and the first stream

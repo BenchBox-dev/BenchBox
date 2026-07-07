@@ -367,6 +367,34 @@ class TestResultBuilder:
         assert qr["iteration"] == 2
         assert qr["stream_id"] == 1
 
+    def test_query_results_format_includes_plan_capture_error(self) -> None:
+        """A DataFrame plan-capture failure's real cause (qpc-05 / F4.4) must
+        reach the persisted query row, not just the companion errors list."""
+        builder = self.create_builder()
+        builder.add_query_result(
+            QueryResultInput(
+                query_id="1",
+                execution_time_seconds=1.5,
+                rows_returned=100,
+                status="SUCCESS",
+                plan_capture_error="TypeError: unsupported operand",
+            )
+        )
+
+        result = builder.build()
+        qr = result.query_results[0]
+
+        assert qr["plan_capture_error"] == "TypeError: unsupported operand"
+
+    def test_query_results_format_omits_plan_capture_error_when_none(self) -> None:
+        builder = self.create_builder()
+        builder.add_query_result(self.create_query_result("1", 1.0, 100))
+
+        result = builder.build()
+        qr = result.query_results[0]
+
+        assert "plan_capture_error" not in qr
+
     def test_platform_info_dict_format(self) -> None:
         """Test that platform_info dict is formatted correctly."""
         builder = ResultBuilder(

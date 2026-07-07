@@ -193,6 +193,32 @@ class TestGeneratePlanComparisonSummary:
         assert summary.structural_differences[0].query_id == "q1"
         assert summary.structural_differences[0].change_type != "unchanged"
 
+    def test_fingerprint_version_bump_on_identical_plan_is_not_a_change(self) -> None:
+        """A pure fingerprint-encoding-version bump (v1 -> v2) on an otherwise
+        structurally identical plan must not be misreported as plan_changed
+        (qpc-03 anti-pattern, #1028 review F-comparison). fingerprints_comparable
+        is False here (version mismatch), so the fast path is skipped and the
+        full tree-walk fallback must correct the verdict to "unchanged"."""
+        plan1 = _create_simple_plan("q1", "orders")
+        plan2 = _create_simple_plan("q1", "orders")
+        plan2.fingerprint_version = plan1.fingerprint_version + 1
+
+        baseline = make_benchmark_results(
+            run_id="baseline",
+            query_results=[_qr("q1", 100.0, plan1)],
+        )
+        current = make_benchmark_results(
+            run_id="current",
+            query_results=[_qr("q1", 100.0, plan2)],
+        )
+
+        summary = generate_plan_comparison_summary(baseline, current)
+
+        assert summary.plans_compared == 1
+        assert summary.plans_unchanged == 1
+        assert summary.plans_changed == 0
+        assert summary.structural_differences[0].change_type == "unchanged"
+
     def test_multiple_queries(self) -> None:
         """Test comparison with multiple queries."""
         plan1a = _create_simple_plan("q1", "orders")

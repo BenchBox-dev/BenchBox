@@ -349,6 +349,15 @@ class ResultExporter:
         drops the field outright for anonymized exports rather than risk a
         false sense of safety from a partial regex scrub.
 
+        The SAME raw text also gets copied verbatim into each operator node's
+        structured ``physical_operator.platform_metadata`` by many parsers
+        (e.g. Spark's FileScan ``details``, DuckDB's ``extra_info``, Presto's
+        ``details``) - clearing only the top-level ``raw_explain_output``
+        left it reachable via ``logical_root``'s operator tree (#1024
+        review). Per-parser field names differ too much to selectively
+        redact safely, so every node's ``platform_metadata`` is dropped
+        outright, mirroring the ``raw_explain_output`` policy above.
+
         Operates on a deep copy; the caller's ``plans_payload`` (and the
         in-memory ``BenchmarkResults``/``QueryPlanDAG`` it was built from) are
         never mutated, mirroring the main-file anonymize-a-copy pattern in
@@ -362,9 +371,29 @@ class ResultExporter:
             if not isinstance(entry, dict):
                 continue
             plan = entry.get("plan")
-            if isinstance(plan, dict) and plan.get("raw_explain_output") is not None:
+            if not isinstance(plan, dict):
+                continue
+            if plan.get("raw_explain_output") is not None:
                 plan["raw_explain_output"] = None
+            self._strip_operator_platform_metadata(plan.get("logical_root"))
         return sanitized
+
+    def _strip_operator_platform_metadata(self, node: Any) -> None:
+        """Recursively clear ``physical_operator.platform_metadata`` on a
+        logical-operator tree node and its children, in place.
+
+        Parsers copy raw (potentially path/host/user-bearing) EXPLAIN text
+        into this dict under per-platform key names, so it is dropped
+        outright rather than selectively redacted (see
+        ``_anonymize_plans_payload``).
+        """
+        if not isinstance(node, dict):
+            return
+        physical_operator = node.get("physical_operator")
+        if isinstance(physical_operator, dict) and physical_operator.get("platform_metadata"):
+            physical_operator["platform_metadata"] = {}
+        for child in node.get("children") or []:
+            self._strip_operator_platform_metadata(child)
 
     def _convert_datetimes_to_iso(self, obj: Any) -> Any:
         """Convert datetime objects to ISO format strings."""

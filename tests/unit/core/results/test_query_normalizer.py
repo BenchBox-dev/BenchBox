@@ -294,6 +294,31 @@ class TestNormalizeQueryResult:
 
         assert result.row_count_validation == {"expected": 100, "actual": 100, "status": "PASSED"}
 
+    def test_normalize_preserves_plan_capture_error(self) -> None:
+        """A DataFrame plan-capture failure's real cause (qpc-05 / F4.4) must
+        survive normalization instead of being silently dropped."""
+        raw = {
+            "query_id": "Q1",
+            "execution_time_seconds": 1.5,
+            "rows_returned": 100,
+            "status": "SUCCESS",
+            "plan_capture_error": "TypeError: unsupported operand",
+        }
+        result = normalize_query_result(raw)
+
+        assert result.plan_capture_error == "TypeError: unsupported operand"
+
+    def test_normalize_plan_capture_error_defaults_to_none(self) -> None:
+        raw = {
+            "query_id": "Q1",
+            "execution_time_seconds": 1.5,
+            "rows_returned": 100,
+            "status": "SUCCESS",
+        }
+        result = normalize_query_result(raw)
+
+        assert result.plan_capture_error is None
+
     def test_normalize_with_defaults(self) -> None:
         """Test normalizing with custom defaults."""
         raw = {

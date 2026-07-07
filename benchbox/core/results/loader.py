@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import defaultdict, deque
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -503,20 +504,34 @@ def _reconstruct_query_results(
     compact entry that already reports non-SUCCESS, and (b) synthesize a
     standalone FAILED row for a query_id that never appears in ``queries[]``
     at all (the legacy shape).
+
+    ``errors[]`` and ``queries[]`` are written in the same order (see
+    ``schema.py``'s single pass over ``normalized_results``), and a query_id
+    can legitimately fail more than once across iterations/streams. Errors
+    are matched to their queries[] row one-at-a-time, in write order, per
+    query_id (a FIFO queue keyed by normalized query_id) rather than always
+    reusing the first error seen for that ID - the earlier ``dict.setdefault``
+    approach attached the SAME (first) error detail to every repeated failure
+    of a query, discarding the real cause of the later ones.
     """
     plan_entries = _index_plan_entries(plans_data)
     results: list[dict[str, Any]] = []
 
-    query_error_by_id: dict[str, dict[str, Any]] = {}
+    query_errors_by_id: dict[str, deque[dict[str, Any]]] = defaultdict(deque)
     for error in errors_list:
         if error.get("phase") != "query":
             continue
         qid = error.get("query_id")
         if qid is None:
             continue
-        query_error_by_id.setdefault(normalize_query_id(qid), error)
+        query_errors_by_id[normalize_query_id(qid)].append(error)
 
-    ids_in_queries_list: set[str] = {normalize_query_id(q["id"]) for q in queries_list if q.get("id") is not None}
+    # Tracks which error dicts (by identity) were actually attached to a
+    # queries[] row below, so the legacy fallback only synthesizes a
+    # standalone row for errors that a queries[] row never consumed - not
+    # for every error whose query_id merely appears elsewhere in queries[]
+    # (e.g. a different, successful execution of the same query_id).
+    consumed_error_ids: set[int] = set()
 
     for q in queries_list:
         query_id = q.get("id")
@@ -537,8 +552,10 @@ def _reconstruct_query_results(
             result["test_type"] = q["test_type"]
 
         if status not in ("SUCCESS", "SKIPPED") and query_id is not None:
-            error = query_error_by_id.get(normalize_query_id(query_id))
-            if error is not None:
+            error_queue = query_errors_by_id.get(normalize_query_id(query_id))
+            if error_queue:
+                error = error_queue.popleft()
+                consumed_error_ids.add(id(error))
                 result["error_type"] = error.get("type")
                 result["error_message"] = error.get("message")
 
@@ -548,19 +565,18 @@ def _reconstruct_query_results(
         )
         results.append(result)
 
-    # Legacy fallback: synthesize a FAILED row only for query_ids that never
-    # appear in queries[] at all. Current-format bundles duplicate every
-    # failure into queries[] too (handled above); re-adding it here would
-    # produce a phantom second row for the same failure.
+    # Legacy fallback: synthesize a FAILED row for every error not already
+    # consumed above. Current-format bundles duplicate every failure into
+    # queries[] too, so every error is consumed by the loop above and this
+    # produces nothing extra (no phantom second row for the same failure).
     for error in errors_list:
         if error.get("phase") != "query":
             continue
-        qid = error.get("query_id")
-        if qid is not None and normalize_query_id(qid) in ids_in_queries_list:
+        if id(error) in consumed_error_ids:
             continue
         results.append(
             {
-                "query_id": qid,
+                "query_id": error.get("query_id"),
                 "status": "FAILED",
                 "error_type": error.get("type"),
                 "error_message": error.get("message"),

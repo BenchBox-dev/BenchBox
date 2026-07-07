@@ -112,6 +112,10 @@ class QueryResultInput:
     plan_fingerprint: str | None = None
     plan_fingerprint_normalized: str | None = None
     plan_capture_time_ms: float | None = None
+    # Real capture-failure cause (qpc-05 / F4.4), e.g. an exception message
+    # from a DataFrame plan-capture attempt. None on success or when capture
+    # wasn't attempted.
+    plan_capture_error: str | None = None
     # Gate-only value-digest oracle (BENCHBOX_EMIT_RESULT_DIGEST): full-result
     # digest of a stream-0 query. None on a normal run (no payload change).
     result_digest: str | None = None
@@ -205,6 +209,7 @@ def normalize_query_result(
         plan_fingerprint=raw_result.get("plan_fingerprint"),
         plan_fingerprint_normalized=raw_result.get("plan_fingerprint_normalized"),
         plan_capture_time_ms=raw_result.get("plan_capture_time_ms"),
+        plan_capture_error=raw_result.get("plan_capture_error"),
         result_digest=raw_result.get("result_digest"),
         test_type=raw_result.get("test_type"),
     )

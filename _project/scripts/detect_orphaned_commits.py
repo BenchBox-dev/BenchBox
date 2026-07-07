@@ -149,20 +149,29 @@ def _api(url: str, token: str) -> list[dict]:
 def merged_head_for_branch(owner: str, repo: str, branch: str, token: str) -> str | None:
     """Return the pre-squash head SHA of the branch's latest MERGED PR.
 
-    Returns None if the branch has an OPEN PR (in-flight — not an orphan case)
-    or has no merged PR (never merged — abandoned WIP, out of scope here).
+    Returns None if the branch has an OPEN PR (in-flight — not an orphan
+    case), has no PRs at all, or if the LATEST PR for the branch (by PR
+    number, which is monotonically increasing) closed WITHOUT merging
+    (#1020 review). That last case matters when a branch is reused: an
+    older PR merged, then a later PR on the same branch name was opened and
+    abandoned (closed unmerged). Using that older merged PR's head as the
+    cutoff would misreport every commit from the later, intentionally
+    abandoned PR as an orphan even though it did have real PR coverage —
+    just not a merge. The branch is skipped entirely in that case rather
+    than diffed from a stale cutoff.
     """
     prs = _api(
         f"https://api.github.com/repos/{owner}/{repo}/pulls?head={owner}:{branch}&state=all&per_page=100",
         token,
     )
+    if not prs:
+        return None
     if any(pr.get("state") == "open" for pr in prs):
         return None
-    merged = [pr for pr in prs if pr.get("merged_at")]
-    if not merged:
+    latest_pr = max(prs, key=lambda pr: pr["number"])
+    if not latest_pr.get("merged_at"):
         return None
-    merged.sort(key=lambda pr: pr["merged_at"])
-    return merged[-1]["head"]["sha"]
+    return latest_pr["head"]["sha"]
 
 
 def find_orphans(owner: str, repo: str, token: str) -> dict[str, list[str]]:

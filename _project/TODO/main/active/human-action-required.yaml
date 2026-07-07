@@ -44,11 +44,14 @@ work:
 
 - id: w2
   summary: "GitHub admin: rename branch main->release + recreate the ruleset (rename w5/w6)"
-  needs: [w1]
+  needs: [w1, w3]
   status: pending
   notes: |
     Source: rename-release-branch-main-to-release (w5/w6, ADMIN half).
-    Run RIGHT AFTER w1 merges, per docs/operations/branch-rename-runbook.md:
+    Blocked on w3 too: the source TODO's deps.needs: branch-default-switch-to-develop
+    encodes the A-before-B sequencing (Decision A, the default-branch switch,
+    must land before Decision B, this rename). Run RIGHT AFTER w1 merges AND
+    w3 is done, per docs/operations/branch-rename-runbook.md:
       gh api -X POST repos/joeharris76/BenchBox/branches/main/rename -f new_name=release
     Then recreate the `main-release-only` ruleset as `release-only` targeting
     refs/heads/release (same required checks/protections), and update the

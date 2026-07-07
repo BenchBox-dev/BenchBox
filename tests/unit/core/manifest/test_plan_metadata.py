@@ -234,6 +234,10 @@ class TestCreatePlanMetadataFromResults:
         assert metadata.plan_versions == {"q1": 1, "q2": 1}
         assert "q1" in metadata.plan_capture_timestamp
         assert "q2" in metadata.plan_capture_timestamp
+        assert metadata.plan_fingerprint_versions == {
+            "q1": plan1.fingerprint_version,
+            "q2": plan2.fingerprint_version,
+        }
 
     def test_skips_executions_without_plans(self) -> None:
         """Test that executions without plans are skipped."""
@@ -320,6 +324,45 @@ class TestUpdatePlanVersions:
 
         assert current.plan_versions["q1"] == 3
         assert current.plan_versions["q2"] == 1
+
+    def test_fingerprint_version_boundary_does_not_bump_version(self) -> None:
+        """A pure fingerprint-encoding-version bump (qpc-03 v1 -> v2) makes the
+        fingerprint STRING change for the same logical plan (#1028 review).
+        Without the full plan tree to verify equality across encodings, the
+        version must be preserved rather than recording a spurious change."""
+        prev = PlanMetadata(
+            plan_fingerprints={"q1": "a" * 64},
+            plan_versions={"q1": 3},
+            plan_fingerprint_versions={"q1": 1},
+        )
+        current = PlanMetadata(
+            plan_fingerprints={"q1": "b" * 64},  # different string, but...
+            plan_versions={},
+            plan_fingerprint_versions={"q1": 2},  # ...a different encoding version
+        )
+
+        update_plan_versions(prev, current)
+
+        assert current.plan_versions["q1"] == 3
+
+    def test_same_fingerprint_version_still_increments_on_real_change(self) -> None:
+        """A real content change within the SAME fingerprint_version must
+        still increment the version (the boundary exclusion above must not
+        mask genuine plan changes)."""
+        prev = PlanMetadata(
+            plan_fingerprints={"q1": "a" * 64},
+            plan_versions={"q1": 3},
+            plan_fingerprint_versions={"q1": 2},
+        )
+        current = PlanMetadata(
+            plan_fingerprints={"q1": "b" * 64},
+            plan_versions={},
+            plan_fingerprint_versions={"q1": 2},
+        )
+
+        update_plan_versions(prev, current)
+
+        assert current.plan_versions["q1"] == 4
 
 
 class TestValidatePlanMetadata:

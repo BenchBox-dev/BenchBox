@@ -1645,9 +1645,12 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         Mirrors the SQL adapter's ``_record_plan_capture_failure`` pattern: the
         real exception is appended to a per-run list (``plan_capture_errors``,
         available for inspection/aggregation) and surfaced ONCE per run at
-        WARNING, instead of being swallowed silently at DEBUG. The list and the
-        warn-once flag are lazily initialized so no ``__init__`` change is
-        needed; a fresh adapter per run gets its own clean state.
+        WARNING, instead of being swallowed silently at DEBUG. ``run_benchmark``
+        resets both the list and the warn-once flag at the start of each run
+        (qpc-15 F4.4 follow-up), so a reused adapter instance doesn't
+        accumulate errors or permanently suppress the warning after run 1; the
+        ``hasattr`` guard below remains only as a defensive fallback for
+        callers that invoke this method outside ``run_benchmark``.
         """
         if not hasattr(self, "plan_capture_errors"):
             self.plan_capture_errors: list[dict[str, Any]] = []

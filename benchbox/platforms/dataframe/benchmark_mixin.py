@@ -295,6 +295,14 @@ class BenchmarkExecutionMixin:
         )
         builder.mark_started()
 
+        # Reset per-run plan-capture failure state (qpc-05 / F4.4 follow-up):
+        # ExpressionFamilyAdapter doesn't inherit the SQL mixin's
+        # _reset_plan_capture_stats, so a reused adapter instance would
+        # otherwise accumulate plan_capture_errors across runs and keep
+        # _plan_capture_warning_emitted permanently True after the first run.
+        self.plan_capture_errors: list[dict[str, Any]] = []
+        self._plan_capture_warning_emitted = False
+
         options_map = getattr(benchmark_config, "options", {}) or {}
         builder.set_run_config(
             RunConfigInput(
@@ -396,7 +404,9 @@ class BenchmarkExecutionMixin:
                     builder.add_query_result(normalize_query_result(qr))
 
                 plans_captured, capture_failures, capture_errors = compute_plan_capture_stats(
-                    query_results, getattr(benchmark_config, "capture_plans", False)
+                    query_results,
+                    getattr(benchmark_config, "capture_plans", False),
+                    existing_errors=list(getattr(self, "plan_capture_errors", [])) or None,
                 )
                 builder.add_plan_capture_stats(
                     plans_captured=plans_captured,
