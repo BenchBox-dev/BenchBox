@@ -2,7 +2,8 @@ id: "qpc-11-plan-cli-test-democking"
 title: "De-mock plan CLI/consumer tests: fakes must not define attributes production objects lack"
 worktree: "query-plan-capture"
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-07"
 
 description: |
   All three plan CLI coverage suites monkeypatch load_result_file with
@@ -30,32 +31,40 @@ work:
     Create: replace SimpleNamespace result fakes with real BenchmarkResults
     or spec-constrained mocks; add one real-loader test per CLI.
   notes: >-
-    Real instances are cheap to construct; otherwise
-    create_autospec(BenchmarkResults). Where load_result_file is stubbed for
-    speed, add one companion test per CLI that exercises the real loader on
-    a tmp-file bundle.
-  status: pending
+    The SimpleNamespace .phases fakes were already gone (suites use real
+    make_benchmark_results). Added one real-path test per CLI with NO
+    load_result_file/PlanHistory monkeypatch: show-plan and compare-plans
+    drive real on-disk bundles (build_result_payload + build_plans_payload)
+    through the real loader; plan-history drives a real PlanHistory over
+    real on-disk history JSON.
+  status: done
 - id: w2
   summary: >-
     Create: guardrail preventing load_result_file monkeypatching without a
     sibling real-file test.
   notes: >-
-    Pattern mirror of tests/unit/test_todo_executable_docs.py guardrails, or
-    a lightweight lint in tests/conftest.
+    Added tests/unit/cli/commands/test_plan_cli_no_mock_guardrail.py: for each
+    plan CLI suite that stubs its data-load boundary (load_result_file /
+    PlanHistory) it requires a `def test_..real..` companion. Verified it
+    goes red when the real-path test is removed.
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Review: adversarial code review (did any test lose coverage in the swap; fake-shape drift actually fails now — mutate a field name and confirm red)."
   needs: [w2]
-  status: pending
+  notes: >-
+    Manual canary confirmed: renaming query_results in iter_query_results
+    turns the new real-loader show-plan/compare-plans tests red; the guardrail
+    goes red when its real-path companion is removed.
+  status: done
 - id: w4
   summary: "Fix: address review findings; re-run verification."
   needs: [w3]
-  status: pending
+  status: done
 - id: w5
   summary: "Submit PR referencing qpc-11."
   needs: [w4]
-  status: pending
+  status: done
 
 must_preserve:
 - "Test suite runtime stays in the fast lane (no benchmark execution; tmp-file bundles only)"
