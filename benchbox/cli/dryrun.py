@@ -60,6 +60,8 @@ def generate_cli_command(
     publish_target: str | None = None,
     publish_label: str | None = None,
     benchmark_options: dict[str, str] | None = None,
+    funding: str | None = None,
+    result_source: str | None = None,
 ) -> str:
     """Generate equivalent CLI command from interactive wizard configuration.
 
@@ -92,6 +94,8 @@ def generate_cli_command(
         publish: Publish the exported result bundle after a successful run
         publish_target: Destination for --publish (local dir or cloud URI)
         publish_label: Trust label for --publish
+        funding: Funding-source disclosure recorded in the bundle's provenance block
+        result_source: Advisory producer hint recorded in the bundle's provenance block
 
     Returns:
         Complete CLI command string
@@ -128,6 +132,8 @@ def generate_cli_command(
         (presort, "--presort", None),
         (sorted_ingestion_mode, "--sorted-ingestion-mode", "off"),
         (sorted_ingestion_method, "--sorted-ingestion-method", None),
+        (funding, "--funding", None),
+        (result_source, "--result-source", None),
     ]
     for value, flag, skip in _VALUE_PARAMS:
         if value is not None and value != skip:

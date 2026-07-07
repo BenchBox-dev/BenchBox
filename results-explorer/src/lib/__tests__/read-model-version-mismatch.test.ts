@@ -45,7 +45,7 @@ describe("read-model version guard", () => {
     const conn = makeConn(null);
     await expect(
       _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
-    ).rejects.toThrow(/read-model v0; UI requires v1/);
+    ).rejects.toThrow(/read-model v0; UI requires v2/);
     await expect(
       _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
     ).rejects.not.toThrow(/is missing required columns/);
@@ -85,7 +85,7 @@ describe("read-model version guard", () => {
     const conn = makeConn(0);
     await expect(
       _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
-    ).rejects.toThrow(/read-model v0; UI requires v1/);
+    ).rejects.toThrow(/read-model v0; UI requires v2/);
     await expect(
       _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
     ).rejects.toThrow(/npm run dev:snapshot/);
@@ -129,7 +129,7 @@ describe("read-model version guard", () => {
 
     await expect(
       _validateAttachedSnapshotForTest(conn as unknown as Parameters<typeof _validateAttachedSnapshotForTest>[0]),
-    ).rejects.toThrow(/read-model v0; UI requires v1/);
+    ).rejects.toThrow(/read-model v0; UI requires v2/);
 
     expect(queries).toEqual(["SELECT read_model_version FROM bench.metadata LIMIT 1"]);
   });

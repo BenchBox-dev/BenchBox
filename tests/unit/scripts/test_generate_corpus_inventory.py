@@ -124,6 +124,19 @@ class TestGenerateInventory:
         assert inventory["bundles"][0]["funding"] == "unspecified"
         assert "by_funding" in inventory["summary"]
 
+    def test_submit_manifest_funding_override_wins_over_bundle_provenance(self, tmp_path: Path) -> None:
+        # `benchbox submit --funding` resolves an explicit override against the
+        # bundle's own declared value and records the result in the per-bundle
+        # manifest sidecar. That already-resolved value must win over the
+        # bundle's raw embedded provenance.funding, which the submitter may
+        # have explicitly corrected.
+        _write_bundle(tmp_path / "result.json", provenance={"funding": "employer"})
+        (tmp_path / "result.manifest.json").write_text(json.dumps({"funding": "personal"}), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["bundles"][0]["funding"] == "personal"
+
     def test_excludes_companions_and_sorts_deterministically(self, tmp_path: Path) -> None:
         bundle_dir = tmp_path / "bundles"
         bundle_dir.mkdir()

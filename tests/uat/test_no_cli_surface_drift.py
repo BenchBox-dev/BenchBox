@@ -57,6 +57,9 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     # for run.py for this PR; a follow-up removes it here once the new signature is
     # the develop baseline, re-enabling the guard for run.py.
     "benchbox/cli/commands/run.py",
+    # results-labels-funding (PR #1021): adds --funding/--notes disclosure options
+    # to `submit`, intentionally changing submit()'s signature surface.
+    "benchbox/cli/commands/submit.py",
 }
 ALLOWED_INTERNAL_CLI_FILES = ALLOWED_INTERNAL_CLI_FILES | ALLOWED_HIDDEN_COMPAT_CLI_FILES
 FORBIDDEN_CLI_SURFACE_DECORATORS = {"argument", "command", "group", "option"}

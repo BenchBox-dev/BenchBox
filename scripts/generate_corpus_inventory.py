@@ -108,13 +108,12 @@ def _bundle_trust_label(bundle_path: Path, bundles_dir: Path) -> str:
 def _bundle_funding(bundle_path: Path, data: dict) -> str:
     """Resolve the funding value for a bundle.
 
-    Precedence: the bundle's own ``provenance.funding`` block, then the
-    submission manifest sidecar's ``funding`` field, then ``unspecified``.
+    Precedence: the submission manifest sidecar's ``funding`` field (already
+    resolved against ``--funding`` at submit time - see
+    ``benchbox/cli/commands/submit.py``, which prefers the explicit CLI
+    override over the bundle's own declared value), then the bundle's own
+    ``provenance.funding`` block, then ``unspecified``.
     """
-    provenance = data.get("provenance")
-    if isinstance(provenance, dict) and provenance.get("funding"):
-        return _normalize_funding(provenance.get("funding"))
-
     for name in (f"{bundle_path.stem}{SUBMISSION_MANIFEST_SUFFIX}", SUBMISSION_MANIFEST):
         sidecar = bundle_path.parent / name
         if sidecar.is_file():
@@ -125,6 +124,11 @@ def _bundle_funding(bundle_path: Path, data: dict) -> str:
             if isinstance(manifest, dict) and manifest.get("funding"):
                 return _normalize_funding(manifest.get("funding"))
             break
+
+    provenance = data.get("provenance")
+    if isinstance(provenance, dict) and provenance.get("funding"):
+        return _normalize_funding(provenance.get("funding"))
+
     return DEFAULT_FUNDING
 
 
