@@ -1045,12 +1045,18 @@ def _build_plan_entry(qr: dict[str, Any]) -> dict[str, Any]:
     if capture_time is not None:
         plan_entry["capture_time_ms"] = round(capture_time, 1)
 
-    if is_dataclass(query_plan):
-        plan_entry["plan"] = asdict(query_plan)
+    # `to_dict()` (when the object defines one) is the intentional serialization:
+    # for QueryPlanDAG it applies depth protection (see DEFAULT_PLAN_MAX_DEPTH)
+    # and omits internal-only fields like fingerprint_integrity. Checking
+    # is_dataclass() first would always win (QueryPlanDAG is a dataclass) and
+    # fall through to plain asdict(), bypassing both of those and leaking
+    # fingerprint_integrity into the companion file.
+    if hasattr(query_plan, "to_dict"):
+        plan_entry["plan"] = query_plan.to_dict()
     elif isinstance(query_plan, dict):
         plan_entry["plan"] = query_plan
-    elif hasattr(query_plan, "to_dict"):
-        plan_entry["plan"] = query_plan.to_dict()
+    elif is_dataclass(query_plan):
+        plan_entry["plan"] = asdict(query_plan)
     else:
         plan_entry["plan"] = str(query_plan)
 

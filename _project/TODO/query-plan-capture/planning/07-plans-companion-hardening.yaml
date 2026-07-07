@@ -2,7 +2,8 @@ id: "qpc-07-plans-companion-hardening"
 title: "Harden .plans.json: to_dict serialization, multi-iteration retention, anonymization, path arithmetic"
 worktree: "query-plan-capture"
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-07"
 
 description: |
   Four companion-file defects:
@@ -36,45 +37,66 @@ work:
   summary: >-
     Create: reorder serialization branches (to_dict first, asdict fallback);
     assert fingerprint_integrity is absent from exported payloads.
-  status: pending
+  notes: >-
+    _build_plan_entry now checks hasattr(to_dict) before is_dataclass, so
+    QueryPlanDAG.to_dict() (depth-guarded, omits fingerprint_integrity) is
+    used instead of asdict(). Added a test asserting the companion plan dict
+    equals plan.to_dict() and excludes fingerprint_integrity.
+  status: done
 - id: w2
   summary: >-
     Create: retain plans per (query_id, iteration, stream) in the companion
     instead of last-writer-wins; loader accepts both shapes.
   notes: >-
-    Companion entries become a list under each normalized query id with a
-    schema-version bump, or (minimum) keep first + emit plans_dropped count;
-    prefer the list.
+    SKIPPED (already satisfied): #976/#979 already key .plans.json by
+    "{query_id}#{stream_id}[:{test_type}]" so multi-stream/cross-phase plans
+    are never last-writer-wins collapsed. Verified there is no separate
+    per-iteration capture axis to retain: capture_query_plan's docstring
+    states iteration/stream sampling was retired -- the canonical model
+    captures each distinct query exactly once in the isolated
+    post-measurement phase, so a query_id+stream_id pair never produces more
+    than one plan record. The YAML's `-k iteration` verification predates
+    that retirement and has no corresponding scenario to test; the existing
+    multi-stream/cross-phase tests are the applicable coverage.
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: >-
     Create: anonymize the plans payload when anonymize=True (paths/hostnames
     in raw_explain_output and operator properties).
   notes: >-
-    Route through AnonymizationManager, or omit raw_explain_output entirely
-    for anonymized exports.
+    _write_companion_files now strips raw_explain_output (set to None) from
+    a deep-copied plans payload when anonymize=True, mirroring the
+    anonymize-a-copy pattern (does not mutate the in-memory result). Chose
+    omission over partial regex/path scrubbing since raw_explain_output is
+    opaque per-platform free text no existing AnonymizationManager helper is
+    designed to safely scrub. Added anonymized/non-anonymized exporter tests.
   needs: [w2]
-  status: pending
+  status: done
 - id: w4
   summary: >-
     Create: fix companion path arithmetic — exact basename suffix
     replacement (name[:-len('.json')] + suffix); regression test with sf0.1
     style filenames.
   needs: [w3]
-  status: pending
+  notes: >-
+    Replaced the double with_suffix()/global str.replace with an exact
+    basename swap; added a regression test with a result_sf0.1.json-style
+    filename asserting the plans companion resolves to
+    result_sf0.1.plans.json (not the corrupted result_sf0.plans.json).
+  status: done
 - id: w5
   summary: "Review: adversarial code review (companion schema-version handling on load, anonymization completeness)."
   needs: [w4]
-  status: pending
+  status: done
 - id: w6
   summary: "Fix: address review findings; re-run verification."
   needs: [w5]
-  status: pending
+  status: done
 - id: w7
   summary: "Submit PR referencing qpc-07."
   needs: [w6]
-  status: pending
+  status: done
 
 must_preserve:
 - "Existing single-plan companions still load (backward-compatible reader)"

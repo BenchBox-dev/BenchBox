@@ -196,6 +196,49 @@ class TestLoadResultFile:
         assert result.total_queries == 22
         assert raw_data["version"] == "2.0"
 
+    def test_load_result_file_loads_companion_with_extra_dots_in_basename(self, tmp_path):
+        """qpc-07 w4: a scale-factor filename like ``result_sf0.1.json`` has a
+        dot in the basename itself. The old companion-path arithmetic chained
+        ``Path.with_suffix("")`` twice, which strips ``.1`` as a second
+        "suffix" and corrupts the plans companion path to
+        ``result_sf0.plans.json`` instead of ``result_sf0.1.plans.json``.
+        """
+        result_file = tmp_path / "result_sf0.1.json"
+        write_v2_result_file(
+            result_file,
+            version="2.0",
+            platform="DuckDB",
+            scale_factor=0.1,
+            queries=[{"id": "1", "ms": 100.0, "rows": 4}],
+        )
+        plans_file = tmp_path / "result_sf0.1.plans.json"
+        with open(plans_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "version": "2.0",
+                    "run_id": "test",
+                    "plans_captured": 1,
+                    "capture_failures": 0,
+                    "queries": {
+                        "1": {
+                            "fingerprint": "a" * 64,
+                            "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None},
+                        }
+                    },
+                },
+                f,
+            )
+        # The wrong basename this bug used to compute must NOT exist, so a
+        # false pass (loader stumbling onto the right file some other way)
+        # can't mask the regression.
+        wrong_path = tmp_path / "result_sf0.plans.json"
+        assert not wrong_path.exists()
+
+        result, _raw_data = load_result_file(result_file)
+
+        assert result.query_plans_captured == 1
+        assert result.query_results[0]["plan_fingerprint"] == "a" * 64
+
     def test_load_result_file_not_found(self):
         """Test loading nonexistent file raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError):

@@ -161,11 +161,21 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
 
 
 def _load_companion_file(main_file: Path, suffix: str) -> dict[str, Any] | None:
-    """Load a companion file if it exists."""
-    companion_path = main_file.with_suffix("").with_suffix(suffix)
-    if not companion_path.exists():
-        # Try alternate naming: main.plans.json instead of main.json -> main.plans.json
-        companion_path = Path(str(main_file).replace(".json", suffix))
+    """Load a companion file if it exists.
+
+    Computed as an exact basename suffix swap (``name[:-len(".json")] + suffix``)
+    rather than ``Path.with_suffix()`` chained twice or a path-wide
+    ``str.replace(".json", suffix)``: both of those break on a scale-factor
+    filename like ``result_sf0.1.json`` -- ``with_suffix("")`` leaves
+    ``result_sf0.1``, whose OWN suffix is then read as ``.1`` (stripped by
+    the second ``with_suffix()`` call, corrupting the basename to
+    ``result_sf0.plans.json``); ``str.replace`` operates on the full path
+    string and rewrites the FIRST ``.json`` it finds anywhere, including one
+    that happens to appear in a parent directory name.
+    """
+    name = main_file.name
+    companion_name = name[: -len(".json")] + suffix if name.endswith(".json") else name + suffix
+    companion_path = main_file.with_name(companion_name)
 
     if companion_path.exists():
         try:
