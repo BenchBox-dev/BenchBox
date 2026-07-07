@@ -519,6 +519,54 @@ class TestReleaseInfrastructure:
         assert "origin/main" in release_guide
         assert "intentionally does not replay release commits onto" in release_guide
 
+    def test_release_cut_curation_survives_untracked_paths(self):
+        """Curation `git rm` lines must use --ignore-unmatch and abort on real failures.
+
+        Without --ignore-unmatch, one untracked pathspec aborts the entire
+        `git rm`, and the old `-` prefix hid that — the v0.3.1 cut shipped an
+        uncurated release branch because .codex/.gemini/todo.config.yaml were
+        untracked at cut time.
+        """
+        recipe = _make_target_recipe("release-cut")
+        rm_lines = [line.strip() for line in recipe.splitlines() if re.search(r"git rm (?:-rf|-f) ", line)]
+        assert rm_lines, "expected git rm curation lines in release-cut"
+        for line in rm_lines:
+            assert "--ignore-unmatch" in line, f"curation line missing --ignore-unmatch: {line}"
+            assert not line.startswith("-"), f"real git rm failures must abort the cut (drop `-` prefix): {line}"
+
+    def test_release_cut_post_curation_guard_covers_every_curated_path(self):
+        """The git ls-files guard must re-check every path the git rm lines curate."""
+        recipe = _make_target_recipe("release-cut")
+        rm_paths: set[str] = set()
+        for line in recipe.splitlines():
+            rm_match = re.search(r"git rm (?:-rf|-f) --ignore-unmatch (.+?)$", line.strip())
+            if rm_match:
+                rm_paths.update(rm_match.group(1).split())
+        assert rm_paths, "expected git rm curation paths in release-cut"
+        guard_match = re.search(r"git ls-files (.+?)\)", recipe)
+        assert guard_match, "expected a `git ls-files <curated paths>` post-curation guard in release-cut"
+        guard_paths = set(guard_match.group(1).split())
+        assert rm_paths == guard_paths, (
+            f"post-curation guard out of sync with git rm lines; "
+            f"missing from guard: {sorted(rm_paths - guard_paths)}, "
+            f"extra in guard: {sorted(guard_paths - rm_paths)}"
+        )
+
+    def test_release_cut_refreshes_and_stages_uv_lock(self):
+        """release-cut must regenerate uv.lock after the version bump and stage it.
+
+        The v0.3.1 cut aborted mid-commit because the tracked uv.lock was stale
+        and the pre-commit uv-lock hook rewrote it during `git commit`.
+        """
+        recipe = _make_target_recipe("release-cut")
+        lock_match = re.search(r"^\tuv lock\s*$", recipe, re.MULTILINE)
+        assert lock_match, "release-cut must run `uv lock` to refresh the lockfile"
+        bump_idx = recipe.index("scripts/update_version.py")
+        assert bump_idx < lock_match.start(), "`uv lock` must run after the pyproject version bump"
+        add_match = re.search(r"^\tgit add (.+?)$", recipe, re.MULTILINE)
+        assert add_match, "expected explicit git add line in release-cut"
+        assert "uv.lock" in add_match.group(1).split(), "uv.lock must be staged with the release commit"
+
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""
         templates_dir = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"

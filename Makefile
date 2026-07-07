@@ -1073,6 +1073,10 @@ release-cut:
 	git fetch origin
 	git checkout -b v$(VERSION) develop
 	uv run -- python scripts/update_version.py --version $(VERSION) --update-pyproject
+	@# Refresh uv.lock now that pyproject.toml carries the new version, so the
+	@# pre-commit uv-lock hook has nothing to regenerate mid-commit (v0.3.1
+	@# aborted because the tracked lock was stale and the hook rewrote it).
+	uv lock
 	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/main
 	@if [ -n "$$EDITOR" ]; then \
 		echo "==> Opening CHANGELOG.md in $$EDITOR for hand-curation"; \
@@ -1086,12 +1090,25 @@ release-cut:
 	@# before git add ensures untracked files inside _project/ etc. don't end up
 	@# staged-for-add by a later git add.
 	@# Curation list: A3 of _project/decisions/single-repo-migration.md.
-	-git rm -rf _project _blog results-data results-explorer .claude .codex .gemini
-	-git rm -f .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
-	-git rm -f .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
-	@# Stage only the files update_version.py + generate_changelog_entry.py write.
-	@# Explicit list (not `git add -A`) to avoid staging build/cache artifacts.
-	git add pyproject.toml benchbox/__init__.py landing/index.html README.md docs/README.md benchbox/utils/VERSION_MANAGEMENT.md CHANGELOG.md
+	@# --ignore-unmatch: git rm aborts the ENTIRE command when any one pathspec
+	@# is untracked, and a leading `-` would hide that, silently skipping all
+	@# curation on that line (v0.3.1 shipped uncurated because of this). With
+	@# --ignore-unmatch, unmatched paths are a no-op and any remaining failure
+	@# is real, so no `-` prefix: real failures must abort the cut.
+	git rm -rf --ignore-unmatch _project _blog results-data results-explorer .claude .codex .gemini
+	git rm -f --ignore-unmatch .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
+	git rm -f --ignore-unmatch .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
+	@# Post-curation guard: every curated path must be gone from the index.
+	@LEFTOVER=$$(git ls-files _project _blog results-data results-explorer .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml); \
+	if [ -n "$$LEFTOVER" ]; then \
+		echo "ERROR: release curation incomplete; dev-only paths still tracked:" >&2; \
+		echo "$$LEFTOVER" | sed 's/^/  /' >&2; \
+		exit 1; \
+	fi
+	@# Stage only the files update_version.py + generate_changelog_entry.py +
+	@# uv lock write. Explicit list (not `git add -A`) to avoid staging
+	@# build/cache artifacts.
+	git add pyproject.toml uv.lock benchbox/__init__.py landing/index.html README.md docs/README.md benchbox/utils/VERSION_MANAGEMENT.md CHANGELOG.md
 	git commit -m "Release v$(VERSION)"
 	git push -u origin v$(VERSION)
 	gh pr create --base main --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
