@@ -44,12 +44,14 @@ def _stubs_symbol(text: str, symbol: str) -> bool:
     return f'"{symbol}"' in text and "monkeypatch.setattr" in text
 
 
-# A real-path companion test is identified by a ``real`` token in its OWN
-# function name (e.g. ``test_show_plan_real_loader_...``,
+# A real-path companion test is identified by a ``real`` token, delimited by
+# underscores, in its OWN function name (e.g. ``test_show_plan_real_loader_...``,
 # ``test_..._real_history_store_...``). Matching the function name -- not just
 # any "real" appearing in a comment/docstring/helper -- is what makes deleting
-# the companion test actually trip this guardrail.
-_REAL_PATH_TEST_RE = re.compile(r"^def (test_\w*real\w*)\(", re.MULTILINE)
+# the companion test actually trip this guardrail. Requiring the ``_real_``
+# delimiters (rather than a bare "real" substring) stops an unrelated future
+# test such as ``test_really_fast_flag`` from silently satisfying the guardrail.
+_REAL_PATH_TEST_RE = re.compile(r"^def (test_\w*_real_\w*)\(", re.MULTILINE)
 
 
 def _has_real_path_test(text: str) -> bool:
