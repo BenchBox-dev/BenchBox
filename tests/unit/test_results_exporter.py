@@ -279,6 +279,8 @@ def test_canonical_bundle_export_keeps_plans_raw_explain_output_when_not_anonymi
         plans_data = json.load(handle)
 
     assert plans_data["queries"]["1"]["plan"]["raw_explain_output"] == "SEQ_SCAN /Users/alice/data/lineitem.parquet"
+
+
 def test_exporter_records_plan_history_when_dir_configured(tmp_path):
     """qpc-08 w2: `add_run` had zero production callers -- `_export_json_v2`
     is now the single wired call site, gated behind an opt-in
