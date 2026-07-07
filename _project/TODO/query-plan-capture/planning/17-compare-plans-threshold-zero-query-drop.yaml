@@ -1,0 +1,74 @@
+id: "qpc-17-compare-plans-threshold-zero-query-drop"
+title: "compare-plans drops an explicitly-requested query at --threshold 0.0"
+worktree: "query-plan-capture"
+priority: "Low"
+status: "Not Started"
+
+description: |
+  Follow-up from the qpc-11 (#1026) review. In
+  benchbox/cli/commands/compare_plans.py::_build_comparisons the append
+  condition is roughly:
+    overall_similarity < threshold or (not explicit_query_id and threshold == 0.0)
+  With BOTH an explicit --query-id AND --threshold 0.0, the first clause is
+  `similarity < 0.0` (always False) and the second is
+  `(not True and ...)` (always False), so the requested query is never appended;
+  the command then prints "No plans available for comparison" and exits 0. Net:
+  single-query comparison output is unreachable at the default threshold — a
+  confusing product quirk (surfaced because a test vacuously passed on this
+  exit-0 path before qpc-11 hardened it).
+
+  Fix: when a query_id is explicitly requested, always include that query's
+  comparison regardless of threshold (threshold should filter the multi-query
+  sweep, not suppress an explicit single-query request).
+
+category: "Usability / CLI"
+
+prior_art:
+- "benchbox/cli/commands/compare_plans.py::_build_comparisons — the append condition"
+- "tests/unit/cli/commands/test_compare_plans_coverage.py — qpc-11 real-loader test now asserts real comparison content"
+
+work:
+- id: w1
+  summary: "Make _build_comparisons always include an explicitly-requested --query-id's comparison regardless of --threshold; threshold filters only the unfiltered sweep."
+  status: pending
+- id: w2
+  summary: "Test: --query-id X --threshold 0.0 emits X's comparison (not 'No plans available'); the multi-query threshold sweep is unchanged."
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Review: adversarial code review (default multi-query behavior preserved; no double-count)."
+  needs: [w2]
+  status: pending
+- id: w4
+  summary: "Fix review findings; re-run verification."
+  needs: [w3]
+  status: pending
+- id: w5
+  summary: "Submit PR referencing qpc-17."
+  needs: [w4]
+  status: pending
+
+must_preserve:
+- "Default (no --query-id) threshold-sweep behavior unchanged"
+
+anti_patterns:
+- "DO NOT change the threshold default; fix the explicit-query interaction only."
+
+verification:
+- description: "Explicit query at threshold 0.0 produces output"
+  command: "uv run -- python -m pytest tests/unit/cli/commands/test_compare_plans_coverage.py -q"
+  expected_output: "all pass, including the explicit-query-at-0.0 test"
+
+scope_limit:
+  only_modify:
+  - "benchbox/cli/commands/compare_plans.py"
+  - "tests/"
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["query-plans", "cli", "compare-plans"]
+  estimated_effort: "Small"
+  created_date: "2026-07-07"
+  review_findings: ["qpc-11-threshold-quirk"]
