@@ -41,6 +41,25 @@ logger = logging.getLogger(__name__)
 SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 COMMUNITY_TRUST_LABEL = "community-submission"
+# Vendor-supplied results live under a maintainer-controlled top-level vendor/
+# subtree (gated by CODEOWNERS on the submission branch). See provenance.py.
+VENDOR_TRUST_LABEL = "vendor-supplied"
+VENDOR_VISIBILITY = "public-vendor-reported"
+VENDOR_SUBTREE_COMPONENT = "vendor"
+
+
+def _is_vendor_subtree(bundle_path: Path, bundles_dir: Path) -> bool:
+    """True when the bundle sits directly under the top-level ``vendor/`` subtree.
+
+    Anchored to ``<bundles_dir>/vendor/...`` (the first path component under the
+    bundles root), not any nested directory merely named ``vendor`` - so the
+    label surface matches the CODEOWNERS prefix ``/results-data/bundles/vendor/``.
+    """
+    try:
+        rel = bundle_path.relative_to(bundles_dir)
+    except ValueError:
+        return False
+    return len(rel.parts) >= 2 and rel.parts[0] == VENDOR_SUBTREE_COMPONENT
 
 
 def _find_submission_manifest(bundle_path: Path) -> Path | None:
@@ -453,10 +472,17 @@ class ExplorerPipeline:
                 prefix = bundle_url_prefix.rstrip("/")
                 bundle_download_url = f"{prefix}/{result_id}.json"
 
-                # Per-bundle trust label: if a submission manifest sidecar
-                # exists alongside this bundle, it was community-submitted.
+                # Per-bundle trust label. Precedence: a bundle under the
+                # maintainer-controlled top-level vendor/ subtree is
+                # vendor-supplied; else a submission-manifest sidecar marks it
+                # community-submitted; else the pipeline default.
                 effective_trust = trust_label
-                if _find_submission_manifest(bundle_path) is not None:
+                effective_visibility = visibility
+                if _is_vendor_subtree(bundle_path, bundles_dir):
+                    effective_trust = VENDOR_TRUST_LABEL
+                    effective_visibility = VENDOR_VISIBILITY
+                    logger.debug("Vendor subtree bundle %s - using trust_label=%r", bundle_path.name, effective_trust)
+                elif _find_submission_manifest(bundle_path) is not None:
                     effective_trust = COMMUNITY_TRUST_LABEL
                     logger.debug(
                         "Found submission manifest for %s - using trust_label=%r",
@@ -467,7 +493,7 @@ class ExplorerPipeline:
                 entry = self._transformer.to_manifest_entry(
                     bundle_path,
                     trust_label=effective_trust,
-                    visibility=visibility,
+                    visibility=effective_visibility,
                     result_id=result_id,
                     data=bundle_data,
                 )
@@ -477,7 +503,7 @@ class ExplorerPipeline:
                     bundle_path,
                     result_id,
                     trust_label=effective_trust,
-                    visibility=visibility,
+                    visibility=effective_visibility,
                     bundle_download_url=bundle_download_url,
                     data=bundle_data,
                 )

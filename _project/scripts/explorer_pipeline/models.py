@@ -145,6 +145,9 @@ class ManifestEntry(BaseModel):
     ranking_exclusion_reason: str | None = None
     trust_label: str
     visibility: str
+    # How the run was funded (provenance.funding); "unspecified" when the bundle
+    # declares no funding. Orthogonal to trust_label - a disclosure, not a rank.
+    funding: str = "unspecified"
     # Extended fields (null for bundles predating these fields)
     platform_version: str | None = None
     execution_mode: str | None = None

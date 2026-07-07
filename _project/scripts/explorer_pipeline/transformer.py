@@ -134,6 +134,23 @@ def _geomean_ms(data: dict[str, Any]) -> float | None:
     return math.exp(sum(math.log(v) for v in values) / len(values))
 
 
+_FUNDING_SOURCES = ("employer", "personal", "free-trial", "vendor-sponsored", "grant", "unspecified")
+
+
+def _funding(data: dict[str, Any]) -> str:
+    """Extract the funding disclosure from a bundle's provenance block.
+
+    Returns the normalized funding value, defaulting to "unspecified" when the
+    bundle declares no provenance or an unrecognized value. Kept in lockstep with
+    benchbox/core/results/provenance.py::FUNDING_SOURCES.
+    """
+    provenance = data.get("provenance")
+    if not isinstance(provenance, dict):
+        return "unspecified"
+    token = str(provenance.get("funding") or "").strip().lower()
+    return token if token in _FUNDING_SOURCES else "unspecified"
+
+
 def _platform_version(data: dict[str, Any]) -> str | None:
     """Extract platform version from schema-v2 bundle."""
     platform = data.get("platform", {})
@@ -818,6 +835,7 @@ class BundleTransformer:
             comparison_exclusion_reason=timing_contract.comparison_exclusion_reason,
             trust_label=trust_label,
             visibility=visibility,
+            funding=_funding(bundle_data),
             platform_version=_platform_version(bundle_data),
             execution_mode=_execution_mode(bundle_data),
             tuning_mode=_tuning_mode(bundle_data),

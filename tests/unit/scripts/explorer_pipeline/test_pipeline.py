@@ -309,6 +309,47 @@ class TestExplorerPipelineRun:
 
         assert _duckdb_results(output)[0]["trust_label"] == "maintainer-run"
 
+    def test_top_level_vendor_subtree_sets_vendor_label_and_visibility(self, tmp_path: Path) -> None:
+        """A bundle under the top-level vendor/ subtree is vendor-supplied + public-vendor-reported."""
+        vendor_dir = tmp_path / "data" / "bundles" / "vendor"
+        vendor_dir.mkdir(parents=True)
+        (vendor_dir / "vendor_result.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output, trust_label="maintainer-run")
+
+        entry = _duckdb_results(output)[0]
+        assert entry["trust_label"] == "vendor-supplied"
+        assert entry["visibility"] == "public-vendor-reported"
+
+    def test_nested_vendor_dir_does_not_grant_vendor_label(self, tmp_path: Path) -> None:
+        """A nested directory merely named 'vendor' must NOT self-grant the vendor label."""
+        nested = tmp_path / "data" / "bundles" / "community" / "vendor"
+        nested.mkdir(parents=True)
+        (nested / "result.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output, trust_label="maintainer-run")
+
+        assert _duckdb_results(output)[0]["trust_label"] == "maintainer-run"
+
+    def test_funding_flows_from_bundle_provenance(self, tmp_path: Path) -> None:
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        funded = {**MINIMAL_BUNDLE, "provenance": {"funding": "free-trial"}}
+        (bundles_dir / "funded_result.json").write_text(json.dumps(funded), encoding="utf-8")
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        assert _duckdb_results(output)[0]["funding"] == "free-trial"
+
+    def test_funding_defaults_to_unspecified(self, data_dir: Path, tmp_path: Path) -> None:
+        output = tmp_path / "out"
+        ExplorerPipeline().run(data_dir, output)
+
+        assert _duckdb_results(output)[0]["funding"] == "unspecified"
+
     def test_per_bundle_manifest_sidecar_overrides_trust_label(self, tmp_path: Path) -> None:
         """The new `<stem>.manifest.json` naming triggers the community trust label."""
         bundles_dir = tmp_path / "data" / "bundles"

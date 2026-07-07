@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 EXPLORER_BUILD_CONTRACT_VERSION = "4"
-EXPLORER_READ_MODEL_VERSION = 1
+# v2: added the results.funding column (result provenance funding disclosure).
+EXPLORER_READ_MODEL_VERSION = 2
 
 EXPLORER_BUILD_CONTRACT = {
     "version": EXPLORER_BUILD_CONTRACT_VERSION,
