@@ -2,7 +2,7 @@ id: "explorer-pipeline-frontend-handoff"
 title: "Hand-off spec: populate funding + vendor label in the pipeline and render them in the frontend"
 worktree: "results-labels-funding"
 priority: "High"
-status: "Blocked"
+status: "In Progress"
 description: |
   The remaining changes live in two trees that are gitignored and NOT present in
   this checkout: the build pipeline `_project/scripts/explorer_pipeline/`

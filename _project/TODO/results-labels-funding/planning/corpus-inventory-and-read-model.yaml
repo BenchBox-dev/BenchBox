@@ -2,7 +2,7 @@ id: "corpus-inventory-and-read-model"
 title: "Surface vendor-supplied label + funding in the corpus inventory and DuckDB read model"
 worktree: "results-labels-funding"
 priority: "High"
-status: "Blocked"
+status: "In Progress"
 description: |
   Integrate the two new signals into the explorer's ingest layer so they reach
   the browser. Two in-repo surfaces change: (1) scripts/generate_corpus_inventory.py,
@@ -64,7 +64,7 @@ work:
       community-vs-default); extract funding from the bundle provenance
       block/manifest; add funding to each entry and a by_funding counter to
       the summary; retire the local COMMUNITY/DEFAULT literals.
-    status: pending
+    status: done
   - id: w2
     summary: >-
       Add `funding VARCHAR NOT NULL` to the `results` table in
