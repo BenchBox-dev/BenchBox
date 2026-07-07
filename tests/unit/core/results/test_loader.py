@@ -196,6 +196,64 @@ class TestLoadResultFile:
         assert result.total_queries == 22
         assert raw_data["version"] == "2.0"
 
+    def test_load_result_file_loads_companion_with_extra_dots_in_basename(self, tmp_path):
+        """qpc-07 w4: exercise BOTH companion-path defects at once so a revert of
+        either half of the fix fails this test.
+
+        The result lives in a parent directory whose name itself contains
+        ``.json`` (``bundle.json``) and has a scale-factor basename with an extra
+        dot (``result_sf0.1.json``). This defeats both old code paths:
+
+        * ``main_file.with_suffix("").with_suffix(suffix)`` reads ``.1`` as a
+          second suffix and strips it, corrupting the basename to
+          ``result_sf0.plans.json``; and
+        * the ``str(main_file).replace(".json", suffix)`` fallback rewrites the
+          FIRST ``.json`` in the whole path -- here the ``bundle.json`` parent
+          directory -- producing ``bundle.plans.json/result_sf0.1.plans.json``.
+
+        Neither corrupted path exists, so only the exact-basename swap
+        (``name[:-len(".json")] + suffix`` via ``with_name``) resolves the real
+        companion. (With a plain ``tmp_path`` parent the buggy fallback happens
+        to rescue the extra-dot basename, which is why the parent name matters.)
+        """
+        bundle_dir = tmp_path / "bundle.json"
+        bundle_dir.mkdir()
+        result_file = bundle_dir / "result_sf0.1.json"
+        write_v2_result_file(
+            result_file,
+            version="2.0",
+            platform="DuckDB",
+            scale_factor=0.1,
+            queries=[{"id": "1", "ms": 100.0, "rows": 4}],
+        )
+        plans_file = bundle_dir / "result_sf0.1.plans.json"
+        with open(plans_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "version": "2.0",
+                    "run_id": "test",
+                    "plans_captured": 1,
+                    "capture_failures": 0,
+                    "queries": {
+                        "1": {
+                            "fingerprint": "a" * 64,
+                            "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None},
+                        }
+                    },
+                },
+                f,
+            )
+        # The corrupted paths both buggy branches used to compute must NOT
+        # exist, so a false pass (loader stumbling onto the right file some
+        # other way) can't mask the regression.
+        assert not (bundle_dir / "result_sf0.plans.json").exists()  # double-with_suffix corruption
+        assert not (tmp_path / "bundle.plans.json").exists()  # str.replace-hits-parent corruption
+
+        result, _raw_data = load_result_file(result_file)
+
+        assert result.query_plans_captured == 1
+        assert result.query_results[0]["plan_fingerprint"] == "a" * 64
+
     def test_load_result_file_not_found(self):
         """Test loading nonexistent file raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError):

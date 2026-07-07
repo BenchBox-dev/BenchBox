@@ -273,6 +273,58 @@ class TestSchemaV2ExportWithPlans:
         assert plans_payload["plans_captured"] == 1
         assert "q01" in plans_payload["queries"]
 
+    def test_schema_v2_plans_companion_uses_to_dict_not_asdict(self) -> None:
+        """build_plans_payload must serialize QueryPlanDAG via its to_dict()
+        (depth-guarded, internal-field-free) rather than plain dataclasses.asdict()
+        (qpc-07 / F1.5): QueryPlanDAG is a dataclass, so checking is_dataclass()
+        before hasattr(to_dict) always wins and bypasses to_dict() entirely,
+        leaking the internal fingerprint_integrity field into the companion file.
+        """
+        root = LogicalOperator(
+            operator_type=LogicalOperatorType.SCAN,
+            operator_id="scan_1",
+            table_name="lineitem",
+        )
+        plan = QueryPlanDAG(
+            query_id="q01",
+            platform="duckdb",
+            logical_root=root,
+            estimated_cost=100.0,
+        )
+
+        results = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="duckdb",
+            scale_factor=1.0,
+            execution_id="test_007",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            duration_seconds=10.0,
+            total_queries=1,
+            successful_queries=1,
+            query_plans_captured=1,
+            query_results=[
+                {
+                    "query_id": "q01",
+                    "status": "SUCCESS",
+                    "execution_time_ms": 150,
+                    "rows_returned": 4,
+                    "query_plan": plan,
+                    "plan_fingerprint": plan.plan_fingerprint,
+                }
+            ],
+        )
+
+        plans_payload = build_plans_payload(results)
+
+        assert plans_payload is not None
+        plan_dict = plans_payload["queries"]["q01"]["plan"]
+        # fingerprint_integrity is a dataclass field asdict() would include but
+        # to_dict() deliberately omits (internal verification state, not part
+        # of the plan's serialized contract).
+        assert "fingerprint_integrity" not in plan_dict
+        assert plan_dict == plan.to_dict()
+
     def test_schema_v2_plans_companion_multi_stream_keys_per_stream(self) -> None:
         """A query_id captured in more than one stream must not collapse to one
         last-writer-wins entry: capture_query_plan's contract is one plan record
