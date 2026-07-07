@@ -118,6 +118,30 @@ class TestDuckDBTextFormatVersions:
 
         assert LogicalOperatorType.SCAN in op_types
 
+    def test_0_9_wrapped_filter_parses_as_single_expression(self) -> None:
+        """qpc-05 / F2.3: DuckDB's box format wraps a long predicate across
+        fixed-width lines mid-token (``(l_shipdate <= CAST(`` /
+        ``'1998-12-01' AS DATE))``). Those fragments must be rejoined into ONE
+        filter expression, otherwise the parsed filter count (and thus the plan
+        fingerprint) depends on the box wrap width."""
+        parser = DuckDBQueryPlanParser()
+        plan = parser.parse_explain_output("q02", DUCKDB_0_9_FILTER_SCAN)
+
+        assert plan is not None
+        filter_ops = [
+            op for op in self._collect_operators(plan.logical_root) if op.operator_type == LogicalOperatorType.FILTER
+        ]
+        assert len(filter_ops) == 1
+        exprs = filter_ops[0].filter_expressions
+        assert exprs is not None
+        # Exactly one expression, not two wrap-split fragments.
+        assert len(exprs) == 1
+        joined = exprs[0]
+        assert "l_shipdate" in joined
+        assert "AS DATE" in joined
+        # Rejoined predicate has balanced parentheses.
+        assert joined.count("(") == joined.count(")")
+
     def test_0_9_aggregate(self) -> None:
         """Test parsing 0.9 aggregate query."""
         parser = DuckDBQueryPlanParser()

@@ -142,6 +142,35 @@ def test_show_plan_real_loader_renders_plan_from_bundle(tmp_path: Path) -> None:
     assert '"lineitem"' in result.output
 
 
+def test_show_plan_reports_corrupt_companion_distinctly_from_no_plan(tmp_path: Path) -> None:
+    """qpc-05 / F4.3: when a .plans.json exists but is corrupt, show-plan must
+    say the plans file failed to load -- NOT the misleading 'no query plan
+    captured, run with --capture-plans' (a different, wrong remediation).
+    Driven through the REAL loader (no monkeypatch)."""
+    main_path = _write_real_bundle(tmp_path, query_id="1")
+    # Corrupt the companion the real bundle wrote.
+    (tmp_path / "r.plans.json").write_text("{ not valid json", encoding="utf-8")
+
+    result = CliRunner().invoke(mod.show_plan, ["--run", str(main_path), "--query-id", "1"])
+
+    assert result.exit_code == 1
+    assert "failed to load" in result.output
+    assert "capture-plans" not in result.output
+
+
+def test_show_plan_no_companion_says_no_plan_captured(tmp_path: Path) -> None:
+    """Control: with NO companion at all, show-plan gives the 'no plan captured'
+    guidance (the correct remediation for that case)."""
+    main_path = _write_real_bundle(tmp_path, query_id="1")
+    (tmp_path / "r.plans.json").unlink()  # remove companion entirely
+
+    result = CliRunner().invoke(mod.show_plan, ["--run", str(main_path), "--query-id", "1"])
+
+    assert result.exit_code == 1
+    assert "No query plan captured" in result.output
+    assert "capture-plans" in result.output
+
+
 def test_show_plan_load_error_and_verbose_exception(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # File that causes load_result_file to fail (bad JSON → ResultLoadError → caught as Exception)
     bad = tmp_path / "bad.json"

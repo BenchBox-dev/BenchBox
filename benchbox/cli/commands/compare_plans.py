@@ -100,7 +100,24 @@ def _build_comparisons(
         plan1 = exec1.get("query_plan")
         plan2 = exec2.get("query_plan")
         if not plan1 or not plan2:
-            _warn_if_explicit(explicit_query_id, f"Query '{qid}' missing plan in one or both runs")
+            # Distinguish a missing plan from a .plans.json that exists but
+            # failed to load, so the user knows whether to re-capture or to
+            # investigate a corrupt companion file (qpc-05 / F4.3).
+            load_errors = [
+                err
+                for err in (
+                    getattr(results1, "plans_load_error", None),
+                    getattr(results2, "plans_load_error", None),
+                )
+                if err
+            ]
+            if load_errors:
+                _warn_if_explicit(
+                    explicit_query_id,
+                    f"Query '{qid}': plans file exists but failed to load: {'; '.join(load_errors)}",
+                )
+            else:
+                _warn_if_explicit(explicit_query_id, f"Query '{qid}' missing plan in one or both runs")
             continue
         comparison = compare_query_plans(plan1, plan2)
         if comparison.similarity.overall_similarity < threshold or (not explicit_query_id and threshold == 0.0):

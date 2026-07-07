@@ -109,8 +109,15 @@ def show_plan(
 
         # Check if plan was captured
         if query_exec.get("query_plan") is None:
-            console.print(f"[yellow]Warning:[/yellow] No query plan captured for query '{query_id}'")
-            console.print("Run benchmark with --capture-plans flag to capture query plans")
+            # Distinguish "no plan captured" from "a .plans.json exists but
+            # failed to load" (qpc-05 / F4.3): the fix differs (re-run with
+            # --capture-plans vs. investigate the corrupt companion file).
+            plans_load_error = getattr(results, "plans_load_error", None)
+            if plans_load_error:
+                console.print(f"[red]Error:[/red] plans file exists but failed to load: {plans_load_error}")
+            else:
+                console.print(f"[yellow]Warning:[/yellow] No query plan captured for query '{query_id}'")
+                console.print("Run benchmark with --capture-plans flag to capture query plans")
             ctx.exit(1)
 
         plan = query_exec["query_plan"]

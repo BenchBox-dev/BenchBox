@@ -440,3 +440,79 @@ def test_plan_query_filter_only_captures_selected_queries() -> None:
     plan3, time3 = adapter.capture_query_plan(None, "SELECT 1", "q02")
     assert plan3 is None
     assert time3 == 0.0
+
+
+class _FakeCursor:
+    """Minimal DBAPI cursor whose EXPLAIN raises, for the shared helper test."""
+
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+        self.closed = False
+
+    def execute(self, _sql: str) -> None:
+        raise self._error
+
+    def fetchall(self):  # pragma: no cover - never reached after execute raises
+        return []
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _FakeConnection:
+    def __init__(self, cursor: _FakeCursor) -> None:
+        self._cursor = cursor
+
+    def cursor(self) -> _FakeCursor:
+        return self._cursor
+
+
+def test_get_query_plan_from_cursor_returns_none_and_logs_on_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """qpc-05 / F4.2: on EXPLAIN failure the shared helper must return None and
+    log the exception -- NOT return the error text as if it were the plan (which
+    the display path would print as a plan and the capture path would hand to a
+    parser)."""
+    from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
+
+    cursor = _FakeCursor(RuntimeError("EXPLAIN blew up"))
+    connection = _FakeConnection(cursor)
+
+    with caplog.at_level(logging.WARNING, logger="benchbox.platforms.base.sql_execution"):
+        result = get_query_plan_from_cursor(connection, "SELECT 1")
+
+    assert result is None
+    assert cursor.closed is True
+    assert any("EXPLAIN blew up" in rec.getMessage() for rec in caplog.records)
+    # The error text must NOT be smuggled back as plan data.
+    assert result is None or "Could not get query plan" not in result
+
+
+def test_get_query_plan_from_cursor_returns_joined_rows_on_success() -> None:
+    """Control: a successful EXPLAIN returns the newline-joined plan rows."""
+    from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
+
+    class _OkCursor:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def execute(self, _sql: str) -> None:
+            pass
+
+        def fetchall(self):
+            return [("row one",), ("row two",)]
+
+        def close(self) -> None:
+            self.closed = True
+
+    cursor = _OkCursor()
+
+    class _OkConnection:
+        def cursor(self) -> _OkCursor:
+            return cursor
+
+    result = get_query_plan_from_cursor(_OkConnection(), "SELECT 1")
+
+    assert result == "row one\nrow two"
+    assert cursor.closed is True
