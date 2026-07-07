@@ -39,22 +39,22 @@ needed outside the trigger conditions), trigger it manually via
 ### 1.3 Explorer publish path
 
 The static explorer at `benchbox.dev/results/` is intended to build and
-deploy from `main` via [`docs.yml`](../../.github/workflows/docs.yml): the
-`build` job runs on pushes and PRs to `main`, and the `deploy` job (Pages)
-runs only on pushes to `main`. `published-results` is **not** the explorer's
+deploy from `release` via [`docs.yml`](../../.github/workflows/docs.yml): the
+`build` job runs on pushes and PRs to `release`, and the `deploy` job (Pages)
+runs only on pushes to `release`. `published-results` is **not** the explorer's
 build source — it is the corpus-archive branch that contributor PRs target
 and that mirrors develop's `results-data/`.
 
 > **Current state (pre-launch):** the explorer steps in `docs.yml` are gated
 > on `hashFiles('results-explorer/package.json')`, and `release-cut`
 > (`Makefile`) currently `git rm`s `results-explorer/` and `results-data/`
-> from the release branch, so those paths are **not on `main`** and the
+> from the release branch, so those paths are **not on `release`** and the
 > explorer build/deploy steps are a deliberate no-op there today. The site is
-> therefore not yet published from `main`. For the explorer to go live from
-> `main`, the develop → main release flow must stop curating
+> therefore not yet published from `release`. For the explorer to go live from
+> `release`, the develop → release flow must stop curating
 > `results-explorer/`/`results-data/` out of the release branch — a maintainer
 > decision tracked separately. Until then, treat `benchbox.dev/results/` as a
-> develop-built preview, not a main-deployed site.
+> develop-built preview, not a release-deployed site.
 
 ## 2. Maintainer Review Checklist
 
@@ -126,9 +126,9 @@ gh run watch --repo joeharris76/BenchBox
 Use `workflow_dispatch` only after confirming there is no newer push already
 rebuilding the site. Note that `workflow_dispatch` runs the `build` job but
 **not** the `deploy` job — the Pages deploy is gated on
-`github.event_name == 'push' && github.ref == 'refs/heads/main'` — so a manual
+`github.event_name == 'push' && github.ref == 'refs/heads/release'` — so a manual
 run validates the build without publishing. A publish requires a push to
-`main` (and, per §1.3, the explorer paths actually being present on `main`).
+`release` (and, per §1.3, the explorer paths actually being present on `release`).
 
 ## 7. Data Locations
 

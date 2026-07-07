@@ -1042,7 +1042,7 @@ run-test:
 # These targets must be run from the public clone (origin -> joeharris76/BenchBox).
 # Do NOT invoke from the legacy private clone — it has no `origin` remote.
 #
-# Flow: develop -> v$(VERSION) -> (squash) main -> tag main -> release.yml publishes
+# Flow: develop -> v$(VERSION) -> (squash) release -> tag release -> release.yml publishes
 #   develop is intentionally NOT modified post-release. dev-only paths and
 #   deferred release surfaces (_project/, _blog/, results explorer, AGENTS.md,
 #   etc.) live on develop and are removed from the release branch by
@@ -1058,12 +1058,12 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 # Cut a release branch from develop in one shot:
 #   1. Create v$(VERSION) branch off develop (develop is not modified).
 #   2. On v$(VERSION): bump version sources (scripts/update_version.py).
-#   3. On v$(VERSION): generate CHANGELOG.md entry from the origin/main patch delta.
+#   3. On v$(VERSION): generate CHANGELOG.md entry from the origin/release patch delta.
 #   4. $EDITOR opens CHANGELOG.md for hand-curation (skipped if EDITOR unset).
 #   5. Curate: git rm dev-only/deferred paths (per A3 in single-repo-migration.md).
 #   6. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).
-#   7. Merge origin/main with `-s ours` so the PR is mergeable and CI can run.
-#   8. Push, open PR vs main.
+#   7. Merge origin/release with `-s ours` so the PR is mergeable and CI can run.
+#   8. Push, open PR vs release.
 #   9. Sweep stale v* branches on origin (option-c lifecycle).
 # Pre-conditions: on develop, clean tree.
 # Usage: make release-cut VERSION=X.Y.Z
@@ -1078,7 +1078,7 @@ release-cut:
 	@# pre-commit uv-lock hook has nothing to regenerate mid-commit (v0.3.1
 	@# aborted because the tracked lock was stale and the hook rewrote it).
 	uv lock
-	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/main
+	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/release
 	@if [ -n "$$EDITOR" ]; then \
 		echo "==> Opening CHANGELOG.md in $$EDITOR for hand-curation"; \
 		$$EDITOR CHANGELOG.md; \
@@ -1122,37 +1122,37 @@ release-cut:
 	@# every release cut. Nothing is skipped that matters: develop's PRs
 	@# already ran these hooks before this content was curated.
 	git commit --no-verify -m "Release v$(VERSION)"
-	@# Align release histories. main and develop have unrelated roots (Phase 4
-	@# filter-merge) and diverge permanently: main carries one squash commit per
-	@# release that develop never sees, and A4 step 6 (rebase develop onto main)
+	@# Align release histories. release and develop have unrelated roots (Phase 4
+	@# filter-merge) and diverge permanently: release carries one squash commit per
+	@# release that develop never sees, and A4 step 6 (rebase develop onto release)
 	@# was removed by the 2026-04-27 amendment. So a branch cut cleanly from
-	@# develop is NOT mergeable into main — GitHub cannot compute a merge ref, the
+	@# develop is NOT mergeable into release — GitHub cannot compute a merge ref, the
 	@# PR sits at CONFLICTING, and *no CI runs at all*: neither validate-base nor
 	@# release-required-result ever trigger. Every cut before v0.3.1 (#711, #712,
 	@# #1029, #1043, #1072) fixed this by hand.
 	@#
-	@# `-s ours` records origin/main as a second parent while keeping the curated
+	@# `-s ours` records origin/release as a second parent while keeping the curated
 	@# release tree byte-for-byte; release-finalize's squash-merge then collapses
-	@# the branch to one commit, so this merge never reaches main's release-only
-	@# ledger. Run AFTER the changelog step: --since-ref origin/main computes the
-	@# patch delta against a main that is not yet an ancestor of this branch.
+	@# the branch to one commit, so this merge never reaches the release branch's
+	@# release-only ledger. Run AFTER the changelog step: --since-ref origin/release
+	@# computes the patch delta against a release that is not yet an ancestor of this branch.
 	@#
 	@# --no-verify: merge fires pre-merge-commit (not pre-commit). That hook is not
 	@# in default_install_hook_types today, so this is defensive — but curation has
 	@# already deleted .pre-commit-config.yaml and the repo:local hook entrypoints,
 	@# so adding pre-merge-commit later would otherwise break every cut here.
-	@echo "==> Aligning release histories: merging origin/main into v$(VERSION) (strategy: ours)"
+	@echo "==> Aligning release histories: merging origin/release into v$(VERSION) (strategy: ours)"
 	@RELEASE_TREE=$$(git rev-parse 'HEAD^{tree}') && \
-	git merge -s ours --no-verify --allow-unrelated-histories origin/main \
-		-m "Merge main into v$(VERSION) (strategy: ours) to align release histories" && \
+	git merge -s ours --no-verify --allow-unrelated-histories origin/release \
+		-m "Merge release into v$(VERSION) (strategy: ours) to align release histories" && \
 	MERGED_TREE=$$(git rev-parse 'HEAD^{tree}') && \
 	if [ "$$RELEASE_TREE" != "$$MERGED_TREE" ]; then \
 		echo "ERROR: alignment merge changed the curated release tree ($$RELEASE_TREE -> $$MERGED_TREE)" >&2; \
 		exit 1; \
 	fi
 	git push -u origin v$(VERSION)
-	gh pr create --base main --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
-	@# Option-c lifecycle: delete any prior release branches on origin (loop sweeps stale entries).
+	gh pr create --base release --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
+	@# Option-c lifecycle: delete any prior v* branches on origin (loop sweeps stale entries).
 	@# ls-remote patterns match the LAST path component, so 'v*' alone also matches
 	@# e.g. fix/validate-submission-... (bit the 2026-07-08 v0.3.1 re-cut). Filter full
 	@# refs against the release-branch shape, mirroring _RELEASE_BRANCH_RE in
@@ -1169,13 +1169,13 @@ release-cut:
 	@echo "  3. make release-finalize VERSION=$(VERSION)"
 
 # After release-cut's PR is approved and all required release contexts are
-# green: squash-merge it, tag main, push the tag (fires release.yml), and
+# green: squash-merge it, tag release, push the tag (fires release.yml), and
 # leave develop alone.
 # Usage: make release-finalize VERSION=X.Y.Z
 release-finalize:
 	@test -n "$(VERSION)" || (echo "Usage: make release-finalize VERSION=X.Y.Z" && exit 1)
-	@PR=$$(gh pr list --base main --head v$(VERSION) --state open --json number --jq '.[0].number'); \
-	test -n "$$PR" || (echo "Error: no open PR found for v$(VERSION) → main" && exit 1); \
+	@PR=$$(gh pr list --base release --head v$(VERSION) --state open --json number --jq '.[0].number'); \
+	test -n "$$PR" || (echo "Error: no open PR found for v$(VERSION) → release" && exit 1); \
 	echo "==> Verifying required release contexts '$(RELEASE_REQUIRED_CONTEXTS)' for PR #$$PR"; \
 	for context in $(RELEASE_REQUIRED_CONTEXTS); do \
 		CHECK_BUCKET=$$(gh pr checks "$$PR" --required --json name,bucket,state --jq "map(select(.name == \"$$context\")) | if length == 1 then .[0].bucket elif length == 0 then \"missing\" else \"duplicate\" end"); \
@@ -1189,7 +1189,7 @@ release-finalize:
 		fi; \
 		case "$$CHECK_BUCKET" in \
 			pass) echo "==> $$context is green";; \
-			missing) echo "Error: required release context '$$context' is missing. Check main-release-only and release workflows." >&2; exit 1;; \
+			missing) echo "Error: required release context '$$context' is missing. Check release-only and release workflows." >&2; exit 1;; \
 			pending) echo "Error: required release context '$$context' is pending. Wait for GitHub Actions, then rerun." >&2; exit 1;; \
 			fail|cancel|skipping) echo "Error: required release context '$$context' is $$CHECK_BUCKET. Fix the release PR before finalizing." >&2; exit 1;; \
 			duplicate) echo "Error: multiple required contexts named '$$context' were returned. Fix workflow/ruleset drift." >&2; exit 1;; \
@@ -1199,13 +1199,13 @@ release-finalize:
 	echo "==> Squash-merging PR #$$PR (required release contexts are green)"; \
 	gh pr merge --squash "$$PR"
 	git fetch origin --tags
-	git checkout main
-	git pull --ff-only origin main
+	git checkout release
+	git pull --ff-only origin release
 	git tag v$(VERSION)
 	git push origin v$(VERSION)
 	@echo
 	@echo "Tag v$(VERSION) pushed; release.yml will publish to PyPI."
-	@echo "Push-to-main jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
+	@echo "Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "develop is intentionally unchanged — dev-only paths persist on develop."
 
 # =============================================================================
@@ -1276,7 +1276,7 @@ pr-content-guard:
 # Push current branch and open a PR against develop with auto-merge enabled
 # unless the diff touches soundness-critical comparator/plan-parser paths.
 # Squash-merge happens automatically once `lint` + `test (ubuntu-latest, 3.12)`
-# go green. Refuses to run from develop/main.
+# go green. Refuses to run from develop/release.
 #
 # Idempotent: safe to rerun. If a PR is already open for the branch, reuses it
 # and just (re)enables auto-merge when the soundness-path review gate does not
@@ -1290,7 +1290,7 @@ pr-open:
 	@$(MAKE) -s agent-write-preflight
 	@CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
-		develop|main) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
+		develop|release) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
 	esac; \
 	if [ -n "$(PR_BODY_FILE)" ] && [ ! -f "$(PR_BODY_FILE)" ]; then \
 		echo "PR_BODY_FILE does not exist: $(PR_BODY_FILE)" >&2; \
@@ -1334,7 +1334,7 @@ pr-fanout:
 	git worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r wt; do \
 		[ "$$(realpath "$$wt")" = "$$MAIN_CLONE" ] && { echo "(skip $$wt: main clone)"; continue; }; \
 		BR=$$(git -C "$$wt" branch --show-current 2>/dev/null); \
-		case "$$BR" in develop|main|"") echo "(skip $$wt: branch=$$BR)"; continue ;; esac; \
+		case "$$BR" in develop|release|"") echo "(skip $$wt: branch=$$BR)"; continue ;; esac; \
 		IDX=$$(($${IDX:-0} + 1)); \
 		printf '%06d|%s\0' "$$IDX" "$$wt" >> "$$TMP"; \
 	done; \
@@ -1352,7 +1352,7 @@ pr-fanout:
 pr-refresh:
 	@CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
-		develop|main|"") echo "Refusing to refresh $$CURRENT — switch to a feature branch worktree."; exit 1 ;; \
+		develop|release|"") echo "Refusing to refresh $$CURRENT — switch to a feature branch worktree."; exit 1 ;; \
 	esac; \
 	git fetch origin develop --quiet && \
 	git merge --no-edit origin/develop && \
@@ -1672,7 +1672,7 @@ worktree-release-locked:
 	top=$$(git rev-parse --show-toplevel); \
 	branch=$$(git branch --show-current); \
 	test -n "$$branch" || { echo "Refusing: this pool worktree is already detached/free."; exit 1; }; \
-	case "$$branch" in develop|main) echo "Refusing to release protected branch $$branch."; exit 1 ;; esac; \
+	case "$$branch" in develop|release) echo "Refusing to release protected branch $$branch."; exit 1 ;; esac; \
 	dirty=$$(git status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
 	if [ -n "$$dirty" ] && [ "$(FORCE)" != "1" ]; then \
 		echo "Refusing to release dirty pool worktree $$top. Review changes or rerun with FORCE=1."; \
@@ -1888,7 +1888,7 @@ worktree-pool-reset-locked:
 	git -C "$$wt" reset --hard origin/develop; \
 	if [ "$(FORCE)" = "1" ]; then git -C "$$wt" clean -fdx -e .benchbox >/dev/null; fi; \
 	if [ "$(FORCE)" = "1" ] && [ -n "$$branch" ]; then \
-		case "$$branch" in develop|main) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
+		case "$$branch" in develop|release) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
 	fi; \
 	echo "Reset pool-$(POOL): $$wt"
 
@@ -2302,7 +2302,7 @@ help:
 	@echo "  make blind-spots-sweep  Alias for blind-spots-report"
 	@echo ""
 	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
-	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs main"
-	@echo "  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag main, push tag"
+	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs release"
+	@echo "  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag release, push tag"
 	@echo ""
 	@echo "  make help            Show this help message"

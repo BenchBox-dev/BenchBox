@@ -2,7 +2,7 @@ name: Documentation
 
 on:
   push:
-    branches: [main]
+    branches: [release]
     paths:
       - "benchbox/**"
       - "docs/**"
@@ -19,7 +19,7 @@ on:
       - "README.md"
       - "pyproject.toml"
   pull_request:
-    branches: [main, develop]
+    branches: [release, develop]
     paths:
       - "benchbox/**"
       - "docs/**"
@@ -79,8 +79,8 @@ jobs:
       # Steps gate on package.json as a sentinel so the workflow degrades
       # gracefully if the explorer directory is ever removed or renamed.
       # This is also the intended dormancy on the release branch: results-explorer/
-      # and _project/scripts/explorer_publish.py ship on develop, not main, so on
-      # a main build hashFiles(...) is empty and every explorer step below is a
+      # and _project/scripts/explorer_publish.py ship on develop, not release, so on
+      # a release build hashFiles(...) is empty and every explorer step below is a
       # deliberate no-op rather than accidental dead code (see
       # tests/uat/phases/explorer_smoke.py:explorer_present).
       - name: Validate results-explorer lockfile
@@ -199,11 +199,11 @@ jobs:
         with:
           path: site
 
-  # Deploy to GitHub Pages (main pushes only)
+  # Deploy to GitHub Pages (release pushes only)
   # Isolated as its own job so the github-pages environment protection
   # rules don't gate the build job on PRs.
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
     needs: build
     runs-on: ubuntu-latest
     environment:

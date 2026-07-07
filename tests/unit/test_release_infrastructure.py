@@ -26,7 +26,7 @@ CI_FAST_EXPRESSION = "fast and not (slow or stress or resource_heavy or live_int
 RELEASE_INTEGRATION_EXPRESSION = "integration and not (slow or stress or resource_heavy or live_integration)"
 RELEASE_CANARY_NON_FAST_EXPRESSION = "(slow or resource_heavy) and not (stress or live_integration)"
 RELEASE_PR_BRANCH_SKIP = (
-    "(github.event_name != 'pull_request' || github.base_ref != 'main' || !startsWith(github.head_ref, 'v'))"
+    "(github.event_name != 'pull_request' || github.base_ref != 'release' || !startsWith(github.head_ref, 'v'))"
 )
 RELEASE_REQUIRED_CONTEXTS = ("validate-base", "release-required-result")
 
@@ -249,7 +249,7 @@ class TestReleaseInfrastructure:
         jobs = _workflow("test.yml")["jobs"]
 
         assert jobs["integration"]["if"] == (
-            "github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'main')"
+            "github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'release')"
         )
         integration_run_text = _workflow_job_run_text("test.yml", "integration")
         assert f'tests/integration -m "{RELEASE_INTEGRATION_EXPRESSION}"' in integration_run_text
@@ -270,7 +270,7 @@ class TestReleaseInfrastructure:
         assert 'uv run --isolated --no-project --with "$$wheel"' in make_test_package
 
         release_readiness = jobs["release-readiness"]
-        assert release_readiness["if"] == "${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}"
+        assert release_readiness["if"] == "${{ github.event_name == 'pull_request' && github.base_ref == 'release' }}"
         readiness_run_text = _workflow_job_run_text("test.yml", "release-readiness")
         assert "scripts/check_dependency_bounds.py" in readiness_run_text
         assert "--fail-on=cap-reached" in readiness_run_text
@@ -288,7 +288,9 @@ class TestReleaseInfrastructure:
             "test-package",
             "release-readiness",
         }
-        assert result_job["if"] == "${{ always() && github.event_name == 'pull_request' && github.base_ref == 'main' }}"
+        assert (
+            result_job["if"] == "${{ always() && github.event_name == 'pull_request' && github.base_ref == 'release' }}"
+        )
         aggregate_run_text = _workflow_job_run_text("test.yml", "release-required-result")
         for expected in [
             "test (ubuntu-latest, 3.12)",
@@ -388,9 +390,9 @@ class TestReleaseInfrastructure:
         assert not pattern.match("24795 tests collected in 16.98s")
         assert not pattern.match("0 tests collected")
 
-    def test_validate_main_pr_checks_release_canary_freshness(self):
+    def test_validate_release_pr_checks_release_canary_freshness(self):
         """The required validate-base context must include release canary freshness."""
-        workflow = _workflow("validate-main-pr.yml")
+        workflow = _workflow("validate-release-pr.yml")
         assert workflow["permissions"]["actions"] == "read"
         assert workflow["permissions"]["contents"] == "read"
 
@@ -402,7 +404,7 @@ class TestReleaseInfrastructure:
         assert checkout_step["with"]["fetch-depth"] == 0
         assert "${{ github.event.pull_request.head.sha }}" not in str(checkout_step)
 
-        run_text = _workflow_job_run_text("validate-main-pr.yml", "validate-base")
+        run_text = _workflow_job_run_text("validate-release-pr.yml", "validate-base")
         assert "git fetch --prune origin develop" in run_text
         assert "refs/pull/${{ github.event.pull_request.number }}/head" in run_text
         assert "scripts/release_readiness_check.py" in run_text
@@ -419,15 +421,15 @@ class TestReleaseInfrastructure:
 
         readiness_step = next(step for step in steps if step["name"] == "Check release canary freshness")
         assert readiness_step["env"]["RELEASE_CANARY_WORKFLOW"] == "release-canary.yml"
-        assert readiness_step["env"]["RELEASE_CANARY_BRANCH"] == "main"
+        assert readiness_step["env"]["RELEASE_CANARY_BRANCH"] == "release"
         assert readiness_step["env"]["RELEASE_CANARY_CHECKED_REF"] == "develop"
         assert readiness_step["env"]["RELEASE_CANARY_MAX_AGE_HOURS"] == "48"
         assert "RELEASE_READINESS_OVERRIDE_SHA" in readiness_step["env"]
 
-    def test_validate_main_pr_restores_ruleset_helper_before_drift_check(self):
+    def test_validate_release_pr_restores_ruleset_helper_before_drift_check(self):
         """scripts/ruleset_drift_check.py imports its enforcement helper from
         _project/scripts, which release-cut curation strips from both the
-        release head and (once a release has been cut) the trusted main
+        release head and (once a release has been cut) the trusted release
         base. The restore-from-develop step must run, and must run before
         the ruleset drift check, or bootstrap evidence would ModuleNotFoundError
         on every real release PR.
@@ -436,7 +438,7 @@ class TestReleaseInfrastructure:
         curated-out directory, so restoring only the helper still fails
         (v0.3.1 release PR #1072). Both modules must be restored.
         """
-        job = _workflow("validate-main-pr.yml")["jobs"]["validate-base"]
+        job = _workflow("validate-release-pr.yml")["jobs"]["validate-base"]
         step_names = [step.get("name") for step in job["steps"]]
         restore_index = step_names.index("Restore ruleset review enforcement helper for bootstrap")
         drift_check_index = step_names.index("Bootstrap ruleset drift evidence")
@@ -521,7 +523,7 @@ class TestReleaseInfrastructure:
         assert "Wait for CI green" not in makefile_content
         assert "CI is not green" not in makefile_content
         assert "required release contexts: $(RELEASE_REQUIRED_CONTEXTS)" in makefile_content
-        assert "Push-to-main jobs are post-merge signals" in makefile_content
+        assert "Push-to-release jobs are post-merge signals" in makefile_content
 
         for content in [release_guide, release_template]:
             normalized = content.lower()
@@ -531,16 +533,16 @@ class TestReleaseInfrastructure:
             assert "pre-merge" in normalized
             assert "patch release or incident" in content
 
-    def test_release_cut_generates_changelog_from_main_delta(self):
-        """The release branch changelog boundary is the main patch delta, not tag ancestry."""
+    def test_release_cut_generates_changelog_from_release_delta(self):
+        """The release branch changelog boundary is the release patch delta, not tag ancestry."""
         recipe = _make_target_recipe("release-cut")
         release_guide = (REPO_ROOT / "docs" / "operations" / "release-guide.md").read_text(encoding="utf-8")
         release_template = (REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md").read_text(encoding="utf-8")
 
-        assert "scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/main" in recipe
-        assert "`origin/main` patch delta" in release_template
-        assert "git log origin/main..HEAD" in release_guide
-        assert "origin/main" in release_guide
+        assert "scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/release" in recipe
+        assert "`origin/release` patch delta" in release_template
+        assert "git log origin/release..HEAD" in release_guide
+        assert "origin/release" in release_guide
         assert "intentionally does not replay release commits onto" in release_guide
 
     def test_release_cut_curation_survives_untracked_paths(self):
@@ -605,13 +607,13 @@ class TestReleaseInfrastructure:
         )
 
     def test_release_cut_aligns_release_histories_before_pushing(self):
-        """release-cut must merge `origin/main` with `-s ours` before it pushes.
+        """release-cut must merge `origin/release` with `-s ours` before it pushes.
 
-        `main` and `develop` have unrelated roots (Phase 4 filter-merge) and
-        diverge permanently — `main` gains one squash commit per release that
-        `develop` never sees, and A4 step 6 (rebase develop onto main) was
+        `release` and `develop` have unrelated roots (Phase 4 filter-merge) and
+        diverge permanently — `release` gains one squash commit per release that
+        `develop` never sees, and A4 step 6 (rebase develop onto release) was
         removed by the 2026-04-27 amendment. A `vX.Y.Z` branch cut cleanly from
-        `develop` is therefore not mergeable into `main`: GitHub cannot compute
+        `develop` is therefore not mergeable into `release`: GitHub cannot compute
         a merge ref, the PR sits at CONFLICTING, and *no CI runs at all* —
         neither `validate-base` nor `release-required-result` ever trigger.
         Every cut before v0.3.1 fixed this by hand (#711/#712/#1029/#1043/#1072).
@@ -620,19 +622,19 @@ class TestReleaseInfrastructure:
         # `\t@?git merge`, not `\t.*git merge`: recipe comments are `\t@# ...` lines
         # that precede the command, so a loose anchor would match a comment first.
         merge_match = re.search(r"^\t@?git merge (.+?)$", recipe, re.MULTILINE)
-        assert merge_match, "release-cut must merge origin/main to make the release PR mergeable"
+        assert merge_match, "release-cut must merge origin/release to make the release PR mergeable"
 
         merge_args = merge_match.group(1).split()
         # `-s ours` keeps the curated release tree byte-for-byte and only records
-        # origin/main as a second parent; any other strategy drags main-only
+        # origin/release as a second parent; any other strategy drags release-only
         # content back into the release tree, silently un-curating the release.
         assert "-s" in merge_args and merge_args[merge_args.index("-s") + 1] == "ours", (
             f"alignment merge must use `-s ours` to preserve the curated tree: {merge_match.group(1)}"
         )
         assert "--allow-unrelated-histories" in merge_args, (
-            "main and develop have unrelated roots; the merge needs --allow-unrelated-histories"
+            "release and develop have unrelated roots; the merge needs --allow-unrelated-histories"
         )
-        assert "origin/main" in merge_args, "the alignment merge must target the fetched origin/main"
+        assert "origin/release" in merge_args, "the alignment merge must target the fetched origin/release"
 
         # A `-s ours` merge cannot change the tree by construction, so the guard is
         # really an assertion that the strategy above is still `ours`. It must stay.
@@ -640,7 +642,7 @@ class TestReleaseInfrastructure:
             "expected a post-merge guard asserting the curated release tree is unchanged"
         )
 
-        # Ordering: changelog (--since-ref origin/main) needs main to still be a
+        # Ordering: changelog (--since-ref origin/release) needs release to still be a
         # non-ancestor; the merge must land on top of the release commit; and the
         # push must carry the merge, or the PR is born CONFLICTING again.
         commit_match = re.search(r"^\tgit commit .*Release v\$\(VERSION\)", recipe, re.MULTILINE)

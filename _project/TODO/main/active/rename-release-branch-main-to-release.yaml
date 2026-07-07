@@ -2,7 +2,7 @@ id: rename-release-branch-main-to-release
 title: "Rename the release branch main->release (Decision B of the branching-strategy review)"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "In Progress"
 category: "Release Tooling"
 
 description: |
@@ -26,6 +26,17 @@ description: |
   GitHub Pages (deploy-pages, source = GitHub Actions). README badges pin no
   branch.
 
+  PROGRESS (2026-07-07, PR chore/rename-main-to-release-in-repo): the in-repo
+  half (w1-w4) landed via PR to develop — workflows, Makefile, docs/templates,
+  and the branch-rename-runbook.md are done. w5 (decision doc) and w6 (admin:
+  branch rename + ruleset recreate) are intentionally NOT done in that PR —
+  they require GitHub admin/settings actions this session was scoped to avoid.
+  This item stays In Progress until the maintainer executes w5/w6 per
+  docs/operations/branch-rename-runbook.md. Until then, GitHub's actual
+  release branch is still named `main` even though the tree now refers to it
+  as `release` (documented-safe intermediate state; see the runbook's
+  "No real gap" section).
+
 prior_art:
   - "docs/operations/branch-rename-runbook.md — DRAFTED in the PR #993 session and saved to the session scratchpad (not yet committed); enumerates the full admin sequence, ordering/no-gap reasoning, verification, and rollback. Land it with w4/w6 or recreate from the scratchpad patch."
   - "_project/TODO/main/active/tag-and-pypi-environment-admin-hardening.yaml — reuse the agent-does-code/docs plus admin-does-GitHub-action split for w6 (the branch rename + ruleset recreate are admin-only)."
@@ -34,7 +45,7 @@ prior_art:
 work:
   - id: w1
     summary: "Rename in-repo across workflows (incl. the functional publish gate)"
-    status: pending
+    status: done
     notes: |
       Triggers main->release: lint.yml, test.yml, perf-smoke.yml, docs.yml
       (incl. Pages deploy gate refs/heads/main). Dev-only
@@ -49,7 +60,7 @@ work:
       validate-release-pr.yml and its strings.
   - id: w2
     summary: "Rename in-repo across Makefile"
-    status: pending
+    status: done
     notes: |
       release-cut / release-finalize base branch (--base main), checkout/pull
       release, generate_changelog_entry --since-ref origin/main,
@@ -59,7 +70,7 @@ work:
       MAIN_CLONE / "main clone" worktree-pool concept untouched (unrelated).
   - id: w3
     summary: "Rename in docs/templates + pin external URLs"
-    status: pending
+    status: done
     notes: |
       release-guide.md, RELEASE_PR_TEMPLATE.md, CONTRIBUTING.md, and — CAREFUL,
       NON-MECHANICAL — repo-admin-settings.md (its scheduling section logic
@@ -70,7 +81,7 @@ work:
       `git cat-file -e <tag>:<path>`.
   - id: w4
     summary: "Add the migration runbook doc"
-    status: pending
+    status: done
     notes: |
       Land docs/operations/branch-rename-runbook.md (recreate from the session
       scratchpad patch): default-branch switch, branch rename, ruleset

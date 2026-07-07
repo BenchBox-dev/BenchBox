@@ -42,7 +42,7 @@ This document provides guidelines and instructions for contributing.
 
 ## Branches & PR gate
 
-`develop` is the long-lived development branch; **all changes land via PR**. `main` is release-only (handled by the version-branch flow — see `docs/operations/release-guide.md`). PRs target `develop` and squash-merge with linear history.
+`develop` is the long-lived development branch; **all changes land via PR**. `release` is release-only (handled by the version-branch flow — see `docs/operations/release-guide.md`). PRs target `develop` and squash-merge with linear history.
 
 Required CI on `develop` reports through `ci-required-result`. The umbrella uses `.github/path-filters.yml` to classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. Reviews are not required for solo-dev work; auto-merge handles landing.
 
@@ -88,7 +88,7 @@ The canonical loop is **branch → edit → preflight → `make pr-open`**. Auto
    make pr-open           # push + gh pr create --base develop + gh pr merge --auto --squash
    ```
 
-   `make pr-open` refuses to run from `develop` or `main`. The PR will squash-merge the moment the required checks turn green. Don't poll for CI — auto-merge handles it.
+   `make pr-open` refuses to run from `develop` or `release`. The PR will squash-merge the moment the required checks turn green. Don't poll for CI — auto-merge handles it.
 
 5. **After merge**, the remote branch auto-deletes (repo setting `delete_branch_on_merge`). Sweep any stale local branches and worktrees with:
 
@@ -218,10 +218,10 @@ are cut by maintainers via the version-branch flow documented in
 
 1. `make bump VERSION=X.Y.Z` and `make changelog-draft VERSION=X.Y.Z` on `develop`.
 2. `make release-prepare VERSION=X.Y.Z` cuts `vX.Y.Z` from `develop` with a
-   release-curated tree and opens a PR against `main`.
-3. Squash-merge the PR; tag `main`; `release.yml` publishes to PyPI.
+   release-curated tree and opens a PR against `release`.
+3. Squash-merge the PR; tag `release`; `release.yml` publishes to PyPI.
 4. `make release-rebase-develop VERSION=X.Y.Z` rebases `develop` onto the
-   release-shaped `main`.
+   release-shaped `release`.
 
 We follow semantic versioning.
 
