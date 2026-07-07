@@ -2,7 +2,8 @@ id: "qpc-08-history-and-plan-metadata-wiring"
 title: "Make plan history real: fix dead attribute reads, wire add_run into the run path, sane ordering"
 worktree: "query-plan-capture"
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-07"
 
 description: |
   benchbox plan-history is dead end-to-end:
@@ -33,39 +34,50 @@ work:
     Create: fix dead attribute reads in history and plan_metadata_utils;
     make shape drift fail loudly instead of getattr defaults.
   notes: >-
-    Fix attribute names (execution_id, timestamp) and read plans via the
-    qpc-01 accessor; replace getattr(..., {}) defaults with explicit access;
-    same fixes in plan_metadata_utils.
-  status: pending
+    Fixed add_run to read execution_id/timestamp (not run_id/start_time) and
+    iterate plans via iter_query_results. plan_metadata_utils was already
+    correct (fixed by #967); no change needed there.
+  status: done
 - id: w2
   summary: >-
     Create: wire add_run into the export/post-run path; timestamp-parse
     sorting; partition flap detection by platform.
   notes: >-
-    Single call site, opt-in config for the history dir; parse timestamps
-    with datetime.fromisoformat for sorting; partition flap/version
-    detection by platform.
+    Wired add_run via ResultExporter._record_plan_history (single call site,
+    opt-in plan_history_dir arg + BENCHBOX_PLAN_HISTORY_DIR env, no-op by
+    default, non-fatal on error). Timestamps parsed with datetime.fromisoformat
+    for sorting; flap detection partitioned by platform.
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: >-
     Create: end-to-end test — run add_run on a real BenchmarkResults with
     plans, then plan-history CLI via CliRunner shows the entry; flapping test
     with mixed platforms asserts partitioning.
   needs: [w2]
-  status: pending
+  status: done
 - id: w4
   summary: "Review: adversarial code review (history dir lifecycle, cache staleness, fingerprint_version interaction with qpc-03)."
   needs: [w3]
-  status: pending
+  notes: >-
+    Opus review: flagged that add_run still used getattr(..., None) for the
+    now-required execution_id/timestamp (spec-forbidden anti-pattern) and that
+    the mixed-offset sort test did not actually distinguish lexicographic from
+    chronological order. Out-of-scope forward-ref noted: flap detection
+    compares raw fingerprints — revisit when qpc-03's fingerprint_version lands.
+  status: done
 - id: w5
   summary: "Fix: address review findings; re-run verification."
   needs: [w4]
-  status: pending
+  notes: >-
+    Changed add_run to direct results.execution_id/results.timestamp access;
+    rewrote the mixed-offset timestamp sort test to genuinely fail under a
+    lexicographic sort. 88 passed, ruff/ty clean.
+  status: done
 - id: w6
   summary: "Submit PR referencing qpc-08."
   needs: [w5]
-  status: pending
+  status: done
 
 must_preserve:
 - "Existing history-file JSON shape stays readable"
