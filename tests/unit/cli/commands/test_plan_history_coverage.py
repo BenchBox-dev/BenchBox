@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -123,3 +124,46 @@ def test_plan_history_reraises_exception_in_verbose_mode(monkeypatch: pytest.Mon
     )
     assert result.exit_code == 1
     assert isinstance(result.exception, RuntimeError)
+
+
+def _write_history_file(history_dir: Path, run_id: str, timestamp: str, fingerprint: str) -> None:
+    """Write a real on-disk PlanHistory JSON file (the format PlanHistory reads)."""
+    (history_dir / f"{run_id}.json").write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "timestamp": timestamp,
+                "platform": "duckdb",
+                "plan_fingerprints": {
+                    "1": {"fingerprint": fingerprint, "estimated_cost": None, "execution_time_ms": 100.0}
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_plan_history_real_history_store_end_to_end(tmp_path: Path) -> None:
+    """End-to-end through the REAL PlanHistory (no monkeypatch): the CLI reads
+    genuine on-disk history files, sorts + versions + renders them via the real
+    query_plan_history/get_plan_version_history path (qpc-11 w1: one real-path
+    test per CLI).
+
+    Writes files directly rather than via ``PlanHistory.add_run`` so the test
+    is independent of the add_run wiring (exercised separately by qpc-08's
+    suite); it pins the CLI's real *read* path against a real store.
+    """
+    history_dir = tmp_path / "history"
+    history_dir.mkdir()
+    _write_history_file(history_dir, "run0", "2024-01-01T00:00:00", "a" * 64)
+    _write_history_file(history_dir, "run1", "2024-01-02T00:00:00", "a" * 64)
+    _write_history_file(history_dir, "run2", "2024-01-03T00:00:00", "b" * 64)
+
+    result = CliRunner().invoke(ph.plan_history, ["--query-id", "1", "--history-dir", str(history_dir)])
+
+    assert result.exit_code == 0, result.output
+    assert "Plan History for 1" in result.output
+    assert "run0" in result.output
+    assert "run2" in result.output
+    # Two distinct fingerprints across the three runs.
+    assert "Unique plans: 2" in result.output
