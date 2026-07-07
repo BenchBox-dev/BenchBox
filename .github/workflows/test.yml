@@ -378,7 +378,6 @@ jobs:
             .codex \
             .gemini \
             .pre-commit-config.yaml \
-            _benchbox_pytest_xdist_safety.py \
             todo.config.yaml \
             skill-sync.yaml \
             skill-sync.lock \
