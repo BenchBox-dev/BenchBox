@@ -850,6 +850,14 @@ class TestExportLoadReexportRoundtrip:
         plans_payload = build_plans_payload(original)
         assert plans_payload is not None
 
+        # Guard the schema.py `if capture_time is not None:` fix (F1.5): a
+        # capture time of exactly 0.0 is falsy, so a truthy check would drop
+        # it from the plans payload entirely. Byte-equality alone cannot catch
+        # that regression -- both the export and re-export would omit the field
+        # symmetrically and still compare equal -- so assert the 0.0 actually
+        # survives the initial export here.
+        assert plans_payload["queries"]["2"]["capture_time_ms"] == 0.0
+
         reimported = reconstruct_benchmark_results(exported, plans_data=plans_payload)
         re_exported = build_result_payload(reimported)
         re_plans_payload = build_plans_payload(reimported)
