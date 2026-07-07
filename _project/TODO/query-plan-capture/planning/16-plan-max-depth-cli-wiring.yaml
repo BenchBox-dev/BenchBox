@@ -1,0 +1,87 @@
+id: "qpc-16-plan-max-depth-cli-wiring"
+title: "Expose plan_max_depth via --platform-option (and bound the persisted companion)"
+worktree: "query-plan-capture"
+priority: "Low"
+status: "Not Started"
+
+description: |
+  Follow-up from the qpc-10 (#1018) review. qpc-10 added a configurable
+  plan_max_depth adapter-config knob and a truncated_at_depth serialization
+  marker, but two loose ends remain:
+
+  1. plan_max_depth is reachable only via direct adapter config= construction /
+     an arbitrary-key config path — it is NOT registered in
+     benchbox/core/results/platform_options.py and has no CLI flag, so
+     `--platform-option plan_max_depth=N` is rejected. (Its sibling
+     plan_capture_timeout_seconds has the same gap.)
+  2. The truncated_at_depth marker does not reach the persisted .plans.json:
+     schema.py::_build_plan_entry serializes a QueryPlanDAG via
+     asdict(...)/to_dict() at full depth for the companion, so plan_max_depth
+     today only affects the capture-time size-guard estimate and
+     `show-plan --format json`, not the on-disk bundle. The size-guard hint
+     "use a smaller plan_max_depth" therefore overstates its effect.
+
+  Decide whether bounding the persisted companion is desired (it would shrink
+  pathologically deep bundles) or whether full-depth persistence is preferred
+  (deep plans are no longer dropped — a strict improvement over pre-qpc-10);
+  at minimum, register the option so it is settable and correct the hint.
+
+category: "Usability / Config"
+
+prior_art:
+- "benchbox/core/results/query_plan_models.py DEFAULT_PLAN_MAX_DEPTH / to_dict(max_depth) / truncated_at_depth (qpc-10 #1018)"
+- "benchbox/core/results/platform_options.py — the --platform-option allowlist (plan_max_depth + plan_capture_timeout_seconds not registered)"
+- "benchbox/core/results/schema.py::_build_plan_entry — companion serialization (full depth)"
+
+work:
+- id: w1
+  summary: "Register plan_max_depth (and plan_capture_timeout_seconds) as PlatformOptionSpecs so --platform-option accepts them; add CLI/help coverage."
+  status: pending
+- id: w2
+  summary: "Decide + implement persisted-companion depth policy: either thread plan_max_depth into _build_plan_entry serialization, or correct the size-guard hint to say it does not bound the bundle."
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Test: --platform-option plan_max_depth=N is accepted and takes effect; companion depth behavior matches the chosen policy."
+  needs: [w2]
+  status: pending
+- id: w4
+  summary: "Review: adversarial code review (option validation, no schema regression)."
+  needs: [w3]
+  status: pending
+- id: w5
+  summary: "Fix review findings; re-run verification."
+  needs: [w4]
+  status: pending
+- id: w6
+  summary: "Submit PR referencing qpc-16."
+  needs: [w5]
+  status: pending
+
+must_preserve:
+- "Deep plans are never dropped (qpc-10 truncation-marker behavior)"
+- "Default plan_max_depth (50) unchanged when the option is not set"
+
+anti_patterns:
+- "DO NOT leave the size-guard hint claiming plan_max_depth shrinks the bundle if it does not."
+
+verification:
+- description: "plan_max_depth settable via --platform-option and effective"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_base_adapter_database_management.py tests/unit/core/results/test_query_plan_models.py -q -k depth"
+  expected_output: "all pass, including new --platform-option test"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/results/platform_options.py"
+  - "benchbox/core/results/schema.py"
+  - "benchbox/cli/"
+  - "tests/"
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["query-plans", "config", "cli", "limits"]
+  estimated_effort: "Small"
+  created_date: "2026-07-07"
+  review_findings: ["F5.3-cli", "qpc-10-followup"]

@@ -1,0 +1,91 @@
+id: "qpc-15-dataframe-capture-error-persistence"
+title: "Persist DataFrame plan-capture error cause to the bundle; reset capture state per run"
+worktree: "query-plan-capture"
+priority: "Low"
+status: "Not Started"
+
+description: |
+  Follow-up from the qpc-05 (#1032) review, F4.4. qpc-05 stopped the DataFrame
+  plan-capture path from swallowing exceptions at DEBUG — it now records the
+  real cause on the query row (plan_capture_error) and a per-run adapter list
+  (self.plan_capture_errors) and warns once per run. But two gaps remain, both
+  out of qpc-05's scope_limit:
+
+  1. The cause never reaches the persisted files. run_benchmark calls
+     compute_plan_capture_stats(query_results, capture_plans) WITHOUT
+     existing_errors= (benchbox/platforms/dataframe/benchmark_mixin.py:~397), so
+     schema.py emits the generic {"error": "Query plan not captured"} instead of
+     the real cause. And row["plan_capture_error"] is dropped by
+     normalize_query_result / QueryResultInput (not in its field set), so it
+     isn't in the main results file either. Durable improvement today = the
+     warn-once log only.
+  2. ExpressionFamilyAdapter does not inherit the SQL mixin's
+     _reset_plan_capture_stats, so neither plan_capture_errors nor
+     _plan_capture_warning_emitted is reset per run. A reused DF adapter
+     instance accumulates errors and permanently suppresses warn-once from run 2
+     on. Low impact today (module entrypoints construct a fresh adapter per run).
+
+category: "Observability / Data Integrity"
+
+prior_art:
+- "benchbox/platforms/dataframe/benchmark_mixin.py:~397 compute_plan_capture_stats call (missing existing_errors=)"
+- "benchbox/core/results/query_normalizer.py QueryResultInput (drops plan_capture_error)"
+- "benchbox/platforms/base/result_capture.py::_reset_plan_capture_stats — the SQL-side per-run reset the DF adapter lacks"
+
+work:
+- id: w1
+  summary: "Thread existing_errors=self.plan_capture_errors into the DF compute_plan_capture_stats call so the real cause reaches the .plans.json errors list."
+  status: pending
+- id: w2
+  summary: "Persist plan_capture_error on the main-file row and add a per-run reset of the DF adapter's capture-error/warn-once state."
+  notes: >-
+    Allow plan_capture_error through normalize_query_result/QueryResultInput
+    (currently dropped); add a per-run reset of plan_capture_errors and
+    _plan_capture_warning_emitted for ExpressionFamilyAdapter (it doesn't
+    inherit the SQL mixin's _reset_plan_capture_stats).
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Test: a DF capture failure's real cause appears in the companion errors + row; warn-once resets across two runs on a reused adapter."
+  needs: [w2]
+  status: pending
+- id: w4
+  summary: "Review: adversarial code review (SQL path unaffected; no schema break)."
+  needs: [w3]
+  status: pending
+- id: w5
+  summary: "Fix review findings; re-run verification."
+  needs: [w4]
+  status: pending
+- id: w6
+  summary: "Submit PR referencing qpc-15."
+  needs: [w5]
+  status: pending
+
+must_preserve:
+- "SQL-path plan-capture stats/errors behavior unchanged"
+- "compute_plan_capture_stats iteration-stable semantics"
+
+anti_patterns:
+- "DO NOT reset capture state per-query (breaks warn-once/accumulation within a run) — reset once per run."
+
+verification:
+- description: "DF capture cause persists to companion + row; warn-once resets per run"
+  command: "uv run -- python -m pytest tests/unit/platforms/dataframe -q -k 'capture or plan'"
+  expected_output: "all pass, including new persistence/reset tests"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/dataframe/benchmark_mixin.py"
+  - "benchbox/core/results/query_normalizer.py"
+  - "benchbox/platforms/dataframe/expression_family.py"
+  - "tests/"
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["query-plans", "dataframe", "error-handling"]
+  estimated_effort: "Small"
+  created_date: "2026-07-07"
+  review_findings: ["F4.4-persistence", "F4.4-reset"]
