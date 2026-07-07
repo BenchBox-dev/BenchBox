@@ -118,6 +118,21 @@ jobs:
             --tb=short \
             --maxfail=5
 
+      - name: Restore ruleset review enforcement helper for bootstrap
+        if: steps.release-readiness.outputs.bootstrap_required == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # scripts/ruleset_drift_check.py imports the enforcement helper from
+          # _project/scripts, but both the release head and the trusted main
+          # base are curated (no _project/) once the release-cut curation
+          # step removes it. Pull the helper from develop, which always has
+          # it, so bootstrap evidence doesn't ModuleNotFoundError.
+          if [ ! -f _project/scripts/ruleset_review_enforcement.py ]; then
+            mkdir -p _project/scripts
+            git show origin/develop:_project/scripts/ruleset_review_enforcement.py > _project/scripts/ruleset_review_enforcement.py
+          fi
+
       - name: Bootstrap ruleset drift evidence
         if: steps.release-readiness.outputs.bootstrap_required == 'true'
         shell: bash
