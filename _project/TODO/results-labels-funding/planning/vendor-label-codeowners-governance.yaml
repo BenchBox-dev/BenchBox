@@ -1,0 +1,150 @@
+id: "vendor-label-codeowners-governance"
+title: "Enforce the vendor-supplied label via CODEOWNERS on the vendor/ subtree"
+worktree: "results-labels-funding"
+priority: "High"
+status: "Blocked"
+description: |
+  The vendor-supplied trust label is RANKING-ELIGIBLE (decision D2) and is derived
+  purely from a bundle living under the top-level `results-data/bundles/vendor/`
+  subtree (generate_corpus_inventory.py::_is_vendor_subtree and
+  explorer_pipeline/pipeline.py::_is_vendor_subtree). The submission validator
+  (benchbox/validation/bundle.py::_validate_manifest_provenance) only rejects a
+  community bundle that self-asserts result_source=vendor OUTSIDE that path — it
+  is an advisory consistency guard, NOT the enforced control.
+
+  The ENFORCED control is supposed to be CODEOWNERS on the vendor/ subtree, so a
+  community contributor cannot add a file under vendor/ (and thus cannot grant
+  themselves the ranking-eligible vendor label) without maintainer review. That
+  CODEOWNERS entry does NOT exist yet. Until it does, on any branch where a PR can
+  add to results-data/bundles/vendor/, a community PR can self-grant the vendor
+  tier by directory placement. This item closes that gap.
+
+  Surfaced by the item-3 security review; deliberately deferred from PR #1021
+  because it couples to the auto-merge soundness-mirror machinery (see gate).
+
+category: "Security"
+
+decision_gates:
+  - id: G-CODEOWNERS-MECHANISM
+    gate: >-
+      .github/CODEOWNERS is pinned to a 1:1 mirror of
+      _project/scripts/auto_merge_soundness_paths.py::SOUNDNESS_PREFIXES by
+      tests/unit/test_auto_merge_soundness_paths.py::test_codeowners_matches_soundness_prefixes_1to1
+      (exact set equality) + ::test_codeowners_covers_soundness_paths. Adding a
+      vendor CODEOWNERS line therefore requires ONE of:
+      (A) also add results-data/bundles/vendor/ to SOUNDNESS_PREFIXES — makes
+          vendor-bundle PRs require Code Owner review before squash-auto-merge
+          (this IS the desired governance, but couples vendor policy to the
+          soundness/auto-merge machinery, which is otherwise about comparator/
+          plan-parser soundness);
+      (B) relax the 1:1 mirror test to permit non-soundness owner paths (a
+          separate "governance owner paths" set), then add the vendor entry there;
+      (C) a different enforcement entirely (branch protection path rule, a CI job
+          that fails a PR touching vendor/ without a maintainer approver).
+    blocks: [w1, w2]
+    outcome: >-
+      UNRESOLVED — needs a maintainer decision. Recommendation: Option A if the
+      auto-merge review gate is acceptable for vendor bundles (simplest, reuses
+      the existing require_code_owner_review ruleset); otherwise Option B to keep
+      the soundness set semantically clean. Coordinate with the adjacent items
+      auto-merge-review-gate-admin-enforcement and harden-auto-merge-on-open-stranding.
+  - id: G-CODEOWNERS-BRANCH
+    gate: >-
+      CODEOWNERS is per-branch. Submissions PR to `published-results`, but
+      results-data/ is also tracked on `develop` (~1051 files). On which branch(es)
+      must the vendor/ owner rule exist to actually gate vendor bundles?
+    blocks: [w1]
+    outcome: >-
+      UNRESOLVED — confirm the branch(es) that can receive a PR adding to
+      results-data/bundles/vendor/ and place the rule there. Likely BOTH develop
+      (where bundles live) and published-results (the submission target).
+
+prior_art:
+  - ".github/CODEOWNERS + _project/scripts/auto_merge_soundness_paths.py:SOUNDNESS_PREFIXES — extend (add the vendor path per the resolved gate; keep the mirror test green)"
+  - "tests/unit/test_auto_merge_soundness_paths.py::test_codeowners_matches_soundness_prefixes_1to1 + ::test_codeowners_covers_soundness_paths — reference/extend (the 1:1 pin that constrains this change)"
+  - "benchbox/validation/bundle.py::_validate_manifest_provenance — reference (the advisory validator guard this CODEOWNERS rule is the real teeth for)"
+  - "scripts/generate_corpus_inventory.py::_is_vendor_subtree + _project/scripts/explorer_pipeline/pipeline.py::_is_vendor_subtree — reference (the path -> vendor-supplied label derivation being gated)"
+  - "_project/TODO/main/planning/auto-merge-review-gate-admin-enforcement.yaml + _project/TODO/main/active/harden-auto-merge-on-open-stranding.yaml — reference (adjacent auto-merge/CODEOWNERS governance work to coordinate with)"
+
+work:
+  - id: w1
+    summary: >-
+      Resolve G-CODEOWNERS-MECHANISM + G-CODEOWNERS-BRANCH, then add the vendor/
+      owner rule on the required branch(es) via the chosen mechanism.
+    needs: []
+    status: pending
+  - id: w2
+    summary: >-
+      Add a regression test asserting a PR adding under results-data/bundles/vendor/
+      requires maintainer/Code-Owner review (or the chosen gate fires).
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: >-
+      Document the enforced vendor-label control (path + CODEOWNERS) in
+      hosted-results-contract.md and contributing-results.md; remove the "advisory
+      only / follow-up" hedging once the real gate exists.
+    needs: [w1]
+    status: pending
+
+must_preserve:
+  - "The soundness-mirror tests stay green (1:1 CODEOWNERS <-> SOUNDNESS_PREFIXES) whichever option is chosen."
+  - "Existing soundness paths keep their Code Owner requirement unchanged."
+  - "The validator's advisory result_source=vendor check stays as defense-in-depth."
+
+approach: |
+  This is a governance/config change, not application code. Start by resolving the
+  two gates with the maintainer. Then implement the smallest change that makes
+  'a community contributor cannot place a bundle under results-data/bundles/vendor/
+  without maintainer review' TRUE on every branch that can receive such a PR, and
+  pin it with a test so it cannot silently regress (the whole failure mode here is
+  a control that looks present but does nothing).
+
+anti_patterns:
+  - "DO NOT rely on the validator's result_source check as the enforced control — an attacker omits result_source and the path alone grants the label."
+  - "DO NOT add a CODEOWNERS line without updating SOUNDNESS_PREFIXES (or the mirror test) — the 1:1 test will fail, or worse, require_code_owner_review silently won't apply."
+  - "DO NOT assume develop's CODEOWNERS governs published-results PRs — CODEOWNERS is per-branch."
+
+verification:
+  - description: "Soundness-mirror tests stay green after the CODEOWNERS change"
+    command: "uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -q"
+    expected_output: "all pass"
+  - description: "New regression test proves the vendor path requires review"
+    command: "uv run -- python -m pytest -k vendor_codeowners -q"
+    expected_output: "test asserting the vendor/ path is owner-gated passes"
+
+scope_limit:
+  only_modify:
+    - ".github/CODEOWNERS"
+    - "_project/scripts/auto_merge_soundness_paths.py (only if Option A)"
+    - "tests/unit/test_auto_merge_soundness_paths.py"
+    - "docs/reference/hosted-results-contract.md"
+    - "docs/contributing-results.md"
+  do_not_modify:
+    - "benchbox/validation/bundle.py (the advisory guard stays as-is)"
+    - "scripts/generate_corpus_inventory.py (label derivation is correct; this item adds the enforced gate)"
+
+impact:
+  technical_debt: |
+    Closes the one unenforced control in the vendor-label governance model. Without
+    it, 'vendor cannot be self-asserted' is true only via an advisory validator
+    check that an attacker can sidestep by omitting result_source and placing the
+    bundle under vendor/.
+
+success_metrics:
+  - "A community PR that adds a bundle under results-data/bundles/vendor/ cannot merge without maintainer review, on every branch that can receive it."
+  - "A test pins the gate so it cannot silently regress."
+
+deps:
+  needs: ["submit-manifest-and-validator"]
+
+delivery_loop:
+  create: "Resolve both gates with the maintainer FIRST; then implement the chosen mechanism."
+  review: "/security-review (this is the enforced governance control); run the soundness-mirror tests."
+  fix: "Resolve findings; re-run the mirror + new regression test."
+  submit_pr: "PR vs develop (and a matching change on published-results if that branch also receives vendor bundles) using PULL_REQUEST_TEMPLATE.md."
+
+metadata:
+  tags: ["security", "governance", "codeowners", "vendor", "auto-merge", "results-data"]
+  estimated_effort: "Medium"
+  created_date: "2026-07-07"
