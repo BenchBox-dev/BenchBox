@@ -1,0 +1,60 @@
+name: Orphaned Commit Detector
+
+# Scheduled backstop for the auto-merge-on-open stranding class of bug: a commit
+# pushed to a feature branch AFTER its only PR already squash-merged and closed
+# is never covered by any pull_request event, so its content silently never
+# reaches develop (see _project/analysis/auto-merge-stranding-forensic.md). This
+# happened three times in the results-explorer/publication remediation and was
+# only caught by a manual adversarial re-review. This job catches the next one
+# automatically.
+#
+# It compares, for every branch whose PR merged, the branch tip against the PR's
+# pre-squash head reported by the GitHub API — squash-proof, no patch-id guess.
+# Historical/resolved cases are allowlisted in
+# _project/analysis/known-stranded-commits.txt; only a NEW orphan fails the run.
+
+on:
+  schedule:
+    # Weekly, Monday 07:00 UTC (after the submission-validator drift check).
+    - cron: "0 7 * * 1"
+  workflow_dispatch: {}
+  # Also run when the detector or its allowlist changes, so a regression in the
+  # detector itself (or a bad allowlist edit) surfaces immediately.
+  push:
+    branches:
+      - develop
+    paths:
+      - "_project/scripts/detect_orphaned_commits.py"
+      - "_project/analysis/known-stranded-commits.txt"
+      - ".github/workflows/orphaned-commit-detector.yml"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  detect:
+    name: Detect orphaned commits on dead branches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Fetch all remote branches
+        run: git fetch --no-tags origin "+refs/heads/*:refs/remotes/origin/*"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run detector
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: uv run -- python _project/scripts/detect_orphaned_commits.py
