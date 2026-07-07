@@ -457,3 +457,115 @@ def test_tpcds_dataframe_requires_variant_parity_in_mixin():
 
     with pytest.raises(RuntimeError, match="missing variant DataFrame implementations"):
         adapter._get_queries_for_benchmark(config, benchmark, stream_id=0)
+
+
+class TestStructureDataFramePlan:
+    """qpc-06 w4 / F3.2: DataFrame text plans are promoted to QueryPlanDAGs via
+    a registered parser, with a text-only fallback when no parser exists or
+    parsing fails."""
+
+    def test_datafusion_text_plan_promoted_to_dag_preserving_raw_output(self):
+        from benchbox.core.dataframe.profiling import QueryPlan
+        from benchbox.core.results.query_plan_models import QueryPlanDAG
+
+        adapter = DummyAdapter()
+        plan_text = (
+            "Projection: lineitem.l_returnflag\n"
+            '  Filter: lineitem.l_shipdate <= Date32("1998-09-02")\n'
+            "    TableScan: lineitem"
+        )
+        captured = QueryPlan(platform="datafusion", plan_type="logical", plan_text=plan_text)
+
+        structured = adapter._structure_dataframe_plan(captured, "q1")
+
+        assert isinstance(structured, QueryPlanDAG)
+        assert structured.plan_fingerprint  # real structural fingerprint computed
+        # Original plan text preserved for debugging.
+        assert structured.raw_explain_output == plan_text
+
+    def test_platform_without_parser_falls_back_to_text_plan(self):
+        from benchbox.core.dataframe.profiling import QueryPlan
+
+        adapter = DummyAdapter()  # platform_name "Polars" (no registered parser)
+        captured = QueryPlan(platform="polars", plan_type="logical", plan_text="FILTER\n  SCAN lineitem")
+
+        structured = adapter._structure_dataframe_plan(captured, "q1")
+
+        # Returned unchanged (still the text-only QueryPlan), not a DAG.
+        assert structured is captured
+
+    def test_parser_failure_falls_back_to_text_plan(self, monkeypatch):
+        from benchbox.core.dataframe.profiling import QueryPlan
+
+        adapter = DummyAdapter()
+
+        class _BoomParser:
+            def parse_explain_output(self, _qid, _txt):
+                raise ValueError("unparseable")
+
+        monkeypatch.setattr(
+            "benchbox.core.query_plans.parsers.registry.get_parser_for_platform",
+            lambda _platform: _BoomParser(),
+        )
+        captured = QueryPlan(platform="datafusion", plan_type="logical", plan_text="garbage")
+
+        structured = adapter._structure_dataframe_plan(captured, "q1")
+
+        assert structured is captured
+
+    def test_parser_returning_none_falls_back_to_text_plan(self, monkeypatch):
+        from benchbox.core.dataframe.profiling import QueryPlan
+
+        adapter = DummyAdapter()
+
+        class _NoneParser:
+            def parse_explain_output(self, _qid, _txt):
+                return None
+
+        monkeypatch.setattr(
+            "benchbox.core.query_plans.parsers.registry.get_parser_for_platform",
+            lambda _platform: _NoneParser(),
+        )
+        captured = QueryPlan(platform="datafusion", plan_type="logical", plan_text="x")
+
+        structured = adapter._structure_dataframe_plan(captured, "q1")
+
+        assert structured is captured
+
+    def test_error_plan_type_falls_back_without_parsing(self, monkeypatch):
+        from benchbox.core.dataframe.profiling import QueryPlan
+
+        adapter = DummyAdapter()
+
+        def _fail_if_called(_platform):
+            raise AssertionError("parser should not be looked up for a failed capture")
+
+        monkeypatch.setattr(
+            "benchbox.core.query_plans.parsers.registry.get_parser_for_platform",
+            _fail_if_called,
+        )
+        captured = QueryPlan(platform="datafusion", plan_type="error", plan_text="Could not capture plan: boom")
+
+        structured = adapter._structure_dataframe_plan(captured, "q1")
+
+        assert structured is captured
+
+    def test_capture_unavailable_sentinel_text_falls_back_without_parsing(self, monkeypatch):
+        from benchbox.core.dataframe.profiling import QueryPlan
+
+        adapter = DummyAdapter()
+
+        def _fail_if_called(_platform):
+            raise AssertionError("parser should not be looked up for capture-unavailable sentinel text")
+
+        monkeypatch.setattr(
+            "benchbox.core.query_plans.parsers.registry.get_parser_for_platform",
+            _fail_if_called,
+        )
+        # plan_type stays "logical" on this path (see capture_datafusion_plan);
+        # only the sentinel text signals capture was unavailable.
+        captured = QueryPlan(platform="datafusion", plan_type="logical", plan_text="Plan capture not available")
+
+        structured = adapter._structure_dataframe_plan(captured, "q1")
+
+        assert structured is captured

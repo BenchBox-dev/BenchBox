@@ -1102,6 +1102,18 @@ def _build_plan_entry(qr: dict[str, Any]) -> dict[str, Any]:
     else:
         plan_entry["plan"] = str(query_plan)
 
+    # plan_format discriminator (qpc-06 / F3.2): two platform families used to
+    # write differently-shaped "plan" objects with no marker -- a structured
+    # QueryPlanDAG (SQL adapters and DataFrame plans routed through a registered
+    # parser) vs a text-only DataFrame QueryPlan fallback. Tag each entry so a
+    # consumer can tell whether "plan" is a rehydratable DAG (has a
+    # ``logical_root``) or opaque text, and fail informatively instead of
+    # blindly calling QueryPlanDAG.from_dict on a text plan.
+    serialized_plan = plan_entry["plan"]
+    plan_entry["plan_format"] = (
+        "dag" if isinstance(serialized_plan, dict) and "logical_root" in serialized_plan else "text"
+    )
+
     return plan_entry
 
 

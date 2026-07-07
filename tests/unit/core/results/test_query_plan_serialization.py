@@ -325,6 +325,80 @@ class TestSchemaV2ExportWithPlans:
         assert "fingerprint_integrity" not in plan_dict
         assert plan_dict == plan.to_dict()
 
+    def test_companion_entry_plan_format_dag_for_structured_plan(self) -> None:
+        """qpc-06 w4 / F3.2: a structured QueryPlanDAG entry is tagged
+        plan_format='dag' so consumers know "plan" is a rehydratable DAG."""
+        root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
+        plan = QueryPlanDAG(query_id="q01", platform="duckdb", logical_root=root)
+        results = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="duckdb",
+            scale_factor=1.0,
+            execution_id="fmt_dag",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            duration_seconds=1.0,
+            total_queries=1,
+            successful_queries=1,
+            query_plans_captured=1,
+            query_results=[
+                {
+                    "query_id": "q01",
+                    "status": "SUCCESS",
+                    "execution_time_ms": 150,
+                    "rows_returned": 4,
+                    "query_plan": plan,
+                    "plan_fingerprint": plan.plan_fingerprint,
+                }
+            ],
+        )
+
+        payload = build_plans_payload(results)
+
+        assert payload is not None
+        assert payload["queries"]["q01"]["plan_format"] == "dag"
+
+    def test_companion_entry_plan_format_text_for_textonly_plan(self) -> None:
+        """qpc-06 w4 / F3.2: a text-only DataFrame plan (no logical_root) is
+        tagged plan_format='text' so a consumer does not mis-read it as a DAG
+        or blindly call QueryPlanDAG.from_dict on it."""
+        from benchbox.core.dataframe.profiling import QueryPlan
+
+        text_plan = QueryPlan(
+            platform="polars",
+            plan_type="logical",
+            plan_text="FILTER [(col > 5)]\n  SCAN lineitem",
+        )
+        results = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="polars",
+            scale_factor=1.0,
+            execution_id="fmt_text",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            duration_seconds=1.0,
+            total_queries=1,
+            successful_queries=1,
+            query_plans_captured=1,
+            query_results=[
+                {
+                    "query_id": "q01",
+                    "status": "SUCCESS",
+                    "execution_time_ms": 150,
+                    "rows_returned": 4,
+                    "query_plan": text_plan,
+                }
+            ],
+        )
+
+        payload = build_plans_payload(results)
+
+        assert payload is not None
+        entry = payload["queries"]["q01"]
+        assert entry["plan_format"] == "text"
+        # The text blob is preserved but is NOT a DAG (no logical_root).
+        assert "logical_root" not in entry["plan"]
+
     def test_schema_v2_plans_companion_multi_stream_keys_per_stream(self) -> None:
         """A query_id captured in more than one stream must not collapse to one
         last-writer-wins entry: capture_query_plan's contract is one plan record
