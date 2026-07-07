@@ -1042,7 +1042,7 @@ def _build_plan_entry(qr: dict[str, Any]) -> dict[str, Any]:
         plan_entry["fingerprint"] = plan_fingerprint
     if plan_fingerprint_normalized:
         plan_entry["fingerprint_normalized"] = plan_fingerprint_normalized
-    if capture_time:
+    if capture_time is not None:
         plan_entry["capture_time_ms"] = round(capture_time, 1)
 
     if is_dataclass(query_plan):
