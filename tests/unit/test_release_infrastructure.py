@@ -421,7 +421,11 @@ class TestReleaseInfrastructure:
 
         readiness_step = next(step for step in steps if step["name"] == "Check release canary freshness")
         assert readiness_step["env"]["RELEASE_CANARY_WORKFLOW"] == "release-canary.yml"
-        assert readiness_step["env"]["RELEASE_CANARY_BRANCH"] == "release"
+        # develop, not release: release-canary.yml's scheduled runs report the
+        # branch they were triggered from (the repository default, which the
+        # branch-rename migration moves to develop), regardless of which ref
+        # RELEASE_CANARY_REF checks out.
+        assert readiness_step["env"]["RELEASE_CANARY_BRANCH"] == "develop"
         assert readiness_step["env"]["RELEASE_CANARY_CHECKED_REF"] == "develop"
         assert readiness_step["env"]["RELEASE_CANARY_MAX_AGE_HOURS"] == "48"
         assert "RELEASE_READINESS_OVERRIDE_SHA" in readiness_step["env"]

@@ -9,7 +9,7 @@ pins the merged behaviour: ``compare_ruleset`` now imports
 ``review_enforcement_findings`` from
 ``_project/scripts/ruleset_review_enforcement.py`` (the single source of
 truth for that predicate - not reimplemented here) and applies it only to
-``develop-squash-only`` (``main-release-only`` has no equivalent
+``develop-squash-only`` (``release-only`` has no equivalent
 documented requirement).
 
 Decision (ruleset-drift-check-review-rule-coverage, w1): WARN-until-enforced.
@@ -140,16 +140,16 @@ def test_review_enforcement_can_be_switched_to_blocking_explicitly():
     assert blocking_findings(findings) == findings
 
 
-def test_main_release_only_is_not_subject_to_the_review_rule_check():
-    """main-release-only has no documented review-enforcement requirement;
+def test_release_only_is_not_subject_to_the_review_rule_check():
+    """release-only has no documented review-enforcement requirement;
     compare_ruleset must not apply the develop-only check to it."""
     expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
-        "main-release-only"
+        "release-only"
     ]
     live = {
-        "name": "main-release-only",
+        "name": "release-only",
         "enforcement": "active",
-        "conditions": {"ref_name": {"include": ["refs/heads/main"], "exclude": []}},
+        "conditions": {"ref_name": {"include": ["refs/heads/release"], "exclude": []}},
         "bypass_actors": [],
         "rules": [
             {

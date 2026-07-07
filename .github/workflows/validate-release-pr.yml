@@ -57,7 +57,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_CANARY_WORKFLOW: release-canary.yml
-          RELEASE_CANARY_BRANCH: release
+          # release-canary.yml runs scheduled from the repository's DEFAULT
+          # branch (develop, per the branch-rename migration this PR is part
+          # of) even though it checks out develop's content either way via
+          # RELEASE_CANARY_REF. A workflow run's `branch` field reflects
+          # where the run was TRIGGERED from, not RELEASE_CANARY_REF's
+          # checkout target -- so the branch= filter here must track the
+          # default branch, not the release branch, or release_readiness_check.py
+          # queries a branch that never runs the canary and every release PR
+          # fails with "No completed release canary runs found."
+          RELEASE_CANARY_BRANCH: develop
           RELEASE_CANARY_CHECKED_REF: develop
           RELEASE_CANARY_MAX_AGE_HOURS: "48"
           RELEASE_READINESS_OVERRIDE_SHA: ${{ vars.RELEASE_READINESS_OVERRIDE_SHA }}
