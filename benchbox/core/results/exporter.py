@@ -74,6 +74,7 @@ class ResultExporter:
         anonymize: bool = True,
         anonymization_config: AnonymizationConfig | None = None,
         console: Console | None = None,
+        plan_history_dir: str | Path | None = None,
     ):
         """Initialize the result exporter.
 
@@ -82,6 +83,11 @@ class ResultExporter:
             anonymize: Whether to anonymize system information. Defaults to True.
             anonymization_config: Configuration for anonymization.
             console: Rich console for output. Creates new one if not provided.
+            plan_history_dir: Opt-in directory to record this run's plan
+                fingerprints into via ``PlanHistory.add_run`` (see
+                ``benchbox plan-history``). Falls back to the
+                ``BENCHBOX_PLAN_HISTORY_DIR`` env var; unset (the default)
+                means no plan-history recording, matching prior behavior.
         """
         if output_dir is None:
             self.output_dir = resolve_results_dir(env=os.environ)
@@ -105,6 +111,9 @@ class ResultExporter:
             AnonymizationManager(anonymization_config or AnonymizationConfig()) if anonymize else None
         )
         self._validator = SchemaV2Validator()
+
+        resolved_plan_history_dir = plan_history_dir or os.environ.get("BENCHBOX_PLAN_HISTORY_DIR")
+        self.plan_history_dir = Path(resolved_plan_history_dir) if resolved_plan_history_dir else None
 
     def _write_file(self, file_path: Path, content: str, mode: str = "w") -> None:
         """Write content to file, handling both local and cloud paths."""
@@ -248,6 +257,9 @@ class ResultExporter:
         # Write companion files
         self._write_companion_files(result, filename_base)
 
+        # Opt-in plan-history recording (single call site; see plan_history_dir).
+        self._record_plan_history(result)
+
         return filepath
 
     def _write_companion_files(self, result: ResultLike, filename_base: str) -> None:
@@ -267,6 +279,26 @@ class ResultExporter:
             tuning_path = self._create_file_path(f"{filename_base}.tuning.json")
             self._write_file(tuning_path, canonical_json_text(tuning_payload))
             self.console.print(f"[dim]Exported tuning: {tuning_path}[/dim]")
+
+    def _record_plan_history(self, result: ResultLike) -> None:
+        """Opt-in: append this run's plan fingerprints to a PlanHistory store.
+
+        No-op unless ``plan_history_dir`` was configured (constructor arg or
+        ``BENCHBOX_PLAN_HISTORY_DIR``) -- this is the wiring `add_run` never
+        had (qpc-08 / F1.2): it existed with zero production callers, so the
+        `benchbox plan-history` CLI could only ever read an empty store.
+        Recording failures are logged, never fatal to the export -- plan
+        history is a secondary observability feature, not part of the
+        result's correctness contract.
+        """
+        if not self.plan_history_dir:
+            return
+        try:
+            from benchbox.core.query_plans.history import PlanHistory
+
+            PlanHistory(self.plan_history_dir).add_run(result)
+        except Exception as exc:
+            logger.warning(f"Failed to record plan history: {exc}")
 
     def _apply_anonymization(self, payload: dict[str, Any]) -> None:
         """Apply public-export anonymization to environment, platform, config, and execution metadata."""

@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import json
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
+from benchbox.cli.commands.plan_history import plan_history
 from benchbox.core.query_plans.history import (
     PlanHistory,
     PlanHistoryEntry,
@@ -86,7 +89,15 @@ class TestPlanHistoryEntry:
 
 
 class TestPlanHistory:
-    """Tests for PlanHistory class."""
+    """Tests for PlanHistory class.
+
+    Constructs real ``BenchmarkResults`` via ``make_benchmark_results`` using
+    its REAL attribute names (``execution_id``/``timestamp``), not the
+    ``run_id``/``start_time`` names ``PlanHistory.add_run`` used to read
+    (qpc-08 / F1.2): those attributes don't exist on ``BenchmarkResults``, so
+    a fixture that bolted them on as loose attributes masked `add_run` being
+    permanently unreachable from any real caller.
+    """
 
     def test_add_run(self) -> None:
         """Test adding a benchmark run to history."""
@@ -95,7 +106,7 @@ class TestPlanHistory:
 
             plan = _create_plan_with_fingerprint("q1", "a" * 64)
             results = make_benchmark_results(
-                run_id="run1",
+                execution_id="run1",
                 query_results=[_qr("q1", 100.0, plan)],
             )
 
@@ -111,6 +122,21 @@ class TestPlanHistory:
             assert "q1" in data["plan_fingerprints"]
             assert data["plan_fingerprints"]["q1"]["fingerprint"] == "a" * 64
 
+    def test_add_run_without_execution_id_is_a_noop(self) -> None:
+        """A result with no execution_id cannot be filed under any run name."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history = PlanHistory(Path(tmpdir))
+
+            plan = _create_plan_with_fingerprint("q1", "a" * 64)
+            results = make_benchmark_results(
+                execution_id="",
+                query_results=[_qr("q1", 100.0, plan)],
+            )
+
+            history.add_run(results)
+
+            assert history.get_run_count() == 0
+
     def test_query_plan_history(self) -> None:
         """Test retrieving history for a query."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -120,8 +146,8 @@ class TestPlanHistory:
             for i in range(3):
                 plan = _create_plan_with_fingerprint("q1", "a" * 64)
                 results = make_benchmark_results(
-                    run_id=f"run{i}",
-                    start_time=f"2024-01-0{i + 1}T00:00:00Z",
+                    execution_id=f"run{i}",
+                    timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
                     query_results=[_qr("q1", 100.0 + i * 10, plan)],
                 )
                 history.add_run(results)
@@ -131,6 +157,48 @@ class TestPlanHistory:
             assert len(entries) == 3
             assert entries[0].run_id == "run0"  # Sorted by timestamp
             assert entries[2].run_id == "run2"
+
+    def test_query_plan_history_sorts_mixed_offset_timestamps_chronologically(self) -> None:
+        """qpc-08 / F7.2: a lexicographic string sort misorders timestamps that
+        mix representations (naive vs. explicit UTC offset) even when they are
+        chronologically unambiguous once parsed.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history = PlanHistory(Path(tmpdir))
+
+            # Naive-looking "Z" timestamp that sorts AFTER an explicit "+00:00"
+            # offset lexicographically ('Z' > '+') despite being the earlier
+            # instant once parsed.
+            plan_a = _create_plan_with_fingerprint("q1", "a" * 64)
+            plan_b = _create_plan_with_fingerprint("q1", "b" * 64)
+            history.add_run(
+                make_benchmark_results(
+                    execution_id="early",
+                    timestamp=datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+                    query_results=[_qr("q1", 100.0, plan_a)],
+                )
+            )
+            history.add_run(
+                make_benchmark_results(
+                    execution_id="late",
+                    timestamp=datetime(2024, 1, 2, 0, 0, 0, tzinfo=timezone.utc),
+                    query_results=[_qr("q1", 100.0, plan_b)],
+                )
+            )
+            # Directly corrupt "early"'s stored timestamp representation to a
+            # lexicographically-larger-but-chronologically-earlier string, the
+            # way a naive-vs-aware mix would in practice.
+            early_file = Path(tmpdir) / "early.json"
+            with open(early_file, encoding="utf-8") as f:
+                data = json.load(f)
+            data["timestamp"] = "2024-01-01T00:00:00Z"
+            with open(early_file, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+            history._cache.clear()
+
+            entries = history.query_plan_history("q1")
+
+            assert [e.run_id for e in entries] == ["early", "late"]
 
     def test_query_plan_history_empty(self) -> None:
         """Test history for non-existent query."""
@@ -148,8 +216,8 @@ class TestPlanHistory:
             for i in range(5):
                 plan = _create_plan_with_fingerprint("q1", "a" * 64)
                 results = make_benchmark_results(
-                    run_id=f"run{i}",
-                    start_time=f"2024-01-0{i + 1}T00:00:00Z",
+                    execution_id=f"run{i}",
+                    timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
                     query_results=[_qr("q1", 100.0, plan)],
                 )
                 history.add_run(results)
@@ -166,8 +234,8 @@ class TestPlanHistory:
             for i, fp in enumerate(fingerprints):
                 plan = _create_plan_with_fingerprint("q1", fp)
                 results = make_benchmark_results(
-                    run_id=f"run{i}",
-                    start_time=f"2024-01-0{i + 1}T00:00:00Z",
+                    execution_id=f"run{i}",
+                    timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
                     query_results=[_qr("q1", 100.0, plan)],
                 )
                 history.add_run(results)
@@ -185,8 +253,8 @@ class TestPlanHistory:
             for i, fp in enumerate(fingerprints):
                 plan = _create_plan_with_fingerprint("q1", fp)
                 results = make_benchmark_results(
-                    run_id=f"run{i}",
-                    start_time=f"2024-01-0{i + 1}T00:00:00Z",
+                    execution_id=f"run{i}",
+                    timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
                     query_results=[_qr("q1", 100.0, plan)],
                 )
                 history.add_run(results)
@@ -204,13 +272,70 @@ class TestPlanHistory:
                 fp = "a" * 64 if i == 0 else "b" * 64
                 plan = _create_plan_with_fingerprint("q1", fp)
                 results = make_benchmark_results(
-                    run_id=f"run{i}",
-                    start_time=f"2024-01-0{i + 1}T00:00:00Z",
+                    execution_id=f"run{i}",
+                    timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
                     query_results=[_qr("q1", 100.0, plan)],
                 )
                 history.add_run(results)
 
             assert history.detect_plan_flapping("q1") is False
+
+    def test_detect_plan_flapping_ignores_cross_platform_alternation(self) -> None:
+        """qpc-08 / F3.4-partial: two platforms alternating for the same
+        query_id is NOT one flapping sequence -- each platform has its own
+        independent, stable plan lineage. Naive interleaved comparison would
+        report 100% transitions; partitioned by platform, neither platform
+        actually flaps.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history = PlanHistory(Path(tmpdir))
+
+            # duckdb: always "a". postgres: always "b". Interleaved by
+            # timestamp they alternate a/b/a/b/a -- 100% naive transition rate.
+            for i in range(5):
+                platform = "duckdb" if i % 2 == 0 else "postgres"
+                fingerprint = "a" * 64 if platform == "duckdb" else "b" * 64
+                plan = _create_plan_with_fingerprint("q1", fingerprint)
+                results = make_benchmark_results(
+                    execution_id=f"run{i}",
+                    timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
+                    platform=platform,
+                    query_results=[_qr("q1", 100.0, plan)],
+                )
+                history.add_run(results)
+
+            assert history.detect_plan_flapping("q1") is False
+
+    def test_detect_plan_flapping_detects_real_flap_within_one_platform(self) -> None:
+        """A genuine flap on ONE platform is still detected even when a
+        second, stable platform's runs are interleaved in the same history."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history = PlanHistory(Path(tmpdir))
+
+            duckdb_fingerprints = ["a" * 64, "c" * 64, "a" * 64, "c" * 64, "a" * 64]
+            for i, fp in enumerate(duckdb_fingerprints):
+                plan = _create_plan_with_fingerprint("q1", fp)
+                history.add_run(
+                    make_benchmark_results(
+                        execution_id=f"duckdb-run{i}",
+                        timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
+                        platform="duckdb",
+                        query_results=[_qr("q1", 100.0, plan)],
+                    )
+                )
+            # A stable postgres lineage interleaved in the same history dir.
+            for i in range(5):
+                plan = _create_plan_with_fingerprint("q1", "b" * 64)
+                history.add_run(
+                    make_benchmark_results(
+                        execution_id=f"postgres-run{i}",
+                        timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
+                        platform="postgres",
+                        query_results=[_qr("q1", 100.0, plan)],
+                    )
+                )
+
+            assert history.detect_plan_flapping("q1") is True
 
     def test_get_plan_version_history(self) -> None:
         """Test version history tracking."""
@@ -221,8 +346,8 @@ class TestPlanHistory:
             for i, fp in enumerate(fingerprints):
                 plan = _create_plan_with_fingerprint("q1", fp)
                 results = make_benchmark_results(
-                    run_id=f"run{i}",
-                    start_time=f"2024-01-0{i + 1}T00:00:00Z",
+                    execution_id=f"run{i}",
+                    timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
                     query_results=[_qr("q1", 100.0, plan)],
                 )
                 history.add_run(results)
@@ -246,7 +371,7 @@ class TestPlanHistory:
             plan1 = _create_plan_with_fingerprint("q1", "a" * 64)
             plan2 = _create_plan_with_fingerprint("q2", "b" * 64)
             results = make_benchmark_results(
-                run_id="run1",
+                execution_id="run1",
                 query_results=[
                     _qr("q1", 100.0, plan1),
                     _qr("q2", 200.0, plan2),
@@ -268,7 +393,7 @@ class TestPlanHistory:
             for i in range(3):
                 plan = _create_plan_with_fingerprint("q1", "a" * 64)
                 results = make_benchmark_results(
-                    run_id=f"run{i}",
+                    execution_id=f"run{i}",
                     query_results=[_qr("q1", 100.0, plan)],
                 )
                 history.add_run(results)
@@ -282,7 +407,7 @@ class TestPlanHistory:
 
             plan = _create_plan_with_fingerprint("q1", "a" * 64)
             results = make_benchmark_results(
-                run_id="run1",
+                execution_id="run1",
                 query_results=[_qr("q1", 100.0, plan)],
             )
             history.add_run(results)
@@ -309,3 +434,37 @@ class TestCreatePlanHistory:
             new_dir = Path(tmpdir) / "subdir" / "history"
             create_plan_history(new_dir)
             assert new_dir.exists()
+
+
+class TestAddRunEndToEndViaCLI:
+    """qpc-08 w3: exercise the real (un-mocked) `add_run` -> `PlanHistory` ->
+    `benchbox plan-history` CLI path end to end, proving the wiring actually
+    reaches a real ``BenchmarkResults`` rather than only a fixture that
+    happens to define the attributes `add_run` reads.
+    """
+
+    def test_real_benchmark_results_recorded_and_shown_by_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history_dir = Path(tmpdir)
+            history = PlanHistory(history_dir)
+
+            for i, fp in enumerate(["a" * 64, "a" * 64, "b" * 64]):
+                plan = _create_plan_with_fingerprint("1", fp)
+                results = make_benchmark_results(
+                    execution_id=f"run{i}",
+                    timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
+                    platform="duckdb",
+                    query_results=[_qr("1", 100.0 + i, plan)],
+                )
+                history.add_run(results)
+
+            result = CliRunner().invoke(
+                plan_history,
+                ["--query-id", "1", "--history-dir", str(history_dir)],
+            )
+
+            assert result.exit_code == 0, result.output
+            assert "Plan History for 1" in result.output
+            assert "run0" in result.output
+            assert "run2" in result.output
+            assert "Unique plans: 2" in result.output

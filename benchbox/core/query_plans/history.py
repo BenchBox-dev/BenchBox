@@ -18,6 +18,26 @@ from benchbox.core.results.loader import iter_query_results
 logger = logging.getLogger(__name__)
 
 
+def _parse_history_timestamp(timestamp: str) -> datetime:
+    """Parse a history entry's ISO-8601 timestamp for chronological ordering.
+
+    Naive and timezone-aware timestamps can both appear across history files
+    (e.g. a `datetime.now(timezone.utc).isoformat()` fallback vs. a captured
+    `BenchmarkResults.timestamp` that may be naive); comparing a naive and an
+    aware `datetime` raises `TypeError`, so a naive result is treated as UTC.
+    A malformed/empty timestamp sorts first rather than raising, so one
+    corrupt history entry doesn't break ordering for the rest.
+    """
+    if timestamp:
+        try:
+            parsed = datetime.fromisoformat(timestamp)
+        except ValueError:
+            logger.warning(f"Could not parse history timestamp {timestamp!r}; sorting it first")
+        else:
+            return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+    return datetime.min.replace(tzinfo=timezone.utc)
+
+
 @dataclass
 class PlanHistoryEntry:
     """Single entry in plan history for a query."""
@@ -77,19 +97,30 @@ class PlanHistory:
         Args:
             results: BenchmarkResults instance
         """
-        run_id = getattr(results, "run_id", None)
-        if not run_id:
-            logger.warning("Cannot add run without run_id")
+        # BenchmarkResults has no `run_id`/`start_time` attributes -- the real
+        # fields are `execution_id`/`timestamp` (qpc-08 / F1.2). Reading the
+        # wrong names made this a permanent, silent no-op: `getattr(...,
+        # default)` never raised, it just always returned the default.
+        execution_id = getattr(results, "execution_id", None)
+        if not execution_id:
+            logger.warning("Cannot add run without execution_id")
             return
 
-        timestamp = getattr(results, "start_time", None)
-        if not timestamp:
+        timestamp_value = getattr(results, "timestamp", None)
+        if isinstance(timestamp_value, datetime):
+            timestamp = timestamp_value.isoformat()
+        elif timestamp_value:
+            timestamp = str(timestamp_value)
+        else:
             timestamp = datetime.now(timezone.utc).isoformat()
 
         platform = getattr(results, "platform", "unknown")
 
+        # The on-disk/JSON key stays "run_id" (must_preserve: existing
+        # history-file shape stays readable) even though the value now comes
+        # from the correctly-named `execution_id` attribute.
         history_entry = {
-            "run_id": run_id,
+            "run_id": execution_id,
             "timestamp": timestamp,
             "platform": platform,
             "plan_fingerprints": {},
@@ -107,12 +138,12 @@ class PlanHistory:
                 }
 
         # Write to storage
-        history_file = self.storage_path / f"{run_id}.json"
+        history_file = self.storage_path / f"{execution_id}.json"
         with open(history_file, "w", encoding="utf-8") as f:
             json.dump(history_entry, f, indent=2)
 
         # Update cache
-        self._cache[run_id] = history_entry
+        self._cache[execution_id] = history_entry
 
     def query_plan_history(self, query_id: str) -> list[PlanHistoryEntry]:
         """
@@ -152,8 +183,12 @@ class PlanHistory:
                 logger.warning(f"Error loading history file {entry_file}: {e}")
                 continue
 
-        # Sort by timestamp
-        history.sort(key=lambda x: x.timestamp)
+        # Sort chronologically. Parsing (rather than a lexicographic string
+        # sort) matters once entries mix timestamp representations -- e.g. a
+        # naive local ISO string alongside a "+00:00"/"Z" UTC one sort
+        # incorrectly as plain strings despite being comparable instants
+        # once parsed (qpc-08 / F7.2).
+        history.sort(key=lambda x: _parse_history_timestamp(x.timestamp))
         return history
 
     def detect_plan_flapping(
@@ -168,16 +203,37 @@ class PlanHistory:
         Flapping indicates optimizer instability where the same query gets
         different plans across runs, potentially oscillating between them.
 
+        History is partitioned by platform before checking for flapping: a
+        history directory holding runs from two platforms for the same
+        query_id is NOT one interleaved sequence -- each platform has its own
+        independent plan lineage, and naively alternating between them would
+        report 100% transitions regardless of either platform's actual
+        stability (qpc-08 / F3.4-partial). Flapping is reported if any single
+        platform's own sequence flaps.
+
         Args:
             query_id: Query identifier
-            window_size: Number of recent runs to analyze
+            window_size: Number of recent runs to analyze (per platform)
             transition_threshold: Fraction of transitions that indicates flapping
 
         Returns:
-            True if plan flapping is detected
+            True if plan flapping is detected for any platform
         """
-        history = self.query_plan_history(query_id)[-window_size:]
+        history = self.query_plan_history(query_id)
+        if not history:
+            return False
 
+        by_platform: dict[str, list[PlanHistoryEntry]] = {}
+        for entry in history:
+            by_platform.setdefault(entry.platform, []).append(entry)
+
+        return any(
+            self._series_is_flapping(entries[-window_size:], transition_threshold) for entries in by_platform.values()
+        )
+
+    @staticmethod
+    def _series_is_flapping(history: list[PlanHistoryEntry], transition_threshold: float) -> bool:
+        """Flapping check for a single platform's own chronological series."""
         if len(history) < 3:
             return False
 

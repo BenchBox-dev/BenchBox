@@ -279,6 +279,47 @@ def test_canonical_bundle_export_keeps_plans_raw_explain_output_when_not_anonymi
         plans_data = json.load(handle)
 
     assert plans_data["queries"]["1"]["plan"]["raw_explain_output"] == "SEQ_SCAN /Users/alice/data/lineitem.parquet"
+def test_exporter_records_plan_history_when_dir_configured(tmp_path):
+    """qpc-08 w2: `add_run` had zero production callers -- `_export_json_v2`
+    is now the single wired call site, gated behind an opt-in
+    `plan_history_dir` so default export behavior (no history recording) is
+    unchanged.
+    """
+    history_dir = tmp_path / "history"
+    result = _minimal_result("duckdb")
+
+    ResultExporter(output_dir=tmp_path / "results", anonymize=False, plan_history_dir=history_dir).export_result(
+        result, formats=["json"]
+    )
+
+    history_file = history_dir / f"{result.execution_id}.json"
+    assert history_file.exists()
+    with open(history_file, encoding="utf-8") as handle:
+        entry = json.load(handle)
+    assert entry["run_id"] == result.execution_id
+
+
+def test_exporter_records_plan_history_from_env_var(tmp_path, monkeypatch):
+    """The BENCHBOX_PLAN_HISTORY_DIR env var is an equivalent opt-in to the
+    constructor arg, for callers that can't easily thread a new parameter
+    through (e.g. existing CLI entry points)."""
+    history_dir = tmp_path / "history"
+    monkeypatch.setenv("BENCHBOX_PLAN_HISTORY_DIR", str(history_dir))
+    result = _minimal_result("duckdb")
+
+    ResultExporter(output_dir=tmp_path / "results", anonymize=False).export_result(result, formats=["json"])
+
+    assert (history_dir / f"{result.execution_id}.json").exists()
+
+
+def test_exporter_does_not_record_plan_history_by_default(tmp_path):
+    """No plan_history_dir configured (the default) -- no history directory
+    should be created at all."""
+    result = _minimal_result("duckdb")
+
+    ResultExporter(output_dir=tmp_path / "results", anonymize=False).export_result(result, formats=["json"])
+
+    assert not (tmp_path / "history").exists()
 
 
 def test_exporter_omits_direct_total_for_unavailable_normalized_cost(tmp_path):
