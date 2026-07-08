@@ -65,7 +65,7 @@ from benchbox.core.benchmark_registry import get_benchmark_default_scale
 from benchbox.core.config import DatabaseConfig
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.provenance import FUNDING_SOURCES, RESULT_SOURCES
-from benchbox.core.results.status import result_non_clean_reason
+from benchbox.core.results.status import result_cli_failure_reason, result_non_clean_reason
 from benchbox.core.schemas import ExecutionContext
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
 from benchbox.utils.cloud_storage import is_cloud_path
@@ -1543,6 +1543,10 @@ def _direct_handle_result(
 ) -> None:
     """Export results and perform post-run actions for the direct branch."""
     non_clean_reason = result_non_clean_reason(result)
+    # Exit code uses the narrower CLI policy: unvalidated-but-successful runs
+    # (DataFrame mode, --validation disabled) warn and stay non-clean for
+    # publishing, but do not fail the invocation. See status.py.
+    cli_failure_reason = result_cli_failure_reason(result)
     if result.validation_status not in ["FAILED", "INTERRUPTED"]:
         if not s.quiet:
             console.print("\n[bold]Exporting results...[/bold]")
@@ -1605,7 +1609,7 @@ def _direct_handle_result(
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
-        if non_clean_reason:
+        if cli_failure_reason:
             s.ctx.exit(1)
     else:
         console.print(f"\n[red]❌ Benchmark failed: {result.validation_status}[/red]")
