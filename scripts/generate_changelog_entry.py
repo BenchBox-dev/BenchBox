@@ -31,6 +31,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -265,7 +266,12 @@ def find_untagged_changelog_versions(
 def _current_branch(source: Path) -> str | None:
     result = _run_git(source, "rev-parse", "--abbrev-ref", "HEAD")
     branch = result.stdout.strip()
-    return branch if result.returncode == 0 and branch and branch != "HEAD" else None
+    if result.returncode == 0 and branch and branch != "HEAD":
+        return branch
+    # PR CI checks out a detached merge ref; fall back to the PR head ref so
+    # the release-branch exemption in the tag-claim guard still applies.
+    env_branch = os.environ.get("GITHUB_HEAD_REF", "").strip()
+    return env_branch or None
 
 
 def check_tag_claims(source: Path) -> tuple[bool, list[str]]:
