@@ -431,6 +431,16 @@ class BenchmarkOrchestrator:
             return None
         if execution_mode == "dataframe":
             self.console.print("[cyan]Using DataFrame execution mode[/cyan]")
+            # database_config.options carries user-supplied --platform-option
+            # values (e.g. target_partitions=4). Unlike the SQL branch below
+            # (whose PlatformAdapter.__init__(self, **config) accepts anything),
+            # DataFrame adapters declare explicit, narrow constructor signatures
+            # (e.g. DataFusionDataFrameAdapter's target_partitions/batch_size/...),
+            # so this can only be forwarded safely because CLI option parsing
+            # already validated every key against that platform's registered
+            # _OPTION_SPEC_ROWS before it reached database_config.options - an
+            # unregistered --platform-option name is rejected earlier as
+            # "Unknown platform option", so no unexpected kwarg reaches here.
             return get_adapter(
                 database_config.type,
                 mode="dataframe",
@@ -438,6 +448,7 @@ class BenchmarkOrchestrator:
                 verbose=self._verbosity.verbose if self._verbosity else False,
                 very_verbose=self._verbosity.very_verbose if self._verbosity else False,
                 tuning_config=opts.get("df_tuning_config"),
+                **(database_config.options or {}),
             )
         adapter = get_platform_adapter(database_config.type, **(platform_cfg or {}))
         if adapter and benchmark:
