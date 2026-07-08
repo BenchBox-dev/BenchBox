@@ -678,7 +678,9 @@ class TPCCompiler:
 # Platform: {platform_name}
 CC = gcc
 # Let config.h handle most definitions to avoid redefinition warnings
-# Enable EOL_HANDLING to prevent trailing column separators
+# -DEOL_HANDLING: no trailing field separator. Must match makefile.suite's
+# default CFLAGS and compile-all-platforms.sh so a runtime-built dbgen frames
+# rows identically to the bundled binaries (BenchBox canonical convention).
 CFLAGS = -O2 -DDBNAME=\\"dss\\" -D{machine_flag} -DTPCH -DRNG_TEST -D_FILE_OFFSET_BITS=64 \\
          -DEOL_HANDLING {extra_defines} -I.
 

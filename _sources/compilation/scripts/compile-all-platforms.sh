@@ -35,6 +35,22 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Resolve a Docker-compatible container engine for the Linux/Windows builds.
+# `mocker` (Apple Containerization, macOS) and `docker` (Linux CI) share a
+# CLI, so the same `build`/`run -v` invocations work with either. Preference
+# order puts `mocker` first because CI Linux runners ship `docker` but not
+# `mocker`, so this resolves correctly in both environments; override with
+# BENCHBOX_CONTAINER_ENGINE when needed.
+CONTAINER_ENGINE="${BENCHBOX_CONTAINER_ENGINE:-}"
+if [ -z "$CONTAINER_ENGINE" ]; then
+    for _engine in mocker docker podman; do
+        if command -v "$_engine" >/dev/null 2>&1; then
+            CONTAINER_ENGINE="$_engine"
+            break
+        fi
+    done
+fi
+
 # Platform configurations for all supported targets
 PLATFORMS=(
     "darwin:arm64:native"
@@ -56,7 +72,9 @@ compile_tpch_macos_native() {
     mkdir -p "$temp_build"
     cp -r "$PROJECT_ROOT/_sources/tpc-h/dbgen"/* "$temp_build/"
 
-    # Build using native macOS clang
+    # Build using native macOS clang.
+    # EOL_HANDLING (no trailing field separator) comes from makefile.suite's
+    # default CFLAGS -- BenchBox's canonical framing convention.
     cd "$temp_build"
     make -f makefile.suite clean || true
     make -f makefile.suite CC=clang MACHINE=LINUX DATABASE=ORACLE WORKLOAD=TPCH
@@ -191,7 +209,7 @@ compile_tpch_macos_cross() {
         MACHINE=LINUX \
         DATABASE=ORACLE \
         WORKLOAD=TPCH \
-        CFLAGS="-g -DDBNAME=\\\"dss\\\" -DLINUX -DORACLE -DTPCH -DRNG_TEST -D_FILE_OFFSET_BITS=64" \
+        CFLAGS="-g -DDBNAME=\\\"dss\\\" -DLINUX -DORACLE -DTPCH -DRNG_TEST -D_FILE_OFFSET_BITS=64 -DEOL_HANDLING" \
         LDFLAGS="$cross_flags -O" \
         || {
             log_error "TPC-H cross-compilation failed for macOS ${target_arch}"
@@ -291,14 +309,14 @@ compile_with_docker() {
     local benchmark=$3  # tpc-h or tpc-ds
 
     local benchmark_upper=$(echo "$benchmark" | tr '[:lower:]' '[:upper:]')
-    log_info "Compiling ${benchmark_upper} for ${platform}-${arch} using Docker..."
+    log_info "Compiling ${benchmark_upper} for ${platform}-${arch} using ${CONTAINER_ENGINE}..."
 
     local platform_dir="$PROJECT_ROOT/_binaries/${benchmark}/${platform}-${arch}"
     local docker_platform="linux/${arch}"
 
-    # Build Docker image
+    # Build the container image
     local image_name="benchbox/${benchmark}-${platform}-${arch}"
-    docker build -f "$PROJECT_ROOT/_sources/compilation/docker/Dockerfile.${platform}-${arch}" \
+    "$CONTAINER_ENGINE" build -f "$PROJECT_ROOT/_sources/compilation/docker/Dockerfile.${platform}-${arch}" \
                  -t "$image_name" \
                  "$PROJECT_ROOT/_sources/compilation/docker/"
 
@@ -318,7 +336,7 @@ compile_tpch_docker() {
     local image_name=$3
     local platform_dir=$4
 
-    docker run --rm \
+    "$CONTAINER_ENGINE" run --rm \
         -v "$PROJECT_ROOT/_sources/tpc-h/dbgen:/build/source" \
         -v "$platform_dir:/build/output" \
         "$image_name" \
@@ -326,6 +344,10 @@ compile_tpch_docker() {
             cd /build/source
             make -f makefile.suite clean || true
 
+            # Framing note: these builds do NOT override CFLAGS, so they inherit
+            # makefile.suite's default -DEOL_HANDLING (no trailing field
+            # separator) -- BenchBox's canonical convention. Keep it that way so
+            # Linux/Windows .tbl framing matches macOS.
             # Set compilation parameters based on platform
             if [ '$platform' = 'windows' ]; then
                 # Fix MinGW integer literal compatibility in config.h
@@ -355,7 +377,7 @@ compile_tpcds_docker() {
     local image_name=$3
     local platform_dir=$4
 
-    docker run --rm \
+    "$CONTAINER_ENGINE" run --rm \
         -v "$PROJECT_ROOT/_sources/tpc-ds/tools:/build/source" \
         -v "$PROJECT_ROOT/_sources/tpc-ds/query_templates:/build/query_templates" \
         -v "$platform_dir:/build/output" \
@@ -588,12 +610,14 @@ main() {
     # Change to project root
     cd "$PROJECT_ROOT"
 
-    # Check Docker availability for Docker-based platforms
-    if ! command -v docker &> /dev/null; then
-        log_error "Docker is not installed or not available"
-        log_info "Tip: run with --native to compile for the current platform only (no Docker needed)"
+    # Check container-engine availability for the Linux/Windows builds.
+    if [ -z "$CONTAINER_ENGINE" ]; then
+        log_error "No container engine found (looked for: mocker, docker, podman)"
+        log_info "Install one, set BENCHBOX_CONTAINER_ENGINE=<engine>, or run with"
+        log_info "--native to compile for the current platform only (no engine needed)"
         exit 1
     fi
+    log_info "Using container engine: ${CONTAINER_ENGINE}"
 
     compile_all_platforms
     verify_all_binaries

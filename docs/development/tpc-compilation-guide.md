@@ -340,12 +340,18 @@ git add benchbox/_binaries/tpc-ds/darwin-arm64/
 git commit -m "fix(tpcds): rebuild darwin-arm64 binaries from patched sources"
 ```
 
-#### Rebuild for all platforms (requires Docker)
+#### Rebuild for all platforms (requires a container engine)
 
 ```bash
 cd _sources/compilation/scripts
 ./compile-all-platforms.sh
 ```
+
+The Linux/Windows builds run in a container. The script auto-detects a
+Docker-compatible engine, preferring `mocker` (Apple Containerization on
+macOS) then `docker` then `podman`; override with
+`BENCHBOX_CONTAINER_ENGINE=<engine>`. The macOS `arm64`/`x86_64` binaries build
+natively (no engine needed).
 
 **Supported platforms:**
 
@@ -353,10 +359,15 @@ cd _sources/compilation/scripts
 |----------|--------------|--------|
 | darwin | arm64 | Native (on Apple Silicon) |
 | darwin | x86_64 | Cross-compilation |
-| linux | x86_64 | Docker |
-| linux | arm64 | Docker |
-| windows | x86_64 | Docker + MinGW |
-| windows | arm64 | Docker + MinGW |
+| linux | x86_64 | Container (mocker/docker/podman) |
+| linux | arm64 | Container (mocker/docker/podman) |
+| windows | x86_64 | Container + MinGW |
+| windows | arm64 | Container + MinGW |
+
+> **Framing convention:** all `dbgen` builds compile with `-DEOL_HANDLING`
+> (no trailing field separator), matching TPC-DS `-terminate n`. Keep this
+> consistent across every build path — see `_sources/tpc-h/PATCHES.md`.
+> `tests/unit/core/tpch/test_tpch_dbgen_framing.py` enforces it.
 
 > **Note:** The full Docker build currently only deploys to `_binaries/`
 > (untracked).  After running it, manually copy the updated binaries into
