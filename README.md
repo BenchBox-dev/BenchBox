@@ -28,7 +28,7 @@ BenchBox _loosely_ follows [Semantic Versioning](https://semver.org/) using the 
 - **MINOR** when we add backward-compatible changes _OR significantly expand functionality_.
 - **PATCH** when we make bug fixes or documentation updates, _bug-fixes may not be backward-compatible_.
 
-Current release: v0.2.1. This marker mirrors `pyproject.toml` on `develop` (bumped only during release-cut, so it trails the actual latest published release between cuts) and is checked for internal consistency by `benchbox --version`; it is **not** what `pip install benchbox` gets you today.
+Current release: v0.3.1. This marker mirrors `pyproject.toml` on `develop` (bumped only during release-cut, so it trails the actual latest published release between cuts) and is checked for internal consistency by `benchbox --version`; it is **not** what `pip install benchbox` gets you today.
 
 **The actual PyPI-latest release is `v0.3.0`** (published 2026-05-16; see [PyPI's release history](https://pypi.org/project/benchbox/#history) or `pip index versions benchbox` for the authoritative answer). **Known issue:** `v0.3.0`'s clean install is broken — `pip install benchbox` followed by `import benchbox` fails with `ModuleNotFoundError: No module named 'pandas'`. The fix is complete on `develop` (see `CHANGELOG.md`'s Unreleased section) but not yet published under a released version; until a recovery release ships, install from `develop` if you hit this: `pip install git+https://github.com/joeharris76/BenchBox.git@develop`. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
 
