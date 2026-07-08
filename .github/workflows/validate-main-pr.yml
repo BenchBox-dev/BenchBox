@@ -116,7 +116,7 @@ jobs:
             -m "(slow or resource_heavy) and not (stress or live_integration)" \
             -n 0 \
             --tb=short \
-            --maxfail=5
+            --maxfail=25
 
       - name: Restore ruleset review enforcement helper for bootstrap
         if: steps.release-readiness.outputs.bootstrap_required == 'true'
