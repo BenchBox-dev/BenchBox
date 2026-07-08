@@ -100,3 +100,65 @@ def test_no_orphans_means_empty_new() -> None:
 )
 def test_is_structural(branch: str, structural: bool) -> None:
     assert mod.is_structural(branch) is structural
+
+
+class TestMergedHeadForBranch:
+    """#1020 review: use the LATEST PR (by number) as the cutoff, and skip
+    the branch entirely when that latest PR closed without merging - an
+    older merged PR's head must never be used as the diff cutoff when a
+    later PR on the same branch name exists, merged or not."""
+
+    def test_single_merged_pr_returns_its_head(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            mod,
+            "_api",
+            lambda _url, _token: [
+                {"number": 10, "state": "closed", "merged_at": "2026-01-01T00:00:00Z", "head": {"sha": "a" * 40}},
+            ],
+        )
+        assert mod.merged_head_for_branch("o", "r", "b", "tok") == "a" * 40
+
+    def test_open_pr_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            mod,
+            "_api",
+            lambda _url, _token: [
+                {"number": 10, "state": "open", "merged_at": None, "head": {"sha": "a" * 40}},
+            ],
+        )
+        assert mod.merged_head_for_branch("o", "r", "b", "tok") is None
+
+    def test_no_prs_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(mod, "_api", lambda _url, _token: [])
+        assert mod.merged_head_for_branch("o", "r", "b", "tok") is None
+
+    def test_reused_branch_older_merged_then_later_closed_unmerged_skips_branch(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The exact false-positive scenario: PR#10 merged the branch long
+        ago; the branch name was reused for PR#20, which was closed without
+        merging. Commits pushed for PR#20 already had real PR coverage, so
+        the branch must be skipped (None), not diffed from PR#10's stale
+        head."""
+        monkeypatch.setattr(
+            mod,
+            "_api",
+            lambda _url, _token: [
+                {"number": 10, "state": "closed", "merged_at": "2026-01-01T00:00:00Z", "head": {"sha": "a" * 40}},
+                {"number": 20, "state": "closed", "merged_at": None, "head": {"sha": "b" * 40}},
+            ],
+        )
+        assert mod.merged_head_for_branch("o", "r", "b", "tok") is None
+
+    def test_reused_branch_older_merged_then_later_also_merged_uses_latest_head(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            mod,
+            "_api",
+            lambda _url, _token: [
+                {"number": 10, "state": "closed", "merged_at": "2026-01-01T00:00:00Z", "head": {"sha": "a" * 40}},
+                {"number": 20, "state": "closed", "merged_at": "2026-02-01T00:00:00Z", "head": {"sha": "b" * 40}},
+            ],
+        )
+        assert mod.merged_head_for_branch("o", "r", "b", "tok") == "b" * 40

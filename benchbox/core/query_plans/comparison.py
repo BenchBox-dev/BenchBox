@@ -859,25 +859,48 @@ def generate_plan_comparison_summary(
                 details="Plans are identical",
             )
         else:
-            plans_changed += 1
-
             # Perform detailed comparison
             comparison = comparator.compare_plans(baseline_plan, current_plan)
 
-            # Determine primary change type
-            if comparison.similarity.structure_mismatches > 0:
-                change_type = "structure_change"
-            elif comparison.similarity.type_mismatches > 0:
-                change_type = "type_change"
-            else:
-                change_type = "property_change"
+            # When fingerprints weren't comparable (different encoding version,
+            # or an untrusted/stale fingerprint), the plan_changed=True above is
+            # only a "the fast path can't be trusted" signal, not a verdict.
+            # Correct it against the full tree-walk result so a pure
+            # fingerprint-encoding-version bump on an otherwise-identical plan
+            # is never misreported as a changed plan / regression (qpc-03
+            # anti-pattern).
+            if not fingerprints_comparable and (
+                comparison.similarity.type_mismatches == 0
+                and comparison.similarity.property_mismatches == 0
+                and comparison.similarity.structure_mismatches == 0
+            ):
+                plan_changed = False
 
-            change = QueryPlanChange(
-                query_id=query_id,
-                change_type=change_type,
-                similarity=comparison.similarity.overall_similarity,
-                details=comparison.summary,
-            )
+            if not plan_changed:
+                plans_unchanged += 1
+                change = QueryPlanChange(
+                    query_id=query_id,
+                    change_type="unchanged",
+                    similarity=1.0,
+                    details="Plans are identical",
+                )
+            else:
+                plans_changed += 1
+
+                # Determine primary change type
+                if comparison.similarity.structure_mismatches > 0:
+                    change_type = "structure_change"
+                elif comparison.similarity.type_mismatches > 0:
+                    change_type = "type_change"
+                else:
+                    change_type = "property_change"
+
+                change = QueryPlanChange(
+                    query_id=query_id,
+                    change_type=change_type,
+                    similarity=comparison.similarity.overall_similarity,
+                    details=comparison.summary,
+                )
 
         structural_differences.append(change)
 

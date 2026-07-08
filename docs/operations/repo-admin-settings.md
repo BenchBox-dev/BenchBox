@@ -475,6 +475,15 @@ Live state observed 2026-07-05 (release-canary-scheduled-activation TODO, w0):
   `RELEASE_CANARY_REF` shell pattern release-canary.yml uses), so landing
   the file on `main` does not leave a scheduled run checking out `main`'s
   stripped tree (no `_project/` or `scripts/phase2_metrics.py`) by default.
+- Same class, third instance (#1020 review): `orphaned-commit-detector.yml`
+  (weekly cron `0 7 * * 1`) is also on `develop` but absent from
+  `origin/main`, so its schedule has never fired either — only its
+  path-filtered `push: branches: [develop]` trigger can run, on the cadence
+  of detector/allowlist edits rather than weekly. It already hardcodes
+  `ref: develop` on its checkout step (the same shell pattern as
+  release-canary.yml/phase3-promotion-review.yml), so it is safe to land on
+  `main` as-is whenever the admin does the next pass for this class of fix —
+  no `main`-relative edits needed first.
 
 GitHub runs `on.schedule` workflows only from the default branch (`main`).
 Activation options considered (w1):

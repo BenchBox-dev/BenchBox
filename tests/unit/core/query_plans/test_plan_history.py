@@ -14,6 +14,7 @@ from benchbox.cli.commands.plan_history import plan_history
 from benchbox.core.query_plans.history import (
     PlanHistory,
     PlanHistoryEntry,
+    _parse_history_timestamp,
     create_plan_history,
 )
 from benchbox.core.results.query_plan_models import (
@@ -49,6 +50,58 @@ def _create_plan_with_fingerprint(query_id: str, fingerprint: str) -> QueryPlanD
         plan_fingerprint=fingerprint,
         raw_explain_output="test",
     )
+
+
+class TestParseHistoryTimestamp:
+    """#1025 review: datetime.fromisoformat only accepts a trailing "Z" from
+    Python 3.11 onward; on 3.10 (requires-python floor) it raises ValueError,
+    which the except branch silently downgrades to a datetime.min sort key -
+    misordering history entries with a "Z"-suffixed timestamp instead of
+    raising or logging anything actionable."""
+
+    def test_z_suffix_parses_as_utc(self) -> None:
+        parsed = _parse_history_timestamp("2024-03-10T02:30:00Z")
+
+        assert parsed == datetime(2024, 3, 10, 2, 30, 0, tzinfo=timezone.utc)
+        assert parsed != datetime.min.replace(tzinfo=timezone.utc)
+
+    def test_z_suffix_sorts_correctly_against_offset_timestamps(self) -> None:
+        z_time = _parse_history_timestamp("2024-03-10T02:30:00Z")
+        earlier_offset_time = _parse_history_timestamp("2024-03-10T01:00:00+00:00")
+        later_offset_time = _parse_history_timestamp("2024-03-10T05:00:00+00:00")
+
+        assert earlier_offset_time < z_time < later_offset_time
+
+    def test_malformed_timestamp_still_sorts_first(self) -> None:
+        assert _parse_history_timestamp("not-a-timestamp") == datetime.min.replace(tzinfo=timezone.utc)
+
+    def test_z_suffix_is_stripped_before_fromisoformat_regardless_of_python_version(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Prove the "Z" -> "+00:00" normalization happens unconditionally,
+        not just on interpreters new enough to accept "Z" natively. The
+        sandbox's own Python (3.11+) already tolerates "Z" in fromisoformat,
+        so a plain before/after diff can't distinguish fixed from buggy here
+        - assert directly on the string handed to fromisoformat instead."""
+        import benchbox.core.query_plans.history as history_module
+
+        seen: list[str] = []
+        real_fromisoformat = datetime.fromisoformat
+
+        class _RecordingDatetime:
+            @staticmethod
+            def fromisoformat(value: str) -> datetime:
+                seen.append(value)
+                return real_fromisoformat(value)
+
+        # `datetime` is a plain module-level name in history.py (`from datetime
+        # import datetime`); datetime.datetime itself is a C type and cannot
+        # be monkeypatched directly, so replace the module-level binding.
+        monkeypatch.setattr(history_module, "datetime", _RecordingDatetime)
+
+        history_module._parse_history_timestamp("2024-03-10T02:30:00Z")
+
+        assert seen == ["2024-03-10T02:30:00+00:00"]
 
 
 class TestPlanHistoryEntry:
@@ -268,6 +321,32 @@ class TestPlanHistory:
             # 4 transitions = 4/4 = 100%, above 30% threshold
             assert history.detect_plan_flapping("q1") is True
 
+    def test_detect_plan_flapping_ignores_fingerprint_version_boundary(self) -> None:
+        """A pure fingerprint-encoding-version bump (qpc-03 v1 -> v2) makes
+        the fingerprint string change even for an unchanged plan (#1028
+        review). Every consecutive pair here crosses a fingerprint_version
+        boundary; without the fix that reads as 100% transitions (flapping),
+        but none of it reflects a real plan change, so it must not flap."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history = PlanHistory(Path(tmpdir))
+
+            # Alternating fingerprint_version on every run, same logical plan
+            # re-encoded each time - an artificial worst case that isolates
+            # the version-boundary-exclusion mechanism (same technique as
+            # test_detect_plan_flapping_ignores_cross_platform_alternation).
+            specs = [("v1-a" * 16, 1), ("v2-a" * 16, 2), ("v1-a" * 16, 1), ("v2-a" * 16, 2), ("v1-a" * 16, 1)]
+            for i, (fp, version) in enumerate(specs):
+                plan = _create_plan_with_fingerprint("q1", fp)
+                plan.fingerprint_version = version
+                results = make_benchmark_results(
+                    execution_id=f"run{i}",
+                    timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
+                    query_results=[_qr("q1", 100.0, plan)],
+                )
+                history.add_run(results)
+
+            assert history.detect_plan_flapping("q1") is False
+
     def test_detect_plan_flapping_few_runs(self) -> None:
         """Test flapping detection with too few runs."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -368,6 +447,37 @@ class TestPlanHistory:
             assert versions[2] == ("b" * 64, 2)
             assert versions[3] == ("c" * 64, 3)
             assert versions[4] == ("c" * 64, 3)
+
+    def test_get_plan_version_history_ignores_fingerprint_version_boundary(self) -> None:
+        """A fingerprint_version change alone (qpc-03 encoding bump) must not
+        bump the reported plan version - only a genuine content change within
+        the same encoding version should (#1028 review)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history = PlanHistory(Path(tmpdir))
+
+            specs = [
+                ("a" * 64, 1),  # v1 baseline
+                ("a2" * 32, 2),  # same logical plan, re-encoded as v2 - NOT a change
+                ("a2" * 32, 2),  # stable under v2
+                ("b" * 64, 2),  # genuine change, same (v2) encoding
+            ]
+            for i, (fp, version) in enumerate(specs):
+                plan = _create_plan_with_fingerprint("q1", fp)
+                plan.fingerprint_version = version
+                results = make_benchmark_results(
+                    execution_id=f"run{i}",
+                    timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
+                    query_results=[_qr("q1", 100.0, plan)],
+                )
+                history.add_run(results)
+
+            versions = history.get_plan_version_history("q1")
+
+            assert len(versions) == 4
+            assert versions[0] == ("a" * 64, 1)
+            assert versions[1] == ("a2" * 32, 1)  # encoding bump alone: no version bump
+            assert versions[2] == ("a2" * 32, 1)
+            assert versions[3] == ("b" * 64, 2)  # genuine change: version bumps
 
     def test_get_all_query_ids(self) -> None:
         """Test getting all query IDs."""

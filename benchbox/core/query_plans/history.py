@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from benchbox.core.results.loader import iter_query_results
+from benchbox.core.results.query_plan_models import LEGACY_FINGERPRINT_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +28,18 @@ def _parse_history_timestamp(timestamp: str) -> datetime:
     aware `datetime` raises `TypeError`, so a naive result is treated as UTC.
     A malformed/empty timestamp sorts first rather than raising, so one
     corrupt history entry doesn't break ordering for the rest.
+
+    `datetime.fromisoformat` only accepts a trailing "Z" (Zulu/UTC) suffix
+    from Python 3.11 onward; on 3.10 (the project's floor - see
+    requires-python) it raises ValueError on e.g. "2026-01-01T00:00:00Z",
+    which the except branch used to silently swallow into a datetime.min
+    sort key. Normalize "Z" to the "+00:00" offset fromisoformat has always
+    accepted, on every supported version, before parsing.
     """
     if timestamp:
+        normalized = timestamp[:-1] + "+00:00" if timestamp.endswith("Z") else timestamp
         try:
-            parsed = datetime.fromisoformat(timestamp)
+            parsed = datetime.fromisoformat(normalized)
         except ValueError:
             logger.warning(f"Could not parse history timestamp {timestamp!r}; sorting it first")
         else:
@@ -48,6 +57,12 @@ class PlanHistoryEntry:
     estimated_cost: float | None
     execution_time_ms: float
     platform: str
+    # QueryPlanDAG.fingerprint_version the fingerprint was encoded under (qpc-03
+    # F2.1). A v1 flat-string and a v2 tree-JSON encoding of the SAME logical
+    # plan hash differently, so flapping/version-history detection must never
+    # treat a version-boundary crossing as evidence the plan itself changed.
+    # Entries from before this field existed default to LEGACY_FINGERPRINT_VERSION.
+    fingerprint_version: int = LEGACY_FINGERPRINT_VERSION
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dictionary."""
@@ -58,6 +73,7 @@ class PlanHistoryEntry:
             "estimated_cost": self.estimated_cost,
             "execution_time_ms": self.execution_time_ms,
             "platform": self.platform,
+            "fingerprint_version": self.fingerprint_version,
         }
 
     @classmethod
@@ -70,6 +86,7 @@ class PlanHistoryEntry:
             estimated_cost=data.get("estimated_cost"),
             execution_time_ms=data["execution_time_ms"],
             platform=data["platform"],
+            fingerprint_version=data.get("fingerprint_version", LEGACY_FINGERPRINT_VERSION),
         )
 
 
@@ -139,6 +156,7 @@ class PlanHistory:
                     "fingerprint": plan.plan_fingerprint,
                     "estimated_cost": getattr(plan, "estimated_cost", None),
                     "execution_time_ms": execution.get("execution_time_ms", 0.0) or 0.0,
+                    "fingerprint_version": getattr(plan, "fingerprint_version", LEGACY_FINGERPRINT_VERSION),
                 }
 
         # Write to storage
@@ -181,6 +199,7 @@ class PlanHistory:
                             estimated_cost=plan_data.get("estimated_cost"),
                             execution_time_ms=plan_data.get("execution_time_ms", 0.0),
                             platform=entry.get("platform", "unknown"),
+                            fingerprint_version=plan_data.get("fingerprint_version", LEGACY_FINGERPRINT_VERSION),
                         )
                     )
             except (json.JSONDecodeError, KeyError) as e:
@@ -248,8 +267,19 @@ class PlanHistory:
         if len(unique_fps) < 2:
             return False
 
-        # Count transitions (changes from one fingerprint to another)
-        transitions = sum(1 for i in range(len(fingerprints) - 1) if fingerprints[i] != fingerprints[i + 1])
+        # Count transitions (changes from one fingerprint to another). A
+        # transition across a fingerprint_version boundary (e.g. a qpc-03
+        # v1->v2 encoding bump) is excluded: the two strings differ by
+        # encoding alone, not necessarily because the plan changed, and
+        # without the full plan tree here there is no way to verify which -
+        # counting it would risk a false-positive flapping report on every
+        # query for one run, purely from the encoding upgrade.
+        transitions = sum(
+            1
+            for i in range(len(fingerprints) - 1)
+            if fingerprints[i] != fingerprints[i + 1]
+            and history[i].fingerprint_version == history[i + 1].fingerprint_version
+        )
 
         # Flapping if transitions exceed threshold of possible transitions
         max_transitions = len(fingerprints) - 1
@@ -273,11 +303,20 @@ class PlanHistory:
 
         current_version = 0
         current_fp = None
+        current_fp_version: int | None = None
 
         for entry in history:
-            if entry.fingerprint != current_fp:
+            # A fingerprint_version change from the previous entry means the
+            # two strings aren't comparable (qpc-03 anti-pattern) - never
+            # treat that boundary alone as a plan change/version bump. Still
+            # adopt the new entry as the comparison baseline (current_fp/
+            # current_fp_version) so later same-version entries compare
+            # correctly against it.
+            version_boundary = current_fp_version is not None and entry.fingerprint_version != current_fp_version
+            if entry.fingerprint != current_fp and not version_boundary:
                 current_version += 1
-                current_fp = entry.fingerprint
+            current_fp = entry.fingerprint
+            current_fp_version = entry.fingerprint_version
             versions.append((entry.fingerprint, current_version))
 
         return versions

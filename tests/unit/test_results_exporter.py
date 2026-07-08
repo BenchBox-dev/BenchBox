@@ -281,6 +281,118 @@ def test_canonical_bundle_export_keeps_plans_raw_explain_output_when_not_anonymi
     assert plans_data["queries"]["1"]["plan"]["raw_explain_output"] == "SEQ_SCAN /Users/alice/data/lineitem.parquet"
 
 
+def test_canonical_bundle_export_anonymizes_operator_platform_metadata(monkeypatch, tmp_path):
+    """#1024 review: the same raw EXPLAIN text raw_explain_output-stripping
+    guards against also gets copied verbatim into each operator node's
+    structured physical_operator.platform_metadata by many parsers (e.g.
+    Spark FileScan `details`, DuckDB `extra_info`). An anonymized export must
+    strip it there too, at every depth of the logical_root tree, not just
+    the top-level raw_explain_output.
+    """
+    monkeypatch.setattr(
+        exporter_module,
+        "build_plans_payload",
+        lambda _result: {
+            "version": "2.1",
+            "run_id": "cost-spark",
+            "plans_captured": 1,
+            "capture_failures": 0,
+            "queries": {
+                "1": {
+                    "fingerprint": "a" * 64,
+                    "plan": {
+                        "query_id": "1",
+                        "platform": "spark",
+                        "raw_explain_output": None,
+                        "logical_root": {
+                            "operator_id": "1",
+                            "operator_type": "Join",
+                            "children": [
+                                {
+                                    "operator_id": "2",
+                                    "operator_type": "Scan",
+                                    "children": [],
+                                    "physical_operator": {
+                                        "operator_type": "FileScan",
+                                        "operator_id": "2",
+                                        "properties": {},
+                                        "platform_metadata": {
+                                            "details": "Location: /Users/alice/data/lineitem, PartitionFilters: []"
+                                        },
+                                    },
+                                }
+                            ],
+                            "physical_operator": None,
+                        },
+                    },
+                }
+            },
+        },
+    )
+
+    exported = ResultExporter(output_dir=tmp_path, anonymize=True).export_result(
+        _minimal_result("spark"),
+        formats=["json"],
+    )
+    primary_path = exported["json"]
+    plans_path = tmp_path / f"{primary_path.stem}.plans.json"
+
+    with open(plans_path, encoding="utf-8") as handle:
+        plans_data = json.load(handle)
+
+    scan_node = plans_data["queries"]["1"]["plan"]["logical_root"]["children"][0]
+    assert scan_node["physical_operator"]["platform_metadata"] == {}
+
+
+def test_canonical_bundle_export_keeps_operator_platform_metadata_when_not_anonymized(monkeypatch, tmp_path):
+    """Companion behavior is unchanged for non-anonymized exports: operator
+    platform_metadata round-trips verbatim."""
+    monkeypatch.setattr(
+        exporter_module,
+        "build_plans_payload",
+        lambda _result: {
+            "version": "2.1",
+            "run_id": "cost-spark",
+            "plans_captured": 1,
+            "capture_failures": 0,
+            "queries": {
+                "1": {
+                    "fingerprint": "a" * 64,
+                    "plan": {
+                        "query_id": "1",
+                        "platform": "spark",
+                        "raw_explain_output": None,
+                        "logical_root": {
+                            "operator_id": "2",
+                            "operator_type": "Scan",
+                            "children": [],
+                            "physical_operator": {
+                                "operator_type": "FileScan",
+                                "operator_id": "2",
+                                "properties": {},
+                                "platform_metadata": {"details": "Location: /Users/alice/data/lineitem"},
+                            },
+                        },
+                    },
+                }
+            },
+        },
+    )
+
+    exported = ResultExporter(output_dir=tmp_path, anonymize=False).export_result(
+        _minimal_result("spark"),
+        formats=["json"],
+    )
+    primary_path = exported["json"]
+    plans_path = tmp_path / f"{primary_path.stem}.plans.json"
+
+    with open(plans_path, encoding="utf-8") as handle:
+        plans_data = json.load(handle)
+
+    root = plans_data["queries"]["1"]["plan"]["logical_root"]
+    assert root["physical_operator"]["platform_metadata"] == {"details": "Location: /Users/alice/data/lineitem"}
+
+
 def test_exporter_records_plan_history_when_dir_configured(tmp_path):
     """qpc-08 w2: `add_run` had zero production callers -- `_export_json_v2`
     is now the single wired call site, gated behind an opt-in

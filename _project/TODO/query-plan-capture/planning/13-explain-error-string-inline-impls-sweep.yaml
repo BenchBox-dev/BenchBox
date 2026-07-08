@@ -13,7 +13,7 @@ description: |
   {e}"` as the plan text — so a failed EXPLAIN is handed to a parser as if it
   were plan output, or displayed as a plan:
     - benchbox/platforms/velox.py:520
-    - benchbox/platforms/dataframe/_spark_helpers.py:132
+    - benchbox/platforms/_spark_helpers.py:132
     - benchbox/platforms/athena.py:1319
     - benchbox/platforms/presto_trino_adapter_base.py:649
   (redshift.py / snowflake.py log at DEBUG — a separate lower-priority smell.)
@@ -28,7 +28,7 @@ category: "Error Handling / Consistency"
 
 prior_art:
 - "benchbox/platforms/base/sql_execution.py::get_query_plan_from_cursor — the fixed shared helper (qpc-05, returns None + WARNING)"
-- "benchbox/platforms/{velox.py:520, athena.py:1319, presto_trino_adapter_base.py:649}, benchbox/platforms/dataframe/_spark_helpers.py:132 — inline error-string returners"
+- "benchbox/platforms/{velox.py:520, athena.py:1319, presto_trino_adapter_base.py:649}, benchbox/platforms/_spark_helpers.py:132 — inline error-string returners"
 - "parsers doris/singlestore/spark/databend/questdb — sniff the 'Could not get query plan' prefix"
 
 work:
@@ -71,12 +71,12 @@ scope_limit:
   - "benchbox/platforms/velox.py"
   - "benchbox/platforms/athena.py"
   - "benchbox/platforms/presto_trino_adapter_base.py"
-  - "benchbox/platforms/dataframe/_spark_helpers.py"
+  - "benchbox/platforms/_spark_helpers.py"
   - "benchbox/core/query_plans/parsers/"
   - "tests/"
 
 deps:
-  needs: []
+  needs: ["qpc-05-silent-failure-surfacing"]
 
 metadata:
   tags: ["query-plans", "error-handling", "parsers"]

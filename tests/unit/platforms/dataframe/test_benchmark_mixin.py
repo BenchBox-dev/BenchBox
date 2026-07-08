@@ -402,6 +402,76 @@ def test_capture_plans_counts_missing_plan_as_failure(tmp_path):
     assert result.plan_capture_errors[0]["query_id"] == "Q1"
 
 
+class _RecordingCaptureFailureAdapter(DummyPandasProfiledAdapter):
+    """Mirrors ExpressionFamilyAdapter's real capture-failure recording: the
+    real exception cause is set on the row dict (plan_capture_error) and
+    appended to the per-run self.plan_capture_errors list."""
+
+    def execute_query_profiled(self, ctx, query, query_id=None):
+        result, profile = super().execute_query_profiled(ctx, query, query_id)
+        result["plan_capture_error"] = "TypeError: unsupported operand"
+        self.plan_capture_errors.append({"query_id": "Q1", "error": "TypeError: unsupported operand"})
+        return result, profile
+
+
+def test_capture_plans_preserves_real_capture_error_cause(tmp_path):
+    """qpc-05/#1032 review (F4.4): the real capture-failure cause recorded on
+    self.plan_capture_errors during execution must reach the companion
+    errors list via existing_errors=, and plan_capture_error must reach the
+    persisted main query row - not the generic "Query plan not captured"."""
+    adapter = _RecordingCaptureFailureAdapter(query_plan=None)
+    tbl_path = tmp_path / "customer.tbl"
+    tbl_path.write_text("1|Alice|\n")
+    benchmark = DummyBenchmark({"customer": tbl_path})
+    config = BenchmarkConfig(
+        name="dummy",
+        display_name="Dummy",
+        scale_factor=1.0,
+        options={"power_warmup_iterations": 0, "power_iterations": 1},
+        capture_plans=True,
+    )
+
+    result = adapter.run_benchmark(
+        benchmark,
+        benchmark_config=config,
+        phases=DataFramePhases(load=False, execute=True),
+        options=DataFrameRunOptions(prefer_parquet=False),
+    )
+
+    assert result.plan_capture_failures == 1
+    assert result.plan_capture_errors[0]["error"] == "TypeError: unsupported operand"
+    qr = next(q for q in result.query_results if q["query_id"] == "Q1")
+    assert qr["plan_capture_error"] == "TypeError: unsupported operand"
+
+
+def test_run_benchmark_resets_plan_capture_errors_between_runs(tmp_path):
+    """A reused adapter instance must not leak plan_capture_errors from a
+    prior run into the next run's companion errors list (qpc-15 F4.4)."""
+    adapter = _RecordingCaptureFailureAdapter(query_plan=None)
+    tbl_path = tmp_path / "customer.tbl"
+    tbl_path.write_text("1|Alice|\n")
+    benchmark = DummyBenchmark({"customer": tbl_path})
+    config = BenchmarkConfig(
+        name="dummy",
+        display_name="Dummy",
+        scale_factor=1.0,
+        options={"power_warmup_iterations": 0, "power_iterations": 1},
+        capture_plans=True,
+    )
+    run_kwargs = {
+        "benchmark_config": config,
+        "phases": DataFramePhases(load=False, execute=True),
+        "options": DataFrameRunOptions(prefer_parquet=False),
+    }
+
+    first = adapter.run_benchmark(benchmark, **run_kwargs)
+    second = adapter.run_benchmark(benchmark, **run_kwargs)
+
+    assert len(first.plan_capture_errors) == 1
+    # Not 2: the second run's errors must not be appended to the first run's.
+    assert len(second.plan_capture_errors) == 1
+
+
 def test_collect_skip_query_ids_routes_through_get_platform_skip_queries():
     """Platform-specific skips flow through get_platform_skip_queries, not a hardcoded check."""
     adapter = DummyDataFusionAdapter()

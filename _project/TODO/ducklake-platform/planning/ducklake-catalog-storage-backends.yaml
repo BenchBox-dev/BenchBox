@@ -113,13 +113,13 @@ anti_patterns:
 
 verification:
   - description: "SQLite catalog runs TPC-H"
-    command: "uv run -- python -m benchbox run --platform ducklake --benchmark tpch --scale 0.01 --platform-option catalog=sqlite"
+    command: "uv run -- benchbox run --platform ducklake --benchmark tpch --scale 0.01 --platform-option catalog=sqlite"
     expected_output: "queries succeed; metadata.sqlite + Parquet written"
   - description: "PostgreSQL catalog runs TPC-H (with a reachable PG server + pre-created catalog DB)"
-    command: "uv run -- python -m benchbox run --platform ducklake --benchmark tpch --scale 0.01 --platform-option catalog=postgres --platform-option pg_host=localhost"
+    command: "uv run -- benchbox run --platform ducklake --benchmark tpch --scale 0.01 --platform-option catalog=postgres --platform-option pg_host=localhost"
     expected_output: "queries succeed; catalog rows in the Postgres ducklake_catalog DB"
   - description: "S3 DATA_PATH (with creds present) writes Parquet to the bucket"
-    command: "uv run -- python -m benchbox run --platform ducklake --benchmark tpch --scale 0.01 --platform-option data_path=s3://<bucket>/bench/"
+    command: "uv run -- benchbox run --platform ducklake --benchmark tpch --scale 0.01 --platform-option data_path=s3://<bucket>/bench/"
     expected_output: "queries succeed; Parquet objects appear under s3://<bucket>/bench/"
   - description: "Extended-backend integration tests pass or skip cleanly"
     command: "uv run -- python -m pytest tests/integration/test_ducklake_integration.py -q"

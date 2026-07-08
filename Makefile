@@ -1113,7 +1113,14 @@ release-cut:
 	@# uv lock write. Explicit list (not `git add -A`) to avoid staging
 	@# build/cache artifacts.
 	git add pyproject.toml uv.lock benchbox/__init__.py landing/index.html README.md docs/README.md benchbox/utils/VERSION_MANAGEMENT.md CHANGELOG.md
-	git commit -m "Release v$(VERSION)"
+	@# --no-verify: the curation above (git rm) already deleted
+	@# .pre-commit-config.yaml and _project/scripts/ (the repo:local hook
+	@# entrypoints) from this working tree. The pre-commit git hook is still
+	@# installed locally and would otherwise run against a config/entrypoints
+	@# that no longer exist, aborting this commit with a false failure on
+	@# every release cut. Nothing is skipped that matters: develop's PRs
+	@# already ran these hooks before this content was curated.
+	git commit --no-verify -m "Release v$(VERSION)"
 	git push -u origin v$(VERSION)
 	gh pr create --base main --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
 	@# Option-c lifecycle: delete any prior v* branches on origin (loop sweeps stale entries).

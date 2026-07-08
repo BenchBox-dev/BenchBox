@@ -125,7 +125,7 @@ work:
     needs: [w6]
     status: pending
     notes: |
-      uv run -- python -m benchbox run --platform ducklake --benchmark tpch --scale 0.01
+      uv run -- benchbox run --platform ducklake --benchmark tpch --scale 0.01
       (then tpcds, then SF 1). Confirm all queries pass, Parquet + .ducklake catalog
       appear on disk, results validate, and TPC-H power results/row-counts match the
       `duckdb` platform at the same SF (same engine).
@@ -163,7 +163,7 @@ anti_patterns:
 
 verification:
   - description: "Platform is discoverable"
-    command: "uv run -- python -m benchbox platform list"
+    command: "uv run -- benchbox platforms list"
     expected_output: "output includes 'ducklake'"
   - description: "Registry metadata/support-status validation + ABC conformance pass with ducklake registered"
     command: "uv run -- python -m pytest tests/unit/platforms/test_abc_conformance.py tests/unit/platforms/test_adapter_validation_consistency.py -q"
@@ -172,10 +172,10 @@ verification:
     command: "uv run -- python -m pytest tests/unit/platforms/test_ducklake_adapter.py -q"
     expected_output: "all pass, 0 failures"
   - description: "Live TPC-H at SF 0.01 (duckdb catalog, local storage)"
-    command: "uv run -- python -m benchbox run --platform ducklake --benchmark tpch --scale 0.01"
+    command: "uv run -- benchbox run --platform ducklake --benchmark tpch --scale 0.01"
     expected_output: "all 22 queries succeed; Parquet data + .ducklake catalog written under benchmark_runs/"
   - description: "Live TPC-DS at SF 0.01"
-    command: "uv run -- python -m benchbox run --platform ducklake --benchmark tpcds --scale 0.01"
+    command: "uv run -- benchbox run --platform ducklake --benchmark tpcds --scale 0.01"
     expected_output: "queries succeed; results validate"
 
 scope_limit:

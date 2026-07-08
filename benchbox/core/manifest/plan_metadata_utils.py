@@ -79,6 +79,7 @@ def create_plan_metadata_from_results(
                 metadata.plan_fingerprints[query_id] = fingerprint
                 metadata.plan_capture_timestamp[query_id] = timestamp
                 metadata.plan_versions[query_id] = 1  # Default to version 1
+                metadata.plan_fingerprint_versions[query_id] = getattr(plan, "fingerprint_version", 1)
 
     return metadata
 
@@ -132,8 +133,21 @@ def update_plan_versions(
     for query_id, current_fp in current_metadata.plan_fingerprints.items():
         prev_fp = prev_metadata.plan_fingerprints.get(query_id)
         prev_version = prev_metadata.plan_versions.get(query_id, 0)
+        # Legacy metadata predating plan_fingerprint_versions defaults to 1
+        # (LEGACY_FINGERPRINT_VERSION), matching QueryPlanDAG.from_dict's own
+        # legacy-bundle default.
+        prev_fp_version = prev_metadata.plan_fingerprint_versions.get(query_id, 1)
+        current_fp_version = current_metadata.plan_fingerprint_versions.get(query_id, 1)
 
-        if prev_fp == current_fp:
+        if prev_fp_version != current_fp_version:
+            # Not comparable across fingerprint encoding versions (qpc-03
+            # anti-pattern): a v1->v2 encoding bump makes every fingerprint
+            # string change even for an unchanged plan. Without the full plan
+            # tree here (only the fingerprint string is persisted), we cannot
+            # verify equality, so preserve the previous version rather than
+            # recording a spurious "changed" event.
+            current_metadata.plan_versions[query_id] = prev_version
+        elif prev_fp == current_fp:
             # Unchanged
             current_metadata.plan_versions[query_id] = prev_version
         else:
@@ -209,5 +223,6 @@ def merge_plan_metadata(
         platform=overlay.platform or base.platform,
         platform_version=overlay.platform_version or base.platform_version,
         normalization_scheme=overlay.normalization_scheme if overlay.plan_fingerprints else base.normalization_scheme,
+        plan_fingerprint_versions={**base.plan_fingerprint_versions, **overlay.plan_fingerprint_versions},
     )
     return merged

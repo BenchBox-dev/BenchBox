@@ -34,21 +34,24 @@ prior_art:
 
 work:
 - id: w1
-  summary: "Thread existing_errors=self.plan_capture_errors into the DF compute_plan_capture_stats call so the real cause reaches the .plans.json errors list."
-  status: pending
+  summary: "Thread existing_errors=self.plan_capture_errors into the DF compute_plan_capture_stats call so the real cause
+    reaches the .plans.json errors list."
+  status: done
 - id: w2
-  summary: "Persist plan_capture_error on the main-file row and add a per-run reset of the DF adapter's capture-error/warn-once state."
+  summary: "Persist plan_capture_error on the main-file row and add a per-run reset of the DF adapter's capture-error/warn-once
+    state."
   notes: >-
     Allow plan_capture_error through normalize_query_result/QueryResultInput
     (currently dropped); add a per-run reset of plan_capture_errors and
     _plan_capture_warning_emitted for ExpressionFamilyAdapter (it doesn't
     inherit the SQL mixin's _reset_plan_capture_stats).
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
-  summary: "Test: a DF capture failure's real cause appears in the companion errors + row; warn-once resets across two runs on a reused adapter."
+  summary: "Test: a DF capture failure's real cause appears in the companion errors + row; warn-once resets across two runs
+    on a reused adapter."
   needs: [w2]
-  status: pending
+  status: done
 - id: w4
   summary: "Review: adversarial code review (SQL path unaffected; no schema break)."
   needs: [w3]
@@ -82,7 +85,7 @@ scope_limit:
   - "tests/"
 
 deps:
-  needs: []
+  needs: ["qpc-05-silent-failure-surfacing"]
 
 metadata:
   tags: ["query-plans", "dataframe", "error-handling"]
