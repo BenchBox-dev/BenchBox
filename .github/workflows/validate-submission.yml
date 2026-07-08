@@ -45,6 +45,40 @@ jobs:
           fi
           echo "No validator/workflow files changed - proceeding."
 
+      - name: Reject non-maintainer vendor/ additions
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+        run: |
+          # The vendor-supplied trust label is RANKING-ELIGIBLE and is granted
+          # purely by a bundle living under results-data/bundles/vendor/ (see
+          # scripts/generate_corpus_inventory.py::_is_vendor_subtree). A community
+          # contributor must not be able to self-grant that tier by dropping a
+          # file there. Only maintainers may add under vendor/. This is the
+          # ENFORCED half of the vendor-label governance; the manifest
+          # result_source check in benchbox/validation/bundle.py is advisory only
+          # (an attacker can omit result_source and the path alone grants the
+          # label). author_association is set by GitHub from the actor's repo
+          # relationship and cannot be set by PR content; fork PRs (how community
+          # contributors submit) run this base-branch copy of the workflow, so the
+          # gate cannot be edited away in the same PR.
+          VENDOR_CHANGES=$(git diff --name-only "$BASE_SHA"...HEAD -- \
+            'results-data/bundles/vendor/**' || true)
+          if [ -n "$VENDOR_CHANGES" ]; then
+            case "$AUTHOR_ASSOCIATION" in
+              OWNER | MEMBER | COLLABORATOR)
+                echo "Maintainer ($AUTHOR_ASSOCIATION) vendor/ addition - allowed."
+                ;;
+              *)
+                echo "::error::This PR adds or modifies files under results-data/bundles/vendor/, which grants the ranking-eligible vendor-supplied label. Only maintainers may do this:"
+                printf '%s\n' "$VENDOR_CHANGES"
+                echo "Community submissions belong in results-data/bundles/ (not vendor/). Author association: ${AUTHOR_ASSOCIATION}."
+                exit 1
+                ;;
+            esac
+          fi
+          echo "No non-maintainer vendor/ additions - proceeding."
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
