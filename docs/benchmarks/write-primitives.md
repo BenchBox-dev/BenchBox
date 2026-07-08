@@ -131,8 +131,9 @@ The benchmark includes **112 write operations** across 6 categories:
   current version of a changed business key and opens a new one, expressed as
   portable UPDATE + INSERT against the dedicated `scd2_ops_*` dimension tables
   (no `APPLY CHANGES INTO` / declarative-pipeline syntax, so it runs unchanged on
-  standard-DML engines; ClickHouse lacks a standard UPDATE so it runs only the
-  insert-only path, and DataFusion is skipped)
+  standard-DML engines). The catalog marks only DataFusion unsupported; ClickHouse
+  has no standard UPDATE, so only the insert-only op is portable there and the
+  close-old ops would need a mutation rewrite (they are not auto-skipped today)
 
 **Purpose**: Test UPSERT/MERGE operations for CDC, ETL, slowly-changing
 dimension maintenance, and incremental data loading scenarios.

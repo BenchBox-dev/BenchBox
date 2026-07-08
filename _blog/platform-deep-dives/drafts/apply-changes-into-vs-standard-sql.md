@@ -107,8 +107,11 @@ Two documented exceptions apply. DataFusion is marked unsupported for this exact
 operation in BenchBox's Write Primitives catalog
 (`platform_overrides: {"datafusion": null}`)[^op], so it is skipped. ClickHouse has no
 standard UPDATE statement (row changes go through `ALTER TABLE ... UPDATE` mutations),
-so only the insert-only path (`merge_scd_type2_new_keys_only`) runs there unchanged; the
-close-old step would need a mutation rewrite. The same standard-DML scoping applies to
+so only the insert-only path (`merge_scd_type2_new_keys_only`) is portable there; the
+close-old step would need a mutation rewrite. Note the catalog currently marks only
+DataFusion unsupported, so BenchBox does not yet special-case ClickHouse: a ClickHouse
+run attempts the close-old ops (and errors on the UPDATE) rather than automatically
+restricting to the insert-only path. The same standard-DML scoping applies to
 the harness setup that seeds the dimension and change batch (it also uses string
 concatenation and CAST), so the portability claim is about standard-DML engines end to
 end, not just the operation.
@@ -265,15 +268,18 @@ and the declarative form absorbs that complexity for you.
 
 The more useful way to read the comparison is convenience versus portability. AUTO CDC
 buys you concise, correct-by-construction SCD Type 2 on Databricks. Portable SQL buys you
-the same history-tracking workload on every engine, including ones that reject `MERGE
-INTO`. Both are legitimate choices; the right one depends on whether your constraint is
+the same history-tracking workload on any standard-DML engine, including ones that reject
+`MERGE INTO` (like DuckDB); engines without a standard UPDATE (such as ClickHouse) run
+the insert-only path unchanged and need a mutation rewrite for the close-old step. Both
+are legitimate choices; the right one depends on whether your constraint is
 maintainability inside one platform or portability across many.
 
 ## Next steps
 
 The portable operation lives in BenchBox's Write Primitives benchmark[^op], and the full
 evidence behind every number here is in our verification log[^log]. We would love for
-others to run the portable form on PostgreSQL, Snowflake, BigQuery, or ClickHouse and
+others to run the portable form on other standard-DML engines like PostgreSQL, Snowflake,
+or BigQuery (and to try the insert-only path or a mutation rewrite on ClickHouse) and
 compare. Open an issue to share results or to discuss the methodology.
 
 ---
