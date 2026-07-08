@@ -2,8 +2,36 @@ id: joinorder-canonical-release-asset-restore
 title: "fix(joinorder): restore the canonical IMDb 2013 archive GitHub Release asset (fetch URL 404s)"
 worktree: main
 priority: High
-status: Not Started
+status: Blocked
 category: Core Functionality
+
+blockers:
+  - date: "2026-07-08"
+    work: [w1, w2, w3]
+    reason: |
+      The release asset still cannot be restored from the current repository or
+      local BenchBox evidence. The GitHub release object is missing, the
+      manifest URL still returns 404, and no local byte-identical
+      `joinorder-imdb-2013-v1.tar.zst` archive was found to upload. Rebuilding
+      is not a safe substitute because the documented provenance check says
+      local rebuilds are not byte-identical to the committed transport archive.
+    evidence: |
+      - `curl -sS -o /dev/null -w '%{http_code}\n' -I 'https://github.com/joeharris76/BenchBox/releases/download/data%2Fjoinorder-imdb-2013-v1/joinorder-imdb-2013-v1.tar.zst'` returned `404`.
+      - `gh release view data/joinorder-imdb-2013-v1 --repo joeharris76/BenchBox --json tagName,name,isDraft,isPrerelease,assets,createdAt,publishedAt,url` returned `release not found`.
+      - `git ls-remote --tags origin 'refs/tags/data/joinorder-imdb-2013-v1'` confirmed the tag still exists at `0182c9556cfa1c2ea4f1168a1648e484bdb46635`.
+      - Targeted searches under `/Users/joe/Developer/benchmark_runs`, `/Users/joe/.cache`, `/Users/joe/Developer/BenchBox`, and `/Users/joe/Developer/BenchBox.pool-01` found no `joinorder-imdb-2013-v1.tar.zst` archive to hash-check and upload.
+      - `/Users/joe/Developer/benchmark_runs/datagen/joinorder_sf1` and `/Users/joe/Developer/benchmark_runs/databases/joinorder_sf1` exist but are empty (`0B`).
+      - `_project/joinorder/provenance-attestation.md` records that rebuild-local archives produced `e24bc0f1a12ab7619942da4b985d2eae809686b0d986005334bada93692e0a49` and `adf28547f5c2b90884a0e2564cdf8a42b9a1c16192461dcc02a78677e21fa952`, not the committed `669c97ce7e9e7498c7ce0cad018153aa93a9b8eefff0f77e436d690f64ebc5fd`.
+      - `gh auth status` shows the active account has `repo` scope, so the practical blocker is the absent exact archive and missing release-history/audit evidence, not an unauthenticated GitHub client.
+    unblock: |
+      From a machine or durable storage location that has the original archive,
+      verify `sha256sum joinorder-imdb-2013-v1.tar.zst` equals
+      `669c97ce7e9e7498c7ce0cad018153aa93a9b8eefff0f77e436d690f64ebc5fd`,
+      then create or upload the asset at tag `data/joinorder-imdb-2013-v1` and
+      run the TODO verification commands. If the original archive is
+      permanently unavailable, make an explicit data-version decision and
+      regenerate the manifest, reference cardinalities, and release notes
+      together instead of reusing the v1 hashes.
 
 description: |
   Re-review finding (2026-07-03, joinorder Track-2 review triage). The canonical
