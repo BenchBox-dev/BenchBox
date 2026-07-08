@@ -153,7 +153,7 @@ class TestPandasFamilyPlatformHooks:
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if MODIN_AVAILABLE:
-            specs = PlatformHookRegistry.list_option_specs("modin-df")
+            specs = PlatformHookRegistry.list_option_specs("modin")
             assert "engine" in specs
         else:
             # If modin not available, verify platform exists but may have no options
@@ -164,7 +164,7 @@ class TestPandasFamilyPlatformHooks:
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if MODIN_AVAILABLE:
-            specs = PlatformHookRegistry.list_option_specs("modin-df")
+            specs = PlatformHookRegistry.list_option_specs("modin")
             engine_spec = specs.get("engine")
             if engine_spec and hasattr(engine_spec, "choices"):
                 assert "ray" in engine_spec.choices
@@ -175,7 +175,7 @@ class TestPandasFamilyPlatformHooks:
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if CUDF_AVAILABLE:
-            specs = PlatformHookRegistry.list_option_specs("cudf-df")
+            specs = PlatformHookRegistry.list_option_specs("cudf")
             assert "device_id" in specs
 
     def test_cudf_df_spill_to_host_option_registered(self):
@@ -183,7 +183,7 @@ class TestPandasFamilyPlatformHooks:
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if CUDF_AVAILABLE:
-            specs = PlatformHookRegistry.list_option_specs("cudf-df")
+            specs = PlatformHookRegistry.list_option_specs("cudf")
             assert "spill_to_host" in specs
 
     def test_dask_df_n_workers_option_registered(self):
@@ -191,7 +191,7 @@ class TestPandasFamilyPlatformHooks:
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if DASK_AVAILABLE:
-            specs = PlatformHookRegistry.list_option_specs("dask-df")
+            specs = PlatformHookRegistry.list_option_specs("dask")
             assert "n_workers" in specs
 
     def test_dask_df_threads_per_worker_option_registered(self):
@@ -199,7 +199,7 @@ class TestPandasFamilyPlatformHooks:
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if DASK_AVAILABLE:
-            specs = PlatformHookRegistry.list_option_specs("dask-df")
+            specs = PlatformHookRegistry.list_option_specs("dask")
             assert "threads_per_worker" in specs
 
     def test_dask_df_use_distributed_option_registered(self):
@@ -207,7 +207,7 @@ class TestPandasFamilyPlatformHooks:
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if DASK_AVAILABLE:
-            specs = PlatformHookRegistry.list_option_specs("dask-df")
+            specs = PlatformHookRegistry.list_option_specs("dask")
             assert "use_distributed" in specs
 
     def test_dask_df_scheduler_address_option_registered(self):
@@ -215,7 +215,7 @@ class TestPandasFamilyPlatformHooks:
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if DASK_AVAILABLE:
-            specs = PlatformHookRegistry.list_option_specs("dask-df")
+            specs = PlatformHookRegistry.list_option_specs("dask")
             assert "scheduler_address" in specs
 
 

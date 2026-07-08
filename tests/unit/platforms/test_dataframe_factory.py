@@ -157,7 +157,9 @@ class TestPlatformHookRegistration:
         """Test that polars-df platform options are registered."""
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
-        specs = PlatformHookRegistry.list_option_specs("polars-df")
+        # Options are keyed by the base platform name (`polars`), not the `-df`
+        # CLI alias, so they are reachable via the normalized run platform key.
+        specs = PlatformHookRegistry.list_option_specs("polars")
 
         assert "streaming" in specs
         assert "rechunk" in specs
@@ -167,7 +169,7 @@ class TestPlatformHookRegistration:
         """Test that pandas-df platform options are registered."""
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
-        specs = PlatformHookRegistry.list_option_specs("pandas-df")
+        specs = PlatformHookRegistry.list_option_specs("pandas")
 
         assert "dtype_backend" in specs
 
@@ -175,7 +177,7 @@ class TestPlatformHookRegistration:
         """Test polars-df option defaults."""
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
-        defaults = PlatformHookRegistry.get_default_options("polars-df")
+        defaults = PlatformHookRegistry.get_default_options("polars")
 
         assert defaults["streaming"] == "false"
         assert defaults["rechunk"] == "true"
@@ -185,7 +187,7 @@ class TestPlatformHookRegistration:
         """Test pandas-df option defaults."""
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
-        defaults = PlatformHookRegistry.get_default_options("pandas-df")
+        defaults = PlatformHookRegistry.get_default_options("pandas")
 
         assert defaults["dtype_backend"] == "numpy_nullable"
 
@@ -194,7 +196,7 @@ class TestPlatformHookRegistration:
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         parsed = PlatformHookRegistry.parse_options(
-            "polars-df",
+            "polars",
             [("streaming", "true"), ("rechunk", "false"), ("n_rows", "1000")],
         )
 
@@ -207,7 +209,7 @@ class TestPlatformHookRegistration:
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         parsed = PlatformHookRegistry.parse_options(
-            "pandas-df",
+            "pandas",
             [("dtype_backend", "pyarrow")],
         )
 
@@ -219,7 +221,7 @@ class TestPlatformHookRegistration:
 
         with pytest.raises(PlatformOptionError, match="Invalid value"):
             PlatformHookRegistry.parse_options(
-                "pandas-df",
+                "pandas",
                 [("dtype_backend", "invalid_backend")],
             )
 
