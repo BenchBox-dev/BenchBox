@@ -463,7 +463,9 @@ def _logical_columns(columns: Sequence[ColumnSchema]) -> list[LogicalColumn]:
     Integer-ness is derived from the PostgreSQL type — the same source the
     runtime reads from the pinned manifest schema — so build and runtime agree.
     """
-    return [LogicalColumn(name=column.name, is_integer=is_integer_postgres_type(column.postgres_type)) for column in columns]
+    return [
+        LogicalColumn(name=column.name, is_integer=is_integer_postgres_type(column.postgres_type)) for column in columns
+    ]
 
 
 def _csv_value_to_plain(value: CsvLogicalValue) -> str | None:
@@ -587,7 +589,9 @@ def logical_content_report_from_hashes(
     return report
 
 
-def logical_content_table_report(csv_hash: LogicalTableHash, parquet_hash: LogicalTableHash) -> tuple[dict[str, Any], list[str]]:
+def logical_content_table_report(
+    csv_hash: LogicalTableHash, parquet_hash: LogicalTableHash
+) -> tuple[dict[str, Any], list[str]]:
     table_report = {
         "table": parquet_hash.table,
         "row_count": parquet_hash.row_count,
@@ -598,7 +602,9 @@ def logical_content_table_report(csv_hash: LogicalTableHash, parquet_hash: Logic
     }
     failures: list[str] = []
     if csv_hash.row_count != parquet_hash.row_count:
-        failures.append(f"{parquet_hash.table}: row count mismatch csv={csv_hash.row_count} parquet={parquet_hash.row_count}")
+        failures.append(
+            f"{parquet_hash.table}: row count mismatch csv={csv_hash.row_count} parquet={parquet_hash.row_count}"
+        )
     if csv_hash.sha256 != parquet_hash.sha256:
         failures.append(
             f"{parquet_hash.table}: logical content hash mismatch csv={csv_hash.sha256} parquet={parquet_hash.sha256}"
@@ -631,13 +637,17 @@ def logical_table_hash_from_csv(csv_path: Path, columns: Sequence[ColumnSchema])
         raise JoinOrderBuildError(f"CSV header mismatch for {csv_path}: expected {column_names}, got {fieldnames}")
     for row in records:
         if len(row) != len(columns):
-            raise JoinOrderBuildError(f"CSV row for {columns[0].table} has {len(row)} values for {len(columns)} columns")
+            raise JoinOrderBuildError(
+                f"CSV row for {columns[0].table} has {len(row)} values for {len(columns)} columns"
+            )
         row_values = dict(zip(column_names, row, strict=True))
         row_id = int(row_values["id"].value)
         if last_id is not None and row_id <= last_id:
             raise JoinOrderBuildError(f"CSV rows for {columns[0].table} are not strictly ordered by id")
         last_id = row_id
-        update_logical_row_hash(hasher, logical_columns, [_csv_value_to_plain(row_values[column.name]) for column in columns])
+        update_logical_row_hash(
+            hasher, logical_columns, [_csv_value_to_plain(row_values[column.name]) for column in columns]
+        )
         row_count += 1
     return LogicalTableHash(table=columns[0].table, row_count=row_count, sha256=hasher.hexdigest())
 
@@ -841,14 +851,25 @@ def write_source_manifest(work_dir: Path, artifact: PgDumpArtifact, *, reused: b
     )
 
 
+def container_cli() -> str:
+    """Container runtime CLI to shell out to.
+
+    Defaults to ``docker``; set ``BENCHBOX_CONTAINER_CLI`` to a Docker-CLI-
+    compatible runtime (e.g. ``mocker`` on Apple Containerization) to build
+    without Docker Desktop.
+    """
+    return os.environ.get("BENCHBOX_CONTAINER_CLI", "docker")
+
+
 def require_docker() -> None:
-    if shutil.which("docker") is None:
-        raise DockerUnavailableError("Docker CLI is not available on PATH")
-    result = run_command(["docker", "version", "--format", "{{.Server.Version}}"], check=False)
+    cli = container_cli()
+    if shutil.which(cli) is None:
+        raise DockerUnavailableError(f"Container CLI {cli!r} is not available on PATH")
+    result = run_command([cli, "version", "--format", "{{.Server.Version}}"], check=False)
     if result.returncode != 0:
         raise DockerUnavailableError(
-            "Docker daemon is not available: "
-            + (result.stderr.strip() or result.stdout.strip() or "docker version failed")
+            f"Container runtime {cli!r} is not available: "
+            + (result.stderr.strip() or result.stdout.strip() or f"{cli} version failed")
         )
 
 
@@ -870,9 +891,10 @@ def stream_command(args: Sequence[str], *, check: bool = True) -> subprocess.Com
 
 
 def ensure_postgres_image(image: str) -> None:
-    if run_command(["docker", "image", "inspect", image], check=False).returncode == 0:
+    cli = container_cli()
+    if run_command([cli, "image", "inspect", image], check=False).returncode == 0:
         return
-    stream_command(["docker", "pull", image])
+    stream_command([cli, "pull", image])
 
 
 def default_container_name() -> str:
@@ -881,7 +903,7 @@ def default_container_name() -> str:
 
 def remove_container(container_name: str) -> None:
     subprocess.run(
-        ["docker", "rm", "-f", container_name], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        [container_cli(), "rm", "-f", container_name], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
 
 
@@ -897,7 +919,7 @@ def start_postgres_container(
         remove_container(container_name)
     stream_command(
         [
-            "docker",
+            container_cli(),
             "run",
             "--detach",
             "--name",
@@ -921,7 +943,7 @@ def wait_for_postgres(*, container_name: str, database: str, user: str, timeout_
     last_message = ""
     while time.monotonic() < deadline:
         result = run_command(
-            ["docker", "exec", container_name, "pg_isready", "-U", user, "-d", database],
+            [container_cli(), "exec", container_name, "pg_isready", "-U", user, "-d", database],
             check=False,
         )
         if result.returncode == 0:
@@ -959,10 +981,10 @@ def restore_pgdump(
         )
         started = True
         container_dump_path = f"/tmp/{artifact.path.name}"
-        stream_command(["docker", "cp", str(artifact.path), f"{actual_container_name}:{container_dump_path}"])
+        stream_command([container_cli(), "cp", str(artifact.path), f"{actual_container_name}:{container_dump_path}"])
         stream_command(
             [
-                "docker",
+                container_cli(),
                 "exec",
                 actual_container_name,
                 "pg_restore",
@@ -1096,7 +1118,7 @@ def psql(*, container_name: str, database: str, user: str, sql: str) -> str:
     sql_to_run = f"SET max_parallel_workers_per_gather = 0; {sql}"
     result = run_command(
         [
-            "docker",
+            container_cli(),
             "exec",
             container_name,
             "psql",
@@ -1217,7 +1239,7 @@ def copy_table_to_csv(
     with destination.open("wb") as handle:
         result = subprocess.run(
             [
-                "docker",
+                container_cli(),
                 "exec",
                 container_name,
                 "psql",
@@ -1279,8 +1301,7 @@ def verify_csv_utf8_fidelity(
         csv_hex = csv_value.encode("utf-8").hex()
         if csv_hex != sample["utf8_hex"]:
             raise JoinOrderBuildError(
-                f"CSV UTF-8 drift for {table}.{column} id={sample['id']}: "
-                f"postgres {sample['utf8_hex']} csv {csv_hex}"
+                f"CSV UTF-8 drift for {table}.{column} id={sample['id']}: postgres {sample['utf8_hex']} csv {csv_hex}"
             )
         samples.append({"table": table, "column": column, "id": sample["id"], "utf8_hex": csv_hex})
     return samples
@@ -1975,7 +1996,9 @@ def validate_predicate_domain(
     report = {
         "query_underlying_row_counts": counts,
         "known_zero_underlying_queries": sorted(KNOWN_ZERO_UNDERLYING_QUERIES, key=query_sort_key),
-        "known_zero_underlying_row_counts": dict(sorted(known_zero_counts.items(), key=lambda item: query_sort_key(item[0]))),
+        "known_zero_underlying_row_counts": dict(
+            sorted(known_zero_counts.items(), key=lambda item: query_sort_key(item[0]))
+        ),
         "query_count_failures": query_count_failures,
         "query_failures": failures,
         "unexpected_empty_query_failures": [failure for failure in failures if failure["reason"] == "unexpected_empty"],
@@ -2227,7 +2250,9 @@ def validate_conversion_fidelity(
     }
     write_build_manifest(work_dir, {"conversion_fidelity": report})
     if failures:
-        raise JoinOrderBuildError(f"Conversion fidelity validation failed with {len(failures)} issue(s): {failures[:5]}")
+        raise JoinOrderBuildError(
+            f"Conversion fidelity validation failed with {len(failures)} issue(s): {failures[:5]}"
+        )
     return report
 
 
@@ -2290,7 +2315,9 @@ def compute_reference_cardinalities(
 ) -> Path:
     manifest = load_build_manifest(work_dir)
     queries: dict[str, dict[str, Any]] = {}
-    postgres_version = psql(container_name=container_name, database=database, user=user, sql="SHOW server_version").strip()
+    postgres_version = psql(
+        container_name=container_name, database=database, user=user, sql="SHOW server_version"
+    ).strip()
     for path in query_files(query_dir):
         sql = strip_query_semicolon(path.read_text(encoding="utf-8"))
         row_count = int(
@@ -2383,7 +2410,9 @@ def verify_reference_results(
             }
         )
 
-    postgres_version = psql(container_name=container_name, database=database, user=user, sql="SHOW server_version").strip()
+    postgres_version = psql(
+        container_name=container_name, database=database, user=user, sql="SHOW server_version"
+    ).strip()
     verified: dict[str, dict[str, Any]] = {}
 
     for query_id, path in sorted(paths.items(), key=lambda item: query_sort_key(item[0])):
@@ -2755,17 +2784,19 @@ def export_tiny_fixture(
                 (FORMAT 'parquet', COMPRESSION 'zstd', ROW_GROUP_SIZE 100000)
                 """
             )
-            row_count = con.execute(
-                f"SELECT count(*) FROM read_parquet({duckdb_literal(parquet_path)})"
-            ).fetchone()[0]
+            row_count = con.execute(f"SELECT count(*) FROM read_parquet({duckdb_literal(parquet_path)})").fetchone()[0]
             sha256, _md5, size = hash_file(parquet_path)
-            table_files.append(TableFile(table=table, path=parquet_path, sha256=sha256, bytes=size, row_count=row_count))
+            table_files.append(
+                TableFile(table=table, path=parquet_path, sha256=sha256, bytes=size, row_count=row_count)
+            )
         load_queries_for_duckdb(con, output_dir)
         tiny_cardinalities: dict[str, dict[str, Any]] = {}
         for path in query_files(query_dir):
             sql = strip_query_semicolon(path.read_text(encoding="utf-8"))
             duckdb_sql = duckdb_compatible_query_sql(sql)
-            underlying = con.execute(duckdb_compatible_query_sql(underlying_count_sql(sql, query_id=path.stem))).fetchone()[0]
+            underlying = con.execute(
+                duckdb_compatible_query_sql(underlying_count_sql(sql, query_id=path.stem))
+            ).fetchone()[0]
             failure = underlying_count_failure(path.stem, int(underlying))
             if failure is not None:
                 raise JoinOrderBuildError(
@@ -2944,7 +2975,9 @@ def stage_draft_release(*, work_dir: Path, archive_path: Path, archive_sha_path:
                 str(notes_path),
             ]
         )
-        stream_command(["gh", "release", "upload", GITHUB_RELEASE_TAG, "--clobber", str(archive_path), str(archive_sha_path)])
+        stream_command(
+            ["gh", "release", "upload", GITHUB_RELEASE_TAG, "--clobber", str(archive_path), str(archive_sha_path)]
+        )
     write_build_manifest(
         work_dir,
         {
@@ -3062,7 +3095,9 @@ def add_query_dir_arg(parser: argparse.ArgumentParser) -> None:
 
 
 def query_dir_from_arg(raw: str | None) -> Path:
-    return Path(raw).expanduser().resolve() if raw else repo_root() / "_project" / "joinorder" / "build-inputs" / "queries"
+    return (
+        Path(raw).expanduser().resolve() if raw else repo_root() / "_project" / "joinorder" / "build-inputs" / "queries"
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -3155,7 +3190,9 @@ def build_parser() -> argparse.ArgumentParser:
     cross_check.add_argument("--cardinalities", default=None)
     cross_check.add_argument("--output", default=None)
 
-    package = subparsers.add_parser("package", help="w13: Package Parquets, manifest, license, checksums, cardinalities.")
+    package = subparsers.add_parser(
+        "package", help="w13: Package Parquets, manifest, license, checksums, cardinalities."
+    )
     add_common_args(package)
     package.add_argument("--manifest", default=None)
     package.add_argument("--cardinalities", default=None)
@@ -3179,7 +3216,9 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_args(runtime_manifest)
     add_existing_postgres_args(runtime_manifest)
 
-    foundation = subparsers.add_parser("foundation", help="Run w5-w16 after restoring PostgreSQL from the cached pg_dump.")
+    foundation = subparsers.add_parser(
+        "foundation", help="Run w5-w16 after restoring PostgreSQL from the cached pg_dump."
+    )
     add_common_args(foundation)
     foundation.add_argument("--force-download", action="store_true", help="Re-download before restoring.")
     add_restore_args(foundation)
@@ -3392,13 +3431,17 @@ def run_cross_check(args: argparse.Namespace) -> int:
 
 def run_package(args: argparse.Namespace) -> int:
     work_dir = work_dir_from_arg(args.work_dir)
-    manifest_path = Path(args.manifest).expanduser().resolve() if args.manifest else work_dir / "manifest" / "data_manifest.toml"
+    manifest_path = (
+        Path(args.manifest).expanduser().resolve() if args.manifest else work_dir / "manifest" / "data_manifest.toml"
+    )
     cardinalities = (
         Path(args.cardinalities).expanduser().resolve()
         if args.cardinalities
         else repo_root() / "_project" / "joinorder" / "reference_cardinalities.json"
     )
-    archive_path, sha_path = package_archive(work_dir=work_dir, manifest_path=manifest_path, cardinalities_path=cardinalities)
+    archive_path, sha_path = package_archive(
+        work_dir=work_dir, manifest_path=manifest_path, cardinalities_path=cardinalities
+    )
     print(f"Packaged archive: {archive_path}")
     print(f"Archive sha256:   {sha_path}")
     return 0
