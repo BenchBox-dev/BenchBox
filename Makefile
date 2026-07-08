@@ -1123,9 +1123,13 @@ release-cut:
 	git commit --no-verify -m "Release v$(VERSION)"
 	git push -u origin v$(VERSION)
 	gh pr create --base main --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
-	@# Option-c lifecycle: delete any prior v* branches on origin (loop sweeps stale entries).
+	@# Option-c lifecycle: delete any prior release branches on origin (loop sweeps stale entries).
+	@# ls-remote patterns match the LAST path component, so 'v*' alone also matches
+	@# e.g. fix/validate-submission-... (bit the 2026-07-08 v0.3.1 re-cut). Filter full
+	@# refs against the release-branch shape, mirroring _RELEASE_BRANCH_RE in
+	@# scripts/generate_changelog_entry.py.
 	@# Use grep -Fxv (literal, full-line match) so version strings with `.` aren't treated as regex.
-	@for br in $$(git ls-remote --heads origin 'v*' | awk '{print $$2}' | sed 's|refs/heads/||' | grep -Fxv "v$(VERSION)"); do \
+	@for br in $$(git ls-remote --heads origin 'v*' | awk '$$2 ~ /^refs\/heads\/v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.+-]+)?$$/ {print $$2}' | sed 's|refs/heads/||' | grep -Fxv "v$(VERSION)"); do \
 		echo "==> Deleting prior release branch on origin: $$br"; \
 		git push origin --delete "$$br" || true; \
 	done
