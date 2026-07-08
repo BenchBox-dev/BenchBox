@@ -37,6 +37,23 @@ from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+# Shared, single-source-of-truth logical-hash algorithm. The build script runs
+# under the repo-root uv environment, so it imports the same primitives the
+# runtime loader/verifier use — build and runtime therefore cannot compute the
+# logical hash differently (see
+# _project/decisions/joinorder-logical-verification-2026-07-08.md).
+from benchbox.core.data_fetch.logical_hash import (
+    LOGICAL_CONTENT_VERSION,
+    LogicalColumn,
+    LogicalTableHash,
+    aggregate_logical_content_hash,
+    is_integer_postgres_type,
+    logical_table_hash_from_parquet as _shared_logical_table_hash_from_parquet,
+    update_logical_row_hash,
+    update_sized_hash_part,
+)
+from benchbox.core.data_fetch.manifest import TableEntry, compute_manifest_identity_hash
+
 DATASET_VERSION = "joinorder-imdb-2013-v1"
 SOURCE_DOI = "10.7910/DVN/2QYZBT"
 SOURCE_PERSISTENT_ID = f"doi:{SOURCE_DOI}"
@@ -217,15 +234,6 @@ class TableFile:
     sha256: str
     bytes: int
     row_count: int
-
-
-@dataclasses.dataclass(frozen=True)
-class LogicalTableHash:
-    """Canonical row-content hash for one table."""
-
-    table: str
-    row_count: int
-    sha256: str
 
 
 @dataclasses.dataclass(frozen=True)
@@ -449,50 +457,23 @@ def aggregate_table_hash(table_files: Sequence[TableFile]) -> str:
     return hashlib.sha256((payload + "\n").encode("utf-8")).hexdigest()
 
 
-def aggregate_logical_content_hash(table_hashes: Sequence[LogicalTableHash]) -> str:
-    """Stable dataset hash over logical table-content hashes."""
+def _logical_columns(columns: Sequence[ColumnSchema]) -> list[LogicalColumn]:
+    """Adapt build ColumnSchema to the shared LogicalColumn projection.
 
-    payload = "\n".join(
-        f"{entry.table}:{entry.row_count}:{entry.sha256}" for entry in sorted(table_hashes, key=lambda f: f.table)
-    )
-    return hashlib.sha256((payload + "\n").encode("utf-8")).hexdigest()
-
-
-def is_integer_schema(column: ColumnSchema) -> bool:
-    return column.duckdb_type in DUCKDB_INTEGER_RANGES
+    Integer-ness is derived from the PostgreSQL type — the same source the
+    runtime reads from the pinned manifest schema — so build and runtime agree.
+    """
+    return [LogicalColumn(name=column.name, is_integer=is_integer_postgres_type(column.postgres_type)) for column in columns]
 
 
-def update_sized_hash_part(hasher: Any, tag: str, payload: bytes) -> None:
-    hasher.update(tag.encode("ascii"))
-    hasher.update(str(len(payload)).encode("ascii"))
-    hasher.update(b":")
-    hasher.update(payload)
-    hasher.update(b";")
+def _csv_value_to_plain(value: CsvLogicalValue) -> str | None:
+    r"""Collapse a CSV field to the plain value the shared row hash expects.
 
-
-def canonical_logical_value(value: Any, column: ColumnSchema) -> tuple[str, bytes]:
-    """Return a type-tagged value payload independent of CSV/Parquet encoding."""
-
-    if value is None:
-        return ("N", b"")
-    if isinstance(value, CsvLogicalValue):
-        if value.value == CSV_NULL and not value.quoted:
-            return ("N", b"")
-        value = value.value
-    if is_integer_schema(column):
-        return ("I", str(int(value)).encode("ascii"))
-    return ("S", str(value).encode("utf-8"))
-
-
-def update_logical_row_hash(hasher: Any, columns: Sequence[ColumnSchema], row_values: Sequence[Any]) -> None:
-    if len(row_values) != len(columns):
-        raise JoinOrderBuildError(f"Logical hash row has {len(row_values)} values for {len(columns)} columns")
-    hasher.update(b"row{")
-    for column, value in zip(columns, row_values, strict=True):
-        update_sized_hash_part(hasher, "C", column.name.encode("utf-8"))
-        tag, payload = canonical_logical_value(value, column)
-        update_sized_hash_part(hasher, tag, payload)
-    hasher.update(b"}\n")
+    An unquoted ``\N`` is a SQL NULL; a quoted empty string is the empty string.
+    """
+    if value.value == CSV_NULL and not value.quoted:
+        return None
+    return value.value
 
 
 def parse_postgres_csv_record(record: str) -> list[CsvLogicalValue]:
@@ -633,8 +614,9 @@ def logical_table_hash_from_csv(csv_path: Path, columns: Sequence[ColumnSchema])
     rather than an accidental file-byte contract.
     """
 
+    logical_columns = _logical_columns(columns)
     hasher = hashlib.sha256()
-    update_sized_hash_part(hasher, "V", b"joinorder-logical-content-v1")
+    update_sized_hash_part(hasher, "V", LOGICAL_CONTENT_VERSION.encode("ascii"))
     update_sized_hash_part(hasher, "T", columns[0].table.encode("utf-8"))
     column_names = [column.name for column in columns]
     last_id: int | None = None
@@ -655,7 +637,7 @@ def logical_table_hash_from_csv(csv_path: Path, columns: Sequence[ColumnSchema])
         if last_id is not None and row_id <= last_id:
             raise JoinOrderBuildError(f"CSV rows for {columns[0].table} are not strictly ordered by id")
         last_id = row_id
-        update_logical_row_hash(hasher, columns, [row_values[column.name] for column in columns])
+        update_logical_row_hash(hasher, logical_columns, [_csv_value_to_plain(row_values[column.name]) for column in columns])
         row_count += 1
     return LogicalTableHash(table=columns[0].table, row_count=row_count, sha256=hasher.hexdigest())
 
@@ -668,24 +650,15 @@ def logical_table_hash_from_parquet(
     columns: Sequence[ColumnSchema],
     batch_size: int = 100_000,
 ) -> LogicalTableHash:
-    """Hash canonical Parquet rows in id order, ignoring Parquet file layout."""
+    """Hash canonical Parquet rows in id order via the shared runtime algorithm."""
 
-    hasher = hashlib.sha256()
-    update_sized_hash_part(hasher, "V", b"joinorder-logical-content-v1")
-    update_sized_hash_part(hasher, "T", table.encode("utf-8"))
-    select_list = ", ".join(quote_ident(column.name) for column in columns)
-    cursor = con.execute(
-        f"SELECT {select_list} FROM read_parquet({duckdb_literal(parquet_path)}) ORDER BY {quote_ident('id')}"
+    return _shared_logical_table_hash_from_parquet(
+        con=con,
+        parquet_path=parquet_path,
+        table=table,
+        columns=_logical_columns(columns),
+        batch_size=batch_size,
     )
-    row_count = 0
-    while True:
-        rows = cursor.fetchmany(batch_size)
-        if not rows:
-            break
-        for row in rows:
-            update_logical_row_hash(hasher, columns, row)
-            row_count += 1
-    return LogicalTableHash(table=table, row_count=row_count, sha256=hasher.hexdigest())
 
 
 def sql_literal(value: str) -> str:
@@ -1640,28 +1613,67 @@ def render_data_manifest(
     restore = manifest.get("restore", {})
     parquet = manifest.get("parquet", {})
     query_import = manifest.get("query_import", {})
-    data_archive_hash = aggregate_table_hash(table_files)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Logical mode: if the logical-content gate has run and passed, pin per-table
+    # logical hashes and make manifest_hash / data_archive_hash logical (stable
+    # across a non-deterministic transport rebuild). Otherwise fall back to the
+    # legacy byte-based manifest so partial/older builds still render.
+    logical_content = manifest.get("logical_content", {})
+    logical_by_table = {t["table"]: t["parquet_logical_sha256"] for t in logical_content.get("tables", [])}
+    logical_aggregate = logical_content.get("aggregate_hash")
+    ordered_files = sorted(table_files, key=lambda f: f.table)
+    logical_mode = (
+        logical_content.get("logical_content_rebuild") == "PASS"
+        and bool(logical_aggregate)
+        and all(tf.table in logical_by_table for tf in ordered_files)
+    )
+
+    if logical_mode:
+        data_archive_hash = str(logical_aggregate)
+        entries = [
+            TableEntry(
+                name=tf.table,
+                file=tf.path.name,
+                sha256=tf.sha256,
+                row_count=tf.row_count,
+                logical_sha256=str(logical_by_table[tf.table]),
+                schema={column.name: column.postgres_type for column in schema[tf.table]},
+            )
+            for tf in ordered_files
+        ]
+        manifest_hash = compute_manifest_identity_hash(
+            dataset_version=DATASET_VERSION,
+            data_archive_hash=data_archive_hash,
+            url=url,
+            license_file="DATA-LICENSE.md",
+            tables=entries,
+        )
+    else:
+        data_archive_hash = aggregate_table_hash(table_files)
+        manifest_hash = "0"
 
     lines: list[str] = [
         f"dataset_version = {format_toml_string(DATASET_VERSION)}",
-        'manifest_hash = "0"',
+        f"manifest_hash = {format_toml_string(manifest_hash)}",
         f"data_archive_hash = {format_toml_string(data_archive_hash)}",
         f"url = {format_toml_string(url)}",
         f"archive_sha256 = {format_toml_string(archive_sha256)}",
         'license_file = "DATA-LICENSE.md"',
         "",
     ]
-    for table_file in sorted(table_files, key=lambda f: f.table):
+    for table_file in ordered_files:
         lines.extend(
             [
                 "[[tables]]",
                 f"name = {format_toml_string(table_file.table)}",
                 f"file = {format_toml_string(table_file.path.name)}",
                 f"sha256 = {format_toml_string(table_file.sha256)}",
-                f"row_count = {table_file.row_count}",
             ]
         )
+        if logical_mode:
+            lines.append(f"logical_sha256 = {format_toml_string(str(logical_by_table[table_file.table]))}")
+        lines.append(f"row_count = {table_file.row_count}")
         for column in schema[table_file.table]:
             lines.append(f"schema.{column.name} = {format_toml_string(column.postgres_type)}")
         lines.append("")
@@ -1681,9 +1693,11 @@ def render_data_manifest(
     lines.append("")
 
     output_path.write_text("\n".join(lines), encoding="utf-8")
-    digest = compute_manifest_hash(output_path)
-    text = output_path.read_text(encoding="utf-8")
-    output_path.write_text(text.replace('manifest_hash = "0"', f'manifest_hash = "{digest}"'), encoding="utf-8")
+    if not logical_mode:
+        # Legacy: manifest_hash is a hash of the file text with itself excluded.
+        digest = compute_manifest_hash(output_path)
+        text = output_path.read_text(encoding="utf-8")
+        output_path.write_text(text.replace('manifest_hash = "0"', f'manifest_hash = "{digest}"'), encoding="utf-8")
     return output_path
 
 
