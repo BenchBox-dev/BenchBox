@@ -9,6 +9,12 @@ NON_CLEAN_VALIDATION_STATUSES: frozenset[str] = frozenset(
     {"failed", "interrupted", "partial", "error", "not_run", "not_validated", "uncertain", "unknown"}
 )
 NON_CLEAN_TRANSLATION_STATUSES: frozenset[str] = frozenset({"fallback", "failed"})
+# Statuses that make a run a *CLI-level* failure (non-zero exit). Narrower than
+# NON_CLEAN_VALIDATION_STATUSES: publication must flag unvalidated results
+# (not_run, not_validated, ...), but a completed run whose validation never
+# executed — DataFrame mode, --validation disabled — is not a failed run.
+# Matches the v0.3.0 exit semantics.
+CLI_FAILURE_VALIDATION_STATUSES: frozenset[str] = frozenset({"failed", "interrupted", "partial", "error"})
 
 
 def normalize_validation_status(value: Any) -> str | None:
@@ -76,6 +82,28 @@ def result_non_clean_reason(result: Any) -> str | None:
 def result_is_clean_pass(result: Any) -> bool:
     """Return True when a result has no query failures, non-clean validation, or translation fallback."""
     return result_non_clean_reason(result) is None
+
+
+def result_cli_failure_reason(result: Any) -> str | None:
+    """Return a reason when a completed run should exit non-zero at the CLI.
+
+    Narrower than :func:`result_non_clean_reason`: validation that never
+    executed (``not_run``/``not_validated``/...) keeps the bundle non-clean for
+    publication, but does not fail the run itself.
+    """
+    failed = result_failed_query_count(result)
+    if failed:
+        noun = "query" if failed == 1 else "queries"
+        return f"{failed} failed {noun}"
+
+    status = normalize_validation_status(getattr(result, "validation_status", None))
+    if status in CLI_FAILURE_VALIDATION_STATUSES:
+        return f"validation_status={status}"
+
+    translation_status = _result_translation_status(result)
+    if translation_status in NON_CLEAN_TRANSLATION_STATUSES:
+        return f"translation_status={translation_status}"
+    return None
 
 
 def bundle_failed_query_count(data: dict[str, Any]) -> int:

@@ -9,6 +9,7 @@ import pytest
 from benchbox.core.results.status import (
     bundle_failed_query_count,
     bundle_is_clean_pass,
+    result_cli_failure_reason,
     result_failed_query_count,
     result_is_clean_pass,
 )
@@ -77,3 +78,34 @@ def test_result_non_clean_translation_statuses_are_not_clean(status: str) -> Non
     )
 
     assert result_is_clean_pass(result) is False
+
+
+@pytest.mark.parametrize("status", ["not_run", "NOT_RUN", "not_validated", "uncertain", "unknown"])
+def test_unexecuted_validation_is_not_a_cli_failure(status: str) -> None:
+    """Validation that never ran keeps the result non-clean for publication
+    but must not fail the CLI invocation (v0.3.0 exit semantics)."""
+    result = SimpleNamespace(total_queries=1, successful_queries=1, failed_queries=0, validation_status=status)
+    assert not result_is_clean_pass(result)
+    assert result_cli_failure_reason(result) is None
+
+
+@pytest.mark.parametrize("status", ["failed", "interrupted", "partial", "error"])
+def test_executed_validation_failures_are_cli_failures(status: str) -> None:
+    result = SimpleNamespace(total_queries=1, successful_queries=1, failed_queries=0, validation_status=status)
+    assert result_cli_failure_reason(result) == f"validation_status={status}"
+
+
+def test_failed_queries_are_cli_failures_regardless_of_validation() -> None:
+    result = SimpleNamespace(total_queries=2, successful_queries=1, failed_queries=1, validation_status="not_run")
+    assert result_cli_failure_reason(result) == "1 failed query"
+
+
+def test_translation_fallback_is_a_cli_failure() -> None:
+    result = SimpleNamespace(
+        total_queries=1,
+        successful_queries=1,
+        failed_queries=0,
+        validation_status="passed",
+        execution_metadata={"translation": {"status": "fallback"}},
+    )
+    assert result_cli_failure_reason(result) == "translation_status=fallback"
