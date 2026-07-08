@@ -38,39 +38,42 @@ description: |
 
 work:
   - id: w0
-    summary: >
-      DECISION GATE / bug check: confirm both items are non-shipping (they are on
-      current evidence). Re-run the zero-current probe — delete the INSERT half of
+    summary: "DECISION GATE / bug check: confirm both items are non-shipping (hardening-only)."
+    notes: >
+      Re-run the zero-current probe - delete the INSERT half of
       merge_scd_type2_basic in a scratch harness and confirm the op is still
-      failed by the companion positive check (not by one_current_per_business_key).
-      If ANY op lacks a positive backstop for its keys, escalate that op to a
-      real defect and fix the validation. Otherwise proceed as hardening-only.
+      failed by the companion positive check (not by
+      one_current_per_business_key). If ANY op lacks a positive backstop for
+      its keys, escalate that op to a real defect and fix the validation.
+      Otherwise proceed as hardening-only.
     status: pending
   - id: w1
-    summary: >
-      Rename/annotate the invariant honestly: either rename the validation id to
-      at_most_one_current_per_business_key across all three ops in
-      operations.yaml, OR (preferred) strengthen it to also flag zero-current
-      business keys that have a current staged version, so the name holds. Keep
-      expected_rows: 0 semantics. Regenerate any registry-derived count/doc that
-      references validation ids.
+    summary: "Rename or strengthen the one_current_per_business_key invariant so its name holds."
+    notes: >
+      Either rename the validation id to at_most_one_current_per_business_key
+      across all three ops in operations.yaml, OR (preferred) strengthen it to
+      also flag zero-current business keys that have a current staged
+      version. Keep expected_rows: 0 semantics. Regenerate any registry-derived
+      count/doc that references validation ids.
     needs: [w0]
     status: pending
   - id: w2
-    summary: >
-      Add a short code comment at _scd2_row_hash_expr documenting the same-engine
-      comparison guarantee and the '|' delimiter / arbitrary-data assumption, so
-      a future reuse of this fingerprint over non-TPC-H data does not silently
-      inherit a collision risk. Optionally switch the literal '|' to a
-      lower-collision separator or length-prefacing if the team wants defense in
-      depth (guard behind w0 confirming no behavior change on TPC-H).
+    summary: "Document the row_hash same-engine/'|'-delimiter assumption at _scd2_row_hash_expr."
+    notes: >
+      Add a short code comment documenting the same-engine comparison
+      guarantee and the '|' delimiter / arbitrary-data assumption, so a future
+      reuse of this fingerprint over non-TPC-H data does not silently inherit
+      a collision risk. Optionally switch the literal '|' to a lower-collision
+      separator or length-prefacing if the team wants defense in depth (guard
+      behind w0 confirming no behavior change on TPC-H).
     status: pending
   - id: w3
-    summary: >
-      If w1 changed any validation SQL, re-run the SCD2 unit + DuckDB integration
-      tests and confirm all three ops still validate green on real dbgen TPC-H;
-      add/adjust a unit assertion that the strengthened invariant flags a
-      synthetic zero-current row.
+    summary: "Re-run SCD2 tests if w1 changed validation SQL; add a synthetic zero-current assertion."
+    notes: >
+      If w1 changed any validation SQL, re-run the SCD2 unit + DuckDB
+      integration tests and confirm all three ops still validate green on
+      real dbgen TPC-H; add/adjust a unit assertion that the strengthened
+      invariant flags a synthetic zero-current row.
     needs: [w1, w2]
     status: pending
 

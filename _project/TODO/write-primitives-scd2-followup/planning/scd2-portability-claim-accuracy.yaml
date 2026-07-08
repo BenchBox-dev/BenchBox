@@ -64,43 +64,46 @@ context_sections:
 
 work:
   - id: w0
-    summary: >
-      DECISION GATE: choose the remediation path. (A) Wording-only — remove
-      ClickHouse from the 'runs unchanged' set and either drop or qualify
-      Snowflake/BigQuery to 'standard-DML engines', keeping the DuckDB proof.
-      (B) Wording + scope note — additionally state that only the insert-only
-      path (new_keys_only) is engine-agnostic and the UPDATE-based ops need
-      standard DML. (C) Engineering — add a sql_compat UPDATE->ALTER TABLE
-      UPDATE rewrite so the claim becomes true (defer to a separate code TODO;
-      do NOT do it here). Recommendation: (A) with a one-line (B) caveat.
+    summary: "DECISION GATE: choose the remediation path (wording-only vs wording+scope vs engineering)."
+    notes: >
+      (A) Wording-only - remove ClickHouse from the 'runs unchanged' set and
+      either drop or qualify Snowflake/BigQuery to 'standard-DML engines',
+      keeping the DuckDB proof. (B) Wording + scope note - additionally state
+      that only the insert-only path (new_keys_only) is engine-agnostic and
+      the UPDATE-based ops need standard DML. (C) Engineering - add a
+      sql_compat UPDATE->ALTER TABLE UPDATE rewrite so the claim becomes true
+      (defer to a separate code TODO; do NOT do it here). Recommendation: (A)
+      with a one-line (B) caveat.
     status: pending
   - id: w1
-    summary: >
-      Apply the chosen wording to the blog draft
-      _blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md:
+    summary: "Apply the chosen wording to the blog draft so ClickHouse isn't claimed unchanged."
+    notes: >
+      Apply to _blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md:
       meta_description (:3), TL;DR (:17-18), body (:103-108), and the lock-in
       section (:158) so ClickHouse is no longer claimed to run the UPDATE-based
       ops unchanged. Preserve the honest 'verified on DuckDB only' framing.
     needs: [w0]
     status: pending
   - id: w2
-    summary: >
-      Apply the same correction to docs/benchmarks/write-primitives.md:134
-      ('runs unchanged across every target engine') — qualify to standard-DML
-      engines and note ClickHouse/DataFusion exceptions, consistent with the
-      existing DataFusion caveat already in the draft.
+    summary: "Apply the same correction to docs/benchmarks/write-primitives.md:134."
+    notes: >
+      Correct 'runs unchanged across every target engine' - qualify to
+      standard-DML engines and note ClickHouse/DataFusion exceptions,
+      consistent with the existing DataFusion caveat already in the draft.
     needs: [w0]
     status: pending
   - id: w3
-    summary: >
+    summary: "Add an honesty note that the harness SETUP SQL is also not ClickHouse-portable."
+    notes: >
       Add a one-sentence honesty note (draft + docs) that the harness SETUP
-      population SQL (|| concat, CAST AS VARCHAR, boolean/DATE literals) is also
-      standard-SQL, not ClickHouse-portable, so the portability statement is
-      scoped to standard-DML engines end to end.
+      population SQL (|| concat, CAST AS VARCHAR, boolean/DATE literals) is
+      also standard-SQL, not ClickHouse-portable, so the portability statement
+      is scoped to standard-DML engines end to end.
     needs: [w1, w2]
     status: pending
   - id: w4
-    summary: >
+    summary: "Re-verify footnotes still resolve and strip any em/en-dash introduced by the edit."
+    notes: >
       Re-run the two source footnote fetches to confirm they still resolve and
       the corrected paragraph does not disturb any cited quote; strip any
       em/en-dash introduced by the edit (see sibling TODO scd2-doc-count-hygiene
@@ -131,9 +134,9 @@ anti_patterns:
   - "DO NOT implement a ClickHouse UPDATE->mutation rewrite inside this TODO — that is option C and belongs in a separate code TODO with its own tests."
 
 verification:
-  - description: "No remaining unqualified 'unchanged ... ClickHouse' claim in blog or docs"
-    command: "grep -rniE \"unchanged.*clickhouse|clickhouse.*unchanged|every target engine\" _blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md docs/benchmarks/write-primitives.md"
-    expected_output: "no matches, or only matches inside an explicit exception/caveat sentence"
+  - description: "No remaining unqualified 'unchanged ... ClickHouse' claim in blog, outline, or docs"
+    command: "for f in _blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md _blog/platform-deep-dives/outlines/apply-changes-into-vs-standard-sql.md docs/benchmarks/write-primitives.md; do tr '\\n' ' ' < \"$f\" | grep -oiE 'unchanged[^.]*clickhouse|clickhouse[^.]*unchanged|every target engine'; done"
+    expected_output: "no matches, or only matches inside an explicit exception/caveat sentence (tr collapses wrapped lines to one line per file so a claim spanning a line break, e.g. draft:17-18 or :103-104, is still caught; the outline file - in scope_limit.only_modify but previously missing from this check - is now included)"
   - description: "No em/en-dash introduced by the edit"
     command: "grep -cP \"\\x{2014}|\\x{2013}\" _blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md docs/benchmarks/write-primitives.md"
     expected_output: "0 for lines this TODO touched (pre-existing dashes handled in scd2-doc-count-hygiene)"

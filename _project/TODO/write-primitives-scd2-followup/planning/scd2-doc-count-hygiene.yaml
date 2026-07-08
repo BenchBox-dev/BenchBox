@@ -40,43 +40,45 @@ description: |
 
 work:
   - id: w0
-    summary: >
-      DECISION GATE for docs/_build tracking. (A) Regenerate docs/_build with the
-      Sphinx build so the committed HTML matches the 112-count source. (B) Stop
-      tracking docs/_build entirely (add to .gitignore + git rm --cached) since
-      it is generated output. Recommendation: (B) if the team does not rely on
-      committed HTML; otherwise (A). This gate decides whether w1 regenerates or
-      removes.
+    summary: "DECISION GATE: regenerate docs/_build (A) or untrack it as generated output (B)."
+    notes: >
+      (A) Regenerate docs/_build with the Sphinx build so the committed HTML
+      matches the 112-count source. (B) Stop tracking docs/_build entirely (add
+      to .gitignore + git rm --cached) since it is generated output.
+      Recommendation: (B) if the team does not rely on committed HTML;
+      otherwise (A). This gate decides whether w1 regenerates or removes.
     status: pending
   - id: w1
-    summary: >
-      Execute the w0 decision: either regenerate docs/_build via the project's
-      Sphinx build and commit the refreshed 112-count HTML, or untrack
-      docs/_build (.gitignore + git rm --cached -r docs/_build) so stale build
-      output stops shipping.
+    summary: "Execute the w0 decision: regenerate docs/_build or untrack it."
+    notes: >
+      Either regenerate docs/_build via the project's Sphinx build and commit
+      the refreshed 112-count HTML, or untrack docs/_build (.gitignore + git rm
+      --cached -r docs/_build) so stale build output stops shipping.
     needs: [w0]
     status: pending
   - id: w2
-    summary: >
-      Update the stale comment at tests/integration/test_write_primitives_duckdb.py
+    summary: "Fix the stale '109 total' comment in test_write_primitives_duckdb.py:512-513."
+    notes: >
+      Update the comment at tests/integration/test_write_primitives_duckdb.py
       :512-513 to reflect 112 ops / 23 merge and the fact that this path is
       un-gated (no platform_key) and resets between ops.
     status: pending
   - id: w3
-    summary: >
-      Replace the em/en-dashes at draft:104 and docs/benchmarks/write-primitives.md
-      :130 with house-style punctuation (comma / parenthetical / restructure).
-      Coordinate with scd2-portability-claim-accuracy which also touches
-      draft:104 / docs:134 — land order should avoid a conflict.
+    summary: "Replace the em/en-dashes at draft:104 and write-primitives.md:130."
+    notes: >
+      Replace with house-style punctuation (comma / parenthetical /
+      restructure). Coordinate with scd2-portability-claim-accuracy which also
+      touches draft:104 / docs:134 - land order should avoid a conflict.
     status: pending
   - id: w4
-    summary: >
-      OPTIONAL coverage improvement (defer if out of appetite): add a focused
-      DuckDB test that calls execute_operation(op_id, conn, platform_key='duckdb')
-      and asserts the three SCD2 ops return SUCCESS while legacy MERGE INTO ops
-      return status SKIPPED (validates #931), plus a no-reset sequential test
-      asserting the dimension returns to seed after basic->no_change->
-      new_keys_only (validates cleanup on the production path).
+    summary: "OPTIONAL: add DuckDB coverage for the #931 skip path and no-reset cleanup."
+    notes: >
+      Add a focused DuckDB test that calls execute_operation(op_id, conn,
+      platform_key='duckdb') and asserts the three SCD2 ops return SUCCESS
+      while legacy MERGE INTO ops return status SKIPPED (validates #931), plus
+      a no-reset sequential test asserting the dimension returns to seed after
+      basic->no_change->new_keys_only (validates cleanup on the production
+      path). Defer if out of appetite.
     needs: [w2]
     status: pending
 
