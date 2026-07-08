@@ -167,6 +167,12 @@ if _linkcheck_ignore_file.exists():
 # docs.snowflake.com) fail CI at the Sphinx defaults (30s, 1 attempt).
 linkcheck_timeout = 60
 linkcheck_retries = 2
+# Sphinx only retries links whose status is BROKEN; a RequestTimeout returns
+# TIMEOUT and skips the retry loop unless timeouts are reported as broken.
+# Without this, linkcheck_retries never covers the transient-timeout failures
+# above. With it, a timeout is retried and only fails if every attempt times
+# out (a genuinely unreachable host), which is the behaviour we want.
+linkcheck_report_timeouts_as_broken = True
 
 # Anchor checks require downloading and parsing the full page body, which is
 # the slow path on heavy JS-rendered doc sites; anchors there are injected
