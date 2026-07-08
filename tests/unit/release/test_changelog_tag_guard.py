@@ -118,3 +118,29 @@ def test_repo_changelog_has_no_untagged_released_section_on_this_branch():
     from an in-progress release branch for that exact version."""
     ok, untagged = gce.check_tag_claims(REPO_ROOT)
     assert ok, f"CHANGELOG.md claims untagged version(s): {untagged}"
+
+
+def test_current_branch_falls_back_to_github_head_ref(tmp_path, monkeypatch):
+    """On a detached-HEAD PR checkout, the release-branch exemption must come
+    from GITHUB_HEAD_REF (set by Actions for pull_request events)."""
+    import subprocess
+
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "commit", "-q", "--allow-empty", "-m", "x"],
+        check=True,
+        env={
+            **__import__("os").environ,
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@t",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@t",
+        },
+    )
+    subprocess.run(["git", "-C", str(tmp_path), "checkout", "-q", "--detach"], check=True)
+
+    monkeypatch.setenv("GITHUB_HEAD_REF", "v9.9.9")
+    assert gce._current_branch(tmp_path) == "v9.9.9"
+
+    monkeypatch.delenv("GITHUB_HEAD_REF")
+    assert gce._current_branch(tmp_path) is None
