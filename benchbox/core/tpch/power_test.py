@@ -21,6 +21,17 @@ from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
+def _parse_tpch_query_id(qid: object) -> int:
+    """Parse a TPC-H query id that may carry the CLI's Q prefix ("Q1" -> 1)."""
+    text = str(qid).strip()
+    if text[:1] in ("Q", "q"):
+        text = text[1:]
+    try:
+        return int(text)
+    except ValueError as exc:
+        raise ValueError(f"Invalid TPC-H query id: {qid!r} (expected 1-22, optionally Q-prefixed)") from exc
+
+
 @dataclass
 class TPCHPowerTestConfig:
     """Configuration for TPC-H Power Test."""
@@ -232,7 +243,7 @@ class TPCHPowerTest:
         # Determine query execution order
         if self.config.query_subset:
             # User specified specific queries - run in their order
-            query_permutation = [int(qid) for qid in self.config.query_subset]
+            query_permutation = [_parse_tpch_query_id(qid) for qid in self.config.query_subset]
             if self.config.verbose:
                 self.logger.info(f"Using user-specified query subset: {query_permutation}")
             # Warn about TPC-H compliance impact
