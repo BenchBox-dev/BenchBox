@@ -601,6 +601,12 @@ try:
             *(_spec(spec[0], spec[1], **(spec[2] if len(spec) > 2 else {})) for spec in specs),
         )
 
+    # Rows are "platform|name|help|kwargs". `platform` is the BASE platform key
+    # (e.g. `datafusion`, `polars`) — NOT the `-df` CLI alias. `benchbox run`
+    # normalizes `--platform datafusion-df` to `datafusion` via PLATFORM_ALIASES
+    # before calling PlatformHookRegistry.parse_options(), and the DataFrame
+    # adapters take these as base-name constructor kwargs, so DataFrame options
+    # must be keyed by the base name to be reachable from the CLI.
     _OPTION_SPEC_ROWS = """\
 databricks|uc_catalog|Unity Catalog catalog name for staging data|{}
 databricks|uc_schema|Unity Catalog schema name for staging data|{}
@@ -765,25 +771,25 @@ singlestore|port|SingleStore MySQL protocol port|{'default': '3306'}
 singlestore|database|SingleStore database name (auto-generated if not specified)|{}
 singlestore|username|SingleStore username|{'default': 'root'}
 singlestore|password|SingleStore password|{}
-polars-df|streaming|Enable streaming mode for large datasets|{'parser': 'parse_bool', 'default': 'false'}
-polars-df|rechunk|Rechunk data for better memory layout|{'parser': 'parse_bool', 'default': 'true'}
-polars-df|n_rows|Limit number of rows to read (for testing)|{'parser': 'int'}
-pandas-df|dtype_backend|Backend for nullable dtypes|{'choices': ('numpy', 'numpy_nullable', 'pyarrow'), 'default': 'numpy_nullable'}
-modin-df|engine|Modin execution engine|{'choices': ('ray', 'dask'), 'default': 'ray'}
-cudf-df|device_id|CUDA device ID to use|{'parser': 'int', 'default': '0'}
-cudf-df|spill_to_host|Enable GPU memory spilling to host RAM|{'parser': 'parse_bool', 'default': 'true'}
-dask-df|n_workers|Number of worker processes|{'parser': 'int'}
-dask-df|threads_per_worker|Threads per worker process|{'parser': 'int'}
-dask-df|use_distributed|Use distributed scheduler (enables dashboard)|{'parser': 'parse_bool', 'default': True}
-dask-df|scheduler_address|Connect to existing scheduler (e.g., 'tcp://...')|{}
-dask-df|memory_limit|Memory limit per local Dask worker (e.g., '4GB')|{}
-dask-df|spill_directory|Directory for Dask spill files; explicit directories are not deleted by close()|{}
-datafusion-df|target_partitions|Number of target partitions for parallelism (default: CPU count)|{'parser': 'int'}
-datafusion-df|repartition_joins|Enable automatic repartitioning for joins|{'parser': 'parse_bool', 'default': 'true'}
-datafusion-df|parquet_pushdown|Enable predicate/projection pushdown for Parquet files|{'parser': 'parse_bool', 'default': 'true'}
-datafusion-df|batch_size|Batch size for query execution|{'parser': 'int', 'default': '8192'}
-datafusion-df|memory_limit|Memory limit for fair spill pool (e.g., '8G', '16GB')|{}
-datafusion-df|temp_dir|Temporary directory for disk spilling (default: system temp)|{}
+polars|streaming|Enable streaming mode for large datasets|{'parser': 'parse_bool', 'default': 'false'}
+polars|rechunk|Rechunk data for better memory layout|{'parser': 'parse_bool', 'default': 'true'}
+polars|n_rows|Limit number of rows to read (for testing)|{'parser': 'int'}
+pandas|dtype_backend|Backend for nullable dtypes|{'choices': ('numpy', 'numpy_nullable', 'pyarrow'), 'default': 'numpy_nullable'}
+modin|engine|Modin execution engine|{'choices': ('ray', 'dask'), 'default': 'ray'}
+cudf|device_id|CUDA device ID to use|{'parser': 'int', 'default': '0'}
+cudf|spill_to_host|Enable GPU memory spilling to host RAM|{'parser': 'parse_bool', 'default': 'true'}
+dask|n_workers|Number of worker processes|{'parser': 'int'}
+dask|threads_per_worker|Threads per worker process|{'parser': 'int'}
+dask|use_distributed|Use distributed scheduler (enables dashboard)|{'parser': 'parse_bool', 'default': True}
+dask|scheduler_address|Connect to existing scheduler (e.g., 'tcp://...')|{}
+dask|memory_limit|Memory limit per local Dask worker (e.g., '4GB')|{}
+dask|spill_directory|Directory for Dask spill files; explicit directories are not deleted by close()|{}
+datafusion|target_partitions|Number of target partitions for parallelism (default: CPU count)|{'parser': 'int'}
+datafusion|repartition_joins|Enable automatic repartitioning for joins|{'parser': 'parse_bool', 'default': 'true'}
+datafusion|parquet_pushdown|Enable predicate/projection pushdown for Parquet files|{'parser': 'parse_bool', 'default': 'true'}
+datafusion|batch_size|Batch size for query execution|{'parser': 'int', 'default': '8192'}
+datafusion|memory_limit|Memory limit for fair spill pool (e.g., '8G', '16GB')|{}
+datafusion|temp_dir|Temporary directory for disk spilling (default: system temp)|{}
 sqlite|database_path|Path to the SQLite database file (auto-generated from --benchmark/--scale when omitted)|{}
 sqlite|timeout|SQLite connection timeout in seconds|{'parser': 'float', 'default': '30.0'}
 sqlite|check_same_thread|Enforce that connections are used on the creating thread only|{'parser': 'parse_bool', 'default': 'false'}
