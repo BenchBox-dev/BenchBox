@@ -43,6 +43,9 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/help.py",
     "benchbox/cli/main.py",
     "benchbox/cli/orchestrator.py",
+    # fix-datafusion-df-mode-erasure: comment-only clarification of
+    # PLATFORM_ALIASES' -df entries; no click surface in this module.
+    "benchbox/cli/platform.py",
 }
 ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     "benchbox/cli/commands/calculate_qphh.py",

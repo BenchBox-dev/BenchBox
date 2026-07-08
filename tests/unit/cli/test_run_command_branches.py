@@ -959,3 +959,69 @@ class TestDeriveExecutionType:
     def test_standard_fallback(self):
         assert self.fn(["warmup"]) == "standard"
         assert self.fn(["load", "power"]) == "power"
+
+
+# ===================================================================
+# _apply_dataframe_suffix_mode / _resolve_platform_mode
+# ===================================================================
+
+
+class TestDataFrameSuffixModeResolution:
+    """A -df platform suffix must select DataFrame mode without an explicit --mode.
+
+    Regression for the v0.3.0 PLATFORM_ALIASES erasure: `datafusion-df` was
+    normalized to `datafusion` before mode resolution, so the registry SQL
+    default silently selected the SQL adapter (flagged by review on PR #1029).
+    """
+
+    def _resolved_state(self, platform: str, mode: str | None = None) -> SimpleNamespace:
+        from benchbox.cli.commands.run import _apply_dataframe_suffix_mode, _resolve_platform_mode
+        from benchbox.cli.platform import normalize_platform_name
+
+        s = SimpleNamespace(
+            platform=platform,
+            mode=mode,
+            dry_run=True,
+            ctx=MagicMock(),
+            logger=None,
+            platform_manager=MagicMock(),
+        )
+        # Same ordering as _prepare_run_state: suffix inference, alias
+        # normalization, then mode resolution.
+        _apply_dataframe_suffix_mode(s)
+        s.platform_key = normalize_platform_name(s.platform)
+        _resolve_platform_mode(s)
+        return s
+
+    @pytest.mark.parametrize("platform", ["datafusion-df", "lakesail-df", "pyspark-df", "polars-df"])
+    def test_df_suffix_resolves_dataframe_mode_without_mode_flag(self, platform: str):
+        s = self._resolved_state(platform)
+        assert s.resolved_mode == "dataframe"
+
+    def test_df_suffix_is_case_insensitive(self):
+        s = self._resolved_state("DataFusion-DF")
+        assert s.resolved_mode == "dataframe"
+
+    @pytest.mark.parametrize(("platform", "expected"), [("datafusion", "sql"), ("lakesail", "sql")])
+    def test_base_name_keeps_registry_default_mode(self, platform: str, expected: str):
+        s = self._resolved_state(platform)
+        assert s.resolved_mode == expected
+
+    def test_explicit_mode_flag_wins_over_df_suffix(self):
+        # Matches adapter-factory precedence: explicit mode > -df suffix > default.
+        s = self._resolved_state("datafusion-df", mode="sql")
+        assert s.resolved_mode == "sql"
+
+    def test_no_suffix_leaves_mode_unset(self):
+        from benchbox.cli.commands.run import _apply_dataframe_suffix_mode
+
+        s = SimpleNamespace(platform="duckdb", mode=None)
+        _apply_dataframe_suffix_mode(s)
+        assert s.mode is None
+
+    def test_missing_platform_is_noop(self):
+        from benchbox.cli.commands.run import _apply_dataframe_suffix_mode
+
+        s = SimpleNamespace(platform=None, mode=None)
+        _apply_dataframe_suffix_mode(s)
+        assert s.mode is None
