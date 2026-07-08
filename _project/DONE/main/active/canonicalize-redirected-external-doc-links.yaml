@@ -1,0 +1,187 @@
+id: canonicalize-redirected-external-doc-links
+title: "Canonicalize the ~49 redirected external doc links surfaced by linkcheck"
+worktree: main
+priority: Low
+status: Completed
+completed_date: "2026-07-08"
+category: Documentation
+commits:
+  - f377bb0c3
+
+description: |
+  PR #1051 (`fix/docs-linkcheck-resilience`) hardened the Sphinx
+  `linkcheck` job against transient timeouts (60s timeout, retries,
+  report-timeouts-as-broken). A clean run of `make docs-linkcheck` on
+  that branch reports **0 broken / 0 timeouts** but **~49 permanent
+  redirects** — external URLs that resolve fine (so CI stays green) but
+  point at stale locations that the upstream site 301/302-redirects to a
+  canonical URL.
+
+  Redirects are informational and do NOT fail the build, so this is
+  pure hygiene: repoint the source links at their canonical targets so
+  readers (and future linkcheck runs) hit the real page directly. It is
+  explicitly NOT about the internal repo-relative links — those are the
+  separate `check_doc_relative_links.py` baseline burn-down tracked in
+  `burn-down-baselined-broken-doc-links.yaml`. This TODO is external
+  http/https only, driven off the Sphinx linkcheck redirect report.
+
+  NOT every redirect should be chased — some are canonical/stable by
+  design and repointing them is wrong or churny. Triage first (w1), then
+  fix only the clear wins.
+
+  Redirect clusters observed 2026-07-08 (regenerate to confirm before
+  starting — counts/targets drift as upstreams reorganize):
+    REPOINT (clear canonical wins):
+      - docs.snowflake.com/...html -> same path without `.html`  (~6)
+      - cloud.google.com/bigquery|storage -> docs.cloud.google.com/... (~10)
+      - clickhouse.com/docs/en/... -> clickhouse.com/docs/... (drop /en) (~4)
+      - arrow.apache.org/datafusion* -> datafusion.apache.org/* (2)
+      - docs.databricks.com/...html -> docs.databricks.com/aws/en/... (~3)
+      - docs.microsoft.com/... -> learn.microsoft.com/... (1)
+      - docs.influxdata.com/influxdb/latest -> .../v2 (1)
+      - docs.timescale.com -> www.tigerdata.com/docs (1)
+      - velodb.io -> www.velodb.io ; singlestore.com/cloud -> /product-overview
+      - clickhouse.cloud -> console.clickhouse.cloud
+      - github.com/mwc360/LakeBench -> github.com/microsoft/LakeBench (1)
+    LEAVE ALONE (do not repoint — record the decision in the PR):
+      - doi.org/10.7910/... -> dataverse.harvard.edu  (DOI is the stable
+        citation identifier; the redirect is the point of a DOI).
+      - github.com/.../issues/new -> github.com/login?return_to=...  (auth
+        gate for anonymous checkers; the source link is correct).
+      - *.readthedocs.io/ -> /en/stable/  (version canonicalization; low
+        value and prone to re-churn on the next docs release).
+      - http://www.cs.umb.edu/... and other `:443`/scheme-normalization
+        redirects that only add an explicit port/scheme.
+
+  Alternative considered and rejected as the primary fix: silence stable
+  redirects via `linkcheck_allowed_redirects` in `docs/conf.py`. That
+  hides the signal rather than fixing the stale link, and readers still
+  land on a redirect. Prefer fixing the source; reserve config for the
+  LEAVE-ALONE set only if a future stricter policy is adopted.
+
+work:
+  - id: w0
+    summary: "Regenerate the redirect list against current develop"
+    status: done
+    notes: |
+      Bind the cited evidence before editing. On the implementation
+      branch run `make docs-linkcheck`, then extract the redirect report:
+        grep -E '\[redirected' docs/_build/linkcheck/output.txt
+      (or parse `output.json` for `"status": "redirected"`). Record in
+      the PR description: the develop SHA, the total redirect count, and
+      any drift from the ~49 captured 2026-07-08 (the clusters in this
+      TODO's description are that snapshot). If targets shifted, re-derive
+      the w2 groupings before proceeding.
+
+  - id: w1
+    summary: "Triage every redirect into REPOINT vs LEAVE-ALONE"
+    needs: [w0]
+    status: done
+    notes: |
+      For each (source_file:line, from_url -> to_url) assign a disposition
+      per the description's rules: REPOINT stale-path canonical rewrites;
+      LEAVE-ALONE DOIs, auth redirects, readthedocs version canonicalization,
+      and pure scheme/port (`:443`) normalizations. Record the table in the
+      PR description as the audit trail for w2. When unsure, verify the
+      target actually serves the intended content (open it) before
+      repointing — a redirect can land on a generic index (e.g. one AWS
+      `whats-new` link collapses to `aws.amazon.com/about-aws/`), in which
+      case find the real successor page or LEAVE-ALONE with a note.
+
+  - id: w2
+    summary: "Apply the REPOINT edits and re-run linkcheck"
+    needs: [w1]
+    status: done
+    notes: |
+      Edit the source `.md`/`.rst` files to the canonical target URLs from
+      the w1 table. Fix external http/https links only; leave repo-relative
+      links to the other checker. Re-run `make docs-linkcheck` and confirm
+      the REPOINTed URLs now report `ok` (working) rather than `redirected`,
+      the redirect count drops to the LEAVE-ALONE residual, and broken/
+      timeout stay at 0. Standard close-out: `make lint format typecheck`,
+      `code review` (fix findings), `make pr-open`.
+
+verification:
+  - description: "REPOINTed links now resolve directly (no redirect); build clean"
+    command: "make docs-linkcheck"
+    expected_output: "exit 0; 0 broken, 0 timeouts; redirect count reduced to the LEAVE-ALONE residual"
+  - description: "Spot-check a representative canonicalization is gone from source"
+    command: "! rg -n 'docs\\.snowflake\\.com/[^ )]+\\.html' docs/"
+    expected_output: "no matches (Snowflake .html links repointed)"
+  - description: "No repo-relative links were collaterally touched (that is the other TODO)"
+    command: "git diff --name-only develop -- scripts/doc_relative_link_baseline.txt"
+    expected_output: "empty (baseline untouched by this work)"
+
+must_preserve:
+  - "Sphinx linkcheck stays green (0 broken, 0 timeouts) after edits."
+  - "DOI, auth-gated, readthedocs-version, and scheme/port-only redirects are left as-is — repointing them is incorrect."
+  - "Internal repo-relative link handling is untouched — that is the separate check_doc_relative_links.py baseline burn-down."
+
+anti_patterns:
+  - "DO NOT silence redirects with linkcheck_allowed_redirects as the primary fix -- because it hides stale links instead of fixing them and readers still hit the redirect -- repoint the source URL."
+  - "DO NOT repoint a DOI to its current dataverse landing page -- because the DOI is the durable citation identifier and the redirect is intentional -- leave DOIs alone."
+  - "DO NOT blindly follow a redirect that lands on a generic index page -- because you would replace a specific (if stale) link with a less-useful one -- find the real successor page or leave it with a note."
+
+scope_limit:
+  only_modify:
+    - "docs/"
+  do_not_modify:
+    - "docs/conf.py"  # linkcheck config is out of scope; this is source-link hygiene
+    - "docs/linkcheck_ignore.txt"
+    - "scripts/doc_relative_link_baseline.txt"
+    - ".github/workflows/"
+
+prior_art:
+  - "burn-down-baselined-broken-doc-links.yaml — sibling docs-link TODO; REUSE its triage-table-in-PR pattern, but it covers INTERNAL repo-relative links via check_doc_relative_links.py; this TODO is genuinely new for EXTERNAL redirect canonicalization."
+  - "docs/conf.py:linkcheck_* (added in PR #1051) — the linkcheck config that surfaces the redirect report; REUSE `make docs-linkcheck` output as the input, do not modify the config here."
+  - "docs/linkcheck_ignore.txt — existing external-link escape hatch for flaky/gated hosts; reference for where LEAVE-ALONE hosts would go IF a stricter policy is later adopted (not in scope now)."
+
+metadata:
+  tags:
+    - docs
+    - ci
+    - tech-debt
+    - pr-1051-followup
+  estimated_effort: "Small"
+  created_date: "2026-07-08"
+
+impact:
+  technical_debt: |
+    Repoints ~35 external doc links at their canonical URLs so readers
+    (and linkcheck) hit the real page directly instead of a 301/302 hop,
+    and shrinks the linkcheck redirect report to an intentional residual
+    (DOIs, auth gates, version canonicalization) that is stable to ignore.
+  user_impact: |
+    External "learn more" links in the docs land on the current canonical
+    page rather than bouncing through a redirect (or, over time, dead-ending
+    when an upstream retires the old path).
+
+success_metrics:
+  - "make docs-linkcheck: 0 broken, 0 timeouts; redirect count reduced to the documented LEAVE-ALONE residual"
+  - "Every REPOINT/LEAVE-ALONE decision is recorded in the PR description as an audit trail"
+  - "No changes to docs/conf.py, linkcheck_ignore.txt, or the relative-link baseline"
+
+sections:
+  completion: |
+    Implemented via PR #1063 (merge commit f377bb0c3), squash-merged to
+    develop 2026-07-08. Delivered exactly to plan:
+      - 48 external link references repointed across 18 docs files.
+      - Sphinx linkcheck: 0 broken, 0 timeouts, redirect count 49 -> 9;
+        working links 117 -> 153. lint/format/typecheck clean.
+      - The 9 residual redirects are the intended LEAVE-ALONE set: DOI,
+        github issues/new auth gate, rich.readthedocs version canonical-
+        ization, http->https and :443 scheme/port normalization, and two
+        generic-index collapses (AWS whats-new + Redshift dg/r_*.html)
+        where the redirect lands on an index rather than a specific
+        successor page.
+      - Full REPOINT/LEAVE-ALONE disposition table recorded in the #1063
+        PR description.
+    Scope held to docs/ source; conf.py, linkcheck_ignore.txt, the
+    relative-link baseline, and workflows were untouched, as required.
+
+    Process note: this record was authored directly into DONE/ rather than
+    moved from TODO/. The original TODO file was committed to the #1051
+    branch after that PR had already squash-merged, so it never reached
+    develop; recording completion here avoids resurrecting it in the active
+    tree. The sibling burn-down-baselined-broken-doc-links (internal
+    repo-relative links) remains open and separate.
