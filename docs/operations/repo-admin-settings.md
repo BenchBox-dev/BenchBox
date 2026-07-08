@@ -453,9 +453,25 @@ stale/red canary evidence instead of silently trusting comments.
 script with the identical token, so the same review-rule coverage is reachable
 from both CI call sites without a separate code path.
 
-### Scheduled activation of `release-canary.yml` (pending admin action)
+### Scheduled activation of `release-canary.yml` (RESOLVED 2026-07-08)
 
-Live state observed 2026-07-05 (release-canary-scheduled-activation TODO, w0):
+> **RESOLVED 2026-07-08 by the default-branch switch (Decision A,
+> `branch-default-switch-to-develop`).** The GitHub default branch is now
+> `develop` (`gh api repos/joeharris76/BenchBox --jq .default_branch` →
+> `develop`). GitHub runs `on.schedule` workflows from the **default** branch's
+> copy, so every develop-authored scheduled workflow now registers and fires
+> directly — the "land it on `main`" problem below no longer exists. Verified
+> 2026-07-08 via the Actions list-workflows API: `release-canary.yml`
+> (id 309070628), `phase3-promotion-review.yml`, and
+> `orphaned-commit-detector.yml` are now registered (26 workflows, up from 19).
+> Activation options (a)/(b)/(c) and the "Admin steps (w2)" below are
+> **superseded** and retained only as history. The `nightly.yml`
+> `scheduled-workflow-liveness` guard now runs from `develop` directly (no
+> "until its file lands on `main`" caveat). The canary's first scheduled run is
+> expected **RED** on the broken 0.3.0 PyPI release (see
+> `release-recovery-v0-3-1`) — that is the canary working, not a regression.
+
+Historical live state observed 2026-07-05 (release-canary-scheduled-activation TODO, w0):
 
 - `git ls-tree origin/main --name-only .github/workflows/` does **not**
   contain `release-canary.yml` — the file exists only on `develop`.
@@ -485,7 +501,9 @@ Live state observed 2026-07-05 (release-canary-scheduled-activation TODO, w0):
   `main` as-is whenever the admin does the next pass for this class of fix —
   no `main`-relative edits needed first.
 
-GitHub runs `on.schedule` workflows only from the default branch (`main`).
+GitHub runs `on.schedule` workflows only from the default branch (historically
+`main`; **now `develop` as of 2026-07-08** — see the RESOLVED note above, which
+makes the options below historical).
 Activation options considered (w1):
 
 - **(a) Admin lands the current `release-canary.yml` on `main` out-of-band**
