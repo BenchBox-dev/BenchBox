@@ -1543,10 +1543,6 @@ def _direct_handle_result(
 ) -> None:
     """Export results and perform post-run actions for the direct branch."""
     non_clean_reason = result_non_clean_reason(result)
-    # Exit code uses the narrower CLI policy: unvalidated-but-successful runs
-    # (DataFrame mode, --validation disabled) warn and stay non-clean for
-    # publishing, but do not fail the invocation. See status.py.
-    cli_failure_reason = result_cli_failure_reason(result)
     if result.validation_status not in ["FAILED", "INTERRUPTED"]:
         if not s.quiet:
             console.print("\n[bold]Exporting results...[/bold]")
@@ -1609,7 +1605,7 @@ def _direct_handle_result(
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
-        if cli_failure_reason:
+        if result_cli_failure_reason(result):  # narrower than non_clean_reason; see status.py
             s.ctx.exit(1)
     else:
         console.print(f"\n[red]❌ Benchmark failed: {result.validation_status}[/red]")
