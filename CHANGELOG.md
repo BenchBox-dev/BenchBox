@@ -42,6 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`-df` platform names select DataFrame mode** - `benchbox run --platform
+  datafusion-df` (and `lakesail-df`) now runs the DataFrame adapter without
+  needing `--mode dataframe`; alias normalization previously dropped the
+  suffix and fell back to the platform's SQL default. An explicit `--mode`
+  still wins.
 - **Clean install now imports** - `pip install benchbox` imports cleanly
   without pulling pandas. Optional engine and DataFrame imports (ClickHouse
   local, DataFrame mode) are now loaded lazily, so the base install stays

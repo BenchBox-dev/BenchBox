@@ -52,7 +52,9 @@ PLATFORM_ALIASES: dict[str, str] = {
     "duck": "duckdb",
     # DataFusion
     "fusion": "datafusion",
-    # DataFrame CLI aliases
+    # DataFrame CLI aliases. Mapping -df names to the base platform erases the
+    # DataFrame-mode request the suffix carries; `benchbox run` re-applies it
+    # via _apply_dataframe_suffix_mode before this normalization runs.
     "polars-df": "polars",
     "pandas-df": "pandas",
     "pyspark-df": "pyspark",

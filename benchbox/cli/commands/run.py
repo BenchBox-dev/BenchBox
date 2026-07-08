@@ -541,6 +541,19 @@ def _validate_initial_flags(s: types.SimpleNamespace) -> None:
         console.print()
 
 
+def _apply_dataframe_suffix_mode(s: types.SimpleNamespace) -> None:
+    """Treat a trailing ``-df`` platform suffix as an explicit DataFrame-mode request.
+
+    Must run before PLATFORM_ALIASES normalization, which maps ``-df`` names to
+    their base platform. For dual-mode platforms whose registry default is SQL
+    (datafusion, lakesail) that erases the request and the run silently selects
+    the SQL adapter. An explicit --mode flag still wins, matching adapter-factory
+    precedence (explicit mode > -df suffix > platform default).
+    """
+    if s.mode is None and s.platform and s.platform.lower().endswith("-df"):
+        s.mode = "dataframe"
+
+
 def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
     """Parse --platform-option and --benchmark-option flags; set state fields."""
     s.logger, s.verbosity_settings = setup_verbose_logging(s.verbose, quiet=bool(s.quiet))
@@ -548,6 +561,7 @@ def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
     s.ctx.obj["verbosity"] = s.verbosity_settings
     s.verbosity_payload = s.verbosity_settings.to_config()
 
+    _apply_dataframe_suffix_mode(s)
     s.platform_key = normalize_platform_name(s.platform) if s.platform else None
     s.benchmark = normalize_benchmark_name(s.benchmark) if s.benchmark else None
     s.table_mode = (s.table_mode or "native").lower()
