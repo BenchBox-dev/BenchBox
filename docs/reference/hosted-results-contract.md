@@ -177,8 +177,11 @@ result carries a distinct "Vendor Supplied" label (see Section 2.2). Unlike
 `public-self-reported`, vendor-reported results are ranking-eligible (see
 Section 3.4): the conflict of interest is disclosed via the badge rather than by
 excluding the result from ranked tables. The vendor label is applied under
-maintainer control at publication and cannot be self-asserted through the
-community submission path.
+maintainer control and cannot be self-asserted through the community submission
+path: it is derived from a bundle living under `results-data/bundles/vendor/`,
+and the `published-results` submission CI (`validate-submission.yml`) rejects any
+pull request from a non-maintainer that adds under that path. The manifest
+`result_source` field is an advisory consistency check on top of that gate.
 
 **`public-curated`** - Fully public and indexed. Results generated and
 committed by BenchBox maintainers carry this visibility. This is the only

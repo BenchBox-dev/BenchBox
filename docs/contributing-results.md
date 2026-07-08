@@ -131,8 +131,12 @@ Community submissions are labeled "Community" in the explorer to distinguish
 them from maintainer-curated results. **Vendor Supplied** results appear in
 ranked tables (unlike community submissions) but always carry the distinct
 vendor badge, because the platform vendor has a direct interest in the outcome.
-You cannot self-apply the vendor label through a community PR — maintainers
-assign it at publication.
+You cannot self-apply the vendor label through a community PR. The label is
+derived from a bundle living under `results-data/bundles/vendor/`, and the
+submission CI (`validate-submission.yml`) rejects any pull request from a
+non-maintainer that adds files under that path. Community submissions belong in
+`results-data/bundles/` (not `vendor/`); maintainers place and review vendor
+results.
 
 ## Funding Disclosure
 
