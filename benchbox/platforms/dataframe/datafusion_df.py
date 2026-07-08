@@ -522,6 +522,20 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         format_type = detect_data_format(path)
 
         if format_type == "tbl":
+            # Raw TPC .tbl/.dat rows use a field-terminating delimiter (every row
+            # ends with `|`), so DataFusion's native CSV reader sees N+1 fields and
+            # errors on the column count ("Expected N columns, got N+1"). That error
+            # is not an extension mismatch, so _read_tbl_via_datafusion would raise
+            # rather than fall back. Detect the trailing delimiter up front and route
+            # such files straight to the tolerant PyArrow path, which appends a dummy
+            # column, projects it away, and transparently decompresses .zst — so
+            # chunked/compressed names like customer.tbl.1.zst load correctly. This
+            # mirrors the pandas/polars adapters. Non-trailing files (e.g. macOS
+            # dbgen output) keep the faster native path unchanged.
+            if has_trailing_delimiter(path, delimiter, column_names):
+                return self._read_tbl_via_pyarrow(
+                    path, delimiter=delimiter, has_header=has_header, column_names=column_names
+                )
             df = self._read_tbl_via_datafusion(
                 path,
                 delimiter=delimiter,
@@ -530,7 +544,9 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
             )
             if df is not None:
                 return df
-            return self._read_tbl_via_pyarrow(path, delimiter=delimiter, column_names=column_names)
+            return self._read_tbl_via_pyarrow(
+                path, delimiter=delimiter, has_header=has_header, column_names=column_names
+            )
 
         # Build read options
         # Note: DataFusion's read_csv API varies by version
@@ -608,6 +624,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         path: Path,
         *,
         delimiter: str,
+        has_header: bool = False,
         column_names: list[str] | None,
     ) -> DataFusionLazyDF:
         """Read a TBL/DAT file via PyArrow and register in DataFusion.
@@ -631,6 +648,10 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
 
         read_options = pv.ReadOptions(
             column_names=actual_column_names if actual_column_names else None,
+            # When explicit column_names are supplied for a header-bearing file,
+            # drop the header row so it is not registered as data (off-by-one).
+            # Mirrors DataFusionAdapter._convert_and_register_parquet.
+            skip_rows=1 if (column_names and has_header) else 0,
         )
         parse_options = pv.ParseOptions(delimiter=delimiter)
         compression = detect_compression(path)

@@ -39,6 +39,7 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.file_format import (
     TRAILING_DUMMY_COLUMN,
     get_column_names_with_trailing,
+    get_data_extension,
     has_trailing_delimiter,
 )
 
@@ -1406,7 +1407,12 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         # `has_trailing_delimiter` uses a raw split() which returns true for any
         # line whose last quoted field happens to contain the delimiter character.
         # Quoted CSVs (non-TPC sources) must use the standard quoted-parsing path.
-        _is_tpc_raw = Path(file_paths[0]).suffix.lower() in {".tbl", ".dat"}
+        # Use the base data extension, not Path.suffix: real dbgen output is
+        # compressed and/or shard-numbered (customer.tbl.zst, customer.tbl.1,
+        # customer.tbl.1.zst), whose Path.suffix is .zst/.1 — a bare Path.suffix
+        # check would wrongly treat those chunks as quoted CSV and fail on the
+        # trailing field.
+        _is_tpc_raw = get_data_extension(file_paths[0]) in {".tbl", ".dat"}
         is_trailing = (
             column_names is not None and _is_tpc_raw and has_trailing_delimiter(file_paths[0], delimiter, column_names)
         )

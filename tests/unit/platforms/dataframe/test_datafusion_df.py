@@ -278,11 +278,16 @@ class TestDataFusionDataLoading:
         assert None not in phrases
 
     def test_read_tbl_with_column_names(self, tmp_path):
-        """Test reading TPC-style .tbl with trailing delimiter."""
+        """Test reading TPC-style .tbl with a genuine trailing delimiter.
+
+        Each row ends with a trailing `|`, so it splits into 3 fields for 2
+        columns — the field-terminating framing raw dbgen emits. read_csv must
+        drop the extra field rather than surface it as a third column.
+        """
         adapter = DataFusionDataFrameAdapter()
 
         tbl_path = tmp_path / "test.tbl"
-        tbl_path.write_text("1|Alice\n2|Bob\n")
+        tbl_path.write_text("1|Alice|\n2|Bob|\n")
 
         df = adapter.read_csv(
             tbl_path,
