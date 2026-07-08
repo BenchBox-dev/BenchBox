@@ -558,6 +558,20 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
         Returns:
             A portable SQL string expression yielding the row fingerprint.
+
+        Safety assumptions (verified for TPC-H; revisit if reused elsewhere):
+            - Same-engine comparison only. The dimension and staging ``row_hash``
+              are both computed by this expression during setup on the SAME
+              engine, and the ops only ever compare ``s.row_hash <> d.row_hash``
+              within that engine, so ``CAST(... AS VARCHAR)`` formatting
+              differences across engines cannot cause a false match/miss.
+            - Delimiter safety. The literal ``'|'`` separator is collision-safe
+              only because the TPC-H attributes it joins contain no ``'|'``
+              (verified: SF0.01 customer has zero pipe chars in
+              name/address/mktsegment). Reusing this fingerprint over arbitrary
+              dimension data where an attribute may contain ``'|'`` could let a
+              changed row look unchanged (or vice versa); use a collision-
+              resistant separator or length-prefixed encoding in that case.
         """
         return f"c_name || '|' || c_address || '|' || CAST({acctbal_expr} AS VARCHAR) || '|' || c_mktsegment"
 
