@@ -14,9 +14,10 @@ date: 2026-06-30
 **TL;DR**: Databricks' AUTO CDC (formerly APPLY CHANGES INTO) genuinely removes
 boilerplate and a class of Slowly Changing Dimension bugs, and that convenience is
 real. But it runs only on Databricks declarative pipelines, while the equivalent
-portable SQL runs unchanged across DuckDB, PostgreSQL, Snowflake, BigQuery, and
-ClickHouse. For a basic Type 2, that portable SQL is about 18 lines, not 200. The
-honest trade-off is convenience versus portability, not lines of code.
+portable SQL runs unchanged across standard-DML engines such as DuckDB,
+PostgreSQL, Snowflake, and BigQuery (verified here on DuckDB). For a basic Type 2,
+that portable SQL is about 18 lines, not 200. The honest trade-off is convenience
+versus portability, not lines of code.
 
 ---
 
@@ -99,13 +100,18 @@ WHERE s.change_type = 'new'
 
 This is portable standard SQL. It uses a business key (`c_custkey`), a current-version
 flag (`is_current`), validity timestamps (`valid_from` and `valid_to`), and a
-change-detection fingerprint (`row_hash`) to decide what changed. There is no
-engine-specific syntax, so it runs unchanged across the engines named above
-(DuckDB, PostgreSQL, Snowflake, BigQuery, and ClickHouse) — not every engine
-BenchBox targets. DataFusion is a documented exception: BenchBox's Write
-Primitives catalog marks this exact operation unsupported there
-(`platform_overrides: {"datafusion": null}`)[^op], so it is skipped rather than
-run on that engine.
+change-detection fingerprint (`row_hash`) to decide what changed. The close-and-insert
+uses standard DML (UPDATE plus INSERT), so it runs unchanged on engines that support a
+standard UPDATE: DuckDB (which we verify below), PostgreSQL, Snowflake, and BigQuery.
+Two documented exceptions apply. DataFusion is marked unsupported for this exact
+operation in BenchBox's Write Primitives catalog
+(`platform_overrides: {"datafusion": null}`)[^op], so it is skipped. ClickHouse has no
+standard UPDATE statement (row changes go through `ALTER TABLE ... UPDATE` mutations),
+so only the insert-only path (`merge_scd_type2_new_keys_only`) runs there unchanged; the
+close-old step would need a mutation rewrite. The same standard-DML scoping applies to
+the harness setup that seeds the dimension and change batch (it also uses string
+concatenation and CAST), so the portability claim is about standard-DML engines end to
+end, not just the operation.
 
 ### The honest line count
 
@@ -157,8 +163,10 @@ pipeline, not on warehouse compute, and not on any other engine. It is not a sta
 statement you can run against an ordinary table, and it does not run on DuckDB,
 PostgreSQL, Snowflake, BigQuery, or ClickHouse.
 
-The portable form runs on all of them. We can show this concretely with one engine. The
-bundled DuckDB 1.3.2 rejects `MERGE INTO` outright, so BenchBox's standard run skips its
+The portable form runs on the standard-DML engines in that list (ClickHouse, lacking a
+standard UPDATE, needs the insert-only path or a mutation rewrite, as noted above). We
+can show the portable form concretely on one engine. The bundled DuckDB 1.3.2 rejects
+`MERGE INTO` outright, so BenchBox's standard run skips its
 entire MERGE category on DuckDB[^skip]. Yet the portable SCD Type 2 operation, built
 from UPDATE and INSERT rather than `MERGE INTO`, runs on DuckDB and passes its
 correctness checks. The same SQL that an engine refuses in `MERGE INTO` form runs fine

@@ -1,0 +1,67 @@
+id: "scd2-portability-claim-accuracy"
+title: "Correct the SCD2 'runs unchanged on ClickHouse' portability claim (blog + docs)"
+worktree: "write-primitives-scd2-followup"
+priority: "Medium-High"
+status: "Completed"
+completed_date: "2026-07-08"
+category: "Documentation"
+description: |
+  SCD2 audit finding #1. The blog draft and docs/benchmarks/write-primitives.md
+  claimed the portable SCD2 op "runs unchanged" on ClickHouse (and "every target
+  engine"). False for merge_scd_type2_basic / _no_change: they use standard
+  UPDATE, which ClickHouse lacks (row changes go through ALTER TABLE ... UPDATE
+  mutations); no UPDATE->mutation rewrite exists in benchbox/sql_compat/. Only
+  merge_scd_type2_new_keys_only (pure INSERT) runs there unchanged. Verified only
+  on DuckDB. Decision (w0): Option A + one-line B caveat - scope the claim to
+  standard-DML engines, name ClickHouse (and DataFusion) as exceptions, keep the
+  DuckDB proof.
+
+work:
+  - id: w0
+    summary: "Decision gate: chose Option A + caveat (scope to standard-DML engines; ClickHouse/DataFusion named as exceptions; DuckDB proof retained)."
+    status: done
+  - id: w1
+    summary: "Corrected blog draft: TL;DR (:16), portability body (:102), and lock-in section (:166) no longer claim ClickHouse runs the UPDATE-based ops unchanged."
+    status: done
+  - id: w2
+    summary: "Corrected docs/benchmarks/write-primitives.md SCD2 bullet: 'every target engine' -> standard-DML engines, with ClickHouse insert-only / DataFusion-skipped caveat."
+    status: done
+  - id: w3
+    summary: "Added end-to-end honesty note: the harness setup population SQL (concat/CAST) is also standard-SQL, so the standard-DML scoping covers setup, not just the op."
+    status: done
+  - id: w4
+    summary: "Verified no em/en-dash remains in either edited file (incidentally fixed the pre-existing draft:104 and docs:130 dashes); footnotes untouched and previously confirmed resolving."
+    needs: [w1, w2, w3]
+    status: done
+
+sections:
+  "Implementation Summary": |
+    Wording-only change across two files. ClickHouse removed from the unqualified
+    "runs unchanged" set in the blog TL;DR, portability body, and lock-in
+    paragraph; recast as an explicit exception (no standard UPDATE -> only the
+    insert-only path runs unchanged; close-old needs a mutation rewrite).
+    docs/benchmarks/write-primitives.md:134 changed from "runs unchanged across
+    every target engine" to standard-DML engines with the ClickHouse/DataFusion
+    caveat. Both edits incidentally removed the pre-existing em-dashes at
+    draft:104 and docs:130, so the sibling scd2-doc-count-hygiene TODO no longer
+    needs to touch those lines (only the test comment and docs/_build remain).
+  "Verification": |
+    grep confirms 0 em/en-dashes in both files and no remaining "every target
+    engine" / unqualified "unchanged ... ClickHouse" claim. Databricks footnotes
+    [^cdc] and [^blog] were confirmed to resolve verbatim during the audit and
+    were not modified.
+
+metadata:
+  tags: ["scd2", "write-primitives", "blog", "docs", "portability", "honesty"]
+  estimated_effort: "Small"
+  created_date: "2026-07-08"
+  last_updated: "2026-07-08T00:00:00"
+
+files_affected:
+  modified:
+    - "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md"
+    - "docs/benchmarks/write-primitives.md"
+
+success_metrics:
+  - "Blog + docs no longer assert the UPDATE-based SCD2 ops run unchanged on ClickHouse."
+  - "Portability claim scoped to standard-DML engines; DuckDB proof retained; ClickHouse/DataFusion exceptions named."
