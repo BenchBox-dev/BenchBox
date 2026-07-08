@@ -163,6 +163,18 @@ if _linkcheck_ignore_file.exists():
         if line.strip() and not line.strip().startswith("#")
     ]
 
+# Transient read timeouts on healthy external sites (observed: velox-lib.io,
+# docs.snowflake.com) fail CI at the Sphinx defaults (30s, 1 attempt).
+linkcheck_timeout = 60
+linkcheck_retries = 2
+
+# Anchor checks require downloading and parsing the full page body, which is
+# the slow path on heavy JS-rendered doc sites; anchors there are injected
+# client-side and can't be validated from static HTML anyway.
+linkcheck_anchors_ignore_for_url = [
+    r"https://docs\.snowflake\.com/.*",
+]
+
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
