@@ -622,7 +622,7 @@ class TestSCD2Operations:
             op = catalog.operations[op_id]
             assert len(op.validation_queries) >= 1
             val_ids = {v.id for v in op.validation_queries}
-            assert "one_current_per_business_key" in val_ids
+            assert "at_most_one_current_per_business_key" in val_ids
             assert op.cleanup_sql is not None and op.cleanup_sql.strip()
 
     def test_scd2_ops_are_scale_independent(self):
