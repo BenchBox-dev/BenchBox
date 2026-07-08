@@ -145,4 +145,4 @@ SET GLOBAL local_infile = ON;
 
 - [SingleStore Documentation](https://docs.singlestore.com/)
 - [singlestoredb Python SDK](https://github.com/singlestore-labs/singlestoredb-python)
-- [SingleStore Helios](https://www.singlestore.com/cloud/)
+- [SingleStore Helios](https://www.singlestore.com/product-overview/)

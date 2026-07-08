@@ -916,5 +916,5 @@ External Resources
 
 - `cloudpathlib Documentation <https://cloudpathlib.drivendata.org/>`_ - Underlying cloud path library
 - `AWS S3 Documentation <https://docs.aws.amazon.com/s3/>`_ - Amazon S3 object storage
-- `Google Cloud Storage Documentation <https://cloud.google.com/storage/docs>`_ - GCS documentation
-- `Azure Blob Storage Documentation <https://docs.microsoft.com/en-us/azure/storage/blobs/>`_ - Azure storage
+- `Google Cloud Storage Documentation <https://docs.cloud.google.com/storage/docs>`_ - GCS documentation
+- `Azure Blob Storage Documentation <https://learn.microsoft.com/en-us/azure/storage/blobs/>`_ - Azure storage

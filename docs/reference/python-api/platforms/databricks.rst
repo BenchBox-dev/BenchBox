@@ -753,8 +753,8 @@ API Reference
 External Resources
 ~~~~~~~~~~~~~~~~~~
 
-- `Databricks Documentation <https://docs.databricks.com/>`_ - Official Databricks docs
-- `Delta Lake Guide <https://docs.databricks.com/delta/index.html>`_ - Delta Lake reference
-- `Unity Catalog <https://docs.databricks.com/data-governance/unity-catalog/index.html>`_ - Unity Catalog docs
-- `SQL Warehouses <https://docs.databricks.com/sql/admin/sql-endpoints.html>`_ - Warehouse configuration
-- `Photon Engine <https://docs.databricks.com/runtime/photon.html>`_ - Photon performance
+- `Databricks Documentation <https://docs.databricks.com/aws/en>`_ - Official Databricks docs
+- `Delta Lake Guide <https://docs.databricks.com/aws/en/delta>`_ - Delta Lake reference
+- `Unity Catalog <https://docs.databricks.com/aws/en/data-governance/unity-catalog>`_ - Unity Catalog docs
+- `SQL Warehouses <https://docs.databricks.com/aws/en/compute/sql-warehouse/create>`_ - Warehouse configuration
+- `Photon Engine <https://docs.databricks.com/aws/en/compute/photon>`_ - Photon performance

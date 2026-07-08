@@ -745,8 +745,8 @@ API Reference
 External Resources
 ~~~~~~~~~~~~~~~~~~
 
-- `BigQuery Documentation <https://cloud.google.com/bigquery/docs>`_ - Official BigQuery docs
-- `BigQuery Best Practices <https://cloud.google.com/bigquery/docs/best-practices>`_ - Performance and cost optimization
-- `Partitioning Guide <https://cloud.google.com/bigquery/docs/partitioned-tables>`_ - Partitioning strategies
-- `Clustering Guide <https://cloud.google.com/bigquery/docs/clustered-tables>`_ - Clustering best practices
-- `Cost Optimization <https://cloud.google.com/bigquery/docs/best-practices-costs>`_ - Reducing query costs
+- `BigQuery Documentation <https://docs.cloud.google.com/bigquery/docs>`_ - Official BigQuery docs
+- `BigQuery Best Practices <https://docs.cloud.google.com/bigquery/docs/best-practices-performance-overview>`_ - Performance and cost optimization
+- `Partitioning Guide <https://docs.cloud.google.com/bigquery/docs/partitioned-tables>`_ - Partitioning strategies
+- `Clustering Guide <https://docs.cloud.google.com/bigquery/docs/clustered-tables>`_ - Clustering best practices
+- `Cost Optimization <https://docs.cloud.google.com/bigquery/docs/best-practices-costs>`_ - Reducing query costs

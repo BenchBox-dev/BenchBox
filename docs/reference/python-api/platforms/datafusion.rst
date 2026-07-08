@@ -675,6 +675,6 @@ API Reference
 External Resources
 ~~~~~~~~~~~~~~~~~~
 
-- `Apache DataFusion Documentation <https://arrow.apache.org/datafusion/>`_ - Official docs
-- `DataFusion Python Bindings <https://arrow.apache.org/datafusion-python/>`_ - Python API
+- `Apache DataFusion Documentation <https://datafusion.apache.org/>`_ - Official docs
+- `DataFusion Python Bindings <https://datafusion.apache.org/python/>`_ - Python API
 - `Apache Arrow <https://arrow.apache.org/>`_ - Arrow columnar format

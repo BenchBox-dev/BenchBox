@@ -352,9 +352,9 @@ uv run -- python -m pytest -m live_databricks -v --log-cli-level=DEBUG
 
 - [BenchBox Documentation](../../README.md)
 - [Platform Setup Guide](../platforms/index.md)
-- [Databricks SQL Warehouse Docs](https://docs.databricks.com/sql/admin/sql-endpoints.html)
-- [Snowflake Connection Docs](https://docs.snowflake.com/en/user-guide/admin-account-identifier.html)
-- [BigQuery Authentication Docs](https://cloud.google.com/bigquery/docs/authentication)
+- [Databricks SQL Warehouse Docs](https://docs.databricks.com/aws/en/compute/sql-warehouse/create)
+- [Snowflake Connection Docs](https://docs.snowflake.com/en/user-guide/admin-account-identifier)
+- [BigQuery Authentication Docs](https://docs.cloud.google.com/bigquery/docs/authentication)
 
 ## Support
 

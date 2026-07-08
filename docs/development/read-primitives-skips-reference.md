@@ -231,7 +231,7 @@ model relies on `UNNEST` + re-aggregation, which changes query structure rather
 than being a drop-in dialect fix.
 
 **Re-enable when**: These functions appear in the
-[BigQuery Standard SQL array functions reference](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions).
+[BigQuery Standard SQL array functions reference](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/array_functions).
 
 ---
 
@@ -243,7 +243,7 @@ value>>` patterns instead. The queries test map-as-first-class-value semantics
 cannot express equivalently.
 
 **Re-enable when**: A native MAP type or `MAP_FROM_ENTRIES` function appears
-in the [BigQuery data types reference](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types).
+in the [BigQuery data types reference](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-types).
 
 ---
 
@@ -253,7 +253,7 @@ in the [BigQuery data types reference](https://cloud.google.com/bigquery/docs/re
 `FILTER(arr, x -> ...)`, or `REDUCE(arr, init, (acc, x) -> ...)`.
 
 **Re-enable when**: Lambda/higher-order array functions appear in the
-[BigQuery array functions reference](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions).
+[BigQuery array functions reference](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/array_functions).
 
 ---
 
@@ -262,7 +262,7 @@ in the [BigQuery data types reference](https://cloud.google.com/bigquery/docs/re
 **Why skipped**: BigQuery does not support `ASOF JOIN` syntax.
 
 **Re-enable when**: `ASOF JOIN` appears in the
-[BigQuery JOIN reference](https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#join_types).
+[BigQuery JOIN reference](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#join_types).
 
 ---
 
@@ -391,7 +391,7 @@ clause syntax. ClickHouse provides `ARRAY JOIN` and conditional aggregation
 query structure that tests different capabilities than `PIVOT`/`UNPIVOT`.
 
 **Re-enable when**: Standard `PIVOT`/`UNPIVOT` clause syntax appears in the
-[ClickHouse SELECT reference](https://clickhouse.com/docs/en/sql-reference/statements/select).
+[ClickHouse SELECT reference](https://clickhouse.com/docs/sql-reference/statements/select).
 
 ---
 
@@ -438,7 +438,7 @@ time this skip was added. Spark's `MERGE ASOF` exists in PySpark but is not
 available as a SQL clause.
 
 **Re-enable when**: `ASOF JOIN` appears in the
-[Databricks SQL reference](https://docs.databricks.com/sql/language-manual/sql-ref-syntax-qry-select-join.html).
+[Databricks SQL reference](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-join).
 
 ---
 

@@ -754,7 +754,7 @@ See Also
 External Resources
 ~~~~~~~~~~~~~~~~~~
 
-- `Databricks Delta Lake Optimization <https://docs.databricks.com/delta/optimizations/index.html>`_
+- `Databricks Delta Lake Optimization <https://docs.databricks.com/aws/en/optimizations>`_
 - `Snowflake Clustering <https://docs.snowflake.com/en/user-guide/tables-clustering-keys>`_
 - `Redshift Distribution Styles <https://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html>`_
-- `BigQuery Partitioning <https://cloud.google.com/bigquery/docs/partitioned-tables>`_
+- `BigQuery Partitioning <https://docs.cloud.google.com/bigquery/docs/partitioned-tables>`_
