@@ -325,6 +325,29 @@ class TestUpdatePlanVersions:
         assert current.plan_versions["q1"] == 3
         assert current.plan_versions["q2"] == 1
 
+    def test_new_query_across_fingerprint_version_boundary_starts_at_one(self) -> None:
+        """#1038 review: a brand-new query_id (absent from prev entirely) must
+        always start at version 1, even when its fingerprint_version differs
+        from prev's default - there is no prior recording to be "not
+        comparable" to, so the version-mismatch branch must not apply and
+        fall back to a 0 default (invalid per validate_plan_metadata)."""
+        prev = PlanMetadata(
+            plan_fingerprints={"q1": "a" * 64},
+            plan_versions={"q1": 3},
+            plan_fingerprint_versions={"q1": 1},
+        )
+        current = PlanMetadata(
+            plan_fingerprints={"q1": "a" * 64, "q2": "b" * 64},  # q2 is new, captured as v2
+            plan_versions={},
+            plan_fingerprint_versions={"q1": 1, "q2": 2},
+        )
+
+        update_plan_versions(prev, current)
+
+        assert current.plan_versions["q1"] == 3
+        assert current.plan_versions["q2"] == 1
+        assert not validate_plan_metadata(current)
+
     def test_fingerprint_version_boundary_does_not_bump_version(self) -> None:
         """A pure fingerprint-encoding-version bump (qpc-03 v1 -> v2) makes the
         fingerprint STRING change for the same logical plan (#1028 review).
