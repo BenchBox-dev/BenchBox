@@ -25,6 +25,7 @@ from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
 )
+from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
 from benchbox.core.platform_config import get_platform_config as _core_get_platform_config
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.driver_metadata import apply_driver_metadata
@@ -431,6 +432,22 @@ class BenchmarkOrchestrator:
             return None
         if execution_mode == "dataframe":
             self.console.print("[cyan]Using DataFrame execution mode[/cyan]")
+            # database_config.options carries both user-supplied --platform-option
+            # values (e.g. target_partitions=4) AND runtime-only overrides that
+            # PlatformHookRegistry.build_database_config() merges in alongside them
+            # (verbose, very_verbose, tuning_enabled, force_recreate, ...; see
+            # DatabaseManager.create_config). Unlike the SQL branch below (whose
+            # PlatformAdapter.__init__(self, **config) accepts anything), DataFrame
+            # adapters declare explicit, narrow constructor signatures (e.g.
+            # DataFusionDataFrameAdapter's target_partitions/batch_size/...), and
+            # the runtime-only keys would collide with the verbose=/very_verbose=
+            # kwargs passed explicitly below. Restrict forwarding to option names
+            # actually registered in that platform's _OPTION_SPEC_ROWS so only
+            # genuine --platform-option values reach the adapter (#1062 review).
+            registered_option_names = PlatformHookRegistry.list_option_specs(database_config.type)
+            dataframe_options = {
+                key: value for key, value in (database_config.options or {}).items() if key in registered_option_names
+            }
             return get_adapter(
                 database_config.type,
                 mode="dataframe",
@@ -438,6 +455,7 @@ class BenchmarkOrchestrator:
                 verbose=self._verbosity.verbose if self._verbosity else False,
                 very_verbose=self._verbosity.very_verbose if self._verbosity else False,
                 tuning_config=opts.get("df_tuning_config"),
+                **dataframe_options,
             )
         adapter = get_platform_adapter(database_config.type, **(platform_cfg or {}))
         if adapter and benchmark:

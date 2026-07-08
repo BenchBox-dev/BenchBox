@@ -408,6 +408,84 @@ class TestBenchmarkOrchestrator:
         # database_path is NOT set by get_platform_config() - it's handled by adapter's from_config()
         assert "database_path" not in config
 
+    @patch("benchbox.cli.orchestrator.get_adapter")
+    def test_build_platform_adapter_forwards_dataframe_platform_options(self, mock_get_adapter):
+        """#1054 review: --platform-option values (e.g. target_partitions=4)
+        parsed onto database_config.options must reach the DataFrame adapter
+        constructor via get_adapter(), not just DatabaseManager.create_config -
+        the adapter construction is what actually controls execution."""
+        database_config = Mock()
+        database_config.type = "datafusion"
+        database_config.options = {"target_partitions": 4}
+
+        from benchbox.core.runner.runner import LifecyclePhases
+
+        adapter = self.orchestrator._build_platform_adapter(
+            database_config,
+            execution_mode="dataframe",
+            output_root="/tmp/out",
+            opts={},
+            platform_cfg=None,
+            benchmark=None,
+            phases=LifecyclePhases(generate=False, load=False, execute=True),
+            config=Mock(),
+        )
+
+        assert adapter is mock_get_adapter.return_value
+        call_kwargs = mock_get_adapter.call_args.kwargs
+        assert call_kwargs["target_partitions"] == 4
+
+    @patch("benchbox.cli.orchestrator.get_adapter")
+    def test_build_platform_adapter_filters_runtime_overrides_from_dataframe_options(self, mock_get_adapter):
+        """#1062 review: database_config.options also carries runtime-only
+        overrides (verbose, very_verbose, tuning_enabled, force_recreate, ...)
+        merged in by PlatformHookRegistry.build_database_config(), not just
+        user --platform-option values. Forwarding the whole options dict
+        collides with the explicit verbose=/very_verbose= kwargs below
+        (TypeError: multiple values for keyword argument) and would pass
+        unexpected kwargs to DataFrame adapters' narrow constructors. Only
+        keys registered as this platform's --platform-option specs may
+        reach get_adapter()."""
+        database_config = Mock()
+        database_config.type = "datafusion"
+        database_config.options = {
+            "target_partitions": 4,
+            "verbose": True,
+            "very_verbose": True,
+            "verbose_enabled": True,
+            "verbose_level": 2,
+            "quiet": False,
+            "tuning_enabled": True,
+            "force_recreate": False,
+            "force_upload": False,
+        }
+
+        from benchbox.core.runner.runner import LifecyclePhases
+
+        adapter = self.orchestrator._build_platform_adapter(
+            database_config,
+            execution_mode="dataframe",
+            output_root="/tmp/out",
+            opts={},
+            platform_cfg=None,
+            benchmark=None,
+            phases=LifecyclePhases(generate=False, load=False, execute=True),
+            config=Mock(),
+        )
+
+        assert adapter is mock_get_adapter.return_value
+        call_kwargs = mock_get_adapter.call_args.kwargs
+        assert call_kwargs["target_partitions"] == 4
+        for runtime_only_key in (
+            "tuning_enabled",
+            "force_recreate",
+            "force_upload",
+            "verbose_enabled",
+            "verbose_level",
+            "quiet",
+        ):
+            assert runtime_only_key not in call_kwargs
+
     def test_prepare_run_config(self):
         """Test run configuration preparation."""
         config = BenchmarkConfig(
