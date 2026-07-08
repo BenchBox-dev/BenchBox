@@ -160,3 +160,30 @@ def test_dataframe_adapter_reads_trailing_delimiter_chunk(tmp_path, filename):
     assert result.num_rows == 2, f"{filename}: expected 2 rows, got {result.num_rows}"
     assert result.column_names == _CUSTOMER_COLUMNS, f"{filename}: wrong columns: {result.column_names}"
     assert TRAILING_DUMMY_COLUMN not in result.column_names, f"{filename}: dummy column leaked"
+
+
+@pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
+def test_dataframe_header_bearing_trailing_delimiter_skips_header(tmp_path):
+    """A header-bearing trailing-pipe .tbl must not register its header row as data.
+
+    The PyArrow fallback (now the primary path for trailing files) must honor
+    has_header and skip the header row; otherwise counts are off by one.
+    """
+    data_path = tmp_path / "customer.tbl"
+    header = "|".join(_CUSTOMER_COLUMNS) + "|\n"
+    data_path.write_text(header + _TRAILING_ROWS)
+
+    adapter = DataFusionDataFrameAdapter()
+    df = adapter.read_csv(
+        data_path,
+        delimiter="|",
+        has_header=True,
+        column_names=_CUSTOMER_COLUMNS,
+    )
+    result = adapter.collect(df)
+
+    assert result.num_rows == 2, f"header row leaked into data: got {result.num_rows} rows"
+    assert result.column_names == _CUSTOMER_COLUMNS
+    # The first data row's key is 1, not the header literal "c_custkey"
+    # (had the header leaked, the column would be text-typed and start with it).
+    assert str(result.column("c_custkey").to_pylist()[0]) == "1"
