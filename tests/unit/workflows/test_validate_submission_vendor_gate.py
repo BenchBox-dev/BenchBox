@@ -10,6 +10,7 @@ This test pins that step so it cannot silently regress.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -60,3 +61,39 @@ def test_vendor_gate_fails_the_pr() -> None:
     # A non-maintainer vendor/ addition must hard-fail the job.
     assert "exit 1" in script
     assert "::error::" in script
+
+
+def test_vendor_gate_allows_trusted_same_repo_mirror() -> None:
+    """#1041 review: a maintainer vendor/ addition on develop is published
+    through a same-repo auto/results-mirror-* PR opened by
+    sync-results-data-to-published.yml with secrets.GITHUB_TOKEN, authored by
+    github-actions[bot] - never OWNER/MEMBER/COLLABORATOR. The gate must let
+    that trusted mirror through instead of blocking it, gated on the same
+    unforgeable head.repo.fork signal the "Validate bundles" step's manifest
+    waiver uses (github.head_ref alone is attacker-controlled on fork PRs).
+    """
+    step = _vendor_gate_step()
+    env = step.get("env") or {}
+    run = step["run"]
+
+    fork_var = next((k for k, v in env.items() if "head.repo.fork" in str(v)), None)
+    assert fork_var is not None, (
+        "The vendor gate step must bind github.event.pull_request.head.repo.fork "
+        "into the env so the mirror-bot bypass can gate on it."
+    )
+
+    guard_match = re.search(
+        rf'\[\s*"\${fork_var}"\s*=\s*"false"\s*\]\s*;\s*then\n(.*?)\nfi\b',
+        run,
+        re.DOTALL,
+    )
+    assert guard_match is not None, (
+        f'Could not find a `if [ "${fork_var}" = "false" ]; then ... fi` block - '
+        "the fork guard must wrap a then/fi body, not just appear in a condition."
+    )
+    guarded_body = guard_match.group(1)
+    assert "auto/results-mirror-*" in guarded_body, (
+        "The mirror branch pattern check must be NESTED inside the "
+        f'[ "${fork_var}" = "false" ] guard body, not merely present elsewhere in the '
+        "step - otherwise a same-named branch on a fork PR could still reach the bypass."
+    )

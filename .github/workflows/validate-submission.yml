@@ -49,6 +49,18 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+          # Same two-signal trust check as the "Validate bundles" step below
+          # (see its comment for the full reasoning): a maintainer adding a
+          # vendor bundle on develop is published through a same-repo
+          # auto/results-mirror-* PR opened by sync-results-data-to-published.yml
+          # with secrets.GITHUB_TOKEN, so its author is github-actions[bot] -
+          # never OWNER/MEMBER/COLLABORATOR. Without this, that trusted mirror
+          # PR falls through to the else branch and blocks legitimate
+          # maintainer vendor bundles. head.repo.fork is the load-bearing
+          # signal (unforgeable from a fork); the branch-name pattern alone
+          # would be spoofable.
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           # The vendor-supplied trust label is RANKING-ELIGIBLE and is granted
           # purely by a bundle living under results-data/bundles/vendor/ (see
@@ -65,15 +77,25 @@ jobs:
           VENDOR_CHANGES=$(git diff --name-only "$BASE_SHA"...HEAD -- \
             'results-data/bundles/vendor/**' || true)
           if [ -n "$VENDOR_CHANGES" ]; then
+            TRUSTED_MIRROR="false"
+            if [ "$IS_FORK" = "false" ]; then
+              case "$HEAD_REF" in
+                auto/results-mirror-*) TRUSTED_MIRROR="true" ;;
+              esac
+            fi
             case "$AUTHOR_ASSOCIATION" in
               OWNER | MEMBER | COLLABORATOR)
                 echo "Maintainer ($AUTHOR_ASSOCIATION) vendor/ addition - allowed."
                 ;;
               *)
-                echo "::error::This PR adds or modifies files under results-data/bundles/vendor/, which grants the ranking-eligible vendor-supplied label. Only maintainers may do this:"
-                printf '%s\n' "$VENDOR_CHANGES"
-                echo "Community submissions belong in results-data/bundles/ (not vendor/). Author association: ${AUTHOR_ASSOCIATION}."
-                exit 1
+                if [ "$TRUSTED_MIRROR" = "true" ]; then
+                  echo "Trusted same-repo mirror PR ($HEAD_REF) vendor/ addition - allowed."
+                else
+                  echo "::error::This PR adds or modifies files under results-data/bundles/vendor/, which grants the ranking-eligible vendor-supplied label. Only maintainers may do this:"
+                  printf '%s\n' "$VENDOR_CHANGES"
+                  echo "Community submissions belong in results-data/bundles/ (not vendor/). Author association: ${AUTHOR_ASSOCIATION}."
+                  exit 1
+                fi
                 ;;
             esac
           fi

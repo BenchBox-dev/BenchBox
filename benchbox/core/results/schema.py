@@ -388,6 +388,12 @@ def _build_query_results_section(
             entry["digest"] = result_digest
         if qr.get("dataframe_skip_summary"):
             entry["dataframe_skip_summary"] = qr["dataframe_skip_summary"]
+        # Real DataFrame plan-capture-error cause (qpc-05 / F4.4, #1038 review):
+        # this is the JSON export path, a separate serialization from
+        # ResultBuilder._format_query_results (in-memory only) - without this,
+        # the field was lost on export/reload despite being carried in memory.
+        if qr.get("plan_capture_error") is not None:
+            entry["plan_capture_error"] = qr["plan_capture_error"]
 
         queries_list.append(order_dict(entry, QUERY_KEY_ORDER))
 

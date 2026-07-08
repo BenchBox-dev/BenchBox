@@ -131,8 +131,17 @@ def update_plan_versions(
     _require_matching_scheme(prev_metadata, current_metadata, operation="diff")
 
     for query_id, current_fp in current_metadata.plan_fingerprints.items():
-        prev_fp = prev_metadata.plan_fingerprints.get(query_id)
-        prev_version = prev_metadata.plan_versions.get(query_id, 0)
+        if query_id not in prev_metadata.plan_fingerprints:
+            # Genuinely new query: no prior recording exists to be "not
+            # comparable" to, so the fingerprint-version-mismatch branch below
+            # must not apply here - it would fall back to
+            # prev_metadata.plan_versions.get(query_id, 0), writing an invalid
+            # version 0 (#1038 review). Always start a new query at version 1.
+            current_metadata.plan_versions[query_id] = 1
+            continue
+
+        prev_fp = prev_metadata.plan_fingerprints[query_id]
+        prev_version = prev_metadata.plan_versions.get(query_id, 1)
         # Legacy metadata predating plan_fingerprint_versions defaults to 1
         # (LEGACY_FINGERPRINT_VERSION), matching QueryPlanDAG.from_dict's own
         # legacy-bundle default.

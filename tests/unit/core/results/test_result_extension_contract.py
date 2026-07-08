@@ -127,3 +127,38 @@ def test_platform_specific_extensions_round_trip_through_loader() -> None:
     assert reconstructed.platform_raw_metadata == payload["platform"]["raw_metadata"]
     assert round_trip["comparisons"] == payload["comparisons"]
     assert round_trip["phases"]["migration"] == payload["phases"]["migration"]
+
+
+def test_plan_capture_error_reaches_the_exported_query_row() -> None:
+    """#1038 review: plan_capture_error was added to the in-memory
+    BenchmarkResults.query_results dict, but build_result_payload's
+    _build_query_results_section is a SEPARATE serialization path that
+    copies only specific fields onto the compact queries[] entry - the real
+    DataFrame capture-failure cause must reach the actual exported/persisted
+    JSON, not just the in-memory representation."""
+    result = _extension_result()
+    result.query_results[0]["plan_capture_error"] = "TypeError: unsupported operand"
+
+    payload = build_result_payload(result)
+
+    entry = next(q for q in payload["queries"] if q["id"] == "1")
+    assert entry["plan_capture_error"] == "TypeError: unsupported operand"
+
+
+def test_plan_capture_error_survives_export_load_reexport_round_trip() -> None:
+    """#1052 review: the export fix alone is incomplete - reload
+    (reconstruct_benchmark_results) must also carry plan_capture_error
+    forward, or export -> load -> re-export silently drops it again even
+    though it survives the first export."""
+    result = _extension_result()
+    result.query_results[0]["plan_capture_error"] = "TypeError: unsupported operand"
+
+    payload = build_result_payload(result)
+    reconstructed = reconstruct_benchmark_results(payload)
+    round_trip = build_result_payload(reconstructed)
+
+    reconstructed_row = next(q for q in reconstructed.query_results if q.get("query_id") == "1")
+    assert reconstructed_row["plan_capture_error"] == "TypeError: unsupported operand"
+
+    round_trip_entry = next(q for q in round_trip["queries"] if q["id"] == "1")
+    assert round_trip_entry["plan_capture_error"] == "TypeError: unsupported operand"

@@ -28,6 +28,7 @@ query_key_order:
 - status
 - digest
 - dataframe_skip_summary
+- plan_capture_error
 config_key_order:
 - compression
 - seed
