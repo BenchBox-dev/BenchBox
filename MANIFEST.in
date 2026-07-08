@@ -4,7 +4,7 @@ include LICENSE
 include pyproject.toml
 include MANIFEST.in
 
-recursive-include benchbox *.py *.sql *.yaml *.json *.jinja2 *.md *.csv
+recursive-include benchbox *.py *.sql *.yaml *.json *.jinja2 *.md *.csv *.toml
 
 # Include _sources/ for sdist (patches, EULAs, compilation infra, templates)
 # Note: Runtime templates are ALSO bundled inside benchbox/_binaries/*/templates/

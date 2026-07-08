@@ -52,7 +52,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10: stdlib tomllib is 3.11+
+    import tomli as tomllib  # type: ignore[no-redef]
 
 from .errors import ManifestValidationError
 
