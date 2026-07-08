@@ -44,14 +44,13 @@ work:
 
 - id: w2
   summary: "GitHub admin: rename branch main->release + recreate the ruleset (rename w5/w6)"
-  needs: [w1, w3]
+  needs: [w1]
   status: pending
   notes: |
     Source: rename-release-branch-main-to-release (w5/w6, ADMIN half).
-    Blocked on w3 too: the source TODO's deps.needs: branch-default-switch-to-develop
-    encodes the A-before-B sequencing (Decision A, the default-branch switch,
-    must land before Decision B, this rename). Run RIGHT AFTER w1 merges AND
-    w3 is done, per docs/operations/branch-rename-runbook.md:
+    w3 below (branch-default-switch-to-develop) is DONE, so this is now only
+    blocked on w1. Run RIGHT AFTER w1 merges, per
+    docs/operations/branch-rename-runbook.md:
       gh api -X POST repos/joeharris76/BenchBox/branches/main/rename -f new_name=release
     Then recreate the `main-release-only` ruleset as `release-only` targeting
     refs/heads/release (same required checks/protections), and update the
@@ -63,23 +62,17 @@ work:
 
 - id: w3
   summary: "GitHub admin: set default_branch=develop + verify scheduled workflows fire"
-  status: pending
+  status: done
   notes: |
-    Source: branch-default-switch-to-develop (w1 ADMIN + w2 verify).
-    Low-risk, reversible one-call change:
+    Source: branch-default-switch-to-develop (w1 ADMIN + w2 verify), archived
+    to _project/DONE/main/branch-default-switch-to-develop.yaml.
+    DONE 2026-07-08: maintainer ran
       gh api -X PATCH repos/joeharris76/BenchBox -f default_branch=develop
-    (roll back with default_branch=main). Record the dated before/after in
-    docs/operations/repo-admin-settings.md.
-    THIS ALSO ACTIVATES two things that are built but currently inert:
-      - the §2.8 fork-PR comment companion (.github/workflows/
-        validate-submission-comment.yml) — workflow_run companions fire only
-        from the default branch;
-      - release-canary.yml's daily cron and any future develop-authored
-        scheduled workflow (register from the default branch).
-    Verify after: `gh api repos/joeharris76/BenchBox/actions/workflows --jq
-    '.workflows[].path'` now lists release-canary.yml; dispatch it once to prove
-    liveness (first result is expected RED on 0.3.0's broken import); confirm
-    nightly.yml still fires. Coordinate ordering with w1/w2 per the runbook.
+    default_branch is now "develop" (was "main"; verified via
+    `git ls-remote --symref origin HEAD` -> refs/heads/develop). This also
+    activated the §2.8 fork-PR comment companion and release-canary.yml's
+    daily cron, both previously inert on the non-default develop branch (see
+    the source TODO's w2 for the registration/liveness verification detail).
 
 - id: w4
   summary: "Recruit one external contributor for the Phase-2 submission dry-run"
@@ -123,7 +116,7 @@ verification:
   expected_output: "release (once w2 is done)"
 - description: "w3: default branch is develop"
   command: "gh api repos/joeharris76/BenchBox --jq .default_branch"
-  expected_output: "develop (once w3 is done)"
+  expected_output: "develop (w3 is done)"
 
 scope_limit:
   only_modify:
