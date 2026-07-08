@@ -2,7 +2,8 @@ id: branch-default-switch-to-develop
 title: "Make develop the GitHub default branch (Decision A of the branching-strategy review)"
 worktree: main
 priority: High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-08"
 category: "Release Tooling"
 
 description: |
@@ -40,15 +41,17 @@ prior_art:
 work:
   - id: w1
     summary: "ADMIN: set default_branch=develop"
-    status: pending
+    status: done
     notes: |
       `gh api -X PATCH repos/joeharris76/BenchBox -f default_branch=develop`.
       Admin-only. Reversible: re-run with default_branch=main to roll back.
       Record the dated before/after in repo-admin-settings.md.
+      DONE 2026-07-08: maintainer ran the PATCH. Verified via MCP
+      search_repositories -> default_branch="develop" (was "main").
   - id: w2
     summary: "Verify scheduled workflows now register and fire from develop"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       After the flip, confirm release-canary.yml is registered:
       `gh api repos/joeharris76/BenchBox/actions/workflows --jq '.workflows[].path'`
@@ -58,15 +61,29 @@ work:
       result is RED on 0.3.0's broken import (that is the canary working —
       see release-recovery-v0-3-1). Confirm nightly.yml still fires from the
       new default.
+      DONE 2026-07-08: Actions list-workflows API now returns 26 registered
+      workflows (was 19); Release Canary (id 309070628) is present and active,
+      as are phase3-promotion-review and orphaned-commit-detector — all
+      previously unregistered develop-only scheduled workflows. Registration
+      (the blocker) is confirmed. Immediate workflow_dispatch was NOT run to
+      avoid an unprompted CI run; the daily 08:00 UTC cron now fires on its
+      own (expected first result RED on broken 0.3.0 — cross-link into
+      release-recovery-v0-3-1 when it lands). Maintainer may dispatch for
+      instant proof if desired.
   - id: w3
     summary: "Update repo-admin-settings.md: the default-branch premise inverts"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       The 'Scheduled activation of release-canary.yml' section and any text
       asserting 'the default branch is main' become stale. Rewrite to reflect
       develop-as-default; several (a)/(b)/(c) workarounds for the canary
       become unnecessary. Record the new live state with a date.
+      DONE 2026-07-08: added a dated RESOLVED banner to the 'Scheduled
+      activation' section and corrected the 'default branch (main)' assertion
+      to note develop-as-default. Conservative edit — historical analysis and
+      still-live code-path descriptions (bootstrap, RELEASE_CANARY_REF shell,
+      liveness guard) preserved rather than rewritten.
 
 must_preserve:
   - "main stays release-only and push-restricted regardless of the default-branch setting — the default flip changes clone/PR/UI defaults and scheduled-workflow source, not the release gating."

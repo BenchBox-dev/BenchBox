@@ -99,9 +99,9 @@ work:
       -release window; the release branch only receives pushes via
       release-finalize, which is maintainer-controlled, so no real CI gap).
 
-deps:
-  needs:
-    - branch-default-switch-to-develop
+# deps.needs on branch-default-switch-to-develop cleared 2026-07-08: Decision A
+# COMPLETED (see _project/DONE/main/branch-default-switch-to-develop.yaml), so the
+# sequencing prerequisite is satisfied. B remains independently schedulable.
 
 must_preserve:
   - "release.yml verify-tag-on-* gate and the tag-shaped-ref publish condition — the rename must not loosen the publish gate; only retarget main->release."

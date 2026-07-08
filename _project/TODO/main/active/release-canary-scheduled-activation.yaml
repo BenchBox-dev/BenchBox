@@ -124,6 +124,14 @@ work:
       NOTE 2026-07-06: if branch-default-switch-to-develop lands first, this
       unit is MOOT (develop-as-default registers the canary directly). Prefer
       that path; keep this only as the fallback if Decision A is declined.
+      UPDATE 2026-07-08: Decision A LANDED (default_branch=develop; see
+      _project/DONE/main/branch-default-switch-to-develop.yaml). release-canary
+      is now registered (Actions list-workflows: 26 workflows, Release Canary
+      id 309070628) with no per-release re-landing on main. This w2 is now
+      MOOT — no admin land-on-main action is needed. Remaining to fully close
+      this TODO: confirm the first scheduled cron run (expected RED on broken
+      0.3.0) and cross-link it into release-recovery-v0-3-1, then w3 (the
+      liveness guard) which already exists in nightly.yml.
 
   - id: w3
     summary: "Add a scheduled-workflow liveness guard so this class of gap cannot recur silently"
