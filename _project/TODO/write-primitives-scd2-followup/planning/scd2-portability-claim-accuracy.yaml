@@ -1,0 +1,176 @@
+id: "scd2-portability-claim-accuracy"
+title: "Correct the SCD2 'runs unchanged on ClickHouse' portability claim (blog + docs)"
+worktree: "write-primitives-scd2-followup"
+priority: "Medium-High"
+status: "Identified"
+category: "Documentation"
+description: |
+  Adversarial audit of the SCD Type 2 surface (PRs #916 / #922 / #931) found the
+  only material honesty defect in the PORTABILITY CLAIM, not in the SQL mechanics.
+
+  The blog draft
+  `_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md` and the
+  benchmark docs `docs/benchmarks/write-primitives.md` both assert the portable
+  SCD2 operation "runs unchanged" across a named engine set that INCLUDES
+  ClickHouse:
+    - draft:17-18  "portable SQL runs unchanged across DuckDB, PostgreSQL,
+                    Snowflake, BigQuery, and ClickHouse"
+    - draft:103-108 "no engine-specific syntax, so it runs unchanged across the
+                    engines named above (DuckDB, PostgreSQL, Snowflake, BigQuery,
+                    and ClickHouse)"
+    - draft:3 (meta_description) and draft:158 repeat the ClickHouse framing
+    - docs/benchmarks/write-primitives.md:134 "so it runs unchanged across every
+      target engine"
+
+  This is FALSE for two of the three ops. `merge_scd_type2_basic` and
+  `merge_scd_type2_no_change` open with a standard
+  `UPDATE scd2_ops_dim_customer SET is_current = false, valid_to = (SELECT MIN(...))
+  WHERE ... EXISTS(...)`. ClickHouse has NO standard UPDATE statement; row
+  mutation is `ALTER TABLE ... UPDATE` with different semantics and no
+  correlated-subquery-in-SET form. ClickHouse is a wired BenchBox platform
+  (benchbox/platforms/clickhouse/adapter.py) and there is NO UPDATE->mutation
+  rewrite anywhere in benchbox/sql_compat/ (grep for ALTER TABLE ... UPDATE /
+  mutation returns nothing). Only `merge_scd_type2_new_keys_only` (pure
+  INSERT ... SELECT) would actually run unchanged on ClickHouse.
+
+  The draft itself only ever verified DuckDB ("We can show this concretely with
+  one engine", draft:160). So the ClickHouse (and, less severely, the
+  Snowflake/BigQuery) inclusion is an unverified — and for ClickHouse incorrect —
+  claim in published/queued content whose entire thesis is portability-vs-lock-in.
+
+  Secondary, same root cause: the setup population SQL in
+  benchbox/core/write_primitives/benchmark.py:_get_population_sql /
+  _scd2_row_hash_expr uses `||` string concat, `CAST(... AS VARCHAR)`, boolean
+  and DATE literals, executed un-rewritten via connection.execute(); it is also
+  non-portable to ClickHouse. The "portable" claim only ever concerned the
+  operation SQL, so this is a note to keep the corrected wording honest about
+  SETUP portability too, not a separate defect.
+
+  Fix is a documentation/wording change (default), OR — only if the team wants
+  ClickHouse to genuinely execute the ops — a sql_compat UPDATE->mutation rewrite
+  (much larger; out of scope here, capture as its own TODO). See the decision gate.
+
+context_sections:
+  "Audit evidence (verified 2026-07-08)":
+    |
+    - Ran all three ops on real dbgen TPC-H via DuckDB: all SUCCESS, all
+      validations pass. Mechanics are sound; this TODO is wording-only.
+    - Confirmed ClickHouse is a registered platform:
+      `grep -ril clickhouse benchbox/platforms/` -> clickhouse/adapter.py et al.
+    - Confirmed NO UPDATE->mutation rewrite in sql_compat:
+      `grep -rniE "ALTER TABLE.*UPDATE|mutation" benchbox/sql_compat/` -> empty.
+    - Footnotes [^cdc] and [^blog] resolve and quote verbatim-accurately; the
+      Databricks-side facts are NOT in scope for change.
+
+work:
+  - id: w0
+    summary: >
+      DECISION GATE: choose the remediation path. (A) Wording-only — remove
+      ClickHouse from the 'runs unchanged' set and either drop or qualify
+      Snowflake/BigQuery to 'standard-DML engines', keeping the DuckDB proof.
+      (B) Wording + scope note — additionally state that only the insert-only
+      path (new_keys_only) is engine-agnostic and the UPDATE-based ops need
+      standard DML. (C) Engineering — add a sql_compat UPDATE->ALTER TABLE
+      UPDATE rewrite so the claim becomes true (defer to a separate code TODO;
+      do NOT do it here). Recommendation: (A) with a one-line (B) caveat.
+    status: pending
+  - id: w1
+    summary: >
+      Apply the chosen wording to the blog draft
+      _blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md:
+      meta_description (:3), TL;DR (:17-18), body (:103-108), and the lock-in
+      section (:158) so ClickHouse is no longer claimed to run the UPDATE-based
+      ops unchanged. Preserve the honest 'verified on DuckDB only' framing.
+    needs: [w0]
+    status: pending
+  - id: w2
+    summary: >
+      Apply the same correction to docs/benchmarks/write-primitives.md:134
+      ('runs unchanged across every target engine') — qualify to standard-DML
+      engines and note ClickHouse/DataFusion exceptions, consistent with the
+      existing DataFusion caveat already in the draft.
+    needs: [w0]
+    status: pending
+  - id: w3
+    summary: >
+      Add a one-sentence honesty note (draft + docs) that the harness SETUP
+      population SQL (|| concat, CAST AS VARCHAR, boolean/DATE literals) is also
+      standard-SQL, not ClickHouse-portable, so the portability statement is
+      scoped to standard-DML engines end to end.
+    needs: [w1, w2]
+    status: pending
+  - id: w4
+    summary: >
+      Re-run the two source footnote fetches to confirm they still resolve and
+      the corrected paragraph does not disturb any cited quote; strip any
+      em/en-dash introduced by the edit (see sibling TODO scd2-doc-count-hygiene
+      for the pre-existing dash at draft:104 / docs:130).
+    needs: [w3]
+    status: pending
+
+open_questions:
+  - "Do we want ClickHouse to actually execute write_primitives SCD2 (option C, separate code TODO), or is standard-DML-only portability the honest and sufficient claim?"
+  - "Should Snowflake/BigQuery be asserted at all without an execution proof, or softened to 'standard-DML engines' pending a live run?"
+
+must_preserve:
+  - "The DuckDB-only verification framing and the 'we ran no AUTO CDC pipeline / claim no declarative timing' honesty statements in the draft."
+  - "All Databricks-side footnoted facts and their verbatim quotes ([^cdc], [^blog], [^merge], etc.) — these were audited as accurate and must not be reworded."
+  - "The BenchBox measurement tables (SF0.01 / SF0.1) and the scale-independence observation — verified and out of scope."
+
+approach: |
+  This is a wording correction, not a code change. Start from the decision gate
+  (w0). The cleanest fix mirrors how the draft already handles DataFusion: name
+  the exception explicitly rather than deleting the portability argument. Keep
+  the 'portable standard SQL / runs on standard-DML engines, proven on DuckDB'
+  spine; remove ClickHouse from the unqualified 'runs unchanged' set because its
+  lack of standard UPDATE makes the basic/no_change ops non-portable there.
+
+anti_patterns:
+  - "DO NOT silently delete the whole portability section — the portability-vs-lock-in thesis is the point; correct the engine set instead."
+  - "DO NOT edit the Databricks footnote quotes to 'balance' the change — they were verified verbatim and are not the defect."
+  - "DO NOT implement a ClickHouse UPDATE->mutation rewrite inside this TODO — that is option C and belongs in a separate code TODO with its own tests."
+
+verification:
+  - description: "No remaining unqualified 'unchanged ... ClickHouse' claim in blog or docs"
+    command: "grep -rniE \"unchanged.*clickhouse|clickhouse.*unchanged|every target engine\" _blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md docs/benchmarks/write-primitives.md"
+    expected_output: "no matches, or only matches inside an explicit exception/caveat sentence"
+  - description: "No em/en-dash introduced by the edit"
+    command: "grep -cP \"\\x{2014}|\\x{2013}\" _blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md docs/benchmarks/write-primitives.md"
+    expected_output: "0 for lines this TODO touched (pre-existing dashes handled in scd2-doc-count-hygiene)"
+
+scope_limit:
+  only_modify:
+    - "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md"
+    - "_blog/platform-deep-dives/outlines/apply-changes-into-vs-standard-sql.md"
+    - "docs/benchmarks/write-primitives.md"
+  do_not_modify:
+    - "benchbox/core/write_primitives/"
+    - "benchbox/sql_compat/"
+    - "_blog/platform-deep-dives/research/apply-changes-into-vs-merge-verification-2026-06-27.md"
+
+files_affected:
+  modified:
+    - "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md"
+    - "docs/benchmarks/write-primitives.md"
+
+impact:
+  business_value: |
+    The blog's credibility rests on evidence discipline; a demonstrably wrong
+    portability claim (ClickHouse cannot run standard UPDATE) in a lock-in
+    argument is the kind of error a Databricks-friendly reader will seize on.
+  user_impact: |
+    A reader who copies the "portable" op to ClickHouse per the promise hits a
+    syntax error on the UPDATE. Correcting the claim prevents that.
+  technical_debt: |
+    Keeps published portability statements bound to what BenchBox actually
+    verified (DuckDB) rather than an aspirational engine list.
+
+metadata:
+  tags: ["scd2", "write-primitives", "blog", "docs", "portability", "honesty"]
+  estimated_effort: "Small"
+  created_date: "2026-07-08"
+  last_updated: "2026-07-08T00:00:00"
+
+success_metrics:
+  - "Blog + docs no longer assert the UPDATE-based SCD2 ops run unchanged on ClickHouse."
+  - "Portability claim scoped to standard-DML engines with DuckDB as the proven case; DataFusion/ClickHouse exceptions named."

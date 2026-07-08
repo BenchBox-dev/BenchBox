@@ -1,0 +1,157 @@
+id: "scd2-doc-count-hygiene"
+title: "Clear stale post-SCD2 counts and em-dashes in built docs, test comments"
+worktree: "write-primitives-scd2-followup"
+priority: "Low"
+status: "Identified"
+category: "Documentation"
+description: |
+  Post-SCD2 count reconciliation (PR #916 / #923) updated the SOURCE docs to the
+  correct figures (get_all_operations = 112, merge = 23, staging = 18, raw
+  catalog = 136 = 112 baseline + 24 sketch — all verified 2026-07-08). Two
+  residues were missed:
+
+  1. Committed Sphinx BUILD ARTIFACTS under docs/_build/ still show the stale
+     "109 operations" count and are git-tracked (git ls-files docs/_build/ lists
+     them; git check-ignore reports NOT ignored):
+       - docs/_build/html/benchmarks/write-primitives.html:923,1401
+       - docs/_build/html/benchmarks/transaction-primitives.html:1276
+       - docs/_build/html/_sources/benchmarks/write-primitives.md.txt:161,623
+       - docs/_build/html/_sources/benchmarks/transaction-primitives.md.txt:525
+     So the committed/published HTML docs still read "109 operations across 6
+     categories" while the source .md reads 112.
+
+  2. A stale explanatory comment in a live test:
+       tests/integration/test_write_primitives_duckdb.py:512-513
+       "# ... DuckDB doesn't support MERGE (20 ops) ..."
+       "# Expected successes: ~50-60 operations (109 total - 20 MERGE - ...)"
+     The assertion above it (:506, len(results) == 112) is already correct; only
+     the comment is stale. Note the same test (:501) calls
+     execute_operation(op_id, conn) WITHOUT platform_key and reset()s between
+     ops (:499), so it exercises the raw un-gated path (legacy MERGE INTO ops
+     truly FAIL) and does NOT cover the shipped `--platform duckdb` SKIP path
+     (#931) nor the production no-reset cleanup path. Fixing the comment is the
+     required change; adding real coverage for the shipped paths is an optional
+     work unit below.
+
+  3. Pre-existing house-rule em/en-dash violations (PR #922 claimed "no
+     em/en-dashes"):
+       - _blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md:104
+       - docs/benchmarks/write-primitives.md:130
+
+work:
+  - id: w0
+    summary: >
+      DECISION GATE for docs/_build tracking. (A) Regenerate docs/_build with the
+      Sphinx build so the committed HTML matches the 112-count source. (B) Stop
+      tracking docs/_build entirely (add to .gitignore + git rm --cached) since
+      it is generated output. Recommendation: (B) if the team does not rely on
+      committed HTML; otherwise (A). This gate decides whether w1 regenerates or
+      removes.
+    status: pending
+  - id: w1
+    summary: >
+      Execute the w0 decision: either regenerate docs/_build via the project's
+      Sphinx build and commit the refreshed 112-count HTML, or untrack
+      docs/_build (.gitignore + git rm --cached -r docs/_build) so stale build
+      output stops shipping.
+    needs: [w0]
+    status: pending
+  - id: w2
+    summary: >
+      Update the stale comment at tests/integration/test_write_primitives_duckdb.py
+      :512-513 to reflect 112 ops / 23 merge and the fact that this path is
+      un-gated (no platform_key) and resets between ops.
+    status: pending
+  - id: w3
+    summary: >
+      Replace the em/en-dashes at draft:104 and docs/benchmarks/write-primitives.md
+      :130 with house-style punctuation (comma / parenthetical / restructure).
+      Coordinate with scd2-portability-claim-accuracy which also touches
+      draft:104 / docs:134 — land order should avoid a conflict.
+    status: pending
+  - id: w4
+    summary: >
+      OPTIONAL coverage improvement (defer if out of appetite): add a focused
+      DuckDB test that calls execute_operation(op_id, conn, platform_key='duckdb')
+      and asserts the three SCD2 ops return SUCCESS while legacy MERGE INTO ops
+      return status SKIPPED (validates #931), plus a no-reset sequential test
+      asserting the dimension returns to seed after basic->no_change->
+      new_keys_only (validates cleanup on the production path).
+    needs: [w2]
+    status: pending
+
+deferred:
+  - summary: "Broader audit of other benchmarks' docs/_build for stale counts"
+    reason: "Scope is SCD2 follow-up; a repo-wide build-artifact policy is a separate concern."
+
+open_questions:
+  - "Is docs/_build intended to be a committed, browsable artifact, or should it be gitignored build output? (drives w0)"
+
+must_preserve:
+  - "The already-correct 112 / 23 / 18 counts in the source docs/benchmarks/*.md and README — do not regress them."
+  - "tests/integration/test_write_primitives_duckdb.py assertion `len(results) == 112` and the MERGE-failure assertion for the un-gated path."
+
+approach: |
+  Mechanical hygiene. Do the count/build fix (w0->w1) and the comment/dash fixes
+  (w2, w3) as independent small commits. Treat w4 as optional; if the team wants
+  the shipped #931 skip path and no-reset cleanup path under test, it is a genuine
+  coverage gap the current test does not close.
+
+anti_patterns:
+  - "DO NOT hand-edit generated files under docs/_build to patch the number — regenerate or untrack (that is what w0 decides)."
+  - "DO NOT change the test's assertion counts — only the stale prose comment (unless adding the optional w4 tests)."
+
+verification:
+  - description: "No stale 109 count remains in tracked, non-generated files"
+    command: "grep -rniE \"109 operations|109 total\" docs/ tests/ benchbox/ --include=*.md --include=*.py"
+    expected_output: "no matches"
+  - description: "docs/_build either matches 112 or is untracked"
+    command: "git ls-files docs/_build/ | head -1 ; grep -rn \"109 operations\" docs/_build/ 2>/dev/null | head"
+    expected_output: "either docs/_build is no longer tracked (empty ls-files) or grep finds no '109 operations'"
+  - description: "No em/en-dash in the two flagged files"
+    command: "grep -cP \"\\x{2014}|\\x{2013}\" _blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md docs/benchmarks/write-primitives.md"
+    expected_output: "0"
+  - description: "SCD2 DuckDB integration tests still pass"
+    command: "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -k scd2 -q"
+    expected_output: "all selected tests pass"
+
+scope_limit:
+  only_modify:
+    - "docs/_build/"
+    - ".gitignore"
+    - "docs/benchmarks/write-primitives.md"
+    - "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md"
+    - "tests/integration/test_write_primitives_duckdb.py"
+  do_not_modify:
+    - "benchbox/core/write_primitives/catalog/operations.yaml"
+    - "benchbox/core/write_primitives/benchmark.py"
+
+files_affected:
+  modified:
+    - "tests/integration/test_write_primitives_duckdb.py"
+    - "docs/benchmarks/write-primitives.md"
+    - "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md"
+  removed:
+    - "docs/_build/ (if w0 chooses untrack)"
+
+impact:
+  business_value: |
+    Committed docs that still say "109 operations" undercut the count
+    reconciliation that #923 was supposed to finish.
+  technical_debt: |
+    Removes the last stale-count residue and closes the gap where the DuckDB
+    integration test does not exercise the shipped skip / no-reset paths.
+
+metadata:
+  tags: ["scd2", "write-primitives", "docs", "tests", "hygiene", "counts"]
+  estimated_effort: "Small"
+  created_date: "2026-07-08"
+  last_updated: "2026-07-08T00:00:00"
+
+deps:
+  needs:
+    - "scd2-portability-claim-accuracy"
+
+success_metrics:
+  - "No tracked file reports the stale 109 count; docs/_build is consistent or untracked."
+  - "Stale test comment corrected; both flagged em/en-dashes removed."

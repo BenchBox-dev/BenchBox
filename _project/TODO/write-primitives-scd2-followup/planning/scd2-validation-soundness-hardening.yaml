@@ -1,0 +1,141 @@
+id: "scd2-validation-soundness-hardening"
+title: "Harden SCD2 validation naming and document row_hash fingerprint limits"
+worktree: "write-primitives-scd2-followup"
+priority: "Low"
+status: "Identified"
+category: "Testing and Quality Assurance"
+description: |
+  Two latent (non-shipping-defect) soundness observations from the SCD2 audit.
+  Both are currently SAFE on the actual benchmark data; this TODO is about making
+  the safety explicit and robust, not fixing a live bug. A real bug gate is in w0.
+
+  OBSERVATION 1 — misnamed / weak invariant.
+  Every SCD2 op includes a validation `one_current_per_business_key`:
+    SELECT c_custkey FROM scd2_ops_dim_customer WHERE is_current = true
+    GROUP BY c_custkey HAVING COUNT(*) <> 1      (expected_rows: 0)
+  This catches DUPLICATE current versions (COUNT > 1) but a business key with
+  ZERO current rows produces no group row and is silently NOT flagged. So the
+  check does not enforce the "exactly one current per key" invariant its name
+  implies; it only enforces "at most one". In each op this is backstopped by a
+  companion positive-existence check
+  (every_changed_key_has_current_staged_version / every_new_key_present_as_current),
+  so a missing-current regression IS caught today. The gap is that the named
+  invariant is weaker than it reads, which is a trap for future edits that lean
+  on it alone.
+
+  OBSERVATION 2 — row_hash fingerprint robustness.
+  benchbox/core/write_primitives/benchmark.py:_scd2_row_hash_expr builds
+    c_name || '|' || c_address || '|' || CAST(acctbal AS VARCHAR) || '|' || c_mktsegment
+  Verified SAFE for TPC-H: SF0.01 customer has 0 pipe chars in name/address/
+  mktsegment and clean decimal acctbal formatting (e.g. '711.56'), and the
+  fingerprint is only ever compared same-engine (dim and stage row_hash computed
+  in the same setup), so CAST-formatting drift across engines cannot cause a
+  false match/miss within a run. The latent risk is a literal '|' delimiter
+  inside an attribute (delimiter injection) or reuse of this fingerprint over
+  arbitrary non-TPC-H data, either of which could make a CHANGED row look
+  unchanged or vice versa. No shipped defect; document the assumption and
+  optionally use a collision-resistant delimiter/encoding.
+
+work:
+  - id: w0
+    summary: >
+      DECISION GATE / bug check: confirm both items are non-shipping (they are on
+      current evidence). Re-run the zero-current probe — delete the INSERT half of
+      merge_scd_type2_basic in a scratch harness and confirm the op is still
+      failed by the companion positive check (not by one_current_per_business_key).
+      If ANY op lacks a positive backstop for its keys, escalate that op to a
+      real defect and fix the validation. Otherwise proceed as hardening-only.
+    status: pending
+  - id: w1
+    summary: >
+      Rename/annotate the invariant honestly: either rename the validation id to
+      at_most_one_current_per_business_key across all three ops in
+      operations.yaml, OR (preferred) strengthen it to also flag zero-current
+      business keys that have a current staged version, so the name holds. Keep
+      expected_rows: 0 semantics. Regenerate any registry-derived count/doc that
+      references validation ids.
+    needs: [w0]
+    status: pending
+  - id: w2
+    summary: >
+      Add a short code comment at _scd2_row_hash_expr documenting the same-engine
+      comparison guarantee and the '|' delimiter / arbitrary-data assumption, so
+      a future reuse of this fingerprint over non-TPC-H data does not silently
+      inherit a collision risk. Optionally switch the literal '|' to a
+      lower-collision separator or length-prefacing if the team wants defense in
+      depth (guard behind w0 confirming no behavior change on TPC-H).
+    status: pending
+  - id: w3
+    summary: >
+      If w1 changed any validation SQL, re-run the SCD2 unit + DuckDB integration
+      tests and confirm all three ops still validate green on real dbgen TPC-H;
+      add/adjust a unit assertion that the strengthened invariant flags a
+      synthetic zero-current row.
+    needs: [w1, w2]
+    status: pending
+
+deferred:
+  - summary: "Generalize row_hash to a real hash function (md5/sha) per engine"
+    reason: "Portability of hash functions across engines is itself non-trivial; the delimiter concat was a deliberate portable choice. Only revisit if the fingerprint is reused outside TPC-H."
+
+open_questions:
+  - "Rename vs strengthen the one_current_per_business_key check — is the extra zero-current predicate worth the added query cost in the benchmark hot path?"
+  - "Is row_hash ever intended to run over user-supplied dimension data (where '|' could appear), or is it forever TPC-H-scoped?"
+
+must_preserve:
+  - "All three SCD2 ops must continue to validate green on real dbgen TPC-H at SF0.01/SF0.1 with identical SCD2 history semantics."
+  - "The portable, single-engine-friendly nature of the fingerprint (no engine-specific hash function) — see the sibling portability TODO."
+  - "expected_rows: 0 offending-row validation style (the harness checks row count only)."
+
+approach: |
+  Hardening, not a fix. Start at w0 to confirm no op is actually unprotected. If
+  confirmed safe, the changes are a validation rename/strengthen plus a code
+  comment. Keep the benchmark hot path cheap — do not add expensive validation
+  that would distort the measured write times the blog reports.
+
+anti_patterns:
+  - "DO NOT swap the portable '|' concat for an engine-specific hash() — that reintroduces the portability problem the design avoided."
+  - "DO NOT add heavy validation SQL to the measured operation path — validations run inside the timed op cycle context; keep them O(scan) like the existing ones."
+  - "DO NOT treat this as a blocker — verified non-shipping on current data."
+
+verification:
+  - description: "All SCD2 ops still green on real TPC-H via DuckDB"
+    command: "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py tests/integration/test_write_primitives_duckdb.py -k scd2 -q"
+    expected_output: "all selected tests pass"
+  - description: "Strengthened/renamed invariant is consistent across all three ops"
+    command: "grep -oE \"(one|at_most_one)_current_per_business_key\" benchbox/core/write_primitives/catalog/operations.yaml | sort | uniq -c"
+    expected_output: "the chosen id appears for all three SCD2 ops, none of the old id"
+  - description: "row_hash assumption documented"
+    command: "grep -n \"delimiter\\|same-engine\\|collision\" benchbox/core/write_primitives/benchmark.py"
+    expected_output: "comment present at _scd2_row_hash_expr"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/write_primitives/catalog/operations.yaml"
+    - "benchbox/core/write_primitives/benchmark.py"
+    - "tests/unit/benchmarks/test_write_primitives_core.py"
+  do_not_modify:
+    - "benchbox/core/write_primitives/schema_specs.yaml"
+    - "benchbox/sql_compat/"
+
+files_affected:
+  modified:
+    - "benchbox/core/write_primitives/catalog/operations.yaml"
+    - "benchbox/core/write_primitives/benchmark.py"
+    - "tests/unit/benchmarks/test_write_primitives_core.py"
+
+impact:
+  technical_debt: |
+    Aligns a validation's name with what it actually enforces and records the
+    fingerprint's safety assumptions, preventing a future edit from leaning on a
+    weaker-than-named invariant or reusing the delimiter concat unsafely.
+
+metadata:
+  tags: ["scd2", "write-primitives", "validation", "row-hash", "hardening"]
+  estimated_effort: "Small"
+  created_date: "2026-07-08"
+  last_updated: "2026-07-08T00:00:00"
+
+success_metrics:
+  - "one_current_per_business_key either renamed to its true meaning or strengthened to enforce exactly-one."
+  - "row_hash same-engine + delimiter assumptions documented in code; no behavior change on TPC-H."
