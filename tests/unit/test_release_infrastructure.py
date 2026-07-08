@@ -599,6 +599,68 @@ class TestReleaseInfrastructure:
             f"release commit must skip hooks (curation already deleted the hook config): {commit_match.group(1)}"
         )
 
+    def test_release_cut_branch_sweep_matches_only_release_branches(self):
+        """The Option-c stale-branch sweep must filter full refs, not `ls-remote 'v*'` alone.
+
+        `git ls-remote --heads origin 'v*'` matches the LAST path component of a ref,
+        so it also matches non-release branches like `fix/validate-submission-...`
+        (last component starts with "v") — the 2026-07-08 v0.3.1 re-cut deleted exactly
+        such a branch. The sweep must additionally filter the full `refs/heads/...` path
+        against the release-branch shape, mirroring `_RELEASE_BRANCH_RE` in
+        scripts/generate_changelog_entry.py.
+        """
+        recipe = _make_target_recipe("release-cut")
+        sweep_match = re.search(r"^\t@?for br in \$\$\((.+?)\); do", recipe, re.MULTILINE)
+        assert sweep_match, "expected the stale release-branch sweep `for br in $$(...)` in release-cut"
+        pipeline = sweep_match.group(1)
+        assert "awk" in pipeline, "sweep must filter with awk against the full ref, not just `ls-remote 'v*'`"
+
+        awk_match = re.search(r"awk '(.+?)'", pipeline)
+        assert awk_match, "expected an awk filter in the sweep pipeline"
+        awk_program = awk_match.group(1)
+        # $2 is `refs/heads/<name>` per `git ls-remote --heads` output.
+        assert re.search(r"\$2\s*~", awk_program), "awk filter must match against the full ref ($2), not $1/$NF"
+        assert r"refs\/heads\/" in awk_program or "refs/heads/" in awk_program, (
+            "awk filter must anchor to refs/heads/ to avoid matching bare tag-ish names"
+        )
+
+        # Simulate `git ls-remote --heads` output for a realistic mix of refs and confirm
+        # the sweep pipeline (minus the trailing version-exclusion) keeps only true
+        # release branches, dropping the branch that caused the 2026-07-08 incident.
+        sample_refs = [
+            "refs/heads/v0.3.0",
+            "refs/heads/v0.3.1",
+            "refs/heads/v0.3.1-rc1",
+            "refs/heads/fix/validate-submission-self-green-guard",
+            "refs/heads/version-bump-tooling",
+            "refs/heads/vendor/foo",
+        ]
+        sample_input = "\n".join(f"deadbeef\t{ref}" for ref in sample_refs)
+        # Isolate the ref-filtering stages (awk + sed) from `ls-remote` (replaced by
+        # piped-in sample data) and the trailing `grep -Fxv "v$(VERSION)"` (a Make
+        # variable this test doesn't expand, and unrelated to the ref-shape bug).
+        pipeline_without_ls_remote = re.sub(r"^git ls-remote --heads origin 'v\*'\s*\|\s*", "", pipeline)
+        pipeline_without_version_grep = re.sub(
+            r'\s*\|\s*grep -Fxv "v\$\(VERSION\)"\s*$', "", pipeline_without_ls_remote
+        )
+        assert pipeline_without_version_grep != pipeline_without_ls_remote, (
+            "expected to isolate the awk/sed stages from the trailing version-exclusion grep"
+        )
+        # Make collapses `$$` to a literal `$` in recipes before the shell ever sees it;
+        # emulate that here since this test runs the extracted text via bash directly.
+        shell_pipeline = pipeline_without_version_grep.replace("$$", "$")
+        result = subprocess.run(
+            ["bash", "-c", shell_pipeline],
+            input=sample_input,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        matched = set(result.stdout.split())
+        assert matched == {"v0.3.0", "v0.3.1", "v0.3.1-rc1"}, (
+            f"sweep must match only true release branches, got: {sorted(matched)}"
+        )
+
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""
         templates_dir = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
