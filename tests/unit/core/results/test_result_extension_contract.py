@@ -143,3 +143,22 @@ def test_plan_capture_error_reaches_the_exported_query_row() -> None:
 
     entry = next(q for q in payload["queries"] if q["id"] == "1")
     assert entry["plan_capture_error"] == "TypeError: unsupported operand"
+
+
+def test_plan_capture_error_survives_export_load_reexport_round_trip() -> None:
+    """#1052 review: the export fix alone is incomplete - reload
+    (reconstruct_benchmark_results) must also carry plan_capture_error
+    forward, or export -> load -> re-export silently drops it again even
+    though it survives the first export."""
+    result = _extension_result()
+    result.query_results[0]["plan_capture_error"] = "TypeError: unsupported operand"
+
+    payload = build_result_payload(result)
+    reconstructed = reconstruct_benchmark_results(payload)
+    round_trip = build_result_payload(reconstructed)
+
+    reconstructed_row = next(q for q in reconstructed.query_results if q.get("query_id") == "1")
+    assert reconstructed_row["plan_capture_error"] == "TypeError: unsupported operand"
+
+    round_trip_entry = next(q for q in round_trip["queries"] if q["id"] == "1")
+    assert round_trip_entry["plan_capture_error"] == "TypeError: unsupported operand"

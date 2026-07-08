@@ -550,6 +550,12 @@ def _reconstruct_query_results(
             result["run_type"] = q["run_type"]
         if q.get("test_type"):
             result["test_type"] = q["test_type"]
+        if q.get("plan_capture_error") is not None:
+            # Real DataFrame plan-capture-error cause (qpc-05 / F4.4, #1052
+            # review): without this, the export -> load -> re-export round
+            # trip silently drops it again even though it survives the JSON
+            # export itself.
+            result["plan_capture_error"] = q["plan_capture_error"]
 
         if status not in ("SUCCESS", "SKIPPED") and query_id is not None:
             error_queue = query_errors_by_id.get(normalize_query_id(query_id))
