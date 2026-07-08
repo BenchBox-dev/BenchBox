@@ -212,7 +212,7 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.1
 - [HammerDB Official Site](https://www.hammerdb.com/)
 - [HammerDB GitHub (TPC Council)](https://github.com/TPC-Council/HammerDB)
 - [BenchBase GitHub (CMU)](https://github.com/cmu-db/benchbase)
-- [LakeBench GitHub](https://github.com/mwc360/LakeBench)
+- [LakeBench GitHub](https://github.com/microsoft/LakeBench)
 
 ## See Also
 

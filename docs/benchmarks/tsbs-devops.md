@@ -445,5 +445,5 @@ The generator creates realistic data with:
 ## External Resources
 
 - [TSBS GitHub Repository](https://github.com/timescale/tsbs) - Original implementation
-- [TimescaleDB Documentation](https://docs.timescale.com/) - Time-series optimization
-- [InfluxDB Line Protocol](https://docs.influxdata.com/influxdb/latest/reference/syntax/line-protocol/) - Time-series data format
+- [TimescaleDB Documentation](https://www.tigerdata.com/docs) - Time-series optimization
+- [InfluxDB Line Protocol](https://docs.influxdata.com/influxdb/v2/reference/syntax/line-protocol/) - Time-series data format

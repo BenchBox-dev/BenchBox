@@ -38,7 +38,7 @@ uv add benchbox --extra cloud-spark-databricks
 The base `databricks` extra covers SQL-mode only; it does **not** pull in
 `databricks-connect`. Use `cloud-spark-databricks` (or the legacy
 `databricks-connect` alias) for DataFrame-mode runs. See
-[Databricks Connect docs](https://docs.databricks.com/dev-tools/databricks-connect.html).
+[Databricks Connect docs](https://docs.databricks.com/aws/en/dev-tools/databricks-connect).
 
 ## Authentication
 

@@ -34,7 +34,7 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0
 
 ### Getting Your Credentials
 
-1. Sign in to [clickhouse.cloud](https://clickhouse.cloud)
+1. Sign in to [clickhouse.cloud](https://console.clickhouse.cloud/)
 2. Navigate to your service
 3. Click "Connect" to get your connection details:
    - **Host**: `abc123.us-east-2.aws.clickhouse.cloud`

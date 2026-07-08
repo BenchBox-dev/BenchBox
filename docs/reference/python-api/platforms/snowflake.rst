@@ -772,8 +772,8 @@ API Reference
 External Resources
 ~~~~~~~~~~~~~~~~~~
 
-- `Snowflake Documentation <https://docs.snowflake.com/>`_ - Official Snowflake docs
-- `Warehouse Sizing <https://docs.snowflake.com/en/user-guide/warehouses-considerations.html>`_ - Sizing guidance
-- `Clustering Keys <https://docs.snowflake.com/en/user-guide/tables-clustering-keys.html>`_ - Clustering best practices
-- `Cost Optimization <https://docs.snowflake.com/en/user-guide/cost-understanding.html>`_ - Cost management
-- `Time Travel <https://docs.snowflake.com/en/user-guide/data-time-travel.html>`_ - Time Travel guide
+- `Snowflake Documentation <https://docs.snowflake.com/en/>`_ - Official Snowflake docs
+- `Warehouse Sizing <https://docs.snowflake.com/en/user-guide/warehouses-considerations>`_ - Sizing guidance
+- `Clustering Keys <https://docs.snowflake.com/en/user-guide/tables-clustering-keys>`_ - Clustering best practices
+- `Cost Optimization <https://docs.snowflake.com/en/user-guide/cost-understanding-overall>`_ - Cost management
+- `Time Travel <https://docs.snowflake.com/en/user-guide/data-time-travel>`_ - Time Travel guide
