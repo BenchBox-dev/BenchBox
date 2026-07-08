@@ -509,12 +509,16 @@ class TestWritePrimitivesDuckDBBenchmarkRuns:
         for result in results:
             assert isinstance(result, OperationResult)
 
-        # Most should succeed, but DuckDB doesn't support MERGE (20 ops) and some other advanced features
-        # Expected successes: ~50-60 operations (109 total - 20 MERGE - ~30-40 other DB-specific features)
+        # This path calls execute_operation without platform_key, so the DuckDB MERGE-skip
+        # gate (duckdb_write_primitive_skip_reason, PR #931) does NOT apply here: the 20
+        # legacy MERGE INTO ops actually fail on DuckDB, while the 3 portable SCD2 ops run.
+        # Successes land around 50-60 of the 112 ops (112 - 20 failing MERGE INTO - ~30-40
+        # other DB-specific features). The shipped `--platform duckdb` skip path is covered
+        # separately by the -k scd2 tests.
         successful = [r for r in results if r.success]
         assert len(successful) >= 50, f"Expected at least 50 successes, got {len(successful)}"
 
-        # Verify that MERGE operations fail with expected error on DuckDB
+        # Verify that MERGE operations fail with expected error on DuckDB (un-gated path)
         merge_results = [r for r in results if r.operation_id.startswith("merge_")]
         merge_failures = [r for r in merge_results if not r.success]
         assert len(merge_failures) > 0, "Expected some MERGE operations to fail on DuckDB"
