@@ -2,7 +2,7 @@ id: joinorder-canonical-release-asset-restore
 title: "fix(joinorder): restore the canonical IMDb 2013 archive GitHub Release asset (fetch URL 404s)"
 worktree: main
 priority: High
-status: Blocked
+status: Completed
 category: Core Functionality
 
 blockers:
@@ -68,12 +68,25 @@ description: |
   manifest and _project/joinorder/release-notes.md:8) exists only in local
   build/UAT caches, not in the repo.
 
+  RESOLVED 2026-07-09. The byte-identical archive was unrecoverable (no local
+  copy, no backup, non-deterministic rebuild), so the original "re-upload the
+  exact asset" plan (w1-w3) was superseded by
+  _project/decisions/joinorder-logical-verification-2026-07-08.md: adopt
+  logical row-content verification as the dataset identity, keep dataset_version
+  joinorder-imdb-2013-v1 (a transport-wrapper rebuild, logical content
+  unchanged), rebuild the archive via the foundation pipeline, and re-publish.
+  Outcome: manifest is logical-mode (per-table logical_sha256; logical
+  manifest_hash/data_archive_hash stable across future rebuilds); new archive
+  106ae78c published at tag data/joinorder-imdb-2013-v1 (asset URL now 200, not
+  404); cold-cache generate_data() returns 21 tables and verify_logical_content
+  reports ALL_MATCH on the full 74M-row dataset.
+
 deps: {}
 
 work:
   - id: w1
     summary: "Determine why the release object is missing (never promoted vs deleted) and record it"
-    status: pending
+    status: done
     notes: |
       Check the GitHub audit log / release history for tag
       data/joinorder-imdb-2013-v1. One line in this TODO's notes or the
@@ -83,7 +96,7 @@ work:
   - id: w2
     summary: "Re-publish the release at tag data/joinorder-imdb-2013-v1 with the archive asset"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       From a machine that has the built archive (owner's build cache or a
       rebuild via _project/scripts/build_joinorder_data.py):
@@ -96,7 +109,7 @@ work:
   - id: w3
     summary: "Verify cold-cache fetch end-to-end and close the loop on the UAT deferral"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       curl -sSI on the manifest URL must return 302/200 (not 404), and a
       cold-cache `JoinOrderBenchmark.generate_data()` (or
