@@ -185,6 +185,130 @@ class TestTimingMeasurementAccuracy:
             assert abs(measured_ttt - max_stream_duration) < 0.5
 
 
+class TestGenerationExcludedFromTiming:
+    """Validate that query GENERATION cost is excluded from the timed window.
+
+    Query generation (qgen/dsqgen subprocess calls) used to run INSIDE the
+    per-query timed region, contaminating both ``execution_time_seconds`` and
+    TTT with generation cost. These tests instrument ``get_query`` to sleep
+    for a known duration and assert neither the per-query timing nor TTT
+    include it, proving generation now happens entirely before the timed
+    concurrent window (see ``_pregenerate_stream_queries`` in both
+    ``tpch/throughput_test.py`` and ``tpcds/throughput_test.py``).
+    """
+
+    GENERATION_SLEEP = 0.3
+
+    def test_tpch_generation_time_excluded_from_timing(self):
+        """22 queries x 0.3s sleep = 6.6s of generation cost must not land
+        inside TTT or any single query's execution_time_seconds."""
+
+        def slow_get_query(*args, **kwargs):
+            time.sleep(self.GENERATION_SLEEP)
+            return "SELECT 1"
+
+        benchmark = Mock()
+        benchmark.get_query = slow_get_query
+
+        def connection_factory():
+            conn = Mock()
+            cursor = Mock()
+            cursor.fetchall.return_value = []
+            conn.execute.return_value = cursor
+            conn.close.return_value = None
+            return conn
+
+        config = TPCHThroughputTestConfig(
+            scale_factor=0.01,
+            num_streams=1,
+            stream_timeout=30,
+            verbose=False,
+        )
+
+        test = TPCHThroughputTest(
+            benchmark=benchmark,
+            connection_factory=connection_factory,
+            scale_factor=config.scale_factor,
+            num_streams=config.num_streams,
+            verbose=config.verbose,
+        )
+
+        result = test.run(config)
+
+        assert result.success
+        assert result.stream_results[0].queries_executed == 22
+
+        total_generation_time = 22 * self.GENERATION_SLEEP
+        # TTT excludes generation entirely -- it happens before the timed
+        # window starts, so it should be nowhere near the 6.6s of sleeping
+        # that 22 in-loop get_query() calls would have added.
+        assert result.total_time < total_generation_time
+        for query_result in result.stream_results[0].query_results:
+            assert query_result["execution_time_seconds"] < self.GENERATION_SLEEP
+
+    def test_tpcds_generation_time_excluded_from_timing(self):
+        """3 queries x 0.3s sleep = 0.9s of generation cost must not land
+        inside TTT or any single query's execution_time_seconds."""
+
+        def slow_get_query(*args, **kwargs):
+            time.sleep(self.GENERATION_SLEEP)
+            return "SELECT 1"
+
+        def connection_factory():
+            conn = Mock()
+            cursor = Mock()
+            cursor.fetchall.return_value = []
+            conn.execute.return_value = cursor
+            conn.close.return_value = None
+            conn.commit.return_value = None
+            return conn
+
+        benchmark = Mock()
+        benchmark.get_query = slow_get_query
+        benchmark.get_queries.return_value = {"1": "SELECT 1", "2": "SELECT 2", "3": "SELECT 3"}
+        benchmark.query_manager = Mock()
+
+        config = TPCDSThroughputTestConfig(
+            scale_factor=1.0,
+            num_streams=1,
+            stream_timeout=30,
+            verbose=False,
+            queries_per_stream=3,
+            enable_preflight=True,  # pre-generation only runs when preflight is enabled
+        )
+
+        test = TPCDSThroughputTest(
+            benchmark=benchmark,
+            connection_factory=connection_factory,
+            scale_factor=config.scale_factor,
+            num_streams=config.num_streams,
+            verbose=config.verbose,
+        )
+
+        from unittest.mock import patch
+
+        with patch("benchbox.core.tpcds.streams.create_standard_streams") as mock_create:
+            mock_manager = Mock()
+            mock_manager.generate_streams.return_value = {
+                0: [
+                    Mock(stream_id=0, query_id=1, position=0, variant=None, sql="SELECT 1"),
+                    Mock(stream_id=0, query_id=2, position=1, variant=None, sql="SELECT 2"),
+                    Mock(stream_id=0, query_id=3, position=2, variant=None, sql="SELECT 3"),
+                ]
+            }
+            mock_create.return_value = mock_manager
+
+            result = test.run(config)
+
+        assert result.success
+        assert result.stream_results[0].queries_executed == 3
+
+        total_generation_time = 3 * self.GENERATION_SLEEP
+        assert result.total_time < total_generation_time
+        for query_result in result.stream_results[0].query_results:
+            assert query_result["execution_time_seconds"] < self.GENERATION_SLEEP
+
+
 class TestConnectionCleanup:
     """Validate connection cleanup on failures."""
 

@@ -12,6 +12,7 @@ This implementation is based on the TPC-H specification.
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import concurrent.futures
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -85,6 +86,14 @@ class TPCHThroughputTest:
         # Initialize captured items for dry-run SQL preview
         self.captured_items: list[tuple[str, str]] = []
 
+        # Populated by run() via _pregenerate_stream_queries() before the timed
+        # concurrent window starts. When set, _execute_stream() consumes this
+        # pre-built SQL instead of generating inline. Left as None when
+        # _execute_stream() is invoked directly (bypassing run()), which
+        # preserves the historical inline-generation behavior for direct/unit
+        # callers and test doubles.
+        self._pregenerated_queries: Optional[dict[int, list[Any]]] = None
+
     def run(self, config: Optional[TPCHThroughputTestConfig] = None) -> TPCHThroughputTestResult:
         """Execute the TPC-H Throughput Test.
 
@@ -124,6 +133,12 @@ class TPCHThroughputTest:
                 self.logger.info(f"Number of streams: {config.num_streams}")
                 self.logger.info(f"Scale factor: {config.scale_factor}")
 
+            # Pre-generate every stream's ordered SQL text BEFORE the timed
+            # concurrent window starts. This removes qgen subprocess/tempdir
+            # cost from execution_time_seconds and TTT -- _execute_stream()
+            # only performs connection use and DB execution once this is set.
+            self._pregenerated_queries = self._pregenerate_stream_queries(config)
+
             # Execute concurrent streams
             StreamRunner.execute(self._execute_stream, config, result, self.logger)
 
@@ -161,6 +176,101 @@ class TPCHThroughputTest:
                 self.logger.error(f"Throughput Test failed: {e}")
 
             return result
+
+    def _pregenerate_stream_queries(self, config: TPCHThroughputTestConfig) -> dict[int, list[Any]]:
+        """Pre-generate ordered SQL text for every stream before the timed window.
+
+        Builds a ``{stream_id: [sql_or_exception, ...]}`` map (one entry per
+        permutation position) using the *exact* per-stream, per-position seed
+        formula ``seed + stream_id * 1000 + position`` that ``_execute_stream``
+        has always used, so generated SQL is byte-identical to before -- only
+        *when* it is generated changes.
+
+        Deviation from the TODO's literal instruction: the native
+        ``qgen -p <stream>`` batch path (``TPCHStreamManager.
+        _generate_stream_queries_qgen``) seeds its single subprocess call with
+        ``rng_seed + stream_id`` and lets qgen derive all 22 per-query seeds
+        internally from that ONE value (see ``qgen.c`` main(): ``Seed[0] =
+        rndm; Seed[i] = NextRand(Seed[i-1])`` for i=1..22, indexed by query
+        number). That is a fundamentally different Park-Miller LCG seed chain
+        than this throughput test's per-*position* seed convention. Routing
+        through the batch path would silently change every generated query's
+        substitution parameters -- a correctness regression the TODO's own
+        ``must_preserve`` explicitly forbids. So per-query generation is kept
+        (via the existing ``self.benchmark.get_query`` path), but moved
+        entirely out of the timed loop and parallelized across streams here;
+        see ``QGenBinary._ensure_work_dir`` (queries.py) for the complementary
+        fix that removes the per-call temp-dir + dists.dss copy overhead this
+        TODO also flagged.
+
+        Generation failures are captured per-position (not raised) so a
+        single bad query still only fails that one query during execution,
+        matching today's per-query fault isolation in ``_execute_stream``.
+        """
+        from benchbox.core.tpch.streams import TPCHStreams
+
+        def _generate_one_stream(stream_id: int) -> tuple[int, list[Any]]:
+            seed = config.base_seed + stream_id
+            query_permutation = TPCHStreams.PERMUTATION_MATRIX[stream_id % len(TPCHStreams.PERMUTATION_MATRIX)]
+            sql_list: list[Any] = []
+            for position, query_id in enumerate(query_permutation):
+                stream_seed = seed + stream_id * 1000 + position
+                try:
+                    sql_list.append(
+                        self.benchmark.get_query(
+                            query_id,
+                            seed=stream_seed,
+                            stream_id=stream_id,
+                            scale_factor=config.scale_factor,
+                        )
+                    )
+                except Exception as exc:  # noqa: BLE001 - deferred to per-query fault isolation
+                    sql_list.append(exc)
+            return stream_id, sql_list
+
+        stream_queries: dict[int, list[Any]] = {}
+        if config.num_streams <= 0:
+            return stream_queries
+
+        max_workers = max(1, config.max_workers or config.num_streams)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(_generate_one_stream, sid) for sid in range(config.num_streams)]
+            for future in concurrent.futures.as_completed(futures):
+                stream_id, sql_list = future.result()
+                stream_queries[stream_id] = sql_list
+
+        return stream_queries
+
+    def _resolve_query_text(
+        self,
+        pregenerated: Optional[list[Any]],
+        position: int,
+        stream_id: int,
+        seed: int,
+        query_id: int,
+        config: TPCHThroughputTestConfig,
+    ) -> str:
+        """Return this position's SQL: pre-generated if available, else inline.
+
+        Re-raises a cached generation failure so it still only fails this one
+        query, matching the per-query fault isolation _execute_stream has
+        always had.
+        """
+        if pregenerated is not None:
+            pre = pregenerated[position]
+            if isinstance(pre, BaseException):
+                raise pre
+            return pre
+
+        # Fall back to inline generation (_execute_stream called directly,
+        # bypassing run()'s pre-generation pass).
+        stream_seed = seed + stream_id * 1000 + position
+        return self.benchmark.get_query(
+            query_id,
+            seed=stream_seed,
+            stream_id=stream_id,
+            scale_factor=config.scale_factor,
+        )
 
     def _execute_stream(
         self, stream_id: int, seed: int, config: TPCHThroughputTestConfig
@@ -204,6 +314,11 @@ class TPCHThroughputTest:
             if config.verbose:
                 self.logger.info(f"Stream {stream_id} using TPC-H permutation: {query_permutation}")
 
+            # If run() pre-generated this stream's SQL (the normal path), use
+            # it; otherwise (e.g. _execute_stream() called directly, bypassing
+            # run()) fall back to inline generation exactly as before.
+            pregenerated = self._pregenerated_queries.get(stream_id) if self._pregenerated_queries is not None else None
+
             for position, query_id in enumerate(query_permutation):
                 query_start = mono_time()
                 query_result = {
@@ -217,15 +332,7 @@ class TPCHThroughputTest:
                 }
 
                 try:
-                    # Get the query with stream-specific parameters
-                    # Use stream and position-specific seed as per TPC-H specification
-                    stream_seed = seed + stream_id * 1000 + position
-                    query_text = self.benchmark.get_query(
-                        query_id,
-                        seed=stream_seed,
-                        stream_id=stream_id,
-                        scale_factor=config.scale_factor,
-                    )
+                    query_text = self._resolve_query_text(pregenerated, position, stream_id, seed, query_id, config)
 
                     # Execute the actual query against the database
                     label = f"Stream_{stream_id}_Position_{position + 1}_Query_{query_id}"
