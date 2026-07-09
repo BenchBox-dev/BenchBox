@@ -442,7 +442,10 @@ def _handle_execute(args: argparse.Namespace) -> int:
 
 
 def _handle_docker_cleanup(args: argparse.Namespace) -> int:
-    """Implements `make uat-docker-cleanup [APPLY=1]`."""
+    """Implements `make uat-docker-cleanup [ENGINE=] [MODE=] [APPLY=1]`."""
+    if args.engine == "container":
+        return _handle_container_cleanup(args)
+
     from tests.uat import docker_cleanup
 
     try:
@@ -454,6 +457,23 @@ def _handle_docker_cleanup(args: argparse.Namespace) -> int:
         print(f"[uat-docker-cleanup] ERROR: {exc}", file=sys.stderr)
         return 2
     print(docker_cleanup.format_cleanup_report(report))
+    return 0
+
+
+def _handle_container_cleanup(args: argparse.Namespace) -> int:
+    """Apple `container` mode of `make uat-docker-cleanup ENGINE=container`."""
+    from tests.uat import container_cleanup
+
+    try:
+        report = container_cleanup.reclaim_container_usage(
+            project_prefix=args.prefix,
+            mode=args.mode,
+            apply=args.apply,
+        )
+    except container_cleanup.ContainerCleanupError as exc:
+        print(f"[uat-docker-cleanup] ERROR: {exc}", file=sys.stderr)
+        return 2
+    print(container_cleanup.format_container_cleanup_report(report))
     return 0
 
 
@@ -546,18 +566,32 @@ def _build_parser() -> argparse.ArgumentParser:
     execute.add_argument("--resume", default=None, help="Path to a prior execute/sweep resume.json manifest")
     _set_handler(execute, _handle_execute)
 
-    docker = subparsers.add_parser("docker-cleanup", help="report or remove abandoned UAT-owned Docker resources")
-    from tests.uat import docker_cleanup
+    docker = subparsers.add_parser(
+        "docker-cleanup", help="report or remove abandoned UAT-owned Docker / Apple container resources"
+    )
+    from tests.uat import container_cleanup, docker_cleanup
 
+    docker.add_argument(
+        "--engine",
+        choices=("docker", "container"),
+        default="docker",
+        help="Cleanup engine: 'docker' (default) or 'container' (Apple container store).",
+    )
+    docker.add_argument(
+        "--mode",
+        choices=container_cleanup.CONTAINER_CLEANUP_MODES,
+        default="owned",
+        help="Apple-container breadth ladder: owned (default) < images < max. Ignored for --engine docker.",
+    )
     docker.add_argument(
         "--prefix",
         default=docker_cleanup.DEFAULT_UAT_PROJECT_PREFIX,
-        help="Docker compose project prefix that marks UAT-owned resources",
+        help="Compose project prefix that marks UAT-owned resources",
     )
     docker.add_argument(
         "--apply",
         action="store_true",
-        help="Remove UAT-owned resources. Without this flag the command only reports the plan.",
+        help="Remove owned resources. Without this flag the command only reports the plan.",
     )
     _set_handler(docker, _handle_docker_cleanup)
 
