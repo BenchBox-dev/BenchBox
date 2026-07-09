@@ -70,6 +70,21 @@ query). NOT validated: 3+ service stacks -- databend stays healthy on docker but
 minio exits on mocker, so use docker for multi-service (doris/starrocks are
 all-in-one single containers).
 
+## Apple container cleanup
+
+The Apple `container` store (`~/Library/Application Support/com.apple.container`)
+grows unbounded -- image snapshots, mocker compose leftovers, the buildkit
+builder's writable cache. Reclaim it via the container mode of the UAT cleanup
+flow: `make uat-docker-cleanup ENGINE=container [MODE=owned|images|max]
+[APPLY=1]`. Dry-run (no `APPLY`) prints `container system df` footprint + the
+plan; it speaks the native `container` CLI (mocker can't inventory). Mode ladder,
+widest last: `owned` (default; `benchbox/*` + `local/benchbox*` images and
+UAT-prefixed compose leftovers) < `images` (+ shared pull-through bases:
+postgres/ubuntu/uv/questdb) < `max` (+ stopped-container/volume prune + builder
+delete, ~all reclaimable). Never removes the store dir or stops `container
+system`. `owned` is safe anytime; `max` also clears non-BenchBox containers, so
+run it only when the engine is idle.
+
 ## Output Discipline
 
 Broad commands are final gates. Long output is an artifact, not chat, and

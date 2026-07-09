@@ -2087,9 +2087,14 @@ uat-bring-up:
 		$(if $(BENCHMARK_RUNS_DIR),--benchmark-runs-dir "$(BENCHMARK_RUNS_DIR)",) \
 		$(if $(DRY_RUN),--dry-run,)
 
-# make uat-docker-cleanup [APPLY=1] [PREFIX=benchbox-uat]
+# make uat-docker-cleanup [ENGINE=docker|container] [MODE=owned|images|max] [APPLY=1] [PREFIX=benchbox-uat]
+# ENGINE=container reclaims the Apple `container` store (~/Library/Application
+# Support/com.apple.container); MODE widens breadth owned<images<max. See
+# AGENTS.md "Apple container cleanup".
 uat-docker-cleanup:
 	@uv run --no-sync -- python -m tests.uat._cli docker-cleanup \
+		$(if $(ENGINE),--engine "$(ENGINE)",) \
+		$(if $(MODE),--mode "$(MODE)",) \
 		$(if $(PREFIX),--prefix "$(PREFIX)",) \
 		$(if $(APPLY),--apply,)
 
@@ -2203,6 +2208,7 @@ help:
 	@echo "UAT Operations:"
 	@echo "  make uat-docker-cleanup        Report abandoned UAT Docker resources and non-UAT cleanup commands"
 	@echo "  make uat-docker-cleanup APPLY=1 Remove only UAT-owned Docker leftovers"
+	@echo "  make uat-docker-cleanup ENGINE=container [MODE=owned|images|max] Reclaim the Apple container store"
 	@echo ""
 	@echo "Coverage:"
 	@echo "  make coverage-fast   Run fast-marked tests with coverage (quick feedback)"
