@@ -37,6 +37,8 @@ from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+import tomllib
+
 # Shared, single-source-of-truth logical-hash algorithm. The build script runs
 # under the repo-root uv environment, so it imports the same primitives the
 # runtime loader/verifier use — build and runtime therefore cannot compute the
@@ -450,6 +452,19 @@ def compute_manifest_hash(path: Path) -> str:
     return hashlib.sha256(manifest_hash_input(path.read_bytes())).hexdigest()
 
 
+def rendered_manifest_identity(manifest_path: Path) -> tuple[str, str]:
+    """Return the (manifest_hash, data_archive_hash) actually written to a
+    rendered manifest.
+
+    Build-manifest records and reference_cardinalities must reflect the identity
+    that shipped in data_manifest.toml. In logical mode those values come from
+    the logical-content hash, not the legacy text/byte hashes, so they are read
+    back from the rendered file rather than recomputed.
+    """
+    raw = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+    return str(raw["manifest_hash"]), str(raw["data_archive_hash"])
+
+
 def aggregate_table_hash(table_files: Sequence[TableFile]) -> str:
     """Stable data identity hash over table sha256s, independent of tar metadata."""
 
@@ -555,9 +570,16 @@ def iter_postgres_csv_records(path: Path) -> Iterator[list[CsvLogicalValue]]:
                     record = record[:-1]
                 if record.endswith("\r"):
                     record = record[:-1]
-                yield parse_postgres_csv_record(record)
                 record_parts = []
                 at_field_start = True
+                if record == "":
+                    # Skip blank lines. A FORCE_QUOTE row is never empty, so an
+                    # empty record is a stray line — e.g. the trailing newline
+                    # that some container runtimes' `exec` stdout capture appends
+                    # to COPY output. Row-count validation guards against real
+                    # data loss.
+                    continue
+                yield parse_postgres_csv_record(record)
         if record_parts:
             raise JoinOrderBuildError(f"CSV file {path} ended inside a quoted record")
 
@@ -882,8 +904,8 @@ def run_command(args: Sequence[str], *, check: bool = True) -> subprocess.Comple
     return result
 
 
-def stream_command(args: Sequence[str], *, check: bool = True) -> subprocess.CompletedProcess[None]:
-    result = subprocess.run(args, check=False)
+def stream_command(args: Sequence[str], *, check: bool = True, stdin: Any = None) -> subprocess.CompletedProcess[None]:
+    result = subprocess.run(args, check=False, stdin=stdin)
     if check and result.returncode != 0:
         command = " ".join(args)
         raise JoinOrderBuildError(f"Command failed ({result.returncode}): {command}")
@@ -980,24 +1002,30 @@ def restore_pgdump(
             replace_existing=replace_existing,
         )
         started = True
-        container_dump_path = f"/tmp/{artifact.path.name}"
-        stream_command([container_cli(), "cp", str(artifact.path), f"{actual_container_name}:{container_dump_path}"])
-        stream_command(
-            [
-                container_cli(),
-                "exec",
-                actual_container_name,
-                "pg_restore",
-                "-U",
-                user,
-                "-d",
-                database,
-                "--no-owner",
-                "--no-privileges",
-                "--exit-on-error",
-                container_dump_path,
-            ]
-        )
+        # Stream the dump straight into pg_restore over stdin rather than
+        # staging it inside the container: some runtimes' `cp` silently
+        # truncate large files (mocker/Apple Containerization delivers a
+        # 0-byte file for a ~1.2 GB dump), and `exec -i` avoids a second
+        # in-container copy of the dump entirely. pg_restore reads a serial
+        # custom-format archive from a pipe fine.
+        with artifact.path.open("rb") as dump:
+            stream_command(
+                [
+                    container_cli(),
+                    "exec",
+                    "-i",
+                    actual_container_name,
+                    "pg_restore",
+                    "-U",
+                    user,
+                    "-d",
+                    database,
+                    "--no-owner",
+                    "--no-privileges",
+                    "--exit-on-error",
+                ],
+                stdin=dump,
+            )
         validation = validate_restored_database(
             container_name=actual_container_name,
             database=database,
@@ -1738,13 +1766,14 @@ def assemble_manifest(
         archive_sha256=archive_sha256,
         output_path=manifest_path,
     )
+    manifest_hash, data_archive_hash = rendered_manifest_identity(manifest_path)
     write_build_manifest(
         work_dir,
         {
             "data_manifest": {
                 "path": str(manifest_path),
-                "manifest_hash": compute_manifest_hash(manifest_path),
-                "data_archive_hash": aggregate_table_hash(table_files),
+                "manifest_hash": manifest_hash,
+                "data_archive_hash": data_archive_hash,
                 "archive_sha256": archive_sha256,
                 "assembled_at": utc_now_iso(),
             }
@@ -3007,12 +3036,13 @@ def write_runtime_manifest(*, work_dir: Path, schema: Mapping[str, Sequence[Colu
         archive_sha256=archive_sha,
         output_path=output_path,
     )
+    runtime_manifest_hash, _ = rendered_manifest_identity(output_path)
     write_build_manifest(
         work_dir,
         {
             "runtime_manifest": {
                 "path": str(output_path),
-                "manifest_hash": compute_manifest_hash(output_path),
+                "manifest_hash": runtime_manifest_hash,
                 "archive_sha256": archive_sha,
                 "written_at": utc_now_iso(),
             }
