@@ -35,11 +35,10 @@ def _source_has_trailing_delimiter(source_files: list[Path]) -> bool:
     """Probe the first source file's tail for a raw dbgen/dsdgen trailing delimiter.
 
     Row framing (trailing ``|`` before the newline, or not) is uniform across
-    an entire TBL file - dbgen/dsdgen decide it once per run/compile, and
-    BenchBox's own normalization pass (see
-    :func:`benchbox.core.tpch.generator.normalize_tbl_trailing_delimiters`)
-    strips it file-wide when present - so checking one file's tail classifies
-    the whole batch.
+    an entire TBL file - dbgen/dsdgen decide it once per run/compile - so
+    checking one file's tail classifies the whole batch. The bundled binaries
+    are all built to emit no trailing delimiter, but this probe keeps the
+    reader robust to either framing.
     """
     if not source_files:
         return False

@@ -194,13 +194,12 @@ class TestSortedParquetWriterSingleColumn:
             writer.write_sorted_parquet("orders", [source], tmp_path)
 
     def test_reads_normalized_tbl_with_no_trailing_delimiter(self, tmp_path: Path):
-        """#1059 review: generator.py's normalize_tbl_trailing_delimiters() now
-        strips the trailing '|' from file-mode TPC-H output before
-        _apply_data_organization() runs. When a schema is supplied, the reader
-        used to unconditionally assume N+1 raw fields (schema columns + a
-        synthetic trailing-delimiter column), which breaks on already-clean
-        N-field rows with a PyArrow column-count mismatch. Detect the file's
-        actual framing instead of assuming it."""
+        """The bundled dbgen binaries emit clean rows (no trailing '|'), so
+        _apply_data_organization() must read N-field rows correctly. When a
+        schema is supplied, the reader used to unconditionally assume N+1 raw
+        fields (schema columns + a synthetic trailing-delimiter column), which
+        breaks on clean N-field rows with a PyArrow column-count mismatch.
+        Detect the file's actual framing instead of assuming it."""
         source = tmp_path / "lineitem.tbl"
         _write_tbl_clean(
             source,
