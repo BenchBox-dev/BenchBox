@@ -1,80 +1,121 @@
-id: experimental-concurrency-promote-or-remove
-title: "Decide promote-or-remove for the orphaned experimental concurrency load-test framework"
+id: rename-experimental-concurrency-to-load-testing
+title: "Rename experimental/concurrency to load_testing to clarify intent (stays experimental)"
 worktree: main
 priority: Medium
 status: Not Started
 category: Core Functionality
 
 description: |
-  benchbox/experimental/concurrency/ is a full, well-tested concurrent
-  load-testing framework that no user-facing path can reach:
-  - executor.py: ConcurrentLoadExecutor (real ThreadPoolExecutor, per-stream
-    connections, dynamic concurrency targeting, background psutil resource
-    monitor, queue-wait + percentile-latency analysis).
-  - patterns.py: Steady/Burst/RampUp/Spike/Step/Wave workload patterns.
-  - pool_tester.py: ConnectionPoolTester (pool exhaustion/churn/under-load).
-  - analyzer.py: ConcurrencyAnalyzer (queue/contention/scaling analysis).
-  It has ~1,900 lines of real-thread unit tests (tests/unit/core/concurrency/)
-  but is imported only within its own package -- no CLI command, orchestrator,
-  or UAT config uses it. README/FAQ document benchbox.experimental as
-  unsupported with no stability guarantees.
+  DECISION MADE (do not re-litigate promote-vs-remove): keep
+  benchbox/experimental/concurrency/, but RENAME it -- the name "concurrency"
+  is a misnomer. It is not the TPC spec concurrency (that lives in
+  core/throughput/). It is a load-testing + workload-analysis framework:
+  - patterns.py: WorkloadPattern shapes (Steady/Burst/RampUp/Spike/Step/Wave)
+    -- time-varying demand profiles.
+  - executor.py: ConcurrentLoadExecutor -- drives a pattern, per-stream
+    connections, dynamic concurrency targeting, background resource monitor.
+  - pool_tester.py: ConnectionPoolTester -- pool exhaustion / churn / under-load.
+  - analyzer.py: ConcurrencyAnalyzer -- queue-dwell, contention, scaling curves.
 
-  This is a fork in the road, not a bug: either this framework is the intended
-  future of realistic multi-user concurrency benchmarking (queue analysis,
-  ramp/burst patterns -- things the spec-oriented throughput test does not do),
-  in which case it should be wired into the CLI/UAT and promoted; OR it is
-  research residue that should be removed to stop accruing test/maintenance cost.
-  Its pool/session abstractions also overlap with
-  throughput-independent-sessions-per-stream -- decide before that work
-  reinvents them.
+  The package name collides conceptually with core/throughput and hides what the
+  code does. Rename to `benchbox/experimental/load_testing/` (recommended). The
+  class names already use the operative term ("ConcurrentLoad*", "Workload*"),
+  so only the package name and one analyzer class are actually misleading.
 
-  Make an explicit, documented decision.
+  SCOPE: this item is a rename + honest re-documentation ONLY. It stays under
+  benchbox.experimental (unsupported, no stability guarantees, not wired into
+  the CLI/registry). Hardening and any decision to wire it into the CLI/UAT are
+  DEFERRED to a separate future item -- do not do that work here.
 
 prior_art:
-  - "benchbox/experimental/concurrency/__init__.py — the package surface to promote or delete."
-  - "docs/design/future-state/isolate-experimental-core-subsystems/README.md — the design doc that moved this behind the experimental boundary; the decision record to update."
-  - "docs/usage/faq.md:20 — the 'experimental is unsupported' caveat to keep consistent with the decision."
-  - "benchbox/core/throughput/runner.py:StreamRunner — the spec-oriented executor this framework would complement (not replace)."
+  - "benchbox/experimental/concurrency/__init__.py — the public surface (__all__) whose internal import paths must be rewritten to the new package name."
+  - "benchbox/experimental/nl2sql/, gpu/, multiregion/, aiml_functions/ — sibling experimental subsystems; keep the same 'experimental package, unsupported' shape and README/FAQ treatment."
+  - "benchbox/core/throughput/ — the SPEC concurrency the old name collides with; the rename exists to disambiguate from this."
+  - "README.md:41 and docs/usage/faq.md:20 — the prose that lists 'concurrency' as an experimental subsystem; update the name there too."
 
 work:
-  - id: w0
-    summary: "Write a short decision doc: promote (wire into CLI/UAT) vs remove, with rationale and overlap analysis vs StreamRunner"
-    status: pending
   - id: w1
-    summary: "If PROMOTE: expose a CLI/experimental entrypoint and one example; keep behind the experimental flag"
-    needs: [w0]
+    summary: "git mv benchbox/experimental/concurrency -> benchbox/experimental/load_testing and rewrite internal imports in __init__.py"
     status: pending
+    notes: |
+      Update the four `from benchbox.experimental.concurrency.<mod> import`
+      lines in __init__.py to the new package path. Keep __all__ unchanged.
   - id: w2
-    summary: "If REMOVE: delete the package and its tests, update docs/pyproject/coverage config, note in CHANGELOG"
-    needs: [w0]
+    summary: "Rename the test dir and update all importers"
+    needs: [w1]
+    status: pending
+    notes: |
+      git mv tests/unit/core/concurrency -> tests/unit/core/load_testing.
+      Update imports in test_analyzer.py, test_executor.py, test_patterns.py,
+      test_pool_tester.py, AND tests/unit/core/test_concurrency_executor_and_joinorder.py
+      (which stays put but imports the package).
+  - id: w3
+    summary: "Update coverage/config references"
+    needs: [w1]
+    status: pending
+    notes: |
+      pyproject.toml:666-667 and .coveragerc_core:22,24 list
+      benchbox/experimental/concurrency/{executor,pool_tester}.py -- repoint to
+      the new path.
+  - id: w4
+    summary: "Rename the one class that perpetuates the confusion: ConcurrencyAnalyzer -> LoadAnalyzer (or WorkloadAnalyzer)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Optional but recommended for consistency with the package name. Update
+      __all__, the class def in analyzer.py, and its importers/tests. The
+      ConcurrentLoad*/Workload* classes already read correctly and can stay.
+  - id: w5
+    summary: "Re-document honestly: update README.md:41 and docs/usage/faq.md:20 to name 'load_testing' and describe it as unsupported load-testing/workload-analysis research"
+    needs: [w1]
     status: pending
 
 must_preserve:
-  - "Whichever branch is chosen, docs must not claim an unreachable feature is supported."
+  - "The package stays under benchbox.experimental and remains unsupported/undocumented as a product feature (no CLI/registry wiring in this item)."
+  - "Public class names ConcurrentLoadExecutor/Config/Result, the WorkloadPattern family, and the pool-tester types keep working (only the package path and ConcurrencyAnalyzer change)."
+  - "All existing tests still pass after the path/class updates."
 
 anti_patterns:
-  - "DO NOT leave it half-wired — because that is the current problem — the deliverable is a decision plus follow-through."
+  - "DO NOT wire it into the CLI/UAT or 'harden' it here — because this item is a rename only — capture that as a separate deferred item."
+  - "DO NOT leave stale import paths — because coverage config and the joinorder test import it from outside the package dir — grep the whole repo for the old path after moving."
 
 verification:
-  - description: "Repo reflects the decision (either reachable+documented, or removed+clean)"
-    command: "uv run -- python -m pytest tests/unit/core/concurrency/ -v"
-    expected_output: "passes (promote) or removed with green suite (remove)"
+  - description: "No references to the old package path remain"
+    command: "rg -rn --fixed-strings 'experimental.concurrency' benchbox tests pyproject.toml .coveragerc_core"
+    expected_output: "no matches"
+  - description: "Renamed package imports and tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/load_testing/ tests/unit/core/test_concurrency_executor_and_joinorder.py -v"
+    expected_output: "all pass under the new path"
 
 scope_limit:
   only_modify:
     - "benchbox/experimental/concurrency/"
+    - "benchbox/experimental/load_testing/"
     - "tests/unit/core/concurrency/"
-    - "docs/"
+    - "tests/unit/core/load_testing/"
+    - "tests/unit/core/test_concurrency_executor_and_joinorder.py"
     - "pyproject.toml"
-    - "CHANGELOG.md"
+    - ".coveragerc_core"
+    - "README.md"
+    - "docs/usage/faq.md"
 
-open_questions:
-  - question: "Is realistic workload-pattern / queue-analysis concurrency a product goal, or is spec-throughput sufficient?"
-    gating: true
-    affects: ["w0"]
-    default: "Keep isolated + explicitly documented as unsupported research; revisit if a user need appears."
+deferred:
+  - summary: "Harden the framework and decide whether to wire it into the CLI/UAT as a supported load-testing mode"
+    reason: "Out of scope for the rename; revisit when there is time to invest in the feature."
+
+impact:
+  technical_debt: |
+    Removes a naming collision with the spec throughput path and makes the
+    module's purpose (load testing / workload analysis) legible, so a future
+    reader does not confuse it with TPC concurrency.
 
 metadata:
-  tags: [concurrency, experimental, decision, tech-debt]
+  tags: [concurrency, experimental, load-testing, rename, naming]
   estimated_effort: Small
   created_date: "2026-07-09"
+
+open_questions:
+  - question: "Final package name: load_testing (recommended) vs workload_lab vs load_analysis?"
+    gating: false
+    affects: ["w1"]
+    default: "load_testing — industry-standard, covers both load generation and analysis, matches existing ConcurrentLoad*/Workload* class names."
