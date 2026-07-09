@@ -450,6 +450,7 @@ class DuckDBSnapshotBuilder:
                 r.ranking_exclusion_reason,
                 r.trust_label,
                 r.visibility,
+                r.funding,
                 r.platform_version,
                 r.execution_mode,
                 r.tuning_mode,
