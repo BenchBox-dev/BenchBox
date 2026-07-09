@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Union
 
+import yaml
+
 from benchbox.base import BaseBenchmark
 from benchbox.core.ai_primitives.cost import (
     CostEstimate,
@@ -29,22 +31,18 @@ from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 logger = logging.getLogger(__name__)
 
 
+def _load_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_SPECS = _load_specs()
+
 # Platforms that support AI functions
-SUPPORTED_PLATFORMS = {"snowflake", "bigquery", "databricks"}
+SUPPORTED_PLATFORMS = set(_SPECS["supported_platforms"])
 
 # Platforms where AI queries should be skipped
-UNSUPPORTED_PLATFORMS = {
-    "duckdb",
-    "clickhouse",
-    "sqlite",
-    "postgresql",
-    "datafusion",
-    "trino",
-    "presto",
-    "redshift",
-    "synapse",
-    "fabric",
-}
+UNSUPPORTED_PLATFORMS = set(_SPECS["unsupported_platforms"])
 
 
 @dataclass
@@ -162,8 +160,8 @@ class AIPrimitivesBenchmark(BaseBenchmark):
         self.dry_run = dry_run
         self.cost_tracker = CostTracker(budget_usd=max_cost_usd)
 
-        # Data file mapping (reuses TPC-H)
-        self.tables: dict[str, str] = {}
+        # Data file mapping (reuses TPC-H). Values may be sharded file lists.
+        self.tables: dict[str, Any] = {}
 
     def get_data_source_benchmark(self) -> str | None:
         """AI Primitives benchmark shares TPC-H data."""
@@ -181,13 +179,19 @@ class AIPrimitivesBenchmark(BaseBenchmark):
         # AI Primitives uses TPC-H data - delegate to TPC-H generator
         from benchbox.core.tpch.benchmark import TPCHBenchmark
 
-        tpch = TPCHBenchmark(scale_factor=self.scale_factor)
-        data_files = tpch.generate_data()
+        tpch = TPCHBenchmark(scale_factor=self.scale_factor, output_dir=self.output_dir)
+        tpch.generate_data()
 
-        # Store table mappings
-        self.tables = {Path(f).stem: str(f) for f in data_files}
+        # Preserve TPC-H's table-name mapping so loaders can handle sharded files.
+        self.tables = dict(tpch.tables)
 
-        return data_files
+        flattened: list[Union[str, Path]] = []
+        for table_files in self.tables.values():
+            if isinstance(table_files, (list, tuple)):
+                flattened.extend(table_files)
+            else:
+                flattened.append(table_files)
+        return flattened
 
     def is_platform_supported(self, platform: str) -> bool:
         """Check if a platform supports AI functions.

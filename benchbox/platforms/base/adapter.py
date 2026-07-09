@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import logging
 import math
+import threading
 import uuid
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
 from benchbox.platforms.base.connection_lifecycle import ConnectionLifecycleMixin
 from benchbox.platforms.base.connection_wrappers import (
@@ -32,6 +34,7 @@ from benchbox.platforms.base.dialect_translation import DialectTranslationMixin
 from benchbox.platforms.base.execution import TestDriversMixin
 from benchbox.platforms.base.models import (
     SetupPhase,
+    StatisticsGatheringPhase,
 )
 from benchbox.platforms.base.phase_tracking import (
     PhaseTrackingMixin,
@@ -107,6 +110,16 @@ class PlatformAdapter(
     # External table mode capability declaration.
     # Subclasses that implement external table/view registration should set this to True.
     supports_external_tables: bool = False
+    # Plan-capture style. When True, the generic query pipeline captures plans in
+    # an isolated post-measurement phase (a single EXPLAIN pass after all timed
+    # queries on the same connection) instead of inline inside each timed
+    # execute_query(). This is the canonical default for EVERY EXPLAIN-based
+    # engine: a standalone EXPLAIN on the measurement connection reproduces the
+    # plan with no loss, so capture is fully isolatable from measurement.
+    # The ONLY exceptions are engines whose plan/stats are obtainable solely as a
+    # side effect of running the workload query (BigQuery-class): they set this
+    # False explicitly and keep their inline/job-harvest capture path.
+    plan_capture_phase_eligible: bool = True
 
     def __init__(self, **config):
         """Initialize the platform adapter with configuration.
@@ -122,21 +135,46 @@ class PlatformAdapter(
         self.force_recreate = config.get("force_recreate", False)
         self.show_query_plans = config.get("show_query_plans", False)
         self.capture_plans = config.get("capture_plans", False)
-        # When True (default), plan capture uses EXPLAIN (ANALYZE, FORMAT JSON) to include actual
-        # per-operator timing and cardinality. Set to False to use plain EXPLAIN (FORMAT JSON) for
-        # estimated-plan-only capture with no re-execution overhead.
-        self.analyze_plans: bool = config.get("analyze_plans", True)
+        # When False (default), plan capture uses plain EXPLAIN (FORMAT JSON) for
+        # estimated-plan-only capture with no re-execution overhead: fingerprints are
+        # structure-only, so estimated plans lose nothing for structural comparison.
+        # Set to True to opt into EXPLAIN (ANALYZE, FORMAT JSON), which re-executes
+        # every captured SELECT once to include actual per-operator timing and
+        # cardinality -- roughly 2x wall-clock for a --capture-plans run and
+        # perturbed cache state. A one-time run-level notice is printed the first
+        # time a plan is actually captured with this enabled (see
+        # ResultCaptureMixin.capture_query_plan).
+        self.analyze_plans: bool = config.get("analyze_plans", False)
         self.strict_plan_capture = config.get("strict_plan_capture", False)
+        # When True, also record a literal-normalized plan fingerprint alongside
+        # the default fingerprint during plan capture (see --normalize-plan-literals).
+        self.normalize_plan_literals = config.get("normalize_plan_literals", False)
         self.plan_capture_timeout_seconds = int(config.get("plan_capture_timeout_seconds", 30))
-        # Plan capture sampling options
-        self.plan_sampling_rate: float | None = config.get("plan_sampling_rate")
-        self.plan_first_n: int | None = config.get("plan_first_n")
+        # Maximum logical-tree depth serialized when a captured plan is written to
+        # the results bundle / size-checked. Nodes deeper than this become a
+        # truncation marker instead of dropping the whole plan (see
+        # query_plan_models.DEFAULT_PLAN_MAX_DEPTH). The structural fingerprint is
+        # computed over the full in-memory tree, so it is unaffected by this cap.
+        self.plan_max_depth = int(config.get("plan_max_depth", DEFAULT_PLAN_MAX_DEPTH))
+        # Plan capture query selection. plan_query_filter restricts capture to an
+        # explicit set of query ids; it is orthogonal to the retired per-iteration /
+        # per-stream sampling machinery (plan_first_n / plan_sampling_rate), which the
+        # canonical capture-once-per-query model made obsolete and which is gone.
         plan_queries_str = config.get("plan_queries")
         self.plan_query_filter: set[str] | None = (
             {q.strip() for q in plan_queries_str.split(",") if q.strip()} if plan_queries_str else None
         )
-        # Track iteration counts for plan_first_n
-        self._plan_capture_iteration_counts: dict[str, int] = {}
+        # Guards concurrent writes to _phase_recorded_queries from throughput streams.
+        self._plan_capture_lock = threading.Lock()
+        # Isolated-phase plan capture (see TestDriversMixin._execute_queries_by_type).
+        # When ``_plan_capture_phase_active`` is True, the inline capture chokepoint
+        # (_merge_plan_capture_into_result) records each executed query into
+        # ``_phase_recorded_queries`` instead of running EXPLAIN inline, so capture is
+        # fully isolated from the timed run for every test type. The plans are captured
+        # once, post-measurement, by the isolated phase. The buffer is written from
+        # concurrent throughput streams, so writes are guarded by _plan_capture_lock.
+        self._plan_capture_phase_active: bool = False
+        self._phase_recorded_queries: dict[str, str] = {}
         self.tuning_enabled = config.get("tuning_enabled", False)
         # Driver runtime contract metadata (set by adapter factory / runtime resolution).
         self.driver_package = config.get("driver_package")
@@ -177,6 +215,18 @@ class PlatformAdapter(
         self._sorted_ingestion_applied_tables: list[str] = []
         self._sorted_ingestion_total_apply_seconds: float = 0.0
         self._reset_plan_capture_stats()
+
+    def _reset_run_scoped_state(self) -> None:
+        """Reset mutable state that belongs to one benchmark execution."""
+        self.database_was_reused = False
+        self._last_power_test_result = None
+        self._last_throughput_test_result = None
+        self._sorted_ingestion_applied_tables = []
+        self._sorted_ingestion_total_apply_seconds = 0.0
+        self._reset_plan_capture_stats()
+        if self.dry_run_mode:
+            self.captured_sql = []
+            self.query_counter = 0
 
     @staticmethod
     @abstractmethod
@@ -344,6 +394,152 @@ class PlatformAdapter(
             benchmark_type: Type of benchmark (e.g., "olap", "oltp", "analytics")
         """
 
+    def gather_statistics(self, connection: Any, table_names: list[str]) -> tuple[str, int]:
+        """Run the platform's explicit statistics build for the statistics phase.
+
+        Returns (stats_mode, tables_analyzed). The default resolves the
+        adapter's existing analyze surface: whole-database ``analyze_tables``
+        when available, else per-table ``analyze_table``, else
+        ``("unsupported", 0)``. Engines whose statistics are built during load
+        (e.g. Redshift with auto_analyze) override this to report
+        ``("auto-on-load", 0)`` instead of double-building.
+        """
+        analyze_tables = getattr(self, "analyze_tables", None)
+        if callable(analyze_tables):
+            analyze_tables(connection)
+            return "explicit", len(table_names)
+        analyze_table = getattr(self, "analyze_table", None)
+        if callable(analyze_table):
+            for table_name in table_names:
+                analyze_table(connection, table_name)
+            return "explicit", len(table_names)
+        return "unsupported", 0
+
+    def reset_statistics(self, connection: Any, table_names: list[str]) -> str:
+        """Reset (drop/invalidate) optimizer statistics ahead of a cold-stats rebuild.
+
+        Sibling of ``gather_statistics`` for the reset/persist control (opt-in
+        via the statistics phase's ``reset=True``). Returns a stats_lifecycle
+        marker: ``"reset"`` when statistics were actually cleared, or
+        ``"unsupported"`` when this adapter has no generic drop-stats
+        primitive it's safe to run generically.
+
+        The base default is a documented no-op that always returns
+        ``"unsupported"``: engines must never have this method force an
+        operation that could fail or corrupt state on a platform it wasn't
+        vetted for. This is a safe fallback rather than a regression - the
+        statistics phase's subsequent ``gather_statistics()`` call still runs
+        a full ANALYZE/rebuild that reflects current data, so a cold-stats
+        study remains meaningful even without an explicit reset step.
+        Platform adapters that support a real drop-stats operation should
+        override this method.
+        """
+        self.logger.debug(
+            f"reset_statistics not implemented for {self.__class__.__name__}; "
+            "no generic drop-stats primitive, deferring to the gather_statistics rebuild"
+        )
+        return "unsupported"
+
+    def run_statistics_phase(
+        self,
+        benchmark: Any,
+        connection: Any,
+        *,
+        benchmark_name: str = "",
+        table_names: list[str] | None = None,
+        reset: bool | None = None,
+        collect_per_table_timing: bool = False,
+    ) -> StatisticsGatheringPhase | None:
+        """Run the opt-in statistics phase between load and query execution.
+
+        Returns None (phase not run) when the benchmark has not opted in via
+        the registry's ``supports_statistics_phase`` flag, so legacy
+        benchmarks keep load-includes-stats semantics and their historical
+        bundles stay comparable. Failures are recorded on the phase rather
+        than aborting the run - queries remain meaningful on unanalyzed data.
+
+        Args:
+            reset: Cold-stats vs warm-stats control. None (default) leaves
+                statistics untouched and records no stats_lifecycle marker,
+                exactly matching the PR #980 shipped behavior. True resets
+                statistics via ``reset_statistics()`` before rebuilding
+                (cold-stats). False explicitly records a "persist" marker
+                (warm-stats) without changing behavior.
+            collect_per_table_timing: When True and this adapter's statistics
+                build falls back to a per-table ANALYZE loop (no whole-database
+                analyze hook, and gather_statistics is not overridden with
+                platform-specific routing), record a per-table wall-clock
+                breakdown on the returned phase. Left None otherwise.
+        """
+        from benchbox.core.benchmark_registry import get_benchmark_metadata
+
+        slug = (benchmark_name or "").lower()
+        metadata = get_benchmark_metadata(slug) if slug else None
+        if not (metadata or {}).get("supports_statistics_phase"):
+            quiet_console.print(
+                f"⏭️  Statistics phase requested but benchmark '{slug or 'unknown'}' has not opted in; "
+                "skipping (load keeps legacy statistics semantics)"
+            )
+            return None
+
+        names = table_names or _resolve_benchmark_table_names(benchmark)
+        quiet_console.print("Gathering optimizer statistics...")
+        start_time = mono_time()
+
+        stats_lifecycle: str | None = None
+        if reset:
+            try:
+                stats_lifecycle = self.reset_statistics(connection, names) or "unsupported"
+            except Exception as exc:
+                self.logger.warning(f"Statistics reset failed, continuing with rebuild: {exc}")
+                stats_lifecycle = "unsupported"
+        elif reset is False:
+            # The control was explicitly exercised in persist mode (warm-stats
+            # study): record the marker even though behavior matches default.
+            stats_lifecycle = "persist"
+
+        # Per-table timing is only safe to collect by looping analyze_table()
+        # ourselves when gather_statistics() is the unmodified base
+        # implementation - platform overrides (e.g. Redshift's auto-on-load
+        # routing) must keep deciding stats_mode themselves, so we defer to
+        # gather_statistics() and leave per_table_ms unset for those adapters.
+        per_table_ms: dict[str, int] | None = None
+        use_per_table_loop = (
+            collect_per_table_timing
+            and type(self).gather_statistics is PlatformAdapter.gather_statistics
+            and callable(getattr(self, "analyze_table", None))
+            and not callable(getattr(self, "analyze_tables", None))
+        )
+        try:
+            if use_per_table_loop:
+                per_table_ms = {}
+                analyze_table = self.analyze_table  # type: ignore[attr-defined]
+                for table_name in names:
+                    table_start = mono_time()
+                    analyze_table(connection, table_name)
+                    per_table_ms[table_name] = int(elapsed_seconds(table_start) * 1000)
+                stats_mode, tables_analyzed = "explicit", len(names)
+            else:
+                stats_mode, tables_analyzed = self.gather_statistics(connection, names)
+        except Exception as exc:
+            self.logger.warning(f"Statistics phase failed: {exc}")
+            return StatisticsGatheringPhase(
+                duration_ms=int(elapsed_seconds(start_time) * 1000),
+                status="FAILED",
+                stats_mode="explicit",
+                tables_analyzed=0,
+                error_message=str(exc),
+                stats_lifecycle=stats_lifecycle,
+            )
+        return StatisticsGatheringPhase(
+            duration_ms=int(elapsed_seconds(start_time) * 1000),
+            status="COMPLETED",
+            stats_mode=stats_mode,
+            tables_analyzed=tables_analyzed,
+            stats_lifecycle=stats_lifecycle,
+            per_table_ms=(per_table_ms or None),
+        )
+
     @abstractmethod
     def execute_query(
         self,
@@ -417,11 +613,23 @@ class PlatformAdapter(
         """Run complete benchmark with enhanced phase tracking."""
         start_time = mono_time()
         execution_id = str(uuid.uuid4())[:8]
-        self._reset_plan_capture_stats()
+        self._reset_run_scoped_state()
+        plan_capture_config = {
+            "capture_plans": self.capture_plans,
+            "analyze_plans": self.analyze_plans,
+            "strict_plan_capture": self.strict_plan_capture,
+            "plan_capture_timeout_seconds": self.plan_capture_timeout_seconds,
+        }
         if "capture_plans" in run_config:
             self.capture_plans = bool(run_config.get("capture_plans"))
+        # analyze_plans is tri-state in RunConfig: only override the adapter's value
+        # when the first-class flag was set (non-None); None leaves the adapter default.
+        if run_config.get("analyze_plans") is not None:
+            self.analyze_plans = bool(run_config.get("analyze_plans"))
         if "strict_plan_capture" in run_config:
             self.strict_plan_capture = bool(run_config.get("strict_plan_capture"))
+        if "normalize_plan_literals" in run_config:
+            self.normalize_plan_literals = bool(run_config.get("normalize_plan_literals"))
         if "plan_capture_timeout_seconds" in run_config:
             self.plan_capture_timeout_seconds = int(run_config.get("plan_capture_timeout_seconds"))
 
@@ -493,6 +701,26 @@ class PlatformAdapter(
             benchmark_type = run_config.get("benchmark_type", "olap")
             self.configure_for_benchmark(connection, benchmark_type)
 
+            # Opt-in statistics phase: load -> statistics -> query, so
+            # stats-build wall-clock is attributed to neither load nor query.
+            statistics_phase = None
+            if run_config.get("gather_statistics"):
+                # Prefer a dedicated statistics-only slug over "benchmark_name"
+                # when the caller set one. Some callers (the MCP run_benchmark
+                # tool) need the registry gate to resolve correctly without also
+                # setting "benchmark_name" itself, which _resolve_benchmark_slug
+                # reads to route power/throughput/maintenance/combined tests to
+                # TPC-specialized harnesses vs the generic handler - requesting
+                # the statistics phase must not also change which harness runs.
+                statistics_phase = self.run_statistics_phase(
+                    benchmark,
+                    connection,
+                    benchmark_name=run_config.get("statistics_benchmark_name") or run_config.get("benchmark_name", ""),
+                    table_names=sorted(table_stats) if table_stats else None,
+                    reset=run_config.get("stats_reset"),
+                    collect_per_table_timing=bool(run_config.get("stats_per_table_timing", False)),
+                )
+
             test_execution_type = run_config.get("test_execution_type", "standard")
             quiet_console.print(f"Executing benchmark queries ({test_execution_type} mode)...")
             self._last_throughput_test_result = None
@@ -517,6 +745,7 @@ class PlatformAdapter(
                 schema_creation=schema_creation_phase,
                 data_loading=data_loading_phase,
                 validation=validation_phase,
+                statistics_gathering=statistics_phase,
             )
 
             execution_phases, total_exec_time, power_test_phase, throughput_test_phase = self._build_execution_phases(
@@ -589,6 +818,10 @@ class PlatformAdapter(
             )
 
         finally:
+            self.capture_plans = plan_capture_config["capture_plans"]
+            self.analyze_plans = plan_capture_config["analyze_plans"]
+            self.strict_plan_capture = plan_capture_config["strict_plan_capture"]
+            self.plan_capture_timeout_seconds = plan_capture_config["plan_capture_timeout_seconds"]
             if hasattr(self, "connection") and self.connection:
                 self.close_connection(self.connection)
                 self.connection = None

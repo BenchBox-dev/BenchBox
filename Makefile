@@ -39,7 +39,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-verify skill-sync-lock-audit mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -102,6 +102,181 @@ test-dev:
 
 # Smoke tests (alias for test-quick)
 test-smoke: test-quick
+
+# Bounded real-result correctness gate for develop PRs: one local benchmark case
+# (DuckDB x TPC-H, SF=1, reference qgen seed) through generate/load/execute with
+# phase, cardinality, EXACT stored answer-set row-count checks, AND stored VALUE
+# digests. The value oracle (BENCHBOX_EMIT_RESULT_DIGEST=1) makes the runner emit an
+# order-normalized digest of each stream-0 query's full result set, which the gate
+# asserts against a stored reference digest -- so a wrong-but-same-cardinality answer
+# (e.g. a perturbed Q1 aggregate, a swapped column) is caught, not just a wrong row
+# count. The proven guarantee is value+cardinality at SF=1/pinned-seed only; values
+# above SF=1 are UNGUARDED (no stored answers exist there). The query subset is the
+# 18 TPC-H queries whose answer-set cardinalities are stable across dbgen builds;
+# Q11/Q16/Q18/Q20 are excluded because their HAVING/threshold boundaries make the
+# stored row count vary with the generated data (see tests/README.md).
+#
+# WHAT THE VALUE ORACLE IS (and is NOT): the stored reference digests are a frozen
+# benchbox-on-DuckDB snapshot, so the value check is a REGRESSION SNAPSHOT vs a
+# DuckDB-pinned baseline (it detects CHANGE from the frozen answer), NOT an
+# independent correctness oracle -- a conceptual value bug present at freeze time is
+# enshrined, not caught. Regenerate the reference with `make correctness-gate-digests-regen`.
+#
+# The JUnit-report guard fails the target if the selected node SKIPs instead of
+# running: pytest exits 0 on a selected skip, which would otherwise pass the gate
+# without executing the benchmark. The report goes to a private temp file (not the
+# repo-root test-results.xml that pytest-ci.ini also writes) and is removed after
+# parsing; both the pytest status and the guard status are propagated.
+#
+# CORRECTNESS_GATE_QUERY_IDS is the ONE source of the gated query-id set, shared by
+# both this gate and `correctness-gate-digests-regen` (the reference is regenerated
+# from the same query set it is asserted against -- never re-hardcode the list).
+CORRECTNESS_GATE_QUERY_IDS := 1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22
+
+test-correctness-gate:
+	@REPORT="$$(mktemp)"; \
+	BENCHBOX_STRICT_EXPECTED_RESULTS=1 BENCHBOX_EMIT_RESULT_DIGEST=1 BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS) uv run -- python -m pytest -m stress "tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]" -n 0 --tb=short --timeout=1200 -v --junitxml="$$REPORT"; \
+	PYTEST_STATUS=$$?; \
+	uv run -- python -c "import sys, xml.etree.ElementTree as ET; root = ET.parse(sys.argv[1]).getroot(); suites = [root] if root.tag == 'testsuite' else root.findall('testsuite'); tests = sum(int(s.get('tests') or 0) for s in suites); skipped = sum(int(s.get('skipped') or 0) for s in suites); errors = sum(int(s.get('errors') or 0) for s in suites); failures = sum(int(s.get('failures') or 0) for s in suites); print('correctness gate guard: ran=%d skipped=%d failures=%d errors=%d' % (tests, skipped, failures, errors)); sys.exit(0 if (tests == 1 and skipped == 0 and errors == 0 and failures == 0) else 'correctness gate: expected exactly 1 node to run with 0 skipped/failed/errored; a selected skip means duckdb/tpch dropped from the stable matrix or the node-id drifted')" "$$REPORT"; \
+	GUARD_STATUS=$$?; \
+	rm -f "$$REPORT"; \
+	test $$PYTEST_STATUS -eq 0 && test $$GUARD_STATUS -eq 0
+
+plan-capture-gate:
+	uv run -- python -m pytest tests/integration/test_plan_capture_gate.py -q -n 0 --tb=short
+
+# Regenerate the bounded correctness-gate VALUE-digest reference
+# (benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json)
+# from a live gate run. Replaces the historical hand-copy: this runs the SAME gate
+# configuration (DuckDB x TPC-H, SF=1, reference qgen seed, the shared
+# CORRECTNESS_GATE_QUERY_IDS set) with BENCHBOX_EMIT_RESULT_DIGEST=1 and WRITES the
+# stream-0 per-query digests + provenance back to the JSON. Idempotent on a clean
+# tree: `make correctness-gate-digests-regen && git diff --exit-code <json>` is clean.
+# The reference is a regression SNAPSHOT vs a DuckDB-pinned baseline, tied to the
+# DuckDB build in uv.lock (stamped into the file's provenance). Run this whenever the
+# digest normalization changes or DuckDB is bumped, in the SAME change, or
+# `make test-correctness-gate` goes RED on a correct tree.
+correctness-gate-digests-regen:
+	BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS) uv run -- python _project/scripts/regenerate_correctness_gate_digests.py
+
+# Gate: compare every TPC-Havoc SQL variant to canonical TPC-H on real SF=0.1
+# DuckDB data; exits non-zero on any divergence beyond KNOWN_DIVERGENCES
+# (see benchbox/core/tpchavoc/equivalence.py).
+tpchavoc-equivalence-report:
+	uv run -- python -m benchbox.core.tpchavoc.equivalence
+
+# Second-engine SAMPLE: compare every Postgres-executable TPC-Havoc SQL variant
+# to canonical TPC-H on the SAME PostgreSQL instance (both translated to the
+# postgres dialect). Excludes POSTGRES_TPCHAVOC_SKIPS (un-executable variants).
+# Needs a reachable Postgres (defaults match the postgres-integration CI service
+# container; override via PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE). Skips
+# cleanly (exit 0) if no server is reachable. The DuckDB gate above stays the
+# hard blocker; this is a non-blocking sample (see equivalence.py).
+tpchavoc-equivalence-report-postgres:
+	uv run -- python -m benchbox.core.tpchavoc.equivalence --engine postgres
+
+# Third-engine SAMPLE: compare every DataFusion-executable TPC-Havoc SQL variant
+# to canonical TPC-H on the SAME in-process DataFusion session (both translated
+# to the datafusion dialect, which the seam normalizes to postgres). Excludes
+# DATAFUSION_TPCHAVOC_SKIPS (variants DataFusion cannot plan). DataFusion is
+# in-process (no service container); skips cleanly (exit 0) only if DataFusion is
+# not installed. The DuckDB gate above stays the hard blocker; this is a
+# non-blocking sample with a DIFFERENT gap profile from Postgres (see equivalence.py).
+tpchavoc-equivalence-report-datafusion:
+	uv run -- python -m benchbox.core.tpchavoc.equivalence --engine datafusion
+
+# Fourth-engine SAMPLE: compare every ClickHouse-executable TPC-Havoc SQL variant
+# to canonical TPC-H on the SAME in-process ClickHouse instance (chDB /
+# clickhouse-local), both translated to the NATIVE clickhouse dialect (NOT
+# normalized to postgres - this is the first sampled engine on a non-Postgres
+# dialect). Excludes CLICKHOUSE_TPCHAVOC_SKIPS (variants ClickHouse cannot execute)
+# and runs with SQL-standard NULL semantics (join_use_nulls=1). Unlike the other
+# three engines this is NOT systematic-zero: CLICKHOUSE_KNOWN_DIVERGENCES records
+# the irreducible engine-semantic result differences (Decimal-vs-Float division,
+# SUM of an empty group = 0, partial correlated-subquery decorrelation). ClickHouse
+# is in-process (no service container); skips cleanly (exit 0) only if chDB is not
+# installed. The DuckDB gate above stays the hard blocker; this is a non-blocking
+# sample (see equivalence.py).
+tpchavoc-equivalence-report-clickhouse:
+	uv run -- python -m benchbox.core.tpchavoc.equivalence --engine clickhouse
+
+# Gate: compare every TPC-Havoc DataFrame variant (both backends) to canonical
+# TPC-H on real SF=0.1 DuckDB-backed data; exits non-zero on any divergence
+# beyond KNOWN_DIVERGENCES (see benchbox/core/tpchavoc/dataframe_equivalence.py).
+tpchavoc-dataframe-equivalence-report:
+	uv run -- python -m benchbox.core.tpchavoc.dataframe_equivalence
+
+# Gate: compare a dual-surface benchmark's DataFrame surface (both backends) to
+# its OWN SQL surface on real SF=0.1 DuckDB-backed data; exits non-zero on any
+# divergence beyond the benchmark's baseline. SQL is the reference for its own
+# DataFrame surface, so no hand-curated answer key is needed (see
+# benchbox/core/equivalence/cross_surface.py). Currently gates ssb, amplab, and coffeeshop.
+ssb-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark ssb
+
+amplab-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark amplab
+
+coffeeshop-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark coffeeshop
+
+# Enforced gate: clickbench SQL<->DataFrame equivalence on a bounded DuckDB cell.
+# In GATES (STAGED_GATES is empty) and run in the blocking correctness-gate (pr.yml);
+# exits non-zero on any unclassified divergence. Q18's order-less LIMIT is the one
+# classified exception (see _project/analysis/clickbench-cross-surface-divergences.md).
+clickbench-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark clickbench
+
+# Enforced gate: joinorder_synthetic SQL<->DataFrame equivalence on a bounded DuckDB
+# cell. In GATES (STAGED_GATES is empty) and run in the blocking correctness-gate
+# (pr.yml); exits non-zero on any unclassified divergence (see
+# _project/analysis/joinorder-synthetic-cross-surface-divergences.md).
+joinorder-synthetic-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark joinorder_synthetic
+
+# Enforced gate: H2O-DB DataFrame surface vs its own SQL surface on a bounded
+# ~100k-row DuckDB cell (SF=0.01: its generator base is the 10M-row small tier, so
+# the shared SF=0.1 would emit ~1M rows). Q9's PERCENTILE_CONT carries one
+# classified DECIMAL(8,2)-scale exception (see cross_surface.py); every other cell
+# must match. Exits non-zero on any unclassified divergence.
+h2odb-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark h2odb
+
+# Enforced gate: Read Primitives DataFrame surface vs its DuckDB-dialect SQL
+# surface on a bounded ~300k-row TPC-H cell (SF=0.05). 148 gateable queries (the 4
+# fulltext/json ids DuckDB cannot transpile are excluded). Every compared cell
+# matches; the classified cells are irreducible engine differences (HLL/T-Digest
+# approximation, DECIMAL-scale percentile/ROUND, ARG_MIN ties, JSON text, Polars
+# Map-dtype gap) plus legitimately-empty selective/no-JSON filters. Exits non-zero
+# on any unclassified divergence.
+read-primitives-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark read_primitives
+
+# Maintenance writer (#903 follow-up): drop known-divergence baseline entries that
+# no longer reproduce for ONE gate, in a reviewed change. Explicit/operator-driven -
+# the blocking gate run never prunes; only writes when the run is otherwise fully
+# clean, and is idempotent on a second run. Usage:
+#   make cross-surface-update-baseline BENCHMARK=h2odb
+cross-surface-update-baseline:
+	@test -n "$(BENCHMARK)" || { echo "Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives>"; exit 1; }
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark $(BENCHMARK) --update-baseline
+
+# Regenerate the benchmark correctness-oracle coverage map (which oracle, if any,
+# guards each shipped benchmark). Derived from the registry + provider/gate
+# registries; commit the refreshed _project/analysis/ artifacts.
+oracle-coverage-map:
+	uv run -- python _project/scripts/generate_oracle_coverage_map.py
+
+# Advisory CI guard: fail if the checked-in coverage map is stale (e.g. a new
+# benchmark was added without regenerating, hiding an UNGUARDED surface).
+oracle-coverage-map-check:
+	uv run -- python _project/scripts/generate_oracle_coverage_map.py --check
+
+# Cross-surface applicability drill-down (report mode): which dual-surface
+# unguarded benchmarks actually ship comparable DataFrame queries (cross-surface
+# gateable) vs which only support DataFrame loading (need a w2 fallback oracle).
+cross-surface-applicability-report:
+	uv run -- python _project/scripts/cross_surface_applicability_sweep.py
 
 # Real benchmark matrix across local SQL platforms x all benchmarks (heavy, opt-in)
 test-local-matrix:
@@ -269,6 +444,25 @@ test-docker-pg-extensions:
 DOCKER_PLATFORMS := clickhouse trino presto postgresql starrocks doris databend influxdb cedardb firebolt questdb singlestore
 DOCKER_TEST_STATE_DIR ?= /tmp/benchbox-docker-projects
 
+# Container engine for local test-docker-* compose stacks: `docker` (default,
+# and the ONLY engine CI uses) or `mocker` (Docker-compatible CLI over Apple
+# `container`; Apple-silicon/macOS-26 LOCAL DEV ONLY, MUST NOT run in CI). The
+# docker/*/docker-compose.yml files stay unmodified; only the driver swaps.
+# See AGENTS.md "Mocker as a local test-docker engine".
+CONTAINER_ENGINE ?= docker
+COMPOSE := $(CONTAINER_ENGINE) compose
+
+# `compose down -v` extended to also remove leaked named volumes on a SUCCESSFUL
+# down. mocker 0.5.4's `compose down -v` removes containers but LEAKS named
+# volumes (a stale-data risk across runs); this prunes any volume with the
+# project prefix afterward. A no-op beyond `down -v` on docker (which already
+# removes them). Scoped to the project so it never touches unrelated volumes.
+# Grepping the project-prefixed name directly avoids assuming `volume ls` emits a
+# header or a fixed column layout. $(1)=project $(2)=compose file.
+define compose_down_fresh
+$(COMPOSE) -p "$(1)" -f "$(2)" down -v; if [ "$(CONTAINER_ENGINE)" = "mocker" ]; then mocker volume ls 2>/dev/null | grep -oE "$(1)[-_][A-Za-z0-9._-]+" | while read -r _v; do mocker volume rm "$$_v" >/dev/null 2>&1 || true; done; fi
+endef
+
 test-docker-up-%:
 	@set -e; \
 		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
@@ -281,12 +475,12 @@ test-docker-up-%:
 		status=1; \
 		cleanup() { \
 			if [ $$status -ne 0 ]; then \
-				docker compose -p "$$project_name" -f docker/$*/docker-compose.yml down -v >/dev/null 2>&1 || true; \
+				{ $(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml) ; } >/dev/null 2>&1 || true; \
 				rm -f "$$project_file"; \
 			fi; \
 		}; \
 		trap cleanup EXIT INT TERM; \
-		docker compose -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
+		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
 		printf '%s\n' "$$project_name" > "$$project_file"; \
 		status=0
 
@@ -299,7 +493,7 @@ test-docker-down-%:
 			echo "No tracked Docker test stack for $*"; \
 			exit 0; \
 		fi; \
-		docker compose -p "$$project_name" -f docker/$*/docker-compose.yml down -v; \
+		$(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml); \
 		rm -f "$$project_file"
 
 # Explicit override: generic test-docker-% expands to -m "live_firebolt" (cloud tests).
@@ -308,18 +502,18 @@ test-docker-firebolt:
 	@echo "Running Firebolt Core Docker integration tests"
 	@set -e; \
 		project_name="benchbox-firebolt-test-$$(date +%s)-$$RANDOM"; \
-		cleanup() { docker compose -p "$$project_name" -f docker/firebolt/docker-compose.yml down -v || true; }; \
+		cleanup() { { $(call compose_down_fresh,$$project_name,docker/firebolt/docker-compose.yml) ; } || true; }; \
 		trap cleanup EXIT INT TERM; \
-		docker compose -p "$$project_name" -f docker/firebolt/docker-compose.yml up -d --wait; \
+		$(COMPOSE) -p "$$project_name" -f docker/firebolt/docker-compose.yml up -d --wait; \
 		uv run -- python -m pytest -m "live_firebolt_core" --tb=short -v -n 0
 
 test-docker-%:
 	@echo "Running $* Docker integration tests"
 	@set -e; \
 		project_name="benchbox-$*-test-$$(date +%s)-$$RANDOM"; \
-		cleanup() { docker compose -p "$$project_name" -f docker/$*/docker-compose.yml down -v || true; }; \
+		cleanup() { { $(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml) ; } || true; }; \
 		trap cleanup EXIT INT TERM; \
-		docker compose -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
+		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
 		uv run -- python -m pytest -m "live_$*" --tb=short -v -n 0
 
 test-docker-up-all:
@@ -335,7 +529,7 @@ test-docker-up-all:
 					project_file="$$state_dir/$$p.project"; \
 					project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
 					if [ -n "$$project_name" ]; then \
-						docker compose -p "$$project_name" -f docker/$$p/docker-compose.yml down -v >/dev/null 2>&1 || true; \
+						{ $(call compose_down_fresh,$$project_name,docker/$$p/docker-compose.yml) ; } >/dev/null 2>&1 || true; \
 						rm -f "$$project_file"; \
 					fi; \
 				done; \
@@ -350,7 +544,7 @@ test-docker-up-all:
 				printf '%s\n' "$$project_name" > "$$project_file"; \
 			fi; \
 			echo "Starting $$p..."; \
-			docker compose -p "$$project_name" -f docker/$$p/docker-compose.yml up -d --wait; \
+			$(COMPOSE) -p "$$project_name" -f docker/$$p/docker-compose.yml up -d --wait; \
 		done; \
 		status=0
 
@@ -365,7 +559,7 @@ test-docker-down-all:
 				continue; \
 			fi; \
 			echo "Stopping $$p..."; \
-			docker compose -p "$$project_name" -f docker/$$p/docker-compose.yml down -v; \
+			$(call compose_down_fresh,$$project_name,docker/$$p/docker-compose.yml); \
 			rm -f "$$project_file"; \
 		done
 
@@ -375,6 +569,18 @@ test-docker-all:
 		echo "=== Testing $$p ==="; \
 		$(MAKE) test-docker-$$p || exit 1; \
 	done
+
+# Compose-lifecycle parity acceptance test: asserts up --wait health-gating,
+# published-port reachability, and the down -v fresh-state guarantee (no leaked
+# container/volume) for the selected engine. Same asserts on docker and mocker so
+# parity is measured. Usage:
+#   make test-docker-parity                             # docker (default)
+#   make test-docker-parity CONTAINER_ENGINE=mocker     # Apple container backend
+#   make test-docker-parity PARITY_PLATFORMS="questdb postgresql doris"
+PARITY_PLATFORMS ?= questdb postgresql
+.PHONY: test-docker-parity
+test-docker-parity:
+	@bash _project/scripts/mocker_compose_parity.sh $(CONTAINER_ENGINE) $(PARITY_PLATFORMS)
 
 # Coverage commands using pytest
 coverage-fast:
@@ -426,10 +632,18 @@ lint:
 	$(MAKE) lint-explorer-tokens
 	$(MAKE) lint-site-theme-tokens
 
-# Dependency audit - checks declarations against whole-tree import sites.
-# Fails on both unused declarations and undeclared third-party imports.
+# Dependency audit - checks that every declared dep has an import site or is allowlisted.
+# Fails if an unused dep is introduced. See _project/scripts/dependency_audit/.
 audit-deps:
-	uv run -- python scripts/check_dependency_audit.py
+	uv run -- python _project/scripts/dependency_audit/check_deps.py
+
+# Regenerate the raw declared-dependency inventory from pyproject.toml.
+audit-raw:
+	uv run -- python _project/scripts/dependency_audit/parse_deps.py
+
+# Verify the committed raw inventory matches pyproject.toml. Fails on drift.
+audit-raw-check:
+	uv run -- python _project/scripts/dependency_audit/parse_deps.py --check
 
 # Validate that an audit report records the develop SHA it describes.
 audit-sha-check:
@@ -439,10 +653,17 @@ audit-sha-check:
 		$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \
 		"$(FILE)"
 
-# Validate test marker annotations - fails on speed-lane conflicts or fast-incompatible pairs.
-# Uses --collect-only so no tests run; the conflict-detection hook fires at collection time.
+# Validate marker registration and the explicit marker-strategy policy.
 lint-markers:
 	uv run -- python -m pytest --collect-only -q -p no:warnings
+	uv run -- python -m pytest tests/unit/test_marker_strategy.py -q
+
+# Enforce the utils < core < platforms < cli import-layering convention and
+# the experimental/mcp isolation contracts (see .importlinter). Fails on any
+# newly introduced layering violation that isn't already an explicitly
+# named, justified exception in .importlinter's ignore_imports lists.
+lint-imports:
+	uv run -- lint-imports
 
 # Token-scan gate for the Results Explorer retheme: fails when raw Tailwind
 # palette literals (text-/bg-/border-/...-{slate|gray|...}-{50..950}) appear
@@ -462,18 +683,29 @@ lint-site-theme-tokens:
 lint-explorer-stale-theme:
 	python3 _project/scripts/scan_explorer_stale_theme.py
 
+# Validate a built Results Explorer read model against the snapshot invariants
+# (required columns, ranking/compare eligibility). Point SNAPSHOT at the built
+# .duckdb; defaults to the path docs.yml's pipeline writes. CI runs the same
+# script in .github/workflows/docs.yml after the explorer data build.
+SNAPSHOT ?= results-explorer/public/data/results.duckdb
+.PHONY: explorer-snapshot-check
+explorer-snapshot-check:
+	uv run -- python _project/scripts/results_explorer_snapshot_invariants.py "$(SNAPSHOT)"
+
 artifact-hygiene:
 	uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
 
-# skill-sync — materialize project-local skill mirrors from ~/.skill-sync/skills.
-# Manifest is tracked (skill-sync.yaml/skill-sync.lock); the materialized
-# .claude/skills, .codex/skills, .gemini/skills are gitignored and regenerated
-# locally per developer. Override SKILL_SYNC to point at a different install
-# (e.g. an npm-installed copy).
+# skill-sync — materialize project-local skills from ~/.skill-sync/skills.
+# Manifest is tracked (skill-sync.yaml/skill-sync.lock). The `claude` target
+# (.claude/skills) is a TRACKED snapshot committed for cloud/CI parity — verify
+# it with `make skill-sync-verify`. The codex/gemini/antigravity mirrors stay
+# gitignored and are regenerated locally per developer. Override SKILL_SYNC to
+# point at a different install (e.g. an npm-installed copy).
 SKILL_SYNC ?= /Users/joe/Developer/skill-sync/dist/cli/index.js
 
 skill-sync:
 	@if [ -f "$(SKILL_SYNC)" ]; then \
+		$(MAKE) -s agent-write-preflight; \
 		node "$(SKILL_SYNC)" sync; \
 	else \
 		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
@@ -484,6 +716,18 @@ skill-sync-check:
 		node "$(SKILL_SYNC)" doctor; \
 	else \
 		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
+	fi
+
+# skill-sync-verify — offline integrity gate for the tracked snapshot (CI/local).
+# Proves .claude/skills matches skill-sync.lock + the regenerated config; exits
+# non-zero on any hand-edit, stray file, or stale config. Skips when the CLI is
+# absent (e.g. cloud/CI without skill-sync) — the committed snapshot is plain
+# files and needs skill-sync only to be *verified*, not to be consumed.
+skill-sync-verify:
+	@if [ -f "$(SKILL_SYNC)" ]; then \
+		node "$(SKILL_SYNC)" verify; \
+	else \
+		echo "skill-sync not installed at $(SKILL_SYNC); skipping verify (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
 	fi
 
 # Review helper for PRs that modify skill-sync.lock while .claude/skills is gitignored.
@@ -526,12 +770,14 @@ ci-lint:
 	$(MAKE) skill-sync-check
 	uv run -- python _project/scripts/timing_policy_check.py --strict
 	$(MAKE) compat-docs-check
+	$(MAKE) oracle-coverage-map-check
 	$(MAKE) audit-deps
 	@echo "✅ CI lint checks passed"
 
 # CI test check - exact match for test.yml workflow (fast tests with coverage)
 # Note: -p pytest_cov re-enables pytest-cov which is disabled by default in pytest.ini
-# Suite-wide coverage threshold set to 70%
+# Suite-wide coverage threshold set to 70%. tests/conftest.py emits a separate
+# non-failing advisory warning below 80%; 70 is the blocking CI floor.
 ci-test:
 	@echo "Running CI test suite..."
 	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
@@ -578,13 +824,22 @@ docstring-coverage:
 # Package build and install test - exact match for test.yml test-package job
 test-package:
 	@echo "Building and testing package installation..."
+	rm -rf dist/
 	uv build
 	uvx twine check dist/*
 	@echo "Testing package installation..."
-	@rm -rf test-venv
-	uv venv test-venv
-	. test-venv/bin/activate && uv pip install dist/*.whl && python -c "import benchbox; print('Package installation successful')" && benchbox --help > /dev/null
-	@rm -rf test-venv
+	@wheel_count=$$(find "$$PWD/dist" -maxdepth 1 -type f -name '*.whl' | wc -l | tr -d '[:space:]'); \
+	if [ "$$wheel_count" != "1" ]; then \
+		echo "Expected exactly one wheel, found $$wheel_count"; \
+		find "$$PWD/dist" -maxdepth 1 -type f -print; \
+		exit 1; \
+	fi; \
+	wheel=$$(find "$$PWD/dist" -maxdepth 1 -type f -name '*.whl' -print -quit); \
+	tmpdir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmpdir"' EXIT; \
+	cd "$$tmpdir"; \
+	uv run --isolated --no-project --with "$$wheel" -- python -c "import benchbox; print('Package installation successful')"; \
+	uv run --isolated --no-project --with "$$wheel" -- benchbox --help > /dev/null
 	@echo "✅ Package test passed"
 
 # Integration smoke tests - exact match for test.yml integration-smoke job
@@ -618,6 +873,41 @@ ci-local:
 	@echo "✅ All CI checks passed!"
 	@echo "========================================"
 
+# --- Apple container Linux CI-parity sandbox (opt-in; Apple silicon + macOS 26) ---
+# Reproduce the Linux pr.yml gate locally inside a `container machine`. Motivated by a
+# MEASURED macOS<->Linux divergence: on identical DuckDB 1.3.2/arm64, TPC-H Q2/Q10/Q15
+# value digests differ, so `make test-correctness-gate` FAILS on a correct tree on Apple
+# silicon (the pinned digest references are Linux-generated). This wrapper is the only way
+# to validate that soundness gate pre-PR from a Mac. Purely additive and opt-in: a no-op on
+# non-Apple-silicon / non-macOS-26 hosts, and NEVER a CI or pr-open dependency. One-time
+# setup + usage: AGENTS.md "Apple container Linux CI parity". Override the gate with
+# `make ci-linux CI_LINUX_CMD='make ci-local'`.
+CI_LINUX_MACHINE ?= benchbox-agent
+CI_LINUX_CMD ?= make test-correctness-gate
+.PHONY: ci-linux
+ci-linux:
+	@if [ "$$(uname -s)" != "Darwin" ] || [ "$$(uname -m)" != "arm64" ]; then \
+		echo "ci-linux: skipped -- Apple silicon macOS only (host $$(uname -s)/$$(uname -m)); no-op."; \
+		exit 0; \
+	fi; \
+	if [ "$$(sw_vers -productVersion | cut -d. -f1)" -lt 26 ]; then \
+		echo "ci-linux: skipped -- needs macOS 26+ (host $$(sw_vers -productVersion)); no-op."; \
+		exit 0; \
+	fi; \
+	if ! command -v container >/dev/null 2>&1; then \
+		echo "ci-linux: Apple 'container' not installed -> 'brew install container' (see AGENTS.md)."; \
+		exit 1; \
+	fi; \
+	if ! container machine list 2>/dev/null | awk 'NR>1{print $$1}' | grep -Fqx "$(CI_LINUX_MACHINE)"; then \
+		echo "ci-linux: machine '$(CI_LINUX_MACHINE)' not found. One-time setup (see AGENTS.md):"; \
+		echo "  container system start"; \
+		echo "  container build --arch arm64 --tag local/benchbox-agent docker/benchbox-agent"; \
+		echo "  container machine create local/benchbox-agent --name $(CI_LINUX_MACHINE) --home-mount rw --cpus 4 --memory 8G"; \
+		exit 1; \
+	fi; \
+	echo "==> ci-linux: '$(CI_LINUX_CMD)' inside container machine '$(CI_LINUX_MACHINE)'"; \
+	container machine run -n $(CI_LINUX_MACHINE) -- bash -lc 'cd "$(CURDIR)" && $(CI_LINUX_CMD)'
+
 # Type checking
 typecheck:
 	uv run ty check
@@ -625,9 +915,14 @@ typecheck:
 # Backward-compatible alias for older local notes/scripts.
 typecheck-uv: typecheck
 
-# Import validation
-validate-imports:
-	uv run -- python scripts/validate_imports.py
+# Import validation. Alias for the import-linter gate (lint-imports); the
+# previously-referenced scripts/validate_imports.py never existed, so the bare
+# target failed with file-not-found. CI uses lint-imports directly.
+validate-imports: lint-imports
+
+# Field-level schema validation for migrated YAML catalogs (see benchbox/core/catalog_schema.py).
+catalog-schema-check:
+	uv run -- python -m benchbox.core.catalog_schema
 
 # Dependency matrix / validation
 dependency-check:
@@ -674,6 +969,9 @@ docs-validate:
 	@echo ""
 	@echo "Validating visualization screenshot sync..."
 	@uv run -- python scripts/validate_visualization_images.py
+	@echo ""
+	@echo "Checking repo-local doc relative links..."
+	@uv run -- python scripts/check_doc_relative_links.py
 
 # Refresh generated visualization screenshots and sync shared docs/blog copies
 docs-images:
@@ -712,11 +1010,12 @@ parity-fixtures:
 
 # Regenerate sql_compat capability matrix and skip reference docs from the registry.
 compat-docs:
-	uv run scripts/generate_compat_docs.py
+	uv run -- python scripts/generate_compat_docs.py
 
-# Verify the committed compat docs match the registry. CI gate against drift.
+# Verify committed compat docs and DDL governance match the registry/source.
 compat-docs-check:
-	uv run scripts/generate_compat_docs.py --check
+	uv run -- python scripts/generate_compat_docs.py --check
+	uv run -- python -m benchbox.sql_compat.inventory --output /tmp/benchbox-compat-inventory.jsonl --check-ddl-drift
 
 # Verify fixtures match the current Python implementation without overwriting.
 # Fails if any fixture is out of date (drift detected).
@@ -752,12 +1051,14 @@ run-test:
 #
 # See docs/operations/release-guide.md and _project/decisions/single-repo-migration.md.
 
+RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
+
 .PHONY: release-cut release-finalize
 
 # Cut a release branch from develop in one shot:
 #   1. Create v$(VERSION) branch off develop (develop is not modified).
 #   2. On v$(VERSION): bump version sources (scripts/update_version.py).
-#   3. On v$(VERSION): generate CHANGELOG.md entry.
+#   3. On v$(VERSION): generate CHANGELOG.md entry from the origin/main patch delta.
 #   4. $EDITOR opens CHANGELOG.md for hand-curation (skipped if EDITOR unset).
 #   5. Curate: git rm dev-only/deferred paths (per A3 in single-repo-migration.md).
 #   6. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).
@@ -772,7 +1073,11 @@ release-cut:
 	git fetch origin
 	git checkout -b v$(VERSION) develop
 	uv run -- python scripts/update_version.py --version $(VERSION) --update-pyproject
-	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION)
+	@# Refresh uv.lock now that pyproject.toml carries the new version, so the
+	@# pre-commit uv-lock hook has nothing to regenerate mid-commit (v0.3.1
+	@# aborted because the tracked lock was stale and the hook rewrote it).
+	uv lock
+	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/main
 	@if [ -n "$$EDITOR" ]; then \
 		echo "==> Opening CHANGELOG.md in $$EDITOR for hand-curation"; \
 		$$EDITOR CHANGELOG.md; \
@@ -785,35 +1090,84 @@ release-cut:
 	@# before git add ensures untracked files inside _project/ etc. don't end up
 	@# staged-for-add by a later git add.
 	@# Curation list: A3 of _project/decisions/single-repo-migration.md.
-	-git rm -rf _project _blog results-data results-explorer .claude .codex .gemini
-	-git rm -f .pre-commit-config.yaml _benchbox_pytest_xdist_safety.py todo.config.yaml skill-sync.yaml skill-sync.lock .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md
-	-git rm -f .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
-	@# Stage only the files update_version.py + generate_changelog_entry.py write.
-	@# Explicit list (not `git add -A`) to avoid staging build/cache artifacts.
-	git add pyproject.toml benchbox/__init__.py landing/index.html README.md docs/README.md benchbox/utils/VERSION_MANAGEMENT.md CHANGELOG.md
-	git commit -m "Release v$(VERSION)"
+	@# --ignore-unmatch: git rm aborts the ENTIRE command when any one pathspec
+	@# is untracked, and a leading `-` would hide that, silently skipping all
+	@# curation on that line (v0.3.1 shipped uncurated because of this). With
+	@# --ignore-unmatch, unmatched paths are a no-op and any remaining failure
+	@# is real, so no `-` prefix: real failures must abort the cut.
+	git rm -rf --ignore-unmatch _project _blog results-data results-explorer .claude .codex .gemini
+	git rm -f --ignore-unmatch .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
+	git rm -f --ignore-unmatch .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
+	@# Tests that import _project/dev-only tooling or test curated-out surfaces
+	@# cannot collect on the release tree (found by the v0.3.1 release PR CI).
+	git rm -rf --ignore-unmatch tests/unit/scripts/explorer_pipeline tests/unit/explorer
+	git rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_skill_sync_lock_audit.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/scripts/test_validate_todo.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/test_todo_executable_docs.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py
+	@# Post-curation guard: every curated path must be gone from the index.
+	@LEFTOVER=$$(git ls-files _project _blog results-data results-explorer .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_skill_sync_lock_audit.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/scripts/test_validate_todo.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/test_todo_executable_docs.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py); \
+	if [ -n "$$LEFTOVER" ]; then \
+		echo "ERROR: release curation incomplete; dev-only paths still tracked:" >&2; \
+		echo "$$LEFTOVER" | sed 's/^/  /' >&2; \
+		exit 1; \
+	fi
+	@# Stage only the files update_version.py + generate_changelog_entry.py +
+	@# uv lock write. Explicit list (not `git add -A`) to avoid staging
+	@# build/cache artifacts.
+	git add pyproject.toml uv.lock benchbox/__init__.py landing/index.html README.md docs/README.md benchbox/utils/VERSION_MANAGEMENT.md CHANGELOG.md
+	@# --no-verify: the curation above (git rm) already deleted
+	@# .pre-commit-config.yaml and _project/scripts/ (the repo:local hook
+	@# entrypoints) from this working tree. The pre-commit git hook is still
+	@# installed locally and would otherwise run against a config/entrypoints
+	@# that no longer exist, aborting this commit with a false failure on
+	@# every release cut. Nothing is skipped that matters: develop's PRs
+	@# already ran these hooks before this content was curated.
+	git commit --no-verify -m "Release v$(VERSION)"
 	git push -u origin v$(VERSION)
 	gh pr create --base main --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
-	@# Option-c lifecycle: delete any prior v* branches on origin (loop sweeps stale entries).
+	@# Option-c lifecycle: delete any prior release branches on origin (loop sweeps stale entries).
+	@# ls-remote patterns match the LAST path component, so 'v*' alone also matches
+	@# e.g. fix/validate-submission-... (bit the 2026-07-08 v0.3.1 re-cut). Filter full
+	@# refs against the release-branch shape, mirroring _RELEASE_BRANCH_RE in
+	@# scripts/generate_changelog_entry.py.
 	@# Use grep -Fxv (literal, full-line match) so version strings with `.` aren't treated as regex.
-	@for br in $$(git ls-remote --heads origin 'v*' | awk '{print $$2}' | sed 's|refs/heads/||' | grep -Fxv "v$(VERSION)"); do \
+	@for br in $$(git ls-remote --heads origin 'v*' | awk '$$2 ~ /^refs\/heads\/v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.+-]+)?$$/ {print $$2}' | sed 's|refs/heads/||' | grep -Fxv "v$(VERSION)"); do \
 		echo "==> Deleting prior release branch on origin: $$br"; \
 		git push origin --delete "$$br" || true; \
 	done
 	@echo
 	@echo "Release PR opened. Next steps:"
 	@echo "  1. Review the PR diff; confirm CHANGELOG and curation are correct."
-	@echo "  2. Wait for CI green."
+	@echo "  2. Wait for the required release contexts: $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "  3. make release-finalize VERSION=$(VERSION)"
 
-# After release-cut's PR is approved and CI is green: squash-merge it,
-# tag main, push the tag (fires release.yml), and leave develop alone.
+# After release-cut's PR is approved and all required release contexts are
+# green: squash-merge it, tag main, push the tag (fires release.yml), and
+# leave develop alone.
 # Usage: make release-finalize VERSION=X.Y.Z
 release-finalize:
 	@test -n "$(VERSION)" || (echo "Usage: make release-finalize VERSION=X.Y.Z" && exit 1)
 	@PR=$$(gh pr list --base main --head v$(VERSION) --state open --json number --jq '.[0].number'); \
 	test -n "$$PR" || (echo "Error: no open PR found for v$(VERSION) → main" && exit 1); \
-	echo "==> Squash-merging PR #$$PR (ruleset main-release-only blocks merge if CI is not green)"; \
+	echo "==> Verifying required release contexts '$(RELEASE_REQUIRED_CONTEXTS)' for PR #$$PR"; \
+	for context in $(RELEASE_REQUIRED_CONTEXTS); do \
+		CHECK_BUCKET=$$(gh pr checks "$$PR" --required --json name,bucket,state --jq "map(select(.name == \"$$context\")) | if length == 1 then .[0].bucket elif length == 0 then \"missing\" else \"duplicate\" end"); \
+		CHECK_RC=$$?; \
+		if [ "$$CHECK_RC" = "8" ]; then \
+			echo "Error: required PR checks are pending. Wait for GitHub Actions, then rerun." >&2; \
+			exit 1; \
+		elif [ "$$CHECK_RC" != "0" ]; then \
+			echo "Error: gh pr checks failed while verifying $$context (exit $$CHECK_RC)" >&2; \
+			exit "$$CHECK_RC"; \
+		fi; \
+		case "$$CHECK_BUCKET" in \
+			pass) echo "==> $$context is green";; \
+			missing) echo "Error: required release context '$$context' is missing. Check main-release-only and release workflows." >&2; exit 1;; \
+			pending) echo "Error: required release context '$$context' is pending. Wait for GitHub Actions, then rerun." >&2; exit 1;; \
+			fail|cancel|skipping) echo "Error: required release context '$$context' is $$CHECK_BUCKET. Fix the release PR before finalizing." >&2; exit 1;; \
+			duplicate) echo "Error: multiple required contexts named '$$context' were returned. Fix workflow/ruleset drift." >&2; exit 1;; \
+			*) echo "Error: unexpected $$context status '$$CHECK_BUCKET'." >&2; exit 1;; \
+		esac; \
+	done; \
+	echo "==> Squash-merging PR #$$PR (required release contexts are green)"; \
 	gh pr merge --squash "$$PR"
 	git fetch origin --tags
 	git checkout main
@@ -822,6 +1176,7 @@ release-finalize:
 	git push origin v$(VERSION)
 	@echo
 	@echo "Tag v$(VERSION) pushed; release.yml will publish to PyPI."
+	@echo "Push-to-main jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "develop is intentionally unchanged — dev-only paths persist on develop."
 
 # =============================================================================
@@ -831,14 +1186,18 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics audit-sha-check worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
-# Mirror the CI gate locally before pushing. Catches ~all CI failures
-# without the network roundtrip. Delegates to ci-lint so the local
-# preflight surface stays in sync with lint.yml automatically.
+agent-write-preflight:
+	@sh scripts/agent_write_preflight.sh
+
+# Lightweight local gate before pushing. Mirrors CI lint and fast marker
+# selection, but not CI's coverage fail-under; run ci-test for the exact
+# coverage-enforced test workflow.
 pr-preflight:
 	@$(MAKE) ci-lint
 	@$(MAKE) pr-preflight-fast-tests
+	@$(MAKE) -s uat-artifact-hygiene
 
 pr-preflight-fast-tests:
 	@DECISION=$$(mktemp); \
@@ -847,8 +1206,8 @@ pr-preflight-fast-tests:
 	git fetch origin develop --quiet; \
 	uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
 	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
-		echo "==> fast tests"; \
-		uv run -- python -m pytest -m fast -q; \
+		echo "==> fast tests (CI marker selection; coverage remains CI-only)"; \
+		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q; \
 	else \
 		$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
 		echo "No code changes detected; skipping fast tests."; \
@@ -885,32 +1244,56 @@ pr-content-guard:
 		echo "No docs paths changed."; \
 	fi
 
-# Push current branch and open a PR against develop with auto-merge enabled.
+# Push current branch and open a PR against develop with auto-merge enabled
+# unless the diff touches soundness-critical comparator/plan-parser paths.
 # Squash-merge happens automatically once `lint` + `test (ubuntu-latest, 3.12)`
 # go green. Refuses to run from develop/main.
 #
 # Idempotent: safe to rerun. If a PR is already open for the branch, reuses it
-# and just (re)enables auto-merge — useful after a partial run, or to flip
-# auto-merge on for a PR opened via `gh pr create` directly.
+# and just (re)enables auto-merge when the soundness-path review gate does not
+# apply — useful after a partial run, or to flip auto-merge on for a PR opened
+# via `gh pr create` directly.
 #
 # Pre-push warning: runs `git merge-tree` against every other open PR head
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
 # before landing. Warn-only — does not block the push.
 pr-open:
+	@$(MAKE) -s agent-write-preflight
 	@CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
 		develop|main) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
 	esac; \
+	if [ -n "$(PR_BODY_FILE)" ] && [ ! -f "$(PR_BODY_FILE)" ]; then \
+		echo "PR_BODY_FILE does not exist: $(PR_BODY_FILE)" >&2; \
+		exit 1; \
+	fi; \
+	git fetch origin develop --quiet; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
-	git push -u origin "$$CURRENT" && \
+	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
 	URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
 	if [ -z "$$URL" ]; then \
-		URL=$$(gh pr create --base develop --fill --head "$$CURRENT"); \
+		if [ -n "$(PR_BODY_FILE)" ]; then \
+			URL=$$(gh pr create --base develop --fill --head "$$CURRENT" --body-file "$(PR_BODY_FILE)"); \
+		else \
+			URL=$$(gh pr create --base develop --fill --head "$$CURRENT"); \
+		fi; \
 	else \
 		echo "Reusing existing PR: $$URL"; \
+		if [ -n "$(PR_BODY_FILE)" ]; then \
+			gh pr edit "$$URL" --body-file "$(PR_BODY_FILE)"; \
+		fi; \
 	fi && \
 	echo "$$URL" && \
-	gh pr merge --auto --squash "$$URL"
+	SOUNDNESS_PATH=$$(git diff --name-only --no-renames origin/develop...HEAD | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin); \
+	if [ "$$SOUNDNESS_PATH" = "true" ]; then \
+		echo "Soundness-critical paths changed; leaving auto-merge disabled pending review."; \
+	else \
+		gh pr merge --auto --squash "$$URL"; \
+	fi
+
+shrink-rollup:
+	@git fetch origin develop --quiet
+	@uv run --project _project/scripts -- python _project/scripts/shrink_rollup.py
 
 # Walk every worktree (except the main clone) and run `make pr-open` in each.
 # Use PR_FANOUT_JOBS to bound parallelism.
@@ -927,7 +1310,7 @@ pr-fanout:
 		printf '%06d|%s\0' "$$IDX" "$$wt" >> "$$TMP"; \
 	done; \
 	if [ ! -s "$$TMP" ]; then exit 0; fi; \
-	xargs -0 -n 1 -P "$(PR_FANOUT_JOBS)" sh -c 'logdir="$$1"; record="$$2"; idx="$${record%%|*}"; wt="$${record#*|}"; br=$$(git -C "$$wt" branch --show-current 2>/dev/null); { echo "==> $$wt [$$br]"; ( cd "$$wt" && $(MAKE) -s pr-open ) || echo "(failed: $$wt)"; } > "$$logdir/$$idx.log" 2>&1' sh "$$LOGDIR" < "$$TMP"; \
+	xargs -0 -n 1 -P "$(PR_FANOUT_JOBS)" sh -c 'logdir="$$1"; record="$$2"; idx="$${record%%|*}"; wt="$${record#*|}"; br=$$(git -C "$$wt" branch --show-current 2>/dev/null); { echo "==> $$wt [$$br]"; ( cd "$$wt" && $(MAKE) -s pr-open ) || { echo "(failed: $$wt)"; exit 1; }; } > "$$logdir/$$idx.log" 2>&1' sh "$$LOGDIR" < "$$TMP"; \
 	STATUS=$$?; \
 	for log in "$$LOGDIR"/*.log; do [ -e "$$log" ] && cat "$$log"; done; \
 	exit $$STATUS
@@ -970,8 +1353,10 @@ pr-status:
 		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
 
 # Discover candidate bot/agent review comments on merged PRs without making changes.
-# Default --author filter is the chatgpt-codex-connector bot; override with --author
-# (or by editing DEFAULT_REVIEW_AUTHORS in the script) to add other reviewers.
+# Also reports merged PRs whose Codex review hit usage limits and still need a
+# fresh @codex review trigger. Default --author filter is the
+# chatgpt-codex-connector bot; override with --author (or by editing
+# DEFAULT_REVIEW_AUTHORS in the script) to add other reviewers.
 pr-review-followups-list:
 	@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \
 		--base "$(PR_REVIEW_BASE)" \
@@ -999,6 +1384,11 @@ pr-review-followups-list:
 #                                    the default, so the reply is posted.
 #   PR_REVIEW_SUBMIT=0               skip final pr-open. Same accepted values
 #                                    as PR_REVIEW_REPLY above.
+#   PR_REVIEW_USAGE_LIMIT_RETRY=0    skip the top-level Codex usage-limit
+#                                    retry step. By default, the routine posts
+#                                    @codex review on merged PRs with no later
+#                                    trigger and keeps later-triggered PRs
+#                                    visible until a review result appears.
 #   PR_REVIEW_RESUME=1               re-drive the routine on a branch that
 #                                    already carries per-comment commits from
 #                                    a prior crashed sweep. Implies
@@ -1563,21 +1953,6 @@ worktree-pool-disk-clean:
 	done; \
 	echo "Cleaned $$cleaned slot(s); freed $${freed_total}K total."
 
-# Path convention: ../BenchBox.<branch-with-slashes-as-dashes>/
-# After: cd into the path, work, run `make pr-open` from inside.
-worktree-add:
-	@test -n "$(BRANCH)" || { echo "Usage: make worktree-add BRANCH=<branch-name>"; exit 1; }
-	@echo "DEPRECATED: use \`make worktree-claim BRANCH=...\` instead. The pool model retains worktrees rather than creating new ones. \`worktree-add\` will be removed in the next release." >&2
-	@WTNAME=$$(echo "$(BRANCH)" | tr '/' '-'); \
-	WTPATH="../BenchBox.$$WTNAME"; \
-	test ! -e "$$WTPATH" || { echo "Path exists: $$WTPATH"; exit 1; }; \
-	git fetch origin develop --quiet && \
-	git worktree add -b "$(BRANCH)" "$$WTPATH" origin/develop && \
-	echo "" && \
-	echo "Worktree ready: $$WTPATH" && \
-	echo "Branch:        $(BRANCH) (based on origin/develop)" && \
-	echo "Next:          cd $$WTPATH && uv sync --group dev"
-
 worktree-list:
 	@git worktree list
 
@@ -1623,7 +1998,18 @@ blind-spots-sweep: blind-spots-report
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-docker-cleanup
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-docker-cleanup uat-artifact-hygiene
+
+# Local-artifact hygiene gate. No-op unless an external output root is
+# configured (BENCHBOX_OUTPUT_DIR or OUTPUT=); when it is, fails if the
+# worktree-local benchmark_runs/datagen holds artifacts that should have
+# landed under the external root (the 2026-06-01 datagen-leak incident).
+# Report-only: never deletes or moves artifacts.
+#   make uat-artifact-hygiene [OUTPUT=<root>] [THRESHOLD_BYTES=N]
+uat-artifact-hygiene:
+	@uv run --no-sync -- python -m tests.uat.artifact_hygiene \
+		$(if $(OUTPUT),--output "$(OUTPUT)",) \
+		$(if $(THRESHOLD_BYTES),--threshold-bytes "$(THRESHOLD_BYTES)",)
 
 # make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
 uat-cell:
@@ -1701,9 +2087,14 @@ uat-bring-up:
 		$(if $(BENCHMARK_RUNS_DIR),--benchmark-runs-dir "$(BENCHMARK_RUNS_DIR)",) \
 		$(if $(DRY_RUN),--dry-run,)
 
-# make uat-docker-cleanup [APPLY=1] [PREFIX=benchbox-uat]
+# make uat-docker-cleanup [ENGINE=docker|container] [MODE=owned|images|max] [APPLY=1] [PREFIX=benchbox-uat]
+# ENGINE=container reclaims the Apple `container` store (~/Library/Application
+# Support/com.apple.container); MODE widens breadth owned<images<max. See
+# AGENTS.md "Apple container cleanup".
 uat-docker-cleanup:
 	@uv run --no-sync -- python -m tests.uat._cli docker-cleanup \
+		$(if $(ENGINE),--engine "$(ENGINE)",) \
+		$(if $(MODE),--mode "$(MODE)",) \
 		$(if $(PREFIX),--prefix "$(PREFIX)",) \
 		$(if $(APPLY),--apply,)
 
@@ -1717,7 +2108,7 @@ uat-sweep:
 		$(if $(DRY_RUN),--dry-run,)
 
 # make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=] [CONFIG=]
-# Canned stress preset; feature parity with scripts/local_stress_test.sh.
+# Canned stress preset using the UAT framework matrix runner.
 uat-stress:
 	@uv run --no-sync -- python -m tests.uat._cli stress \
 		$(if $(CONFIG),--config "$(CONFIG)",) \
@@ -1758,8 +2149,17 @@ help:
 	@echo "  make test-slow       Run slow tests (> 10 sec)"
 	@echo "  make test-dev        Fast development cycle testing"
 	@echo "  make test-smoke      Quick smoke testing"
+	@echo "  make test-correctness-gate Run bounded real-result correctness gate"
+	@echo "  make tpchavoc-equivalence-report Gate: TPC-Havoc variant vs canonical TPC-H equivalence (DuckDB)"
+	@echo "  make tpchavoc-equivalence-report-postgres Sample: TPC-Havoc variant equivalence on PostgreSQL"
+	@echo "  make tpchavoc-equivalence-report-datafusion Sample: TPC-Havoc variant equivalence on DataFusion"
+	@echo "  make tpchavoc-equivalence-report-clickhouse Sample: TPC-Havoc variant equivalence on ClickHouse"
+	@echo "  make tpchavoc-dataframe-equivalence-report Gate: TPC-Havoc DataFrame variants vs canonical TPC-H"
+	@echo "  make ssb-cross-surface-equivalence-report Gate: SSB DataFrame surface vs its own SQL surface"
+	@echo "  make amplab-cross-surface-equivalence-report Gate: AMPLab DataFrame surface vs its own SQL surface"
+	@echo "  make coffeeshop-cross-surface-equivalence-report Gate: CoffeeShop DataFrame surface vs its own SQL surface"
 	@echo "  make test-local-matrix Run real local benchmark matrix (stress)"
-	@echo "  make test-ci         CI-optimized test suite"
+	@echo "  make test-ci         Maintained broad local CI profile"
 	@echo ""
 	@echo "Database-Specific Testing:"
 	@echo "  make test-duckdb     Run DuckDB-specific tests"
@@ -1775,13 +2175,14 @@ help:
 	@echo "  make test-window     Run window functions tests"
 	@echo ""
 	@echo "CI/CD Testing:"
-	@echo "  make test-ci         Run CI-optimized test suite"
+	@echo "  make test-ci         Run maintained broad local CI profile"
 	@echo ""
 	@echo "CI Local Equivalents (run before push):"
 	@echo "  make ci-local        Run ALL CI checks locally (lint+test+docs+package)"
 	@echo "  make ci-lint         Lint + format check + type check (matches lint.yml)"
 	@echo "  make ci-test         Fast tests with coverage (matches test.yml)"
 	@echo "  make ci-docs         Build documentation (matches docs.yml)"
+	@echo "  make ci-linux        Reproduce the Linux pr.yml gate in Apple container (Apple silicon, opt-in)"
 	@echo "  make test-integration-smoke  Integration smoke tests"
 	@echo "  make test-package    Build and test package installation"
 	@echo "  make security-audit  Run pip-audit security check"
@@ -1807,6 +2208,7 @@ help:
 	@echo "UAT Operations:"
 	@echo "  make uat-docker-cleanup        Report abandoned UAT Docker resources and non-UAT cleanup commands"
 	@echo "  make uat-docker-cleanup APPLY=1 Remove only UAT-owned Docker leftovers"
+	@echo "  make uat-docker-cleanup ENGINE=container [MODE=owned|images|max] Reclaim the Apple container store"
 	@echo ""
 	@echo "Coverage:"
 	@echo "  make coverage-fast   Run fast-marked tests with coverage (quick feedback)"
@@ -1817,6 +2219,7 @@ help:
 	@echo "Development:"
 	@echo "  make lint            Check code style"
 	@echo "  make lint-markers    Validate test marker annotations (catches speed-lane conflicts)"
+	@echo "  make lint-imports    Enforce import-layering contracts (utils < core < platforms < cli; experimental/mcp isolation)"
 	@echo "  make typecheck       Run type checking with ty"
 	@echo "  make typecheck-uv    Run type checking with uv (development)"
 	@echo "  make validate-imports Validate import structure and detect circular dependencies"
@@ -1840,9 +2243,11 @@ help:
 	@echo "  make docs-check      Run all documentation checks (validate, linkcheck, build)"
 	@echo ""
 	@echo "PR Workflow & Worktrees:"
-	@echo "  make pr-preflight    Run lint + fast tests locally; mirrors CI gate"
-	@echo "  make pr-open         Push branch + open PR vs develop + enable auto-merge (idempotent; safe to rerun)"
+	@echo "  make agent-write-preflight  Refuse write work from the BenchBox primary clone unless explicitly overridden"
+	@echo "  make pr-preflight    Run lint + fast marker tests locally (coverage remains CI-only)"
+	@echo "  make pr-open [PR_BODY_FILE=path] Push branch + open PR vs develop + enable auto-merge"
 	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
+	@echo "  make shrink-rollup   Sum merged shrink ledger fragments from origin/develop"
 	@echo "  make pr-refresh      Merge origin/develop into current branch, push, and re-enable auto-merge"
 	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
 	@echo "  make pr-review-followups-list        List un-actioned bot/agent review comments on merged PRs"
@@ -1858,8 +2263,7 @@ help:
 	@echo "  make worktree-pool-disk-clean     Drop pytest/mypy/ruff/coverage caches from pool slots (preserves .venv)"
 	@echo "  make worktree-pool-reset POOL=NN  Manual escape hatch for stuck pool slots"
 	@echo ""
-	@echo "Legacy / non-pool worktree paths (deprecated, kept for one release):"
-	@echo "  make worktree-add BRANCH=name  Deprecated legacy worktree creator (prefer worktree-claim)"
+	@echo "Legacy / non-pool worktree utilities (pool path via worktree-claim is preferred):"
 	@echo "  make worktree-list             List active worktrees"
 	@echo "  make worktree-prune            Remove legacy non-pool worktrees whose branches are gone on origin"
 	@echo ""
@@ -1870,6 +2274,6 @@ help:
 	@echo ""
 	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
 	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs main"
-	@echo "  make release-finalize VERSION=X.Y.Z Squash-merge the release PR, tag main, push tag (fires release.yml)"
+	@echo "  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag main, push tag"
 	@echo ""
 	@echo "  make help            Show this help message"

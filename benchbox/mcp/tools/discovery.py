@@ -16,10 +16,11 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import (
-    BENCHMARK_METADATA,
-    get_benchmark_class,
+    get_all_benchmarks,
     get_benchmark_default_scale,
+    get_benchmark_metadata,
     get_benchmark_surface,
+    get_public_benchmark_class,
     list_public_benchmark_ids,
 )
 from benchbox.mcp.errors import ErrorCode, make_error
@@ -62,7 +63,7 @@ def _collect_benchmark_queries_and_tables(benchmark_lower: str) -> tuple[list[di
     queries: list[dict[str, Any]] = []
     tables: list[str] = []
     try:
-        benchmark_class = get_benchmark_class(benchmark_lower)
+        benchmark_class = get_public_benchmark_class(benchmark_lower)
         if benchmark_class is not None:
             bm = benchmark_class(scale_factor=get_benchmark_default_scale(benchmark_lower))
             if hasattr(bm, "get_queries"):
@@ -77,13 +78,13 @@ def _collect_benchmark_queries_and_tables(benchmark_lower: str) -> tuple[list[di
 
 def _get_benchmark_info_impl(benchmark: str) -> dict[str, Any]:
     benchmark_lower = benchmark.lower()
-    if benchmark_lower not in BENCHMARK_METADATA or get_benchmark_surface(benchmark_lower) != "public":
+    meta = get_benchmark_metadata(benchmark_lower)
+    if meta is None or get_benchmark_surface(benchmark_lower) != "public":
         return {
             "error": f"Benchmark '{benchmark}' not found",
             "available_benchmarks": list_public_benchmark_ids(),
         }
 
-    meta = BENCHMARK_METADATA[benchmark_lower]
     queries, tables = _collect_benchmark_queries_and_tables(benchmark_lower)
 
     return {
@@ -91,6 +92,7 @@ def _get_benchmark_info_impl(benchmark: str) -> dict[str, Any]:
         "display_name": meta.get("display_name", benchmark_lower),
         "description": meta.get("description", f"{benchmark} benchmark"),
         "category": meta.get("category", "unknown"),
+        "support_status": meta["support_status"],
         "queries": {
             "count": meta.get("num_queries", len(queries)),
             "ids": [q["id"] for q in queries][:30],
@@ -263,7 +265,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         """Get detailed information about a specific benchmark.
 
         Args:
-            benchmark: Benchmark name (tpch, tpcds, ssb, clickbench, nyctaxi, tsbs_devops, h2odb, amplab, coffeeshop, tpch_skew, datavault, tpcdi, write_primitives, read_primitives, and more)
+            benchmark: Any registered benchmark ID; call list_available("benchmarks") to enumerate.
 
         Returns:
             Detailed benchmark information including queries and schema.
@@ -337,7 +339,7 @@ def _list_platforms_impl() -> dict[str, Any]:
 def _list_benchmarks_impl() -> dict[str, Any]:
     """List all available benchmarks."""
     benchmarks = []
-    for name, meta in BENCHMARK_METADATA.items():
+    for name, meta in get_all_benchmarks().items():
         if get_benchmark_surface(name) != "public":
             continue
         benchmark_data = {
@@ -345,6 +347,7 @@ def _list_benchmarks_impl() -> dict[str, Any]:
             "display_name": meta.get("display_name", name),
             "description": meta.get("description", f"{name} benchmark"),
             "category": meta.get("category", "unknown"),
+            "support_status": meta["support_status"],
             "query_count": meta.get("num_queries", 0),
             "scale_factors": {
                 "default": meta.get("default_scale", 0.01),
@@ -371,6 +374,7 @@ def _list_benchmarks_impl() -> dict[str, Any]:
 
 def _list_chart_templates_impl() -> dict[str, Any]:
     """List available chart templates for visualization."""
+    from benchbox.core.visualization.chart_types import ALL_CHART_TYPES, CHART_TYPE_DESCRIPTIONS
     from benchbox.core.visualization.templates import list_templates
 
     templates = list_templates()
@@ -384,14 +388,14 @@ def _list_chart_templates_impl() -> dict[str, Any]:
             }
             for t in templates
         ],
-        "chart_types": {
-            "performance_bar": "Bar chart comparing total runtime",
-            "distribution_box": "Box plot of query time distribution",
-            "query_heatmap": "Heatmap of per-query times across platforms",
-            "cost_scatter": "Cost vs performance scatter plot",
-            "time_series": "Performance trend over time",
+        "chart_types": dict(CHART_TYPE_DESCRIPTIONS),
+        "chart_type_coverage": "complete_semantic_registry",
+        "chart_namespace": "benchbox_result_aware_semantic_ids",
+        "semantic_chart_ids": list(ALL_CHART_TYPES),
+        "external_chart_namespaces": {
+            "textcharts": "Separate raw primitive MCP server namespace when installed/configured; not accepted as BenchBox chart_type values."
         },
-        "supported_formats": ["html"],
+        "supported_formats": ["ascii"],
     }
 
 

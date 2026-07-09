@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<dsql_query number_nodes="1" number_distributions="60" number_distributions_per_node="60">
+  <sql>SELECT o.o_orderkey, SUM(l.l_extendedprice) AS revenue FROM orders o JOIN lineitem l ON o.o_orderkey = l.l_orderkey GROUP BY o.o_orderkey ORDER BY revenue DESC</sql>
+  <dsql_operations total_cost="42.5" total_number_operations="4">
+    <dsql_operation operation_type="RND_ID">
+      <identifier>TEMP_ID_17</identifier>
+    </dsql_operation>
+    <dsql_operation operation_type="ON">
+      <location distribution="AllDistributions" />
+      <sql_operation type="statement">CREATE TABLE [tempdb].[dbo].[TEMP_ID_17] WITH (DISTRIBUTION = HASH(o_orderkey))</sql_operation>
+    </dsql_operation>
+    <dsql_operation operation_type="SHUFFLE_MOVE">
+      <operation_cost cost="38.0" accumulative_cost="38.0" average_rowsize="24" output_rows="1500" />
+      <location distribution="AllDistributions" />
+      <source_statement>SELECT o.o_orderkey, l.l_extendedprice FROM [tpch].[dbo].[orders] o INNER JOIN [tpch].[dbo].[lineitem] l ON o.o_orderkey = l.l_orderkey</source_statement>
+      <destination_table>TEMP_ID_17</destination_table>
+      <shuffle_columns>o_orderkey</shuffle_columns>
+    </dsql_operation>
+    <dsql_operation operation_type="RETURN">
+      <location distribution="Control" />
+      <select>SELECT o_orderkey, SUM(l_extendedprice) AS revenue FROM TEMP_ID_17 GROUP BY o_orderkey ORDER BY revenue DESC</select>
+    </dsql_operation>
+  </dsql_operations>
+</dsql_query>

@@ -26,11 +26,21 @@ import ast
 import json
 import re
 import sys
+from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterator, Literal
 
+from benchbox.utils.printing import emit
+
 CompatKind = Literal["skip", "rewrite", "ddl", "type_mapping", "session_setting", "benchmark_gate"]
+DdlGovernanceStatus = Literal[
+    "registered_runtime_behavior",
+    "registered_governance_only_intent",
+    "explicit_exemption",
+    "unregistered_detected_behavior",
+    "unknown_uninspectable_behavior",
+]
 
 _DIALECT_PLATFORMS = {
     "duckdb",
@@ -78,6 +88,43 @@ _DDL_OPTIMIZE_FUNC_NAMES = {
     "_inject_doris_ddl_clauses",  # Doris: monolithic transform (PK + FK + type maps + clauses)
     "_strip_pk_constraints",  # QuestDB: PK strip path
 }
+_DDL_REWRITE_FUNCTION_NAME_FRAGMENTS = (
+    "create",
+    "ddl",
+    "external_table",
+    "table",
+)
+_DDL_TEXT_TRANSFORM_CALL_NAMES = {
+    "replace",
+    "sub",
+    "strip_foreign_keys",
+    "strip_with_properties",
+}
+_DDL_REWRITE_OUTPUT_MARKERS = (
+    "create external table",
+    "create or replace table",
+    "distributed by",
+    "diststyle",
+    "duplicate key",
+    "engine =",
+    "location",
+    "order by",
+    "partition by",
+    "primary key",
+    "sort key",
+    "sortkey",
+    "stored as",
+    "tblproperties",
+    "using delta",
+)
+_DDL_STATEMENT_ARG_NAMES = {"statement", "stmt", "table_sql"}
+_DDL_STATUS_ORDER: tuple[DdlGovernanceStatus, ...] = (
+    "registered_runtime_behavior",
+    "registered_governance_only_intent",
+    "explicit_exemption",
+    "unregistered_detected_behavior",
+    "unknown_uninspectable_behavior",
+)
 _TYPE_MAP_FUNC_NAMES = {"_map_type_to_dialect"}
 
 # Map adapter file stems → registry platform keys (only needed for exceptions to the rule
@@ -87,6 +134,35 @@ _TYPE_MAP_FUNC_NAMES = {"_map_type_to_dialect"}
 _FILE_STEM_TO_PLATFORM_KEY: dict[str, str] = {
     "azure_synapse": "synapse",
     "fabric_warehouse": "fabric_dw",
+}
+
+# Shared helper functions whose runtime callers are platform adapters with their
+# own DDL_OPTIMIZE rules. The detector reports them under each governed platform
+# instead of the helper module's private file stem.
+_DDL_HELPER_PLATFORM_KEYS: dict[tuple[str, str], tuple[str, ...]] = {
+    ("_spark_helpers.py", "optimize_spark_table_definition"): ("lakesail", "spark", "velox"),
+}
+_DDL_GOVERNANCE_TRANSFORMER_ALIASES: dict[tuple[str, str], tuple[str, ...]] = {
+    ("athena", "_convert_to_external_table"): ("athena_convert_to_external_table",),
+    ("bigquery", "_convert_to_bigquery_table"): ("bigquery_convert_to_bigquery_table",),
+    ("clickhouse", "_optimize_table_definition"): ("clickhouse_ddl_optimizer",),
+    ("databend", "_optimize_table_definition"): ("databend_ddl_optimizer",),
+    ("databricks", "_convert_to_delta_table"): ("databricks_delta_ddl_optimizer",),
+    ("doris", "_inject_doris_ddl_clauses"): ("doris_inject_ddl_clauses",),
+    ("fabric_dw", "_optimize_table_definition"): ("fabric_dw_ddl_optimizer",),
+    ("firebolt", "_optimize_table_definition"): ("firebolt_ddl_optimizer",),
+    ("lakesail", "optimize_spark_table_definition"): ("lakesail_ddl_optimizer",),
+    ("pg_mooncake", "_transform_create_statement"): ("pg_mooncake_heap_load_then_mirror",),
+    ("postgresql", "_transform_create_statement"): ("postgresql_strip_foreign_keys",),
+    ("presto", "_optimize_table_definition"): ("presto_ddl_optimizer",),
+    ("questdb", "_strip_pk_constraints"): ("questdb_strip_fk_and_pk_constraints",),
+    ("redshift", "_optimize_table_definition"): ("redshift_ddl_optimizer",),
+    ("snowflake", "_optimize_table_definition"): ("snowflake_ddl_optimizer",),
+    ("spark", "optimize_spark_table_definition"): ("spark_ddl_optimizer",),
+    ("starrocks", "_optimize_table_definition"): ("starrocks_ddl_optimizer",),
+    ("synapse", "_optimize_table_definition"): ("azure_synapse_ddl_optimizer",),
+    ("trino", "_optimize_table_definition"): ("trino_ddl_optimizer",),
+    ("velox", "optimize_spark_table_definition"): ("velox_ddl_optimizer",),
 }
 
 # Regex for session-setting patterns (grep over raw source)
@@ -113,12 +189,44 @@ class InventoryEntry:
     description: str
 
 
+@dataclass(frozen=True)
+class DdlDriftExemption:
+    """A local DDL rewrite intentionally outside registry enforcement.
+
+    Keep this list empty unless a platform has a documented reason that a
+    detected CREATE TABLE rewrite cannot be represented by a DDL_OPTIMIZE rule.
+    The drift checker reports exemptions separately so "clean" cannot be
+    confused with "runtime-dispatched".
+    """
+
+    platform_key: str
+    func_name: str | None
+    reason: str
+
+
+_DDL_DRIFT_EXEMPTIONS: tuple[DdlDriftExemption, ...] = ()
+
+
+@dataclass(frozen=True)
+class _DdlRegistrationInfo:
+    runtime_transformers: frozenset[str]
+    governance_only_transformers: frozenset[str]
+
+    @property
+    def has_runtime_dispatch(self) -> bool:
+        return bool(self.runtime_transformers)
+
+    @property
+    def has_governance_only(self) -> bool:
+        return bool(self.governance_only_transformers)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _extract_string_literals(node: ast.expr) -> list[str]:
+def _extract_string_literals(node: ast.AST) -> list[str]:
     """Collect all string literal values from a node tree."""
     result = []
     for child in ast.walk(node):
@@ -135,6 +243,59 @@ def _extract_platforms(node: ast.expr) -> list[str]:
 
 def _rel(path: Path, root: Path) -> str:
     return str(path.relative_to(root.parent))
+
+
+def _normalize_sql_marker(value: str) -> str:
+    """Normalize SQL/regex string fragments enough for source-signature checks."""
+    marker = value.lower()
+    marker = re.sub(r"\\s[+*]?", " ", marker)
+    marker = marker.replace("\\b", " ")
+    marker = re.sub(r"\s+", " ", marker)
+    return marker.strip()
+
+
+def _call_name(call: ast.Call) -> str | None:
+    func = call.func
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    if isinstance(func, ast.Name):
+        return func.id
+    return None
+
+
+def _has_create_table_literal(node: ast.AST) -> bool:
+    return any("create table" in _normalize_sql_marker(value) for value in _extract_string_literals(node))
+
+
+def _has_ddl_rewrite_output_marker(node: ast.AST) -> bool:
+    normalized_values = [_normalize_sql_marker(value) for value in _extract_string_literals(node)]
+    return any(marker in value for marker in _DDL_REWRITE_OUTPUT_MARKERS for value in normalized_values)
+
+
+def _has_ddl_text_transform_call(node: ast.AST) -> bool:
+    return any(
+        isinstance(child, ast.Call) and (_call_name(child) in _DDL_TEXT_TRANSFORM_CALL_NAMES)
+        for child in ast.walk(node)
+    )
+
+
+def _accepts_statement_text(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    args = [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]
+    return any(arg.arg in _DDL_STATEMENT_ARG_NAMES for arg in args)
+
+
+def _looks_like_create_table_rewrite(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """Detect CREATE TABLE rewrite behavior without relying on method names."""
+    if not _accepts_statement_text(node):
+        return False
+    if not _has_create_table_literal(node):
+        return False
+
+    name = node.name.lower()
+    if any(fragment in name for fragment in _DDL_REWRITE_FUNCTION_NAME_FRAGMENTS):
+        return _has_ddl_text_transform_call(node) or _has_ddl_rewrite_output_marker(node)
+
+    return _has_ddl_text_transform_call(node) and _has_ddl_rewrite_output_marker(node)
 
 
 # ---------------------------------------------------------------------------
@@ -399,6 +560,23 @@ def _detect_unsupported_benchmarks(tree: ast.Module, filepath: Path, root: Path)
                 suggested_phase="benchmark_gate",
                 description="caps.unsupported_benchmarks access - benchmark_gate preflight",
             )
+        # Current CLI shape: getattr(caps, "unsupported_benchmarks", None)
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "getattr"
+            and len(node.args) >= 2
+            and isinstance(node.args[1], ast.Constant)
+            and node.args[1].value == "unsupported_benchmarks"
+        ):
+            yield InventoryEntry(
+                file=rel,
+                line=node.lineno,
+                kind="benchmark_gate",
+                platforms=[],
+                suggested_phase="benchmark_gate",
+                description="getattr(caps, 'unsupported_benchmarks') - benchmark_gate preflight",
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -602,28 +780,17 @@ class DdlDriftEntry:
     line: int
     func_name: str
     inferred_platform_key: str
+    detection_kind: str = "known-function-name"
+    status: DdlGovernanceStatus = "unregistered_detected_behavior"
+    detail: str = ""
 
 
-def check_ddl_drift(root: Path) -> list[DdlDriftEntry]:
-    """Return unregistered DDL-optimize transforms found under *root*.
-
-    Scans platform adapter files for ``_optimize_table_definition`` and
-    ``_transform_create_statement`` definitions, infers the platform key
-    from the file path, and checks whether a rule is registered under
-    ``Phase.DDL_OPTIMIZE`` for that platform key.
-
-    Returns a list of DdlDriftEntry for each unregistered transform; an
-    empty list means the codebase is clean.
-
-    Loads all rules from ``benchbox.sql_compat.rules.ddl_optimize`` before
-    the check so rule files do not need to be imported elsewhere first.
-    """
+def _load_ddl_rule_modules() -> None:
+    """Import all DDL_OPTIMIZE rule modules or raise with a compact error."""
     import importlib
     import pkgutil
 
     import benchbox.sql_compat.rules.ddl_optimize as _ddl_pkg
-    from benchbox.sql_compat.context import Phase
-    from benchbox.sql_compat.registry import REGISTRY
 
     broken_modules: list[str] = []
     for _, mod_name, _ispkg in pkgutil.walk_packages(_ddl_pkg.__path__, _ddl_pkg.__name__ + "."):
@@ -638,43 +805,171 @@ def check_ddl_drift(root: Path) -> list[DdlDriftEntry]:
             + "\n".join(f"  {m}" for m in broken_modules)
         )
 
-    registered_platforms: set[str] = {
-        platform for (phase, platform, _, _), _ in REGISTRY.all_rules() if phase == Phase.DDL_OPTIMIZE
+
+def _registered_ddl_info_by_platform() -> dict[str, _DdlRegistrationInfo]:
+    """Return registered DDL transformer metadata for each platform."""
+    from benchbox.sql_compat.context import Phase
+    from benchbox.sql_compat.decision import RewriteDDLPayload
+    from benchbox.sql_compat.registry import REGISTRY
+
+    runtime_transformers: dict[str, set[str]] = {}
+    governance_only_transformers: dict[str, set[str]] = {}
+    for (phase, platform, _, _), entry in REGISTRY.all_rules():
+        if phase != Phase.DDL_OPTIMIZE:
+            continue
+        payload = entry.decision.payload
+        if isinstance(payload, RewriteDDLPayload) and not payload.governance_only:
+            runtime_transformers.setdefault(platform, set()).add(payload.transformer_id)
+        elif isinstance(payload, RewriteDDLPayload):
+            governance_only_transformers.setdefault(platform, set()).add(payload.transformer_id)
+    platforms = set(runtime_transformers) | set(governance_only_transformers)
+    return {
+        platform: _DdlRegistrationInfo(
+            runtime_transformers=frozenset(runtime_transformers.get(platform, set())),
+            governance_only_transformers=frozenset(governance_only_transformers.get(platform, set())),
+        )
+        for platform in platforms
     }
 
-    drift: list[DdlDriftEntry] = []
+
+def _ddl_exemption_for(platform_key: str, func_name: str) -> DdlDriftExemption | None:
+    for exemption in _DDL_DRIFT_EXEMPTIONS:
+        if exemption.platform_key != platform_key:
+            continue
+        if exemption.func_name is not None and exemption.func_name != func_name:
+            continue
+        return exemption
+    return None
+
+
+def _platform_keys_for_ddl_function(filepath: Path, func_name: str) -> tuple[str, ...]:
+    helper_platforms = _DDL_HELPER_PLATFORM_KEYS.get((filepath.name, func_name))
+    if helper_platforms is not None:
+        return helper_platforms
+    if filepath.stem.startswith("_"):
+        return ()
+    return (_platform_key_from_adapter_path(filepath),)
+
+
+def _ddl_status_for_function(
+    registration_info: _DdlRegistrationInfo | None,
+    platform_key: str,
+    func_name: str,
+    detection_kind: str,
+) -> DdlGovernanceStatus:
+    if registration_info is None:
+        return "unregistered_detected_behavior"
+    transformer_names = {func_name, *_DDL_GOVERNANCE_TRANSFORMER_ALIASES.get((platform_key, func_name), ())}
+    if transformer_names & registration_info.runtime_transformers:
+        return "registered_runtime_behavior"
+    if detection_kind == "known-function-name" and registration_info.has_runtime_dispatch:
+        return "registered_runtime_behavior"
+    if transformer_names & registration_info.governance_only_transformers:
+        return "registered_governance_only_intent"
+    return "unregistered_detected_behavior"
+
+
+def _iter_ddl_rewrite_functions(
+    tree: ast.Module,
+) -> Iterator[tuple[ast.FunctionDef | ast.AsyncFunctionDef, str, str]]:
+    """Yield DDL rewrite functions with detection metadata."""
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if node.name in _DDL_OPTIMIZE_FUNC_NAMES:
+            yield node, "known-function-name", "function name is registered as a DDL optimizer signature"
+        elif _looks_like_create_table_rewrite(node):
+            yield (
+                node,
+                "create-table-rewrite-signature",
+                "function contains CREATE TABLE markers plus SQL text rewrite calls or output clauses",
+            )
+
+
+def collect_ddl_governance_statuses(root: Path) -> list[DdlDriftEntry]:
+    """Return detected DDL rewrite behavior and its governance status.
+
+    A clean codebase may include runtime-dispatched transforms, governance-only
+    local transforms, and explicit exemptions. Only unregistered or
+    uninspectable entries fail the drift gate.
+    """
+    _load_ddl_rule_modules()
+    registered_info = _registered_ddl_info_by_platform()
+
+    entries: list[DdlDriftEntry] = []
     platforms_dir = root / "platforms"
     if not platforms_dir.exists():
-        return drift
+        return entries
 
     for filepath in sorted(platforms_dir.rglob("*.py")):
         if "__pycache__" in filepath.parts:
             continue
-        try:
-            source = filepath.read_text(encoding="utf-8")
-            tree = ast.parse(source, filename=str(filepath))
-        except (SyntaxError, UnicodeDecodeError):
+        if filepath.parent.name == "base":
             continue
 
         platform_key = _platform_key_from_adapter_path(filepath)
         rel = str(filepath.relative_to(root.parent))
+        try:
+            source = filepath.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(filepath))
+        except (SyntaxError, UnicodeDecodeError) as exc:
+            entries.append(
+                DdlDriftEntry(
+                    file=rel,
+                    line=0,
+                    func_name="<module>",
+                    inferred_platform_key=platform_key,
+                    detection_kind=type(exc).__name__,
+                    status="unknown_uninspectable_behavior",
+                    detail=str(exc),
+                )
+            )
+            continue
 
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            if node.name not in _DDL_OPTIMIZE_FUNC_NAMES:
-                continue
-            if platform_key not in registered_platforms:
-                drift.append(
+        for node, detection_kind, detail in _iter_ddl_rewrite_functions(tree):
+            for detected_platform_key in _platform_keys_for_ddl_function(filepath, node.name):
+                exemption = _ddl_exemption_for(detected_platform_key, node.name)
+                status: DdlGovernanceStatus
+                status_detail = detail
+                if exemption is not None:
+                    status = "explicit_exemption"
+                    status_detail = exemption.reason
+                else:
+                    status = _ddl_status_for_function(
+                        registered_info.get(detected_platform_key),
+                        detected_platform_key,
+                        node.name,
+                        detection_kind,
+                    )
+
+                entries.append(
                     DdlDriftEntry(
                         file=rel,
                         line=node.lineno,
                         func_name=node.name,
-                        inferred_platform_key=platform_key,
+                        inferred_platform_key=detected_platform_key,
+                        detection_kind=detection_kind,
+                        status=status,
+                        detail=status_detail,
                     )
                 )
 
-    return drift
+    return entries
+
+
+def check_ddl_drift(root: Path) -> list[DdlDriftEntry]:
+    """Return unregistered or uninspectable DDL-optimize transforms found under *root*.
+
+    Scans platform adapter files for known DDL optimizer method names and
+    behavior signatures such as CREATE TABLE guards with ``.replace()``,
+    ``re.sub()``, or DDL output clauses. The returned entries are the subset
+    that would make ``compat_lint`` unsafe to call clean.
+    """
+    return [
+        entry
+        for entry in collect_ddl_governance_statuses(root)
+        if entry.status in {"unregistered_detected_behavior", "unknown_uninspectable_behavior"}
+    ]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -710,53 +1005,66 @@ def main(argv: list[str] | None = None) -> int:
     output = Path(args.output)
 
     if not root.exists():
-        print(f"ERROR: root directory not found: {root}", file=sys.stderr)
+        emit(f"ERROR: root directory not found: {root}", stderr=True)
         return 1
 
-    print(f"Scanning {root} ...", file=sys.stderr)
+    emit(f"Scanning {root} ...", stderr=True)
     entries = scan(root)
     write_jsonl(entries, output)
-    print(f"Wrote {len(entries)} entries to {output}", file=sys.stderr)
+    emit(f"Wrote {len(entries)} entries to {output}", stderr=True)
 
     exit_code = 0
 
     errors = _validate_mandatory_sites(entries)
     if errors:
         for err in errors:
-            print(f"VALIDATION ERROR: {err}", file=sys.stderr)
+            emit(f"VALIDATION ERROR: {err}", stderr=True)
         exit_code = 1
 
     if args.summary:
-        from collections import Counter
-
         kind_counts = Counter(e.kind for e in entries)
         phase_counts = Counter(e.suggested_phase for e in entries)
-        print("\nKind distribution:")
+        emit("\nKind distribution:")
         for kind, count in sorted(kind_counts.items()):
-            print(f"  {kind:20s} {count}")
-        print("\nSuggested phase distribution:")
+            emit(f"  {kind:20s} {count}")
+        emit("\nSuggested phase distribution:")
         for phase, count in sorted(phase_counts.items()):
-            print(f"  {phase:20s} {count}")
+            emit(f"  {phase:20s} {count}")
 
     if args.check_ddl_drift:
-        print("\nChecking DDL drift ...", file=sys.stderr)
-        drift = check_ddl_drift(root)
+        emit("\nChecking DDL drift ...", stderr=True)
+        statuses = collect_ddl_governance_statuses(root)
+        counts = Counter(entry.status for entry in statuses)
+        summary = ", ".join(f"{status}={counts.get(status, 0)}" for status in _DDL_STATUS_ORDER)
+        emit(f"DDL governance status: {summary}", stderr=True)
+
+        drift = [
+            entry
+            for entry in statuses
+            if entry.status in {"unregistered_detected_behavior", "unknown_uninspectable_behavior"}
+        ]
         if drift:
-            print(f"DDL DRIFT: {len(drift)} unregistered DDL-optimize transform(s):", file=sys.stderr)
+            emit(
+                f"DDL DRIFT: {len(drift)} unregistered or uninspectable DDL-optimize transform(s):",
+                stderr=True,
+            )
             for d in drift:
-                print(
-                    f"  {d.file}:{d.line}  {d.func_name}()  [inferred platform key: {d.inferred_platform_key!r}]",
-                    file=sys.stderr,
+                emit(
+                    f"  {d.file}:{d.line}  {d.func_name}()  "
+                    f"[platform={d.inferred_platform_key!r}, status={d.status}, detector={d.detection_kind}]",
+                    stderr=True,
                 )
-            print(
+                if d.detail:
+                    emit(f"    {d.detail}", stderr=True)
+            emit(
                 "Register each unregistered transform in "
                 "benchbox/sql_compat/rules/ddl_optimize/{platform}_ddl_rewrites.py "
-                "before enabling --check-ddl-drift in CI.",
-                file=sys.stderr,
+                "or add an explicit drift exemption with rationale.",
+                stderr=True,
             )
             exit_code = 1
         else:
-            print("DDL drift check: CLEAN (0 unregistered transforms)", file=sys.stderr)
+            emit("DDL drift check: CLEAN (0 unregistered or uninspectable transforms)", stderr=True)
 
     return exit_code
 

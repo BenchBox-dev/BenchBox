@@ -31,6 +31,27 @@ _TRAILING_DELIMITER_COLUMN = "__benchbox_trailing_delimiter__"
 _DEFAULT_MAX_IN_MEMORY_BYTES = 2 * 1024 * 1024 * 1024
 
 
+def _source_has_trailing_delimiter(source_files: list[Path]) -> bool:
+    """Probe the first source file's tail for a raw dbgen/dsdgen trailing delimiter.
+
+    Row framing (trailing ``|`` before the newline, or not) is uniform across
+    an entire TBL file - dbgen/dsdgen decide it once per run/compile - so
+    checking one file's tail classifies the whole batch. The bundled binaries
+    are all built to emit no trailing delimiter, but this probe keeps the
+    reader robust to either framing.
+    """
+    if not source_files:
+        return False
+    path = source_files[0]
+    size = path.stat().st_size
+    if size == 0:
+        return False
+    with path.open("rb") as handle:
+        handle.seek(max(0, size - 2))
+        tail = handle.read()
+    return tail.endswith((b"|\n", b"|"))
+
+
 class SortedParquetWriter:
     """Writes TBL benchmark data as sorted Parquet files.
 
@@ -273,12 +294,17 @@ class SortedParquetWriter:
     ) -> pa.Table:
         """Read one or more TBL files into a PyArrow table.
 
-        TBL format: pipe-delimited, no header, trailing delimiter on each line.
+        TBL format: pipe-delimited, no header, optionally a trailing delimiter
+        on each line (raw dbgen/dsdgen file-mode output before BenchBox's own
+        normalization pass strips it; see ``_source_has_trailing_delimiter``).
         """
         read_column_names = column_names
-        if column_names is not None:
-            # TBL always has a trailing delimiter, so provide a synthetic final
-            # column to keep parser arity aligned when schema names are provided.
+        if column_names is not None and _source_has_trailing_delimiter(source_files):
+            # File-mode output still carries a trailing delimiter, so provide a
+            # synthetic final column to keep parser arity aligned with the
+            # explicit schema names. Normalized files have exactly N fields for
+            # N schema columns, so this synthetic column must be omitted or
+            # PyArrow raises a column-count mismatch (#1059 review).
             read_column_names = [*column_names, _TRAILING_DELIMITER_COLUMN]
 
         read_options = csv.ReadOptions(

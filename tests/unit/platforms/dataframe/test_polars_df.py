@@ -333,6 +333,33 @@ class TestPolarsDataLoading:
         df = lf.collect()
         assert df.columns == ["id", "name", "amount"]
 
+    def test_read_csv_empty_string_follows_null_marker(self, tmp_path):
+        """Empty text fields stay '' when null_marker is None, NULL when '' (w6).
+
+        Mirrors the pandas adapter and the SQL dialect: ClickBench keeps '' (the
+        cross-surface Q6/Q17/Q18 contract), JoinOrder treats empty as NULL. Without
+        this, Polars' raw-CSV path maps empty -> null and reintroduces the bug under
+        prefer_parquet=False.
+        """
+        import polars as pl
+
+        adapter = PolarsDataFrameAdapter()
+        csv_path = tmp_path / "t.csv"
+        csv_path.write_text("a|1\n|2\nb|\n")
+
+        kept = adapter.read_csv(
+            csv_path, delimiter="|", has_header=False, column_names=["s", "n"], null_marker=None
+        ).collect()
+        assert kept["s"].to_list() == ["a", "", "b"]
+        assert kept["s"].null_count() == 0
+
+        nulled = adapter.read_csv(
+            csv_path, delimiter="|", has_header=False, column_names=["s", "n"], null_marker=""
+        ).collect()
+        assert nulled["s"].to_list() == ["a", None, "b"]
+        assert nulled["s"].null_count() == 1
+        assert nulled.schema["n"] == pl.Int64  # numeric column unaffected
+
     def test_read_csv_respects_n_rows(self, tmp_path):
         """Test CSV scanning honors the adapter row limit."""
         adapter = PolarsDataFrameAdapter(n_rows=2)

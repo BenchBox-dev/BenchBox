@@ -59,7 +59,7 @@ jobs:
 
   compat-test:
     name: compat-test (${{ matrix.os }}, ${{ matrix.python-version }})
-    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
+    if: ${{ (github.event_name != 'pull_request' || github.base_ref != 'develop') && (github.event_name != 'pull_request' || github.base_ref != 'main' || !startsWith(github.head_ref, 'v')) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -141,7 +141,10 @@ jobs:
     env:
       # Comma-separated GHSA/CVE IDs for temporarily accepted false positives.
       # Keep empty unless triage is documented in the TODO item.
-      PIP_AUDIT_IGNORE_VULNS: ""
+      # PYSEC-2026-87 (lxml): redshift-connector==2.1.13 pins lxml<=6.0.2, so
+      # the fixed lxml 6.1.0 can't be resolved until upstream relaxes that
+      # bound. See _project/TODO/main/planning/lxml-cve-pysec-2026-87-blocked-by-redshift-connector.yaml
+      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-87"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -170,7 +173,7 @@ jobs:
   # Quick integration smoke tests - non-required on main/push; develop broad
   # validation runs through nightly/manual workflows.
   integration-smoke:
-    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
+    if: ${{ (github.event_name != 'pull_request' || github.base_ref != 'develop') && (github.event_name != 'pull_request' || github.base_ref != 'main' || !startsWith(github.head_ref, 'v')) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -228,11 +231,11 @@ jobs:
         run: |
           uv run -- python -m pytest -q tests/integration/core/data_organization/test_presorted_generation.py -m "requires_table_formats" --tb=short
 
-  # Full integration test suite - runs on push to main or with label
+  # Credential-free integration suite - release-required for main PRs and runs on main pushes.
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-integration'))
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'main')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -251,9 +254,36 @@ jobs:
 
       - name: Run integration tests
         run: |
-          uv run -- python -m pytest tests/integration -m "integration and not slow and not stress" --tb=short --maxfail=5 --timeout=300
+          uv run -- python -m pytest tests/integration -m "integration and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5 --timeout=300
 
-  # Package build and install test
+  correctness-gate:
+    name: correctness-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'main')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run bounded real-result correctness gate
+        run: make test-correctness-gate
+
+  # Package build and install test — builds a fresh wheel from this branch to verify
+  # the package is importable and the CLI entry point resolves. This is an independent
+  # build from the wheel published by release.yml; it validates pre-merge correctness,
+  # not artifact identity.
   test-package:
     if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ${{ matrix.os }}
@@ -284,18 +314,22 @@ jobs:
       - name: Test package installation
         shell: bash
         run: |
-          # Use bash on all platforms so glob expansion and mktemp work cross-platform.
-          # --no-project plus a temp cwd prevents uv from syncing the checkout env.
-          mapfile -t wheels < <(find "$PWD/dist" -maxdepth 1 -type f -name '*.whl' | sort)
-          if [ "${#wheels[@]}" -ne 1 ]; then
-            printf 'Expected exactly one wheel in dist/, found %s:\n' "${#wheels[@]}"
-            printf '  %s\n' "${wheels[@]}"
+          set -euo pipefail
+          # Use bash on all platforms so glob expansion works cross-platform.
+          # GitHub Actions Windows runners have Git Bash available.
+          wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
+          if [ "$wheel_count" != "1" ]; then
+            echo "::error::Expected exactly one wheel, found $wheel_count"
+            find dist -maxdepth 1 -type f -print
             exit 1
           fi
-          wheel="${wheels[0]}"
-          smoke_dir="$(mktemp -d)"
-          cd "$smoke_dir"
-          uv run --isolated --no-project --with "$wheel" -- python -c "import benchbox; assert 'site-packages' in benchbox.__file__, benchbox.__file__; print(f'BenchBox {benchbox.__version__} imported from wheel')"
+          wheel=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
+          tmpdir=$(mktemp -d)
+          cd "$tmpdir"
+          # Minimal-surface gate: a clean core install must import benchbox AND
+          # must not pull pandas (optional engine/DataFrame dep). This is the
+          # contract whose absence let v0.3.0 ship a broken clean install.
+          uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
           uv run --isolated --no-project --with "$wheel" -- benchbox --help
 
       - name: Upload build artifacts
@@ -304,6 +338,111 @@ jobs:
           name: test-build-dist-${{ matrix.os }}
           path: dist/
           retention-days: 7  # Shorter retention for test artifacts
+
+  release-readiness:
+    name: release-readiness
+    if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Check dependency upper bounds
+        run: |
+          mkdir -p release-artifacts
+          uv run -- python scripts/check_dependency_bounds.py \
+            --fail-on=cap-reached \
+            --output release-artifacts/dependency-bounds.md
+
+      - name: Check release branch curation
+        run: |
+          missing=0
+          for forbidden in \
+            _project \
+            _blog \
+            results-data \
+            results-explorer \
+            .claude \
+            .codex \
+            .gemini \
+            .pre-commit-config.yaml \
+            todo.config.yaml \
+            skill-sync.yaml \
+            skill-sync.lock \
+            .coveragerc_core \
+            .dockerignore \
+            .env.example \
+            .mcp.json \
+            AGENTS.md \
+            CLAUDE.md \
+            GEMINI.md \
+            .github/workflows/results-explorer-browser.yml \
+            .github/workflows/seed-corpus.yml \
+            .github/workflows/sync-results-data-to-published.yml \
+            .github/workflows/validate-submission.yml; do
+            if [ -e "$forbidden" ]; then
+              echo "::error::Release branch still contains curated path: $forbidden"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Upload dependency bounds report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-pr-dependency-bounds
+          path: release-artifacts/dependency-bounds.md
+          retention-days: 30
+
+  release-required-result:
+    name: release-required-result
+    needs: [test, integration, correctness-gate, test-package, release-readiness]
+    if: ${{ always() && github.event_name == 'pull_request' && github.base_ref == 'main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate release-required result
+        env:
+          FAST_TEST_RESULT: ${{ needs.test.result }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+          CORRECTNESS_RESULT: ${{ needs.correctness-gate.result }}
+          PACKAGE_RESULT: ${{ needs.test-package.result }}
+          RELEASE_READINESS_RESULT: ${{ needs.release-readiness.result }}
+        run: |
+          set -euo pipefail
+
+          failed=0
+          for pair in \
+            "test (ubuntu-latest, 3.12)=$FAST_TEST_RESULT" \
+            "integration=$INTEGRATION_RESULT" \
+            "correctness-gate=$CORRECTNESS_RESULT" \
+            "test-package=$PACKAGE_RESULT" \
+            "release-readiness=$RELEASE_READINESS_RESULT"; do
+            name="${pair%%=*}"
+            result="${pair#*=}"
+            if [ "$result" != "success" ]; then
+              echo "$name=$result"
+              failed=1
+            fi
+          done
+
+          if [ "$failed" != "0" ]; then
+            exit 1
+          fi
+
+          echo "Release-required checks passed."
 
   # CLI↔explorer visualization parity check.
   # Verifies that the checked-in JSON fixtures in tests/parity/fixtures/

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import defaultdict, deque
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,9 @@ from benchbox.core.results.models import (
     NativeComparisonEntry,
     SetupPhase,
 )
+from benchbox.core.results.query_normalizer import normalize_query_id
+from benchbox.core.results.query_plan_models import QueryPlanDAG
+from benchbox.core.results.schema_policy import LOADER_SCHEMA_POLICY, is_loader_supported_result_schema
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +79,8 @@ def find_latest_result(
             with open(filepath, encoding="utf-8") as f:
                 data = json.load(f)
 
-            # Only consider v2.0/v2.1 files
-            version = data.get("version")
-            if version not in ("2.0", "2.1"):
+            # Only consider files accepted by the runtime loader policy.
+            if not is_loader_supported_result_schema(data):
                 continue
 
             # Extract metadata for filtering (v2.0 format)
@@ -140,18 +143,14 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
     except OSError as e:
         raise ResultLoadError(f"Failed to read result file: {e}") from e
 
-    # Check schema version - v2.0 and v2.1 are supported
-    version = data.get("version")
-    if version not in ("2.0", "2.1"):
-        raise UnsupportedSchemaError(
-            f"Unsupported schema version: {version}. "
-            f"Only schema v2.0 and v2.1 are supported. "
-            f"Please re-export the result using the current version of BenchBox."
-        )
+    # Check schema version through the named runtime loader policy.
+    version_decision = LOADER_SCHEMA_POLICY.evaluate(data.get("version"))
+    if not version_decision.accepted:
+        raise UnsupportedSchemaError(version_decision.error_message())
 
     # Load companion files if they exist
-    plans_data = _load_companion_file(filepath_obj, ".plans.json")
-    tuning_data = _load_companion_file(filepath_obj, ".tuning.json")
+    plans_data, plans_load_error = _load_companion_file(filepath_obj, ".plans.json")
+    tuning_data, _tuning_load_error = _load_companion_file(filepath_obj, ".tuning.json")
 
     # Reconstruct BenchmarkResults
     try:
@@ -159,24 +158,51 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
     except Exception as e:
         raise ResultLoadError(f"Failed to reconstruct BenchmarkResults: {e}") from e
 
+    # Surface a plans-companion load failure so consumers can distinguish "no
+    # plans were captured" from "a .plans.json exists but could not be read"
+    # (qpc-05 / F4.3). Attached as an attribute rather than swallowed at DEBUG.
+    result.plans_load_error = plans_load_error
+
     return result, data
 
 
-def _load_companion_file(main_file: Path, suffix: str) -> dict[str, Any] | None:
-    """Load a companion file if it exists."""
-    companion_path = main_file.with_suffix("").with_suffix(suffix)
+def _load_companion_file(main_file: Path, suffix: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Load a companion file if it exists.
+
+    Returns ``(data, error)``:
+      - ``(dict, None)`` when the companion loaded successfully;
+      - ``(None, None)`` when no companion file exists (the common case);
+      - ``(None, "<reason>")`` when the companion EXISTS but could not be read
+        or parsed.
+
+    The exists-but-unreadable case is a user-actionable problem (a corrupt or
+    unreadable ``.plans.json``), so it is logged at WARNING and returned as an
+    error string rather than swallowed at DEBUG and reported downstream as "no
+    plans captured" (qpc-05 / F4.3).
+
+    Path arithmetic: an exact basename suffix swap (``name[:-len(".json")] +
+    suffix``) rather than ``Path.with_suffix()`` chained twice or a path-wide
+    ``str.replace(".json", suffix)`` -- both of those break on a scale-factor
+    filename like ``result_sf0.1.json`` -- ``with_suffix("")`` leaves
+    ``result_sf0.1``, whose OWN suffix is then read as ``.1`` (stripped by
+    the second ``with_suffix()`` call, corrupting the basename to
+    ``result_sf0.plans.json``); ``str.replace`` operates on the full path
+    string and rewrites the FIRST ``.json`` it finds anywhere, including one
+    that happens to appear in a parent directory name.
+    """
+    name = main_file.name
+    companion_name = name[: -len(".json")] + suffix if name.endswith(".json") else name + suffix
+    companion_path = main_file.with_name(companion_name)
+
     if not companion_path.exists():
-        # Try alternate naming: main.plans.json instead of main.json -> main.plans.json
-        companion_path = Path(str(main_file).replace(".json", suffix))
+        return None, None
 
-    if companion_path.exists():
-        try:
-            with open(companion_path, encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError) as e:
-            logger.debug(f"Could not load companion file {companion_path}: {e}")
-
-    return None
+    try:
+        with open(companion_path, encoding="utf-8") as f:
+            return json.load(f), None
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Companion file %s exists but could not be loaded: %s", companion_path, e)
+        return None, f"{companion_path.name}: {e}"
 
 
 def reconstruct_benchmark_results(
@@ -206,9 +232,11 @@ def reconstruct_benchmark_results(
     benchmark_section = data.get("benchmark", {})
     platform_section = data.get("platform", {})
     summary_section = data.get("summary", {})
+    execution_section = data.get("execution", {})
+    provenance_section = data.get("provenance", {})
 
     timestamp = _parse_timestamp(run_section.get("timestamp", ""))
-    query_results = _reconstruct_query_results(data.get("queries", []), data.get("errors", []))
+    query_results = _reconstruct_query_results(data.get("queries", []), data.get("errors", []), plans_data)
 
     timing = _extract_timing_metrics(summary_section)
     tpc = _extract_tpc_metrics(summary_section)
@@ -251,7 +279,8 @@ def reconstruct_benchmark_results(
         qph_at_size=tpc["qph_at_size"],
         geometric_mean_execution_time=tpc["geometric_mean_execution_time"],
         test_execution_type=benchmark_section.get("mode", "standard"),
-        validation_status=summary_section.get("validation", "PASSED"),
+        validation_status=summary_section.get("validation", "NOT_RUN"),
+        execution_metadata=_extract_execution_metadata(execution_section),
         execution_environment=execution_environment,
         platform_deployment=platform_section.get("deployment"),
         platform_cloud=platform_section.get("cloud"),
@@ -276,7 +305,18 @@ def reconstruct_benchmark_results(
         dataset_version=benchmark_section.get("dataset_version"),
         manifest_hash=benchmark_section.get("manifest_hash"),
         data_archive_hash=benchmark_section.get("data_archive_hash"),
+        funding=provenance_section.get("funding"),
+        result_source=provenance_section.get("source"),
     )
+
+
+def _extract_execution_metadata(execution_section: dict[str, Any]) -> dict[str, Any] | None:
+    """Preserve execution metadata that is not otherwise reconstructed."""
+    metadata: dict[str, Any] = {}
+    translation = execution_section.get("translation")
+    if isinstance(translation, dict):
+        metadata["translation"] = translation
+    return metadata or None
 
 
 def _parse_timestamp(timestamp_str: str) -> datetime:
@@ -426,6 +466,7 @@ def _extract_plans_info(plans_data: dict[str, Any] | None) -> tuple[int, int]:
 def _reconstruct_query_results(
     queries_list: list[dict[str, Any]],
     errors_list: list[dict[str, Any]],
+    plans_data: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Reconstruct query results from compact v2.0 format.
 
@@ -434,36 +475,192 @@ def _reconstruct_query_results(
 
     To internal format:
         {"query_id": "Q1", "execution_time_ms": 632.9, "rows_returned": 100, "status": "SUCCESS"}
+
+    When ``plans_data`` (the loaded ``.plans.json`` companion) carries an entry for a
+    query ID, rehydrate ``query_plan`` as a real ``QueryPlanDAG`` plus its fingerprint
+    fields, so plans survive a load -> show-plan/compare-plans round-trip.
+
+    ``build_plans_payload`` keys its ``queries`` map by the raw, pre-normalization
+    query ID (e.g. ``"q1"``), while the compact ``queries`` list here carries the
+    already-normalized ID (e.g. ``"1"``) written by ``_build_query_results_section``.
+    Normalize both sides for the lookup so the two companion files agree without
+    changing the on-disk ``.plans.json`` format. A query ID that ran in more than
+    one stream is written under ``"{query_id}#{stream_id}"`` composite keys (see
+    ``build_plans_payload``); ``_index_plan_entries``/``_lookup_plan_entry`` below
+    resolve those back to the exact stream's entry. A combined run (e.g. power
+    then throughput) can have a power row and a throughput row share the same
+    query_id AND stream_id (each phase's stream counter starts at its own 0);
+    those are disambiguated with a further ``"{query_id}#{stream_id}:{test_type}"``
+    key, resolved via the row's own compact ``test_type`` field.
+
+    Current-format bundles write ``status``/``run_type`` on every compact entry
+    (including failures, which are ALSO duplicated into ``errors[]`` for the
+    legacy fallback below) and use ``iter``/``stream`` 0 for warmup rows / the
+    first stream. Legacy bundles predate those per-entry fields entirely: their
+    ``queries[]`` entries carry only successful queries (no ``status`` key at
+    all) and failures live solely in ``errors[]``. Both shapes must round-trip:
+    an entry's own ``status`` (when present) is authoritative; ``errors[]`` is
+    only used to (a) attach ``error_type``/``error_message`` detail onto a
+    compact entry that already reports non-SUCCESS, and (b) synthesize a
+    standalone FAILED row for a query_id that never appears in ``queries[]``
+    at all (the legacy shape).
+
+    ``errors[]`` and ``queries[]`` are written in the same order (see
+    ``schema.py``'s single pass over ``normalized_results``), and a query_id
+    can legitimately fail more than once across iterations/streams. Errors
+    are matched to their queries[] row one-at-a-time, in write order, per
+    query_id (a FIFO queue keyed by normalized query_id) rather than always
+    reusing the first error seen for that ID - the earlier ``dict.setdefault``
+    approach attached the SAME (first) error detail to every repeated failure
+    of a query, discarding the real cause of the later ones.
     """
+    plan_entries = _index_plan_entries(plans_data)
     results: list[dict[str, Any]] = []
 
-    # Process successful queries
+    query_errors_by_id: dict[str, deque[dict[str, Any]]] = defaultdict(deque)
+    for error in errors_list:
+        if error.get("phase") != "query":
+            continue
+        qid = error.get("query_id")
+        if qid is None:
+            continue
+        query_errors_by_id[normalize_query_id(qid)].append(error)
+
+    # Tracks which error dicts (by identity) were actually attached to a
+    # queries[] row below, so the legacy fallback only synthesizes a
+    # standalone row for errors that a queries[] row never consumed - not
+    # for every error whose query_id merely appears elsewhere in queries[]
+    # (e.g. a different, successful execution of the same query_id).
+    consumed_error_ids: set[int] = set()
+
     for q in queries_list:
+        query_id = q.get("id")
+        status = q.get("status", "SUCCESS")
         result: dict[str, Any] = {
-            "query_id": q.get("id"),
+            "query_id": query_id,
             "execution_time_ms": q.get("ms"),
             "rows_returned": q.get("rows"),
-            "status": "SUCCESS",
+            "status": status,
         }
-        if q.get("iter"):
+        if q.get("iter") is not None:
             result["iteration"] = q["iter"]
-        if q.get("stream"):
+        if q.get("stream") is not None:
             result["stream_id"] = q["stream"]
+        if q.get("run_type") is not None:
+            result["run_type"] = q["run_type"]
+        if q.get("test_type"):
+            result["test_type"] = q["test_type"]
+        if q.get("plan_capture_error") is not None:
+            # Real DataFrame plan-capture-error cause (qpc-05 / F4.4, #1052
+            # review): without this, the export -> load -> re-export round
+            # trip silently drops it again even though it survives the JSON
+            # export itself.
+            result["plan_capture_error"] = q["plan_capture_error"]
+
+        if status not in ("SUCCESS", "SKIPPED") and query_id is not None:
+            error_queue = query_errors_by_id.get(normalize_query_id(query_id))
+            if error_queue:
+                error = error_queue.popleft()
+                consumed_error_ids.add(id(error))
+                result["error_type"] = error.get("type")
+                result["error_message"] = error.get("message")
+
+        _attach_plan(
+            result,
+            _lookup_plan_entry(plan_entries, query_id, q.get("stream", 0), q.get("test_type")),
+        )
         results.append(result)
 
-    # Add failed queries from errors
+    # Legacy fallback: synthesize a FAILED row for every error not already
+    # consumed above. Current-format bundles duplicate every failure into
+    # queries[] too, so every error is consumed by the loop above and this
+    # produces nothing extra (no phantom second row for the same failure).
     for error in errors_list:
-        if error.get("phase") == "query":
-            results.append(
-                {
-                    "query_id": error.get("query_id"),
-                    "status": "FAILED",
-                    "error_type": error.get("type"),
-                    "error_message": error.get("message"),
-                }
-            )
+        if error.get("phase") != "query":
+            continue
+        if id(error) in consumed_error_ids:
+            continue
+        results.append(
+            {
+                "query_id": error.get("query_id"),
+                "status": "FAILED",
+                "error_type": error.get("type"),
+                "error_message": error.get("message"),
+            }
+        )
 
     return results
+
+
+def _attach_plan(result: dict[str, Any], plan_entry: dict[str, Any] | None) -> None:
+    """Rehydrate a ``.plans.json`` entry onto a reconstructed query result dict."""
+    if not plan_entry:
+        return
+
+    plan_dict = plan_entry.get("plan")
+    if plan_dict is not None:
+        result["query_plan"] = QueryPlanDAG.from_dict(plan_dict)
+    if plan_entry.get("fingerprint"):
+        result["plan_fingerprint"] = plan_entry["fingerprint"]
+    if plan_entry.get("fingerprint_normalized"):
+        result["plan_fingerprint_normalized"] = plan_entry["fingerprint_normalized"]
+    if plan_entry.get("capture_time_ms") is not None:
+        result["plan_capture_time_ms"] = plan_entry["capture_time_ms"]
+
+
+def _index_plan_entries(plans_data: dict[str, Any] | None) -> dict[str, Any]:
+    """Index a ``.plans.json`` ``queries`` map for lookup by normalized query ID.
+
+    A query ID that ran in more than one stream is written under
+    ``"{query_id}#{stream_id}"`` composite keys (see ``build_plans_payload``); this
+    splits those apart so the reader doesn't need to know the writer's key format.
+    Each normalized query ID maps to either a single entry dict (the common
+    bare-key, single-stream case) or a ``{stream_id_str: entry}`` dict (the
+    multi-stream case) - distinguished in ``_lookup_plan_entry`` by the presence
+    of a ``"plan"`` key, which a stream-keyed bucket never has.
+    """
+    raw_entries: dict[str, Any] = (plans_data or {}).get("queries") or {}
+    indexed: dict[str, Any] = {}
+    for key, entry in raw_entries.items():
+        if "#" in key:
+            base_id, _, stream_id = key.rpartition("#")
+            bucket = indexed.setdefault(normalize_query_id(base_id), {})
+            bucket[stream_id] = entry
+        else:
+            indexed[normalize_query_id(key)] = entry
+    return indexed
+
+
+def _lookup_plan_entry(
+    plan_entries: dict[str, Any], query_id: Any, stream_id: Any, test_type: Any = None
+) -> dict[str, Any] | None:
+    """Resolve the plan entry for ``query_id``, disambiguating by ``stream_id`` (and,
+    for a cross-phase collision, ``test_type``) when needed."""
+    if query_id is None:
+        return None
+    entry = plan_entries.get(normalize_query_id(query_id))
+    if entry is None or "plan" in entry:
+        return entry
+    if test_type:
+        qualified = entry.get(f"{stream_id}:{test_type}")
+        if qualified is not None:
+            return qualified
+    return entry.get(str(stream_id))
+
+
+def iter_query_results(results: Any) -> list[dict[str, Any]]:
+    """Return the flattened per-query result dicts for a ``BenchmarkResults`` instance.
+
+    ``query_results`` is the canonical per-query source: ``ResultBuilder`` populates it
+    identically for freshly executed results and ``reconstruct_benchmark_results``
+    populates it the same way for bundles reloaded from disk (including rehydrated
+    ``query_plan``/``plan_fingerprint`` values from the ``.plans.json`` companion).
+    ``execution_phases`` is not a reliable per-query source once reconstructed from a
+    bundle - only phase-level summaries survive that round-trip - so consumers that
+    need per-query plan/fingerprint data should use this accessor instead of walking
+    ``execution_phases``.
+    """
+    return list(getattr(results, "query_results", None) or [])
 
 
 def _reconstruct_execution_phases(phases_section: dict[str, Any]) -> ExecutionPhases | None:
@@ -536,6 +733,7 @@ def _reconstruct_native_comparison(comparisons_section: dict[str, Any]) -> Nativ
 
 __all__ = [
     "find_latest_result",
+    "iter_query_results",
     "load_result_file",
     "reconstruct_benchmark_results",
     "ResultLoadError",

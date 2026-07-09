@@ -41,6 +41,8 @@ class ClickHouseServerAdapter(ClickHouseAdapter):
     unchanged; only the platform identity and connection contract differ.
     """
 
+    plan_capture_phase_eligible = True
+
     def __init__(self, **config: Any) -> None:
         config["deployment_mode"] = "server"
         super().__init__(**config)

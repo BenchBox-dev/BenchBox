@@ -1,0 +1,58 @@
+[
+  {
+    "name": "S00: Input",
+    "id": "0",
+    "status": "COMPLETE",
+    "inputStages": [],
+    "recordsRead": "150000",
+    "recordsWritten": "150000",
+    "steps": [
+      {"kind": "READ", "substeps": ["$1:o_orderkey", "FROM tpch.orders"]}
+    ]
+  },
+  {
+    "name": "S01: Input",
+    "id": "1",
+    "status": "COMPLETE",
+    "inputStages": [],
+    "recordsRead": "600000",
+    "recordsWritten": "600000",
+    "steps": [
+      {"kind": "READ", "substeps": ["$10:l_orderkey", "$11:l_extendedprice", "FROM tpch.lineitem"]}
+    ]
+  },
+  {
+    "name": "S02: Join+",
+    "id": "2",
+    "status": "COMPLETE",
+    "inputStages": ["0", "1"],
+    "recordsRead": "750000",
+    "recordsWritten": "600000",
+    "steps": [
+      {"kind": "JOIN", "substeps": ["INNER HASH JOIN EACH WITH ALL ON $1 = $10"]},
+      {"kind": "AGGREGATE", "substeps": ["GROUP BY $1", "$20 := SUM($11)"]}
+    ]
+  },
+  {
+    "name": "S03: Sort+",
+    "id": "3",
+    "status": "COMPLETE",
+    "inputStages": ["2"],
+    "recordsRead": "100",
+    "recordsWritten": "100",
+    "steps": [
+      {"kind": "SORT", "substeps": ["$20 DESC"]}
+    ]
+  },
+  {
+    "name": "S04: Output",
+    "id": "4",
+    "status": "COMPLETE",
+    "inputStages": ["3"],
+    "recordsRead": "100",
+    "recordsWritten": "100",
+    "steps": [
+      {"kind": "WRITE", "substeps": ["$1", "$20", "TO __output"]}
+    ]
+  }
+]

@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import subprocess
-from pathlib import Path
 from typing import Any
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -44,6 +43,7 @@ from ._spark_helpers import (
     validate_spark_identifier,
 )
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.config_utils import make_registered_platform_config_builder
 from .base.spark_execution_mixin import SparkDataLoadMixin, SparkQueryExecutionMixin
 
 try:
@@ -82,6 +82,8 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
     - Support for local (single-node) and distributed cluster modes
     - Spark SQL dialect compatibility via SQLGlot transpilation
     """
+
+    plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
@@ -212,45 +214,26 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create LakeSail adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-
-        # Generate proper database name using benchmark characteristics
-        if "database" in config and config["database"]:
-            adapter_config["database"] = config["database"]
-        else:
-            database_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                config,
                 platform="lakesail",
-                tuning_config=config.get("tuning_config"),
+                fields=[
+                    "endpoint",
+                    "app_name",
+                    "driver_memory",
+                    "sail_mode",
+                    "sail_workers",
+                    "shuffle_partitions",
+                    "adaptive_enabled",
+                    "table_format",
+                    "spark_config",
+                    "disable_cache",
+                ],
             )
-            adapter_config["database"] = database_name
-
-        # Core configuration parameters
-        for key in [
-            "endpoint",
-            "app_name",
-            "driver_memory",
-            "sail_mode",
-            "sail_workers",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        # Optional configuration parameters
-        for key in [
-            "shuffle_partitions",
-            "adaptive_enabled",
-            "table_format",
-            "spark_config",
-            "disable_cache",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get LakeSail platform information."""
@@ -539,16 +522,6 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
 
         return elapsed_seconds(start_time)
 
-    def load_data(
-        self, benchmark, connection: Any, data_dir: Path
-    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data into Sail server via Spark Connect.
-
-        Delegates to SparkDataLoadMixin._load_data_spark for the shared
-        DataFrame-based loading implementation.
-        """
-        return self._load_data_spark(benchmark, data_dir, connection)
-
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply Sail-specific optimizations based on benchmark type."""
         spark = connection
@@ -565,31 +538,6 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
 
         except Exception as e:
             self.logger.warning(f"Failed to apply benchmark configuration: {e}")
-
-    def execute_query(
-        self,
-        connection: Any,
-        query: str,
-        query_id: str,
-        benchmark_type: str | None = None,
-        scale_factor: float | None = None,
-        validate_row_count: bool = True,
-        stream_id: int | None = None,
-    ) -> dict[str, Any]:
-        """Execute query via Spark Connect to Sail server with timing.
-
-        Delegates to SparkQueryExecutionMixin._execute_query_spark for the
-        shared execution implementation.
-        """
-        return self._execute_query_spark(
-            connection=connection,
-            query=query,
-            query_id=query_id,
-            benchmark_type=benchmark_type,
-            scale_factor=scale_factor,
-            validate_row_count=validate_row_count,
-            stream_id=stream_id,
-        )
 
     def _get_dialect_queries(self, benchmark: Any, benchmark_slug: str, connection: Any | None = None) -> dict:
         """Use LakeSail-specific query rules where Spark syntax compatibility diverges."""
@@ -648,17 +596,7 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
             self.logger.debug(f"Connection test failed: {e}")
             return False
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if LakeSail supports a specific tuning type."""
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {
-                TuningType.PARTITIONING,
-                TuningType.SORTING,
-            }
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "SORTING")
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Spark-compatible tuning clauses for CREATE TABLE statements."""
@@ -701,42 +639,21 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
         analyze_spark_table(connection, table_name, logger=self.logger)
 
 
-def _build_lakesail_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build LakeSail database configuration with credential loading."""
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="lakesail",
-        credential_key="lakesail",
-        default_display_name="LakeSail Sail",
-        default_driver_package="pyspark",
-        platform_fields=[
-            "endpoint",
-            "app_name",
-            "driver_memory",
-            "sail_mode",
-            "sail_workers",
-            "shuffle_partitions",
-            "adaptive_enabled",
-            "table_format",
-            "spark_config",
-            "disable_cache",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
-
-
-# Register the config builder with the platform hook registry
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("lakesail", _build_lakesail_config)
-except ImportError:
-    pass
+_build_lakesail_config = make_registered_platform_config_builder(
+    "lakesail",
+    __name__,
+    "LakeSail Sail",
+    "pyspark",
+    [
+        "endpoint",
+        "app_name",
+        "driver_memory",
+        "sail_mode",
+        "sail_workers",
+        "shuffle_partitions",
+        "adaptive_enabled",
+        "table_format",
+        "spark_config",
+        "disable_cache",
+    ],
+)

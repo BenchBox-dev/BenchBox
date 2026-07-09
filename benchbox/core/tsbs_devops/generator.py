@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Union
 
 import numpy as np
+import yaml
 
 from benchbox.core.manifest_utils import write_generator_manifest
 from benchbox.core.tsbs_devops.schema import (
@@ -37,14 +38,22 @@ from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 DEFAULT_HOSTS = 100
 DEFAULT_DURATION_DAYS = 2
 DEFAULT_INTERVAL_SECONDS = 10
-REGIONS = ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"]
-DATACENTERS = ["dc1", "dc2", "dc3"]
-RACKS = ["rack-a", "rack-b", "rack-c", "rack-d"]
-OS_TYPES = ["linux", "linux", "linux", "windows"]  # 75% Linux
-ARCHITECTURES = ["x86_64", "x86_64", "arm64"]  # 67% x86
-TEAMS = ["platform", "backend", "frontend", "data", "infra"]
-SERVICES = ["api", "web", "worker", "cache", "db", "queue"]
-ENVIRONMENTS = ["prod", "prod", "staging", "dev"]  # 50% prod
+
+
+def _load_generator_specs() -> dict:
+    with (Path(__file__).with_name("generator_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_GENERATOR_SPECS = _load_generator_specs()
+REGIONS = list(_GENERATOR_SPECS["regions"])
+DATACENTERS = list(_GENERATOR_SPECS["datacenters"])
+RACKS = list(_GENERATOR_SPECS["racks"])
+OS_TYPES = list(_GENERATOR_SPECS["os_types"])
+ARCHITECTURES = list(_GENERATOR_SPECS["architectures"])
+TEAMS = list(_GENERATOR_SPECS["teams"])
+SERVICES = list(_GENERATOR_SPECS["services"])
+ENVIRONMENTS = list(_GENERATOR_SPECS["environments"])
 
 
 class TSBSDevOpsDataGenerator(CompressionMixin, VerbosityMixin):

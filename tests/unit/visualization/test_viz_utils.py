@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from benchbox.core.visualization.utils import build_chart_subtitle, extract_chart_subtitle, slugify
+from benchbox.core.visualization.utils import (
+    build_chart_subtitle,
+    extract_chart_subtitle,
+    natural_query_sort_key,
+    slugify,
+)
 from tests.fixtures.result_dict_fixtures import make_normalized_result
 
 pytestmark = [
@@ -113,3 +118,22 @@ class TestSlugify:
         # Parentheses become hyphens, multiple hyphens collapsed, trailing stripped
         assert slugify("Snowflake (Enterprise)") == "snowflake-enterprise"
         assert slugify("BigQuery") == "bigquery"
+
+
+class TestNaturalQuerySortKey:
+    def test_prefixed_ids_sort_by_number(self):
+        assert sorted(["Q10", "Q1", "Q2"], key=natural_query_sort_key) == ["Q1", "Q2", "Q10"]
+
+    def test_bare_numeric_ids_sort_by_number(self):
+        assert sorted(["14", "2", "9"], key=natural_query_sort_key) == ["2", "9", "14"]
+
+    def test_suffix_text_is_tie_breaker(self):
+        assert sorted(["Q14b", "Q14", "Q14a"], key=natural_query_sort_key) == ["Q14", "Q14a", "Q14b"]
+
+    def test_nonnumeric_ids_sort_after_numeric_ids(self):
+        assert sorted(["setup", "Q2", "Q1"], key=natural_query_sort_key) == ["Q1", "Q2", "setup"]
+
+    def test_result_plotter_wrapper_delegates_to_shared_key(self):
+        from benchbox.core.visualization.result_plotter import ResultPlotter
+
+        assert ResultPlotter._natural_sort_key("Q10") == natural_query_sort_key("Q10")

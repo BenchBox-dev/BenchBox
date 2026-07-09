@@ -641,8 +641,8 @@ class TestOrchestratorDataLoadModes:
         # Verify platform adapter was not called
         mock_get_adapter.assert_not_called()
 
-        # Verify result is successful
-        assert result.validation_status == "PASSED"
+        # Generate-only runs without validation records should not claim validation passed.
+        assert result.validation_status == "NOT_RUN"
 
 
 class TestDryRunDataLoadModes:

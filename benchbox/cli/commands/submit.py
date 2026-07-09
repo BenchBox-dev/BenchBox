@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
-import importlib.util
 import json
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import ModuleType
 
 import click
 
@@ -34,8 +31,21 @@ from benchbox.core.results.loader import (
     find_latest_result,
     load_result_file,
 )
+from benchbox.core.results.provenance import FUNDING_SOURCES, normalize_funding
 from benchbox.core.results.status import result_non_clean_reason
 from benchbox.core.results.submission_history import record_hosted_submission
+from benchbox.core.results.submit_classification import (
+    SubmitTerminalState,
+    classify_loaded_result,
+)
+from benchbox.validation.bundle import (
+    COMPANION_SUFFIXES,
+    SUBMISSION_NOTES_MAX_LEN,
+    _hash_bytes,
+    _hash_file,
+    format_summary,
+    validate_bundles,
+)
 
 # Submission manifest phase - indicates the result schema generation (v2.0 = phase 2).
 _SUBMISSION_PHASE = 2
@@ -118,20 +128,6 @@ def _resolve_submitted_by(explicit: str | None) -> str:
     return ""
 
 
-def _compute_file_hash(file_path: Path) -> str:
-    """Compute SHA-256 of a single file's contents."""
-    try:
-        return _compute_bytes_hash(file_path.read_bytes())
-    except PermissionError:
-        raise PermissionError(f"Cannot read file for hashing: {file_path}") from None
-
-
-def _compute_bytes_hash(data: bytes) -> str:
-    """Compute SHA-256 for already-materialized bytes."""
-
-    return hashlib.sha256(data).hexdigest()
-
-
 def _canonical_submission_file_bytes(file_path: Path) -> bytes:
     """Return canonical JSON bytes for a submit source or companion file."""
 
@@ -157,69 +153,42 @@ def _build_submission_manifest(
     result,
     submitted_by: str | None,
     submission_path: str,
+    funding: str | None = None,
+    submission_notes: str | None = None,
 ) -> dict:
-    """Build the shared submission manifest envelope for PR and hosted modes."""
+    """Build the shared submission manifest envelope for PR and hosted modes.
 
-    return {
+    ``result_source`` is hard-coded to ``community``: the public submit CLI is the
+    community contribution path and must never self-assert the ``vendor`` label
+    (that is applied downstream under maintainer control). Funding precedence:
+    explicit ``--funding`` > the bundle's declared ``provenance.funding`` >
+    ``unspecified``.
+    """
+
+    resolved_funding = normalize_funding(funding or getattr(result, "funding", None))
+
+    manifest = {
         "submission_tool_version": f"benchbox/{benchbox.__version__}",
         "submitted_at": datetime.now(timezone.utc).isoformat(),
         "bundle_file": source_path.name,
-        "bundle_hash": _compute_file_hash(source_path),
-        "companion_hashes": {comp.name: _compute_file_hash(comp) for comp in companions},
+        "bundle_hash": _hash_file(source_path),
+        "companion_hashes": {comp.name: _hash_file(comp) for comp in companions},
         "benchmark": result.benchmark_name,
         "platform": result.platform,
         "scale_factor": result.scale_factor,
         "phase": _SUBMISSION_PHASE,
         "submission_path": submission_path,
         "submitted_by": _resolve_submitted_by(submitted_by),
+        "result_source": "community",
+        "funding": resolved_funding,
     }
-
-
-def _load_submission_validator_module() -> ModuleType:
-    # Resolve only against the installed package's repo root so packaged installs
-    # never load `scripts/validate_submission.py` from an arbitrary current
-    # working directory (security: arbitrary code execution surface).
-    repo_root = Path(__file__).resolve().parents[3]
-    validator_path = repo_root / "scripts" / "validate_submission.py"
-
-    if not validator_path.is_file():
-        raise FileNotFoundError(f"scripts/validate_submission.py not found at {validator_path}")
-
-    spec = importlib.util.spec_from_file_location("_benchbox_submission_validator", validator_path)
-    if spec is None or spec.loader is None:
-        raise FileNotFoundError(f"scripts/validate_submission.py at {validator_path} has no loader")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    if submission_notes:
+        manifest["submission_notes"] = submission_notes
+    return manifest
 
 
 def _validate_submission_bundle_for_dry_run(ctx: click.Context, source_path: Path) -> None:
-    """Run the same local bundle validator used by published-results CI.
-
-    When the validator script is not available (typical for packaged wheel
-    installs that don't ship ``scripts/``), downgrade to a soft warning so
-    ``--dry-run`` still emits its preview output. Hard exit is reserved for
-    the case where the validator is found but errors during execution.
-    """
-
-    try:
-        validator = _load_submission_validator_module()
-        validate_bundles = validator.validate_bundles
-        format_summary = validator.format_summary
-    except FileNotFoundError:
-        console.print(
-            "\n[yellow]Dry-run preview without schema validation:[/yellow] "
-            "scripts/validate_submission.py is not packaged with this install."
-        )
-        console.print("[dim]Run from a BenchBox source checkout for full local schema validation.[/dim]")
-        return
-    except Exception as exc:
-        console.print(
-            f"\n[red]Submission validation unavailable:[/red] could not load scripts.validate_submission ({exc})."
-        )
-        console.print("[dim]Run this command from a BenchBox source checkout with the validator script present.[/dim]")
-        ctx.exit(1)
-        return
+    """Run the same local bundle validator used by published-results CI."""
 
     try:
         validation_results = validate_bundles([source_path])
@@ -252,6 +221,8 @@ def _dispatch_service_mode(
     wait: bool,
     dry_run: bool,
     submitted_by: str | None,
+    funding: str | None = None,
+    submission_notes: str | None = None,
 ) -> None:
     """Phase 3 hosted-API submission path.
 
@@ -261,11 +232,11 @@ def _dispatch_service_mode(
     publication status.
 
     Dry-run validation policy: `submit()` runs the same
-    ``scripts/validate_submission.py`` bundle checks used by
-    published-results CI before dispatching into this mode. The real hosted
-    upload still relies on server-side validation so older clients are not
-    blocked by develop-tip validator changes after credentials have already
-    been configured.
+    ``benchbox.validation.bundle`` checks used by published-results CI
+    before dispatching into this mode. The real hosted upload still relies
+    on server-side validation so older clients are not blocked by
+    develop-tip validator changes after credentials have already been
+    configured.
 
     Hash contract for the dry-run: the values printed are SHA-256 of the
     canonical JSON bytes that the real hosted path uploads. This matches the
@@ -275,8 +246,8 @@ def _dispatch_service_mode(
     bundle_bytes = _canonical_submission_file_bytes(source_path)
     companion_bytes = {comp.name: _canonical_submission_file_bytes(comp) for comp in companions}
     bundle_size = len(bundle_bytes)
-    bundle_hash = _compute_bytes_hash(bundle_bytes)
-    companion_hashes = {name: _compute_bytes_hash(data) for name, data in companion_bytes.items()}
+    bundle_hash = _hash_bytes(bundle_bytes)
+    companion_hashes = {name: _hash_bytes(data) for name, data in companion_bytes.items()}
 
     if dry_run:
         console.print("\n[bold]Dry-run - would upload:[/bold]")
@@ -317,6 +288,8 @@ def _dispatch_service_mode(
             companions=upload_companions,
             result=result,
             submitted_by=submitted_by,
+            funding=funding,
+            submission_notes=submission_notes,
             submission_path="hosted-service",
         )
         bundle_hash = manifest["bundle_hash"]
@@ -521,6 +494,22 @@ def _print_submission_summary(
         "Precedence: this flag > git config user.name > empty (with warning)."
     ),
 )
+@click.option(
+    "--funding",
+    type=click.Choice(FUNDING_SOURCES, case_sensitive=False),
+    default=None,
+    help=(
+        "Disclose how this run was funded. Precedence: this flag > the bundle's "
+        "declared provenance.funding > 'unspecified'."
+    ),
+)
+@click.option(
+    "--notes",
+    "submission_notes",
+    type=str,
+    default=None,
+    help=f"Optional free-text submission notes (max {SUBMISSION_NOTES_MAX_LEN} characters).",
+)
 @click.pass_context
 def submit(
     ctx,
@@ -535,6 +524,8 @@ def submit(
     wait,
     dry_run,
     submitted_by,
+    funding,
+    submission_notes,
 ):
     """Submit a benchmark result bundle to the BenchBox results platform.
 
@@ -574,6 +565,14 @@ def submit(
     Note: benchbox submit shares results publicly. To copy a result to
     storage you control (local path, S3, etc.), use 'benchbox publish'.
     """
+    if submission_notes is not None and len(submission_notes) > SUBMISSION_NOTES_MAX_LEN:
+        console.print(
+            f"[red]--notes exceeds {SUBMISSION_NOTES_MAX_LEN} characters "
+            f"({len(submission_notes)}). Shorten the note and retry.[/red]"
+        )
+        ctx.exit(1)
+        return
+
     if result_file:
         source_path = Path(result_file)
     elif last:
@@ -633,12 +632,16 @@ def submit(
         ctx.exit(1)
         return
 
+    # Submit-classification policy is shared with UAT via
+    # benchbox.core.results.submit_classification so the two surfaces cannot
+    # drift. The CLI maps the terminal state to its own exit codes + messages.
+    submit_state = classify_loaded_result(result)
+
     # Compliance guardrail: refuse submission of unofficial results.
     # Unofficial TPC-DS runs (subscale or non-standard SF) must not be submitted
     # as they are not valid TPC-DS comparable results.
-    _compliance_class = getattr(result, "compliance_class", None)
-    _unofficial_classes = {"unofficial_nonstandard", "unofficial_subscale"}
-    if _compliance_class in _unofficial_classes:
+    if submit_state is SubmitTerminalState.unofficial:
+        _compliance_class = getattr(result, "compliance_class", None)
         console.print(
             f"\n[red]❌ Submission refused: compliance_class={_compliance_class}[/red]\n"
             "   This result was produced with an unofficial TPC-DS configuration and\n"
@@ -649,8 +652,8 @@ def submit(
         ctx.exit(1)
         return
 
-    non_clean_reason = result_non_clean_reason(result)
-    if non_clean_reason:
+    if submit_state is not SubmitTerminalState.submittable:
+        non_clean_reason = result_non_clean_reason(result)
         console.print(
             f"\n[red]❌ Submission refused: result is not a clean pass ({non_clean_reason})[/red]\n"
             "   Query-level failures remain visible in the result artifact, but\n"
@@ -660,9 +663,7 @@ def submit(
         return
 
     companions = [
-        p
-        for suffix in (".plans.json", ".tuning.json")
-        if (p := source_path.with_name(source_path.stem + suffix)).exists()
+        p for suffix in COMPANION_SUFFIXES if (p := source_path.with_name(source_path.stem + suffix)).exists()
     ]
 
     if dry_run:
@@ -680,6 +681,8 @@ def submit(
             wait=wait,
             dry_run=dry_run,
             submitted_by=submitted_by,
+            funding=funding,
+            submission_notes=submission_notes,
         )
         return
 
@@ -721,6 +724,8 @@ def submit(
         companions=packaged_companions,
         result=result,
         submitted_by=submitted_by,
+        funding=funding,
+        submission_notes=submission_notes,
         submission_path="PR-based",
     )
 

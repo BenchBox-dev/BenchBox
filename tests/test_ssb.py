@@ -35,6 +35,12 @@ class TestSSB:
             compression_type="none",
         )
 
+    # Runs to completion but far exceeds the medium lane's 60s cap: timed out
+    # on a clean GitHub runner (develop-post-merge run 28706929881, medium-test
+    # job) and measured ~58s in a 4-core container (2026-07-05). The marker
+    # overrides the CLI --timeout=60 (pytest-timeout marker precedence) so the
+    # test keeps running in the medium lane instead of being killed mid-work.
+    @pytest.mark.timeout(300)
     def test_generate_data(self, ssb: SSB) -> None:
         """Test that data generation produces expected files."""
         data_paths = ssb.generate_data()

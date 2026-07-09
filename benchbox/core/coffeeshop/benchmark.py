@@ -6,7 +6,7 @@ import csv
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.coffeeshop.generator import CoffeeShopDataGenerator
 from benchbox.core.coffeeshop.queries import CoffeeShopQueryManager
 from benchbox.core.coffeeshop.schema import TABLES, get_all_create_table_sql
@@ -54,7 +54,7 @@ GROUP BY dl.region, totals.grand_total
 ORDER BY revenue DESC;"""
 
 
-class CoffeeShopBenchmark(TranslatableQueryMixin, BaseBenchmark):
+class CoffeeShopBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenchmark):
     """Expose data generation and query execution for the CoffeeShop benchmark."""
 
     def __init__(

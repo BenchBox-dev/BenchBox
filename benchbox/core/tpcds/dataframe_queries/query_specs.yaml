@@ -1,0 +1,229 @@
+joined_aggregate:
+  - query_id: 19
+    title: Store Sales Item/Customer Analysis
+    base: date_dim
+    joins:
+      - [store_sales, d_date_sk, ss_sold_date_sk]
+      - [item, ss_item_sk, i_item_sk]
+      - [customer, ss_customer_sk, c_customer_sk]
+      - [customer_address, c_current_addr_sk, ca_address_sk]
+      - [store, ss_store_sk, s_store_sk]
+    filters:
+      - [eq, i_manager_id, {param: manager_id, default: 8}]
+      - [eq, d_moy, {param: month, default: 11}]
+      - [eq, d_year, {param: year, default: 1999}]
+      - [prefix_ne_cols, ca_zip, s_zip, 5]
+    group_by: [i_brand_id, i_brand, i_manufact_id, i_manufact]
+    aggs:
+      - [ext_price, ss_ext_sales_price, sum]
+    sort_by: [ext_price, i_brand, i_brand_id, i_manufact_id, i_manufact]
+    descending: [true, false, false, false, false]
+  - query_id: 15
+    title: Catalog Sales Analysis
+    base: catalog_sales
+    joins:
+      - [customer, cs_bill_customer_sk, c_customer_sk]
+      - [customer_address, c_current_addr_sk, ca_address_sk]
+      - [date_dim, cs_sold_date_sk, d_date_sk]
+    filters:
+      - [eq, d_qoy, {param: quarter, default: 2}]
+      - [eq, d_year, {param: year, default: 2001}]
+      - [prefix_eq, ca_zip, 2, {param: zip_prefix, default: "85"}]
+    group_by: [ca_zip]
+    aggs:
+      - [total_sales, cs_sales_price, sum]
+    sort_by: [ca_zip]
+  - query_id: 43
+    title: Store Sales Day Analysis
+    base: date_dim
+    joins:
+      - [store_sales, d_date_sk, ss_sold_date_sk]
+      - [store, ss_store_sk, s_store_sk]
+    filters:
+      - [eq, s_gmt_offset, {param: gmt_offset, default: -5.0}]
+      - [eq, d_year, {param: year, default: 2000}]
+    group_by: [s_store_name, s_store_id, d_day_name]
+    aggs:
+      - [total_sales, ss_sales_price, sum]
+    sort_by: [s_store_name, s_store_id, d_day_name]
+  - query_id: 46
+    title: Store Sales Household Analysis
+    base: store_sales
+    joins:
+      - [date_dim, ss_sold_date_sk, d_date_sk]
+      - [store, ss_store_sk, s_store_sk]
+      - [household_demographics, ss_hdemo_sk, hd_demo_sk]
+      - [customer_address, ss_addr_sk, ca_address_sk]
+      - [customer, ss_customer_sk, c_customer_sk]
+    filters:
+      - [eq, d_year, {param: year, default: 2001}]
+      - [between, d_dom, 1, 2]
+      - [in, ca_city, {param: cities, default: [Fairview, Midway, Fairview, Fairview, Fairview]}]
+      - [or, [eq, hd_dep_count, 5], [eq, hd_vehicle_count, 3]]
+    group_by: [c_last_name, c_first_name, ca_city, ss_ticket_number, ss_coupon_amt, ss_net_profit]
+    aggs:
+      - [bought_city, ss_ext_sales_price, sum]
+    sort_by: [c_last_name, c_first_name, ca_city, ss_ticket_number]
+  - query_id: 50
+    title: Store Sales Returns Analysis
+    base: store_sales
+    joins:
+      - [store_returns, [ss_item_sk, ss_customer_sk, ss_ticket_number], [sr_item_sk, sr_customer_sk, sr_ticket_number]]
+      - [store, ss_store_sk, s_store_sk]
+      - [date_dim, sr_returned_date_sk, d_date_sk]
+    filters:
+      - [eq, d_year, {param: year, default: 2001}]
+      - [eq, d_moy, 8]
+    group_by: [s_store_name, s_company_id, s_street_number, s_street_name, s_street_type]
+    aggs:
+      - [return_amt, sr_return_amt, sum]
+      - [net_loss, sr_net_loss, sum]
+    sort_by: [s_store_name, s_company_id, return_amt]
+    descending: [false, false, true]
+  - query_id: 65
+    title: Store Sales Item Profit
+    base: store_sales
+    joins:
+      - [store, ss_store_sk, s_store_sk]
+      - [item, ss_item_sk, i_item_sk]
+      - [date_dim, ss_sold_date_sk, d_date_sk]
+    filters:
+      - [eq, d_year, {param: year, default: 2000}]
+      - [between, d_dom, 1, 15]
+    group_by: [s_store_name, i_item_desc]
+    aggs:
+      - [revenue, ss_sales_price, sum]
+    sort_by: [revenue, s_store_name, i_item_desc]
+    descending: [true, false, false]
+  - query_id: 68
+    title: Store Sales Customer Household
+    base: store_sales
+    joins:
+      - [date_dim, ss_sold_date_sk, d_date_sk]
+      - [store, ss_store_sk, s_store_sk]
+      - [household_demographics, ss_hdemo_sk, hd_demo_sk]
+      - [customer_address, ss_addr_sk, ca_address_sk]
+    filters:
+      - [eq, d_year, {param: year, default: 2001}]
+      - [between, d_dom, 1, 2]
+      - [in, ca_city, {param: cities, default: [Midway, Fairview]}]
+      - [or, [eq, hd_dep_count, 4], [eq, hd_vehicle_count, 3]]
+    group_by: [ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city]
+    aggs:
+      - [extended_price, ss_ext_sales_price, sum]
+      - [list_price, ss_ext_list_price, sum]
+      - [extended_tax, ss_ext_tax, sum]
+    sort_by: [ss_ticket_number]
+  - query_id: 73
+    title: Store Sales Household Vehicle
+    base: store_sales
+    joins:
+      - [date_dim, ss_sold_date_sk, d_date_sk]
+      - [store, ss_store_sk, s_store_sk]
+      - [household_demographics, ss_hdemo_sk, hd_demo_sk]
+      - [customer, ss_customer_sk, c_customer_sk]
+    filters:
+      - [in, d_year, {param: year, default: 1999, offsets: [0, 1, 2]}]
+      - [between, d_dom, 1, 2]
+      - [eq, s_county, {param: county, default: Williamson County}]
+      - [in, hd_buy_potential, [">10000", Unknown]]
+      - [gt, hd_vehicle_count, 0]
+    group_by: [c_last_name, c_first_name, c_salutation, c_preferred_cust_flag, ss_ticket_number]
+    aggs:
+      - [cnt, ss_ticket_number, count]
+    post_filter: [between, cnt, 1, 5]
+    sort_by: [c_last_name, c_first_name]
+  - query_id: 79
+    title: Store Sales Customer/Store Profit
+    base: store_sales
+    joins:
+      - [date_dim, ss_sold_date_sk, d_date_sk]
+      - [store, ss_store_sk, s_store_sk]
+      - [household_demographics, ss_hdemo_sk, hd_demo_sk]
+      - [customer, ss_customer_sk, c_customer_sk]
+    filters:
+      - [eq, d_year, {param: year, default: 2000}]
+      - [between, d_dom, 1, 2]
+      - [or, [eq, hd_dep_count, {param: household_dep_count, default: 6}], [gt, hd_vehicle_count, 0]]
+    group_by: [c_last_name, c_first_name, ss_ticket_number, s_city]
+    aggs:
+      - [amt, ss_coupon_amt, sum]
+      - [profit, ss_net_profit, sum]
+    sort_by: [c_last_name, c_first_name, s_city, profit]
+    descending: [false, false, false, true]
+  - query_id: 89
+    title: Store Item Sales Profit
+    base: store_sales
+    joins:
+      - [date_dim, ss_sold_date_sk, d_date_sk]
+      - [store, ss_store_sk, s_store_sk]
+      - [item, ss_item_sk, i_item_sk]
+    filters:
+      - [eq, d_year, {param: year, default: 1999}]
+      - [or, [and, [eq, i_category, Books], [eq, i_class, business]], [and, [eq, i_category, Electronics], [eq, i_class, portable]]]
+    group_by: [i_category, i_class, i_brand, s_store_name, s_company_name, d_moy]
+    aggs:
+      - [sum_sales, ss_sales_price, sum]
+    sort_by: [sum_sales, s_store_name, i_category]
+  - query_id: 91
+    title: Call Center Returns Analysis
+    base: catalog_returns
+    joins:
+      - [call_center, cr_call_center_sk, cc_call_center_sk]
+      - [date_dim, cr_returned_date_sk, d_date_sk]
+      - [customer, cr_returning_customer_sk, c_customer_sk]
+      - [customer_demographics, c_current_cdemo_sk, cd_demo_sk]
+      - [household_demographics, c_current_hdemo_sk, hd_demo_sk]
+      - [customer_address, c_current_addr_sk, ca_address_sk]
+    filters:
+      - [eq, d_year, {param: year, default: 1998}]
+      - [eq, d_moy, {param: month, default: 11}]
+      - [or, [and, [eq, cd_marital_status, M], [eq, cd_education_status, Unknown]], [and, [eq, cd_marital_status, W], [eq, cd_education_status, "Advanced Degree"]]]
+      - [starts_with, hd_buy_potential, {param: buy_potential, default: Unknown}]
+      - [eq, ca_gmt_offset, {param: gmt_offset, default: -7}]
+    group_by: [cc_call_center_id, cc_name, cc_manager, cd_marital_status, cd_education_status]
+    aggs:
+      - [returns_loss, cr_net_loss, sum]
+    sort_by: [returns_loss]
+    descending: [true]
+    limit:
+
+state_average_returns:
+  - query_id: 30
+    title: Web Returns Customer Analysis
+    return_table: web_returns
+    return_date_key: wr_returned_date_sk
+    return_addr_key: wr_returning_addr_sk
+    return_customer_key: wr_returning_customer_sk
+    return_amount: wr_return_amt
+    year_default: 2002
+    state_default: GA
+    expression_select: [c_customer_id, c_salutation, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_day, c_birth_month, c_birth_year, c_birth_country, c_login, c_email_address, c_last_review_date_sk, ctr_total_return]
+    pandas_select: [c_customer_id, c_salutation, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_day, c_birth_month, c_birth_year, c_birth_country, c_login, c_email_address, c_last_review_date_sk, ctr_total_return]
+  - query_id: 81
+    title: Catalog Returns Customer Analysis
+    return_table: catalog_returns
+    return_date_key: cr_returned_date_sk
+    return_addr_key: cr_returning_addr_sk
+    return_customer_key: cr_returning_customer_sk
+    return_amount: cr_return_amt_inc_tax
+    year_default: 2000
+    state_default: GA
+    expression_select:
+      - c_customer_id
+      - c_salutation
+      - c_first_name
+      - c_last_name
+      - ca_street_number
+      - ca_street_name
+      - ca_street_type
+      - ca_suite_number
+      - ca_city
+      - ca_county
+      - {column: ca_state, alias: ca_state_out}
+      - ca_zip
+      - ca_country
+      - ca_gmt_offset
+      - ca_location_type
+      - ctr_total_return
+    pandas_select: [c_customer_id, c_salutation, c_first_name, c_last_name, ca_street_number, ca_street_name, ca_street_type, ca_suite_number, ca_city, ca_county, ca_state_y, ca_zip, ca_country, ca_gmt_offset, ca_location_type, ctr_total_return]

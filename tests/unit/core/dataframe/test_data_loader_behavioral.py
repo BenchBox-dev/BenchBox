@@ -53,12 +53,12 @@ class TestSchemaMapperTypeMaps:
 
     def test_polars_type_map_keys(self):
         """Verify all expected SQL types are mapped to Polars types."""
-        expected_sql_types = {"INTEGER", "DECIMAL(15,2)", "VARCHAR", "CHAR", "DATE"}
+        expected_sql_types = {"INTEGER", "DECIMAL(15,2)", "VARCHAR", "CHAR", "DATE", "TIMESTAMP", "TIME"}
         assert set(SchemaMapper.POLARS_TYPE_MAP.keys()) == expected_sql_types
 
     def test_polars_type_map_values_are_valid_polars_types(self):
         """Polars type map values must be recognized type strings."""
-        valid_polars_types = {"Int64", "Float64", "Utf8", "Date"}
+        valid_polars_types = {"Int64", "Float64", "Utf8", "Date", "Datetime"}
         for polars_type in SchemaMapper.POLARS_TYPE_MAP.values():
             assert polars_type in valid_polars_types, f"Unexpected Polars type: {polars_type}"
 
@@ -70,7 +70,7 @@ class TestSchemaMapperTypeMaps:
 
     def test_pyarrow_type_map_values_are_valid(self):
         """PyArrow type map values must be recognized type strings."""
-        valid_arrow_types = {"int64", "float64", "string", "date32"}
+        valid_arrow_types = {"int64", "float64", "string", "date32", "timestamp[us]"}
         for arrow_type in SchemaMapper.PYARROW_TYPE_MAP.values():
             assert arrow_type in valid_arrow_types, f"Unexpected Arrow type: {arrow_type}"
 

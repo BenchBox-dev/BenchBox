@@ -3,7 +3,6 @@ description: "Focused LakeSail rerun for UAT enabled-platforms remediation failu
 
 phases:
   - preflight
-  - enumerate
   - execute
   - report
 

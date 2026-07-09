@@ -6,7 +6,10 @@ platform-specific resource usage metrics and configuration.
 
 import logging
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, Callable, Optional
+
+import yaml
 
 from benchbox.core.cost.models import BenchmarkCost, DeploymentMetadata, NormalizedCost, PhaseCost, QueryCost
 from benchbox.core.cost.pricing import (
@@ -32,123 +35,13 @@ _COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
 BYTES_PER_TB = 1024**4
 
 
+def _load_cost_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("cost_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
 # Expected resource_usage fields per platform
-RESOURCE_USAGE_SCHEMA = {
-    "snowflake": {
-        "required": ["credits_used"],
-        "optional": ["bytes_scanned", "execution_time_ms", "warehouse_size"],
-    },
-    "bigquery": {
-        "required": [],  # Either bytes_billed or bytes_processed required
-        "optional": ["bytes_billed", "bytes_processed", "slot_ms", "creation_time", "start_time", "end_time"],
-        "requires_one_of": ["bytes_billed", "bytes_processed"],
-    },
-    "redshift": {
-        "required": ["execution_time_seconds"],
-        "optional": [],
-    },
-    "databricks": {
-        "required": [],  # Either dbu_consumed or execution_time_seconds required
-        "optional": ["dbu_consumed", "execution_time_seconds"],
-        "requires_one_of": ["dbu_consumed", "execution_time_seconds"],
-    },
-    "duckdb": {
-        "required": [],
-        "optional": ["execution_time_seconds", "memory_usage", "rows_processed"],
-    },
-    "clickhouse": {
-        "required": [],
-        "optional": ["execution_time_seconds", "memory_usage", "bytes_read"],
-    },
-    "clickhouse-local": {
-        "required": [],
-        "optional": ["execution_time_seconds", "memory_usage", "bytes_read"],
-    },
-    "clickhouse-server": {
-        "required": [],
-        "optional": ["execution_time_seconds", "memory_usage", "bytes_read"],
-    },
-    "athena": {
-        "required": ["data_scanned_bytes"],
-        "optional": ["cost_usd", "execution_time_ms"],
-    },
-    "synapse": {
-        "required": [],  # Either bytes_processed (serverless) or execution_time_seconds (dedicated) required
-        "optional": ["bytes_processed", "execution_time_seconds", "mode"],
-        "requires_one_of": ["bytes_processed", "execution_time_seconds"],
-    },
-    "fabric_dw": {
-        "required": [],  # Either cu_seconds or execution_time_seconds required
-        "optional": ["cu_seconds", "execution_time_seconds"],
-        "requires_one_of": ["cu_seconds", "execution_time_seconds"],
-    },
-    "firebolt": {
-        "required": [],  # Either fbu_consumed or execution_time_seconds required
-        "optional": ["fbu_consumed", "execution_time_seconds"],
-        "requires_one_of": ["fbu_consumed", "execution_time_seconds"],
-    },
-    # databricks-df uses same schema as databricks
-    "databricks-df": {
-        "required": [],
-        "optional": ["dbu_consumed", "execution_time_seconds"],
-        "requires_one_of": ["dbu_consumed", "execution_time_seconds"],
-    },
-    # Local/self-hosted SQL platforms (zero cloud cost)
-    "postgresql": {
-        "required": [],
-        "optional": ["execution_time_seconds", "rows_processed", "shared_blks_hit", "shared_blks_read"],
-    },
-    "sqlite": {
-        "required": [],
-        "optional": ["execution_time_seconds"],
-    },
-    "timescaledb": {
-        "required": [],
-        "optional": ["execution_time_seconds", "chunks_accessed", "rows_processed"],
-    },
-    "trino": {
-        "required": [],
-        "optional": ["execution_time_seconds", "bytes_read", "splits_processed", "rows_read"],
-    },
-    "presto": {
-        "required": [],
-        "optional": ["execution_time_seconds", "bytes_read", "splits_processed", "rows_read"],
-    },
-    "influxdb": {
-        "required": [],
-        "optional": ["execution_time_seconds", "series_scanned", "bytes_read"],
-    },
-    # Local/self-hosted distributed platforms (zero cloud cost)
-    "spark": {
-        "required": [],
-        "optional": ["execution_time_seconds", "shuffle_bytes_written", "shuffle_bytes_read", "stages"],
-    },
-    "pyspark": {
-        "required": [],
-        "optional": ["execution_time_seconds", "shuffle_bytes_written", "shuffle_bytes_read", "stages"],
-    },
-    # DataFrame platforms (zero cloud cost)
-    "datafusion": {
-        "required": [],
-        "optional": ["execution_time_seconds", "rows_processed"],
-    },
-    "polars": {
-        "required": [],
-        "optional": ["execution_time_seconds", "memory_usage", "rows_processed"],
-    },
-    "polars-df": {
-        "required": [],
-        "optional": ["execution_time_seconds", "memory_usage", "rows_processed"],
-    },
-    "pandas-df": {
-        "required": [],
-        "optional": ["execution_time_seconds", "memory_usage"],
-    },
-    "cudf-df": {
-        "required": [],
-        "optional": ["execution_time_seconds", "gpu_memory_usage"],
-    },
-}
+RESOURCE_USAGE_SCHEMA = _load_cost_specs()["resource_usage_schema"]
 
 
 def validate_resource_usage(platform: str, resource_usage: dict[str, Any]) -> tuple[bool, list[str]]:

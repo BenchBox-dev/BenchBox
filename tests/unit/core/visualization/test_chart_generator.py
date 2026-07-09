@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
@@ -19,16 +21,20 @@ pytestmark = [
 ]
 
 
-def test_all_chart_types_count_matches_registry() -> None:
-    """Guard against forward drift: adding a chart type without updating chartRegistry.ts.
+def test_all_chart_types_match_generated_explorer_fixture() -> None:
+    """Guard against forward drift between Python registry and generated Explorer fixture.
 
-    When the count here and in chartRegistry.meta.test.ts disagree, the mismatch
-    surfaces in CI so the developer knows to update the TS registry too.
+    When this fails, run make parity-fixtures and update chartRegistry.ts.
     """
-    assert len(ALL_CHART_TYPES) == 16, (
-        f"Expected 16 chart types but found {len(ALL_CHART_TYPES)}. "
-        "If you added a chart type, also update chartRegistry.ts and chartRegistry.meta.test.ts."
-    )
+    fixture_path = Path("tests/parity/fixtures/chart_ids.json")
+    fixture_ids = json.loads(fixture_path.read_text(encoding="utf-8"))["chart_ids"]
+
+    registry_ids = list(ALL_CHART_TYPES)
+    missing_from_fixture = [chart_id for chart_id in registry_ids if chart_id not in fixture_ids]
+    extras_in_fixture = [chart_id for chart_id in fixture_ids if chart_id not in registry_ids]
+
+    assert missing_from_fixture == []
+    assert extras_in_fixture == []
 
 
 def test_generate_comparison_charts_empty_results_returns_empty(tmp_path):

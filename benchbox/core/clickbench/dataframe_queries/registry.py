@@ -24,10 +24,7 @@ def get_clickbench_query(query_id: str) -> DataFrameQuery | None:
     return CLICKBENCH_DATAFRAME_QUERIES.get(query_id)
 
 
-def list_clickbench_queries(
-    family: str | None = None,
-    category: QueryCategory | None = None,
-) -> list[DataFrameQuery]:
+def list_clickbench_queries(family: str | None = None, category: QueryCategory | None = None) -> list[DataFrameQuery]:
     """List ClickBench DataFrame queries with optional filtering."""
     return CLICKBENCH_DATAFRAME_QUERIES.list_queries(family=family, category=category)
 

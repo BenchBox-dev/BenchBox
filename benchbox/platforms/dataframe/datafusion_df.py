@@ -500,6 +500,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         has_header: bool = True,
         column_names: list[str] | None = None,
         null_marker: str | None = None,
+        string_columns: list[str] | None = None,
     ) -> DataFusionLazyDF:
         """Read a CSV file into a DataFusion DataFrame.
 
@@ -508,9 +509,10 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
             delimiter: Field delimiter
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
-            null_marker: Unused for DataFusion — TPC-style trailing delimiters are handled
-                via detect_data_format() which routes .tbl/.dat files through
-                _read_tbl_via_datafusion / _read_tbl_via_pyarrow above.
+            null_marker: ``None`` means empty fields stay ``""`` in declared
+                string columns; non-``None`` preserves NULL semantics.
+            string_columns: Declared string columns whose empty CSV fields must
+                stay ``""`` when ``null_marker`` is ``None``.
 
         Returns:
             DataFusion DataFrame with the file contents
@@ -520,6 +522,20 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         format_type = detect_data_format(path)
 
         if format_type == "tbl":
+            # Raw TPC .tbl/.dat rows use a field-terminating delimiter (every row
+            # ends with `|`), so DataFusion's native CSV reader sees N+1 fields and
+            # errors on the column count ("Expected N columns, got N+1"). That error
+            # is not an extension mismatch, so _read_tbl_via_datafusion would raise
+            # rather than fall back. Detect the trailing delimiter up front and route
+            # such files straight to the tolerant PyArrow path, which appends a dummy
+            # column, projects it away, and transparently decompresses .zst — so
+            # chunked/compressed names like customer.tbl.1.zst load correctly. This
+            # mirrors the pandas/polars adapters. Non-trailing files (e.g. macOS
+            # dbgen output) keep the faster native path unchanged.
+            if has_trailing_delimiter(path, delimiter, column_names):
+                return self._read_tbl_via_pyarrow(
+                    path, delimiter=delimiter, has_header=has_header, column_names=column_names
+                )
             df = self._read_tbl_via_datafusion(
                 path,
                 delimiter=delimiter,
@@ -528,7 +544,9 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
             )
             if df is not None:
                 return df
-            return self._read_tbl_via_pyarrow(path, delimiter=delimiter, column_names=column_names)
+            return self._read_tbl_via_pyarrow(
+                path, delimiter=delimiter, has_header=has_header, column_names=column_names
+            )
 
         # Build read options
         # Note: DataFusion's read_csv API varies by version
@@ -542,6 +560,28 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         except TypeError:
             # Fall back to simpler API
             df = self.session_ctx.read_csv(path_str)
+
+        if column_names:
+            # DataFusion's non-.tbl read_csv ignores column_names (unlike the
+            # .tbl path), so a headerless CSV (e.g. ClickBench's generated
+            # hits.csv) keeps DataFusion's inferred names (column_1, …) rather
+            # than the benchmark schema names. Re-apply the declared names
+            # positionally so downstream schema-name lookups resolve — without
+            # this the string-column coalesce below skips every declared column
+            # and the empty text fields stay NULL instead of "".
+            df = self._apply_tbl_column_names(df, column_names)
+
+        if null_marker is None and string_columns:
+            # ``null_marker is None`` means empty fields in declared string
+            # columns must stay ``""`` (ClickBench filters ``SearchPhrase <> ''``
+            # etc.). DataFusion reads an empty CSV field as NULL, so coalesce it
+            # back to "". The membership guard tolerates a declared column that
+            # genuinely isn't present (e.g. column_names was not supplied so the
+            # rename above could not align the schema names).
+            present_columns = {field.name for field in df.schema()}
+            for name in string_columns:
+                if name in present_columns:
+                    df = df.with_column(name, f.coalesce(col(name), lit("")))
 
         return df
 
@@ -584,6 +624,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         path: Path,
         *,
         delimiter: str,
+        has_header: bool = False,
         column_names: list[str] | None,
     ) -> DataFusionLazyDF:
         """Read a TBL/DAT file via PyArrow and register in DataFusion.
@@ -607,6 +648,10 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
 
         read_options = pv.ReadOptions(
             column_names=actual_column_names if actual_column_names else None,
+            # When explicit column_names are supplied for a header-bearing file,
+            # drop the header row so it is not registered as data (off-by-one).
+            # Mirrors DataFusionAdapter._convert_and_register_parquet.
+            skip_rows=1 if (column_names and has_header) else 0,
         )
         parse_options = pv.ParseOptions(delimiter=delimiter)
         compression = detect_compression(path)

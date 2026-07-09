@@ -85,6 +85,8 @@ class InfluxDBAdapter(
         ... )
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
     def __init__(self, **config):

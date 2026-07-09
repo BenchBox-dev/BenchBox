@@ -1,3 +1,4 @@
+# ruff: noqa: SIM905
 """Apache Doris platform adapter for BenchBox benchmarking.
 
 Provides Apache Doris-specific functionality including:
@@ -29,20 +30,10 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 from urllib.parse import urlparse, urlunparse
 
 from benchbox.platforms.base.ddl_helpers import strip_foreign_keys
-from benchbox.utils.clock import elapsed_seconds, mono_time
-
-if TYPE_CHECKING:
-    from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
-        PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
-        TableTuning,
-        UnifiedTuningConfiguration,
-    )
 
 from ..utils.dependencies import (
     check_platform_dependencies,
@@ -52,15 +43,19 @@ from ..utils.file_format import get_data_extension
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import (
     CsvDialect,
-    DataSourceResolver,
+    DataSourceResolver,  # noqa: F401 - tests patch this module-local name; shared loader resolves it dynamically.
     FileFormatRegistry,
     GzipHandler,
     NoCompressionHandler,
     ZstdHandler,
-    normalize_table_paths,
     resolve_csv_dialect,
 )
-from .base.sql_execution import execute_sql_query
+from .base.mysql_wire import (
+    MySqlWireConnectionWrapper,
+    MySqlWireLifecycleMixin,
+    NoOpTableTuningMixin,
+    build_database_config,
+)
 
 # Doris dialect for SQLGlot
 DORIS_DIALECT = "doris"
@@ -94,21 +89,21 @@ _DEFAULT_BUCKETS = 10
 # are intentionally excluded; Doris's CSV parser treats a trailing | as a terminator
 # and discards the resulting empty field without a column-count error.
 # Derived from benchbox/core/tpcds/schema/tables.py - update if the schema changes.
-_TPCDS_DECIMAL_NULL_POSITIONS: dict[str, list[int]] = {
-    "call_center": [29, 30],
-    "catalog_returns": [18, 19, 20, 21, 22, 23, 24, 25, 26],
-    "catalog_sales": [19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-    "customer_address": [11],
-    "item": [5, 6],
-    "promotion": [5],
-    "store": [27, 28],
-    "store_returns": [11, 12, 13, 14, 15, 16, 17, 18, 19],
-    "store_sales": [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
-    "warehouse": [13],
-    "web_returns": [15, 16, 17, 18, 19, 20, 21, 22, 23],
-    "web_sales": [19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
-    "web_site": [24, 25],
-}
+_TPCDS_DECIMAL_NULL_POSITIONS: dict[str, list[int]] = dict(  # noqa: C408
+    call_center=[29, 30],
+    catalog_returns=list(range(18, 27)),
+    catalog_sales=list(range(19, 34)),
+    customer_address=[11],
+    item=[5, 6],
+    promotion=[5],
+    store=[27, 28],
+    store_returns=list(range(11, 20)),
+    store_sales=list(range(11, 22)),
+    warehouse=[13],
+    web_returns=list(range(15, 24)),
+    web_sales=list(range(19, 34)),
+    web_site=[24, 25],
+)
 
 
 def _fix_tpcds_decimal_nulls(line: str, delimiter: str, positions: list[int]) -> str:
@@ -141,39 +136,9 @@ _CREATE_TABLE_RE = re.compile(
     re.IGNORECASE,
 )
 # Column definition parser: matches (name, type); known SQL types filter out constraint lines.
-_KNOWN_SQL_TYPES = frozenset(
-    {
-        "int",
-        "integer",
-        "bigint",
-        "smallint",
-        "tinyint",
-        "largeint",
-        "float",
-        "double",
-        "decimal",
-        "numeric",
-        "string",
-        "text",
-        "varchar",
-        "char",
-        "boolean",
-        "bool",
-        "date",
-        "datetime",
-        "timestamp",
-        "time",
-        "json",
-        "jsonb",
-        "array",
-        "map",
-        "struct",
-        "bitmap",
-        "hll",
-        "blob",
-        "binary",
-        "varbinary",
-    }
+_KNOWN_SQL_TYPES = frozenset(  # noqa: SIM905
+    "int integer bigint smallint tinyint largeint float double decimal numeric string text varchar char boolean "
+    "bool date datetime timestamp time json jsonb array map struct bitmap hll blob binary varbinary".split()  # noqa: SIM905
 )
 _COL_DEF_RE = re.compile(r'[`"]?(\w+)[`"]?\s+(\w+)', re.MULTILINE)
 # Types Doris rejects as key columns (unbounded or unsupported key types)
@@ -181,112 +146,41 @@ _NON_KEY_DORIS_TYPES = frozenset({"time", "json", "jsonb", "blob", "binary", "hl
 _DORIS_ENGINE_VERSION_RE = re.compile(r"doris[-\s]v?(\d+\.\d+\.\d+(?:-[A-Za-z0-9]+)?)", re.IGNORECASE)
 
 # TPC-H table key columns for DUPLICATE KEY model
-_TPCH_TABLE_KEYS: dict[str, list[str]] = {
-    "lineitem": ["l_orderkey", "l_linenumber"],
-    "orders": ["o_orderkey"],
-    "customer": ["c_custkey"],
-    "part": ["p_partkey"],
-    "supplier": ["s_suppkey"],
-    "partsupp": ["ps_partkey", "ps_suppkey"],
-    "nation": ["n_nationkey"],
-    "region": ["r_regionkey"],
-}
+_TPCH_TABLE_KEYS: dict[str, list[str]] = dict(  # noqa: C408
+    lineitem=["l_orderkey", "l_linenumber"],
+    orders=["o_orderkey"],
+    customer=["c_custkey"],
+    part=["p_partkey"],
+    supplier=["s_suppkey"],
+    partsupp=["ps_partkey", "ps_suppkey"],
+    nation=["n_nationkey"],
+    region=["r_regionkey"],
+)
 
 # TPC-H distribution keys (hash distribution column per table)
 _TPCH_DISTRIBUTION_KEYS: dict[str, str] = {
-    "lineitem": "l_orderkey",
-    "orders": "o_orderkey",
-    "customer": "c_custkey",
-    "part": "p_partkey",
-    "supplier": "s_suppkey",
-    "partsupp": "ps_partkey",
-    "nation": "n_nationkey",
-    "region": "r_regionkey",
-}
+    table: keys[0] for table, keys in _TPCH_TABLE_KEYS.items() if table != "partsupp"
+} | {"partsupp": "ps_partkey"}
 
 # TPC-H partition columns (date columns for PARTITION BY RANGE on large tables)
-_TPCH_PARTITION_TABLES: dict[str, str] = {
-    "lineitem": "l_shipdate",
-    "orders": "o_orderdate",
-}
+_TPCH_PARTITION_TABLES: dict[str, str] = dict(lineitem="l_shipdate", orders="o_orderdate")  # noqa: C408
 
 # TPC-H partition date ranges
+_TPCH_YEAR_PARTITIONS = [(f"p{year}", f"{year}-01-01", f"{year + 1}-01-01") for year in range(1992, 1999)]
 _TPCH_PARTITION_RANGES: dict[str, list[tuple[str, str, str]]] = {
-    "lineitem": [
-        ("p1992", "1992-01-01", "1993-01-01"),
-        ("p1993", "1993-01-01", "1994-01-01"),
-        ("p1994", "1994-01-01", "1995-01-01"),
-        ("p1995", "1995-01-01", "1996-01-01"),
-        ("p1996", "1996-01-01", "1997-01-01"),
-        ("p1997", "1997-01-01", "1998-01-01"),
-        ("p1998", "1998-01-01", "1999-01-01"),
-    ],
-    "orders": [
-        ("p1992", "1992-01-01", "1993-01-01"),
-        ("p1993", "1993-01-01", "1994-01-01"),
-        ("p1994", "1994-01-01", "1995-01-01"),
-        ("p1995", "1995-01-01", "1996-01-01"),
-        ("p1996", "1996-01-01", "1997-01-01"),
-        ("p1997", "1997-01-01", "1998-01-01"),
-        ("p1998", "1998-01-01", "1999-01-01"),
-    ],
+    "lineitem": _TPCH_YEAR_PARTITIONS,
+    "orders": _TPCH_YEAR_PARTITIONS,
 }
 
 # Bloom filter index targets: high-cardinality key columns
 _TPCH_BLOOM_FILTER_COLUMNS: dict[str, list[str]] = {
-    "lineitem": ["l_orderkey"],
-    "orders": ["o_orderkey"],
-    "customer": ["c_custkey"],
-    "supplier": ["s_suppkey"],
-    "part": ["p_partkey"],
-    "partsupp": ["ps_partkey"],
+    table: [key] for table, key in _TPCH_DISTRIBUTION_KEYS.items() if table not in {"nation", "region"}
 }
 
 # Bitmap index targets: low-cardinality columns
-_TPCH_BITMAP_COLUMNS: dict[str, list[str]] = {
-    "lineitem": ["l_returnflag", "l_linestatus"],
-    "orders": ["o_orderstatus"],
-    "part": ["p_type"],
-}
-
-
-def _split_sql_statements(sql: str) -> list[str]:
-    """Split SQL on semicolons outside single-quoted string literals."""
-    statements: list[str] = []
-    current: list[str] = []
-    n = len(sql)
-    i = 0
-    while i < n:
-        c = sql[i]
-        if c == "'":
-            lit_start = i
-            i += 1
-            while i < n:
-                lc = sql[i]
-                if lc == "\\" and i + 1 < n:
-                    i += 2
-                    continue
-                if lc == "'":
-                    if i + 1 < n and sql[i + 1] == "'":
-                        i += 2
-                        continue
-                    i += 1
-                    break
-                i += 1
-            current.append(sql[lit_start:i])
-        elif c == ";":
-            stmt = "".join(current).strip()
-            if stmt:
-                statements.append(stmt)
-            current = []
-            i += 1
-        else:
-            current.append(c)
-            i += 1
-    stmt = "".join(current).strip()
-    if stmt:
-        statements.append(stmt)
-    return statements
+_TPCH_BITMAP_COLUMNS: dict[str, list[str]] = dict(  # noqa: C408
+    lineitem=["l_returnflag", "l_linestatus"], orders=["o_orderstatus"], part=["p_type"]
+)
 
 
 def _normalize_doris_engine_version(
@@ -336,7 +230,7 @@ def _read_doris_version_details(cursor: Any) -> tuple[str | None, str | None, st
     return platform_version, mysql_protocol_version_str, version_comment_str
 
 
-class _DorisConnectionWrapper:
+class _DorisConnectionWrapper(MySqlWireConnectionWrapper):
     """Thin adapter that adds a DuckDB-compatible execute() to a PyMySQL connection.
 
     PyMySQL exposes execute() only on cursors; BenchBox benchmarks (write_primitives,
@@ -348,40 +242,10 @@ class _DorisConnectionWrapper:
     execution, so staging tables created by benchmark setup code get valid Doris DDL.
     """
 
-    def __init__(self, conn: Any, ddl_optimizer: Any = None) -> None:
-        self._conn = conn
-        self._ddl_optimizer = ddl_optimizer
-
-    def _optimize_if_create(self, stmt: str) -> str:
-        if self._ddl_optimizer is not None and "CREATE TABLE" in stmt.upper():
-            return self._ddl_optimizer(stmt)
-        return stmt
-
-    def execute(self, sql: str, params: Any = None) -> Any:
-        if not sql or not sql.strip():
-            return self._conn.cursor()
-
-        statements = _split_sql_statements(sql)
-
-        if len(statements) <= 1:
-            stmt = self._optimize_if_create(sql.strip())
-            cursor = self._conn.cursor()
-            cursor.execute(stmt, params)
-            return cursor
-
-        last_cursor: Any = None
-        for stmt in statements:
-            stmt = self._optimize_if_create(stmt)
-            c = self._conn.cursor()
-            c.execute(stmt)
-            last_cursor = c
-        return last_cursor if last_cursor is not None else self._conn.cursor()
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._conn, name)
+    optimize_contains_create = True
 
 
-class DorisAdapter(PlatformAdapter):
+class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapter):
     """Apache Doris platform adapter with Stream Load data loading.
 
     Supports Apache Doris 2.0+ with vectorized execution engine.
@@ -404,7 +268,11 @@ class DorisAdapter(PlatformAdapter):
     - DORIS_DATABASE: Default database name
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
+    connection_operation_name = "Doris connection"
+    current_database_sql = "SELECT database()"
 
     @property
     def platform_name(self) -> str:
@@ -585,12 +453,6 @@ class DorisAdapter(PlatformAdapter):
         if not self._validate_identifier(self.database):
             raise ValueError(f"Invalid database identifier: {self.database}")
 
-    def _validate_identifier(self, identifier: str) -> bool:
-        """Validate SQL identifier to prevent injection."""
-        from benchbox.utils.sql_identifier import is_valid_sql_identifier
-
-        return is_valid_sql_identifier(identifier, max_length=128)
-
     def _admin_connect(self) -> Any:
         """Create an admin connection (no database selected)."""
         return pymysql.connect(
@@ -601,88 +463,8 @@ class DorisAdapter(PlatformAdapter):
             connect_timeout=10,
         )
 
-    def check_server_database_exists(
-        self,
-        schema: str | None = None,
-        catalog: str | None = None,
-        database: str | None = None,
-        **_kwargs,
-    ) -> bool:
-        """Check if a database exists on the Doris server."""
-        db_name = database or self.database
-
-        try:
-            conn = self._admin_connect()
-            try:
-                cursor = conn.cursor()
-                cursor.execute("SHOW DATABASES")
-                databases = [row[0] for row in cursor.fetchall()]
-                cursor.close()
-                return db_name in databases
-            finally:
-                conn.close()
-
-        except Exception as e:
-            self.logger.debug(f"Failed to check database existence: {e}")
-            return False
-
-    def drop_database(
-        self,
-        schema: str | None = None,
-        catalog: str | None = None,
-        database: str | None = None,
-        **_kwargs,
-    ) -> None:
-        """Drop a database from Doris server."""
-        db_name = database or self.database
-
-        if not self._validate_identifier(db_name):
-            raise ValueError(f"Invalid database identifier: {db_name}")
-
-        conn = self._admin_connect()
-        try:
-            cursor = conn.cursor()
-            # Safety: db_name validated by _validate_identifier() above
-            cursor.execute(f"DROP DATABASE IF EXISTS `{db_name}`")
-            cursor.close()
-            self.logger.info(f"Dropped database: {db_name}")
-        except Exception as e:
-            self.logger.warning(f"Failed to drop database {db_name}: {e}")
-            raise
-        finally:
-            conn.close()
-
-    def _create_database(self) -> None:
-        """Create the target database if it doesn't exist."""
-        if not self._validate_identifier(self.database):
-            raise ValueError(f"Invalid database identifier: {self.database}")
-
-        conn = self._admin_connect()
-        try:
-            cursor = conn.cursor()
-            # Safety: self.database validated by _validate_identifier() above
-            cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{self.database}`")
-            cursor.close()
-            self.logger.info(f"Created database: {self.database}")
-        except Exception as e:
-            self.logger.error(f"Failed to create database: {e}")
-            raise
-        finally:
-            conn.close()
-
-    def create_connection(self, **connection_config) -> Any:
-        """Create Doris connection via MySQL protocol."""
-        self.log_operation_start("Doris connection")
-
-        # Handle existing database
-        self.handle_existing_database(**connection_config)
-
-        # Create database if needed
-        if not self.check_server_database_exists():
-            self._create_database()
-
-        # Connect to target database
-        conn = pymysql.connect(
+    def _connect_database(self, **connection_config: Any) -> Any:
+        return pymysql.connect(
             host=self.host,
             port=self.port,
             user=self.username,
@@ -694,130 +476,26 @@ class DorisAdapter(PlatformAdapter):
             charset="utf8mb4",
         )
 
-        # Verify connection
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        cursor.fetchone()
-        cursor.close()
-
-        self.log_operation_complete(
-            "Doris connection",
-            details=f"Connected to {self.host}:{self.port}/{self.database}",
-        )
-        # Wrap with DDL optimizer so benchmark setup code (write_primitives,
-        # transaction_primitives, metadata_primitives) that calls connection.execute()
-        # directly gets proper Doris DDL (DUPLICATE KEY + DISTRIBUTED BY HASH).
+    def _wrap_database_connection(self, conn: Any) -> Any:
         return _DorisConnectionWrapper(conn, ddl_optimizer=self._inject_doris_ddl_clauses)
 
-    def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using benchmark's SQL definitions."""
-        start_time = mono_time()
-        self.log_operation_start("Schema creation", f"benchmark: {benchmark.__class__.__name__}")
-
-        # Get schema SQL and translate to Doris dialect
-        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
-
-        self.log_very_verbose(f"Executing schema creation script ({len(schema_sql)} characters)")
-
+    def _transform_schema_statement(self, stmt: str, benchmark: Any) -> str:
         scale_factor: float | None = getattr(benchmark, "scale_factor", None)
-        cursor = connection.cursor()
-        critical_failures = []
+        return self._inject_doris_ddl_clauses(stmt, scale_factor=scale_factor)
 
-        # Execute each statement separately
-        statements = [s.strip() for s in schema_sql.split(";") if s.strip()]
-        try:
-            for stmt in statements:
-                stmt = self._inject_doris_ddl_clauses(stmt, scale_factor=scale_factor)
-                try:
-                    cursor.execute(stmt)
-                except Exception as e:
-                    is_create_table = stmt.strip().upper().startswith("CREATE TABLE")
-                    if is_create_table:
-                        critical_failures.append((stmt[:80], str(e)))
-                    self.logger.warning(f"Schema statement failed: {e}")
-                    # Continue with other statements
-
-            connection.commit()
-        finally:
-            cursor.close()
-
-        if critical_failures:
-            failed_summary = "; ".join(f"{s}: {err}" for s, err in critical_failures)
-            raise RuntimeError(f"{len(critical_failures)} critical CREATE TABLE statement(s) failed: {failed_summary}")
-
-        duration = elapsed_seconds(start_time)
-        self.log_operation_complete("Schema creation", duration, "Schema and tables created")
-        return duration
-
-    def load_data(
+    def _load_resolved_data_file(
         self,
-        benchmark,
+        benchmark: Any,
         connection: Any,
-        data_dir: Path,
-    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load benchmark data using Stream Load HTTP API or INSERT for efficiency.
-
-        Uses HTTP Stream Load API (port 8030) for CSV/TPC format files when
-        the requests library is available. Falls back to batch INSERT via
-        MySQL protocol otherwise.
-        """
-        start_time = mono_time()
-        table_stats = {}
-        per_table_timings = {}
-
-        self.log_operation_start("Data loading", f"source: {data_dir}")
-
-        resolver = DataSourceResolver(
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
-        )
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            self.logger.warning("No data files found. Ensure benchmark.generate_data() was called first.")
-            loading_time = elapsed_seconds(start_time)
-            self.log_operation_complete("Data loading", loading_time, "Loaded 0 total rows")
-            return {}, loading_time, None
-
-        for table_name, table_path in data_source.tables.items():
-            if not self._validate_identifier(table_name):
-                self.logger.warning(f"Skipping table with invalid identifier: {table_name}")
-                table_stats[table_name] = 0
-                continue
-
-            data_files = [f for f in normalize_table_paths(table_path) if f.exists()]
-            if not data_files:
-                self.logger.warning(f"Data file(s) not found for table: {table_name}")
-                table_stats[table_name] = 0
-                continue
-
-            table_start = mono_time()
-            table_rows = 0
-
-            for data_file in data_files:
-                try:
-                    dialect = resolve_csv_dialect(data_source, table_name, data_file, benchmark)
-                    if _requests is not None:
-                        table_rows += self._stream_load_file(table_name, data_file, dialect)
-                    else:
-                        table_rows += self._insert_load_file(connection, table_name, data_file, dialect)
-                except Exception as e:
-                    self.logger.error(f"Failed to load {table_name}: {e}")
-
-            table_stats[table_name] = table_rows
-            table_duration = elapsed_seconds(table_start)
-            per_table_timings[table_name] = {
-                "rows": table_rows,
-                "duration_seconds": table_duration,
-            }
-            self.log_verbose(f"Loaded {table_rows:,} rows into {table_name}")
-
-        loading_time = elapsed_seconds(start_time)
-        total_rows = sum(table_stats.values())
-        self.log_operation_complete("Data loading", loading_time, f"Loaded {total_rows:,} total rows")
-
-        return table_stats, loading_time, per_table_timings
+        table_name: str,
+        source_table_name: str,
+        data_file: Path,
+        data_source: Any,
+    ) -> int:
+        dialect = resolve_csv_dialect(data_source, source_table_name, data_file, benchmark)
+        if _requests is not None:
+            return self._stream_load_file(table_name, data_file, dialect)
+        return self._insert_load_file(connection, table_name, data_file, dialect)
 
     def _stream_load_file(self, table_name: str, data_file: Path, dialect: CsvDialect) -> int:
         """Load a file into Doris using Stream Load HTTP API.
@@ -1269,6 +947,22 @@ class DorisAdapter(PlatformAdapter):
 
         cursor.close()
 
+    def _explain_query_prefix(self, explain_options: dict[str, Any] | None = None) -> str:
+        verbose = explain_options.get("verbose", False) if explain_options else False
+        # SHAPE PLAN (Nereids planner) emits a stable dash-indented Physical*
+        # operator tree that DorisQueryPlanParser consumes; it is preferred over
+        # the fragment-oriented default EXPLAIN for structured plan capture.
+        return "EXPLAIN VERBOSE" if verbose else "EXPLAIN SHAPE PLAN"
+
+    def _format_query_plan_rows(self, rows: Any) -> str:
+        return "\n".join(str(row[0]) for row in rows)
+
+    def get_query_plan_parser(self):
+        """Get the Doris query plan parser."""
+        from benchbox.core.query_plans.parsers.doris import DorisQueryPlanParser
+
+        return DorisQueryPlanParser()
+
     def execute_query(
         self,
         connection: Any,
@@ -1279,67 +973,24 @@ class DorisAdapter(PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a single query and return detailed results."""
-        return execute_sql_query(
+        """Execute a query and capture its structured plan when enabled.
+
+        Delegates execution to the shared MySQL-wire path, then merges plan
+        capture (SUCCESS-guarded; no EXPLAIN issued when capture_plans is off).
+        Kept outside the execution path so a strict_plan_capture PlanCaptureError
+        propagates rather than being mislabeled as a failed query.
+        """
+        result = super().execute_query(
             connection,
             query,
             query_id,
-            log_verbose=self.log_verbose,
-            build_query_result_with_validation=self._build_query_result_with_validation,
             benchmark_type=benchmark_type,
             scale_factor=scale_factor,
             validate_row_count=validate_row_count,
             stream_id=stream_id,
         )
-
-    def get_query_plan(
-        self,
-        connection: Any,
-        query: str,
-        explain_options: dict[str, Any] | None = None,
-    ) -> str:
-        """Get query execution plan using EXPLAIN."""
-        cursor = connection.cursor()
-
-        # Doris supports EXPLAIN VERBOSE and EXPLAIN GRAPH
-        verbose = explain_options.get("verbose", False) if explain_options else False
-        explain_prefix = "EXPLAIN VERBOSE" if verbose else "EXPLAIN"
-        explain_query = f"{explain_prefix} {query}"
-
-        try:
-            cursor.execute(explain_query)
-            plan_rows = cursor.fetchall()
-            cursor.close()
-
-            return "\n".join(str(row[0]) for row in plan_rows)
-
-        except Exception as e:
-            cursor.close()
-            return f"Failed to get query plan: {e}"
-
-    def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE on a table to update statistics."""
-        if not self._validate_identifier(table_name):
-            self.logger.warning(f"Invalid table identifier: {table_name}")
-            return
-
-        cursor = connection.cursor()
-
-        try:
-            # Safety: table_name validated by _validate_identifier() above
-            cursor.execute(f"ANALYZE TABLE `{table_name}`")
-        except Exception as e:
-            self.logger.warning(f"ANALYZE failed for {table_name}: {e}")
-        finally:
-            cursor.close()
-
-    def close_connection(self, connection: Any) -> None:
-        """Close Doris connection."""
-        if connection:
-            try:
-                connection.close()
-            except Exception as e:
-                self.logger.debug(f"Error closing connection: {e}")
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
+        return result
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get Doris platform information."""
@@ -1391,45 +1042,6 @@ class DorisAdapter(PlatformAdapter):
             platform_info["client_library_version"] = pymysql.__version__
 
         return platform_info
-
-    def test_connection(self) -> bool:
-        """Test if connection can be established."""
-        try:
-            conn = pymysql.connect(
-                host=self.host,
-                port=self.port,
-                user=self.username,
-                password=self.password,
-                connect_timeout=10,
-            )
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
-            cursor.close()
-            conn.close()
-            return True
-        except Exception as e:
-            self.logger.debug(f"Connection test failed: {e}")
-            return False
-
-    def _get_existing_tables(self, connection: Any) -> list[str]:
-        """Get list of existing tables in the database (lowercased for reuse comparison).
-
-        Migration note: databases created before the lower_case_table_names fix
-        have lowercase TPC-DI table names (e.g. dimcustomer). Those databases
-        pass the reuse check (both sides are lowercased) but fail at query time
-        because queries reference the original mixed-case names. Use --force all
-        to drop and recreate a stale TPC-DI database after upgrading.
-        """
-        try:
-            cursor = connection.cursor()
-            cursor.execute("SHOW TABLES")
-            result = cursor.fetchall()
-            cursor.close()
-            return [row[0].lower() for row in result]
-        except Exception as e:
-            self.logger.debug(f"Failed to get existing tables: {e}")
-            return []
 
     # ------------------------------------------------------------------ #
     # DDL clause injection
@@ -1702,6 +1314,34 @@ class DorisAdapter(PlatformAdapter):
     # w20/w21: Bloom filter and Bitmap index creation
     # ------------------------------------------------------------------ #
 
+    def _create_secondary_indexes(
+        self,
+        connection: Any,
+        columns_by_table: dict[str, list[str]],
+        index_type: str,
+        index_name_prefix: str,
+        tables: list[str] | None = None,
+    ) -> list[str]:
+        target_tables = tables or list(columns_by_table.keys())
+        executed_stmts: list[str] = []
+        cursor = connection.cursor()
+        try:
+            for table_name in target_tables:
+                for col in columns_by_table.get(table_name, []):
+                    if not self._validate_identifier(table_name) or not self._validate_identifier(col):
+                        continue
+                    idx_name = f"idx_{index_name_prefix}_{col}"
+                    stmt = f"CREATE INDEX `{idx_name}` ON `{table_name}` (`{col}`) USING {index_type}"
+                    try:
+                        cursor.execute(stmt)
+                        executed_stmts.append(stmt)
+                        self.log_verbose(f"Created {index_type} index: {idx_name} on {table_name}.{col}")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to create {index_type} index {idx_name}: {e}")
+        finally:
+            cursor.close()
+        return executed_stmts
+
     def create_bloom_filter_indexes(self, connection: Any, tables: list[str] | None = None) -> list[str]:
         """Create Bloom filter indexes on high-cardinality columns.
 
@@ -1712,29 +1352,7 @@ class DorisAdapter(PlatformAdapter):
         Returns:
             List of SQL statements executed
         """
-        target_tables = tables or list(_TPCH_BLOOM_FILTER_COLUMNS.keys())
-        executed_stmts: list[str] = []
-        cursor = connection.cursor()
-
-        try:
-            for table_name in target_tables:
-                columns = _TPCH_BLOOM_FILTER_COLUMNS.get(table_name, [])
-                for col in columns:
-                    if not self._validate_identifier(table_name) or not self._validate_identifier(col):
-                        continue
-                    idx_name = f"idx_bloom_{col}"
-                    # Safety: table_name and col validated above
-                    stmt = f"CREATE INDEX `{idx_name}` ON `{table_name}` (`{col}`) USING BLOOM_FILTER"
-                    try:
-                        cursor.execute(stmt)
-                        executed_stmts.append(stmt)
-                        self.log_verbose(f"Created Bloom filter index: {idx_name} on {table_name}.{col}")
-                    except Exception as e:
-                        self.logger.warning(f"Failed to create Bloom filter index {idx_name}: {e}")
-        finally:
-            cursor.close()
-
-        return executed_stmts
+        return self._create_secondary_indexes(connection, _TPCH_BLOOM_FILTER_COLUMNS, "BLOOM_FILTER", "bloom", tables)
 
     def create_bitmap_indexes(self, connection: Any, tables: list[str] | None = None) -> list[str]:
         """Create Bitmap indexes on low-cardinality columns.
@@ -1746,65 +1364,7 @@ class DorisAdapter(PlatformAdapter):
         Returns:
             List of SQL statements executed
         """
-        target_tables = tables or list(_TPCH_BITMAP_COLUMNS.keys())
-        executed_stmts: list[str] = []
-        cursor = connection.cursor()
-
-        try:
-            for table_name in target_tables:
-                columns = _TPCH_BITMAP_COLUMNS.get(table_name, [])
-                for col in columns:
-                    if not self._validate_identifier(table_name) or not self._validate_identifier(col):
-                        continue
-                    idx_name = f"idx_bitmap_{col}"
-                    # Safety: table_name and col validated above
-                    stmt = f"CREATE INDEX `{idx_name}` ON `{table_name}` (`{col}`) USING BITMAP"
-                    try:
-                        cursor.execute(stmt)
-                        executed_stmts.append(stmt)
-                        self.log_verbose(f"Created Bitmap index: {idx_name} on {table_name}.{col}")
-                    except Exception as e:
-                        self.logger.warning(f"Failed to create Bitmap index {idx_name}: {e}")
-        finally:
-            cursor.close()
-
-        return executed_stmts
-
-    def apply_table_tunings(self, table_tuning: TableTuning, connection: Any) -> None:
-        """Apply tuning configurations to Doris tables."""
-        # Doris tuning is primarily handled through DDL (distribution, indexes)
-
-    def generate_tuning_clause(self, table_tuning: TableTuning | None) -> str:
-        """Generate Doris-specific tuning clauses."""
-        if not table_tuning:
-            return ""
-        # Doris distribution and properties are handled at schema creation time
-        return ""
-
-    def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration."""
-        # Doris tuning is session-based or applied at table creation
-
-    def apply_platform_optimizations(
-        self,
-        platform_config: PlatformOptimizationConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply Doris-specific optimizations."""
-        # Optimizations applied in configure_for_benchmark
-
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to Doris.
-
-        Note: Doris does not enforce primary key or foreign key constraints
-        in the traditional RDBMS sense. Keys are used for data distribution
-        and deduplication, not referential integrity.
-        """
+        return self._create_secondary_indexes(connection, _TPCH_BITMAP_COLUMNS, "BITMAP", "bitmap", tables)
 
     def validate_platform_capabilities(self, benchmark_type: str):
         """Validate Doris-specific capabilities for the benchmark."""
@@ -1856,62 +1416,21 @@ class DorisAdapter(PlatformAdapter):
         except ImportError:
             return None
 
-    def validate_connection_health(self, connection: Any):
-        """Validate Doris connection health and capabilities."""
-        errors = []
-        warnings = []
-        connection_info = {}
-
-        try:
-            cursor = connection.cursor()
-
-            # Test basic query execution
-            cursor.execute("SELECT 1 as test_value")
-            result = cursor.fetchone()
-            if result[0] != 1:
-                errors.append("Basic query execution test failed")
-            else:
-                connection_info["basic_query_test"] = "passed"
-
-            platform_version, mysql_protocol_version, version_comment = _read_doris_version_details(cursor)
-            if platform_version:
-                connection_info["server_version"] = platform_version
-            else:
-                warnings.append("Could not query Doris version")
-            if mysql_protocol_version:
-                connection_info["mysql_protocol_version"] = mysql_protocol_version
-            if version_comment:
-                connection_info["version_comment"] = version_comment
-
-            # Check current database
-            try:
-                cursor.execute("SELECT database()")
-                db_result = cursor.fetchone()
-                if db_result:
-                    connection_info["current_database"] = db_result[0]
-            except Exception:
-                warnings.append("Could not query current database")
-
-            cursor.close()
-
-        except Exception as e:
-            errors.append(f"Connection health check failed: {str(e)}")
-
-        try:
-            from benchbox.core.validation import ValidationResult
-
-            return ValidationResult(
-                is_valid=len(errors) == 0,
-                errors=errors,
-                warnings=warnings,
-                details={
-                    "platform": self.platform_name,
-                    "connection_type": type(connection).__name__,
-                    **connection_info,
-                },
-            )
-        except ImportError:
-            return None
+    def _populate_connection_health_details(
+        self,
+        cursor: Any,
+        warnings: list[str],
+        connection_info: dict[str, Any],
+    ) -> None:
+        platform_version, mysql_protocol_version, version_comment = _read_doris_version_details(cursor)
+        if platform_version:
+            connection_info["server_version"] = platform_version
+        else:
+            warnings.append("Could not query Doris version")
+        if mysql_protocol_version:
+            connection_info["mysql_protocol_version"] = mysql_protocol_version
+        if version_comment:
+            connection_info["version_comment"] = version_comment
 
     def _validate_data_integrity(self, benchmark, connection, table_stats: dict) -> tuple:
         """Doris override: backtick-quote table names to preserve case and reserved words.
@@ -1948,22 +1467,7 @@ class DorisAdapter(PlatformAdapter):
             validation_details["integrity_error"] = str(e)
             return "FAILED", validation_details
 
-    def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if Doris supports a specific tuning type."""
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            supported = {
-                TuningType.PARTITIONING: True,  # PARTITION BY RANGE
-                TuningType.SORTING: True,  # Sort keys in Duplicate model
-                TuningType.DISTRIBUTION: True,  # DISTRIBUTED BY HASH
-                TuningType.CLUSTERING: False,  # No CLUSTER command
-                TuningType.PRIMARY_KEYS: True,  # Unique/Primary key models
-                TuningType.FOREIGN_KEYS: False,  # No FK enforcement
-            }
-            return supported.get(tuning_type, False)
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "SORTING", "DISTRIBUTION", "PRIMARY_KEYS")
 
 
 def _build_doris_config(
@@ -1972,58 +1476,22 @@ def _build_doris_config(
     overrides: dict[str, Any],
     info: Any,
 ) -> Any:
-    """Build Doris database configuration with credential loading.
-
-    Args:
-        platform: Platform name (should be 'doris')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded
-    """
-    # Intentionally inline - not using build_platform_config because env-var fallback and multi-port
-    # int coercion must happen at builder runtime for CLI/test parity. See the Group D TODO notes.
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
-
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("doris") or {}
-
-    # Priority: defaults < saved_creds < explicit_options < overrides
-    explicit_options = overrides.get("_explicit_platform_options", {})
-    merged_options: dict[str, Any] = {}
-    merged_options.update(options)
-    merged_options.update(saved_creds)
-    merged_options.update(explicit_options)
-    merged_options.update(overrides)
-
-    name = info.display_name if info else "Apache Doris"
-    driver_package = info.driver_package if info else "pymysql"
-
-    config_dict = {
-        "type": "doris",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields
-        "host": merged_options.get("host") or os.environ.get("DORIS_HOST", "localhost"),
-        "port": int(merged_options.get("port") or os.environ.get("DORIS_PORT", "9030")),
-        "http_port": int(merged_options.get("http_port") or os.environ.get("DORIS_HTTP_PORT", "8030")),
-        "be_http_port": int(merged_options.get("be_http_port") or os.environ.get("DORIS_BE_HTTP_PORT", "8040")),
-        "username": (
-            merged_options.get("username") or os.environ.get("DORIS_USER") or os.environ.get("DORIS_USERNAME", "root")
-        ),
-        "password": merged_options.get("password") or os.environ.get("DORIS_PASSWORD", ""),
-        "database": merged_options.get("database") or os.environ.get("DORIS_DATABASE"),
-        # Benchmark context
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    return DatabaseConfig(**config_dict)
+    return build_database_config(
+        platform=platform,
+        options=options,
+        overrides=overrides,
+        info=info,
+        default_name="Apache Doris",
+        default_driver_package="pymysql",
+        fields={
+            "host": lambda m: m.get("host") or os.environ.get("DORIS_HOST", "localhost"),
+            "port": lambda m: int(m.get("port") or os.environ.get("DORIS_PORT", "9030")),
+            "http_port": lambda m: int(m.get("http_port") or os.environ.get("DORIS_HTTP_PORT", "8030")),
+            "be_http_port": lambda m: int(m.get("be_http_port") or os.environ.get("DORIS_BE_HTTP_PORT", "8040")),
+            "username": lambda m: m.get("username")
+            or os.environ.get("DORIS_USER")
+            or os.environ.get("DORIS_USERNAME", "root"),
+            "password": lambda m: m.get("password") or os.environ.get("DORIS_PASSWORD", ""),
+            "database": lambda m: m.get("database") or os.environ.get("DORIS_DATABASE"),
+        },
+    )

@@ -19,11 +19,12 @@ from typing import Any
 from benchbox.core.benchmark_loader import (
     get_benchmark_instance,
 )
-from benchbox.core.benchmark_registry import validate_scale_factor
+from benchbox.core.benchmark_registry import get_benchmark_metadata, validate_scale_factor
 from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
 )
+from benchbox.core.results.driver_metadata import apply_driver_metadata
 from benchbox.core.results.models import (
     BenchmarkResults,
 )
@@ -58,6 +59,11 @@ from benchbox.platforms.base.runtime_metadata import (
 )
 from benchbox.platforms.dataframe.benchmark_mixin import DataFramePhases, DataFrameRunOptions
 from benchbox.utils.cloud_storage import create_path_handler
+from benchbox.utils.dialect_utils import (
+    SqlTranslationOutcome,
+    sql_translation_context,
+    summarize_sql_translation_outcomes,
+)
 from benchbox.utils.format_converters import ConversionOptions
 from benchbox.utils.printing import emit
 from benchbox.utils.verbosity import VerbosityMixin, VerbositySettings
@@ -107,18 +113,31 @@ def _resolve_manifest_allowed_names(benchmark: Any, config: BenchmarkConfig) -> 
 
 
 def _resolve_output_dir_handler(benchmark: Any, output_root: str | None) -> Any | None:
-    """Resolve and cache the benchmark output directory handler if available."""
+    """Resolve the benchmark output directory handler (compatibility shim).
 
-    if output_root:
-        handler = create_path_handler(output_root)
-        benchmark.output_dir = handler
-        return handler
+    The orchestrator resolves the final datagen root before construction and
+    injects it into the constructor (_resolve_construction_output_dir), so for
+    that path the benchmark already holds the right handler and no assignment
+    happens here. The shim remains for externally constructed instances and
+    callers that pass output_root directly (including cloud staging handlers,
+    which resolve only after platform config is known).
+    """
+    from pathlib import Path
 
     existing = getattr(benchmark, "output_dir", None)
-    if existing is None:
+    target = output_root if output_root else existing
+    if target is None:
         return None
 
-    handler = create_path_handler(existing)
+    handler = create_path_handler(target)
+    # Skip the redundant reassignment only for a plain local path already equal
+    # to the live one (the common case where the orchestrator injected the same
+    # managed root at construction). create_path_handler preserves cloud handler
+    # types that are not pathlib.Path subclasses (DatabricksPath, cloudpathlib
+    # CloudPath); their __eq__ to a plain Path ignores the cloud/dbfs target, so
+    # an equality-only skip would silently drop it — always assign those.
+    if isinstance(handler, Path) and handler == existing:
+        return handler
     benchmark.output_dir = handler
     return handler
 
@@ -177,12 +196,7 @@ def _run_postload_validation(
     from benchbox.core.validation import DatabaseValidationEngine, ValidationResult
 
     if not hasattr(adapter, "create_connection") or not hasattr(adapter, "close_connection"):
-        return ValidationResult(
-            is_valid=False,
-            errors=["Platform adapter does not support connection-based validation"],
-            warnings=[],
-            details={"benchmark": benchmark_config.name},
-        )
+        return None
 
     connection = None
     try:
@@ -211,7 +225,8 @@ def _finalize_validation_metadata(
 
     if not records:
         current_status = (result.validation_status or "UNKNOWN").upper()
-        if current_status in {"", "UNKNOWN", None}:
+        has_validation_evidence = bool(result.validation_details)
+        if current_status in {"", "UNKNOWN", None} or (current_status == "PASSED" and not has_validation_evidence):
             result.validation_status = "NOT_RUN"
         result.validation_details = result.validation_details or {}
         result.validation_details.setdefault("stages", [])
@@ -261,43 +276,59 @@ def _finalize_validation_metadata(
     return result
 
 
-_DRIVER_STR_FIELDS = [
-    "driver_package",
-    "driver_version_requested",
-    "driver_version_resolved",
-    "driver_version_actual",
-    "driver_runtime_strategy",
-    "driver_runtime_path",
-    "driver_runtime_python_executable",
-]
-
-# Config attribute names differ from local field names for a few fields.
-_CONFIG_FIELD_MAP: dict[str, str] = {
-    "driver_version_requested": "driver_version",
-    "driver_auto_install_used": "driver_auto_install",
-}
-
-# execution_metadata fields that use setdefault (preserve existing); others overwrite.
-_EXEC_META_SETDEFAULT = {"driver_package", "driver_version_requested", "driver_auto_install_used"}
+def _coerce_bool_option(value: Any) -> bool:
+    """Coerce CLI/config option values into booleans."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on", "strict"}
+    return bool(value)
 
 
-def _apply_driver_meta_to_dicts(meta: dict[str, Any], result: BenchmarkResults) -> None:
-    """Push resolved driver metadata into execution_metadata and platform_info dicts."""
-    execution_metadata = result.execution_metadata if isinstance(result.execution_metadata, dict) else None
-    if execution_metadata is not None:
-        for field in _DRIVER_STR_FIELDS + ["driver_auto_install_used"]:
-            value = meta[field]
-            if value or field == "driver_auto_install_used":
-                if field in _EXEC_META_SETDEFAULT:
-                    execution_metadata.setdefault(field, value)
-                else:
-                    execution_metadata[field] = value
+def _resolve_strict_translation_mode(options: Mapping[str, Any]) -> bool:
+    """Resolve strict SQL translation mode from benchmark or platform options."""
+    for key in ("strict_translation", "translation_strict", "sql_translation_strict"):
+        if key in options:
+            return _coerce_bool_option(options[key])
 
-    platform_info = result.platform_info if isinstance(result.platform_info, dict) else None
-    if platform_info is not None:
-        for field in _DRIVER_STR_FIELDS:
-            if meta[field]:
-                platform_info.setdefault(field, meta[field])
+    platform_options = options.get("platform_options")
+    if isinstance(platform_options, Mapping):
+        for key in ("strict_translation", "translation_strict", "sql_translation_strict"):
+            if key in platform_options:
+                return _coerce_bool_option(platform_options[key])
+
+    benchmark_options = options.get("benchmark_options")
+    if isinstance(benchmark_options, Mapping):
+        for key in ("strict_translation", "translation_strict", "sql_translation_strict"):
+            if key in benchmark_options:
+                return _coerce_bool_option(benchmark_options[key])
+
+    return False
+
+
+def _attach_translation_metadata(
+    result: BenchmarkResults,
+    outcomes: list[SqlTranslationOutcome],
+    *,
+    strict_mode: bool,
+) -> BenchmarkResults:
+    """Attach SQL translation outcome metadata and mark fallback results uncertain."""
+    summary = summarize_sql_translation_outcomes(outcomes, strict_mode=strict_mode)
+    if not summary:
+        return result
+
+    if not isinstance(result.execution_metadata, dict):
+        result.execution_metadata = {}
+    result.execution_metadata["translation"] = summary
+
+    if summary.get("status") in {"fallback", "failed"} and (result.validation_status or "").upper() == "PASSED":
+        result.validation_status = "UNCERTAIN"
+        result.validation_details = result.validation_details or {}
+        warnings = result.validation_details.setdefault("warnings", [])
+        if isinstance(warnings, list):
+            warnings.append("SQL translation fell back to source SQL; result correctness is uncertain.")
+
+    return result
 
 
 def _enrich_driver_runtime_metadata(
@@ -306,44 +337,8 @@ def _enrich_driver_runtime_metadata(
     adapter: Any | None,
     database_config: DatabaseConfig | None,
 ) -> BenchmarkResults:
-    """Attach resolved driver runtime metadata to result objects.
-
-    Lifecycle runs can return BenchmarkResults built through benchmark helpers
-    that normalize ``platform_info`` and drop custom top-level fields. Persist
-    driver metadata explicitly on result and execution metadata to keep exports
-    consistent across all adapters.
-    """
-    meta: dict[str, Any] = dict.fromkeys(_DRIVER_STR_FIELDS)
-    meta["driver_auto_install_used"] = False
-
-    if adapter is not None:
-        for field in _DRIVER_STR_FIELDS:
-            meta[field] = getattr(adapter, field, None) or meta[field]
-        meta["driver_auto_install_used"] = getattr(adapter, "driver_auto_install_used", False)
-
-    if database_config is not None:
-        for field in _DRIVER_STR_FIELDS:
-            if not meta[field]:
-                config_attr = _CONFIG_FIELD_MAP.get(field, field)
-                meta[field] = getattr(database_config, config_attr, None)
-        # driver_version_resolved also falls back to driver_version
-        if not meta["driver_version_resolved"]:
-            meta["driver_version_resolved"] = database_config.driver_version
-        if not meta["driver_auto_install_used"]:
-            meta["driver_auto_install_used"] = database_config.driver_auto_install
-
-        resolved = meta["driver_version_resolved"]
-        if resolved and database_config.driver_version_resolved != resolved:
-            database_config.driver_version_resolved = resolved
-
-    # Apply to result object
-    for field in _DRIVER_STR_FIELDS:
-        setattr(result, field, meta[field])
-    result.driver_auto_install = meta["driver_auto_install_used"]
-
-    # Apply to execution_metadata and platform_info dicts
-    _apply_driver_meta_to_dicts(meta, result)
-
+    """Attach resolved driver runtime metadata to result objects."""
+    apply_driver_metadata(result, database_config=database_config, platform_adapter=adapter)
     return result
 
 
@@ -396,6 +391,7 @@ def _execute_load_only_mode(
     platform_config: dict[str, Any] | None,
     validation_opts: ValidationOptions,
     table_mode: str = "native",
+    gather_statistics: bool = False,
 ) -> tuple[BenchmarkResults, ValidationResult | None]:
     """Execute load-only workflow using the core runner primitives."""
 
@@ -462,6 +458,38 @@ def _execute_load_only_mode(
             },
         }
 
+        statistics_time_seconds = 0.0
+        run_statistics_phase = getattr(adapter, "run_statistics_phase", None)
+        if gather_statistics and callable(run_statistics_phase):
+            statistics_phase = run_statistics_phase(
+                benchmark,
+                connection,
+                benchmark_name=benchmark_config.name,
+                table_names=sorted(table_stats) if table_stats else None,
+                reset=getattr(benchmark_config, "stats_reset", None),
+                collect_per_table_timing=bool(getattr(benchmark_config, "stats_per_table_timing", False)),
+            )
+            if statistics_phase is not None:
+                phases["statistics"] = {
+                    "status": statistics_phase.status,
+                    "duration_ms": statistics_phase.duration_ms,
+                    "stats_mode": statistics_phase.stats_mode,
+                    "tables_analyzed": statistics_phase.tables_analyzed,
+                }
+                # Opt-in reset/persist marker and per-table breakdown: both
+                # additive/omitted-when-empty so unmodified load-only runs
+                # stay byte-identical to the PR #980 payload.
+                if statistics_phase.stats_lifecycle:
+                    phases["statistics"]["stats_lifecycle"] = statistics_phase.stats_lifecycle
+                if statistics_phase.per_table_ms:
+                    phases["statistics"]["per_table_ms"] = statistics_phase.per_table_ms
+                # Fold the phase's own wall-clock into the load-only result's
+                # duration_seconds so it isn't underreported relative to the
+                # emitted phases.statistics.duration_ms (ANALYZE can be
+                # substantial; omitting it here would disagree with the phase
+                # block for exactly the runs this feature enables).
+                statistics_time_seconds = (statistics_phase.duration_ms or 0) / 1000.0
+
         # Calculate total rows and data size
         total_rows = sum(table_stats.values()) if table_stats else 0
         # Try to calculate data size from benchmark output_dir if available
@@ -475,7 +503,7 @@ def _execute_load_only_mode(
         result_obj = benchmark.create_enhanced_benchmark_result(
             platform=getattr(adapter, "platform_name", "load_only"),
             query_results=[],
-            duration_seconds=schema_time + load_time,
+            duration_seconds=schema_time + load_time + statistics_time_seconds,
             phases=phases,
             execution_metadata={"mode": "load_only"},
             schema_creation_time=schema_time,
@@ -607,6 +635,9 @@ class LifecyclePhases:
     generate: bool = True
     load: bool = True
     execute: bool = True
+    # Opt-in statistics phase between load and query (off by default so
+    # legacy benchmarks keep load-includes-stats semantics).
+    statistics: bool = False
 
 
 @dataclass
@@ -672,6 +703,7 @@ def _build_run_config_from_options(
     verbosity_settings: VerbositySettings,
     test_type: str,
     table_format: str | None,
+    gather_statistics: bool = False,
 ) -> RunConfig:
     """Assemble the RunConfig passed to SQL adapters."""
     iterations = int(
@@ -710,7 +742,12 @@ def _build_run_config_from_options(
         warm_up_iterations=max(0, warmups),
         power_fail_fast=bool(options.get("power_fail_fast", False)),
         capture_plans=benchmark_config.capture_plans,
+        analyze_plans=getattr(benchmark_config, "analyze_plans", None),
         strict_plan_capture=benchmark_config.strict_plan_capture,
+        normalize_plan_literals=bool(options.get("normalize_plan_literals", False)),
+        gather_statistics=gather_statistics,
+        stats_reset=getattr(benchmark_config, "stats_reset", None),
+        stats_per_table_timing=bool(getattr(benchmark_config, "stats_per_table_timing", False)),
         table_format=table_format,
         table_format_compression=str(options.get("table_format_compression", "snappy") or "snappy"),
         table_format_partition_cols=_parse_partition_cols(options.get("table_format_partition_cols")),
@@ -889,6 +926,7 @@ def _run_load_only_mode(
     output_root: str | None,
     is_dataframe_adapter: bool,
     validation_records: list[tuple[str, ValidationResult]],
+    gather_statistics: bool = False,
 ) -> BenchmarkResults:
     """Execute the load-only branch for DataFrame or SQL adapters and record postload results."""
     if adapter is None:
@@ -929,6 +967,7 @@ def _run_load_only_mode(
         platform_config=platform_config,
         validation_opts=validation_opts,
         table_mode=table_mode,
+        gather_statistics=gather_statistics,
     )
     if postload_result is not None:
         validation_records.append(("post_load", postload_result))
@@ -985,7 +1024,10 @@ def _configure_lifecycle_adapter(
     if adapter is not None and hasattr(adapter, "table_mode"):
         adapter.table_mode = table_mode
 
-    is_dataframe_adapter = hasattr(adapter, "family") and adapter.family in ("expression", "pandas")
+    is_dataframe_adapter = getattr(adapter, "is_dataframe_adapter", False) is True
+    if not is_dataframe_adapter and adapter is not None:
+        family = getattr(adapter, "family", None)
+        is_dataframe_adapter = isinstance(family, str) and callable(getattr(adapter, "run_benchmark", None))
     return adapter, is_dataframe_adapter
 
 
@@ -1097,8 +1139,10 @@ def run_benchmark_lifecycle(
 
     options_map = getattr(benchmark_config, "options", {}) or {}
     verbosity_settings = _resolve_verbosity_settings(verbosity, options_map)
+    strict_translation = _resolve_strict_translation_mode(options_map)
 
-    validate_scale_factor(benchmark_config.name, benchmark_config.scale_factor)
+    if benchmark_instance is None or get_benchmark_metadata(benchmark_config.name) is not None:
+        validate_scale_factor(benchmark_config.name, benchmark_config.scale_factor)
     benchmark = benchmark_instance or get_benchmark_instance(benchmark_config, system_profile)
     if isinstance(benchmark, VerbosityMixin):  # type: ignore[arg-type]
         benchmark.apply_verbosity(verbosity_settings)
@@ -1148,21 +1192,23 @@ def run_benchmark_lifecycle(
     should_run_load_only = test_type == "load_only" or (phases.load and not phases.execute and adapter is not None)
 
     if should_run_load_only:
-        result_obj = _run_load_only_mode(
-            benchmark=benchmark,
-            benchmark_config=benchmark_config,
-            system_profile=system_profile,
-            adapter=adapter,
-            platform_config=platform_config,
-            validation_opts=validation_opts,
-            table_mode=table_mode,
-            options=options,
-            verbosity_settings=verbosity_settings,
-            monitor=monitor,
-            output_root=output_root,
-            is_dataframe_adapter=is_dataframe_adapter,
-            validation_records=validation_records,
-        )
+        with sql_translation_context(strict=strict_translation) as translation_outcomes:
+            result_obj = _run_load_only_mode(
+                benchmark=benchmark,
+                benchmark_config=benchmark_config,
+                system_profile=system_profile,
+                adapter=adapter,
+                platform_config=platform_config,
+                validation_opts=validation_opts,
+                table_mode=table_mode,
+                options=options,
+                verbosity_settings=verbosity_settings,
+                monitor=monitor,
+                output_root=output_root,
+                is_dataframe_adapter=is_dataframe_adapter,
+                validation_records=validation_records,
+                gather_statistics=phases.statistics,
+            )
         result_obj = _finalize_validation_metadata(result_obj, validation_records)
         result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
         result_obj = _enrich_normalized_runtime_metadata(
@@ -1172,7 +1218,7 @@ def run_benchmark_lifecycle(
         )
         if execution_context is not None:
             result_obj.execution_context = execution_context.model_dump()
-        return result_obj
+        return _attach_translation_metadata(result_obj, translation_outcomes, strict_mode=strict_translation)
 
     if adapter is None or (not phases.execute and not phases.load):
         return _build_setup_only_result(
@@ -1196,28 +1242,30 @@ def run_benchmark_lifecycle(
         verbosity_settings=verbosity_settings,
         test_type=test_type,
         table_format=table_format,
+        gather_statistics=phases.statistics,
     )
 
-    result_obj = _execute_via_adapter(
-        adapter=adapter,
-        benchmark=benchmark,
-        benchmark_config=benchmark_config,
-        system_profile=system_profile,
-        run_config=run_config,
-        options=options,
-        phases=phases,
-        verbosity_settings=verbosity_settings,
-        monitor=monitor,
-        output_root=output_root,
-        is_dataframe_adapter=is_dataframe_adapter,
-    )
+    with sql_translation_context(strict=strict_translation) as translation_outcomes:
+        result_obj = _execute_via_adapter(
+            adapter=adapter,
+            benchmark=benchmark,
+            benchmark_config=benchmark_config,
+            system_profile=system_profile,
+            run_config=run_config,
+            options=options,
+            phases=phases,
+            verbosity_settings=verbosity_settings,
+            monitor=monitor,
+            output_root=output_root,
+            is_dataframe_adapter=is_dataframe_adapter,
+        )
 
     if validation_opts.enable_postload_validation and not is_dataframe_adapter:
         postload_result = _run_postload_validation(adapter, benchmark_config, platform_config)
         if postload_result is not None:
             validation_records.append(("post_load", postload_result))
 
-    return _finalize_lifecycle_result(
+    finalized = _finalize_lifecycle_result(
         result_obj,
         validation_records,
         adapter=adapter,
@@ -1227,6 +1275,7 @@ def run_benchmark_lifecycle(
         resource_monitor=resource_monitor,
         execution_context=execution_context,
     )
+    return _attach_translation_metadata(finalized, translation_outcomes, strict_mode=strict_translation)
 
 
 def _flatten_manifest_v2_entries(table_formats: Any, preferred_formats: list[str] | None = None) -> list[Any]:

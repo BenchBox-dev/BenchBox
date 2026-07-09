@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
+logger = logging.getLogger(__name__)
 
-def get_query_plan_from_cursor(connection: Any, query: str) -> str:
+
+def get_query_plan_from_cursor(connection: Any, query: str) -> str | None:
     """Get query execution plan via EXPLAIN on a DBAPI connection.
 
     Shared implementation for platforms that use the standard
@@ -19,7 +22,15 @@ def get_query_plan_from_cursor(connection: Any, query: str) -> str:
         query: SQL query to explain.
 
     Returns:
-        Newline-joined plan rows, or an error message on failure.
+        Newline-joined plan rows, or ``None`` on failure.
+
+    On failure this returns ``None`` and logs the exception, rather than
+    returning the error text AS the plan (qpc-05 / F4.2). Encoding the error in
+    the data channel was actively harmful: the display path printed
+    ``"Could not get query plan: ..."`` as if it were a plan, and the capture
+    path (``capture_query_plan``) would hand that error string to the platform
+    parser as though it were EXPLAIN output. A ``None`` return is treated as a
+    clean capture failure by callers and simply skips best-effort display.
     """
     cursor = connection.cursor()
     try:
@@ -27,7 +38,8 @@ def get_query_plan_from_cursor(connection: Any, query: str) -> str:
         plan_rows = cursor.fetchall()
         return "\n".join([str(row[0]) for row in plan_rows])
     except Exception as e:
-        return f"Could not get query plan: {e}"
+        logger.warning("Could not get query plan via EXPLAIN: %s", e)
+        return None
     finally:
         cursor.close()
 
@@ -73,12 +85,19 @@ def execute_sql_query(
                 stream_id=stream_id,
             )
 
+        # Gate-only value oracle: digest the FULL result set (behind
+        # BENCHBOX_EMIT_RESULT_DIGEST, stream 0 only). Absent on a normal run.
+        from benchbox.core.results.result_digest import compute_result_digest, result_digest_enabled
+
+        result_digest = compute_result_digest(results) if result_digest_enabled() and stream_id in (None, 0) else None
+
         return build_query_result_with_validation(
             query_id=query_id,
             execution_time=execution_time,
             actual_row_count=actual_row_count,
             first_row=results[0] if results else None,
             validation_result=validation_result,
+            result_digest=result_digest,
         )
 
     except Exception as exc:

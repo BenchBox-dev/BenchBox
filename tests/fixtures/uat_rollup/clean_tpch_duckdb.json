@@ -16,6 +16,7 @@
     "version": "1.4.3"
   },
   "summary": {
+    "validation": "passed",
     "queries": {"total": 2, "passed": 2, "failed": 0}
   },
   "queries": [

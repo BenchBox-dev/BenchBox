@@ -13,35 +13,14 @@ enforcement only; transformer_id is not resolved at runtime.
 
 from __future__ import annotations
 
-from benchbox.sql_compat.actions import CompatAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.decision import (
-    CompatibilityDecision,
-    FailureMode,
-    RewriteDDLPayload,
-    SupportLevel,
-)
-from benchbox.sql_compat.registry import REGISTRY
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.presto.all.optimize_table_definition",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.SYNTAX_ERROR,
-        payload=RewriteDDLPayload(
-            transformer_id="presto_ddl_optimizer",
-            description=(
-                "Adjust CREATE TABLE DDL for Presto connector: strip PRIMARY KEY constraints, "
-                "strip WITH/NOT NULL for memory catalog, add WITH (format = 'PARQUET') for Hive connector"
-            ),
-            governance_only=True,
-        ),
-        reason=(
-            "Presto rejects PRIMARY KEY constraints in benchmark DDL; memory catalog rejects WITH properties "
-            "and NOT NULL constraints; Hive connector requires explicit format declaration for table creation."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "presto",
+register_ddl_rewrite(
+    platform="presto",
+    rule_name="optimize_table_definition",
+    transformer_id="presto_ddl_optimizer",
+    description="Adjust CREATE TABLE DDL for Presto connector: strip PRIMARY KEY constraints, "
+    "strip WITH/NOT NULL for memory catalog, add WITH (format = 'PARQUET') for Hive connector",
+    reason="Presto rejects PRIMARY KEY constraints in benchmark DDL; memory catalog rejects WITH properties "
+    "and NOT NULL constraints; Hive connector requires explicit format declaration for table creation.",
 )

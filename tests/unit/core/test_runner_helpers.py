@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from benchbox.core.results.driver_metadata import apply_driver_metadata
 from benchbox.core.runner.runner import (
     ValidationOptions,
     _emit_manifest_reuse_message,
@@ -72,7 +73,74 @@ class TestResolveManifestAllowedNames:
         assert "Unexpected alias type" in caplog.text
 
 
+class _OutputDirTrackingBenchmark:
+    """Stub recording how many times output_dir is assigned post-construction."""
+
+    def __init__(self, value):
+        self._output_dir = value
+        self.set_count = 0
+
+    @property
+    def output_dir(self):
+        return self._output_dir
+
+    @output_dir.setter
+    def output_dir(self, value):
+        self._output_dir = value
+        self.set_count += 1
+
+
 class TestOutputDirResolution:
+    def test_resolve_output_dir_handler_skips_reassignment_when_already_resolved(self):
+        benchmark = _OutputDirTrackingBenchmark(Path("/tmp/resolved"))
+
+        result = _resolve_output_dir_handler(benchmark, "/tmp/resolved")
+
+        assert result == Path("/tmp/resolved")
+        assert benchmark.set_count == 0
+
+    def test_resolve_output_dir_handler_assigns_when_root_differs(self):
+        benchmark = _OutputDirTrackingBenchmark(Path("/tmp/original"))
+
+        result = _resolve_output_dir_handler(benchmark, "/tmp/override")
+
+        assert result == Path("/tmp/override")
+        assert benchmark.output_dir == Path("/tmp/override")
+        assert benchmark.set_count == 1
+
+    def test_resolve_output_dir_handler_normalizes_existing_string(self):
+        benchmark = _OutputDirTrackingBenchmark("/tmp/existing")
+
+        result = _resolve_output_dir_handler(benchmark, None)
+
+        assert result == Path("/tmp/existing")
+        assert benchmark.output_dir == Path("/tmp/existing")
+        assert benchmark.set_count == 1
+
+    def test_resolve_output_dir_handler_assigns_databricks_handler_with_matching_local_cache(self):
+        """A DatabricksPath handler must be assigned even when its local cache
+        path equals the benchmark's existing local default.
+
+        ``create_path_handler`` preserves a DatabricksPath by identity, and its
+        ``__eq__`` compares only the local path (ignoring ``dbfs_target``). An
+        equality-only skip would therefore drop the dbfs target, leaving the
+        benchmark on a plain local path and never uploading to dbfs. The handler
+        must always reach the benchmark.
+        """
+        from benchbox.utils.cloud_storage import DatabricksPath
+
+        local_cache = Path("/tmp/datagen/tpch_sf1")
+        benchmark = _OutputDirTrackingBenchmark(local_cache)
+        handler = DatabricksPath(str(local_cache), "dbfs:/Volumes/cat/schema/vol")
+        assert handler == local_cache  # equal by local path alone
+
+        result = _resolve_output_dir_handler(benchmark, handler)
+
+        assert result is handler
+        assert benchmark.output_dir is handler
+        assert benchmark.output_dir.dbfs_target == "dbfs:/Volumes/cat/schema/vol"
+        assert benchmark.set_count == 1
+
     def test_resolve_output_dir_handler_prefers_output_root(self):
         benchmark = SimpleNamespace(output_dir=Path("/tmp/original"))
 
@@ -145,10 +213,7 @@ class TestValidationHelpers:
         config = _benchmark_config("tpch")
 
         assert _run_postload_validation(None, config, {}) is None
-
-        invalid = _run_postload_validation(SimpleNamespace(), config, {})
-        assert invalid is not None and invalid.is_valid is False
-        assert invalid.errors == ["Platform adapter does not support connection-based validation"]
+        assert _run_postload_validation(SimpleNamespace(), config, {}) is None
 
         connection = object()
         adapter = SimpleNamespace(create_connection=Mock(return_value=connection), close_connection=Mock())
@@ -163,6 +228,19 @@ class TestValidationHelpers:
         adapter.create_connection.assert_called_once_with(database="bench")
         adapter.close_connection.assert_called_once_with(connection)
         mock_validate.assert_called_once_with(connection, "tpch", 0.01)
+
+    def test_run_postload_validation_failure_after_attempt_returns_invalid(self):
+        config = _benchmark_config("tpch")
+        adapter = SimpleNamespace(
+            create_connection=Mock(side_effect=RuntimeError("connect failed")), close_connection=Mock()
+        )
+
+        result = _run_postload_validation(adapter, config, {})
+
+        assert result is not None
+        assert result.is_valid is False
+        assert result.errors == ["Post-load validation failed: connect failed"]
+        adapter.close_connection.assert_not_called()
 
     def test_finalize_validation_metadata_handles_empty_and_aggregated_records(self):
         result = make_benchmark_results(validation_status="UNKNOWN", validation_details=None)
@@ -190,10 +268,43 @@ class TestValidationHelpers:
 
 
 class TestDriverMetadataHelpers:
+    def test_runner_driver_metadata_matches_shared_helper_output(self):
+        adapter = SimpleNamespace(
+            driver_package="duckdb",
+            driver_version_requested="1.1.0",
+            driver_version_resolved="1.1.0",
+            driver_version_actual="1.1.1",
+            driver_runtime_strategy="bundled",
+            driver_runtime_path="/tmp/driver",
+            driver_runtime_python_executable="/usr/bin/python",
+            driver_auto_install_used=True,
+        )
+        database_config = DatabaseConfig(type="duckdb", name="bench", driver_version="1.1.2", driver_auto_install=False)
+        runner_result = make_benchmark_results(execution_metadata={}, platform_info={})
+        shared_result = make_benchmark_results(execution_metadata={}, platform_info={})
+
+        _enrich_driver_runtime_metadata(runner_result, adapter=adapter, database_config=database_config)
+        apply_driver_metadata(shared_result, database_config=database_config, platform_adapter=adapter)
+
+        fields = [
+            "driver_package",
+            "driver_version_requested",
+            "driver_version_resolved",
+            "driver_version_actual",
+            "driver_runtime_strategy",
+            "driver_runtime_path",
+            "driver_runtime_python_executable",
+            "driver_auto_install",
+        ]
+        for field in fields:
+            assert getattr(runner_result, field) == getattr(shared_result, field)
+        assert runner_result.execution_metadata == shared_result.execution_metadata
+        assert runner_result.platform_info == shared_result.platform_info
+
     def test_enrich_driver_runtime_metadata_populates_result_and_dicts(self):
         result = make_benchmark_results(
             execution_metadata={"driver_package": "preserve-me"},
-            platform_info={"platform_name": "duckdb"},
+            platform_info={"platform_name": "duckdb", "driver_runtime_path": "preserve-path"},
         )
         adapter = SimpleNamespace(
             driver_package="duckdb",
@@ -221,6 +332,8 @@ class TestDriverMetadataHelpers:
         assert enriched.execution_metadata["driver_version_resolved"] == "1.1.2"
         assert enriched.execution_metadata["driver_auto_install_used"] is True
         assert enriched.platform_info["driver_package"] == "duckdb"
+        assert enriched.platform_info["driver_runtime_path"] == "preserve-path"
+        assert enriched.platform_info["driver_version_resolved"] == "1.1.2"
         assert database_config.driver_version_resolved == "1.1.2"
 
 

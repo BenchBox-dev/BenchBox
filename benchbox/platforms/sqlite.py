@@ -115,6 +115,7 @@ class SQLiteAdapter(PlatformAdapter):
     """SQLite platform adapter for testing and lightweight usage."""
 
     driver_isolation_capability = DriverIsolationCapability.NOT_APPLICABLE
+    plan_capture_phase_eligible = True
 
     @property
     def platform_name(self) -> str:
@@ -475,6 +476,29 @@ class SQLiteAdapter(PlatformAdapter):
             # OLTP optimizations
             connection.execute("PRAGMA synchronous = FULL")
 
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get SQLite query execution plan using EXPLAIN QUERY PLAN.
+
+        Reconstructs the tree-formatted text that SQLiteQueryPlanParser expects
+        from the raw (id, parent, notused, detail) rows SQLite returns.
+        """
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"EXPLAIN QUERY PLAN {query}")
+            rows = cursor.fetchall()
+            return _format_sqlite_query_plan(rows) if rows else None
+        except Exception as e:
+            self.logger.debug(f"Failed to get SQLite query plan: {e}")
+            return None
+        finally:
+            cursor.close()
+
+    def get_query_plan_parser(self):
+        """Get SQLite query plan parser."""
+        from benchbox.core.query_plans.parsers.sqlite import SQLiteQueryPlanParser
+
+        return SQLiteQueryPlanParser()
+
     def execute_query(
         self,
         connection: Any,
@@ -490,7 +514,11 @@ class SQLiteAdapter(PlatformAdapter):
         self.log_verbose(f"Executing query {query_id}")
         self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
+        cursor = None
         try:
+            # Acquire the cursor inside the try: a broken/closed connection raises here,
+            # and that setup failure must be recorded as a FAILED query result (below)
+            # rather than aborting the whole benchmark run.
             cursor = connection.cursor()
             cursor.execute(query)
             results = cursor.fetchall()
@@ -534,7 +562,6 @@ class SQLiteAdapter(PlatformAdapter):
             )
             # Include full results for SQLite compatibility
             result["results"] = results
-            return result
 
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
@@ -545,6 +572,24 @@ class SQLiteAdapter(PlatformAdapter):
                 "rows_returned": 0,
                 "error": str(e),
             }
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+        # Display plan in console when --show-query-plans is active.
+        # Skip here when --capture-plans is also active: capture_query_plan below
+        # already calls get_query_plan (running EXPLAIN); calling
+        # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
+        if not self.capture_plans:
+            self.display_query_plan_if_enabled(connection, query, query_id)
+
+        # Capture and merge structured query plan (SUCCESS-guarded in the helper).
+        # Deliberately outside the try: with strict_plan_capture=True a capture
+        # failure raises PlanCaptureError, which must propagate instead of being
+        # swallowed by the broad except and mislabeling the successful query FAILED.
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
+
+        return result
 
     def run_power_test(self, benchmark, **kwargs) -> dict[str, Any]:
         """Run TPC power test (not implemented for SQLite)."""
@@ -557,6 +602,41 @@ class SQLiteAdapter(PlatformAdapter):
     def run_maintenance_test(self, benchmark, **kwargs) -> dict[str, Any]:
         """Run TPC maintenance test (not implemented for SQLite)."""
         raise NotImplementedError("Maintenance test not implemented for SQLite adapter")
+
+
+def _format_sqlite_query_plan(rows: list) -> str | None:
+    """Format SQLite EXPLAIN QUERY PLAN rows into tree text for SQLiteQueryPlanParser.
+
+    SQLite returns rows of (id, parent, notused, detail). Reconstructs the
+    indented "|--" / "`--" tree format that SQLiteQueryPlanParser expects.
+    """
+    if not rows:
+        return None
+    node_text: dict[int, str] = {}
+    children: dict[int, list[int]] = {}
+    for row in rows:
+        node_id, parent_id, _unused, detail = int(row[0]), int(row[1]), row[2], str(row[3])
+        node_text[node_id] = detail
+        children.setdefault(parent_id, []).append(node_id)
+
+    roots = children.get(0, [])
+    if not roots:
+        return None
+
+    lines = ["QUERY PLAN"]
+
+    def _emit(node_id: int, prefix: str, is_last: bool) -> None:
+        marker = "`--" if is_last else "|--"
+        lines.append(f"{prefix}{marker}{node_text[node_id]}")
+        child_ids = children.get(node_id, [])
+        ext = "   " if is_last else "|  "
+        for i, cid in enumerate(child_ids):
+            _emit(cid, prefix + ext, i == len(child_ids) - 1)
+
+    for i, rid in enumerate(roots):
+        _emit(rid, "", i == len(roots) - 1)
+
+    return "\n".join(lines)
 
 
 def _is_tpch_benchmark(benchmark: Any) -> bool:

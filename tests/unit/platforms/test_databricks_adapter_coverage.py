@@ -689,19 +689,35 @@ class TestResolveClusteringStrategy:
             result = adapter._resolve_databricks_clustering_strategy()
         assert result == "liquid_clustering"
 
-    def test_liquid_overrides_z_order_enabled(self):
-        """Liquid clustering takes precedence over z_ordering_enabled flag."""
+    def test_liquid_rejects_z_order_enabled(self):
+        """Liquid clustering rejects contradictory z_ordering_enabled flag."""
         adapter = _make_adapter()
         platform_opts = MagicMock()
         platform_opts.databricks_clustering_strategy = "z_order"
         platform_opts.liquid_clustering_enabled = True
         platform_opts.liquid_clustering_columns = []
-        platform_opts.z_ordering_enabled = True  # Both enabled - liquid wins
+        platform_opts.z_ordering_enabled = True
+        effective_config = MagicMock()
+        effective_config.platform_optimizations = platform_opts
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=effective_config),
+            pytest.raises(ValueError, match="Liquid Clustering cannot be combined"),
+        ):
+            adapter._resolve_databricks_clustering_strategy()
+
+    def test_liquid_auto_strategy_returns_liquid_auto(self):
+        adapter = _make_adapter()
+        platform_opts = MagicMock()
+        platform_opts.databricks_clustering_strategy = "liquid_clustering_auto"
+        platform_opts.liquid_clustering_enabled = True
+        platform_opts.liquid_clustering_columns = []
+        platform_opts.z_ordering_enabled = False
+        platform_opts.z_ordering_columns = []
         effective_config = MagicMock()
         effective_config.platform_optimizations = platform_opts
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=effective_config):
             result = adapter._resolve_databricks_clustering_strategy()
-        assert result == "liquid_clustering"
+        assert result == "liquid_clustering_auto"
 
     def test_strategy_none_returns_none(self):
         adapter = _make_adapter()

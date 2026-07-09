@@ -947,6 +947,48 @@ class TestExpressionOrderBy:
         # Limit is 1000, we have 10 rows
         assert len(result) == 10
 
+    def test_orderby_shortstrings_distinct_precedes_sort(self):
+        """DISTINCT must run before ORDER BY for expression-family generated queries."""
+        from benchbox.core.read_primitives.dataframe_queries import get_dataframe_queries
+
+        class TrackingFrame:
+            def __init__(self):
+                self.calls = []
+
+            def select(self, *cols):
+                self.calls.append(("select", cols))
+                return self
+
+            def unique(self):
+                self.calls.append(("unique",))
+                return self
+
+            def sort(self, by, descending=False):
+                self.calls.append(("sort", by, descending))
+                return self
+
+            def limit(self, n):
+                self.calls.append(("limit", n))
+                return self
+
+        class TrackingContext:
+            def __init__(self):
+                self.frame = TrackingFrame()
+
+            def get_table(self, name):
+                assert name == "lineitem"
+                return self.frame
+
+        ctx = TrackingContext()
+        query = get_dataframe_queries().get("orderby_shortstrings")
+
+        assert query.expression_impl(ctx) is ctx.frame
+        assert ctx.frame.calls == [
+            ("select", ("l_returnflag", "l_linestatus")),
+            ("unique",),
+            ("sort", ["l_returnflag", "l_linestatus"], False),
+        ]
+
 
 # =============================================================================
 # Expression-Family (Polars) Execution Tests - Window Functions
@@ -969,11 +1011,15 @@ class TestExpressionWindow:
         return _to_pandas(query.expression_impl(self.ctx))
 
     def test_window_row_number(self):
-        """ROW_NUMBER() OVER (PARTITION BY l_orderkey ORDER BY l_extendedprice DESC)."""
+        """ROW_NUMBER() OVER (PARTITION BY o_custkey ORDER BY o_totalprice DESC) as order_rank."""
         result = self._execute("window_row_number")
-        assert "row_num" in result.columns
-        # All row_nums should be <= 3
-        assert result["row_num"].max() <= 3
+        assert "order_rank" in result.columns
+        # ROW_NUMBER per o_custkey partition: every partition starts at 1 and its
+        # ranks form a contiguous 1..n sequence.
+        assert result["order_rank"].min() == 1
+        for _, group in result.groupby("o_custkey"):
+            ranks = sorted(int(rank) for rank in group["order_rank"].tolist())
+            assert ranks == list(range(1, len(ranks) + 1))
 
     def test_window_rank(self):
         """RANK() OVER (PARTITION BY l_returnflag ORDER BY l_quantity DESC)."""

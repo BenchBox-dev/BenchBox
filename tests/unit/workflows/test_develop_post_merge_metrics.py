@@ -23,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 RED_AT_JQ = r"""
 if $post_merge_red == "true" then
   ([($jobs.jobs // [])[] |
-    select((.name == "lint" or .name == "fast-test" or .name == "explorer-tokens") and .conclusion == "failure" and .completed_at != null) |
+    select((.name == "lint" or .name == "fast-test" or .name == "explorer-tokens" or .name == "medium-test") and .conclusion == "failure" and .completed_at != null) |
     .completed_at] | min // null)
 else null end
 """
@@ -116,6 +116,38 @@ def test_explorer_tokens_failure_counted_in_red_at() -> None:
     assert run_red_at_jq(jobs) == "2026-05-01T10:01:00Z"
 
 
+def test_medium_test_failure_counted_in_red_at() -> None:
+    # Mirror of test_explorer_tokens_failure_counted_in_red_at for the medium
+    # speed tier's post-merge CI home (medium-tier-ci-home.yaml). While
+    # medium-test is demoted (job-level continue-on-error, see
+    # test_medium_test_is_visibility_only_not_auto_revert_trigger), this
+    # branch of the jq filter is inert in practice: MEDIUM_TEST_RESULT reads
+    # "success" under continue-on-error, so post_merge_red never flips on a
+    # medium-test failure alone. Kept wired (and pinned here) so the metrics
+    # row is complete the moment the job is promoted.
+    jobs = {
+        "jobs": [
+            {
+                "name": "lint",
+                "conclusion": "failure",
+                "completed_at": "2026-05-01T10:10:00Z",
+            },
+            {
+                "name": "medium-test",
+                "conclusion": "failure",
+                "completed_at": "2026-05-01T10:01:00Z",
+            },
+            {
+                "name": "fast-test",
+                "conclusion": "failure",
+                "completed_at": "2026-05-01T10:05:00Z",
+            },
+        ]
+    }
+
+    assert run_red_at_jq(jobs) == "2026-05-01T10:01:00Z"
+
+
 def test_workflow_metrics_filter_includes_explorer_tokens() -> None:
     # The jq filter inside develop-post-merge.yml's metrics step decides
     # which job names are counted as post-merge-red signals. If
@@ -136,6 +168,15 @@ def test_post_merge_red_shell_flag_includes_explorer_tokens() -> None:
     assert '${EXPLORER_TOKENS_RESULT}" = "failure"' in workflow
 
 
+def test_post_merge_red_shell_flag_includes_medium_test() -> None:
+    # Same guard as test_post_merge_red_shell_flag_includes_explorer_tokens,
+    # for the medium-test job added by medium-tier-ci-home.yaml. Inert while
+    # medium-test carries continue-on-error (the result reads "success"),
+    # but kept wired so promotion only needs the workflow-side flip.
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    assert '${MEDIUM_TEST_RESULT}" = "failure"' in workflow
+
+
 def test_auto_revert_triggers_on_explorer_tokens_failure() -> None:
     # The auto-revert-on-failure job's `if:` expression decides which
     # post-merge red events open a revert PR. Adding `explorer-tokens`
@@ -150,15 +191,44 @@ def test_auto_revert_triggers_on_explorer_tokens_failure() -> None:
     assert "needs.explorer-tokens.result == 'failure'" in auto_revert["if"]
 
 
+def test_medium_test_is_promoted_to_auto_revert_trigger() -> None:
+    # PROMOTED 2026-07-06 (medium-tier-red-disposition-and-promotion): after
+    # the medium tier ran clean (green) on the real runner - develop-post-merge
+    # run 28763663703, job 85283671051 - once its dispositioned failures were
+    # fixed (#977 timeout markers, #994 pytest-ci.ini filterwarnings marker
+    # sync), medium-test was promoted to a blocking post-merge lane on the
+    # explorer-tokens pattern: no continue-on-error, present in
+    # auto-revert-on-failure's needs + if:failure trigger. This is the inverse
+    # of the former visibility-only pin; a regression here means the promotion
+    # was silently undone and a medium-test failure would no longer open a
+    # revert PR.
+    workflow_yaml = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    )
+    medium_test = workflow_yaml["jobs"]["medium-test"]
+    auto_revert = workflow_yaml["jobs"]["auto-revert-on-failure"]
+
+    assert "continue-on-error" not in medium_test
+    assert "medium-test" in auto_revert["needs"]
+    assert "needs.medium-test.result == 'failure'" in auto_revert["if"]
+
+
 def test_close_orphaned_prs_waits_for_post_merge_validation_success() -> None:
     # Closing superseded PRs is only safe after the post-merge validation
     # jobs have passed. Otherwise a failing develop push can be auto-reverted
     # after ancestor PRs were already closed as superseded.
+    #
+    # medium-test joined this list 2026-07-06 (review-followup-sweep):
+    # medium-test was promoted into the blocking auto-revert signal (see
+    # test_medium_test_is_promoted_to_auto_revert_trigger above) but this job
+    # still only waited on lint/fast-test/explorer-tokens, so a medium-test
+    # failure alongside three passing jobs could close orphaned PRs before
+    # the develop push was classified red and a revert PR opened.
     workflow_yaml = yaml.safe_load(
         (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
     )
     close_orphaned_prs = workflow_yaml["jobs"]["close-orphaned-prs"]
-    assert close_orphaned_prs["needs"] == ["lint", "fast-test", "explorer-tokens"]
+    assert close_orphaned_prs["needs"] == ["lint", "fast-test", "explorer-tokens", "medium-test"]
     assert close_orphaned_prs.get("if") is None
 
 

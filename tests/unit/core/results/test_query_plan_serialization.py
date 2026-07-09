@@ -273,6 +273,238 @@ class TestSchemaV2ExportWithPlans:
         assert plans_payload["plans_captured"] == 1
         assert "q01" in plans_payload["queries"]
 
+    def test_schema_v2_plans_companion_uses_to_dict_not_asdict(self) -> None:
+        """build_plans_payload must serialize QueryPlanDAG via its to_dict()
+        (depth-guarded, internal-field-free) rather than plain dataclasses.asdict()
+        (qpc-07 / F1.5): QueryPlanDAG is a dataclass, so checking is_dataclass()
+        before hasattr(to_dict) always wins and bypasses to_dict() entirely,
+        leaking the internal fingerprint_integrity field into the companion file.
+        """
+        root = LogicalOperator(
+            operator_type=LogicalOperatorType.SCAN,
+            operator_id="scan_1",
+            table_name="lineitem",
+        )
+        plan = QueryPlanDAG(
+            query_id="q01",
+            platform="duckdb",
+            logical_root=root,
+            estimated_cost=100.0,
+        )
+
+        results = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="duckdb",
+            scale_factor=1.0,
+            execution_id="test_007",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            duration_seconds=10.0,
+            total_queries=1,
+            successful_queries=1,
+            query_plans_captured=1,
+            query_results=[
+                {
+                    "query_id": "q01",
+                    "status": "SUCCESS",
+                    "execution_time_ms": 150,
+                    "rows_returned": 4,
+                    "query_plan": plan,
+                    "plan_fingerprint": plan.plan_fingerprint,
+                }
+            ],
+        )
+
+        plans_payload = build_plans_payload(results)
+
+        assert plans_payload is not None
+        plan_dict = plans_payload["queries"]["q01"]["plan"]
+        # fingerprint_integrity is a dataclass field asdict() would include but
+        # to_dict() deliberately omits (internal verification state, not part
+        # of the plan's serialized contract).
+        assert "fingerprint_integrity" not in plan_dict
+        assert plan_dict == plan.to_dict()
+
+    def test_companion_entry_plan_format_dag_for_structured_plan(self) -> None:
+        """qpc-06 w4 / F3.2: a structured QueryPlanDAG entry is tagged
+        plan_format='dag' so consumers know "plan" is a rehydratable DAG."""
+        root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
+        plan = QueryPlanDAG(query_id="q01", platform="duckdb", logical_root=root)
+        results = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="duckdb",
+            scale_factor=1.0,
+            execution_id="fmt_dag",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            duration_seconds=1.0,
+            total_queries=1,
+            successful_queries=1,
+            query_plans_captured=1,
+            query_results=[
+                {
+                    "query_id": "q01",
+                    "status": "SUCCESS",
+                    "execution_time_ms": 150,
+                    "rows_returned": 4,
+                    "query_plan": plan,
+                    "plan_fingerprint": plan.plan_fingerprint,
+                }
+            ],
+        )
+
+        payload = build_plans_payload(results)
+
+        assert payload is not None
+        assert payload["queries"]["q01"]["plan_format"] == "dag"
+
+    def test_companion_entry_plan_format_text_for_textonly_plan(self) -> None:
+        """qpc-06 w4 / F3.2: a text-only DataFrame plan (no logical_root) is
+        tagged plan_format='text' so a consumer does not mis-read it as a DAG
+        or blindly call QueryPlanDAG.from_dict on it."""
+        from benchbox.core.dataframe.profiling import QueryPlan
+
+        text_plan = QueryPlan(
+            platform="polars",
+            plan_type="logical",
+            plan_text="FILTER [(col > 5)]\n  SCAN lineitem",
+        )
+        results = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="polars",
+            scale_factor=1.0,
+            execution_id="fmt_text",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            duration_seconds=1.0,
+            total_queries=1,
+            successful_queries=1,
+            query_plans_captured=1,
+            query_results=[
+                {
+                    "query_id": "q01",
+                    "status": "SUCCESS",
+                    "execution_time_ms": 150,
+                    "rows_returned": 4,
+                    "query_plan": text_plan,
+                }
+            ],
+        )
+
+        payload = build_plans_payload(results)
+
+        assert payload is not None
+        entry = payload["queries"]["q01"]
+        assert entry["plan_format"] == "text"
+        # The text blob is preserved but is NOT a DAG (no logical_root).
+        assert "logical_root" not in entry["plan"]
+
+    def test_schema_v2_plans_companion_multi_stream_keys_per_stream(self) -> None:
+        """A query_id captured in more than one stream must not collapse to one
+        last-writer-wins entry: capture_query_plan's contract is one plan record
+        per (query_id, stream_id), so each stream's plan must survive under its
+        own key.
+        """
+
+        def _plan(fingerprint: str) -> QueryPlanDAG:
+            root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
+            return QueryPlanDAG(query_id="q06", platform="duckdb", logical_root=root, plan_fingerprint=fingerprint)
+
+        plan_stream0 = _plan("a" * 64)
+        plan_stream1 = _plan("b" * 64)
+
+        results = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="duckdb",
+            scale_factor=1.0,
+            execution_id="test_multi_stream",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            total_queries=2,
+            successful_queries=2,
+            query_plans_captured=2,
+            query_results=[
+                {
+                    "query_id": "q06",
+                    "status": "SUCCESS",
+                    "stream_id": 0,
+                    "query_plan": plan_stream0,
+                    "plan_fingerprint": plan_stream0.plan_fingerprint,
+                },
+                {
+                    "query_id": "q06",
+                    "status": "SUCCESS",
+                    "stream_id": 1,
+                    "query_plan": plan_stream1,
+                    "plan_fingerprint": plan_stream1.plan_fingerprint,
+                },
+            ],
+        )
+
+        plans_payload = build_plans_payload(results)
+
+        assert plans_payload is not None
+        # Top-level count is unique query IDs, not per-stream row count.
+        assert plans_payload["plans_captured"] == 1
+        queries = plans_payload["queries"]
+        assert "q06" not in queries, "bare query_id key must not be used once ambiguous across streams"
+        assert queries["q06#0"]["fingerprint"] == "a" * 64
+        assert queries["q06#1"]["fingerprint"] == "b" * 64
+
+    def test_schema_v2_plans_companion_cross_phase_same_stream_id_disambiguated(self) -> None:
+        """A power row and a throughput row can share the SAME query_id AND
+        stream_id (each phase's stream counter independently starts at 0). The
+        stream_id-only composite key from the multi-stream fix would then
+        collide again (both rows landing on "q06#0"), so a cross-phase
+        collision must fall back to a further test_type-qualified key.
+        """
+
+        def _plan(fingerprint: str) -> QueryPlanDAG:
+            root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
+            return QueryPlanDAG(query_id="q06", platform="duckdb", logical_root=root, plan_fingerprint=fingerprint)
+
+        power_plan = _plan("a" * 64)
+        throughput_plan = _plan("b" * 64)
+
+        results = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="duckdb",
+            scale_factor=1.0,
+            execution_id="test_cross_phase",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            total_queries=2,
+            successful_queries=2,
+            query_plans_captured=2,
+            query_results=[
+                {
+                    "query_id": "q06",
+                    "status": "SUCCESS",
+                    "stream_id": 0,
+                    "test_type": "power",
+                    "query_plan": power_plan,
+                    "plan_fingerprint": power_plan.plan_fingerprint,
+                },
+                {
+                    "query_id": "q06",
+                    "status": "SUCCESS",
+                    "stream_id": 0,
+                    "test_type": "throughput",
+                    "query_plan": throughput_plan,
+                    "plan_fingerprint": throughput_plan.plan_fingerprint,
+                },
+            ],
+        )
+
+        plans_payload = build_plans_payload(results)
+
+        assert plans_payload is not None
+        assert plans_payload["plans_captured"] == 1
+        queries = plans_payload["queries"]
+        assert "q06#0" not in queries, "bare stream_id key must not be used once ambiguous across phases too"
+        assert queries["q06#0:power"]["fingerprint"] == "a" * 64
+        assert queries["q06#0:throughput"]["fingerprint"] == "b" * 64
+
     def test_schema_v2_export_complex_plan(self) -> None:
         """Test schema v2.0 export with complex query plan tree."""
         # Build: Join(orders, lineitem) -> [Scan(orders), Scan(lineitem)]
@@ -472,7 +704,8 @@ class TestSchemaV2Validation:
 
         with pytest.raises(SchemaV2ValidationError) as exc:
             validator.validate(payload)
-        assert "invalid schema version" in str(exc.value)
+        assert "runtime result schema policy" in str(exc.value)
+        assert "schema versions 2.0 and 2.1" in str(exc.value)
 
     def test_validator_rejects_missing_run_fields(self) -> None:
         """Test that validator rejects payload with missing run block fields."""

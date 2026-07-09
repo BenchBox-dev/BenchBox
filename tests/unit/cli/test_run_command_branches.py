@@ -25,8 +25,6 @@ from click.testing import CliRunner
 # versions.
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
-__import__("benchbox.cli.commands.publish")
-_publish_module = _sys.modules["benchbox.cli.commands.publish"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -244,6 +242,59 @@ class TestApplyPlatformOptimizationOverrides:
         assert unified.platform_optimizations.databricks_clustering_strategy == "none"
         assert unified.platform_optimizations.liquid_clustering_enabled is False
 
+    def test_liquid_auto_strategy_via_platform_options(self):
+        from benchbox.cli.commands.run import _apply_platform_optimization_overrides
+        from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+        unified = UnifiedTuningConfiguration()
+
+        _apply_platform_optimization_overrides(
+            unified,
+            sorted_ingestion_mode=None,
+            sorted_ingestion_method=None,
+            parsed_platform_options={"databricks_clustering_strategy": "liquid_clustering_auto"},
+        )
+
+        assert unified.platform_optimizations.databricks_clustering_strategy == "liquid_clustering_auto"
+        assert unified.platform_optimizations.liquid_clustering_enabled is True
+
+    def test_liquid_strategy_rejects_legacy_zorder_template_fields(self):
+        from benchbox.cli.commands.run import _apply_platform_optimization_overrides
+        from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+        unified = UnifiedTuningConfiguration()
+        unified.platform_optimizations.z_ordering_enabled = True
+
+        with pytest.raises(ValueError, match="Liquid Clustering cannot be combined"):
+            _apply_platform_optimization_overrides(
+                unified,
+                sorted_ingestion_mode=None,
+                sorted_ingestion_method=None,
+                parsed_platform_options={"databricks_clustering_strategy": "liquid_clustering_auto"},
+            )
+
+    def test_strategy_override_resets_stale_physical_rendering_id(self):
+        from benchbox.cli.commands.run import _apply_platform_optimization_overrides
+        from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+        # A liquid template carries physical_rendering_id=databricks_liquid_auto; overriding to z_order must drop
+        # it so the reported rendering identity follows the authoritative strategy instead of diverging.
+        unified = UnifiedTuningConfiguration()
+        unified.platform_optimizations.databricks_clustering_strategy = "liquid_clustering_auto"
+        unified.platform_optimizations.liquid_clustering_enabled = True
+        unified.platform_optimizations.physical_rendering_id = "databricks_liquid_auto"
+
+        _apply_platform_optimization_overrides(
+            unified,
+            sorted_ingestion_mode=None,
+            sorted_ingestion_method=None,
+            parsed_platform_options={"databricks_clustering_strategy": "z_order"},
+        )
+
+        assert unified.platform_optimizations.databricks_clustering_strategy == "z_order"
+        assert unified.platform_optimizations.liquid_clustering_enabled is False
+        assert unified.platform_optimizations.physical_rendering_id is None
+
     def test_sorted_ingestion_validation_is_preserved(self):
         from benchbox.cli.commands.run import _apply_platform_optimization_overrides
         from benchbox.core.tuning.interface import UnifiedTuningConfiguration
@@ -361,7 +412,7 @@ class TestDirectHandleResult:
             ) as export,
             patch.object(_run_module, "_render_post_run_charts") as render_charts,
             patch("benchbox.cli.preferences.save_last_run_config") as save_last_run,
-            patch.object(_publish_module, "publish_bundle") as publish_bundle,
+            patch("benchbox.cli.commands.publish.publish_bundle") as publish_bundle,
             pytest.raises(SystemExit),
         ):
             _direct_handle_result(settings, result, MagicMock(), benchmark_config)
@@ -873,6 +924,8 @@ class TestDeriveExecutionType:
             ["load"],
             ["generate", "load"],  # generate present but load present → not data_only
             ["load", "warmup"],
+            ["load", "statistics"],  # statistics is not a query phase → still load_only
+            ["generate", "load", "statistics"],
         ],
     )
     def test_load_only(self, phases):
@@ -906,3 +959,69 @@ class TestDeriveExecutionType:
     def test_standard_fallback(self):
         assert self.fn(["warmup"]) == "standard"
         assert self.fn(["load", "power"]) == "power"
+
+
+# ===================================================================
+# _apply_dataframe_suffix_mode / _resolve_platform_mode
+# ===================================================================
+
+
+class TestDataFrameSuffixModeResolution:
+    """A -df platform suffix must select DataFrame mode without an explicit --mode.
+
+    Regression for the v0.3.0 PLATFORM_ALIASES erasure: `datafusion-df` was
+    normalized to `datafusion` before mode resolution, so the registry SQL
+    default silently selected the SQL adapter (flagged by review on PR #1029).
+    """
+
+    def _resolved_state(self, platform: str, mode: str | None = None) -> SimpleNamespace:
+        from benchbox.cli.commands.run import _apply_dataframe_suffix_mode, _resolve_platform_mode
+        from benchbox.cli.platform import normalize_platform_name
+
+        s = SimpleNamespace(
+            platform=platform,
+            mode=mode,
+            dry_run=True,
+            ctx=MagicMock(),
+            logger=None,
+            platform_manager=MagicMock(),
+        )
+        # Same ordering as _prepare_run_state: suffix inference, alias
+        # normalization, then mode resolution.
+        _apply_dataframe_suffix_mode(s)
+        s.platform_key = normalize_platform_name(s.platform)
+        _resolve_platform_mode(s)
+        return s
+
+    @pytest.mark.parametrize("platform", ["datafusion-df", "lakesail-df", "pyspark-df", "polars-df"])
+    def test_df_suffix_resolves_dataframe_mode_without_mode_flag(self, platform: str):
+        s = self._resolved_state(platform)
+        assert s.resolved_mode == "dataframe"
+
+    def test_df_suffix_is_case_insensitive(self):
+        s = self._resolved_state("DataFusion-DF")
+        assert s.resolved_mode == "dataframe"
+
+    @pytest.mark.parametrize(("platform", "expected"), [("datafusion", "sql"), ("lakesail", "sql")])
+    def test_base_name_keeps_registry_default_mode(self, platform: str, expected: str):
+        s = self._resolved_state(platform)
+        assert s.resolved_mode == expected
+
+    def test_explicit_mode_flag_wins_over_df_suffix(self):
+        # Matches adapter-factory precedence: explicit mode > -df suffix > default.
+        s = self._resolved_state("datafusion-df", mode="sql")
+        assert s.resolved_mode == "sql"
+
+    def test_no_suffix_leaves_mode_unset(self):
+        from benchbox.cli.commands.run import _apply_dataframe_suffix_mode
+
+        s = SimpleNamespace(platform="duckdb", mode=None)
+        _apply_dataframe_suffix_mode(s)
+        assert s.mode is None
+
+    def test_missing_platform_is_noop(self):
+        from benchbox.cli.commands.run import _apply_dataframe_suffix_mode
+
+        s = SimpleNamespace(platform=None, mode=None)
+        _apply_dataframe_suffix_mode(s)
+        assert s.mode is None

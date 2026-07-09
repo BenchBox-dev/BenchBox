@@ -1,4 +1,3 @@
-import inspect
 from types import SimpleNamespace
 
 import pytest
@@ -76,32 +75,6 @@ def test_ensure_driver_version_rejects_requested_version_without_package():
             requested_version="1.2.3",
             auto_install=False,
         )
-
-
-def test_platforms_reexports_real_platform_registry_class():
-    import benchbox.platforms as platforms
-    from benchbox.core.platform_registry import PlatformRegistry
-
-    assert platforms.PlatformRegistry is PlatformRegistry
-
-
-def test_lazy_adapter_factory_wrappers_preserve_introspection():
-    import benchbox.platforms as platforms
-    from benchbox.platforms import adapter_factory
-
-    assert inspect.signature(platforms.get_adapter) == inspect.signature(adapter_factory.get_adapter)
-    assert inspect.signature(platforms.is_dataframe_mode) == inspect.signature(adapter_factory.is_dataframe_mode)
-    assert inspect.signature(platforms.get_available_modes) == inspect.signature(adapter_factory.get_available_modes)
-    assert inspect.signature(platforms.get_available_deployments) == inspect.signature(
-        adapter_factory.get_available_deployments
-    )
-    assert inspect.signature(platforms.get_default_deployment) == inspect.signature(
-        adapter_factory.get_default_deployment
-    )
-
-    platforms.get_available_modes("duckdb")
-
-    assert platforms.get_available_modes.__wrapped__ is adapter_factory.get_available_modes
 
 
 def test_dataframe_adapter_rejects_requested_version_for_non_package_platform():

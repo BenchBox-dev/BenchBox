@@ -443,19 +443,44 @@ class TestCaptureQueryPlanDuckDB:
         # Verify we didn't short-circuit due to filter
         assert duckdb_adapter.query_plans_captured + duckdb_adapter.plan_capture_failures >= 1
 
-    def test_plan_first_n_limits_iterations(self, duckdb_adapter, connection):
-        """plan_first_n should only capture for the first N iterations per query_id."""
+    def test_plan_query_filter_limits_capture(self, duckdb_adapter, connection):
+        """plan_query_filter restricts capture to the selected query ids; the
+        retired per-iteration sampling machinery no longer limits repeats."""
         duckdb_adapter.capture_plans = True
-        duckdb_adapter.plan_first_n = 2
+        duckdb_adapter.plan_query_filter = {"q_keep"}
 
-        results = []
-        for i in range(4):
-            plan, _ = duckdb_adapter.capture_query_plan(connection, "SELECT 1", "q_repeat")
-            results.append(plan)
+        kept, _ = duckdb_adapter.capture_query_plan(connection, "SELECT 1", "q_keep")
+        skipped, skipped_ms = duckdb_adapter.capture_query_plan(connection, "SELECT 1", "q_skip")
 
-        # First 2 should attempt capture, last 2 should return None
-        assert results[2] is None
-        assert results[3] is None
+        assert kept is not None
+        assert skipped is None
+        assert skipped_ms == 0.0
+
+    def test_query_filter_matches_internal_capture_key(self, duckdb_adapter, connection):
+        """The isolated capture phase passes the internal capture key
+        (``<public>#<digest>``), not the user-facing id, as the capture query id.
+        The filter must recover the public id so ``--plan-queries q_keep`` still
+        selects the query instead of silently producing no plans."""
+        from benchbox.platforms.base.result_capture import _plan_capture_key
+
+        connection.execute("CREATE TABLE key_filter_test (x INT)")
+        duckdb_adapter.capture_plans = True
+        duckdb_adapter.plan_query_filter = {"q_keep"}
+
+        sql = "SELECT * FROM key_filter_test"
+        capture_key = _plan_capture_key("q_keep", sql)
+        assert "#" in capture_key  # internal key carries the digest suffix
+
+        # Phase-style call with the internal key must NOT be filtered out.
+        before = duckdb_adapter.query_plans_captured + duckdb_adapter.plan_capture_failures
+        duckdb_adapter.capture_query_plan(connection, sql, capture_key)
+        assert duckdb_adapter.query_plans_captured + duckdb_adapter.plan_capture_failures > before
+
+        # A different public id keyed the same way is still excluded.
+        other_key = _plan_capture_key("q_other", sql)
+        skipped, skipped_ms = duckdb_adapter.capture_query_plan(connection, sql, other_key)
+        assert skipped is None
+        assert skipped_ms == 0.0
 
     def test_get_query_plan_returns_json(self, duckdb_adapter, connection):
         """DuckDB's get_query_plan should return JSON-formatted EXPLAIN output."""

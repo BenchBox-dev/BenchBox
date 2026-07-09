@@ -351,7 +351,7 @@ Several vendors offer managed Apache Doris cloud services:
 
 | Provider | Service | Description |
 |----------|---------|-------------|
-| **VeloDB Cloud** | [velodb.io](https://velodb.io) | Fully managed Doris by core contributors |
+| **VeloDB Cloud** | [velodb.io](https://www.velodb.io/) | Fully managed Doris by core contributors |
 | **SelectDB Cloud** | [selectdb.com](https://selectdb.com) | Enterprise managed Doris with compute-storage separation |
 | **ApsaraDB for SelectDB** | Alibaba Cloud | Managed Doris on Alibaba Cloud infrastructure |
 

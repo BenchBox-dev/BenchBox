@@ -17,9 +17,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from benchbox.core.dataframe.query_resolution import build_dataframe_query_filter
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.platform_info import PlatformInfoInput
 from benchbox.core.runner.dataframe_runner import (
+    DATAFRAME_PRODUCTION_EXECUTION_PATH,
+    DATAFRAME_RUNNER_API_SURFACE,
+    DATAFRAME_RUNNER_LIFECYCLE,
     DataFramePhases,
     DataFrameRunOptions,
     _get_queries_for_benchmark,
@@ -33,6 +37,13 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def test_dataframe_runner_lifecycle_is_deprecated_internal_compatibility():
+    """The standalone runner is not the production DataFrame execution path."""
+    assert DATAFRAME_RUNNER_API_SURFACE == "deprecated"
+    assert DATAFRAME_RUNNER_LIFECYCLE == "deprecated-internal-compatibility-runner"
+    assert DATAFRAME_PRODUCTION_EXECUTION_PATH == "adapter.run_benchmark+BenchmarkExecutionMixin"
 
 
 class TestIsDataFrameExecution:
@@ -50,9 +61,9 @@ class TestIsDataFrameExecution:
         """Test duckdb is detected as SQL mode."""
         assert is_dataframe_execution(types.SimpleNamespace(type="duckdb")) is False
 
-    def test_polars_without_df_is_sql(self):
-        """Test polars (without -df) is SQL mode."""
-        assert is_dataframe_execution(types.SimpleNamespace(type="polars")) is False
+    def test_polars_default_mode_is_dataframe(self):
+        """Bare polars follows the platform registry default mode."""
+        assert is_dataframe_execution(types.SimpleNamespace(type="polars")) is True
 
     def test_none_config(self):
         """Test None config returns False."""
@@ -77,6 +88,19 @@ class TestGetExecutionMode:
     def test_none_returns_sql(self):
         """Test None config returns 'sql'."""
         assert get_execution_mode(None) == "sql"
+
+
+class TestDataFrameQueryFilter:
+    """Tests for shared DataFrame query subset filtering."""
+
+    def test_prefixed_query_matches_prefixed_and_bare_ids(self):
+        assert build_dataframe_query_filter(["Q14a"]) == {"Q14A", "14A"}
+
+    def test_bare_query_matches_bare_and_prefixed_ids(self):
+        assert build_dataframe_query_filter(["1"]) == {"1", "Q1"}
+
+    def test_none_query_subset_returns_none(self):
+        assert build_dataframe_query_filter(None) is None
 
 
 class TestDataFramePhases:
@@ -319,7 +343,7 @@ class TestModeCoexistence:
             "duckdb": "sql",
             "sqlite": "sql",
             "datafusion": "sql",
-            "polars": "sql",  # Without -df suffix = SQL mode
+            "polars": "dataframe",  # Bare polars follows the registry default mode.
             "polars-df": "dataframe",
             "pandas-df": "dataframe",
             "snowflake": "sql",
@@ -457,7 +481,12 @@ class TestMaintenancePhaseValidation:
         )
 
         assert result is not None
-        assert result.validation_status in ("PASSED", "FAILED")
+        # Mocked adapter raises nothing and DataFramePhases(load=False, execute=False)
+        # means the runner's except branch never runs (no "FAILED" overwrite) and there
+        # are no query results to demote status to "PARTIAL" - "PASSED" is the only
+        # reachable outcome (see builder.py's default and dataframe_runner.py's except
+        # branch).
+        assert result.validation_status == "PASSED"
 
     def test_power_phase_does_not_raise(self):
         """Test that power execution type works normally (queries only)."""

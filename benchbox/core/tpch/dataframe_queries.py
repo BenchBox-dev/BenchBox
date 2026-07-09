@@ -23,6 +23,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from datetime import date
 from typing import Any
 
@@ -91,6 +92,15 @@ TPCH_DEFAULT_PARAMS: dict[int, dict[str, Any]] = {
 # query execution, get_tpch_parameters() merges these into the defaults.
 _parameter_overrides: dict[int, dict[str, Any]] | None = None
 
+# Module-level scale factor for scale-dependent parameter defaults. Canonical
+# TPC-H Q11 renders its value threshold as 0.0001 / SF (qgen does this); the
+# value in TPCH_DEFAULT_PARAMS is the SF=1 rendering. get_tpch_parameters()
+# scales it by this factor so unseeded DataFrame runs stay scale-faithful at
+# every scale, mirroring the SQL run path's {q11_fraction} rendering. Set by the
+# dataframe_runner (and the TPC-Havoc equivalence gate) before execution;
+# defaults to 1.0 (the qgen SF=1 rendering).
+_scale_factor: float = 1.0
+
 
 def set_parameter_overrides(overrides: dict[int, dict[str, Any]] | None) -> None:
     """Set parameter overrides for the current benchmark run.
@@ -105,11 +115,62 @@ def set_parameter_overrides(overrides: dict[int, dict[str, Any]] | None) -> None
     _parameter_overrides = overrides
 
 
+def set_scale_factor(scale_factor: float | None) -> None:
+    """Set the scale factor used for scale-dependent parameter defaults.
+
+    Canonical TPC-H Q11 renders its value threshold as ``0.0001 / SF``. The
+    dataframe_runner calls this before query execution so unseeded runs derive
+    the scale-correct Q11 fraction (mirroring the SQL run path) instead of
+    always using the SF=1 default. Pass ``None`` (or ``1.0``) to reset to the
+    SF=1 rendering.
+
+    Seed-derived overrides (see :func:`set_parameter_overrides`) take precedence
+    over the scaled default, so seeded runs are unaffected.
+
+    Args:
+        scale_factor: The run's scale factor, or None to reset to 1.0.
+    """
+    global _scale_factor
+    _scale_factor = 1.0 if scale_factor is None else float(scale_factor)
+
+
+# Benchmark ids whose DataFrame queries reuse this module's parameter seam
+# (get_tpch_parameters / the scale-dependent Q11 default). TPC-H Skew
+# re-registers the TPC-H DataFrame queries verbatim and TPC-Havoc's variants
+# read the same seam, so all three derive Q11's 0.0001/SF threshold from the
+# run's scale factor the same way.
+TPCH_FAMILY_DATAFRAME_IDS = frozenset({"tpch", "tpch_skew", "tpchavoc"})
+
+
+def set_scale_factor_for_benchmark(benchmark_id: str, scale_factor: float | None) -> None:
+    """Apply :func:`set_scale_factor` for TPC-H-family DataFrame benchmarks.
+
+    A no-op for any benchmark whose DataFrame queries do not share this module's
+    parameter seam (see :data:`TPCH_FAMILY_DATAFRAME_IDS`). Pass
+    ``scale_factor=None`` to reset to the SF=1 rendering. Both the production
+    DataFrame execution path (``BenchmarkExecutionMixin``) and the compatibility
+    runner call this so unseeded runs derive Q11's 0.0001/SF threshold at every
+    scale.
+
+    Args:
+        benchmark_id: Normalized benchmark id (e.g. from normalize_benchmark_id).
+        scale_factor: The run's scale factor, or None to reset to 1.0.
+    """
+    if benchmark_id in TPCH_FAMILY_DATAFRAME_IDS:
+        set_scale_factor(scale_factor)
+
+
 def get_tpch_parameters(query_id: int) -> dict[str, Any]:
     """Get parameters for a TPC-H query.
 
-    If parameter overrides are active (set via set_parameter_overrides),
-    override values are merged on top of the defaults for the given query.
+    Q11's value threshold is scale-dependent: canonical qgen renders it as
+    ``0.0001 / SF``. The default in TPCH_DEFAULT_PARAMS is the SF=1 value, so it
+    is scaled by the active scale factor (set via :func:`set_scale_factor`) to
+    keep unseeded DataFrame runs aligned with the SQL run path at every scale.
+
+    If parameter overrides are active (set via :func:`set_parameter_overrides`),
+    override values are merged on top, so seed-derived parameters win over the
+    scaled default.
 
     Args:
         query_id: Query number (1-22)
@@ -118,6 +179,12 @@ def get_tpch_parameters(query_id: int) -> dict[str, Any]:
         Dict of parameter values for this query.
     """
     params = dict(TPCH_DEFAULT_PARAMS.get(query_id, {}))
+    if query_id == 11 and "fraction" in params and _scale_factor > 0:
+        # Mirror canonical qgen's `0.0001 / SF` rendering exactly - including its
+        # 10-decimal literal - so the unseeded default matches both the SQL run
+        # path's {q11_fraction} token and the seeded extraction (which parses
+        # that same literal). TPCH_DEFAULT_PARAMS holds the SF=1 base value.
+        params["fraction"] = float(f"{params['fraction'] / _scale_factor:.10f}")
     if _parameter_overrides is not None and query_id in _parameter_overrides:
         params.update(_parameter_overrides[query_id])
     return params
@@ -142,7 +209,7 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_tpch_parameters(1)
     cutoff_date = params["cutoff_date"]
 
-    result = (
+    return (
         lineitem.filter(col("l_shipdate") <= lit(cutoff_date))
         .group_by("l_returnflag", "l_linestatus")
         .agg(
@@ -157,8 +224,6 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .sort("l_returnflag", "l_linestatus")
     )
-
-    return result
 
 
 def q3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -179,7 +244,7 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
 
     # Join customer -> orders -> lineitem
     # Filter by segment, order date, and ship date
-    result = (
+    return (
         customer.filter(col("c_mktsegment") == lit(segment))
         .join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter(col("o_orderdate") < lit(order_date))
@@ -187,11 +252,10 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
         .filter(col("l_shipdate") > lit(order_date))
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select("o_orderkey", "revenue", "o_orderdate", "o_shippriority")
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-
-    return result
 
 
 def q4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -212,15 +276,13 @@ def q4_expression_impl(ctx: DataFrameContext) -> Any:
     # Find orders with late lineitems using semi-join pattern
     late_orders = lineitem.filter(col("l_commitdate") < col("l_receiptdate")).select("l_orderkey").unique()
 
-    result = (
+    return (
         orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(late_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
         .group_by("o_orderpriority")
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority")
     )
-
-    return result
 
 
 def q5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -243,7 +305,7 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         region.filter(col("r_name") == lit(region_name))
         .join(nation, left_on="r_regionkey", right_on="n_regionkey")
         .join(customer, left_on="n_nationkey", right_on="c_nationkey")
@@ -259,8 +321,6 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-
-    return result
 
 
 def q6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -279,7 +339,7 @@ def q6_expression_impl(ctx: DataFrameContext) -> Any:
     discount_high = params["discount_high"]
     quantity_limit = params["quantity_limit"]
 
-    result = (
+    return (
         lineitem.filter(
             (col("l_shipdate") >= lit(start_date))
             & (col("l_shipdate") < lit(end_date))
@@ -290,8 +350,6 @@ def q6_expression_impl(ctx: DataFrameContext) -> Any:
         .select((col("l_extendedprice") * col("l_discount")).alias("revenue"))
         .sum()
     )
-
-    return result
 
 
 def q10_expression_impl(ctx: DataFrameContext) -> Any:
@@ -310,7 +368,7 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
@@ -326,11 +384,10 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
             "c_comment",
         )
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select("c_custkey", "c_name", "revenue", "c_acctbal", "n_name", "c_address", "c_phone", "c_comment")
         .sort("revenue", descending=True)
         .limit(20)
     )
-
-    return result
 
 
 def q12_expression_impl(ctx: DataFrameContext) -> Any:
@@ -350,7 +407,7 @@ def q12_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         lineitem.filter(
             (col("l_shipmode").is_in([shipmode1, shipmode2]))
             & (col("l_commitdate") < col("l_receiptdate"))
@@ -373,8 +430,6 @@ def q12_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("l_shipmode")
     )
 
-    return result
-
 
 def q14_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-H Q14: Promotion Effect (Expression Family).
@@ -390,7 +445,7 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         lineitem.filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
         .join(part, left_on="l_partkey", right_on="p_partkey")
         .select(
@@ -403,8 +458,6 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
             ).alias("promo_revenue")
         )
     )
-
-    return result
 
 
 def q7_expression_impl(ctx: DataFrameContext) -> Any:
@@ -430,7 +483,7 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
     n1 = nation.select(col("n_nationkey").alias("n1_nationkey"), col("n_name").alias("supp_nation"))
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("cust_nation"))
 
-    result = (
+    return (
         supplier.join(n1, left_on="s_nationkey", right_on="n1_nationkey")
         .join(lineitem, left_on="s_suppkey", right_on="l_suppkey")
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") <= lit(end_date)))
@@ -449,8 +502,6 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("volume").sum().alias("revenue"))
         .sort("supp_nation", "cust_nation", "l_year")
     )
-
-    return result
 
 
 def q8_expression_impl(ctx: DataFrameContext) -> Any:
@@ -478,7 +529,7 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
     # Alias nation for supplier nation
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("nation"))
 
-    result = (
+    return (
         part.filter(col("p_type") == lit(target_type))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
@@ -503,8 +554,6 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("o_year")
     )
 
-    return result
-
 
 def q9_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-H Q9: Product Type Profit Measure (Expression Family).
@@ -523,7 +572,7 @@ def q9_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_tpch_parameters(9)
     color = params["color"]
 
-    result = (
+    return (
         part.filter(col("p_name").str.contains(color))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
@@ -544,8 +593,6 @@ def q9_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("amount").sum().alias("sum_profit"))
         .sort(["nation", "o_year"], descending=[False, True])
     )
-
-    return result
 
 
 def q13_expression_impl(ctx: DataFrameContext) -> Any:
@@ -575,13 +622,11 @@ def q13_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Count customers per order count
-    result = (
+    return (
         customer_orders.group_by("c_count")
         .agg(col("c_custkey").count().alias("custdist"))
         .sort(["custdist", "c_count"], descending=[True, True])
     )
-
-    return result
 
 
 def q18_expression_impl(ctx: DataFrameContext) -> Any:
@@ -606,7 +651,7 @@ def q18_expression_impl(ctx: DataFrameContext) -> Any:
         .select("l_orderkey")
     )
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .join(large_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
@@ -615,8 +660,6 @@ def q18_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["o_totalprice", "o_orderdate"], descending=[True, False])
         .limit(100)
     )
-
-    return result
 
 
 def q19_expression_impl(ctx: DataFrameContext) -> Any:
@@ -643,7 +686,7 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
     ship_modes = ["AIR", "AIR REG"]
 
     # Join and apply complex OR conditions
-    result = (
+    return (
         lineitem.join(part, left_on="l_partkey", right_on="p_partkey")
         .filter(
             col("l_shipmode").is_in(ship_modes)
@@ -679,8 +722,6 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
         .sum()
     )
 
-    return result
-
 
 def q2_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-H Q2: Minimum Cost Supplier (Expression Family).
@@ -712,7 +753,7 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Main query joining with minimum costs
-    result = (
+    return (
         part.filter((col("p_size") == lit(size)) & col("p_type").str.ends_with(type_suffix))
         .join(partsupp, left_on="p_partkey", right_on="ps_partkey")
         .join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
@@ -734,8 +775,6 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["s_acctbal", "n_name", "s_name", "p_partkey"], descending=[True, False, False, False])
         .limit(100)
     )
-
-    return result
 
 
 def q11_expression_impl(ctx: DataFrameContext) -> Any:
@@ -766,14 +805,12 @@ def q11_expression_impl(ctx: DataFrameContext) -> Any:
     threshold = total_value * fraction
 
     # Find parts above threshold
-    result = (
+    return (
         nation_stock.group_by("ps_partkey")
         .agg(col("value").sum().alias("value"))
         .filter(col("value") > lit(threshold))
         .sort("value", descending=True)
     )
-
-    return result
 
 
 def q15_expression_impl(ctx: DataFrameContext) -> Any:
@@ -801,14 +838,12 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
     max_revenue = ctx.scalar(revenue.select(col("total_revenue").max().alias("max_rev")))
 
     # Join with suppliers having maximum revenue
-    result = (
+    return (
         supplier.join(revenue, left_on="s_suppkey", right_on="supplier_no")
         .filter(col("total_revenue") == lit(max_revenue))
         .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
-
-    return result
 
 
 def q16_expression_impl(ctx: DataFrameContext) -> Any:
@@ -832,7 +867,7 @@ def q16_expression_impl(ctx: DataFrameContext) -> Any:
     complaint_suppliers = supplier.filter(col("s_comment").str.contains("Customer.*Complaints")).select("s_suppkey")
 
     # Main query
-    result = (
+    return (
         part.filter(
             (col("p_brand") != lit(brand)) & ~col("p_type").str.starts_with(type_prefix) & col("p_size").is_in(sizes)
         )
@@ -842,8 +877,6 @@ def q16_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("ps_suppkey").n_unique().alias("supplier_cnt"))
         .sort(["supplier_cnt", "p_brand", "p_type", "p_size"], descending=[True, False, False, False])
     )
-
-    return result
 
 
 def q17_expression_impl(ctx: DataFrameContext) -> Any:
@@ -864,15 +897,13 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     avg_qty_per_part = lineitem.group_by("l_partkey").agg((col("l_quantity").mean() * lit(0.2)).alias("avg_qty"))
 
     # Main query
-    result = (
+    return (
         part.filter((col("p_brand") == lit(brand)) & (col("p_container") == lit(container)))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(avg_qty_per_part, left_on="p_partkey", right_on="l_partkey")
         .filter(col("l_quantity") < col("avg_qty"))
         .select((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
     )
-
-    return result
 
 
 def q20_expression_impl(ctx: DataFrameContext) -> Any:
@@ -914,15 +945,13 @@ def q20_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Main query
-    result = (
+    return (
         supplier.join(nation, left_on="s_nationkey", right_on="n_nationkey")
         .filter(col("n_name") == lit(nation_name))
         .join(excess_partsupps, left_on="s_suppkey", right_on="ps_suppkey", how="semi")
         .select("s_name", "s_address")
         .sort("s_name")
     )
-
-    return result
 
 
 def q21_expression_impl(ctx: DataFrameContext) -> Any:
@@ -985,7 +1014,7 @@ def q21_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Step 5: Join candidates with counts and apply EXISTS/NOT EXISTS as filters
-    result = (
+    return (
         candidates.join(suppliers_per_order, left_on="l_orderkey", right_on="supp_orderkey")
         .join(late_suppliers_per_order, left_on="l_orderkey", right_on="late_orderkey")
         # EXISTS: order has multiple suppliers
@@ -999,8 +1028,6 @@ def q21_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["numwait", "s_name"], descending=[True, False])
         .limit(100)
     )
-
-    return result
 
 
 def q22_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1031,15 +1058,13 @@ def q22_expression_impl(ctx: DataFrameContext) -> Any:
     customers_with_orders = orders.select("o_custkey").unique()
 
     # Main query
-    result = (
+    return (
         customer_with_code.filter(col("cntrycode").is_in(country_codes) & (col("c_acctbal") > lit(avg_balance)))
         .join(customers_with_orders, left_on="c_custkey", right_on="o_custkey", how="anti")
         .group_by("cntrycode")
         .agg(col("c_custkey").count().alias("numcust"), col("c_acctbal").sum().alias("totacctbal"))
         .sort("cntrycode")
     )
-
-    return result
 
 
 # =============================================================================
@@ -1063,7 +1088,7 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["charge"] = filtered["disc_price"] * (1 + filtered["l_tax"])
 
     # Aggregate
-    result = (
+    return (
         filtered.groupby(["l_returnflag", "l_linestatus"], as_index=False)
         .agg(
             sum_qty=("l_quantity", "sum"),
@@ -1077,8 +1102,6 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
         )
         .sort_values(["l_returnflag", "l_linestatus"])
     )
-
-    return result
 
 
 def q6_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1142,14 +1165,12 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
     joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
 
     # Aggregate
-    result = (
+    return (
         joined.groupby(["l_orderkey", "o_orderdate", "o_shippriority"], as_index=False)
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[["l_orderkey", "revenue", "o_orderdate", "o_shippriority"]]
         .sort_values(["revenue", "o_orderdate"], ascending=[False, True])
         .head(10)
     )
-
-    return result
 
 
 def q4_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1172,13 +1193,11 @@ def q4_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered_orders = filtered_orders[filtered_orders["o_orderkey"].isin(late_orderkeys)]
 
     # Count by priority
-    result = (
+    return (
         filtered_orders.groupby("o_orderpriority", as_index=False)
         .agg(order_count=("o_orderkey", "count"))
         .sort_values("o_orderpriority")
     )
-
-    return result
 
 
 def q5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1221,11 +1240,9 @@ def q5_pandas_impl(ctx: DataFrameContext) -> Any:
     joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
 
     # Aggregate by nation
-    result = (
+    return (
         joined.groupby("n_name", as_index=False).agg(revenue=("revenue", "sum")).sort_values("revenue", ascending=False)
     )
-
-    return result
 
 
 def q10_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1239,34 +1256,46 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Join customer -> orders, filter by date
-    customer_orders = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    customer_orders = customer_orders[
-        (customer_orders["o_orderdate"] >= start_date) & (customer_orders["o_orderdate"] < end_date)
+    # Projection pushdown: carry only the columns each stage needs so the wide
+    # string columns (c_comment, l_comment, o_comment, ...) never ride through
+    # the large lineitem join. Push the l_returnflag='R' filter below the join,
+    # and group by the narrow integer keys (c_custkey is the customer PK so it
+    # functionally determines the other customer attributes; c_nationkey -> n_name),
+    # then rejoin the small detail columns onto the aggregated result. This keeps
+    # the groupby off wide string keys and is what lets the graph fit a
+    # constrained local Dask envelope; the result is identical to grouping by all
+    # seven output columns.
+    customer_keys = customer[["c_custkey", "c_nationkey"]]
+    customer_detail = customer[["c_custkey", "c_name", "c_acctbal", "c_phone", "c_address", "c_comment"]]
+
+    orders_window = orders[["o_orderkey", "o_custkey", "o_orderdate"]]
+    orders_window = orders_window[
+        (orders_window["o_orderdate"] >= start_date) & (orders_window["o_orderdate"] < end_date)
     ]
 
-    # Join with lineitem, filter for returns
-    order_lines = customer_orders.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    order_lines = order_lines[order_lines["l_returnflag"] == "R"]
+    returned_lines = lineitem[["l_orderkey", "l_extendedprice", "l_discount", "l_returnflag"]]
+    returned_lines = returned_lines[returned_lines["l_returnflag"] == "R"]
+    returned_lines = returned_lines.assign(
+        revenue=returned_lines["l_extendedprice"] * (1 - returned_lines["l_discount"])
+    )[["l_orderkey", "revenue"]]
 
-    # Join with nation
-    joined = order_lines.merge(nation, left_on="c_nationkey", right_on="n_nationkey")
+    customer_orders = customer_keys.merge(orders_window, left_on="c_custkey", right_on="o_custkey")
+    order_lines = customer_orders.merge(returned_lines, left_on="o_orderkey", right_on="l_orderkey")
 
-    # Calculate revenue
-    joined = joined.copy()
-    joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
+    revenue_by_customer = order_lines.groupby(["c_custkey", "c_nationkey"], as_index=False).agg(
+        revenue=("revenue", "sum")
+    )
 
-    # Aggregate
-    result = (
-        joined.groupby(
-            ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"], as_index=False
-        )
-        .agg(revenue=("revenue", "sum"))
+    with_nation = revenue_by_customer.merge(
+        nation[["n_nationkey", "n_name"]], left_on="c_nationkey", right_on="n_nationkey"
+    )
+    with_detail = with_nation.merge(customer_detail, on="c_custkey")
+
+    return (
+        with_detail[["c_custkey", "c_name", "revenue", "c_acctbal", "n_name", "c_address", "c_phone", "c_comment"]]
         .sort_values("revenue", ascending=False)
         .head(20)
     )
-
-    return result
 
 
 def q2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1318,13 +1347,11 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
     part_supplier = part_supplier[part_supplier["ps_supplycost"] == part_supplier["min_cost"]]
 
     # Select and sort
-    result = (
+    return (
         part_supplier[["s_acctbal", "s_name", "n_name", "p_partkey", "p_mfgr", "s_address", "s_phone", "s_comment"]]
         .sort_values(["s_acctbal", "n_name", "s_name", "p_partkey"], ascending=[False, True, True, True])
         .head(100)
     )
-
-    return result
 
 
 def q7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1377,13 +1404,11 @@ def q7_pandas_impl(ctx: DataFrameContext) -> Any:
     joined["volume"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
 
     # Aggregate
-    result = (
+    return (
         joined.groupby(["supp_nation", "cust_nation", "l_year"], as_index=False)
         .agg(revenue=("volume", "sum"))
         .sort_values(["supp_nation", "cust_nation", "l_year"])
     )
-
-    return result
 
 
 def q8_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1452,9 +1477,7 @@ def q8_pandas_impl(ctx: DataFrameContext) -> Any:
     result = yearly.merge(brazil_volume, on="o_year", how="left")
     result["nation_volume"] = result["nation_volume"].fillna(0)
     result["mkt_share"] = result["nation_volume"] / result["total_volume"]
-    result = result[["o_year", "mkt_share"]].sort_values("o_year")
-
-    return result
+    return result[["o_year", "mkt_share"]].sort_values("o_year")
 
 
 def q9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1497,14 +1520,12 @@ def q9_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Aggregate
-    result = (
+    return (
         joined.groupby(["n_name", "o_year"], as_index=False)
         .agg(sum_profit=("amount", "sum"))
         .rename(columns={"n_name": "nation"})
         .sort_values(["nation", "o_year"], ascending=[True, False])
     )
-
-    return result
 
 
 def q11_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1537,9 +1558,7 @@ def q11_pandas_impl(ctx: DataFrameContext) -> Any:
     # Aggregate by part and filter by threshold
     # Use explicit comparison instead of .query() for Dask compatibility
     aggregated = joined.groupby("ps_partkey", as_index=False).agg(value=("value", "sum"))
-    result = aggregated[aggregated["value"] > threshold].sort_values("value", ascending=False)
-
-    return result
+    return aggregated[aggregated["value"] > threshold].sort_values("value", ascending=False)
 
 
 def q12_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1571,13 +1590,11 @@ def q12_pandas_impl(ctx: DataFrameContext) -> Any:
     joined["low_priority"] = (~joined["o_orderpriority"].isin(["1-URGENT", "2-HIGH"])).astype(int)
 
     # Aggregate
-    result = (
+    return (
         joined.groupby("l_shipmode", as_index=False)
         .agg(high_line_count=("high_priority", "sum"), low_line_count=("low_priority", "sum"))
         .sort_values("l_shipmode")
     )
-
-    return result
 
 
 def q13_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1599,13 +1616,11 @@ def q13_pandas_impl(ctx: DataFrameContext) -> Any:
     order_counts = customer_orders.groupby("c_custkey", as_index=False).agg(c_count=("o_orderkey", "count"))
 
     # Count customers per order count
-    result = (
+    return (
         order_counts.groupby("c_count", as_index=False)
         .agg(custdist=("c_custkey", "count"))
         .sort_values(["custdist", "c_count"], ascending=[False, False])
     )
-
-    return result
 
 
 def q14_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1666,11 +1681,9 @@ def q15_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Join with suppliers having maximum revenue
     top_suppliers = revenue[revenue["total_revenue"] == max_revenue]
-    result = supplier.merge(top_suppliers, left_on="s_suppkey", right_on="supplier_no")[
+    return supplier.merge(top_suppliers, left_on="s_suppkey", right_on="supplier_no")[
         ["s_suppkey", "s_name", "s_address", "s_phone", "total_revenue"]
     ].sort_values("s_suppkey")
-
-    return result
 
 
 def q16_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1701,13 +1714,11 @@ def q16_pandas_impl(ctx: DataFrameContext) -> Any:
     joined = joined[~joined["ps_suppkey"].isin(complaint_suppliers)]
 
     # Count unique suppliers per part combination
-    result = (
+    return (
         joined.groupby(["p_brand", "p_type", "p_size"], as_index=False)
         .agg(supplier_cnt=("ps_suppkey", "nunique"))
         .sort_values(["supplier_cnt", "p_brand", "p_type", "p_size"], ascending=[False, True, True, True])
     )
-
-    return result
 
 
 def q17_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1768,14 +1779,12 @@ def q18_pandas_impl(ctx: DataFrameContext) -> Any:
     joined = joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
 
     # Aggregate
-    result = (
+    return (
         joined.groupby(["c_name", "c_custkey", "o_orderkey", "o_orderdate", "o_totalprice"], as_index=False)
         .agg(sum_qty=("l_quantity", "sum"))
         .sort_values(["o_totalprice", "o_orderdate"], ascending=[False, True])
         .head(100)
     )
-
-    return result
 
 
 def q19_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1877,11 +1886,9 @@ def q20_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Join supplier -> nation, filter by nation and excess suppliers
     supplier_nation = supplier.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
-    result = supplier_nation[
+    return supplier_nation[
         (supplier_nation["n_name"] == nation_name) & (supplier_nation["s_suppkey"].isin(excess_suppliers))
     ][["s_name", "s_address"]].sort_values("s_name")
-
-    return result
 
 
 def q21_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1941,14 +1948,12 @@ def q21_pandas_impl(ctx: DataFrameContext) -> Any:
     supplier_late_orders = supplier_late_orders.drop(columns=["_exclude"])
 
     # Count and return
-    result = (
+    return (
         supplier_late_orders.groupby("s_name", as_index=False)
         .agg(numwait=("l_orderkey", "count"))
         .sort_values(["numwait", "s_name"], ascending=[False, True])
         .head(100)
     )
-
-    return result
 
 
 def q22_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1979,13 +1984,11 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
     ]
 
     # Aggregate
-    result = (
+    return (
         result_customers.groupby("cntrycode", as_index=False)
         .agg(numcust=("c_custkey", "count"), totacctbal=("c_acctbal", "sum"))
         .sort_values("cntrycode")
     )
-
-    return result
 
 
 # =============================================================================
@@ -1995,282 +1998,60 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
 # Create the TPC-H DataFrame query registry
 TPCH_DATAFRAME_QUERIES = QueryRegistry("TPC-H DataFrame")
 
-# Register Q1 - Pricing Summary Report
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q1",
-        query_name="Pricing Summary Report",
-        description="Pricing summary statistics for shipped lineitems",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.FILTER],
-        expression_impl=q1_expression_impl,
-        pandas_impl=q1_pandas_impl,
-        sql_equivalent="SELECT l_returnflag, l_linestatus, sum(l_quantity)...",
-        expected_row_count=4,  # 2x2 combinations of flags
-    )
-)
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "JO": QueryCategory.JOIN,
+    "SO": QueryCategory.SORT,
+    "SQ": QueryCategory.SUBQUERY,
+}
 
-# Register Q3 - Shipping Priority
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q3",
-        query_name="Shipping Priority",
-        description="Top 10 unshipped orders with highest value",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SORT],
-        expression_impl=q3_expression_impl,
-        pandas_impl=q3_pandas_impl,
-        expected_row_count=10,
-    )
-)
+_QUERY_METADATA = """\
+Q1|Pricing Summary Report|Pricing summary statistics for shipped lineitems|AG,GB,FI|q1|SELECT l_returnflag, l_linestatus, sum(l_quantity)...|4
+Q3|Shipping Priority|Top 10 unshipped orders with highest value|JO,AG,SO|q3||10
+Q4|Order Priority Checking|Orders by priority with late lineitems|JO,AG,SQ|q4||5
+Q5|Local Supplier Volume|Revenue from orders in same nation within region|JO,AG,FI|q5||
+Q6|Forecasting Revenue Change|Revenue increase from eliminating discounts|AG,FI|q6||1
+Q10|Returned Item Reporting|Customers with returned parts and revenue impact|JO,AG,SO|q10||20
+Q12|Shipping Modes and Order Priority|Effect of shipping modes on order priority|JO,AG,FI|q12||2
+Q14|Promotion Effect|Effect of promotions on revenue|JO,AG,FI|q14||1
+Q7|Volume Shipping|Value of goods shipped between nations|JO,AG,FI|q7||
+Q8|National Market Share|Market share of a nation within a region|JO,AG,FI|q8||
+Q9|Product Type Profit Measure|Profit on a given line of parts|JO,AG,FI|q9||
+Q13|Customer Distribution|Distribution of customers by order count|JO,AG,SQ|q13||
+Q18|Large Volume Customer|Customers with large orders|JO,AG,SQ|q18||100
+Q19|Discounted Revenue|Revenue for parts with specific conditions|JO,AG,FI|q19||1
+Q2|Minimum Cost Supplier|Find supplier with minimum cost for parts in region|JO,SQ,SO|q2||100
+Q11|Important Stock Identification|Find most important stock in a nation|JO,AG,SQ|q11||
+Q15|Top Supplier|Determine top supplier based on revenue|JO,AG,SQ|q15||
+Q16|Parts/Supplier Relationship|Count suppliers per part, excluding complaints|JO,AG,SQ|q16||
+Q17|Small-Quantity-Order Revenue|Revenue from eliminating small quantity orders|JO,AG,SQ|q17||1
+Q20|Potential Part Promotion|Suppliers with excess inventory of parts|JO,SQ,FI|q20||
+Q21|Suppliers Who Kept Orders Waiting|Suppliers who delayed orders they could fill|JO,AG,SQ|q21||100
+Q22|Global Sales Opportunity|Identify customers likely to make purchases|AG,SQ,FI|q22||
+"""
 
-# Register Q4 - Order Priority Checking
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q4",
-        query_name="Order Priority Checking",
-        description="Orders by priority with late lineitems",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q4_expression_impl,
-        pandas_impl=q4_pandas_impl,
-        expected_row_count=5,  # 5 priority levels
-    )
-)
 
-# Register Q5 - Local Supplier Volume
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q5",
-        query_name="Local Supplier Volume",
-        description="Revenue from orders in same nation within region",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q5_expression_impl,
-        pandas_impl=q5_pandas_impl,
-    )
-)
+def _impl_for(stem: str, family: str) -> Any:
+    return globals()[f"{stem}_{family}_impl"]
 
-# Register Q6 - Forecasting Revenue Change
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q6",
-        query_name="Forecasting Revenue Change",
-        description="Revenue increase from eliminating discounts",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q6_expression_impl,
-        pandas_impl=q6_pandas_impl,
-        expected_row_count=1,
-    )
-)
 
-# Register Q10 - Returned Item Reporting
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q10",
-        query_name="Returned Item Reporting",
-        description="Customers with returned parts and revenue impact",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SORT],
-        expression_impl=q10_expression_impl,
-        pandas_impl=q10_pandas_impl,
-        expected_row_count=20,
+for query_id, query_name, description, category_codes, impl_stem, sql_equivalent, expected_row_count in reader(
+    _QUERY_METADATA.splitlines(), delimiter="|"
+):
+    TPCH_DATAFRAME_QUERIES.register(
+        DataFrameQuery(
+            query_id=query_id,
+            query_name=query_name,
+            description=description,
+            categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+            expression_impl=_impl_for(impl_stem, "expression"),
+            pandas_impl=_impl_for(impl_stem, "pandas"),
+            sql_equivalent=sql_equivalent or None,
+            expected_row_count=int(expected_row_count) if expected_row_count else None,
+        )
     )
-)
-
-# Register Q12 - Shipping Modes and Order Priority
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q12",
-        query_name="Shipping Modes and Order Priority",
-        description="Effect of shipping modes on order priority",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q12_expression_impl,
-        pandas_impl=q12_pandas_impl,
-        expected_row_count=2,  # 2 ship modes
-    )
-)
-
-# Register Q14 - Promotion Effect
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q14",
-        query_name="Promotion Effect",
-        description="Effect of promotions on revenue",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q14_expression_impl,
-        pandas_impl=q14_pandas_impl,
-        expected_row_count=1,
-    )
-)
-
-# Register Q7 - Volume Shipping
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q7",
-        query_name="Volume Shipping",
-        description="Value of goods shipped between nations",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q7_expression_impl,
-        pandas_impl=q7_pandas_impl,
-    )
-)
-
-# Register Q8 - National Market Share
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q8",
-        query_name="National Market Share",
-        description="Market share of a nation within a region",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q8_expression_impl,
-        pandas_impl=q8_pandas_impl,
-    )
-)
-
-# Register Q9 - Product Type Profit Measure
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q9",
-        query_name="Product Type Profit Measure",
-        description="Profit on a given line of parts",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q9_expression_impl,
-        pandas_impl=q9_pandas_impl,
-    )
-)
-
-# Register Q13 - Customer Distribution
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q13",
-        query_name="Customer Distribution",
-        description="Distribution of customers by order count",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q13_expression_impl,
-        pandas_impl=q13_pandas_impl,
-    )
-)
-
-# Register Q18 - Large Volume Customer
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q18",
-        query_name="Large Volume Customer",
-        description="Customers with large orders",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q18_expression_impl,
-        pandas_impl=q18_pandas_impl,
-        expected_row_count=100,
-    )
-)
-
-# Register Q19 - Discounted Revenue
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q19",
-        query_name="Discounted Revenue",
-        description="Revenue for parts with specific conditions",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q19_expression_impl,
-        pandas_impl=q19_pandas_impl,
-        expected_row_count=1,
-    )
-)
-
-# Register Q2 - Minimum Cost Supplier
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q2",
-        query_name="Minimum Cost Supplier",
-        description="Find supplier with minimum cost for parts in region",
-        categories=[QueryCategory.JOIN, QueryCategory.SUBQUERY, QueryCategory.SORT],
-        expression_impl=q2_expression_impl,
-        pandas_impl=q2_pandas_impl,
-        expected_row_count=100,
-    )
-)
-
-# Register Q11 - Important Stock Identification
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q11",
-        query_name="Important Stock Identification",
-        description="Find most important stock in a nation",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q11_expression_impl,
-        pandas_impl=q11_pandas_impl,
-    )
-)
-
-# Register Q15 - Top Supplier
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q15",
-        query_name="Top Supplier",
-        description="Determine top supplier based on revenue",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q15_expression_impl,
-        pandas_impl=q15_pandas_impl,
-    )
-)
-
-# Register Q16 - Parts/Supplier Relationship
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q16",
-        query_name="Parts/Supplier Relationship",
-        description="Count suppliers per part, excluding complaints",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q16_expression_impl,
-        pandas_impl=q16_pandas_impl,
-    )
-)
-
-# Register Q17 - Small-Quantity-Order Revenue
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q17",
-        query_name="Small-Quantity-Order Revenue",
-        description="Revenue from eliminating small quantity orders",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q17_expression_impl,
-        pandas_impl=q17_pandas_impl,
-        expected_row_count=1,
-    )
-)
-
-# Register Q20 - Potential Part Promotion
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q20",
-        query_name="Potential Part Promotion",
-        description="Suppliers with excess inventory of parts",
-        categories=[QueryCategory.JOIN, QueryCategory.SUBQUERY, QueryCategory.FILTER],
-        expression_impl=q20_expression_impl,
-        pandas_impl=q20_pandas_impl,
-    )
-)
-
-# Register Q21 - Suppliers Who Kept Orders Waiting
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q21",
-        query_name="Suppliers Who Kept Orders Waiting",
-        description="Suppliers who delayed orders they could fill",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q21_expression_impl,
-        pandas_impl=q21_pandas_impl,
-        expected_row_count=100,
-    )
-)
-
-# Register Q22 - Global Sales Opportunity
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q22",
-        query_name="Global Sales Opportunity",
-        description="Identify customers likely to make purchases",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.SUBQUERY, QueryCategory.FILTER],
-        expression_impl=q22_expression_impl,
-        pandas_impl=q22_pandas_impl,
-    )
-)
 
 
 def get_tpch_dataframe_queries() -> QueryRegistry:

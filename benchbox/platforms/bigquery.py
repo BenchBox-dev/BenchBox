@@ -11,18 +11,21 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import argparse
+import json
 import logging
+import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from benchbox.core.errors import PlanCaptureError
+from benchbox.platforms.base.config_utils import make_registered_platform_config_builder
+from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
         TuningColumn,
         UnifiedTuningConfiguration,
     )
@@ -33,7 +36,7 @@ from benchbox.utils.printing import emit
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
 from .base import DriverIsolationCapability, PlatformAdapter
-from .base.data_loading import NO_BENCHMARK, DataSource, DataSourceResolver, resolve_csv_dialect
+from .base.data_loading import NO_BENCHMARK, DataSource, resolve_adapter_data_source, resolve_csv_dialect
 from .base.runtime_metadata import build_default_normalized_result_metadata
 
 try:
@@ -60,6 +63,12 @@ class BigQueryAdapter(PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
     _DELIMITED_FORMATS = frozenset({"tbl", "csv"})
+    # Genuine side-effect engine: BigQuery has no EXPLAIN statement; the real plan
+    # and stage timing are only available from the executed QueryJob (job.query_plan).
+    # A standalone EXPLAIN/dry-run yields only an estimate and a real re-run costs
+    # money, so BigQuery is excluded from the isolated phase and keeps job-harvest
+    # capture. See _project/TODO/main/planning/query-plan-capture-sideeffect-engine-policy.yaml.
+    plan_capture_phase_eligible = False
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -1126,16 +1135,7 @@ class BigQueryAdapter(PlatformAdapter):
 
     def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> Any:
         """Resolve benchmark data files from benchmark tables or manifest."""
-        resolver = DataSourceResolver(
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
-        )
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source
+        return resolve_adapter_data_source(self, benchmark, data_dir)
 
     @staticmethod
     def _ensure_file_list(file_paths: Any) -> list[Any]:
@@ -1561,8 +1561,24 @@ class BigQueryAdapter(PlatformAdapter):
             # Map job_statistics to resource_usage for cost calculation
             result_dict["resource_usage"] = job_stats
 
+            # Capture the structured query plan from the already-completed job's
+            # statistics (job.query_plan) — no extra EXPLAIN/API call. Guarded by
+            # capture_plans so nothing extra happens when capture is off.
+            if self.capture_plans and result_dict.get("status") == "SUCCESS":
+                query_plan, plan_capture_time_ms = self._capture_bq_plan(query_job, query_id)
+                if query_plan:
+                    result_dict["query_plan"] = query_plan
+                    result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
+                if plan_capture_time_ms is not None:
+                    result_dict["plan_capture_time_ms"] = plan_capture_time_ms
+
             return result_dict
 
+        except PlanCaptureError:
+            # strict_plan_capture=True: a capture failure on an otherwise
+            # successful query must propagate rather than be masked as a query
+            # failure by the broad handler below.
+            raise
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
 
@@ -1740,6 +1756,102 @@ class BigQueryAdapter(PlatformAdapter):
         except Exception as e:
             return {"error": str(e)}
 
+    def get_query_plan_parser(self):
+        """Get BigQuery query plan parser.
+
+        BigQuery captures plans from job statistics via ``_capture_bq_plan``
+        rather than the EXPLAIN-output path, but the parser is exposed here for
+        symmetry with the other adapters and for direct use.
+        """
+        from benchbox.core.query_plans.parsers.bigquery import BigQueryQueryPlanParser
+
+        return BigQueryQueryPlanParser()
+
+    def _capture_bq_plan(self, job: Any, query_id: str) -> tuple[Any, float]:
+        """Capture the structured plan from a completed BigQuery ``QueryJob``.
+
+        BigQuery has no EXPLAIN statement; the execution plan is only available
+        after the query runs, from ``job.query_plan`` (the Job Statistics API).
+        This bypasses the EXPLAIN-based ``capture_query_plan`` path entirely and
+        reads the in-memory job object, so it incurs no additional API call.
+
+        Returns a ``(QueryPlanDAG | None, capture_time_ms)`` tuple, mirroring
+        ``capture_query_plan``. Honors the same ``capture_plans`` /
+        ``plan_query_filter`` gates (the per-iteration / per-stream sampling
+        machinery has been retired).
+        """
+        if not self.capture_plans:
+            return None, 0.0
+        if self.plan_query_filter and query_id not in self.plan_query_filter:
+            return None, 0.0
+
+        start_time = time.perf_counter()
+        try:
+            stages = [self._bq_entry_to_dict(entry) for entry in (getattr(job, "query_plan", None) or [])]
+            if not stages:
+                capture_time_ms = (time.perf_counter() - start_time) * 1000
+                self._record_plan_capture_failure(
+                    query_id,
+                    reason="explain_failed",
+                    message="Completed job exposed no query_plan stages",
+                )
+                return None, capture_time_ms
+
+            parser = self.get_query_plan_parser()
+            plan = parser.parse_explain_output(query_id, json.dumps(stages))
+        except PlanCaptureError:
+            raise
+        except Exception as exc:
+            capture_time_ms = (time.perf_counter() - start_time) * 1000
+            self._record_plan_capture_failure(query_id, reason="parse_error", message=str(exc))
+            return None, capture_time_ms
+
+        if plan is None:
+            capture_time_ms = (time.perf_counter() - start_time) * 1000
+            self._record_plan_capture_failure(query_id, reason="parse_error", message="Parser returned no plan")
+            return None, capture_time_ms
+
+        # Apply the raw_explain_output retention policy, mirroring the generic
+        # EXPLAIN-based capture_query_plan() path. This BigQuery path bypasses that
+        # method, so without this the plan_raw_output="none"/truncated policy would be
+        # ignored and the full raw plan text retained in the result bundle.
+        raw_output_policy, raw_output_max_bytes = self._resolve_raw_output_policy(query_id)
+        plan.apply_raw_output_policy(raw_output_policy, raw_output_max_bytes)
+
+        capture_time_ms = (time.perf_counter() - start_time) * 1000
+        self.query_plans_captured += 1
+        return plan, capture_time_ms
+
+    @staticmethod
+    def _bq_entry_to_dict(entry: Any) -> dict[str, Any]:
+        """Normalize a ``QueryPlanEntry`` (or dict) into a JSON-serializable dict.
+
+        Prefers the entry's raw ``_properties`` (already the camelCase API shape
+        the parser expects); falls back to building the dict from public
+        attributes when those are all that is available.
+        """
+        if isinstance(entry, dict):
+            return entry
+        raw = getattr(entry, "_properties", None)
+        if isinstance(raw, dict) and raw:
+            return raw
+        steps = [
+            {
+                "kind": getattr(step, "kind", None),
+                "substeps": list(getattr(step, "substeps", None) or []),
+            }
+            for step in (getattr(entry, "steps", None) or [])
+        ]
+        return {
+            "name": getattr(entry, "name", None),
+            "id": getattr(entry, "entry_id", getattr(entry, "id", None)),
+            "status": getattr(entry, "status", None),
+            "inputStages": list(getattr(entry, "input_stages", None) or []),
+            "recordsRead": getattr(entry, "records_read", None),
+            "recordsWritten": getattr(entry, "records_written", None),
+            "steps": steps,
+        }
+
     def close_connection(self, connection: Any) -> None:
         """Close BigQuery connection.
 
@@ -1772,26 +1884,7 @@ class BigQueryAdapter(PlatformAdapter):
             # Silently ignore transport cleanup errors
             pass
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if BigQuery supports a specific tuning type.
-
-        BigQuery supports:
-        - PARTITIONING: Via PARTITION BY clause (date/timestamp/integer columns)
-        - CLUSTERING: Via CLUSTER BY clause (up to 4 columns)
-
-        Args:
-            tuning_type: The type of tuning to check support for
-
-        Returns:
-            True if the tuning type is supported by BigQuery
-        """
-        # Import here to avoid circular imports
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {TuningType.PARTITIONING, TuningType.CLUSTERING}
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "CLUSTERING")
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate BigQuery-specific tuning clauses for CREATE TABLE statements.
@@ -1952,25 +2045,10 @@ class BigQueryAdapter(PlatformAdapter):
             raise ValueError(f"Failed to apply tunings to BigQuery table {table_name}: {e}") from e
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration to BigQuery.
+        """Apply unified tuning configuration to BigQuery."""
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        Args:
-            unified_config: Unified tuning configuration to apply
-            connection: BigQuery connection
-        """
-        if not unified_config:
-            return
-
-        # Apply constraint configurations
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        # Apply platform optimizations
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        # Apply table-level tunings
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
         """Apply BigQuery-specific platform optimizations.
@@ -1986,72 +2064,13 @@ class BigQueryAdapter(PlatformAdapter):
         # Store optimizations for use during query execution
         self.logger.info("BigQuery platform optimizations stored for query execution")
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to BigQuery.
-
-        Note: BigQuery has limited constraint support. Constraints are mainly for metadata/optimization.
-
-        Args:
-            primary_key_config: Primary key constraint configuration
-            foreign_key_config: Foreign key constraint configuration
-            connection: BigQuery connection
-        """
-        # BigQuery constraints are applied at table creation time
-        # This method is called after tables are created, so log the configurations
-
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info("Primary key constraints enabled for BigQuery (applied during table creation)")
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info("Foreign key constraints enabled for BigQuery (applied during table creation)")
-
-        # BigQuery doesn't support ALTER TABLE to add constraints after creation
-        # So there's no additional work to do here
-
-
-def _build_bigquery_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build BigQuery database configuration with credential loading.
-
-    This function loads saved credentials from the CredentialManager and
-    merges them with CLI options and runtime overrides.
-
-    Args:
-        platform: Platform name (should be 'bigquery')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded and platform-specific fields at top-level
-    """
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    config = build_platform_config(
-        platform_type="bigquery",
-        credential_key="bigquery",
-        default_display_name="Google BigQuery",
-        default_driver_package="google-cloud-bigquery",
-        platform_fields=[
-            "project_id",
-            "dataset_id",
-            "location",
-            "credentials_path",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints enabled for BigQuery (applied during table creation)",
+        "Foreign key constraints enabled for BigQuery (applied during table creation)",
     )
 
+
+def _apply_bigquery_config_fields(config: Any) -> None:
     staging_root = config.options.get("staging_root")
     if not staging_root:
         default_output = config.options.get("default_output_location")
@@ -2072,15 +2091,18 @@ def _build_bigquery_config(
     config.staging_root = staging_root
     config.storage_bucket = storage_bucket
     config.storage_prefix = storage_prefix
-    return config
 
 
-# Register the config builder with the platform hook registry
-# This must happen when the module is imported
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("bigquery", _build_bigquery_config)
-except ImportError:
-    # Platform hooks may not be available in all contexts (e.g., core-only usage)
-    pass
+_build_bigquery_config = make_registered_platform_config_builder(
+    "bigquery",
+    __name__,
+    "Google BigQuery",
+    "google-cloud-bigquery",
+    [
+        "project_id",
+        "dataset_id",
+        "location",
+        "credentials_path",
+    ],
+    postprocess=_apply_bigquery_config_fields,
+)

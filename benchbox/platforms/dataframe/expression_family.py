@@ -44,6 +44,7 @@ from benchbox.platforms.dataframe._result_helpers import (
     build_success_result_dict,
 )
 from benchbox.platforms.dataframe.benchmark_mixin import BenchmarkExecutionMixin
+from benchbox.platforms.dataframe.shared_loading import declared_string_columns, resolve_dataframe_csv_dialect
 from benchbox.platforms.dataframe.tuning_mixin import TuningConfigurableMixin
 from benchbox.platforms.dataframe.unified_frame import UnifiedExpr, UnifiedLazyFrame, UnifiedWhen
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -128,7 +129,7 @@ class ExpressionFamilyContext(DataFrameContextImpl[DF], Generic[DF, Expr]):
             return value
         # Track if this is a string literal for PySpark concat detection
         is_string = isinstance(value, str)
-        return UnifiedExpr(self._adapter.lit(value), _is_string_literal=is_string)
+        return UnifiedExpr(self._adapter.lit(value), _is_string_literal=is_string, _literal_value=value)
 
     def element(self) -> UnifiedExpr:
         """Create a list element expression for use inside list.eval().
@@ -935,6 +936,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         has_header: bool = True,
         column_names: list[str] | None = None,
         null_marker: str | None = None,
+        string_columns: list[str] | None = None,
     ) -> LazyDF:
         """Read a CSV file into a DataFrame.
 
@@ -944,6 +946,8 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
             null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
+            string_columns: Declared string columns whose empty CSV fields must
+                stay ``""`` when ``null_marker`` is ``None``.
 
         Returns:
             LazyFrame/DataFrame with the file contents
@@ -1236,20 +1240,15 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             effective_delimiter = delimiter or ("|" if format_type == "tbl" else ",")
             has_header = format_type == "csv" and delimiter is None
 
-            # Resolve null_marker for trailing-delimiter probing via the resolver when a
-            # DataSource is available (manifest path).  Without one, derive from format_type
-            # so .tbl files (format_type=="tbl") keep their existing trailing-delimiter behaviour.
-            # When benchmark=None, NO_BENCHMARK is used: path (a) wins when table_metadata is
-            # present; otherwise path (c) of resolve_csv_dialect derives null_marker from the
-            # file extension (.tbl/.dat → "", everything else → None), which is correct.
-            if data_source is not None:
-                from benchbox.platforms.base.data_loading import NO_BENCHMARK, resolve_csv_dialect
-
-                bm = benchmark if benchmark is not None else NO_BENCHMARK
-                _dialect = resolve_csv_dialect(data_source, table_name, first_file, bm)
-                null_marker: str | None = _dialect.null_marker
-            else:
-                null_marker = "" if format_type == "tbl" else None
+            null_marker, has_header = resolve_dataframe_csv_dialect(
+                data_source=data_source,
+                table_name=table_name,
+                first_file=first_file,
+                benchmark=benchmark,
+                format_type=format_type,
+                default_has_header=has_header,
+            )
+            string_columns = declared_string_columns(benchmark, table_name, column_names)
 
             df = self._load_csv_files(
                 file_paths,
@@ -1257,6 +1256,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 has_header=has_header,
                 column_names=column_names,
                 null_marker=null_marker,
+                string_columns=string_columns,
             )
 
         # Register table
@@ -1406,6 +1406,10 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         profile_ctx = QueryProfileContext(qid, self.platform_name)
         profile_ctx._start_time = mono_time()
 
+        # Real cause of a plan-capture failure, if any (qpc-05 / F4.4); attached
+        # to the successful query row below so it is not silently lost.
+        plan_capture_error: str | None = None
+
         # Start memory tracking if enabled
         memory_tracker: MemoryTracker | None = None
         if track_memory:
@@ -1427,14 +1431,24 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             if isinstance(lazy_result, UnifiedLazyFrame):
                 lazy_result = lazy_result.native
 
-            # Capture query plan before collect if enabled
+            # Capture query plan before collect if enabled. Timed as its own phase
+            # so capture cost is excluded from execution_time_ms and reported
+            # separately as plan_capture_time_ms (matching the SQL platforms).
             if capture_plan:
+                profile_ctx.start_plan_capture()
                 try:
                     plan = capture_query_plan(lazy_result, self.platform_name)
                     if plan:
                         profile_ctx.set_query_plan(plan)
                 except Exception as e:
-                    logger.debug(f"Plan capture failed for {qid}: {e}")
+                    # Do not swallow the real cause at DEBUG (qpc-05 / F4.4).
+                    # Record it on a per-run list, surface it once per run at
+                    # WARNING, and carry it on the query row so the failure has
+                    # a concrete cause instead of a generic "not captured".
+                    plan_capture_error = str(e)
+                    self._record_dataframe_plan_capture_failure(qid, plan_capture_error)
+                finally:
+                    profile_ctx.end_plan_capture()
 
             # Phase 2: Collection (materialize results)
             profile_ctx.start_collect()
@@ -1476,6 +1490,10 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 row_count=row_count,
                 first_row=first_row,
             )
+            if plan_capture_error is not None:
+                # Carry the concrete plan-capture failure cause on the (otherwise
+                # successful) query row instead of losing it (qpc-05 / F4.4).
+                result_dict["plan_capture_error"] = plan_capture_error
 
             return result_dict, profile
 
@@ -1542,6 +1560,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         has_header: bool,
         column_names: list[str] | None,
         null_marker: str | None = None,
+        string_columns: list[str] | None = None,
     ) -> LazyDF:
         """Load CSV/TBL files.
 
@@ -1551,30 +1570,26 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             has_header: Whether files have headers
             column_names: Optional column names
             null_marker: Passed through to read_csv for trailing-delimiter probing.
+            string_columns: Declared string columns whose empty CSV fields must
+                stay ``""`` when ``null_marker`` is ``None``.
 
         Returns:
             Combined DataFrame
         """
+        read_kwargs: dict[str, Any] = {
+            "delimiter": delimiter,
+            "has_header": has_header,
+            "column_names": column_names,
+            "null_marker": null_marker,
+        }
+        if string_columns:
+            read_kwargs["string_columns"] = string_columns
+
         if len(file_paths) == 1:
-            return self.read_csv(
-                file_paths[0],
-                delimiter=delimiter,
-                has_header=has_header,
-                column_names=column_names,
-                null_marker=null_marker,
-            )
+            return self.read_csv(file_paths[0], **read_kwargs)
 
         # Multiple files - load and concatenate
-        dfs = [
-            self.read_csv(
-                f,
-                delimiter=delimiter,
-                has_header=has_header,
-                column_names=column_names,
-                null_marker=null_marker,
-            )
-            for f in file_paths
-        ]
+        dfs = [self.read_csv(f, **read_kwargs) for f in file_paths]
         return self._concat_dataframes(dfs)
 
     def concat_dataframes(self, dfs: list[LazyDF]) -> LazyDF:
@@ -1623,6 +1638,34 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             First row as tuple, or None
         """
         return None
+
+    def _record_dataframe_plan_capture_failure(self, query_id: str, message: str) -> None:
+        """Record a DataFrame plan-capture failure (qpc-05 / F4.4).
+
+        Mirrors the SQL adapter's ``_record_plan_capture_failure`` pattern: the
+        real exception is appended to a per-run list (``plan_capture_errors``,
+        available for inspection/aggregation) and surfaced ONCE per run at
+        WARNING, instead of being swallowed silently at DEBUG. ``run_benchmark``
+        resets both the list and the warn-once flag at the start of each run
+        (qpc-15 F4.4 follow-up), so a reused adapter instance doesn't
+        accumulate errors or permanently suppress the warning after run 1; the
+        ``hasattr`` guard below remains only as a defensive fallback for
+        callers that invoke this method outside ``run_benchmark``.
+        """
+        if not hasattr(self, "plan_capture_errors"):
+            self.plan_capture_errors: list[dict[str, Any]] = []
+        self.plan_capture_errors.append({"query_id": query_id, "error": message})
+
+        if not getattr(self, "_plan_capture_warning_emitted", False):
+            self._plan_capture_warning_emitted = True
+            logger.warning(
+                "Query plan capture failed for %s on %s: %s (further capture failures this run are logged at debug)",
+                query_id,
+                self.platform_name,
+                message,
+            )
+        else:
+            logger.debug("Query plan capture failed for %s: %s", query_id, message)
 
     def _log_verbose(self, message: str) -> None:
         """Log a verbose message if verbose mode is enabled."""

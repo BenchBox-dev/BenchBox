@@ -11,6 +11,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -151,6 +152,148 @@ class TestPandasDataLoading:
         )
 
         assert list(df.columns) == ["id", "name", "amount"]
+
+    def test_read_csv_with_column_names_parses_dates(self, tmp_path):
+        """Explicit-schema raw CSV loads parse date columns without date surrogate keys."""
+        adapter = PandasDataFrameAdapter()
+
+        csv_path = tmp_path / "orders.tbl"
+        csv_path.write_text("1|1998-01-02|2450815|2013-07-01 12:34:56|\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["o_orderkey", "o_orderdate", "d_date_sk", "EventTime"],
+            null_marker="",
+        )
+
+        assert df["o_orderdate"].iloc[0] == date(1998, 1, 2)
+        assert df["o_orderdate"].dt.year.iloc[0] == 1998
+        assert not pd.api.types.is_datetime64_any_dtype(df["d_date_sk"])
+        assert pd.api.types.is_datetime64_any_dtype(df["EventTime"])
+
+    def test_read_csv_type_aware_date_parsing_by_declared_type(self, tmp_path):
+        """A declared TIMESTAMP column parses even when its name misses the suffix heuristic (w9).
+
+        ClickBench's ClientEventTime is TIMESTAMP but does not end in
+        date/timestamp, so the name-only heuristic read it as a raw string while
+        the SQL surface returned a datetime. Declared types are now authoritative.
+        """
+        adapter = PandasDataFrameAdapter()
+        csv_path = tmp_path / "hits.csv"
+        csv_path.write_text("1|2013-07-01 00:01:34\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "ClientEventTime"],
+            null_marker=None,
+            column_types=["INTEGER", "TIMESTAMP"],
+        )
+        assert pd.api.types.is_datetime64_any_dtype(df["ClientEventTime"])
+
+    def test_read_csv_declared_text_column_not_inferred_numeric(self, tmp_path):
+        """A declared TEXT column with numeric-looking values stays string (w9).
+
+        join-order movie_info_idx.info holds rating strings like "8.0"; pandas
+        would infer float64 and diverge from the VARCHAR SQL surface.
+        """
+        adapter = PandasDataFrameAdapter()
+        csv_path = tmp_path / "info.csv"
+        csv_path.write_text("1|8.0\n2|10.0\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "info"],
+            null_marker="",
+            column_types=["INTEGER", "TEXT"],
+        )
+        assert not pd.api.types.is_numeric_dtype(df["info"])
+        assert df["info"].iloc[0] == "8.0"
+
+    def test_read_csv_empty_string_handling_follows_null_marker(self, tmp_path):
+        """Empty text fields stay "" when null_marker is None, NaN when "" (w9).
+
+        Matches the SQL surface per the benchmark's resolved CSV dialect:
+        ClickBench (null_marker=None) keeps ""; JoinOrder (null_marker="") nulls.
+        """
+        adapter = PandasDataFrameAdapter()
+        csv_path = tmp_path / "t.csv"
+        csv_path.write_text("1|\n2|hello\n")
+
+        kept = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "note"],
+            null_marker=None,
+            column_types=["INTEGER", "TEXT"],
+        )
+        assert kept["note"].iloc[0] == ""
+
+        nulled = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "note"],
+            null_marker="",
+            column_types=["INTEGER", "TEXT"],
+        )
+        assert pd.isna(nulled["note"].iloc[0])
+
+    def test_load_headered_csv_with_column_names_parses_dates(self, tmp_path):
+        """Headered CSV loads still use schema names for pandas date converters."""
+        adapter = PandasDataFrameAdapter()
+        ctx = adapter.create_context()
+
+        csv_path = tmp_path / "flights.csv"
+        csv_path.write_text("flight_id,flight_date,EventTime\n1,2018-01-02,2018-01-02 12:34:56\n")
+
+        adapter.load_table(
+            ctx,
+            "flights",
+            [csv_path],
+            column_names=["flight_id", "flight_date", "EventTime"],
+            format_hint="csv",
+        )
+
+        df = ctx.get_table("flights")._df
+        assert df["flight_date"].iloc[0] == date(2018, 1, 2)
+        assert df["flight_date"].dt.year.iloc[0] == 2018
+        assert pd.api.types.is_datetime64_any_dtype(df["EventTime"])
+
+    def test_read_csv_all_digit_string_column_stays_text(self, tmp_path):
+        """An all-digit declared string column keeps its values as text, not numbers.
+
+        Without forcing the declared string dtype, pandas infers an all-digit
+        VARCHAR (e.g. a zip/id code) as float64, so '10' becomes 10.0 and diverges
+        from the SQL reference that stores the literal string.
+        """
+        adapter = PandasDataFrameAdapter()
+
+        csv_path = tmp_path / "codes.tbl"
+        csv_path.write_text("1|007|x\n2|10|y\n3||z\n")
+
+        # null_marker=None (keep-empty dialect, e.g. ClickBench): an empty declared
+        # string field stays '' rather than NULL, so the all-digit-text contract can
+        # be asserted alongside the empty-field handling.
+        df = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["id", "code", "tag"],
+            null_marker=None,
+            column_types=["INTEGER", "VARCHAR", "VARCHAR"],
+        )
+
+        # Leading zero preserved, value is the string '10' not the number 10, and
+        # the empty field is '' (not NaN) under the keep-empty dialect.
+        assert list(df["code"]) == ["007", "10", ""]
+        assert df["code"].dtype == object
 
     def test_read_parquet(self, tmp_path):
         """Test reading a Parquet file."""
@@ -674,3 +817,74 @@ class TestPandasNotAvailable:
 
         # This just tests that the flag exists and is boolean
         assert isinstance(PANDAS_AVAILABLE, bool)
+
+
+class TestTypeAwareDateColumnInference:
+    """The CSV date heuristic must use schema types, not just column names.
+
+    Regression for SSB: ``lo_orderdate`` / ``lo_commitdate`` are INTEGER YYYYMMDD
+    datekeys whose names end in ``date``; the name-only heuristic tried to
+    date-parse them and crashed the pandas loader.
+    """
+
+    def test_numeric_date_named_column_is_not_a_date(self):
+        from benchbox.platforms.dataframe.pandas_df import _pandas_parse_date_columns
+
+        names = ["lo_orderkey", "lo_orderdate", "lo_commitdate", "lo_revenue"]
+        types = ["INTEGER", "INTEGER", "INTEGER", "INTEGER"]
+        date_cols, datetime_cols = _pandas_parse_date_columns(names, types)
+        assert date_cols == []
+        assert datetime_cols == []
+
+    def test_string_date_named_column_is_still_a_date(self):
+        from benchbox.platforms.dataframe.pandas_df import _pandas_parse_date_columns
+
+        # SSB d_date is VARCHAR; a real string date must still be parsed.
+        names = ["d_datekey", "d_date"]
+        types = ["INTEGER", "VARCHAR(18)"]
+        date_cols, _ = _pandas_parse_date_columns(names, types)
+        assert date_cols == ["d_date"]
+
+    def test_without_types_falls_back_to_name_heuristic(self):
+        from benchbox.platforms.dataframe.pandas_df import _pandas_parse_date_columns
+
+        # No types supplied -> unchanged legacy behavior (name-only).
+        names = ["o_orderdate", "o_custkey"]
+        date_cols, _ = _pandas_parse_date_columns(names, None)
+        assert date_cols == ["o_orderdate"]
+
+    def test_mismatched_types_length_is_ignored(self):
+        from benchbox.platforms.dataframe.pandas_df import _pandas_parse_date_columns
+
+        # A types list that does not align with names is ignored (safe fallback).
+        names = ["o_orderdate", "o_custkey"]
+        date_cols, _ = _pandas_parse_date_columns(names, ["INTEGER"])  # wrong length
+        assert date_cols == ["o_orderdate"]
+
+    def test_is_numeric_sql_type(self):
+        from benchbox.platforms.dataframe.pandas_df import _is_numeric_sql_type
+
+        assert _is_numeric_sql_type("INTEGER")
+        assert _is_numeric_sql_type("integer")
+        assert _is_numeric_sql_type("BIGINT")
+        assert _is_numeric_sql_type("DECIMAL(15,2)")
+        assert not _is_numeric_sql_type("VARCHAR(18)")
+        assert not _is_numeric_sql_type("DATE")
+        assert not _is_numeric_sql_type(None)
+
+    def test_read_csv_does_not_date_parse_integer_datekeys(self, tmp_path):
+        """End-to-end: read_csv with an integer datekey column must not crash or coerce."""
+        from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
+
+        csv = tmp_path / "lineorder.tbl"
+        csv.write_text("1|19920101|100\n2|19980815|200\n")
+        adapter = PandasDataFrameAdapter()
+        df = adapter.read_csv(
+            csv,
+            delimiter="|",
+            header=None,
+            names=["lo_orderkey", "lo_orderdate", "lo_revenue"],
+            column_types=["INTEGER", "INTEGER", "INTEGER"],
+        )
+        # lo_orderdate stays an integer datekey (not a date) and loads cleanly.
+        assert df["lo_orderdate"].tolist() == [19920101, 19980815]

@@ -1,0 +1,48 @@
+{
+  "GlobalStats": {
+    "partitionsTotal": 8,
+    "partitionsAssigned": 8,
+    "bytesAssigned": 16777216
+  },
+  "Operations": [
+    [
+      {
+        "id": 0,
+        "operation": "Result",
+        "expressions": ["O_ORDERKEY", "REVENUE"]
+      },
+      {
+        "id": 1,
+        "operation": "Sort",
+        "parentOperators": [0],
+        "expressions": ["REVENUE DESC"]
+      },
+      {
+        "id": 2,
+        "operation": "Aggregate",
+        "parentOperators": [1],
+        "expressions": ["SUM(L_EXTENDEDPRICE) AS REVENUE", "groupBy: O_ORDERKEY"]
+      },
+      {
+        "id": 3,
+        "operation": "InnerJoin",
+        "parentOperators": [2],
+        "expressions": ["O_ORDERKEY = L_ORDERKEY"]
+      },
+      {
+        "id": 4,
+        "operation": "TableScan",
+        "parentOperators": [3],
+        "objects": ["TPCH.PUBLIC.ORDERS"],
+        "expressions": ["O_ORDERKEY"]
+      },
+      {
+        "id": 5,
+        "operation": "TableScan",
+        "parentOperators": [3],
+        "objects": ["TPCH.PUBLIC.LINEITEM"],
+        "expressions": ["L_ORDERKEY", "L_EXTENDEDPRICE"]
+      }
+    ]
+  ]
+}

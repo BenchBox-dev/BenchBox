@@ -37,6 +37,8 @@ class ClickHouseAdapter(
         manual query rewriting or ClickHouse engine improvements.
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
     # Known incompatible queries that may fail despite transformations
@@ -102,6 +104,35 @@ class ClickHouseAdapter(
                     "\nFor more information, visit: https://clickhouse.com/docs/en/integrations/python"
                 )
             self._setup_cloud_mode(config)
+
+    def get_query_plan(self, connection, query: str) -> str | None:
+        """Get the ClickHouse logical plan via ``EXPLAIN PLAN``.
+
+        All three modes (local/chDB, server/clickhouse-driver, cloud/
+        clickhouse-connect) expose the same ``connection.execute()`` API returning
+        indexable rows, so a single base-class implementation works for all of
+        them. ``EXPLAIN PLAN`` (not ``PIPELINE``) is used because it carries the
+        logical operator names needed for cross-platform comparison.
+
+        Returns the joined plan text, or ``None`` on any failure (e.g. ClickHouse
+        < 20.6 without EXPLAIN support), so capture degrades gracefully.
+        """
+        try:
+            result = connection.execute(f"EXPLAIN PLAN {query}")
+            if not result:
+                return None
+            lines = [str(row[0]) if isinstance(row, (list, tuple)) else str(row) for row in result]
+            text = "\n".join(lines)
+            return text or None
+        except Exception as e:
+            self.logger.debug(f"Could not get ClickHouse query plan: {e}")
+            return None
+
+    def get_query_plan_parser(self):
+        """Return the ClickHouse plan parser (shared by local, server, and cloud)."""
+        from benchbox.core.query_plans.parsers.clickhouse import ClickHouseQueryPlanParser
+
+        return ClickHouseQueryPlanParser()
 
 
 __all__ = ["ClickHouseAdapter"]

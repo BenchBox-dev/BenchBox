@@ -971,8 +971,16 @@ class ResultBuilder:
                 result_dict["query_plan"] = result.query_plan
             if result.plan_fingerprint is not None:
                 result_dict["plan_fingerprint"] = result.plan_fingerprint
+            if result.plan_fingerprint_normalized is not None:
+                result_dict["plan_fingerprint_normalized"] = result.plan_fingerprint_normalized
             if result.plan_capture_time_ms is not None:
                 result_dict["plan_capture_time_ms"] = result.plan_capture_time_ms
+            if result.plan_capture_error is not None:
+                result_dict["plan_capture_error"] = result.plan_capture_error
+            if result.result_digest is not None:
+                result_dict["result_digest"] = result.result_digest
+            if result.test_type:
+                result_dict["test_type"] = result.test_type
 
             results.append(result_dict)
 

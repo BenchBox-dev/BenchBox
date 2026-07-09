@@ -17,11 +17,16 @@ established the following priority tiers based on coupling analysis, effort, and
 evidence of need:
 
 **Tier 1: Act now (small effort, clear value):**
-- **artifactlinks**: Dead code with zero consumers. Prune.
+- **artifactlinks**: Completed in v0.2.1 — the old generic publishing layer was
+  pruned. `benchbox/core/publishing/` now hosts the live, CLI-integrated
+  bundle-publish subsystem; do not prune it. See
+  [Prune publishing](prune-publishing-subsystem/README.md).
 - **benchbox-maintainer**: Near-zero coupling. Remove entry point and exclude from wheel.
 - **benchbox-experimental**: Namespace hygiene for 5 misplaced subsystems.
 
 **Tier 2: Act when prerequisites are met:**
+- **Benchmark family plugin seam**: Classify benchmark APIs and pilot a small
+  family interface before splitting core benchmark packages.
 - **MCP APIs**: Already an optional extra. Formalize 3 internal API refs as public exports. Defer distribution split until post-v1.0.
 - **Monitoring**: Light coupling but no second consumer. Gate behind `benchbox[monitoring]` optional extra first.
 
@@ -34,7 +39,11 @@ Two proposals were discarded during adversarial review:
 
 ## Proposals
 
-- [Prune publishing](prune-publishing-subsystem/README.md) - **High** priority (dead code removal)
+- [Architecture contract decision index](contract-index.md) - active planning
+  index for public-contract and future-state decisions
+- [Benchmark family plugin seam](benchmark-family-plugin-seam/README.md) -
+  **Medium** priority, gated by API classification and one pilot family
+- [Prune publishing](prune-publishing-subsystem/README.md) - **Completed (v0.2.1)**; retained as a historical record (the path now hosts the live bundle-publish subsystem)
 - [Remove release tooling from wheel](remove-release-tooling-from-wheel/README.md) - **High** priority
 - [Isolate experimental subsystems](isolate-experimental-core-subsystems/README.md) - **High** priority
 - [Gate monitoring behind optional extra](gate-monitoring-behind-optional-extra/README.md) - **Medium** priority
@@ -44,6 +53,8 @@ Two proposals were discarded during adversarial review:
 :maxdepth: 1
 :hidden:
 
+contract-index
+benchmark-family-plugin-seam/README
 prune-publishing-subsystem/README
 remove-release-tooling-from-wheel/README
 isolate-experimental-core-subsystems/README

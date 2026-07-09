@@ -13,40 +13,19 @@ only; transformer_id is not resolved at runtime.
 
 from __future__ import annotations
 
-from benchbox.sql_compat.actions import CompatAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.decision import (
-    CompatibilityDecision,
-    FailureMode,
-    RewriteDDLPayload,
-    SupportLevel,
-)
-from benchbox.sql_compat.registry import REGISTRY
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.doris.all.inject_ddl_clauses",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.SYNTAX_ERROR,
-        payload=RewriteDDLPayload(
-            transformer_id="doris_inject_ddl_clauses",
-            description=(
-                "Transform DuckDB DDL to valid Doris OLAP DDL: strip FOREIGN KEY and "
-                "PRIMARY KEY constraints, translate TIME → VARCHAR(8), "
-                "STRING/TEXT → VARCHAR(65533), SMALLINT → INT, "
-                "inject DUPLICATE KEY and DISTRIBUTED BY HASH clauses, "
-                "inject PROPERTIES(replication_num) for single-node deployments."
-            ),
-            governance_only=True,
-        ),
-        reason=(
-            "Doris OLAP rejects standard SQL DDL in multiple ways: it does not support "
-            "FOREIGN KEY or PRIMARY KEY constraint syntax, lacks TIME as a column type, "
-            "and requires explicit DUPLICATE KEY and DISTRIBUTED BY HASH clauses — "
-            "both mandatory for CREATE TABLE to succeed in OLAP mode."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "doris",
+register_ddl_rewrite(
+    platform="doris",
+    rule_name="inject_ddl_clauses",
+    transformer_id="doris_inject_ddl_clauses",
+    description="Transform DuckDB DDL to valid Doris OLAP DDL: strip FOREIGN KEY and "
+    "PRIMARY KEY constraints, translate TIME → VARCHAR(8), "
+    "STRING/TEXT → VARCHAR(65533), SMALLINT → INT, "
+    "inject DUPLICATE KEY and DISTRIBUTED BY HASH clauses, "
+    "inject PROPERTIES(replication_num) for single-node deployments.",
+    reason="Doris OLAP rejects standard SQL DDL in multiple ways: it does not support "
+    "FOREIGN KEY or PRIMARY KEY constraint syntax, lacks TIME as a column type, "
+    "and requires explicit DUPLICATE KEY and DISTRIBUTED BY HASH clauses — "
+    "both mandatory for CREATE TABLE to succeed in OLAP mode.",
 )

@@ -42,13 +42,12 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
     )
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message, get_package_install_message
@@ -94,6 +93,8 @@ class FabricWarehouseAdapter(PlatformAdapter):
         ...     auth_method="default_credential",
         ... )
     """
+
+    plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
@@ -264,48 +265,37 @@ class FabricWarehouseAdapter(PlatformAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create Fabric Warehouse adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
+        adapter_source = config
+        if not config.get("database") and config.get("warehouse"):
+            adapter_source = {**config, "database": config["warehouse"]}
 
-        # Generate proper database name using benchmark characteristics
-        if "database" in config and config["database"]:
-            adapter_config["database"] = config["database"]
-        elif "warehouse" in config and config["warehouse"]:
-            adapter_config["database"] = config["warehouse"]
-        else:
-            database_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                adapter_source,
                 platform="fabric_dw",
-                tuning_config=config.get("tuning_config"),
+                fields=[
+                    "server",
+                    "workspace",
+                    "warehouse",
+                    "port",
+                    "schema",
+                    "auth_method",
+                    "tenant_id",
+                    "client_id",
+                    "client_secret",
+                    "driver",
+                    "connect_timeout",
+                    "query_timeout",
+                    "onelake_workspace",
+                    "staging_path",
+                    "disable_result_cache",
+                    "strict_validation",
+                    "item_type",
+                ],
             )
-            adapter_config["database"] = database_name
-
-        # Copy config keys
-        for key in [
-            "server",
-            "workspace",
-            "warehouse",
-            "port",
-            "schema",
-            "auth_method",
-            "tenant_id",
-            "client_id",
-            "client_secret",
-            "driver",
-            "connect_timeout",
-            "query_timeout",
-            "onelake_workspace",
-            "staging_path",
-            "disable_result_cache",
-            "strict_validation",
-            "item_type",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
     def _get_access_token(self) -> str:
         """Acquire Entra ID access token for SQL connection.
@@ -679,7 +669,7 @@ class FabricWarehouseAdapter(PlatformAdapter):
 
             execution_time = elapsed_seconds(start_time)
 
-            return {
+            result_dict = {
                 "query_id": query_id,
                 "stream_id": stream_id,
                 "iteration": iteration,
@@ -702,6 +692,13 @@ class FabricWarehouseAdapter(PlatformAdapter):
             }
         finally:
             cursor.close()
+
+        # Capture and merge the structured query plan (SUCCESS-guarded in the
+        # helper). Outside the try so a strict-mode PlanCaptureError propagates
+        # rather than being masked as a query failure.
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
+
+        return result_dict
 
     def get_existing_tables(self, connection: Any) -> list[str]:
         """Get list of existing tables in the schema.
@@ -1099,16 +1096,28 @@ class FabricWarehouseAdapter(PlatformAdapter):
         """
         cursor = connection.cursor()
         try:
-            # Enable plan capture
             cursor.execute("SET SHOWPLAN_TEXT ON")
-            cursor.execute(query)
-            plan_rows = cursor.fetchall()
-            cursor.execute("SET SHOWPLAN_TEXT OFF")
-            return "\n".join([str(row[0]) for row in plan_rows])
+            try:
+                cursor.execute(query)
+                plan_rows = cursor.fetchall()
+                return "\n".join([str(row[0]) for row in plan_rows])
+            finally:
+                # Always turn SHOWPLAN off, even on failure, so subsequent
+                # benchmark statements execute normally rather than returning plans.
+                try:
+                    cursor.execute("SET SHOWPLAN_TEXT OFF")
+                except Exception:
+                    pass
         except Exception as e:
             return f"Failed to get query plan: {e}"
         finally:
             cursor.close()
+
+    def get_query_plan_parser(self):
+        """Get Fabric Warehouse query plan parser."""
+        from benchbox.core.query_plans.parsers.fabric_warehouse import FabricWarehouseQueryPlanParser
+
+        return FabricWarehouseQueryPlanParser()
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Update table statistics.
@@ -1116,13 +1125,15 @@ class FabricWarehouseAdapter(PlatformAdapter):
         Args:
             connection: Active database connection.
             table_name: Name of table to analyze.
+
+        Raises on failure (does not swallow) so the opt-in statistics phase's
+        gather_statistics() -> run_statistics_phase() caller can detect and
+        record a real failure as status=FAILED.
         """
         cursor = connection.cursor()
         try:
             cursor.execute(f"UPDATE STATISTICS [{self.schema}].[{table_name}]")
             self.logger.debug(f"Updated statistics for {table_name}")
-        except pyodbc.Error as e:
-            self.logger.warning(f"Could not update statistics for {table_name}: {e}")
         finally:
             cursor.close()
 
@@ -1148,48 +1159,12 @@ class FabricWarehouseAdapter(PlatformAdapter):
 
         self.logger.info("Fabric Warehouse platform optimizations applied")
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to Fabric Warehouse.
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints enabled for Fabric Warehouse (informational only)",
+        "Foreign key constraints enabled for Fabric Warehouse (informational only)",
+    )
 
-        Note: Fabric Warehouse supports PRIMARY KEY and FOREIGN KEY for query
-        optimization, but constraints are not enforced (similar to Synapse).
-
-        Args:
-            primary_key_config: Primary key constraint configuration.
-            foreign_key_config: Foreign key constraint configuration.
-            connection: Active database connection.
-        """
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info("Primary key constraints enabled for Fabric Warehouse (informational only)")
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info("Foreign key constraints enabled for Fabric Warehouse (informational only)")
-
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if Fabric Warehouse supports a specific tuning type.
-
-        Note: Fabric automatically manages distribution and partitioning,
-        so only clustering (columnstore index) is relevant.
-
-        Args:
-            tuning_type: TuningType enum value.
-
-        Returns:
-            True if supported, False otherwise.
-        """
-        try:
-            from benchbox.core.tuning.interface import TuningType
-        except ImportError:
-            return False
-
-        # Fabric automatically manages distribution and partitioning
-        # Only clustering (columnstore) is user-controllable
-        return tuning_type == TuningType.CLUSTERING
+    _supported_tuning_type_names = ("CLUSTERING",)
 
     def generate_tuning_clause(
         self,

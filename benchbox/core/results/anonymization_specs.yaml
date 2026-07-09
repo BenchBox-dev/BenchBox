@@ -1,0 +1,100 @@
+secret_key_parts:
+- password
+- token
+- secret
+- accesskey
+- privatekey
+- sessiontoken
+- connectionstring
+- credential
+identifier_keys:
+  account: account
+  accountid: account
+  accountname: account
+  org: organization
+  orgid: organization
+  orgname: organization
+  organization: organization
+  organizationid: organization
+  organizationname: organization
+  project: project
+  projectid: project
+  workspace: workspace
+  workspaceid: workspace
+  warehouse: warehouse
+  warehousename: warehouse
+  workgroup: workgroup
+  workgroupname: workgroup
+  cluster: cluster
+  clusterid: cluster
+  clustername: cluster
+  database: database
+  databasename: database
+  db: database
+  dbname: database
+  schema: schema
+  schemaname: schema
+  bucket: bucket
+  bucketname: bucket
+  prefix: prefix
+  containerid: container
+  containername: container
+  username: user
+  user: user
+  userid: user
+  role: role
+  rolename: role
+  rolearn: role
+  iamrole: role
+  iamrolearn: role
+  arn: arn
+  engine: engine
+  enginename: engine
+  clientid: client
+  machineid: machine
+endpoint_keys:
+- apiendpoint
+- endpoint
+- host
+- hostname
+- server
+- serviceendpoint
+- url
+- workspacehost
+- workspaceurl
+path_keys:
+- credentialfile
+- databasepath
+- datadirectory
+- datapath
+- filepath
+- httppath
+- outputdirectory
+- outputlocation
+- outputpath
+- path
+- s3stagingurl
+- sourceroot
+- staginglocation
+- stagingurl
+mount_collection_keys:
+- bindmounts
+- mounts
+- volumes
+mount_path_keys:
+- destination
+- source
+- target
+local_endpoint_values:
+- 0.0.0.0
+- 127.0.0.1
+- ::1
+- '[::1]'
+- localhost
+message_keys:
+- collectionerrormessage
+- errormessage
+- exception
+- message
+- stderr
+- stdout

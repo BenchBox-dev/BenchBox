@@ -69,7 +69,7 @@ WHERE lo_orderdate = d_datekey
 
         # Flight 2: Drill-down queries with joins
         queries["Q2.1"] = """
-SELECT sum(lo_revenue), d_year, p_brand1
+SELECT d_year, p_brand1, sum(lo_revenue) as revenue
 FROM lineorder, date, part, supplier
 WHERE lo_orderdate = d_datekey
   AND lo_partkey = p_partkey
@@ -81,7 +81,7 @@ ORDER BY d_year, p_brand1;
 """
 
         queries["Q2.2"] = """
-SELECT sum(lo_revenue), d_year, p_brand1
+SELECT d_year, p_brand1, sum(lo_revenue) as revenue
 FROM lineorder, date, part, supplier
 WHERE lo_orderdate = d_datekey
   AND lo_partkey = p_partkey
@@ -93,7 +93,7 @@ ORDER BY d_year, p_brand1;
 """
 
         queries["Q2.3"] = """
-SELECT sum(lo_revenue), d_year, p_brand1
+SELECT d_year, p_brand1, sum(lo_revenue) as revenue
 FROM lineorder, date, part, supplier
 WHERE lo_orderdate = d_datekey
   AND lo_partkey = p_partkey
@@ -248,5 +248,13 @@ ORDER BY d_year, s_city, p_brand1;
             "mfgr1": "MFGR#1",
             "mfgr2": "MFGR#2",
         }
+
+        # The `year_month` placeholder is overloaded across two columns: Q1.2 filters
+        # the NUMERIC d_yearmonthnum (199401), while Q3.4 filters the STRING
+        # d_yearmonth column whose canonical SSB value is 'Dec1997' (e.g. month-name +
+        # year, as emitted by the generator). Substituting the numeric default into
+        # Q3.4 never matches a string yearmonth, so resolve it per query.
+        if query_id == "Q3.4":
+            defaults["year_month"] = "Dec1997"
 
         return defaults

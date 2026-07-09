@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 from typing import Iterable, Mapping
+
+import yaml
 
 TUNED_TEMPLATE = "tuned_template"
 BASIC_CONSTRAINTS = "basic_constraints"
@@ -24,22 +27,33 @@ DECISION_DONE = "done"
 VALID_DECISIONS = frozenset({DECISION_AUTHOR, DECISION_WAIVED, DECISION_DONE})
 
 STATUS_RANK = {
-    UNTUNED: 0,
-    BASIC_CONSTRAINTS: 1,
     TUNED_TEMPLATE: 2,
+    BASIC_CONSTRAINTS: 1,
+    UNTUNED: 0,
 }
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TUNING_TEMPLATE_ROOT = REPO_ROOT / "examples" / "tunings"
 MATRIX_COLUMNS = ("platform", "benchmark", "status", "decision", "reason", "template_path")
 
-# The 2026-05-05 handoff called these out as high-priority tuned-template gaps.
-HIGH_PRIORITY_AUTHOR_BACKLOG = frozenset(
-    {
-        ("duckdb", "flightdata"),
-        ("duckdb", "nyctaxi"),
-    }
+_RUNTIME_STATUS_MARKERS: tuple[tuple[str, str], ...] = (
+    ("Tuning: auto-discovered template", TUNED_TEMPLATE),
+    ("Tuning: using basic constraints", BASIC_CONSTRAINTS),
+    ("Tuning disabled:", UNTUNED),
 )
+
+
+@cache
+def _coverage_spec() -> dict:
+    return yaml.safe_load((Path(__file__).with_suffix(".yaml")).read_text(encoding="utf-8"))
+
+
+@cache
+def _high_priority_author_backlog() -> frozenset[tuple[str, str]]:
+    # The 2026-05-05 handoff called these out as high-priority tuned-template gaps.
+    return frozenset(
+        (entry["platform"], entry["benchmark"]) for entry in _coverage_spec()["high_priority_author_backlog"]
+    )
 
 
 @dataclass(frozen=True)
@@ -120,7 +134,7 @@ def default_decision(platform: str, benchmark: str, status: str) -> tuple[str, s
     """Return the matrix disposition for one platform/benchmark status."""
     if status == TUNED_TEMPLATE:
         return DECISION_DONE, "benchmark-specific tuned template exists"
-    if (platform, benchmark) in HIGH_PRIORITY_AUTHOR_BACKLOG:
+    if (platform, benchmark) in _high_priority_author_backlog():
         return DECISION_AUTHOR, "high-priority backlog from 2026-05-05 fallback evidence"
     if status == BASIC_CONSTRAINTS:
         return DECISION_WAIVED, "basic constraints are acceptable until measured benefit justifies a template"
@@ -240,12 +254,9 @@ def parse_uat_cell_log_stem(
 
 def status_from_log_text(text: str) -> str | None:
     """Extract the tuning resolver status recorded in one runtime log."""
-    if "Tuning: auto-discovered template" in text:
-        return TUNED_TEMPLATE
-    if "Tuning: using basic constraints" in text:
-        return BASIC_CONSTRAINTS
-    if "Tuning disabled:" in text:
-        return UNTUNED
+    for marker, status in _RUNTIME_STATUS_MARKERS:
+        if marker in text:
+            return status
     return None
 
 

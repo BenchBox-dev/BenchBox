@@ -1,0 +1,41 @@
+regions:
+- us-east-1
+- us-west-2
+- eu-west-1
+- ap-southeast-1
+datacenters:
+- dc1
+- dc2
+- dc3
+racks:
+- rack-a
+- rack-b
+- rack-c
+- rack-d
+os_types:
+- linux
+- linux
+- linux
+- windows
+architectures:
+- x86_64
+- x86_64
+- arm64
+teams:
+- platform
+- backend
+- frontend
+- data
+- infra
+services:
+- api
+- web
+- worker
+- cache
+- db
+- queue
+environments:
+- prod
+- prod
+- staging
+- dev

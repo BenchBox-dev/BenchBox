@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 from benchbox.core.tpcds_obt.manual_queries import MANUAL_QUERY_IDS, get_manual_query, render_manual_query
 from benchbox.core.tpcds_obt.query_conversion import QueryConverter
+
+
+def _load_query_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("query_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
 
 # Queries that successfully convert to OBT schema
 # Total: 89 out of 99 convertible (90% coverage)
@@ -15,97 +24,7 @@ from benchbox.core.tpcds_obt.query_conversion import QueryConverter
 #       Q46, Q64, Q68, Q84 (need customer, customer_address, household_demographics, etc.)
 # Manually crafted queries: 14, 49 (complex semantics requiring manual rewrite)
 # Note: Q64 uses cross-channel self-join pattern which defeats OBT's single-scan design
-CONVERTIBLE_QUERY_IDS = (
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-    8,
-    9,
-    10,
-    11,
-    12,
-    13,
-    14,
-    15,
-    16,
-    17,
-    18,
-    19,
-    20,
-    23,
-    24,
-    25,
-    26,
-    27,
-    28,
-    29,
-    30,
-    31,
-    32,
-    33,
-    34,
-    35,
-    36,
-    38,
-    40,
-    41,
-    42,
-    43,
-    44,
-    45,
-    47,
-    48,
-    49,
-    50,
-    51,
-    52,
-    53,
-    54,
-    55,
-    56,
-    57,
-    58,
-    59,
-    60,
-    61,
-    62,
-    63,
-    65,
-    66,
-    67,
-    69,
-    70,
-    71,
-    73,
-    74,
-    75,
-    76,
-    77,
-    78,
-    79,
-    80,
-    81,
-    83,
-    85,
-    86,
-    87,
-    88,
-    89,
-    90,
-    91,
-    92,
-    93,
-    94,
-    95,
-    96,
-    97,
-    98,
-    99,
-)
+CONVERTIBLE_QUERY_IDS = tuple(_load_query_specs()["convertible_query_ids"])
 
 
 class TPCDSOBTQueryManager:

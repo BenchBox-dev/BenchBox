@@ -24,13 +24,14 @@ import logging
 import os
 import time
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from .base.config_utils import (
+    POSTGRES_FAMILY_BASE_OPTIONS,
+    POSTGRES_FAMILY_PLATFORM_FIELDS,
+    make_platform_config_builder,
+)
 from .postgresql import POSTGRES_DIALECT, PostgreSQLAdapter, _build_postgres_connection_kwargs
-
-if TYPE_CHECKING:
-    from benchbox.core.platform_registry import PlatformInfo
-    from benchbox.core.schemas import DatabaseConfig
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,8 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
 
     Requires PostgreSQL 14+ with pg_duckdb 1.0+ extension installed.
     """
+
+    plan_capture_phase_eligible = True
 
     @property
     def platform_name(self) -> str:
@@ -410,72 +413,25 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
             entries=entries,
         )
 
-    def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if pg_duckdb supports a specific tuning type.
-
-        pg_duckdb operates on standard PostgreSQL heap tables, so tuning
-        capabilities match PostgreSQL. The main optimization is the DuckDB
-        execution engine itself, which benefits less from B-tree indexes
-        for analytical queries.
-        """
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            supported = {
-                TuningType.PARTITIONING: True,  # PostgreSQL declarative partitioning
-                TuningType.SORTING: False,  # No native sort keys
-                TuningType.DISTRIBUTION: False,  # Not distributed
-                TuningType.CLUSTERING: True,  # CLUSTER command available
-                TuningType.PRIMARY_KEYS: True,  # Full constraint support
-                TuningType.FOREIGN_KEYS: True,  # Full constraint support
-            }
-            return supported.get(tuning_type, False)
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "CLUSTERING", "PRIMARY_KEYS", "FOREIGN_KEYS")
 
 
-def _build_pg_duckdb_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: PlatformInfo | None,
-) -> DatabaseConfig:
-    """Build pg_duckdb database configuration with credential loading.
-
-    This function is registered with PlatformHookRegistry to provide
-    pg_duckdb-specific configuration handling.
-    """
-    from benchbox.platforms.base.config_utils import POSTGRES_FAMILY_BASE_OPTIONS, build_platform_config
-
-    return build_platform_config(
-        platform_type="pg-duckdb",
-        credential_key="pg-duckdb",
-        default_display_name="pg_duckdb",
-        default_driver_package="psycopg",
-        base_options={
-            **POSTGRES_FAMILY_BASE_OPTIONS,
-            "force_execution": True,
-            "postgres_scan_threads": 0,
-            "compare_native": False,
-        },
-        platform_fields=[
-            "host",
-            "port",
-            "username",
-            "password",
-            "database",
-            "admin_database",
-            "sslmode",
-            "work_mem",
-            "maintenance_work_mem",
-            "effective_cache_size",
-            "max_parallel_workers_per_gather",
-            "force_execution",
-            "postgres_scan_threads",
-            "compare_native",
-            "duckdb_db_path",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
+_build_pg_duckdb_config = make_platform_config_builder(
+    "pg-duckdb",
+    __name__,
+    "pg_duckdb",
+    "psycopg",
+    POSTGRES_FAMILY_PLATFORM_FIELDS
+    + (
+        "force_execution",
+        "postgres_scan_threads",
+        "compare_native",
+        "duckdb_db_path",
+    ),
+    base_options={
+        **POSTGRES_FAMILY_BASE_OPTIONS,
+        "force_execution": True,
+        "postgres_scan_threads": 0,
+        "compare_native": False,
+    },
+)

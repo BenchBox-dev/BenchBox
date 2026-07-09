@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Union
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.tpch.generator import TPCHDataGenerator
 from benchbox.core.tpch.maintenance_test import TPCHMaintenanceTest
 from benchbox.core.tpch.queries import TPCHQueries
@@ -152,7 +152,7 @@ def _expand_sqlite_named_column_aliases(query: str) -> str:
     )
 
 
-class TPCHBenchmark(BaseBenchmark):
+class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     """TPC-H benchmark implementation.
 
     This class provides a complete implementation of the TPC-H benchmark,
@@ -260,7 +260,10 @@ class TPCHBenchmark(BaseBenchmark):
         """
         src = (base_dialect or "netezza").lower()
         tgt = (dialect or src).lower()
-        int_queries = self.query_manager.get_all_queries()
+        # Render scale-dependent parameters (e.g. Q11's 0.0001/SF value threshold)
+        # at the benchmark's actual scale factor, not the SF=1 default, so the
+        # run path stays scale-faithful for both TPC-H and TPC-Havoc variants.
+        int_queries = self.query_manager.get_all_queries(scale_factor=self.scale_factor)
         base_queries = {str(k): v for k, v in int_queries.items()}
         translated_queries = {}
         for query_id, query in base_queries.items():

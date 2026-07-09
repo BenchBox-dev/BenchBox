@@ -8,11 +8,14 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-import functools
+import ast
 import importlib
-from typing import Any, Literal, Optional, Type
+import importlib.util
+from collections.abc import Iterable
+from typing import Optional, Type
 
-from benchbox.utils.runtime_env import DriverResolution, ensure_driver_version
+from benchbox.core.platform_registry import PlatformRegistry
+from benchbox.utils.runtime_env import DriverResolution, DriverRuntimeStrategy, ensure_driver_version
 
 from .base import BenchmarkResults, ConnectionConfig, DriverIsolationCapability, PlatformAdapter
 from .base.adapter import check_isolation_capability
@@ -59,64 +62,81 @@ from .base.adapter import check_isolation_capability
 # Cache for lazily loaded adapters and constants
 _lazy_adapter_cache: dict[str, Optional[Type[PlatformAdapter]]] = {}
 _lazy_constant_cache: dict[str, bool] = {}
+_lazy_adapter_diagnostics: dict[str, dict[str, object]] = {}
 
-# Mapping of lazy adapter names to their module paths
-_LAZY_ADAPTERS = {
-    # Cloud SQL platforms with heavy SDK dependencies
-    "DatabricksAdapter": ".databricks",
-    "BigQueryAdapter": ".bigquery",
-    "SnowflakeAdapter": ".snowflake",
-    "RedshiftAdapter": ".redshift",
-    "ClickHouseAdapter": ".clickhouse",
-    "ClickHouseLocalAdapter": ".clickhouse_local",
-    "ClickHouseServerAdapter": ".clickhouse_server",
-    "ClickHouseCloudAdapter": ".clickhouse_cloud",
-    "TrinoAdapter": ".trino",
-    "AthenaAdapter": ".athena",
-    "SparkAdapter": ".spark",
-    "PySparkSQLAdapter": ".pyspark",
-    "FireboltAdapter": ".firebolt",
-    "DatabendAdapter": ".databend",
-    "InfluxDBAdapter": ".influxdb",
-    "PrestoAdapter": ".presto",
-    "AzureSynapseAdapter": ".azure_synapse",
-    "FabricWarehouseAdapter": ".fabric_warehouse",
-    "FabricLakehouseAdapter": ".fabric_lakehouse",
-    "FabricSparkAdapter": ".fabric_spark",
-    "StarRocksAdapter": ".starrocks",
-    "SingleStoreAdapter": ".singlestore",
-    "QuantonAdapter": ".onehouse",
-    "LakeSailAdapter": ".lakesail",
-    "VeloxAdapter": ".velox",
-    "DorisAdapter": ".doris",
-    # Native-heavy adapters deferred to avoid ~210 MB of native library loading per process
-    "DataFusionAdapter": ".datafusion",
-    "PolarsAdapter": ".polars_platform",
-    # DataFrame adapters (have their own lazy loading but need module-level deferral)
-    "PolarsDataFrameAdapter": ".dataframe",
-    "PandasDataFrameAdapter": ".dataframe",
-    "ModinDataFrameAdapter": ".dataframe",
-    "CuDFDataFrameAdapter": ".dataframe",
-    "DaskDataFrameAdapter": ".dataframe",
-    "DataFusionDataFrameAdapter": ".dataframe",
-    "PySparkDataFrameAdapter": ".dataframe",
-    "LakeSailDataFrameAdapter": ".dataframe",
-    "DataFramePlatformChecker": ".dataframe",
-}
+# Mapping of lazy adapter names to their module paths.
+_LAZY_ADAPTER_ROWS = """\
+DuckDBAdapter|.duckdb
+MotherDuckAdapter|.motherduck
+SQLiteAdapter|.sqlite
+PostgreSQLAdapter|.postgresql
+TimescaleDBAdapter|.timescaledb
+PgDuckDBAdapter|.pg_duckdb
+PgMooncakeAdapter|.pg_mooncake
+CedarDBAdapter|.cedardb
+QuestDBAdapter|.questdb
+DatabricksAdapter|.databricks
+BigQueryAdapter|.bigquery
+SnowflakeAdapter|.snowflake
+RedshiftAdapter|.redshift
+ClickHouseAdapter|.clickhouse
+ClickHouseLocalAdapter|.clickhouse_local
+ClickHouseServerAdapter|.clickhouse_server
+ClickHouseCloudAdapter|.clickhouse_cloud
+TrinoAdapter|.trino
+AthenaAdapter|.athena
+SparkAdapter|.spark
+PySparkSQLAdapter|.pyspark
+FireboltAdapter|.firebolt
+DatabendAdapter|.databend
+InfluxDBAdapter|.influxdb
+PrestoAdapter|.presto
+AzureSynapseAdapter|.azure_synapse
+FabricWarehouseAdapter|.fabric_warehouse
+FabricLakehouseAdapter|.fabric_lakehouse
+FabricSparkAdapter|.fabric_spark
+StarRocksAdapter|.starrocks
+SingleStoreAdapter|.singlestore
+QuantonAdapter|.onehouse
+LakeSailAdapter|.lakesail
+VeloxAdapter|.velox
+DorisAdapter|.doris
+DataFusionAdapter|.datafusion
+PolarsAdapter|.polars_platform
+PolarsDataFrameAdapter|.dataframe
+PandasDataFrameAdapter|.dataframe
+ModinDataFrameAdapter|.dataframe
+CuDFDataFrameAdapter|.dataframe
+DaskDataFrameAdapter|.dataframe
+DataFusionDataFrameAdapter|.dataframe
+PySparkDataFrameAdapter|.dataframe
+LakeSailDataFrameAdapter|.dataframe
+DataFramePlatformChecker|.dataframe
+"""
+_LAZY_ADAPTERS = dict(row.split("|", 1) for row in _LAZY_ADAPTER_ROWS.splitlines())
 
-# Mapping of lazy constants to their module paths and default values
+_LAZY_CONSTANT_ROWS = """\
+POLARS_AVAILABLE|.dataframe
+PANDAS_AVAILABLE|.dataframe
+MODIN_AVAILABLE|.dataframe
+CUDF_AVAILABLE|.dataframe
+DASK_AVAILABLE|.dataframe
+DATAFUSION_DF_AVAILABLE|.dataframe
+PYSPARK_AVAILABLE|.dataframe
+"""
 _LAZY_CONSTANTS = {
-    "POLARS_AVAILABLE": (".dataframe", False),
-    "PANDAS_AVAILABLE": (".dataframe", False),
-    "MODIN_AVAILABLE": (".dataframe", False),
-    "CUDF_AVAILABLE": (".dataframe", False),
-    "DASK_AVAILABLE": (".dataframe", False),
-    "DATAFUSION_DF_AVAILABLE": (".dataframe", False),
-    "PYSPARK_AVAILABLE": (".dataframe", False),
+    name: (module_path, False) for name, module_path in (row.split("|", 1) for row in _LAZY_CONSTANT_ROWS.splitlines())
 }
 
 # Cache for clickhouse module (special case - needs module reference)
 _clickhouse_module_cache = None
+
+
+def _resolve_lazy_module_path(module_path: str) -> str:
+    """Return the absolute module path used for import diagnostics."""
+    if module_path.startswith(".") and __package__ is not None:
+        return importlib.util.resolve_name(module_path, __package__)
+    return module_path
 
 
 def _load_lazy_adapter(name: str) -> Optional[Type[PlatformAdapter]]:
@@ -134,13 +154,31 @@ def _load_lazy_adapter(name: str) -> Optional[Type[PlatformAdapter]]:
     module_path = _LAZY_ADAPTERS.get(name)
     if module_path is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    diagnostic_module_path = _resolve_lazy_module_path(module_path)
 
     try:
         module = importlib.import_module(module_path, __package__)
         adapter_class = getattr(module, name, None)
         _lazy_adapter_cache[name] = adapter_class
+        if adapter_class is None:
+            _lazy_adapter_diagnostics[name] = {
+                "adapter": name,
+                "module_path": module_path,
+                "status": "broken_adapter_import",
+                "error_type": "AttributeError",
+                "error_message": f"{module_path} does not expose {name}",
+            }
+        else:
+            _lazy_adapter_diagnostics.pop(name, None)
         return adapter_class
-    except ImportError:
+    except (ImportError, OSError) as exc:
+        _lazy_adapter_diagnostics[name] = {
+            "adapter": name,
+            "module_path": module_path,
+            "status": PlatformRegistry.classify_optional_import_error(exc, module_path=diagnostic_module_path),
+            "error_type": type(exc).__name__,
+            "error_message": str(exc),
+        }
         _lazy_adapter_cache[name] = None
         return None
 
@@ -166,7 +204,16 @@ def _load_lazy_constant(name: str) -> bool:
         value = getattr(module, name, default)
         _lazy_constant_cache[name] = value
         return value
-    except ImportError:
+    except (ImportError, OSError) as exc:
+        _lazy_adapter_diagnostics[name] = {
+            "adapter": name,
+            "module_path": module_path,
+            "status": PlatformRegistry.classify_optional_import_error(
+                exc, module_path=_resolve_lazy_module_path(module_path)
+            ),
+            "error_type": type(exc).__name__,
+            "error_message": str(exc),
+        }
         _lazy_constant_cache[name] = default
         return default
 
@@ -188,21 +235,26 @@ def __getattr__(name: str):
     if name in _LAZY_CONSTANTS:
         return _load_lazy_constant(name)
 
-    if name == "PlatformRegistry":
-        from benchbox.core.platform_registry import PlatformRegistry
-
-        return PlatformRegistry
-
     # Special case: clickhouse module reference (for legacy patches/tests)
     if name == "clickhouse":
         if _clickhouse_module_cache is None:
             try:
                 _clickhouse_module_cache = importlib.import_module(".clickhouse", __package__)
-            except ImportError:
+            except (ImportError, OSError):
                 pass  # Keep as None
         return _clickhouse_module_cache
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def get_lazy_adapter_diagnostics() -> dict[str, dict[str, object]]:
+    """Return diagnostics captured by lazy adapter loading."""
+    return {name: diagnostic.copy() for name, diagnostic in _lazy_adapter_diagnostics.items()}
+
+
+def diagnose_optional_adapter_imports(platform_names: Optional[Iterable[str]] = None) -> dict[str, dict[str, object]]:
+    """Run registry-level optional adapter diagnostics on demand."""
+    return PlatformRegistry.diagnose_optional_adapter_imports(platform_names)
 
 
 # ============================================================================
@@ -211,171 +263,41 @@ def __getattr__(name: str):
 # These adapters have lightweight dependencies that don't impact startup time
 # significantly, so they're loaded eagerly for simpler access patterns.
 
-# Import local platform adapters (core/light dependencies)
-try:
-    from .duckdb import DuckDBAdapter
-except ImportError:
-    DuckDBAdapter: Optional[Type[PlatformAdapter]] = None  # type: ignore[assignment,misc]
 
-try:
-    from .motherduck import MotherDuckAdapter
-except ImportError:
-    MotherDuckAdapter: Optional[Type[PlatformAdapter]] = None  # type: ignore[assignment,misc]
-
-try:
-    from .sqlite import SQLiteAdapter
-except ImportError:
-    SQLiteAdapter: Optional[Type[PlatformAdapter]] = None  # type: ignore[assignment,misc]
-
-# DataFusionAdapter and PolarsAdapter are loaded lazily via _LAZY_ADAPTERS
-# because their native libraries are large (~68 MB and ~142 MB respectively).
-
-try:
-    from .postgresql import PostgreSQLAdapter
-except ImportError:
-    PostgreSQLAdapter: Optional[Type[PlatformAdapter]] = None  # type: ignore[assignment,misc]
-
-try:
-    from .timescaledb import TimescaleDBAdapter
-except ImportError:
-    TimescaleDBAdapter: Optional[Type[PlatformAdapter]] = None  # type: ignore[assignment,misc]
-
-try:
-    from .pg_duckdb import PgDuckDBAdapter
-except ImportError:
-    PgDuckDBAdapter: Optional[Type[PlatformAdapter]] = None  # type: ignore[assignment,misc]
-
-try:
-    from .pg_mooncake import PgMooncakeAdapter
-except ImportError:
-    PgMooncakeAdapter: Optional[Type[PlatformAdapter]] = None  # type: ignore[assignment,misc]
-
-try:
-    from .cedardb import CedarDBAdapter
-except ImportError:
-    CedarDBAdapter: Optional[Type[PlatformAdapter]] = None  # type: ignore[assignment,misc]
-
-try:
-    from .questdb import QuestDBAdapter
-except ImportError:
-    QuestDBAdapter: Optional[Type[PlatformAdapter]] = None  # type: ignore[assignment,misc]
-
-__all__ = [
-    "PlatformAdapter",
-    "ConnectionConfig",
-    "BenchmarkResults",
-    "DuckDBAdapter",
-    "MotherDuckAdapter",
-    "DataFusionAdapter",
-    "PolarsAdapter",
-    "ClickHouseAdapter",
-    "ClickHouseCloudAdapter",
-    "DatabricksAdapter",
-    "BigQueryAdapter",
-    "RedshiftAdapter",
-    "SnowflakeAdapter",
-    "TrinoAdapter",
-    "AthenaAdapter",
-    "SparkAdapter",
-    "PySparkSQLAdapter",
-    "FireboltAdapter",
-    "DatabendAdapter",
-    "InfluxDBAdapter",
-    "PrestoAdapter",
-    "PostgreSQLAdapter",
-    "PgDuckDBAdapter",
-    "PgMooncakeAdapter",
-    "CedarDBAdapter",
-    "QuestDBAdapter",
-    "AzureSynapseAdapter",
-    "FabricWarehouseAdapter",
-    "FabricLakehouseAdapter",
-    "FabricSparkAdapter",
-    "StarRocksAdapter",
-    "SingleStoreAdapter",
-    "QuantonAdapter",
-    "LakeSailAdapter",
-    "DorisAdapter",
-    # DataFrame adapters
-    "PolarsDataFrameAdapter",
-    "PandasDataFrameAdapter",
-    "ModinDataFrameAdapter",
-    "CuDFDataFrameAdapter",
-    "DaskDataFrameAdapter",
-    "DataFusionDataFrameAdapter",
-    "PySparkDataFrameAdapter",
-    "LakeSailDataFrameAdapter",
-    "POLARS_AVAILABLE",
-    "PANDAS_AVAILABLE",
-    "MODIN_AVAILABLE",
-    "CUDF_AVAILABLE",
-    "DASK_AVAILABLE",
-    "DATAFUSION_DF_AVAILABLE",
-    "PYSPARK_AVAILABLE",
-    "DataFramePlatformChecker",
-    # Unified adapter factory (--mode and --deployment flag support)
-    "get_adapter",
-    "is_dataframe_mode",
-    "get_available_modes",
-    "get_available_deployments",
-    "get_default_deployment",
-    # Functions
-    "get_platform_adapter",
-    "get_dataframe_adapter",
-    "list_available_platforms",
-    "list_available_dataframe_platforms",
-    "get_platform_requirements",
-    "get_dataframe_requirements",
-    "check_platform_connectivity",
-    "is_dataframe_platform",
-]
+# Import local platform adapters (core/light dependencies).
+def _load_optional_adapter(module_path: str, class_name: str) -> Optional[Type[PlatformAdapter]]:
+    try:
+        module = importlib.import_module(module_path, __package__)
+    except (ImportError, OSError):
+        return None
+    return getattr(module, class_name, None)
 
 
-def _adapter_factory_function(name: str):
-    function = getattr(importlib.import_module(".adapter_factory", __package__), name)
-    globals()[name].__wrapped__ = function
-    functools.update_wrapper(globals()[name], function)
-    return function
+_EXPORT_NAMES = """\
+PlatformAdapter ConnectionConfig BenchmarkResults DuckDBAdapter MotherDuckAdapter DataFusionAdapter PolarsAdapter
+ClickHouseAdapter ClickHouseCloudAdapter DatabricksAdapter BigQueryAdapter RedshiftAdapter SnowflakeAdapter
+TrinoAdapter AthenaAdapter SparkAdapter PySparkSQLAdapter FireboltAdapter DatabendAdapter InfluxDBAdapter
+PrestoAdapter PostgreSQLAdapter PgDuckDBAdapter PgMooncakeAdapter CedarDBAdapter QuestDBAdapter AzureSynapseAdapter
+FabricWarehouseAdapter FabricLakehouseAdapter FabricSparkAdapter StarRocksAdapter SingleStoreAdapter QuantonAdapter
+LakeSailAdapter DorisAdapter PolarsDataFrameAdapter PandasDataFrameAdapter ModinDataFrameAdapter CuDFDataFrameAdapter
+DaskDataFrameAdapter DataFusionDataFrameAdapter PySparkDataFrameAdapter LakeSailDataFrameAdapter POLARS_AVAILABLE
+PANDAS_AVAILABLE MODIN_AVAILABLE CUDF_AVAILABLE DASK_AVAILABLE DATAFUSION_DF_AVAILABLE PYSPARK_AVAILABLE
+DataFramePlatformChecker get_adapter is_dataframe_mode get_available_modes get_available_deployments
+get_default_deployment get_platform_adapter get_dataframe_adapter list_available_platforms
+list_available_dataframe_platforms get_platform_requirements get_dataframe_requirements check_platform_connectivity
+is_dataframe_platform diagnose_optional_adapter_imports get_lazy_adapter_diagnostics
+"""
+__all__ = _EXPORT_NAMES.split()
 
 
-def get_adapter(
-    platform: str,
-    mode: Optional[Literal["sql", "dataframe"]] = None,
-    deployment: Optional[str] = None,
-    **config: Any,
-) -> Any:
-    """Lazy wrapper for the unified adapter factory."""
-
-    _get_adapter = _adapter_factory_function("get_adapter")
-    return _get_adapter(platform, mode=mode, deployment=deployment, **config)
-
-
-def is_dataframe_mode(platform: str, mode: Optional[str] = None) -> bool:
-    """Lazy wrapper for adapter_factory.is_dataframe_mode."""
-
-    _is_dataframe_mode = _adapter_factory_function("is_dataframe_mode")
-    return _is_dataframe_mode(platform, mode=mode)
-
-
-def get_available_modes(platform: str) -> list[str]:
-    """Lazy wrapper for adapter_factory.get_available_modes."""
-
-    _get_available_modes = _adapter_factory_function("get_available_modes")
-    return _get_available_modes(platform)
-
-
-def get_available_deployments(platform: str) -> list[str]:
-    """Lazy wrapper for adapter_factory.get_available_deployments."""
-
-    _get_available_deployments = _adapter_factory_function("get_available_deployments")
-    return _get_available_deployments(platform)
-
-
-def get_default_deployment(platform: str) -> Optional[str]:
-    """Lazy wrapper for adapter_factory.get_default_deployment."""
-
-    _get_default_deployment = _adapter_factory_function("get_default_deployment")
-    return _get_default_deployment(platform)
+# Import unified adapter factory
+from benchbox.platforms.adapter_factory import (
+    get_adapter,
+    get_available_deployments,
+    get_available_modes,
+    get_default_deployment,
+    is_dataframe_mode,
+)
 
 
 def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
@@ -396,8 +318,6 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
         ValueError: If platform is not supported
         ImportError: If platform dependencies are not installed
     """
-    from benchbox.core.platform_registry import PlatformRegistry
-
     # Resolve aliases and normalize to canonical name via PlatformRegistry
     canonical_name = PlatformRegistry.resolve_platform_name(platform_name)
 
@@ -502,8 +422,6 @@ def list_available_platforms() -> dict[str, bool]:
     Returns:
         Dictionary mapping platform names to availability boolean.
     """
-    from benchbox.core.platform_registry import PlatformRegistry
-
     return PlatformRegistry.get_platform_availability()
 
 
@@ -519,8 +437,6 @@ def get_platform_requirements(platform_name: str) -> str:
     Returns:
         Installation command string
     """
-    from benchbox.core.platform_registry import PlatformRegistry
-
     return PlatformRegistry.get_platform_requirements(platform_name)
 
 
@@ -545,6 +461,23 @@ def check_platform_connectivity(platform_name: str, **config) -> bool:
 # DataFrame Platform Support
 # ============================================================================
 
+_DATAFRAME_PLATFORM_ROWS = """\
+polars-df|PolarsDataFrameAdapter|POLARS_AVAILABLE|pip install polars (core dependency - should be installed)
+pandas-df|PandasDataFrameAdapter|PANDAS_AVAILABLE|pip install pandas  # standalone\\n  uv add benchbox --extra pandas  # inside a project
+modin-df|ModinDataFrameAdapter|MODIN_AVAILABLE|pip install modin[ray]  # standalone\\n  uv add benchbox --extra modin  # inside a project
+cudf-df|CuDFDataFrameAdapter|CUDF_AVAILABLE|pip install cudf-cu12 (requires NVIDIA GPU with CUDA)
+dask-df|DaskDataFrameAdapter|DASK_AVAILABLE|pip install dask[distributed]  # standalone\\n  uv add benchbox --extra dask  # inside a project
+datafusion-df|DataFusionDataFrameAdapter|DATAFUSION_DF_AVAILABLE|pip install datafusion  # standalone\\n  uv add benchbox --extra datafusion  # inside a project
+pyspark-df|PySparkDataFrameAdapter|PYSPARK_AVAILABLE|pip install pyspark  # standalone\\n  uv add benchbox --extra pyspark  # inside a project
+lakesail-df|LakeSailDataFrameAdapter|PYSPARK_AVAILABLE|pip install pyspark  # standalone (LakeSail Sail uses PySpark Spark Connect client)
+"""
+_DATAFRAME_PLATFORM_INFO = {
+    platform: (adapter, availability, requirements.replace("\\n", "\n"))
+    for platform, adapter, availability, requirements in (
+        row.split("|", 3) for row in _DATAFRAME_PLATFORM_ROWS.splitlines()
+    )
+}
+
 
 def get_dataframe_adapter(platform_name: str, **config):
     """Factory function to create DataFrame platform adapters.
@@ -563,26 +496,14 @@ def get_dataframe_adapter(platform_name: str, **config):
         ValueError: If platform is not a recognized DataFrame platform
         ImportError: If required dependencies are not installed
     """
-    # Mapping uses lazy-loaded adapter names (resolved via __getattr__)
-    dataframe_adapter_names = {
-        "polars-df": "PolarsDataFrameAdapter",
-        "pandas-df": "PandasDataFrameAdapter",
-        "modin-df": "ModinDataFrameAdapter",
-        "cudf-df": "CuDFDataFrameAdapter",
-        "dask-df": "DaskDataFrameAdapter",
-        "datafusion-df": "DataFusionDataFrameAdapter",
-        "pyspark-df": "PySparkDataFrameAdapter",
-        "lakesail-df": "LakeSailDataFrameAdapter",
-    }
-
     platform_lower = platform_name.lower()
 
-    if platform_lower not in dataframe_adapter_names:
-        available = ", ".join(sorted(dataframe_adapter_names.keys()))
+    if platform_lower not in _DATAFRAME_PLATFORM_INFO:
+        available = ", ".join(sorted(_DATAFRAME_PLATFORM_INFO))
         raise ValueError(f"Unknown DataFrame platform: {platform_name}. Available: {available}")
 
     # Trigger lazy load via __getattr__
-    adapter_name = dataframe_adapter_names[platform_lower]
+    adapter_name = _DATAFRAME_PLATFORM_INFO[platform_lower][0]
     adapter_class = _load_lazy_adapter(adapter_name)
 
     if adapter_class is None:
@@ -600,19 +521,8 @@ def list_available_dataframe_platforms() -> dict[str, bool]:
     Returns:
         Dictionary mapping platform name to availability boolean
     """
-    # Mapping uses lazy-loaded constant names (resolved via __getattr__)
-    availability_constants = {
-        "polars-df": "POLARS_AVAILABLE",
-        "pandas-df": "PANDAS_AVAILABLE",
-        "modin-df": "MODIN_AVAILABLE",
-        "cudf-df": "CUDF_AVAILABLE",
-        "dask-df": "DASK_AVAILABLE",
-        "datafusion-df": "DATAFUSION_DF_AVAILABLE",
-        "pyspark-df": "PYSPARK_AVAILABLE",
-        "lakesail-df": "PYSPARK_AVAILABLE",
-    }
     # Trigger lazy load via __getattr__ for each constant
-    return {platform: _load_lazy_constant(const_name) for platform, const_name in availability_constants.items()}
+    return {platform: _load_lazy_constant(info[1]) for platform, info in _DATAFRAME_PLATFORM_INFO.items()}
 
 
 def get_dataframe_requirements(platform_name: str) -> str:
@@ -624,20 +534,8 @@ def get_dataframe_requirements(platform_name: str) -> str:
     Returns:
         Installation command string
     """
-    requirements = {
-        "polars-df": "pip install polars (core dependency - should be installed)",
-        "pandas-df": "pip install pandas  # standalone\n  uv add benchbox --extra pandas  # inside a project",
-        "modin-df": "pip install modin[ray]  # standalone\n  uv add benchbox --extra modin  # inside a project",
-        "cudf-df": "pip install cudf-cu12 (requires NVIDIA GPU with CUDA)",
-        "dask-df": "pip install dask[distributed]  # standalone\n  uv add benchbox --extra dask  # inside a project",
-        "datafusion-df": (
-            "pip install datafusion  # standalone\n  uv add benchbox --extra datafusion  # inside a project"
-        ),
-        "pyspark-df": "pip install pyspark  # standalone\n  uv add benchbox --extra pyspark  # inside a project",
-        "lakesail-df": "pip install pyspark  # standalone (LakeSail Sail uses PySpark Spark Connect client)",
-    }
-
-    return requirements.get(platform_name.lower(), "Unknown DataFrame platform")
+    info = _DATAFRAME_PLATFORM_INFO.get(platform_name.lower())
+    return info[2] if info is not None else "Unknown DataFrame platform"
 
 
 def is_dataframe_platform(platform_name: str) -> bool:
@@ -649,16 +547,7 @@ def is_dataframe_platform(platform_name: str) -> bool:
     Returns:
         True if the platform is a DataFrame platform
     """
-    return platform_name.lower() in {
-        "polars-df",
-        "pandas-df",
-        "modin-df",
-        "cudf-df",
-        "dask-df",
-        "datafusion-df",
-        "pyspark-df",
-        "lakesail-df",
-    }
+    return platform_name.lower() in _DATAFRAME_PLATFORM_INFO
 
 
 # ============================================================================
@@ -701,7 +590,234 @@ def _make_lazy_config_builder(module_path: str, builder_name: str):
 
 
 try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry, PlatformOptionSpec, parse_bool
+    from benchbox.core.hooks.platform_hooks import PlatformHookRegistry, PlatformOptionSpec, parse_bool
+
+    def _spec(name: str, help_text: str, **kwargs) -> PlatformOptionSpec:
+        return PlatformOptionSpec(name=name, help=help_text, **kwargs)
+
+    def _register_specs(platform: str, *specs) -> None:
+        PlatformHookRegistry.register_option_specs(
+            platform,
+            *(_spec(spec[0], spec[1], **(spec[2] if len(spec) > 2 else {})) for spec in specs),
+        )
+
+    # Rows are "platform|name|help|kwargs". `platform` is the BASE platform key
+    # (e.g. `datafusion`, `polars`) — NOT the `-df` CLI alias. `benchbox run`
+    # normalizes `--platform datafusion-df` to `datafusion` via PLATFORM_ALIASES
+    # before calling PlatformHookRegistry.parse_options(), and the DataFrame
+    # adapters take these as base-name constructor kwargs, so DataFrame options
+    # must be keyed by the base name to be reachable from the CLI.
+    _OPTION_SPEC_ROWS = """\
+databricks|uc_catalog|Unity Catalog catalog name for staging data|{}
+databricks|uc_schema|Unity Catalog schema name for staging data|{}
+databricks|uc_volume|Unity Catalog volume name for staging data|{}
+databricks|staging_root|Cloud storage path for staging data (e.g., dbfs:/Volumes/..., s3://..., abfss://...)|{}
+databricks|databricks_clustering_strategy|Databricks SQL tuning strategy override (z_order, liquid_clustering, liquid_clustering_auto, none)|{'choices': ('z_order', 'liquid_clustering', 'liquid_clustering_auto', 'none')}
+databricks|liquid_clustering_columns|Comma-separated Databricks liquid clustering columns|{}
+bigquery|staging_root|GCS path for staging data (e.g., gs://bucket/path)|{}
+bigquery|storage_bucket|GCS bucket name for data staging (alternative to staging_root)|{}
+bigquery|storage_prefix|GCS path prefix within bucket for data staging|{}
+trino|catalog|Trino catalog to use (e.g., hive, iceberg, memory). Auto-discovered if not specified.|{}
+trino|staging_root|Cloud storage path for staging data (e.g., s3://..., gs://..., abfss://...)|{}
+trino|table_format|Table format for creating tables (memory, hive, iceberg, delta)|{'default': 'memory'}
+trino|source_catalog|Source catalog for external data loading (e.g., hive connector)|{}
+firebolt|deployment_mode|Explicit Firebolt mode: 'core' for local Docker, 'cloud' for managed Firebolt|{'aliases': ('firebolt_mode',), 'choices': ('core', 'cloud')}
+firebolt|url|Firebolt Core endpoint URL (default: http://localhost:3473)|{'default': 'http://localhost:3473'}
+firebolt|client_id|Firebolt Cloud OAuth client ID|{}
+firebolt|client_secret|Firebolt Cloud OAuth client secret|{}
+firebolt|account_name|Firebolt Cloud account name|{}
+firebolt|engine_name|Firebolt Cloud engine name|{}
+firebolt|api_endpoint|Firebolt Cloud API endpoint|{'default': 'api.app.firebolt.io'}
+firebolt|database|Firebolt database name|{}
+firebolt|region|Firebolt Cloud region when known|{'aliases': ('cloud_region',)}
+firebolt|cloud_provider|Firebolt Cloud provider when known|{}
+firebolt|engine_type|Firebolt Cloud engine type when known|{}
+firebolt|engine_size|Firebolt Cloud requested engine size when known|{}
+firebolt|compute_size|Firebolt Cloud requested compute size alias for engine size|{}
+firebolt|s3_staging_url|S3 URL for Firebolt Cloud data staging|{}
+firebolt|s3_region|AWS region for Firebolt S3 staging|{}
+firebolt|disable_result_cache|Disable Firebolt Cloud result cache during benchmark execution|{'parser': 'parse_bool', 'default': True}
+firebolt|strict_validation|Fail when Firebolt cache-control validation cannot prove expected state|{'parser': 'parse_bool', 'default': False}
+presto|catalog|Presto catalog to use (e.g., hive, memory). Auto-discovered if not specified.|{}
+presto|staging_root|Cloud storage path for staging data (e.g., s3://..., gs://...)|{}
+presto|table_format|Table format for creating tables (memory, hive)|{'default': 'memory'}
+presto|source_catalog|Source catalog for external data loading (e.g., hive connector)|{}
+postgresql|host|PostgreSQL server hostname|{'default': 'localhost'}
+postgresql|port|PostgreSQL server port|{'parser': 'int', 'default': 5432}
+postgresql|database|PostgreSQL database name (auto-generated if not specified)|{}
+postgresql|username|PostgreSQL username|{'default': 'postgres'}
+postgresql|password|PostgreSQL password|{}
+postgresql|schema|PostgreSQL schema name|{'default': 'public'}
+postgresql|work_mem|PostgreSQL work_mem setting for queries|{'default': '256MB'}
+postgresql|enable_timescale|Enable TimescaleDB extensions if available|{'default': 'false'}
+timescaledb|host|TimescaleDB server hostname|{'default': 'localhost'}
+timescaledb|port|TimescaleDB server port|{'parser': 'int', 'default': 5432}
+timescaledb|database|TimescaleDB database name (auto-generated if not specified)|{}
+timescaledb|username|TimescaleDB username|{'default': 'postgres'}
+timescaledb|password|TimescaleDB password|{}
+timescaledb|schema|TimescaleDB schema name|{'default': 'public'}
+timescaledb|admin_database|Database used for CREATE/DROP DATABASE operations|{'default': 'postgres'}
+timescaledb|sslmode|PostgreSQL SSL mode|{'default': 'prefer'}
+timescaledb|work_mem|TimescaleDB work_mem setting for queries|{'default': '256MB'}
+timescaledb|maintenance_work_mem|TimescaleDB maintenance_work_mem for VACUUM/CREATE INDEX|{'default': '512MB'}
+timescaledb|effective_cache_size|TimescaleDB effective_cache_size planner hint|{'default': '1GB'}
+timescaledb|max_parallel_workers_per_gather|TimescaleDB max_parallel_workers_per_gather setting|{'parser': 'int', 'default': 2}
+timescaledb|chunk_interval|Chunk time interval for hypertables (e.g., '1 day', '1 week')|{'default': '1 day'}
+timescaledb|compression_enabled|Enable compression on hypertables|{'default': 'false'}
+timescaledb|compression_after|Compress chunks older than this interval (e.g., '7 days')|{'default': '7 days'}
+pg-duckdb|host|PostgreSQL server hostname (with pg_duckdb installed)|{'default': 'localhost'}
+pg-duckdb|port|PostgreSQL server port|{'parser': 'int', 'default': 5432}
+pg-duckdb|database|PostgreSQL database name (auto-generated if not specified)|{}
+pg-duckdb|username|PostgreSQL username|{'default': 'postgres'}
+pg-duckdb|password|PostgreSQL password|{}
+pg-duckdb|schema|PostgreSQL schema name|{'default': 'public'}
+pg-duckdb|admin_database|Database used for CREATE/DROP DATABASE operations|{'default': 'postgres'}
+pg-duckdb|sslmode|PostgreSQL SSL mode|{'default': 'prefer'}
+pg-duckdb|work_mem|PostgreSQL work_mem setting for queries|{'default': '256MB'}
+pg-duckdb|maintenance_work_mem|PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX|{'default': '512MB'}
+pg-duckdb|effective_cache_size|PostgreSQL effective_cache_size planner hint|{'default': '1GB'}
+pg-duckdb|max_parallel_workers_per_gather|PostgreSQL max_parallel_workers_per_gather setting|{'parser': 'int', 'default': 2}
+pg-duckdb|force_execution|Force DuckDB execution engine for all queries|{'parser': 'parse_bool', 'default': True}
+pg-duckdb|postgres_scan_threads|Threads for parallel PostgreSQL table scanning (0 = auto)|{'parser': 'int', 'default': 0}
+pg-duckdb|compare_native|Run native DuckDB comparison for matched queries|{'parser': 'parse_bool', 'default': False}
+pg-mooncake|host|PostgreSQL server hostname (with pg_mooncake installed)|{'default': 'localhost'}
+pg-mooncake|port|PostgreSQL server port|{'parser': 'int', 'default': 5432}
+pg-mooncake|database|PostgreSQL database name (auto-generated if not specified)|{}
+pg-mooncake|username|PostgreSQL username|{'default': 'postgres'}
+pg-mooncake|password|PostgreSQL password|{}
+pg-mooncake|schema|PostgreSQL schema name|{'default': 'public'}
+pg-mooncake|admin_database|Database used for CREATE/DROP DATABASE operations|{'default': 'postgres'}
+pg-mooncake|sslmode|PostgreSQL SSL mode|{'default': 'prefer'}
+pg-mooncake|work_mem|PostgreSQL work_mem setting for queries|{'default': '256MB'}
+pg-mooncake|maintenance_work_mem|PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX|{'default': '512MB'}
+pg-mooncake|effective_cache_size|PostgreSQL effective_cache_size planner hint|{'default': '1GB'}
+pg-mooncake|max_parallel_workers_per_gather|PostgreSQL max_parallel_workers_per_gather setting|{'parser': 'int', 'default': 2}
+pg-mooncake|storage_mode|Storage backend: local (disk) or s3 (object storage)|{'choices': ('local', 's3'), 'default': 'local'}
+pg-mooncake|mooncake_bucket|S3/GCS bucket URL for columnstore data (required when storage_mode=s3)|{}
+questdb|host|QuestDB server hostname|{'default': 'localhost'}
+questdb|pg_port|QuestDB PostgreSQL wire protocol port|{'default': '8812'}
+questdb|http_port|QuestDB REST API HTTP port (BenchBox Docker uses 19000; native default is 9000)|{'default': '9000'}
+questdb|ilp_port|QuestDB InfluxDB Line Protocol port|{'default': '9009'}
+questdb|username|QuestDB username|{'default': 'admin'}
+questdb|password|QuestDB password|{'default': 'quest'}
+questdb|database|QuestDB database name|{'default': 'qdb'}
+questdb|loading_method|Data loading method: 'rest' (CSV import, default) or 'ilp' (InfluxDB Line Protocol)|{'default': 'rest'}
+cedardb|host|CedarDB server hostname|{'default': 'localhost'}
+cedardb|port|CedarDB server port|{'default': '5432'}
+cedardb|database|CedarDB database name (auto-generated if not specified)|{}
+cedardb|username|CedarDB username|{'default': 'postgres'}
+cedardb|password|CedarDB password|{}
+cedardb|schema|CedarDB schema name|{'default': 'public'}
+synapse|server|Azure Synapse server endpoint (e.g., myworkspace.sql.azuresynapse.net)|{}
+synapse|database|Azure Synapse database name (auto-generated if not specified)|{}
+synapse|username|Azure Synapse username|{}
+synapse|password|Azure Synapse password|{}
+synapse|auth_method|Authentication method: sql, aad_password, or aad_msi|{'default': 'sql'}
+synapse|storage_account|Azure storage account for data staging|{}
+synapse|container|Azure blob container name|{}
+synapse|storage_sas_token|SAS token for Azure storage access|{}
+synapse|resource_class|Workload resource class (e.g., staticrc20, staticrc30)|{'default': 'staticrc20'}
+fabric_dw|server|Fabric warehouse endpoint (e.g., workspace-guid.datawarehouse.fabric.microsoft.com)|{}
+fabric_dw|workspace|Fabric workspace name or GUID|{}
+fabric_dw|warehouse|Fabric warehouse name|{}
+fabric_dw|database|Database/warehouse name (alias for --warehouse)|{}
+fabric_dw|auth_method|Authentication method: service_principal, default_credential, or interactive|{'default': 'default_credential'}
+fabric_dw|tenant_id|Azure tenant ID for service principal auth|{}
+fabric_dw|client_id|Service principal client ID|{}
+fabric_dw|client_secret|Service principal client secret|{}
+fabric_dw|staging_path|OneLake staging path for data loading|{'default': 'benchbox-staging'}
+quanton|api_key|Onehouse API key (or set ONEHOUSE_API_KEY env var)|{}
+quanton|s3_staging_dir|S3 path for data staging (e.g., s3://bucket/path)|{}
+quanton|region|AWS region for cluster deployment|{'default': 'us-east-1'}
+quanton|database|Database name for benchmarks|{'default': 'benchbox'}
+quanton|table_format|Table format: iceberg, hudi, or delta|{'choices': ('iceberg', 'hudi', 'delta'), 'default': 'iceberg'}
+quanton|cluster_size|Cluster size: small, medium, large, xlarge|{'choices': ('small', 'medium', 'large', 'xlarge'), 'default': 'small'}
+clickhouse-cloud|host|ClickHouse Cloud hostname (e.g., abc123.us-east-2.aws.clickhouse.cloud)|{}
+clickhouse-cloud|password|ClickHouse Cloud password (or set CLICKHOUSE_CLOUD_PASSWORD env var)|{}
+clickhouse-cloud|username|Username (default: 'default')|{'default': 'default'}
+clickhouse-cloud|database|Database name|{'default': 'default'}
+clickhouse-cloud|region|ClickHouse Cloud service region when it cannot be inferred from the host|{}
+clickhouse-cloud|cloud_provider|ClickHouse Cloud provider when it cannot be inferred from the host|{}
+clickhouse-cloud|service_id|ClickHouse Cloud service identifier for result metadata|{}
+clickhouse-cloud|service_name|ClickHouse Cloud service display name for result metadata|{}
+clickhouse-cloud|service_tier|ClickHouse Cloud service tier for result metadata|{}
+clickhouse-cloud|compute_size|ClickHouse Cloud requested compute size for result metadata|{}
+clickhouse-cloud|oauth_token|OAuth token for keyless authentication (alternative to password)|{}
+clickhouse-cloud|s3_staging_url|S3 URL for bulk data loading (e.g., s3://my-bucket/benchbox-staging/)|{}
+clickhouse-cloud|s3_region|AWS region for the S3 staging bucket|{'default': 'us-east-1'}
+clickhouse-cloud|gcs_staging_url|GCS URL for bulk data loading (e.g., gs://my-bucket/benchbox-staging/)|{}
+starrocks|host|StarRocks FE hostname|{'default': 'localhost'}
+starrocks|port|StarRocks FE MySQL protocol port|{'default': '9030'}
+starrocks|username|StarRocks username|{'default': 'root'}
+starrocks|password|StarRocks password|{}
+starrocks|database|StarRocks database name (auto-generated if not specified)|{}
+starrocks|http_port|StarRocks BE HTTP port for Stream Load|{'default': '8040'}
+databend|host|Databend host (or set DATABEND_HOST env var)|{}
+databend|port|Databend port (default: 443 for cloud, 8000 for self-hosted)|{}
+databend|username|Databend username (default: benchbox)|{'default': 'benchbox'}
+databend|password|Databend password (or set DATABEND_PASSWORD env var)|{}
+databend|database|Database name (default: benchbox)|{'default': 'benchbox'}
+databend|dsn|Full Databend DSN (overrides individual connection params)|{}
+databend|warehouse|Databend Cloud warehouse name|{}
+doris|host|Doris FE node hostname|{'default': 'localhost'}
+doris|port|Doris MySQL protocol port|{'parser': 'int', 'default': 9030}
+doris|http_port|Doris Stream Load HTTP port (FE)|{'parser': 'int', 'default': 8030}
+doris|be_http_port|Doris BE HTTP port for stream load redirects|{'parser': 'int', 'default': 8040}
+doris|database|Doris database name (auto-generated if not specified)|{}
+doris|username|Doris username|{'default': 'root'}
+doris|password|Doris password|{}
+singlestore|host|SingleStore server hostname or Helios endpoint|{'default': 'localhost'}
+singlestore|port|SingleStore MySQL protocol port|{'default': '3306'}
+singlestore|database|SingleStore database name (auto-generated if not specified)|{}
+singlestore|username|SingleStore username|{'default': 'root'}
+singlestore|password|SingleStore password|{}
+polars|streaming|Enable streaming mode for large datasets|{'parser': 'parse_bool', 'default': 'false'}
+polars|rechunk|Rechunk data for better memory layout|{'parser': 'parse_bool', 'default': 'true'}
+polars|n_rows|Limit number of rows to read (for testing)|{'parser': 'int'}
+pandas|dtype_backend|Backend for nullable dtypes|{'choices': ('numpy', 'numpy_nullable', 'pyarrow'), 'default': 'numpy_nullable'}
+modin|engine|Modin execution engine|{'choices': ('ray', 'dask'), 'default': 'ray'}
+cudf|device_id|CUDA device ID to use|{'parser': 'int', 'default': '0'}
+cudf|spill_to_host|Enable GPU memory spilling to host RAM|{'parser': 'parse_bool', 'default': 'true'}
+dask|n_workers|Number of worker processes|{'parser': 'int'}
+dask|threads_per_worker|Threads per worker process|{'parser': 'int'}
+dask|use_distributed|Use distributed scheduler (enables dashboard)|{'parser': 'parse_bool', 'default': True}
+dask|scheduler_address|Connect to existing scheduler (e.g., 'tcp://...')|{}
+dask|memory_limit|Memory limit per local Dask worker (e.g., '4GB')|{}
+dask|spill_directory|Directory for Dask spill files; explicit directories are not deleted by close()|{}
+datafusion|target_partitions|Number of target partitions for parallelism (default: CPU count)|{'parser': 'int'}
+datafusion|repartition_joins|Enable automatic repartitioning for joins|{'parser': 'parse_bool', 'default': 'true'}
+datafusion|parquet_pushdown|Enable predicate/projection pushdown for Parquet files|{'parser': 'parse_bool', 'default': 'true'}
+datafusion|batch_size|Batch size for query execution|{'parser': 'int', 'default': '8192'}
+datafusion|memory_limit|Memory limit for fair spill pool (e.g., '8G', '16GB')|{}
+datafusion|temp_dir|Temporary directory for disk spilling (default: system temp)|{}
+sqlite|database_path|Path to the SQLite database file (auto-generated from --benchmark/--scale when omitted)|{}
+sqlite|timeout|SQLite connection timeout in seconds|{'parser': 'float', 'default': '30.0'}
+sqlite|check_same_thread|Enforce that connections are used on the creating thread only|{'parser': 'parse_bool', 'default': 'false'}
+spark|adaptive_enabled|Enable or disable Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
+velox|deployment|Deployment mode: 'local' (in-process SparkSession, Linux only) or 'remote' (Spark-Connect server)|{'choices': ('local', 'remote'), 'default': 'local'}
+velox|endpoint|Spark-Connect endpoint for remote mode (e.g., sc://localhost:50051)|{'default': 'sc://localhost:50051'}
+velox|gluten_jar_path|Absolute path to the Gluten Velox bundle jar (required for local mode)|{'aliases': ('jar',)}
+velox|offheap_size|Off-heap memory for Velox native engine (e.g., '8g', '16g')|{'default': '8g'}
+velox|driver_memory|Spark driver JVM heap memory (e.g., '4g')|{'default': '4g'}
+velox|shuffle_partitions|Number of shuffle partitions|{'parser': 'int', 'default': '200'}
+velox|adaptive_enabled|Enable Spark Adaptive Query Execution|{'parser': 'parse_bool', 'default': 'true'}
+"""
+
+    _SPEC_PARSERS = {"int": int, "float": float, "parse_bool": parse_bool}
+
+    def _spec_kwargs(text: str) -> dict[str, object]:
+        kwargs = ast.literal_eval(text)
+        parser = kwargs.get("parser")
+        if isinstance(parser, str):
+            kwargs["parser"] = _SPEC_PARSERS[parser]
+        return kwargs
+
+    def _register_spec_rows(rows: str) -> None:
+        for row in rows.splitlines():
+            platform, name, help_text, kwargs_text = row.split("|", 3)
+            _register_specs(platform, (name, help_text, _spec_kwargs(kwargs_text)))
+
+    _register_spec_rows(_OPTION_SPEC_ROWS)
 
     # ========================================================================
     # Cloud Platform Hooks (Lazy Config Builders)
@@ -721,580 +837,41 @@ try:
     PlatformHookRegistry.register_config_builder(
         "databricks", _make_lazy_config_builder(".databricks", "_build_databricks_config")
     )
-    PlatformHookRegistry.register_option_specs(
-        "databricks",
-        PlatformOptionSpec(
-            name="uc_catalog",
-            help="Unity Catalog catalog name for staging data",
-        ),
-        PlatformOptionSpec(
-            name="uc_schema",
-            help="Unity Catalog schema name for staging data",
-        ),
-        PlatformOptionSpec(
-            name="uc_volume",
-            help="Unity Catalog volume name for staging data",
-        ),
-        PlatformOptionSpec(
-            name="staging_root",
-            help="Cloud storage path for staging data (e.g., dbfs:/Volumes/..., s3://..., abfss://...)",
-        ),
-        PlatformOptionSpec(
-            name="databricks_clustering_strategy",
-            choices=("z_order", "liquid_clustering", "none"),
-            help="Databricks SQL tuning strategy override (z_order, liquid_clustering, none)",
-        ),
-        PlatformOptionSpec(
-            name="liquid_clustering_columns",
-            help="Comma-separated Databricks liquid clustering columns",
-        ),
-    )
 
     # BigQuery
     PlatformHookRegistry.register_config_builder(
         "bigquery", _make_lazy_config_builder(".bigquery", "_build_bigquery_config")
     )
-    PlatformHookRegistry.register_option_specs(
-        "bigquery",
-        PlatformOptionSpec(
-            name="staging_root",
-            help="GCS path for staging data (e.g., gs://bucket/path)",
-        ),
-        PlatformOptionSpec(
-            name="storage_bucket",
-            help="GCS bucket name for data staging (alternative to staging_root)",
-        ),
-        PlatformOptionSpec(
-            name="storage_prefix",
-            help="GCS path prefix within bucket for data staging",
-        ),
-    )
 
     # Trino
     PlatformHookRegistry.register_config_builder("trino", _make_lazy_config_builder(".trino", "_build_trino_config"))
-    PlatformHookRegistry.register_option_specs(
-        "trino",
-        PlatformOptionSpec(
-            name="catalog",
-            help="Trino catalog to use (e.g., hive, iceberg, memory). Auto-discovered if not specified.",
-        ),
-        PlatformOptionSpec(
-            name="staging_root",
-            help="Cloud storage path for staging data (e.g., s3://..., gs://..., abfss://...)",
-        ),
-        PlatformOptionSpec(
-            name="table_format",
-            help="Table format for creating tables (memory, hive, iceberg, delta)",
-            default="memory",
-        ),
-        PlatformOptionSpec(
-            name="source_catalog",
-            help="Source catalog for external data loading (e.g., hive connector)",
-        ),
-    )
 
     # Firebolt
     PlatformHookRegistry.register_config_builder(
         "firebolt", _make_lazy_config_builder(".firebolt", "_build_firebolt_config")
     )
-    PlatformHookRegistry.register_option_specs(
-        "firebolt",
-        PlatformOptionSpec(
-            name="deployment_mode",
-            aliases=("firebolt_mode",),
-            help="Explicit Firebolt mode: 'core' for local Docker, 'cloud' for managed Firebolt",
-            choices=("core", "cloud"),
-        ),
-        PlatformOptionSpec(
-            name="url",
-            help="Firebolt Core endpoint URL (default: http://localhost:3473)",
-            default="http://localhost:3473",
-        ),
-        PlatformOptionSpec(
-            name="client_id",
-            help="Firebolt Cloud OAuth client ID",
-        ),
-        PlatformOptionSpec(
-            name="client_secret",
-            help="Firebolt Cloud OAuth client secret",
-        ),
-        PlatformOptionSpec(
-            name="account_name",
-            help="Firebolt Cloud account name",
-        ),
-        PlatformOptionSpec(
-            name="engine_name",
-            help="Firebolt Cloud engine name",
-        ),
-        PlatformOptionSpec(
-            name="api_endpoint",
-            help="Firebolt Cloud API endpoint",
-            default="api.app.firebolt.io",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Firebolt database name",
-        ),
-        PlatformOptionSpec(
-            name="region",
-            aliases=("cloud_region",),
-            help="Firebolt Cloud region when known",
-        ),
-        PlatformOptionSpec(
-            name="cloud_provider",
-            help="Firebolt Cloud provider when known",
-        ),
-        PlatformOptionSpec(
-            name="engine_type",
-            help="Firebolt Cloud engine type when known",
-        ),
-        PlatformOptionSpec(
-            name="engine_size",
-            help="Firebolt Cloud requested engine size when known",
-        ),
-        PlatformOptionSpec(
-            name="compute_size",
-            help="Firebolt Cloud requested compute size alias for engine size",
-        ),
-        PlatformOptionSpec(
-            name="s3_staging_url",
-            help="S3 URL for Firebolt Cloud data staging",
-        ),
-        PlatformOptionSpec(
-            name="s3_region",
-            help="AWS region for Firebolt S3 staging",
-        ),
-        PlatformOptionSpec(
-            name="disable_result_cache",
-            parser=parse_bool,
-            help="Disable Firebolt Cloud result cache during benchmark execution",
-            default=True,
-        ),
-        PlatformOptionSpec(
-            name="strict_validation",
-            parser=parse_bool,
-            help="Fail when Firebolt cache-control validation cannot prove expected state",
-            default=False,
-        ),
-    )
 
     # Presto
     PlatformHookRegistry.register_config_builder("presto", _make_lazy_config_builder(".presto", "_build_presto_config"))
-    PlatformHookRegistry.register_option_specs(
-        "presto",
-        PlatformOptionSpec(
-            name="catalog",
-            help="Presto catalog to use (e.g., hive, memory). Auto-discovered if not specified.",
-        ),
-        PlatformOptionSpec(
-            name="staging_root",
-            help="Cloud storage path for staging data (e.g., s3://..., gs://...)",
-        ),
-        PlatformOptionSpec(
-            name="table_format",
-            help="Table format for creating tables (memory, hive)",
-            default="memory",
-        ),
-        PlatformOptionSpec(
-            name="source_catalog",
-            help="Source catalog for external data loading (e.g., hive connector)",
-        ),
+
+    # PostgreSQL-family hooks are lazy too; importing their modules pulls psycopg.
+    PlatformHookRegistry.register_config_builder(
+        "postgresql", _make_lazy_config_builder(".postgresql", "_build_postgresql_config")
     )
-
-    # ========================================================================
-    # Eagerly-Loaded Platform Hooks (PostgreSQL, TimescaleDB)
-    # ========================================================================
-    # These platforms have lightweight dependencies that are already loaded
-    # eagerly, so we can use direct imports for their config builders.
-
-    # PostgreSQL (eagerly loaded - uses psycopg2 which is a core dependency)
-    if PostgreSQLAdapter is not None:
-        from benchbox.platforms.postgresql import _build_postgresql_config
-
-        PlatformHookRegistry.register_config_builder("postgresql", _build_postgresql_config)
-
-    PlatformHookRegistry.register_option_specs(
-        "postgresql",
-        PlatformOptionSpec(
-            name="host",
-            help="PostgreSQL server hostname",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="PostgreSQL server port",
-            parser=int,
-            default=5432,
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="PostgreSQL database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="PostgreSQL username",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="PostgreSQL password",
-        ),
-        PlatformOptionSpec(
-            name="schema",
-            help="PostgreSQL schema name",
-            default="public",
-        ),
-        PlatformOptionSpec(
-            name="work_mem",
-            help="PostgreSQL work_mem setting for queries",
-            default="256MB",
-        ),
-        PlatformOptionSpec(
-            name="enable_timescale",
-            help="Enable TimescaleDB extensions if available",
-            default="false",
-        ),
+    PlatformHookRegistry.register_config_builder(
+        "timescaledb", _make_lazy_config_builder(".timescaledb", "_build_timescaledb_config")
     )
-
-    # TimescaleDB (eagerly loaded - shares psycopg2 with PostgreSQL)
-    if TimescaleDBAdapter is not None:
-        from benchbox.platforms.timescaledb import _build_timescaledb_config
-
-        PlatformHookRegistry.register_config_builder("timescaledb", _build_timescaledb_config)
-
-    PlatformHookRegistry.register_option_specs(
-        "timescaledb",
-        PlatformOptionSpec(
-            name="host",
-            help="TimescaleDB server hostname",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="TimescaleDB server port",
-            parser=int,
-            default=5432,
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="TimescaleDB database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="TimescaleDB username",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="TimescaleDB password",
-        ),
-        PlatformOptionSpec(
-            name="schema",
-            help="TimescaleDB schema name",
-            default="public",
-        ),
-        PlatformOptionSpec(
-            name="admin_database",
-            help="Database used for CREATE/DROP DATABASE operations",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="sslmode",
-            help="PostgreSQL SSL mode",
-            default="prefer",
-        ),
-        PlatformOptionSpec(
-            name="work_mem",
-            help="TimescaleDB work_mem setting for queries",
-            default="256MB",
-        ),
-        PlatformOptionSpec(
-            name="maintenance_work_mem",
-            help="TimescaleDB maintenance_work_mem for VACUUM/CREATE INDEX",
-            default="512MB",
-        ),
-        PlatformOptionSpec(
-            name="effective_cache_size",
-            help="TimescaleDB effective_cache_size planner hint",
-            default="1GB",
-        ),
-        PlatformOptionSpec(
-            name="max_parallel_workers_per_gather",
-            help="TimescaleDB max_parallel_workers_per_gather setting",
-            parser=int,
-            default=2,
-        ),
-        PlatformOptionSpec(
-            name="chunk_interval",
-            help="Chunk time interval for hypertables (e.g., '1 day', '1 week')",
-            default="1 day",
-        ),
-        PlatformOptionSpec(
-            name="compression_enabled",
-            help="Enable compression on hypertables",
-            default="false",
-        ),
-        PlatformOptionSpec(
-            name="compression_after",
-            help="Compress chunks older than this interval (e.g., '7 days')",
-            default="7 days",
-        ),
+    PlatformHookRegistry.register_config_builder(
+        "pg-duckdb", _make_lazy_config_builder(".pg_duckdb", "_build_pg_duckdb_config")
     )
-
-    # pg_duckdb (eagerly loaded - shares psycopg2 with PostgreSQL)
-    if PgDuckDBAdapter is not None:
-        from benchbox.platforms.pg_duckdb import _build_pg_duckdb_config
-
-        PlatformHookRegistry.register_config_builder("pg-duckdb", _build_pg_duckdb_config)
-
-    PlatformHookRegistry.register_option_specs(
-        "pg-duckdb",
-        PlatformOptionSpec(
-            name="host",
-            help="PostgreSQL server hostname (with pg_duckdb installed)",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="PostgreSQL server port",
-            parser=int,
-            default=5432,
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="PostgreSQL database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="PostgreSQL username",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="PostgreSQL password",
-        ),
-        PlatformOptionSpec(
-            name="schema",
-            help="PostgreSQL schema name",
-            default="public",
-        ),
-        PlatformOptionSpec(
-            name="admin_database",
-            help="Database used for CREATE/DROP DATABASE operations",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="sslmode",
-            help="PostgreSQL SSL mode",
-            default="prefer",
-        ),
-        PlatformOptionSpec(
-            name="work_mem",
-            help="PostgreSQL work_mem setting for queries",
-            default="256MB",
-        ),
-        PlatformOptionSpec(
-            name="maintenance_work_mem",
-            help="PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX",
-            default="512MB",
-        ),
-        PlatformOptionSpec(
-            name="effective_cache_size",
-            help="PostgreSQL effective_cache_size planner hint",
-            default="1GB",
-        ),
-        PlatformOptionSpec(
-            name="max_parallel_workers_per_gather",
-            help="PostgreSQL max_parallel_workers_per_gather setting",
-            parser=int,
-            default=2,
-        ),
-        PlatformOptionSpec(
-            name="force_execution",
-            help="Force DuckDB execution engine for all queries",
-            parser=parse_bool,
-            default=True,
-        ),
-        PlatformOptionSpec(
-            name="postgres_scan_threads",
-            help="Threads for parallel PostgreSQL table scanning (0 = auto)",
-            parser=int,
-            default=0,
-        ),
-        PlatformOptionSpec(
-            name="compare_native",
-            help="Run native DuckDB comparison for matched queries",
-            parser=parse_bool,
-            default=False,
-        ),
+    PlatformHookRegistry.register_config_builder(
+        "pg-mooncake", _make_lazy_config_builder(".pg_mooncake", "_build_pg_mooncake_config")
     )
-
-    # pg_mooncake (eagerly loaded - shares psycopg2 with PostgreSQL)
-    if PgMooncakeAdapter is not None:
-        from benchbox.platforms.pg_mooncake import _build_pg_mooncake_config
-
-        PlatformHookRegistry.register_config_builder("pg-mooncake", _build_pg_mooncake_config)
-
-    PlatformHookRegistry.register_option_specs(
-        "pg-mooncake",
-        PlatformOptionSpec(
-            name="host",
-            help="PostgreSQL server hostname (with pg_mooncake installed)",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="PostgreSQL server port",
-            parser=int,
-            default=5432,
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="PostgreSQL database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="PostgreSQL username",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="PostgreSQL password",
-        ),
-        PlatformOptionSpec(
-            name="schema",
-            help="PostgreSQL schema name",
-            default="public",
-        ),
-        PlatformOptionSpec(
-            name="admin_database",
-            help="Database used for CREATE/DROP DATABASE operations",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="sslmode",
-            help="PostgreSQL SSL mode",
-            default="prefer",
-        ),
-        PlatformOptionSpec(
-            name="work_mem",
-            help="PostgreSQL work_mem setting for queries",
-            default="256MB",
-        ),
-        PlatformOptionSpec(
-            name="maintenance_work_mem",
-            help="PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX",
-            default="512MB",
-        ),
-        PlatformOptionSpec(
-            name="effective_cache_size",
-            help="PostgreSQL effective_cache_size planner hint",
-            default="1GB",
-        ),
-        PlatformOptionSpec(
-            name="max_parallel_workers_per_gather",
-            help="PostgreSQL max_parallel_workers_per_gather setting",
-            parser=int,
-            default=2,
-        ),
-        PlatformOptionSpec(
-            name="storage_mode",
-            help="Storage backend: local (disk) or s3 (object storage)",
-            choices=("local", "s3"),
-            default="local",
-        ),
-        PlatformOptionSpec(
-            name="mooncake_bucket",
-            help="S3/GCS bucket URL for columnstore data (required when storage_mode=s3)",
-        ),
+    PlatformHookRegistry.register_config_builder(
+        "questdb", _make_lazy_config_builder(".questdb", "_build_questdb_config")
     )
-
-    # QuestDB (eagerly loaded - shares psycopg2 with PostgreSQL)
-    if QuestDBAdapter is not None:
-        from benchbox.platforms.questdb import _build_questdb_config
-
-        PlatformHookRegistry.register_config_builder("questdb", _build_questdb_config)
-
-    PlatformHookRegistry.register_option_specs(
-        "questdb",
-        PlatformOptionSpec(
-            name="host",
-            help="QuestDB server hostname",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="pg_port",
-            help="QuestDB PostgreSQL wire protocol port",
-            default="8812",
-        ),
-        PlatformOptionSpec(
-            name="http_port",
-            help="QuestDB REST API HTTP port (BenchBox Docker uses 19000; native default is 9000)",
-            default="9000",
-        ),
-        PlatformOptionSpec(
-            name="ilp_port",
-            help="QuestDB InfluxDB Line Protocol port",
-            default="9009",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="QuestDB username",
-            default="admin",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="QuestDB password",
-            default="quest",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="QuestDB database name",
-            default="qdb",
-        ),
-        PlatformOptionSpec(
-            name="loading_method",
-            help="Data loading method: 'rest' (CSV import, default) or 'ilp' (InfluxDB Line Protocol)",
-            default="rest",
-        ),
-    )
-
-    # CedarDB (eagerly loaded - shares psycopg2 with PostgreSQL)
-    if CedarDBAdapter is not None:
-        from benchbox.platforms.cedardb import _build_cedardb_config
-
-        PlatformHookRegistry.register_config_builder("cedardb", _build_cedardb_config)
-
-    PlatformHookRegistry.register_option_specs(
-        "cedardb",
-        PlatformOptionSpec(
-            name="host",
-            help="CedarDB server hostname",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="CedarDB server port",
-            default="5432",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="CedarDB database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="CedarDB username",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="CedarDB password",
-        ),
-        PlatformOptionSpec(
-            name="schema",
-            help="CedarDB schema name",
-            default="public",
-        ),
+    PlatformHookRegistry.register_config_builder(
+        "cedardb", _make_lazy_config_builder(".cedardb", "_build_cedardb_config")
     )
 
     # ========================================================================
@@ -1305,342 +882,36 @@ try:
     PlatformHookRegistry.register_config_builder(
         "synapse", _make_lazy_config_builder(".azure_synapse", "_build_synapse_config")
     )
-    PlatformHookRegistry.register_option_specs(
-        "synapse",
-        PlatformOptionSpec(
-            name="server",
-            help="Azure Synapse server endpoint (e.g., myworkspace.sql.azuresynapse.net)",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Azure Synapse database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="Azure Synapse username",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="Azure Synapse password",
-        ),
-        PlatformOptionSpec(
-            name="auth_method",
-            help="Authentication method: sql, aad_password, or aad_msi",
-            default="sql",
-        ),
-        PlatformOptionSpec(
-            name="storage_account",
-            help="Azure storage account for data staging",
-        ),
-        PlatformOptionSpec(
-            name="container",
-            help="Azure blob container name",
-        ),
-        PlatformOptionSpec(
-            name="storage_sas_token",
-            help="SAS token for Azure storage access",
-        ),
-        PlatformOptionSpec(
-            name="resource_class",
-            help="Workload resource class (e.g., staticrc20, staticrc30)",
-            default="staticrc20",
-        ),
-    )
 
     # Microsoft Fabric Warehouse (lazy - uses pyodbc and azure-identity)
     # Fabric uses from_config pattern, no separate config builder needed
-    PlatformHookRegistry.register_option_specs(
-        "fabric_dw",
-        PlatformOptionSpec(
-            name="server",
-            help="Fabric warehouse endpoint (e.g., workspace-guid.datawarehouse.fabric.microsoft.com)",
-        ),
-        PlatformOptionSpec(
-            name="workspace",
-            help="Fabric workspace name or GUID",
-        ),
-        PlatformOptionSpec(
-            name="warehouse",
-            help="Fabric warehouse name",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Database/warehouse name (alias for --warehouse)",
-        ),
-        PlatformOptionSpec(
-            name="auth_method",
-            help="Authentication method: service_principal, default_credential, or interactive",
-            default="default_credential",
-        ),
-        PlatformOptionSpec(
-            name="tenant_id",
-            help="Azure tenant ID for service principal auth",
-        ),
-        PlatformOptionSpec(
-            name="client_id",
-            help="Service principal client ID",
-        ),
-        PlatformOptionSpec(
-            name="client_secret",
-            help="Service principal client secret",
-        ),
-        PlatformOptionSpec(
-            name="staging_path",
-            help="OneLake staging path for data loading",
-            default="benchbox-staging",
-        ),
-    )
 
     # Onehouse Quanton (lazy - uses requests and boto3)
     PlatformHookRegistry.register_config_builder(
         "quanton", _make_lazy_config_builder(".onehouse", "_build_quanton_config")
-    )
-    PlatformHookRegistry.register_option_specs(
-        "quanton",
-        PlatformOptionSpec(
-            name="api_key",
-            help="Onehouse API key (or set ONEHOUSE_API_KEY env var)",
-        ),
-        PlatformOptionSpec(
-            name="s3_staging_dir",
-            help="S3 path for data staging (e.g., s3://bucket/path)",
-        ),
-        PlatformOptionSpec(
-            name="region",
-            help="AWS region for cluster deployment",
-            default="us-east-1",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Database name for benchmarks",
-            default="benchbox",
-        ),
-        PlatformOptionSpec(
-            name="table_format",
-            help="Table format: iceberg, hudi, or delta",
-            choices=("iceberg", "hudi", "delta"),
-            default="iceberg",
-        ),
-        PlatformOptionSpec(
-            name="cluster_size",
-            help="Cluster size: small, medium, large, xlarge",
-            choices=("small", "medium", "large", "xlarge"),
-            default="small",
-        ),
     )
 
     # ClickHouse Cloud (lazy - uses clickhouse-connect)
     PlatformHookRegistry.register_config_builder(
         "clickhouse-cloud", _make_lazy_config_builder(".clickhouse_cloud", "_build_clickhouse_cloud_config")
     )
-    PlatformHookRegistry.register_option_specs(
-        "clickhouse-cloud",
-        PlatformOptionSpec(
-            name="host",
-            help="ClickHouse Cloud hostname (e.g., abc123.us-east-2.aws.clickhouse.cloud)",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="ClickHouse Cloud password (or set CLICKHOUSE_CLOUD_PASSWORD env var)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="Username (default: 'default')",
-            default="default",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Database name",
-            default="default",
-        ),
-        PlatformOptionSpec(
-            name="region",
-            help="ClickHouse Cloud service region when it cannot be inferred from the host",
-        ),
-        PlatformOptionSpec(
-            name="cloud_provider",
-            help="ClickHouse Cloud provider when it cannot be inferred from the host",
-        ),
-        PlatformOptionSpec(
-            name="service_id",
-            help="ClickHouse Cloud service identifier for result metadata",
-        ),
-        PlatformOptionSpec(
-            name="service_name",
-            help="ClickHouse Cloud service display name for result metadata",
-        ),
-        PlatformOptionSpec(
-            name="service_tier",
-            help="ClickHouse Cloud service tier for result metadata",
-        ),
-        PlatformOptionSpec(
-            name="compute_size",
-            help="ClickHouse Cloud requested compute size for result metadata",
-        ),
-        PlatformOptionSpec(
-            name="oauth_token",
-            help="OAuth token for keyless authentication (alternative to password)",
-        ),
-        PlatformOptionSpec(
-            name="s3_staging_url",
-            help="S3 URL for bulk data loading (e.g., s3://my-bucket/benchbox-staging/)",
-        ),
-        PlatformOptionSpec(
-            name="s3_region",
-            help="AWS region for the S3 staging bucket",
-            default="us-east-1",
-        ),
-        PlatformOptionSpec(
-            name="gcs_staging_url",
-            help="GCS URL for bulk data loading (e.g., gs://my-bucket/benchbox-staging/)",
-        ),
-    )
 
     # StarRocks (lazy - uses pymysql)
     PlatformHookRegistry.register_config_builder(
         "starrocks", _make_lazy_config_builder(".starrocks.setup", "_build_starrocks_config")
-    )
-    PlatformHookRegistry.register_option_specs(
-        "starrocks",
-        PlatformOptionSpec(
-            name="host",
-            help="StarRocks FE hostname",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="StarRocks FE MySQL protocol port",
-            default="9030",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="StarRocks username",
-            default="root",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="StarRocks password",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="StarRocks database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="http_port",
-            help="StarRocks BE HTTP port for Stream Load",
-            default="8040",
-        ),
     )
 
     # Databend (lazy - uses databend-driver)
     PlatformHookRegistry.register_config_builder(
         "databend", _make_lazy_config_builder(".databend", "_build_databend_config")
     )
-    PlatformHookRegistry.register_option_specs(
-        "databend",
-        PlatformOptionSpec(
-            name="host",
-            help="Databend host (or set DATABEND_HOST env var)",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="Databend port (default: 443 for cloud, 8000 for self-hosted)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="Databend username (default: benchbox)",
-            default="benchbox",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="Databend password (or set DATABEND_PASSWORD env var)",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Database name (default: benchbox)",
-            default="benchbox",
-        ),
-        PlatformOptionSpec(
-            name="dsn",
-            help="Full Databend DSN (overrides individual connection params)",
-        ),
-        PlatformOptionSpec(
-            name="warehouse",
-            help="Databend Cloud warehouse name",
-        ),
-    )
 
     # Doris (lazy - uses pymysql)
     PlatformHookRegistry.register_config_builder("doris", _make_lazy_config_builder(".doris", "_build_doris_config"))
-    PlatformHookRegistry.register_option_specs(
-        "doris",
-        PlatformOptionSpec(
-            name="host",
-            help="Doris FE node hostname",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            parser=int,
-            help="Doris MySQL protocol port",
-            default=9030,
-        ),
-        PlatformOptionSpec(
-            name="http_port",
-            parser=int,
-            help="Doris Stream Load HTTP port (FE)",
-            default=8030,
-        ),
-        PlatformOptionSpec(
-            name="be_http_port",
-            parser=int,
-            help="Doris BE HTTP port for stream load redirects",
-            default=8040,
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Doris database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="Doris username",
-            default="root",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="Doris password",
-        ),
-    )
 
     # SingleStore (lazy - uses singlestoredb SDK)
     PlatformHookRegistry.register_config_builder(
         "singlestore", _make_lazy_config_builder(".singlestore", "_build_singlestore_config")
-    )
-    PlatformHookRegistry.register_option_specs(
-        "singlestore",
-        PlatformOptionSpec(
-            name="host",
-            help="SingleStore server hostname or Helios endpoint",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="SingleStore MySQL protocol port",
-            default="3306",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="SingleStore database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="SingleStore username",
-            default="root",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="SingleStore password",
-        ),
     )
 
     # ========================================================================
@@ -1651,197 +922,19 @@ try:
     # runtime when the adapter is instantiated.
 
     # Polars DataFrame
-    PlatformHookRegistry.register_option_specs(
-        "polars-df",
-        PlatformOptionSpec(
-            name="streaming",
-            help="Enable streaming mode for large datasets",
-            parser=parse_bool,
-            default="false",
-        ),
-        PlatformOptionSpec(
-            name="rechunk",
-            help="Rechunk data for better memory layout",
-            parser=parse_bool,
-            default="true",
-        ),
-        PlatformOptionSpec(
-            name="n_rows",
-            help="Limit number of rows to read (for testing)",
-            parser=int,
-        ),
-    )
 
     # Pandas DataFrame
-    PlatformHookRegistry.register_option_specs(
-        "pandas-df",
-        PlatformOptionSpec(
-            name="dtype_backend",
-            help="Backend for nullable dtypes",
-            choices=("numpy", "numpy_nullable", "pyarrow"),
-            default="numpy_nullable",
-        ),
-    )
 
     # Modin DataFrame
-    PlatformHookRegistry.register_option_specs(
-        "modin-df",
-        PlatformOptionSpec(
-            name="engine",
-            help="Modin execution engine",
-            choices=("ray", "dask"),
-            default="ray",
-        ),
-    )
 
     # cuDF DataFrame
-    PlatformHookRegistry.register_option_specs(
-        "cudf-df",
-        PlatformOptionSpec(
-            name="device_id",
-            help="CUDA device ID to use",
-            parser=int,
-            default="0",
-        ),
-        PlatformOptionSpec(
-            name="spill_to_host",
-            help="Enable GPU memory spilling to host RAM",
-            parser=parse_bool,
-            default="true",
-        ),
-    )
 
     # Dask DataFrame
-    PlatformHookRegistry.register_option_specs(
-        "dask-df",
-        PlatformOptionSpec(
-            name="n_workers",
-            help="Number of worker processes",
-            parser=int,
-        ),
-        PlatformOptionSpec(
-            name="threads_per_worker",
-            help="Threads per worker process",
-            parser=int,
-        ),
-        PlatformOptionSpec(
-            name="use_distributed",
-            help="Use distributed scheduler (enables dashboard)",
-            parser=parse_bool,
-            default=True,
-        ),
-        PlatformOptionSpec(
-            name="scheduler_address",
-            help="Connect to existing scheduler (e.g., 'tcp://...')",
-        ),
-        PlatformOptionSpec(
-            name="memory_limit",
-            help="Memory limit per local Dask worker (e.g., '4GB')",
-        ),
-        PlatformOptionSpec(
-            name="spill_directory",
-            help="Directory for Dask spill files; explicit directories are not deleted by close()",
-        ),
-    )
 
     # DataFusion DataFrame
-    PlatformHookRegistry.register_option_specs(
-        "datafusion-df",
-        PlatformOptionSpec(
-            name="target_partitions",
-            help="Number of target partitions for parallelism (default: CPU count)",
-            parser=int,
-        ),
-        PlatformOptionSpec(
-            name="repartition_joins",
-            help="Enable automatic repartitioning for joins",
-            parser=parse_bool,
-            default="true",
-        ),
-        PlatformOptionSpec(
-            name="parquet_pushdown",
-            help="Enable predicate/projection pushdown for Parquet files",
-            parser=parse_bool,
-            default="true",
-        ),
-        PlatformOptionSpec(
-            name="batch_size",
-            help="Batch size for query execution",
-            parser=int,
-            default="8192",
-        ),
-        PlatformOptionSpec(
-            name="memory_limit",
-            help="Memory limit for fair spill pool (e.g., '8G', '16GB')",
-        ),
-        PlatformOptionSpec(
-            name="temp_dir",
-            help="Temporary directory for disk spilling (default: system temp)",
-        ),
-    )
     # SQLite (embedded — stdlib sqlite3, no heavy SDK imports)
-    PlatformHookRegistry.register_option_specs(
-        "sqlite",
-        PlatformOptionSpec(
-            name="database_path",
-            help="Path to the SQLite database file (auto-generated from --benchmark/--scale when omitted)",
-        ),
-        PlatformOptionSpec(
-            name="timeout",
-            help="SQLite connection timeout in seconds",
-            parser=float,
-            default="30.0",
-        ),
-        PlatformOptionSpec(
-            name="check_same_thread",
-            help="Enforce that connections are used on the creating thread only",
-            parser=parse_bool,
-            default="false",
-        ),
-    )
 
     # Apache Gluten + Velox (lazy - uses pyspark + Gluten bundle jar)
-    PlatformHookRegistry.register_option_specs(
-        "velox",
-        PlatformOptionSpec(
-            name="deployment",
-            help="Deployment mode: 'local' (in-process SparkSession, Linux only) or 'remote' (Spark-Connect server)",
-            choices=("local", "remote"),
-            default="local",
-        ),
-        PlatformOptionSpec(
-            name="endpoint",
-            help="Spark-Connect endpoint for remote mode (e.g., sc://localhost:50051)",
-            default="sc://localhost:50051",
-        ),
-        PlatformOptionSpec(
-            name="gluten_jar_path",
-            help="Absolute path to the Gluten Velox bundle jar (required for local mode)",
-            aliases=("jar",),
-        ),
-        PlatformOptionSpec(
-            name="offheap_size",
-            help="Off-heap memory for Velox native engine (e.g., '8g', '16g')",
-            default="8g",
-        ),
-        PlatformOptionSpec(
-            name="driver_memory",
-            help="Spark driver JVM heap memory (e.g., '4g')",
-            default="4g",
-        ),
-        PlatformOptionSpec(
-            name="shuffle_partitions",
-            help="Number of shuffle partitions",
-            parser=int,
-            default="200",
-        ),
-        PlatformOptionSpec(
-            name="adaptive_enabled",
-            help="Enable Spark Adaptive Query Execution",
-            parser=parse_bool,
-            default="true",
-        ),
-    )
 
 except ImportError:
     # Platform hooks may not be available in all contexts

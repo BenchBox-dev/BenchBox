@@ -19,12 +19,19 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from benchbox.core.results.loader import load_result_file
+from benchbox.core.results.provenance import SOURCE_TO_TRUST_LABEL
+from benchbox.core.results.status import bundle_non_clean_reason, result_non_clean_reason
+from benchbox.validation.bundle import COMPANION_SUFFIXES
+
 from .store import PublicationRecord, PublicationStore, build_reference
 
 logger = logging.getLogger(__name__)
 
-VALID_LABELS = ("maintainer-run", "community-submission", "ci", "local", "unofficial-research")
-COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
+# Provenance-derived trust labels (maintainer-run, community-submission,
+# vendor-supplied) come from the canonical provenance vocabulary; the remaining
+# labels are publish-only workflow tags with no result_source counterpart.
+VALID_LABELS = (*SOURCE_TO_TRUST_LABEL.values(), "ci", "local", "unofficial-research")
 
 
 @dataclass
@@ -82,7 +89,15 @@ class BundlePublisher:
         """
         self.destination = str(destination)
         self.store = store or PublicationStore()
-        self.label = label if label in VALID_LABELS else "maintainer-run"
+        # Fail loudly on an out-of-vocabulary label rather than silently
+        # coercing it to the MOST trusted tier. Silent coercion let a typo'd or
+        # caller-supplied bad label (e.g. "communtiy-submission", "unofficial")
+        # be recorded as "maintainer-run" — a truthful-looking but wrong
+        # provenance stamp. The CLI paths validate the label before reaching
+        # here; this guards programmatic/API callers.
+        if label not in VALID_LABELS:
+            raise ValueError(f"Invalid trust label {label!r}; must be one of {VALID_LABELS}.")
+        self.label = label
 
     def publish(self, source_bundle: str | Path) -> BundlePublishResult:
         """Publish a schema-v2 result bundle to the configured destination.
@@ -116,6 +131,10 @@ class BundlePublisher:
                     "Companion files (.plans.json, .tuning.json) are published automatically."
                 ],
             )
+
+        validation_errors = _validate_source_bundle_for_publication(bundle_path)
+        if validation_errors:
+            return BundlePublishResult(success=False, errors=validation_errors)
 
         # Extract informational metadata from the bundle header
         metadata = _read_bundle_metadata(bundle_path)
@@ -170,6 +189,19 @@ class _BundleMetadata:
     dataset_version: str | None = None
     manifest_hash: str | None = None
     data_archive_hash: str | None = None
+
+
+def _validate_source_bundle_for_publication(bundle_path: Path) -> list[str]:
+    """Return publication-blocking errors for source bundles that are not clean passes."""
+    try:
+        result, data = load_result_file(bundle_path)
+    except Exception as exc:
+        return [f"Source bundle is not a loadable schema-v2 result bundle: {exc}"]
+
+    reason = bundle_non_clean_reason(data) or result_non_clean_reason(result)
+    if reason:
+        return [f"Source bundle is not a clean pass: {reason}"]
+    return []
 
 
 def _read_bundle_metadata(bundle_path: Path) -> _BundleMetadata:

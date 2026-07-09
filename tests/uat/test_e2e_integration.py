@@ -18,7 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from tests.uat import matrix, orchestrator
+from benchbox.validation.bundle import ValidationResult
+from tests.uat import orchestrator
 from tests.uat.config import validate_config
 from tests.uat.runner import CellResult
 
@@ -56,12 +57,11 @@ def test_e2e_two_platforms_three_benchmarks_with_cleanup_and_report(
       - cells.jsonl contains every cell that ran.
       - matrix_summary.tsv has the right row count and pass count.
     """
-    matrix.reset_reachability_cache()
 
     cfg = validate_config(
         {
             "name": "e2e",
-            "phases": ["enumerate", "execute", "report"],
+            "phases": ["execute", "report"],
             "platforms": {"include": ["duckdb", "sqlite"]},
             # Deliberately put consumers ahead of source — topology must reorder.
             "benchmarks": {"include": ["read_primitives", "write_primitives", "tpch"]},
@@ -90,7 +90,7 @@ def test_e2e_two_platforms_three_benchmarks_with_cleanup_and_report(
     )
 
     assert result.aborted_phase is None, result.abort_reason
-    assert result.phase_exit_codes == {"enumerate": 0, "execute": 0, "report": 0}
+    assert result.phase_exit_codes == {"execute": 0, "report": 0}
 
     benches_per_platform: dict[str, list[str]] = {}
     for plat, bench, _scale in invocations:
@@ -126,12 +126,11 @@ def test_e2e_two_platforms_three_benchmarks_with_cleanup_and_report(
 
 def test_e2e_validator_status_reaches_cross_scale_check(tmp_path: Path, monkeypatch):
     """A failed validator status should disqualify the cell from cross_scale_clean_pair_count."""
-    matrix.reset_reachability_cache()
 
     cfg = validate_config(
         {
             "name": "e2e-validator",
-            "phases": ["enumerate", "execute", "validate", "report"],
+            "phases": ["execute", "validate", "report"],
             "platforms": {"include": ["duckdb"]},
             "benchmarks": {"include": ["tpch"]},
             "scales": {"rungs": [0.01, 0.1]},
@@ -146,25 +145,18 @@ def test_e2e_validator_status_reaches_cross_scale_check(tmp_path: Path, monkeypa
 
     validated_paths: list[Path] = []
 
-    def fake_validate_runner(argv, check):
-        result_path = Path(argv[2])
-        output_tsv = Path(argv[argv.index("--output") + 1])
+    def fake_validate_bundles(paths):
+        result_path = paths[0]
         validated_paths.append(result_path)
         scale = float(result_path.stem.rsplit("_", 1)[-1])
-        status = "clean" if scale == 0.01 else "error"
-        rows = ["platform\tbenchmark\tscale\tresult_path\tvalidator_status\terror_count\twarning_count\tfirst_error"]
-        plat, bench, scale_text = result_path.stem.split("_", 2)
-        rows.append(f"{plat}\t{bench}\t{scale_text}\t{result_path}\t{status}\t0\t0\t")
-        output_tsv.write_text("\n".join(rows) + "\n", encoding="utf-8")
-
-        class Completed:
-            returncode = 0
-
-        return Completed()
+        validation_result = ValidationResult(str(result_path))
+        if scale != 0.01:
+            validation_result.error("forced validator failure")
+        return [validation_result]
 
     monkeypatch.setattr(
-        "tests.uat.phases.validate.subprocess.run",
-        fake_validate_runner,
+        "tests.uat.phases.validate.validate_bundles",
+        fake_validate_bundles,
     )
 
     result = orchestrator.run_sweep(

@@ -150,60 +150,44 @@ class DataFrameTransactionCapabilities:
         return [op for op in TransactionOperationType if not self.supports_operation(op)]
 
 
-# Pre-defined capability profiles for platforms
-DELTA_LAKE_TRANSACTION_CAPABILITIES = DataFrameTransactionCapabilities(
-    platform_name="delta-lake",
-    supports_transactions=True,
-    supports_rollback=True,
-    supports_time_travel=True,
-    supports_concurrent_writes=True,
-    transaction_isolation=TransactionIsolation.SNAPSHOT,
-    table_format="delta",
-    notes="Full ACID via Delta Lake. RESTORE for rollback, version queries for time travel.",
-)
+def _transaction_capabilities(
+    platform_name: str, table_format: str, notes: str, *, supports_acid: bool
+) -> DataFrameTransactionCapabilities:
+    return DataFrameTransactionCapabilities(
+        platform_name,
+        supports_acid,
+        supports_acid,
+        supports_acid,
+        supports_acid,
+        TransactionIsolation.SNAPSHOT if supports_acid else TransactionIsolation.NONE,
+        table_format,
+        notes,
+    )
 
-PYSPARK_DELTA_TRANSACTION_CAPABILITIES = DataFrameTransactionCapabilities(
-    platform_name="pyspark-delta",
-    supports_transactions=True,
-    supports_rollback=True,
-    supports_time_travel=True,
-    supports_concurrent_writes=True,
-    transaction_isolation=TransactionIsolation.SNAPSHOT,
-    table_format="delta",
-    notes="Full ACID via delta-spark. Uses DeltaTable API for transactions.",
-)
 
-ICEBERG_TRANSACTION_CAPABILITIES = DataFrameTransactionCapabilities(
-    platform_name="iceberg",
-    supports_transactions=True,
-    supports_rollback=True,
-    supports_time_travel=True,
-    supports_concurrent_writes=True,
-    transaction_isolation=TransactionIsolation.SNAPSHOT,
-    table_format="iceberg",
-    notes="Full ACID via Apache Iceberg. Snapshot-based transactions.",
+DELTA_LAKE_TRANSACTION_CAPABILITIES = _transaction_capabilities(
+    "delta-lake",
+    "delta",
+    "Full ACID via Delta Lake. RESTORE for rollback, version queries for time travel.",
+    supports_acid=True,
 )
-
-POLARS_TRANSACTION_CAPABILITIES = DataFrameTransactionCapabilities(
-    platform_name="polars-df",
-    supports_transactions=False,
-    supports_rollback=False,
-    supports_time_travel=False,
-    supports_concurrent_writes=False,
-    transaction_isolation=TransactionIsolation.NONE,
-    table_format="parquet",
-    notes="No transaction support. Use Delta Lake or Iceberg for ACID operations.",
+PYSPARK_DELTA_TRANSACTION_CAPABILITIES = _transaction_capabilities(
+    "pyspark-delta", "delta", "Full ACID via delta-spark. Uses DeltaTable API for transactions.", supports_acid=True
 )
-
-PANDAS_TRANSACTION_CAPABILITIES = DataFrameTransactionCapabilities(
-    platform_name="pandas-df",
-    supports_transactions=False,
-    supports_rollback=False,
-    supports_time_travel=False,
-    supports_concurrent_writes=False,
-    transaction_isolation=TransactionIsolation.NONE,
-    table_format="parquet",
-    notes="No transaction support. Use Delta Lake or Iceberg for ACID operations.",
+ICEBERG_TRANSACTION_CAPABILITIES = _transaction_capabilities(
+    "iceberg", "iceberg", "Full ACID via Apache Iceberg. Snapshot-based transactions.", supports_acid=True
+)
+POLARS_TRANSACTION_CAPABILITIES = _transaction_capabilities(
+    "polars-df",
+    "parquet",
+    "No transaction support. Use Delta Lake or Iceberg for ACID operations.",
+    supports_acid=False,
+)
+PANDAS_TRANSACTION_CAPABILITIES = _transaction_capabilities(
+    "pandas-df",
+    "parquet",
+    "No transaction support. Use Delta Lake or Iceberg for ACID operations.",
+    supports_acid=False,
 )
 
 
@@ -572,41 +556,23 @@ class DataFrameTransactionOperationsManager:
 
         return None
 
-    def execute_atomic_insert(
+    def _execute_atomic_operation(
         self,
+        operation: TransactionOperationType,
         table_path: Path | str,
-        dataframe: Any,
-        partition_columns: list[str] | None = None,
+        action_name: str,
+        operation_fn: Any,
+        metrics_fn: Any | None = None,
     ) -> DataFrameTransactionResult:
-        """Execute an atomic INSERT operation.
-
-        Each INSERT is a single atomic transaction. Measures the overhead
-        of transaction commit vs raw write performance.
-
-        Args:
-            table_path: Path to the target table
-            dataframe: DataFrame containing rows to insert
-            partition_columns: Optional partition columns
-
-        Returns:
-            DataFrameTransactionResult with operation outcome
-        """
         start_time = time.time()
-        operation = TransactionOperationType.ATOMIC_INSERT
 
         if not self.supports_operation(operation):
-            return DataFrameTransactionResult.failure(
-                operation,
-                self.get_unsupported_message(),
-                start_time,
-            )
+            return DataFrameTransactionResult.failure(operation, self.get_unsupported_message(), start_time)
 
-        # Validate table format
         is_valid, error_msg = self.validate_table_format(table_path)
         if not is_valid:
             return DataFrameTransactionResult.failure(operation, error_msg, start_time)
 
-        # Get version before operation
         version_before = self.get_table_version(table_path)
 
         try:
@@ -617,40 +583,55 @@ class DataFrameTransactionOperationsManager:
                     start_time,
                 )
 
-            # Execute INSERT via maintenance operations
-            result = self._maintenance_ops.insert_rows(
-                table_path=table_path,
-                dataframe=dataframe,
-                partition_columns=partition_columns,
-                mode="append",
-            )
-
-            # Get version after operation
+            result = operation_fn(self._maintenance_ops)
             version_after = self.get_table_version(table_path)
 
             end_time = time.time()
             total_duration_ms = (end_time - start_time) * 1000
-            write_duration_ms = result.duration * 1000
-
-            return DataFrameTransactionResult(
-                operation_type=operation,
-                success=result.success,
-                start_time=start_time,
-                end_time=end_time,
-                duration_ms=total_duration_ms,
-                rows_affected=result.rows_affected,
-                version_before=version_before,
-                version_after=version_after,
-                error_message=result.error_message,
-                metrics={
-                    "write_duration_ms": write_duration_ms,
-                    "version_check_overhead_ms": total_duration_ms - write_duration_ms,
-                },
+            operation_result = self._success_result(
+                operation,
+                start_time,
+                end_time,
+                result.rows_affected,
+                version_before,
+                version_after,
+                metrics_fn(result, total_duration_ms) if metrics_fn else {},
+                result.error_message,
             )
+            operation_result.success = result.success
+            return operation_result
 
         except Exception as e:
-            self.logger.error(f"Atomic INSERT failed: {e}")
+            self.logger.error(f"{action_name} failed: {e}")
             return DataFrameTransactionResult.failure(operation, str(e), start_time)
+
+    def execute_atomic_insert(
+        self,
+        table_path: Path | str,
+        dataframe: Any,
+        partition_columns: list[str] | None = None,
+    ) -> DataFrameTransactionResult:
+        """Execute an atomic INSERT operation."""
+
+        def metrics(result: Any, total_duration_ms: float) -> dict[str, float]:
+            write_duration_ms = result.duration * 1000
+            return {
+                "write_duration_ms": write_duration_ms,
+                "version_check_overhead_ms": total_duration_ms - write_duration_ms,
+            }
+
+        return self._execute_atomic_operation(
+            TransactionOperationType.ATOMIC_INSERT,
+            table_path,
+            "Atomic INSERT",
+            lambda ops: ops.insert_rows(
+                table_path=table_path,
+                dataframe=dataframe,
+                partition_columns=partition_columns,
+                mode="append",
+            ),
+            metrics,
+        )
 
     def execute_atomic_update(
         self,
@@ -658,126 +639,33 @@ class DataFrameTransactionOperationsManager:
         condition: str,
         updates: dict[str, Any],
     ) -> DataFrameTransactionResult:
-        """Execute an atomic UPDATE operation.
-
-        Args:
-            table_path: Path to the target table
-            condition: SQL-like condition string
-            updates: Column name to new value mapping
-
-        Returns:
-            DataFrameTransactionResult with operation outcome
-        """
-        start_time = time.time()
-        operation = TransactionOperationType.ATOMIC_UPDATE
-
-        if not self.supports_operation(operation):
-            return DataFrameTransactionResult.failure(
-                operation,
-                self.get_unsupported_message(),
-                start_time,
-            )
-
-        is_valid, error_msg = self.validate_table_format(table_path)
-        if not is_valid:
-            return DataFrameTransactionResult.failure(operation, error_msg, start_time)
-
-        version_before = self.get_table_version(table_path)
-
-        try:
-            if self._maintenance_ops is None:
-                return DataFrameTransactionResult.failure(
-                    operation,
-                    f"Maintenance operations not available for {self.platform_name}",
-                    start_time,
-                )
-
-            result = self._maintenance_ops.update_rows(
+        """Execute an atomic UPDATE operation."""
+        return self._execute_atomic_operation(
+            TransactionOperationType.ATOMIC_UPDATE,
+            table_path,
+            "Atomic UPDATE",
+            lambda ops: ops.update_rows(
                 table_path=table_path,
                 condition=condition,
                 updates=updates,
-            )
-
-            version_after = self.get_table_version(table_path)
-
-            end_time = time.time()
-            return DataFrameTransactionResult(
-                operation_type=operation,
-                success=result.success,
-                start_time=start_time,
-                end_time=end_time,
-                duration_ms=(end_time - start_time) * 1000,
-                rows_affected=result.rows_affected,
-                version_before=version_before,
-                version_after=version_after,
-                error_message=result.error_message,
-            )
-
-        except Exception as e:
-            self.logger.error(f"Atomic UPDATE failed: {e}")
-            return DataFrameTransactionResult.failure(operation, str(e), start_time)
+            ),
+        )
 
     def execute_atomic_delete(
         self,
         table_path: Path | str,
         condition: str,
     ) -> DataFrameTransactionResult:
-        """Execute an atomic DELETE operation.
-
-        Args:
-            table_path: Path to the target table
-            condition: SQL-like condition string
-
-        Returns:
-            DataFrameTransactionResult with operation outcome
-        """
-        start_time = time.time()
-        operation = TransactionOperationType.ATOMIC_DELETE
-
-        if not self.supports_operation(operation):
-            return DataFrameTransactionResult.failure(
-                operation,
-                self.get_unsupported_message(),
-                start_time,
-            )
-
-        is_valid, error_msg = self.validate_table_format(table_path)
-        if not is_valid:
-            return DataFrameTransactionResult.failure(operation, error_msg, start_time)
-
-        version_before = self.get_table_version(table_path)
-
-        try:
-            if self._maintenance_ops is None:
-                return DataFrameTransactionResult.failure(
-                    operation,
-                    f"Maintenance operations not available for {self.platform_name}",
-                    start_time,
-                )
-
-            result = self._maintenance_ops.delete_rows(
+        """Execute an atomic DELETE operation."""
+        return self._execute_atomic_operation(
+            TransactionOperationType.ATOMIC_DELETE,
+            table_path,
+            "Atomic DELETE",
+            lambda ops: ops.delete_rows(
                 table_path=table_path,
                 condition=condition,
-            )
-
-            version_after = self.get_table_version(table_path)
-
-            end_time = time.time()
-            return DataFrameTransactionResult(
-                operation_type=operation,
-                success=result.success,
-                start_time=start_time,
-                end_time=end_time,
-                duration_ms=(end_time - start_time) * 1000,
-                rows_affected=result.rows_affected,
-                version_before=version_before,
-                version_after=version_after,
-                error_message=result.error_message,
-            )
-
-        except Exception as e:
-            self.logger.error(f"Atomic DELETE failed: {e}")
-            return DataFrameTransactionResult.failure(operation, str(e), start_time)
+            ),
+        )
 
     def execute_atomic_merge(
         self,
@@ -787,27 +675,163 @@ class DataFrameTransactionOperationsManager:
         when_matched: dict[str, Any] | None = None,
         when_not_matched: dict[str, Any] | None = None,
     ) -> DataFrameTransactionResult:
-        """Execute an atomic MERGE (upsert) operation.
+        """Execute an atomic MERGE (upsert) operation."""
+        return self._execute_atomic_operation(
+            TransactionOperationType.ATOMIC_MERGE,
+            table_path,
+            "Atomic MERGE",
+            lambda ops: ops.merge_rows(
+                table_path=table_path,
+                source_dataframe=source_dataframe,
+                merge_condition=merge_condition,
+                when_matched=when_matched,
+                when_not_matched=when_not_matched,
+            ),
+        )
 
-        Args:
-            table_path: Path to the target table
-            source_dataframe: DataFrame containing source rows
-            merge_condition: Join condition for matching rows
-            when_matched: Updates to apply when matched
-            when_not_matched: Values for insert when not matched
+    def _restore_delta_table(
+        self, table_path: Path | str, *, version: int | None = None, timestamp: str | None = None
+    ) -> None:
+        table_path_str = str(table_path)
+        if "pyspark" in self.platform_name and self.spark_session:
+            from delta.tables import DeltaTable
 
-        Returns:
-            DataFrameTransactionResult with operation outcome
-        """
+            dt = DeltaTable.forPath(self.spark_session, table_path_str)
+            if version is not None:
+                dt.restoreToVersion(version)
+            else:
+                dt.restoreToTimestamp(timestamp)
+            return
+
+        from deltalake import DeltaTable
+
+        dt = DeltaTable(table_path_str)
+        if version is not None:
+            dt.restore(version)
+            return
+
+        from datetime import datetime
+
+        ts = datetime.fromisoformat(timestamp.replace("Z", "+00:00")) if isinstance(timestamp, str) else timestamp
+        dt.restore(datetime_target=ts)
+
+    @staticmethod
+    def _parse_timestamp(timestamp: str | None) -> Any:
+        if timestamp is None:
+            return None
+        from datetime import datetime
+
+        return datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+
+    @staticmethod
+    def _arrow_table_from_dataframe(dataframe: Any) -> Any:
+        import pyarrow as pa
+
+        return pa.Table.from_pandas(dataframe.toPandas() if hasattr(dataframe, "toPandas") else dataframe)
+
+    @staticmethod
+    def _write_row_count(dataframe: Any) -> int:
+        return dataframe.count() if hasattr(dataframe, "count") else len(dataframe)
+
+    def _read_delta_snapshot(
+        self, table_path: str, *, version: int | None = None, timestamp: str | None = None
+    ) -> tuple[int, list[str]]:
+        if "pyspark" in self.platform_name and self.spark_session:
+            reader = self.spark_session.read.format("delta")
+            if version is not None:
+                reader = reader.option("versionAsOf", version)
+            elif timestamp is not None:
+                reader = reader.option("timestampAsOf", timestamp)
+            df = reader.load(table_path)
+            return df.count(), [f.name for f in df.schema.fields]
+
+        from deltalake import DeltaTable
+
+        kwargs = {"version": version} if version is not None else {"datetime_target": self._parse_timestamp(timestamp)}
+        arrow_table = DeltaTable(table_path, **kwargs).to_pyarrow_table()
+        return arrow_table.num_rows, arrow_table.schema.names
+
+    def _write_transaction_dataframe(
+        self, table_path: str, dataframe: Any, mode: str = "append", *, count_rows: bool = False
+    ) -> int | None:
+        if self._capabilities.table_format == "delta" and self.spark_session:
+            rows_written = self._write_row_count(dataframe) if count_rows else None
+            dataframe.write.format("delta").mode(mode).save(table_path)
+            return rows_written
+        if self._capabilities.table_format == "iceberg" and self.spark_session:
+            rows_written = self._write_row_count(dataframe) if count_rows else None
+            writer = dataframe.writeTo(table_path)
+            writer.overwritePartitions() if mode == "overwrite" else writer.append()
+            return rows_written
+
+        from deltalake.writer import write_deltalake
+
+        arrow_table = self._arrow_table_from_dataframe(dataframe)
+        write_deltalake(table_path, arrow_table, mode=mode)
+        return arrow_table.num_rows if count_rows else None
+
+    def _read_transaction_table_count(self, table_path: str) -> int:
+        if self._capabilities.table_format in {"delta", "iceberg"} and self.spark_session:
+            return self.spark_session.read.format(self._capabilities.table_format).load(table_path).count()
+
+        from deltalake import DeltaTable
+
+        return DeltaTable(table_path).to_pyarrow_table().num_rows
+
+    def _snapshot_read_counts(
+        self, table_path: str, current_version: int | None, query_fn: Any | None
+    ) -> tuple[int, int, bool]:
+        if self._capabilities.table_format in {"delta", "iceberg"} and self.spark_session:
+            reader = self.spark_session.read.format(self._capabilities.table_format)
+            if self._capabilities.table_format == "delta" and current_version is not None:
+                reader = reader.option("versionAsOf", current_version)
+            df = query_fn(reader.load(table_path)) if query_fn is not None else reader.load(table_path)
+            count1 = df.count()
+            count2 = df.count()
+            return count1, count2, count1 == count2
+
+        from deltalake import DeltaTable
+
+        count = DeltaTable(table_path, version=current_version).to_pyarrow_table().num_rows
+        return count, count, True
+
+    @staticmethod
+    def _success_result(
+        operation: TransactionOperationType,
+        start_time: float,
+        end_time: float,
+        rows_affected: int,
+        version_before: int | None,
+        version_after: int | None,
+        metrics: dict[str, Any] | None = None,
+        error_message: str | None = None,
+    ) -> DataFrameTransactionResult:
+        return DataFrameTransactionResult(
+            operation_type=operation,
+            success=True,
+            start_time=start_time,
+            end_time=end_time,
+            duration_ms=(end_time - start_time) * 1000,
+            rows_affected=rows_affected,
+            version_before=version_before,
+            version_after=version_after,
+            error_message=error_message,
+            metrics=metrics or {},
+        )
+
+    def _execute_rollback(
+        self,
+        operation: TransactionOperationType,
+        table_path: Path | str,
+        target_label: str,
+        metrics: dict[str, Any],
+        restore_fn: Any,
+        unsupported_message: str,
+    ) -> DataFrameTransactionResult:
         start_time = time.time()
-        operation = TransactionOperationType.ATOMIC_MERGE
 
         if not self.supports_operation(operation):
-            return DataFrameTransactionResult.failure(
-                operation,
-                self.get_unsupported_message(),
-                start_time,
-            )
+            return DataFrameTransactionResult.failure(operation, unsupported_message, start_time)
 
         is_valid, error_msg = self.validate_table_format(table_path)
         if not is_valid:
@@ -816,38 +840,20 @@ class DataFrameTransactionOperationsManager:
         version_before = self.get_table_version(table_path)
 
         try:
-            if self._maintenance_ops is None:
-                return DataFrameTransactionResult.failure(
-                    operation,
-                    f"Maintenance operations not available for {self.platform_name}",
-                    start_time,
-                )
+            if self._capabilities.table_format == "delta":
+                restore_fn()
+                version_after = self.get_table_version(table_path)
+                end_time = time.time()
+                return self._success_result(operation, start_time, end_time, 0, version_before, version_after, metrics)
 
-            result = self._maintenance_ops.merge_rows(
-                table_path=table_path,
-                source_dataframe=source_dataframe,
-                merge_condition=merge_condition,
-                when_matched=when_matched,
-                when_not_matched=when_not_matched,
-            )
-
-            version_after = self.get_table_version(table_path)
-
-            end_time = time.time()
-            return DataFrameTransactionResult(
-                operation_type=operation,
-                success=result.success,
-                start_time=start_time,
-                end_time=end_time,
-                duration_ms=(end_time - start_time) * 1000,
-                rows_affected=result.rows_affected,
-                version_before=version_before,
-                version_after=version_after,
-                error_message=result.error_message,
+            return DataFrameTransactionResult.failure(
+                operation,
+                f"Rollback not implemented for table format: {self._capabilities.table_format}",
+                start_time,
             )
 
         except Exception as e:
-            self.logger.error(f"Atomic MERGE failed: {e}")
+            self.logger.error(f"Rollback to {target_label} failed: {e}")
             return DataFrameTransactionResult.failure(operation, str(e), start_time)
 
     def execute_rollback_to_version(
@@ -855,155 +861,31 @@ class DataFrameTransactionOperationsManager:
         table_path: Path | str,
         version: int,
     ) -> DataFrameTransactionResult:
-        """Rollback a table to a previous version.
-
-        For Delta Lake, this uses RESTORE TO VERSION.
-        For Iceberg, this uses rollback_to_snapshot (not yet implemented).
-
-        Args:
-            table_path: Path to the table
-            version: Target version number
-
-        Returns:
-            DataFrameTransactionResult with operation outcome
-        """
-        start_time = time.time()
-        operation = TransactionOperationType.ROLLBACK_TO_VERSION
-
-        if not self.supports_operation(operation):
-            return DataFrameTransactionResult.failure(
-                operation,
-                f"Rollback not supported on {self.platform_name}. "
-                f"Use Delta Lake or Iceberg for RESTORE/rollback operations.",
-                start_time,
-            )
-
-        is_valid, error_msg = self.validate_table_format(table_path)
-        if not is_valid:
-            return DataFrameTransactionResult.failure(operation, error_msg, start_time)
-
-        version_before = self.get_table_version(table_path)
-        table_path_str = str(table_path)
-
-        try:
-            # Delta Lake RESTORE
-            if self._capabilities.table_format == "delta":
-                if "pyspark" in self.platform_name and self.spark_session:
-                    from delta.tables import DeltaTable
-
-                    dt = DeltaTable.forPath(self.spark_session, table_path_str)
-                    dt.restoreToVersion(version)
-                else:
-                    # delta-rs
-                    from deltalake import DeltaTable
-
-                    dt = DeltaTable(table_path_str)
-                    dt.restore(version)
-
-                version_after = self.get_table_version(table_path)
-
-                end_time = time.time()
-                return DataFrameTransactionResult(
-                    operation_type=operation,
-                    success=True,
-                    start_time=start_time,
-                    end_time=end_time,
-                    duration_ms=(end_time - start_time) * 1000,
-                    rows_affected=0,  # RESTORE doesn't report rows
-                    version_before=version_before,
-                    version_after=version_after,
-                    metrics={"target_version": version},
-                )
-
-            return DataFrameTransactionResult.failure(
-                operation,
-                f"Rollback not implemented for table format: {self._capabilities.table_format}",
-                start_time,
-            )
-
-        except Exception as e:
-            self.logger.error(f"Rollback to version {version} failed: {e}")
-            return DataFrameTransactionResult.failure(operation, str(e), start_time)
+        """Rollback a table to a previous version."""
+        return self._execute_rollback(
+            TransactionOperationType.ROLLBACK_TO_VERSION,
+            table_path,
+            f"version {version}",
+            {"target_version": version},
+            lambda: self._restore_delta_table(table_path, version=version),
+            f"Rollback not supported on {self.platform_name}. "
+            f"Use Delta Lake or Iceberg for RESTORE/rollback operations.",
+        )
 
     def execute_rollback_to_timestamp(
         self,
         table_path: Path | str,
         timestamp: str,
     ) -> DataFrameTransactionResult:
-        """Rollback a table to a previous timestamp.
-
-        For Delta Lake, this uses RESTORE TO TIMESTAMP.
-
-        Args:
-            table_path: Path to the table
-            timestamp: Target timestamp (ISO format or SQL timestamp)
-
-        Returns:
-            DataFrameTransactionResult with operation outcome
-        """
-        start_time = time.time()
-        operation = TransactionOperationType.ROLLBACK_TO_TIMESTAMP
-
-        if not self.supports_operation(operation):
-            return DataFrameTransactionResult.failure(
-                operation,
-                f"Rollback not supported on {self.platform_name}.",
-                start_time,
-            )
-
-        is_valid, error_msg = self.validate_table_format(table_path)
-        if not is_valid:
-            return DataFrameTransactionResult.failure(operation, error_msg, start_time)
-
-        version_before = self.get_table_version(table_path)
-        table_path_str = str(table_path)
-
-        try:
-            if self._capabilities.table_format == "delta":
-                if "pyspark" in self.platform_name and self.spark_session:
-                    from delta.tables import DeltaTable
-
-                    dt = DeltaTable.forPath(self.spark_session, table_path_str)
-                    dt.restoreToTimestamp(timestamp)
-                else:
-                    # delta-rs - restore to timestamp
-                    from deltalake import DeltaTable
-
-                    dt = DeltaTable(table_path_str)
-                    # delta-rs uses datetime object
-                    from datetime import datetime
-
-                    if isinstance(timestamp, str):
-                        # Parse ISO format
-                        ts = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                    else:
-                        ts = timestamp
-                    dt.restore(datetime_target=ts)
-
-                version_after = self.get_table_version(table_path)
-
-                end_time = time.time()
-                return DataFrameTransactionResult(
-                    operation_type=operation,
-                    success=True,
-                    start_time=start_time,
-                    end_time=end_time,
-                    duration_ms=(end_time - start_time) * 1000,
-                    rows_affected=0,
-                    version_before=version_before,
-                    version_after=version_after,
-                    metrics={"target_timestamp": timestamp},
-                )
-
-            return DataFrameTransactionResult.failure(
-                operation,
-                f"Rollback not implemented for table format: {self._capabilities.table_format}",
-                start_time,
-            )
-
-        except Exception as e:
-            self.logger.error(f"Rollback to timestamp {timestamp} failed: {e}")
-            return DataFrameTransactionResult.failure(operation, str(e), start_time)
+        """Rollback a table to a previous timestamp."""
+        return self._execute_rollback(
+            TransactionOperationType.ROLLBACK_TO_TIMESTAMP,
+            table_path,
+            f"timestamp {timestamp}",
+            {"target_timestamp": timestamp},
+            lambda: self._restore_delta_table(table_path, timestamp=timestamp),
+            f"Rollback not supported on {self.platform_name}.",
+        )
 
     def execute_time_travel_query(
         self,
@@ -1011,16 +893,7 @@ class DataFrameTransactionOperationsManager:
         version: int | None = None,
         timestamp: str | None = None,
     ) -> DataFrameTransactionResult:
-        """Query a table at a historical version or timestamp.
-
-        Args:
-            table_path: Path to the table
-            version: Target version number (mutually exclusive with timestamp)
-            timestamp: Target timestamp (mutually exclusive with version)
-
-        Returns:
-            DataFrameTransactionResult with operation outcome and row count
-        """
+        """Query a table at a historical version or timestamp."""
         start_time = time.time()
         operation = TransactionOperationType.TIME_TRAVEL_QUERY
 
@@ -1042,48 +915,20 @@ class DataFrameTransactionOperationsManager:
         if not is_valid:
             return DataFrameTransactionResult.failure(operation, error_msg, start_time)
 
-        table_path_str = str(table_path)
         current_version = self.get_table_version(table_path)
 
         try:
             if self._capabilities.table_format == "delta":
-                if "pyspark" in self.platform_name and self.spark_session:
-                    # PySpark time travel via options
-                    reader = self.spark_session.read.format("delta")
-                    if version is not None:
-                        reader = reader.option("versionAsOf", version)
-                    elif timestamp is not None:
-                        reader = reader.option("timestampAsOf", timestamp)
-
-                    df = reader.load(table_path_str)
-                    row_count = df.count()
-                else:
-                    # delta-rs time travel
-                    from deltalake import DeltaTable
-
-                    if version is not None:
-                        dt = DeltaTable(table_path_str, version=version)
-                    else:
-                        # delta-rs timestamp query
-                        from datetime import datetime
-
-                        ts = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                        dt = DeltaTable(table_path_str, datetime_target=ts)
-
-                    arrow_table = dt.to_pyarrow_table()
-                    row_count = arrow_table.num_rows
-
+                row_count, _ = self._read_delta_snapshot(str(table_path), version=version, timestamp=timestamp)
                 end_time = time.time()
-                return DataFrameTransactionResult(
-                    operation_type=operation,
-                    success=True,
-                    start_time=start_time,
-                    end_time=end_time,
-                    duration_ms=(end_time - start_time) * 1000,
-                    rows_affected=row_count,
-                    version_before=current_version,
-                    version_after=current_version,  # No change from query
-                    metrics={
+                return self._success_result(
+                    operation,
+                    start_time,
+                    end_time,
+                    row_count,
+                    current_version,
+                    current_version,
+                    {
                         "query_version": version,
                         "query_timestamp": timestamp,
                         "row_count": row_count,
@@ -1106,19 +951,7 @@ class DataFrameTransactionOperationsManager:
         version1: int,
         version2: int,
     ) -> DataFrameTransactionResult:
-        """Compare two versions of a table and return difference metrics.
-
-        Queries both versions and computes the difference in row counts and
-        optionally schema changes.
-
-        Args:
-            table_path: Path to the table
-            version1: First version number (typically older)
-            version2: Second version number (typically newer)
-
-        Returns:
-            DataFrameTransactionResult with comparison metrics
-        """
+        """Compare two versions of a table and return difference metrics."""
         start_time = time.time()
         operation = TransactionOperationType.VERSION_COMPARE
 
@@ -1134,50 +967,25 @@ class DataFrameTransactionOperationsManager:
         if not is_valid:
             return DataFrameTransactionResult.failure(operation, error_msg, start_time)
 
-        table_path_str = str(table_path)
         current_version = self.get_table_version(table_path)
 
         try:
             if self._capabilities.table_format == "delta":
-                if "pyspark" in self.platform_name and self.spark_session:
-                    # Query both versions via PySpark
-                    df1 = self.spark_session.read.format("delta").option("versionAsOf", version1).load(table_path_str)
-                    df2 = self.spark_session.read.format("delta").option("versionAsOf", version2).load(table_path_str)
-                    count1 = df1.count()
-                    count2 = df2.count()
-                    schema1 = [f.name for f in df1.schema.fields]
-                    schema2 = [f.name for f in df2.schema.fields]
-                else:
-                    # delta-rs
-                    from deltalake import DeltaTable
-
-                    dt1 = DeltaTable(table_path_str, version=version1)
-                    dt2 = DeltaTable(table_path_str, version=version2)
-
-                    arrow1 = dt1.to_pyarrow_table()
-                    arrow2 = dt2.to_pyarrow_table()
-
-                    count1 = arrow1.num_rows
-                    count2 = arrow2.num_rows
-                    schema1 = arrow1.schema.names
-                    schema2 = arrow2.schema.names
-
-                # Compute differences
+                count1, schema1 = self._read_delta_snapshot(str(table_path), version=version1)
+                count2, schema2 = self._read_delta_snapshot(str(table_path), version=version2)
                 row_diff = count2 - count1
                 schema_added = [c for c in schema2 if c not in schema1]
                 schema_removed = [c for c in schema1 if c not in schema2]
 
                 end_time = time.time()
-                return DataFrameTransactionResult(
-                    operation_type=operation,
-                    success=True,
-                    start_time=start_time,
-                    end_time=end_time,
-                    duration_ms=(end_time - start_time) * 1000,
-                    rows_affected=abs(row_diff),
-                    version_before=current_version,
-                    version_after=current_version,  # No change from comparison
-                    metrics={
+                return self._success_result(
+                    operation,
+                    start_time,
+                    end_time,
+                    abs(row_diff),
+                    current_version,
+                    current_version,
+                    {
                         "version1": version1,
                         "version2": version2,
                         "row_count_v1": count1,
@@ -1204,28 +1012,8 @@ class DataFrameTransactionOperationsManager:
         table_path: Path | str,
         dataframes: list[Any],
     ) -> DataFrameTransactionResult:
-        """Execute concurrent write operations and measure conflict resolution.
-
-        Simulates concurrent writes to a transactional table using sequential
-        execution with version-conflict detection. True parallelism requires
-        external coordination (e.g., thread pools), which is intentionally
-        out of scope here - the goal is to verify the platform's conflict
-        detection semantics and report the outcome.
-
-        Delta Lake uses optimistic concurrency: each write reads the current
-        version, writes data, then checks if the version changed. If conflicted,
-        the write is retried or fails.
-
-        Args:
-            table_path: Path to the target table
-            dataframes: List of DataFrames to write (each represents a concurrent write)
-
-        Returns:
-            DataFrameTransactionResult with conflict detection metrics
-        """
-        import time as _time
-
-        start_time = _time.time()
+        """Execute concurrent write operations and measure conflict resolution."""
+        start_time = time.time()
         operation = TransactionOperationType.CONCURRENT_WRITE
 
         if not self.supports_operation(operation):
@@ -1245,37 +1033,23 @@ class DataFrameTransactionOperationsManager:
 
             for i, df in enumerate(dataframes):
                 try:
-                    if self._capabilities.table_format == "delta" and self.spark_session:
-                        df.write.format("delta").mode("append").save(table_path_str)
-                        writes_succeeded += 1
-                    elif self._capabilities.table_format == "iceberg" and self.spark_session:
-                        df.writeTo(table_path_str).append()
-                        writes_succeeded += 1
-                    else:
-                        # delta-rs: write via arrow
-                        import pyarrow as pa
-                        from deltalake.writer import write_deltalake
-
-                        arrow_table = pa.Table.from_pandas(df.toPandas() if hasattr(df, "toPandas") else df)
-                        write_deltalake(table_path_str, arrow_table, mode="append")
-                        writes_succeeded += 1
+                    self._write_transaction_dataframe(table_path_str, df)
+                    writes_succeeded += 1
                 except Exception as write_err:
                     self.logger.warning(f"Concurrent write {i} conflicted: {write_err}")
                     writes_conflicted += 1
 
             version_after = self.get_table_version(table_path_str)
-            end_time = _time.time()
+            end_time = time.time()
 
-            return DataFrameTransactionResult(
-                operation_type=operation,
-                success=True,
-                start_time=start_time,
-                end_time=end_time,
-                duration_ms=(end_time - start_time) * 1000,
-                rows_affected=writes_succeeded,
-                version_before=version_before,
-                version_after=version_after,
-                metrics={
+            return self._success_result(
+                operation,
+                start_time,
+                end_time,
+                writes_succeeded,
+                version_before,
+                version_after,
+                {
                     "writes_attempted": len(dataframes),
                     "writes_succeeded": writes_succeeded,
                     "writes_conflicted": writes_conflicted,
@@ -1292,28 +1066,8 @@ class DataFrameTransactionOperationsManager:
         dataframe: Any,
         resolution_strategy: str = "retry",
     ) -> DataFrameTransactionResult:
-        """Execute a write that may conflict and apply a resolution strategy.
-
-        Tests the platform's conflict resolution behaviour by writing to a table
-        with an explicit strategy:
-        - "retry": Retry the write after reading the current version
-        - "overwrite": Overwrite conflicting changes (last-write-wins)
-        - "fail": Surface the conflict as an error (pessimistic)
-
-        Delta Lake uses optimistic concurrency; this operation measures
-        the overhead of conflict detection and resolution.
-
-        Args:
-            table_path: Path to the target table
-            dataframe: DataFrame to write
-            resolution_strategy: One of "retry", "overwrite", "fail"
-
-        Returns:
-            DataFrameTransactionResult with conflict resolution outcome
-        """
-        import time as _time
-
-        start_time = _time.time()
+        """Execute a write that may conflict and apply a resolution strategy."""
+        start_time = time.time()
         operation = TransactionOperationType.CONFLICT_RESOLUTION
 
         if not self.supports_operation(operation):
@@ -1336,30 +1090,10 @@ class DataFrameTransactionOperationsManager:
 
             for attempt in range(max_retries):
                 try:
-                    if self._capabilities.table_format == "delta" and self.spark_session:
-                        write_mode = "overwrite" if resolution_strategy == "overwrite" else "append"
-                        dataframe.write.format("delta").mode(write_mode).save(table_path_str)
-                        succeeded = True
-                        break
-                    elif self._capabilities.table_format == "iceberg" and self.spark_session:
-                        if resolution_strategy == "overwrite":
-                            dataframe.writeTo(table_path_str).overwritePartitions()
-                        else:
-                            dataframe.writeTo(table_path_str).append()
-                        succeeded = True
-                        break
-                    else:
-                        from deltalake.writer import write_deltalake
-
-                        write_mode = "overwrite" if resolution_strategy == "overwrite" else "append"
-                        import pyarrow as pa
-
-                        arrow_table = pa.Table.from_pandas(
-                            dataframe.toPandas() if hasattr(dataframe, "toPandas") else dataframe
-                        )
-                        write_deltalake(table_path_str, arrow_table, mode=write_mode)
-                        succeeded = True
-                        break
+                    write_mode = "overwrite" if resolution_strategy == "overwrite" else "append"
+                    self._write_transaction_dataframe(table_path_str, dataframe, mode=write_mode)
+                    succeeded = True
+                    break
                 except Exception as e:
                     last_error = str(e)
                     retry_count += 1
@@ -1367,19 +1101,17 @@ class DataFrameTransactionOperationsManager:
                         break
 
             version_after = self.get_table_version(table_path_str)
-            end_time = _time.time()
+            end_time = time.time()
 
             if succeeded:
-                return DataFrameTransactionResult(
-                    operation_type=operation,
-                    success=True,
-                    start_time=start_time,
-                    end_time=end_time,
-                    duration_ms=(end_time - start_time) * 1000,
-                    rows_affected=1,
-                    version_before=version_before,
-                    version_after=version_after,
-                    metrics={
+                return self._success_result(
+                    operation,
+                    start_time,
+                    end_time,
+                    1,
+                    version_before,
+                    version_after,
+                    {
                         "resolution_strategy": resolution_strategy,
                         "retry_count": retry_count,
                     },
@@ -1399,26 +1131,8 @@ class DataFrameTransactionOperationsManager:
         table_path: Path | str,
         query_fn: Any | None = None,
     ) -> DataFrameTransactionResult:
-        """Verify snapshot isolation semantics by reading a stable table snapshot.
-
-        In Delta Lake, reads always see a consistent snapshot of the table at
-        a point in time. This operation reads the table twice in sequence and
-        verifies that the row count is identical (no dirty reads).
-
-        For PySpark + Delta Lake, snapshot isolation is guaranteed by the table
-        format - this operation measures the overhead of reading a snapshot
-        vs the current version.
-
-        Args:
-            table_path: Path to the target table
-            query_fn: Optional function that applies a filter/aggregation on the DataFrame
-
-        Returns:
-            DataFrameTransactionResult with snapshot consistency metrics
-        """
-        import time as _time
-
-        start_time = _time.time()
+        """Verify snapshot isolation semantics by reading a stable table snapshot."""
+        start_time = time.time()
         operation = TransactionOperationType.SNAPSHOT_ISOLATION
 
         if not self.supports_operation(operation):
@@ -1433,55 +1147,16 @@ class DataFrameTransactionOperationsManager:
 
         try:
             current_version = self.get_table_version(table_path_str)
-
-            if self._capabilities.table_format == "delta" and self.spark_session:
-                # Read snapshot at pinned version to verify isolation
-                if current_version is not None:
-                    df1 = (
-                        self.spark_session.read.format("delta")
-                        .option("versionAsOf", current_version)
-                        .load(table_path_str)
-                    )
-                else:
-                    df1 = self.spark_session.read.format("delta").load(table_path_str)
-
-                if query_fn is not None:
-                    df1 = query_fn(df1)
-
-                count1 = df1.count()
-                # Second read of same snapshot - must match
-                count2 = df1.count()
-                consistent = count1 == count2
-
-            elif self._capabilities.table_format == "iceberg" and self.spark_session:
-                df1 = self.spark_session.read.format("iceberg").load(table_path_str)
-                if query_fn is not None:
-                    df1 = query_fn(df1)
-                count1 = df1.count()
-                count2 = df1.count()
-                consistent = count1 == count2
-
-            else:
-                # delta-rs: read pinned version
-                from deltalake import DeltaTable
-
-                dt = DeltaTable(table_path_str, version=current_version)
-                arrow_table = dt.to_pyarrow_table()
-                count1 = arrow_table.num_rows
-                count2 = arrow_table.num_rows
-                consistent = True  # delta-rs reads are always snapshot-isolated
-
-            end_time = _time.time()
-            return DataFrameTransactionResult(
-                operation_type=operation,
-                success=True,
-                start_time=start_time,
-                end_time=end_time,
-                duration_ms=(end_time - start_time) * 1000,
-                rows_affected=count1,
-                version_before=current_version,
-                version_after=current_version,
-                metrics={
+            count1, count2, consistent = self._snapshot_read_counts(table_path_str, current_version, query_fn)
+            end_time = time.time()
+            return self._success_result(
+                operation,
+                start_time,
+                end_time,
+                count1,
+                current_version,
+                current_version,
+                {
                     "snapshot_consistent": consistent,
                     "row_count_read1": count1,
                     "row_count_read2": count2,
@@ -1498,26 +1173,8 @@ class DataFrameTransactionOperationsManager:
         table_path: Path | str,
         dataframe: Any,
     ) -> DataFrameTransactionResult:
-        """Verify read-your-writes consistency after an atomic write.
-
-        After writing rows to a transactional table, immediately reads them
-        back and verifies the count matches. This validates that the platform
-        guarantees read-your-writes semantics (the writer always sees its own
-        committed changes).
-
-        Delta Lake guarantees this because each write produces a new version
-        and subsequent reads default to the latest version.
-
-        Args:
-            table_path: Path to the target table
-            dataframe: DataFrame containing rows to write then read back
-
-        Returns:
-            DataFrameTransactionResult with read-your-writes verification
-        """
-        import time as _time
-
-        start_time = _time.time()
+        """Verify read-your-writes consistency after an atomic write."""
+        start_time = time.time()
         operation = TransactionOperationType.READ_YOUR_WRITES
 
         if not self.supports_operation(operation):
@@ -1532,55 +1189,26 @@ class DataFrameTransactionOperationsManager:
 
         try:
             version_before = self.get_table_version(table_path_str)
-            rows_written = 0
-
-            # Write
-            if self._capabilities.table_format == "delta" and self.spark_session:
-                rows_written = dataframe.count() if hasattr(dataframe, "count") else len(dataframe)
-                dataframe.write.format("delta").mode("append").save(table_path_str)
-            elif self._capabilities.table_format == "iceberg" and self.spark_session:
-                rows_written = dataframe.count() if hasattr(dataframe, "count") else len(dataframe)
-                dataframe.writeTo(table_path_str).append()
-            else:
-                import pyarrow as pa
-                from deltalake.writer import write_deltalake
-
-                arrow_table = pa.Table.from_pandas(
-                    dataframe.toPandas() if hasattr(dataframe, "toPandas") else dataframe
-                )
-                rows_written = arrow_table.num_rows
-                write_deltalake(table_path_str, arrow_table, mode="append")
+            rows_written = self._write_transaction_dataframe(table_path_str, dataframe, count_rows=True)
+            if rows_written is None:
+                raise RuntimeError("Unable to determine rows written for read-your-writes validation")
 
             # Read back immediately
             version_after = self.get_table_version(table_path_str)
-            rows_read_back = 0
+            rows_read_back = self._read_transaction_table_count(table_path_str)
 
-            if self._capabilities.table_format == "delta" and self.spark_session:
-                df_back = self.spark_session.read.format("delta").load(table_path_str)
-                rows_read_back = df_back.count()
-            elif self._capabilities.table_format == "iceberg" and self.spark_session:
-                df_back = self.spark_session.read.format("iceberg").load(table_path_str)
-                rows_read_back = df_back.count()
-            else:
-                from deltalake import DeltaTable
-
-                dt = DeltaTable(table_path_str)
-                rows_read_back = dt.to_pyarrow_table().num_rows
-
-            end_time = _time.time()
+            end_time = time.time()
             # Read-your-writes is satisfied if the table grew by at least rows_written
             reads_own_writes = rows_read_back >= rows_written
 
-            return DataFrameTransactionResult(
-                operation_type=operation,
-                success=True,
-                start_time=start_time,
-                end_time=end_time,
-                duration_ms=(end_time - start_time) * 1000,
-                rows_affected=rows_written,
-                version_before=version_before,
-                version_after=version_after,
-                metrics={
+            return self._success_result(
+                operation,
+                start_time,
+                end_time,
+                rows_written,
+                version_before,
+                version_after,
+                {
                     "rows_written": rows_written,
                     "rows_read_back": rows_read_back,
                     "reads_own_writes": reads_own_writes,

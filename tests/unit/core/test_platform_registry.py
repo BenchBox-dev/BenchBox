@@ -5,11 +5,13 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 
-from benchbox.core.platform_registry import PlatformRegistry
+from benchbox.core.platform_registry import SUPPORT_STATUS_VALUES, PlatformRegistry
 from benchbox.core.schemas import LibraryInfo
 
 pytestmark = [
@@ -79,6 +81,7 @@ class TestPlatformRegistry:
         for key in required_keys:
             assert key in duckdb_spec, f"Missing required key: {key}"
 
+        assert duckdb_spec["support_status"] == "stable"
         assert duckdb_spec["display_name"] == "DuckDB"
         assert duckdb_spec["category"] == "analytical"
         assert duckdb_spec["adoption"] == "mainstream"
@@ -174,6 +177,7 @@ class TestPlatformRegistry:
             assert "installation_command" in platform_spec
             assert "adoption" in platform_spec
             assert "supports" in platform_spec
+            assert "support_status" in platform_spec
 
             # Check library specifications have required fields
             for lib_spec in platform_spec["libraries"]:
@@ -309,6 +313,29 @@ class TestPlatformRegistry:
         assert caps.supports_dataframe
         assert caps.default_mode == "dataframe"
 
+    def test_platform_taxonomy_helpers_derive_from_capabilities(self):
+        sql_platforms = PlatformRegistry.get_sql_platforms()
+        dataframe_platforms = PlatformRegistry.get_dataframe_platforms()
+        self_hosted_platforms = PlatformRegistry.get_self_hosted_platforms()
+
+        assert "duckdb" in sql_platforms
+        assert "polars" not in sql_platforms
+        assert "clickhouse" not in sql_platforms
+        assert "clickhouse" in PlatformRegistry.get_sql_platforms(include_deprecated=True)
+
+        assert {"polars", "pandas", "dask", "datafusion", "pyspark"}.issubset(dataframe_platforms)
+        assert "duckdb" not in dataframe_platforms
+
+        assert {
+            "clickhouse-server",
+            "postgresql",
+            "presto",
+            "trino",
+            "influxdb",
+            "velox",
+        }.issubset(self_hosted_platforms)
+        assert "clickhouse" not in self_hosted_platforms
+
     def test_known_paid_platforms_expose_cost_class(self):
         """Prompt safety gates rely on the coarse paid/free registry tag."""
         for platform_name, expected_cost_class in KNOWN_PAID_PLATFORM_COST_CLASSES.items():
@@ -320,6 +347,134 @@ class TestPlatformRegistry:
         assert PlatformRegistry.get_platform_capabilities("datafusion").cost_class == "free"
         assert PlatformRegistry.get_platform_capabilities("postgresql").cost_class == "free"
         assert PlatformRegistry.get_platform_capabilities("sqlite").cost_class == "free"
+
+    def test_all_platforms_have_exactly_one_valid_support_status(self):
+        """Every platform metadata entry must carry the accepted support taxonomy."""
+        metadata = PlatformRegistry.get_all_platform_metadata()
+        valid = set(SUPPORT_STATUS_VALUES)
+
+        assert len(metadata) == 50
+        for platform_name, platform_spec in metadata.items():
+            assert set(platform_spec.keys()).intersection({"support_status"}) == {"support_status"}
+            assert platform_spec["support_status"] in valid, f"{platform_name} has invalid support_status"
+
+        summary = PlatformRegistry.get_platform_count_summary()
+        assert sum(summary["support_status"].values()) == len(metadata)
+        assert summary["support_status"] == {
+            "stable": 5,
+            "beta": 27,
+            "experimental": 17,
+            "repo_only": 0,
+            "deprecated": 1,
+            "document_only": 0,
+        }
+
+    def test_support_status_is_distinct_from_dependency_availability(self):
+        """Support status is a product promise, not local optional dependency state."""
+        metadata = PlatformRegistry.get_all_platform_metadata()
+
+        assert metadata["snowflake"]["support_status"] == "beta"
+        availability = PlatformRegistry.get_platform_availability()
+        if "snowflake" in availability:
+            assert isinstance(availability["snowflake"], bool)
+
+    def test_platform_support_status_filtering(self):
+        assert PlatformRegistry.get_platform_support_status("fabric-dw") == "beta"
+        assert "clickhouse" in PlatformRegistry.get_platforms_by_support_status("deprecated")
+
+        with pytest.raises(ValueError, match="Unknown support_status"):
+            PlatformRegistry.get_platforms_by_support_status("unknown")  # type: ignore[arg-type]
+
+    @patch("benchbox.core.platform_registry.importlib.import_module")
+    def test_optional_adapter_diagnostics_available(self, mock_import):
+        """Diagnostics report available adapters without registering them."""
+        adapter_cls = object()
+        mock_import.return_value = SimpleNamespace(SnowflakeAdapter=adapter_cls)
+
+        diagnostics = PlatformRegistry.diagnose_optional_adapter_imports(["snowflake"])
+
+        assert diagnostics["snowflake"]["status"] == "available"
+        assert diagnostics["snowflake"]["available"] is True
+        assert diagnostics["snowflake"]["support_status"] == "beta"
+        mock_import.assert_called_once_with("benchbox.platforms.snowflake")
+
+    @patch("benchbox.core.platform_registry.importlib.import_module")
+    def test_optional_adapter_diagnostics_missing_dependency(self, mock_import):
+        mock_import.side_effect = ModuleNotFoundError(
+            "No module named 'snowflake.connector'",
+            name="snowflake.connector",
+        )
+
+        diagnostics = PlatformRegistry.diagnose_optional_adapter_imports(["snowflake"])
+
+        assert diagnostics["snowflake"]["status"] == "missing_optional_dependency"
+        assert diagnostics["snowflake"]["available"] is False
+        assert diagnostics["snowflake"]["error_type"] == "ModuleNotFoundError"
+
+    @patch("benchbox.core.platform_registry.importlib.import_module")
+    def test_optional_adapter_diagnostics_missing_adapter_module_is_broken(self, mock_import):
+        mock_import.side_effect = ModuleNotFoundError(
+            "No module named 'benchbox.platforms.snowflake'",
+            name="benchbox.platforms.snowflake",
+        )
+
+        diagnostics = PlatformRegistry.diagnose_optional_adapter_imports(["snowflake"])
+
+        assert diagnostics["snowflake"]["status"] == "broken_adapter_import"
+        assert diagnostics["snowflake"]["error_type"] == "ModuleNotFoundError"
+
+    @patch("benchbox.core.platform_registry.importlib.import_module")
+    def test_optional_adapter_diagnostics_native_load_failure(self, mock_import):
+        mock_import.side_effect = OSError("dlopen(libarrow.dylib): image not found")
+
+        diagnostics = PlatformRegistry.diagnose_optional_adapter_imports(["datafusion"])
+
+        assert diagnostics["datafusion"]["status"] == "native_library_load_failure"
+        assert diagnostics["datafusion"]["error_type"] == "OSError"
+
+    @patch("benchbox.core.platform_registry.importlib.import_module")
+    def test_optional_adapter_diagnostics_broken_adapter_import(self, mock_import):
+        mock_import.return_value = SimpleNamespace()
+
+        diagnostics = PlatformRegistry.diagnose_optional_adapter_imports(["snowflake"])
+
+        assert diagnostics["snowflake"]["status"] == "broken_adapter_import"
+        assert "SnowflakeAdapter" in diagnostics["snowflake"]["error_message"]
+
+    @patch("benchbox.core.platform_registry.importlib.import_module")
+    def test_optional_adapter_diagnostics_deprecated_platform(self, mock_import):
+        diagnostics = PlatformRegistry.diagnose_optional_adapter_imports(["clickhouse"])
+
+        assert diagnostics["clickhouse"]["status"] == "deprecated_platform"
+        assert diagnostics["clickhouse"]["support_status"] == "deprecated"
+        mock_import.assert_not_called()
+
+    def test_public_docs_platform_and_benchmark_count_markers_match_registries(self):
+        """README and comparison matrix exact counts must track registry metadata."""
+        from benchbox.core.benchmark_registry import get_all_benchmarks, list_public_benchmark_ids
+
+        summary = PlatformRegistry.get_platform_count_summary()
+        platform_marker = (
+            f"Platform registry: **{summary['total']}** metadata entries; "
+            f"**{summary['sql_capable']}** SQL-capable; "
+            f"**{summary['dataframe_capable']}** DataFrame-capable; "
+            f"**{summary['dual_mode']}** dual-mode; "
+            f"support status counts: stable={summary['support_status']['stable']}, "
+            f"beta={summary['support_status']['beta']}, "
+            f"experimental={summary['support_status']['experimental']}, "
+            f"deprecated={summary['support_status']['deprecated']}."
+        )
+        benchmark_marker = (
+            f"Benchmark registry: **{len(get_all_benchmarks())}** metadata entries; "
+            f"**{len(list_public_benchmark_ids())}** public discovery entries."
+        )
+
+        readme = Path("README.md").read_text(encoding="utf-8")
+        comparison_matrix = Path("docs/platforms/comparison-matrix.md").read_text(encoding="utf-8")
+
+        assert platform_marker in readme
+        assert benchmark_marker in readme
+        assert platform_marker in comparison_matrix
 
     def test_requires_cloud_storage_for_cloud_platforms(self):
         """Test that cloud platforms are correctly identified as requiring cloud storage."""
@@ -497,6 +652,7 @@ class TestPlatformRegistryBoundaries:
                 "installation_command",
                 "adoption",
                 "supports",
+                "support_status",
             ]
 
             for field in cli_required_fields:

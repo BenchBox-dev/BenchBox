@@ -1,0 +1,91 @@
+staging_tables:
+- id: TXN_ORDERS
+  key: txn_orders
+  schema:
+    name: txn_orders
+    columns:
+    - name: o_orderkey
+      type: INTEGER
+      primary_key: true
+    - name: o_custkey
+      type: INTEGER
+    - name: o_orderstatus
+      type: VARCHAR(1)
+    - name: o_totalprice
+      type: DECIMAL(15,2)
+    - name: o_orderdate
+      type: DATE
+    - name: o_orderpriority
+      type: VARCHAR(15)
+    - name: o_clerk
+      type: VARCHAR(15)
+    - name: o_shippriority
+      type: INTEGER
+    - name: o_comment
+      type: VARCHAR(79)
+- id: TXN_LINEITEM
+  key: txn_lineitem
+  schema:
+    name: txn_lineitem
+    columns:
+    - name: l_orderkey
+      type: INTEGER
+    - name: l_partkey
+      type: INTEGER
+    - name: l_suppkey
+      type: INTEGER
+    - name: l_linenumber
+      type: INTEGER
+    - name: l_quantity
+      type: DECIMAL(15,2)
+    - name: l_extendedprice
+      type: DECIMAL(15,2)
+    - name: l_discount
+      type: DECIMAL(15,2)
+    - name: l_tax
+      type: DECIMAL(15,2)
+    - name: l_returnflag
+      type: VARCHAR(1)
+    - name: l_linestatus
+      type: VARCHAR(1)
+    - name: l_shipdate
+      type: DATE
+    - name: l_commitdate
+      type: DATE
+    - name: l_receiptdate
+      type: DATE
+    - name: l_shipinstruct
+      type: VARCHAR(25)
+    - name: l_shipmode
+      type: VARCHAR(10)
+    - name: l_comment
+      type: VARCHAR(44)
+    primary_key:
+    - l_orderkey
+    - l_linenumber
+- id: TXN_CUSTOMER
+  key: txn_customer
+  schema:
+    name: txn_customer
+    columns:
+    - name: c_custkey
+      type: INTEGER
+      primary_key: true
+    - name: c_name
+      type: VARCHAR(25)
+    - name: c_address
+      type: VARCHAR(40)
+    - name: c_nationkey
+      type: INTEGER
+    - name: c_phone
+      type: VARCHAR(15)
+    - name: c_acctbal
+      type: DECIMAL(15,2)
+    - name: c_mktsegment
+      type: VARCHAR(10)
+    - name: c_comment
+      type: VARCHAR(117)
+staging_table_order:
+- txn_orders
+- txn_lineitem
+- txn_customer

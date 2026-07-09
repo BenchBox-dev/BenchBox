@@ -10,6 +10,7 @@ on:
       - "landing/**"
       - "_project/scripts/explorer_pipeline/**"
       - "_project/scripts/explorer_publish.py"
+      - "_project/scripts/results_explorer_snapshot_invariants.py"
       - "results-data/**"
       - "results-explorer/**"
       - "scripts/**"
@@ -26,6 +27,7 @@ on:
       - "landing/**"
       - "_project/scripts/explorer_pipeline/**"
       - "_project/scripts/explorer_publish.py"
+      - "_project/scripts/results_explorer_snapshot_invariants.py"
       - "results-data/**"
       - "results-explorer/**"
       - "scripts/**"
@@ -76,6 +78,11 @@ jobs:
       # --- Results Explorer ---
       # Steps gate on package.json as a sentinel so the workflow degrades
       # gracefully if the explorer directory is ever removed or renamed.
+      # This is also the intended dormancy on the release branch: results-explorer/
+      # and _project/scripts/explorer_publish.py ship on develop, not main, so on
+      # a main build hashFiles(...) is empty and every explorer step below is a
+      # deliberate no-op rather than accidental dead code (see
+      # tests/uat/phases/explorer_smoke.py:explorer_present).
       - name: Validate results-explorer lockfile
         if: hashFiles('results-explorer/package.json') != ''
         run: |
@@ -106,6 +113,17 @@ jobs:
         if: hashFiles('results-explorer/package.json') != ''
         run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
         # Note: results-data/bundles/ may be empty on first deploy; pipeline handles empty gracefully
+
+      # Gate the built read model before it is bundled into the deployed site.
+      # Skips gracefully when the pipeline produced no snapshot (empty corpus).
+      - name: Validate explorer snapshot invariants
+        if: hashFiles('results-explorer/package.json') != ''
+        run: |
+          if [ -f results-explorer/public/data/results.duckdb ]; then
+            uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb
+          else
+            echo "No results.duckdb produced (empty corpus); skipping invariants check."
+          fi
 
       - name: Build results-explorer
         if: hashFiles('results-explorer/package.json') != ''

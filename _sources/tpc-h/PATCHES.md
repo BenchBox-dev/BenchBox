@@ -130,6 +130,65 @@ diff /tmp/stdout.tbl customer.tbl
 
 ---
 
+## Patch: EOL_HANDLING default (consistent row framing across platforms)
+
+**Date Applied:** 2026-07-08
+**Reference:** BenchBox `fix/tpch-dbgen-eol-consistency`; upstream `config.h`
+documents `EOL_HANDLING -- flat files don't need final column separator`.
+
+### Problem
+
+Upstream `makefile.suite` does **not** define `EOL_HANDLING`, so `dbgen`
+emits a trailing field separator (`|`) at the end of every row (see the
+`#ifdef EOL_HANDLING` guard in `print.c`). BenchBox's bundled binaries were
+built inconsistently: the macOS binaries were compiled *with* `EOL_HANDLING`
+(no trailing `|`) while the Linux/Windows binaries used the upstream default
+(*with* trailing `|`). Because `core/tpch/generator.py` streams raw `dbgen`
+bytes straight into the `.tbl`/`.tbl.N.zst` output, this compile-time
+difference produced **platform-dependent generated data** — a reproducibility
+defect for a benchmarking tool (it surfaced as a DataFusion "Expected 8
+columns, got 9" failure, worked around at the reader layer in PR #1053).
+
+### Solution
+
+Standardize on **`EOL_HANDLING` ON (no trailing separator)** everywhere. This
+matches TPC-DS, which BenchBox already invokes with `-terminate n` (disable
+trailing field delimiters), so both benchmarks now frame rows identically.
+
+### Changes
+
+#### makefile.suite - add `-DEOL_HANDLING` to default CFLAGS
+
+```make
+# Before:
+CFLAGS	= -g -DDBNAME=\"dss\" -D$(MACHINE) -D$(DATABASE) -D$(WORKLOAD) -DRNG_TEST -D_FILE_OFFSET_BITS=64
+
+# After:
+CFLAGS	= -g -DDBNAME=\"dss\" -D$(MACHINE) -D$(DATABASE) -D$(WORKLOAD) -DRNG_TEST -D_FILE_OFFSET_BITS=64 -DEOL_HANDLING
+```
+
+Build paths that override `CFLAGS` must include `-DEOL_HANDLING` explicitly;
+paths that don't override it inherit the flag from the default above. The three
+BenchBox build entrypoints are kept in sync:
+
+- `_sources/compilation/scripts/compile-all-platforms.sh` — macOS native/docker
+  Linux/Windows inherit the default; the macOS cross block adds it explicitly.
+- `benchbox/utils/tpc_compilation.py::_create_tpc_h_makefile` — runtime source
+  build fallback (already defines `-DEOL_HANDLING`).
+
+### Verification
+
+```bash
+# A generated row must NOT end with the field separator.
+./dbgen -s 0.01 -T n && tail -n 1 nation.tbl | od -c | tail -n 2
+# The last byte before \n must be a data character, not '|'.
+```
+
+`tests/unit/core/test_tpch_dbgen_framing.py` asserts this invariant across all
+bundled per-platform binaries (skipping those the host can't execute).
+
+---
+
 ## Applying the Patch
 
 To apply these changes to a fresh TPC-H source distribution:

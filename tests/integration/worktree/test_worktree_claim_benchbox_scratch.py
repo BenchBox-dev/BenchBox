@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 from pathlib import Path
 
@@ -42,17 +41,6 @@ def create_origin_with_develop(tmp_path: Path) -> Path:
     return origin
 
 
-def assert_worktree_path(stdout: str, path: Path) -> None:
-    resolved = str(path.resolve())
-    candidates = {f"WORKTREE_PATH={resolved}"}
-    if os.name == "nt" and len(resolved) > 2 and resolved[1] == ":":
-        drive = resolved[0].lower()
-        tail = resolved[2:].replace("\\", "/").lstrip("/")
-        candidates.add(f"WORKTREE_PATH=/{drive}/{tail}")
-
-    assert any(candidate in stdout for candidate in candidates), stdout
-
-
 def test_worktree_claim_ignores_untracked_benchbox_scratch(tmp_path: Path) -> None:
     origin = create_origin_with_develop(tmp_path)
     main = tmp_path / "BenchBox"
@@ -85,7 +73,7 @@ def test_worktree_claim_ignores_untracked_benchbox_scratch(tmp_path: Path) -> No
     )
 
     assert result.returncode == 0, result.stderr
-    assert_worktree_path(result.stdout, pool)
+    assert f"WORKTREE_PATH={pool.resolve()}" in result.stdout
     assert run(["git", "branch", "--show-current"], pool).stdout.strip() == "feature/scratch-ok"
     assert (pool / ".benchbox" / "cache" / "scratch").exists()
 
@@ -163,7 +151,7 @@ def test_worktree_claim_preserves_dirty_detached_slots(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert "claim skip pool-01: porcelain non-empty before reset" in result.stderr
-    assert_worktree_path(result.stdout, clean_pool)
+    assert f"WORKTREE_PATH={clean_pool.resolve()}" in result.stdout
     assert run(["git", "branch", "--show-current"], dirty_pool).stdout.strip() == ""
     assert run(["git", "branch", "--show-current"], clean_pool).stdout.strip() == "feature/preserve-dirty"
     assert (dirty_pool / "README.md").read_text(encoding="utf-8") == "tracked WIP\n"

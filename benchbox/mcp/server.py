@@ -112,11 +112,15 @@ Use these tools to:
 1. **Discover** available platforms and benchmarks (list_available, get_benchmark_info)
 2. **Run** benchmarks with specific configurations (run_benchmark with dry_run/validate_only flags)
 3. **Analyze** results and compare runs (get_results, analyze_results)
-4. **Visualize** results with charts (generate_chart, suggest_charts)
+4. **Visualize** results with BenchBox semantic charts (generate_chart, suggest_charts)
 
 Start by listing available benchmarks or platforms to see what's possible.
 For a quick test, try: run_benchmark(platform="duckdb", benchmark="tpch", scale_factor=0.01)
 Then visualize: generate_chart(result_files="<result_file>", chart_type="performance_bar")
+BenchBox chart IDs are result-aware semantic IDs such as performance_bar,
+power_bar, and query_heatmap. They are separate from raw textcharts primitive
+tool names such as textcharts_bar or textcharts_heatmap, which belong to the
+external textcharts MCP server if that server is configured separately.
 
 To capture query execution plans, use the capture_plans parameter:
   run_benchmark(platform="datafusion", benchmark="tpch", capture_plans=True)

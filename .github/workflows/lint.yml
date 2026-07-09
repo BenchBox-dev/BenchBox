@@ -42,24 +42,23 @@ jobs:
       - name: Validate test marker annotations
         run: make lint-markers
 
+      # The four steps below depend on _project/ dev tooling, which is curated
+      # out of release branches; hashFiles guards make them skip there.
       - name: Timing policy (wall-clock allowlist)
-        run: |
-          if [ -d _project/scripts ]; then
-            uv run -- python _project/scripts/timing_policy_check.py --strict
-          else
-            echo "_project/scripts/ is absent on curated release branches; skipping timing policy check."
-          fi
+        if: hashFiles('_project/scripts/timing_policy_check.py') != ''
+        run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
       - name: Compatibility docs drift check
         run: make compat-docs-check
 
-      - name: Dependency audit (declared/imported contract)
+      - name: Dependency audit (no unused declarations)
+        if: hashFiles('_project/scripts/dependency_audit/check_deps.py') != ''
         run: make audit-deps
 
+      - name: Dependency inventory drift check
+        if: hashFiles('_project/scripts/dependency_audit/parse_deps.py') != ''
+        run: make audit-raw-check
+
       - name: Release curation list drift check
-        run: |
-          if [ -d _project/scripts ]; then
-            uv run python scripts/check_release_curation.py
-          else
-            echo "_project/scripts/ is absent on curated release branches; skipping curation drift check."
-          fi
+        if: hashFiles('_project/decisions/single-repo-migration.md') != ''
+        run: uv run python scripts/check_release_curation.py

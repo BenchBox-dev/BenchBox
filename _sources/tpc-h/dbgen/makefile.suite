@@ -110,7 +110,12 @@ DATABASE=
 MACHINE = 
 WORKLOAD = 
 #
-CFLAGS	= -g -DDBNAME=\"dss\" -D$(MACHINE) -D$(DATABASE) -D$(WORKLOAD) -DRNG_TEST -D_FILE_OFFSET_BITS=64 
+# BenchBox: -DEOL_HANDLING makes dbgen emit rows WITHOUT a trailing field
+# separator (see print.c EOL_HANDLING #ifdef). This is BenchBox's canonical
+# framing convention so generated .tbl output is byte-identical across
+# platforms and consistent with TPC-DS (invoked with `-terminate n`). Keep
+# this in sync with compile-all-platforms.sh and _create_tpc_h_makefile.
+CFLAGS	= -g -DDBNAME=\"dss\" -D$(MACHINE) -D$(DATABASE) -D$(WORKLOAD) -DRNG_TEST -D_FILE_OFFSET_BITS=64 -DEOL_HANDLING
 LDFLAGS = -O
 # The OBJ,EXE and LIB macros will need to be changed for compilation under
 #  Windows NT

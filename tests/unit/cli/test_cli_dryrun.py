@@ -195,6 +195,42 @@ class TestGenerateCliCommand:
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, capture_plans=True)
         assert "--capture-plans" in cmd
 
+    def test_strict_translation_included(self):
+        """Test that strict-translation flag is included."""
+        from benchbox.cli.dryrun import generate_cli_command
+
+        cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, strict_translation=True)
+        assert "--strict-translation" in cmd
+
+    def test_stats_reset_omitted_when_unset(self):
+        """Tri-state --stats-reset must be absent entirely when not passed
+        (None), so the reconstructed command stays byte-identical to a default
+        PR #980 run."""
+        from benchbox.cli.dryrun import generate_cli_command
+
+        cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01)
+        assert "--stats-reset" not in cmd
+        assert "--no-stats-reset" not in cmd
+
+    def test_stats_reset_true_emits_stats_reset_flag(self):
+        from benchbox.cli.dryrun import generate_cli_command
+
+        cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, stats_reset=True)
+        assert "--stats-reset" in cmd
+        assert "--no-stats-reset" not in cmd
+
+    def test_stats_reset_false_emits_no_stats_reset_flag(self):
+        from benchbox.cli.dryrun import generate_cli_command
+
+        cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, stats_reset=False)
+        assert "--no-stats-reset" in cmd
+
+    def test_stats_per_table_timing_included(self):
+        from benchbox.cli.dryrun import generate_cli_command
+
+        cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, stats_per_table_timing=True)
+        assert "--stats-per-table-timing" in cmd
+
     def test_validation_included(self):
         """Test that validation mode is included."""
         from benchbox.cli.dryrun import generate_cli_command

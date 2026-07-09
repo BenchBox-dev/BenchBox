@@ -24,10 +24,11 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from tests.uat import docker_assets
-from tests.uat.cleanup import SOURCE_REUSE_GRAPH, CellKey, can_prune, prune_database_dir
+from tests.uat.cleanup import CellKey, can_prune, prune_database_dir, source_reuse_graph
 from tests.uat.config import UATConfig
 from tests.uat.ladder import LadderRung, plan_ladder
-from tests.uat.matrix import platform_is_reachable, reset_reachability_cache
+from tests.uat.matrix import invalidate_reachability_cache_after_lifecycle_change, platform_is_reachable
+from tests.uat.phases import PhaseResult
 from tests.uat.phases.enumerate import (
     Cell,
     CompatibilityPrunedCell,
@@ -51,7 +52,7 @@ class DockerLifecycleEvent:
 
 
 @dataclass(frozen=True)
-class ExecuteOutcome:
+class ExecuteOutcome(PhaseResult):
     """Aggregated outcome of run_execute."""
 
     results: tuple[CellResult, ...]
@@ -59,8 +60,11 @@ class ExecuteOutcome:
     skipped_unreachable: tuple[Cell, ...]
     compatibility_pruned: tuple[CompatibilityPrunedCell, ...] = ()
     docker_events: tuple[DockerLifecycleEvent, ...] = ()
-    aborted: bool = False
-    abort_reason: str | None = None
+
+    def exit_code(self) -> int:
+        if self.aborted:
+            return 2
+        return 0 if all(result.status == "passed" for result in self.results) else 1
 
 
 @dataclass(frozen=True)
@@ -112,7 +116,7 @@ def run_execute(
     if free_space_min_gib is None:
         free_space_min_gib = config.preflight.free_space_min_gib
 
-    enumeration = enumerate_cells_with_pruning(config.raw)
+    enumeration = enumerate_cells_with_pruning(config)
     cells = list(enumeration.cells)
     by_pb: dict[tuple[str, str], list[Cell]] = defaultdict(list)
     for cell in cells:
@@ -122,8 +126,8 @@ def run_execute(
     for key in by_pb:
         by_pb[key].sort(key=lambda c: c.scale)
 
-    # Reorder by_pb so that for each platform, sources from
-    # SOURCE_REUSE_GRAPH come before their consumers. Without this,
+    # Reorder by_pb so that for each platform, registry-declared data
+    # sources come before their consumers. Without this,
     # `include: [read_primitives, tpch]` (or a future registry change
     # that moves consumer-categories ahead of sources) would attempt to
     # run a consumer before the source has loaded its DB.
@@ -153,9 +157,10 @@ def run_execute(
         )
         docker_state = _DockerPlatformState(cleanup_status=last_docker_cleanup_status)
 
+        docker_startup_failed = False
         try:
             if platform_abort_reason is None:
-                docker_state, platform_abort_reason = _start_docker_platform_if_needed(
+                docker_state, startup_reason = _start_docker_platform_if_needed(
                     config,
                     platform=platform,
                     benchmark_runs_dir=benchmark_runs_dir,
@@ -164,23 +169,55 @@ def run_execute(
                     log_dir=log_dir,
                 )
                 last_docker_cleanup_status = docker_state.cleanup_status
-            if platform_abort_reason is None:
-                _run_or_skip_platform(
-                    config,
-                    platform=platform,
-                    platform_pairs=platform_pairs,
-                    by_pb=by_pb,
-                    results=results,
-                    pruned=pruned,
-                    skipped_unreachable=skipped_unreachable,
-                    completed_pairs=completed_pairs,
-                    already_pruned=already_pruned,
-                    databases_root=databases_root,
-                    cleanup_enabled=cleanup_enabled,
-                    runner=runner,
-                    log_dir=log_dir,
-                    benchmark_runs_dir=benchmark_runs_dir,
-                )
+                if startup_reason is not None:
+                    # A managed Docker compose-up failure (e.g. the LakeSail
+                    # Spark Connect service exceeding docker_start_timeout_s) is
+                    # a per-platform infrastructure failure, not a global abort.
+                    # The failure is already captured in docker_events /
+                    # uat_lifecycle.log (action=up status=failed). Record this
+                    # platform's cells as unreachable and advance to the next
+                    # stack so one stack's startup failure cannot truncate the
+                    # whole sweep. Genuine global aborts (free space, fixed
+                    # container-name policy, teardown failure) still abort below.
+                    if docker_state.cleanup_status == "startup-failed":
+                        skipped_unreachable.extend(cell for _, pb_cells in platform_pairs for cell in pb_cells)
+                        docker_startup_failed = True
+                    else:
+                        platform_abort_reason = startup_reason
+            if platform_abort_reason is None and not docker_startup_failed:
+                try:
+                    _run_or_skip_platform(
+                        config,
+                        platform=platform,
+                        platform_pairs=platform_pairs,
+                        by_pb=by_pb,
+                        results=results,
+                        pruned=pruned,
+                        skipped_unreachable=skipped_unreachable,
+                        completed_pairs=completed_pairs,
+                        already_pruned=already_pruned,
+                        databases_root=databases_root,
+                        cleanup_enabled=cleanup_enabled,
+                        runner=runner,
+                        log_dir=log_dir,
+                        benchmark_runs_dir=benchmark_runs_dir,
+                    )
+                except Exception as exc:  # noqa: BLE001 - re-raised after annotation
+                    # A mid-sweep DiskFloorAbort propagates out of the runner
+                    # here, bypassing the normal ExecuteOutcome return. The
+                    # skipped-unreachable cells accumulated for earlier
+                    # platforms would otherwise be lost (run_execute never
+                    # returns), causing the abort report to under-count
+                    # `total_defined`. Annotate the exception with the count
+                    # so the orchestrator can thread it into the abort
+                    # artifact. The platform teardown still runs via the
+                    # enclosing `finally` before the exception propagates.
+                    if not hasattr(exc, "skipped_unreachable_count"):
+                        try:
+                            exc.skipped_unreachable_count = len(skipped_unreachable)  # type: ignore[attr-defined]
+                        except (AttributeError, TypeError):
+                            pass
+                    raise
         finally:
             docker_state, teardown_abort_reason = _teardown_docker_platform_if_needed(
                 config,
@@ -205,6 +242,7 @@ def run_execute(
         last_completed_platform = platform
 
     return ExecuteOutcome(
+        phase="execute",
         results=tuple(results),
         pruned=tuple(pruned),
         skipped_unreachable=tuple(skipped_unreachable),
@@ -281,7 +319,7 @@ def _start_docker_platform_if_needed(
         cleanup_status="started" if up_result.succeeded else "startup-failed",
     )
     if up_result.succeeded:
-        reset_reachability_cache()
+        invalidate_reachability_cache_after_lifecycle_change()
         return state, None
     return (
         state,
@@ -520,12 +558,13 @@ def _reorder_for_topology(
 ) -> dict[tuple[str, str], list[Cell]]:
     """Reorder by_pb so for each platform, sources precede their consumers.
 
-    Reuse graph from `cleanup.SOURCE_REUSE_GRAPH` (e.g. tpch is a source
-    for read_primitives etc.). The topological sort is stable: benchmarks
-    not constrained by the graph keep their original relative order.
+    Reuse graph from registry `data_source` metadata (e.g. tpch is a
+    source for read_primitives etc.). The topological sort is stable:
+    benchmarks not constrained by the graph keep their original relative
+    order.
     """
     consumer_to_sources: dict[str, list[str]] = {}
-    for source, consumers in SOURCE_REUSE_GRAPH.items():
+    for source, consumers in source_reuse_graph().items():
         for c in consumers:
             if c == source:
                 continue
@@ -580,7 +619,7 @@ def _topological_sort(
     while pending:
         ready = next((b for b in benchmarks if b in pending and indegree[b] == 0), None)
         if ready is None:
-            # SOURCE_REUSE_GRAPH is expected to be acyclic, but preserve
+            # The registry-derived reuse graph is expected to be acyclic, but preserve
             # deterministic progress if a future edit introduces a cycle.
             ready = next(b for b in benchmarks if b in pending)
         pending.remove(ready)

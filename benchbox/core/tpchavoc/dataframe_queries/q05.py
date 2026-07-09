@@ -13,12 +13,13 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q5_expression_impl as _q5_expr_base,
     q5_pandas_impl as _q5_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -56,7 +57,7 @@ def q5_v2_expression_impl(ctx: DataFrameContext) -> Any:
     filtered_region = region.filter(col("r_name") == lit(region_name))
     filtered_orders = orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
 
-    result = (
+    return (
         filtered_region.join(nation, left_on="r_regionkey", right_on="n_regionkey")
         .join(customer, left_on="n_nationkey", right_on="c_nationkey")
         .join(filtered_orders, left_on="c_custkey", right_on="o_custkey")
@@ -66,7 +67,6 @@ def q5_v2_expression_impl(ctx: DataFrameContext) -> Any:
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-    return result
 
 
 def q5_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -119,7 +119,7 @@ def q5_v3_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         region.select("r_regionkey", "r_name")
         .filter(col("r_name") == lit(region_name))
         .join(nation.select("n_regionkey", "n_nationkey", "n_name"), left_on="r_regionkey", right_on="n_regionkey")
@@ -145,7 +145,6 @@ def q5_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-    return result
 
 
 def q5_v3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -237,7 +236,7 @@ def q5_v5_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         region.filter(col("r_name") == lit(region_name))
         .join(nation, left_on="r_regionkey", right_on="n_regionkey")
         .join(customer, left_on="n_nationkey", right_on="c_nationkey")
@@ -250,7 +249,6 @@ def q5_v5_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("revenue").sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-    return result
 
 
 def q5_v5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -338,48 +336,22 @@ def q5_v7_expression_impl(ctx: DataFrameContext) -> Any:
         left_on="n_regionkey",
         right_on="r_regionkey",
     )
+    # customer is the left side here, so the join keeps c_nationkey and drops
+    # n_nationkey; c_nationkey carries the same value for the supplier match.
     asia_customers = customer.join(asia_nations, left_on="c_nationkey", right_on="n_nationkey")
     customer_orders = asia_customers.join(orders, left_on="c_custkey", right_on="o_custkey").filter(
         (col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date))
     )
-    result = (
+    return (
         customer_orders.join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-        .join(supplier, left_on=["l_suppkey", "n_nationkey"], right_on=["s_suppkey", "s_nationkey"])
+        .join(supplier, left_on=["l_suppkey", "c_nationkey"], right_on=["s_suppkey", "s_nationkey"])
         .group_by("n_name")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-    return result
 
 
-def q5_v7_pandas_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
-
-    params = get_tpch_parameters(5)
-    region_name = params["region_name"]
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    asia_region = region[region["r_name"] == region_name]
-    asia_nations = nation.merge(asia_region, left_on="n_regionkey", right_on="r_regionkey")
-    asia_customers = customer.merge(asia_nations, left_on="c_nationkey", right_on="n_nationkey")
-    customer_orders = asia_customers.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    customer_orders = customer_orders[
-        (customer_orders["o_orderdate"] >= start_date) & (customer_orders["o_orderdate"] < end_date)
-    ]
-    order_lines = customer_orders.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    joined = order_lines.merge(
-        supplier, left_on=["l_suppkey", "c_nationkey"], right_on=["s_suppkey", "s_nationkey"]
-    ).copy()
-    joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
-    return (
-        joined.groupby("n_name", as_index=False).agg(revenue=("revenue", "sum")).sort_values("revenue", ascending=False)
-    )
+q5_v7_pandas_impl = make_variant_delegate(q5_v5_pandas_impl, name="q5_v7_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -427,63 +399,11 @@ def q5_v8_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q5_v9_expression_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(5)
-    region_name = params["region_name"]
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    result = (
-        region.filter(col("r_name") == lit(region_name))
-        .join(nation, left_on="r_regionkey", right_on="n_regionkey")
-        .join(customer, left_on="n_nationkey", right_on="c_nationkey")
-        .join(orders, left_on="c_custkey", right_on="o_custkey")
-        .filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
-        .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-        .join(supplier, left_on=["l_suppkey", "n_nationkey"], right_on=["s_suppkey", "s_nationkey"])
-        .group_by("n_name")
-        .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
-        .sort("revenue", descending=True)
-    )
-    return result
+    return _q5_expr_base(ctx)
 
 
 def q5_v9_pandas_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
-
-    params = get_tpch_parameters(5)
-    region_name = params["region_name"]
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    asia_region = region[region["r_name"] == region_name]
-    asia_nations = asia_region.merge(nation, left_on="r_regionkey", right_on="n_regionkey")
-    asia_customers = asia_nations.merge(customer, left_on="n_nationkey", right_on="c_nationkey")
-    customer_orders = asia_customers.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    customer_orders = customer_orders[
-        (customer_orders["o_orderdate"] >= start_date) & (customer_orders["o_orderdate"] < end_date)
-    ]
-    order_lines = customer_orders.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    joined = order_lines.merge(
-        supplier, left_on=["l_suppkey", "c_nationkey"], right_on=["s_suppkey", "s_nationkey"]
-    ).copy()
-    joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
-    return (
-        joined.groupby("n_name", as_index=False).agg(revenue=("revenue", "sum")).sort_values("revenue", ascending=False)
-    )
+    return q5_v5_pandas_impl(ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -508,7 +428,7 @@ def q5_v10_expression_impl(ctx: DataFrameContext) -> Any:
 
     revenue_alt = col("l_extendedprice") - col("l_extendedprice") * col("l_discount")
 
-    result = (
+    return (
         region.filter(col("r_name") == lit(region_name))
         .join(nation, left_on="r_regionkey", right_on="n_regionkey")
         .join(customer, left_on="n_nationkey", right_on="c_nationkey")
@@ -520,7 +440,6 @@ def q5_v10_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(revenue_alt.sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-    return result
 
 
 def q5_v10_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -558,40 +477,4 @@ def q5_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q5_v1_expression_impl, q5_v1_pandas_impl),
-    (q5_v2_expression_impl, q5_v2_pandas_impl),
-    (q5_v3_expression_impl, q5_v3_pandas_impl),
-    (q5_v4_expression_impl, q5_v4_pandas_impl),
-    (q5_v5_expression_impl, q5_v5_pandas_impl),
-    (q5_v6_expression_impl, q5_v6_pandas_impl),
-    (q5_v7_expression_impl, q5_v7_pandas_impl),
-    (q5_v8_expression_impl, q5_v8_pandas_impl),
-    (q5_v9_expression_impl, q5_v9_pandas_impl),
-    (q5_v10_expression_impl, q5_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q5 implementation",
-    "Pre-filter: filter region and orders by date before joining",
-    "Column prune: select only needed columns from each table",
-    "Intermediate vars: one named DataFrame per join step",
-    "Pre-compute derived: add revenue column before groupby",
-    "Chained style: maximum method chaining",
-    "Join reorder: start from nation→region to get Asia nations first",
-    "Filter combination: single combined date+region filter",
-    "Explicit sort: descending=True explicitly specified",
-    "Alternative formula: revenue = price - price*disc",
-]
-
-Q5_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q5v{v}",
-        query_name=f"TPC-H Q5 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q5_VARIANTS = build_yaml_variants(__file__, globals(), 5, JOIN_AGG_FILTER)

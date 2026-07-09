@@ -122,3 +122,21 @@ class TestDuckDBRealConnection:
         conn.close()
         with pytest.raises(Exception):
             conn.execute("SELECT 1")  # should fail after close
+
+    def test_statistics_phase_is_idempotent_across_repeated_runs(self, adapter, connection):
+        """Sanity check for the opt-in statistics phase (design doc's idempotence
+        check, w3 of track2-joinorder-stats-phase-controls): re-running the
+        statistics build (ANALYZE) on unchanged data must produce the same plan
+        shape / cardinality estimates both times, so the phase measures stats
+        build cost rather than incidental cache warmth."""
+        connection.execute("CREATE TABLE region (r_regionkey INTEGER, r_name VARCHAR(25))")
+        connection.execute("INSERT INTO region SELECT range::INTEGER, 'NAME_' || range::VARCHAR FROM range(500)")
+
+        stats_mode_1, tables_analyzed_1 = adapter.gather_statistics(connection, ["region"])
+        plan_1 = connection.execute("EXPLAIN SELECT * FROM region WHERE r_regionkey < 100").fetchall()
+
+        stats_mode_2, tables_analyzed_2 = adapter.gather_statistics(connection, ["region"])
+        plan_2 = connection.execute("EXPLAIN SELECT * FROM region WHERE r_regionkey < 100").fetchall()
+
+        assert (stats_mode_1, tables_analyzed_1) == (stats_mode_2, tables_analyzed_2) == ("explicit", 1)
+        assert plan_1 == plan_2

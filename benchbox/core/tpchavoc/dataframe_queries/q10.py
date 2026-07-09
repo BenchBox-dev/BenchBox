@@ -13,12 +13,16 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q10_expression_impl as _q10_expr_base,
     q10_pandas_impl as _q10_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SORT, build_yaml_variants
+
+# TPC-H spec output order for Q10.
+_RESULT_COLUMNS = ["c_custkey", "c_name", "revenue", "c_acctbal", "n_name", "c_address", "c_phone", "c_comment"]
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -53,16 +57,16 @@ def q10_v2_expression_impl(ctx: DataFrameContext) -> Any:
     filtered_orders = orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
     filtered_lineitem = lineitem.filter(col("l_returnflag") == lit("R"))
 
-    result = (
+    return (
         customer.join(filtered_orders, left_on="c_custkey", right_on="o_custkey")
         .join(filtered_lineitem, left_on="o_orderkey", right_on="l_orderkey")
         .join(nation, left_on="c_nationkey", right_on="n_nationkey")
         .group_by("c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select(*_RESULT_COLUMNS)
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
 def q10_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -87,7 +91,7 @@ def q10_v2_pandas_impl(ctx: DataFrameContext) -> Any:
         joined.groupby(
             ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"], as_index=False
         )
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[_RESULT_COLUMNS]
         .sort_values("revenue", ascending=False)
         .head(20)
     )
@@ -110,7 +114,7 @@ def q10_v3_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         customer.select("c_custkey", "c_name", "c_acctbal", "c_phone", "c_address", "c_comment", "c_nationkey")
         .join(
             orders.select("o_custkey", "o_orderkey", "o_orderdate").filter(
@@ -129,10 +133,10 @@ def q10_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .join(nation.select("n_nationkey", "n_name"), left_on="c_nationkey", right_on="n_nationkey")
         .group_by("c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select(*_RESULT_COLUMNS)
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
 def q10_v3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -164,7 +168,7 @@ def q10_v4_expression_impl(ctx: DataFrameContext) -> Any:
     step6 = step5.group_by("c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment").agg(
         (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue")
     )
-    return step6.sort("revenue", descending=True).limit(20)
+    return step6.select(*_RESULT_COLUMNS).sort("revenue", descending=True).limit(20)
 
 
 def q10_v4_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -188,7 +192,7 @@ def q10_v4_pandas_impl(ctx: DataFrameContext) -> Any:
         step5.groupby(
             ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"], as_index=False
         )
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[_RESULT_COLUMNS]
         .sort_values("revenue", ascending=False)
         .head(20)
     )
@@ -211,7 +215,7 @@ def q10_v5_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
@@ -220,38 +224,13 @@ def q10_v5_expression_impl(ctx: DataFrameContext) -> Any:
         .with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
         .group_by("c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment")
         .agg(col("revenue").sum().alias("revenue"))
+        .select(*_RESULT_COLUMNS)
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
-def q10_v5_pandas_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-    nation = ctx.get_table("nation")
-
-    params = get_tpch_parameters(10)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    joined = joined[(joined["o_orderdate"] >= start_date) & (joined["o_orderdate"] < end_date)]
-    joined = joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    joined = joined[joined["l_returnflag"] == "R"]
-    joined = joined.merge(nation, left_on="c_nationkey", right_on="n_nationkey").copy()
-    # Pre-compute revenue
-    joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
-
-    return (
-        joined.groupby(
-            ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"], as_index=False
-        )
-        .agg(revenue=("revenue", "sum"))
-        .sort_values("revenue", ascending=False)
-        .head(20)
-    )
+q10_v5_pandas_impl = make_variant_delegate(q10_v4_pandas_impl, name="q10_v5_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -272,6 +251,7 @@ def q10_v6_expression_impl(ctx: DataFrameContext) -> Any:
         .join(ctx.get_table("nation"), left_on="c_nationkey", right_on="n_nationkey")
         .group_by("c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select(*_RESULT_COLUMNS)
         .sort("revenue", descending=True)
         .limit(20)
     )
@@ -298,18 +278,20 @@ def q10_v7_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Swapped: start from orders→customer
-    result = (
+    # Swapped: start from orders→customer. The join keeps the left key
+    # (o_custkey) and drops c_custkey, so restore it for the spec projection.
+    return (
         orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(customer, left_on="o_custkey", right_on="c_custkey")
+        .with_columns(col("o_custkey").alias("c_custkey"))
         .join(lineitem.filter(col("l_returnflag") == lit("R")), left_on="o_orderkey", right_on="l_orderkey")
         .join(nation, left_on="c_nationkey", right_on="n_nationkey")
         .group_by("c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select(*_RESULT_COLUMNS)
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
 def q10_v7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -334,7 +316,7 @@ def q10_v7_pandas_impl(ctx: DataFrameContext) -> Any:
         joined.groupby(
             ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"], as_index=False
         )
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[_RESULT_COLUMNS]
         .sort_values("revenue", ascending=False)
         .head(20)
     )
@@ -357,7 +339,7 @@ def q10_v8_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
         # Combine both filters in single call after all joins
@@ -369,10 +351,10 @@ def q10_v8_expression_impl(ctx: DataFrameContext) -> Any:
         .join(nation, left_on="c_nationkey", right_on="n_nationkey")
         .group_by("c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
+        .select(*_RESULT_COLUMNS)
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
 def q10_v8_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -398,7 +380,7 @@ def q10_v8_pandas_impl(ctx: DataFrameContext) -> Any:
         joined.groupby(
             ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"], as_index=False
         )
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[_RESULT_COLUMNS]
         .sort_values("revenue", ascending=False)
         .head(20)
     )
@@ -410,56 +392,11 @@ def q10_v8_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q10_v9_expression_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-    nation = ctx.get_table("nation")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(10)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    result = (
-        customer.join(orders, left_on="c_custkey", right_on="o_custkey")
-        .filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
-        .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-        .filter(col("l_returnflag") == lit("R"))
-        .join(nation, left_on="c_nationkey", right_on="n_nationkey")
-        .group_by("c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment")
-        .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
-        .sort("revenue", descending=True)
-        .limit(20)
-    )
-    return result
+    return _q10_expr_base(ctx)
 
 
 def q10_v9_pandas_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-    nation = ctx.get_table("nation")
-
-    params = get_tpch_parameters(10)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    joined = joined[(joined["o_orderdate"] >= start_date) & (joined["o_orderdate"] < end_date)]
-    joined = joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    joined = joined[joined["l_returnflag"] == "R"]
-    joined = joined.merge(nation, left_on="c_nationkey", right_on="n_nationkey").copy()
-    joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
-
-    return (
-        joined.groupby(
-            ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"], as_index=False
-        )
-        .agg(revenue=("revenue", "sum"))
-        .sort_values("revenue", ascending=False)
-        .head(20)
-    )
+    return q10_v5_pandas_impl(ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -481,7 +418,7 @@ def q10_v10_expression_impl(ctx: DataFrameContext) -> Any:
 
     revenue_alt = col("l_extendedprice") - col("l_extendedprice") * col("l_discount")
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
@@ -489,10 +426,10 @@ def q10_v10_expression_impl(ctx: DataFrameContext) -> Any:
         .join(nation, left_on="c_nationkey", right_on="n_nationkey")
         .group_by("c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment")
         .agg(revenue_alt.sum().alias("revenue"))
+        .select(*_RESULT_COLUMNS)
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
 def q10_v10_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -517,7 +454,7 @@ def q10_v10_pandas_impl(ctx: DataFrameContext) -> Any:
         joined.groupby(
             ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"], as_index=False
         )
-        .agg(revenue=("revenue", "sum"))
+        .agg(revenue=("revenue", "sum"))[_RESULT_COLUMNS]
         .sort_values("revenue", ascending=False)
         .head(20)
     )
@@ -527,40 +464,4 @@ def q10_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q10_v1_expression_impl, q10_v1_pandas_impl),
-    (q10_v2_expression_impl, q10_v2_pandas_impl),
-    (q10_v3_expression_impl, q10_v3_pandas_impl),
-    (q10_v4_expression_impl, q10_v4_pandas_impl),
-    (q10_v5_expression_impl, q10_v5_pandas_impl),
-    (q10_v6_expression_impl, q10_v6_pandas_impl),
-    (q10_v7_expression_impl, q10_v7_pandas_impl),
-    (q10_v8_expression_impl, q10_v8_pandas_impl),
-    (q10_v9_expression_impl, q10_v9_pandas_impl),
-    (q10_v10_expression_impl, q10_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q10 implementation",
-    "Pre-filter: filter orders by date and lineitem by returnflag before joining",
-    "Column prune: select only needed columns from each table",
-    "Intermediate vars: named DataFrames for each join and filter step",
-    "Pre-compute derived: add revenue column before groupby",
-    "Chained style: maximum method chaining",
-    "Join reorder: start from orders→customer instead of customer→orders",
-    "Filter combination: combine date and returnflag filter in single call after joins",
-    "Explicit sort: descending=True explicitly specified",
-    "Alternative formula: revenue = price - price*disc",
-]
-
-Q10_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q10v{v}",
-        query_name=f"TPC-H Q10 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SORT],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q10_VARIANTS = build_yaml_variants(__file__, globals(), 10, JOIN_AGG_SORT)

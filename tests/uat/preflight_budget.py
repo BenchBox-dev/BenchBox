@@ -1,9 +1,9 @@
-"""Advisory disk-budget estimator for UAT configs.
+"""Disk-budget estimator for UAT configs.
 
 The checked-in TSV is an operator-maintained inventory from prior UAT
-sweeps. It is deliberately advisory: unknown cells stay visible in the
-estimate instead of blocking execution, and the existing preflight free-
-space cutoff remains the hard gate.
+sweeps. Unknown cells stay visible in the estimate instead of being
+treated as zero; preflight uses known peak demand as a headroom gate while
+surfacing unknown coverage as an operator warning.
 """
 
 from __future__ import annotations
@@ -52,6 +52,33 @@ class DiskBudget:
     est_peak_gib: float
     est_steady_gib: float
     unknown_cells: tuple[UnknownDiskCell, ...]
+
+
+@dataclass(frozen=True)
+class DiskRootFreeSpace:
+    """Free-space observation for a required UAT disk root."""
+
+    label: str
+    path: Path
+    free_gib: float
+
+
+@dataclass(frozen=True)
+class DiskHeadroomShortfall:
+    """A required root that cannot fit the estimated disk budget."""
+
+    label: str
+    path: Path
+    free_gib: float
+    required_gib: float
+
+
+@dataclass(frozen=True)
+class DiskHeadroomCheck:
+    """Disk-budget gate result for a set of required roots."""
+
+    required_gib: float
+    shortfalls: tuple[DiskHeadroomShortfall, ...]
 
 
 BudgetTable = dict[tuple[str, str, float], DiskBudgetRow]
@@ -106,7 +133,24 @@ def estimate_peak_disk(config: UATConfig, *, table_path: Path | None = None) -> 
     growth are counted per cell. Unknown cells are reported separately;
     callers must not treat them as a hard gate.
     """
-    return estimate_cells(enumerate_cells(config.raw), table=load_budget_table(table_path))
+    return estimate_cells(enumerate_cells(config), table=load_budget_table(table_path))
+
+
+def estimate_peak_disk_by_scale(config: UATConfig, *, table_path: Path | None = None) -> dict[float, DiskBudget]:
+    """Return advisory disk estimates grouped by scale rung."""
+    table = load_budget_table(table_path)
+    cells_by_scale: dict[float, list[Cell]] = {}
+    for cell in enumerate_cells(config):
+        cells_by_scale.setdefault(cell.scale, []).append(cell)
+    return {scale: estimate_cells(cells, table=table) for scale, cells in cells_by_scale.items()}
+
+
+def estimate_largest_scale_peak_disk(config: UATConfig, *, table_path: Path | None = None) -> DiskBudget:
+    """Return the disk estimate for the largest configured scale rung."""
+    by_scale = estimate_peak_disk_by_scale(config, table_path=table_path)
+    if not by_scale:
+        return DiskBudget(cells=0, est_peak_gib=0.0, est_steady_gib=0.0, unknown_cells=())
+    return by_scale[max(by_scale)]
 
 
 def estimate_cells(cells: Iterable[Cell], *, table: BudgetTable) -> DiskBudget:
@@ -136,6 +180,22 @@ def estimate_cells(cells: Iterable[Cell], *, table: BudgetTable) -> DiskBudget:
     )
 
 
+def check_disk_headroom(
+    budget: DiskBudget,
+    roots: Iterable[DiskRootFreeSpace],
+    *,
+    min_free_gib: float,
+) -> DiskHeadroomCheck:
+    """Compare an estimated peak budget against required disk roots."""
+    required_gib = max(min_free_gib, budget.est_peak_gib)
+    shortfalls = tuple(
+        DiskHeadroomShortfall(root.label, root.path, root.free_gib, required_gib)
+        for root in roots
+        if root.free_gib < required_gib
+    )
+    return DiskHeadroomCheck(required_gib=required_gib, shortfalls=shortfalls)
+
+
 def format_disk_budget(budget: DiskBudget) -> str:
     """One-line operator summary used by preflight CLI/sweep output."""
     return (
@@ -144,3 +204,13 @@ def format_disk_budget(budget: DiskBudget) -> str:
         f"({budget.est_steady_gib:.2f} GiB steady; "
         f"cells={budget.cells}; unknown={len(budget.unknown_cells)})"
     )
+
+
+def format_disk_headroom_failure(check: DiskHeadroomCheck) -> str:
+    """Operator-facing abort reason for disk-budget shortfalls."""
+    details = "; ".join(
+        f"{shortfall.label} {shortfall.path}: "
+        f"{shortfall.free_gib:.1f} GiB free < {shortfall.required_gib:.1f} GiB required"
+        for shortfall in check.shortfalls
+    )
+    return f"disk headroom gate failed: {details}"

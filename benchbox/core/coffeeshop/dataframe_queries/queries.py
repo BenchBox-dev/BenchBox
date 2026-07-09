@@ -19,6 +19,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from datetime import date
 from typing import Any
 
@@ -28,6 +29,69 @@ def _parse_date(value: str | date) -> date:
     if isinstance(value, date):
         return value
     return date.fromisoformat(value)
+
+
+def _date_between(series: Any, start: str | date, end: str | date) -> Any:
+    """Boolean mask selecting an order_date column within [start, end] (inclusive).
+
+    Production loads DATE columns as pyarrow ``date32`` (date-valued), so comparing
+    against ``datetime.date`` bounds is correct. Some contexts/fixtures instead
+    provide ``datetime64[ns]``; pandas refuses to compare those against ``date``, so
+    align the bounds to ``Timestamp`` when the column is datetime-typed.
+    """
+    import pandas as pd
+
+    low, high = _parse_date(start), _parse_date(end)
+    # Guard the dtype check with isinstance so non-Series inputs (e.g. expression
+    # mocks in unit tests) skip introspection and just use the comparison operators.
+    if isinstance(series, pd.Series) and pd.api.types.is_datetime64_any_dtype(series):
+        low, high = pd.Timestamp(low), pd.Timestamp(high)
+    return (series >= low) & (series <= high)
+
+
+def _hour_pandas(series: Any) -> Any:
+    """Extract the hour (0-23) from a pandas order_time column.
+
+    Production loads TIME columns as "HH:MM:SS" strings, but custom contexts and
+    temporal fixtures may register order_time as a native temporal column. Use the
+    ``.dt`` accessor for temporal dtypes and only slice the leading two characters
+    when the column is genuinely string-typed - slicing a timestamp such as
+    "2023-..." would otherwise misread the year prefix as hour 20.
+    """
+    import pandas as pd
+
+    if isinstance(series, pd.Series) and (
+        pd.api.types.is_datetime64_any_dtype(series) or isinstance(series.dtype, pd.PeriodDtype)
+    ):
+        return series.dt.hour.astype("int64")
+    if isinstance(series, pd.Series) and pd.api.types.is_timedelta64_dtype(series):
+        return (series.dt.total_seconds() // 3600).astype("int64")
+    return series.astype("string").str[:2].astype("int64")
+
+
+def _is_temporal_expression_column(frame: Any, name: str) -> bool:
+    """Return True when *name* is a native temporal column on an expression frame.
+
+    Inspects the underlying native (Polars/PySpark/DataFusion) schema so TM1 can
+    use the temporal hour accessor for time/datetime columns and fall back to the
+    "HH:MM:SS" string-slice path for string columns. Returns False on any
+    introspection failure (e.g. expression mocks in unit tests) so the safe
+    string-slice path is used.
+    """
+    try:
+        native = getattr(frame, "native", frame)
+        if hasattr(native, "collect_schema"):
+            dtype = native.collect_schema().get(name)
+        elif hasattr(native, "schema") and not callable(native.schema):
+            dtype = dict(native.schema).get(name)
+        else:
+            return False
+        if dtype is None:
+            return False
+        type_name = type(dtype).__name__.lower()
+        return any(token in type_name for token in ("time", "date", "datetime", "timestamp"))
+    except Exception:
+        return False
 
 
 from benchbox.core.dataframe.context import DataFrameContext
@@ -82,8 +146,13 @@ def sa1_pandas_impl(ctx: DataFrameContext) -> Any:
 
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)]
-    merged = filtered.merge(dl, left_on="location_record_id", right_on="record_id")
+    filtered = ol[_date_between(ol["order_date"], start_date, end_date)]
+    # order_lines is denormalized (carries its own location_id/region); drop those
+    # before the join so the grouped/filtered columns come from dim_locations, as
+    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
+    merged = filtered.drop(columns=["location_id", "region"], errors="ignore").merge(
+        dl, left_on="location_record_id", right_on="record_id"
+    )
     grouped = merged.groupby(["order_date", "region"], as_index=False).agg(
         order_count=("order_id", "nunique"),
         gross_revenue=("total_price", "sum"),
@@ -114,11 +183,13 @@ def sa2_expression_impl(ctx: DataFrameContext) -> Any:
         ol.with_columns(col("order_date").dt.year().alias("year"))
         .filter(col("year") == lit(year))
         .join(dp, left_on="product_record_id", right_on="record_id")
-        .group_by("subcategory", "product_name")
+        .group_by("subcategory", "name")
         .agg(
             col("quantity").sum().alias("total_quantity"),
             col("total_price").sum().alias("total_revenue"),
         )
+        # SQL selects "dp.name AS product_name"; match that output schema.
+        .rename({"name": "product_name"})
         .sort("total_revenue", descending=True)
         .limit(limit)
     )
@@ -133,10 +204,17 @@ def sa2_pandas_impl(ctx: DataFrameContext) -> Any:
     ol = ctx.get_table("order_lines")
     dp = ctx.get_table("dim_products")
     filtered = ol[ol["order_date"].dt.year == year]
-    merged = filtered.merge(dp, left_on="product_record_id", right_on="record_id")
+    # Drop order_lines' denormalized product_id before the join so dim_products'
+    # columns (product_id/name/subcategory/validity) are used unambiguously, as
+    # the SQL does, rather than pandas suffixing the product_id collision.
+    merged = filtered.drop(columns=["product_id"], errors="ignore").merge(
+        dp, left_on="product_record_id", right_on="record_id"
+    )
     return (
         merged.groupby(["subcategory", "name"], as_index=False)
         .agg(total_quantity=("quantity", "sum"), total_revenue=("total_price", "sum"))
+        # SQL selects "dp.name AS product_name"; match that output schema.
+        .rename(columns={"name": "product_name"})
         .sort_values("total_revenue", ascending=False)
         .head(limit)
     )
@@ -247,8 +325,13 @@ def sa4_pandas_impl(ctx: DataFrameContext) -> Any:
 
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)]
-    merged = filtered.merge(dl, left_on="location_record_id", right_on="record_id")
+    filtered = ol[_date_between(ol["order_date"], start_date, end_date)]
+    # order_lines is denormalized (carries its own location_id/region); drop those
+    # before the join so the grouped/filtered columns come from dim_locations, as
+    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
+    merged = filtered.drop(columns=["location_id", "region"], errors="ignore").merge(
+        dl, left_on="location_record_id", right_on="record_id"
+    )
     grouped = merged.groupby(["region"], as_index=False).agg(
         orders=("order_id", "nunique"),
         revenue=("total_price", "sum"),
@@ -300,8 +383,13 @@ def sa5_pandas_impl(ctx: DataFrameContext) -> Any:
 
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)]
-    merged = filtered.merge(dl, left_on="location_record_id", right_on="record_id")
+    filtered = ol[_date_between(ol["order_date"], start_date, end_date)]
+    # order_lines is denormalized (carries its own location_id/region); drop those
+    # before the join so the grouped/filtered columns come from dim_locations, as
+    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
+    merged = filtered.drop(columns=["location_id", "region"], errors="ignore").merge(
+        dl, left_on="location_record_id", right_on="record_id"
+    )
     return (
         merged.groupby(["location_id", "city", "state", "region"], as_index=False)
         .agg(orders=("order_id", "nunique"), revenue=("total_price", "sum"), avg_line_value=("total_price", "mean"))
@@ -350,8 +438,13 @@ def pr1_pandas_impl(ctx: DataFrameContext) -> Any:
 
     ol = ctx.get_table("order_lines")
     dp = ctx.get_table("dim_products")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)]
-    merged = filtered.merge(dp, left_on="product_record_id", right_on="record_id")
+    filtered = ol[_date_between(ol["order_date"], start_date, end_date)]
+    # Drop order_lines' denormalized product_id before the join so dim_products'
+    # columns (product_id/name/subcategory/validity) are used unambiguously, as
+    # the SQL does, rather than pandas suffixing the product_id collision.
+    merged = filtered.drop(columns=["product_id"], errors="ignore").merge(
+        dp, left_on="product_record_id", right_on="record_id"
+    )
     merged = merged[(merged["order_date"] >= merged["from_date"]) & (merged["order_date"] <= merged["to_date"])]
     return (
         merged.groupby(["subcategory"], as_index=False)
@@ -409,7 +502,7 @@ def pr2_pandas_impl(ctx: DataFrameContext) -> Any:
     end_date = params.get("end_date", "2024-12-31")
 
     ol = ctx.get_table("order_lines")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)].copy()
+    filtered = ol[_date_between(ol["order_date"], start_date, end_date)].copy()
     conditions = [
         filtered["unit_price"] < 4,
         filtered["unit_price"] < 6,
@@ -498,7 +591,16 @@ def tm1_expression_impl(ctx: DataFrameContext) -> Any:
         .join(dl, left_on="location_record_id", right_on="record_id")
         .filter(col("region") == lit(region))
     )
-    with_hour = joined.with_columns(col("order_time").dt.hour().alias("hour"))
+    # order_time is usually loaded as an "HH:MM:SS" string (TIME has no reliable
+    # DataFrame dtype), so parse the hour from the leading two characters - but when
+    # a context registers order_time as a native temporal column, use the temporal
+    # hour accessor instead so we match the SQL's hour(order_time) without misreading
+    # a "2023-..." timestamp prefix.
+    if _is_temporal_expression_column(joined, "order_time"):
+        hour_expr = col("order_time").dt.hour()
+    else:
+        hour_expr = col("order_time").str.slice(0, 2).cast_int()
+    with_hour = joined.with_columns(hour_expr.alias("hour"))
     with_part = with_hour.with_columns(
         ctx.when((col("hour") >= lit(5)) & (col("hour") <= lit(10)))
         .then(lit("Morning"))
@@ -535,10 +637,19 @@ def tm1_pandas_impl(ctx: DataFrameContext) -> Any:
 
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)]
-    merged = filtered.merge(dl, left_on="location_record_id", right_on="record_id")
+    filtered = ol[_date_between(ol["order_date"], start_date, end_date)]
+    # order_lines is denormalized (carries its own location_id/region); drop those
+    # before the join so the grouped/filtered columns come from dim_locations, as
+    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
+    merged = filtered.drop(columns=["location_id", "region"], errors="ignore").merge(
+        dl, left_on="location_record_id", right_on="record_id"
+    )
     merged = merged[merged["region"] == region].copy()
-    merged["hour"] = merged["order_time"].dt.hour
+    # order_time is usually loaded as an "HH:MM:SS" string, but custom contexts may
+    # register it as a native temporal column; extract the hour via .dt for temporal
+    # dtypes and only string-slice genuine strings (slicing a "2023-..." timestamp
+    # would misread the year prefix as hour 20). Matches the SQL's hour(order_time).
+    merged["hour"] = _hour_pandas(merged["order_time"])
     conditions = [
         (merged["hour"] >= 5) & (merged["hour"] <= 10),
         (merged["hour"] >= 11) & (merged["hour"] <= 14),
@@ -594,7 +705,7 @@ def qc1_pandas_impl(ctx: DataFrameContext) -> Any:
     end_date = params.get("end_date", "2024-12-31")
 
     ol = ctx.get_table("order_lines")
-    filtered = ol[(ol["order_date"] >= start_date) & (ol["order_date"] <= end_date)]
+    filtered = ol[_date_between(ol["order_date"], start_date, end_date)]
     total_lines = len(filtered)
     unique_orders = filtered["order_id"].nunique()
     total_items = filtered["quantity"].sum()
@@ -659,7 +770,12 @@ def qc2_pandas_impl(ctx: DataFrameContext) -> Any:
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
     filtered = ol[(ol["order_date"].dt.year >= start_year) & (ol["order_date"].dt.year <= end_year)].copy()
-    merged = filtered.merge(dl, left_on="location_record_id", right_on="record_id")
+    # order_lines is denormalized (carries its own location_id/region); drop those
+    # before the join so the grouped/filtered columns come from dim_locations, as
+    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
+    merged = filtered.drop(columns=["location_id", "region"], errors="ignore").merge(
+        dl, left_on="location_record_id", right_on="record_id"
+    )
     month = merged["order_date"].dt.month
     conditions = [
         month.isin([12, 1, 2]),
@@ -679,143 +795,49 @@ def qc2_pandas_impl(ctx: DataFrameContext) -> Any:
 # Query Registration
 # =============================================================================
 
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "AN": QueryCategory.ANALYTICAL,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "JO": QueryCategory.JOIN,
+    "SO": QueryCategory.SORT,
+    "WI": QueryCategory.WINDOW,
+}
+
+_QUERY_METADATA = """\
+SA1|Daily Revenue by Region|Daily revenue and order volume by region with NULLIF avg order value|FI,JO,GB,AG|sa1
+SA2|Top Products by Revenue|Top products by revenue for a given year with JOIN to dim_products|FI,JO,GB,SO|sa2
+SA3|Monthly Performance|Monthly orders, items sold, revenue with NULLIF derived metrics|FI,GB,AG,AN|sa3
+SA4|Revenue Share by Region|Revenue share by region using SUM OVER() window function|FI,JO,GB,WI|sa4
+SA5|Top Locations|Top-performing locations by revenue with multi-column GROUP BY|FI,JO,GB,SO|sa5
+PR1|Product Mix|Product mix by subcategory with date validity check on dim_products|FI,JO,GB,AG|pr1
+PR2|Price Band Distribution|Price-band distribution using multi-way CASE WHEN binning|FI,GB,AG,AN|pr2
+TR1|Quarterly Trends|Quarterly revenue and order growth using FLOOR quarter calculation|FI,GB,AG,AN|tr1
+TM1|Day-Part Cadence|Order cadence by day-part (Morning/Midday/Afternoon/Evening) for a region|FI,JO,GB,AN|tm1
+QC1|Lines per Order|Average lines and items per order with NULLIF protection|FI,AG|qc1
+QC2|Seasonal Revenue|Seasonal revenue comparison across regions using CASE WHEN month mapping|FI,JO,GB,AN|qc2
+"""
+
+
+def _impl_for(stem: str, family: str) -> Any:
+    return globals()[f"{stem}_{family}_impl"]
+
 
 def _register_all_queries() -> None:
-    """Register all 11 CoffeeShop DataFrame queries."""
-    # Sales Analysis
-    register_query(
-        DataFrameQuery(
-            query_id="SA1",
-            query_name="Daily Revenue by Region",
-            description="Daily revenue and order volume by region with NULLIF avg order value",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=sa1_expression_impl,
-            pandas_impl=sa1_pandas_impl,
+    for query_id, query_name, description, category_codes, impl_stem in reader(
+        _QUERY_METADATA.splitlines(), delimiter="|"
+    ):
+        register_query(
+            DataFrameQuery(
+                query_id=query_id,
+                query_name=query_name,
+                description=description,
+                categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+                expression_impl=_impl_for(impl_stem, "expression"),
+                pandas_impl=_impl_for(impl_stem, "pandas"),
+            )
         )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="SA2",
-            query_name="Top Products by Revenue",
-            description="Top products by revenue for a given year with JOIN to dim_products",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=sa2_expression_impl,
-            pandas_impl=sa2_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="SA3",
-            query_name="Monthly Performance",
-            description="Monthly orders, items sold, revenue with NULLIF derived metrics",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=sa3_expression_impl,
-            pandas_impl=sa3_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="SA4",
-            query_name="Revenue Share by Region",
-            description="Revenue share by region using SUM OVER() window function",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.WINDOW],
-            expression_impl=sa4_expression_impl,
-            pandas_impl=sa4_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="SA5",
-            query_name="Top Locations",
-            description="Top-performing locations by revenue with multi-column GROUP BY",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=sa5_expression_impl,
-            pandas_impl=sa5_pandas_impl,
-        )
-    )
-
-    # Product Analysis
-    register_query(
-        DataFrameQuery(
-            query_id="PR1",
-            query_name="Product Mix",
-            description="Product mix by subcategory with date validity check on dim_products",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=pr1_expression_impl,
-            pandas_impl=pr1_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="PR2",
-            query_name="Price Band Distribution",
-            description="Price-band distribution using multi-way CASE WHEN binning",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=pr2_expression_impl,
-            pandas_impl=pr2_pandas_impl,
-        )
-    )
-
-    # Trend Analysis
-    register_query(
-        DataFrameQuery(
-            query_id="TR1",
-            query_name="Quarterly Trends",
-            description="Quarterly revenue and order growth using FLOOR quarter calculation",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=tr1_expression_impl,
-            pandas_impl=tr1_pandas_impl,
-        )
-    )
-
-    # Time Analysis
-    register_query(
-        DataFrameQuery(
-            query_id="TM1",
-            query_name="Day-Part Cadence",
-            description="Order cadence by day-part (Morning/Midday/Afternoon/Evening) for a region",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.ANALYTICAL],
-            expression_impl=tm1_expression_impl,
-            pandas_impl=tm1_pandas_impl,
-        )
-    )
-
-    # Quality Checks
-    register_query(
-        DataFrameQuery(
-            query_id="QC1",
-            query_name="Lines per Order",
-            description="Average lines and items per order with NULLIF protection",
-            categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-            expression_impl=qc1_expression_impl,
-            pandas_impl=qc1_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="QC2",
-            query_name="Seasonal Revenue",
-            description="Seasonal revenue comparison across regions using CASE WHEN month mapping",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.ANALYTICAL],
-            expression_impl=qc2_expression_impl,
-            pandas_impl=qc2_pandas_impl,
-        )
-    )
 
 
 _register_all_queries()

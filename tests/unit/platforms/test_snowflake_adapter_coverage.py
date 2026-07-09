@@ -1425,15 +1425,18 @@ class TestAnalyzeTableAndCloseConnection:
         recluster_sqls = [s for s in all_sqls if "RECLUSTER" in s.upper()]
         assert len(recluster_sqls) >= 1
 
-    def test_analyze_table_suppresses_exception(self):
+    def test_analyze_table_raises_on_failure(self):
+        """Must raise (not swallow) so gather_statistics()'s caller can detect
+        and record a real failure as status=FAILED."""
         adapter = _make_adapter()
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.execute.side_effect = RuntimeError("not supported")
         mock_conn.cursor.return_value = mock_cursor
 
-        # Should not raise
-        adapter.analyze_table(mock_conn, "orders")
+        with pytest.raises(RuntimeError, match="not supported"):
+            adapter.analyze_table(mock_conn, "orders")
+        mock_cursor.close.assert_called_once()
 
     def test_close_connection_calls_close(self):
         adapter = _make_adapter()

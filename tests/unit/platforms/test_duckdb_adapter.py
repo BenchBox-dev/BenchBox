@@ -869,30 +869,86 @@ class TestDuckDBAdapter:
         assert isinstance(result["execution_time_seconds"], float)
 
     @patch("benchbox.platforms.duckdb.duckdb")
+    def test_show_plans_displays_without_capture(self, mock_duckdb):
+        """--show-plans is decoupled from --capture-plans.
+
+        With show_query_plans=True and capture_plans=False the plan is displayed
+        to the console but NOT captured into the result bundle, exercising the
+        flag decoupling (run.py no longer ties show_query_plans to capture_plans).
+        """
+        mock_connection = Mock()
+        mock_result = Mock()
+        mock_result.fetchall.return_value = [(1,)]
+        mock_connection.execute.return_value = mock_result
+        mock_duckdb.connect.return_value = mock_connection
+
+        adapter = DuckDBAdapter(show_query_plans=True, capture_plans=False)
+
+        with (
+            patch.object(adapter, "display_query_plan_if_enabled") as mock_display,
+            patch.object(adapter, "capture_query_plan") as mock_capture,
+        ):
+            result = adapter.execute_query(mock_connection, "SELECT 1", "q1")
+
+        assert result["status"] == "SUCCESS"
+        # Display fires for show_query_plans=True, capture_plans=False.
+        mock_display.assert_called_once()
+        # Capture must not run when capture_plans is False.
+        mock_capture.assert_not_called()
+
+    @patch("benchbox.platforms.duckdb.duckdb")
+    def test_capture_no_display_suppresses_plan_display(self, mock_duckdb):
+        """--capture-plans suppresses console display to avoid a double EXPLAIN.
+
+        With capture_plans=True and show_query_plans=False the plan is captured
+        into the result bundle but the display call is suppressed (the guard in
+        execute_query), so get_query_plan/EXPLAIN runs once, not twice.
+        """
+        mock_connection = Mock()
+        mock_result = Mock()
+        mock_result.fetchall.return_value = [(1,)]
+        mock_connection.execute.return_value = mock_result
+        mock_duckdb.connect.return_value = mock_connection
+
+        adapter = DuckDBAdapter(show_query_plans=False, capture_plans=True)
+
+        with (
+            patch.object(adapter, "display_query_plan_if_enabled") as mock_display,
+            patch.object(adapter, "capture_query_plan", return_value=(None, 0.0)) as mock_capture,
+        ):
+            result = adapter.execute_query(mock_connection, "SELECT 1", "q1")
+
+        assert result["status"] == "SUCCESS"
+        # Display suppressed while capturing (prevents the double-EXPLAIN path).
+        mock_display.assert_not_called()
+        # Capture runs exactly once.
+        mock_capture.assert_called_once()
+
+    @patch("benchbox.platforms.duckdb.duckdb")
     def test_get_query_plan(self, mock_duckdb):
         """Test query plan retrieval via EXPLAIN (ANALYZE, FORMAT JSON) / EXPLAIN (FORMAT JSON)."""
         mock_connection = Mock()
         mock_duckdb.connect.return_value = mock_connection
 
-        # Default (analyze_plans=True): uses EXPLAIN (ANALYZE, FORMAT JSON)
+        # Default (analyze_plans=False): uses EXPLAIN (FORMAT JSON) - estimated plan only
+        estimated_payload = '{"name": "SEQ_SCAN", "timing": null}'
+        mock_connection.execute.return_value.fetchall.return_value = [("explain_key", estimated_payload)]
+        adapter_default = DuckDBAdapter()
+        plan = adapter_default.get_query_plan(mock_connection, "SELECT * FROM test")
+        assert plan == estimated_payload
+        call_sql = mock_connection.execute.call_args[0][0]
+        assert "ANALYZE" not in call_sql
+        assert "FORMAT JSON" in call_sql
+
+        # analyze_plans=True (opt-in): uses EXPLAIN (ANALYZE, FORMAT JSON)
+        mock_connection.execute.reset_mock()
         json_payload = '{"operator_type": "SEQ_SCAN", "operator_timing": 0.001}'
         mock_connection.execute.return_value.fetchall.return_value = [("explain_key", json_payload)]
-        adapter = DuckDBAdapter()
+        adapter = DuckDBAdapter(analyze_plans=True)
         plan = adapter.get_query_plan(mock_connection, "SELECT * FROM test")
         assert plan == json_payload
         call_sql = mock_connection.execute.call_args[0][0]
         assert "ANALYZE" in call_sql
-        assert "FORMAT JSON" in call_sql
-
-        # analyze_plans=False: uses EXPLAIN (FORMAT JSON) - estimated plan only
-        mock_connection.execute.reset_mock()
-        estimated_payload = '{"name": "SEQ_SCAN", "timing": null}'
-        mock_connection.execute.return_value.fetchall.return_value = [("explain_key", estimated_payload)]
-        adapter_no_analyze = DuckDBAdapter(analyze_plans=False)
-        plan = adapter_no_analyze.get_query_plan(mock_connection, "SELECT * FROM test")
-        assert plan == estimated_payload
-        call_sql = mock_connection.execute.call_args[0][0]
-        assert "ANALYZE" not in call_sql
         assert "FORMAT JSON" in call_sql
 
         # Exception during EXPLAIN → returns None

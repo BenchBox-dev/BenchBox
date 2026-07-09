@@ -66,6 +66,7 @@ docs/site/
 data/
 generated/
 benchmark_runs/
+spark-warehouse/
 *.db
 *.csv
 *.parquet
@@ -138,13 +139,16 @@ _sources/tpc-ds/tools/.ctags*
 _sources/tpc-h/dbgen/dbgen_x86_64
 .mcp.json
 
-# skill-sync materialized skill mirrors (regenerate locally via `make skill-sync`).
-# The manifest (skill-sync.yaml + skill-sync.lock) is tracked; these mirrors are not.
-.claude/skills/
+# skill-sync mirrors (regenerate locally via `make skill-sync`). The `claude`
+# target is a TRACKED snapshot — committed for cloud/CI, managed by the
+# skill-sync block below. codex/gemini/antigravity stay untracked local mirrors.
 .codex/skills/
 .codex/shared-skills/
 .codex/shared-skills.lock.json
 .gemini/skills/
+.antigravity/skills/
+.agents/
+.antigravitycli/
 
 # TODO system infrastructure (added for distributed TODO structure)
 !_project/TODO/
@@ -212,3 +216,10 @@ ci-log.txt
 
 # Node - declared in results-explorer/package.json; never vendor at repo root.
 node_modules/
+
+# >>> skill-sync managed (do not edit) >>>
+/.antigravity/skills/
+/.claude/skills/blog/
+/.codex/skills/
+/.gemini/skills/
+# <<< skill-sync managed <<<

@@ -1,0 +1,73 @@
+tpch_base_counts:
+  region: 5
+  nation: 25
+  customer: 150000
+  supplier: 10000
+  part: 200000
+  partsupp: 800000
+  orders: 1500000
+  lineitem: 6001215
+datavault_row_expectations:
+  hub_region:
+  - region
+  - 1.0
+  hub_nation:
+  - nation
+  - 1.0
+  hub_customer:
+  - customer
+  - 1.0
+  hub_supplier:
+  - supplier
+  - 1.0
+  hub_part:
+  - part
+  - 1.0
+  hub_order:
+  - orders
+  - 1.0
+  hub_lineitem:
+  - lineitem
+  - 1.0
+  link_nation_region:
+  - nation
+  - 1.0
+  link_customer_nation:
+  - customer
+  - 1.0
+  link_supplier_nation:
+  - supplier
+  - 1.0
+  link_part_supplier:
+  - partsupp
+  - 1.0
+  link_order_customer:
+  - orders
+  - 1.0
+  link_lineitem:
+  - lineitem
+  - 1.0
+  sat_region:
+  - region
+  - 1.0
+  sat_nation:
+  - nation
+  - 1.0
+  sat_customer:
+  - customer
+  - 1.0
+  sat_supplier:
+  - supplier
+  - 1.0
+  sat_part:
+  - part
+  - 1.0
+  sat_partsupp:
+  - partsupp
+  - 1.0
+  sat_order:
+  - orders
+  - 1.0
+  sat_lineitem:
+  - lineitem
+  - 1.0

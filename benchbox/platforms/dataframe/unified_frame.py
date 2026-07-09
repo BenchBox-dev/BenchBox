@@ -17,8 +17,12 @@ Key API translations:
 
 DataFusion Compatibility Notes:
     The DataFusion support includes experimental AST parsing for handling
-    aggregate arithmetic expressions. This was tested with DataFusion 43.0.0
-    and may not work with other versions if the error message format changes.
+    aggregate arithmetic expressions. This was originally tested with
+    DataFusion 43.0.0 and re-validated against 53.0.0. If a future DataFusion
+    release changes the underlying error-message format this relies on,
+    `_get_datafusion_ast_string()` now raises `DataFusionASTFormatError`
+    (naming the installed DataFusion version and the unrecognized error
+    text) instead of silently falling back to unchanged-expression behavior.
     See _get_datafusion_ast_string() for details.
 
 Copyright 2026 Joe Harris / BenchBox Project
@@ -51,6 +55,7 @@ Expr = TypeVar("Expr")
 # Maps string type names to PyArrow types for DataFusion casting.
 # Defined at module level to avoid recreation on each cast() call.
 _DATAFUSION_TYPE_MAPPING: dict[str, Any] | None = None
+_NO_LITERAL_VALUE = object()
 
 
 def _get_datafusion_type_mapping() -> dict[str, Any]:
@@ -93,11 +98,11 @@ def _is_polars_expr(expr: Any) -> bool:
     return "polars" in type_name and "Expr" in type(expr).__name__
 
 
-def _is_datafusion_expr(expr: Any) -> bool:
-    """Check if an expression is a DataFusion Expr."""
-    type_name = type(expr).__module__
-    class_name = type(expr).__name__
-    return "datafusion" in type_name and class_name == "Expr"
+def _unwrap_unified_expr(value: Any) -> Any:
+    if isinstance(value, UnifiedExpr):
+        literal_value = getattr(value, "_literal_value", _NO_LITERAL_VALUE)
+        return value._expr if literal_value is _NO_LITERAL_VALUE else literal_value
+    return value
 
 
 class UnifiedStrExpr:
@@ -130,12 +135,14 @@ class UnifiedStrExpr:
         Returns:
             UnifiedExpr with boolean result
         """
+        prefix = _unwrap_unified_expr(prefix)
         if self._is_pyspark:
             return UnifiedExpr(self._expr.startswith(prefix))
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
 
-            return UnifiedExpr(df_f.starts_with(self._expr, df_lit(prefix)))
+            prefix = prefix if _is_datafusion_expr(prefix) else df_lit(prefix)
+            return UnifiedExpr(df_f.starts_with(self._expr, prefix))
         return UnifiedExpr(self._expr.str.starts_with(prefix))
 
     def ends_with(self, suffix: str) -> UnifiedExpr:
@@ -147,12 +154,14 @@ class UnifiedStrExpr:
         Returns:
             UnifiedExpr with boolean result
         """
+        suffix = _unwrap_unified_expr(suffix)
         if self._is_pyspark:
             return UnifiedExpr(self._expr.endswith(suffix))
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
 
-            return UnifiedExpr(df_f.ends_with(self._expr, df_lit(suffix)))
+            suffix = suffix if _is_datafusion_expr(suffix) else df_lit(suffix)
+            return UnifiedExpr(df_f.ends_with(self._expr, suffix))
         return UnifiedExpr(self._expr.str.ends_with(suffix))
 
     def contains(self, pattern: str) -> UnifiedExpr:
@@ -164,6 +173,7 @@ class UnifiedStrExpr:
         Returns:
             UnifiedExpr with boolean result
         """
+        pattern = _unwrap_unified_expr(pattern)
         if self._is_pyspark:
             # PySpark .contains() uses SQL LIKE pattern, but .rlike() uses regex
             # For compatibility with Polars regex, use rlike
@@ -171,8 +181,38 @@ class UnifiedStrExpr:
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
 
-            return UnifiedExpr(df_f.regexp_like(self._expr, df_lit(pattern)))
+            pattern = pattern if _is_datafusion_expr(pattern) else df_lit(pattern)
+            return UnifiedExpr(df_f.regexp_like(self._expr, pattern))
         return UnifiedExpr(self._expr.str.contains(pattern))
+
+    def replace(self, pattern: Any, value: Any) -> UnifiedExpr:
+        """Regex-replace matches of ``pattern`` with ``value`` (capture groups via ``$1``).
+
+        Mirrors SQL ``REGEXP_REPLACE``. ``pattern``/``value`` may be plain strings or
+        wrapped literal expressions. Polars replaces only the first match; for the
+        anchored whole-string patterns this is used for that is equivalent to a full
+        replace.
+
+        Args:
+            pattern: Regex pattern to match.
+            value: Replacement string (may reference capture groups, e.g. ``$1``).
+
+        Returns:
+            UnifiedExpr with the replaced string.
+        """
+        pattern = _unwrap_unified_expr(pattern)
+        value = _unwrap_unified_expr(value)
+        if self._is_pyspark:
+            from pyspark.sql.functions import regexp_replace
+
+            return UnifiedExpr(regexp_replace(self._expr, pattern, value))
+        if self._is_datafusion:
+            from datafusion import functions as df_f, lit as df_lit
+
+            pattern = pattern if _is_datafusion_expr(pattern) else df_lit(pattern)
+            value = value if _is_datafusion_expr(value) else df_lit(value)
+            return UnifiedExpr(df_f.regexp_replace(self._expr, pattern, value))
+        return UnifiedExpr(self._expr.str.replace(pattern, value))
 
     def slice(self, offset: int, length: int | None = None) -> UnifiedExpr:
         """Extract substring.
@@ -230,6 +270,7 @@ class UnifiedStrExpr:
         Returns:
             UnifiedListExpr wrapping the resulting list-typed expression
         """
+        separator = _unwrap_unified_expr(separator)
         if self._is_pyspark:
             from pyspark.sql import functions as F  # noqa: N812
 
@@ -323,6 +364,14 @@ class UnifiedListExpr:
         # Polars: .implode() collects into a list in agg context
         return UnifiedExpr(self._expr.implode())
 
+    def _wrap(self, expr: Any) -> UnifiedListExpr:
+        return UnifiedListExpr(
+            expr,
+            is_pyspark=self._is_pyspark,
+            is_datafusion=self._is_datafusion,
+            is_polars=self._is_polars,
+        )
+
     def contains(self, value: Any) -> UnifiedExpr:
         """Check if list contains a value.
 
@@ -350,12 +399,12 @@ class UnifiedListExpr:
         if self._is_pyspark:
             from pyspark.sql import functions as F  # noqa: N812
 
-            return UnifiedListExpr(F.array_distinct(self._expr), is_pyspark=True)
+            return self._wrap(F.array_distinct(self._expr))
         if self._is_datafusion:
             from datafusion import functions as df_f
 
-            return UnifiedListExpr(df_f.array_distinct(self._expr), is_datafusion=True)
-        return UnifiedListExpr(self._expr.list.unique(), is_polars=True)
+            return self._wrap(df_f.array_distinct(self._expr))
+        return self._wrap(self._expr.list.unique())
 
     def len(self) -> UnifiedExpr:
         """Get list length.
@@ -415,12 +464,12 @@ class UnifiedListExpr:
         if self._is_pyspark:
             from pyspark.sql import functions as F  # noqa: N812
 
-            return UnifiedListExpr(F.sort_array(self._expr, asc=not descending), is_pyspark=True)
+            return self._wrap(F.sort_array(self._expr, asc=not descending))
         if self._is_datafusion:
             from datafusion import functions as df_f
 
-            return UnifiedListExpr(df_f.array_sort(self._expr), is_datafusion=True)
-        return UnifiedListExpr(self._expr.list.sort(descending=descending), is_polars=True)
+            return self._wrap(df_f.array_sort(self._expr))
+        return self._wrap(self._expr.list.sort(descending=descending))
 
     def slice(self, offset: int, length: int) -> UnifiedListExpr:
         """Get a slice of the list.
@@ -436,13 +485,13 @@ class UnifiedListExpr:
             from pyspark.sql import functions as F  # noqa: N812
 
             # PySpark slice is 1-indexed
-            return UnifiedListExpr(F.slice(self._expr, offset + 1, length), is_pyspark=True)
+            return self._wrap(F.slice(self._expr, offset + 1, length))
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
 
             # DataFusion array_slice is 1-indexed
-            return UnifiedListExpr(df_f.array_slice(self._expr, df_lit(offset + 1), df_lit(length)), is_datafusion=True)
-        return UnifiedListExpr(self._expr.list.slice(offset, length), is_polars=True)
+            return self._wrap(df_f.array_slice(self._expr, df_lit(offset + 1), df_lit(length)))
+        return self._wrap(self._expr.list.slice(offset, length))
 
     def sum(self) -> UnifiedExpr:
         """Sum all elements in the list."""
@@ -487,7 +536,7 @@ class UnifiedListExpr:
         """
         native_expr = expr._expr if isinstance(expr, UnifiedExpr) else expr
         if self._is_polars:
-            return UnifiedListExpr(self._expr.list.eval(native_expr), is_polars=True)
+            return self._wrap(self._expr.list.eval(native_expr))
         raise NotImplementedError("list.eval() is only supported on Polars")
 
     @property
@@ -505,10 +554,6 @@ class UnifiedListExpr:
         Args:
             name: New column name
         """
-        if self._is_pyspark:
-            return UnifiedExpr(self._expr.alias(name))
-        if self._is_datafusion:
-            return UnifiedExpr(self._expr.alias(name))
         return UnifiedExpr(self._expr.alias(name))
 
 
@@ -741,13 +786,20 @@ class UnifiedExpr:
       runtime branches via isinstance / getattr.
     """
 
-    def __init__(self, expr: Any, *, _is_string_literal: bool = False) -> None:
+    def __init__(
+        self,
+        expr: Any,
+        *,
+        _is_string_literal: bool = False,
+        _literal_value: Any = _NO_LITERAL_VALUE,
+    ) -> None:
         """Initialize the expression wrapper.
 
         Args:
             expr: Native expression (PySpark Column, Polars Expr, or DataFusion Expr)
             _is_string_literal: Internal flag indicating this is a string literal
                                (used for PySpark string concatenation detection)
+            _literal_value: Optional scalar value behind a backend literal expression.
 
         `expr: Any` is the same escape-hatch documented on `.native`: the
         honest type is the union of every backend's expression class plus
@@ -759,6 +811,7 @@ class UnifiedExpr:
         self._is_pyspark = _is_pyspark_column(expr)
         self._is_datafusion = _is_datafusion_expr(expr)
         self._is_string_literal = _is_string_literal
+        self._literal_value = _literal_value
 
     @property
     def native(self) -> Any:
@@ -775,6 +828,10 @@ class UnifiedExpr:
 
     def __repr__(self) -> str:
         return f"UnifiedExpr({self._expr})"
+
+    @staticmethod
+    def _unwrap(other: Any) -> Any:
+        return other._expr if isinstance(other, UnifiedExpr) else other
 
     # =========================================================================
     # Arithmetic Operations
@@ -898,23 +955,19 @@ class UnifiedExpr:
         return UnifiedExpr(other_expr + self._expr)
 
     def __sub__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr - other_expr)
+        return UnifiedExpr(self._expr - self._unwrap(other))
 
     def __rsub__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(other_expr - self._expr)
+        return UnifiedExpr(self._unwrap(other) - self._expr)
 
     def __mul__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr * other_expr)
+        return UnifiedExpr(self._expr * self._unwrap(other))
 
     def __rmul__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(other_expr * self._expr)
+        return UnifiedExpr(self._unwrap(other) * self._expr)
 
     def __truediv__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
+        other_expr = self._unwrap(other)
         # DataFusion: use nullif to prevent DivideByZero errors
         # dividend / nullif(divisor, 0) returns NULL when divisor is 0
         if self._is_datafusion:
@@ -930,7 +983,7 @@ class UnifiedExpr:
         return UnifiedExpr(self._expr / other_expr)
 
     def __rtruediv__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
+        other_expr = self._unwrap(other)
         # DataFusion: use nullif to prevent DivideByZero errors
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
@@ -953,24 +1006,19 @@ class UnifiedExpr:
         return result
 
     def __ne__(self, other: Any) -> UnifiedExpr:  # type: ignore[override]
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr != other_expr)
+        return UnifiedExpr(self._expr != self._unwrap(other))
 
     def __lt__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr < other_expr)
+        return UnifiedExpr(self._expr < self._unwrap(other))
 
     def __le__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr <= other_expr)
+        return UnifiedExpr(self._expr <= self._unwrap(other))
 
     def __gt__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr > other_expr)
+        return UnifiedExpr(self._expr > self._unwrap(other))
 
     def __ge__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr >= other_expr)
+        return UnifiedExpr(self._expr >= self._unwrap(other))
 
     def __and__(self, other: Any) -> UnifiedExpr:
         """Logical/bitwise AND operator.
@@ -981,7 +1029,7 @@ class UnifiedExpr:
         In DataFusion, & is only for boolean logical AND, not bitwise operations.
         For integer columns with power-of-2 masks, we use modulo arithmetic.
         """
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
+        other_expr = self._unwrap(other)
 
         if self._is_pyspark and isinstance(other, int):
             # PySpark's & operator only works for boolean columns, not integers
@@ -1015,8 +1063,7 @@ class UnifiedExpr:
         return UnifiedExpr(self._expr & other_expr)
 
     def __or__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr | other_expr)
+        return UnifiedExpr(self._expr | self._unwrap(other))
 
     def __invert__(self) -> UnifiedExpr:
         return UnifiedExpr(~self._expr)
@@ -1083,11 +1130,19 @@ class UnifiedExpr:
         """Variance aggregation."""
         return self._apply_aggregation("variance", "var_samp", "var")
 
-    def quantile(self, q: float) -> UnifiedExpr:
+    def quantile(self, q: float, interpolation: str = "nearest") -> UnifiedExpr:
         """Quantile/percentile aggregation.
 
         Args:
             q: Quantile value between 0 and 1 (e.g., 0.5 for median, 0.9 for p90)
+            interpolation: How to interpolate when ``q`` falls between two ranks.
+                Polars defaults to ``"nearest"``; pass ``"linear"`` to compute the
+                continuous percentile that SQL ``PERCENTILE_CONT`` and pandas
+                ``Series.quantile`` (whose own default is linear) produce, so the
+                two DataFrame backends agree with each other and with SQL. The
+                default is left at ``"nearest"`` so existing callers are unchanged.
+                The PySpark/DataFusion branches use their engine's approximate
+                percentile and ignore this argument.
 
         Returns:
             UnifiedExpr with the quantile value
@@ -1100,7 +1155,7 @@ class UnifiedExpr:
             from datafusion import functions as df_f
 
             return UnifiedExpr(df_f.approx_percentile_cont(self._expr, q))
-        return UnifiedExpr(self._expr.quantile(q))
+        return UnifiedExpr(self._expr.quantile(q, interpolation=interpolation))
 
     # =========================================================================
     # Naming Methods
@@ -1277,6 +1332,32 @@ class UnifiedExpr:
         import polars as pl
 
         return UnifiedExpr(self._expr.cast(pl.Utf8))
+
+    def cast_date(self) -> UnifiedExpr:
+        """Cast to a Date type.
+
+        Provides unified date casting so queries can coerce a column to a date
+        regardless of whether it was loaded as a temporal type (Parquet/date32 -
+        a no-op) or as an ISO ``YYYY-MM-DD`` string (raw-CSV path):
+        - Polars: Uses .cast(pl.Date)
+        - PySpark: Uses .cast(DateType())
+        - DataFusion: Uses .cast(pa.date32())
+
+        Returns:
+            UnifiedExpr with date values
+        """
+        if self._is_pyspark:
+            from pyspark.sql.types import DateType
+
+            return UnifiedExpr(self._expr.cast(DateType()))
+        if self._is_datafusion:
+            import pyarrow as pa
+
+            return UnifiedExpr(self._expr.cast(pa.date32()))
+
+        import polars as pl
+
+        return UnifiedExpr(self._expr.cast(pl.Date))
 
     def cast_int32(self) -> UnifiedExpr:
         """Cast to Int32/IntegerType.
@@ -1735,16 +1816,23 @@ class UnifiedExpr:
     def desc(self) -> UnifiedExpr:
         """Mark expression for descending sort order.
 
-        Returns a sort-marked expression that UnifiedLazyFrame.sort() can interpret.
-        - Polars: Uses sort_by with descending=True
-        - DataFusion: Uses expr.sort(ascending=False)
+        Returns a sort-marked expression that ``UnifiedLazyFrame.sort()`` interprets
+        as "sort by this column descending".
+        - DataFusion / PySpark: their native expr.sort(ascending=False) / .desc()
+          markers are consumed by the per-backend sort builders.
+        - Polars: carry a ``_sort_descending`` marker on the PLAIN column expression.
+          The previous implementation returned ``expr.sort(descending=True)`` - a
+          value-reordering expression, NOT a sort key - so the column was sorted
+          ASCENDING by that derived value (i.e. the descending intent was lost).
+          ``_normalize_sort_inputs`` reads the marker and flips the per-column flag.
         """
         if self._is_datafusion:
             return UnifiedExpr(self._expr.sort(ascending=False, nulls_first=False))
         elif self._is_pyspark:
             return UnifiedExpr(self._expr.desc())
-        # Polars: return expr with descending flag via sort_by
-        return UnifiedExpr(self._expr.sort(descending=True))
+        marked = UnifiedExpr(self._expr)
+        marked._sort_descending = True
+        return marked
 
     # =========================================================================
     # Namespace Accessors
@@ -2218,12 +2306,54 @@ def _is_datafusion_expr(expr: Any) -> bool:
 # arithmetic and apply it after the aggregation.
 #
 # WARNING: This implementation uses error message parsing to extract AST
-# information, which is inherently fragile. Tested with DataFusion 43.0.0.
-# Future DataFusion versions may change error message formats.
+# information, which is inherently fragile. Originally tested with
+# DataFusion 43.0.0; re-validated against 53.0.0 as of the
+# unified-frame-error-parsing-hardening.yaml TODO (the pinned/installed
+# version has drifted well past 43.0.0, but the error format below is
+# unchanged as of 53.0.0).
 #
-# If AST extraction fails, the functions gracefully fall back to passing
-# expressions through unchanged (which may cause DataFusion errors for
-# unsupported aggregate arithmetic patterns).
+# `_get_datafusion_ast_string()` distinguishes two failure modes instead of
+# silently returning None for both:
+#   1. The expression's AST doesn't contain an Alias/BinaryExpr/
+#      AggregateFunction node (e.g. a plain Column, Literal, or unaliased
+#      aggregate) - this is a genuinely different expression shape that this
+#      module's aggregate-arithmetic extraction doesn't apply to. Falls back
+#      to passing the expression through unchanged, exactly as before.
+#   2. `rex_call_operator()`'s error text no longer even matches the
+#      "Catch all triggered in get_operator_name: <ast>" wrapper format this
+#      module depends on - this means the underlying error-message mechanism
+#      itself changed (not just the AST it happens to embed), which is the
+#      actual fragile-dependency risk the module docstring warns about.
+#      Raises DataFusionASTFormatError loudly instead of silently degrading.
+
+
+class DataFusionASTFormatError(RuntimeError):
+    """DataFusion's rex_call_operator() error text no longer matches the
+    "Catch all triggered in get_operator_name: <ast>" format this module
+    depends on to extract AST information for aggregate-arithmetic support.
+
+    This means a DataFusion release changed the underlying error-message
+    mechanism this module relies on (not merely the specific AST node it
+    happens to embed - see _DATAFUSION_AST_SANITY_KEYWORDS for that case,
+    which is handled separately and does not raise). Fix by re-validating
+    the current error format (see w0 in
+    unified-frame-error-parsing-hardening.yaml) and updating
+    _DATAFUSION_AST_ERROR_PREFIX / the AST-extraction regexes below to match.
+    """
+
+
+# The stable wrapper text DataFusion's rex_call_operator() uses to embed a
+# Rust Debug-formatted AST dump in its error message, regardless of the
+# wrapped expression's own node type (Column, Literal, Alias, BinaryExpr,
+# AggregateFunction, ...). Confirmed present for Column/Literal/
+# AggregateFunction/Alias(BinaryExpr(...)) shapes as of DataFusion 53.0.0.
+_DATAFUSION_AST_ERROR_PREFIX = "Catch all triggered in get_operator_name"
+
+# Node-type keywords that indicate this expression is the
+# Alias(BinaryExpr(...AggregateFunction...)) shape this module's arithmetic
+# extraction cares about, as opposed to some other expression shape that
+# legitimately doesn't need arithmetic extraction.
+_DATAFUSION_AST_SANITY_KEYWORDS = ("Alias", "BinaryExpr", "AggregateFunction")
 
 
 def _get_datafusion_ast_string(expr: DataFusionExpr) -> str | None:
@@ -2233,15 +2363,31 @@ def _get_datafusion_ast_string(expr: DataFusionExpr) -> str | None:
     DataFusion's rex_call_operator() method to extract AST information.
     This is fragile and may break with DataFusion version changes.
 
-    Tested with: DataFusion 43.0.0
+    Tested with: DataFusion 43.0.0 and 53.0.0.
     Expected error message format: "Catch all triggered in get_operator_name: Alias(BinaryExpr...)"
 
     Args:
         expr: A DataFusion expression
 
     Returns:
-        The AST string representation, or None if extraction failed
+        The AST string representation, or None if this expression's AST
+        doesn't contain an Alias/BinaryExpr/AggregateFunction node (a
+        genuinely different, unrelated expression shape - not an error).
+
+    Raises:
+        DataFusionASTFormatError: If DataFusion raised an error but its text
+            no longer matches the expected catch-all AST-dump wrapper format
+            at all, indicating the underlying mechanism this function
+            depends on has changed upstream.
     """
+    if not hasattr(expr, "rex_call_operator"):
+        # Not a real DataFusion Expr at all (e.g. a plain column-name string
+        # mixed into the same select()/agg() call as an aggregate
+        # expression) - this is a type mismatch in the caller's input, not a
+        # DataFusion error-format question, so it is definitely not the
+        # Alias/BinaryExpr/AggregateFunction pattern this caller looks for.
+        return None
+
     try:
         # rex_call_operator throws an error for Alias expressions,
         # but the error message contains the full AST
@@ -2251,10 +2397,34 @@ def _get_datafusion_ast_string(expr: DataFusionExpr) -> str | None:
         # The error message contains the AST like:
         # "Catch all triggered in get_operator_name: Alias(BinaryExpr...)"
         error_str = str(e)
-        # Verify we got the expected format (basic sanity check)
-        if "Alias" in error_str or "BinaryExpr" in error_str or "AggregateFunction" in error_str:
+
+        if _DATAFUSION_AST_ERROR_PREFIX not in error_str:
+            # The catch-all AST-dump wrapper itself is gone/changed - the
+            # mechanism this module depends on has broken upstream. This is
+            # the actual format-drift risk flagged in the module docstring;
+            # fail loudly and attributably rather than silently falling back
+            # to unchanged-expression behavior.
+            import datafusion
+
+            installed_version = getattr(datafusion, "__version__", "unknown")
+            raise DataFusionASTFormatError(
+                "DataFusion's rex_call_operator() error format has changed and no "
+                f"longer contains the expected '{_DATAFUSION_AST_ERROR_PREFIX}' "
+                "wrapper text that benchbox's aggregate-arithmetic AST extraction "
+                f"depends on. Installed DataFusion version: {installed_version}. "
+                f"Unrecognized error text: {error_str!r}"
+            ) from e
+
+        # Verify we got the expected format (basic sanity check): does this
+        # expression's own AST contain the Alias/BinaryExpr/AggregateFunction
+        # shape this caller is looking for?
+        if any(keyword in error_str for keyword in _DATAFUSION_AST_SANITY_KEYWORDS):
             return error_str
-        # Unexpected format - return None to trigger graceful fallback
+
+        # The catch-all wrapper is intact, but this expression is a
+        # genuinely different, unrelated shape (e.g. a plain Column, Literal,
+        # or unaliased aggregate) - not a format break. Return None so the
+        # caller falls back to passing the expression through unchanged.
         return None
 
 
@@ -2782,6 +2952,13 @@ def _normalize_sort_inputs(
         desc_flags = list(descending)
         if len(desc_flags) < len(cols):
             desc_flags.extend([False] * (len(cols) - len(desc_flags)))
+
+    # Honor per-column descending markers from UnifiedExpr.desc() (the
+    # `.sort(col_a, col_b.desc())` calling style) - the marker takes precedence
+    # over the (default ascending) `descending` flag for that column.
+    for i, c in enumerate(cols):
+        if getattr(c, "_sort_descending", False):
+            desc_flags[i] = True
     return cols, desc_flags
 
 
@@ -3274,9 +3451,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         # The right_expr.native gives us the computed PySpark Column
         condition = self._df[left_col] == right_expr.native
 
-        result = self._df.join(renamed_other, condition, spark_how)
-
-        return result
+        return self._df.join(renamed_other, condition, spark_how)
 
     def _pyspark_join_multi_expr(
         self,
@@ -3360,9 +3535,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         for cond in conditions[1:]:
             combined_condition = combined_condition & cond
 
-        result = self._df.join(renamed_other, combined_condition, spark_how)
-
-        return result
+        return self._df.join(renamed_other, combined_condition, spark_how)
 
     def _polars_join_with_exprs(
         self,
@@ -3889,6 +4062,32 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
     def head(self, n: int = 10) -> UnifiedLazyFrame:
         """Get first n rows (alias for limit)."""
         return self.limit(n)
+
+    def slice(self, offset: int, length: int | None = None) -> UnifiedLazyFrame:
+        """Return ``length`` rows starting at ``offset`` (SQL ``LIMIT length OFFSET offset``).
+
+        Args:
+            offset: Zero-based start row.
+            length: Number of rows to return; ``None`` means all rows from ``offset``.
+
+        Returns:
+            UnifiedLazyFrame with the sliced rows.
+        """
+        if _is_polars_df(self._df):
+            result = self._df.slice(offset, length)
+        elif _is_datafusion_df(self._df):
+            # DataFusion has no .slice(); it offsets via limit(count, offset=).
+            if length is None:
+                raise NotImplementedError("UnifiedLazyFrame.slice without a length is not supported for DataFusion")
+            result = self._df.limit(length, offset=offset)
+        elif _is_pyspark_df(self._df):
+            # PySpark has no native offset slice (it would need a row_number window);
+            # not exercised by the current cross-surface gates.
+            raise NotImplementedError("UnifiedLazyFrame.slice is not implemented for PySpark")
+        else:
+            # Fallback: rely on a native polars-style slice if present.
+            result = self._df.slice(offset, length)
+        return UnifiedLazyFrame(result, self._adapter)
 
     # =========================================================================
     # Rename Operations

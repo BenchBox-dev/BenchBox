@@ -1,58 +1,22 @@
-"""H2O DB benchmark schema definitions.
+"""H2O DB benchmark schema definitions."""
 
-The H2O DB benchmark is designed to test analytical database performance
-using taxi trip data. It consists of a single large table with trip records
-and a set of analytical queries.
+from pathlib import Path
+from typing import Any, cast
 
-The benchmark is based on the NYC Taxi & Limousine Commission Trip Record Data
-and tests various aspects of analytical query performance including:
-- Aggregations
-- Grouping
-- Joins
-- Window functions
-- String operations
+import yaml
 
-For more information, see:
-- https://h2oai.github.io/db-benchmark/
 
-Copyright 2026 Joe Harris / BenchBox Project
+def _load_schema_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("schema_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
 
-from typing import cast
+_SCHEMA_SPECS = _load_schema_specs()
+_TABLE_DEFS = {entry["id"]: entry for entry in _SCHEMA_SPECS["tables"]}
+globals().update({symbol: entry["schema"] for symbol, entry in _TABLE_DEFS.items()})
 
-# Main trips table - based on NYC taxi data structure
-TRIPS = {
-    "name": "trips",
-    "columns": [
-        {"name": "vendor_id", "type": "INTEGER"},
-        {"name": "pickup_datetime", "type": "TIMESTAMP"},
-        {"name": "dropoff_datetime", "type": "TIMESTAMP"},
-        {"name": "passenger_count", "type": "INTEGER"},
-        {"name": "trip_distance", "type": "DECIMAL(8,2)"},
-        {"name": "pickup_longitude", "type": "DECIMAL(18,14)"},
-        {"name": "pickup_latitude", "type": "DECIMAL(18,14)"},
-        {"name": "rate_code_id", "type": "INTEGER"},
-        {"name": "store_and_fwd_flag", "type": "VARCHAR(1)"},
-        {"name": "dropoff_longitude", "type": "DECIMAL(18,14)"},
-        {"name": "dropoff_latitude", "type": "DECIMAL(18,14)"},
-        {"name": "payment_type", "type": "INTEGER"},
-        {"name": "fare_amount", "type": "DECIMAL(8,2)"},
-        {"name": "extra", "type": "DECIMAL(8,2)"},
-        {"name": "mta_tax", "type": "DECIMAL(8,2)"},
-        {"name": "tip_amount", "type": "DECIMAL(8,2)"},
-        {"name": "tolls_amount", "type": "DECIMAL(8,2)"},
-        {"name": "improvement_surcharge", "type": "DECIMAL(8,2)"},
-        {"name": "total_amount", "type": "DECIMAL(8,2)"},
-        {"name": "pickup_location_id", "type": "INTEGER"},
-        {"name": "dropoff_location_id", "type": "INTEGER"},
-        {"name": "congestion_surcharge", "type": "DECIMAL(8,2)"},
-    ],
-}
-
-# All tables in the H2O DB schema (just one table)
-TABLES = {"trips": TRIPS}
+TABLES: dict[str, dict] = {entry["key"]: globals()[symbol] for symbol, entry in _TABLE_DEFS.items()}
+_TABLE_ORDER = list(_SCHEMA_SPECS["table_order"])
 
 
 def get_create_table_sql(
@@ -110,7 +74,7 @@ def get_all_create_table_sql(
         Complete SQL schema creation script
     """
     sql_statements = []
-    for table_name in TABLES:
+    for table_name in _TABLE_ORDER:
         sql_statements.append(get_create_table_sql(table_name, dialect, enable_primary_keys, enable_foreign_keys))
 
     return "\n\n".join(sql_statements)

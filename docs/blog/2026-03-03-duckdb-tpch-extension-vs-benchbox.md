@@ -55,16 +55,16 @@ CALL dbgen(sf=1);
 PRAGMA tpch(1);
 ```
 
-The `tpch` extension documentation highlights several practical features ([DuckDB TPC-H extension docs](https://duckdb.org/docs/stable/core_extensions/tpch.html)):
+The `tpch` extension documentation highlights several practical features ([DuckDB TPC-H extension docs](https://duckdb.org/docs/stable/core_extensions/tpch)):
 
 - `CALL dbgen(sf=<value>)` handles TPC-H data generation in-engine.
 - `sf=0` creates schema without generating data.
 - `children` and `step` allow chunked and parallelized data-generation control.
 - Existing tables are not dropped automatically during regeneration.
 
-For query execution, `PRAGMA tpch(query_id)` provides direct query access with predefined bind behavior ([DuckDB TPC-H extension docs](https://duckdb.org/docs/stable/core_extensions/tpch.html), [DuckDB benchmarking guide](https://duckdb.org/docs/stable/guides/performance/benchmarks)).
+For query execution, `PRAGMA tpch(query_id)` provides direct query access with predefined bind behavior ([DuckDB TPC-H extension docs](https://duckdb.org/docs/stable/core_extensions/tpch), [DuckDB benchmarking guide](https://duckdb.org/docs/stable/guides/performance/benchmarks)).
 
-DuckDB also exposes `tpch_answers()`, with documented expected answers currently for SF 0.01, 0.1, and 1 ([DuckDB TPC-H extension docs](https://duckdb.org/docs/stable/core_extensions/tpch.html)).
+DuckDB also exposes `tpch_answers()`, with documented expected answers currently for SF 0.01, 0.1, and 1 ([DuckDB TPC-H extension docs](https://duckdb.org/docs/stable/core_extensions/tpch)).
 
 Why this path is strong:
 
@@ -79,7 +79,7 @@ Where this path is narrower:
 - DuckDB's `tpch` extension does not support RF1/RF2 maintenance operations (the TPC-H insert and delete refresh functions that simulate ongoing data maintenance).
 - Workflow metadata and artifact structure are not the primary interface.
 
-Maintenance support note: the documented extension API covers `tpch` (pragma), `tpch_queries`, and `tpch_answers`, with no RF1/RF2 maintenance entry points ([DuckDB TPC-H extension docs](https://duckdb.org/docs/stable/core_extensions/tpch.html)).
+Maintenance support note: the documented extension API covers `tpch` (pragma), `tpch_queries`, and `tpch_answers`, with no RF1/RF2 maintenance entry points ([DuckDB TPC-H extension docs](https://duckdb.org/docs/stable/core_extensions/tpch)).
 
 ## BenchBox TPC-H mode
 
@@ -320,7 +320,7 @@ We built BenchBox to make workflow guarantees explicit. We would love to hear ho
 
 ## References
 
-1. [DuckDB TPC-H extension docs](https://duckdb.org/docs/stable/core_extensions/tpch.html)
+1. [DuckDB TPC-H extension docs](https://duckdb.org/docs/stable/core_extensions/tpch)
 2. [DuckDB benchmarking guide](https://duckdb.org/docs/stable/guides/performance/benchmarks)
 3. [BenchBox TPC-H benchmark core](https://github.com/joeharris76/BenchBox/blob/main/benchbox/core/tpch/benchmark.py)
 4. [BenchBox TPC-H generator](https://github.com/joeharris76/BenchBox/blob/main/benchbox/core/tpch/generator.py)

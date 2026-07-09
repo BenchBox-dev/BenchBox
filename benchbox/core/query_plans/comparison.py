@@ -16,8 +16,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from benchbox.core.results.loader import iter_query_results
 from benchbox.core.results.query_plan_models import (
     LogicalOperator,
+    LogicalOperatorType,
     QueryPlanDAG,
     get_join_type_str,
     get_operator_type_str,
@@ -25,6 +27,184 @@ from benchbox.core.results.query_plan_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Cross-engine operator-shape harmonization (wrapper-stripped structural backbone)
+# ---------------------------------------------------------------------------
+#
+# The raw plan_fingerprint is a PER-ENGINE within-version key and is deliberately
+# NOT comparable across engines (see the stability contract in
+# query_plan_models.py): engines emit different wrapper/exchange/codegen operators
+# and harmonize names differently (ClickHouse Expression -> Project, Presto Output
+# -> Project, Spark Exchange -> Other), so the same logical query hashes differently
+# on each engine.
+#
+# This projection provides the SEPARATE, opt-in cross-engine operator-shape view:
+# it reduces a harmonized DAG to its structural backbone — the relational skeleton
+# of base scans, joins, aggregates and set operations — by
+#   1. dropping engine-variable wrapper nodes (Project/Filter/CTE/Subquery/Other),
+#      which carry no cross-engine-stable structural meaning, and
+#   2. collapsing a parent->child run of the SAME backbone type into one node, so a
+#      partial+final aggregate (Spark/Databend) or a multi-stage sort (Doris) counts
+#      once — the single logical operation it represents.
+#
+# The result is a multiset of backbone operator types that can be harmonized across
+# engines for the same logical query. It is intentionally weaker than plan
+# equivalence: it ignores table identity, predicates, join conditions and most
+# physical operators. It is kept separate from the raw fingerprint, which remains
+# unchanged for within-engine regression detection.
+
+# Operator types that form the cross-engine structural backbone. Everything else
+# (Project / Filter / CTE / Subquery / Other) is treated as engine-variable wrapper
+# noise and dropped from the comparable subset.
+BACKBONE_OPERATOR_TYPES: frozenset[str] = frozenset(
+    {
+        LogicalOperatorType.SCAN.value,
+        LogicalOperatorType.JOIN.value,
+        LogicalOperatorType.AGGREGATE.value,
+        LogicalOperatorType.SORT.value,
+        LogicalOperatorType.LIMIT.value,
+        LogicalOperatorType.UNION.value,
+        LogicalOperatorType.INTERSECT.value,
+        LogicalOperatorType.EXCEPT.value,
+        LogicalOperatorType.WINDOW.value,
+    }
+)
+
+# Backbone operators that engines split into a parent->child run of the SAME type as
+# stages of ONE logical operation: a partial+final aggregate (Spark/Databend) or a
+# multi-stage / merge sort (Doris). Only these collapse. JOIN, SCAN and the set
+# operators are NOT collapsed: a parent Join over a child Join is a multi-table join
+# (two distinct joins), and a Scan over a Scan is two distinct base scans — collapsing
+# those would undercount the relational skeleton the projection exists to measure.
+COLLAPSIBLE_OPERATOR_TYPES: frozenset[str] = frozenset(
+    {
+        LogicalOperatorType.AGGREGATE.value,
+        LogicalOperatorType.SORT.value,
+    }
+)
+
+# Dropped wrapper types that are pure physical pass-throughs (exchanges, repartitions
+# and codegen stages, all harmonized to ``Other``). A collapsible backbone run separated
+# only by these still collapses — ``Aggregate -> Exchange -> Aggregate`` is the partial+
+# final stages of ONE aggregate. Every other dropped wrapper (Filter/Project/Subquery/CTE)
+# is a real relational boundary and is NOT transparent: it resets the collapse context so
+# separate aggregations/sorts on either side (e.g. a grouped subquery filtered before an
+# outer aggregate, ``Aggregate -> Filter -> Aggregate``) are counted as two operators.
+TRANSPARENT_WRAPPER_TYPES: frozenset[str] = frozenset(
+    {
+        LogicalOperatorType.OTHER.value,
+    }
+)
+
+
+def _backbone_type(node: LogicalOperator) -> str | None:
+    """Return the backbone operator-type string for a node, or None if it is wrapper noise."""
+    type_str = get_operator_type_str(node.operator_type, warn_unknown=False)
+    return type_str if type_str in BACKBONE_OPERATOR_TYPES else None
+
+
+def structural_backbone_counts(
+    root: LogicalOperator,
+    *,
+    only: set[str] | frozenset[str] | None = None,
+) -> dict[str, int]:
+    """Reduce a harmonized DAG to a cross-engine operator-shape multiset.
+
+    Wrapper/engine-variable nodes (Project/Filter/CTE/Subquery/Other) are dropped. A
+    parent->child run of the same *collapsible* backbone type
+    (``COLLAPSIBLE_OPERATOR_TYPES`` — aggregate, sort) is collapsed to a single node,
+    so a partial+final aggregate or a multi-stage sort counts once. The collapse looks
+    through transparent physical wrappers (exchanges), so ``Aggregate -> Exchange ->
+    Aggregate`` still counts as one aggregate, but a semantic boundary resets it, so
+    ``Aggregate -> Filter -> Aggregate`` correctly counts two. Non-collapsible backbone
+    operators (joins, scans, set
+    operators) are always counted per node, so a left-deep 3-table join correctly
+    reports two joins.
+
+    Args:
+        root: Root of the harmonized logical operator tree.
+        only: Optional set of backbone operator-type strings to restrict the result to
+            (keys not present are reported as 0). Use to compare a declared invariant
+            subset (e.g. {"Scan", "Join", "Aggregate"}) across engines. This is an
+            operator-shape harmonization check, not plan equivalence. Must be
+            non-empty when provided.
+
+    Returns:
+        Mapping of backbone operator-type string -> count.
+    """
+    if only is not None and not only:
+        raise ValueError("`only` must be a non-empty set of operator types, or None to include all")
+
+    counts: dict[str, int] = {}
+
+    def walk(node: LogicalOperator, collapsing_type: str | None) -> None:
+        backbone = _backbone_type(node)
+        if backbone is None:
+            # Wrapper node: drop it. Keep the collapse context only through transparent
+            # physical pass-throughs (exchanges harmonized to ``Other``) so a partial+
+            # final aggregate still collapses; reset it through semantic relational
+            # boundaries (Filter/Project/Subquery/CTE) so separate aggregations/sorts on
+            # either side are counted independently.
+            wrapper_type = get_operator_type_str(node.operator_type, warn_unknown=False)
+            child_collapsing = collapsing_type if wrapper_type in TRANSPARENT_WRAPPER_TYPES else None
+            for child in node.children:
+                walk(child, child_collapsing)
+            return
+        # Count the node unless it continues a collapsible same-type run.
+        if not (backbone in COLLAPSIBLE_OPERATOR_TYPES and backbone == collapsing_type):
+            counts[backbone] = counts.get(backbone, 0) + 1
+        # Only propagate a collapse context for collapsible types; otherwise reset it so
+        # an unrelated descendant of the same type is still counted.
+        next_collapsing = backbone if backbone in COLLAPSIBLE_OPERATOR_TYPES else None
+        for child in node.children:
+            walk(child, next_collapsing)
+
+    walk(root, None)
+
+    if only is not None:
+        return {key: counts.get(key, 0) for key in only}
+    return counts
+
+
+def comparable_subset_signature(
+    root: LogicalOperator,
+    *,
+    only: set[str] | frozenset[str] | None = None,
+) -> str:
+    """Deterministic string signature of the cross-engine operator-shape backbone.
+
+    Unlike ``QueryPlanDAG.plan_fingerprint`` (per-engine, not cross-engine comparable),
+    this signature can align across engines for the same logical query because it is
+    built from the wrapper-stripped, collapsed backbone. Two plans from different
+    engines that share a signature have the same backbone operator-shape multiset;
+    that does not prove table/predicate/condition equivalence.
+
+    Args:
+        root: Root of the harmonized logical operator tree.
+        only: Optional restriction set (see ``structural_backbone_counts``).
+
+    Returns:
+        Signature like ``"Aggregate:1|Join:1|Scan:2"`` (sorted by operator type).
+    """
+    counts = structural_backbone_counts(root, only=only)
+    return "|".join(f"{op_type}:{counts[op_type]}" for op_type in sorted(counts))
+
+
+def structural_backbones_match(
+    left: LogicalOperator,
+    right: LogicalOperator,
+    *,
+    only: set[str] | frozenset[str] | None = None,
+) -> bool:
+    """Return True if two plans share the same cross-engine operator-shape backbone.
+
+    This compares the wrapper-stripped backbone multisets, so it is a useful
+    cross-engine harmonization check for the same logical query. It is deliberately
+    weaker than ``plan_fingerprint`` equality and is not a plan-equivalence proof.
+    """
+    return structural_backbone_counts(left, only=only) == structural_backbone_counts(right, only=only)
 
 
 @dataclass
@@ -167,10 +347,19 @@ class QueryPlanComparator:
         # Check if fingerprints can be trusted for fast-path comparison
         left_trusted = plan_left.is_fingerprint_trusted()
         right_trusted = plan_right.is_fingerprint_trusted()
+        # Fingerprints are only comparable within the same encoding version: a
+        # v1 and a v2 fingerprint hash different encodings of the same logical
+        # plan, so equality across versions is meaningless. When versions
+        # differ (e.g. an old bundle vs a freshly captured plan) we must fall
+        # through to the full tree walk (qpc-03 anti-pattern: never compare
+        # across fingerprint_version for equality).
+        same_version = getattr(plan_left, "fingerprint_version", None) == getattr(
+            plan_right, "fingerprint_version", None
+        )
 
-        # Quick fingerprint check (only if both are trusted)
+        # Quick fingerprint check (only if both are trusted AND same-version)
         fingerprints_match = False
-        if left_trusted and right_trusted:
+        if left_trusted and right_trusted and same_version:
             fingerprints_match = (
                 plan_left.plan_fingerprint == plan_right.plan_fingerprint
                 if plan_left.plan_fingerprint and plan_right.plan_fingerprint
@@ -181,6 +370,12 @@ class QueryPlanComparator:
             if fingerprints_match:
                 return self._create_identical_comparison(plan_left, plan_right)
         else:
+            if not same_version:
+                logger.debug(
+                    f"Plan {plan_left.query_id} fingerprint_version "
+                    f"{getattr(plan_left, 'fingerprint_version', None)} != "
+                    f"{getattr(plan_right, 'fingerprint_version', None)}; using full comparison"
+                )
             # Log a warning about untrusted fingerprints
             if not left_trusted:
                 logger.debug(
@@ -576,9 +771,10 @@ class PlanComparisonSummary:
 def _build_execution_map(results: Any) -> dict[str, Any]:
     """Collect the first execution per query ID across all phases."""
     execution_map: dict[str, Any] = {}
-    for phase_results in results.phases.values():
-        for execution in phase_results.queries:
-            execution_map.setdefault(execution.query_id, execution)
+    for execution in iter_query_results(results):
+        query_id = execution.get("query_id")
+        if query_id is not None:
+            execution_map.setdefault(query_id, execution)
     return execution_map
 
 
@@ -621,8 +817,8 @@ def generate_plan_comparison_summary(
         baseline_exec = baseline_map[query_id]
         current_exec = current_map[query_id]
 
-        baseline_plan = getattr(baseline_exec, "query_plan", None)
-        current_plan = getattr(current_exec, "query_plan", None)
+        baseline_plan = baseline_exec.get("query_plan")
+        current_plan = current_exec.get("query_plan")
 
         # Skip if either run doesn't have a plan
         if not baseline_plan or not current_plan:
@@ -630,11 +826,29 @@ def generate_plan_comparison_summary(
 
         plans_compared += 1
 
-        # Compare fingerprints first (fast path)
+        # Compare fingerprints first (fast path) - but ONLY when they are
+        # actually comparable: same encoding version and both trusted. A v1 vs
+        # v2 fingerprint (or a stale/tampered one) must never be equality-tested
+        # to decide "changed", or a pure encoding bump would be misreported as a
+        # plan flap (qpc-03 anti-pattern). When not comparable, fall through to
+        # the full tree walk and let it decide.
         baseline_fp = getattr(baseline_plan, "plan_fingerprint", None)
         current_fp = getattr(current_plan, "plan_fingerprint", None)
+        same_version = getattr(baseline_plan, "fingerprint_version", None) == getattr(
+            current_plan, "fingerprint_version", None
+        )
+        fingerprints_comparable = (
+            bool(baseline_fp)
+            and bool(current_fp)
+            and same_version
+            and baseline_plan.is_fingerprint_trusted()
+            and current_plan.is_fingerprint_trusted()
+        )
 
-        plan_changed = baseline_fp != current_fp
+        # "Unchanged" is only assertable from comparable, equal fingerprints;
+        # anything else (different, or not comparable across version/trust) is
+        # treated as changed and routed through the full tree walk.
+        plan_changed = not (fingerprints_comparable and baseline_fp == current_fp)
 
         if not plan_changed:
             plans_unchanged += 1
@@ -645,31 +859,54 @@ def generate_plan_comparison_summary(
                 details="Plans are identical",
             )
         else:
-            plans_changed += 1
-
             # Perform detailed comparison
             comparison = comparator.compare_plans(baseline_plan, current_plan)
 
-            # Determine primary change type
-            if comparison.similarity.structure_mismatches > 0:
-                change_type = "structure_change"
-            elif comparison.similarity.type_mismatches > 0:
-                change_type = "type_change"
-            else:
-                change_type = "property_change"
+            # When fingerprints weren't comparable (different encoding version,
+            # or an untrusted/stale fingerprint), the plan_changed=True above is
+            # only a "the fast path can't be trusted" signal, not a verdict.
+            # Correct it against the full tree-walk result so a pure
+            # fingerprint-encoding-version bump on an otherwise-identical plan
+            # is never misreported as a changed plan / regression (qpc-03
+            # anti-pattern).
+            if not fingerprints_comparable and (
+                comparison.similarity.type_mismatches == 0
+                and comparison.similarity.property_mismatches == 0
+                and comparison.similarity.structure_mismatches == 0
+            ):
+                plan_changed = False
 
-            change = QueryPlanChange(
-                query_id=query_id,
-                change_type=change_type,
-                similarity=comparison.similarity.overall_similarity,
-                details=comparison.summary,
-            )
+            if not plan_changed:
+                plans_unchanged += 1
+                change = QueryPlanChange(
+                    query_id=query_id,
+                    change_type="unchanged",
+                    similarity=1.0,
+                    details="Plans are identical",
+                )
+            else:
+                plans_changed += 1
+
+                # Determine primary change type
+                if comparison.similarity.structure_mismatches > 0:
+                    change_type = "structure_change"
+                elif comparison.similarity.type_mismatches > 0:
+                    change_type = "type_change"
+                else:
+                    change_type = "property_change"
+
+                change = QueryPlanChange(
+                    query_id=query_id,
+                    change_type=change_type,
+                    similarity=comparison.similarity.overall_similarity,
+                    details=comparison.summary,
+                )
 
         structural_differences.append(change)
 
         # Calculate performance correlation
-        baseline_time = getattr(baseline_exec, "execution_time_ms", 0.0) or 0.0
-        current_time = getattr(current_exec, "execution_time_ms", 0.0) or 0.0
+        baseline_time = baseline_exec.get("execution_time_ms", 0.0) or 0.0
+        current_time = current_exec.get("execution_time_ms", 0.0) or 0.0
 
         if baseline_time > 0:
             perf_change_pct = ((current_time - baseline_time) / baseline_time) * 100

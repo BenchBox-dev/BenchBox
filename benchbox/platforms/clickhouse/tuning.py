@@ -5,12 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from benchbox.core.exceptions import ConfigurationError
+from benchbox.platforms.base.tuning import make_informational_constraint_applier, supports_named_tuning_type
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
         UnifiedTuningConfiguration,
     )
 
@@ -61,14 +60,6 @@ class ClickHouseTuningMixin:
             "allow_experimental_correlated_subqueries": 1,
         }
 
-        # Apply server-wide memory limit override (server mode only - not supported in chdb)
-        if (
-            self.deployment_mode == "server"
-            and hasattr(self, "max_server_memory_usage_ratio")
-            and self.max_server_memory_usage_ratio
-        ):
-            settings["max_server_memory_usage_to_ram_ratio"] = self.max_server_memory_usage_ratio
-
         # Apply cache control settings for accurate benchmarking
         if self.disable_result_cache:
             settings.update(
@@ -105,15 +96,6 @@ class ClickHouseTuningMixin:
                 "join_algorithm": "grace_hash",
                 "grace_hash_join_initial_buckets": 8,
             }
-
-            # Include settings that may not exist in local ClickHouse
-            if self.deployment_mode != "local":
-                # These settings might not be available in local mode (server-only)
-                olap_settings.update(
-                    {
-                        "enable_multiple_joins_emulation": 1,
-                    }
-                )
 
             settings.update(olap_settings)
 
@@ -273,7 +255,8 @@ class ClickHouseTuningMixin:
             return False
 
         try:
-            connection.execute(f"SET {setting} = {value}")
+            setting_value = self._format_setting_value(value)
+            connection.execute(f"SET {setting} = {setting_value}")
             self.logger.debug(f"Set {setting} = {value}")
             return True
         except Exception as e:
@@ -284,33 +267,19 @@ class ClickHouseTuningMixin:
                 self.logger.warning(f"Failed to set {setting}: {e}")
             return False
 
+    def _format_setting_value(self, value: Any) -> Any:
+        """Format ClickHouse SET values, quoting string literals."""
+        if not isinstance(value, str):
+            return value
+        if len(value) >= 2 and value[0] in {"'", '"'} and value[-1] == value[0]:
+            return value
+        return "'" + value.replace("'", "''") + "'"
+
+    _supported_tuning_type_names = ("PARTITIONING", "SORTING", "CLUSTERING", "DISTRIBUTION")
+
     def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if ClickHouse supports a specific tuning type.
-
-        ClickHouse supports:
-        - PARTITIONING: Via PARTITION BY clause in MergeTree engines
-        - SORTING: Via ORDER BY clause in MergeTree engines
-        - CLUSTERING: Via ORDER BY clause for data clustering
-        - DISTRIBUTION: Via distributed engine configurations
-
-        Args:
-            tuning_type: The type of tuning to check support for
-
-        Returns:
-            True if the tuning type is supported by ClickHouse
-        """
-        # Import here to avoid circular imports
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {
-                TuningType.PARTITIONING,
-                TuningType.SORTING,
-                TuningType.CLUSTERING,
-                TuningType.DISTRIBUTION,
-            }
-        except ImportError:
-            return False
+        """Check if ClickHouse supports a specific tuning type."""
+        return supports_named_tuning_type(tuning_type, self._supported_tuning_type_names)
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
         """Apply ClickHouse-specific table tunings.
@@ -464,19 +433,9 @@ class ClickHouseTuningMixin:
             unified_config: Unified tuning configuration to apply
             connection: ClickHouse connection
         """
-        if not unified_config:
-            return
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        # Apply constraint configurations
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        # Apply platform optimizations
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        # Apply table-level tunings
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
         """Apply ClickHouse-specific platform optimizations.
@@ -519,31 +478,10 @@ class ClickHouseTuningMixin:
         except Exception as e:
             self.logger.error(f"Failed to apply ClickHouse platform optimizations: {e}")
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to ClickHouse.
-
-        Note: ClickHouse has limited constraint support compared to traditional RDBMS.
-        Primary keys and foreign keys are mainly for query optimization hints.
-
-        Args:
-            primary_key_config: Primary key constraint configuration
-            foreign_key_config: Foreign key constraint configuration
-            connection: ClickHouse connection
-        """
-        # ClickHouse constraints are applied at table creation time
-        # This method is called after tables are created, so log the configurations
-        # Actual constraint application happens in generate_tuning_clause during CREATE TABLE
-
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info("Primary key constraints enabled for ClickHouse (applied during table creation)")
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info("Foreign key constraints enabled for ClickHouse (applied during table creation)")
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints enabled for ClickHouse (applied during table creation)",
+        "Foreign key constraints enabled for ClickHouse (applied during table creation)",
+    )
 
 
 __all__ = ["ClickHouseTuningMixin"]

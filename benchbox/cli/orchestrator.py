@@ -7,14 +7,16 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 if TYPE_CHECKING:
     from benchbox.base import BaseBenchmark
 
 from benchbox.cli.config import DirectoryManager
 from benchbox.core.benchmark_loader import (
-    get_benchmark_class as _core_get_benchmark_class,
+    get_core_benchmark_class,
+    instantiate_benchmark_class,
 )
 
 # Import from common_types to avoid circular imports
@@ -23,6 +25,7 @@ from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
 )
+from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
 from benchbox.core.platform_config import get_platform_config as _core_get_platform_config
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.driver_metadata import apply_driver_metadata
@@ -89,7 +92,7 @@ class BenchmarkOrchestrator:
     # -- Private helpers (wrappable in tests) ---------------------------------
     def _get_benchmark_class(self, benchmark_name: str):
         """Resolve a benchmark class by name (via core loader)."""
-        return _core_get_benchmark_class(benchmark_name)
+        return get_core_benchmark_class(benchmark_name)
 
     def _get_benchmark_instance(self, config: BenchmarkConfig, system_profile):
         """Create a benchmark instance honoring parallel and compression fields.
@@ -140,18 +143,50 @@ class BenchmarkOrchestrator:
 
         kwargs.update(benchmark_options)
 
-        try:
-            benchmark_instance = benchmark_class(parallel=cpu_cores, **kwargs)
-        except TypeError:
-            # Fallback for benchmarks without parallel support
-            benchmark_instance = benchmark_class(**kwargs)
+        # Resolve the final datagen root BEFORE construction so nested
+        # generators capture it immediately, instead of constructing first and
+        # mutating output_dir afterward.
+        optional_kwargs: dict[str, Any] = {"parallel": cpu_cores}
+        construction_output_dir = self._resolve_construction_output_dir(config, benchmark_class)
+        if construction_output_dir is not None:
+            optional_kwargs["output_dir"] = construction_output_dir
 
-        data_source = getattr(benchmark_instance, "get_data_source_benchmark", lambda: None)()
-        if data_source and self.custom_output_dir is None:
-            shared_path = self.directory_manager.get_datagen_path(data_source.lower(), config.scale_factor)
-            benchmark_instance.output_dir = shared_path
+        benchmark_instance = instantiate_benchmark_class(benchmark_class, kwargs, optional_kwargs)
+
+        # Compatibility fallback: benchmarks that declare data sharing only via
+        # the get_data_source_benchmark() instance method (no
+        # DATA_SOURCE_BENCHMARK class attribute) were not resolved at
+        # construction, so redirect them to the shared root now. Class-attr
+        # sharers were already constructed with it.
+        if getattr(benchmark_class, "DATA_SOURCE_BENCHMARK", None) is None:
+            data_source = getattr(benchmark_instance, "get_data_source_benchmark", lambda: None)()
+            if data_source and self.custom_output_dir is None:
+                shared_path = self.directory_manager.get_datagen_path(data_source.lower(), config.scale_factor)
+                benchmark_instance.output_dir = shared_path
 
         return benchmark_instance
+
+    def _resolve_construction_output_dir(self, config: BenchmarkConfig, benchmark_class) -> Optional[Union[str, Path]]:
+        """Resolve the local datagen root before the benchmark is constructed.
+
+        Precedence matches the post-construction resolution it replaces:
+        CLI --output (custom_output_dir) wins, then the shared data-source
+        root for data-sharing benchmarks, then the managed per-benchmark path.
+        Returns None when the root is not knowable yet — cloud --output paths
+        resolve later via _resolve_custom_output_root, which needs platform
+        config; the runner's compatibility shim applies that handler
+        post-construction.
+        """
+        if self.custom_output_dir:
+            from benchbox.utils.cloud_storage import is_cloud_path
+
+            if is_cloud_path(self.custom_output_dir):
+                return None
+            return self.custom_output_dir
+
+        data_source = getattr(benchmark_class, "DATA_SOURCE_BENCHMARK", None)
+        source_name = (data_source or config.name).lower()
+        return self.directory_manager.get_datagen_path(source_name, config.scale_factor)
 
     def _get_platform_config(
         self,
@@ -249,9 +284,11 @@ class BenchmarkOrchestrator:
                     generate="generate" in phases_to_run,
                     load="load" in phases_to_run,
                     execute=any(p in phases_to_run for p in ["warmup", "power", "throughput", "maintenance"]),
+                    statistics="statistics" in phases_to_run,
                 )
             else:
-                # Default to standard lifecycle (generate + load + execute)
+                # Default to standard lifecycle (generate + load + execute);
+                # the statistics phase stays opt-in.
                 phases = LifecyclePhases(generate=True, load=True, execute=True)
 
             # Validate phase combinations and warn about potential issues
@@ -395,6 +432,22 @@ class BenchmarkOrchestrator:
             return None
         if execution_mode == "dataframe":
             self.console.print("[cyan]Using DataFrame execution mode[/cyan]")
+            # database_config.options carries both user-supplied --platform-option
+            # values (e.g. target_partitions=4) AND runtime-only overrides that
+            # PlatformHookRegistry.build_database_config() merges in alongside them
+            # (verbose, very_verbose, tuning_enabled, force_recreate, ...; see
+            # DatabaseManager.create_config). Unlike the SQL branch below (whose
+            # PlatformAdapter.__init__(self, **config) accepts anything), DataFrame
+            # adapters declare explicit, narrow constructor signatures (e.g.
+            # DataFusionDataFrameAdapter's target_partitions/batch_size/...), and
+            # the runtime-only keys would collide with the verbose=/very_verbose=
+            # kwargs passed explicitly below. Restrict forwarding to option names
+            # actually registered in that platform's _OPTION_SPEC_ROWS so only
+            # genuine --platform-option values reach the adapter (#1062 review).
+            registered_option_names = PlatformHookRegistry.list_option_specs(database_config.type)
+            dataframe_options = {
+                key: value for key, value in (database_config.options or {}).items() if key in registered_option_names
+            }
             return get_adapter(
                 database_config.type,
                 mode="dataframe",
@@ -402,6 +455,7 @@ class BenchmarkOrchestrator:
                 verbose=self._verbosity.verbose if self._verbosity else False,
                 very_verbose=self._verbosity.very_verbose if self._verbosity else False,
                 tuning_config=opts.get("df_tuning_config"),
+                **dataframe_options,
             )
         adapter = get_platform_adapter(database_config.type, **(platform_cfg or {}))
         if adapter and benchmark:
@@ -441,6 +495,7 @@ class BenchmarkOrchestrator:
             test_execution_type=getattr(config, "test_execution_type", "standard"),
             scale_factor=config.scale_factor,
             capture_plans=config.capture_plans,
+            analyze_plans=getattr(config, "analyze_plans", None),
             strict_plan_capture=config.strict_plan_capture,
             seed=int(options.get("seed")) if options.get("seed") is not None else None,
             connection={"database_path": str(database_path)},

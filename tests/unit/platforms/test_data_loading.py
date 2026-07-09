@@ -13,7 +13,12 @@ from pathlib import Path
 
 import pytest
 
-from benchbox.platforms.base.data_loading import ClickHouseNativeHandler, DataSource, DataSourceResolver
+from benchbox.platforms.base.data_loading import (
+    ClickHouseNativeHandler,
+    DataSource,
+    DataSourceResolver,
+    resolve_adapter_data_source,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -31,6 +36,16 @@ class _BenchmarkWithTables:
     """Benchmark stub that exposes tables (bypasses ManifestFileSource)."""
 
     tables: dict
+
+
+@dataclass
+class _AdapterStub:
+    """Adapter state consumed by resolve_adapter_data_source."""
+
+    platform_name: str = "Test Platform"
+    table_mode: str = "external"
+    platform_config: dict | None = None
+    requested_table_format: str | None = "parquet"
 
 
 def _write_manifest(directory: Path, tables_metadata: dict) -> None:
@@ -113,6 +128,35 @@ def test_datasource_table_metadata_defaults_to_empty_dict() -> None:
     """DataSource.table_metadata defaults to {} without requiring explicit arg."""
     ds = DataSource(source_type="benchmark_tables", tables={"t": [Path("/x")]})
     assert ds.table_metadata == {}
+
+
+def test_resolve_adapter_data_source_uses_standard_adapter_state(monkeypatch, tmp_path: Path) -> None:
+    """Shared adapter resolver delegates with the standard platform attributes."""
+    calls = {}
+    data_source = DataSource(source_type="benchmark_tables", tables={"t": [tmp_path / "t.tbl"]})
+
+    class FakeResolver:
+        def __init__(self, **kwargs):
+            calls["init"] = kwargs
+
+        def resolve(self, benchmark, data_dir):
+            calls["resolve"] = (benchmark, data_dir)
+            return data_source
+
+    monkeypatch.setattr("benchbox.platforms.base.data_loading.DataSourceResolver", FakeResolver)
+    adapter = _AdapterStub(platform_config={"storage": "external"})
+    benchmark = object()
+
+    result = resolve_adapter_data_source(adapter, benchmark, tmp_path)
+
+    assert result is data_source
+    assert calls["init"] == {
+        "platform_name": "Test Platform",
+        "table_mode": "external",
+        "platform_config": {"storage": "external"},
+        "requested_format": "parquet",
+    }
+    assert calls["resolve"] == (benchmark, tmp_path)
 
 
 def test_table_metadata_present_when_manifest_wins(tmp_path: Path) -> None:

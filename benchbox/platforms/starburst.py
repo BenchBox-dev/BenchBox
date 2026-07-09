@@ -21,6 +21,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from benchbox.platforms.base.adapter import DriverIsolationCapability
+from benchbox.platforms.base.config_utils import make_registered_platform_config_builder
 
 from .trino import TrinoAdapter
 
@@ -63,6 +64,8 @@ class StarburstAdapter(TrinoAdapter):
             --platform-option username=joe@example.com/accountadmin \\
             --platform-option password=my-password
     """
+
+    plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
@@ -150,6 +153,17 @@ class StarburstAdapter(TrinoAdapter):
     def platform_name(self) -> str:
         return "Starburst"
 
+    def get_query_plan_parser(self):
+        """Return the shared Presto/Trino parser stamped as ``starburst``.
+
+        Starburst inherits Trino's ``platform_key`` (for credential lookup), so the
+        concrete plan-capture platform name is supplied explicitly here rather than
+        recording captured plans under ``trino``.
+        """
+        from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
+
+        return PrestoTrinoQueryPlanParser(platform_name="starburst")
+
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get Starburst Galaxy platform information.
 
@@ -230,88 +244,56 @@ class StarburstAdapter(TrinoAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create Starburst adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-
-        # Generate proper schema name using benchmark characteristics
-        if "schema" in config and config["schema"]:
-            adapter_config["schema"] = config["schema"]
-        else:
-            schema_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                config,
                 platform="starburst",
-                tuning_config=config.get("tuning_config"),
+                generated_key="schema",
+                fields=[
+                    "host",
+                    "port",
+                    "catalog",
+                    "username",
+                    "password",
+                    "role",
+                    "http_scheme",
+                    "verify_ssl",
+                    "ssl_cert_path",
+                    "session_properties",
+                    "query_timeout",
+                    "timezone",
+                    "encoding",
+                    "disable_result_cache",
+                    "table_format",
+                    "staging_root",
+                    "source_catalog",
+                ],
             )
-            adapter_config["schema"] = schema_name
-
-        # Core connection parameters
-        for key in ["host", "port", "catalog", "username", "password", "role"]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        # Optional configuration parameters
-        for key in [
-            "http_scheme",
-            "verify_ssl",
-            "ssl_cert_path",
-            "session_properties",
-            "query_timeout",
-            "timezone",
-            "encoding",
-            "disable_result_cache",
-            "table_format",
-            "staging_root",
-            "source_catalog",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
 
-def _build_starburst_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="starburst",
-        credential_key="starburst",
-        default_display_name="Starburst",
-        default_driver_package="trino",
-        platform_fields=[
-            "host",
-            "port",
-            "catalog",
-            "username",
-            "password",
-            "role",
-            "http_scheme",
-            "verify_ssl",
-            "ssl_cert_path",
-            "session_properties",
-            "query_timeout",
-            "timezone",
-            "table_format",
-            "staging_root",
-            "schema",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
-
-
-# Register the config builder with the platform hook registry
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("starburst", _build_starburst_config)
-except ImportError:
-    # Platform hooks may not be available in all contexts
-    pass
+_build_starburst_config = make_registered_platform_config_builder(
+    "starburst",
+    __name__,
+    "Starburst",
+    "trino",
+    [
+        "host",
+        "port",
+        "catalog",
+        "username",
+        "password",
+        "role",
+        "http_scheme",
+        "verify_ssl",
+        "ssl_cert_path",
+        "session_properties",
+        "query_timeout",
+        "timezone",
+        "table_format",
+        "staging_root",
+        "schema",
+    ],
+)

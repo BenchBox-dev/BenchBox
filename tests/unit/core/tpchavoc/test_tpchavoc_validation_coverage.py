@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
-from benchbox.core.tpchavoc.validation import ResultValidator, ValidationError, ValidationReport
+from benchbox.core.tpchavoc.validation import (
+    ResultValidator,
+    ValidationError,
+    ValidationReport,
+    calculate_checksum,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -19,6 +26,252 @@ def test_validate_results_exact_accepts_reordered_rows() -> None:
     variant = [("B", 2.0), ("A", 1.0)]
 
     assert validator.validate_results_exact(original, variant, query_id=3, variant_id=2)
+
+
+# --- tie_aware top-N boundary handling (cross-surface gate) -------------------
+# The reference (``original``) is in ORDER BY order; the order key is the last
+# column, DESC, so the worst-kept value (the boundary) is the minimum. Rows tied
+# at that boundary value may be an ambiguous selection across the LIMIT cutoff.
+
+
+def test_tie_aware_accepts_boundary_tie_swap() -> None:
+    """A swap confined to rows tied at the boundary order-key value is accepted."""
+    validator = ResultValidator()
+    original = [(10, 5), (11, 5), (12, 3), (13, 2), (14, 2)]
+    # row (13,2) -> (99,2): a different but equally-valid boundary-tie member
+    variant = [(10, 5), (11, 5), (12, 3), (99, 2), (14, 2)]
+
+    assert validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
+
+
+def test_tie_aware_off_by_default_still_strict() -> None:
+    """Without tie_aware the same boundary-tie swap is a hard failure (unchanged)."""
+    validator = ResultValidator()
+    original = [(10, 5), (11, 5), (12, 3), (13, 2), (14, 2)]
+    variant = [(10, 5), (11, 5), (12, 3), (99, 2), (14, 2)]
+
+    with pytest.raises(ValidationError, match="Value mismatch"):
+        validator.validate_results_exact(original, variant, 1, 0)
+
+
+def test_tie_aware_rejects_non_boundary_value_bug() -> None:
+    """A wrong order-key value on a fully-included (non-boundary) row still fails."""
+    validator = ResultValidator()
+    original = [(10, 5), (11, 5), (12, 3), (13, 2), (14, 2)]
+    # top row's order key 5 -> 4: a real value bug, not a boundary tie
+    variant = [(10, 4), (11, 5), (12, 3), (13, 2), (14, 2)]
+
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
+
+
+def test_tie_aware_rejects_non_key_bug_on_determined_row() -> None:
+    """A wrong non-key value on a non-boundary row is not masked by tie tolerance."""
+    validator = ResultValidator()
+    original = [(1, "A", 5), (2, "B", 5), (3, "C", 3), (4, "D", 2), (5, "E", 2)]
+    # (2,'B',5) -> (2,'X',5): wrong dimension at the TOP (count 5), not the boundary
+    variant = [(1, "A", 5), (2, "X", 5), (3, "C", 3), (4, "D", 2), (5, "E", 2)]
+
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
+
+
+def test_tie_aware_rejects_unique_last_row_change() -> None:
+    """A unique (untied) boundary row is deterministic and must still match."""
+    validator = ResultValidator()
+    original = [(10, 5), (11, 4), (12, 3), (13, 2), (14, 1)]
+    # last row's non-key value changed; the boundary value 1 is unique (no tie)
+    variant = [(10, 5), (11, 4), (12, 3), (13, 2), (99, 1)]
+
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
+
+
+# --- calculate_checksum on NULL-bearing / mixed-type rows ---------------------
+# (correctness-gate-value-digest-fidelity-followups w6)
+#
+# The bounded gate's 18 SF=1 result sets are NULL-free and single-typed per column,
+# so calculate_checksum's None-safe / type-safe ``_row_sort_key`` branch is NEVER
+# exercised by the gate. A bare ``sorted(rows)`` would raise ``TypeError`` on a
+# NULL-bearing column (``None < 1`` unorderable) or a mixed-type column, which the
+# gate would mislabel as an execution "error:" rather than a clean digest. These
+# tests exercise that path directly so a latent ordering bug in None handling cannot
+# hide behind the gate's NULL-free inputs. They FAIL if the None-safe surrogate is
+# removed (a bare sort would raise here).
+
+
+def test_calculate_checksum_null_bearing_rows_are_deterministic() -> None:
+    """A column mixing NULL with values hashes deterministically and never raises."""
+    rows = [(1, None), (2, "x"), (3, None), (4, "y")]
+
+    first = calculate_checksum(rows)
+    second = calculate_checksum(rows)
+    assert first == second, "checksum must be deterministic for identical NULL-bearing input"
+    # Order-normalized: a permutation of the same rows hashes identically.
+    assert calculate_checksum(list(reversed(rows))) == first
+
+
+def test_calculate_checksum_mixed_type_column_does_not_raise() -> None:
+    """A single column mixing int / str / None / float sorts via the surrogate, no TypeError.
+
+    A bare ``sorted`` would raise ``TypeError`` comparing ``int`` with ``str`` (or
+    ``None`` with anything); the None-safe ``_row_sort_key`` groups by a stable type
+    name so ordering is total. The digest is stable across input permutations.
+    """
+    rows = [(1,), ("a",), (None,), (2.5,), ("b",), (None,)]
+
+    digest = calculate_checksum(rows)  # must not raise
+    assert isinstance(digest, str) and len(digest) == 32  # md5 hex
+    # Permutation-invariant (order-normalized) despite the mixed types + NULLs.
+    import random
+
+    shuffled = rows[:]
+    random.Random(17).shuffle(shuffled)
+    assert calculate_checksum(shuffled) == digest
+
+
+def test_calculate_checksum_distinguishes_null_from_string_null() -> None:
+    """A real NULL and the literal string ``"NULL"`` hash DIFFERENTLY (fixed).
+
+    Historical collision: the pre-hardening renderer mapped ``None`` -> ``"NULL"``,
+    identical to the literal string. calculate-checksum-collision-hardening's
+    type-tagged rendering (``z:`` for NULL vs ``s:NULL`` for the string) makes
+    them distinct -- distinctness is now guaranteed, not an accepted ambiguity.
+    """
+    assert calculate_checksum([(None,)]) != calculate_checksum([("NULL",)])
+
+
+def test_calculate_checksum_distinguishes_across_cell_separator() -> None:
+    """A ``"|"`` embedded in a value can no longer alias across column shapes (fixed).
+
+    Historical collision (pinned by value-digest-collision-pinning, fixed by
+    calculate-checksum-collision-hardening): unescaped ``"|"`` made
+    ``[("a|b", "c")]`` and ``[("a", "b|c")]`` render identically. The renderer
+    now backslash-escapes ``|`` inside payloads, so the shapes are distinct.
+    """
+    assert calculate_checksum([("a|b", "c")]) != calculate_checksum([("a", "b|c")])
+
+
+def test_calculate_checksum_distinguishes_across_row_separator() -> None:
+    """A ``"\\n"`` embedded in a value can no longer alias across row counts (fixed).
+
+    Historical collision (pinned by value-digest-collision-pinning, fixed by
+    calculate-checksum-collision-hardening): unescaped newlines made
+    ``[("a\\nb",)]`` and ``[("a",), ("b",)]`` render identically. The renderer
+    now escapes ``\\n`` inside payloads, so row-count aliasing is impossible.
+    """
+    assert calculate_checksum([("a\nb",)]) != calculate_checksum([("a",), ("b",)])
+
+
+def test_calculate_checksum_distinguishes_str_and_int_dtype() -> None:
+    """A string cell and an int cell of the same textual value hash DIFFERENTLY (fixed).
+
+    Historical collision (pinned by value-digest-collision-pinning, fixed by
+    calculate-checksum-collision-hardening): rendering every cell via ``str``
+    made ``"1"`` and ``1`` indistinguishable, so an INTEGER column silently
+    becoming VARCHAR was invisible to the digest. The type-tagged renderer
+    (``s:1`` vs ``i:1``) makes a dtype regression a digest change. NOTE: the
+    gate-side ``result_digest._normalize_cell`` int-vs-float rendering
+    asymmetry is a separate, still-pinned accepted property with its own
+    DuckDB-pinned-oracle rationale (see
+    tests/unit/test_correctness_gate_value_oracle.py).
+    """
+    assert calculate_checksum([("1",)]) != calculate_checksum([(1,)])
+
+
+def test_calculate_checksum_escape_character_round_trip() -> None:
+    """Payloads containing the escape character itself stay injective.
+
+    Exercises the escaping rather than just the happy path: a literal
+    backslash in a value must not be confusable with the renderer's own
+    escape sequences, and adjacent escape-char/separator combinations must
+    not alias across shapes.
+    """
+    # A literal backslash-n two-char sequence vs a real newline.
+    assert calculate_checksum([("a\\nb",)]) != calculate_checksum([("a\nb",)])
+    # A trailing literal backslash vs a backslash-escaped separator.
+    assert calculate_checksum([("a\\", "b")]) != calculate_checksum([("a\\|b",)])
+    # Doubled backslash vs single backslash.
+    assert calculate_checksum([("a\\\\b",)]) != calculate_checksum([("a\\b",)])
+    # Escape char before a separator across shapes.
+    assert calculate_checksum([("a\\", "c")]) != calculate_checksum([("a", "\\c")])
+
+
+def test_calculate_checksum_fallback_typename_cannot_forge_separators() -> None:
+    """The o:<typename> fallback escapes the typename and its ':' delimiter.
+
+    A dynamically created type can carry an arbitrary __name__; without
+    escaping, a name like "x:y|s" would render "o:x:y|s:w" -- byte-identical
+    to the two-cell row [obj-of-type-"x"-str-"y", "w"] -- reintroducing the
+    separator-forgery false-pass this hardening closes.
+    """
+
+    def make(name: str, text: str) -> object:
+        cls = type(name, (), {"__str__": lambda self: text, "__repr__": lambda self: text})
+        return cls()
+
+    forged = calculate_checksum([(make("x:y|s", "w"),)])
+    victim = calculate_checksum([(make("x", "y"), "w")])
+    assert forged != victim
+    # Newline in a typename must not alias a two-row shape either.
+    assert calculate_checksum([(make("a\nb", "c"),)]) != calculate_checksum([(make("a", ""), make("b", "c"))])
+
+
+def test_calculate_checksum_distinguishes_numeric_and_temporal_dtypes() -> None:
+    """Type tags separate bool/float/Decimal/date renderings of similar text."""
+    from datetime import date
+    from decimal import Decimal
+
+    assert calculate_checksum([(1.0,)]) != calculate_checksum([(Decimal("1.0"),)])
+    assert calculate_checksum([("2026-01-01",)]) != calculate_checksum([(date(2026, 1, 1),)])
+    # bool stays distinct from int (the pre-hardening str-renderer already
+    # distinguished them; over-distinguishing can only false-fail).
+    assert calculate_checksum([(True,)]) != calculate_checksum([(1,)])
+
+
+def test_calculate_checksum_escapes_temporal_payloads() -> None:
+    """Temporal cells (``t:`` tag) must be escaped like every other cell type.
+
+    A date/time subclass with a forged ``__str__`` containing a row separator
+    would otherwise render byte-identical to two separate temporal rows,
+    reopening the exact separator-forgery false-pass this hardening closes for
+    every other dtype (str, the ``o:`` fallback, etc.).
+    """
+    from datetime import date
+
+    class ForgedDate(date):
+        def __str__(self) -> str:
+            return "a\nt:b"
+
+    forged = calculate_checksum([(ForgedDate(2026, 1, 1),)])
+
+    class LiteralA(date):
+        def __str__(self) -> str:
+            return "a"
+
+    class LiteralB(date):
+        def __str__(self) -> str:
+            return "b"
+
+    two_rows = calculate_checksum([(LiteralA(2026, 1, 1),), (LiteralB(2026, 1, 2),)])
+    assert forged != two_rows
+
+
+def test_tie_aware_constant_column_is_not_a_boundary_key() -> None:
+    """A constant/literal column must not qualify as the tie-boundary key.
+
+    Mirrors ClickBench Q35 (``SELECT 1, URL, COUNT(*) AS c ... ORDER BY c DESC
+    LIMIT N``): column 0 is the literal ``1``. A real count bug on a non-boundary
+    row (top ``c`` 5 -> 4) shares that constant 1, so treating column 0 as a
+    monotonic boundary key would wrongly accept the swap. The actual order key
+    (column 2) puts the change off the boundary value, so it must still fail.
+    """
+    validator = ResultValidator()
+    original = [(1, "a", 5), (1, "b", 5), (1, "c", 3), (1, "d", 2), (1, "e", 2)]
+    variant = [(1, "a", 4), (1, "b", 5), (1, "c", 3), (1, "d", 2), (1, "e", 2)]
+
+    with pytest.raises(ValidationError):
+        validator.validate_results_exact(original, variant, 1, 0, tie_aware=True)
 
 
 @pytest.mark.parametrize(
@@ -43,11 +296,81 @@ def test_validate_results_exact_failure_modes(
 def test_numeric_and_string_value_comparison_behavior() -> None:
     validator = ResultValidator(tolerance=1e-6)
 
-    assert validator._values_equal("  abc ", "abc")
+    assert not validator._values_equal("  abc ", "abc")
     assert validator._values_equal(1.0000001, 1.0000002)
     assert validator._values_equal(None, None)
     assert not validator._values_equal(None, 1)
     assert not validator._values_equal("x", "y")
+
+
+def test_value_widening_is_strict_by_default_and_explicitly_opted_in() -> None:
+    strict = ResultValidator()
+    widened = ResultValidator(treat_nan_as_null=True, strip_strings=True)
+
+    assert not strict._values_equal(None, float("nan"))
+    assert not strict._values_equal(float("nan"), None)
+    assert not strict._values_equal(float("nan"), float("nan"))
+    assert not strict._values_equal("foo ", "foo")
+
+    assert widened._values_equal(None, float("nan"))
+    assert widened._values_equal(float("nan"), None)
+    assert widened._values_equal(float("nan"), float("nan"))
+    assert widened._values_equal("foo ", "foo")
+
+
+def test_validate_results_exact_reports_nan_null_and_whitespace_divergences() -> None:
+    strict = ResultValidator()
+
+    with pytest.raises(ValidationError, match="Value mismatch"):
+        strict.validate_results_exact([(None,)], [(float("nan"),)], query_id=6, variant_id=1)
+
+    with pytest.raises(ValidationError, match="Value mismatch"):
+        strict.validate_results_exact([("foo",)], [("foo ",)], query_id=6, variant_id=2)
+
+    widened = ResultValidator(treat_nan_as_null=True, strip_strings=True)
+    assert widened.validate_results_exact([(None,), ("foo",)], [(float("nan"),), ("foo ",)], 6, 3)
+
+
+def test_treat_nan_as_null_sorts_nan_into_null_bucket_so_rows_pair() -> None:
+    """The positional comparator sorts both sides before pairing rows. The NaN-as-NULL
+    widening only helps if the sort agrees: a reference NULL row and a candidate NaN
+    row must land in the SAME ordinal position. Without normalizing the sort key, NaN
+    sorts in the numeric bucket while NULL sorts first, so the rows below pair NULL vs
+    a numeric value and raise a spurious mismatch despite the flag."""
+    widened = ResultValidator(treat_nan_as_null=True)
+
+    reference = [(None, "a"), (2, "b")]
+    candidate = [(2, "b"), (float("nan"), "a")]
+
+    # The sort surrogate maps NaN to the None bucket so both lists order identically.
+    assert widened._row_sort_key((float("nan"), "a")) == widened._row_sort_key((None, "a"))
+    assert widened.validate_results_exact(reference, candidate, query_id=7, variant_id=1)
+
+    # Strict mode leaves NaN in the numeric bucket (distinct from the None bucket).
+    strict = ResultValidator()
+    assert strict._row_sort_key((float("nan"), "a")) != strict._row_sort_key((None, "a"))
+
+
+def test_container_values_compared_elementwise_with_tolerance() -> None:
+    """List/struct/map cells recurse so float tolerance + Decimal coercion apply
+    INSIDE containers (a DECIMAL array from DuckDB vs the same array as float64
+    from a DataFrame surface), while staying order-sensitive for lists."""
+    from decimal import Decimal
+
+    validator = ResultValidator(tolerance=1e-6)
+
+    # Nested Decimal-vs-float and nested float precision are tolerated.
+    assert validator._values_equal([Decimal("322261.46"), Decimal("1.5")], [322261.46, 1.5])
+    assert validator._values_equal([1100.011], [1100.0110000000001])
+    assert validator._values_equal({"125": Decimal("806.66")}, {"125": 806.66})
+    assert validator._values_equal(Decimal("77.87"), 77.87)
+
+    # Lists stay order-sensitive; length / key / real-value differences still fail.
+    assert not validator._values_equal([1, 2, 3], [1, 3, 2])
+    assert not validator._values_equal([1, 2], [1, 2, 3])
+    assert not validator._values_equal({"a": 1}, {"b": 1})
+    assert not validator._values_equal([1.0, 2.0], [1.0, 2.5])
+    assert not validator._values_equal([math.nan], [math.nan])
 
 
 def test_validate_results_checksum_mismatch_raises() -> None:
@@ -70,6 +393,32 @@ def test_validate_aggregation_results_uses_tolerance_for_numeric_columns() -> No
         variant_id=3,
         aggregation_columns=[1],
     )
+
+
+def test_validate_aggregation_results_reports_clean_key_mismatch_despite_malformed_agg_cell() -> None:
+    """A malformed non-numeric aggregation cell must not crash the all-columns scan.
+
+    Scanning every column (validator-report-all-row-mismatches) means an
+    earlier key-column mismatch no longer short-circuits before a later
+    aggregation column is compared. If that later column holds a
+    non-numeric value (e.g. a variant returning a string where a number was
+    expected), the numeric-tolerance comparison must report it as a mismatch,
+    not raise, so the caller still gets the clean ValidationError the old
+    short-circuiting loop reported for the key-column mismatch alone.
+    """
+    validator = ResultValidator()
+
+    original = [("A", "F", 5)]
+    variant = [("B", "F", "bad")]
+
+    with pytest.raises(ValidationError, match="Value mismatch at row 0, column 0"):
+        validator.validate_aggregation_results(
+            original,
+            variant,
+            query_id=1,
+            variant_id=3,
+            aggregation_columns=[2],
+        )
 
 
 def test_validate_query1_results_delegates_aggregation_columns(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -164,7 +513,7 @@ def test_get_query_variant_delegates(tmp_path, monkeypatch) -> None:
 
     result = bench.get_query_variant(2, 3)
 
-    mock_qm.get_query_variant.assert_called_once_with(2, 3, None)
+    mock_qm.get_query_variant.assert_called_once_with(2, 3, None, scale_factor=bench.scale_factor)
     assert result == "SELECT variant"
 
 
@@ -175,7 +524,7 @@ def test_get_all_variants_delegates(tmp_path, monkeypatch) -> None:
     result = bench.get_all_variants(1)
 
     assert result == {1: "SELECT a", 2: "SELECT b"}
-    mock_qm.get_all_variants.assert_called_once_with(1)
+    mock_qm.get_all_variants.assert_called_once_with(1, scale_factor=bench.scale_factor)
 
 
 def test_get_variant_description_delegates(tmp_path, monkeypatch) -> None:

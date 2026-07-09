@@ -1,0 +1,52 @@
+tables:
+- id: TRIPS
+  key: trips
+  schema:
+    name: trips
+    columns:
+    - name: vendor_id
+      type: INTEGER
+    - name: pickup_datetime
+      type: TIMESTAMP
+    - name: dropoff_datetime
+      type: TIMESTAMP
+    - name: passenger_count
+      type: INTEGER
+    - name: trip_distance
+      type: DECIMAL(8,2)
+    - name: pickup_longitude
+      type: DECIMAL(18,14)
+    - name: pickup_latitude
+      type: DECIMAL(18,14)
+    - name: rate_code_id
+      type: INTEGER
+    - name: store_and_fwd_flag
+      type: VARCHAR(1)
+    - name: dropoff_longitude
+      type: DECIMAL(18,14)
+    - name: dropoff_latitude
+      type: DECIMAL(18,14)
+    - name: payment_type
+      type: INTEGER
+    - name: fare_amount
+      type: DECIMAL(8,2)
+    - name: extra
+      type: DECIMAL(8,2)
+    - name: mta_tax
+      type: DECIMAL(8,2)
+    - name: tip_amount
+      type: DECIMAL(8,2)
+    - name: tolls_amount
+      type: DECIMAL(8,2)
+    - name: improvement_surcharge
+      type: DECIMAL(8,2)
+    - name: total_amount
+      type: DECIMAL(8,2)
+    - name: pickup_location_id
+      type: INTEGER
+    - name: dropoff_location_id
+      type: INTEGER
+    - name: congestion_surcharge
+      type: DECIMAL(8,2)
+table_order:
+- trips

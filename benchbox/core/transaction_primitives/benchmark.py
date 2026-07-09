@@ -27,6 +27,9 @@ from benchbox.core.transaction_primitives.generator import TransactionPrimitives
 from benchbox.core.transaction_primitives.operations import TransactionOperationsManager
 from benchbox.core.transaction_primitives.schema import STAGING_TABLES, get_all_staging_tables_sql, get_create_table_sql
 from benchbox.core.transactional.benchmark_base import TransactionalBenchmarkBase
+from benchbox.sql_compat.rules.execution_filter.duckdb_transaction_primitives import (
+    DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+)
 from benchbox.sql_compat.rules.execution_filter.pg_duckdb_transaction_primitives import (
     PG_DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
 )
@@ -87,6 +90,8 @@ class OperationResult:
         cleanup_warning: Warning message for cleanup failures
         status: Explicit status string ("SUCCESS", "FAILED", "SKIPPED"); derived from success if None
         skip_reason: Human-readable explanation when status is "SKIPPED"; distinct from error
+        executed_sql: The final transaction SQL actually executed (after platform
+            overrides, dialect rewrites, and placeholder replacement); used for plan capture.
     """
 
     operation_id: str
@@ -102,6 +107,7 @@ class OperationResult:
     cleanup_warning: Optional[str] = None
     status: Optional[str] = None
     skip_reason: Optional[str] = None
+    executed_sql: Optional[str] = None
 
 
 class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
@@ -668,6 +674,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
 
         try:
             platform_operation_skips = {
+                "duckdb": DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
                 "pg_duckdb": PG_DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
                 "timescaledb": TIMESCALEDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
             }
@@ -810,6 +817,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 cleanup_duration_ms=cleanup_duration_ms,
                 cleanup_success=cleanup_success,
                 cleanup_warning=cleanup_warning,
+                executed_sql=write_sql,
             )
 
         except Exception as e:

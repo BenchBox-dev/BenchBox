@@ -328,6 +328,36 @@ def _normalize(text: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _compare_or_fail(chart_name: str, normalized: str, golden_path: Path, update_golden: bool) -> None:
+    """Compare rendered output against a golden file, or regenerate it.
+
+    - If `update_golden` is set, unconditionally (re)write the golden file and
+      `pytest.skip` - this is the ONLY path allowed to create or modify golden
+      files, whether the file is brand-new or previously existed.
+    - Otherwise, a missing golden file is a hard failure with zero writes:
+      the test must never silently self-heal a lost/deleted golden fixture by
+      writing whatever the current render happens to produce.
+    - Otherwise, compare content and fail normally on mismatch.
+    """
+    if update_golden:
+        golden_path.parent.mkdir(parents=True, exist_ok=True)
+        golden_path.write_text(normalized, encoding="utf-8")
+        pytest.skip(f"Updated golden file: {golden_path}")
+
+    if not golden_path.exists():
+        pytest.fail(
+            f"Golden file missing: {golden_path}. If this chart is "
+            f"new or the rendering intentionally changed, regenerate "
+            f"with --update-golden and review the diff before "
+            f"committing; do not let this test create it implicitly."
+        )
+
+    expected = golden_path.read_text(encoding="utf-8")
+    assert normalized == expected, (
+        f"Chart '{chart_name}' output differs from golden file {golden_path}.\nRun with --update-golden to regenerate."
+    )
+
+
 @pytest.mark.parametrize(
     "builder",
     ALL_CHART_BUILDERS,
@@ -339,17 +369,22 @@ def test_golden_output(builder, update_golden: bool) -> None:
     normalized = _normalize(rendered)
     golden_path = GOLDEN_DIR / f"{chart_name}.txt"
 
-    if update_golden:
-        golden_path.parent.mkdir(parents=True, exist_ok=True)
-        golden_path.write_text(normalized, encoding="utf-8")
-        pytest.skip(f"Updated golden file: {golden_path}")
+    _compare_or_fail(chart_name, normalized, golden_path, update_golden)
 
-    if not golden_path.exists():
-        golden_path.parent.mkdir(parents=True, exist_ok=True)
-        golden_path.write_text(normalized, encoding="utf-8")
-        pytest.fail(f"Golden file did not exist - created {golden_path}. Re-run to verify parity.")
 
-    expected = golden_path.read_text(encoding="utf-8")
-    assert normalized == expected, (
-        f"Chart '{chart_name}' output differs from golden file {golden_path}.\nRun with --update-golden to regenerate."
-    )
+def test_missing_golden_file_hard_fails_without_writing(tmp_path: Path) -> None:
+    """A missing golden file must hard-fail with zero side effects (no self-heal).
+
+    Regression test for the bug where the "golden file simply missing" branch
+    unconditionally wrote the golden file before failing once, causing the
+    very next run to pass by construction with no real parity check ever
+    having happened.
+    """
+    golden_path = tmp_path / "some_chart.txt"
+    assert not golden_path.exists()
+
+    with pytest.raises(pytest.fail.Exception):
+        _compare_or_fail("some_chart", "irrelevant rendered content\n", golden_path, update_golden=False)
+
+    assert not golden_path.exists(), "Missing-golden-file path must not create the golden file"
+    assert list(tmp_path.iterdir()) == [], "Missing-golden-file path must not write anything to the golden dir"

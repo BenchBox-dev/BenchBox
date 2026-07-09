@@ -1,0 +1,28 @@
+Sort
+├── sort keys: [o_orderpriority ASC NULLS LAST]
+├── estimated rows: 5.00
+└── AggregateFinal
+    ├── group by: [o_orderpriority]
+    ├── aggregate functions: [count()]
+    ├── estimated rows: 5.00
+    └── AggregatePartial
+        ├── group by: [o_orderpriority]
+        ├── aggregate functions: [count()]
+        ├── estimated rows: 5.00
+        └── HashJoin
+            ├── output columns: [o_orderpriority (#5)]
+            ├── join type: INNER
+            ├── build keys: [orders.o_orderkey (#0)]
+            ├── probe keys: [lineitem.l_orderkey (#9)]
+            ├── estimated rows: 600.00
+            ├── Filter(Build)
+            │   ├── filters: [is_true(orders.o_orderdate (#4) >= '1993-07-01')]
+            │   ├── estimated rows: 150.00
+            │   └── TableScan(Build)
+            │       ├── table: default.tpch.orders
+            │       ├── read rows: 1500
+            │       └── estimated rows: 1500.00
+            └── TableScan(Probe)
+                ├── table: default.tpch.lineitem
+                ├── read rows: 6000
+                └── estimated rows: 6000.00

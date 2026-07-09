@@ -71,9 +71,47 @@ jobs:
       - name: Run public site theme token scan
         run: make lint-site-theme-tokens
 
+  medium-test:
+    name: medium-test
+    # The medium speed tier (~81 files, `make test-medium`, Makefile:90-91) had
+    # no CI consumer before this job - it only ran when a developer invoked it
+    # locally. Measured locally at ~18 minutes (2 xdist workers), too slow for
+    # the develop-PR-blocking lane, so it lands here for visibility/metrics.
+    # See _project/TODO/main/planning/medium-tier-ci-home.yaml.
+    #
+    # PROMOTED 2026-07-06 (medium-tier-red-disposition-and-promotion): the
+    # tier ran clean (green) on the real runner - develop-post-merge run
+    # 28763663703, job 85283671051, "Run medium speed tier" success - once
+    # its dispositioned failures were fixed: timeout markers for the 6 slow
+    # data-gen/cross-surface tests (#977) and the pytest-ci.ini
+    # filterwarnings marker sync (#994, the last remaining runner failure).
+    # It is now a blocking post-merge lane wired into auto-revert-on-failure's
+    # trigger, same as lint/fast-test/explorer-tokens (continue-on-error
+    # dropped). The 44 tpch-extension "errors" reported earlier were
+    # sandbox-only (egress proxy 403 on the extension download) and do not
+    # occur on the runner.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run medium speed tier
+        run: make test-medium
+
   close-orphaned-prs:
     name: close-orphaned-prs
-    needs: [lint, fast-test, explorer-tokens]
+    needs: [lint, fast-test, explorer-tokens, medium-test]
     # When a squash merge to develop lands one of several open PRs whose
     # branches share linear history (e.g. two worktrees produced overlapping
     # branches where one is a strict ancestor of the other), the squash hides
@@ -193,8 +231,12 @@ jobs:
   auto-revert-on-failure:
     name: auto-revert-on-failure
     runs-on: ubuntu-latest
-    needs: [lint, fast-test, explorer-tokens]
-    if: ${{ always() && (needs.lint.result == 'failure' || needs.fast-test.result == 'failure' || needs.explorer-tokens.result == 'failure') }}
+    # medium-test promoted into this trigger 2026-07-06 (see the medium-test
+    # job's promotion note): the tier ran clean on the real runner after its
+    # dispositioned failures were fixed (#977, #994), so a medium-test failure
+    # now opens a (reviewable) revert PR, same as lint/fast-test/explorer-tokens.
+    needs: [lint, fast-test, explorer-tokens, medium-test]
+    if: ${{ always() && (needs.lint.result == 'failure' || needs.fast-test.result == 'failure' || needs.explorer-tokens.result == 'failure' || needs.medium-test.result == 'failure') }}
     outputs:
       auto-revert-pr-opened-at: ${{ steps.open-revert.outputs.auto-revert-pr-opened-at }}
       auto-revert-pr-url: ${{ steps.open-revert.outputs.auto-revert-pr-url }}
@@ -390,7 +432,7 @@ jobs:
   metrics:
     name: metrics
     runs-on: ubuntu-latest
-    needs: [lint, fast-test, explorer-tokens, auto-revert-on-failure]
+    needs: [lint, fast-test, explorer-tokens, medium-test, auto-revert-on-failure]
     if: ${{ always() }}
     permissions:
       actions: read
@@ -402,6 +444,12 @@ jobs:
       LINT_RESULT: ${{ needs.lint.result }}
       FAST_TEST_RESULT: ${{ needs.fast-test.result }}
       EXPLORER_TOKENS_RESULT: ${{ needs.explorer-tokens.result }}
+      # NOTE: while medium-test carries job-level continue-on-error (see its
+      # promotion criterion), needs.medium-test.result is "success" even when
+      # its steps fail, so this var is inert - it cannot flip post_merge_red.
+      # It becomes live automatically when medium-test is promoted
+      # (continue-on-error dropped); kept wired to avoid churn at promotion.
+      MEDIUM_TEST_RESULT: ${{ needs.medium-test.result }}
       AUTO_REVERT_PR_OPENED_AT: ${{ needs.auto-revert-on-failure.outputs.auto-revert-pr-opened-at }}
       AUTO_REVERT_PR_URL: ${{ needs.auto-revert-on-failure.outputs.auto-revert-pr-url }}
       CONFLICT_ISSUE_URL: ${{ needs.auto-revert-on-failure.outputs.conflict-issue-url }}
@@ -413,7 +461,7 @@ jobs:
 
           repo_name="${GITHUB_REPOSITORY#*/}"
           post_merge_red=false
-          if [ "${LINT_RESULT}" = "failure" ] || [ "${FAST_TEST_RESULT}" = "failure" ] || [ "${EXPLORER_TOKENS_RESULT}" = "failure" ]; then
+          if [ "${LINT_RESULT}" = "failure" ] || [ "${FAST_TEST_RESULT}" = "failure" ] || [ "${EXPLORER_TOKENS_RESULT}" = "failure" ] || [ "${MEDIUM_TEST_RESULT}" = "failure" ]; then
             post_merge_red=true
           fi
 
@@ -461,7 +509,7 @@ jobs:
              ($pr.mergedAt // null) as $merged_at |
              (if $post_merge_red == "true" then
                 ([($jobs.jobs // [])[] |
-                  select((.name == "lint" or .name == "fast-test" or .name == "explorer-tokens") and .conclusion == "failure" and .completed_at != null) |
+                  select((.name == "lint" or .name == "fast-test" or .name == "explorer-tokens" or .name == "medium-test") and .conclusion == "failure" and .completed_at != null) |
                   .completed_at] | min // null)
               else null end) as $red_at |
              {

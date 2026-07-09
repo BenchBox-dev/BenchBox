@@ -14,7 +14,6 @@ tests/
 ├── fixtures/                 # Shared test fixtures
 ├── integration/              # Integration tests
 ├── performance/              # Performance tests
-├── specialized/              # Specialized functionality tests
 ├── unit/                     # Unit tests
 ├── utilities/                # Test utilities and helpers
 ├── conftest.py              # Global pytest configuration
@@ -38,12 +37,12 @@ Fast, isolated tests that verify individual components:
 
 ### E2E Tests (`e2e/`)
 End-to-end tests that validate complete CLI workflows:
-- **test_cli_options.py**: CLI option validation (27 tests)
-- **test_error_handling.py**: Error handling coverage (25 tests)
-- **test_result_validation.py**: Result schema validation (28 tests)
-- **test_local_platforms.py**: Local platform tests (14 tests)
-- **test_cloud_platforms.py**: Cloud platform dry-run tests (15 tests)
-- **test_dataframe_platforms.py**: DataFrame platform tests (16 tests)
+- CLI option validation
+- Error handling coverage
+- Result schema validation
+- Local platform execution
+- Cloud platform dry-run workflows
+- DataFrame platform workflows
 
 **Characteristics:**
 - Tests full CLI workflow from command to results
@@ -83,20 +82,82 @@ Tests focused on performance characteristics:
 - Statistical analysis
 - Baseline comparisons
 
-### Specialized Tests (`specialized/`)
-Tests for advanced or specialized functionality:
-- Advanced SQL features
-- OLAP operations
-- Complex benchmark workflows
-- Edge cases and error conditions
-
-**Characteristics:**
-- Variable execution time
-- Complex test scenarios
-- Advanced feature validation
-- Specialized tooling requirements
-
 ## Test Execution
+
+### Automated Gate Contract
+
+The standard gates are intentionally split by the risk they are meant to catch:
+
+- `make test-fast`: quick developer and develop-PR feedback for code-impacting
+  changes. This is the coverage-bearing lane in `.github/workflows/pr.yml`.
+- `make test-correctness-gate`: bounded develop-PR real-result gate. It runs the
+  DuckDB TPC-H matrix slice (SF=1, pinned reference qgen seed) through generate,
+  load, and execute, then validates the emitted stream-0 results against the stored
+  TPC-H answers with EXACT row-count checking **and** stored VALUE digests. The
+  gated subset is the 18 TPC-H queries whose answer-set cardinalities are stable
+  across dbgen builds; Q11/Q16/Q18/Q20 are excluded because their HAVING/threshold
+  boundaries make the stored row count vary with the generated data. The subset is
+  deliberately *discriminating* — it is not dominated by one-row queries and
+  includes multiple high-cardinality answer-backed queries (e.g. Q9=175, Q2/Q21=100)
+  — so a wrong join/filter/aggregate that still emits one row is caught. The subset
+  shape is ratcheted in `tests/unit/test_standardized_test_commands.py`
+  (`TestCorrectnessGateOracle`). What the gate proves and what it does not:
+  - **Value + cardinality at SF=1/pinned-seed**: with `BENCHBOX_EMIT_RESULT_DIGEST=1`
+    the runner emits an order-normalized digest of each stream-0 query's *full*
+    result set (reusing `benchbox.core.tpchavoc.validation.calculate_checksum`, the
+    same primitive the TPC-Havoc gates use), which the gate asserts against a stored
+    reference digest (`benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json`)
+    in addition to the row count. So a wrong-but-same-cardinality answer — a perturbed
+    Q1 aggregate, a swapped column, a changed rounding — turns the gate RED, not just
+    a wrong row count. Sensitivity is proven in
+    `tests/unit/test_correctness_gate_value_oracle.py`.
+  - **Regression snapshot, NOT an independent oracle**: the reference digests were
+    produced by running benchbox-on-DuckDB and frozen, so the value check detects
+    *change* from that DuckDB-pinned baseline (a regression tripwire), not correctness
+    against an external authority. A conceptual value bug present at *freeze time* is
+    enshrined in the reference, not caught. Read a green `value+cardinality` cell as
+    "unchanged from the frozen DuckDB answer", never "values proven correct". The
+    reference is regenerated (never hand-copied) by `make correctness-gate-digests-regen`,
+    which reruns the same gate config and writes the file idempotently. The independence
+    gap and the deferred cross-engine upgrade are analyzed in
+    `_project/analysis/value-digest-cross-engine-independence-decision.md`. Two further
+    fidelity properties are pinned in `test_correctness_gate_value_oracle.py`: the
+    sensitivity floor is **relative** (~1e-6 per cell via significant-figure rounding,
+    uniform across column magnitude), and the digest is a **value+type** digest
+    (DuckDB-pinned), which is why cross-engine reuse is deferred.
+  - **Values are UNGUARDED above SF=1**: stored answers and digests exist only at
+    SF=1 (the expected-results loader raises for other scales), so the value
+    guarantee holds at SF=1 only. There is no expected-results value or cardinality
+    oracle above SF=1.
+  - **Strict arming (both axes)**: with `BENCHBOX_STRICT_EXPECTED_RESULTS=1`, every
+    configured query *must* produce a non-SKIP row-count validation **and**, where a
+    reference digest exists, an evaluated value digest, or the run fails. A missing
+    digest disarms RED, never green. This is not gated on benchmark name or scale, so
+    a future CI speedup that retargets the gate (a different benchmark, or SF<1 where
+    no answers exist) cannot silently disarm either oracle.
+  - **No-skip guard**: the Makefile target emits a JUnit report and fails unless
+    exactly one node ran with zero skips. `pytest` exits 0 when a *selected* node
+    SKIPs (e.g. duckdb unavailable, or the case dropped from the stable matrix),
+    which would otherwise pass the gate without executing anything.
+  - **Required CI job composition**: the `correctness-gate` job in
+    `.github/workflows/pr.yml` runs more than this row-count+value gate. It also runs
+    the value-level cross-surface and TPC-Havoc equivalence gates
+    (`tpchavoc-equivalence-report`, `tpchavoc-dataframe-equivalence-report`, and the
+    ssb/amplab/coffeeshop/clickbench/joinorder-synthetic cross-surface reports), so
+    the required job proves value-level equivalence across several benchmarks, not
+    only TPC-H row counts. This composition is ratcheted in
+    `tests/unit/test_standardized_test_commands.py`.
+- `make test-integration`: non-live, non-stress integration coverage for broader
+  local and main/release validation.
+- `make test-local-matrix`: opt-in stress matrix for the full local platform
+  benchmark sweep.
+- Release canary, live cloud, Docker, and UAT evidence remain separate release
+  signals until their cost, credential, and flake policies are suitable for
+  blocking routine PRs.
+
+Medium tests are an explicit local routing tier, not an implicit CI guarantee.
+Correctness-relevant medium tests must be promoted into `fast`, an integration
+workflow, or `test-correctness-gate` when they become product-critical.
 
 ### Quick Development Testing
 ```bash
@@ -148,7 +209,7 @@ uv run -- python -m pytest -n auto
 # Run integration tests
 make test-integration
 # or
-uv run -- python -m pytest -m "integration and not live_integration"
+uv run -- python -m pytest -m "integration and not live_integration and not stress"
 
 # Run performance tests
 uv run -- python -m pytest tests/performance/ -m performance
@@ -215,7 +276,6 @@ Tests are organized using pytest markers for selective execution:
 - `e2e_cloud`: Cloud platform E2E tests (dry-run)
 - `e2e_dataframe`: DataFrame platform E2E tests
 - `performance`: Performance tests
-- `specialized`: Specialized functionality tests
 
 ### Database Support
 - `sqlite`: Tests requiring SQLite
@@ -518,10 +578,6 @@ The test suite includes several unified utilities for efficient testing:
 - `utilities/test_runner.py`: Enhanced test runner with caching capabilities
 
 These utilities provide a modern, efficient approach to testing and validation.
-
-**Note**: Minimal tests have been moved to the `specialized/` directory:
-- `specialized/test_tpch_minimal.py`: Minimal tests for TPC-H that don't require data generation
-- `specialized/test_tpcds_minimal.py`: Minimal tests for TPC-DS that don't require data generation
 
 ## Support
 

@@ -1,0 +1,58 @@
+# Release-gate re-run — STAGE 3 of 3: Docker OLTP stacks.
+#
+# Start ONLY after stages 1 and 2 have fully completed. OLTP stacks run at
+# scale 0.01 only. PostgreSQL-family stacks share port 5432 and MUST stay
+# serialized (one Docker stack at a time; parallel_platforms is hard-rejected).
+name: "release-gate-03-docker-oltp"
+description: "Release-gate stage 3: Docker OLTP stacks, scale 0.01"
+
+phases:
+  - preflight
+  - execute
+  - validate
+  - package
+  - explorer_smoke
+  - report
+
+platforms:
+  groups: ["docker-slow"]
+
+benchmarks:
+  groups: ["all"]
+
+scales:
+  rungs: [0.01]
+
+execute:
+  per_cell_timeout_s: 1200
+  early_stop_after_s: 86400
+  early_stop_on_failure: false
+  phases_arg: "load,power"
+  skip_unreachable: true
+  parallel_platforms: false
+
+preflight:
+  free_space_min_gib: 5
+  free_space_path: "~/Developer/benchmark_runs"
+  docker_required: true
+
+cleanup:
+  preserve_datagen: true
+  prune_databases: true
+  docker_manage_platforms: true
+  docker_platform_switch: "volumes"
+  docker_project_prefix: "benchbox-uat-gate"
+  docker_start_timeout_s: 300
+  docker_fixed_container_name_policy: "fail"
+
+validate:
+  validator_clean_rate_floor: 1.0
+
+report:
+  matrix_summary_tsv: "matrix_summary.tsv"
+  cross_scale_coverage_min_pairs: 1
+
+output:
+  benchmark_runs_dir_template: "~/Developer/benchmark_runs"
+  logs_dir_template: "~/Developer/benchmark_runs/logs/release_gate_03_docker_oltp_{date}"
+  submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"

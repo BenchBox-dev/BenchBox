@@ -84,6 +84,16 @@ class TestStripPrimaryKeys:
         assert "PRIMARY KEY" not in result.upper()
         assert "a TEXT" in result
 
+    @pytest.mark.parametrize("constraint_name", ["pk_t", '"pk_t"', "`pk_t`"])
+    def test_named_table_level_pk(self, constraint_name):
+        sql = f"CREATE TABLE t (a INT, CONSTRAINT {constraint_name} PRIMARY KEY (a))"
+        result = strip_primary_keys(sql)
+        result_upper = result.upper()
+        assert "PRIMARY KEY" not in result_upper
+        assert "CONSTRAINT" not in result_upper
+        assert "a INT" in result
+        assert ",)" not in result
+
     def test_composite_pk_multiple_columns(self):
         sql = "CREATE TABLE t (a INT, b INT, c INT, PRIMARY KEY (a, b, c))"
         result = strip_primary_keys(sql)
@@ -94,6 +104,15 @@ class TestStripPrimaryKeys:
         result = strip_primary_keys(sql)
         assert "PRIMARY KEY" not in result.upper()
         assert "a INT" in result
+
+    def test_named_inline_pk(self):
+        sql = "CREATE TABLE t (a INT CONSTRAINT pk_t PRIMARY KEY, b TEXT)"
+        result = strip_primary_keys(sql)
+        result_upper = result.upper()
+        assert "PRIMARY KEY" not in result_upper
+        assert "CONSTRAINT" not in result_upper
+        assert "a INT" in result
+        assert "b TEXT" in result
 
     def test_no_pk_passthrough(self):
         sql = "CREATE TABLE t (a INT, b TEXT)"
@@ -110,6 +129,14 @@ class TestStripPrimaryKeys:
         result = strip_primary_keys(sql)
         assert "PRIMARY KEY" not in result.upper()
         assert ",)" not in result
+
+    def test_table_level_pk_first_does_not_leave_leading_comma(self):
+        sql = "CREATE TABLE t (PRIMARY KEY (a), a INT)"
+        result = strip_primary_keys(sql)
+        assert result == "CREATE TABLE t (a INT)"
+
+    def test_comment_literal_primary_key_limitation_is_documented(self):
+        assert "string-literal false positive" in (strip_primary_keys.__doc__ or "")
 
 
 # ---------------------------------------------------------------------------

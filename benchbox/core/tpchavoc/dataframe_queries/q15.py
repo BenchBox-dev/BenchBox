@@ -14,12 +14,13 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q15_expression_impl as _q15_expr_base,
     q15_pandas_impl as _q15_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SUBQUERY, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
@@ -180,40 +181,15 @@ def q15_v4_expression_impl(ctx: DataFrameContext) -> Any:
     # Step 4: filter to top suppliers
     top_revenue = revenue.filter(col("total_revenue") == lit(max_revenue))
     # Step 5: join with suppliers
-    result = (
+    return (
         supplier.join(top_revenue, left_on="s_suppkey", right_on="supplier_no")
         .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
-    return result
 
 
 def q15_v4_pandas_impl(ctx: DataFrameContext) -> Any:
-    supplier = ctx.get_table("supplier")
-    lineitem = ctx.get_table("lineitem")
-
-    params = get_tpch_parameters(15)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    # Step 1: filter
-    filtered = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)].copy()
-    # Step 2: derive revenue column
-    filtered["revenue"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"])
-    # Step 3: aggregate per supplier
-    revenue = (
-        filtered.groupby("l_suppkey", as_index=False)
-        .agg(total_revenue=("revenue", "sum"))
-        .rename(columns={"l_suppkey": "supplier_no"})
-    )
-    # Step 4: find max
-    max_revenue = revenue["total_revenue"].max()
-    max_revenue = max_revenue.compute() if hasattr(max_revenue, "compute") else max_revenue
-    # Step 5: filter and join
-    top_suppliers = revenue[revenue["total_revenue"] == max_revenue]
-    return supplier.merge(top_suppliers, left_on="s_suppkey", right_on="supplier_no")[
-        ["s_suppkey", "s_name", "s_address", "s_phone", "total_revenue"]
-    ].sort_values("s_suppkey")
+    return q15_v2_pandas_impl(ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -250,31 +226,7 @@ def q15_v5_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def q15_v5_pandas_impl(ctx: DataFrameContext) -> Any:
-    supplier = ctx.get_table("supplier")
-    lineitem = ctx.get_table("lineitem")
-
-    params = get_tpch_parameters(15)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    filtered = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)].copy()
-    # Pre-compute line_revenue column before groupby
-    filtered["line_revenue"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"])
-
-    revenue = (
-        filtered.groupby("l_suppkey", as_index=False)
-        .agg(total_revenue=("line_revenue", "sum"))
-        .rename(columns={"l_suppkey": "supplier_no"})
-    )
-
-    max_revenue = revenue["total_revenue"].max()
-    max_revenue = max_revenue.compute() if hasattr(max_revenue, "compute") else max_revenue
-
-    top_suppliers = revenue[revenue["total_revenue"] == max_revenue]
-    return supplier.merge(top_suppliers, left_on="s_suppkey", right_on="supplier_no")[
-        ["s_suppkey", "s_name", "s_address", "s_phone", "total_revenue"]
-    ].sort_values("s_suppkey")
+q15_v5_pandas_impl = make_variant_delegate(q15_v2_pandas_impl, name="q15_v5_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -332,40 +284,17 @@ def q15_v7_expression_impl(ctx: DataFrameContext) -> Any:
 
     max_revenue = ctx.scalar(revenue.select(col("total_revenue").max().alias("max_rev")))
 
-    # Reversed join: revenue → supplier
+    # Reversed join: revenue → supplier. The join keeps the left key
+    # (supplier_no) and drops s_suppkey, so alias it back for the projection.
     return (
         revenue.filter(col("total_revenue") == lit(max_revenue))
         .join(supplier, left_on="supplier_no", right_on="s_suppkey")
-        .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
+        .select(col("supplier_no").alias("s_suppkey"), "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
 
 
-def q15_v7_pandas_impl(ctx: DataFrameContext) -> Any:
-    supplier = ctx.get_table("supplier")
-    lineitem = ctx.get_table("lineitem")
-
-    params = get_tpch_parameters(15)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-
-    filtered = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)].copy()
-    filtered["revenue"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"])
-
-    revenue = (
-        filtered.groupby("l_suppkey", as_index=False)
-        .agg(total_revenue=("revenue", "sum"))
-        .rename(columns={"l_suppkey": "supplier_no"})
-    )
-
-    max_revenue = revenue["total_revenue"].max()
-    max_revenue = max_revenue.compute() if hasattr(max_revenue, "compute") else max_revenue
-
-    # Reversed: filter revenue first, then join supplier
-    top_revenue = revenue[revenue["total_revenue"] == max_revenue]
-    return top_revenue.merge(supplier, left_on="supplier_no", right_on="s_suppkey")[
-        ["s_suppkey", "s_name", "s_address", "s_phone", "total_revenue"]
-    ].sort_values("s_suppkey")
+q15_v7_pandas_impl = make_variant_delegate(q15_v2_pandas_impl, name="q15_v7_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -548,40 +477,4 @@ def q15_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q15_v1_expression_impl, q15_v1_pandas_impl),
-    (q15_v2_expression_impl, q15_v2_pandas_impl),
-    (q15_v3_expression_impl, q15_v3_pandas_impl),
-    (q15_v4_expression_impl, q15_v4_pandas_impl),
-    (q15_v5_expression_impl, q15_v5_pandas_impl),
-    (q15_v6_expression_impl, q15_v6_pandas_impl),
-    (q15_v7_expression_impl, q15_v7_pandas_impl),
-    (q15_v8_expression_impl, q15_v8_pandas_impl),
-    (q15_v9_expression_impl, q15_v9_pandas_impl),
-    (q15_v10_expression_impl, q15_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q15 implementation",
-    "Pre-filter: filter lineitem by date before revenue aggregation",
-    "Column prune: select only needed columns before computing revenue",
-    "Intermediate vars: explicit named DataFrames for each step",
-    "Pre-compute derived: add line_revenue column before groupby",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Join reorder: filter revenue to max first, then join supplier (reversed join)",
-    "Filter combination: apply date range as two separate filter calls",
-    "Explicit sort: descending=[False] passed explicitly",
-    "Alternative formula: price - price*disc instead of price*(1-disc)",
-]
-
-Q15_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q15v{v}",
-        query_name=f"TPC-H Q15 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q15_VARIANTS = build_yaml_variants(__file__, globals(), 15, JOIN_AGG_SUBQUERY)

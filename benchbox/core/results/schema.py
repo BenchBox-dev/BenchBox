@@ -23,91 +23,38 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import yaml
+
 from benchbox.core.results.builder import normalize_benchmark_id
 from benchbox.core.results.environment import (
     build_environment_payload,
     build_platform_metadata_payload,
 )
 from benchbox.core.results.query_normalizer import normalize_query_id
+from benchbox.core.results.schema_policy import CURRENT_SCHEMA_VERSION, RUNTIME_SCHEMA_POLICY
+from benchbox.validation.bundle import REQUIRED_TOP_KEYS
 
 if TYPE_CHECKING:
     from benchbox.core.results.models import BenchmarkResults
 
-SCHEMA_VERSION = "2.1"
+SCHEMA_VERSION = CURRENT_SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
-CANONICAL_KEY_ORDER = [
-    "version",
-    "run",
-    "benchmark",
-    "platform",
-    "config",
-    "summary",
-    "phases",
-    "queries",
-    "tables",
-    "validation",
-    "comparisons",
-    "cost",
-    "normalized_cost",
-    "execution",
-    "environment",
-    "export",
-    "errors",
-]
 
-QUERY_KEY_ORDER = ["id", "ms", "rows", "iter", "stream", "run_type", "status", "dataframe_skip_summary"]
-CONFIG_KEY_ORDER = [
-    "compression",
-    "seed",
-    "phases",
-    "query_subset",
-    "parallelism",
-    "tuning_mode",
-    "tuning_config",
-    "platform_options",
-    "platform_option_sources",
-    "table_mode",
-    "external_format",
-    "table_format",
-    "table_format_compression",
-    "table_format_partition_cols",
-    "mode",
-    "test_type",
-]
-PHASE_KEY_ORDER = [
-    "data_generation",
-    "schema_creation",
-    "data_loading",
-    "validation",
-    "migration",
-    "power_test",
-    "throughput_test",
-]
-DRIVER_METADATA_KEYS = (
-    "driver_package",
-    "driver_version_requested",
-    "driver_version_resolved",
-    "driver_version_actual",
-    "driver_runtime_strategy",
-    "driver_runtime_path",
-    "driver_runtime_python_executable",
-    "driver_auto_install_used",
-)
-ENGINE_VERSION_KEYS = (
-    "engine_version",
-    "engine_version_source",
-)
+def _load_schema_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("schema_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
-# Maps driver metadata source keys to their result JSON destination keys.
-_DRIVER_PLATFORM_KEYS = [
-    ("driver_package", "driver_package"),
-    ("driver_version_requested", "driver_requested_version"),
-    ("driver_version_resolved", "driver_resolved_version"),
-    ("driver_version_actual", "driver_actual_version"),
-    ("driver_runtime_strategy", "driver_runtime_strategy"),
-]
+
+_SCHEMA_SPECS = _load_schema_specs()
+CANONICAL_KEY_ORDER = list(_SCHEMA_SPECS["canonical_key_order"])
+QUERY_KEY_ORDER = list(_SCHEMA_SPECS["query_key_order"])
+CONFIG_KEY_ORDER = list(_SCHEMA_SPECS["config_key_order"])
+PHASE_KEY_ORDER = list(_SCHEMA_SPECS["phase_key_order"])
+DRIVER_METADATA_KEYS = tuple(_SCHEMA_SPECS["driver_metadata_keys"])
+ENGINE_VERSION_KEYS = tuple(_SCHEMA_SPECS["engine_version_keys"])
+_DRIVER_PLATFORM_KEYS = [tuple(item) for item in _SCHEMA_SPECS["driver_platform_keys"]]
 
 
 def order_dict(d: dict[str, Any], key_order: list[str]) -> dict[str, Any]:
@@ -156,7 +103,9 @@ def _normalize_query_result(qr: Any) -> dict[str, Any]:
         "error_type",
         "query_plan",
         "plan_fingerprint",
+        "plan_fingerprint_normalized",
         "dataframe_skip_summary",
+        "result_digest",
     ):
         if hasattr(qr, attr):
             val = getattr(qr, attr)
@@ -184,7 +133,7 @@ class SchemaV2Validator:
     Optional keys: environment, tables, errors, cost, export
     """
 
-    REQUIRED_KEYS = ("version", "run", "benchmark", "platform", "summary", "queries")
+    REQUIRED_KEYS = REQUIRED_TOP_KEYS
     OPTIONAL_KEYS = (
         "environment",
         "tables",
@@ -194,8 +143,10 @@ class SchemaV2Validator:
         "export",
         "tuning",
         "execution",
+        "provenance",
         "config",
         "phases",
+        "comparisons",
     )
 
     RUN_REQUIRED = ("id", "timestamp", "total_duration_ms", "query_time_ms")
@@ -210,12 +161,10 @@ class SchemaV2Validator:
         if missing_top:
             raise SchemaV2ValidationError(f"schema v2.0 payload missing keys: {missing_top}")
 
-        # Validate version (accept 2.0 and 2.1 as valid)
-        valid_versions = ("2.0", "2.1")
-        if payload.get("version") not in valid_versions:
-            raise SchemaV2ValidationError(
-                f"invalid schema version {payload.get('version')} (expected one of {valid_versions})"
-            )
+        # Validate version using the named runtime policy.
+        version_decision = RUNTIME_SCHEMA_POLICY.evaluate(payload.get("version"))
+        if not version_decision.accepted:
+            raise SchemaV2ValidationError(version_decision.error_message())
 
         # Validate run block
         run = payload.get("run", {})
@@ -349,6 +298,7 @@ def build_result_payload(result: BenchmarkResults) -> dict[str, Any]:
     _add_comparisons_section(payload, result)
     _add_cost_section(payload, result)
     _add_execution_section(payload, result, driver_metadata)
+    _add_provenance_section(payload, result)
 
     return order_dict(payload, CANONICAL_KEY_ORDER)
 
@@ -417,8 +367,33 @@ def _build_query_results_section(
         entry["stream"] = stream_id
         entry["run_type"] = run_type
         entry["status"] = status
+        # Additive, present only for phased runs (power/throughput/maintenance):
+        # a combined run executes the same public query_id in more than one
+        # phase, each with its own independent stream_id counter, so stream_id
+        # alone cannot always disambiguate which phase's .plans.json entry a
+        # reconstructed row belongs to (see build_plans_payload). Standard
+        # single-phase runs never set this, so their compact entries are
+        # unchanged.
+        test_type = qr.get("test_type")
+        if test_type:
+            entry["test_type"] = test_type
+        # Gate-only value-digest oracle (BENCHBOX_EMIT_RESULT_DIGEST): present only
+        # when the runner emitted a full-result digest, so a normal run's payload
+        # shape is unchanged. Explicit None checks (not `or`) so a digest is never
+        # dropped by a falsy value.
+        result_digest = qr.get("result_digest")
+        if result_digest is None:
+            result_digest = qr.get("digest")
+        if result_digest is not None:
+            entry["digest"] = result_digest
         if qr.get("dataframe_skip_summary"):
             entry["dataframe_skip_summary"] = qr["dataframe_skip_summary"]
+        # Real DataFrame plan-capture-error cause (qpc-05 / F4.4, #1038 review):
+        # this is the JSON export path, a separate serialization from
+        # ResultBuilder._format_query_results (in-memory only) - without this,
+        # the field was lost on export/reload despite being carried in memory.
+        if qr.get("plan_capture_error") is not None:
+            entry["plan_capture_error"] = qr["plan_capture_error"]
 
         queries_list.append(order_dict(entry, QUERY_KEY_ORDER))
 
@@ -648,6 +623,30 @@ def _normalized_cost_allows_direct_total(normalized_cost: Any) -> bool:
     return normalized_cost.get("normalized_cost_usd") is not None
 
 
+def _add_provenance_section(payload: dict[str, Any], result: BenchmarkResults) -> None:
+    """Add an optional provenance block (funding / source) to the payload.
+
+    Emitted only when the result declares funding or a source hint, mirroring the
+    other optional sections (environment/tables/errors). When neither is present
+    the payload is byte-identical to a pre-provenance run, so existing bundles and
+    fixtures are unaffected. Values are normalized through the canonical
+    vocabulary so an out-of-band value can never reach the bundle.
+    """
+    from benchbox.core.results.provenance import normalize_funding, normalize_source
+
+    funding = getattr(result, "funding", None)
+    source = getattr(result, "result_source", None)
+    if not funding and not source:
+        return
+
+    block: dict[str, Any] = {}
+    if funding:
+        block["funding"] = normalize_funding(funding)
+    if source:
+        block["source"] = normalize_source(source)
+    payload["provenance"] = block
+
+
 def _add_execution_section(payload: dict[str, Any], result: BenchmarkResults, driver_metadata: dict[str, Any]) -> None:
     """Add execution context section to payload."""
     if result.execution_context:
@@ -715,6 +714,7 @@ def _build_execution_from_context(result: BenchmarkResults, driver_metadata: dic
         if ctx.get(key):
             exec_block[key] = ctx[key]
 
+    _inject_translation_metadata(exec_block, result)
     return exec_block
 
 
@@ -729,6 +729,7 @@ def _build_execution_fallback(result: BenchmarkResults, driver_metadata: dict[st
     if mode_value:
         exec_block["mode"] = mode_value
     _inject_driver_metadata(exec_block, driver_metadata)
+    _inject_translation_metadata(exec_block, result)
     return exec_block
 
 
@@ -830,6 +831,15 @@ def _inject_driver_metadata(exec_block: dict[str, Any], driver_metadata: dict[st
             exec_block[key] = value
 
 
+def _inject_translation_metadata(exec_block: dict[str, Any], result: BenchmarkResults) -> None:
+    """Inject SQL translation outcome metadata into the execution block."""
+    if not isinstance(result.execution_metadata, Mapping):
+        return
+    translation = result.execution_metadata.get("translation")
+    if isinstance(translation, Mapping):
+        exec_block["translation"] = dict(translation)
+
+
 def _shorten_benchmark_name(name: str) -> str:
     if name.lower().endswith(" benchmark"):
         return name[: -len(" benchmark")]
@@ -926,6 +936,26 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
                 "status": setup.validation.row_count_validation,
                 "duration_ms": setup.validation.duration_ms,
             }
+        # Opt-in statistics phase (omit when not run). stats_mode records where
+        # statistics time landed: explicit / auto-on-load / unsupported.
+        if setup.statistics_gathering:
+            stats = setup.statistics_gathering
+            phases["statistics"] = {
+                "status": stats.status,
+                "duration_ms": stats.duration_ms,
+                "stats_mode": stats.stats_mode,
+                "tables_analyzed": stats.tables_analyzed,
+            }
+            if stats.error_message:
+                phases["statistics"]["error_message"] = stats.error_message
+            # Opt-in cold-stats vs warm-stats control and per-table timing
+            # breakdown (both additive/omitted-when-empty; absent entirely
+            # when the reset/persist knob was not used or no breakdown was
+            # collected, so unmodified runs stay byte-identical).
+            if stats.stats_lifecycle:
+                phases["statistics"]["stats_lifecycle"] = stats.stats_lifecycle
+            if stats.per_table_ms:
+                phases["statistics"]["per_table_ms"] = stats.per_table_ms
 
     if result.execution_phases and result.execution_phases.power_test:
         power_test = result.execution_phases.power_test
@@ -1040,6 +1070,59 @@ def compute_plan_capture_stats(
     return plans_captured, len(failed_ids), capture_errors
 
 
+def _build_plan_entry(qr: dict[str, Any]) -> dict[str, Any]:
+    """Serialize a single query result's captured plan into a `.plans.json` entry."""
+    query_plan = qr.get("query_plan")
+    plan_fingerprint = qr.get("plan_fingerprint")
+    plan_fingerprint_normalized = qr.get("plan_fingerprint_normalized")
+    capture_time = qr.get("plan_capture_time_ms")
+
+    plan_entry: dict[str, Any] = {}
+    if plan_fingerprint:
+        plan_entry["fingerprint"] = plan_fingerprint
+        # Surface the fingerprint encoding version at the entry level (not only
+        # buried in the nested plan dict) so a consumer reading the companion
+        # entry can tell whether two fingerprints are comparable without
+        # rehydrating the full plan (qpc-03). Sourced from the plan object when
+        # present; a bare fingerprint with no plan object is left unversioned.
+        fingerprint_version = getattr(query_plan, "fingerprint_version", None)
+        if fingerprint_version is not None:
+            plan_entry["fingerprint_version"] = fingerprint_version
+    if plan_fingerprint_normalized:
+        plan_entry["fingerprint_normalized"] = plan_fingerprint_normalized
+    if capture_time is not None:
+        plan_entry["capture_time_ms"] = round(capture_time, 1)
+
+    # `to_dict()` (when the object defines one) is the intentional serialization:
+    # for QueryPlanDAG it applies depth protection (see DEFAULT_PLAN_MAX_DEPTH)
+    # and omits internal-only fields like fingerprint_integrity. Checking
+    # is_dataclass() first would always win (QueryPlanDAG is a dataclass) and
+    # fall through to plain asdict(), bypassing both of those and leaking
+    # fingerprint_integrity into the companion file.
+    if hasattr(query_plan, "to_dict"):
+        plan_entry["plan"] = query_plan.to_dict()
+    elif isinstance(query_plan, dict):
+        plan_entry["plan"] = query_plan
+    elif is_dataclass(query_plan):
+        plan_entry["plan"] = asdict(query_plan)
+    else:
+        plan_entry["plan"] = str(query_plan)
+
+    # plan_format discriminator (qpc-06 / F3.2): two platform families used to
+    # write differently-shaped "plan" objects with no marker -- a structured
+    # QueryPlanDAG (SQL adapters and DataFrame plans routed through a registered
+    # parser) vs a text-only DataFrame QueryPlan fallback. Tag each entry so a
+    # consumer can tell whether "plan" is a rehydratable DAG (has a
+    # ``logical_root``) or opaque text, and fail informatively instead of
+    # blindly calling QueryPlanDAG.from_dict on a text plan.
+    serialized_plan = plan_entry["plan"]
+    plan_entry["plan_format"] = (
+        "dag" if isinstance(serialized_plan, dict) and "logical_root" in serialized_plan else "text"
+    )
+
+    return plan_entry
+
+
 def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     """Build companion plans file payload.
 
@@ -1050,37 +1133,55 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
 
     Returns:
         Dictionary for plans companion file, or None if no plans.
+
+    Multi-stream keying:
+        ``capture_query_plan``'s documented contract is one plan record per
+        ``(query_id, stream_id)`` - streams are NOT deduplicated, so a query_id
+        that ran in more than one stream has more than one captured-plan row.
+        Keying this payload by bare ``query_id`` alone would collapse those rows
+        to a single last-writer-wins entry. Rows are grouped by ``query_id``
+        first; a group with exactly one plan-bearing row keeps the simple bare
+        ``query_id`` key (the common single-stream case, unchanged format), and
+        a group with more than one row uses a ``"{query_id}#{stream_id}"``
+        composite key per row so every stream's plan survives.
+
+        A combined run (e.g. power then throughput) executes the same public
+        query id in BOTH phases, and each phase's stream_id counter starts at
+        its own 0 - so a power row and a throughput row for the same query_id
+        can share the exact same stream_id too. When stream_id alone does not
+        disambiguate every row in a group, ``test_type`` (already carried on
+        every row - see ``_build_query_results_section``) is appended to the
+        composite key so cross-phase collisions never silently overwrite each
+        other, on top of the same-phase multi-stream case above.
     """
     if not result.query_plans_captured or result.query_plans_captured == 0:
         return None
 
+    rows_by_query_id: dict[str, list[dict[str, Any]]] = {}
+    for qr in result.query_results or []:
+        if qr.get("query_plan") is None:
+            continue
+        query_id = str(qr.get("query_id", qr.get("id", "")))
+        rows_by_query_id.setdefault(query_id, []).append(qr)
+
     plans_by_query: dict[str, Any] = {}
     errors_list: list[dict[str, Any]] = []
 
-    for qr in result.query_results or []:
-        query_id = str(qr.get("query_id", qr.get("id", "")))
-        query_plan = qr.get("query_plan")
-        plan_fingerprint = qr.get("plan_fingerprint")
-        capture_time = qr.get("plan_capture_time_ms")
-
-        if query_plan is not None:
-            plan_entry: dict[str, Any] = {}
-            if plan_fingerprint:
-                plan_entry["fingerprint"] = plan_fingerprint
-            if capture_time:
-                plan_entry["capture_time_ms"] = round(capture_time, 1)
-
-            # Serialize the plan
-            if is_dataclass(query_plan):
-                plan_entry["plan"] = asdict(query_plan)
-            elif isinstance(query_plan, dict):
-                plan_entry["plan"] = query_plan
-            elif hasattr(query_plan, "to_dict"):
-                plan_entry["plan"] = query_plan.to_dict()
+    for query_id, rows in rows_by_query_id.items():
+        multi_stream = len(rows) > 1
+        stream_ids = [qr.get("stream_id", 0) for qr in rows]
+        # stream_id alone disambiguates the group only if every row's stream_id
+        # is distinct; a cross-phase collision (same query_id AND stream_id from
+        # two different test_types) needs test_type appended too.
+        stream_id_disambiguates = len(set(stream_ids)) == len(stream_ids)
+        for qr in rows:
+            if not multi_stream:
+                key = query_id
+            elif stream_id_disambiguates:
+                key = f"{query_id}#{qr.get('stream_id', 0)}"
             else:
-                plan_entry["plan"] = str(query_plan)
-
-            plans_by_query[query_id] = plan_entry
+                key = f"{query_id}#{qr.get('stream_id', 0)}:{qr.get('test_type', '')}"
+            plans_by_query[key] = _build_plan_entry(qr)
 
     # Add plan capture errors
     for error in result.plan_capture_errors or []:
@@ -1097,7 +1198,7 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     return {
         "version": SCHEMA_VERSION,
         "run_id": result.execution_id,
-        "plans_captured": len(plans_by_query),
+        "plans_captured": len(rows_by_query_id),
         "capture_failures": result.plan_capture_failures or 0,
         "queries": plans_by_query,
         "errors": errors_list if errors_list else None,
@@ -1139,6 +1240,10 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     # Validation status
     if result.tuning_validation_status:
         payload["validation_status"] = result.tuning_validation_status.lower()
+
+    tuning_profile = _extract_tuning_profile_metadata(result)
+    if tuning_profile:
+        payload["logical_profile"] = tuning_profile
 
     # Clauses breakdown
     clauses: dict[str, Any] = {}
@@ -1268,7 +1373,30 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
     if clauses_count > 0:
         summary["clauses_applied"] = clauses_count
 
+    tuning_profile = _extract_tuning_profile_metadata(result)
+    if tuning_profile:
+        coverage = tuning_profile.get("logical_profile_coverage")
+        logical_profile = {
+            "id": tuning_profile.get("logical_tuning_profile_id"),
+            "version": tuning_profile.get("logical_tuning_profile_version"),
+            "template_hash": tuning_profile.get("tuning_template_hash"),
+            "physical_rendering_id": tuning_profile.get("physical_rendering_id"),
+            "physical_mechanisms": tuning_profile.get("platform_physical_tuning_mechanisms", []),
+        }
+        if coverage:
+            logical_profile["coverage"] = coverage
+        summary["logical_profile"] = {key: value for key, value in logical_profile.items() if value}
+
     return summary if summary else None
+
+
+def _extract_tuning_profile_metadata(result: BenchmarkResults) -> dict[str, Any] | None:
+    if not isinstance(result.execution_metadata, Mapping):
+        return None
+    tuning_profile = result.execution_metadata.get("tuning_profile")
+    if not isinstance(tuning_profile, Mapping):
+        return None
+    return dict(tuning_profile)
 
 
 def _build_environment_block(result: BenchmarkResults) -> dict[str, Any]:

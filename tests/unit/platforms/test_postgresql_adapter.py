@@ -325,12 +325,12 @@ class TestPostgreSQLAdapter:
         assert result["error_type"] == "Exception"
 
     def test_get_query_plan(self, postgres_stubs):
-        """Query plan should use EXPLAIN ANALYZE."""
+        """Query plan should use EXPLAIN (ANALYZE, FORMAT JSON) and return JSON."""
         mock_conn = Mock()
         mock_cursor = Mock()
+        # PostgreSQL returns the full JSON in the first column of the first row with FORMAT JSON
         mock_cursor.fetchall.return_value = [
-            ("Seq Scan on test  (cost=0.00..10.00 rows=100 width=36)",),
-            ("  Filter: (id > 5)",),
+            ('[{"Plan": {"Node Type": "Seq Scan", "Filter": "(id > 5)"}}]',),
         ]
         mock_conn.cursor.return_value = mock_cursor
 
@@ -338,8 +338,12 @@ class TestPostgreSQLAdapter:
 
         plan = adapter.get_query_plan(mock_conn, "SELECT * FROM test WHERE id > 5")
 
+        assert plan is not None
         assert "Seq Scan" in plan
-        assert "Filter" in plan
+        # Confirm FORMAT JSON is used (parser requires JSON, not text)
+        explain_sql = mock_cursor.execute.call_args[0][0]
+        assert "FORMAT JSON" in explain_sql.upper()
+        assert "FORMAT TEXT" not in explain_sql.upper()
 
     def test_configure_for_benchmark_olap(self, postgres_stubs):
         """OLAP configuration should set appropriate settings."""

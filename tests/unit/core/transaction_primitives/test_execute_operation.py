@@ -292,6 +292,27 @@ class TestSkippedStatus:
         assert "SAVEPOINT is not supported" in (result.skip_reason or "")
         conn.execute.assert_not_called()
 
+    def test_returns_skipped_for_duckdb_explicit_isolation_gap(self, tmp_path: Path):
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(
+            id="transaction_isolation_read_committed",
+            write_sql="SET TRANSACTION ISOLATION LEVEL READ COMMITTED; BEGIN TRANSACTION; COMMIT;",
+        )
+        conn = _make_connection()
+
+        result = bench.execute_operation(
+            "transaction_isolation_read_committed",
+            conn,
+            platform_key="duckdb",
+            platform_name="DuckDB",
+        )
+
+        assert result.status == "SKIPPED"
+        assert result.success is True
+        assert result.error is None
+        assert "SET TRANSACTION ISOLATION LEVEL" in (result.skip_reason or "")
+        conn.execute.assert_not_called()
+
     def test_returns_skipped_for_timescaledb_non_default_isolation_gap(self, tmp_path: Path):
         bench = _make_benchmark(tmp_path)
         bench.operations_manager.get_operation.return_value = _make_operation(

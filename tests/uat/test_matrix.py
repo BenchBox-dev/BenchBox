@@ -1,105 +1,18 @@
-"""Fast-test coverage for tests/uat/matrix.py.
-
-Includes the structural-parity assertion against
-`scripts/local_stress_test.sh` required by the parent TODO's W2: every
-key in the bash case statements must appear in the Python dict (and
-vice versa) with the same value.
-"""
+"""Fast-test coverage for tests/uat/matrix.py."""
 
 from __future__ import annotations
 
-import re
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from tests.uat import matrix
+from benchbox.core.benchmark_registry import CATEGORY_ORDER
+from benchbox.core.platform_registry import PlatformRegistry
+from tests.uat import compatibility, matrix
+from tests.uat.config import validate_config
+from tests.uat.phases import enumerate as enum_phase
 
 pytestmark = pytest.mark.fast
-
-
-# ---------------------------------------------------------------------------
-# Bash-parity helpers and assertions.
-# ---------------------------------------------------------------------------
-
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-BASH_SCRIPT = REPO_ROOT / "scripts" / "local_stress_test.sh"
-
-
-def _parse_bash_case(text: str, fn_name: str) -> dict[str, str]:
-    """Extract `case "$1" in <key>) echo "...";; ... esac` mapping for fn_name."""
-    fn_match = re.search(
-        rf"^\s*{fn_name}\s*\(\s*\)\s*\{{\s*$",
-        text,
-        flags=re.MULTILINE,
-    )
-    if not fn_match:
-        raise AssertionError(f"Did not find function {fn_name} in bash script")
-    body_start = fn_match.end()
-    case_match = re.search(r'case\s+"\$1"\s+in', text[body_start:])
-    assert case_match, f"No case statement in {fn_name}"
-    body_after_case = text[body_start + case_match.end() :]
-    esac_match = re.search(r"\besac\b", body_after_case)
-    assert esac_match, f"No esac in {fn_name}"
-    body = body_after_case[: esac_match.start()]
-    out: dict[str, str] = {}
-    for line in body.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        m = re.match(r'([\w-]+(?:\|[\w-]+)*)\)\s*echo\s+"(.*)"\s*;;\s*$', line)
-        if not m:
-            continue
-        keys = m.group(1).split("|")
-        value = m.group(2)
-        for key in keys:
-            if key == "*":
-                continue
-            out[key] = value
-    return out
-
-
-def _bash_case_keys() -> dict[str, dict[str, str]]:
-    text = BASH_SCRIPT.read_text()
-    return {
-        "get_platform_port": _parse_bash_case(text, "get_platform_port"),
-        "get_platform_extra_opts": _parse_bash_case(text, "get_platform_extra_opts"),
-        "get_platform_cli_flags": _parse_bash_case(text, "get_platform_cli_flags"),
-        "get_platform_uv_extra": _parse_bash_case(text, "get_platform_uv_extra"),
-    }
-
-
-def test_bash_parity_platform_ports():
-    bash = _bash_case_keys()["get_platform_port"]
-    assert set(bash) == set(matrix.PLATFORM_PORTS)
-    for key, value in bash.items():
-        assert matrix.PLATFORM_PORTS[key] == value
-
-
-def test_bash_parity_extra_opts():
-    bash = _bash_case_keys()["get_platform_extra_opts"]
-    py_keys = set(matrix.PLATFORM_EXTRA_OPTS)
-    assert set(bash) == py_keys
-    for key, value in bash.items():
-        # Bash echoes a single space-separated string; Python stores argv list.
-        assert " ".join(matrix.PLATFORM_EXTRA_OPTS[key]) == value
-
-
-def test_bash_parity_cli_flags():
-    bash = _bash_case_keys()["get_platform_cli_flags"]
-    py_keys = set(matrix.PLATFORM_CLI_FLAGS)
-    assert set(bash) == py_keys
-    for key, value in bash.items():
-        assert " ".join(matrix.PLATFORM_CLI_FLAGS[key]) == value
-
-
-def test_bash_parity_uv_extra():
-    bash = _bash_case_keys()["get_platform_uv_extra"]
-    py_keys = set(matrix.PLATFORM_UV_EXTRA)
-    assert set(bash) == py_keys
-    for key, value in bash.items():
-        assert matrix.PLATFORM_UV_EXTRA[key] == value
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +43,39 @@ def test_resolve_platforms_unknown_group():
         matrix.resolve_platforms(groups=["nope"])
 
 
+def test_platform_groups_are_registry_backed():
+    assert matrix.PLATFORM_GROUPS["sql"] == matrix.SQL_PLATFORMS
+    assert matrix.PLATFORM_GROUPS["native-sql"] == matrix.FAST_NATIVE_PLATFORMS + matrix.SLOW_NATIVE_PLATFORMS
+    assert matrix.PLATFORM_GROUPS["docker"] == matrix.DOCKER_PLATFORMS
+    assert matrix.PLATFORM_GROUPS["dataframe"] == matrix.DATAFRAME_PLATFORMS
+    assert set(matrix.SQL_PLATFORMS).issubset(PlatformRegistry.get_sql_platforms())
+    assert set(matrix.PLATFORM_GROUPS["native-sql"]).issubset(PlatformRegistry.get_sql_platforms())
+    assert set(matrix.PLATFORM_GROUPS["native-sql"]).isdisjoint(matrix.DOCKER_PLATFORMS)
+    assert set(matrix.DOCKER_PLATFORMS).issubset(PlatformRegistry.get_self_hosted_platforms())
+    assert tuple(f"{platform}-df" for platform in matrix.UAT_DATAFRAME_PLATFORM_BASES) == matrix.DATAFRAME_PLATFORMS
+
+
+def test_dataframe_mutation_compatibility_rules_cover_dataframe_group():
+    benchmarks = matrix.load_benchmarks()
+
+    for platform in matrix.DATAFRAME_PLATFORMS:
+        for benchmark in ("transaction_primitives", "tpcdi"):
+            rule = compatibility.compatibility_rule_for(platform, benchmark, benchmarks[benchmark])
+            assert rule is not None
+            assert rule.rule_id == f"uat.compat.{platform}.{benchmark}.benchmark_gate"
+
+
+def test_native_model_compatibility_rules_cover_fast_native_targets():
+    benchmarks = matrix.load_benchmarks()
+
+    for platform in ("datafusion", "clickhouse-local"):
+        assert platform in matrix.PLATFORM_GROUPS["fast"]
+        for benchmark in ("write_primitives", "transaction_primitives", "ai_primitives"):
+            rule = compatibility.compatibility_rule_for(platform, benchmark, benchmarks[benchmark])
+            assert rule is not None
+            assert rule.rule_id == f"uat.compat.{platform}.{benchmark}.benchmark_gate"
+
+
 def test_resolve_benchmarks_categories():
     out = matrix.resolve_benchmarks(groups=["tpc"])
     assert "tpch" in out
@@ -141,18 +87,23 @@ def test_resolve_benchmarks_unknown_group():
         matrix.resolve_benchmarks(groups=["nope"])
 
 
+def test_category_groups_are_derived_from_registry_order():
+    expected = {matrix.category_group_slug(category): (category,) for category in CATEGORY_ORDER}
+    expected["all"] = tuple(CATEGORY_ORDER)
+
+    assert expected == matrix.CATEGORY_GROUPS
+
+
 # ---------------------------------------------------------------------------
 # Reachability / TCP probe.
 # ---------------------------------------------------------------------------
 
 
 def test_platform_is_reachable_no_port_assumes_reachable():
-    matrix.reset_reachability_cache()
     assert matrix.platform_is_reachable("duckdb") is True
 
 
 def test_platform_is_reachable_uses_cache():
-    matrix.reset_reachability_cache()
     with patch.object(matrix, "tcp_probe", return_value=False) as probe:
         assert matrix.platform_is_reachable("postgresql") is False
         assert matrix.platform_is_reachable("postgresql") is False
@@ -217,6 +168,109 @@ def test_filter_scales_by_registry_empty_options_passes_through():
 
 
 # ---------------------------------------------------------------------------
+# missing_benchmarks_from_include (uat-accounting-hardening w2).
+# ---------------------------------------------------------------------------
+
+
+def test_missing_benchmarks_from_include_flags_unknown_ids():
+    benchmarks = matrix.load_benchmarks()
+    out = matrix.missing_benchmarks_from_include(["tpch", "totally_bogus_benchmark_xyz"], benchmarks)
+    assert out == ["totally_bogus_benchmark_xyz"]
+
+
+def test_missing_benchmarks_from_include_dedupes_and_preserves_order():
+    benchmarks = matrix.load_benchmarks()
+    out = matrix.missing_benchmarks_from_include(["bogus_a", "tpch", "bogus_b", "bogus_a"], benchmarks)
+    assert out == ["bogus_a", "bogus_b"]
+
+
+def test_missing_benchmarks_from_include_empty_when_all_known():
+    benchmarks = matrix.load_benchmarks()
+    assert matrix.missing_benchmarks_from_include(["tpch", "tpcds"], benchmarks) == []
+
+
+def test_missing_benchmarks_from_include_matches_resolve_benchmarks_drop():
+    """`resolve_benchmarks` silently drops unknown `include` ids; this helper
+    must flag exactly the ids that drop causes, so accounting stays honest."""
+    benchmarks = matrix.load_benchmarks()
+    include = ["tpch", "totally_bogus_benchmark_xyz"]
+    resolved = matrix.resolve_benchmarks(include=include, benchmarks=benchmarks)
+    missing = matrix.missing_benchmarks_from_include(include, benchmarks)
+    assert set(include) == set(resolved) | set(missing)
+    assert set(resolved) & set(missing) == set()
+
+
+# ---------------------------------------------------------------------------
+# enumerate_cells_with_pruning registry/ladder accounting
+# (uat-accounting-hardening w2/w3): a typo'd benchmark id or a scale outside
+# the registry's declared scale_options must produce a visible accounting
+# row instead of a silent drop.
+# ---------------------------------------------------------------------------
+
+
+def _registry_cfg(payload: dict):
+    return validate_config({"name": "matrix-registry-test", **payload})
+
+
+def test_enumerate_with_pruning_records_registry_missing_benchmark():
+    raw = {
+        "platforms": {"include": ["duckdb", "sqlite"]},
+        "benchmarks": {"include": ["tpch", "totally_bogus_benchmark_xyz"]},
+        "scales": {"rungs": [0.01, 0.1]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_registry_cfg(raw))
+
+    assert {c.benchmark for c in result.cells} == {"tpch"}
+    missing_rows = [c for c in result.compatibility_pruned if c.rule_id == "benchmark-not-in-registry"]
+    # One row per platform x requested scale for the missing benchmark - it
+    # must be visible in accounting output, not silently absent.
+    assert {(c.platform, c.benchmark, c.scale) for c in missing_rows} == {
+        ("duckdb", "totally_bogus_benchmark_xyz", 0.01),
+        ("duckdb", "totally_bogus_benchmark_xyz", 0.1),
+        ("sqlite", "totally_bogus_benchmark_xyz", 0.01),
+        ("sqlite", "totally_bogus_benchmark_xyz", 0.1),
+    }
+    assert all(c.status == enum_phase.REGISTRY_PRUNE_STATUS for c in missing_rows)
+    assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
+
+
+def test_enumerate_with_pruning_records_ladder_pruned_scales():
+    raw = {
+        "platforms": {"include": ["duckdb"]},
+        "benchmarks": {"include": ["tpch"]},
+        # 50.0 is not one of tpch's declared scale_options (0.01, 0.1, 1.0,
+        # 10.0, 30.0, 100.0, 300.0, ...); it must be dropped AND recorded
+        # instead of vanishing from the denominator (PR #332 follow-up).
+        "scales": {"rungs": [0.01, 50.0]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_registry_cfg(raw))
+
+    assert {c.scale for c in result.cells} == {0.01}
+    ladder_rows = [c for c in result.compatibility_pruned if c.rule_id.startswith("uat.ladder.")]
+    assert len(ladder_rows) == 1
+    row = ladder_rows[0]
+    assert (row.platform, row.benchmark, row.scale) == ("duckdb", "tpch", 50.0)
+    assert row.status == enum_phase.REGISTRY_PRUNE_STATUS
+    assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
+
+
+def test_enumerate_with_pruning_ladder_scale_survives_when_in_registry():
+    """Sanity check: no spurious ladder-pruned row for an in-registry scale."""
+    raw = {
+        "platforms": {"include": ["duckdb"]},
+        "benchmarks": {"include": ["tpch"]},
+        "scales": {"rungs": [0.01, 0.1]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_registry_cfg(raw))
+
+    assert {c.scale for c in result.cells} == {0.01, 0.1}
+    assert result.compatibility_pruned == ()
+
+
+# ---------------------------------------------------------------------------
 # argv builders.
 # ---------------------------------------------------------------------------
 
@@ -235,12 +289,29 @@ def test_uv_run_argv_extra_uses_extra_flag():
     ]
 
 
+def test_uv_run_argv_clickhouse_server_uses_canonical_extra():
+    assert matrix.uv_run_argv("clickhouse-server") == [
+        "uv",
+        "run",
+        "--extra",
+        "clickhouse-server",
+        "--",
+    ]
+
+
 def test_benchbox_run_argv_includes_platform_extras():
     argv = matrix.benchbox_run_argv("starrocks", "tpch", 0.01)
+    assert "--quiet" in argv
     assert "--platform" in argv and "starrocks" in argv
     assert "--platform-option" in argv
     # The starrocks-specific port=19030 must be there.
     assert "port=19030" in argv
+
+
+def test_benchbox_run_argv_can_omit_quiet_for_diagnostics():
+    argv = matrix.benchbox_run_argv("duckdb", "tpch", 0.01, quiet=False)
+    assert "--quiet" not in argv
+    assert argv[argv.index("--phases") + 1] == "load,power"
 
 
 @pytest.mark.parametrize(

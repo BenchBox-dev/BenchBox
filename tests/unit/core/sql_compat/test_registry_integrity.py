@@ -1,4 +1,4 @@
-"""Registry integrity and compat_lint coverage tests.
+"""Registry integrity tests.
 
 Verifies that:
 1. Exact duplicate rule registration is idempotent (module re-import safe).
@@ -6,14 +6,12 @@ Verifies that:
 3. Registry idempotency survives the sys.modules re-import scenario (patch.dict teardown).
 4. Azure Synapse DDL_OPTIMIZE rule resolves via the canonical ``synapse`` key.
 5. DDL_OPTIMIZE rules carry non-empty transformer_id and description (governance check).
-6. compat_lint exempts registry-backed schema_emit and query_source branches.
-7. compat_lint still fails on unregistered dialect branches.
+6. DDL_OPTIMIZE baseline records stay in sync with rule files.
 """
 
 from __future__ import annotations
 
 import importlib
-import subprocess
 import sys
 from pathlib import Path
 
@@ -49,11 +47,6 @@ def _variant_decision(rule_id: str, *, sql: str) -> CompatibilityDecision:
         payload=SelectVariantPayload(variant_key="test", variant_sql=sql),
         reason="test rule",
     )
-
-
-def _write_file(path: Path, source: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(source, encoding="utf-8")
 
 
 def test_registry_allows_identical_duplicate_registration():
@@ -168,46 +161,6 @@ def test_synapse_ddl_optimize_rule_uses_canonical_platform_key():
     assert decision.rule_id == "ddl_optimize.azure_synapse.all.optimize_table_definition"
 
 
-def test_compat_lint_exempts_registry_backed_schema_emit_branch(tmp_path: Path):
-    root = tmp_path / "benchbox" / "core"
-    _write_file(
-        root / "nyctaxi" / "schema.py",
-        """
-def build_sql(dialect: str) -> str:
-    if dialect == "clickhouse":
-        return "optimized"
-    return "native"
-""".lstrip(),
-    )
-
-    result = subprocess.run(
-        [sys.executable, "scripts/compat_lint.py", "--root", str(root)],
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stderr
-
-
-def test_compat_lint_exempts_registry_backed_query_source_branch(tmp_path: Path):
-    root = tmp_path / "benchbox" / "core"
-    _write_file(
-        root / "vector_search" / "queries.py",
-        """
-def get_query(dialect: str) -> str:
-    if dialect == "snowflake":
-        return "variant"
-    return "native"
-""".lstrip(),
-    )
-
-    result = subprocess.run(
-        [sys.executable, "scripts/compat_lint.py", "--root", str(root)],
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stderr
-
-
 def test_ddl_optimize_baseline_matches_rule_files():
     """_ddl_optimize_records() count stays in sync with the ddl_optimize rule directory."""
     from benchbox.sql_compat.baseline_tool import _ddl_optimize_records
@@ -221,24 +174,3 @@ def test_ddl_optimize_baseline_matches_rule_files():
         f"{len(platform_files)} rule files exist in {rule_dir}. "
         "Update baseline_tool._ddl_optimize_records() when adding or removing ddl_optimize rules."
     )
-
-
-def test_compat_lint_reports_unregistered_branch(tmp_path: Path):
-    root = tmp_path / "benchbox" / "core"
-    _write_file(
-        root / "example_benchmark" / "schema.py",
-        """
-def build_sql(dialect: str) -> str:
-    if dialect == "clickhouse":
-        return "optimized"
-    return "native"
-""".lstrip(),
-    )
-
-    result = subprocess.run(
-        [sys.executable, "scripts/compat_lint.py", "--root", str(root)],
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 1
-    assert "example_benchmark/schema.py:2" in result.stderr.replace("\\", "/")

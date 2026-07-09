@@ -12,35 +12,14 @@ runtime.
 
 from __future__ import annotations
 
-from benchbox.sql_compat.actions import CompatAction
-from benchbox.sql_compat.context import Phase
-from benchbox.sql_compat.decision import (
-    CompatibilityDecision,
-    FailureMode,
-    RewriteDDLPayload,
-    SupportLevel,
-)
-from benchbox.sql_compat.registry import REGISTRY
+from benchbox.sql_compat.rules._registration import register_ddl_rewrite
 
-REGISTRY.register(
-    CompatibilityDecision(
-        rule_id="ddl_optimize.starrocks.all.optimize_table_definition",
-        action=CompatAction.REWRITE_DDL,
-        support_level=SupportLevel.REWRITTEN,
-        failure_mode=FailureMode.SYNTAX_ERROR,
-        payload=RewriteDDLPayload(
-            transformer_id="starrocks_ddl_optimizer",
-            description=(
-                "Convert DuckDB-style DDL to StarRocks dialect: add DUPLICATE/PRIMARY KEY model, "
-                "rewrite types, strip AUTO_INCREMENT / ENGINE= / FOREIGN KEY"
-            ),
-            governance_only=True,
-        ),
-        reason=(
-            "StarRocks DDL dialect differs from DuckDB: requires DUPLICATE KEY or PRIMARY KEY table model, "
-            "rejects AUTO_INCREMENT, ENGINE=, FOREIGN KEY, and uses backtick identifiers."
-        ),
-    ),
-    Phase.DDL_OPTIMIZE,
-    "starrocks",
+register_ddl_rewrite(
+    platform="starrocks",
+    rule_name="optimize_table_definition",
+    transformer_id="starrocks_ddl_optimizer",
+    description="Convert DuckDB-style DDL to StarRocks dialect: add DUPLICATE/PRIMARY KEY model, "
+    "rewrite types, strip AUTO_INCREMENT / ENGINE= / FOREIGN KEY",
+    reason="StarRocks DDL dialect differs from DuckDB: requires DUPLICATE KEY or PRIMARY KEY table model, "
+    "rejects AUTO_INCREMENT, ENGINE=, FOREIGN KEY, and uses backtick identifiers.",
 )

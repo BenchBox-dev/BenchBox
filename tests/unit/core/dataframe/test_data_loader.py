@@ -126,6 +126,93 @@ class TestFormatConverter:
             assert row_count == 2
             assert parquet_path.exists()
 
+    def test_convert_declared_string_columns_survive_production_load_path(self):
+        """A leading-zero VARCHAR keeps its zeros and an all-empty TEXT follows the
+        dialect on the CSV->Parquet production path (w6 acceptance).
+
+        A leading-zero VARCHAR ('007') must not be inferred as an integer, and an
+        all-empty declared-text column must load identically to the SQL reference:
+        for a .tbl source (null_marker == "", e.g. TPC/JoinOrder) DuckDB nulls empty
+        fields, so the DataFrame surface does too.
+
+        Crucially the column types and null marker are DERIVED by the production
+        loader (``DataFrameDataLoader._get_pyarrow_types`` /
+        ``_get_null_markers``) from the declared schema, not hand-injected. Because
+        the converter's ``_resolve_arrow_types`` defaults unrecognized names to
+        ``pa.string()``, a test that passed ``column_types`` by hand would still
+        pass even if the loader stopped mapping declared string columns; driving the
+        derivation here means this test FAILS (the '007' VARCHAR would be inferred as
+        an int) if production stops mapping/passing declared string column types.
+        """
+        import pyarrow.parquet as pq
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            tbl_path = tmpdir / "codes.tbl"
+            tbl_path.write_text("007|\n010|\n100|\n")
+            parquet_path = tmpdir / "codes.parquet"
+
+            # A minimal benchmark declaring a VARCHAR and a TEXT column, exactly as
+            # the production schema-normalization path consumes it.
+            class _DeclaredStringBenchmark:
+                name = "declared_string_fixture"
+
+                def get_schema(self):
+                    return {
+                        "codes": {
+                            "columns": [
+                                {"name": "code", "type": "VARCHAR"},
+                                {"name": "note", "type": "TEXT"},
+                            ]
+                        }
+                    }
+
+            benchmark = _DeclaredStringBenchmark()
+            loader = DataFrameDataLoader(platform="polars")
+
+            # PRODUCTION derivation: the declared VARCHAR/TEXT columns must be
+            # mapped to a string Arrow type here. If the loader stopped mapping
+            # declared string columns this dict would omit them and the leading-zero
+            # assertion below would fail.
+            pyarrow_types = loader._get_pyarrow_types(benchmark)
+            derived_types = pyarrow_types["codes"]
+            assert derived_types["code"] == "string", (
+                f"production loader must derive a string Arrow type for the declared "
+                f"VARCHAR column; got {derived_types.get('code')!r}"
+            )
+            assert derived_types["note"] == "string", (
+                f"production loader must derive a string Arrow type for the declared "
+                f"TEXT column; got {derived_types.get('note')!r}"
+            )
+
+            # PRODUCTION null-marker resolution: a .tbl source resolves to the
+            # empty->NULL marker (""), matching the DuckDB SQL reference.
+            null_markers = loader._get_null_markers(benchmark, {"codes": tbl_path})
+            assert null_markers["codes"] == "", (
+                f"a .tbl source should resolve to the empty->NULL marker; got {null_markers['codes']!r}"
+            )
+
+            # Feed the PRODUCTION-derived types and null marker into the converter
+            # (not hand-injected values), so the contract this test guards is the
+            # real schema -> arrow-types -> converter plumbing.
+            status, row_count = FormatConverter.convert_csv_to_parquet(
+                source_path=tbl_path,
+                target_path=parquet_path,
+                column_names=["code", "note"],
+                delimiter="|",
+                column_types=derived_types,
+                null_marker=null_markers["codes"],
+            )
+
+            assert status == ConversionStatus.SUCCESS
+            assert row_count == 3
+            table = pq.read_table(parquet_path)
+            # Leading zeros preserved (string, not inferred int).
+            assert table.column("code").to_pylist() == ["007", "010", "100"]
+            # All-empty TEXT is pinned to a string column (not dropped to a null
+            # type), matching the SQL reference's nullable VARCHAR.
+            assert str(table.schema.field("note").type) in {"string", "large_string"}
+
     def test_convert_tbl_file(self):
         """Test TBL file conversion with pipe delimiter."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -310,6 +397,72 @@ class TestFormatConverter:
             # Verify date values are actual dates, not strings
             shipdate_col = table.column("l_shipdate")
             assert shipdate_col[0].as_py() == __import__("datetime").date(1996, 3, 13)
+
+    def test_sql_type_to_pyarrow_covers_type_families(self):
+        """Declared SQL type families resolve to a PyArrow type (w9 regression).
+
+        Before w9 the lookup only knew the few names in PYARROW_TYPE_MAP, so a
+        declared TEXT/STRING/BIGINT/NUMERIC column fell through to inference and a
+        null-heavy or numeric-looking text column got the wrong dtype.
+        """
+        assert SchemaMapper.sql_type_to_pyarrow("TEXT") == "string"
+        assert SchemaMapper.sql_type_to_pyarrow("text not null") == "string"
+        assert SchemaMapper.sql_type_to_pyarrow("STRING") == "string"
+        assert SchemaMapper.sql_type_to_pyarrow("VARCHAR(12)") == "string"
+        assert SchemaMapper.sql_type_to_pyarrow("CHARACTER VARYING") == "string"
+        assert SchemaMapper.sql_type_to_pyarrow("BIGINT") == "int64"
+        assert SchemaMapper.sql_type_to_pyarrow("INTEGER") == "int64"
+        assert SchemaMapper.sql_type_to_pyarrow("NUMERIC(10,2)") == "float64"
+        assert SchemaMapper.sql_type_to_pyarrow("DOUBLE PRECISION") == "float64"
+        assert SchemaMapper.sql_type_to_pyarrow("DATE") == "date32"
+        assert SchemaMapper.sql_type_to_pyarrow("TIMESTAMP") == "timestamp[us]"
+        assert SchemaMapper.sql_type_to_pyarrow("TIME") == "string"
+        # Genuinely unknown types are left to inference (None).
+        assert SchemaMapper.sql_type_to_pyarrow("SOMEWEIRDTYPE") is None
+
+    def test_convert_csv_null_marker_controls_empty_string_vs_null(self):
+        """null_marker gates empty-field handling for string columns (w9 regression).
+
+        With null_marker=None an empty field stays "" (matching DuckDB's nullstr
+        sentinel); with null_marker="" it becomes NULL. The same data must
+        materialize differently per the benchmark's resolved CSV dialect so the
+        DataFrame surface does not emit None where the SQL surface emits "".
+        """
+        import pyarrow.parquet as pq
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            csv_path = tmpdir / "t.csv"
+            # row 1 has an empty 'note'
+            csv_path.write_text("1|\n2|hello\n")
+            column_names = ["id", "note"]
+            column_types = {"id": "int64", "note": "string"}
+
+            keep = tmpdir / "keep.parquet"
+            status, _ = FormatConverter.convert_csv_to_parquet(
+                source_path=csv_path,
+                target_path=keep,
+                column_names=column_names,
+                delimiter="|",
+                column_types=column_types,
+                null_marker=None,
+            )
+            assert status == ConversionStatus.SUCCESS
+            note_keep = pq.read_table(keep).column("note").to_pylist()
+            assert note_keep == ["", "hello"]
+
+            nulled = tmpdir / "nulled.parquet"
+            status, _ = FormatConverter.convert_csv_to_parquet(
+                source_path=csv_path,
+                target_path=nulled,
+                column_names=column_names,
+                delimiter="|",
+                column_types=column_types,
+                null_marker="",
+            )
+            assert status == ConversionStatus.SUCCESS
+            note_nulled = pq.read_table(nulled).column("note").to_pylist()
+            assert note_nulled == [None, "hello"]
 
     def test_convert_tbl_with_column_types_casts_dates(self):
         """Test that column_types ensures date typing in TBL files.
@@ -752,6 +905,40 @@ class TestDataFrameDataLoader:
         format = loader._detect_source_format(files)
 
         assert format == DataFormat.PARQUET
+
+    def test_get_schema_info_accepts_table_objects(self):
+        """Table-like schema values provide column names for conversion."""
+        loader = DataFrameDataLoader()
+
+        column = MagicMock()
+        column.name = "load_end_dts"
+        table = MagicMock()
+        table.columns = [column]
+        benchmark = MagicMock()
+        benchmark.get_schema.return_value = {"sat_lineitem": table}
+
+        schema_info = loader._get_schema_info(benchmark)
+
+        assert schema_info["sat_lineitem"] == ["load_end_dts"]
+
+    def test_get_schema_info_accepts_column_mapping(self):
+        """Dict-of-columns schemas provide column names for raw CSV loads."""
+        loader = DataFrameDataLoader()
+        benchmark = MagicMock()
+        benchmark.get_schema.return_value = {
+            "trips": {
+                "columns": {
+                    "pickup_datetime": {"type": "TIMESTAMP"},
+                    "total_amount": {"type": "DOUBLE"},
+                }
+            }
+        }
+
+        schema_info = loader._get_schema_info(benchmark)
+        pyarrow_types = loader._get_pyarrow_types(benchmark)
+
+        assert schema_info["trips"] == ["pickup_datetime", "total_amount"]
+        assert pyarrow_types["trips"]["pickup_datetime"] == "timestamp[us]"
 
     def test_get_source_files_from_benchmark(self):
         """Test getting source files from benchmark.tables."""

@@ -31,30 +31,19 @@ pytestmark = [
 ]
 
 
-@dataclass
-class MockQueryExecution:
-    """Mock query execution for testing."""
-
-    query_id: str
-    execution_time_ms: float = 100.0
-    query_plan: QueryPlanDAG | None = None
-
-
-@dataclass
-class MockPhaseResults:
-    """Mock phase results for testing."""
-
-    queries: list[MockQueryExecution] = field(default_factory=list)
+def _mock_query_result(query_id: str, execution_time_ms: float = 100.0, query_plan: QueryPlanDAG | None = None) -> dict:
+    """Build a query_results dict matching the real BenchmarkResults.query_results shape."""
+    return {"query_id": query_id, "execution_time_ms": execution_time_ms, "query_plan": query_plan}
 
 
 @dataclass
 class MockBenchmarkResults:
-    """Mock benchmark results for testing."""
+    """Mock benchmark results for testing (matches the real query_results flattened list)."""
 
     run_id: str = "test_run"
     platform: str = "duckdb"
     platform_version: str = "0.9.0"
-    phases: dict[str, MockPhaseResults] = field(default_factory=dict)
+    query_results: list[dict] = field(default_factory=list)
 
 
 def _create_plan_with_fingerprint(query_id: str, fingerprint: str) -> QueryPlanDAG:
@@ -231,14 +220,10 @@ class TestCreatePlanMetadataFromResults:
         results = MockBenchmarkResults(
             platform="duckdb",
             platform_version="0.9.0",
-            phases={
-                "power": MockPhaseResults(
-                    queries=[
-                        MockQueryExecution("q1", 100.0, plan1),
-                        MockQueryExecution("q2", 200.0, plan2),
-                    ]
-                )
-            },
+            query_results=[
+                _mock_query_result("q1", 100.0, plan1),
+                _mock_query_result("q2", 200.0, plan2),
+            ],
         )
 
         metadata = create_plan_metadata_from_results(results)
@@ -249,20 +234,20 @@ class TestCreatePlanMetadataFromResults:
         assert metadata.plan_versions == {"q1": 1, "q2": 1}
         assert "q1" in metadata.plan_capture_timestamp
         assert "q2" in metadata.plan_capture_timestamp
+        assert metadata.plan_fingerprint_versions == {
+            "q1": plan1.fingerprint_version,
+            "q2": plan2.fingerprint_version,
+        }
 
     def test_skips_executions_without_plans(self) -> None:
         """Test that executions without plans are skipped."""
         plan1 = _create_plan_with_fingerprint("q1", "a" * 64)
 
         results = MockBenchmarkResults(
-            phases={
-                "power": MockPhaseResults(
-                    queries=[
-                        MockQueryExecution("q1", 100.0, plan1),
-                        MockQueryExecution("q2", 200.0, None),  # No plan
-                    ]
-                )
-            },
+            query_results=[
+                _mock_query_result("q1", 100.0, plan1),
+                _mock_query_result("q2", 200.0, None),  # No plan
+            ],
         )
 
         metadata = create_plan_metadata_from_results(results)
@@ -272,7 +257,7 @@ class TestCreatePlanMetadataFromResults:
 
     def test_handles_empty_results(self) -> None:
         """Test handling results with no executions."""
-        results = MockBenchmarkResults(phases={})
+        results = MockBenchmarkResults(query_results=[])
 
         metadata = create_plan_metadata_from_results(results)
 
@@ -339,6 +324,68 @@ class TestUpdatePlanVersions:
 
         assert current.plan_versions["q1"] == 3
         assert current.plan_versions["q2"] == 1
+
+    def test_new_query_across_fingerprint_version_boundary_starts_at_one(self) -> None:
+        """#1038 review: a brand-new query_id (absent from prev entirely) must
+        always start at version 1, even when its fingerprint_version differs
+        from prev's default - there is no prior recording to be "not
+        comparable" to, so the version-mismatch branch must not apply and
+        fall back to a 0 default (invalid per validate_plan_metadata)."""
+        prev = PlanMetadata(
+            plan_fingerprints={"q1": "a" * 64},
+            plan_versions={"q1": 3},
+            plan_fingerprint_versions={"q1": 1},
+        )
+        current = PlanMetadata(
+            plan_fingerprints={"q1": "a" * 64, "q2": "b" * 64},  # q2 is new, captured as v2
+            plan_versions={},
+            plan_fingerprint_versions={"q1": 1, "q2": 2},
+        )
+
+        update_plan_versions(prev, current)
+
+        assert current.plan_versions["q1"] == 3
+        assert current.plan_versions["q2"] == 1
+        assert not validate_plan_metadata(current)
+
+    def test_fingerprint_version_boundary_does_not_bump_version(self) -> None:
+        """A pure fingerprint-encoding-version bump (qpc-03 v1 -> v2) makes the
+        fingerprint STRING change for the same logical plan (#1028 review).
+        Without the full plan tree to verify equality across encodings, the
+        version must be preserved rather than recording a spurious change."""
+        prev = PlanMetadata(
+            plan_fingerprints={"q1": "a" * 64},
+            plan_versions={"q1": 3},
+            plan_fingerprint_versions={"q1": 1},
+        )
+        current = PlanMetadata(
+            plan_fingerprints={"q1": "b" * 64},  # different string, but...
+            plan_versions={},
+            plan_fingerprint_versions={"q1": 2},  # ...a different encoding version
+        )
+
+        update_plan_versions(prev, current)
+
+        assert current.plan_versions["q1"] == 3
+
+    def test_same_fingerprint_version_still_increments_on_real_change(self) -> None:
+        """A real content change within the SAME fingerprint_version must
+        still increment the version (the boundary exclusion above must not
+        mask genuine plan changes)."""
+        prev = PlanMetadata(
+            plan_fingerprints={"q1": "a" * 64},
+            plan_versions={"q1": 3},
+            plan_fingerprint_versions={"q1": 2},
+        )
+        current = PlanMetadata(
+            plan_fingerprints={"q1": "b" * 64},
+            plan_versions={},
+            plan_fingerprint_versions={"q1": 2},
+        )
+
+        update_plan_versions(prev, current)
+
+        assert current.plan_versions["q1"] == 4
 
 
 class TestValidatePlanMetadata:

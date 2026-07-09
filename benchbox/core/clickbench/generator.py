@@ -179,6 +179,13 @@ class ClickBenchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
     def _generate_data_local(self, output_dir: Path, tables: Optional[list[str]] = None) -> dict[str, Path]:
         """Generate data locally (original implementation)."""
+        # Seed for reproducible data (SSBDataGenerator seeds similarly). Without
+        # this the `random.*` row values differ every run, making top-N /
+        # tie-sensitive queries (e.g. the cross-surface equivalence gate)
+        # non-deterministic. Seeded per generation call so reused generator
+        # instances still produce identical data; like the other generators this
+        # seeds the module-global RNG.
+        random.seed(42)
         if tables is None:
             tables = ["hits"]
 

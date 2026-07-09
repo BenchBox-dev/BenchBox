@@ -1,0 +1,64 @@
+name: Submission Validator Drift Check
+
+# The submission validator workflow (`validate-submission.yml`) exists on both
+# `develop` (source of truth) and `published-results` (the copy that actually
+# runs for contributor PRs). The corpus sync bot cannot mirror workflow files,
+# so the published-results copy is synced by a hand-opened PR — an easy step to
+# forget. This scheduled check fails loudly when the two copies drift beyond the
+# sanctioned slim-branch invocation difference, so a stale validator surfaces
+# instead of silently running behind.
+
+on:
+  schedule:
+    # Weekly, Monday 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch: {}
+  # Also run when develop's copy or the checker itself changes, so a drift is
+  # flagged the moment the source of truth moves ahead of published-results.
+  push:
+    branches:
+      - develop
+    paths:
+      - ".github/workflows/validate-submission.yml"
+      - "scripts/check_submission_validator_sync.py"
+      - ".github/workflows/submission-validator-drift-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  drift-check:
+    name: Compare develop vs published-results validator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Extract the published-results copy
+        run: |
+          git fetch --no-tags --depth=1 origin published-results
+          # Fail clearly if the branch or file is missing rather than silently
+          # passing an empty comparison.
+          if ! git cat-file -e FETCH_HEAD:.github/workflows/validate-submission.yml 2>/dev/null; then
+            echo "::error::published-results has no .github/workflows/validate-submission.yml"
+            exit 2
+          fi
+          git show FETCH_HEAD:.github/workflows/validate-submission.yml \
+            > /tmp/published-validate-submission.yml
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check for drift
+        run: |
+          uv run -- python scripts/check_submission_validator_sync.py \
+            --develop .github/workflows/validate-submission.yml \
+            --published /tmp/published-validate-submission.yml

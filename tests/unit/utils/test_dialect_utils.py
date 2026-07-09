@@ -7,9 +7,12 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import pytest
 
 from benchbox.utils.dialect_utils import (
+    SQLTranslationError,
     _query_has_group_or_order_by_all,
     fix_postgres_date_arithmetic,
     normalize_dialect_for_sqlglot,
+    sql_translation_context,
+    summarize_sql_translation_outcomes,
     translate_sql_query,
 )
 
@@ -218,6 +221,79 @@ class TestSQLTranslation:
         assert "EXTRACT" not in result.upper()
         assert "DATE('1994-01-01', '+1 year')" in result
         assert "STRFTIME('%Y'," in result
+
+    def test_translation_context_records_success_metadata(self):
+        """Successful translation records structured outcome metadata."""
+        query = "SELECT * FROM orders"
+
+        with sql_translation_context(strict=False) as outcomes:
+            result = translate_sql_query(query, target_dialect="duckdb", source_dialect="netezza")
+
+        assert result
+        assert len(outcomes) == 1
+        assert outcomes[0].status == "success"
+        assert outcomes[0].source_dialect == "netezza"
+        assert outcomes[0].target_dialect == "duckdb"
+        assert outcomes[0].translator == "sqlglot"
+
+    def test_translation_context_records_graceful_fallback_metadata(self):
+        """Graceful mode returns source SQL and records fallback category."""
+
+        def fail_preprocessor(_query: str) -> str:
+            raise RuntimeError("synthetic translation failure")
+
+        query = "SELECT * FROM orders"
+
+        with sql_translation_context(strict=False) as outcomes:
+            result = translate_sql_query(
+                query,
+                target_dialect="duckdb",
+                source_dialect="netezza",
+                pre_processors=[fail_preprocessor],
+            )
+
+        assert result == query
+        assert outcomes[0].status == "fallback"
+        assert outcomes[0].warning_category == "translation_failed"
+
+    def test_strict_translation_raises_and_records_failure_metadata(self):
+        """Strict mode fails closed on translation failure."""
+
+        def fail_preprocessor(_query: str) -> str:
+            raise RuntimeError("synthetic translation failure")
+
+        query = "SELECT * FROM orders"
+
+        with sql_translation_context(strict=True) as outcomes:
+            with pytest.raises(SQLTranslationError):
+                translate_sql_query(
+                    query,
+                    target_dialect="duckdb",
+                    source_dialect="netezza",
+                    pre_processors=[fail_preprocessor],
+                )
+
+        assert outcomes[0].status == "failed"
+        assert outcomes[0].strict_mode is True
+        assert outcomes[0].error_category == "translation_failed"
+
+    def test_summarize_translation_outcomes_compacts_repeated_attempts(self):
+        """Result-bundle metadata summarizes repeated attempts compactly."""
+        query = "SELECT * FROM orders"
+
+        with sql_translation_context(strict=False) as outcomes:
+            translate_sql_query(query, target_dialect="duckdb", source_dialect="netezza")
+            translate_sql_query(query, target_dialect="duckdb", source_dialect="netezza")
+
+        summary = summarize_sql_translation_outcomes(outcomes, strict_mode=False)
+
+        assert summary is not None
+        assert summary["status"] == "success"
+        assert summary["attempt_count"] == 2
+        assert summary["success_count"] == 2
+        assert summary["source_dialects"] == ["netezza"]
+        assert summary["target_dialects"] == ["duckdb"]
+        assert summary["outcomes"][0]["count"] == 2
 
 
 class TestIntegrationScenarios:

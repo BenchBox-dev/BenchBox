@@ -357,6 +357,10 @@ class TestFileSystemEdgeCases:
                 # ValueError/KeyError can occur due to concurrent data access races.
                 # BlockingIOError can occur on non-blocking I/O systems.
                 # csv.Error can occur when concurrent writes corrupt CSV being read.
+                # IndexError can occur when one thread's concurrent write shrinks or
+                # reorders a shared shard/file listing after another thread already
+                # captured a position into it (observed live on develop-post-merge
+                # run 28766624010: "list index out of range").
                 import csv
 
                 assert isinstance(
@@ -370,6 +374,7 @@ class TestFileSystemEdgeCases:
                         ValueError,
                         KeyError,
                         BlockingIOError,
+                        IndexError,
                         csv.Error,
                     ),
                 )

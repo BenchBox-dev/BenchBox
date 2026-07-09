@@ -17,7 +17,19 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional
 
+from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
 from benchbox.utils.clock import elapsed_seconds, mono_time
+
+
+def _parse_tpch_query_id(qid: object) -> int:
+    """Parse a TPC-H query id that may carry the CLI's Q prefix ("Q1" -> 1)."""
+    text = str(qid).strip()
+    if text[:1] in ("Q", "q"):
+        text = text[1:]
+    try:
+        return int(text)
+    except ValueError as exc:
+        raise ValueError(f"Invalid TPC-H query id: {qid!r} (expected 1-22, optionally Q-prefixed)") from exc
 
 
 @dataclass
@@ -231,7 +243,7 @@ class TPCHPowerTest:
         # Determine query execution order
         if self.config.query_subset:
             # User specified specific queries - run in their order
-            query_permutation = [int(qid) for qid in self.config.query_subset]
+            query_permutation = [_parse_tpch_query_id(qid) for qid in self.config.query_subset]
             if self.config.verbose:
                 self.logger.info(f"Using user-specified query subset: {query_permutation}")
             # Warn about TPC-H compliance impact
@@ -308,6 +320,11 @@ class TPCHPowerTest:
                                     "error", result_dict.get("row_count_validation_error", "Query validation failed")
                                 )
                                 raise RuntimeError(error_msg)
+                            # Propagate captured plan metadata (including the internal
+                            # _plan_capture_key) so it reaches the result bundle and
+                            # so _attach_captured_plans can match this row by its
+                            # exact key rather than the ambiguous public-id fallback.
+                            propagate_plan_capture_fields(result_dict, query_result)
 
                         if hasattr(self.connection, "commit"):
                             self.connection.commit()
@@ -321,9 +338,15 @@ class TPCHPowerTest:
                         {
                             "execution_time_seconds": execution_time,
                             "success": True,
-                            "result_count": len(rows),
+                            "result_count": self._query_result_count(cursor, rows),
                         }
                     )
+
+                    # Gate-only value oracle: forward the full-result digest the
+                    # adapter computed (behind BENCHBOX_EMIT_RESULT_DIGEST) so the
+                    # bounded correctness gate can assert VALUES, not just row counts.
+                    # None when emission is off; downstream forwarders drop None.
+                    query_result["result_digest"] = self._result_digest_from_cursor(cursor)
 
                     result.queries_successful += 1
 
@@ -382,6 +405,32 @@ class TPCHPowerTest:
             if self.config.verbose:
                 self.logger.error(f"Power Test failed: {e}")
             return result
+
+    @staticmethod
+    def _result_digest_from_cursor(cursor: Any) -> str | None:
+        """Return the gate-only full-result digest the adapter computed, if any.
+
+        The full result set lives in the platform adapter (the wrapped cursor here
+        only carries first_row + count), so the digest is computed there and
+        surfaced via ``platform_result`` behind ``BENCHBOX_EMIT_RESULT_DIGEST``.
+        Only stream 0 carries a stored reference digest (the reference qgen seed).
+        """
+        platform_result = getattr(cursor, "platform_result", None)
+        if isinstance(platform_result, dict):
+            digest = platform_result.get("result_digest")
+            if digest is not None:
+                return str(digest)
+        return None
+
+    @staticmethod
+    def _query_result_count(cursor: Any, rows: list[Any]) -> int:
+        """Return the true result cardinality for adapter cursors when available."""
+        platform_result = getattr(cursor, "platform_result", None)
+        if isinstance(platform_result, dict):
+            reported = platform_result.get("rows_returned")
+            if isinstance(reported, int) and reported >= 0:
+                return reported
+        return len(rows)
 
     def get_all_queries(self) -> dict[str, str]:
         """Get all queries for the power test."""

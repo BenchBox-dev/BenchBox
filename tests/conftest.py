@@ -30,6 +30,8 @@ from typing import Any
 
 import pytest
 
+from benchbox.utils.printing import set_quiet
+
 # Sphinx 11 deprecations in third-party extensions (sphinx_tags, myst_parser, ablog, napoleon).
 # Guarded because older Sphinx versions (e.g. on Python 3.10) lack this class,
 # and --strict-config in pytest.ini would abort on an unresolvable category.
@@ -50,57 +52,6 @@ pytest_plugins = [
     "tests.fixtures.utility_fixtures",
 ]
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-_PROJECT_DIR = _REPO_ROOT / "_project"
-_PROJECT_SCRIPTS_DIR = _PROJECT_DIR / "scripts"
-_RESULTS_EXPLORER_DIR = _REPO_ROOT / "results-explorer"
-_PROJECT_DEPENDENT_TEST_FILES = {
-    Path("tests/unit/cli/test_explorer_build_contract.py"),
-    Path("tests/unit/core/test_platform_labels.py"),
-    Path("tests/unit/test_public_site_theme_contract.py"),
-    Path("tests/unit/test_todo_executable_docs.py"),
-    Path("tests/unit/scripts/test_blind_spot_tools.py"),
-    Path("tests/unit/scripts/test_build_joinorder_data.py"),
-    Path("tests/unit/scripts/test_pr_review_followups.py"),
-    Path("tests/unit/scripts/test_reference_usage_audit.py"),
-    Path("tests/unit/scripts/test_scan_explorer_stale_theme.py"),
-    Path("tests/unit/scripts/test_scan_explorer_tokens.py"),
-    Path("tests/unit/scripts/test_skill_sync_lock_audit.py"),
-    Path("tests/unit/scripts/test_validate_todo.py"),
-}
-_PROJECT_DEPENDENT_TEST_DIRS = {
-    Path("tests/unit/core/explorer_pipeline"),
-}
-_RESULTS_EXPLORER_DEPENDENT_TEST_FILES = {
-    Path("tests/uat/test_explorer_smoke.py"),
-    Path("tests/unit/test_site_header_parity.py"),
-    Path("tests/unit/test_sync_results_workflow.py"),
-}
-_RESULTS_EXPLORER_DEPENDENT_TEST_DIRS = {
-    Path("tests/unit/explorer"),
-}
-
-
-def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool:
-    """Skip dev-project tests when the curated release branch omits dev trees."""
-    try:
-        relative = collection_path.relative_to(_REPO_ROOT)
-    except ValueError:
-        return False
-
-    if not _PROJECT_SCRIPTS_DIR.exists():
-        if relative in _PROJECT_DEPENDENT_TEST_FILES:
-            return True
-        if any(relative == test_dir or test_dir in relative.parents for test_dir in _PROJECT_DEPENDENT_TEST_DIRS):
-            return True
-
-    if not _RESULTS_EXPLORER_DIR.exists() and relative in _RESULTS_EXPLORER_DEPENDENT_TEST_FILES:
-        return True
-    return (
-        any(relative == test_dir or test_dir in relative.parents for test_dir in _RESULTS_EXPLORER_DEPENDENT_TEST_DIRS)
-        and not _RESULTS_EXPLORER_DIR.exists()
-    )
-
 
 @pytest.fixture
 def joinorder_canonical_tiny(tmp_path: Path) -> Path:
@@ -118,6 +69,7 @@ def joinorder_canonical_tiny(tmp_path: Path) -> Path:
 
 # ── Parallel test run mutual exclusion ──────────────────────────────────────
 _test_lock_fd: int | None = None  # Kept open to hold the flock for the session lifetime.
+_test_databases_created = False
 
 
 def _get_test_lock_path() -> Path:
@@ -318,9 +270,80 @@ def _warn_on_unreasoned_skip_markers(items) -> None:
             )
 
 
+def _items_require_test_databases(items) -> bool:
+    """Return True when the selected test set includes database/integration coverage."""
+    return any(item.get_closest_marker("integration") or item.get_closest_marker("database") for item in items)
+
+
+def _create_test_databases() -> None:
+    """Create shared test databases for tests that use persistent DB fixtures."""
+    global _test_databases_created
+    if _test_databases_created:
+        return
+
+    import subprocess
+    import sys
+
+    test_db_dir = Path(__file__).parent / "databases"
+    test_db_dir.mkdir(exist_ok=True)
+
+    create_script = test_db_dir / "create_test_databases.py"
+    if create_script.exists():
+        try:
+            result = subprocess.run(
+                [sys.executable, str(create_script)],
+                capture_output=True,
+                text=True,
+                cwd=str(Path(__file__).parent.parent),
+            )
+            if result.returncode != 0:
+                print(f"Warning: Failed to create test databases: {result.stderr}")
+        except Exception as e:
+            print(f"Warning: Error creating test databases: {e}")
+
+    _test_databases_created = True
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(session, config, items) -> None:
+    """Create shared test databases only when the selected test set needs them."""
+    if _items_require_test_databases(items):
+        _create_test_databases()
+
+
 def pytest_collection_finish(session) -> None:
     """Run read-only marker hygiene checks after collection completes."""
     _warn_on_unreasoned_skip_markers(session.items)
+
+
+@pytest.fixture(autouse=True)
+def _reset_global_quiet_state():
+    """Never let benchbox's global quiet flag leak across tests.
+
+    benchbox.utils.printing keeps module-global output state (_QUIET) that
+    tests toggle via set_quiet(True). A test that fails, times out, or forgets
+    its reset between set_quiet(True) and its cleanup poisons every later
+    test in the same xdist worker: emit() routes to the sink console and
+    capsys sees ''. Observed live on develop-post-merge run 28706929881,
+    where test_display_results failed with CaptureResult(out='') under -n 5
+    while passing in isolation (medium-tier-red-disposition-and-promotion).
+    Resetting AFTER each test (post-yield) contains the blast radius to the
+    leaking test itself.
+
+    ``set_quiet`` is imported at module scope (not lazily here in the
+    teardown body): this fixture is autouse, so its teardown runs after
+    EVERY test, including one that monkeypatches ``builtins.__import__``
+    for the duration of its own test body (e.g. the vortex-converter
+    "missing module" test). A lazy import here would route through that
+    patched ``__import__`` and raise the OTHER test's synthetic
+    ImportError, misattributed to this fixture's teardown, whenever pytest's
+    fixture-teardown ordering runs this after monkeypatch's own finalizer
+    (order is topology-dependent, hence intermittent). Importing once at
+    module load time, before any test's monkeypatch is active, avoids the
+    race entirely.
+    """
+    yield
+    set_quiet(False)
 
 
 def pytest_runtest_setup(item) -> None:
@@ -339,41 +362,6 @@ def pytest_runtest_setup(item) -> None:
 
     if item.get_closest_marker("local_only") and os.environ.get("CI"):
         pytest.skip("Local-only test skipped in CI")
-
-
-def pytest_sessionstart(session) -> None:
-    """Create test databases before the test session starts."""
-    # Skip database setup for unit-only test runs
-    markers = set()
-    for item in session.items:
-        for mark in item.iter_markers():
-            markers.add(mark.name)
-
-    if markers and "integration" not in markers and "database" not in markers:
-        return
-
-    import subprocess
-    import sys
-    from pathlib import Path
-
-    # the test databases directory
-    test_db_dir = Path(__file__).parent / "databases"
-    test_db_dir.mkdir(exist_ok=True)
-
-    # Run the database creation script
-    create_script = test_db_dir / "create_test_databases.py"
-    if create_script.exists():
-        try:
-            result = subprocess.run(
-                [sys.executable, str(create_script)],
-                capture_output=True,
-                text=True,
-                cwd=str(Path(__file__).parent.parent),
-            )
-            if result.returncode != 0:
-                print(f"Warning: Failed to create test databases: {result.stderr}")
-        except Exception as e:
-            print(f"Warning: Error creating test databases: {e}")
 
 
 def pytest_sessionfinish(session, exitstatus) -> None:
@@ -398,6 +386,8 @@ def pytest_terminal_summary(terminalreporter, config, exitstatus) -> None:
     This reads the `.coverage` data file and computes overall coverage using
     the coverage.py API to avoid relying on pytest-cov's fail-under behavior.
     It does not fail the test run; it only prints a prominent warning line.
+    CI remains the blocking gate at 70% via the workflow `--cov-fail-under`
+    flag; this 80% threshold is intentionally advisory.
 
     Only runs when pytest-cov is active (i.e. --cov was passed), so stale
     .coverage files from prior runs don't produce misleading warnings.

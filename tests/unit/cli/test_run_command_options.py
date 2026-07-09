@@ -418,6 +418,7 @@ class TestHelpTopicRendering:
         assert "--mode" in result.output
         assert "--seed" in result.output
         assert "--validation" in result.output
+        assert "--strict-translation" in result.output
         assert "--presort" in result.output
 
     def test_run_help_topic_examples_shows_usage_examples(self):

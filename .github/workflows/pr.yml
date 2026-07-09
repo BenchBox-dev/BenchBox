@@ -24,6 +24,8 @@ jobs:
       code-paths: ${{ steps.classify.outputs.code-paths }}
       unknown-paths: ${{ steps.classify.outputs.unknown-paths }}
       estimated-runner-minutes-saved: ${{ steps.classify.outputs.estimated-runner-minutes-saved }}
+      packaging-needed: ${{ steps.classify.outputs.packaging-needed }}
+      viz-needed: ${{ steps.classify.outputs.viz-needed }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -89,7 +91,22 @@ jobs:
             exit 0
           fi
           mapfile -t yaml_paths < .ci-paths/yaml.txt
-          uv run -- pre-commit run check-yaml --files "${yaml_paths[@]}"
+          # The changed-path lists include deletions; a deleted file path passed
+          # to check-yaml would fail the hook on a legitimate deletion-only PR
+          # (mirrors the TODO-graph step's deleted-path skip below).
+          existing_yaml_paths=()
+          for yaml_path in "${yaml_paths[@]}"; do
+            if [ -e "$yaml_path" ]; then
+              existing_yaml_paths+=("$yaml_path")
+            else
+              echo "Skipping deleted YAML path: $yaml_path"
+            fi
+          done
+          if [ ${#existing_yaml_paths[@]} -eq 0 ]; then
+            echo "No existing YAML content paths to lint."
+            exit 0
+          fi
+          uv run -- pre-commit run check-yaml --files "${existing_yaml_paths[@]}"
 
       - name: Validate artifact hygiene
         run: uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
@@ -102,7 +119,21 @@ jobs:
             exit 0
           fi
           mapfile -t markdown_paths < .ci-paths/markdown.txt
-          uv run -- pre-commit run markdownlint --files "${markdown_paths[@]}"
+          # Skip deleted paths so a deletion-only markdown PR doesn't fail the
+          # hook on a path that no longer exists (see the YAML step above).
+          existing_markdown_paths=()
+          for markdown_path in "${markdown_paths[@]}"; do
+            if [ -e "$markdown_path" ]; then
+              existing_markdown_paths+=("$markdown_path")
+            else
+              echo "Skipping deleted markdown path: $markdown_path"
+            fi
+          done
+          if [ ${#existing_markdown_paths[@]} -eq 0 ]; then
+            echo "No existing markdown content paths to lint."
+            exit 0
+          fi
+          uv run -- pre-commit run markdownlint --files "${existing_markdown_paths[@]}"
 
       - name: Validate TODO graph
         shell: bash
@@ -138,6 +169,94 @@ jobs:
           fi
           make docs-validate
 
+      - name: Validate public contract drift guard
+        shell: bash
+        run: |
+          if [ ! -s .ci-paths/docs.txt ] && [ ! -s .ci-paths/markdown.txt ]; then
+            echo "No docs or markdown paths changed."
+            exit 0
+          fi
+          uv run -- python - <<'PY'
+          from pathlib import Path
+
+          contract = Path("docs/reference/public-contracts.md").read_text(encoding="utf-8")
+          readme = Path("README.md").read_text(encoding="utf-8")
+
+          forbidden_readme_count_claims = [
+              "Twenty-Two Benchmarks",
+              "SQL Platforms (",
+              "DataFrame Platforms (",
+          ]
+          offenders = [phrase for phrase in forbidden_readme_count_claims if phrase in readme]
+          if offenders:
+              raise SystemExit(
+                  "README.md has exact hand-maintained count claims; use registry-derived checks "
+                  f"or mark them non-authoritative: {offenders}"
+              )
+
+          required_surfaces = [
+              "CLI commands and documented options",
+              "Top-level Python wrapper facades",
+              "`benchbox.base.BaseBenchmark`",
+              "`BaseBenchmark.run_with_platform`",
+              "Adapter subclassing hooks and base mixins",
+              "Platform registry metadata",
+              "MCP tools",
+              "Result JSON bundles",
+              "Explorer read model and generated browser inputs",
+              "Public submission validator behavior",
+              "SQL compatibility rule catalog",
+              "Generated compatibility docs",
+              "`benchbox.experimental` namespace",
+              "`_project` scripts, audits, and analysis artifacts",
+              "TODO, DONE, and ADR/future-state docs",
+          ]
+          missing_surfaces = [surface for surface in required_surfaces if surface not in contract]
+          if missing_surfaces:
+              raise SystemExit(f"public-contracts.md missing required surfaces: {missing_surfaces}")
+
+          required_statuses = [
+              "`stable`",
+              "`beta`",
+              "`experimental`",
+              "`repo_only`",
+              "`deprecated`",
+              "`document_only`",
+          ]
+          missing_statuses = [status for status in required_statuses if status not in contract]
+          if missing_statuses:
+              raise SystemExit(f"public-contracts.md missing support_status values: {missing_statuses}")
+
+          from benchbox.core.benchmark_registry import list_benchmark_ids, list_loader_benchmark_ids
+          from benchbox.core.platform_registry import PlatformRegistry
+          from benchbox.core.results.schema import SCHEMA_VERSION
+
+          platforms = PlatformRegistry.get_all_platform_metadata()
+          sql_capable = sum(1 for item in platforms.values() if item.get("capabilities", {}).get("supports_sql"))
+          dataframe_capable = sum(
+              1 for item in platforms.values() if item.get("capabilities", {}).get("supports_dataframe")
+          )
+          dual_mode = sum(
+              1
+              for item in platforms.values()
+              if item.get("capabilities", {}).get("supports_sql")
+              and item.get("capabilities", {}).get("supports_dataframe")
+          )
+
+          source_fragments = [
+              f"{len(list_benchmark_ids())} benchmark metadata entries",
+              f"{len(list_loader_benchmark_ids())} loader-resolved IDs",
+              f"{len(platforms)} platform metadata entries",
+              f"{sql_capable} SQL-capable",
+              f"{dataframe_capable} DataFrame-capable",
+              f"{dual_mode} dual-mode",
+              f"Current result schema version: `{SCHEMA_VERSION}`",
+          ]
+          missing_fragments = [fragment for fragment in source_fragments if fragment not in contract]
+          if missing_fragments:
+              raise SystemExit(f"public-contracts.md source-derived claims are stale: {missing_fragments}")
+          PY
+
   code-lint:
     name: lint
     needs: ci-paths
@@ -170,20 +289,103 @@ jobs:
       - name: Validate test marker annotations
         run: make lint-markers
 
+      - name: Validate import layering
+        run: make lint-imports
+
       - name: Validate artifact hygiene
         run: make artifact-hygiene
 
       - name: Timing policy (wall-clock allowlist)
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
-      - name: Compatibility docs drift check
+      - name: Compatibility governance drift check
         run: make compat-docs-check
+
+      - name: Oracle coverage map drift check
+        run: make oracle-coverage-map-check
+
+      - name: Public contract drift check
+        run: |
+          uv run -- python - <<'PY'
+          from pathlib import Path
+          from benchbox.core.benchmark_registry import list_benchmark_ids, list_loader_benchmark_ids
+          from benchbox.core.platform_registry import PlatformRegistry
+          from benchbox.core.results.schema import SCHEMA_VERSION
+
+          contract = Path("docs/reference/public-contracts.md").read_text(encoding="utf-8")
+          readme = Path("README.md").read_text(encoding="utf-8")
+
+          forbidden_readme_count_claims = [
+              "Twenty-Two Benchmarks",
+              "SQL Platforms (",
+              "DataFrame Platforms (",
+          ]
+          offenders = [phrase for phrase in forbidden_readme_count_claims if phrase in readme]
+          if offenders:
+              raise SystemExit(
+                  "README.md has exact hand-maintained count claims; use registry-derived checks "
+                  f"or mark them non-authoritative: {offenders}"
+              )
+
+          platforms = PlatformRegistry.get_all_platform_metadata()
+          sql_capable = sum(1 for item in platforms.values() if item.get("capabilities", {}).get("supports_sql"))
+          dataframe_capable = sum(
+              1 for item in platforms.values() if item.get("capabilities", {}).get("supports_dataframe")
+          )
+          dual_mode = sum(
+              1
+              for item in platforms.values()
+              if item.get("capabilities", {}).get("supports_sql")
+              and item.get("capabilities", {}).get("supports_dataframe")
+          )
+
+          source_fragments = [
+              f"{len(list_benchmark_ids())} benchmark metadata entries",
+              f"{len(list_loader_benchmark_ids())} loader-resolved IDs",
+              f"{len(platforms)} platform metadata entries",
+              f"{sql_capable} SQL-capable",
+              f"{dataframe_capable} DataFrame-capable",
+              f"{dual_mode} dual-mode",
+              f"Current result schema version: `{SCHEMA_VERSION}`",
+          ]
+          missing_fragments = [fragment for fragment in source_fragments if fragment not in contract]
+          if missing_fragments:
+              raise SystemExit(f"public-contracts.md source-derived claims are stale: {missing_fragments}")
+          PY
 
       - name: Dependency audit (no unused declarations)
         run: make audit-deps
 
+      - name: Dependency inventory drift check
+        run: make audit-raw-check
+
       - name: Release curation list drift check
         run: uv run -- python scripts/check_release_curation.py
+
+      - name: skill-sync tracked snapshot verify (cloud/CI integrity gate)
+        # Public tool, pinned by sha (no token). Proves .claude/skills matches
+        # skill-sync.lock + the regenerated config — fails on any hand-edit or
+        # stale snapshot. Switch to `npx -y skill-sync@<ver>` once published.
+        run: npx -y github:joeharris76/skill-sync#d3c9c45 verify --project .
+
+      - name: Untracked skill-mirror drift guard (cloud parity)
+        # The codex/gemini/antigravity mirrors and the curated-out `blog` skill are
+        # deliberately untracked: cloud is Claude-only and `blog` is published
+        # separately. `skill-sync verify` only inspects the tracked `claude` target
+        # (it skips untracked targets and `ignore`d paths), so it cannot catch these
+        # being force-added. Fail the build if any become git-tracked.
+        # Rationale: _project/decisions/claude-settings-cloud-ownership-2026-06-29.md
+        run: |
+          tracked=$(git ls-files -- \
+            '.codex/skills' '.codex/shared-skills' '.codex/shared-skills.lock.json' \
+            '.gemini/skills' '.antigravity/skills' \
+            '.claude/skills/blog')
+          if [ -n "$tracked" ]; then
+            echo "ERROR: deliberately-untracked skill mirrors are now git-tracked:" >&2
+            echo "$tracked" >&2
+            echo "Untrack them with 'git rm --cached -r <path>' (regenerate locally via 'make skill-sync')." >&2
+            exit 1
+          fi
 
   code-test:
     name: test (ubuntu-latest, 3.12)
@@ -193,6 +395,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -209,6 +413,42 @@ jobs:
         run: |
           uv sync --group dev
 
+      - name: Run cross-surface mutation target drift guard
+        run: |
+          uv run -- python -m pytest \
+            tests/integration/test_cross_surface_mutation_sensitivity.py::test_targets_cover_every_enforced_gate \
+            -m "slow" -n 0 --tb=short -q
+
+      - name: Run cross-surface GATES Make/CI pinning guard
+        run: |
+          # Medium-marked ratchet, so the fast-lane selection below skips it;
+          # invoke the node explicitly so a new GATES entry without its Make
+          # target + correctness-gate CI step fails required CI.
+          uv run -- python -m pytest \
+            tests/unit/test_standardized_test_commands.py::TestMakefileCommands::test_cross_surface_gates_are_pinned_in_make_and_ci \
+            -m "medium" -n 0 --tb=short -q
+
+      - name: Run promoted h2odb mutation-catch reproducer (#901)
+        run: |
+          # #901's mutation-sensitivity catch assertions are slow-marked, so the
+          # fast-lane selection below skips them; invoke the h2odb cell (the gate
+          # whose scale fidelity #901 fixed: gate.scale_factor=0.01 matching
+          # production) explicitly so a regression in its mutation catch fails
+          # required CI instead of only at the main-release boundary (test.yml).
+          # Bounded: the single load-bearing gate cell, not the full slow matrix.
+          uv run -- python -m pytest \
+            tests/integration/test_cross_surface_mutation_sensitivity.py \
+            -m "slow" -n 0 -k "h2odb" --tb=short -q
+
+      - name: Run promoted plan-capture-phase reproducers (#909)
+        run: |
+          # #909's connection-fencing and plan-identity reproducers are
+          # medium-marked and otherwise run only in test.yml; invoke them here so
+          # they execute in the required develop-PR gate, not one ring out.
+          uv run -- python -m pytest \
+            tests/integration/test_plan_capture_phase.py \
+            -m "medium" -n 0 --tb=short -q
+
       - name: Run fast tests
         run: |
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
@@ -220,6 +460,270 @@ jobs:
           file: ./coverage.xml
           fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  correctness-gate:
+    name: correctness-gate
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run bounded real-result correctness gate
+        run: make test-correctness-gate
+
+      - name: Run TPC-Havoc variant-equivalence gate
+        run: make tpchavoc-equivalence-report
+
+      - name: Run TPC-Havoc DataFrame variant-equivalence gate
+        run: make tpchavoc-dataframe-equivalence-report
+
+      - name: Run SSB cross-surface SQL<->DataFrame equivalence gate
+        run: make ssb-cross-surface-equivalence-report
+
+      - name: Run AMPLab cross-surface SQL<->DataFrame equivalence gate
+        run: make amplab-cross-surface-equivalence-report
+
+      - name: Run CoffeeShop cross-surface SQL<->DataFrame equivalence gate
+        run: make coffeeshop-cross-surface-equivalence-report
+
+      - name: Run ClickBench cross-surface SQL<->DataFrame equivalence gate
+        run: make clickbench-cross-surface-equivalence-report
+
+      - name: Run JoinOrder-synthetic cross-surface SQL<->DataFrame equivalence gate
+        run: make joinorder-synthetic-cross-surface-equivalence-report
+
+      - name: Run H2O-DB cross-surface SQL<->DataFrame equivalence gate
+        run: make h2odb-cross-surface-equivalence-report
+
+      - name: Run Read Primitives cross-surface SQL<->DataFrame equivalence gate
+        run: make read-primitives-cross-surface-equivalence-report
+
+  plan-capture-gate:
+    name: plan-capture-gate
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run in-process plan-capture gate
+        run: make plan-capture-gate
+
+  postgres-integration:
+    name: postgres-integration
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Non-blocking: service container startup can be flaky; failures surfaced as
+    # warnings rather than a gate block to avoid spurious PR failures.
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: benchbox
+          POSTGRES_PASSWORD: benchbox
+          POSTGRES_DB: benchbox_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Wait for PostgreSQL service to be reachable
+        run: |
+          # The live tests skip via skip_unless_docker_service when localhost:5432
+          # is unreachable, and pytest exits 0 on an all-skipped run. That would
+          # turn this non-blocking sample green without ever exercising PostgreSQL
+          # plan capture, indistinguishable from a real pass in the PR checks UI.
+          # Fail the step outright if the service container never came up so the
+          # continue-on-error job surfaces as visibly red instead.
+          for attempt in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U benchbox >/dev/null 2>&1; then
+              echo "PostgreSQL is reachable."
+              exit 0
+            fi
+            echo "Waiting for PostgreSQL (attempt ${attempt}/30)..."
+            sleep 2
+          done
+          echo "::error::PostgreSQL service never became reachable on localhost:5432; the live integration sample cannot be skipped silently."
+          exit 1
+
+      - name: Run PostgreSQL live integration tests
+        run: |
+          # --no-header keeps the summary line parseable; -p no:cacheprovider
+          # avoids a stale cache masking collection. The grep guard fails the
+          # step when the run collected/ran nothing but skips (e.g. every test
+          # skipped despite a reachable service), so an all-skipped run cannot
+          # silently render as green in the PR checks UI.
+          set -o pipefail
+          uv run -- python -m pytest tests/integration/platforms/test_postgresql_live.py \
+            -m "live_postgresql" --tb=short -v -p no:cacheprovider \
+            | tee /tmp/pg_live_output.txt
+          if ! grep -Eq '[0-9]+ passed' /tmp/pg_live_output.txt; then
+            echo "::error::PostgreSQL live integration tests produced no passing tests (all skipped or none collected); refusing to report a silent pass."
+            exit 1
+          fi
+
+      # Second-engine equivalence SAMPLE (non-blocking, see continue-on-error
+      # above). The DuckDB SQL gate (correctness-gate job) stays the hard
+      # blocker; this samples TPC-Havoc variant equivalence one engine over to
+      # catch translation-induced divergence. Both canonical and variants are
+      # translated to the postgres dialect and compared on this same instance.
+      - name: Run TPC-Havoc PostgreSQL variant-equivalence sample
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: benchbox
+          PGPASSWORD: benchbox
+          PGDATABASE: benchbox_test
+        run: |
+          set -o pipefail
+          uv run -- python -m pytest \
+            tests/integration/platforms/test_tpchavoc_postgres_equivalence.py \
+            -m "live_postgresql" -n 0 --tb=short -v -p no:cacheprovider \
+            | tee /tmp/pg_tpchavoc_output.txt
+          if ! grep -Eq '[0-9]+ passed' /tmp/pg_tpchavoc_output.txt; then
+            echo "::error::TPC-Havoc PostgreSQL variant-equivalence sample produced no passing tests (all skipped or none collected); refusing to report a silent pass."
+            exit 1
+          fi
+
+  datafusion-integration:
+    name: datafusion-integration
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Non-blocking: this is the THIRD-engine equivalence SAMPLE, not a gate.
+    # The DuckDB SQL gate (correctness-gate job) stays the hard blocker.
+    # DataFusion is in-process (no service container), and its execution gaps
+    # DIFFER from Postgres's, so this samples translation-induced divergence a
+    # third engine over. continue-on-error keeps it a sample, not a blocker.
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      # Third-engine equivalence SAMPLE plus the DataFusion .tbl trailing-delimiter
+      # load regression. Both canonical and variants are translated to the
+      # datafusion dialect and compared on the same in-process session (shared
+      # translation cancels out); DATAFUSION_TPCHAVOC_SKIPS variants are excluded,
+      # never marked equivalent. Both files are slow-marked, so -m "slow" selects
+      # them (overriding the default fast-lane deselect).
+      - name: Run TPC-Havoc DataFusion variant-equivalence sample and .tbl load regression
+        run: |
+          uv run -- python -m pytest \
+            tests/integration/platforms/test_tpchavoc_datafusion_equivalence.py \
+            tests/integration/platforms/test_datafusion_tbl_load.py \
+            -m "slow" -n 0 --tb=short -v
+
+  clickhouse-integration:
+    name: clickhouse-integration
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Non-blocking: this is the FOURTH-engine equivalence SAMPLE, not a gate.
+    # The DuckDB SQL gate (correctness-gate job) stays the hard blocker.
+    # ClickHouse runs in-process via chDB (clickhouse-local), no service container,
+    # and is the first sampled engine on a NATIVE non-Postgres SQLGlot dialect, so
+    # this samples translation-induced divergence through a different seam path.
+    # Unlike the other three engines it is NOT systematic-zero - it surfaces real
+    # engine-semantic result differences classified in CLICKHOUSE_KNOWN_DIVERGENCES.
+    # continue-on-error keeps it a sample, not a blocker.
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      # Fourth-engine equivalence SAMPLE. Both canonical and variants are
+      # translated to the NATIVE clickhouse dialect and compared on the same
+      # in-process chDB instance (shared translation cancels out);
+      # CLICKHOUSE_TPCHAVOC_SKIPS variants are excluded, never marked equivalent,
+      # and the residue is classified against CLICKHOUSE_KNOWN_DIVERGENCES. The
+      # live sweep is tpchavoc + slow-marked; `-m "tpchavoc"` with a pinned path
+      # selects it (overriding the default fast-lane deselect).
+      - name: Run TPC-Havoc ClickHouse variant-equivalence sample
+        run: |
+          uv run -- python -m pytest \
+            tests/integration/platforms/test_tpchavoc_clickhouse_equivalence.py \
+            -m "tpchavoc" -n 0 --tb=short -v
 
   explorer-tokens:
     name: explorer-tokens
@@ -258,6 +762,133 @@ jobs:
         # does not pay a dependency-sync cost before deciding.
         run: make lint-site-theme-tokens
 
+  package-smoke:
+    name: package-smoke
+    needs: ci-paths
+    # Path-filtered: only runs when packaging metadata changed (pyproject.toml,
+    # MANIFEST.in, setup.py/cfg, benchbox/__init__.py, uv.lock). Steps below are
+    # copied from nightly.yml's test-package job (ubuntu/3.12 leg only - the
+    # full ubuntu+windows matrix stays nightly-only, see nightly.yml:261-311).
+    if: ${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build package
+        run: |
+          uv build
+
+      - name: Test package installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
+          if [ "$wheel_count" != "1" ]; then
+            echo "::error::Expected exactly one wheel, found $wheel_count"
+            find dist -maxdepth 1 -type f -print
+            exit 1
+          fi
+          wheel=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
+          tmpdir=$(mktemp -d)
+          cd "$tmpdir"
+          # Minimal-surface gate: a clean core install must import benchbox AND
+          # must not pull pandas (optional engine/DataFrame dep). This is the
+          # contract whose absence let v0.3.0 ship a broken clean install.
+          uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
+          uv run --isolated --no-project --with "$wheel" -- benchbox --help
+
+  dependency-audit:
+    name: dependency-audit
+    needs: ci-paths
+    # Path-filtered on the same packaging group as package-smoke (pyproject.toml
+    # / uv.lock changes are the common case that shifts the dependency graph).
+    if: ${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      # Comma-separated GHSA/CVE IDs for temporarily accepted false positives.
+      # Keep empty unless triage is documented in the TODO item.
+      # PYSEC-2026-87 (lxml): redshift-connector==2.1.13 pins lxml<=6.0.2, so
+      # the fixed lxml 6.1.0 can't be resolved until upstream relaxes that
+      # bound. See _project/TODO/main/planning/lxml-cve-pysec-2026-87-blocked-by-redshift-connector.yaml
+      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-87"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run security audit
+        run: |
+          # `uvx pip-audit` runs pip-audit in its own isolated tool environment,
+          # auditing pip-audit's dependencies, not BenchBox's. `uv run --with` layers
+          # pip-audit onto the project environment `uv sync --group dev` just built,
+          # so the dependency graph actually audited is the one pyproject.toml/uv.lock
+          # produce.
+          if [ -n "${PIP_AUDIT_IGNORE_VULNS}" ]; then
+            IGNORE_ARGS=$(printf '%s' "${PIP_AUDIT_IGNORE_VULNS}" | tr ',' '\n' | sed '/^$/d;s/^[[:space:]]*//;s/[[:space:]]*$//;/^$/d;s/^/--ignore-vuln /' | tr '\n' ' ')
+            uv run --with pip-audit -- pip-audit ${IGNORE_ARGS}
+          else
+            uv run --with pip-audit -- pip-audit
+          fi
+
+  parity-check:
+    name: parity-check
+    needs: ci-paths
+    # Path-filtered on results-explorer/viz source changes (see
+    # _project/DONE/main/parity-check-develop-ring.yaml). `make parity-check`
+    # is Python-only (no npm/vitest install), measured at well under a second
+    # locally, so it is cheap enough to block develop PRs.
+    #
+    # PROMOTED TO THE REQUIRED LANE 2026-07-05 (parity-check-promotion): the
+    # job is now observed by ci-required-result via PARITY_CHECK_RESULT with
+    # the package-smoke skipped-counts-as-pass rule, and continue-on-error is
+    # dropped. Both promotion criteria met: (1) one green run on a real
+    # GitHub runner (PR #973, run 28742318825 job 85227174150 - the runner's
+    # `make parity-check` printed "fixtures match Python source"); (2) the
+    # geomean_ms 2e-13 last-bit drift seen locally did NOT reproduce on the
+    # runner, so it is a local libm transcendental-precision artifact, not a
+    # fixture error - exact comparison is kept and the drift is documented in
+    # tests/parity/README.md. Path-filtering stays: a non-viz PR skips this
+    # job and passes via skipped-counts-as-pass.
+    if: ${{ needs.ci-paths.outputs.viz-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Verify parity fixtures match Python source
+        run: make parity-check
+
   audit-sha:
     name: audit-sha
     needs: ci-paths
@@ -293,7 +924,7 @@ jobs:
 
   ci-required-result:
     name: ci-required-result
-    needs: [ci-paths, content-guard, code-lint, code-test, explorer-tokens, audit-sha]
+    needs: [ci-paths, content-guard, code-lint, code-test, correctness-gate, plan-capture-gate, explorer-tokens, audit-sha, package-smoke, dependency-audit, parity-check]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -303,8 +934,13 @@ jobs:
           CONTENT_RESULT: ${{ needs.content-guard.result }}
           LINT_RESULT: ${{ needs.code-lint.result }}
           TEST_RESULT: ${{ needs.code-test.result }}
+          CORRECTNESS_RESULT: ${{ needs.correctness-gate.result }}
+          PLAN_CAPTURE_RESULT: ${{ needs.plan-capture-gate.result }}
           EXPLORER_TOKENS_RESULT: ${{ needs.explorer-tokens.result }}
           AUDIT_SHA_RESULT: ${{ needs.audit-sha.result }}
+          PACKAGE_SMOKE_RESULT: ${{ needs.package-smoke.result }}
+          DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
+          PARITY_CHECK_RESULT: ${{ needs.parity-check.result }}
           CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
           SAFE_CONTENT_ONLY: ${{ needs.ci-paths.outputs.safe-content-only }}
@@ -327,6 +963,36 @@ jobs:
             exit 1
           fi
 
+          # package-smoke/dependency-audit are gated on the packaging path
+          # filter. A "skipped" result (the filter did not match) counts as
+          # success - a PR that never touched packaging paths must still
+          # pass. A PR that DID touch those paths gets a real success/failure
+          # result from the job itself, so this cannot silently green a
+          # packaging regression (pr-gate-package-and-audit-promotion.yaml).
+          if [ "$PACKAGE_SMOKE_RESULT" != "success" ] \
+              && [ "$PACKAGE_SMOKE_RESULT" != "skipped" ]; then
+            echo "package-smoke=$PACKAGE_SMOKE_RESULT"
+            exit 1
+          fi
+
+          if [ "$DEPENDENCY_AUDIT_RESULT" != "success" ] \
+              && [ "$DEPENDENCY_AUDIT_RESULT" != "skipped" ]; then
+            echo "dependency-audit=$DEPENDENCY_AUDIT_RESULT"
+            exit 1
+          fi
+
+          # parity-check is gated on the viz path filter with the same
+          # skipped-counts-as-pass rule (promoted 2026-07-05,
+          # parity-check-promotion): a non-viz PR skips it and passes, a
+          # viz-touching PR gets a real success/failure so a CLI-vs-explorer
+          # numeric parity regression now blocks merge instead of showing
+          # red-but-mergeable.
+          if [ "$PARITY_CHECK_RESULT" != "success" ] \
+              && [ "$PARITY_CHECK_RESULT" != "skipped" ]; then
+            echo "parity-check=$PARITY_CHECK_RESULT"
+            exit 1
+          fi
+
           if [ "$NEEDS_CODE_CI" = "false" ]; then
             echo "Content-only PR; skipped Python code CI."
             echo "safe-content-only=$SAFE_CONTENT_ONLY"
@@ -342,10 +1008,13 @@ jobs:
             exit 1
           fi
 
-          if [ "$LINT_RESULT" = "success" ] && [ "$TEST_RESULT" = "success" ]; then
-            echo "Code/infra PR; lint and fast tests passed."
+          if [ "$LINT_RESULT" = "success" ] \
+              && [ "$TEST_RESULT" = "success" ] \
+              && [ "$CORRECTNESS_RESULT" = "success" ] \
+              && [ "$PLAN_CAPTURE_RESULT" = "success" ]; then
+            echo "Code/infra PR; lint, fast tests, correctness gate, and plan-capture gate passed."
             exit 0
           fi
 
-          echo "code-lint=$LINT_RESULT code-test=$TEST_RESULT"
+          echo "code-lint=$LINT_RESULT code-test=$TEST_RESULT correctness-gate=$CORRECTNESS_RESULT plan-capture-gate=$PLAN_CAPTURE_RESULT"
           exit 1

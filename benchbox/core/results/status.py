@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
-NON_CLEAN_VALIDATION_STATUSES: frozenset[str] = frozenset({"failed", "interrupted", "partial", "error"})
+NON_CLEAN_VALIDATION_STATUSES: frozenset[str] = frozenset(
+    {"failed", "interrupted", "partial", "error", "not_run", "not_validated", "uncertain", "unknown"}
+)
+NON_CLEAN_TRANSLATION_STATUSES: frozenset[str] = frozenset({"fallback", "failed"})
+# Statuses that make a run a *CLI-level* failure (non-zero exit). Narrower than
+# NON_CLEAN_VALIDATION_STATUSES: publication must flag unvalidated results
+# (not_run, not_validated, ...), but a completed run whose validation never
+# executed — DataFrame mode, --validation disabled — is not a failed run.
+# Matches the v0.3.0 exit semantics.
+CLI_FAILURE_VALIDATION_STATUSES: frozenset[str] = frozenset({"failed", "interrupted", "partial", "error"})
 
 
 def normalize_validation_status(value: Any) -> str | None:
@@ -21,6 +31,22 @@ def validation_status_is_non_clean(value: Any) -> bool:
     """Return True when a validation status must not be treated as a clean pass."""
     status = normalize_validation_status(value)
     return status in NON_CLEAN_VALIDATION_STATUSES
+
+
+def normalize_translation_status(value: Any) -> str | None:
+    """Normalize schema and model SQL translation statuses for policy checks."""
+    if isinstance(value, Mapping):
+        value = value.get("status")
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    return normalized or None
+
+
+def translation_status_is_non_clean(value: Any) -> bool:
+    """Return True when a translation status must not be treated as a clean pass."""
+    status = normalize_translation_status(value)
+    return status in NON_CLEAN_TRANSLATION_STATUSES
 
 
 def result_failed_query_count(result: Any) -> int:
@@ -46,12 +72,38 @@ def result_non_clean_reason(result: Any) -> str | None:
     status = normalize_validation_status(getattr(result, "validation_status", None))
     if status in NON_CLEAN_VALIDATION_STATUSES:
         return f"validation_status={status}"
+
+    translation_status = _result_translation_status(result)
+    if translation_status in NON_CLEAN_TRANSLATION_STATUSES:
+        return f"translation_status={translation_status}"
     return None
 
 
 def result_is_clean_pass(result: Any) -> bool:
-    """Return True when a result has no query failures or non-clean validation status."""
+    """Return True when a result has no query failures, non-clean validation, or translation fallback."""
     return result_non_clean_reason(result) is None
+
+
+def result_cli_failure_reason(result: Any) -> str | None:
+    """Return a reason when a completed run should exit non-zero at the CLI.
+
+    Narrower than :func:`result_non_clean_reason`: validation that never
+    executed (``not_run``/``not_validated``/...) keeps the bundle non-clean for
+    publication, but does not fail the run itself.
+    """
+    failed = result_failed_query_count(result)
+    if failed:
+        noun = "query" if failed == 1 else "queries"
+        return f"{failed} failed {noun}"
+
+    status = normalize_validation_status(getattr(result, "validation_status", None))
+    if status in CLI_FAILURE_VALIDATION_STATUSES:
+        return f"validation_status={status}"
+
+    translation_status = _result_translation_status(result)
+    if translation_status in NON_CLEAN_TRANSLATION_STATUSES:
+        return f"translation_status={translation_status}"
+    return None
 
 
 def bundle_failed_query_count(data: dict[str, Any]) -> int:
@@ -86,12 +138,23 @@ def bundle_non_clean_reason(data: dict[str, Any]) -> str | None:
     status = _bundle_validation_status(data)
     if status in NON_CLEAN_VALIDATION_STATUSES:
         return f"validation_status={status}"
+
+    translation_status = _bundle_translation_status(data)
+    if translation_status in NON_CLEAN_TRANSLATION_STATUSES:
+        return f"translation_status={translation_status}"
     return None
 
 
 def bundle_is_clean_pass(data: dict[str, Any]) -> bool:
-    """Return True when a schema-v2 bundle has no query failures or non-clean status."""
+    """Return True when a schema-v2 bundle has no query failures, non-clean validation, or translation fallback."""
     return bundle_non_clean_reason(data) is None
+
+
+def _result_translation_status(result: Any) -> str | None:
+    execution_metadata = getattr(result, "execution_metadata", None)
+    if not isinstance(execution_metadata, Mapping):
+        return None
+    return normalize_translation_status(execution_metadata.get("translation"))
 
 
 def _bundle_validation_status(data: dict[str, Any]) -> str | None:
@@ -99,6 +162,13 @@ def _bundle_validation_status(data: dict[str, Any]) -> str | None:
     if not isinstance(summary, dict):
         return None
     return normalize_validation_status(summary.get("validation"))
+
+
+def _bundle_translation_status(data: dict[str, Any]) -> str | None:
+    execution = data.get("execution")
+    if not isinstance(execution, dict):
+        return None
+    return normalize_translation_status(execution.get("translation"))
 
 
 def _query_row_failed(query: Any) -> bool:

@@ -14,12 +14,12 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q12_expression_impl as _q12_expr_base,
     q12_pandas_impl as _q12_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
@@ -636,40 +636,4 @@ def q12_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q12_v1_expression_impl, q12_v1_pandas_impl),
-    (q12_v2_expression_impl, q12_v2_pandas_impl),
-    (q12_v3_expression_impl, q12_v3_pandas_impl),
-    (q12_v4_expression_impl, q12_v4_pandas_impl),
-    (q12_v5_expression_impl, q12_v5_pandas_impl),
-    (q12_v6_expression_impl, q12_v6_pandas_impl),
-    (q12_v7_expression_impl, q12_v7_pandas_impl),
-    (q12_v8_expression_impl, q12_v8_pandas_impl),
-    (q12_v9_expression_impl, q12_v9_pandas_impl),
-    (q12_v10_expression_impl, q12_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q12 implementation",
-    "Pre-filter: apply all lineitem predicates before joining orders",
-    "Column prune: select only needed columns before joining",
-    "Intermediate vars: explicit DataFrames for filter, join, agg, sort steps",
-    "Pre-compute derived: add priority flag columns before groupby",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Join reorder: join orders first, then apply lineitem filters",
-    "Filter combination: split mode filter and date filters as separate calls",
-    "Explicit sort: descending=[False] passed explicitly",
-    "Alternative formula: OR of equality checks instead of is_in for shipmode",
-]
-
-Q12_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q12v{v}",
-        query_name=f"TPC-H Q12 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q12_VARIANTS = build_yaml_variants(__file__, globals(), 12, JOIN_AGG_FILTER)

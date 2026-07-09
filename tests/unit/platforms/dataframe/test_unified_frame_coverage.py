@@ -88,6 +88,16 @@ class _DFExpr:
     def __str__(self):
         return str(self.value)
 
+    def rex_call_operator(self):
+        # Mirror real DataFusion Expr behavior: rex_call_operator() always
+        # raises, wrapping a debug-style dump of the expression's own AST in
+        # the same "Catch all triggered in get_operator_name: ..." text real
+        # DataFusion uses (confirmed against DataFusion 43.0.0 and 53.0.0).
+        # None of these fakes represent an Alias(BinaryExpr(...)) shape, so
+        # _get_datafusion_ast_string() should treat this as "not our
+        # pattern" (return None) rather than raising DataFusionASTFormatError.
+        raise RuntimeError(f"{uf._DATAFUSION_AST_ERROR_PREFIX}: {self.value!r}")
+
 
 class _DFAggExpr(_DFExpr):
     def filter(self, condition):
@@ -376,8 +386,8 @@ class _DefaultNativeExpr:
     def std(self):
         return _DefaultNativeExpr(("std", self.value))
 
-    def quantile(self, q):
-        return _DefaultNativeExpr(("quantile", self.value, q))
+    def quantile(self, q, interpolation="nearest"):
+        return _DefaultNativeExpr(("quantile", self.value, q, interpolation))
 
     def alias(self, name):
         return _DefaultNativeExpr(("alias", self.value, name))
@@ -496,13 +506,23 @@ def test_datafusion_ast_extractors_basic_cases():
 
 
 def test_get_datafusion_ast_string_success_and_unexpected_error():
+    # Both fakes use the real "Catch all triggered in get_operator_name: ..."
+    # wrapper DataFusion actually raises (confirmed against DataFusion 43.0.0
+    # and 53.0.0) so this test exercises the sanity-check branch, not the
+    # format-drift branch covered separately by
+    # test_unified_frame_datafusion_ast.py.
     class ExprWithAst:
         def rex_call_operator(self):
-            raise RuntimeError("Alias(BinaryExpr(AggregateFunction(...)))")
+            raise RuntimeError(f"{uf._DATAFUSION_AST_ERROR_PREFIX}: Alias(BinaryExpr(AggregateFunction(...)))")
 
     class ExprWithoutAst:
         def rex_call_operator(self):
-            raise RuntimeError("unrelated failure")
+            # A genuinely different expression shape (e.g. a plain Column) -
+            # still matches the wrapper format but not the Alias/BinaryExpr/
+            # AggregateFunction sanity-check keywords, so this must return
+            # None (fall back to unchanged-expression behavior) rather than
+            # raising DataFusionASTFormatError.
+            raise RuntimeError(f"{uf._DATAFUSION_AST_ERROR_PREFIX}: Column {{ relation: None, name: \\'x\\' }}")
 
     assert "Alias" in uf._get_datafusion_ast_string(ExprWithAst())
     assert uf._get_datafusion_ast_string(ExprWithoutAst()) is None
@@ -524,6 +544,7 @@ def test_extract_datafusion_agg_arithmetic_for_literal(monkeypatch):
     class Expr:
         def rex_call_operator(self):
             raise RuntimeError(
+                f"{uf._DATAFUSION_AST_ERROR_PREFIX}: "
                 'Alias(BinaryExpr { left: AggregateFunction( inner: Sum { args: [Column { name: \\"l_extendedprice\\" }] }), '
                 'op: Multiply, right: Literal(Float64(0.5), None) }, name: \\"half_revenue\\")'
             )

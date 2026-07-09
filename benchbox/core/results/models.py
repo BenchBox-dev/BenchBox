@@ -40,6 +40,8 @@ QUERY_RUN_TYPES = {
 
 @dataclass
 class TableGenerationStats:
+    """Per-table data generation metrics captured during the generate phase."""
+
     generation_time_ms: int
     status: str
     rows_generated: int
@@ -54,6 +56,8 @@ class TableGenerationStats:
 
 @dataclass
 class DataGenerationPhase:
+    """Aggregate data generation metrics for a benchmark run."""
+
     duration_ms: int
     status: str
     tables_generated: int
@@ -64,6 +68,8 @@ class DataGenerationPhase:
 
 @dataclass
 class TableCreationStats:
+    """Per-table schema creation metrics captured during setup."""
+
     creation_time_ms: int
     status: str
     constraints_applied: int
@@ -75,6 +81,8 @@ class TableCreationStats:
 
 @dataclass
 class SchemaCreationPhase:
+    """Aggregate schema creation metrics for a benchmark run."""
+
     duration_ms: int
     status: str
     tables_created: int
@@ -85,6 +93,8 @@ class SchemaCreationPhase:
 
 @dataclass
 class TableLoadingStats:
+    """Per-table load metrics captured during the load phase."""
+
     rows: int
     load_time_ms: int
     status: str
@@ -97,6 +107,8 @@ class TableLoadingStats:
 
 @dataclass
 class DataLoadingPhase:
+    """Aggregate table loading metrics for a benchmark run."""
+
     duration_ms: int
     status: str
     total_rows_loaded: int
@@ -106,6 +118,8 @@ class DataLoadingPhase:
 
 @dataclass
 class ValidationPhase:
+    """Validation outcomes captured for generated or loaded data."""
+
     duration_ms: int
     row_count_validation: str
     schema_validation: str
@@ -114,15 +128,60 @@ class ValidationPhase:
 
 
 @dataclass
+class StatisticsGatheringPhase:
+    """Optimizer-statistics build between load and query (opt-in).
+
+    stats_mode attributes where the statistics time landed:
+    - "explicit": the phase ran the platform's ANALYZE and duration_ms is the
+      measured wall-clock of that build.
+    - "auto-on-load": the engine already gathered statistics during load
+      (e.g. Redshift auto_analyze); nothing is re-built and duration_ms is 0
+      so load timing keeps the cost exactly once.
+    - "unsupported": the platform exposes no statistics-build hook;
+      duration_ms is 0.
+
+    stats_lifecycle records the cold-stats vs warm-stats reset/persist
+    control (opt-in; None when the control was not used, keeping bundles
+    byte-identical to the PR #980 shipped behavior):
+    - "reset": statistics were dropped/invalidated before this build (cold-stats).
+    - "unsupported": a reset was requested but this adapter has no generic
+      drop-stats primitive; the build below still ran a full rebuild.
+    - "persist": the caller explicitly requested warm-stats (no reset),
+      recorded even though it matches the default so a bundle can say the
+      control was deliberately exercised.
+
+    per_table_ms is an OPTIONAL per-table wall-clock breakdown (milliseconds)
+    for the statistics build, populated only when the caller opted in AND
+    this adapter's build fell back to a per-table ANALYZE loop (whole-database
+    analyze hooks and "auto-on-load"/"unsupported" modes cannot provide a
+    breakdown and leave this None). Omitted from the serialized payload when
+    None/empty so schema-v2's additive/omit-empty rule holds.
+    """
+
+    duration_ms: int
+    status: str
+    stats_mode: str
+    tables_analyzed: int = 0
+    error_message: str | None = None
+    stats_lifecycle: str | None = None
+    per_table_ms: dict[str, int] | None = None
+
+
+@dataclass
 class SetupPhase:
+    """Setup phase metrics grouped by lifecycle stage."""
+
     data_generation: DataGenerationPhase | None = None
     schema_creation: SchemaCreationPhase | None = None
     data_loading: DataLoadingPhase | None = None
     validation: ValidationPhase | None = None
+    statistics_gathering: StatisticsGatheringPhase | None = None
 
 
 @dataclass
 class QueryExecution:
+    """Result and timing metadata for a single query execution."""
+
     query_id: str
     stream_id: str
     execution_order: int
@@ -140,11 +199,14 @@ class QueryExecution:
     # Query plan capture (structured DAG representation)
     query_plan: QueryPlanDAG | None = None  # Captured query execution plan
     plan_fingerprint: str | None = None  # SHA256 hash for fast plan comparison
+    plan_fingerprint_normalized: str | None = None  # Literal-normalized fingerprint (opt-in)
     plan_capture_time_ms: float | None = None  # Time spent capturing plan (EXPLAIN + parse)
 
 
 @dataclass
 class PowerTestPhase:
+    """Power-test execution metrics and per-query results."""
+
     start_time: str
     end_time: str
     duration_ms: int
@@ -363,6 +425,13 @@ class BenchmarkResults:
     dataset_version: str | None = None
     manifest_hash: str | None = None
     data_archive_hash: str | None = None
+    # Result provenance (see benchbox.core.results.provenance). funding = how the
+    # run was paid for; result_source = an advisory producer hint (internal/
+    # community/vendor). Both optional; absent -> no provenance block in the bundle.
+    # The authoritative vendor trust label is assigned downstream under maintainer
+    # control, never from result_source here.
+    funding: str | None = None
+    result_source: str | None = None
 
     @property
     def benchmark_id(self) -> str:

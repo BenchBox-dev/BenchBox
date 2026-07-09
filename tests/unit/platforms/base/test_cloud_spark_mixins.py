@@ -21,6 +21,7 @@ from benchbox.core.tuning.interface import (
     TableTuning,
     TuningColumn,
     TuningType,
+    UnifiedTuningConfiguration,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
 from benchbox.platforms.base.cloud_spark.mixins import (
@@ -155,6 +156,19 @@ class TestSparkTuningMixin:
         mixin = StubSparkTuning()
         result = mixin.apply_platform_optimizations(MagicMock())
         assert result == []
+
+    def test_apply_tuning_configuration_uses_unified_platform_optimization_field(self):
+        mixin = StubSparkTuning()
+        mixin.apply_primary_keys = MagicMock(return_value=[])
+        mixin.apply_foreign_keys = MagicMock(return_value=[])
+        mixin.apply_platform_optimizations = MagicMock(return_value=["spark.conf.example=true"])
+        config = UnifiedTuningConfiguration()
+        config.platform_optimizations.auto_optimize_enabled = True
+
+        result = mixin.apply_tuning_configuration(config)
+
+        mixin.apply_platform_optimizations.assert_called_once_with(config.platform_optimizations)
+        assert result["platform_optimizations"] == ["spark.conf.example=true"]
 
     def test_apply_constraint_configuration_both_enabled(self, caplog):
         mixin = StubSparkTuning()

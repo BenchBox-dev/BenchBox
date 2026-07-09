@@ -64,7 +64,8 @@ from benchbox.cli.tuning_runtime import (
 from benchbox.core.benchmark_registry import get_benchmark_default_scale
 from benchbox.core.config import DatabaseConfig
 from benchbox.core.platform_registry import PlatformRegistry
-from benchbox.core.results.status import result_non_clean_reason
+from benchbox.core.results.provenance import FUNDING_SOURCES, RESULT_SOURCES
+from benchbox.core.results.status import result_cli_failure_reason, result_non_clean_reason
 from benchbox.core.schemas import ExecutionContext
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
 from benchbox.utils.cloud_storage import is_cloud_path
@@ -138,7 +139,12 @@ def _apply_platform_optimization_overrides(
     if resolved_strategy:
         strategy = str(resolved_strategy).lower()
         platform_optimizations.databricks_clustering_strategy = strategy
-        platform_optimizations.liquid_clustering_enabled = strategy == "liquid_clustering"
+        platform_optimizations.liquid_clustering_enabled = strategy in {"liquid_clustering", "liquid_clustering_auto"}
+        # An explicit strategy override is authoritative over the template's reporting identity: drop the stale
+        # physical_rendering_id so it is re-derived from the new strategy downstream, preventing result JSON from
+        # claiming a rendering the executor no longer applies. Genuinely contradictory layout fields are still
+        # rejected by __post_init__ below rather than silently rewritten.
+        platform_optimizations.physical_rendering_id = None
 
     resolved_liquid_columns = platform_options.get("liquid_clustering_columns")
     if resolved_liquid_columns:
@@ -146,6 +152,8 @@ def _apply_platform_optimization_overrides(
         platform_optimizations.liquid_clustering_columns = columns
         if columns:
             platform_optimizations.liquid_clustering_enabled = True
+
+    platform_optimizations.__post_init__()
 
 
 def _build_data_organization_from_tuning(unified_tuning: Any) -> dict[str, Any] | None:
@@ -176,7 +184,12 @@ def _build_data_organization_from_tuning(unified_tuning: Any) -> dict[str, Any] 
     platform_opts = getattr(unified_tuning, "platform_optimizations", None)
     method = "z_order"
     method_hint = str(getattr(platform_opts, "sorted_ingestion_method", "auto") or "auto").lower()
-    if method_hint == "hilbert":
+    databricks_strategy = str(getattr(platform_opts, "databricks_clustering_strategy", "") or "").lower()
+    if databricks_strategy in {"liquid_clustering", "liquid_clustering_auto"} or getattr(
+        platform_opts, "liquid_clustering_enabled", False
+    ):
+        method = "liquid_clustering"
+    elif method_hint == "hilbert":
         method = "hilbert"
     elif method_hint == "z_order" or getattr(platform_opts, "z_ordering_enabled", False):
         method = "z_order"
@@ -351,9 +364,18 @@ def _export_orchestrated_result(
     mode_label: str,
     quiet: bool,
     export_formats: list[str] | None = None,
+    funding: str | None = None,
+    result_source: str | None = None,
 ) -> dict[str, Any]:
     """Export a canonical run result using directory-manager naming."""
     from datetime import datetime
+
+    # Attach declared provenance before export so it lands in the bundle. Absent
+    # values leave the result untouched (no provenance block emitted).
+    if funding:
+        result.funding = funding
+    if result_source:
+        result.result_source = result_source
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     result_path = orchestrator.directory_manager.get_result_path(
@@ -469,10 +491,8 @@ def _apply_cli_adapter(s: types.SimpleNamespace) -> None:
     plan_cfg = s.plan_config or PlanCaptureConfig()
     s.plan_cfg = plan_cfg
     s.strict_plan_capture = plan_cfg.strict
-    s.plan_sampling_rate = plan_cfg.sample_rate
-    s.plan_first_n = plan_cfg.first_n
     s.plan_queries_str = ",".join(plan_cfg.queries) if plan_cfg.queries else None
-    s.show_query_plans = s.capture_plans  # Show plans when capturing
+    s.show_query_plans = s.show_plans
 
     # Table format config -> legacy variables
     s.table_format_value = s.table_format.format if s.table_format else None
@@ -521,6 +541,19 @@ def _validate_initial_flags(s: types.SimpleNamespace) -> None:
         console.print()
 
 
+def _apply_dataframe_suffix_mode(s: types.SimpleNamespace) -> None:
+    """Treat a trailing ``-df`` platform suffix as an explicit DataFrame-mode request.
+
+    Must run before PLATFORM_ALIASES normalization, which maps ``-df`` names to
+    their base platform. For dual-mode platforms whose registry default is SQL
+    (datafusion, lakesail) that erases the request and the run silently selects
+    the SQL adapter. An explicit --mode flag still wins, matching adapter-factory
+    precedence (explicit mode > -df suffix > platform default).
+    """
+    if s.mode is None and s.platform and s.platform.lower().endswith("-df"):
+        s.mode = "dataframe"
+
+
 def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
     """Parse --platform-option and --benchmark-option flags; set state fields."""
     s.logger, s.verbosity_settings = setup_verbose_logging(s.verbose, quiet=bool(s.quiet))
@@ -528,6 +561,7 @@ def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
     s.ctx.obj["verbosity"] = s.verbosity_settings
     s.verbosity_payload = s.verbosity_settings.to_config()
 
+    _apply_dataframe_suffix_mode(s)
     s.platform_key = normalize_platform_name(s.platform) if s.platform else None
     s.benchmark = normalize_benchmark_name(s.benchmark) if s.benchmark else None
     s.table_mode = (s.table_mode or "native").lower()
@@ -561,9 +595,9 @@ def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
     s.parsed_benchmark_options = {}
     if s.benchmark and s.benchmark_option_pairs:
         try:
-            from benchbox.core.benchmark_loader import get_benchmark_class
+            from benchbox.core.benchmark_loader import get_core_benchmark_class
 
-            get_benchmark_class(s.benchmark)
+            get_core_benchmark_class(s.benchmark)
         except ValueError:
             pass
         try:
@@ -640,6 +674,23 @@ def _platform_option_config_entries(s: types.SimpleNamespace) -> dict[str, Any]:
     return entries
 
 
+def _strict_translation_config_entry(s: types.SimpleNamespace) -> dict[str, Any]:
+    entries: dict[str, Any] = {"normalize_plan_literals": s.normalize_plan_literals}
+    if getattr(s, "strict_translation", False):
+        entries["strict_translation"] = True
+    return entries
+
+
+def _plan_capture_override_entries(s: types.SimpleNamespace) -> dict[str, Any]:
+    return {
+        "capture_plans": s.capture_plans,
+        "strict_plan_capture": s.strict_plan_capture,
+        "plan_queries": s.plan_queries,
+        "normalize_plan_literals": s.normalize_plan_literals,
+        "execution_mode": s.resolved_mode,
+    }
+
+
 def _validate_non_interactive(s: types.SimpleNamespace) -> None:
     """Set env flag and validate required args for non-interactive mode."""
     if not s.non_interactive:
@@ -650,7 +701,8 @@ def _validate_non_interactive(s: types.SimpleNamespace) -> None:
 
     phase_list = [p.strip() for p in s.phases.split(",") if p.strip()]
     is_data_only = phase_list == ["generate"] or (
-        "generate" in phase_list and not set(phase_list) & {"load", "warmup", "power", "throughput", "maintenance"}
+        "generate" in phase_list
+        and not set(phase_list) & {"load", "statistics", "warmup", "power", "throughput", "maintenance"}
     )
 
     missing_args = []
@@ -670,7 +722,7 @@ def _validate_non_interactive(s: types.SimpleNamespace) -> None:
 
 def _parse_phases_list(s: types.SimpleNamespace) -> None:
     """Parse and validate the --phases list into phases_to_run."""
-    valid_phases = {"generate", "load", "warmup", "power", "throughput", "maintenance"}
+    valid_phases = {"generate", "load", "statistics", "warmup", "power", "throughput", "maintenance"}
     phase_list = [p.strip() for p in s.phases.split(",") if p.strip()]
 
     invalid_phases = set(phase_list) - valid_phases
@@ -1218,7 +1270,10 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
         compression_level=s.compression_level,
         test_execution_type=s.test_execution_type,
         capture_plans=s.capture_plans,
+        analyze_plans=s.analyze_plans,
         strict_plan_capture=s.strict_plan_capture,
+        stats_reset=s.stats_reset,
+        stats_per_table_timing=s.stats_per_table_timing,
         options={
             **s.verbosity_payload,
             "estimated_time_range": benchmark_info["estimated_time_range"],
@@ -1247,6 +1302,7 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_strict_translation_config_entry(s),
             **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
@@ -1304,12 +1360,7 @@ def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManag
         **s.verbosity_payload,
         "tuning_enabled": s.tuning_enabled,
         "force_upload": bool(s.force_upload),
-        "capture_plans": s.capture_plans,
-        "strict_plan_capture": s.strict_plan_capture,
-        "plan_sampling_rate": s.plan_sampling_rate,
-        "plan_first_n": s.plan_first_n,
-        "plan_queries": s.plan_queries,
-        "execution_mode": s.resolved_mode,
+        **_plan_capture_override_entries(s),
     }
     if s.loaded_unified_config:
         overrides["unified_tuning_configuration"] = s.loaded_unified_config
@@ -1366,12 +1417,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         "show_query_plans": s.show_query_plans,
         "tuning_enabled": s.tuning_enabled,
         "force_upload": bool(s.force_upload),
-        "capture_plans": s.capture_plans,
-        "strict_plan_capture": s.strict_plan_capture,
-        "plan_sampling_rate": s.plan_sampling_rate,
-        "plan_first_n": s.plan_first_n,
-        "plan_queries": s.plan_queries,
-        "execution_mode": s.resolved_mode,
+        **_plan_capture_override_entries(s),
     }
     if s.loaded_unified_config:
         overrides["unified_tuning_configuration"] = s.loaded_unified_config
@@ -1425,7 +1471,10 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         compression_level=s.compression_level,
         test_execution_type=s.test_execution_type,
         capture_plans=s.capture_plans,
+        analyze_plans=s.analyze_plans,
         strict_plan_capture=s.strict_plan_capture,
+        stats_reset=s.stats_reset,
+        stats_per_table_timing=s.stats_per_table_timing,
         options={
             **s.verbosity_payload,
             "estimated_time_range": benchmark_info["estimated_time_range"],
@@ -1453,6 +1502,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_strict_translation_config_entry(s),
             **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
@@ -1520,6 +1570,8 @@ def _direct_handle_result(
             mode_label=s.resolved_mode,
             quiet=bool(s.quiet),
             export_formats=["json"],
+            funding=getattr(s, "funding", None),
+            result_source=getattr(s, "result_source", None),
         )
 
         if s.quiet:
@@ -1567,7 +1619,7 @@ def _direct_handle_result(
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
-        if non_clean_reason:
+        if result_cli_failure_reason(result):  # narrower than non_clean_reason; see status.py
             s.ctx.exit(1)
     else:
         console.print(f"\n[red]❌ Benchmark failed: {result.validation_status}[/red]")
@@ -1587,12 +1639,7 @@ def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: Database
         "force_recreate": s.force_regenerate,
         "tuning_enabled": s.tuning_enabled,
         "force_upload": bool(s.force_upload),
-        "capture_plans": s.capture_plans,
-        "strict_plan_capture": s.strict_plan_capture,
-        "plan_sampling_rate": s.plan_sampling_rate,
-        "plan_first_n": s.plan_first_n,
-        "plan_queries": s.plan_queries,
-        "execution_mode": s.resolved_mode,
+        **_plan_capture_override_entries(s),
     }
     if s.loaded_unified_config:
         overrides["unified_tuning_configuration"] = s.loaded_unified_config
@@ -1678,7 +1725,10 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
         compression_level=s.compression_level,
         test_execution_type=s.test_execution_type,
         capture_plans=s.capture_plans,
+        analyze_plans=s.analyze_plans,
         strict_plan_capture=s.strict_plan_capture,
+        stats_reset=s.stats_reset,
+        stats_per_table_timing=s.stats_per_table_timing,
         options={
             **s.verbosity_payload,
             "estimated_time_range": benchmark_info["estimated_time_range"],
@@ -1705,6 +1755,7 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_strict_translation_config_entry(s),
             **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
@@ -1792,6 +1843,8 @@ def _data_or_load_handle_result(
             mode_label=mode_label,
             quiet=bool(s.quiet),
             export_formats=["json"],
+            funding=getattr(s, "funding", None),
+            result_source=getattr(s, "result_source", None),
         )
 
         operation_status, operation_name = _data_or_load_operation_status(result, s.execution_mode)
@@ -1963,6 +2016,7 @@ def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_strict_translation_config_entry(s),
             **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
@@ -2252,6 +2306,7 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
         s.database_config.options = {}
     s.database_config.options["tuning_enabled"] = s.tuning_enabled
     s.database_config.tuning_enabled = s.tuning_enabled
+    s.database_config.show_query_plans = s.show_query_plans
     s.database_config.unified_tuning_configuration = s.loaded_unified_config
 
     s.benchmark_config.options["unified_tuning_configuration"] = s.loaded_unified_config
@@ -2288,6 +2343,16 @@ def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile:
     ctx = s.ctx
     assert s.database_config is not None
     assert s.benchmark_config is not None
+    # The interactive wizard builds s.benchmark_config in _interactive_normal_flow
+    # (bench_manager.select_benchmark()) / _interactive_try_quick_restart, neither
+    # of which knows about --stats-reset/--stats-per-table-timing - those are
+    # collected onto `s` afterward via _interactive_collect_flags. The direct and
+    # load-only paths pass them at BenchmarkConfig construction time; mirror that
+    # here so the actual run (runner.py reads benchmark_config.stats_reset /
+    # .stats_per_table_timing, not s.stats_reset) honors what the preview below
+    # already shows the user, instead of silently running with the defaults.
+    s.benchmark_config.stats_reset = getattr(s, "stats_reset", None)
+    s.benchmark_config.stats_per_table_timing = bool(getattr(s, "stats_per_table_timing", False))
     if PlatformRegistry.requires_cloud_storage(s.database_config.type) and not s.output:
         console.print()
         console.print("[red]❌ Error: Cloud platform requires --output parameter[/red]")
@@ -2378,10 +2443,6 @@ def _interactive_show_preview(s: types.SimpleNamespace) -> None:
     plan_config_str = None
     if s.plan_config:
         plan_parts = []
-        if s.plan_config.sample_rate is not None:
-            plan_parts.append(f"sample:{s.plan_config.sample_rate}")
-        if s.plan_config.first_n is not None:
-            plan_parts.append(f"first:{s.plan_config.first_n}")
         if s.plan_config.queries:
             plan_parts.append(f"queries:{','.join(s.plan_config.queries)}")
         if s.plan_config.strict:
@@ -2402,6 +2463,7 @@ def _interactive_show_preview(s: types.SimpleNamespace) -> None:
         force=force_str,
         official=s.official,
         capture_plans=s.capture_plans,
+        analyze_plans=getattr(s, "analyze_plans", None),
         validation=s.validation_mode if s.validation_mode and s.validation_mode != "exact" else None,
         verbose=s.verbosity_settings.level,
         console_obj=console,
@@ -2411,6 +2473,9 @@ def _interactive_show_preview(s: types.SimpleNamespace) -> None:
         sorted_ingestion_mode=s.sorted_ingestion_mode,
         sorted_ingestion_method=s.sorted_ingestion_method,
         global_cache=s.global_cache,
+        strict_translation=s.strict_translation,
+        stats_reset=getattr(s, "stats_reset", None),
+        stats_per_table_timing=bool(getattr(s, "stats_per_table_timing", False)),
         benchmark_options=dict(s.benchmark_option_pairs) if s.benchmark_option_pairs else None,
     )
 
@@ -2430,6 +2495,8 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
             mode_label=s.resolved_mode,
             quiet=bool(s.quiet),
             export_formats=export_formats,
+            funding=getattr(s, "funding", None),
+            result_source=getattr(s, "result_source", None),
         )
 
         if s.quiet:
@@ -2496,7 +2563,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--phases",
     type=str,
     default="power",
-    help="Phases: generate,load,warmup,power,throughput,maintenance",
+    help="Phases: generate,load,statistics,warmup,power,throughput,maintenance",
 )
 @click.option(
     "--queries",
@@ -2555,17 +2622,73 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--capture-plans",
     is_flag=True,
     help=(
-        "Capture query execution plans. Supported: DuckDB, PostgreSQL, DataFusion. "
-        "DuckDB uses EXPLAIN (ANALYZE, FORMAT JSON) by default - actual per-operator timing and "
-        "cardinality included, at ~2x query cost per captured plan. "
-        "Set analyze_plans=false via --platform-option to capture estimated plans only."
+        "Capture query execution plans into the result bundle, in an isolated "
+        "post-measurement phase (never inside the timed loop). Plans are captured "
+        "with EXPLAIN ANALYZE by default (actual per-operator timing/cardinality, "
+        "~1x extra query cost outside the measured window); pass --no-analyze-plans "
+        "for estimated plans only (a static EXPLAIN, no re-execution)."
+    ),
+)
+@advanced_option(
+    "--analyze-plans/--no-analyze-plans",
+    "analyze_plans",
+    default=None,
+    help=(
+        "With --capture-plans, control capture detail: --analyze-plans (default) "
+        "runs EXPLAIN ANALYZE post-measurement for actual timing/cardinality; "
+        "--no-analyze-plans captures the static (estimated) plan with no re-execution. "
+        "The single capture-detail knob. (Write statements are never re-executed "
+        "regardless: DML stays on a non-ANALYZE EXPLAIN.)"
+    ),
+)
+@advanced_option(
+    "--show-plans",
+    is_flag=True,
+    help=(
+        "Display query plans in the console after each query. "
+        "Use for interactive inspection without --capture-plans. "
+        "Suppressed when --capture-plans is active (capture already runs EXPLAIN; "
+        "use benchbox show-plan to inspect captured plans afterwards)."
     ),
 )
 @advanced_option(
     "--plan-config",
     type=PLAN_CONFIG,
     default=None,
-    help="Plan capture config: sample:0.1,first:5,queries:1,6,strict:true",
+    help="Plan capture config: queries:1,6,17,strict:true (capture is once-per-query; use --analyze-plans for detail)",
+)
+@advanced_option(
+    "--normalize-plan-literals",
+    "normalize_plan_literals",
+    is_flag=True,
+    help=(
+        "Also record a literal-normalized fingerprint (plan_fingerprint_normalized) so queries "
+        "differing only in literal constants collapse to the same value. Requires --capture-plans."
+    ),
+)
+# Statistics Phase (requires --phases ...,statistics)
+@advanced_option(
+    "--stats-reset/--no-stats-reset",
+    "stats_reset",
+    default=None,
+    help=(
+        "With --phases ...,statistics: control cold-stats vs warm-stats. "
+        "--stats-reset drops/invalidates statistics before the rebuild for a "
+        "cold-stats measurement (adapters with no drop-stats primitive fall "
+        "back to a safe no-op and record that in the result); --no-stats-reset "
+        "explicitly records a warm-stats/persist run. Omit entirely for the "
+        "default PR #980 behavior (bundle stays byte-identical when unset)."
+    ),
+)
+@advanced_option(
+    "--stats-per-table-timing",
+    "stats_per_table_timing",
+    is_flag=True,
+    help=(
+        "With --phases ...,statistics: record a per-table wall-clock breakdown "
+        "in the result payload (only available when the platform's statistics "
+        "build falls back to a per-table ANALYZE loop; omitted otherwise)."
+    ),
 )
 # Compression
 @advanced_option(
@@ -2593,6 +2716,11 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     type=VALIDATION,
     default=None,
     help="Validation: exact, loose, range, disabled, full",
+)
+@advanced_option(
+    "--strict-translation",
+    is_flag=True,
+    help="Fail when SQL dialect translation falls back instead of returning source SQL.",
 )
 # Platform-specific
 @click.option(
@@ -2662,7 +2790,30 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--publish-label",
     default="maintainer-run",
     show_default=True,
-    help="Trust label for --publish (maintainer-run, community-submission, ci, local).",
+    help=(
+        "Trust label for --publish (maintainer-run, community-submission, "
+        "vendor-supplied, ci, local, unofficial-research)."
+    ),
+)
+@click.option(
+    "--funding",
+    type=click.Choice(FUNDING_SOURCES, case_sensitive=False),
+    default=None,
+    help=(
+        "Disclose how this run was funded (employer, personal, free-trial, "
+        "vendor-sponsored, grant, unspecified). Recorded in the bundle's "
+        "provenance block; omitted when not set."
+    ),
+)
+@click.option(
+    "--result-source",
+    type=click.Choice(RESULT_SOURCES, case_sensitive=False),
+    default=None,
+    help=(
+        "Advisory producer hint (internal, community, vendor) recorded in the "
+        "bundle's provenance block. NOT the authoritative trust label — the "
+        "vendor label is assigned downstream under maintainer control."
+    ),
 )
 @click.pass_context
 def run(
@@ -2684,7 +2835,13 @@ def run(
     non_interactive: bool,
     official: bool,
     capture_plans: bool,
+    analyze_plans: bool | None,
+    show_plans: bool,
+    strict_translation: bool,
     plan_config: PlanCaptureConfig | None,
+    normalize_plan_literals: bool,
+    stats_reset: bool | None,
+    stats_per_table_timing: bool,
     compression: CompressionConfig | None,
     table_format: TableFormatConfig | None,
     presort: str | None,
@@ -2701,6 +2858,8 @@ def run(
     publish: bool,
     publish_target: str,
     publish_label: str,
+    funding: str | None,
+    result_source: str | None,
 ) -> None:
     """Run benchmarks.
 
@@ -2740,7 +2899,13 @@ def run(
         non_interactive=non_interactive,
         official=official,
         capture_plans=capture_plans,
+        analyze_plans=analyze_plans,
+        show_plans=show_plans,
+        strict_translation=strict_translation,
         plan_config=plan_config,
+        normalize_plan_literals=normalize_plan_literals,
+        stats_reset=stats_reset,
+        stats_per_table_timing=stats_per_table_timing,
         compression=compression,
         table_format=table_format,
         presort=presort,
@@ -2757,6 +2922,8 @@ def run(
         publish=publish,
         publish_target=publish_target,
         publish_label=publish_label,
+        funding=funding,
+        result_source=result_source,
     )
     _prepare_run_state(s)
 

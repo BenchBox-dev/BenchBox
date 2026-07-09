@@ -54,8 +54,8 @@ from typing import Any
 
 try:
     import tomllib
-except ModuleNotFoundError:  # pragma: no cover - exercised on Python 3.10
-    import tomli as tomllib  # type: ignore[import-not-found]
+except ModuleNotFoundError:  # Python 3.10: stdlib tomllib is 3.11+
+    import tomli as tomllib  # type: ignore[no-redef]
 
 from .errors import ManifestValidationError
 
@@ -72,7 +72,6 @@ _REQUIRED_TOP_KEYS = (
 
 def _manifest_hash_input(raw: bytes) -> bytes:
     """Return manifest bytes with top-level transport/bootstrap hashes removed."""
-    raw = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
     excluded_top_level_keys = {b"archive_sha256", b"manifest_hash"}
     lines: list[bytes] = []
     in_top_level = True

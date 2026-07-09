@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"UAT bring-up failed for {platform}: {details}", file=sys.stderr)
         return result.returncode or 1
 
-    matrix.reset_reachability_cache()
+    matrix.invalidate_reachability_cache_after_lifecycle_change()
     if not args.dry_run and not matrix.platform_is_reachable(platform):
         endpoint = spec.tcp_probe_label or "configured endpoint"
         print(f"UAT bring-up failed for {platform}: {endpoint} is still unreachable", file=sys.stderr)

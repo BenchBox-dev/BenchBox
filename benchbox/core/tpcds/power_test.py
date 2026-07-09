@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import Any, Callable, Optional
 
 from benchbox.core.connection import DatabaseConnection
+from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
@@ -323,6 +324,11 @@ class TPCDSPowerTest:
                             "error", result_dict.get("row_count_validation_error", "Query validation failed")
                         )
                         raise RuntimeError(error_msg)
+                    # Propagate captured plan metadata (including the internal
+                    # _plan_capture_key) so a combined power+throughput run can match
+                    # this row by its exact key rather than the ambiguous public-id
+                    # fallback in _attach_captured_plans.
+                    propagate_plan_capture_fields(result_dict, query_result)
 
                 if hasattr(connection, "commit"):
                     connection.commit()

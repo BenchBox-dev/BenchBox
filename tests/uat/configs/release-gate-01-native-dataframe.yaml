@@ -1,0 +1,65 @@
+# Release-gate re-run — STAGE 1 of 3: native SQL + dataframe (native execution).
+#
+# Run order (see docs/operations/uat-framework.md "Release-gate re-run"):
+#   1. release-gate-01-native-dataframe.yaml   <-- this file
+#   2. release-gate-02-docker-nonoltp.yaml
+#   3. release-gate-03-docker-oltp.yaml
+#
+# Native SQL and dataframe (native-execution) platforms must complete BEFORE
+# any Docker stack starts (the 2026-05-28/29 evidence was contaminated because a
+# Docker stack began before the dataframe sweep finished). This stage runs no
+# Docker platforms, so its uat_lifecycle.log contains no `action=up` events —
+# that absence is what the ordering check keys on. Use a FRESH run root and
+# record the run seed (BENCHBOX_SEED) in the release-gate log.
+name: "release-gate-01-native-dataframe"
+description: "Release-gate stage 1: native SQL + dataframe platforms, scales 0.01/0.1/1"
+
+phases:
+  - preflight
+  - execute
+  - validate
+  - package
+  - explorer_smoke
+  - report
+
+platforms:
+  groups: ["native-sql", "dataframe"]
+
+benchmarks:
+  groups: ["all"]
+
+scales:
+  rungs: [0.01, 0.1, 1.0]
+
+execute:
+  per_cell_timeout_s: 1200
+  early_stop_after_s: 86400
+  early_stop_on_failure: false
+  phases_arg: "load,power"
+  skip_unreachable: true
+  parallel_platforms: false
+
+preflight:
+  free_space_min_gib: 5
+  free_space_path: "~/Developer/benchmark_runs"
+
+cleanup:
+  preserve_datagen: true
+  prune_databases: true
+  docker_manage_platforms: false
+
+validate:
+  validator_clean_rate_floor: 1.0
+
+report:
+  matrix_summary_tsv: "matrix_summary.tsv"
+  # APPROVE gate teeth: require every required (platform, benchmark) pair to be
+  # clean across all three rungs. Set to the count expected after a green run;
+  # a breach forces a non-zero report exit so the gate cannot be APPROVED on a
+  # partial/regressed sweep. Tune to the approved pair count during bring-up.
+  cross_scale_coverage_min_pairs: 1
+
+output:
+  benchmark_runs_dir_template: "~/Developer/benchmark_runs"
+  logs_dir_template: "~/Developer/benchmark_runs/logs/release_gate_01_native_dataframe_{date}"
+  submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"

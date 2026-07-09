@@ -99,12 +99,14 @@ def strip_foreign_keys(stmt: str) -> str:
 # PRIMARY KEY stripping
 # ---------------------------------------------------------------------------
 
-# Matches table-level PRIMARY KEY (...) and inline column-level PRIMARY KEY.
+# Matches named or unnamed table-level PRIMARY KEY (...) and inline column-level PRIMARY KEY.
 # The [^)]*  inside \(...\) is intentionally left simple here — we use it only
 # for the *keyword detection* pass; the actual paren extent is found by the
 # balanced walker below.
-_TABLE_PK_RE = re.compile(r",?\s*PRIMARY\s+KEY\s*\(", re.IGNORECASE)
-_INLINE_PK_RE = re.compile(r"\s+PRIMARY\s+KEY\b", re.IGNORECASE)
+_CONSTRAINT_PREFIX = r"(?:CONSTRAINT\s+[`\"\w]+\s+)?"
+_TABLE_PK_RE = re.compile(rf",?\s*{_CONSTRAINT_PREFIX}PRIMARY\s+KEY\s*\(", re.IGNORECASE)
+_INLINE_PK_RE = re.compile(rf"\s+{_CONSTRAINT_PREFIX}PRIMARY\s+KEY\b", re.IGNORECASE)
+_LEADING_COMMA_RE = re.compile(r"(\()\s*,\s*")
 
 
 def strip_primary_keys(stmt: str) -> str:
@@ -112,7 +114,9 @@ def strip_primary_keys(stmt: str) -> str:
 
     Handles both table-level ``PRIMARY KEY (col_a, coalesce(col_b, 0))`` (with
     arbitrary nesting inside the argument list) and inline column-level
-    ``col_name TYPE PRIMARY KEY``.  The table-level form is stripped with a
+    ``col_name TYPE PRIMARY KEY``. Named constraints such as
+    ``CONSTRAINT pk PRIMARY KEY (id)`` are stripped with the constraint name.
+    The table-level form is stripped with a
     character-level depth counter so that expressions such as
     ``PRIMARY KEY ("a", coalesce(b, 0))`` are handled correctly — a plain
     ``[^)]*`` regex would stop at the first ``)`` inside ``coalesce``.
@@ -122,6 +126,14 @@ def strip_primary_keys(stmt: str) -> str:
 
     Non-CREATE-TABLE statements and statements with no PRIMARY KEY keyword
     pass through unchanged.
+
+    Limitation - string-literal false positive:
+        The regexes are not SQL-string-aware. If a CREATE TABLE statement
+        contains the token ``PRIMARY KEY`` inside a string literal (for example
+        a column ``COMMENT``), that substring can be matched and stripped. All
+        current callers invoke this helper from benchmark CREATE TABLE
+        pipelines and no benchmark schema in the suite uses such literals, so
+        production exposure is zero.
 
     Args:
         stmt: A single SQL statement string.
@@ -159,6 +171,8 @@ def strip_primary_keys(stmt: str) -> str:
 
     # Clean up trailing commas before closing paren
     result = _TRAILING_COMMA_RE.sub(r"\1", result)
+    # Clean up leading commas after opening paren
+    result = _LEADING_COMMA_RE.sub(r"\1", result)
 
     return result
 

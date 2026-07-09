@@ -4,7 +4,6 @@ description: "Full canonical JoinOrder SF=1 UAT and local-stage corpus backfill"
 
 phases:
   - preflight
-  - enumerate
   - execute
   - validate
   - package

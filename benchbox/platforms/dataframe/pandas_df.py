@@ -53,6 +53,126 @@ logger = logging.getLogger(__name__)
 PandasDF = pd.DataFrame if PANDAS_AVAILABLE else Any
 
 
+def _parse_date_value(value: Any) -> Any:
+    if value is None or value == "":
+        return None
+    return pd.to_datetime(value).date()
+
+
+# SQL type prefixes that are numeric, not temporal. A column named like a date
+# but declared with one of these (e.g. SSB's INTEGER ``lo_orderdate`` YYYYMMDD
+# datekeys) is a key, not a date, and must never be coerced to a date dtype.
+_NUMERIC_SQL_TYPE_PREFIXES = ("INT", "BIGINT", "SMALLINT", "TINYINT", "DECIMAL", "NUMERIC", "FLOAT", "DOUBLE", "REAL")
+
+
+def _is_numeric_sql_type(sql_type: str | None) -> bool:
+    """True if ``sql_type`` is a numeric SQL type (so a date-named column is a key)."""
+    if not sql_type:
+        return False
+    upper = sql_type.upper()
+    return any(upper.startswith(prefix) for prefix in _NUMERIC_SQL_TYPE_PREFIXES)
+
+
+def _pandas_parse_date_columns(
+    names: list[str] | None,
+    column_types: list[str] | None = None,
+) -> tuple[list[str], list[str]]:
+    """Infer date and timestamp columns for raw CSV/TBL loads with explicit schemas.
+
+    When ``column_types`` (parallel to ``names``) is supplied, a column whose
+    declared SQL type is numeric is never treated as a date/timestamp even if its
+    name ends in ``date``/``time`` - this keeps integer datekey columns (e.g. SSB
+    ``lo_orderdate``) from being mis-parsed as dates.
+    """
+    if not names:
+        return [], []
+
+    types_by_name: dict[str, str] = {}
+    if column_types and len(column_types) == len(names):
+        types_by_name = {name.lower(): sql_type for name, sql_type in zip(names, column_types)}
+
+    date_columns: list[str] = []
+    datetime_columns: list[str] = []
+    seen: set[str] = set()
+    for name in names:
+        lower_name = name.lower()
+        if lower_name.endswith("_sk"):
+            continue
+        if _is_numeric_sql_type(types_by_name.get(lower_name)):
+            continue
+        if lower_name.endswith(("datetime", "_datetime", "timestamp", "_timestamp", "_dts")):
+            datetime_columns.append(name)
+            seen.add(name)
+        elif lower_name.endswith(("date", "_date")):
+            date_columns.append(name)
+            seen.add(name)
+        elif lower_name in {"eventtime"}:
+            datetime_columns.append(name)
+            seen.add(name)
+
+    # Type-aware addition: a column DECLARED temporal must be parsed as a
+    # date/timestamp even when its NAME does not match the suffix heuristic above
+    # (e.g. ClickBench's ClientEventTime TIMESTAMP), so it materializes as a
+    # datetime like the DuckDB SQL surface rather than a raw string. Reuses the
+    # schema SQL-type -> Arrow-type normalizer as the single source of truth.
+    if types_by_name:
+        from benchbox.core.dataframe.data_loader import SchemaMapper
+
+        for name in names:
+            if name in seen:
+                continue
+            arrow_type = SchemaMapper.sql_type_to_pyarrow(str(types_by_name.get(name.lower()) or ""))
+            if arrow_type == "date32":
+                date_columns.append(name)
+            elif arrow_type == "timestamp[us]":
+                datetime_columns.append(name)
+
+    return date_columns, datetime_columns
+
+
+def _pandas_string_columns(
+    names: list[str] | None,
+    column_types: list[str] | None,
+    exclude: set[str],
+) -> list[str]:
+    """Return declared text columns (parallel ``names``/``column_types``) to read as object.
+
+    A column whose declared SQL type is a string/text family (VARCHAR, CHAR,
+    TEXT, ...) must be read as text, not inferred: pandas otherwise reads a
+    numeric-looking text column (e.g. join-order ``info`` rating strings like
+    "8.0") as float64, diverging from the SQL surface where the same column is
+    VARCHAR. The schema's declared type is authoritative, mirroring the
+    CSV->Parquet conversion path (SchemaMapper.sql_type_to_pyarrow). Columns in
+    ``exclude`` (already handled as dates) are skipped to avoid a dtype/converter
+    conflict; numeric/date columns are left to pandas inference (it already
+    matches the SQL surface there), so this is additive.
+    """
+    if not names or not column_types or len(column_types) != len(names):
+        return []
+    from benchbox.core.dataframe.data_loader import SchemaMapper
+
+    string_columns: list[str] = []
+    for name, sql_type in zip(names, column_types):
+        if name in exclude or not sql_type:
+            continue
+        if SchemaMapper.sql_type_to_pyarrow(str(sql_type)) == "string":
+            string_columns.append(name)
+    return string_columns
+
+
+def _coerce_date_columns(df: PandasDF, date_columns: list[str]) -> PandasDF:
+    if not date_columns:
+        return df
+
+    import pyarrow as pa
+
+    date_dtype = pd.ArrowDtype(pa.date32())
+    for column in date_columns:
+        if column in df.columns:
+            df[column] = pd.array(df[column], dtype=date_dtype)
+    return df
+
+
 class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
     """Pandas adapter for Pandas-family DataFrame benchmarking.
 
@@ -206,6 +326,7 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
         header: int | None = 0,
         names: list[str] | None = None,
         null_marker: str | None = None,
+        column_types: list[str] | None = None,
     ) -> PandasDF:
         """Read a CSV file into a Pandas DataFrame.
 
@@ -215,6 +336,9 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
             header: Row to use as header (None for no header)
             names: Column names (if header is None)
             null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
+            column_types: Optional SQL types parallel to ``names``; used to keep
+                numeric columns named like dates (e.g. integer datekeys) from
+                being parsed as dates.
 
         Returns:
             Pandas DataFrame with the file contents
@@ -224,10 +348,24 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
             "header": header,
             "on_bad_lines": "skip",
         }
+        date_columns: list[str] = []
+        string_columns: list[str] = []
 
         # Add column names if provided
         if names:
             read_kwargs["names"] = names
+            date_columns, datetime_columns = _pandas_parse_date_columns(names, column_types)
+            if date_columns:
+                read_kwargs["converters"] = dict.fromkeys(date_columns, _parse_date_value)
+            if datetime_columns:
+                read_kwargs["parse_dates"] = datetime_columns
+            # Read declared text columns as object so numeric-looking strings (e.g.
+            # join-order "info" ratings) are not inferred as float64, matching the
+            # VARCHAR/TEXT they are on the SQL surface. Date columns are excluded
+            # (handled above) to avoid a dtype/converter conflict.
+            string_columns = _pandas_string_columns(names, column_types, set(date_columns) | set(datetime_columns))
+            if string_columns:
+                read_kwargs["dtype"] = dict.fromkeys(string_columns, "object")
 
         # Trailing-delimiter probing only for TPC-style sources (null_marker is not None).
         if null_marker is not None and names and has_trailing_delimiter(path, delimiter, names):
@@ -235,6 +373,17 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
             read_kwargs["names"] = extended_names
 
         df = pd.read_csv(path, **read_kwargs)
+        df = _coerce_date_columns(df, date_columns)
+
+        # When the SQL loader's dialect keeps empty fields as empty strings
+        # (null_marker is None, e.g. ClickBench), restore "" on declared text
+        # columns: pandas reads an empty field as NaN, which would surface as None
+        # where the DuckDB SQL reference emits "". Skipped when null_marker == ""
+        # (empty -> NULL, e.g. JoinOrder), preserving that surface's NULLs.
+        if null_marker is None and string_columns:
+            present = [column for column in string_columns if column in df.columns]
+            if present:
+                df[present] = df[present].fillna("")
 
         # Drop trailing column if present
         if TRAILING_DUMMY_COLUMN in df.columns:

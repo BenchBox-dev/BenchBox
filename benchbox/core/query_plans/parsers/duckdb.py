@@ -66,7 +66,11 @@ import logging
 import re
 from typing import Any
 
-from benchbox.core.query_plans.parsers.base import QueryPlanParser
+from benchbox.core.query_plans.parsers.base import (
+    QueryPlanParser,
+    strip_estimate_keys,
+    strip_estimates,
+)
 from benchbox.core.results.query_plan_models import (
     LogicalOperator,
     LogicalOperatorType,
@@ -263,8 +267,17 @@ class DuckDBQueryPlanParser(QueryPlanParser):
         # Extract operator-specific information
         kwargs: dict[str, Any] = {}
         raw_extra = node.get("extra_info", "")
-        # DuckDB returns extra_info as a dict in FORMAT JSON responses; normalise to string
-        extra_info = raw_extra if isinstance(raw_extra, str) else json.dumps(raw_extra)
+        # DuckDB returns extra_info as a dict in FORMAT JSON responses; normalise to string.
+        # `extra_info` keeps the raw detail (incl. estimates) for platform_metadata / table
+        # extraction; `logical_extra` is the estimate-stripped form for signature-bearing
+        # fields so the fingerprint stays stats-independent (see strip_estimates docstring).
+        if isinstance(raw_extra, dict):
+            extra_info = json.dumps(raw_extra)
+            stripped_extra = strip_estimate_keys(raw_extra)
+            logical_extra = json.dumps(stripped_extra) if stripped_extra else ""
+        else:
+            extra_info = raw_extra
+            logical_extra = strip_estimates(raw_extra)
 
         if operator_type == LogicalOperatorType.SCAN:
             # Try to extract table name from extra_info
@@ -273,21 +286,21 @@ class DuckDBQueryPlanParser(QueryPlanParser):
                 kwargs["table_name"] = table_name
 
         elif operator_type == LogicalOperatorType.FILTER:
-            if extra_info:
-                kwargs["filter_expressions"] = [extra_info]
+            if logical_extra:
+                kwargs["filter_expressions"] = [logical_extra]
 
         elif operator_type == LogicalOperatorType.JOIN:
             kwargs["join_type"] = self._extract_join_type_from_operator(operator_name)
-            if extra_info:
-                kwargs["join_conditions"] = [extra_info]
+            if logical_extra:
+                kwargs["join_conditions"] = [logical_extra]
 
         elif operator_type == LogicalOperatorType.AGGREGATE:
-            if extra_info:
-                kwargs["aggregation_functions"] = [extra_info]
+            if logical_extra:
+                kwargs["aggregation_functions"] = [logical_extra]
 
         elif operator_type == LogicalOperatorType.SORT:
-            if extra_info:
-                kwargs["sort_keys"] = [{"expr": extra_info, "direction": "ASC"}]
+            if logical_extra:
+                kwargs["sort_keys"] = [{"expr": logical_extra, "direction": "ASC"}]
 
         # Create physical operator with DuckDB-specific details.
         # EXPLAIN (ANALYZE, FORMAT JSON) uses operator_timing/operator_cardinality;
@@ -570,8 +583,15 @@ class DuckDBQueryPlanParser(QueryPlanParser):
                 kwargs["table_name"] = table_name
 
         elif logical_type == LogicalOperatorType.FILTER:
-            # Extract filter expressions
-            filter_exprs = [d for d in details if d and not d.startswith("Filters:")]
+            # Extract filter expressions. DuckDB's text/box format wraps a long
+            # predicate across box-width-sized lines, splitting it mid-token
+            # (e.g. "(l_shipdate <= CAST(" / "'1998-12-01' AS DATE))"). Left as
+            # separate details, each fragment became its OWN filter expression,
+            # so the fingerprint depended on the box wrap width (qpc-05 / F2.3).
+            # Rejoin continuation fragments first so one predicate is one
+            # expression regardless of wrapping.
+            raw_exprs = [d for d in details if d and not d.startswith("Filters:")]
+            filter_exprs = self._join_wrapped_expressions(raw_exprs)
             if filter_exprs:
                 kwargs["filter_expressions"] = filter_exprs
 
@@ -623,6 +643,38 @@ class DuckDBQueryPlanParser(QueryPlanParser):
             physical_operator=physical_op,
             **kwargs,
         )
+
+    @staticmethod
+    def _join_wrapped_expressions(fragments: list[str]) -> list[str]:
+        """Rejoin box-wrapped predicate fragments into whole expressions.
+
+        DuckDB's text/box EXPLAIN wraps a long predicate across fixed-width box
+        lines, splitting it mid-token. Each fragment arrives as a separate
+        detail line; concatenating them back into one expression makes the
+        parsed filter (and thus the plan fingerprint) independent of the box
+        wrap width (qpc-05 / F2.3).
+
+        Heuristic: a fragment whose parentheses are not yet balanced (more ``(``
+        than ``)`` accumulated so far) is a continuation, so the following
+        fragment(s) are appended until the running paren balance returns to
+        zero. Fragments are joined with no separator because DuckDB breaks
+        mid-token at the box edge (trailing pad is stripped), so inserting a
+        separator would corrupt a split token. A trailing unbalanced fragment
+        (never closed) is still emitted so nothing is dropped.
+        """
+        joined: list[str] = []
+        buffer = ""
+        depth = 0
+        for fragment in fragments:
+            buffer += fragment
+            depth += fragment.count("(") - fragment.count(")")
+            if depth <= 0:
+                joined.append(buffer)
+                buffer = ""
+                depth = 0
+        if buffer:
+            joined.append(buffer)
+        return joined
 
     def _harmonize_duckdb_operator(self, duckdb_operator: str) -> LogicalOperatorType:
         """

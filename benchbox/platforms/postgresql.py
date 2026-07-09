@@ -12,6 +12,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -35,6 +36,11 @@ from ..utils.dependencies import (
 )
 from ..utils.file_format import get_data_extension
 from .base import DriverIsolationCapability, PlatformAdapter, PsycopgConnectionMixin
+from .base.config_utils import (
+    POSTGRES_FAMILY_BASE_OPTIONS,
+    POSTGRES_FAMILY_PLATFORM_FIELDS,
+    make_platform_config_builder,
+)
 from .base.data_loading import (
     CsvDialect,
     DataSourceResolver,
@@ -42,7 +48,6 @@ from .base.data_loading import (
     prepare_local_load_file,
     resolve_csv_dialect,
 )
-from .base.sql_execution import execute_sql_query
 
 # PostgreSQL dialect for SQLGlot
 POSTGRES_DIALECT = "postgres"
@@ -248,6 +253,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
     """
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
+    plan_capture_phase_eligible = True
 
     @property
     def platform_name(self) -> str:
@@ -686,6 +692,87 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         connection.commit()
         cursor.close()
 
+    def get_query_plan(
+        self,
+        connection: Any,
+        query: str,
+        explain_options: dict[str, Any] | None = None,
+    ) -> str | None:
+        """Get query execution plan using EXPLAIN (FORMAT JSON).
+
+        SELECT queries include ANALYZE and BUFFERS for actual timing and I/O.
+        DML statements (INSERT/UPDATE/DELETE/MERGE/COPY) use FORMAT JSON only:
+        EXPLAIN ANALYZE physically re-executes the statement, which would mutate
+        data a second time. The plan structure is still captured; execution
+        statistics are absent for DML.
+
+        ANALYZE is also suppressed when ``self.analyze_plans`` is False (e.g. the
+        isolated capture phase or ``--platform-option analyze_plans=false``):
+        plain EXPLAIN (FORMAT JSON) captures the estimated plan structure without
+        re-executing the query, so a SELECT is not run a second time.
+        """
+        from benchbox.platforms.base.result_capture import is_dml_query
+
+        # In TPC-DS power/throughput streaming paths a per-stream cursor is passed as
+        # `connection` (see _make_stream_cursor / PlatformAdapterConnection); a real
+        # connection exposes a callable `.cursor()`, a cursor does not. Detect which we
+        # were given so cursor-backed streams capture plans instead of silently failing.
+        #
+        # Always run EXPLAIN on a FRESH cursor that we own, never on the caller's stream
+        # cursor: capture_query_plan() runs this via run_with_timeout and may return on a
+        # timeout while a daemon thread is still executing EXPLAIN. Psycopg cursors are not
+        # safe for concurrent cross-thread use, so reusing the stream cursor would let the
+        # abandoned EXPLAIN corrupt the next query on that stream. When given a cursor,
+        # derive a new cursor from its underlying `.connection`; when given a real
+        # connection, open one from it. We own (and close) the cursor we create in both
+        # cases, never the caller's stream cursor.
+        if callable(getattr(connection, "cursor", None)):
+            cursor = connection.cursor()
+        else:
+            cursor = connection.connection.cursor()
+        _owns_cursor = True
+
+        # Use FORMAT JSON so PostgreSQLQueryPlanParser can parse the output.
+        # ANALYZE and BUFFERS give actual timing and I/O info for SELECT queries,
+        # but they re-execute the statement. Skip them for DML (double-mutation
+        # guard) and whenever analyze_plans is disabled (estimated-plan-only).
+        if self.analyze_plans and not is_dml_query(query):
+            options = ["ANALYZE", "BUFFERS", "FORMAT JSON"]
+        else:
+            options = ["FORMAT JSON"]
+        if explain_options:
+            if explain_options.get("verbose"):
+                options.append("VERBOSE")
+
+        options_str = ", ".join(options)
+        explain_query = f"EXPLAIN ({options_str}) {query}"
+
+        try:
+            cursor.execute(explain_query)
+            plan_rows = cursor.fetchall()
+            if _owns_cursor:
+                cursor.close()
+            # PostgreSQL returns the full JSON as the first column of the first row.
+            # psycopg decodes FORMAT JSON output as a Python object; re-serialize
+            # to a string so PostgreSQLQueryPlanParser.parse_explain_output() receives
+            # the string it expects.
+            raw = plan_rows[0][0] if plan_rows else None
+            if raw is not None and not isinstance(raw, str):
+                raw = json.dumps(raw)
+            return raw
+
+        except Exception as e:
+            if _owns_cursor:
+                cursor.close()
+            self.logger.debug(f"Failed to get query plan: {e}")
+            return None
+
+    def get_query_plan_parser(self):
+        """Get PostgreSQL query plan parser."""
+        from benchbox.core.query_plans.parsers.postgresql import PostgreSQLQueryPlanParser
+
+        return PostgreSQLQueryPlanParser()
+
     def execute_query(
         self,
         connection: Any,
@@ -696,52 +783,27 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a single query and return detailed results."""
-        return execute_sql_query(
-            connection,
-            query,
-            query_id,
-            log_verbose=self.log_verbose,
-            build_query_result_with_validation=self._build_query_result_with_validation,
+        """Execute a query and optionally capture the structured query plan."""
+        result = super().execute_query(
+            connection=connection,
+            query=query,
+            query_id=query_id,
             benchmark_type=benchmark_type,
             scale_factor=scale_factor,
             validate_row_count=validate_row_count,
             stream_id=stream_id,
         )
-
-    def get_query_plan(
-        self,
-        connection: Any,
-        query: str,
-        explain_options: dict[str, Any] | None = None,
-    ) -> str:
-        """Get query execution plan using EXPLAIN ANALYZE."""
-        cursor = connection.cursor()
-
-        # Build EXPLAIN options
-        options = ["ANALYZE", "BUFFERS", "FORMAT TEXT"]
-        if explain_options:
-            if explain_options.get("verbose"):
-                options.append("VERBOSE")
-            if explain_options.get("costs", True):
-                options.append("COSTS")
-
-        options_str = ", ".join(options)
-        explain_query = f"EXPLAIN ({options_str}) {query}"
-
-        try:
-            cursor.execute(explain_query)
-            plan_rows = cursor.fetchall()
-            cursor.close()
-
-            return "\n".join(row[0] for row in plan_rows)
-
-        except Exception as e:
-            cursor.close()
-            return f"Failed to get query plan: {e}"
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
+        return result
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE on a table to update statistics."""
+        """Run ANALYZE on a table to update statistics.
+
+        Raises on failure (does not swallow) so the opt-in statistics phase's
+        gather_statistics() -> run_statistics_phase() caller can detect and
+        record a real ANALYZE failure as status=FAILED, instead of the phase
+        being marked COMPLETED with no statistics actually built.
+        """
         if not self._validate_identifier(table_name):
             self.logger.warning(f"Invalid table identifier: {table_name}")
             return
@@ -752,8 +814,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         try:
             cursor.execute(f"ANALYZE {qualified_table}")
             connection.commit()
-        except Exception as e:
-            self.logger.warning(f"ANALYZE failed for {table_name}: {e}")
         finally:
             cursor.close()
 
@@ -1021,75 +1081,15 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             # Fallback if validation module not available
             return None
 
-    def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if PostgreSQL supports a specific tuning type."""
-        # Import here to avoid circular imports
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            supported = {
-                TuningType.PARTITIONING: True,  # PostgreSQL supports declarative partitioning
-                TuningType.SORTING: False,  # No native sort keys like columnar stores
-                TuningType.DISTRIBUTION: False,  # No distribution keys (not distributed)
-                TuningType.CLUSTERING: True,  # CLUSTER command available
-                TuningType.PRIMARY_KEYS: True,  # Full constraint support
-                TuningType.FOREIGN_KEYS: True,  # Full constraint support
-            }
-            return supported.get(tuning_type, False)
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "CLUSTERING", "PRIMARY_KEYS", "FOREIGN_KEYS")
 
 
-def _build_postgresql_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build PostgreSQL database configuration with credential loading.
-
-    This function is registered with PlatformHookRegistry to provide
-    PostgreSQL-specific configuration handling.
-    """
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
-
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("postgresql") or {}
-
-    explicit_options = overrides.get("_explicit_platform_options", {})
-
-    merged_options: dict[str, Any] = {"schema": "public"}
-    merged_options.update(options)  # registered defaults (lowest priority)
-    merged_options.update(saved_creds)  # saved credentials win over defaults
-    merged_options.update(explicit_options)  # explicit CLI flags win over credentials
-    merged_options.update(overrides)  # runtime overrides (highest priority)
-
-    name = info.display_name if info else "PostgreSQL"
-    driver_package = info.driver_package if info else "psycopg"
-
-    config_dict = {
-        "type": "postgresql",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        "host": merged_options.get("host", "localhost"),
-        "port": merged_options.get("port", 5432),
-        "username": merged_options.get("username", "postgres"),
-        "password": merged_options.get("password"),
-        "database": merged_options.get("database"),
-        "admin_database": merged_options.get("admin_database", "postgres"),
-        "sslmode": merged_options.get("sslmode", "prefer"),
-        "work_mem": merged_options.get("work_mem", "256MB"),
-        "maintenance_work_mem": merged_options.get("maintenance_work_mem", "512MB"),
-        "effective_cache_size": merged_options.get("effective_cache_size", "1GB"),
-        "max_parallel_workers_per_gather": merged_options.get("max_parallel_workers_per_gather", 2),
-        "enable_timescale": merged_options.get("enable_timescale", False),
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    return DatabaseConfig(**config_dict)
+_build_postgresql_config = make_platform_config_builder(
+    "postgresql",
+    __name__,
+    "PostgreSQL",
+    "psycopg",
+    POSTGRES_FAMILY_PLATFORM_FIELDS + ("enable_timescale",),
+    base_options={"schema": "public"},
+    field_defaults={**POSTGRES_FAMILY_BASE_OPTIONS, "enable_timescale": False},
+)

@@ -1,0 +1,24 @@
+# Soundness-critical result comparators and plan parsers require owner review.
+# Mirrors _project/scripts/auto_merge_soundness_paths.py:SOUNDNESS_PREFIXES
+# 1:1 -- keep these two files in lockstep (pinned by
+# tests/unit/test_auto_merge_soundness_paths.py::test_codeowners_covers_soundness_paths).
+benchbox/core/**/validation.py @joeharris76
+benchbox/core/equivalence/** @joeharris76
+benchbox/core/query_plans/parsers/** @joeharris76
+# Oracle-adjacent widening (soundness-surface-widening): reference-value
+# loader/registry/digest fixtures, the validation+plan-capture entry point,
+# and the sql_compat rule-dispatch core (not the whole high-churn tree).
+benchbox/core/expected_results/** @joeharris76
+benchbox/platforms/base/result_capture.py @joeharris76
+benchbox/sql_compat/resolver.py @joeharris76
+benchbox/sql_compat/decision.py @joeharris76
+benchbox/sql_compat/rules/_registration.py @joeharris76
+# Self-protection: the review-gate machinery and the PyPI-publishing
+# workflow. In-workflow checks are attacker-controlled for same-repo PRs
+# (GitHub runs the PR's own copy of a pull_request-triggered workflow), so
+# this CODEOWNERS layer + the develop ruleset's require_code_owner_review
+# is the durable control. .github/workflows/pr.yml deliberately excluded
+# (high churn; its required check is pinned by the ruleset-drift canary).
+_project/scripts/auto_merge_soundness_paths.py @joeharris76
+.github/workflows/auto-merge-on-open.yml @joeharris76
+.github/workflows/release.yml @joeharris76

@@ -79,16 +79,53 @@ class TestClickHouseAdapter:
         mock_client.execute.side_effect = [
             [],
             None,
-        ]  # SHOW DATABASES returns [], SELECT 1 returns None
+            None,
+        ]  # SHOW DATABASES returns [], CREATE DATABASE succeeds, SELECT 1 returns None
 
         adapter = ClickHouseAdapter(deployment_mode="server", host="localhost", port=9000)
         connection = adapter.create_connection()
 
         assert connection == mock_client
-        # Should be called twice: once for admin client (db check), once for main client
-        assert mock_client_class.call_count == 2
-        # Should execute SHOW DATABASES and SELECT 1
-        assert mock_client.execute.call_count == 2
+        # Should be called three times: db check, db create, main client
+        assert mock_client_class.call_count == 3
+        # Should execute SHOW DATABASES, CREATE DATABASE, and SELECT 1
+        assert mock_client.execute.call_count == 3
+
+    @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
+    def test_create_connection_bootstraps_database_before_scoped_client(self, mock_client_class):
+        """Server connections create the target database before selecting it."""
+        check_client = Mock()
+        create_client = Mock()
+        main_client = Mock()
+        check_client.execute.return_value = []
+        mock_client_class.side_effect = [check_client, create_client, main_client]
+
+        adapter = ClickHouseAdapter(
+            deployment_mode="server",
+            host="localhost",
+            port=9000,
+            database="benchbox_run",
+            username="default",
+            password="benchbox",
+        )
+
+        assert adapter.create_connection() == main_client
+
+        create_client.execute.assert_called_once_with("CREATE DATABASE IF NOT EXISTS `benchbox_run`")
+        assert "database" not in mock_client_class.call_args_list[1].kwargs
+        assert mock_client_class.call_args_list[2].kwargs["database"] == "benchbox_run"
+
+    @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
+    def test_create_connection_rejects_unsafe_database_identifier(self, mock_client_class):
+        """Database bootstrap does not interpolate unsafe identifiers into SQL."""
+        check_client = Mock()
+        check_client.execute.return_value = []
+        mock_client_class.return_value = check_client
+
+        adapter = ClickHouseAdapter(deployment_mode="server", database="bad-name")
+
+        with pytest.raises(ValueError, match="Invalid database identifier"):
+            adapter.create_connection()
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_create_connection_failure(self, mock_client_class):
@@ -144,11 +181,11 @@ class TestClickHouseAdapter:
         mock_client = Mock()
         mock_client_class.return_value = mock_client
         # Mock database check to return empty list (database doesn't exist)
-        # Mock SELECT 1 to return None for connection test
+        # Mock database creation and SELECT 1 to return None for connection setup
         # Mock COUNT(*) query to return the row count
-        # Mock: database check (connection setup), connection test (connection setup),
+        # Mock: database check, database create, connection test,
         # COUNT(*) before, INSERT statement, COUNT(*) after
-        mock_client.execute.side_effect = [[], None, [[0]], None, [[100]]]
+        mock_client.execute.side_effect = [[], None, None, [[0]], None, [[100]]]
 
         # Create temporary test file first
         import tempfile
@@ -173,7 +210,7 @@ class TestClickHouseAdapter:
             assert isinstance(load_time, float)
             assert load_time >= 0
             assert "test_table" in table_stats  # Table names are lowercase per TPC spec
-            assert table_stats["test_table"] == 100
+            assert table_stats["test_table"] == 2
 
         finally:
             temp_path.unlink()
@@ -205,8 +242,9 @@ class TestClickHouseAdapter:
         mock_client.execute.side_effect = [
             [],
             None,
+            None,
             Exception("Query failed"),
-        ]  # db check, connection test, then query failure
+        ]  # db check, database create, connection test, then query failure
 
         adapter = ClickHouseAdapter(deployment_mode="server")
         connection = adapter.create_connection()
@@ -242,8 +280,8 @@ class TestClickHouseAdapter:
         # Should only apply basic optimizations for non-OLAP benchmark types
         adapter.configure_for_benchmark(connection, "read_primitives")
 
-        # Should execute fewer statements (basic settings + cache control + validation + server memory ratio = 11)
-        assert mock_client.execute.call_count == 11  # basic (6) + cache (3) + validation (1) + server memory ratio (1)
+        # Should execute fewer statements (basic settings + cache control + validation = 10)
+        assert mock_client.execute.call_count == 10  # basic (6) + cache (3) + validation (1)
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_configure_for_benchmark_tuning_enabled(self, mock_client_class):
@@ -251,7 +289,7 @@ class TestClickHouseAdapter:
         mock_client = Mock()
         mock_client_class.return_value = mock_client
         # Mock database check to return empty list
-        mock_client.execute.side_effect = [[], None]
+        mock_client.execute.side_effect = [[], None, None]
 
         # Use server mode to avoid chdb initialization in unit tests
         adapter = ClickHouseAdapter(deployment_mode="server", strict_validation=False)
@@ -265,8 +303,8 @@ class TestClickHouseAdapter:
         adapter.configure_for_benchmark(connection, "olap")
 
         # Should execute only basic optimization statements (no OLAP-specific ones)
-        # Basic settings (6) + cache control settings (3) + validation query (1) + server memory ratio (1) = 11
-        assert mock_client.execute.call_count == 11  # basic + cache + validation + server memory ratio
+        # Basic settings (6) + cache control settings (3) + validation query (1) = 10
+        assert mock_client.execute.call_count == 10  # basic + cache + validation
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_configure_for_benchmark_join_memory_uses_50_pct_multiplier(self, mock_client_class):
@@ -379,7 +417,7 @@ class TestClickHouseAdapter:
             # Test that problematic settings are attempted in server mode
             result = adapter._apply_setting_with_validation(mock_connection, "join_algorithm", "hash")
             assert result is True
-            mock_connection.execute.assert_called_once_with("SET join_algorithm = hash")
+            mock_connection.execute.assert_called_once_with("SET join_algorithm = 'hash'")
 
             # Test error handling
             mock_connection.reset_mock()
@@ -387,7 +425,7 @@ class TestClickHouseAdapter:
 
             result = adapter._apply_setting_with_validation(mock_connection, "some_setting", "value")
             assert result is False
-            mock_connection.execute.assert_called_once_with("SET some_setting = value")
+            mock_connection.execute.assert_called_once_with("SET some_setting = 'value'")
 
     def test_memory_setting_parsing(self):
         """Test memory setting parsing."""
@@ -435,6 +473,27 @@ class TestClickHouseAdapter:
             assert "my_float_col INT" in mixed_out
             assert "FLOAT[" not in mixed_out
 
+    def test_array_field_parsed_to_list_not_float(self):
+        """An Array column value like ``[0.1,0.2]`` is parsed to a Python list.
+
+        Regression for the embedding-column load: the ARRAY branch must take
+        precedence over the FLOAT substring match, so the raw literal is parsed
+        into a sequence for clickhouse-driver rather than being passed to
+        ``float("[0.1,0.2]")`` (which raised ValueError and dropped all rows).
+        """
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
+
+        handler = ClickHouseNativeHandler(delimiter=",", adapter=None, benchmark=None)
+
+        for type_name in ("Array(Float32)", "FLOAT_ARRAY", "Array(Float64)"):
+            converted = handler._convert_field_for_clickhouse("[0.1,0.2]", type_name)
+            assert converted == [0.1, 0.2], f"{type_name} should parse to a list"
+
+        # A genuine scalar FLOAT column is still converted to a float.
+        assert handler._convert_field_for_clickhouse("0.5", "FLOAT") == 0.5
+        # NULL sentinels in an array column become None.
+        assert handler._convert_field_for_clickhouse("\\N", "Array(Float32)") is None
+
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_get_platform_metadata(self, mock_client_class):
         """Test platform metadata collection."""
@@ -464,6 +523,7 @@ class TestClickHouseAdapter:
         # Mock connection setup, then schema and stats queries
         mock_client.execute.side_effect = [
             [],  # database check
+            None,  # database create
             None,  # connection test
             [("id", "Int32"), ("name", "String")],  # schema query
             [(1000, 1024000, 512000)],  # stats query
@@ -712,10 +772,12 @@ class TestClickHouseAdapter:
 class TestClickHouseNativeHandlerBulk:
     """Tests for ClickHouseNativeHandler.load_table_bulk() glob-pattern loading."""
 
-    def _make_handler(self, dry_run: bool = False):
+    def _make_handler(self, dry_run: bool = False, server_mode: bool = False):
         from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
 
         adapter = Mock(spec=[])  # no dry_run_mode unless set
+        if server_mode:
+            adapter.deployment_mode = "server"
         if dry_run:
             adapter.dry_run_mode = True
             adapter.capture_sql = Mock()
@@ -838,6 +900,32 @@ class TestClickHouseNativeHandlerBulk:
         assert result == 4000
         assert not connection.execute.called
         handler.adapter.capture_sql.assert_called_once()
+
+    def test_server_mode_loads_host_files_with_client_batches(self, tmp_path):
+        """ClickHouse server mode cannot use file() for host-local Docker paths."""
+        shard = tmp_path / "region.tbl"
+        shard.write_text("1|AFRICA\n2|AMERICA\n", encoding="utf-8")
+
+        handler = self._make_handler(server_mode=True)
+        connection = Mock()
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {
+            "region": {
+                "columns": [
+                    {"name": "r_regionkey", "type": "INTEGER"},
+                    {"name": "r_name", "type": "CHAR(25)"},
+                ]
+            }
+        }
+
+        result = handler.load_table_bulk("region", [shard], connection, benchmark, Mock())
+
+        assert result == 2
+        connection.execute.assert_called_once_with(
+            "INSERT INTO region VALUES",
+            [(1, "AFRICA"), (2, "AMERICA")],
+        )
+        assert "file(" not in connection.execute.call_args[0][0]
 
 
 # ===================================================================
@@ -1361,3 +1449,18 @@ class TestClickHouseQueryTransformerSafeDivision:
         result = t.safe_division(sql)
         assert "'a/b'" in result
         assert "x / NULLIF(y, 0)" in result
+
+    def test_windowed_divisor_wraps_whole_window_expression(self):
+        """A windowed divisor ``SUM(x) OVER (...)`` must wrap as a single operand.
+
+        Regression: the operand scanner stopped at ``SUM(volume)`` and left the
+        trailing ``OVER (...)`` outside the NULLIF, producing the invalid
+        ``NULLIF(SUM(volume), 0) OVER (...)`` (ClickHouse: 'NULLIF ... OVER' is not a
+        window function). The whole window expression is one operand.
+        """
+        t = self._transformer()
+        sql = "SELECT mkt / SUM(volume) OVER (PARTITION BY o_year) FROM t"
+        result = t.safe_division(sql)
+        assert "mkt / NULLIF(SUM(volume) OVER (PARTITION BY o_year), 0)" in result
+        # The OVER clause must NOT be stranded outside the NULLIF.
+        assert "NULLIF(SUM(volume), 0) OVER" not in result

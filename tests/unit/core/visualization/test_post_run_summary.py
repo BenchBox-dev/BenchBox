@@ -8,12 +8,10 @@ from unittest.mock import patch
 
 import pytest
 
-from benchbox.core.visualization.ascii_api import ChartOptions
 from benchbox.core.visualization.post_run_summary import (
     PostRunSummary,
     _extract_environment,
     _extract_platform_config,
-    _max_vertical_bars_for_labels,
     _should_use_horizontal,
     generate_post_run_summary,
 )
@@ -242,31 +240,21 @@ class TestGeneratePostRunSummary:
 
     def test_multi_run_preserves_variant_query_ids(self):
         """Variant IDs (e.g., 14a/14b) must remain separate for aggregation."""
-        queries = [
-            _make_query("14a", 100.0),
-            _make_query("Q14a", 110.0),
-            _make_query("14b", 300.0),
-            _make_query("Q14b", 290.0),
-        ]
+        queries = []
+        for i in range(1, 34):
+            queries.append(_make_query(f"{i}a", float(i)))
+            queries.append(_make_query(f"Q{i}a", float(i + 1)))
         result = _make_result(queries)
-        summary = generate_post_run_summary(result, color=False)
+        summary = generate_post_run_summary(result, color=False, max_width=140)
 
         for line in summary.summary_box.split("\n"):
             if "Queries" in line:
-                assert "2" in line
+                assert "33" in line
                 break
         else:
             pytest.fail("Queries line missing from summary box")
 
         assert "Q14a" in summary.query_histogram
-        assert "Q14b" in summary.query_histogram
-
-    def test_joinorder_variant_labels_fit_vertical_histogram(self):
-        """JoinOrder IDs need enough per-bar width to keep numeric suffixes."""
-        queries = [_make_query(f"Q{i}a", float(i)) for i in range(1, 34)]
-        result = _make_result(queries, benchmark_name="JoinOrderBenchmark")
-        summary = generate_post_run_summary(result, color=False, max_width=140)
-
         assert _should_use_horizontal([f"Q{i}a" for i in range(1, 34)]) is False
         assert "Q18a" in summary.query_histogram
         assert "Q26a" in summary.query_histogram
@@ -665,22 +653,6 @@ class TestShouldUseHorizontal:
         """When most IDs are long, median is long → horizontal."""
         ids = ["Q1", "aggregation_groupby", "shuffle_join", "filter_range", "sort_column"]
         assert _should_use_horizontal(ids) is True
-
-
-class TestVerticalHistogramChunkSizing:
-    """Tests for vertical histogram label-fitting chunk size."""
-
-    def test_joinorder_labels_reduce_chunk_size_at_max_width(self):
-        options = ChartOptions(width=140, use_color=False)
-        ids = [f"Q{i}a" for i in range(1, 34)]
-
-        assert _max_vertical_bars_for_labels(ids, options) == 26
-
-    def test_short_ids_keep_default_chunk_size_when_they_fit(self):
-        options = ChartOptions(width=140, use_color=False)
-        ids = [f"Q{i}" for i in range(1, 23)]
-
-        assert _max_vertical_bars_for_labels(ids, options) == 33
 
 
 class TestHorizontalBarChartIntegration:

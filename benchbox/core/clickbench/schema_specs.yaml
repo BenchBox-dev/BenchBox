@@ -1,0 +1,324 @@
+hits_table:
+  name: hits
+  columns:
+  - name: WatchID
+    type: BIGINT
+    nullable: false
+  - name: JavaEnable
+    type: SMALLINT
+    nullable: false
+  - name: Title
+    type: TEXT
+    nullable: false
+  - name: GoodEvent
+    type: SMALLINT
+    nullable: false
+  - name: EventTime
+    type: TIMESTAMP
+    nullable: false
+  - name: EventDate
+    type: DATE
+    nullable: false
+  - name: CounterID
+    type: BIGINT
+    nullable: false
+  - name: ClientIP
+    type: BIGINT
+    nullable: false
+  - name: RegionID
+    type: BIGINT
+    nullable: false
+  - name: UserID
+    type: BIGINT
+    nullable: false
+  - name: CounterClass
+    type: SMALLINT
+    nullable: false
+  - name: OS
+    type: SMALLINT
+    nullable: false
+  - name: UserAgent
+    type: SMALLINT
+    nullable: false
+  - name: URL
+    type: TEXT
+    nullable: false
+  - name: Referer
+    type: TEXT
+    nullable: false
+  - name: IsRefresh
+    type: SMALLINT
+    nullable: false
+  - name: RefererCategoryID
+    type: INTEGER
+    nullable: false
+  - name: RefererRegionID
+    type: BIGINT
+    nullable: false
+  - name: URLCategoryID
+    type: INTEGER
+    nullable: false
+  - name: URLRegionID
+    type: BIGINT
+    nullable: false
+  - name: ResolutionWidth
+    type: SMALLINT
+    nullable: false
+  - name: ResolutionHeight
+    type: SMALLINT
+    nullable: false
+  - name: ResolutionDepth
+    type: SMALLINT
+    nullable: false
+  - name: FlashMajor
+    type: SMALLINT
+    nullable: false
+  - name: FlashMinor
+    type: SMALLINT
+    nullable: false
+  - name: FlashMinor2
+    type: VARCHAR(255)
+    nullable: false
+  - name: NetMajor
+    type: SMALLINT
+    nullable: false
+  - name: NetMinor
+    type: SMALLINT
+    nullable: false
+  - name: UserAgentMajor
+    type: SMALLINT
+    nullable: false
+  - name: UserAgentMinor
+    type: VARCHAR(255)
+    nullable: false
+  - name: CookieEnable
+    type: SMALLINT
+    nullable: false
+  - name: JavascriptEnable
+    type: SMALLINT
+    nullable: false
+  - name: IsMobile
+    type: SMALLINT
+    nullable: false
+  - name: MobilePhone
+    type: SMALLINT
+    nullable: false
+  - name: MobilePhoneModel
+    type: VARCHAR(255)
+    nullable: false
+  - name: Params
+    type: TEXT
+    nullable: false
+  - name: IPNetworkID
+    type: BIGINT
+    nullable: false
+  - name: TraficSourceID
+    type: SMALLINT
+    nullable: false
+  - name: SearchEngineID
+    type: SMALLINT
+    nullable: false
+  - name: SearchPhrase
+    type: VARCHAR(1024)
+    nullable: false
+  - name: AdvEngineID
+    type: SMALLINT
+    nullable: false
+  - name: IsArtifical
+    type: SMALLINT
+    nullable: false
+  - name: WindowClientWidth
+    type: SMALLINT
+    nullable: false
+  - name: WindowClientHeight
+    type: SMALLINT
+    nullable: false
+  - name: ClientTimeZone
+    type: SMALLINT
+    nullable: false
+  - name: ClientEventTime
+    type: TIMESTAMP
+    nullable: false
+  - name: SilverlightVersion1
+    type: SMALLINT
+    nullable: false
+  - name: SilverlightVersion2
+    type: SMALLINT
+    nullable: false
+  - name: SilverlightVersion3
+    type: BIGINT
+    nullable: false
+  - name: SilverlightVersion4
+    type: SMALLINT
+    nullable: false
+  - name: PageCharset
+    type: VARCHAR(255)
+    nullable: false
+  - name: CodeVersion
+    type: BIGINT
+    nullable: false
+  - name: IsLink
+    type: SMALLINT
+    nullable: false
+  - name: IsDownload
+    type: SMALLINT
+    nullable: false
+  - name: IsNotBounce
+    type: SMALLINT
+    nullable: false
+  - name: FUniqID
+    type: BIGINT
+    nullable: false
+  - name: OriginalURL
+    type: TEXT
+    nullable: false
+  - name: HID
+    type: BIGINT
+    nullable: false
+  - name: IsOldCounter
+    type: SMALLINT
+    nullable: false
+  - name: IsEvent
+    type: SMALLINT
+    nullable: false
+  - name: IsParameter
+    type: SMALLINT
+    nullable: false
+  - name: DontCountHits
+    type: SMALLINT
+    nullable: false
+  - name: WithHash
+    type: SMALLINT
+    nullable: false
+  - name: HitColor
+    type: VARCHAR(1)
+    nullable: false
+  - name: LocalEventTime
+    type: TIMESTAMP
+    nullable: false
+  - name: Age
+    type: SMALLINT
+    nullable: false
+  - name: Sex
+    type: SMALLINT
+    nullable: false
+  - name: Income
+    type: SMALLINT
+    nullable: false
+  - name: Interests
+    type: INTEGER
+    nullable: false
+  - name: Robotness
+    type: SMALLINT
+    nullable: false
+  - name: RemoteIP
+    type: BIGINT
+    nullable: false
+  - name: WindowName
+    type: INTEGER
+    nullable: false
+  - name: OpenerName
+    type: INTEGER
+    nullable: false
+  - name: HistoryLength
+    type: SMALLINT
+    nullable: false
+  - name: BrowserLanguage
+    type: VARCHAR(2)
+    nullable: false
+  - name: BrowserCountry
+    type: VARCHAR(2)
+    nullable: false
+  - name: SocialNetwork
+    type: VARCHAR(255)
+    nullable: false
+  - name: SocialAction
+    type: VARCHAR(255)
+    nullable: false
+  - name: HTTPError
+    type: SMALLINT
+    nullable: false
+  - name: SendTiming
+    type: INTEGER
+    nullable: false
+  - name: DNSTiming
+    type: INTEGER
+    nullable: false
+  - name: ConnectTiming
+    type: INTEGER
+    nullable: false
+  - name: ResponseStartTiming
+    type: INTEGER
+    nullable: false
+  - name: ResponseEndTiming
+    type: INTEGER
+    nullable: false
+  - name: FetchTiming
+    type: INTEGER
+    nullable: false
+  - name: SocialSourceNetworkID
+    type: SMALLINT
+    nullable: false
+  - name: SocialSourcePage
+    type: TEXT
+    nullable: false
+  - name: ParamPrice
+    type: BIGINT
+    nullable: false
+  - name: ParamOrderID
+    type: VARCHAR(255)
+    nullable: false
+  - name: ParamCurrency
+    type: VARCHAR(3)
+    nullable: false
+  - name: ParamCurrencyID
+    type: SMALLINT
+    nullable: false
+  - name: OpenstatServiceName
+    type: VARCHAR(255)
+    nullable: false
+  - name: OpenstatCampaignID
+    type: VARCHAR(255)
+    nullable: false
+  - name: OpenstatAdID
+    type: VARCHAR(255)
+    nullable: false
+  - name: OpenstatSourceID
+    type: VARCHAR(255)
+    nullable: false
+  - name: UTMSource
+    type: VARCHAR(255)
+    nullable: false
+  - name: UTMMedium
+    type: VARCHAR(255)
+    nullable: false
+  - name: UTMCampaign
+    type: VARCHAR(255)
+    nullable: false
+  - name: UTMContent
+    type: VARCHAR(255)
+    nullable: false
+  - name: UTMTerm
+    type: VARCHAR(255)
+    nullable: false
+  - name: FromTag
+    type: VARCHAR(255)
+    nullable: false
+  - name: HasGCLID
+    type: SMALLINT
+    nullable: false
+  - name: RefererHash
+    type: BIGINT
+    nullable: false
+  - name: URLHash
+    type: BIGINT
+    nullable: false
+  - name: CLID
+    type: BIGINT
+    nullable: false
+  primary_key:
+  - CounterID
+  - EventDate
+  - UserID
+  - EventTime
+  - WatchID

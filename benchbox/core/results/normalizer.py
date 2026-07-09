@@ -33,6 +33,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from benchbox.core.results.schema_policy import KNOWN_SCHEMA_V2_VERSIONS, detect_normalizer_schema_version
+
 
 @dataclass
 class NormalizedQuery:
@@ -122,10 +124,7 @@ def detect_schema_version(data: dict[str, Any]) -> str:
     Returns:
         Schema version string: "2.0", "2.1", or "1.x"
     """
-    version = data.get("version") or data.get("schema_version", "")
-    if version in ("2.0", "2.1"):
-        return version
-    return "1.x"
+    return detect_normalizer_schema_version(data)
 
 
 def normalize_result_dict(data: dict[str, Any]) -> NormalizedResultDict:
@@ -146,7 +145,7 @@ def normalize_result_dict(data: dict[str, Any]) -> NormalizedResultDict:
         >>> emit(f"{result.platform}: {result.total_time_ms}ms")
     """
     schema_version = detect_schema_version(data)
-    is_v2 = schema_version in ("2.0", "2.1")
+    is_v2 = schema_version in KNOWN_SCHEMA_V2_VERSIONS
 
     # Common blocks present in both schemas
     benchmark_block = data.get("benchmark", {}) or {}

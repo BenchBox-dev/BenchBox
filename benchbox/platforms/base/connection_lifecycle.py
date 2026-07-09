@@ -174,6 +174,16 @@ class ConnectionLifecycleMixin:
         validator = DatabaseValidator(adapter=self, connection_config=connection_config)
         return validator.validate()
 
+    def check_benchmark_tables_exist(self, **connection_config) -> bool | None:
+        """Check whether a managed database has the current benchmark tables.
+
+        Returns:
+            True when the adapter can prove the required tables are present,
+            False when the adapter can prove they are missing or unusable, and
+            None when the adapter does not implement managed table validation.
+        """
+        return None
+
     def handle_existing_database(self, **connection_config) -> None:
         """Handle existing database non-interactively for core/programmatic usage.
 
@@ -181,7 +191,8 @@ class ConnectionLifecycleMixin:
         - If force_recreate=True, always recreate
         - If database is valid, reuse it
         - If database has issues, recreate it
-        - If skip_database_management=True, skip all database management
+        - If skip_database_management=True, skip create/drop management while
+          allowing adapters to opt into table-readiness checks
         """
         self.log_operation_start("Database validation", "Checking existing database compatibility")
 
@@ -191,6 +202,13 @@ class ConnectionLifecycleMixin:
 
         if getattr(self, "skip_database_management", False):
             self.log_verbose("Database management skipped (managed cloud database)")
+            tables_exist = self.check_benchmark_tables_exist(**connection_config)
+            if tables_exist is False:
+                self.log_verbose("Managed database cannot be safely reused - treating as fresh database")
+                self.database_was_reused = False
+                return
+            if tables_exist is True:
+                self.log_verbose("Managed database has required benchmark tables")
             self.database_was_reused = True
             return
 

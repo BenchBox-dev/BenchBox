@@ -20,18 +20,19 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from .base.config_utils import (
+    POSTGRES_CONNECTION_PLATFORM_FIELDS,
+    POSTGRES_FAMILY_BASE_OPTIONS,
+    make_platform_config_builder,
+)
 from .postgresql import (
     POSTGRES_DIALECT,
     PostgreSQLAdapter,
     _add_postgres_compatible_arguments,
     _build_postgres_connection_kwargs,
 )
-
-if TYPE_CHECKING:
-    from benchbox.core.platform_registry import PlatformInfo
-    from benchbox.core.schemas import DatabaseConfig
 
 # CedarDB default port - same as PostgreSQL; configurable via platform-option
 CEDARDB_DEFAULT_PORT = 5432
@@ -49,6 +50,8 @@ class CedarDBAdapter(PostgreSQLAdapter):
 
     Requires CedarDB server with PostgreSQL wire protocol enabled (default port 5432).
     """
+
+    plan_capture_phase_eligible = True
 
     @property
     def platform_name(self) -> str:
@@ -225,88 +228,16 @@ class CedarDBAdapter(PostgreSQLAdapter):
             self.logger.warning(f"Failed to drop database {db_name}: {e}")
             raise
 
-    def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if CedarDB supports a specific tuning type.
-
-        CedarDB is a full relational database with ACID guarantees, so most
-        PostgreSQL tuning types apply. Distribution is not supported (single-node).
-        """
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            supported = {
-                TuningType.PARTITIONING: False,  # Not verified - needs live CedarDB testing
-                TuningType.SORTING: False,  # No native sort keys
-                TuningType.DISTRIBUTION: False,  # Single-node only
-                TuningType.CLUSTERING: False,  # Not verified - CLUSTER is PG-specific
-                TuningType.PRIMARY_KEYS: True,  # Full constraint support
-                TuningType.FOREIGN_KEYS: True,  # Full constraint support
-            }
-            return supported.get(tuning_type, False)
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PRIMARY_KEYS", "FOREIGN_KEYS")
 
 
-def _build_cedardb_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: PlatformInfo | None,
-) -> DatabaseConfig:
-    """Build CedarDB database configuration with credential loading.
-
-    Args:
-        platform: Platform name (should be 'cedardb')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded
-    """
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
-
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("cedardb") or {}
-
-    # Priority: defaults < saved_creds < explicit_options < overrides
-    # `options` mixes registered defaults with explicit CLI values; explicit_options
-    # isolates only what the user actually typed so credentials win over defaults
-    # but lose to explicit --platform-option flags.
-    explicit_options = overrides.pop("_explicit_platform_options", {})
-    merged_options: dict[str, Any] = {"schema": "public"}
-    merged_options.update(options)
-    merged_options.update(saved_creds)
-    merged_options.update(explicit_options)
-    merged_options.update(overrides)
-
-    name = info.display_name if info else "CedarDB"
-    driver_package = info.driver_package if info else "psycopg"
-
-    config_dict = {
-        "type": "cedardb",
-        "name": name,
-        "options": merged_options,
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields
-        # Note: "schema" is not set at top-level because it conflicts with
-        # Pydantic BaseModel's deprecated schema() method. It is available
-        # via config.options["schema"] after build_database_config merges options.
-        "host": merged_options.get("host", "localhost"),
-        "port": merged_options.get("port", CEDARDB_DEFAULT_PORT),
-        "username": merged_options.get("username", "postgres"),
-        "password": merged_options.get("password"),
-        "database": merged_options.get("database"),
-        "admin_database": merged_options.get("admin_database", "postgres"),
-        "sslmode": merged_options.get("sslmode", "prefer"),
-        # Benchmark context
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    return DatabaseConfig(**config_dict)
+_build_cedardb_config = make_platform_config_builder(
+    "cedardb",
+    __name__,
+    "CedarDB",
+    "psycopg",
+    POSTGRES_CONNECTION_PLATFORM_FIELDS,
+    base_options={"schema": "public"},
+    field_defaults={**POSTGRES_FAMILY_BASE_OPTIONS, "port": CEDARDB_DEFAULT_PORT},
+    consume_explicit_options=True,
+)

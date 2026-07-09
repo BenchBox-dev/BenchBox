@@ -20,6 +20,10 @@ except ImportError:
     import tomli as tomllib  # type: ignore[no-redef]
 
 ROOT = Path(__file__).resolve().parent.parent
+try:
+    ROOT = ROOT.relative_to(Path.cwd())
+except ValueError:
+    ROOT = ROOT
 MANIFEST = ROOT / "benchbox" / "core" / "joinorder" / "data_manifest.toml"
 JSON_PATH = ROOT / "benchmark_runs" / "results" / "joinorder_sf1_duckdb_sql_20260518_161132_e392ddcb.json"
 

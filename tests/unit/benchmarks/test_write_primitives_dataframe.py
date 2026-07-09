@@ -30,6 +30,41 @@ except ImportError:
     PANDAS_AVAILABLE = False
     pd = None
 
+try:
+    from benchbox.platforms.dataframe.pyspark_maintenance import (
+        DELTA_SPARK_AVAILABLE,
+        PYSPARK_AVAILABLE,
+        PYSPARK_DELTA_CAPABILITIES,
+        PYSPARK_PARQUET_CAPABILITIES,
+        PySparkMaintenanceOperations,
+        get_pyspark_maintenance_operations,
+    )
+
+    PYSPARK_MAINTENANCE_AVAILABLE = True
+    PYSPARK_MAINTENANCE_IMPORT_ERROR = ""
+except ImportError as exc:
+    # PySpark is a core (non-optional) dependency, so this ImportError normally
+    # only fires on developer machines without it installed - but it also fires
+    # if the wrapper module itself becomes genuinely broken (moved/renamed
+    # symbol, typo). A single module-level guard (rather than 12 duplicated
+    # in-body try/except sites) makes the skip reason carry the real
+    # ImportError text instead of a generic static string, so a real breakage
+    # is visible in the skip reason even though it still (by design) skips
+    # rather than errors on machines without PySpark.
+    PYSPARK_MAINTENANCE_AVAILABLE = False
+    PYSPARK_MAINTENANCE_IMPORT_ERROR = str(exc)
+    DELTA_SPARK_AVAILABLE = False
+    PYSPARK_AVAILABLE = False
+    PYSPARK_DELTA_CAPABILITIES = None
+    PYSPARK_PARQUET_CAPABILITIES = None
+    PySparkMaintenanceOperations = None
+    get_pyspark_maintenance_operations = None
+
+pyspark_maintenance_skip = pytest.mark.skipif(
+    not PYSPARK_MAINTENANCE_AVAILABLE,
+    reason=f"PySpark maintenance module not available: {PYSPARK_MAINTENANCE_IMPORT_ERROR}",
+)
+
 from benchbox.core.write_primitives import (
     DataFrameWriteCapabilities,
     DataFrameWriteOperationsManager,
@@ -554,18 +589,12 @@ class TestPandasWriteOperations:
 # =============================================================================
 
 
+@pyspark_maintenance_skip
 class TestPySparkCapabilities:
     """Test PySpark capability profiles for Delta vs Parquet."""
 
     def test_delta_capabilities_full_acid(self):
         """Test that Delta capabilities declare full ACID support."""
-        try:
-            from benchbox.platforms.dataframe.pyspark_maintenance import (
-                PYSPARK_DELTA_CAPABILITIES,
-            )
-        except ImportError:
-            pytest.skip("PySpark maintenance module not available")
-
         caps = PYSPARK_DELTA_CAPABILITIES
 
         assert caps.platform_name == "pyspark-delta"
@@ -579,13 +608,6 @@ class TestPySparkCapabilities:
 
     def test_parquet_capabilities_limited(self):
         """Test that Parquet capabilities only support INSERT/BULK_LOAD."""
-        try:
-            from benchbox.platforms.dataframe.pyspark_maintenance import (
-                PYSPARK_PARQUET_CAPABILITIES,
-            )
-        except ImportError:
-            pytest.skip("PySpark maintenance module not available")
-
         caps = PYSPARK_PARQUET_CAPABILITIES
 
         assert caps.platform_name == "pyspark-parquet"
@@ -598,47 +620,27 @@ class TestPySparkCapabilities:
         assert caps.supports_row_level_delete is False
 
 
+@pyspark_maintenance_skip
 class TestPySparkMaintenanceInit:
     """Test PySparkMaintenanceOperations initialization."""
 
     def test_requires_spark_session(self):
         """Test that None spark_session raises ValueError."""
-        try:
-            from benchbox.platforms.dataframe.pyspark_maintenance import (
-                PySparkMaintenanceOperations,
-            )
-        except ImportError:
-            pytest.skip("PySpark not installed")
-
         with pytest.raises(ValueError, match="spark_session is required"):
             PySparkMaintenanceOperations(spark_session=None)
 
     def test_factory_returns_none_without_session(self):
         """Test that factory function returns None without SparkSession."""
-        try:
-            from benchbox.platforms.dataframe.pyspark_maintenance import (
-                get_pyspark_maintenance_operations,
-            )
-        except ImportError:
-            pytest.skip("PySpark not installed")
-
         result = get_pyspark_maintenance_operations(spark_session=None)
         assert result is None
 
 
+@pyspark_maintenance_skip
 class TestPySparkInsertWithMock:
     """Test PySpark INSERT operations verify DataFrame API is used (not SQL)."""
 
     def test_insert_uses_dataframe_write_api(self):
         """Verify INSERT uses df.write.mode().format().save(), not spark.sql()."""
-        try:
-            from benchbox.platforms.dataframe.pyspark_maintenance import (
-                PYSPARK_AVAILABLE,
-                PySparkMaintenanceOperations,
-            )
-        except ImportError:
-            pytest.skip("PySpark maintenance module not available")
-
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not installed")
 
@@ -678,19 +680,12 @@ class TestPySparkInsertWithMock:
         assert result == 5
 
 
+@pyspark_maintenance_skip
 class TestPySparkBulkLoadWithMock:
     """Test PySpark BULK_LOAD uses spark.read().write() pattern."""
 
     def test_bulk_load_uses_read_write_pattern(self):
         """Verify BULK_LOAD uses spark.read.format().load() then df.write."""
-        try:
-            from benchbox.platforms.dataframe.pyspark_maintenance import (
-                PYSPARK_AVAILABLE,
-                PySparkMaintenanceOperations,
-            )
-        except ImportError:
-            pytest.skip("PySpark maintenance module not available")
-
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not installed")
 
@@ -744,20 +739,12 @@ class TestPySparkBulkLoadWithMock:
         assert result == 100
 
 
+@pyspark_maintenance_skip
 class TestPySparkDeltaOperationsWithMock:
     """Test PySpark Delta Lake operations use DeltaTable API."""
 
     def test_delete_uses_delta_table_api(self):
         """Verify DELETE uses DeltaTable.forPath().delete(), not spark.sql()."""
-        try:
-            from benchbox.platforms.dataframe.pyspark_maintenance import (
-                DELTA_SPARK_AVAILABLE,
-                PYSPARK_AVAILABLE,
-                PySparkMaintenanceOperations,
-            )
-        except ImportError:
-            pytest.skip("PySpark maintenance module not available")
-
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not installed")
 
@@ -800,15 +787,6 @@ class TestPySparkDeltaOperationsWithMock:
 
     def test_update_uses_delta_table_api(self):
         """Verify UPDATE uses DeltaTable.forPath().update(), not spark.sql()."""
-        try:
-            from benchbox.platforms.dataframe.pyspark_maintenance import (
-                DELTA_SPARK_AVAILABLE,
-                PYSPARK_AVAILABLE,
-                PySparkMaintenanceOperations,
-            )
-        except ImportError:
-            pytest.skip("PySpark maintenance module not available")
-
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not installed")
 
@@ -853,15 +831,6 @@ class TestPySparkDeltaOperationsWithMock:
 
     def test_merge_uses_delta_table_api(self):
         """Verify MERGE uses DeltaTable.alias().merge().execute(), not spark.sql()."""
-        try:
-            from benchbox.platforms.dataframe.pyspark_maintenance import (
-                DELTA_SPARK_AVAILABLE,
-                PYSPARK_AVAILABLE,
-                PySparkMaintenanceOperations,
-            )
-        except ImportError:
-            pytest.skip("PySpark maintenance module not available")
-
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not installed")
 
@@ -915,19 +884,12 @@ class TestPySparkDeltaOperationsWithMock:
         assert result == 10
 
 
+@pyspark_maintenance_skip
 class TestPySparkParquetLimitations:
     """Test that row-level operations raise NotImplementedError for plain Parquet."""
 
     def test_delete_raises_for_parquet(self):
         """Test DELETE raises NotImplementedError for non-Delta tables."""
-        try:
-            from benchbox.platforms.dataframe.pyspark_maintenance import (
-                PYSPARK_AVAILABLE,
-                PySparkMaintenanceOperations,
-            )
-        except ImportError:
-            pytest.skip("PySpark maintenance module not available")
-
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not installed")
 
@@ -942,14 +904,6 @@ class TestPySparkParquetLimitations:
 
     def test_update_raises_for_parquet(self):
         """Test UPDATE raises NotImplementedError for non-Delta tables."""
-        try:
-            from benchbox.platforms.dataframe.pyspark_maintenance import (
-                PYSPARK_AVAILABLE,
-                PySparkMaintenanceOperations,
-            )
-        except ImportError:
-            pytest.skip("PySpark maintenance module not available")
-
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not installed")
 
@@ -964,14 +918,6 @@ class TestPySparkParquetLimitations:
 
     def test_merge_raises_for_parquet(self):
         """Test MERGE raises NotImplementedError for non-Delta tables."""
-        try:
-            from benchbox.platforms.dataframe.pyspark_maintenance import (
-                PYSPARK_AVAILABLE,
-                PySparkMaintenanceOperations,
-            )
-        except ImportError:
-            pytest.skip("PySpark maintenance module not available")
-
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not installed")
 

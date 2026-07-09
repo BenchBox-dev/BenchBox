@@ -92,6 +92,8 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
     - Native support for many file formats
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.NOT_APPLICABLE
     supports_external_tables = True
 

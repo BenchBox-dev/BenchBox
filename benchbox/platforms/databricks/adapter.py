@@ -10,7 +10,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 import os
@@ -23,9 +22,7 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
         TuningColumn,
         UnifiedTuningConfiguration,
     )
@@ -33,6 +30,7 @@ if TYPE_CHECKING:
 from benchbox.core.upload_validation import UploadValidationEngine
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.runtime_metadata import build_default_normalized_result_metadata
+from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.datagen_manifest import MANIFEST_FILENAME
 from benchbox.utils.dependencies import (
     check_platform_dependencies,
@@ -80,6 +78,8 @@ def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 class DatabricksAdapter(PlatformAdapter):
     """Databricks platform adapter with Delta Lake and Unity Catalog support."""
+
+    plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
@@ -137,6 +137,8 @@ class DatabricksAdapter(PlatformAdapter):
         self.disable_result_cache = config.get("disable_result_cache", True)
         self._liquid_clustering_operations: list[dict[str, Any]] = []
         self._z_order_operations: list[dict[str, Any]] = []
+        self._applied_layout_operations: list[dict[str, Any]] = []
+        self._skipped_layout_operations: list[dict[str, Any]] = []
 
         if not self.server_hostname or not self.http_path or not self.access_token:
             missing = []
@@ -161,8 +163,15 @@ class DatabricksAdapter(PlatformAdapter):
     def platform_name(self) -> str:
         return "Databricks"
 
+    def _reset_run_scoped_state(self) -> None:
+        super()._reset_run_scoped_state()
+        self._liquid_clustering_operations = []
+        self._z_order_operations = []
+        self._applied_layout_operations = []
+        self._skipped_layout_operations = []
+
     def _resolve_databricks_clustering_strategy(self) -> str:
-        """Resolve clustering strategy with backward-compatible precedence rules."""
+        """Resolve clustering strategy and reject misleading mixed layout fields."""
         effective_config = self.get_effective_tuning_configuration()
         platform_opts = getattr(effective_config, "platform_optimizations", None)
         if platform_opts is None:
@@ -172,20 +181,60 @@ class DatabricksAdapter(PlatformAdapter):
         liquid_enabled = bool(getattr(platform_opts, "liquid_clustering_enabled", False))
         liquid_columns = list(getattr(platform_opts, "liquid_clustering_columns", []))
         z_order_enabled = bool(getattr(platform_opts, "z_ordering_enabled", False))
+        z_order_columns = list(getattr(platform_opts, "z_ordering_columns", []))
 
-        # Precedence:
-        # 1) Explicit liquid settings
-        # 2) Explicit strategy field
-        # 3) Legacy z_ordering flag (default compatibility path)
-        if liquid_enabled or liquid_columns:
-            if z_order_enabled:
-                self.logger.info("Databricks tuning precedence: liquid clustering overrides legacy z-order settings")
+        if hasattr(platform_opts, "__post_init__"):
+            platform_opts.__post_init__()
+
+        liquid_requested = (
+            strategy in {"liquid_clustering", "liquid_clustering_auto"} or liquid_enabled or liquid_columns
+        )
+        if strategy == "none" and (liquid_enabled or liquid_columns or z_order_enabled or z_order_columns):
+            raise ValueError(
+                "databricks_clustering_strategy='none' cannot be combined with Liquid Clustering or ZORDER fields"
+            )
+        if liquid_requested and (z_order_enabled or z_order_columns):
+            raise ValueError(
+                "Databricks Liquid Clustering cannot be combined with z_ordering_enabled or z_ordering_columns; "
+                "use a Liquid template with ZORDER fields removed or keep the legacy Z-ORDER rendering."
+            )
+        if strategy == "liquid_clustering_auto":
+            return "liquid_clustering_auto"
+        if strategy == "liquid_clustering" or liquid_enabled or liquid_columns:
             return "liquid_clustering"
-        if strategy in {"liquid_clustering", "none"}:
+        if strategy == "none":
             return strategy
         if z_order_enabled:
             return "z_order"
         return "z_order"
+
+    def _record_layout_operation(
+        self,
+        *,
+        mechanism: str,
+        table: str,
+        statement: str,
+        status: str,
+        phase: str,
+        columns: list[str] | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        operation = {
+            "mechanism": mechanism,
+            "table": table,
+            "statement": statement,
+            "phase": phase,
+            "status": status,
+        }
+        if columns:
+            operation["columns"] = list(columns)
+        if error is not None:
+            operation["error_class"] = type(error).__name__
+            operation["error_message"] = str(error)
+        if status == "applied":
+            self._applied_layout_operations.append(operation)
+        else:
+            self._skipped_layout_operations.append(operation)
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | None:
         """Build opt-in sorted-ingestion SQL for Databricks."""
@@ -367,6 +416,7 @@ class DatabricksAdapter(PlatformAdapter):
         clustering_strategy = self._resolve_databricks_clustering_strategy()
         effective_config = self.get_effective_tuning_configuration()
         platform_opts = getattr(effective_config, "platform_optimizations", None)
+        requested_strategy = getattr(platform_opts, "databricks_clustering_strategy", None)
 
         platform_info = {
             "platform_type": "databricks",
@@ -392,11 +442,15 @@ class DatabricksAdapter(PlatformAdapter):
                 "cluster_mode": getattr(self, "cluster_mode", None),
                 "spark_version": getattr(self, "spark_version", None),
                 "result_cache_enabled": not self.disable_result_cache,
+                "requested_databricks_clustering_strategy": requested_strategy,
+                "resolved_databricks_clustering_strategy": clustering_strategy,
                 "databricks_clustering_strategy": clustering_strategy,
                 "liquid_clustering_enabled": bool(getattr(platform_opts, "liquid_clustering_enabled", False)),
                 "liquid_clustering_columns_config": list(getattr(platform_opts, "liquid_clustering_columns", [])),
                 "liquid_clustering_operations": list(self._liquid_clustering_operations),
                 "z_order_operations": list(self._z_order_operations),
+                "applied_layout_operations": list(self._applied_layout_operations),
+                "skipped_layout_operations": list(self._skipped_layout_operations),
             },
         }
 
@@ -1753,8 +1807,25 @@ class DatabricksAdapter(PlatformAdapter):
         optimize_time = 0.0
         if self.enable_delta_optimization:
             optimize_start = mono_time()
-            with contextlib.suppress(Exception):
-                cursor.execute(f"OPTIMIZE {table_name_upper}")
+            optimize_statement = f"OPTIMIZE {table_name_upper}"
+            try:
+                cursor.execute(optimize_statement)
+                self._record_layout_operation(
+                    mechanism="optimize",
+                    table=table_name_upper,
+                    statement=optimize_statement,
+                    status="applied",
+                    phase="post_load",
+                )
+            except Exception as e:
+                self._record_layout_operation(
+                    mechanism="optimize",
+                    table=table_name_upper,
+                    statement=optimize_statement,
+                    status="skipped",
+                    phase="post_load",
+                    error=e,
+                )
             optimize_time = elapsed_seconds(optimize_start)
 
         return row_count, copy_time, optimize_time
@@ -1942,8 +2013,6 @@ class DatabricksAdapter(PlatformAdapter):
                 "execution_time_seconds": execution_time,
             }
 
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
 
@@ -1957,6 +2026,42 @@ class DatabricksAdapter(PlatformAdapter):
             }
         finally:
             cursor.close()
+
+        # Plan capture routes through the shared chokepoint, outside the try so a
+        # strict-mode PlanCaptureError propagates rather than being swallowed. For
+        # phase-eligible engines (the default) the chokepoint records the executed
+        # query for the isolated post-measurement phase instead of running EXPLAIN
+        # inline; otherwise it captures inline (capture_query_plan opens its own cursor).
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
+
+        return result_dict
+
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get the Spark physical plan via ``EXPLAIN EXTENDED`` over the SQL cursor.
+
+        Databricks runs Spark SQL, so the plan text is parsed by
+        SparkQueryPlanParser. Returns ``None`` on any failure so capture degrades
+        gracefully.
+        """
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"EXPLAIN EXTENDED {query}")
+            plan_rows = cursor.fetchall()
+            if not plan_rows:
+                return None
+            text = "\n".join(str(row[0]) for row in plan_rows)
+            return text or None
+        except Exception as e:
+            self.logger.debug(f"Could not get Databricks query plan: {e}")
+            return None
+        finally:
+            cursor.close()
+
+    def get_query_plan_parser(self):
+        """Return the Spark plan parser (Databricks runs Spark SQL)."""
+        from benchbox.core.query_plans.parsers.spark import SparkQueryPlanParser
+
+        return SparkQueryPlanParser()
 
     def _fix_databricks_sql_syntax(self, sql: str) -> str:
         """Transform SQL syntax for Databricks compatibility.
@@ -2058,17 +2163,22 @@ class DatabricksAdapter(PlatformAdapter):
         clustering_strategy = self._resolve_databricks_clustering_strategy()
         effective_config = self.get_effective_tuning_configuration()
         platform_opts = getattr(effective_config, "platform_optimizations", None)
+        requested_strategy = getattr(platform_opts, "databricks_clustering_strategy", None)
         metadata = {
             "platform": self.platform_name,
             "server_hostname": self.server_hostname,
             "catalog": self.catalog,
             "schema": self.schema,
             "result_cache_enabled": not self.disable_result_cache,
+            "requested_databricks_clustering_strategy": requested_strategy,
+            "resolved_databricks_clustering_strategy": clustering_strategy,
             "databricks_clustering_strategy": clustering_strategy,
             "liquid_clustering_enabled": bool(getattr(platform_opts, "liquid_clustering_enabled", False)),
             "liquid_clustering_columns_config": list(getattr(platform_opts, "liquid_clustering_columns", [])),
             "liquid_clustering_operations": list(self._liquid_clustering_operations),
             "z_order_operations": list(self._z_order_operations),
+            "applied_layout_operations": list(self._applied_layout_operations),
+            "skipped_layout_operations": list(self._skipped_layout_operations),
         }
 
         cursor = connection.cursor()
@@ -2121,10 +2231,27 @@ class DatabricksAdapter(PlatformAdapter):
             return
 
         cursor = connection.cursor()
+        table_name_upper = table_name.upper()
+        statement = f"OPTIMIZE {table_name_upper}"
         try:
-            cursor.execute(f"OPTIMIZE {table_name.upper()}")
-            self.logger.info(f"Optimized Delta table {table_name.upper()}")
+            cursor.execute(statement)
+            self._record_layout_operation(
+                mechanism="optimize",
+                table=table_name_upper,
+                statement=statement,
+                status="applied",
+                phase="manual",
+            )
+            self.logger.info(f"Optimized Delta table {table_name_upper}")
         except Exception as e:
+            self._record_layout_operation(
+                mechanism="optimize",
+                table=table_name_upper,
+                statement=statement,
+                status="skipped",
+                phase="manual",
+                error=e,
+            )
             self.logger.warning(f"Failed to optimize table {table_name}: {e}")
         finally:
             cursor.close()
@@ -2166,31 +2293,7 @@ class DatabricksAdapter(PlatformAdapter):
         except Exception as e:
             self.logger.warning(f"Error closing connection: {e}")
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if Databricks supports a specific tuning type.
-
-        Databricks supports:
-        - PARTITIONING: Via PARTITIONED BY clause in Delta Lake
-        - CLUSTERING: Via CLUSTER BY clause (Delta Lake 2.0+)
-        - DISTRIBUTION: Via Spark optimization hints and Z-ORDER clustering
-
-        Args:
-            tuning_type: The type of tuning to check support for
-
-        Returns:
-            True if the tuning type is supported by Databricks
-        """
-        # Import here to avoid circular imports
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {
-                TuningType.PARTITIONING,
-                TuningType.CLUSTERING,
-                TuningType.DISTRIBUTION,
-            }
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING", "CLUSTERING", "DISTRIBUTION")
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Databricks-specific tuning clauses for CREATE TABLE statements.
@@ -2218,10 +2321,17 @@ class DatabricksAdapter(PlatformAdapter):
 
             # Always use Delta Lake format for better performance
             clauses.append("USING DELTA")
+            clustering_strategy = self._resolve_databricks_clustering_strategy()
+            use_liquid = clustering_strategy in {"liquid_clustering", "liquid_clustering_auto"}
 
             # Handle partitioning
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
             if partition_columns:
+                if use_liquid:
+                    raise ValueError(
+                        "Databricks Liquid Clustering is incompatible with PARTITIONED BY; "
+                        "move partition columns to Liquid clustering intent or use databricks_z_order."
+                    )
                 # Sort by order and create partition clause
                 sorted_cols = sorted(partition_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
@@ -2231,7 +2341,9 @@ class DatabricksAdapter(PlatformAdapter):
 
             # Handle clustering (Delta Lake 2.0+)
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
-            if cluster_columns:
+            if clustering_strategy == "liquid_clustering_auto":
+                clauses.append("CLUSTER BY AUTO")
+            elif cluster_columns:
                 # Sort by order and create cluster clause
                 sorted_cols = sorted(cluster_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
@@ -2296,11 +2408,22 @@ class DatabricksAdapter(PlatformAdapter):
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
 
             zorder_columns = self._build_zorder_columns(cluster_columns, distribution_columns)
-            use_liquid = clustering_strategy == "liquid_clustering" or liquid_enabled
+            use_liquid = clustering_strategy in {"liquid_clustering", "liquid_clustering_auto"} or liquid_enabled
+            if use_liquid and partition_columns:
+                raise ValueError(
+                    "Databricks Liquid Clustering is incompatible with per-table partitioning; "
+                    "move partition columns to clustering intent or use databricks_z_order."
+                )
+            if use_liquid and distribution_columns:
+                raise ValueError(
+                    "Databricks Liquid Clustering has no user-managed distribution key; "
+                    "fold distribution candidates into clustering intent or use databricks_z_order."
+                )
             self._apply_clustering_strategy(
                 cursor,
                 table_name,
                 is_delta_table,
+                clustering_strategy,
                 use_liquid,
                 liquid_columns,
                 zorder_columns,
@@ -2313,7 +2436,7 @@ class DatabricksAdapter(PlatformAdapter):
                 use_liquid,
             )
             if is_delta_table and self.enable_delta_optimization:
-                self._apply_delta_optimize(cursor, table_name)
+                self._apply_delta_optimize(cursor, table_name, phase="pre_load")
 
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
@@ -2339,18 +2462,58 @@ class DatabricksAdapter(PlatformAdapter):
         cursor: Any,
         table_name: str,
         is_delta_table: bool,
+        clustering_strategy: str,
         use_liquid: bool,
         liquid_columns: list[str],
         zorder_columns: list[str],
         sort_columns,
     ) -> None:
         """Apply either Liquid Clustering or Z-ORDER to the table."""
-        if use_liquid:
+        if clustering_strategy == "liquid_clustering_auto":
+            self._apply_liquid_auto_clustering(cursor, table_name, is_delta_table)
+        elif use_liquid:
             self._apply_liquid_clustering(
                 cursor, table_name, is_delta_table, liquid_columns, zorder_columns, sort_columns
             )
         elif zorder_columns and is_delta_table:
             self._apply_zorder_optimization(cursor, table_name, zorder_columns)
+
+    def _apply_liquid_auto_clustering(self, cursor: Any, table_name: str, is_delta_table: bool) -> None:
+        clause = f"ALTER TABLE {table_name} CLUSTER BY AUTO"
+        if not is_delta_table:
+            self._record_layout_operation(
+                mechanism="liquid_clustering_auto",
+                table=table_name,
+                statement=clause,
+                status="skipped",
+                phase="pre_load",
+            )
+            self.logger.info(f"Liquid AUTO selected for {table_name} but table is not Delta")
+            return
+
+        try:
+            cursor.execute(clause)
+            self._liquid_clustering_operations.append(
+                {"table": table_name, "columns": [], "statement": clause, "mode": "auto"}
+            )
+            self._record_layout_operation(
+                mechanism="liquid_clustering_auto",
+                table=table_name,
+                statement=clause,
+                status="applied",
+                phase="pre_load",
+            )
+            self.logger.info(f"Applied automatic Liquid Clustering to {table_name}")
+        except Exception as e:
+            self._record_layout_operation(
+                mechanism="liquid_clustering_auto",
+                table=table_name,
+                statement=clause,
+                status="skipped",
+                phase="pre_load",
+                error=e,
+            )
+            self.logger.warning(f"Failed to apply automatic Liquid Clustering to {table_name}: {e}")
 
     def _apply_liquid_clustering(
         self,
@@ -2370,12 +2533,36 @@ class DatabricksAdapter(PlatformAdapter):
             try:
                 cursor.execute(clause)
                 self._liquid_clustering_operations.append(
-                    {"table": table_name, "columns": list(liquid_columns), "statement": clause}
+                    {"table": table_name, "columns": list(liquid_columns), "statement": clause, "mode": "manual"}
+                )
+                self._record_layout_operation(
+                    mechanism="liquid_clustering",
+                    table=table_name,
+                    statement=clause,
+                    status="applied",
+                    phase="pre_load",
+                    columns=liquid_columns,
                 )
                 self.logger.info(f"Applied Liquid Clustering to {table_name}: {', '.join(liquid_columns)}")
             except Exception as e:
+                self._record_layout_operation(
+                    mechanism="liquid_clustering",
+                    table=table_name,
+                    statement=clause,
+                    status="skipped",
+                    phase="pre_load",
+                    columns=liquid_columns,
+                    error=e,
+                )
                 self.logger.warning(f"Failed to apply Liquid Clustering to {table_name}: {e}")
         elif is_delta_table:
+            self._record_layout_operation(
+                mechanism="liquid_clustering",
+                table=table_name,
+                statement=f"ALTER TABLE {table_name} CLUSTER BY (...)",
+                status="skipped",
+                phase="pre_load",
+            )
             self.logger.info(f"Liquid Clustering selected for {table_name} but no clustering columns were available")
 
     def _apply_zorder_optimization(self, cursor: Any, table_name: str, zorder_columns: list[str]) -> None:
@@ -2383,8 +2570,25 @@ class DatabricksAdapter(PlatformAdapter):
         try:
             cursor.execute(clause)
             self._z_order_operations.append({"table": table_name, "columns": list(zorder_columns), "statement": clause})
+            self._record_layout_operation(
+                mechanism="z_order",
+                table=table_name,
+                statement=clause,
+                status="applied",
+                phase="pre_load",
+                columns=zorder_columns,
+            )
             self.logger.info(f"Applied Z-ORDER optimization to {table_name}: {', '.join(zorder_columns)}")
         except Exception as e:
+            self._record_layout_operation(
+                mechanism="z_order",
+                table=table_name,
+                statement=clause,
+                status="skipped",
+                phase="pre_load",
+                columns=zorder_columns,
+                error=e,
+            )
             self.logger.warning(f"Failed to apply Z-ORDER optimization to {table_name}: {e}")
 
     def _log_partitioning_and_sorting(self, table_name: str, partition_columns, sort_columns, use_liquid: bool) -> None:
@@ -2400,35 +2604,57 @@ class DatabricksAdapter(PlatformAdapter):
                 f"Sorting in Databricks achieved via {mechanism} for table {table_name}: {', '.join(names)}"
             )
 
-    def _apply_delta_optimize(self, cursor: Any, table_name: str) -> None:
+    def _apply_delta_optimize(self, cursor: Any, table_name: str, *, phase: str) -> None:
+        optimize_statement = f"OPTIMIZE {table_name}"
         try:
-            cursor.execute(f"OPTIMIZE {table_name}")
+            cursor.execute(optimize_statement)
+            self._record_layout_operation(
+                mechanism="optimize",
+                table=table_name,
+                statement=optimize_statement,
+                status="applied",
+                phase=phase,
+            )
             self.logger.info(f"Optimized Delta table {table_name}")
-            cursor.execute(f"ANALYZE TABLE {table_name} COMPUTE STATISTICS")
-            self.logger.info(f"Updated statistics for {table_name}")
         except Exception as e:
+            self._record_layout_operation(
+                mechanism="optimize",
+                table=table_name,
+                statement=optimize_statement,
+                status="skipped",
+                phase=phase,
+                error=e,
+            )
             self.logger.warning(f"Failed to optimize Delta table {table_name}: {e}")
-
-    def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration to Databricks.
-
-        Args:
-            unified_config: Unified tuning configuration to apply
-            connection: Databricks connection
-        """
-        if not unified_config:
             return
 
-        # Apply constraint configurations
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
+        analyze_statement = f"ANALYZE TABLE {table_name} COMPUTE STATISTICS"
+        try:
+            cursor.execute(analyze_statement)
+            self._record_layout_operation(
+                mechanism="analyze",
+                table=table_name,
+                statement=analyze_statement,
+                status="applied",
+                phase=phase,
+            )
+            self.logger.info(f"Updated statistics for {table_name}")
+        except Exception as e:
+            self._record_layout_operation(
+                mechanism="analyze",
+                table=table_name,
+                statement=analyze_statement,
+                status="skipped",
+                phase=phase,
+                error=e,
+            )
+            self.logger.warning(f"Failed to analyze Delta table {table_name}: {e}")
 
-        # Apply platform optimizations
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
+    def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
+        """Apply unified tuning configuration to Databricks."""
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        # Apply table-level tunings
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
         """Apply Databricks-specific platform optimizations.
@@ -2450,35 +2676,7 @@ class DatabricksAdapter(PlatformAdapter):
         # Store optimizations for use during query execution and Delta Lake operations
         self.logger.info("Databricks platform optimizations stored for Spark session and Delta Lake management")
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to Databricks.
-
-        Note: Databricks (Spark SQL) supports PRIMARY KEY and FOREIGN KEY constraints
-        but they are informational only (not enforced). They are used for query optimization
-        in Catalyst optimizer and must be applied during table creation time.
-
-        Args:
-            primary_key_config: Primary key constraint configuration
-            foreign_key_config: Foreign key constraint configuration
-            connection: Databricks connection
-        """
-        # Databricks constraints are applied at table creation time for Catalyst optimization
-        # This method is called after tables are created, so log the configurations
-
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info(
-                "Primary key constraints enabled for Databricks (informational only, applied during table creation)"
-            )
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info(
-                "Foreign key constraints enabled for Databricks (informational only, applied during table creation)"
-            )
-
-        # Databricks constraints are informational and used by Catalyst optimizer
-        # No additional work to do here as they're applied during CREATE TABLE
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints enabled for Databricks (informational only, applied during table creation)",
+        "Foreign key constraints enabled for Databricks (informational only, applied during table creation)",
+    )

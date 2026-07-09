@@ -177,6 +177,29 @@ class TestClickHouseServerAdapter:
             adapter = ClickHouseServerAdapter.from_config({"deployment_mode": "local"})
             assert adapter.deployment_mode == "server"
 
+    def test_from_config_preserves_database_config_options(self) -> None:
+        from benchbox.platforms.clickhouse_server import ClickHouseServerAdapter
+
+        with (
+            patch("benchbox.platforms.clickhouse.adapter.check_platform_dependencies", return_value=(True, [])),
+            patch("benchbox.platforms.clickhouse.setup.ClickHouseClient"),
+        ):
+            adapter = ClickHouseServerAdapter.from_config(
+                {
+                    "options": {
+                        "host": "localhost",
+                        "port": 19000,
+                        "username": "default",
+                        "password": "benchbox",
+                    }
+                }
+            )
+
+        assert adapter.host == "localhost"
+        assert adapter.port == 19000
+        assert adapter.username == "default"
+        assert adapter.password == "benchbox"
+
 
 # ---------------------------------------------------------------------------
 # Adapter factory: legacy selector routing and deprecation warnings

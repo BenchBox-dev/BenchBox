@@ -14,12 +14,13 @@ from __future__ import annotations
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
-from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.tpch.dataframe_queries import (
     get_tpch_parameters,
     q13_expression_impl as _q13_expr_base,
     q13_pandas_impl as _q13_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
+from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_GROUP_BY, build_yaml_variants
 
 # ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
@@ -65,23 +66,7 @@ def q13_v2_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q13_v2_pandas_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-
-    params = get_tpch_parameters(13)
-    word1 = params["word1"]
-    word2 = params["word2"]
-
-    # Pre-filter orders before left join
-    filtered_orders = orders[~orders["o_comment"].str.contains(f"{word1}.*{word2}", regex=True, na=False)]
-    customer_orders = customer.merge(filtered_orders, left_on="c_custkey", right_on="o_custkey", how="left")
-    order_counts = customer_orders.groupby("c_custkey", as_index=False).agg(c_count=("o_orderkey", "count"))
-
-    return (
-        order_counts.groupby("c_count", as_index=False)
-        .agg(custdist=("c_custkey", "count"))
-        .sort_values(["custdist", "c_count"], ascending=[False, False])
-    )
+    return _q13_pandas_base(ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -189,50 +174,10 @@ def q13_v4_pandas_impl(ctx: DataFrameContext) -> Any:
 # ---------------------------------------------------------------------------
 
 
-def q13_v5_expression_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    col = ctx.col
-
-    params = get_tpch_parameters(13)
-    word1 = params["word1"]
-    word2 = params["word2"]
-
-    # Filter before building the distribution
-    valid_orders = orders.filter(~col("o_comment").str.contains(f"{word1}.*{word2}"))
-
-    customer_orders = (
-        customer.join(valid_orders, left_on="c_custkey", right_on="o_custkey", how="left")
-        .group_by("c_custkey")
-        .agg(col("o_orderkey").count().alias("c_count"))
-    )
-
-    return (
-        customer_orders.group_by("c_count")
-        .agg(col("c_custkey").count().alias("custdist"))
-        .sort(["custdist", "c_count"], descending=[True, True])
-    )
+q13_v5_expression_impl = make_variant_delegate(q13_v2_expression_impl, name="q13_v5_expression_impl", module=__name__)
 
 
-def q13_v5_pandas_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-
-    params = get_tpch_parameters(13)
-    word1 = params["word1"]
-    word2 = params["word2"]
-
-    valid_orders = orders[~orders["o_comment"].str.contains(f"{word1}.*{word2}", regex=True, na=False)]
-    customer_orders = customer.merge(valid_orders, left_on="c_custkey", right_on="o_custkey", how="left")
-
-    # Derive c_count in a separate step
-    order_counts = customer_orders.groupby("c_custkey", as_index=False).agg(c_count=("o_orderkey", "count"))
-
-    return (
-        order_counts.groupby("c_count", as_index=False)
-        .agg(custdist=("c_custkey", "count"))
-        .sort_values(["custdist", "c_count"], ascending=[False, False])
-    )
+q13_v5_pandas_impl = make_variant_delegate(_q13_pandas_base, name="q13_v5_pandas_impl", module=__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -378,49 +323,11 @@ def q13_v8_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q13_v9_expression_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    col = ctx.col
-
-    params = get_tpch_parameters(13)
-    word1 = params["word1"]
-    word2 = params["word2"]
-
-    customer_orders = (
-        customer.join(
-            orders.filter(~col("o_comment").str.contains(f"{word1}.*{word2}")),
-            left_on="c_custkey",
-            right_on="o_custkey",
-            how="left",
-        )
-        .group_by("c_custkey")
-        .agg(col("o_orderkey").count().alias("c_count"))
-    )
-
-    return (
-        customer_orders.group_by("c_count")
-        .agg(col("c_custkey").count().alias("custdist"))
-        .sort(["custdist", "c_count"], descending=[True, True])
-    )
+    return _q13_expr_base(ctx)
 
 
 def q13_v9_pandas_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-
-    params = get_tpch_parameters(13)
-    word1 = params["word1"]
-    word2 = params["word2"]
-
-    filtered_orders = orders[~orders["o_comment"].str.contains(f"{word1}.*{word2}", regex=True, na=False)]
-    customer_orders = customer.merge(filtered_orders, left_on="c_custkey", right_on="o_custkey", how="left")
-    order_counts = customer_orders.groupby("c_custkey", as_index=False).agg(c_count=("o_orderkey", "count"))
-
-    return (
-        order_counts.groupby("c_count", as_index=False)
-        .agg(custdist=("c_custkey", "count"))
-        .sort_values(["custdist", "c_count"], ascending=[False, False])
-    )
+    return _q13_pandas_base(ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -428,31 +335,7 @@ def q13_v9_pandas_impl(ctx: DataFrameContext) -> Any:
 # ---------------------------------------------------------------------------
 
 
-def q13_v10_expression_impl(ctx: DataFrameContext) -> Any:
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    col = ctx.col
-
-    params = get_tpch_parameters(13)
-    word1 = params["word1"]
-    word2 = params["word2"]
-
-    # Two-step: first build order counts per customer, then distribution
-    filtered_orders = orders.filter(~col("o_comment").str.contains(f"{word1}.*{word2}"))
-
-    # Aggregate order counts per customer directly
-    order_cnts = filtered_orders.group_by("o_custkey").agg(col("o_orderkey").count().alias("cnt"))
-
-    # Right join so all customers appear (those with no orders get null -> 0)
-    customer_counts = customer.join(order_cnts, left_on="c_custkey", right_on="o_custkey", how="left").with_columns(
-        col("cnt").fill_null(0).alias("c_count")
-    )
-
-    return (
-        customer_counts.group_by("c_count")
-        .agg(col("c_custkey").count().alias("custdist"))
-        .sort(["custdist", "c_count"], descending=[True, True])
-    )
+q13_v10_expression_impl = make_variant_delegate(q13_v7_expression_impl, name="q13_v10_expression_impl", module=__name__)
 
 
 def q13_v10_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -480,40 +363,4 @@ def q13_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q13_v1_expression_impl, q13_v1_pandas_impl),
-    (q13_v2_expression_impl, q13_v2_pandas_impl),
-    (q13_v3_expression_impl, q13_v3_pandas_impl),
-    (q13_v4_expression_impl, q13_v4_pandas_impl),
-    (q13_v5_expression_impl, q13_v5_pandas_impl),
-    (q13_v6_expression_impl, q13_v6_pandas_impl),
-    (q13_v7_expression_impl, q13_v7_pandas_impl),
-    (q13_v8_expression_impl, q13_v8_pandas_impl),
-    (q13_v9_expression_impl, q13_v9_pandas_impl),
-    (q13_v10_expression_impl, q13_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q13 implementation",
-    "Pre-filter: filter orders to exclude special requests before left join",
-    "Column prune: select only needed columns before joining",
-    "Intermediate vars: explicit DataFrames for filter, join, count, distribute steps",
-    "Pre-compute derived: filter valid orders before building distribution",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Join reorder: pre-aggregate order counts then left join to all customers",
-    "Filter combination: pattern stored in variable, mask applied separately",
-    "Explicit sort: descending=[True, True] passed explicitly",
-    "Alternative formula: pre-aggregate order counts with fill_null(0) for zero-order customers",
-]
-
-Q13_VARIANTS: list[DataFrameQuery] = [
-    DataFrameQuery(
-        query_id=f"Q13v{v}",
-        query_name=f"TPC-H Q13 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=expr_impl,
-        pandas_impl=pandas_impl,
-    )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
-]
+Q13_VARIANTS = build_yaml_variants(__file__, globals(), 13, JOIN_AGG_GROUP_BY)

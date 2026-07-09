@@ -22,9 +22,11 @@ from benchbox.core.benchmark_registry import get_benchmark_metadata, list_benchm
 from benchbox.core.expected_results.models import ValidationMode
 from benchbox.core.expected_results.registry import get_registry
 from benchbox.core.results.loader import find_latest_result
+from benchbox.core.tpch.benchmark import get_reference_seed
 from benchbox.core.validation.query_validation import QueryValidator
 from tests.e2e.utils import is_dataframe_available, is_gpu_available, is_platform_available
 from tests.integration._cli_e2e_utils import run_cli_command
+from tests.uat.matrix import LOCAL_SQL_PLATFORMS
 
 pytestmark = [
     pytest.mark.integration,
@@ -32,8 +34,6 @@ pytestmark = [
 ]
 
 
-# Local SQL platforms with in-process execution paths.
-LOCAL_SQL_PLATFORMS: tuple[str, ...] = ("duckdb", "sqlite", "datafusion")
 ALL_BENCHMARKS: tuple[str, ...] = tuple(list_benchmark_ids())
 DEFAULT_LOCAL_SQL_BENCHMARKS: tuple[str, ...] = ("tpch", "tpcds")
 LOCAL_SQL_STABLE_MATRIX: dict[str, set[str]] = {
@@ -69,6 +69,7 @@ SERVICE_LOCAL_PLATFORMS: tuple[str, ...] = ("postgresql", "timescaledb", "trino"
 # 20 minutes per matrix case: enough for heavy SF=1 workloads in stress mode.
 MATRIX_CASE_TIMEOUT = 1200.0
 MAINTENANCE_TIMEOUT = 1500.0
+CORRECTNESS_GATE_QUERY_IDS_ENV = "BENCHBOX_CORRECTNESS_GATE_QUERY_IDS"
 
 
 def _select_scale(benchmark_name: str, platform_name: str | None = None) -> float:
@@ -99,6 +100,14 @@ def _load_result_payload(work_dir: Path, benchmark_name: str) -> tuple[Path, dic
 def _measurement_queries(payload: dict) -> list[dict]:
     queries = payload.get("queries", [])
     return [q for q in queries if q.get("run_type") == "measurement"]
+
+
+def _query_subset_from_env() -> tuple[str, ...]:
+    """Return a CLI query subset for the bounded correctness gate."""
+    raw = os.environ.get(CORRECTNESS_GATE_QUERY_IDS_ENV, "").strip()
+    if not raw:
+        return ()
+    return tuple(query_id.strip() for query_id in raw.split(",") if query_id.strip())
 
 
 def _service_matrix_enabled() -> bool:
@@ -241,7 +250,7 @@ def _validate_phase_coverage(payload: dict, requested_phases: list[str]) -> None
         assert status not in {"", "NOT_RUN"}, f"Phase '{requested}' was not executed (status={status})"
 
 
-def _validate_completion(payload: dict, benchmark_name: str) -> None:
+def _validate_completion(payload: dict, benchmark_name: str, expected_query_count: int | None = None) -> None:
     """Validate that all expected benchmark work completed."""
     summary = payload.get("summary", {})
     query_summary = summary.get("queries", {})
@@ -255,7 +264,7 @@ def _validate_completion(payload: dict, benchmark_name: str) -> None:
     assert passed == total, f"{benchmark_name}: not all queries passed ({passed}/{total})"
 
     metadata = get_benchmark_metadata(benchmark_name) or {}
-    expected_query_count = int(metadata.get("num_queries", 0))
+    expected_query_count = expected_query_count or int(metadata.get("num_queries", 0))
     measured = _measurement_queries(payload)
 
     def _canonical_query_id(raw_id: object) -> str:
@@ -278,19 +287,86 @@ def _validate_completion(payload: dict, benchmark_name: str) -> None:
         )
 
 
-def _validate_against_expected_results(payload: dict, benchmark_name: str, scale_factor: float) -> None:
-    """Validate query row counts against stored expected results where available."""
+def _expected_result_queries(payload: dict, expected_query_ids: set[str] | None) -> list[dict]:
+    """Select result rows suitable for stored expected-results validation.
+
+    Stored answer sets exist for stream 0 only (the power run executed with the
+    reference qgen seed); streams > 0 use derived seeds and are timed but not
+    answer-validated (per the TPC-H spec). So for the bounded gate we validate the
+    stream-0 executions, not the throughput measurement rows counted by
+    ``_validate_completion`` -- both run the same queries, but only stream 0 is
+    answer-backed.
+    """
+    if not expected_query_ids:
+        return _measurement_queries(payload)
+
+    return [
+        query
+        for query in payload.get("queries", [])
+        if str(query.get("id")) in expected_query_ids and int(query.get("stream") or 0) == 0
+    ]
+
+
+def _stored_value_digest(
+    validator: QueryValidator,
+    benchmark_name: str,
+    query_id: str,
+    scale_factor: float,
+    stream_id: int,
+) -> str | None:
+    """Return the stored reference VALUE digest for a query, or None if none exists.
+
+    A value digest is valid ONLY at the scale it was computed for. The expected-
+    results registry applies a scale-INDEPENDENT fallback for some queries (e.g.
+    TPC-H Q1, whose row count is constant across scales): at SF != 1 it returns the
+    SF=1 ``ExpectedQueryResult``. That object's row count is scale-independent, but
+    its VALUE digest is not (the aggregates sum over different data). So honor the
+    digest only when the stored object's own scale matches the run scale, otherwise
+    a run at SF != 1 with digest emission on would compare an emitted SF!=1 digest
+    against the SF=1 reference and fail spuriously.
+    """
+    expected = validator.registry.get_expected_result(benchmark_name, str(query_id), scale_factor, stream_id)
+    if expected is None or expected.value_digest is None:
+        return None
+    if expected.scale_factor != scale_factor:
+        return None
+    return expected.value_digest
+
+
+def _validate_against_expected_results(
+    payload: dict,
+    benchmark_name: str,
+    scale_factor: float,
+    expected_query_ids: set[str] | None = None,
+) -> None:
+    """Validate query row counts AND value digests against stored expected results.
+
+    Row counts are validated for every benchmark/scale with stored answers (the
+    historical behavior). Where a query also has a stored reference VALUE digest
+    (TPC-H at SF=1 with the pinned seed today), the emitted full-result digest is
+    asserted to match it IN ADDITION to the row count, so a wrong-but-same-
+    cardinality answer is caught. Both checks share the same strict arming: under
+    ``BENCHBOX_STRICT_EXPECTED_RESULTS`` every configured query must produce a
+    non-SKIP row-count validation AND, where a reference digest exists, a matched
+    value digest -- a missing/unevaluated digest disarms RED, never green.
+    """
+    from benchbox.core.results.result_digest import digests_match
+
     validator = QueryValidator()
     checked = 0
+    digest_evaluated = 0
+    digest_reference_count = 0
     failures: list[str] = []
 
-    for query in _measurement_queries(payload):
+    strict = os.environ.get("BENCHBOX_STRICT_EXPECTED_RESULTS", "").strip().lower() in {"1", "true", "yes", "on"}
+
+    for query in _expected_result_queries(payload, expected_query_ids):
         if query.get("status") != "SUCCESS":
             continue
         if query.get("rows") is None:
             continue
 
-        stream_id = int(query.get("stream", 0))
+        stream_id = int(query.get("stream") or 0)
         validation = validator.validate_query_result(
             benchmark_type=benchmark_name,
             query_id=str(query["id"]),
@@ -309,15 +385,64 @@ def _validate_against_expected_results(payload: dict, benchmark_name: str, scale
                 f"actual={validation.actual_row_count}, mode={validation.validation_mode.value}"
             )
 
-    # Optional strict mode: require at least one TPCH expected-results check.
-    if (
-        benchmark_name == "tpch"
-        and scale_factor >= 1.0
-        and os.environ.get("BENCHBOX_STRICT_EXPECTED_RESULTS", "").strip().lower() in {"1", "true", "yes", "on"}
-    ):
-        assert checked > 0, "TPC-H validation did not evaluate any query against stored expected results"
+        # Value-digest oracle: in addition to the row count, compare the emitted
+        # full-result digest to the stored reference digest where one exists.
+        stored_digest = _stored_value_digest(validator, benchmark_name, query["id"], scale_factor, stream_id)
+        if stored_digest is not None:
+            digest_reference_count += 1
+            emitted_digest = query.get("digest")
+            if emitted_digest is not None:
+                # A digest comparison actually happened (armed), whether or not it
+                # matched -- this counts toward strict coverage below.
+                digest_evaluated += 1
+                if not digests_match(stored_digest, emitted_digest):
+                    # A wrong VALUE at the same cardinality: always RED, regardless
+                    # of strict arming -- the headline gap this oracle closes.
+                    failures.append(
+                        f"{benchmark_name} query {validation.query_id}: VALUE DIGEST mismatch "
+                        f"expected={stored_digest}, actual={emitted_digest} (row count matched -- a "
+                        f"wrong-but-same-cardinality answer)"
+                    )
+            # emitted_digest is None: the runner did not emit a digest (e.g. flag
+            # unset). Under strict arming the digest-coverage assertion below turns
+            # this RED; non-strict callers keep the additive row-count-only behavior.
 
-    assert not failures, "Row-count validation failures:\n" + "\n".join(failures)
+    # Strict mode: when enabled, every configured expected-results check must
+    # actually evaluate (non-SKIP). This is deliberately NOT gated on benchmark
+    # name or scale factor. The previous `benchmark_name == "tpch" and
+    # scale_factor >= 1.0` guard meant a future CI speedup that retargeted the
+    # gate (a different benchmark, or SF<1) would silently disarm the oracle:
+    # every configured query would SKIP, `checked` would be 0, and the assertion
+    # was never reached. Now strict mode fails whenever a configured subset does
+    # not fully evaluate, regardless of benchmark/scale. The default non-strict
+    # matrix still skips unsupported expected-results validation (see callers).
+    if strict:
+        configured = set(expected_query_ids or ())
+        if configured:
+            assert checked == len(configured), (
+                f"strict expected-results: evaluated {checked} of {len(configured)} configured "
+                f"{benchmark_name} queries (sf={scale_factor}); every configured query must produce a "
+                f"non-SKIP row-count validation. Unevaluated queries indicate missing answer files, a "
+                f"skipped/failed query, or scale/benchmark drift that disarmed the gate."
+            )
+        else:
+            assert checked > 0, (
+                f"strict expected-results: no {benchmark_name} queries (sf={scale_factor}) were validated "
+                f"against stored expected results"
+            )
+        # Value-digest arming: where reference digests exist for the configured
+        # queries, every one must evaluate to a MATCHED digest. A missing or
+        # unevaluated digest disarms the value oracle and must fail RED, exactly
+        # like the row-count arming above -- never a silent value-skip.
+        if digest_reference_count:
+            assert digest_evaluated == digest_reference_count, (
+                f"strict value-digest: evaluated {digest_evaluated} of {digest_reference_count} configured "
+                f"{benchmark_name} value digests (sf={scale_factor}); every configured query with a stored "
+                f"reference digest must emit a value digest. A missing/unevaluated digest indicates the value "
+                f"oracle was disarmed (digest emission off, query skipped, or scale/seed drift)."
+            )
+
+    assert not failures, "Expected-results validation failures (row count and/or value digest):\n" + "\n".join(failures)
 
 
 @pytest.mark.integration
@@ -343,25 +468,34 @@ def test_local_platform_benchmark_matrix(
 
     scale_factor = _select_scale(benchmark_name, platform_name)
     phases = _phases_for_benchmark(benchmark_name, platform_name)
+    query_subset = _query_subset_from_env()
     case_dir = tmp_path / f"{platform_name}_{benchmark_name}"
     case_dir.mkdir(parents=True, exist_ok=True)
 
-    result = run_cli_command(
-        [
-            "run",
-            "--platform",
-            platform_name,
-            "--benchmark",
-            benchmark_name,
-            "--scale",
-            str(scale_factor),
-            "--phases",
-            ",".join(phases),
-            "--non-interactive",
-        ],
-        cwd=case_dir,
-        timeout=MATRIX_CASE_TIMEOUT,
-    )
+    command = [
+        "run",
+        "--platform",
+        platform_name,
+        "--benchmark",
+        benchmark_name,
+        "--scale",
+        str(scale_factor),
+        "--phases",
+        ",".join(phases),
+        "--non-interactive",
+    ]
+    if query_subset:
+        command.extend(["--queries", ",".join(query_subset)])
+        # The bounded correctness gate validates emitted cardinalities against the
+        # stored TPC-H answer files. Those answers correspond to the reference qgen
+        # seed, so pin it to make stream-0 expected-results validation deterministic
+        # and EXACT. Without it, query parameters drift and only structurally-fixed
+        # (single-row) queries would coincidentally match.
+        gate_seed = get_reference_seed(scale_factor) if benchmark_name == "tpch" else None
+        if gate_seed is not None:
+            command.extend(["--seed", str(gate_seed)])
+
+    result = run_cli_command(command, cwd=case_dir, timeout=MATRIX_CASE_TIMEOUT)
 
     assert result.returncode == 0, (
         f"CLI failed for {platform_name}/{benchmark_name} (sf={scale_factor})\n"
@@ -370,8 +504,13 @@ def test_local_platform_benchmark_matrix(
 
     _, payload = _load_result_payload(case_dir, benchmark_name)
     _validate_phase_coverage(payload, phases)
-    _validate_completion(payload, benchmark_name)
-    _validate_against_expected_results(payload, benchmark_name, scale_factor)
+    _validate_completion(payload, benchmark_name, expected_query_count=len(query_subset) or None)
+    _validate_against_expected_results(
+        payload,
+        benchmark_name,
+        scale_factor,
+        expected_query_ids=set(query_subset) or None,
+    )
 
 
 @pytest.mark.integration

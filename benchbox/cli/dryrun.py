@@ -44,6 +44,12 @@ def generate_cli_command(
     force: str | None = None,
     official: bool = False,
     capture_plans: bool = False,
+    analyze_plans: bool | None = None,
+    show_plans: bool = False,
+    strict_translation: bool = False,
+    normalize_plan_literals: bool = False,
+    stats_reset: bool | None = None,
+    stats_per_table_timing: bool = False,
     validation: str | None = None,
     verbose: int = 0,
     platform_options: dict[str, str] | None = None,
@@ -56,6 +62,8 @@ def generate_cli_command(
     publish_target: str | None = None,
     publish_label: str | None = None,
     benchmark_options: dict[str, str] | None = None,
+    funding: str | None = None,
+    result_source: str | None = None,
 ) -> str:
     """Generate equivalent CLI command from interactive wizard configuration.
 
@@ -75,6 +83,10 @@ def generate_cli_command(
         force: Force mode (all, datagen, upload)
         official: TPC-compliant mode
         capture_plans: Capture query execution plans
+        strict_translation: Fail when SQL dialect translation falls back
+        normalize_plan_literals: Also record a literal-normalized plan fingerprint
+        stats_reset: Cold-stats vs warm-stats control for the statistics phase
+        stats_per_table_timing: Record a per-table statistics-build timing breakdown
         validation: Validation mode (exact, loose, range, disabled, full)
         verbose: Verbosity level (0=off, 1=-v, 2=-vv)
         platform_options: Platform-specific key=value options
@@ -86,6 +98,8 @@ def generate_cli_command(
         publish: Publish the exported result bundle after a successful run
         publish_target: Destination for --publish (local dir or cloud URI)
         publish_label: Trust label for --publish
+        funding: Funding-source disclosure recorded in the bundle's provenance block
+        result_source: Advisory producer hint recorded in the bundle's provenance block
 
     Returns:
         Complete CLI command string
@@ -122,6 +136,8 @@ def generate_cli_command(
         (presort, "--presort", None),
         (sorted_ingestion_mode, "--sorted-ingestion-mode", "off"),
         (sorted_ingestion_method, "--sorted-ingestion-method", None),
+        (funding, "--funding", None),
+        (result_source, "--result-source", None),
     ]
     for value, flag, skip in _VALUE_PARAMS:
         if value is not None and value != skip:
@@ -140,12 +156,26 @@ def generate_cli_command(
     _BOOL_PARAMS = [
         (official, "--official"),
         (capture_plans, "--capture-plans"),
+        (show_plans, "--show-plans"),
+        (strict_translation, "--strict-translation"),
+        (normalize_plan_literals, "--normalize-plan-literals"),
+        (stats_per_table_timing, "--stats-per-table-timing"),
         (global_cache, "--global-cache"),
         (publish, "--publish"),
     ]
     for flag_value, flag in _BOOL_PARAMS:
         if flag_value:
             parts.append(flag)
+
+    # analyze_plans is a tri-state --analyze-plans/--no-analyze-plans flag: only
+    # emit it when explicitly set (None = not passed, adapter default applies).
+    if analyze_plans is not None:
+        parts.append("--analyze-plans" if analyze_plans else "--no-analyze-plans")
+
+    # stats_reset is a tri-state --stats-reset/--no-stats-reset flag: only emit
+    # it when explicitly set (None = not passed, PR #980 default applies).
+    if stats_reset is not None:
+        parts.append("--stats-reset" if stats_reset else "--no-stats-reset")
 
     # Publish target/label only meaningful when --publish is set
     if publish:
@@ -200,6 +230,10 @@ def display_interactive_preview(
     force: str | None = None,
     official: bool = False,
     capture_plans: bool = False,
+    analyze_plans: bool | None = None,
+    strict_translation: bool = False,
+    stats_reset: bool | None = None,
+    stats_per_table_timing: bool = False,
     validation: str | None = None,
     verbose: int = 0,
     console_obj: Console | None = None,
@@ -227,6 +261,9 @@ def display_interactive_preview(
         force: Force mode (all, datagen, upload)
         official: TPC-compliant mode
         capture_plans: Capture query execution plans
+        strict_translation: Fail when SQL dialect translation falls back
+        stats_reset: Cold-stats vs warm-stats control for the statistics phase
+        stats_per_table_timing: Record a per-table statistics-build timing breakdown
         validation: Validation mode
         verbose: Verbosity level (0=off, 1=-v, 2=-vv)
         console_obj: Rich console for output
@@ -299,6 +336,7 @@ def display_interactive_preview(
         ),
         ("Ingestion Method:", sorted_ingestion_method),
         ("Plan Config:", plan_config),
+        ("Strict Translation:", "Enabled" if strict_translation else None),
         ("Global Cache:", "Enabled" if global_cache else None),
     ]
     for label, value in optional_rows:
@@ -342,6 +380,10 @@ def display_interactive_preview(
         force=force,
         official=official,
         capture_plans=capture_plans,
+        analyze_plans=analyze_plans,
+        strict_translation=strict_translation,
+        stats_reset=stats_reset,
+        stats_per_table_timing=stats_per_table_timing,
         validation=validation,
         verbose=verbose,
         platform_options=platform_options,

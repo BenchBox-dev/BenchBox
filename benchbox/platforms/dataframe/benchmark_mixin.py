@@ -13,7 +13,7 @@ from __future__ import annotations
 import inspect
 import logging
 from abc import abstractmethod
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import DEFAULT
@@ -28,6 +28,14 @@ from benchbox.core.dataframe import (
     validate_scale_factor,
 )
 from benchbox.core.dataframe.data_loader import DataFrameDataLoader, get_tpch_column_names
+from benchbox.core.dataframe.query_resolution import (
+    benchmark_provides_dataframe_queries,
+    build_dataframe_query_filter_from_config,
+    get_dataframe_queries_for_benchmark,
+    get_tpcds_dataframe_queries,
+    get_tpch_dataframe_queries,
+)
+from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
 from benchbox.core.exceptions import InsufficientMemoryError
 from benchbox.core.results import (
     BenchmarkInfoInput,
@@ -40,6 +48,7 @@ from benchbox.core.results.models import (
     BenchmarkResults,
     TableLoadingStats,
 )
+from benchbox.core.results.query_plan_models import QueryPlanDAG
 from benchbox.core.results.schema import compute_plan_capture_stats
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 from benchbox.platforms.base.adapter import DriverIsolationCapability
@@ -109,7 +118,7 @@ def _benchmark_supports_dataframe_workload(benchmark: Any | None) -> bool:
 
 def _benchmark_provides_dataframe_queries(benchmark: Any | None) -> bool:
     """Return True when a benchmark defines a DataFrame query provider hook."""
-    return _benchmark_defines_hook(benchmark, "get_dataframe_queries")
+    return benchmark_provides_dataframe_queries(benchmark)
 
 
 @dataclass
@@ -164,6 +173,7 @@ class BenchmarkExecutionMixin:
     # Default: most DataFrame adapters have no versioned driver package.
     # Subclasses like DataFusionDataFrameAdapter override to SUPPORTED.
     driver_isolation_capability: DriverIsolationCapability = DriverIsolationCapability.NOT_APPLICABLE
+    is_dataframe_adapter: bool = True
 
     # These must be provided by the adapter class
     platform_name: str
@@ -180,8 +190,18 @@ class BenchmarkExecutionMixin:
         table_name: str,
         file_paths: list[Path],
         column_names: list[str] | None = None,
+        delimiter: str | None = None,
+        format_hint: str | None = None,
+        *,
+        data_source: Any | None = None,
+        benchmark: Any | None = None,
     ) -> int:
-        """Load a table into context."""
+        """Load a table into context.
+
+        ``benchmark`` (when provided) lets adapters consult the schema's column
+        types - e.g. to avoid date-parsing an integer datekey column named like a
+        date.
+        """
 
     @abstractmethod
     def execute_query(
@@ -274,6 +294,14 @@ class BenchmarkExecutionMixin:
             platform=platform_info,
         )
         builder.mark_started()
+
+        # Reset per-run plan-capture failure state (qpc-05 / F4.4 follow-up):
+        # ExpressionFamilyAdapter doesn't inherit the SQL mixin's
+        # _reset_plan_capture_stats, so a reused adapter instance would
+        # otherwise accumulate plan_capture_errors across runs and keep
+        # _plan_capture_warning_emitted permanently True after the first run.
+        self.plan_capture_errors: list[dict[str, Any]] = []
+        self._plan_capture_warning_emitted = False
 
         options_map = getattr(benchmark_config, "options", {}) or {}
         builder.set_run_config(
@@ -376,7 +404,9 @@ class BenchmarkExecutionMixin:
                     builder.add_query_result(normalize_query_result(qr))
 
                 plans_captured, capture_failures, capture_errors = compute_plan_capture_stats(
-                    query_results, getattr(benchmark_config, "capture_plans", False)
+                    query_results,
+                    getattr(benchmark_config, "capture_plans", False),
+                    existing_errors=list(getattr(self, "plan_capture_errors", [])) or None,
                 )
                 builder.add_plan_capture_stats(
                     plans_captured=plans_captured,
@@ -397,6 +427,45 @@ class BenchmarkExecutionMixin:
             builder.add_execution_metadata("error", str(e))
             builder.mark_completed()
             return builder.build()
+
+    def load_benchmark_into_context(
+        self,
+        benchmark: Any,
+        data_dir: Path,
+        *,
+        scale_factor: float | None = None,
+        options: DataFrameRunOptions | None = None,
+    ) -> Any:
+        """Create a context and load a benchmark's data into it, then return it.
+
+        This uses the exact production data path :meth:`run_benchmark` uses
+        (``_extract_benchmark_config`` + ``_load_data_phase``) but stops short of
+        executing any query. It is for callers that need a production-faithful
+        DataFrame context yet drive query execution themselves - e.g. the
+        cross-surface SQL<->DataFrame equivalence gates, which must compare each
+        backend's real loaded dtypes against the SQL reference.
+
+        Only benchmarks whose data loads in a discrete phase are supported. A
+        benchmark that manages its own loading (``skip_dataframe_data_loading()``,
+        e.g. write/transaction-style benchmarks) interleaves loading with its
+        ``execute_dataframe_workload`` and has no standalone preloaded context, so
+        :meth:`run_benchmark` skips ``_load_data_phase`` for it; calling the
+        generic loader here would fail or preload a wrong context. Raise loudly
+        instead of returning a silently-empty one.
+        """
+        if _benchmark_manages_dataframe_loading(benchmark):
+            raise ValueError(
+                f"{type(benchmark).__name__} manages its own DataFrame loading "
+                "(skip_dataframe_data_loading); load_benchmark_into_context loads data in a "
+                "discrete phase and does not apply - drive such a benchmark through run_benchmark."
+            )
+        ctx = self.create_context()
+        run_config: dict[str, Any] = {}
+        if scale_factor is not None:
+            run_config["scale_factor"] = scale_factor
+        config = self._extract_benchmark_config(benchmark, run_config)
+        self._load_data_phase(ctx, config, benchmark, Path(data_dir), options or DataFrameRunOptions())
+        return ctx
 
     def _extract_benchmark_config(self, benchmark: Any, run_config: dict[str, Any]) -> BenchmarkConfig:
         """Extract BenchmarkConfig from benchmark instance or run_config."""
@@ -556,7 +625,12 @@ class BenchmarkExecutionMixin:
             source_benchmark = getattr(benchmark_instance, "get_data_source_benchmark", lambda: None)()
             if source_benchmark == "tpch":
                 benchmark_id = "tpch"
-        column_names_map = get_tpch_column_names() if benchmark_id == "tpch" else {}
+        column_names_map = {
+            table_name: [column["name"] for column in columns]
+            for table_name, columns in get_benchmark_schema_columns(benchmark_instance).items()
+        }
+        if benchmark_id == "tpch":
+            column_names_map.update(get_tpch_column_names())
 
         csv_delimiter = getattr(benchmark_instance, "csv_delimiter", None)
 
@@ -568,8 +642,13 @@ class BenchmarkExecutionMixin:
         data_paths: dict[str, Path | list[Path]],
         column_names_map: dict[str, list[str]],
         csv_delimiter: str | None,
+        benchmark: Any | None = None,
     ) -> tuple[dict[str, int], dict[str, TableLoadingStats]]:
         """Load all tables into the execution context.
+
+        ``benchmark`` (when provided) is passed through to ``load_table`` so
+        adapters can consult the schema's column types - e.g. to avoid parsing an
+        integer datekey column named like a date as a date.
 
         Returns:
             Tuple of (table_stats, per_table_loading_stats)
@@ -586,7 +665,12 @@ class BenchmarkExecutionMixin:
                 column_names = column_names_map.get(table_name.lower())
                 file_paths = [file_path] if not isinstance(file_path, list) else file_path
                 row_count = self.load_table(
-                    ctx, table_name.lower(), file_paths, column_names=column_names, delimiter=csv_delimiter
+                    ctx,
+                    table_name.lower(),
+                    file_paths,
+                    column_names=column_names,
+                    delimiter=csv_delimiter,
+                    benchmark=benchmark,
                 )
                 load_time_ms = int((elapsed_seconds(load_start)) * 1000)
 
@@ -689,9 +773,43 @@ class BenchmarkExecutionMixin:
         column_names_map, csv_delimiter = self._resolve_column_names_and_delimiter(benchmark_config, benchmark_instance)
 
         # Load tables into context
-        return self._load_tables_into_context(ctx, data_paths, column_names_map, csv_delimiter)
+        return self._load_tables_into_context(
+            ctx, data_paths, column_names_map, csv_delimiter, benchmark=benchmark_instance
+        )
 
     def _execute_queries_phase(
+        self,
+        ctx: Any,
+        benchmark_config: BenchmarkConfig,
+        benchmark_instance: Any | None,
+        monitor: Any | None,
+        run_options: DataFrameRunOptions | None = None,
+    ) -> list[dict[str, Any]]:
+        """Execute DataFrame queries, scoping scale-dependent parameter defaults.
+
+        Canonical TPC-H Q11 renders its value threshold as ``0.0001 / SF``.
+        Unseeded DataFrame runs read the SF=1 default unless the scale factor is
+        declared, so set it for TPC-H-family benchmarks for the duration of query
+        execution (mirroring the SQL run path's ``{q11_fraction}`` rendering) and
+        reset it afterwards on every path.
+        """
+        from benchbox.core.tpch.dataframe_queries import set_scale_factor_for_benchmark
+
+        benchmark_id = normalize_benchmark_id(benchmark_config.name)
+        scale_factor = getattr(benchmark_config, "scale_factor", 1.0)
+        set_scale_factor_for_benchmark(benchmark_id, scale_factor)
+        try:
+            return self._run_query_iterations(
+                ctx=ctx,
+                benchmark_config=benchmark_config,
+                benchmark_instance=benchmark_instance,
+                monitor=monitor,
+                run_options=run_options,
+            )
+        finally:
+            set_scale_factor_for_benchmark(benchmark_id, None)
+
+    def _run_query_iterations(
         self,
         ctx: Any,
         benchmark_config: BenchmarkConfig,
@@ -791,19 +909,7 @@ class BenchmarkExecutionMixin:
     @staticmethod
     def _build_query_filter(benchmark_config: BenchmarkConfig) -> set[str] | None:
         """Normalize query subset into a bidirectional filter set (Q1 <-> 1)."""
-        query_subset = getattr(benchmark_config, "queries", None)
-        if not query_subset:
-            return None
-        normalized = set()
-        for q in query_subset:
-            q_str = str(q).strip().upper()
-            if q_str.startswith("Q"):
-                normalized.add(q_str)
-                normalized.add(q_str[1:])
-            else:
-                normalized.add(q_str)
-                normalized.add(f"Q{q_str}")
-        return normalized
+        return build_dataframe_query_filter_from_config(benchmark_config)
 
     def _collect_skip_query_ids(self, benchmark_instance: Any | None) -> set[str]:
         """Collect all query IDs to skip from benchmark and platform-specific sources."""
@@ -1033,7 +1139,13 @@ class BenchmarkExecutionMixin:
                         raw_result, profile = profiled_runner(ctx, query)
                     raw_result = dict(raw_result)
                     if profile.query_plan is not None:
-                        raw_result["query_plan"] = profile.query_plan
+                        raw_result["query_plan"] = self._structure_dataframe_plan(
+                            profile.query_plan, str(query.query_id)
+                        )
+                    # Surface capture cost separately (excluded from execution time),
+                    # matching the SQL platforms' plan_capture_time_ms field.
+                    if profile.plan_capture_time_ms:
+                        raw_result["plan_capture_time_ms"] = profile.plan_capture_time_ms
                 else:
                     raw_result = self.execute_query(ctx, query)
                     raw_result = dict(raw_result)
@@ -1054,6 +1166,63 @@ class BenchmarkExecutionMixin:
             with monitor.time_operation(f"query_{query.query_id}_iter{iteration}"):
                 return _run()
         return _run()
+
+    def _structure_dataframe_plan(self, captured_plan: Any, query_id: str) -> Any:
+        """Promote a captured DataFrame plan to a structured QueryPlanDAG when a
+        registered parser can parse its text (qpc-06 w4 / F3.2).
+
+        DataFrame profiling captures a text-only ``QueryPlan`` (platform,
+        plan_text, hints) which — stored verbatim into the ``query_plan`` slot —
+        silently forks the companion schema by platform family (text blob vs the
+        SQL adapters' structured DAG). Here the captured ``plan_text`` is routed
+        through the platform's registered parser (DataFusion is the one with a
+        DataFrame-native parser today); on success the real ``QueryPlanDAG`` is
+        returned with ``plan_text`` preserved as ``raw_explain_output``. When no
+        parser is registered for the platform or parsing fails, the original
+        text-only plan is returned unchanged as an explicit fallback — the
+        ``plan_format`` discriminator on the companion entry (see
+        ``_build_plan_entry``) then marks it ``text`` so consumers fail
+        informatively rather than mis-reading it as a DAG.
+        """
+        # Already structured (defensive: a future adapter may capture a DAG).
+        if isinstance(captured_plan, QueryPlanDAG):
+            return captured_plan
+
+        plan_text = getattr(captured_plan, "plan_text", None)
+        platform = getattr(captured_plan, "platform", None) or self.platform_name
+        if not plan_text or not platform:
+            return captured_plan
+
+        # Capture failures are recorded as a sentinel QueryPlan (plan_type
+        # "error", or plan_text like "Plan capture not available"/"Could not
+        # capture plan: ..."). A parser's fallback path can accept
+        # operator-looking lines as an OTHER node, silently promoting a
+        # failed capture into a fake plan_format="dag" entry - skip parsing
+        # and fall back to the text-only plan instead.
+        plan_type = getattr(captured_plan, "plan_type", None)
+        if plan_type == "error" or plan_text.startswith(("Plan capture not available", "Could not capture plan:")):
+            return captured_plan
+
+        from benchbox.core.query_plans.parsers.registry import get_parser_for_platform
+
+        parser = get_parser_for_platform(str(platform).lower().replace("-df", ""))
+        if parser is None:
+            return captured_plan
+
+        try:
+            dag = parser.parse_explain_output(query_id, plan_text)
+        except Exception as exc:  # noqa: BLE001 - parser failure must fall back, never abort
+            logger.debug("DataFrame plan parse failed for %s on %s: %s", query_id, platform, exc)
+            return captured_plan
+
+        if dag is None:
+            return captured_plan
+
+        # Preserve the original plan text for debugging without clobbering any
+        # raw output the parser already set.
+        if getattr(dag, "raw_explain_output", None) is None:
+            dag.raw_explain_output = plan_text
+        return dag
 
     def _append_skip_summary(
         self,
@@ -1145,52 +1314,12 @@ class BenchmarkExecutionMixin:
         stream_id: int | None = None,
     ) -> list[DataFrameQuery]:
         """Get DataFrame queries for a benchmark in proper execution order."""
-        benchmark_id = normalize_benchmark_id(benchmark_config.name)
-
-        if stream_id is None:
-            stream_id = getattr(benchmark_config, "stream_id", 0)
-
-        # Check registry for pre-defined queries
-        if benchmark_id == "tpch":
-            return self._get_tpch_queries(stream_id)
-        elif benchmark_id == "tpcds":
-            return self._get_tpcds_queries(benchmark_config, benchmark_instance, stream_id)
-        elif benchmark_id == "clickbench":
-            from benchbox.core.clickbench.dataframe_queries import CLICKBENCH_DATAFRAME_QUERIES
-
-            return CLICKBENCH_DATAFRAME_QUERIES.get_all_queries()
-
-        # Try benchmark instance
-        if _benchmark_provides_dataframe_queries(benchmark_instance):
-            benchmark_queries = benchmark_instance.get_dataframe_queries()  # type: ignore[no-untyped-call]
-            if isinstance(benchmark_queries, list):
-                return benchmark_queries
-            if hasattr(benchmark_queries, "get_all_queries"):
-                return benchmark_queries.get_all_queries()
-            logger.warning(
-                "Unsupported DataFrame query container type: %s",
-                type(benchmark_queries).__name__,
-            )
-
-        return []
+        return get_dataframe_queries_for_benchmark(benchmark_config, benchmark_instance, stream_id)
 
     @staticmethod
     def _get_tpch_queries(stream_id: int) -> list[DataFrameQuery]:
         """Get TPC-H DataFrame queries in stream-permuted order."""
-        from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
-        from benchbox.core.tpch.streams import TPCHStreams
-
-        query_permutation = TPCHStreams.PERMUTATION_MATRIX[stream_id % len(TPCHStreams.PERMUTATION_MATRIX)]
-
-        queries: list[DataFrameQuery] = []
-        for query_num in query_permutation:
-            query_id = f"Q{query_num}"
-            query = TPCH_DATAFRAME_QUERIES.get(query_id)
-            if query:
-                queries.append(query)
-            else:
-                logger.warning(f"Query {query_id} not found in TPC-H DataFrame registry")
-        return queries
+        return get_tpch_dataframe_queries(stream_id)
 
     @staticmethod
     def _get_tpcds_queries(
@@ -1199,88 +1328,7 @@ class BenchmarkExecutionMixin:
         stream_id: int,
     ) -> list[DataFrameQuery]:
         """Get TPC-DS DataFrame queries in stream-permuted order with variant resolution."""
-        from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES
-        from benchbox.core.tpcds.streams import create_standard_streams
-
-        options_map = getattr(benchmark_config, "options", {}) or {}
-        allow_variant_fallback = bool(options_map.get("tpcds_dataframe_variant_fallback", True))
-
-        query_manager = None
-        if benchmark_instance and hasattr(benchmark_instance, "query_manager"):
-            query_manager = benchmark_instance.query_manager
-        elif (
-            benchmark_instance
-            and hasattr(benchmark_instance, "_impl")
-            and hasattr(benchmark_instance._impl, "query_manager")
-        ):
-            query_manager = benchmark_instance._impl.query_manager
-
-        available_query_ids = sorted(
-            int(qid[1:])
-            for qid in TPCDS_DATAFRAME_QUERIES.get_query_ids()
-            if qid.upper().startswith("Q") and qid[1:].isdigit()
-        )
-
-        if query_manager is None:
-            logger.warning("TPC-DS query_manager unavailable; using legacy 99-query DataFrame ordering")
-            from benchbox.core.tpcds.streams import PermutationMode, TPCDSPermutationGenerator
-
-            generator = TPCDSPermutationGenerator(seed=42 + stream_id)
-            query_permutation = generator.generate_permutation(available_query_ids, PermutationMode.TPCDS_STANDARD)
-            queries: list[DataFrameQuery] = []
-            for query_num in query_permutation:
-                query_id = f"Q{query_num}"
-                query = TPCDS_DATAFRAME_QUERIES.get(query_id)
-                if query:
-                    queries.append(query)
-            return queries
-
-        stream_manager = create_standard_streams(
-            query_manager=query_manager,
-            num_streams=1,
-            query_ids=available_query_ids,
-            query_range=(1, 99),
-            base_seed=42 + stream_id,
-        )
-        stream_queries = stream_manager.generate_streams().get(0, [])
-
-        queries = []
-        missing_variants: list[str] = []
-
-        for stream_query in stream_queries:
-            base_query_id = f"Q{stream_query.query_id}"
-            base_query = TPCDS_DATAFRAME_QUERIES.get(base_query_id)
-            if base_query is None:
-                logger.warning("Query %s not found in TPC-DS DataFrame registry", base_query_id)
-                continue
-
-            if stream_query.variant is None:
-                queries.append(base_query)
-                continue
-
-            variant_id = f"{base_query_id}{stream_query.variant.lower()}"
-            variant_query = (
-                TPCDS_DATAFRAME_QUERIES.get(variant_id)
-                or TPCDS_DATAFRAME_QUERIES.get(variant_id.upper())
-                or TPCDS_DATAFRAME_QUERIES.get(variant_id.capitalize())
-            )
-            if variant_query is not None:
-                queries.append(variant_query)
-                continue
-
-            missing_variants.append(variant_id)
-            if allow_variant_fallback:
-                queries.append(replace(base_query, query_id=variant_id))
-
-        if missing_variants and not allow_variant_fallback:
-            missing = ", ".join(sorted(set(missing_variants)))
-            raise RuntimeError(
-                "TPC-DS DataFrame SQL parity check failed: missing variant DataFrame implementations "
-                f"for [{missing}]. Set option tpcds_dataframe_variant_fallback=true to allow "
-                "non-parity fallback execution."
-            )
-
-        return queries
+        return get_tpcds_dataframe_queries(benchmark_config, benchmark_instance, stream_id)
 
     @staticmethod
     def _query_category(query_id: str) -> str:

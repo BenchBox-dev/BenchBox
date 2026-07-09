@@ -25,7 +25,7 @@ import statistics
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -35,6 +35,7 @@ from pathlib import Path
 DEFAULT_REPO = "joeharris76/BenchBox"
 DEFAULT_BASE = "published-results"
 DEFAULT_NOTES = Path("_project/notes/phase-2-requests.md")
+DEFAULT_HANDOFFS_DIR = Path("_project/handoffs")
 
 VOLUME_WINDOW_DAYS = 90
 LATENCY_WINDOW_DAYS = 30
@@ -73,6 +74,12 @@ GH_PR_LIMIT = 500
 REQUESTER_LINE_RE = re.compile(r"\*\*Requester\*\*:\s*(.+?)\s*$", re.MULTILINE)
 ORG_LINE_RE = re.compile(r"\*\*Organization\*\*:\s*(.+?)\s*$", re.MULTILINE)
 DATE_LINE_RE = re.compile(r"\*\*Date\*\*:\s*\d{4}-\d{2}-\d{2}", re.MULTILINE)
+
+# Date embedded in a `phase-3-review-*.md` handoff filename, e.g.
+# `phase-3-review-baseline-2026-04-27.md` or `phase-3-review-2026-07-06.md`.
+REVIEW_DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
+# A `## Metrics` data row: `| 1 | name | value | threshold | status | note |`.
+METRIC_ROW_RE = re.compile(r"^\|\s*(\d+)\s*\|(.+)\|\s*$")
 
 
 # ---------------------------------------------------------------------------
@@ -359,6 +366,7 @@ def render_report(
     results: list[MetricResult],
     extraction_triggers: list[MetricResult],
     now: datetime,
+    trend: dict | None = None,
 ) -> str:
     lines: list[str] = []
     lines.append(f"# Phase 3 Promotion Metrics — {now.strftime('%Y-%m-%d')}")
@@ -423,7 +431,151 @@ def render_report(
     else:
         lines.append("No extraction triggers fired.")
     lines.append("")
+    lines.extend(render_trend_section(trend))
     return "\n".join(lines) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# Machine-readable output + trend vs the most recent prior review
+# ---------------------------------------------------------------------------
+
+
+def _result_to_dict(r: MetricResult) -> dict:
+    return {
+        "name": r.name,
+        "value": r.value,
+        "breached": r.breached,
+        "threshold": r.threshold,
+        "note": r.note,
+    }
+
+
+def build_payload(
+    repo: str,
+    base: str,
+    results: list[MetricResult],
+    extraction_triggers: list[MetricResult],
+    now: datetime,
+    trend: dict | None,
+) -> dict:
+    """JSON payload consumed by automation (the diff step and CI checks)."""
+    return {
+        "generated_at": now.isoformat(timespec="seconds"),
+        "repo": repo,
+        "base_branch": base,
+        "results": [_result_to_dict(r) for r in results],
+        "extraction_triggers": [_result_to_dict(r) for r in extraction_triggers],
+        "trend": trend,
+    }
+
+
+def parse_prior_metrics(path: Path) -> list[dict]:
+    """Parse the ``## Metrics`` table of a prior review into ordered rows.
+
+    Returns ``[{num, name, value, status}]`` in table order. Callers pair by
+    position rather than by name, because metric *names* drift across releases
+    (the row order is the stable key).
+    """
+    rows: list[dict] = []
+    in_metrics = False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            in_metrics = line.strip() == "## Metrics"
+            continue
+        if not in_metrics:
+            continue
+        match = METRIC_ROW_RE.match(line)
+        if not match:
+            continue
+        cells = [c.strip() for c in match.group(2).split("|")]
+        if len(cells) < 4:  # name, value, threshold, status[, note]
+            continue
+        rows.append(
+            {
+                "num": int(match.group(1)),
+                "name": cells[0],
+                "value": cells[1],
+                "status": cells[3],
+            }
+        )
+    return rows
+
+
+def find_prior_review(handoffs_dir: Path, today: date) -> tuple[str, list[dict]] | None:
+    """Most recent ``phase-3-review-*.md`` dated strictly before ``today``.
+
+    Returns ``(date_str, parsed_metric_rows)`` or ``None`` when no earlier
+    review exists. ISO date strings sort chronologically, so a string ``max``
+    selects the latest prior review.
+    """
+    if not handoffs_dir.is_dir():
+        return None
+    today_iso = today.isoformat()
+    candidates: list[tuple[str, Path]] = []
+    for path in handoffs_dir.glob("phase-3-review-*.md"):
+        match = REVIEW_DATE_RE.search(path.name)
+        if match and match.group(1) < today_iso:
+            candidates.append((match.group(1), path))
+    if not candidates:
+        return None
+    date_str, path = max(candidates, key=lambda item: item[0])
+    return date_str, parse_prior_metrics(path)
+
+
+def compute_trend(
+    prior: tuple[str, list[dict]] | None,
+    results: list[MetricResult],
+) -> dict | None:
+    """Per-metric value/status change since the most recent prior review."""
+    if prior is None:
+        return None
+    since, prior_rows = prior
+    metrics: list[dict] = []
+    for i, r in enumerate(results):
+        prior_row = prior_rows[i] if i < len(prior_rows) else None
+        status_then = prior_row["status"] if prior_row else "n/a"
+        status_now = _glyph(r.breached)
+        metrics.append(
+            {
+                "name": r.name,
+                "value_then": prior_row["value"] if prior_row else "n/a",
+                "value_now": r.value,
+                "status_then": status_then,
+                "status_now": status_now,
+                "status_changed": status_then != status_now,
+            }
+        )
+    return {"since": since, "metrics": metrics}
+
+
+def render_trend_section(trend: dict | None) -> list[str]:
+    """Markdown lines for the 'Trend vs <date>' section."""
+    if not trend:
+        return [
+            "## Trend",
+            "",
+            "No prior `phase-3-review-*.md` found to diff against.",
+            "",
+        ]
+    lines = [
+        f"## Trend vs {trend['since']}",
+        "",
+        "Per-metric change since the most recent prior review. The promotion "
+        'rule\'s "two consecutive quarters" hysteresis (see '
+        "`_project/analysis/phase-3-promotion-metrics.md`) keys off the "
+        "Status-change column, so a reviewer does not have to diff by hand.",
+        "",
+        "| Metric | Value (then) | Value (now) | Status (then -> now) | Changed |",
+        "|--------|--------------|-------------|----------------------|---------|",
+    ]
+    for m in trend["metrics"]:
+        changed = "yes" if m["status_changed"] else ""
+        lines.append(
+            f"| {m['name']} | {m['value_then']} | {m['value_now']} | "
+            f"{m['status_then']} -> {m['status_now']} | {changed} |"
+        )
+    lines.append("")
+    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -452,6 +604,26 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=RESULTS_DATA_DIR,
         help="Path to results-data/ for the extraction-trigger size check",
+    )
+    parser.add_argument(
+        "--format",
+        choices=("markdown", "json"),
+        default="markdown",
+        help="Output format. markdown (default) is the human handoff; json is "
+        "the machine-readable payload for automation.",
+    )
+    parser.add_argument(
+        "--handoffs-dir",
+        type=Path,
+        default=DEFAULT_HANDOFFS_DIR,
+        help="Directory of prior phase-3-review-*.md files for the trend diff",
+    )
+    parser.add_argument(
+        "--exit-non-zero-on-breach",
+        action="store_true",
+        help="Exit 1 if any threshold is breached (off by default; the "
+        "quarterly review always generates the report regardless of breach "
+        "state). Intended for ad-hoc non-quarterly CI gating.",
     )
     args = parser.parse_args(argv)
 
@@ -493,14 +665,23 @@ def main(argv: list[str] | None = None) -> int:
     ]
 
     extraction_triggers = evaluate_extraction_triggers(args.results_data_dir, merged_prs, now)
-    report = render_report(args.repo, args.base_branch, results, extraction_triggers, now)
+    prior = find_prior_review(args.handoffs_dir, now.date())
+    trend = compute_trend(prior, results)
+
+    if args.format == "json":
+        payload = build_payload(args.repo, args.base_branch, results, extraction_triggers, now, trend)
+        output = json.dumps(payload, indent=2) + "\n"
+    else:
+        output = render_report(args.repo, args.base_branch, results, extraction_triggers, now, trend)
 
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(report, encoding="utf-8")
+        args.output.write_text(output, encoding="utf-8")
     else:
-        sys.stdout.write(report)
+        sys.stdout.write(output)
 
+    if args.exit_non_zero_on_breach and any(r.breached for r in results):
+        return 1
     return 0
 
 

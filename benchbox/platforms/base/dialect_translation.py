@@ -30,7 +30,7 @@ class DialectTranslationMixin:
         """Return the SQL dialect for this platform (for sqlglot translation)."""
         return self._dialect
 
-    def translate_sql(self, sql: str, source_dialect: str = "duckdb") -> str:
+    def translate_sql(self, sql: str, source_dialect: str = "duckdb", strict: bool | None = None) -> str:
         """Translate SQL from source dialect to platform dialect using sqlglot.
 
         Delegates to the centralized dialect_utils pipeline, gaining dialect
@@ -41,6 +41,8 @@ class DialectTranslationMixin:
         Args:
             sql: SQL query or schema block (may contain multiple statements)
             source_dialect: Source SQL dialect (default: duckdb)
+            strict: When True, raise instead of falling back to the original SQL.
+                When omitted, the active sql_translation_context policy is used.
 
         Returns:
             Translated SQL string, preserving multi-statement structure.
@@ -49,17 +51,23 @@ class DialectTranslationMixin:
             return sql
 
         from benchbox.utils.dialect_utils import (
+            SQLTranslationError,
+            SqlTranslationOutcome,
             _fix_sqlite_unsupported_syntax,
             _query_has_group_or_order_by_all,
             _restore_group_order_by_all_keyword,
+            current_sql_translation_strict_mode,
             normalize_dialect_for_sqlglot,
+            record_sql_translation_outcome,
         )
+
+        strict_mode = current_sql_translation_strict_mode() if strict is None else strict
+        src = normalize_dialect_for_sqlglot(source_dialect)
+        tgt = normalize_dialect_for_sqlglot(self.dialect)
 
         try:
             import sqlglot
 
-            src = normalize_dialect_for_sqlglot(source_dialect)
-            tgt = normalize_dialect_for_sqlglot(self.dialect)
             should_identify = tgt not in ("clickhouse", "postgres")
 
             translated_statements = sqlglot.transpile(sql, read=src, write=tgt, identify=should_identify)
@@ -73,12 +81,53 @@ class DialectTranslationMixin:
                     stmt = _fix_sqlite_unsupported_syntax(stmt)
                 fixed.append(stmt)
 
+            record_sql_translation_outcome(
+                SqlTranslationOutcome(
+                    source_dialect=source_dialect,
+                    target_dialect=self.dialect or "",
+                    normalized_source_dialect=src,
+                    normalized_target_dialect=tgt,
+                    translator="sqlglot",
+                    status="success",
+                    strict_mode=strict_mode,
+                )
+            )
             return ";\n\n".join(fixed) + ";"
 
         except ImportError:
+            outcome = SqlTranslationOutcome(
+                source_dialect=source_dialect,
+                target_dialect=self.dialect or "",
+                normalized_source_dialect=src,
+                normalized_target_dialect=tgt,
+                translator="sqlglot",
+                status="failed" if strict_mode else "fallback",
+                strict_mode=strict_mode,
+                warning_category=None if strict_mode else "translator_unavailable",
+                error_category="translator_unavailable" if strict_mode else None,
+                message="SQLGlot not available",
+            )
+            record_sql_translation_outcome(outcome)
+            if strict_mode:
+                raise SQLTranslationError("SQLGlot not available for strict SQL translation", outcome) from None
             self.logger.warning("sqlglot not available for SQL translation")
             return sql
         except Exception as e:
+            outcome = SqlTranslationOutcome(
+                source_dialect=source_dialect,
+                target_dialect=self.dialect or "",
+                normalized_source_dialect=src,
+                normalized_target_dialect=tgt,
+                translator="sqlglot",
+                status="failed" if strict_mode else "fallback",
+                strict_mode=strict_mode,
+                warning_category=None if strict_mode else "translation_failed",
+                error_category="translation_failed" if strict_mode else None,
+                message=str(e),
+            )
+            record_sql_translation_outcome(outcome)
+            if strict_mode:
+                raise SQLTranslationError(f"Failed to translate SQL: {e}", outcome) from e
             self.logger.warning(f"Failed to translate SQL: {e}")
             return sql
 

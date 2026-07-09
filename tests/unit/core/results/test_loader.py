@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from benchbox.core.results.canonical_json import canonical_json_text
 from benchbox.core.results.loader import (
     ResultLoadError,
     UnsupportedSchemaError,
@@ -16,8 +17,9 @@ from benchbox.core.results.loader import (
     reconstruct_benchmark_results,
 )
 from benchbox.core.results.models import BenchmarkResults
-from benchbox.core.results.schema import build_result_payload
-from tests.fixtures.result_dict_fixtures import make_v2_result_dict, write_v2_result_file
+from benchbox.core.results.query_plan_models import LogicalOperator, LogicalOperatorType, QueryPlanDAG
+from benchbox.core.results.schema import build_plans_payload, build_result_payload
+from tests.fixtures.result_dict_fixtures import make_benchmark_results, make_v2_result_dict, write_v2_result_file
 
 pytestmark = [
     pytest.mark.unit,
@@ -194,10 +196,106 @@ class TestLoadResultFile:
         assert result.total_queries == 22
         assert raw_data["version"] == "2.0"
 
+    def test_load_result_file_loads_companion_with_extra_dots_in_basename(self, tmp_path):
+        """qpc-07 w4: exercise BOTH companion-path defects at once so a revert of
+        either half of the fix fails this test.
+
+        The result lives in a parent directory whose name itself contains
+        ``.json`` (``bundle.json``) and has a scale-factor basename with an extra
+        dot (``result_sf0.1.json``). This defeats both old code paths:
+
+        * ``main_file.with_suffix("").with_suffix(suffix)`` reads ``.1`` as a
+          second suffix and strips it, corrupting the basename to
+          ``result_sf0.plans.json``; and
+        * the ``str(main_file).replace(".json", suffix)`` fallback rewrites the
+          FIRST ``.json`` in the whole path -- here the ``bundle.json`` parent
+          directory -- producing ``bundle.plans.json/result_sf0.1.plans.json``.
+
+        Neither corrupted path exists, so only the exact-basename swap
+        (``name[:-len(".json")] + suffix`` via ``with_name``) resolves the real
+        companion. (With a plain ``tmp_path`` parent the buggy fallback happens
+        to rescue the extra-dot basename, which is why the parent name matters.)
+        """
+        bundle_dir = tmp_path / "bundle.json"
+        bundle_dir.mkdir()
+        result_file = bundle_dir / "result_sf0.1.json"
+        write_v2_result_file(
+            result_file,
+            version="2.0",
+            platform="DuckDB",
+            scale_factor=0.1,
+            queries=[{"id": "1", "ms": 100.0, "rows": 4}],
+        )
+        plans_file = bundle_dir / "result_sf0.1.plans.json"
+        with open(plans_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "version": "2.0",
+                    "run_id": "test",
+                    "plans_captured": 1,
+                    "capture_failures": 0,
+                    "queries": {
+                        "1": {
+                            "fingerprint": "a" * 64,
+                            "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None},
+                        }
+                    },
+                },
+                f,
+            )
+        # The corrupted paths both buggy branches used to compute must NOT
+        # exist, so a false pass (loader stumbling onto the right file some
+        # other way) can't mask the regression.
+        assert not (bundle_dir / "result_sf0.plans.json").exists()  # double-with_suffix corruption
+        assert not (tmp_path / "bundle.plans.json").exists()  # str.replace-hits-parent corruption
+
+        result, _raw_data = load_result_file(result_file)
+
+        assert result.query_plans_captured == 1
+        assert result.query_results[0]["plan_fingerprint"] == "a" * 64
+
     def test_load_result_file_not_found(self):
         """Test loading nonexistent file raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError):
             load_result_file(Path("/nonexistent/file.json"))
+
+    def test_corrupt_plans_companion_sets_plans_load_error(self, tmp_path, caplog):
+        """qpc-05 / F4.3: a .plans.json that exists but is corrupt must surface
+        as result.plans_load_error (and a WARNING), NOT be swallowed and later
+        reported as 'no plans captured'."""
+        import logging
+
+        result_file = tmp_path / "r.json"
+        write_v2_result_file(
+            result_file,
+            version="2.0",
+            platform="DuckDB",
+            queries=[{"id": "1", "ms": 100.0, "rows": 4}],
+        )
+        # A companion that exists but is not valid JSON.
+        (tmp_path / "r.plans.json").write_text("{ not valid json", encoding="utf-8")
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.core.results.loader"):
+            result, _raw = load_result_file(result_file)
+
+        assert result.plans_load_error is not None
+        assert "r.plans.json" in result.plans_load_error
+        assert any("could not be loaded" in rec.getMessage() for rec in caplog.records)
+
+    def test_no_plans_companion_leaves_plans_load_error_none(self, tmp_path):
+        """A run with no .plans.json at all is NOT an error: plans_load_error
+        stays None so consumers say 'no plans captured', not 'failed to load'."""
+        result_file = tmp_path / "r.json"
+        write_v2_result_file(
+            result_file,
+            version="2.0",
+            platform="DuckDB",
+            queries=[{"id": "1", "ms": 100.0, "rows": 4}],
+        )
+
+        result, _raw = load_result_file(result_file)
+
+        assert result.plans_load_error is None
 
     def test_load_result_file_invalid_json(self, tmp_path):
         """Test loading invalid JSON raises ResultLoadError."""
@@ -239,6 +337,38 @@ class TestLoadResultFile:
 
         with pytest.raises(UnsupportedSchemaError, match="Unsupported schema version"):
             load_result_file(result_file)
+
+    @pytest.mark.parametrize(
+        ("version", "message"),
+        [
+            ("2.99", "runtime loader schema policy"),
+            ("2.x", "runtime loader schema policy"),
+            (None, "<missing>"),
+        ],
+    )
+    def test_load_result_file_reports_loader_policy_for_unsupported_versions(
+        self,
+        tmp_path,
+        version,
+        message,
+    ):
+        """Unsupported versions should name the strict runtime loader policy."""
+        result_file = tmp_path / "unsupported_schema.json"
+        data = {
+            "benchmark": {"id": "tpch", "name": "TPC-H"},
+            "run": {"id": "test", "timestamp": "2026-05-21T00:00:00", "total_duration_ms": 1},
+        }
+        if version is not None:
+            data["version"] = version
+
+        with open(result_file, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        with pytest.raises(UnsupportedSchemaError) as exc_info:
+            load_result_file(result_file)
+
+        assert message in str(exc_info.value)
+        assert "schema versions 2.0 and 2.1" in str(exc_info.value)
 
 
 class TestReconstructBenchmarkResults:
@@ -507,6 +637,121 @@ class TestReconstructBenchmarkResults:
         assert result.query_results[0]["stream_id"] == 1
         assert result.query_results[1]["stream_id"] == 2
 
+    def test_reconstruct_query_results_multi_stream_plans_reattach_per_stream(self):
+        """A query_id captured in multiple streams is keyed in .plans.json as
+        "{query_id}#{stream_id}" (build_plans_payload); the loader must resolve
+        each row to its OWN stream's plan, not the other stream's or none at all.
+        """
+        data = make_v2_result_dict(
+            version="2.0",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=200,
+            streams=2,
+            total_queries=2,
+            passed_queries=2,
+            failed_queries=0,
+            total_ms=200,
+            queries=[
+                {"id": "1", "ms": 100.0, "rows": 4, "stream": 1},
+                {"id": "1", "ms": 90.0, "rows": 4, "stream": 2},
+            ],
+        )
+        plans_data = {
+            "queries": {
+                "1#1": {"fingerprint": "a" * 64, "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None}},
+                "1#2": {"fingerprint": "b" * 64, "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None}},
+            }
+        }
+
+        result = reconstruct_benchmark_results(data, plans_data=plans_data)
+
+        assert len(result.query_results) == 2
+        assert result.query_results[0]["stream_id"] == 1
+        assert result.query_results[0]["plan_fingerprint"] == "a" * 64
+        assert result.query_results[1]["stream_id"] == 2
+        assert result.query_results[1]["plan_fingerprint"] == "b" * 64
+
+    def test_reconstruct_query_results_cross_phase_same_stream_id_reattach(self):
+        """A power row and a throughput row sharing the same query_id AND
+        stream_id (independent per-phase stream counters) are keyed in
+        .plans.json as "{query_id}#{stream_id}:{test_type}"; the loader must
+        resolve each row to its OWN phase's plan using the compact entry's
+        test_type field, not the other phase's.
+        """
+        data = make_v2_result_dict(
+            version="2.0",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=200,
+            streams=2,
+            total_queries=2,
+            passed_queries=2,
+            failed_queries=0,
+            total_ms=200,
+            queries=[
+                {"id": "6", "ms": 100.0, "rows": 4, "stream": 0, "test_type": "power"},
+                {"id": "6", "ms": 90.0, "rows": 4, "stream": 0, "test_type": "throughput"},
+            ],
+        )
+        plans_data = {
+            "queries": {
+                "6#0:power": {
+                    "fingerprint": "a" * 64,
+                    "plan": {"query_id": "6", "platform": "duckdb", "logical_root": None},
+                },
+                "6#0:throughput": {
+                    "fingerprint": "b" * 64,
+                    "plan": {"query_id": "6", "platform": "duckdb", "logical_root": None},
+                },
+            }
+        }
+
+        result = reconstruct_benchmark_results(data, plans_data=plans_data)
+
+        assert len(result.query_results) == 2
+        assert result.query_results[0]["test_type"] == "power"
+        assert result.query_results[0]["plan_fingerprint"] == "a" * 64
+        assert result.query_results[1]["test_type"] == "throughput"
+        assert result.query_results[1]["plan_fingerprint"] == "b" * 64
+
+    def test_reconstruct_query_results_single_stream_bare_key_still_works(self):
+        """A query_id captured in exactly one stream is keyed bare (no "#stream"
+        suffix); this must keep working unchanged (the common case)."""
+        data = make_v2_result_dict(
+            version="2.0",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=100,
+            total_queries=1,
+            passed_queries=1,
+            failed_queries=0,
+            total_ms=100,
+            queries=[{"id": "1", "ms": 100.0, "rows": 4}],
+        )
+        plans_data = {
+            "queries": {
+                "1": {"fingerprint": "c" * 64, "plan": {"query_id": "1", "platform": "duckdb", "logical_root": None}},
+            }
+        }
+
+        result = reconstruct_benchmark_results(data, plans_data=plans_data)
+
+        assert len(result.query_results) == 1
+        assert result.query_results[0]["plan_fingerprint"] == "c" * 64
+
     def test_reconstruct_with_errors(self):
         """Test that errors array is properly reconstructed."""
         data = make_v2_result_dict(
@@ -537,3 +782,257 @@ class TestReconstructBenchmarkResults:
         assert len(failed_query) == 1
         assert failed_query[0]["query_id"] == "2"
         assert failed_query[0]["error_type"] == "QueryError"
+
+    def test_reconstruct_does_not_duplicate_current_format_failure(self):
+        """A current-format bundle duplicates a failure into BOTH queries[]
+        (status="FAILED") and errors[] (see schema.py _build_query_results_section).
+        The loader must reconstruct exactly one row for it, not a phantom
+        second row synthesized from errors[] (qpc-02 / F1.4).
+        """
+        data = make_v2_result_dict(
+            version="2.1",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=100,
+            total_queries=2,
+            passed_queries=1,
+            failed_queries=1,
+            total_ms=100,
+            queries=[
+                {
+                    "id": "1",
+                    "ms": 100.0,
+                    "rows": 4,
+                    "iter": 1,
+                    "stream": 0,
+                    "run_type": "measurement",
+                    "status": "SUCCESS",
+                },
+                {"id": "2", "iter": 1, "stream": 0, "run_type": "measurement", "status": "FAILED"},
+            ],
+            errors=[
+                {"phase": "query", "query_id": "2", "type": "QueryError", "message": "Syntax error"},
+            ],
+        )
+
+        result = reconstruct_benchmark_results(data)
+
+        failed_rows = [q for q in result.query_results if q.get("status") == "FAILED"]
+        assert len(result.query_results) == 2
+        assert len(failed_rows) == 1
+        assert failed_rows[0]["query_id"] == "2"
+        assert failed_rows[0]["error_type"] == "QueryError"
+        assert failed_rows[0]["error_message"] == "Syntax error"
+
+    def test_reconstruct_attaches_distinct_error_to_each_repeated_failure(self):
+        """#1022 review: a query_id that fails more than once (e.g. across
+        iterations) must have EACH failing row get its own error detail from
+        errors[], in write order - not every repeat sharing the first error
+        seen for that query_id (the old dict.setdefault behavior)."""
+        data = make_v2_result_dict(
+            version="2.1",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=100,
+            total_queries=2,
+            passed_queries=0,
+            failed_queries=2,
+            total_ms=100,
+            queries=[
+                {"id": "1", "iter": 1, "stream": 0, "run_type": "measurement", "status": "FAILED"},
+                {"id": "1", "iter": 2, "stream": 0, "run_type": "measurement", "status": "FAILED"},
+            ],
+            errors=[
+                {"phase": "query", "query_id": "1", "type": "TimeoutError", "message": "iteration 1 timed out"},
+                {"phase": "query", "query_id": "1", "type": "MemoryError", "message": "iteration 2 ran out of memory"},
+            ],
+        )
+
+        result = reconstruct_benchmark_results(data)
+
+        failed_rows = [q for q in result.query_results if q.get("status") == "FAILED"]
+        assert len(failed_rows) == 2
+        assert failed_rows[0]["iteration"] == 1
+        assert failed_rows[0]["error_type"] == "TimeoutError"
+        assert failed_rows[0]["error_message"] == "iteration 1 timed out"
+        assert failed_rows[1]["iteration"] == 2
+        assert failed_rows[1]["error_type"] == "MemoryError"
+        assert failed_rows[1]["error_message"] == "iteration 2 ran out of memory"
+
+    def test_reconstruct_legacy_failure_not_suppressed_by_successful_same_id_row(self):
+        """#1022 review: a legacy-shape error whose query_id ALSO appears
+        elsewhere in queries[] as a successful (different-iteration) row must
+        still be synthesized as a standalone FAILED row - the old check
+        ("query_id anywhere in queries[]") incorrectly suppressed it."""
+        data = make_v2_result_dict(
+            version="2.0",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=100,
+            total_queries=2,
+            passed_queries=1,
+            failed_queries=1,
+            total_ms=100,
+            queries=[
+                # Legacy shape: only successful queries appear here, no status key.
+                {"id": "1", "ms": 100.0, "rows": 4},
+            ],
+            errors=[
+                {"phase": "query", "query_id": "1", "type": "QueryError", "message": "iteration 2 failed"},
+            ],
+        )
+
+        result = reconstruct_benchmark_results(data)
+
+        failed_rows = [q for q in result.query_results if q.get("status") == "FAILED"]
+        assert len(result.query_results) == 2
+        assert len(failed_rows) == 1
+        assert failed_rows[0]["query_id"] == "1"
+        assert failed_rows[0]["error_type"] == "QueryError"
+        assert failed_rows[0]["error_message"] == "iteration 2 failed"
+
+    def test_reconstruct_preserves_warmup_iteration_zero_and_stream_zero(self):
+        """iter/stream of 0 are falsy and must not be dropped by a truthy `if`
+        check (qpc-02 / F1.4): warmup rows (iter=0) and the first stream
+        (stream=0) must survive reconstruction.
+        """
+        data = make_v2_result_dict(
+            version="2.1",
+            benchmark_id="test",
+            benchmark_name="Test",
+            platform="Test",
+            scale_factor=1.0,
+            execution_id="test",
+            timestamp="2025-01-01T10:00:00",
+            query_time_ms=100,
+            total_queries=1,
+            passed_queries=1,
+            failed_queries=0,
+            total_ms=100,
+            queries=[
+                {
+                    "id": "1",
+                    "ms": 90.0,
+                    "rows": 4,
+                    "iter": 0,
+                    "stream": 0,
+                    "run_type": "warmup",
+                    "status": "SUCCESS",
+                },
+            ],
+        )
+
+        result = reconstruct_benchmark_results(data)
+
+        assert len(result.query_results) == 1
+        row = result.query_results[0]
+        assert row["iteration"] == 0
+        assert row["stream_id"] == 0
+        assert row["run_type"] == "warmup"
+
+
+class TestExportLoadReexportRoundtrip:
+    """Byte-equality property test (qpc-02): export -> load -> re-export must
+    reproduce both the main result file and the .plans.json companion
+    exactly, for a fixture spanning warmup rows (iter 0), a failure, and a
+    stream > 0 row.
+    """
+
+    def test_export_load_reexport_roundtrip_byte_identical(self):
+        root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
+        plan = QueryPlanDAG(query_id="2", platform="duckdb", logical_root=root)
+
+        query_results = [
+            # Warmup row: iteration 0 and stream 0 are both falsy -- must not
+            # be dropped by the loader.
+            {
+                "query_id": "1",
+                "status": "SUCCESS",
+                "execution_time_ms": 120.0,
+                "rows_returned": 4,
+                "iteration": 0,
+                "stream_id": 0,
+                "run_type": "warmup",
+            },
+            {
+                "query_id": "1",
+                "status": "SUCCESS",
+                "execution_time_ms": 100.0,
+                "rows_returned": 4,
+                "iteration": 1,
+                "stream_id": 0,
+                "run_type": "measurement",
+            },
+            # Second stream, with a captured plan whose capture_time_ms is
+            # exactly 0.0 (also falsy -- must not be dropped either).
+            {
+                "query_id": "2",
+                "status": "SUCCESS",
+                "execution_time_ms": 200.0,
+                "rows_returned": 8,
+                "iteration": 1,
+                "stream_id": 1,
+                "run_type": "measurement",
+                "query_plan": plan,
+                "plan_fingerprint": plan.plan_fingerprint,
+                "plan_capture_time_ms": 0.0,
+            },
+            # A FAILED query, duplicated into errors[] the way
+            # build_result_payload's _build_query_results_section does.
+            {
+                "query_id": "3",
+                "status": "FAILED",
+                "iteration": 1,
+                "stream_id": 0,
+                "run_type": "measurement",
+                "error_type": "QueryError",
+                "error_message": "Syntax error",
+            },
+        ]
+
+        original = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="duckdb",
+            scale_factor=1.0,
+            execution_id="roundtrip-001",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            duration_seconds=10.0,
+            total_queries=4,
+            successful_queries=3,
+            failed_queries=1,
+            query_plans_captured=1,
+            query_results=query_results,
+        )
+
+        exported = build_result_payload(original)
+        plans_payload = build_plans_payload(original)
+        assert plans_payload is not None
+
+        # Guard the schema.py `if capture_time is not None:` fix (F1.5): a
+        # capture time of exactly 0.0 is falsy, so a truthy check would drop
+        # it from the plans payload entirely. Byte-equality alone cannot catch
+        # that regression -- both the export and re-export would omit the field
+        # symmetrically and still compare equal -- so assert the 0.0 actually
+        # survives the initial export here.
+        assert plans_payload["queries"]["2"]["capture_time_ms"] == 0.0
+
+        reimported = reconstruct_benchmark_results(exported, plans_data=plans_payload)
+        re_exported = build_result_payload(reimported)
+        re_plans_payload = build_plans_payload(reimported)
+
+        assert canonical_json_text(exported) == canonical_json_text(re_exported)
+        assert re_plans_payload is not None
+        assert canonical_json_text(plans_payload) == canonical_json_text(re_plans_payload)

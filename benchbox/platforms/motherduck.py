@@ -39,6 +39,7 @@ except ImportError:
     duckdb = None
 
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.config_utils import make_platform_config_builder
 from .duckdb import _build_duckdb_ctas_sort_sql, _create_duckdb_external_views
 
 if TYPE_CHECKING:
@@ -55,38 +56,19 @@ def _redact_motherduck_token(message: str, token: str | None = None) -> str:
     return _MOTHERDUCK_TOKEN_RE.sub(r"\1****", redacted)
 
 
-def _build_motherduck_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build the MotherDuck DatabaseConfig.
-
-    The credential setup wizard (`benchbox/platforms/credentials/motherduck.py`)
-    saves a ``database`` field, but the default config builder did not call
-    CredentialManager, so runtime runs always fell back to the adapter's
-    internal default (``benchbox``) regardless of what the wizard captured.
-    Routing MotherDuck through the shared ``build_platform_config`` helper
-    pulls the saved database into ``options["database"]`` so the adapter's
-    ``config.get("database", "benchbox")`` resolves to the wizard value.
-    """
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="motherduck",
-        credential_key="motherduck",
-        default_display_name="MotherDuck",
-        default_driver_package="duckdb",
-        platform_fields=[
-            "database",
-            "memory_limit",
-            "token_env_var",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
+# MotherDuck credentials include ``database``; route through the shared
+# credential-aware builder so saved setup values reach adapter config.
+_build_motherduck_config = make_platform_config_builder(
+    "motherduck",
+    __name__,
+    "MotherDuck",
+    "duckdb",
+    [
+        "database",
+        "memory_limit",
+        "token_env_var",
+    ],
+)
 
 
 class MotherDuckAdapter(PlatformAdapter):
@@ -106,6 +88,7 @@ class MotherDuckAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
+    plan_capture_phase_eligible = True
 
     def __init__(self, **config):
         """Initialize MotherDuck adapter.
@@ -242,6 +225,41 @@ class MotherDuckAdapter(PlatformAdapter):
         if connection is None:
             self.connection = None
 
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get MotherDuck query execution plan using EXPLAIN (ANALYZE, FORMAT JSON).
+
+        MotherDuck uses DuckDB's SQL dialect; EXPLAIN format is identical.
+        DuckDB EXPLAIN rows are (explain_key, explain_value) tuples; column 1 is the JSON payload.
+
+        DML queries (INSERT/UPDATE/DELETE/MERGE/COPY) are explained without ANALYZE
+        to prevent double-execution, even when analyze_plans=True: EXPLAIN ANALYZE
+        physically runs the statement, which would mutate data a second time. The
+        plan structure is still captured (FORMAT JSON only); execution statistics
+        are absent for these statements.
+        """
+        from benchbox.platforms.base.result_capture import is_dml_query
+
+        analyze = self.analyze_plans
+        # EXPLAIN ANALYZE re-executes the statement; for DML that would double-mutate
+        # data, so downgrade to FORMAT JSON (estimated plan, no execution stats).
+        if analyze and is_dml_query(query):
+            analyze = False
+        explain_options = "ANALYZE, FORMAT JSON" if analyze else "FORMAT JSON"
+        try:
+            rows = (connection or self.connection).execute(f"EXPLAIN ({explain_options}) {query}").fetchall()
+            # column 0 is the key (e.g. "analyzed_plan"), column 1 is the JSON value
+            parts = [str(row[1]) for row in rows]
+            return "\n".join(parts) if parts else None
+        except Exception as e:
+            logger.debug(f"Failed to get MotherDuck query plan: {e}")
+            return None
+
+    def get_query_plan_parser(self):
+        """Get MotherDuck query plan parser (reuses DuckDB parser)."""
+        from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
+
+        return DuckDBQueryPlanParser()
+
     def execute_query(
         self,
         connection: Any,
@@ -276,7 +294,7 @@ class MotherDuckAdapter(PlatformAdapter):
             rows = result.fetchall()
             execution_time = elapsed_seconds(start_time)
             logger.debug(f"Query {query_id} completed in {execution_time:.3f}s, returned {len(rows)} rows")
-            return {
+            result_dict = {
                 "query_id": query_id,
                 "stream_id": stream_id,
                 "status": "SUCCESS",
@@ -297,6 +315,21 @@ class MotherDuckAdapter(PlatformAdapter):
                 "error": str(e),
                 "error_type": type(e).__name__,
             }
+
+        # Display plan in console when --show-query-plans is active.
+        # Skip here when --capture-plans is also active: capture_query_plan below
+        # already calls get_query_plan (running EXPLAIN ANALYZE); calling
+        # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
+        if not self.capture_plans:
+            self.display_query_plan_if_enabled(conn, query, query_id)
+
+        # Capture and merge structured query plan (SUCCESS-guarded in the helper).
+        # Deliberately outside the try: with strict_plan_capture=True a capture
+        # failure raises PlanCaptureError, which must propagate instead of being
+        # swallowed by the broad except and mislabeling the successful query FAILED.
+        self._merge_plan_capture_into_result(result_dict, conn, query, query_id)
+
+        return result_dict
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get MotherDuck platform information for results traceability."""

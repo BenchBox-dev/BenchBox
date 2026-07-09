@@ -30,15 +30,18 @@ from .metadata import (
     TuningMetadata,
     TuningMetadataManager,
 )
-from .validation import (
-    ValidationIssue,
-    ValidationLevel,
-    ValidationResult,
-    detect_tuning_conflicts,
-    validate_benchmark_tunings,
-    validate_column_types,
-    validate_columns_exist,
-    validate_constraint_consistency,
+from .profile_validation import (
+    CandidateTemplateMapping,
+    TuningProfileValidationIssue,
+    TuningProfileValidationResult,
+    build_tuning_profile_metadata,
+    validate_tuning_template,
+)
+from .workload_profiles import (
+    WorkloadTuningCandidate,
+    WorkloadTuningProfile,
+    load_tpc_tuning_profile,
+    load_workload_tuning_profile,
 )
 
 __all__ = [
@@ -58,17 +61,18 @@ __all__ = [
     "PartitioningConfig",
     "SortKeyConfig",
     "ClusteringConfig",
-    # Validation
-    "ValidationLevel",
-    "ValidationIssue",
-    "ValidationResult",
-    "validate_columns_exist",
-    "validate_column_types",
-    "detect_tuning_conflicts",
-    "validate_benchmark_tunings",
-    "validate_constraint_consistency",
     # Metadata
     "TuningMetadata",
     "TuningMetadataManager",
     "MetadataValidationResult",
+    # Workload tuning profiles
+    "WorkloadTuningCandidate",
+    "WorkloadTuningProfile",
+    "load_workload_tuning_profile",
+    "load_tpc_tuning_profile",
+    "CandidateTemplateMapping",
+    "TuningProfileValidationIssue",
+    "TuningProfileValidationResult",
+    "validate_tuning_template",
+    "build_tuning_profile_metadata",
 ]

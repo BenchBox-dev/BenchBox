@@ -7,6 +7,100 @@ This module provides a two-tier DAG structure for query plans:
 
 The models support fingerprinting for fast comparison and JSON serialization
 for storage alongside benchmark results.
+
+Plan fingerprint stability contract
+------------------------------------
+``QueryPlanDAG.plan_fingerprint`` is a SHA256 hash of the *logical* operator
+tree's structural signature (see ``LogicalOperator.get_structural_signature``).
+It is the canonical answer to "did the shape of this plan change?" and its
+stability is defined as follows.
+
+What the fingerprint hashes (structural shape only):
+  - operator types and the recursive child structure (tree shape)
+  - table names (Scan), join types and join conditions
+  - filter expressions, aggregation functions, group-by / sort / projection
+    expressions, and LIMIT / OFFSET counts
+
+What the fingerprint deliberately EXCLUDES:
+  - costs, estimated/actual row counts, and timing (execution statistics)
+  - operator IDs and any other non-structural physical-operator properties
+
+Stability guarantees (what a stable fingerprint means):
+  - **Stats-independent.** The signature excludes the dedicated cost / row-estimate
+    fields (``estimated_cost``, ``estimated_rows``, and the per-operator
+    ``properties`` that hold cost/cardinality/timing). A ``VACUUM``/``ANALYZE`` or
+    other statistics refresh that only changes row estimates does NOT change the
+    fingerprint. Parsers that fold an operator's raw EXPLAIN detail into a
+    signature-bearing field (e.g. the DuckDB FORMAT JSON ``extra_info`` dict, which
+    carries an ``Estimated Cardinality``) strip the cost/cardinality tokens before
+    the text reaches the hashed field, via the shared helpers in
+    ``benchbox/core/query_plans/parsers/base.py`` (``strip_estimates`` /
+    ``strip_estimate_keys``). A registry-wide invariant
+    (``tests/unit/query_plans/test_fingerprint_hygiene.py``) enforces that no
+    parser leaks estimate text into the signature, so this guarantee holds for
+    every registered engine rather than needing per-engine verification.
+  - **Logical, not physical — with an engine-dependent caveat.** The signature is
+    built from the *logical* operator tree, so the physical access method is
+    generally NOT reflected: an index scan and a sequential scan of the same table
+    both normalize to a logical ``Scan``. On engines where the predicate is the
+    same regardless of access method, adding an index does NOT change the
+    fingerprint. **However, index-addition stability is not universal:** some
+    engines expose the predicate differently per access method, and the parser
+    captures only one form. On **PostgreSQL**, a sequential scan exposes the
+    predicate as ``Filter`` (which the parser records in ``filter_expressions`` —
+    structural and hashed) while an index scan exposes it as ``Index Cond`` (which
+    the parser does NOT record), so adding an index that flips ``Filter`` →
+    ``Index Cond`` for the same table/predicate *does* change the fingerprint, and
+    bitmap plans can add child nodes that further change it. Treat index-addition
+    stability as a property to verify per engine, not a guarantee.
+  - **Logical-shape sensitive.** What DOES change the fingerprint is a change in
+    the logical tree: join order or join type, an added aggregation (GROUP BY),
+    sort, projection change, LIMIT/OFFSET, or filter predicates *where the
+    engine's EXPLAIN exposes them*. That logical-shape change is the intended
+    regression signal. Note that predicate sensitivity is engine-dependent: some
+    EXPLAIN formats (e.g. SQLite ``EXPLAIN QUERY PLAN``) do not surface filter
+    expressions, so two queries differing only in a WHERE constant may hash the
+    same on those engines.
+
+What fingerprint equality does NOT guarantee, and explicit non-guarantees:
+  - **Not stable across engine versions.** A minor/major engine upgrade
+    (PostgreSQL, DuckDB, etc.) can change EXPLAIN wording, operator naming, or
+    default plan shapes, which may change the fingerprint even for an unchanged
+    query. Cross-version fingerprint equality is therefore NOT promised — compare
+    fingerprints only within the same engine version.
+  - **Not cross-engine comparable.** Fingerprints from different platforms are
+    not comparable: normalization is best-effort and operator vocabularies differ.
+  - **Equality does not imply equal performance** (costs/timing are excluded),
+    and inequality does not imply a regression (it may be a benign shape change).
+
+Decision — the fingerprint is a PER-ENGINE within-version key (not cross-engine):
+  The raw fingerprint's intended and only supported purpose is per-engine,
+  within-version structural regression detection and within-run deduplication.
+  Cross-engine equality is explicitly OUT OF SCOPE for the raw fingerprint, because
+  engines emit different wrapper/exchange/codegen operators and harmonize operator
+  names differently (ClickHouse ``Expression`` -> Project, Presto ``Output`` ->
+  Project, Spark ``Exchange`` -> Other), so the same logical query legitimately
+  hashes differently on each engine. Forcing cross-engine equality onto the raw
+  fingerprint would require lossy normalization that would weaken its within-engine
+  regression signal.
+
+  When a cross-engine STRUCTURAL comparison is wanted, use the separate, opt-in
+  *comparable subset* projection in ``benchbox/core/query_plans/comparison.py``
+  (``structural_backbone_counts`` / ``comparable_subset_signature`` /
+  ``structural_backbones_match``). It reduces a harmonized DAG to its relational
+  backbone (base scans, joins, aggregates, set operations) by dropping
+  engine-variable wrapper nodes and collapsing partial+final / multi-stage runs of
+  the same operator, yielding a multiset that IS comparable across engines for the
+  same logical query. A cross-engine conformance corpus
+  (``tests/unit/query_plans/test_cross_engine_conformance.py``) asserts that
+  canonical queries meet declared backbone invariants on every engine while their
+  raw fingerprints remain distinct.
+
+Recommended use: stable for structural plan comparison and within-run
+deduplication on a single engine version. Suitable for "did the plan shape
+change?" regression detection when the engine version is held constant; not
+suitable as a cross-version or cross-engine equality key — for cross-engine
+structural comparison use the comparable-subset projection above.
 """
 
 from __future__ import annotations
@@ -14,17 +108,168 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from benchbox.core.errors import SerializationError
+# Literal-masking patterns for normalize_literals fingerprints. Numeric literals
+# (including decimals, and a tightly-adjacent sign like ``-5``) collapse to a
+# placeholder and single-quoted string literals to another, so that structurally
+# identical plans whose only difference is a data-driven parameter value (e.g. a
+# seed-varied filter threshold) hash the same. Numbers are masked first so digits
+# inside a quoted literal are folded into the string token.
+#
+# The numeric pattern uses a negative lookbehind (rather than \b on both ends) so
+# it can also absorb a leading sign: \b requires a word/non-word transition
+# immediately before the sign, which does not exist between two non-word
+# characters (e.g. a space then ``-``), so a plain \b pattern could never match
+# the sign at all. Excluding identifier characters (letters, digits, ``_``,
+# ``.``, ``$``) keeps ``l_orderkey1``/``t1`` intact (the digit is preceded by a
+# letter) while still matching a tightly-adjacent sign (``col > -5``) as PART of
+# the same token. ``#`` is excluded on both boundaries too, so ordinal column
+# references (``#0``/``#1``, emitted by DuckDB and others for projected/grouped
+# columns) stay structural instead of collapsing to an indistinguishable masked
+# token - otherwise two plans that reference GENUINELY DIFFERENT positional
+# columns (``proj:#0,#1`` vs ``proj:#0,#2``) would hash the same, hiding a real
+# structural change behind what looks like a literal. Absorbing the sign matters
+# because without it, ``-5`` and ``5`` (thresholds that cross zero across seeds)
+# mask to distinct signed/unsigned placeholders instead of collapsing to the
+# same one. A sign separated from its digit by whitespace (``a - b``, a binary
+# operator) is NOT absorbed: the pattern requires the sign and digit to be
+# adjacent with nothing in between. The trailing negative lookahead mirrors the
+# leading lookbehind (rather than a trailing \b) so a number is not matched when
+# immediately glued to more identifier-continuation characters either.
+#
+# The alternation covers every SQL numeric literal form atomically (a single
+# match spans the whole literal, never leaving a residual value-dependent
+# fragment like the old plain-decimal-only pattern's ``1.2E-<NUM>``):
+#   - hex: ``0xFF`` / ``0Xff``, with optional ``_`` digit-group separators
+#   - decimal: leading-dot (``.5``), trailing-dot (``5.``), or both-sided
+#     (``5.5``), each with an optional ``[eE][+-]?exponent`` suffix
+#   - plain integer (``123``) or scientific integer (``1e5``, ``1E-3``)
+#   - ``_`` digit-group separators anywhere in the integer/exponent part
+#     (``1_000``, DuckDB/PostgreSQL numeric-literal syntax)
+#
+# ONE canonical numeric pattern is shared by BOTH maskers below. They previously
+# used two separately-compiled patterns that drifted: only the normalized-text
+# masker excluded ``#``, so the ordinal-collision protection above applied to
+# aggregation/group/sort expressions but NOT to join/filter/projection ones.
+# A single source of truth keeps every surface consistent.
+_HEX_LITERAL = r"0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*"
+_DECIMAL_LITERAL = (
+    r"(?:\d(?:_?\d)*(?:\.(?:\d(?:_?\d)*)?)?|\.\d(?:_?\d)*)"  # 123 | 123. | 123.456 | .456
+    r"(?:[eE][+-]?\d(?:_?\d)*)?"  # optional exponent: e5, E-3, e+10
+)
+_NUMERIC_LITERAL_RE = re.compile(rf"(?<![A-Za-z0-9_.$#])[+-]?(?:{_HEX_LITERAL}|{_DECIMAL_LITERAL})(?![A-Za-z0-9_.$#])")
+# ``(?:[^']|'')*`` (rather than ``[^']*``) treats a doubled single quote as an
+# escaped apostrophe INSIDE the literal rather than the end of the string, so
+# ``'O''Brien'`` masks to one token instead of splitting into two (``'O'`` +
+# ``'Brien'``, which would leave the split itself as residual value-dependent
+# syntax in the "normalized" signature).
+_STRING_LITERAL_RE = re.compile(r"'(?:[^']|'')*'")
+_LITERAL_PLACEHOLDER = "?"
 
 logger = logging.getLogger(__name__)
+
+
+def _mask_literals(expression: str) -> str:
+    """Replace numeric and single-quoted string literals with stable placeholders.
+
+    Masks only concrete values, never identifiers: a leading identifier character
+    immediately before a digit (a column or alias like ``l_orderkey1``, ``t1``)
+    excludes the match, and ordinal column references (``#0``/``#1``) are likewise
+    preserved via the shared ``#`` boundary exclusion, so they are left intact.
+    Used for the opt-in literal-normalized structural signature
+    (join/filter/projection expressions); the default fingerprint keeps literals
+    verbatim.
+    """
+    return _STRING_LITERAL_RE.sub("<STR>", _NUMERIC_LITERAL_RE.sub("<NUM>", expression))
+
+
+def _normalize_literal_text(text: str) -> str:
+    """Replace SQL literal constants in an expression string with a placeholder.
+
+    Used to compute literal-normalized plan fingerprints so that queries which
+    differ only in constant values share a fingerprint. String/date literals are
+    replaced first, then standalone numeric literals. Identifiers containing
+    digits and ordinal column references (``#0``/``#1``) are preserved because the
+    shared numeric pattern excludes those boundary characters.
+    """
+    if not text:
+        return text
+    normalized = _STRING_LITERAL_RE.sub(_LITERAL_PLACEHOLDER, text)
+    normalized = _NUMERIC_LITERAL_RE.sub(_LITERAL_PLACEHOLDER, normalized)
+    return normalized
+
 
 # Track unknown operator types that have been logged to avoid log flooding
 _logged_unknown_operator_types: set[str] = set()
 _logged_unknown_join_types: set[str] = set()
+
+
+# ---------------------------------------------------------------------------
+# raw_explain_output retention policy
+# ---------------------------------------------------------------------------
+#
+# Every captured plan retains ``raw_explain_output``, the verbatim EXPLAIN text.
+# For verbose formats (Spark EXPLAIN EXTENDED emits four plan sections; DuckDB
+# EXPLAIN ANALYZE FORMAT JSON is large) this dominates the results-bundle size and
+# grows with query_count x stream_count on throughput runs. The structured DAG and
+# fingerprint are what downstream comparison needs; the raw text is for
+# debugging/display only, so its retention is governed by a policy:
+#
+#   - "full"      keep the raw text verbatim (no cap)
+#   - "truncated" keep the first ``max_bytes`` of raw text (DEFAULT), with a marker
+#   - "none"      drop the raw text entirely
+#
+# The structured DAG and ``plan_fingerprint`` are retained under EVERY policy; only
+# ``raw_explain_output`` is affected. Default is "truncated" rather than "none"
+# because the raw text is valuable for diagnosing capture/parse issues.
+RAW_OUTPUT_FULL = "full"
+RAW_OUTPUT_TRUNCATED = "truncated"
+RAW_OUTPUT_NONE = "none"
+
+RAW_OUTPUT_POLICIES = frozenset({RAW_OUTPUT_FULL, RAW_OUTPUT_TRUNCATED, RAW_OUTPUT_NONE})
+
+# Default retention policy and truncation cap (bytes of UTF-8 raw text retained
+# under the "truncated" policy). 16 KiB keeps the raw text well under the ~100 KB
+# serialized-plan warning threshold while preserving enough of the plan head to be
+# useful for debugging.
+DEFAULT_RAW_OUTPUT_POLICY = RAW_OUTPUT_TRUNCATED
+DEFAULT_RAW_OUTPUT_MAX_BYTES = 16 * 1024
+
+# Default maximum logical-tree depth serialized by ``QueryPlanDAG.to_dict`` /
+# ``to_json`` / ``estimate_serialized_size``. Nodes deeper than this are replaced by
+# a truncation marker (``truncated_at_depth``) in the serialized output rather than
+# dropping the whole plan, so a pathologically deep plan still round-trips its upper
+# levels instead of failing capture outright. The in-memory tree and the structural
+# ``plan_fingerprint`` are computed over the FULL tree and are unaffected by this
+# serialization cap. Configurable per-adapter via ``plan_max_depth``.
+DEFAULT_PLAN_MAX_DEPTH = 50
+
+
+def normalize_raw_output_policy(policy: str | None) -> str:
+    """Return a valid raw-output policy, falling back to the default for unknown values.
+
+    Args:
+        policy: Requested policy string (case-insensitive) or None.
+
+    Returns:
+        One of RAW_OUTPUT_FULL / RAW_OUTPUT_TRUNCATED / RAW_OUTPUT_NONE.
+    """
+    if policy is None:
+        return DEFAULT_RAW_OUTPUT_POLICY
+    normalized = str(policy).strip().lower()
+    if normalized in RAW_OUTPUT_POLICIES:
+        return normalized
+    logger.warning(
+        "Unknown raw_explain_output policy %r; falling back to %r. Valid values: %s",
+        policy,
+        DEFAULT_RAW_OUTPUT_POLICY,
+        ", ".join(sorted(RAW_OUTPUT_POLICIES)),
+    )
+    return DEFAULT_RAW_OUTPUT_POLICY
 
 
 class LogicalOperatorType(str, Enum):
@@ -153,14 +398,35 @@ class LogicalOperator:
     offset_count: int | None = None
 
     def to_dict(self, max_depth: int | None = None, current_depth: int = 0) -> dict[str, Any]:
-        """Convert to JSON-serializable dictionary with optional depth guard."""
-        if max_depth is not None and current_depth > max_depth:
-            raise SerializationError(f"Max depth {max_depth} exceeded")
+        """Convert to JSON-serializable dictionary with optional depth guard.
 
+        When ``max_depth`` is set and this node sits beyond it, the node is
+        serialized as a shallow truncation marker (carrying ``truncated_at_depth``
+        and the count of omitted children) instead of raising and discarding the
+        whole plan. This bounds the serialized size of a pathologically deep tree
+        while preserving everything down to the limit. The in-memory tree and the
+        structural ``plan_fingerprint`` are computed over the FULL tree, so this
+        serialization-only truncation never changes fingerprint equality — a
+        truncated serialized plan is explicitly marked rather than silently passed
+        off as complete.
+        """
         # Handle enum conversion
         operator_type_value = (
             self.operator_type.value if isinstance(self.operator_type, LogicalOperatorType) else self.operator_type
         )
+
+        if max_depth is not None and current_depth > max_depth:
+            # Depth guard: emit a marker node instead of dropping the plan. Keep the
+            # operator identity so the truncation point is legible; omit children and
+            # the value-bearing fields (they are what the depth cap is protecting
+            # against). ``from_dict`` reconstructs this as a childless leaf.
+            return {
+                "operator_type": operator_type_value,
+                "operator_id": self.operator_id,
+                "truncated_at_depth": current_depth,
+                "children_omitted": len(self.children),
+            }
+
         join_type_value = self.join_type.value if isinstance(self.join_type, JoinType) else self.join_type
 
         return {
@@ -222,9 +488,19 @@ class LogicalOperator:
             offset_count=data.get("offset_count"),
         )
 
-    def get_structural_signature(self) -> str:
+    def get_structural_signature(self, normalize_literals: bool = False) -> str:
         """
         Get structural signature for fingerprinting.
+
+        Args:
+            normalize_literals: When True, mask numeric/string literals in the
+                predicate fields (filter_expressions, join_conditions,
+                projection_expressions) to ``<NUM>``/``<STR>`` so that plans which
+                differ only by a data-driven parameter value (e.g. a seed-varied
+                filter threshold) produce the same signature. Default False keeps
+                literals verbatim (the established, literal-sensitive behaviour).
+                Column/identifier fields (table_name, group_by_keys, sort_keys,
+                aggregation_functions, etc.) are never masked.
 
         Returns only structural elements that affect query semantics:
         - operator_type: Type of logical operation
@@ -246,70 +522,126 @@ class LogicalOperator:
         - Expressions compared as unordered sets: join_conditions, filter_expressions, aggregation_functions
         - Expressions with order significance: group_by_keys, sort_keys, projection_expressions
         - Numeric values included directly: limit_count, offset_count
+
+        Args:
+            normalize_literals: When True, literal constants embedded in expressions
+                (and the limit/offset counts) are replaced with a placeholder so
+                that plans which differ only in constant values collapse to the
+                same signature. Identifiers are preserved.
         """
-        # Build signature from structural elements only
-        operator_type_str = get_operator_type_str(self.operator_type)
-        signature_parts = [operator_type_str]
+        return json.dumps(
+            self._structural_signature_obj(normalize_literals=normalize_literals),
+            separators=(",", ":"),
+            ensure_ascii=True,
+            sort_keys=True,
+        )
 
-        # Table name for Scan operators
+    def _structural_signature_obj(self, normalize_literals: bool = False) -> dict[str, Any]:
+        """Build the canonical, JSON-serializable structural node (v2 encoding).
+
+        Two collision classes present in the v1 pipe-joined encoding are closed
+        here (see qpc-03 / F2.1):
+
+        1. Tree shape: children are nested as a ``"children"`` list of child
+           node objects, so ``Join[Scan(t1), Scan(t2)]`` (two siblings) and
+           ``Join[Scan(t1) -> Scan(t2)]`` (a nested chain) produce structurally
+           different JSON and therefore different fingerprints. The v1 form
+           flattened every part - scalars and children alike - with the same
+           ``|`` separator, so both collapsed to the same string.
+        2. Separator injection: list-valued fields stay JSON arrays (e.g.
+           ``["a","b"]``) instead of being ``,``-joined into one string, and
+           every value is JSON-encoded, so ``filters=["a","b"]`` no longer
+           collides with ``filters=["a,b"]`` and a ``table_name`` of
+           ``"x|filters:y"`` no longer collides with table ``x`` + filter ``y``.
+
+        Set-like fields (join_cond, filters, aggs) are sorted; order-significant
+        fields (group, sort, proj, children) preserve order. Only structural
+        elements are included - never costs, row estimates, or operator ids -
+        so fingerprints remain structure-only.
+        """
+        norm = _normalize_literal_text if normalize_literals else (lambda value: value)
+
+        node: dict[str, Any] = {"op": get_operator_type_str(self.operator_type)}
+
         if self.table_name:
-            signature_parts.append(f"table:{self.table_name}")
+            node["table"] = self.table_name
 
-        # Join type for Join operators
         if self.join_type:
-            join_type_str = get_join_type_str(self.join_type)
-            signature_parts.append(f"join:{join_type_str}")
+            node["join"] = get_join_type_str(self.join_type)
 
-        # Join conditions - sorted for set-like semantics (order doesn't affect result)
+        # Join conditions - set-like (order doesn't affect result); mask literals
+        # before sorting so the set is seed-stable when normalizing.
         if self.join_conditions:
-            conditions_str = ",".join(sorted(self.join_conditions))
-            signature_parts.append(f"join_cond:{conditions_str}")
+            conditions = (
+                [_mask_literals(c) for c in self.join_conditions] if normalize_literals else list(self.join_conditions)
+            )
+            node["join_cond"] = sorted(conditions)
 
-        # Filter expressions - sorted for set-like semantics
+        # Filter expressions - set-like.
         if self.filter_expressions:
-            filters_str = ",".join(sorted(self.filter_expressions))
-            signature_parts.append(f"filters:{filters_str}")
+            filters = (
+                [_mask_literals(f) for f in self.filter_expressions]
+                if normalize_literals
+                else list(self.filter_expressions)
+            )
+            node["filters"] = sorted(filters)
 
-        # Aggregation functions - sorted for set-like semantics
+        # Aggregation functions - set-like.
         if self.aggregation_functions:
-            aggs_str = ",".join(sorted(self.aggregation_functions))
-            signature_parts.append(f"aggs:{aggs_str}")
+            node["aggs"] = sorted(norm(a) for a in self.aggregation_functions)
 
-        # Group by keys - order preserved (affects output row grouping)
+        # Group by keys - order preserved (affects output row grouping).
         if self.group_by_keys:
-            group_str = ",".join(self.group_by_keys)
-            signature_parts.append(f"group:{group_str}")
+            node["group"] = [norm(g) for g in self.group_by_keys]
 
-        # Sort keys - order preserved (affects output ordering)
+        # Sort keys - order preserved (affects output ordering). Each dict's
+        # items are sorted for a deterministic per-key representation.
         if self.sort_keys:
-            # Sort keys is a list of dicts, convert to deterministic string
-            # Sort items within each dict for consistent representation
-            sort_str = ",".join(str(sorted(sk.items())) for sk in self.sort_keys)
-            signature_parts.append(f"sort:{sort_str}")
+            node["sort"] = [norm(str(sorted(sk.items()))) for sk in self.sort_keys]
 
-        # Projection expressions - order preserved (affects output columns)
+        # Projection expressions - order preserved (affects output columns).
         if self.projection_expressions:
-            proj_str = ",".join(self.projection_expressions)
-            signature_parts.append(f"proj:{proj_str}")
+            node["proj"] = (
+                [_mask_literals(p) for p in self.projection_expressions]
+                if normalize_literals
+                else list(self.projection_expressions)
+            )
 
-        # Limit count - affects result set size
+        # Limit / offset - literal constants when normalizing.
         if self.limit_count is not None:
-            signature_parts.append(f"limit:{self.limit_count}")
-
-        # Offset count - affects which rows are returned
+            node["limit"] = _LITERAL_PLACEHOLDER if normalize_literals else self.limit_count
         if self.offset_count is not None:
-            signature_parts.append(f"offset:{self.offset_count}")
+            node["offset"] = _LITERAL_PLACEHOLDER if normalize_literals else self.offset_count
 
-        # Recursively include children signatures
+        # Children nested as objects (NOT flattened) so tree shape is encoded.
         if self.children:
-            for child in self.children:
-                signature_parts.append(child.get_structural_signature())
+            node["children"] = [
+                child._structural_signature_obj(normalize_literals=normalize_literals) for child in self.children
+            ]
 
-        return "|".join(signature_parts)
+        return node
+
+
+# Version of the structural-fingerprint encoding produced by
+# ``LogicalOperator.get_structural_signature``. Bumped to 2 when the encoding
+# moved from a flat ``|``-joined string to the tree-shape-encoding, JSON-escaped
+# form (qpc-03 / F2.1). A v1 fingerprint and a v2 fingerprint are NOT comparable
+# for equality even for the same logical plan (they hash different encodings), so
+# consumers must gate any fingerprint-equality fast path on matching
+# fingerprint_version and fall back to a full tree walk across versions. Legacy
+# bundles that predate the field are treated as version 1.
+FINGERPRINT_VERSION = 2
+LEGACY_FINGERPRINT_VERSION = 1
 
 
 class FingerprintIntegrity:
-    """Fingerprint verification states."""
+    """Fingerprint verification states.
+
+    These states describe INTERNAL consistency (does the stored fingerprint
+    match a recomputation of the current tree?), not provenance/authenticity -
+    a trusted state means the fingerprint is self-consistent, not that it came
+    from a trusted source.
+    """
 
     VERIFIED = "verified"  # Fingerprint matches current tree structure
     STALE = "stale"  # Stored fingerprint doesn't match tree (possibly corrupted/tampered)
@@ -331,6 +663,9 @@ class QueryPlanDAG:
         plan_fingerprint: SHA256 hash of logical structure for fast comparison
         raw_explain_output: Original EXPLAIN output for debugging (optional)
         fingerprint_integrity: Verification state of the fingerprint
+        fingerprint_version: Encoding version of ``plan_fingerprint`` (see
+            ``FINGERPRINT_VERSION``). Fingerprints are only comparable within
+            the same version.
     """
 
     query_id: str
@@ -341,27 +676,54 @@ class QueryPlanDAG:
     plan_fingerprint: str | None = None
     raw_explain_output: str | None = None
     fingerprint_integrity: str = field(default=FingerprintIntegrity.UNVERIFIED)
+    fingerprint_version: int = field(default=FINGERPRINT_VERSION)
 
     def __post_init__(self) -> None:
         """Compute plan fingerprint after initialization."""
+        # Lazy cache for the literal-normalized fingerprint. A plain attribute, not a
+        # dataclass field, so it stays out of asdict()/to_dict() serialization and
+        # __eq__ — the default plan_fingerprint remains the only persisted fingerprint.
+        self._normalized_fingerprint: str | None = None
         if self.plan_fingerprint is None:
             self.plan_fingerprint = self.compute_plan_fingerprint()
             self.fingerprint_integrity = FingerprintIntegrity.VERIFIED
+            # A freshly computed fingerprint is always the current encoding.
+            self.fingerprint_version = FINGERPRINT_VERSION
 
-    def compute_plan_fingerprint(self) -> str:
+    def compute_plan_fingerprint(self, normalize_literals: bool = False) -> str:
         """
         Compute SHA256 hash of logical operator tree structure.
 
         Only includes structural elements (operator types, join types, table names).
         Excludes costs, row counts, operator IDs, and other non-structural properties.
 
+        Args:
+            normalize_literals: When True, mask numeric/string literals in predicate
+                fields before hashing, so structurally identical plans that differ
+                only by a data-driven parameter value hash the same. Default False
+                preserves the literal-sensitive fingerprint.
+
         Returns:
             Hexadecimal SHA256 hash string
         """
         if self.logical_root is None:
             return hashlib.sha256(b"EMPTY_PLAN").hexdigest()
-        structural_signature = self.logical_root.get_structural_signature()
+        structural_signature = self.logical_root.get_structural_signature(normalize_literals=normalize_literals)
         return hashlib.sha256(structural_signature.encode("utf-8")).hexdigest()
+
+    @property
+    def normalized_fingerprint(self) -> str:
+        """Literal-normalized structural fingerprint (computed lazily, then cached).
+
+        Equivalent to ``compute_plan_fingerprint(normalize_literals=True)`` but
+        memoised on first access, mirroring how ``plan_fingerprint`` is held once.
+        Stable across runs whose plans differ only by seed-varied literal values,
+        so it is the fingerprint to compare for cross-seed regression detection.
+        The default ``plan_fingerprint`` is left untouched (literal-sensitive).
+        """
+        if self._normalized_fingerprint is None:
+            self._normalized_fingerprint = self.compute_plan_fingerprint(normalize_literals=True)
+        return self._normalized_fingerprint
 
     def verify_fingerprint(self) -> bool:
         """
@@ -402,9 +764,67 @@ class QueryPlanDAG:
         """
         self.plan_fingerprint = self.compute_plan_fingerprint()
         self.fingerprint_integrity = FingerprintIntegrity.VERIFIED
+        # The recomputed fingerprint uses the current encoding version.
+        self.fingerprint_version = FINGERPRINT_VERSION
+        self._normalized_fingerprint = None
 
-    def to_dict(self, max_depth: int | None = 50) -> dict[str, Any]:
-        """Convert to JSON-serializable dictionary with depth protection."""
+    def apply_raw_output_policy(
+        self,
+        policy: str | None = DEFAULT_RAW_OUTPUT_POLICY,
+        max_bytes: int = DEFAULT_RAW_OUTPUT_MAX_BYTES,
+    ) -> None:
+        """Apply the raw_explain_output retention policy in place.
+
+        Governs only ``raw_explain_output``; the structured ``logical_root`` and the
+        already-computed ``plan_fingerprint`` are never touched, so structural
+        comparison and fingerprint equality are unaffected by the policy.
+
+        - ``full``: leave the raw text unchanged.
+        - ``truncated``: if the UTF-8 encoding exceeds ``max_bytes``, keep the first
+          ``max_bytes`` bytes (decoded on a char boundary) plus a marker recording how
+          many bytes were retained vs. the original.
+        - ``none``: drop the raw text (set to None).
+
+        Unknown policy values fall back to the default with a warning.
+
+        Args:
+            policy: Retention policy (full / truncated / none).
+            max_bytes: Byte cap retained under the truncated policy (must be > 0).
+        """
+        resolved = normalize_raw_output_policy(policy)
+
+        if resolved == RAW_OUTPUT_FULL or self.raw_explain_output is None:
+            return
+
+        if resolved == RAW_OUTPUT_NONE:
+            self.raw_explain_output = None
+            return
+
+        # Truncated policy.
+        if max_bytes <= 0:
+            self.raw_explain_output = None
+            return
+
+        encoded = self.raw_explain_output.encode("utf-8")
+        original_bytes = len(encoded)
+        if original_bytes <= max_bytes:
+            return
+
+        # Decode on a valid char boundary (drop a trailing partial multibyte char).
+        kept = encoded[:max_bytes].decode("utf-8", errors="ignore")
+        retained_bytes = len(kept.encode("utf-8"))
+        self.raw_explain_output = (
+            f"{kept}\n...[raw_explain_output truncated: retained {retained_bytes} "
+            f"of {original_bytes} bytes under '{RAW_OUTPUT_TRUNCATED}' policy]"
+        )
+
+    def to_dict(self, max_depth: int | None = DEFAULT_PLAN_MAX_DEPTH) -> dict[str, Any]:
+        """Convert to JSON-serializable dictionary with depth protection.
+
+        Nodes deeper than ``max_depth`` are replaced by a ``truncated_at_depth``
+        marker (see ``LogicalOperator.to_dict``) rather than raising; the stored
+        ``plan_fingerprint`` reflects the full in-memory tree regardless.
+        """
         return {
             "query_id": self.query_id,
             "platform": self.platform,
@@ -414,6 +834,7 @@ class QueryPlanDAG:
             "estimated_cost": self.estimated_cost,
             "estimated_rows": self.estimated_rows,
             "plan_fingerprint": self.plan_fingerprint,
+            "fingerprint_version": self.fingerprint_version,
             "raw_explain_output": self.raw_explain_output,
         }
 
@@ -436,9 +857,31 @@ class QueryPlanDAG:
 
         Returns:
             QueryPlanDAG instance with fingerprint_integrity set appropriately
+
+        Integrity semantics (qpc-03 / F2.2):
+            - A stored fingerprint that recomputes to the same value is VERIFIED.
+            - A stored fingerprint that does NOT recompute (stale/tampered) is
+              STALE, or RECOMPUTED when ``refresh_on_mismatch`` is set.
+            - An ABSENT stored fingerprint is RECOMPUTED, never VERIFIED:
+              deleting the field must not launder an unauthenticated plan into
+              a trusted state (the old code let ``__post_init__`` mark a
+              freshly computed fingerprint VERIFIED, so dropping the field
+              bypassed stale-tamper detection).
+            A legacy bundle whose stored fingerprint predates the v2 encoding
+            recomputes to a different (v2) value and therefore lands STALE
+            (untrusted) - so it compares via a full tree walk, never via
+            cross-version fingerprint equality.
         """
         logical_root_data = data.get("logical_root")
         stored_fingerprint = data.get("plan_fingerprint")
+        # A stored fingerprint with no recorded version predates versioning, so
+        # it is a legacy v1 fingerprint. When there is no stored fingerprint we
+        # will recompute one below, which is always the current encoding.
+        stored_version = (
+            data.get("fingerprint_version", LEGACY_FINGERPRINT_VERSION)
+            if stored_fingerprint is not None
+            else FINGERPRINT_VERSION
+        )
 
         # Build the plan without setting fingerprint yet
         plan = cls(
@@ -450,28 +893,34 @@ class QueryPlanDAG:
             plan_fingerprint=stored_fingerprint,
             raw_explain_output=data.get("raw_explain_output"),
             fingerprint_integrity=FingerprintIntegrity.UNVERIFIED,
+            fingerprint_version=stored_version,
         )
 
-        # Verify fingerprint if requested
-        if verify_fingerprint and stored_fingerprint is not None:
+        if stored_fingerprint is None:
+            # __post_init__ computed a fresh v2 fingerprint and optimistically
+            # marked it VERIFIED; downgrade to RECOMPUTED so an absent stored
+            # fingerprint is never treated as authenticated.
+            plan.fingerprint_integrity = FingerprintIntegrity.RECOMPUTED
+        elif verify_fingerprint:
             computed = plan.compute_plan_fingerprint()
             if computed == stored_fingerprint:
                 plan.fingerprint_integrity = FingerprintIntegrity.VERIFIED
+            elif refresh_on_mismatch:
+                plan.plan_fingerprint = computed
+                plan.fingerprint_integrity = FingerprintIntegrity.RECOMPUTED
+                # The recomputed value uses the current encoding.
+                plan.fingerprint_version = FINGERPRINT_VERSION
             else:
-                if refresh_on_mismatch:
-                    plan.plan_fingerprint = computed
-                    plan.fingerprint_integrity = FingerprintIntegrity.RECOMPUTED
-                else:
-                    plan.fingerprint_integrity = FingerprintIntegrity.STALE
+                plan.fingerprint_integrity = FingerprintIntegrity.STALE
 
         return plan
 
-    def to_json(self, indent: int | None = 2, *, max_depth: int | None = 50) -> str:
+    def to_json(self, indent: int | None = 2, *, max_depth: int | None = DEFAULT_PLAN_MAX_DEPTH) -> str:
         """Serialize to JSON string."""
         return json.dumps(self.to_dict(max_depth=max_depth), indent=indent)
 
-    def estimate_serialized_size(self, *, max_depth: int | None = 50) -> int:
-        """Estimate JSON serialized size in bytes."""
+    def estimate_serialized_size(self, *, max_depth: int | None = DEFAULT_PLAN_MAX_DEPTH) -> int:
+        """Estimate JSON serialized size in bytes (deep nodes truncated, not dropped)."""
         return len(json.dumps(self.to_dict(max_depth=max_depth), indent=None))
 
     @classmethod
@@ -500,7 +949,7 @@ class QueryPlanDAG:
         )
 
 
-def compute_plan_fingerprint(logical_root: LogicalOperator) -> str:
+def compute_plan_fingerprint(logical_root: LogicalOperator, normalize_literals: bool = False) -> str:
     """
     Compute SHA256 hash of logical operator tree structure.
 
@@ -509,11 +958,13 @@ def compute_plan_fingerprint(logical_root: LogicalOperator) -> str:
 
     Args:
         logical_root: Root of the logical operator tree
+        normalize_literals: When True, mask numeric/string literals in predicate
+            fields before hashing (see ``LogicalOperator.get_structural_signature``).
 
     Returns:
         Hexadecimal SHA256 hash string
     """
-    structural_signature = logical_root.get_structural_signature()
+    structural_signature = logical_root.get_structural_signature(normalize_literals=normalize_literals)
     return hashlib.sha256(structural_signature.encode("utf-8")).hexdigest()
 
 

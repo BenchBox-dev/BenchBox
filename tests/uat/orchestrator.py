@@ -13,15 +13,16 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import subprocess
 import sys
+from collections import deque
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from tests.uat.config import UATConfig, apply_stress_overrides, load_config
+from tests.uat.config import UATConfig, load_config
 from tests.uat.phases import (
-    enumerate as enumerate_phase,
     execute as exec_phase,
     preflight as preflight_phase,
     report as report_phase,
@@ -44,9 +45,18 @@ class SweepResult:
         return max((c for c in self.phase_exit_codes.values()), default=0)
 
 
+@dataclass(frozen=True)
+class RunSourceInfo:
+    commit_sha: str
+    commit_short_sha: str
+    dirty: bool
+
+
 RESUME_MANIFEST_VERSION = 1
 ResumeAttempts = Mapping[str, Mapping[str, Any]]
 CellRunner = Callable[..., CellResult]
+FAILURE_TAIL_LINES = 50
+FAILURE_TAIL_CHARS = 12_000
 
 
 class DiskFloorAbort(RuntimeError):
@@ -93,9 +103,39 @@ def build_resume_runner(
             elapsed_s=float(record.get("elapsed_s", 0.0)),
             log_path=_optional_path(record.get("log_path")) or log_dir / "resume-skipped.log",
             result_path=_optional_path(record.get("result_path")),
+            submit_terminal_state=str(record.get("submit_terminal_state", "submittable")),
         )
 
     return runner
+
+
+def capture_run_source_info(repo_root: Path | None = None) -> RunSourceInfo:
+    """Capture source provenance once per sweep."""
+    root = repo_root or Path(__file__).resolve().parents[2]
+    commit_sha = _git_output(root, "rev-parse", "HEAD") or "unknown"
+    commit_short_sha = _git_output(root, "rev-parse", "--short", "HEAD") or commit_sha[:12]
+    dirty_output = _git_output(root, "status", "--porcelain", "--untracked-files=normal")
+    return RunSourceInfo(
+        commit_sha=commit_sha,
+        commit_short_sha=commit_short_sha,
+        dirty=bool(dirty_output),
+    )
+
+
+def _git_output(repo_root: Path, *args: str) -> str:
+    try:
+        completed = subprocess.run(
+            ("git", *args),
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return ""
+    if completed.returncode != 0:
+        return ""
+    return completed.stdout.strip()
 
 
 def _build_disk_floor_runner(
@@ -135,6 +175,7 @@ def _write_resume_manifest(
     aborted_phase: str,
     abort_reason: str | None,
     attempted: Iterable[CellResult],
+    source_info: RunSourceInfo,
 ) -> Path:
     """Persist a resume manifest for a disk-floor abort."""
     manifest_path = log_dir / "resume.json"
@@ -145,6 +186,11 @@ def _write_resume_manifest(
         "log_dir": str(log_dir),
         "aborted_phase": aborted_phase,
         "abort_reason": abort_reason,
+        "source": {
+            "commit_sha": source_info.commit_sha,
+            "commit_short_sha": source_info.commit_short_sha,
+            "dirty": source_info.dirty,
+        },
         "attempted": [
             {
                 "cell_key": cell_key(result.platform, result.benchmark, result.scale),
@@ -152,6 +198,7 @@ def _write_resume_manifest(
                 "benchmark": result.benchmark,
                 "scale": result.scale,
                 "terminal_state": result.status,
+                "submit_terminal_state": result.submit_terminal_state,
                 "exit_code": result.exit_code,
                 "elapsed_s": result.elapsed_s,
                 "log_path": str(result.log_path),
@@ -186,6 +233,7 @@ def run_sweep(  # noqa: C901
     aborted_phase: str | None = None
     abort_reason: str | None = None
     resume_attempts = load_resume_attempts(resume_manifest)
+    source_info = capture_run_source_info()
 
     cells_jsonl = log_dir / "cells.jsonl"
     compatibility_pruned_jsonl = log_dir / "compatibility_pruned.jsonl"
@@ -194,29 +242,21 @@ def run_sweep(  # noqa: C901
     submissions_dir: Path | None = None
 
     for phase in config.phases:
-        if config.dry_run and phase != "enumerate":
-            # Enumerate is cheap and pure (no subprocesses, no FS writes
-            # for the cells themselves). Run it even in dry_run so a
-            # malformed config — unknown platform group, retired
-            # benchmark in a frozen YAML — surfaces as a non-zero
-            # phase exit instead of silently passing through.
+        if config.dry_run:
             phase_exit_codes[phase] = 0
             continue
         if phase == "preflight":
             result = preflight_phase.run_preflight(
-                free_space_path=config.preflight.free_space_path or str(benchmark_runs_dir),
-                free_space_min_gib=config.preflight.free_space_min_gib,
-                docker_required=config.preflight.docker_required or config.cleanup.docker_manage_platforms,
-                noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
-                local_platforms_check=config.preflight.local_platforms_check,
-                requested_platforms=preflight_phase.requested_platforms_from_raw(config.raw),
-                benchmark_runs_dir=benchmark_runs_dir,
-                disk_budget_config=config,
+                **preflight_phase.preflight_kwargs_from_config(config, benchmark_runs_dir=benchmark_runs_dir)
             )
             disk_budget_summary = getattr(result, "disk_budget_summary", None)
             if disk_budget_summary:
                 print(disk_budget_summary, file=sys.stderr)
-            phase_exit_codes[phase] = 2 if result.aborted else 0
+            for line in getattr(result, "free_space_report", ()):
+                print(line, file=sys.stderr)
+            for warning in getattr(result, "warnings", ()):
+                print(f"[preflight warn] {warning}", file=sys.stderr)
+            phase_exit_codes[phase] = result.exit_code()
             if result.aborted:
                 aborted_phase = phase
                 abort_reason = result.abort_reason
@@ -228,19 +268,17 @@ def run_sweep(  # noqa: C901
                         aborted_phase=phase,
                         abort_reason=abort_reason,
                         attempted=attempted,
+                        source_info=source_info,
                     )
-                break
-        elif phase == "enumerate":
-            # Materialise the cell list eagerly so a malformed config
-            # (unknown platform group, missing benchmark) fails here
-            # rather than at execute or — under dry_run — never at all.
-            try:
-                enumerate_phase.enumerate_cells(config.raw)
-                phase_exit_codes[phase] = 0
-            except (ValueError, KeyError, TypeError) as exc:
-                phase_exit_codes[phase] = 2
-                aborted_phase = phase
-                abort_reason = str(exc)
+                _emit_abort_artifacts(
+                    config=config,
+                    log_dir=log_dir,
+                    attempted=(),
+                    execute_outcome=execute_outcome,
+                    source_info=source_info,
+                    aborted_phase=phase,
+                    abort_reason=abort_reason,
+                )
                 break
         elif phase == "execute":
             base_runner = (
@@ -275,43 +313,32 @@ def run_sweep(  # noqa: C901
                     aborted_phase=phase,
                     abort_reason=abort_reason,
                     attempted=attempted_for_resume,
+                    source_info=source_info,
+                )
+                _emit_abort_artifacts(
+                    config=config,
+                    log_dir=log_dir,
+                    attempted=attempted_for_resume,
+                    execute_outcome=None,
+                    source_info=source_info,
+                    aborted_phase=phase,
+                    abort_reason=abort_reason,
+                    # run_execute annotates the abort with the unreachable
+                    # cells skipped before the disk-floor trip; without this
+                    # the abort report would drop them from total_defined.
+                    skipped_unreachable_count=getattr(exc, "skipped_unreachable_count", 0),
                 )
                 break
-            with cells_jsonl.open("w", encoding="utf-8") as fh:
-                for cell in execute_outcome.results:
-                    fh.write(
-                        json.dumps(
-                            {
-                                "platform": cell.platform,
-                                "benchmark": cell.benchmark,
-                                "scale": cell.scale,
-                                "status": cell.status,
-                                "timed_out": cell.status == "timed-out",
-                                "exit_code": cell.exit_code,
-                                "elapsed_s": cell.elapsed_s,
-                                "log_path": str(cell.log_path),
-                                "result_path": (str(cell.result_path) if cell.result_path else None),
-                            }
-                        )
-                        + "\n"
-                    )
-            with compatibility_pruned_jsonl.open("w", encoding="utf-8") as fh:
-                for cell in getattr(execute_outcome, "compatibility_pruned", ()):
-                    fh.write(
-                        json.dumps(
-                            {
-                                "platform": cell.platform,
-                                "benchmark": cell.benchmark,
-                                "scale": cell.scale,
-                                "status": "compatibility-pruned",
-                                "rule_id": cell.rule_id,
-                                "rule_status": cell.status,
-                                "reason": cell.reason,
-                                "evidence": cell.evidence,
-                            }
-                        )
-                        + "\n"
-                    )
+            _write_cells_jsonl(
+                cells_jsonl,
+                execute_outcome.results,
+                source_info=source_info,
+                skipped_unreachable_count=len(getattr(execute_outcome, "skipped_unreachable", ())),
+            )
+            _write_compatibility_pruned_jsonl(
+                compatibility_pruned_jsonl,
+                getattr(execute_outcome, "compatibility_pruned", ()),
+            )
             if execute_outcome.aborted:
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
@@ -323,32 +350,57 @@ def run_sweep(  # noqa: C901
                         aborted_phase=phase,
                         abort_reason=abort_reason,
                         attempted=execute_outcome.results,
+                        source_info=source_info,
                     )
+                _emit_abort_artifacts(
+                    config=config,
+                    log_dir=log_dir,
+                    attempted=(),
+                    execute_outcome=execute_outcome,
+                    source_info=source_info,
+                    aborted_phase=phase,
+                    abort_reason=abort_reason,
+                )
                 break
-            phase_exit_codes[phase] = 0 if all(r.status == "passed" for r in execute_outcome.results) else 1
+            phase_exit_codes[phase] = execute_outcome.exit_code()
         elif phase == "validate":
-            from tests.uat.phases.validate import ValidatePhaseError, run_validate
+            from tests.uat.phases.validate import run_validate
 
-            validate_cfg = config.raw.get("validate") or {}
             if execute_outcome is None:
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = "validate phase requires execute phase to have run"
+                _emit_abort_artifacts(
+                    config=config,
+                    log_dir=log_dir,
+                    attempted=(),
+                    execute_outcome=execute_outcome,
+                    source_info=source_info,
+                    aborted_phase=phase,
+                    abort_reason=abort_reason,
+                )
                 break
             result_paths = [r.result_path for r in execute_outcome.results if r.result_path]
             output_tsv = log_dir / "validator_rollup.tsv"
-            try:
-                vr = run_validate(
-                    result_paths,
-                    output_tsv=output_tsv,
-                    floor=float(validate_cfg.get("validator_clean_rate_floor", 0.80)),
-                )
-                phase_exit_codes[phase] = vr.exit_code()
-                validator_rollup_tsv = vr.rollup_tsv_path
-            except (FileNotFoundError, ValidatePhaseError) as exc:
-                phase_exit_codes[phase] = 2
+            vr = run_validate(
+                result_paths,
+                output_tsv=output_tsv,
+                floor=config.validate.validator_clean_rate_floor,
+            )
+            phase_exit_codes[phase] = vr.exit_code()
+            validator_rollup_tsv = vr.rollup_tsv_path
+            if vr.aborted:
                 aborted_phase = phase
-                abort_reason = str(exc)
+                abort_reason = vr.abort_reason
+                _emit_abort_artifacts(
+                    config=config,
+                    log_dir=log_dir,
+                    attempted=(),
+                    execute_outcome=execute_outcome,
+                    source_info=source_info,
+                    aborted_phase=phase,
+                    abort_reason=abort_reason,
+                )
                 break
         elif phase == "package":
             from tests.uat.phases.package import run_package
@@ -357,6 +409,15 @@ def run_sweep(  # noqa: C901
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = "package phase requires execute phase to have run"
+                _emit_abort_artifacts(
+                    config=config,
+                    log_dir=log_dir,
+                    attempted=(),
+                    execute_outcome=execute_outcome,
+                    source_info=source_info,
+                    aborted_phase=phase,
+                    abort_reason=abort_reason,
+                )
                 break
             result_paths = [r.result_path for r in execute_outcome.results if r.result_path]
             submissions_dir = Path(
@@ -370,24 +431,33 @@ def run_sweep(  # noqa: C901
                 submissions_dir=submissions_dir,
             )
             phase_exit_codes[phase] = pr.exit_code()
+            if pr.aborted:
+                aborted_phase = phase
+                abort_reason = pr.abort_reason
+                _emit_abort_artifacts(
+                    config=config,
+                    log_dir=log_dir,
+                    attempted=(),
+                    execute_outcome=execute_outcome,
+                    source_info=source_info,
+                    aborted_phase=phase,
+                    abort_reason=abort_reason,
+                )
+                break
         elif phase == "explorer_smoke":
             from tests.uat.phases.explorer_smoke import run_explorer_smoke
 
-            es_cfg = config.raw.get("explorer_smoke") or {}
             bundles_dir = submissions_dir if submissions_dir is not None else log_dir / "bundles"
             result = run_explorer_smoke(
                 bundles_dir=bundles_dir,
                 output_dir=log_dir / "explorer_data",
                 log_dir=log_dir,
-                playwright_browsers=tuple(es_cfg.get("playwright_browsers", ["chromium"])),
+                playwright_browsers=config.explorer_smoke.playwright_browsers,
             )
             phase_exit_codes[phase] = result.exit_code()
         elif phase == "report":
-            report_cfg = config.raw.get("report") or {}
-            tsv_path = log_dir / report_cfg.get("matrix_summary_tsv", "matrix_summary.tsv")
+            tsv_path = log_dir / config.report.matrix_summary_tsv
             cells = execute_outcome.results if execute_outcome else []
-            scales_cfg = config.raw.get("scales") or {}
-            rungs = scales_cfg.get("rungs")
             # Wire validator status into the cross-scale check when a
             # validate phase ran earlier in this sweep. Without this,
             # cross_scale_clean_pair_count silently degrades to a
@@ -396,13 +466,17 @@ def run_sweep(  # noqa: C901
             summary = report_phase.write_report(
                 cells,
                 output_path=tsv_path,
-                rungs=[float(r) for r in rungs] if rungs else None,
-                cross_scale_floor=report_cfg.get("cross_scale_coverage_min_pairs"),
+                rungs=list(config.scales.rungs),
+                cross_scale_floor=config.report.cross_scale_coverage_min_pairs,
                 validator_status_by_path=validator_status_by_path,
                 compatibility_pruned_count=(
                     len(getattr(execute_outcome, "compatibility_pruned", ())) if execute_outcome else 0
                 ),
                 early_stop_pruned_count=(len(getattr(execute_outcome, "pruned", ())) if execute_outcome else 0),
+                skipped_unreachable_count=(
+                    len(getattr(execute_outcome, "skipped_unreachable", ())) if execute_outcome else 0
+                ),
+                source_info=source_info,
             )
             phase_exit_codes[phase] = summary.exit_code()
 
@@ -423,6 +497,180 @@ def _validator_status_by_path(validator_rollup_tsv: Path | None) -> dict[Path, s
     return parse_validator_status_by_path(validator_rollup_tsv)
 
 
+def _emit_abort_artifacts(
+    *,
+    config: UATConfig,
+    log_dir: Path,
+    attempted: Iterable[CellResult],
+    execute_outcome: Any,
+    source_info: RunSourceInfo,
+    aborted_phase: str,
+    abort_reason: str | None,
+    skipped_unreachable_count: int | None = None,
+) -> None:
+    cells = tuple(getattr(execute_outcome, "results", ())) if execute_outcome is not None else tuple(attempted)
+    compatibility_pruned = (
+        tuple(getattr(execute_outcome, "compatibility_pruned", ()))
+        if execute_outcome is not None
+        else _compatibility_pruned_for_config(config)
+    )
+    early_stop_pruned_count = len(getattr(execute_outcome, "pruned", ())) if execute_outcome is not None else 0
+    # When the execute outcome is available, derive the unreachable count from
+    # it; otherwise (e.g. a mid-sweep DiskFloorAbort that bypassed the normal
+    # return) fall back to the count threaded in via `skipped_unreachable_count`
+    # so the abort report still reflects platforms skipped before the abort.
+    if skipped_unreachable_count is None:
+        skipped_unreachable_count = (
+            len(getattr(execute_outcome, "skipped_unreachable", ())) if execute_outcome is not None else 0
+        )
+    _write_cells_jsonl(
+        log_dir / "cells.jsonl",
+        cells,
+        source_info=source_info,
+        skipped_unreachable_count=skipped_unreachable_count,
+    )
+    _write_compatibility_pruned_jsonl(log_dir / "compatibility_pruned.jsonl", compatibility_pruned)
+    report_phase.write_report(
+        cells,
+        output_path=_partial_report_path(log_dir / config.report.matrix_summary_tsv),
+        rungs=list(config.scales.rungs),
+        cross_scale_floor=config.report.cross_scale_coverage_min_pairs,
+        compatibility_pruned_count=len(compatibility_pruned),
+        early_stop_pruned_count=early_stop_pruned_count,
+        skipped_unreachable_count=skipped_unreachable_count,
+        source_info=source_info,
+        run_status="ABORTED",
+        abort_phase=aborted_phase,
+        abort_reason=abort_reason,
+    )
+
+
+def _partial_report_path(path: Path) -> Path:
+    if path.suffix:
+        return path.with_name(f"{path.stem}.partial{path.suffix}")
+    return path.with_name(f"{path.name}.partial")
+
+
+def _compatibility_pruned_for_config(config: UATConfig) -> tuple[Any, ...]:
+    return tuple(exec_phase.enumerate_cells_with_pruning(config).compatibility_pruned)
+
+
+def _cells_accounting_path(cells_jsonl: Path) -> Path:
+    """Sidecar that persists accounting counts not representable as cell rows."""
+    return cells_jsonl.with_name(cells_jsonl.name + ".accounting.json")
+
+
+def _write_cells_jsonl(
+    path: Path,
+    cells: Iterable[CellResult],
+    *,
+    source_info: RunSourceInfo,
+    skipped_unreachable_count: int = 0,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # The skipped-unreachable cells are `Cell` records (not `CellResult` rows)
+    # and are therefore not part of the JSONL stream. Persist their count in a
+    # sidecar so a report regenerated from `cells.jsonl` (make uat-report) can
+    # read it back and keep `total_defined` faithful.
+    accounting_path = _cells_accounting_path(path)
+    with accounting_path.open("w", encoding="utf-8") as acc_fh:
+        json.dump({"skipped_unreachable_count": int(skipped_unreachable_count)}, acc_fh)
+        acc_fh.write("\n")
+    with path.open("w", encoding="utf-8") as fh:
+        for cell in cells:
+            terminal_state = report_phase.terminal_state(cell)
+            failure_tail = _persist_cell_failure_context(cell, terminal_state=terminal_state)
+            fh.write(
+                json.dumps(
+                    {
+                        "platform": cell.platform,
+                        "benchmark": cell.benchmark,
+                        "scale": cell.scale,
+                        "status": cell.status,
+                        "terminal_state": terminal_state,
+                        "submit_terminal_state": cell.submit_terminal_state,
+                        "timed_out": cell.status == "timed-out",
+                        "exit_code": cell.exit_code,
+                        "elapsed_s": cell.elapsed_s,
+                        "log_path": str(cell.log_path),
+                        "result_path": (str(cell.result_path) if cell.result_path else None),
+                        "failure_tail": failure_tail,
+                        "source_commit_sha": source_info.commit_sha,
+                        "source_commit_short_sha": source_info.commit_short_sha,
+                        "source_dirty": source_info.dirty,
+                    }
+                )
+                + "\n"
+            )
+
+
+def _write_compatibility_pruned_jsonl(path: Path, cells: Iterable[Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
+        for cell in cells:
+            fh.write(
+                json.dumps(
+                    {
+                        "platform": cell.platform,
+                        "benchmark": cell.benchmark,
+                        "scale": cell.scale,
+                        "status": "compatibility-pruned",
+                        "rule_id": cell.rule_id,
+                        "rule_status": cell.status,
+                        "reason": cell.reason,
+                        "evidence": cell.evidence,
+                    }
+                )
+                + "\n"
+            )
+
+
+def _persist_cell_failure_context(cell: CellResult, *, terminal_state: str) -> str:
+    if cell.status == "passed" and cell.result_path is not None:
+        return ""
+    log_path = Path(cell.log_path)
+    tail = _cell_log_tail(log_path)
+    if log_path.exists():
+        if not _cell_log_has_marker(log_path):
+            with log_path.open("a", encoding="utf-8") as fh:
+                fh.write(
+                    f"# UAT_TERMINAL_STATE terminal_state={terminal_state} "
+                    f"status={cell.status} exit_code={cell.exit_code} "
+                    f"result_path={cell.result_path or ''}\n"
+                )
+                fh.write(f"# UAT_FAILURE_TAIL_START max_lines={FAILURE_TAIL_LINES}\n")
+                fh.write((tail or "(no subprocess output captured)") + "\n")
+                fh.write("# UAT_FAILURE_TAIL_END\n")
+    return tail
+
+
+def _cell_log_tail(log_path: Path) -> str:
+    if not log_path.exists():
+        return ""
+    lines: deque[str] = deque(maxlen=FAILURE_TAIL_LINES)
+    with log_path.open(encoding="utf-8", errors="replace") as fh:
+        for raw_line in fh:
+            line = raw_line.rstrip("\n")
+            if line.startswith("# UAT_"):
+                break
+            if line.startswith("# "):
+                continue
+            if line.strip():
+                lines.append(line)
+    tail = "\n".join(lines)
+    if len(tail) > FAILURE_TAIL_CHARS:
+        return tail[-FAILURE_TAIL_CHARS:]
+    return tail
+
+
+def _cell_log_has_marker(log_path: Path) -> bool:
+    with log_path.open(encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if line.startswith("# UAT_TERMINAL_STATE "):
+                return True
+    return False
+
+
 def run_sweep_from_path(
     config_path: Path,
     *,
@@ -433,14 +681,15 @@ def run_sweep_from_path(
     """Convenience wrapper for `make uat-sweep` and `make uat-stress`."""
     config = load_config(config_path)
     if stress_overrides:
-        config = apply_stress_overrides(
-            config,
-            platform=stress_overrides.get("platform"),
-            benchmark=stress_overrides.get("benchmark"),
-            scale=stress_overrides.get("scale"),
-        )
+        platform = stress_overrides.get("platform")
+        benchmark = stress_overrides.get("benchmark")
+        scale = stress_overrides.get("scale")
+        if platform is not None:
+            config = replace(config, platforms=replace(config.platforms, groups=(), include=(str(platform),)))
+        if benchmark is not None:
+            config = replace(config, benchmarks=replace(config.benchmarks, groups=(), include=(str(benchmark),)))
+        if scale is not None:
+            config = replace(config, scales=replace(config.scales, override=float(scale)))
     if dry_run_override is not None:
-        raw = dict(config.raw)
-        raw["dry_run"] = dry_run_override
-        config = replace(config, dry_run=dry_run_override, raw=raw)
+        config = replace(config, dry_run=dry_run_override)
     return run_sweep(config, resume_manifest=resume_manifest)

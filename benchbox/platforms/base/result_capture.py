@@ -15,22 +15,27 @@ Extracted from `benchbox.platforms.base.adapter` per the refactor map
 
 Instance attributes these methods read (initialized on the host adapter):
 - `query_plans_captured`, `plan_capture_failures`, `plan_capture_errors`
-- `capture_plans`, `plan_query_filter`, `plan_first_n`,
-  `plan_sampling_rate`, `plan_capture_timeout_seconds`,
-  `strict_plan_capture`, `_plan_capture_iteration_counts`
+- `capture_plans`, `analyze_plans`, `plan_query_filter`,
+  `plan_capture_timeout_seconds`, `strict_plan_capture`
 - `show_query_plans`, `enable_validation`
 - `platform_name` (property), `logger`
+- `platform_config` (raw config dict). Read for the raw_explain_output retention
+  policy via the optional ``plan_raw_output`` (full|truncated|none, default
+  truncated) and ``plan_raw_output_max_bytes`` (default 16 KiB) keys. The policy
+  governs only the verbatim EXPLAIN text retained on each captured plan; the
+  structured DAG and ``plan_fingerprint`` are always retained.
 """
 
 from __future__ import annotations
 
-import concurrent.futures
+import hashlib
 import logging
 import math
 import os
 import platform
-import random
+import re
 import statistics
+import threading
 import time
 from collections.abc import Mapping
 from datetime import datetime
@@ -43,6 +48,11 @@ from benchbox.core.results.builder import (
     normalize_benchmark_id,
 )
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT
+from benchbox.core.results.query_plan_models import (
+    DEFAULT_PLAN_MAX_DEPTH,
+    DEFAULT_RAW_OUTPUT_MAX_BYTES,
+    DEFAULT_RAW_OUTPUT_POLICY,
+)
 from benchbox.platforms.base.models import (
     PowerTestPhase,
     QueryExecution,
@@ -54,6 +64,7 @@ from benchbox.platforms.base.runtime_metadata import build_default_normalized_re
 from benchbox.platforms.base.utils import is_non_interactive
 from benchbox.utils.clock import elapsed_seconds
 from benchbox.utils.printing import quiet_console
+from benchbox.utils.timeout_manager import run_with_timeout
 
 try:
     from benchbox.core.results.models import ExecutionPhases, QueryDefinition
@@ -65,6 +76,179 @@ try:
     from benchbox.core.validation import ValidationResult
 except ImportError:  # pragma: no cover - validation always present in real install
     ValidationResult = None  # type: ignore[assignment, misc]
+
+
+# A data-changing verb at the very start of the statement (word-bounded so an
+# identifier like ``COPYRIGHTS`` or ``MERGEABLE`` is not misread as DML).
+# REPLACE and UPSERT (MySQL/SingleStore/Doris family ``REPLACE INTO``/
+# ``UPSERT INTO``) are included defensively: no current ANALYZE-capturing
+# adapter emits a bare form of either today, but a future one would otherwise
+# be physically re-executed during capture, mutating data twice.
+_DML_LEADING_RE = re.compile(r"^(?:INSERT|UPDATE|DELETE|MERGE|COPY|REPLACE|UPSERT)\b", re.IGNORECASE)
+# A data-modifying verb anywhere — used only after a leading WITH to catch
+# CTE-prefixed DML (``WITH cte AS (...) INSERT INTO ...``). COPY is excluded:
+# it cannot appear inside a CTE, and its leading form is already caught above.
+# REPLACE requires a following INTO (unlike INSERT/UPDATE/DELETE/MERGE, which
+# match bare): REPLACE is also a common SQL string function
+# (``replace(col, 'a', 'b')``), so a bare-word match would false-positive on
+# any read-only CTE query that happens to call it, suppressing ANALYZE for a
+# statement that writes nothing. UPSERT has no such overloaded meaning, but is
+# held to the same ``INTO``-qualified form for consistency.
+_DML_AFTER_CTE_RE = re.compile(r"\b(?:INSERT|UPDATE|DELETE|MERGE)\b|\b(?:REPLACE|UPSERT)\s+INTO\b", re.IGNORECASE)
+# Write-producing DDL prefixes: CREATE TABLE ... AS <query> (CTAS) and
+# CREATE MATERIALIZED VIEW ... AS <query>. Both materialize the query's rows,
+# so EXPLAIN ANALYZE would write them a second time. The prefix alone is not
+# enough — _has_top_level_keyword() must also find a paren-depth-0 ``AS``
+# introducing a query, which keeps plain column DDL out: a generated column's
+# ``GENERATED ALWAYS AS (expr)`` and any literal text like ``DEFAULT 'AS
+# SELECT'`` sit inside the column-definition parentheses, so they never match.
+_CREATE_TABLE_PREFIX_RE = re.compile(
+    r"^CREATE\s+(?:OR\s+REPLACE\s+)?(?:GLOBAL\s+|LOCAL\s+)?(?:TEMP(?:ORARY)?\s+|UNLOGGED\s+)?TABLE\b",
+    re.IGNORECASE,
+)
+_CREATE_MATERIALIZED_VIEW_PREFIX_RE = re.compile(
+    r"^CREATE\s+(?:OR\s+REPLACE\s+)?MATERIALIZED\s+VIEW\b",
+    re.IGNORECASE,
+)
+# ``AS`` introducing a query body: optionally parenthesized SELECT/WITH/VALUES/
+# TABLE/FROM (DuckDB allows ``CREATE TABLE t AS FROM s``; PostgreSQL allows
+# ``CREATE TABLE t2 AS TABLE t1``).
+_AS_QUERY_RE = re.compile(r"AS\s*\(*\s*(?:SELECT|WITH|VALUES|TABLE|FROM)\b", re.IGNORECASE)
+_SELECT_LEADING_RE = re.compile(r"^SELECT\b", re.IGNORECASE)
+_WITH_LEADING_RE = re.compile(r"^WITH\b", re.IGNORECASE)
+_WORD_CHARS_RE = re.compile(r"\w")
+
+
+def _plan_capture_key(query_id: Any, sql: str) -> str:
+    """Return a stable internal key for a measured query id + executed SQL pair."""
+    sql_digest = hashlib.sha256(str(sql).encode("utf-8")).hexdigest()[:16]
+    return f"{query_id}#{sql_digest}"
+
+
+# Matches the ``#<16-hex-digest>`` suffix that ``_plan_capture_key`` appends, so the
+# public query id can be recovered from an internal capture key for filter matching
+# (the isolated phase keys queries by the internal key, not the user-facing id).
+_PLAN_CAPTURE_KEY_SUFFIX_RE = re.compile(r"#[0-9a-f]{16}$")
+
+
+def _plan_capture_public_id(query_id: str) -> str:
+    """Recover the public query id from a capture key (``<public>#<digest>``).
+
+    ``--plan-queries`` filters on user-facing ids (``q1``), but the isolated
+    capture phase passes the internal :func:`_plan_capture_key` as the capture
+    query id. Stripping only the exact 16-hex digest suffix leaves a genuine
+    ``#``-bearing id untouched unless it actually ends in a capture digest.
+    """
+    return _PLAN_CAPTURE_KEY_SUFFIX_RE.sub("", query_id)
+
+
+def _has_top_level_keyword(statement: str, keyword: str, followed_by: re.Pattern[str] | None = None) -> bool:
+    """Return True when ``keyword`` appears at paren depth 0 outside quotes.
+
+    Used to find the statement-level ``INTO`` of ``SELECT ... INTO <table>``
+    and the statement-level ``AS`` of CTAS / CREATE MATERIALIZED VIEW. The
+    scan skips single-quoted string literals (including ``''`` escapes) and
+    double-quoted identifiers, and ignores anything inside parentheses, so a
+    subquery's text, a literal like ``'INTO'``, or a generated-column ``AS``
+    in a column list never triggers a match. When ``followed_by`` is given,
+    the keyword only counts if that pattern matches at the keyword's position.
+    """
+    keyword = keyword.upper()
+    klen = len(keyword)
+    depth = 0
+    i = 0
+    n = len(statement)
+    while i < n:
+        ch = statement[i]
+        if ch == "'":
+            i += 1
+            while i < n:
+                if statement[i] == "'":
+                    if i + 1 < n and statement[i + 1] == "'":  # escaped '' inside literal
+                        i += 2
+                        continue
+                    break
+                i += 1
+        elif ch == '"':
+            i += 1
+            while i < n and statement[i] != '"':
+                i += 1
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif depth == 0 and ch.upper() == keyword[0] and statement[i : i + klen].upper() == keyword:
+            before_ok = i == 0 or not _WORD_CHARS_RE.match(statement[i - 1])
+            after_ok = i + klen >= n or not _WORD_CHARS_RE.match(statement[i + klen])
+            if before_ok and after_ok and (followed_by is None or followed_by.match(statement, i)):
+                return True
+        i += 1
+    return False
+
+
+def _strip_leading_sql_comments(statement: str) -> str:
+    """Drop leading ``--`` line comments and ``/* */`` block comments + whitespace."""
+    statement = statement.lstrip()
+    while True:
+        if statement.startswith("--"):
+            newline_pos = statement.find("\n")
+            if newline_pos == -1:
+                return ""
+            statement = statement[newline_pos + 1 :].lstrip()
+        elif statement.startswith("/*"):
+            end = statement.find("*/")
+            if end == -1:
+                return ""
+            statement = statement[end + 2 :].lstrip()
+        else:
+            return statement
+
+
+def is_dml_query(query: str) -> bool:
+    """Return True for statements that write data when executed.
+
+    Used to guard plan capture against double-execution: adapters that capture
+    plans via ``EXPLAIN ANALYZE`` (DuckDB, MotherDuck, PostgreSQL) physically
+    re-run the statement, so a data-writing query would mutate data twice.
+    Callers downgrade to a non-ANALYZE ``EXPLAIN`` for these statements.
+
+    Detection covers the data-modifying verbs INSERT/UPDATE/DELETE/MERGE/COPY/
+    REPLACE/UPSERT (including when they are preceded by a leading ``WITH`` CTE
+    clause) and the write-producing DDL shapes that materialize a query's rows:
+
+    - ``CREATE [OR REPLACE] TABLE ... AS <query>`` (CTAS)
+    - ``CREATE [OR REPLACE] MATERIALIZED VIEW ... AS <query>``
+    - ``SELECT ... INTO <table>``
+
+    Non-writing DDL (plain ``CREATE TABLE`` with column definitions,
+    ``CREATE INDEX``, ``DROP``, ``ALTER``, ``TRUNCATE``) is intentionally
+    excluded: re-running its EXPLAIN writes no rows, so it keeps ANALYZE where
+    applicable. Leading line and block comments are stripped first so a
+    commented preamble (e.g. a ``/* query 12 */`` banner) does not mask the
+    verb.
+    """
+    statement = _strip_leading_sql_comments(query)
+    if not statement:
+        return False
+    if _DML_LEADING_RE.match(statement):
+        return True
+    # CTE-prefixed DML: the data-modifying verb follows the CTE definitions, so a
+    # leading-verb check alone misses it. Conservatively treat a WITH-prefixed
+    # statement that contains a DML verb as DML — worst case a read-only CTE
+    # query loses ANALYZE stats, which is far cheaper than a double mutation.
+    if _WITH_LEADING_RE.match(statement) and _DML_AFTER_CTE_RE.search(statement):
+        return True
+    # Write-producing DDL: CTAS and CREATE MATERIALIZED VIEW ... AS materialize
+    # the query's result rows, so EXPLAIN ANALYZE would write the data twice
+    # (or fail on "table already exists" for the non-REPLACE form).
+    if (
+        _CREATE_TABLE_PREFIX_RE.match(statement) or _CREATE_MATERIALIZED_VIEW_PREFIX_RE.match(statement)
+    ) and _has_top_level_keyword(statement, "AS", followed_by=_AS_QUERY_RE):
+        return True
+    # SELECT ... INTO <table> writes its result rows into a new table.
+    if _SELECT_LEADING_RE.match(statement) and _has_top_level_keyword(statement, "INTO"):
+        return True
+    return False
 
 
 def _extract_result_field(result: Any, attr: str, default: Any = None) -> Any:
@@ -320,6 +504,20 @@ class ResultCaptureMixin:
         self.query_plans_captured = 0
         self.plan_capture_failures = 0
         self.plan_capture_errors: list[dict[str, Any]] = []
+        # Isolated-phase recording buffer (see _execute_queries_by_type): cleared per
+        # run for symmetry with the other plan-capture state, so a prior run's
+        # recorded queries can never leak into the next.
+        self._plan_capture_phase_active = False
+        self._phase_recorded_queries: dict[str, str] = {}
+        # Guards the one-time analyze_plans=True re-execution notice in
+        # capture_query_plan; reset per run so each run gets its own notice.
+        self._analyze_plans_notice_printed = False
+        # The lock is created in PlatformAdapter.__init__; create it defensively
+        # for hosts that reset stats without going through __init__ (e.g. tests
+        # that mix in this class directly). Reset runs before any worker threads
+        # spawn, so installing the lock here is safe.
+        if not hasattr(self, "_plan_capture_lock"):
+            self._plan_capture_lock = threading.Lock()
 
     def get_normalized_result_metadata(
         self,
@@ -557,19 +755,92 @@ class ResultCaptureMixin:
                 details=message,
             )
 
+    def _resolve_raw_output_policy(self, query_id: str) -> tuple[str, int]:
+        """Resolve the raw_explain_output retention policy from ``platform_config``.
+
+        Read from ``platform_config`` (rather than a promoted ``self.<attr>``) so the
+        policy stays within the plan-serialization layer. A non-positive or
+        non-integer ``plan_raw_output_max_bytes`` is treated as misconfiguration and
+        falls back to the default cap with a warning, rather than silently nulling all
+        raw text (which a non-positive cap under the truncated policy would do).
+
+        Returns:
+            Tuple of (policy, max_bytes). Unknown policy values are normalized to the
+            default by ``apply_raw_output_policy``.
+        """
+        plan_config = getattr(self, "platform_config", None) or {}
+        policy = plan_config.get("plan_raw_output", DEFAULT_RAW_OUTPUT_POLICY)
+        configured_max_bytes = plan_config.get("plan_raw_output_max_bytes", DEFAULT_RAW_OUTPUT_MAX_BYTES)
+        try:
+            parsed_max_bytes = int(configured_max_bytes)
+        except (TypeError, ValueError):
+            parsed_max_bytes = None
+        if parsed_max_bytes is not None and parsed_max_bytes > 0:
+            return policy, parsed_max_bytes
+        if configured_max_bytes != DEFAULT_RAW_OUTPUT_MAX_BYTES:
+            self.logger.warning(
+                "Invalid plan_raw_output_max_bytes %r for %s; using default %d bytes.",
+                configured_max_bytes,
+                query_id,
+                DEFAULT_RAW_OUTPUT_MAX_BYTES,
+            )
+        return policy, DEFAULT_RAW_OUTPUT_MAX_BYTES
+
     def capture_query_plan(self, connection: Any, query: str, query_id: str) -> tuple[Any, float]:
         """Capture structured query plan using platform-specific parser.
 
         Calls get_query_plan() to obtain EXPLAIN output and parses it into a QueryPlanDAG.
         Returns timing information for observability of capture overhead.
 
-        By default (analyze_plans=True), DuckDB uses EXPLAIN (ANALYZE, FORMAT JSON) which
-        re-executes the query to capture actual per-operator timing and cardinality.
-        Set analyze_plans=False in the adapter config to use plain EXPLAIN (FORMAT JSON)
-        for estimated-plan-only capture with no re-execution overhead.
+        By default (analyze_plans=False), DuckDB uses plain EXPLAIN (FORMAT JSON), which
+        captures the estimated plan without re-executing the query. Set
+        analyze_plans=True in the adapter config to opt into EXPLAIN (ANALYZE, FORMAT
+        JSON), which re-executes every captured SELECT once to include actual
+        per-operator timing and cardinality -- roughly 2x wall-clock cost for a
+        --capture-plans run and perturbed cache state. The first time this method
+        actually captures a plan with analyze_plans enabled for a run, it prints a
+        one-time notice (see the ``_analyze_plans_notice_printed`` guard below).
 
         Plan fingerprints exclude timing/cardinality by design - structural comparisons
-        are unaffected by this setting.
+        are unaffected by this setting. See the plan fingerprint stability contract in
+        ``benchbox/core/results/query_plan_models.py`` for what fingerprint equality
+        does and does not guarantee.
+
+        Capture timing (pre- vs. post-execution) — design decision:
+            All adapters capture the plan AFTER the timed execution block (the
+            "post-execution" plan). This is intentional and is the supported
+            default:
+              - With ``analyze_plans=True`` (opt-in) it yields the *actual* plan that
+                ran, including real per-operator timing/cardinality (EXPLAIN ANALYZE) —
+                the most useful artifact for profiling, at the cost of re-execution.
+              - The structural fingerprint is unaffected by post- vs. pre-execution
+                timing, because it excludes costs and row estimates. A plan captured
+                before vs. after execution hashes to the same fingerprint as long as
+                the planner's chosen shape is identical.
+            A pre-execution capture mode (plan as decided before any stats change)
+            would be marginally more stable for cross-run regression detection, but
+            is NOT implemented: the fingerprint's stats-independence already provides
+            that stability, so a separate timing mode is unnecessary. If a true
+            pre-execution plan is ever required, add an opt-in
+            ``capture_plan_timing: pre | post`` config (default ``post``) here rather
+            than changing the default behavior.
+
+        Multi-stream behavior (stream_id):
+            Plan capture is per-query-execution. In a multi-stream (concurrent)
+            run, each stream executes and captures its own plan independently, so
+            the result set contains one plan record per (query_id, stream_id) — the
+            plans are NOT deduplicated or averaged, preserving per-stream provenance.
+            Because the fingerprint is structural, every stream running the same
+            query against the same schema on the same engine version is expected to
+            produce the SAME plan_fingerprint (with the engine-dependent caveat in
+            query_plan_models.py that some parsers, e.g. DuckDB, fold an estimated
+            cardinality into the signature — identical across streams as long as the
+            cardinality estimate is stable). Only the execution stats
+            (timing/per-operator cardinality) differ between streams. Consumers that
+            want a single representative plan per query should deduplicate by
+            ``plan_fingerprint``; a fingerprint mismatch across streams of the same
+            query indicates a genuine plan-shape (or estimate) divergence worth
+            investigating.
 
         Args:
             connection: Database connection
@@ -582,45 +853,56 @@ class ResultCaptureMixin:
         if not self.capture_plans:
             return None, 0.0
 
-        # Apply query filter if specified
-        if self.plan_query_filter and query_id not in self.plan_query_filter:
+        # Apply query filter if specified. This is query *selection* (which queries
+        # to capture), orthogonal to the retired per-iteration/per-stream sampling
+        # machinery: the canonical model captures each distinct query exactly once
+        # in the isolated post-measurement phase, so plan_first_n / plan_sampling_rate
+        # no longer exist.
+        # Match the filter against the public query id. The isolated capture
+        # phase passes the internal capture key (``<public>#<digest>``) as the
+        # capture query id, so filtering on the raw value would reject a normal
+        # ``--plan-queries q1`` and silently produce no plans. Fall back to the
+        # public id recovered from the key; the inline path passes a bare public
+        # id, which is unchanged by the recovery.
+        if self.plan_query_filter and (
+            query_id not in self.plan_query_filter and _plan_capture_public_id(query_id) not in self.plan_query_filter
+        ):
             return None, 0.0
 
-        # Apply first-N iterations filter if specified
-        if self.plan_first_n is not None:
-            iteration = self._plan_capture_iteration_counts.get(query_id, 0)
-            self._plan_capture_iteration_counts[query_id] = iteration + 1
-            if iteration >= self.plan_first_n:
-                return None, 0.0
-
-        # Apply sampling rate if specified
-        if self.plan_sampling_rate is not None:
-            if random.random() > self.plan_sampling_rate:
-                return None, 0.0
+        # ANALYZE re-execution is an explicit opt-in (analyze_plans defaults to
+        # False): print a one-time run-level notice the first time this path is
+        # about to actually capture a plan with it enabled, so a user who set
+        # analyze_plans=True is not surprised that --capture-plans runs now cost
+        # ~2x wall-clock and perturb cache state. Guarded by a per-run flag reset
+        # in _reset_plan_capture_stats so a fresh run gets its own notice.
+        if self.analyze_plans and not getattr(self, "_analyze_plans_notice_printed", False):
+            self._analyze_plans_notice_printed = True
+            quiet_console.print(
+                "[bold yellow]Notice:[/bold yellow] plan capture re-executes each query "
+                "(analyze_plans=True); timings are not comparable to non-capture runs."
+            )
 
         start_time = time.perf_counter()
 
+        # Apply timeout protection for the EXPLAIN query. run_with_timeout runs
+        # get_query_plan on a daemon thread and returns promptly when the timeout
+        # fires. (The previous `with ThreadPoolExecutor` implementation blocked in
+        # shutdown(wait=True) on exit even after TimeoutError, so the timeout was
+        # cosmetic: a runaway EXPLAIN still stalled the caller until the database
+        # returned.) Trade-off, accepted by design: after a timeout the abandoned
+        # EXPLAIN thread keeps running — holding the connection — until the
+        # database returns, so a subsequent query issued on the same connection
+        # may contend with it. The previous behavior (stalling the runner for the
+        # full EXPLAIN duration) was strictly worse; full isolation is tracked by
+        # query-plan-capture-isolation-phase-design.
         try:
-            # Apply timeout protection for EXPLAIN query
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(self.get_query_plan, connection, query)
-                try:
-                    explain_output = future.result(timeout=self.plan_capture_timeout_seconds)
-                except concurrent.futures.TimeoutError:
-                    capture_time_ms = (time.perf_counter() - start_time) * 1000
-                    self.logger.warning(
-                        "Query plan capture timed out for %s after %ds (%.2fms elapsed)",
-                        query_id,
-                        self.plan_capture_timeout_seconds,
-                        capture_time_ms,
-                    )
-                    self._record_plan_capture_failure(
-                        query_id,
-                        reason="timeout",
-                        message=f"EXPLAIN query timed out after {self.plan_capture_timeout_seconds}s",
-                        log_warning=False,
-                    )
-                    return None, capture_time_ms
+            explain_output, timed_out = run_with_timeout(
+                self.get_query_plan,
+                self.plan_capture_timeout_seconds,
+                f"plan capture EXPLAIN (query_id={query_id})",
+                connection,
+                query,
+            )
         except PlanCaptureError:
             raise
         except Exception as exc:
@@ -629,6 +911,23 @@ class ResultCaptureMixin:
                 query_id,
                 reason="explain_failed",
                 message=str(exc),
+            )
+            return None, capture_time_ms
+
+        if timed_out:
+            capture_time_ms = (time.perf_counter() - start_time) * 1000
+            self.logger.warning(
+                "Query plan capture timed out for %s after %ds (%.2fms elapsed); "
+                "the EXPLAIN may still be running on the connection until the database returns",
+                query_id,
+                self.plan_capture_timeout_seconds,
+                capture_time_ms,
+            )
+            self._record_plan_capture_failure(
+                query_id,
+                reason="timeout",
+                message=f"EXPLAIN query timed out after {self.plan_capture_timeout_seconds}s",
+                log_warning=False,
             )
             return None, capture_time_ms
 
@@ -679,14 +978,27 @@ class ResultCaptureMixin:
             )
             return None, capture_time_ms
 
+        # Apply the raw_explain_output retention policy before measuring bundle size,
+        # so the size guard reflects what is actually retained. The structured DAG and
+        # fingerprint are untouched; only the verbatim EXPLAIN text is governed.
+        raw_output_policy, raw_output_max_bytes = self._resolve_raw_output_policy(query_id)
+        plan.apply_raw_output_policy(raw_output_policy, raw_output_max_bytes)
+
         try:
-            size_kb = plan.estimate_serialized_size() / 1024
+            # Size the plan as it will actually be serialized: deep nodes past
+            # plan_max_depth become a truncation marker rather than dropping the plan.
+            size_kb = plan.estimate_serialized_size(max_depth=getattr(self, "plan_max_depth", DEFAULT_PLAN_MAX_DEPTH))
+            size_kb /= 1024
             if size_kb > 100:
-                self.logger.warning(
-                    "Large query plan for %s: %.1f KB. Consider using external plan storage.",
-                    query_id,
-                    size_kb,
+                # Only suggest a stricter raw-output policy when raw text is still
+                # retained; if it is already dropped the bloat is the structured DAG,
+                # which a smaller plan_max_depth bounds.
+                hint = (
+                    " Consider a stricter plan_raw_output policy (full|truncated|none)."
+                    if plan.raw_explain_output
+                    else " The structured plan tree itself is large; consider a smaller plan_max_depth."
                 )
+                self.logger.warning("Large query plan for %s: %.1f KB.%s", query_id, size_kb, hint)
         except SerializationError as exc:
             capture_time_ms = (time.perf_counter() - start_time) * 1000
             self._record_plan_capture_failure(
@@ -699,6 +1011,56 @@ class ResultCaptureMixin:
         capture_time_ms = (time.perf_counter() - start_time) * 1000
         self.query_plans_captured += 1
         return plan, capture_time_ms
+
+    def _merge_plan_capture_into_result(
+        self,
+        result: dict[str, Any],
+        connection: Any,
+        query: str,
+        query_id: str,
+    ) -> None:
+        """Capture the query plan and merge the plan fields into ``result`` in place.
+
+        Encapsulates the per-adapter plan-capture block so it lives in exactly one
+        place. The SUCCESS guard is baked in universally: capture only runs when
+        ``capture_plans`` is enabled and the result succeeded, so a validation-
+        failed result never triggers a wasted EXPLAIN round-trip.
+
+        No-op when ``capture_plans`` is False or ``result["status"]`` is not
+        ``"SUCCESS"``. On success, sets ``query_plan`` and ``plan_fingerprint`` when
+        a plan was parsed (plus ``plan_fingerprint_normalized`` when the adapter's
+        ``normalize_plan_literals`` option is enabled), and always records
+        ``plan_capture_time_ms`` when measured.
+
+        Args:
+            result: Result dict to mutate in place.
+            connection: Database connection.
+            query: SQL query text.
+            query_id: Query identifier.
+        """
+        if not getattr(self, "capture_plans", False) or result.get("status") != "SUCCESS":
+            return
+        if getattr(self, "_plan_capture_phase_active", False):
+            # Isolated-phase mode: do NOT run EXPLAIN inline (that would interleave
+            # capture with the timed query). Record the executed query so the
+            # post-measurement phase captures it exactly once per executed SQL.
+            # Written from concurrent throughput streams, so guard the buffer with
+            # the shared lock.
+            recorded_id = result.get("query_id") or query_id
+            if recorded_id is not None:
+                capture_key = _plan_capture_key(recorded_id, query)
+                result["_plan_capture_key"] = capture_key
+                with self._plan_capture_lock:
+                    self._phase_recorded_queries.setdefault(capture_key, query)
+            return
+        query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
+        if query_plan:
+            result["query_plan"] = query_plan
+            result["plan_fingerprint"] = query_plan.plan_fingerprint
+            if getattr(self, "normalize_plan_literals", False):
+                result["plan_fingerprint_normalized"] = query_plan.normalized_fingerprint
+        if plan_capture_time_ms is not None:
+            result["plan_capture_time_ms"] = plan_capture_time_ms
 
     def validate_loaded_data(self, connection: Any, benchmark_type: str, scale_factor: float) -> ValidationResult:
         """Validate database state after data loading using platform-specific methods.
@@ -919,6 +1281,7 @@ class ResultCaptureMixin:
         first_row: Any = None,
         validation_result: Any = None,
         error: str | None = None,
+        result_digest: str | None = None,
     ) -> dict[str, Any]:
         """Build query result dictionary with consistent validation field mapping.
 
@@ -932,6 +1295,9 @@ class ResultCaptureMixin:
             first_row: First row of results (optional)
             validation_result: ValidationResult from QueryValidator (optional)
             error: Error message if query failed (optional)
+            result_digest: Gate-only full-result value digest (optional). Present
+                only when BENCHBOX_EMIT_RESULT_DIGEST armed the value oracle; absent
+                on a normal run so the payload shape is unchanged.
 
         Returns:
             Dictionary with standardized query result fields
@@ -947,6 +1313,9 @@ class ResultCaptureMixin:
             "rows_returned": actual_row_count,
             "first_row": first_row,
         }
+
+        if result_digest is not None:
+            result_dict["result_digest"] = result_digest
 
         if error:
             result_dict["error"] = error
@@ -1397,6 +1766,29 @@ class ResultCaptureMixin:
             return True
         return False
 
+    def _log_plan_capture_summary(self, query_results: list[dict[str, Any]]) -> None:
+        """Log a "Query plans: N/M captured" summary using the same row-derived,
+        unique-query-id stat that ends up in ``BenchmarkResults.query_plans_captured``
+        and the ``.plans.json`` companion (see ``adapter.py``'s canonical
+        ``compute_plan_capture_stats`` call site).
+
+        ``self.query_plans_captured`` is a per-variant counter (one increment per
+        distinct captured SQL text, e.g. once per seed-varied stream), so it
+        legitimately exceeds the unique-query-id count on any multi-stream run;
+        printing it here would contradict what the bundle actually contains.
+        """
+        from benchbox.core.results.schema import compute_plan_capture_stats
+
+        plans_captured, capture_failures, _errors = compute_plan_capture_stats(
+            query_results, self.capture_plans, existing_errors=list(self.plan_capture_errors)
+        )
+        total_queries = plans_captured + capture_failures
+        summary_message = f"Query plans: {plans_captured}/{total_queries} captured"
+        if capture_failures:
+            summary_message = f"{summary_message}, {capture_failures} failed"
+        log_fn = self.logger.warning if capture_failures else self.logger.info
+        log_fn(summary_message)
+
     def _build_execution_phases(self, query_results, query_executions, run_config, setup_phase) -> tuple:
         """Build power/throughput test phases and return execution phases with metrics.
 
@@ -1410,12 +1802,7 @@ class ResultCaptureMixin:
         avg_time = total_exec_time / max(successful_queries, 1)
 
         if self.capture_plans:
-            total_queries_executed = len(query_results)
-            summary_message = f"Query plans: {self.query_plans_captured}/{total_queries_executed} captured"
-            if self.plan_capture_failures:
-                summary_message = f"{summary_message}, {self.plan_capture_failures} failed"
-            log_fn = self.logger.warning if self.plan_capture_failures else self.logger.info
-            log_fn(summary_message)
+            self._log_plan_capture_summary(query_results)
 
         # When a fallback occurred (e.g. throughput requested but unsupported),
         # _effective_execution_type reflects the actual execution shape.
@@ -1507,4 +1894,24 @@ class ResultCaptureMixin:
             },
             "sorted_ingestion": self.get_sorted_ingestion_metadata(),
         }
+        tuning_profile_metadata = self._build_tuning_profile_metadata(run_config)
+        if tuning_profile_metadata:
+            execution_metadata["tuning_profile"] = tuning_profile_metadata
         return execution_metadata, system_profile, anonymous_machine_id
+
+    def _build_tuning_profile_metadata(self, run_config: dict) -> dict[str, Any] | None:
+        """Build workload-profile tuning metadata without making result capture brittle."""
+        try:
+            from benchbox.core.tuning.profile_validation import build_tuning_profile_metadata
+
+            effective_config = self.get_effective_tuning_configuration()
+            return build_tuning_profile_metadata(
+                benchmark=run_config.get("benchmark_name"),
+                platform=getattr(self, "platform_name", None),
+                tuning_config=effective_config,
+            )
+        except Exception as exc:  # pragma: no cover - metadata must not fail result capture
+            logger = getattr(self, "logger", None)
+            if logger is not None:
+                logger.debug("Unable to build tuning profile metadata: %s", exc)
+            return None

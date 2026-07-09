@@ -11,18 +11,17 @@ from importlib import import_module
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union
 
-# __version__ must stay near the top because lazily imported submodules can
-# circle back to benchbox.cli.app, which reads it at module level.
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 from benchbox.base import BaseBenchmark
 from benchbox.flightdata import FlightData
-from benchbox.nyctaxi import NYCTaxi
 from benchbox.tpcds import TPCDS
 from benchbox.tpch import TPCH
 from benchbox.tpch_skew import TPCHSkew
 from benchbox.tpchavoc import TPCHavoc
 from benchbox.tsbs_devops import TSBSDevOps
+
+from . import platforms
 
 # Perform version consistency check on import (but don't fail - just warn)
 try:
@@ -48,7 +47,7 @@ if TYPE_CHECKING:
     from benchbox.coffeeshop import CoffeeShop
     from benchbox.h2odb import H2ODB
     from benchbox.joinorder import JoinOrder
-    from benchbox.nyctaxi import NYCTaxi as NYCTaxi_  # noqa: F401
+    from benchbox.nyctaxi import NYCTaxi
     from benchbox.read_primitives import ReadPrimitives
     from benchbox.ssb import SSB
     from benchbox.tpcdi import TPCDI
@@ -77,6 +76,7 @@ _BENCHMARK_REGISTRY: dict[str, _BenchmarkSpec] = {
     "WritePrimitives": _BenchmarkSpec("write_primitives", "WritePrimitives", ()),
     "TransactionPrimitives": _BenchmarkSpec("transaction_primitives", "TransactionPrimitives", ()),
     "JoinOrder": _BenchmarkSpec("joinorder", "JoinOrder", ("joinorder",)),
+    "NYCTaxi": _BenchmarkSpec("nyctaxi", "NYCTaxi", ()),
     "CoffeeShop": _BenchmarkSpec("coffeeshop", "CoffeeShop", ("coffeeshop",)),
     "DataVault": _BenchmarkSpec("datavault", "DataVault", ()),
     "TPCDSOBT": _BenchmarkSpec("tpcds_obt", "TPCDSOBT", ()),
@@ -150,9 +150,7 @@ def __getattr__(name: str) -> Any:
             return ImportError(f"Could not import {benchmark_name}")
 
     if name == "platforms":
-        module = import_module("benchbox.platforms")
-        globals()[name] = module
-        return module
+        return platforms
 
     if name in _PUBLIC_REEXPORTS:
         module_path, attr = _PUBLIC_REEXPORTS[name]

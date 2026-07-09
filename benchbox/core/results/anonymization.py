@@ -19,108 +19,29 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse
 
+import yaml
+
 logger = logging.getLogger(__name__)
 
 PUBLIC_REDACTED_VALUE = "<redacted>"
 
-_SECRET_KEY_PARTS = (
-    "password",
-    "token",
-    "secret",
-    "accesskey",
-    "privatekey",
-    "sessiontoken",
-    "connectionstring",
-    "credential",
-)
 
-_IDENTIFIER_KEYS = {
-    "account": "account",
-    "accountid": "account",
-    "accountname": "account",
-    "org": "organization",
-    "orgid": "organization",
-    "orgname": "organization",
-    "organization": "organization",
-    "organizationid": "organization",
-    "organizationname": "organization",
-    "project": "project",
-    "projectid": "project",
-    "workspace": "workspace",
-    "workspaceid": "workspace",
-    "warehouse": "warehouse",
-    "warehousename": "warehouse",
-    "workgroup": "workgroup",
-    "workgroupname": "workgroup",
-    "cluster": "cluster",
-    "clusterid": "cluster",
-    "clustername": "cluster",
-    "database": "database",
-    "databasename": "database",
-    "db": "database",
-    "dbname": "database",
-    "schema": "schema",
-    "schemaname": "schema",
-    "bucket": "bucket",
-    "bucketname": "bucket",
-    "prefix": "prefix",
-    "containerid": "container",
-    "containername": "container",
-    "username": "user",
-    "user": "user",
-    "userid": "user",
-    "role": "role",
-    "rolename": "role",
-    "rolearn": "role",
-    "iamrole": "role",
-    "iamrolearn": "role",
-    "arn": "arn",
-    "engine": "engine",
-    "enginename": "engine",
-    "clientid": "client",
-    "machineid": "machine",
-}
+def _load_anonymization_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("anonymization_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
-_ENDPOINT_KEYS = {
-    "host",
-    "hostname",
-    "server",
-    "endpoint",
-    "apiendpoint",
-    "serviceendpoint",
-    "workspacehost",
-    "workspaceurl",
-    "url",
-}
 
-_PATH_KEYS = {
-    "httppath",
-    "path",
-    "filepath",
-    "datapath",
-    "outputpath",
-    "databasepath",
-    "datadirectory",
-    "outputdirectory",
-    "sourceroot",
-    "staginglocation",
-    "stagingurl",
-    "s3stagingurl",
-    "outputlocation",
-    "credentialfile",
-}
+_ANONYMIZATION_SPECS = _load_anonymization_specs()
 
-_MOUNT_COLLECTION_KEYS = {"bindmounts", "volumes", "mounts"}
-_MOUNT_PATH_KEYS = {"source", "destination", "target"}
-_LOCAL_ENDPOINT_VALUES = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "[::1]"}
-_MESSAGE_KEYS = {
-    "message",
-    "errormessage",
-    "collectionerrormessage",
-    "exception",
-    "stderr",
-    "stdout",
-}
+_SECRET_KEY_PARTS = tuple(_ANONYMIZATION_SPECS["secret_key_parts"])
+_IDENTIFIER_KEYS = dict(_ANONYMIZATION_SPECS["identifier_keys"])
+_ENDPOINT_KEYS = set(_ANONYMIZATION_SPECS["endpoint_keys"])
+_PATH_KEYS = set(_ANONYMIZATION_SPECS["path_keys"])
+_MOUNT_COLLECTION_KEYS = set(_ANONYMIZATION_SPECS["mount_collection_keys"])
+_MOUNT_PATH_KEYS = set(_ANONYMIZATION_SPECS["mount_path_keys"])
+_LOCAL_ENDPOINT_VALUES = set(_ANONYMIZATION_SPECS["local_endpoint_values"])
+_MESSAGE_KEYS = set(_ANONYMIZATION_SPECS["message_keys"])
+
 _MESSAGE_PATH_RE = re.compile(
     r"(?<![A-Za-z0-9_])("
     r"(?:~|/Users|/home|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"

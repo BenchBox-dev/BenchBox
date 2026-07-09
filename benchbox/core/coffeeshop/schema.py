@@ -1,78 +1,26 @@
-"""Canonical CoffeeShop benchmark schema aligned with the reference generator.
-
-The CoffeeShop benchmark now models the three-table star schema provided by the
-reference generator (https://github.com/JosueBogran/coffeeshopdatageneratorv2).
-The schema includes two dimensions-``dim_locations`` and ``dim_products``-and a
-single ``order_lines`` fact table that applies the required order-line
-explosion. All previous dimension tables (customers, stores, staff, time_dim)
-and the legacy ``transactions`` fact table have been removed.
-
-The module exposes helper functions for rendering CREATE TABLE statements and
-for producing default tuning recommendations used by the BenchBox planners.
-"""
+"""Canonical CoffeeShop benchmark schema aligned with the reference generator."""
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, cast
+
+import yaml
 
 from benchbox.core.tuning import BenchmarkTunings, TableTuning, TuningColumn
 
-DIM_LOCATIONS = {
-    "name": "dim_locations",
-    "description": "Canonical list of reference store locations and regions.",
-    "row_count_formula": "len(vendored dim_locations seed file)",
-    "columns": [
-        {"name": "record_id", "type": "INTEGER", "primary_key": True},
-        {"name": "location_id", "type": "VARCHAR(16)"},
-        {"name": "city", "type": "VARCHAR(50)"},
-        {"name": "state", "type": "VARCHAR(10)"},
-        {"name": "country", "type": "VARCHAR(50)"},
-        {"name": "region", "type": "VARCHAR(20)"},
-    ],
-}
 
-DIM_PRODUCTS = {
-    "name": "dim_products",
-    "description": "Reference product catalog with seasonal availability windows.",
-    "row_count_formula": "len(vendored dim_products seed file)",
-    "columns": [
-        {"name": "record_id", "type": "INTEGER", "primary_key": True},
-        {"name": "product_id", "type": "INTEGER"},
-        {"name": "name", "type": "VARCHAR(120)"},
-        {"name": "category", "type": "VARCHAR(30)"},
-        {"name": "subcategory", "type": "VARCHAR(30)"},
-        {"name": "standard_cost", "type": "DECIMAL(8,2)"},
-        {"name": "standard_price", "type": "DECIMAL(8,2)"},
-        {"name": "from_date", "type": "DATE"},
-        {"name": "to_date", "type": "DATE"},
-    ],
-}
+def _load_schema_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("schema_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
-ORDER_LINES = {
-    "name": "order_lines",
-    "description": "Exploded order lines fact table with 1-5 lines per order.",
-    "row_count_formula": "50_000_000 * scale_factor * 1.5 (average lines per order)",
-    "columns": [
-        {"name": "order_id", "type": "BIGINT"},
-        {"name": "line_number", "type": "INTEGER"},
-        {"name": "location_record_id", "type": "INTEGER", "foreign_key": "dim_locations.record_id"},
-        {"name": "location_id", "type": "VARCHAR(16)"},
-        {"name": "product_record_id", "type": "INTEGER", "foreign_key": "dim_products.record_id"},
-        {"name": "product_id", "type": "INTEGER"},
-        {"name": "order_date", "type": "DATE"},
-        {"name": "order_time", "type": "TIME"},
-        {"name": "quantity", "type": "INTEGER"},
-        {"name": "unit_price", "type": "DECIMAL(8,2)"},
-        {"name": "total_price", "type": "DECIMAL(10,2)"},
-        {"name": "region", "type": "VARCHAR(20)"},
-    ],
-}
 
-TABLES: dict[str, dict] = {
-    "dim_locations": DIM_LOCATIONS,
-    "dim_products": DIM_PRODUCTS,
-    "order_lines": ORDER_LINES,
-}
+_SCHEMA_SPECS = _load_schema_specs()
+_TABLE_DEFS = {entry["id"]: entry for entry in _SCHEMA_SPECS["tables"]}
+globals().update({symbol: entry["schema"] for symbol, entry in _TABLE_DEFS.items()})
+
+TABLES: dict[str, dict] = {entry["key"]: globals()[symbol] for symbol, entry in _TABLE_DEFS.items()}
+_TABLE_ORDER = list(_SCHEMA_SPECS["table_order"])
 
 _SPARK_FAMILY_DIALECTS = {"spark", "lakesail", "pyspark", "velox", "databricks"}
 
@@ -122,24 +70,20 @@ def get_all_create_table_sql(
     enable_foreign_keys: bool = True,
 ) -> str:
     """Render CREATE TABLE statements for all CoffeeShop tables in dependency order."""
-    table_order = ["dim_locations", "dim_products", "order_lines"]
-    statements = []
-    for table_name in table_order:
-        statements.append(
-            get_create_table_sql(
-                table_name,
-                dialect=dialect,
-                enable_primary_keys=enable_primary_keys,
-                enable_foreign_keys=enable_foreign_keys,
-            )
+    return "\n\n".join(
+        get_create_table_sql(
+            table_name,
+            dialect=dialect,
+            enable_primary_keys=enable_primary_keys,
+            enable_foreign_keys=enable_foreign_keys,
         )
-    return "\n\n".join(statements)
+        for table_name in _TABLE_ORDER
+    )
 
 
 def get_tunings() -> BenchmarkTunings:
     """Return default tuning recommendations for the CoffeeShop schema."""
     tunings = BenchmarkTunings("coffeeshop")
-
     tunings.add_table_tuning(
         TableTuning(
             table_name="order_lines",
@@ -148,7 +92,6 @@ def get_tunings() -> BenchmarkTunings:
             sorting=[TuningColumn("order_id", "BIGINT", 1), TuningColumn("line_number", "INTEGER", 2)],
         )
     )
-
     tunings.add_table_tuning(
         TableTuning(
             table_name="dim_locations",
@@ -156,7 +99,6 @@ def get_tunings() -> BenchmarkTunings:
             sorting=[TuningColumn("location_id", "VARCHAR(16)", 1)],
         )
     )
-
     tunings.add_table_tuning(
         TableTuning(
             table_name="dim_products",
@@ -164,14 +106,11 @@ def get_tunings() -> BenchmarkTunings:
             sorting=[TuningColumn("product_id", "INTEGER", 1)],
         )
     )
-
     return tunings
 
 
 __all__ = [
-    "DIM_LOCATIONS",
-    "DIM_PRODUCTS",
-    "ORDER_LINES",
+    *_TABLE_DEFS,
     "TABLES",
     "get_create_table_sql",
     "get_all_create_table_sql",

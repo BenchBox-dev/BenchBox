@@ -429,7 +429,11 @@ can handle. That threshold is unlikely in the first year of a results platform.
 - `benchbox submit` command to package and submit results to the public corpus
 - Submission manifest schema (contributor, context, notes)
 - CI validation workflow for the data repository
-- Trust labels in explorer: "maintainer" vs "community-submitted"
+- Trust labels in explorer: "maintainer", "community-submitted", and
+  "vendor-supplied" (vendor-produced results, ranked but distinctly badged and
+  maintainer-assigned so they cannot be self-asserted)
+- Funding disclosure (employer / personal / free-trial / vendor-sponsored /
+  grant / unspecified), orthogonal to the trust label
 - Contributor guidelines documentation
 
 ## Phase 3: Hosted Platform (Deferred)
@@ -477,7 +481,7 @@ if the results platform becomes a core product with sustained community usage.
 | Canonical results already exist as schema-v2 bundles with companion files | `benchbox/core/results/exporter.py` | All downstream paths ingest the real exported bundle, not a second payload |
 | Public site is currently static GitHub Pages assembled from landing + docs + blog | `.github/workflows/docs.yml`, `docs/conf.py` | The public explorer must be a static subsite - no server dependency |
 | BenchBox already hints at a hosted service contract | `_project/_archive/specs/cli/config.md` documents `submit_to_service` and `service_url` (archived) | CLI public submission (`benchbox submit`) is a legitimate future direction, but Phase 1 does not require it |
-| Existing publishing prototype is process-local | `benchbox/core/publishing/artifacts.py`, `benchbox/core/publishing/permalink.py` | The prototype is not the hosted service architecture; it is only a source of reusable concepts |
+| Existing publishing is process-local | `benchbox/core/publishing/bundle_publisher.py`, `benchbox/core/publishing/store.py` (the earlier `artifacts.py`/`permalink.py` prototype was removed in v0.2.1) | The current bundle publisher does local/cloud artifact publication only; it is not the hosted service architecture |
 
 ## Reference Matrix
 

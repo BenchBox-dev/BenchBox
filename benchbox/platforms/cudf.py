@@ -592,7 +592,22 @@ class CuDFAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         return "cudf"
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get query execution plan (not supported for cuDF)."""
+        """Get query execution plan (not supported for cuDF).
+
+        cuDF executes through pandas-style DataFrame operations (and, for the SQL
+        path, an in-process translation layer) that do not expose an ``EXPLAIN``
+        statement or any plan-inspection API. There is no native query optimizer
+        plan to capture, so this returns None and ``capture_query_plan()`` records
+        the absence rather than fabricating a plan.
+
+        This is intentional and must not change until cuDF upstream adds an
+        EXPLAIN / logical-plan inspection API. Track:
+          - cudf:  https://github.com/rapidsai/cudf/issues
+          - cudf-polars (the Polars GPU engine) does expose a logical plan; if
+            BenchBox adopts that execution path, revisit this method to parse it.
+        Returning None keeps the result-dict shape unchanged and lets plan
+        capture degrade silently for this platform.
+        """
         return None
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:

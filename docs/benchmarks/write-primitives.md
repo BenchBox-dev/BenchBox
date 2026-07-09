@@ -15,10 +15,10 @@ The Write Primitives benchmark provides comprehensive testing of fundamental dat
 
 ## Key Features
 
-- **109 comprehensive write operations** across 6 categories
+- **112 comprehensive write operations** across 6 categories
 - **Broad platform compatibility** including ClickHouse, BigQuery, Snowflake, PostgreSQL, DuckDB
 - **Non-transactional cleanup** using explicit DELETE/DROP statements
-- **Category-based isolation** with 16 dedicated staging tables
+- **Category-based isolation** with 18 dedicated staging tables
 - **Dynamic data partitioning** that works with any dataset size
 - **TPC-H schema integration** for realistic data patterns
 - **Automatic validation** of write correctness
@@ -52,7 +52,7 @@ print(f"Duration: {result.write_duration_ms:.2f}ms")
 
 ## Operations Catalog
 
-The benchmark includes **109 write operations** across 6 categories:
+The benchmark includes **112 write operations** across 6 categories:
 
 ### INSERT (12 operations)
 
@@ -111,7 +111,7 @@ The benchmark includes **109 write operations** across 6 categories:
 
 **Purpose**: Test bulk data loading from files with various formats, compressions, and transformation requirements.
 
-### MERGE (20 operations)
+### MERGE (23 operations)
 
 - Simple UPSERT
 - UPSERT with DELETE clause (tri-directional)
@@ -126,8 +126,17 @@ The benchmark includes **109 write operations** across 6 categories:
 - Error handling (duplicate sources)
 - ETL aggregation with running totals
 - Window function deduplication (ROW_NUMBER pattern)
+- SCD Type 2 dimension maintenance (`merge_scd_type2_basic`,
+  `merge_scd_type2_no_change`, `merge_scd_type2_new_keys_only`), which closes the
+  current version of a changed business key and opens a new one, expressed as
+  portable UPDATE + INSERT against the dedicated `scd2_ops_*` dimension tables
+  (no `APPLY CHANGES INTO` / declarative-pipeline syntax, so it runs unchanged on
+  standard-DML engines). The catalog marks only DataFusion unsupported; ClickHouse
+  has no standard UPDATE, so only the insert-only op is portable there and the
+  close-old ops would need a mutation rewrite (they are not auto-skipped today)
 
-**Purpose**: Test UPSERT/MERGE operations for CDC, ETL, and incremental data loading scenarios.
+**Purpose**: Test UPSERT/MERGE operations for CDC, ETL, slowly-changing
+dimension maintenance, and incremental data loading scenarios.
 
 ### DDL (12 operations)
 
@@ -152,13 +161,13 @@ The Write Primitives benchmark is designed for **broad platform compatibility** 
 - **Clear Separation**: Transaction testing is handled by the separate [Transaction Primitives](transaction-primitives.md) benchmark
 
 **Key Features**:
-- **Category-based isolation**: 16 dedicated staging tables (one per operation category)
+- **Category-based isolation**: 18 dedicated staging tables (one per operation category)
 - **Non-transactional cleanup**: Explicit DELETE/DROP statements work across all platforms
 - **Dynamic data partitioning**: Works with any dataset size (3 rows to 10M rows)
 - **Optional dependencies**: Graceful handling of missing tables (e.g., supplier)
 
 **Operation Count**:
-- **Write Primitives**: 109 operations (INSERT, UPDATE, DELETE, MERGE, BULK_LOAD, DDL)
+- **Write Primitives**: 112 operations (INSERT, UPDATE, DELETE, MERGE, BULK_LOAD, DDL)
 - **Transaction Primitives**: 8 operations (COMMIT, ROLLBACK, SAVEPOINT, isolation levels)
 
 ## Design
@@ -192,6 +201,8 @@ Each operation category has dedicated staging tables:
 - `merge_ops_source` - Second 50% of orders (merge source)
 - `merge_ops_lineitem_target` - First 50% of lineitems
 - `merge_ops_summary_target` - Target for aggregated merges
+- `scd2_ops_dim_customer` - SCD Type 2 dimension seeded from customer (one current version per business key)
+- `scd2_ops_stage_customer` - Incoming change batch (changed/unchanged/new) derived dynamically from customer
 
 **BULK_LOAD category**:
 - `bulk_load_ops_target` - Target for bulk load testing
@@ -246,7 +257,7 @@ WHERE o_orderkey <= (SELECT CAST(MAX(o_orderkey) * 0.5 AS INTEGER) FROM orders);
 
 ## Schema
 
-### Staging Tables (16 total)
+### Staging Tables (18 total)
 
 **INSERT category** (4 tables):
 - `insert_ops_lineitem`
@@ -262,11 +273,13 @@ WHERE o_orderkey <= (SELECT CAST(MAX(o_orderkey) * 0.5 AS INTEGER) FROM orders);
 - `delete_ops_lineitem`
 - `delete_ops_supplier` (optional)
 
-**MERGE category** (4 tables):
+**MERGE category** (6 tables):
 - `merge_ops_target`
 - `merge_ops_source`
 - `merge_ops_lineitem_target`
 - `merge_ops_summary_target`
+- `scd2_ops_dim_customer` (SCD Type 2 dimension)
+- `scd2_ops_stage_customer` (SCD Type 2 change batch)
 
 **BULK_LOAD category** (1 table):
 - `bulk_load_ops_target`
@@ -367,7 +380,7 @@ Run multiple operations.
 
 **`get_all_operations() -> Dict[str, WriteOperation]`**
 
-Get all available operations (109 total).
+Get all available operations (112 total).
 
 **`get_operation(operation_id) -> WriteOperation`**
 
@@ -462,7 +475,7 @@ print(f"Validation passed: {result.validation_passed}")
 # 4. Run all operations
 results = bench.run_benchmark(conn)
 
-print(f"Total operations: {len(results)}")  # 109
+print(f"Total operations: {len(results)}")  # 112
 successful = [r for r in results if r.success]
 print(f"Successful: {len(successful)}")
 
@@ -620,7 +633,7 @@ Write Primitives and Transaction Primitives are complementary benchmarks designe
 - **Focus**: Individual write operations (INSERT, UPDATE, DELETE, MERGE, BULK_LOAD, DDL)
 - **Platform support**: Broad (ClickHouse, BigQuery, DuckDB, PostgreSQL, Snowflake, Redshift)
 - **Transaction requirements**: None (uses explicit cleanup)
-- **Operations**: 109 operations across 6 categories
+- **Operations**: 112 operations across 6 categories
 - **Use case**: Testing write operation performance and correctness across diverse platforms
 
 ### Transaction Primitives

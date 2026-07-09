@@ -329,6 +329,35 @@ class TestPandasImplExecute:
         assert result is not None
         assert "hero_movie" in result
 
+    @pytest.mark.parametrize("actor_name", ["Robert Downey Jr.", "Downey Robert"])
+    def test_q6a_pandas_actor_filter_matches_name_parts_in_any_order(self, actor_name):
+        import pandas as pd
+
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q6a_pandas_impl
+
+        class MinimalPandasContext:
+            def __init__(self):
+                self.tables = {
+                    "cast_info": pd.DataFrame({"id": [1], "person_id": [1], "movie_id": [1]}),
+                    "keyword": pd.DataFrame({"id": [1], "keyword": ["superhero"]}),
+                    "movie_keyword": pd.DataFrame({"id": [1], "movie_id": [1], "keyword_id": [1]}),
+                    "name": pd.DataFrame({"id": [1], "name": [actor_name]}),
+                    "title": pd.DataFrame({"id": [1], "title": ["Iron Man"], "production_year": [2008]}),
+                }
+
+            def get_table(self, name):
+                return self.tables[name]
+
+            def col(self, name):
+                raise NotImplementedError("Expression API not available in pandas context")
+
+            def lit(self, value):
+                raise NotImplementedError("Expression API not available in pandas context")
+
+        assert q6a_pandas_impl(MinimalPandasContext()).to_dict("records") == [
+            {"movie_keyword": "superhero", "actor_name": actor_name, "hero_movie": "Iron Man"}
+        ]
+
     def test_q7a_pandas(self, pandas_ctx):
         from benchbox.core.joinorder_synthetic.dataframe_queries import q7a_pandas_impl
 

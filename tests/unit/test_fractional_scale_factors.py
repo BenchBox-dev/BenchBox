@@ -12,6 +12,7 @@ import tempfile
 
 import pytest
 
+from benchbox.core.tpcds.compliance import TpcdsComplianceClass
 from benchbox.core.tpcds.generator import TPCDSDataGenerator
 from benchbox.core.tpch.generator import TPCHDataGenerator
 
@@ -81,13 +82,13 @@ class TestFractionalScaleFactors:
                             f"{table_name} line {i + 1} should not end with trailing pipe: {line[:50]}..."
                         )
 
-    def test_tpcds_fractional_scale_factor_enforcement(self):
-        """Test TPC-DS rejects fractional scale factors (dsdgen crashes with SF < 1.0)."""
+    def test_tpcds_fractional_scale_factor_is_unofficial_subscale(self):
+        """Test TPC-DS accepts supported fractional scale factors as unofficial subscale runs."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            # TPC-DS should reject fractional scale factors because the native dsdgen
-            # binary crashes with values < 1.0 due to internal calculation issues
-            with pytest.raises(ValueError, match=r"TPC-DS requires scale_factor >= 1\.0"):
-                TPCDSDataGenerator(scale_factor=0.01, output_dir=tmp_dir, verbose=False)
+            generator = TPCDSDataGenerator(scale_factor=0.01, output_dir=tmp_dir, verbose=False)
+
+            assert generator.scale_factor == 0.01
+            assert generator.compliance_class is TpcdsComplianceClass.UNOFFICIAL_SUBSCALE
 
     def test_tpcds_minimum_scale_factor_accepted(self):
         """Test TPC-DS accepts scale factor = 1.0 (minimum valid value)."""

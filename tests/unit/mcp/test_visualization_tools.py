@@ -124,6 +124,53 @@ class TestChartTypeDescriptions:
             assert len(description) > 10, f"{chart_type} description is too short"
 
 
+class TestVisualizationHelpContract:
+    """Tests for MCP visualization help and namespace contracts."""
+
+    def test_generate_chart_help_includes_current_templates_and_semantic_chart_ids(self):
+        from benchbox.core.visualization.chart_types import ALL_CHART_TYPES
+        from benchbox.core.visualization.templates import list_templates
+        from benchbox.mcp.tools.visualization import MCP_GENERATE_CHART_DESCRIPTION
+
+        for chart_type in ALL_CHART_TYPES:
+            assert chart_type in MCP_GENERATE_CHART_DESCRIPTION
+        for template in list_templates():
+            assert template.name in MCP_GENERATE_CHART_DESCRIPTION
+
+        assert "result-aware semantic chart IDs" in MCP_GENERATE_CHART_DESCRIPTION
+        assert "textcharts primitive" in MCP_GENERATE_CHART_DESCRIPTION
+
+    def test_suggest_charts_help_uses_semantic_namespace(self):
+        from benchbox.core.visualization.chart_types import ALL_CHART_TYPES
+        from benchbox.mcp.tools.visualization import MCP_SUGGEST_CHARTS_DESCRIPTION
+
+        assert "result-aware semantic chart IDs" in MCP_SUGGEST_CHARTS_DESCRIPTION
+        assert "textcharts primitive" in MCP_SUGGEST_CHARTS_DESCRIPTION
+        for chart_type in ALL_CHART_TYPES:
+            assert chart_type in MCP_SUGGEST_CHARTS_DESCRIPTION
+
+    def test_registered_tool_descriptions_use_generated_help(self):
+        from benchbox.mcp.tools.visualization import MCP_GENERATE_CHART_DESCRIPTION, MCP_SUGGEST_CHARTS_DESCRIPTION
+
+        tools = _get_viz_tool_objects()
+
+        assert tools["generate_chart"].description == MCP_GENERATE_CHART_DESCRIPTION
+        assert tools["suggest_charts"].description == MCP_SUGGEST_CHARTS_DESCRIPTION
+
+    def test_textcharts_primitive_ids_are_not_benchbox_chart_ids(self):
+        from benchbox.core.visualization.chart_types import ALL_CHART_TYPES
+        from benchbox.mcp.tools.visualization import _generate_chart_impl
+
+        assert "bar" not in ALL_CHART_TYPES
+        assert "heatmap" not in ALL_CHART_TYPES
+        assert "query_heatmap" in ALL_CHART_TYPES
+
+        result = _generate_chart_impl([], [], chart_type="bar", template=None)
+
+        assert result["error"] is True
+        assert "VALIDATION_ERROR" in result["error_code"]
+
+
 class TestGenerateChartValidation:
     """Tests for generate_chart validation logic."""
 
@@ -372,6 +419,29 @@ class TestSuggestCharts:
         assert "cost_scatter" in chart_types
         assert result["data_profile"]["has_cost_data"] is True
 
+    def test_power_run_suggests_power_bar(self, tmp_path):
+        """Power-run result files should include power_bar in MCP suggestions."""
+        results_dir = tmp_path / "benchmark_runs" / "results"
+        results_dir.mkdir(parents=True)
+
+        result_file = results_dir / "power_result.json"
+        result_file.write_text("""{
+            "version": "2.1",
+            "benchmark": {"id": "joinorder", "name": "JoinOrder", "scale_factor": 1, "test_type": "power"},
+            "platform": {"name": "DuckDB"},
+            "summary": {"queries": {"total": 1, "passed": 1, "failed": 0}, "timing": {"total_ms": 100}},
+            "queries": [{"id": "1a", "ms": 12.0, "status": "SUCCESS"}]
+        }""")
+
+        tools = _get_viz_tool_functions(results_dir=results_dir)
+        suggest_charts = tools.get("suggest_charts")
+        result = suggest_charts(result_files="power_result.json")
+
+        chart_types = [suggestion["chart_type"] for suggestion in result["suggestions"]]
+        assert "power_bar" in chart_types
+        assert result["primary"]["chart_type"] == "power_bar"
+        assert result["data_profile"]["has_power_data"] is True
+
     def test_multiple_results_with_timestamps_suggests_time_series(self, tmp_path):
         """Test that 3+ results with timestamps include time_series suggestion."""
         results_dir = tmp_path / "benchmark_runs" / "results"
@@ -403,6 +473,13 @@ class TestSuggestCharts:
 
 def _get_viz_tool_functions(*, results_dir=None, charts_dir=None):
     """Create a fresh MCP server and extract visualization tool functions."""
+    return {
+        name: tool.fn for name, tool in _get_viz_tool_objects(results_dir=results_dir, charts_dir=charts_dir).items()
+    }
+
+
+def _get_viz_tool_objects(*, results_dir=None, charts_dir=None):
+    """Create a fresh MCP server and extract visualization tool objects."""
     from benchbox.mcp import create_server
 
     kwargs = {}
@@ -414,8 +491,9 @@ def _get_viz_tool_functions(*, results_dir=None, charts_dir=None):
     tools = {}
     if hasattr(server, "_tool_manager"):
         tool_dict = getattr(server._tool_manager, "_tools", {})
-        for name, tool in tool_dict.items():
-            tools[name] = tool.fn
+        for name in ("suggest_charts", "generate_chart"):
+            if name in tool_dict:
+                tools[name] = tool_dict[name]
     return tools
 
 
@@ -471,6 +549,66 @@ class TestGenerateChartIntegration:
 
         assert result["error"] is True
         assert "VALIDATION_ERROR" in result["error_code"]
+
+    def test_known_inapplicable_chart_is_not_reported_as_unsupported(self, tmp_path):
+        """Known charts without required data should report not-applicable, not unsupported."""
+        results_dir = tmp_path / "benchmark_runs" / "results"
+        results_dir.mkdir(parents=True)
+
+        result_file = results_dir / "test_result.json"
+        result_file.write_text("""{
+            "benchmark": {"name": "TPC-H", "scale_factor": 1},
+            "platform": {"name": "DuckDB"},
+            "config": {"mode": "sql"},
+            "results": {
+                "queries": {"details": [{"id": "Q1", "execution_time_ms": 100}]},
+                "timing": {"total_ms": 1000, "avg_ms": 100}
+            }
+        }""")
+
+        tools = _get_viz_tool_functions(results_dir=results_dir)
+        generate_chart = tools.get("generate_chart")
+
+        result = generate_chart(result_files="test_result.json", chart_type="stacked_phase")
+
+        assert result["error"] is True
+        assert "VALIDATION_ERROR" in result["error_code"]
+        assert "not applicable" in result["message"]
+        assert "Unsupported chart type" not in result["message"]
+        assert result["details"]["skip"]["chart_type"] == "stacked_phase"
+
+    def test_renderer_failure_returns_internal_error_for_single_chart(self, tmp_path, monkeypatch):
+        """Renderer exceptions should not be misclassified as not-applicable charts."""
+        from benchbox.core.visualization import ascii_api
+
+        results_dir = tmp_path / "benchmark_runs" / "results"
+        results_dir.mkdir(parents=True)
+
+        result_file = results_dir / "test_result.json"
+        result_file.write_text("""{
+            "benchmark": {"name": "TPC-H", "scale_factor": 1},
+            "platform": {"name": "DuckDB"},
+            "config": {"mode": "sql"},
+            "results": {
+                "queries": {"details": [{"id": "Q1", "execution_time_ms": 100}]},
+                "timing": {"total_ms": 1000, "avg_ms": 100}
+            }
+        }""")
+
+        def failing_renderer(results, chart_type, *, options=None, subtitle=None):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(ascii_api, "render_ascii_chart_from_results", failing_renderer)
+
+        tools = _get_viz_tool_functions(results_dir=results_dir)
+        generate_chart = tools.get("generate_chart")
+
+        result = generate_chart(result_files="test_result.json", chart_type="performance_bar")
+
+        assert result["error"] is True
+        assert "INTERNAL_ERROR" in result["error_code"]
+        assert "boom" in result["message"]
+        assert result["details"]["skip"]["reason"] == "renderer failed"
 
     def test_rejects_pairwise_chart_without_two_results(self, tmp_path):
         """Pairwise chart types require exactly two result files."""

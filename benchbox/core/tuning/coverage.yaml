@@ -1,0 +1,35 @@
+statuses:
+  - key: tuned_template
+    value: tuned_template
+    rank: 2
+    runtime_marker: "Tuning: auto-discovered template"
+  - key: basic_constraints
+    value: basic_constraints
+    rank: 1
+    runtime_marker: "Tuning: using basic constraints"
+  - key: untuned
+    value: untuned
+    rank: 0
+    runtime_marker: "Tuning disabled:"
+
+decisions:
+  - key: author
+    value: author
+  - key: waived
+    value: waived
+  - key: done
+    value: done
+
+matrix_columns:
+  - platform
+  - benchmark
+  - status
+  - decision
+  - reason
+  - template_path
+
+high_priority_author_backlog:
+  - platform: duckdb
+    benchmark: flightdata
+  - platform: duckdb
+    benchmark: nyctaxi

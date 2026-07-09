@@ -155,6 +155,13 @@ def _write_tbl(path: Path, rows: list[tuple[object, ...]]) -> None:
             f.write("|".join(str(v) for v in row) + "|\n")
 
 
+def _write_tbl_clean(path: Path, rows: list[tuple[object, ...]]) -> None:
+    """Write TBL rows WITHOUT a trailing delimiter (post-normalization shape)."""
+    with path.open("w", encoding="utf-8") as f:
+        for row in rows:
+            f.write("|".join(str(v) for v in row) + "\n")
+
+
 class TestSortedParquetWriterSingleColumn:
     def test_single_column_sorting_writes_sorted_parquet(self, tmp_path: Path):
         source = tmp_path / "lineitem.tbl"
@@ -185,6 +192,33 @@ class TestSortedParquetWriterSingleColumn:
 
         with pytest.raises(ValueError, match="Sort column 'missing_col' not found"):
             writer.write_sorted_parquet("orders", [source], tmp_path)
+
+    def test_reads_normalized_tbl_with_no_trailing_delimiter(self, tmp_path: Path):
+        """The bundled dbgen binaries emit clean rows (no trailing '|'), so
+        _apply_data_organization() must read N-field rows correctly. When a
+        schema is supplied, the reader used to unconditionally assume N+1 raw
+        fields (schema columns + a synthetic trailing-delimiter column), which
+        breaks on clean N-field rows with a PyArrow column-count mismatch.
+        Detect the file's actual framing instead of assuming it."""
+        source = tmp_path / "lineitem.tbl"
+        _write_tbl_clean(
+            source,
+            [
+                (3, "1998-03-01"),
+                (1, "1992-01-02"),
+                (2, "1996-05-17"),
+            ],
+        )
+        schema_registry = {"lineitem": {"columns": [{"name": "id"}, {"name": "l_shipdate"}]}}
+        config = DataOrganizationConfig(sort_columns=[SortColumn(name="l_shipdate")], compression="none")
+        writer = SortedParquetWriter(config=config, schema_registry=schema_registry)
+
+        output = writer.write_sorted_parquet("lineitem", [source], tmp_path)
+
+        table = pq.read_table(output)
+        assert table.column_names == ["id", "l_shipdate"]
+        assert table.column("l_shipdate").to_pylist() == [date(1992, 1, 2), date(1996, 5, 17), date(1998, 3, 1)]
+        assert table.column("id").to_pylist() == [1, 2, 3]
 
 
 class TestSortedParquetWriterMultiColumn:

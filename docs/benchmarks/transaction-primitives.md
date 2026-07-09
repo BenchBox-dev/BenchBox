@@ -522,7 +522,7 @@ Transaction Primitives was split from Write Primitives v2 to separate concerns:
 - **Focus**: Individual write operations (INSERT, UPDATE, DELETE, MERGE, BULK_LOAD, DDL)
 - **Platform support**: Broad (ClickHouse, BigQuery, Snowflake, Databricks, Redshift, DuckDB, SQLite)
 - **Transaction requirements**: Optional, uses explicit cleanup
-- **Operations**: 109 operations across 6 categories
+- **Operations**: 112 operations across 6 categories
 
 ### Transaction Primitives
 

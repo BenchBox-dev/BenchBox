@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-# Fields propagated from adapter/config → result → execution_metadata.
+# Fields propagated from adapter/config -> result -> execution_metadata.
 # Order matters: it defines the iteration order for consistent output.
 _DRIVER_FIELDS = (
     "driver_package",
@@ -41,6 +41,10 @@ def apply_driver_metadata(
     execution_metadata = getattr(result, "execution_metadata", None)
     if isinstance(execution_metadata, dict):
         _propagate_to_execution_dict(execution_metadata, values)
+
+    platform_info = getattr(result, "platform_info", None)
+    if isinstance(platform_info, dict):
+        _propagate_to_platform_info(platform_info, values)
 
 
 def _collect_driver_values(
@@ -111,3 +115,11 @@ def _propagate_to_execution_dict(execution_metadata: dict[str, Any], values: dic
             else:
                 execution_metadata[field] = val
     execution_metadata.setdefault("driver_auto_install_used", values["auto_install_used"])
+
+
+def _propagate_to_platform_info(platform_info: dict[str, Any], values: dict[str, Any]) -> None:
+    """Fill platform_info compatibility aliases without overwriting metadata."""
+    for field in _DRIVER_FIELDS:
+        value = values[field]
+        if value:
+            platform_info.setdefault(field, value)

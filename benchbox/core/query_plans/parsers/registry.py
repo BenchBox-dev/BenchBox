@@ -192,10 +192,22 @@ def get_parser_registry() -> ParserRegistry:
 
 def _create_default_registry() -> ParserRegistry:
     """Create and populate the default parser registry."""
+    from benchbox.core.query_plans.parsers.azure_synapse import AzureSynapseQueryPlanParser
+    from benchbox.core.query_plans.parsers.bigquery import BigQueryQueryPlanParser
+    from benchbox.core.query_plans.parsers.clickhouse import ClickHouseQueryPlanParser
+    from benchbox.core.query_plans.parsers.databend import DatabendQueryPlanParser
     from benchbox.core.query_plans.parsers.datafusion import DataFusionQueryPlanParser
+    from benchbox.core.query_plans.parsers.doris import DorisQueryPlanParser
     from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
+    from benchbox.core.query_plans.parsers.fabric_warehouse import FabricWarehouseQueryPlanParser
+    from benchbox.core.query_plans.parsers.firebolt import FireboltQueryPlanParser
     from benchbox.core.query_plans.parsers.postgresql import PostgreSQLQueryPlanParser
+    from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
+    from benchbox.core.query_plans.parsers.questdb import QuestDBQueryPlanParser
     from benchbox.core.query_plans.parsers.redshift import RedshiftQueryPlanParser
+    from benchbox.core.query_plans.parsers.singlestore import SingleStoreQueryPlanParser
+    from benchbox.core.query_plans.parsers.snowflake import SnowflakeQueryPlanParser
+    from benchbox.core.query_plans.parsers.spark import SparkQueryPlanParser
     from benchbox.core.query_plans.parsers.sqlite import SQLiteQueryPlanParser
 
     registry = ParserRegistry()
@@ -203,6 +215,9 @@ def _create_default_registry() -> ParserRegistry:
     # Register DuckDB parsers
     # The current parser supports both JSON and text formats with auto-detection
     registry.register("duckdb", "0.0.0", DuckDBQueryPlanParser)
+
+    # MotherDuck is serverless DuckDB - identical EXPLAIN (FORMAT JSON) dialect.
+    registry.register("motherduck", "0.0.0", DuckDBQueryPlanParser)
 
     # Register PostgreSQL parsers
     registry.register("postgresql", "0.0.0", PostgreSQLQueryPlanParser)
@@ -216,6 +231,58 @@ def _create_default_registry() -> ParserRegistry:
 
     # Register SQLite parser
     registry.register("sqlite", "0.0.0", SQLiteQueryPlanParser)
+
+    # Register ClickHouse parser (local, server, and cloud modes share it).
+    # The legacy "clickhouse" key plus the concrete platform identifiers
+    # (clickhouse-local / clickhouse-server / clickhouse-cloud) all resolve to
+    # the same parser, so a direct get_parser_for_platform() lookup works for
+    # every deployment mode without relying on an adapter override.
+    for _ch_key in ("clickhouse", "clickhouse-local", "clickhouse-server", "clickhouse-cloud"):
+        registry.register(_ch_key, "0.0.0", ClickHouseQueryPlanParser)
+
+    # Register Presto / Trino family parser (shared EXPLAIN FORMAT JSON dialect).
+    # Starburst is Trino-compatible; Athena uses the Presto engine.
+    registry.register("presto", "0.0.0", PrestoTrinoQueryPlanParser)
+    registry.register("trino", "0.0.0", PrestoTrinoQueryPlanParser)
+    registry.register("starburst", "0.0.0", PrestoTrinoQueryPlanParser)
+    registry.register("athena", "0.0.0", PrestoTrinoQueryPlanParser)
+
+    # Register Spark parser (shared by Spark and Databricks, which runs Spark SQL).
+    registry.register("spark", "0.0.0", SparkQueryPlanParser)
+    registry.register("databricks", "0.0.0", SparkQueryPlanParser)
+    # Gluten + Velox accelerates Spark SQL and emits Spark's EXPLAIN EXTENDED
+    # physical-plan text (with Velox/Gluten operator-name variants), so it reuses
+    # the Spark parser rather than the Presto/Trino one.
+    registry.register("velox", "0.0.0", SparkQueryPlanParser)
+
+    # Register Databend parser (box-drawing text tree).
+    registry.register("databend", "0.0.0", DatabendQueryPlanParser)
+
+    # Register QuestDB parser (indented EXPLAIN text tree).
+    registry.register("questdb", "0.0.0", QuestDBQueryPlanParser)
+
+    # Register Doris and SingleStore parsers. Their EXPLAIN formats differ
+    # structurally (Doris SHAPE PLAN is a dash-indented Physical* tree;
+    # SingleStore is a "|---" connector chain-tree), so they use separate parsers
+    # rather than a single shared MySQL-compatible parser.
+    registry.register("doris", "0.0.0", DorisQueryPlanParser)
+    registry.register("singlestore", "0.0.0", SingleStoreQueryPlanParser)
+
+    # Register cloud SaaS parsers.
+    # Snowflake EXPLAIN USING JSON, Firebolt indented EXPLAIN text, Azure Synapse
+    # Dedicated SQL pool EXPLAIN XML (DSQL distributed plan), and Fabric Warehouse
+    # SHOWPLAN_TEXT each use a distinct format, so they get dedicated parsers.
+    registry.register("snowflake", "0.0.0", SnowflakeQueryPlanParser)
+    registry.register("firebolt", "0.0.0", FireboltQueryPlanParser)
+    registry.register("azure_synapse", "0.0.0", AzureSynapseQueryPlanParser)
+    registry.register("fabric_warehouse", "0.0.0", FabricWarehouseQueryPlanParser)
+    # BigQuery has no EXPLAIN; plans come from job statistics (job.query_plan) and
+    # are captured via BigQueryAdapter._capture_bq_plan, but the parser is also
+    # registered for symmetry and direct lookup.
+    registry.register("bigquery", "0.0.0", BigQueryQueryPlanParser)
+    # LakeSail is a Spark-Connect engine and emits Spark's EXPLAIN EXTENDED text,
+    # so it reuses the Spark parser (matching Databricks / Velox).
+    registry.register("lakesail", "0.0.0", SparkQueryPlanParser)
 
     return registry
 

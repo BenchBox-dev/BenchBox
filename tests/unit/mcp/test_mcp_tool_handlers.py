@@ -7,6 +7,7 @@ structure.
 """
 
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -172,6 +173,114 @@ class TestGetQueryDetailsTool:
 
         assert "benchmark_info" in result
         assert "display_name" in result["benchmark_info"]
+        assert result["benchmark_info"]["support_status"] == "stable"
+
+    def test_internal_benchmark_info_omits_support_status(self):
+        """Explicit-ID MCP query details must not expose repo-only support tiers."""
+        from benchbox.core.benchmark_registry import BENCHMARK_METADATA
+        from benchbox.mcp.tools.benchmark import _build_query_details_benchmark_info
+
+        info = _build_query_details_benchmark_info(
+            "joinorder_synthetic",
+            BENCHMARK_METADATA["joinorder_synthetic"],
+        )
+
+        assert info["display_name"] == "JoinOrder Synthetic"
+        assert "support_status" not in info
+
+
+def _future_benchmark_meta(support_status: str, surface: str, *, supports_dataframe: bool = False) -> dict[str, object]:
+    """Metadata for a hypothetical future benchmark used to pin visibility invariants."""
+    return {
+        "display_name": f"Future {support_status}/{surface}",
+        "description": "synthetic future-status fixture",
+        "category": "Test",
+        "num_queries": 0,
+        "query_description": "n/a",
+        "supports_streams": False,
+        "default_scale": 1.0,
+        "scale_options": [1.0],
+        "min_scale": 1.0,
+        "complexity": "Low",
+        "estimated_time_range": (0, 0),
+        "supports_dataframe": supports_dataframe,
+        "support_status": support_status,
+        "surface": surface,
+    }
+
+
+@contextmanager
+def _registered_future_benchmark(benchmark_id: str, meta: dict[str, object]):
+    """Inject a synthetic benchmark through the live registry surface."""
+    from benchbox.core import benchmark_registry
+
+    fixtures = {benchmark_id: meta}
+    with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False):
+        yield
+
+
+class TestFutureSupportStatusVisibilityInvariants:
+    """Cross-surface invariants for future support_status x surface combinations.
+
+    These use synthetic metadata so that adding a real `document_only`,
+    `deprecated`, `beta`, or `experimental` benchmark later cannot silently
+    expose or hide it contrary to the surface policy.
+    """
+
+    def test_internal_future_status_hidden_from_mcp_discovery(self):
+        """An internal benchmark of any future status stays off MCP discovery surfaces."""
+        from benchbox.mcp.tools.discovery import _get_benchmark_info_impl, _list_benchmarks_impl
+
+        with _registered_future_benchmark("x_future_internal", _future_benchmark_meta("document_only", "internal")):
+            listed = {row["name"] for row in _list_benchmarks_impl()["benchmarks"]}
+            assert "x_future_internal" not in listed
+
+            info = _get_benchmark_info_impl("x_future_internal")
+            assert "error" in info
+            assert "x_future_internal" not in info["available_benchmarks"]
+
+    def test_internal_future_status_query_details_omit_support_status(self):
+        """Explicit-ID query details for an internal benchmark omit support claims."""
+        from benchbox.mcp.tools.benchmark import _build_query_details_benchmark_info
+
+        meta = _future_benchmark_meta("deprecated", "internal")
+        with _registered_future_benchmark("x_future_internal", meta):
+            info = _build_query_details_benchmark_info("x_future_internal", meta)
+
+        assert info["display_name"] == "Future deprecated/internal"
+        assert "support_status" not in info
+
+    def test_public_future_status_exposed_and_labeled_over_mcp(self):
+        """A public benchmark of a future status is discoverable with its support_status."""
+        from benchbox.mcp.tools.discovery import _get_benchmark_info_impl, _list_benchmarks_impl
+
+        with _registered_future_benchmark("x_future_public", _future_benchmark_meta("deprecated", "public")):
+            listed = {row["name"]: row for row in _list_benchmarks_impl()["benchmarks"]}
+            assert listed["x_future_public"]["support_status"] == "deprecated"
+
+            info = _get_benchmark_info_impl("x_future_public")
+            assert "error" not in info
+            assert info["support_status"] == "deprecated"
+
+    def test_dataframe_routing_uses_capability_not_support_status(self):
+        """DataFrame validation must read supports_dataframe, not infer from support tier."""
+        from benchbox.core import benchmark_registry
+        from benchbox.mcp.tools.benchmark import _validate_benchmark_config
+
+        fixtures = {
+            "x_experimental_df": _future_benchmark_meta("experimental", "public", supports_dataframe=True),
+            "x_stable_nodf": _future_benchmark_meta("stable", "public", supports_dataframe=False),
+        }
+        with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False):
+            errors: list[str] = []
+            warnings: list[str] = []
+            _validate_benchmark_config("x_experimental_df", "x_experimental_df", 1.0, "polars-df", errors, warnings)
+            assert errors == []
+
+            errors = []
+            warnings = []
+            _validate_benchmark_config("x_stable_nodf", "x_stable_nodf", 1.0, "polars-df", errors, warnings)
+            assert errors == ["DataFrame mode does not support x_stable_nodf benchmark"]
 
 
 # ---------------------------------------------------------------------------
@@ -263,8 +372,18 @@ class TestListBenchmarksTool:
         for bm in result["benchmarks"]:
             assert "name" in bm
             assert "display_name" in bm
+            assert "support_status" in bm
             assert "query_count" in bm
             assert "scale_factors" in bm
+
+    def test_benchmark_entries_project_support_status(self, tool_functions):
+        """MCP benchmark discovery reports registry support status."""
+        fn = tool_functions["list_available"]
+        result = fn(category="benchmarks")
+        benchmarks = {bm["name"]: bm for bm in result["benchmarks"]}
+
+        assert benchmarks["tpch"]["support_status"] == "stable"
+        assert benchmarks["ai_primitives"]["support_status"] == "experimental"
 
     def test_categories_grouping(self, tool_functions):
         """Response includes category grouping."""
@@ -290,6 +409,7 @@ class TestGetBenchmarkInfoTool:
 
         assert "error" not in result
         assert result.get("name") == "tpch" or result.get("benchmark") == "tpch"
+        assert result["support_status"] == "stable"
 
     def test_unknown_benchmark_returns_error(self, tool_functions):
         """Unknown benchmark returns error."""
@@ -377,7 +497,7 @@ class TestRunBenchmarkToolSuccess:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01)
@@ -406,7 +526,7 @@ class TestRunBenchmarkToolSuccess:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
         ):
             fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, queries="1,6,17")
 
@@ -434,7 +554,7 @@ class TestRunBenchmarkToolSuccess:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             fn(platform="duckdb", benchmark="tpch", scale_factor=0.01)
@@ -465,7 +585,7 @@ class TestRunBenchmarkToolSuccess:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01)
@@ -509,7 +629,7 @@ class TestRunBenchmarkToolSuccess:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             result = fn(platform="duckdb", benchmark="tpcds", scale_factor=0.01)
@@ -553,7 +673,7 @@ class TestRunBenchmarkToolSuccess:
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
             patch("benchbox.platforms.is_dataframe_platform", return_value=True),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_benchmark_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_benchmark_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             result = fn(platform="polars-df", benchmark="tpch", scale_factor=0.01)
@@ -792,7 +912,7 @@ class TestModeParameterValidation:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, mode="sql")
@@ -864,7 +984,7 @@ class TestModeParameterValidation:
         mock_bm.generate_data = MagicMock()
         mock_bm_class = MagicMock(return_value=mock_bm)
 
-        with patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class):
+        with patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class):
             result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, mode="data_only")
 
         assert result["mcp_metadata"]["status"] == "completed"
@@ -950,7 +1070,7 @@ class TestPhasesMapping:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, phases="power")
@@ -987,7 +1107,7 @@ class TestPhasesMapping:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter", mock_get_adapter),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             fn(platform="datafusion", benchmark="tpch", scale_factor=0.01, mode="dataframe")

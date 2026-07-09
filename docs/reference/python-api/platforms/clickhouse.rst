@@ -631,6 +631,6 @@ External Resources
 ~~~~~~~~~~~~~~~~~~
 
 - `ClickHouse Documentation <https://clickhouse.com/docs>`_ - Official ClickHouse docs
-- `ClickHouse Performance Guide <https://clickhouse.com/docs/en/operations/optimizing-performance/>`_ - Performance tuning
+- `ClickHouse Performance Guide <https://clickhouse.com/docs/optimize/query-optimization>`_ - Performance tuning
 - `chDB Documentation <https://github.com/chdb-io/chdb>`_ - Local mode library
-- `ClickHouse Table Engines <https://clickhouse.com/docs/en/engines/table-engines/>`_ - Storage engines
+- `ClickHouse Table Engines <https://clickhouse.com/docs/engines/table-engines>`_ - Storage engines

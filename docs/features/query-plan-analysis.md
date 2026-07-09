@@ -53,13 +53,15 @@ This captures the logical query plan for each query executed during the benchmar
 
 ### Supported Platforms
 
-Currently supported platforms for query plan capture:
+Plan capture is the default for every EXPLAIN-based engine (see "Capture Isolation" below); the
+table lists the platforms with the most mature parsers. BigQuery is the one side-effect engine that
+harvests its plan from the executed job rather than via `EXPLAIN`.
 
 | Platform    | Parser Status | EXPLAIN Format                          | Notes                                                    |
 |-------------|---------------|-----------------------------------------|----------------------------------------------------------|
 | DuckDB      | ✓ Stable      | JSON (`EXPLAIN (ANALYZE, FORMAT JSON)`) | Actual per-operator timing; ~1× query cost overhead      |
 | SQLite      | ✓ Stable      | Text (tree)                             | Simple tree format                                       |
-| PostgreSQL  | ✓ Stable      | JSON                                    | Requires `EXPLAIN (FORMAT JSON)`                         |
+| PostgreSQL  | ✓ Stable      | JSON                                    | SELECT: `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`; DML: `EXPLAIN (FORMAT JSON)` only |
 | Redshift    | ✓ Beta        | Text                                    | Supports XN prefixed operators                           |
 | DataFusion  | ✓ Beta        | Text (indent)                           | Physical plan operators                                  |
 
@@ -71,13 +73,118 @@ Plan capture overhead depends on the platform:
 
 - **DuckDB** (default): uses `EXPLAIN (ANALYZE, FORMAT JSON)`, which re-executes the query to collect
   actual per-operator timing and cardinality. Overhead is approximately **1× query cost** per captured
-  plan - a 2-second query costs ~2 extra seconds. Disable re-execution with
-  `--platform-option analyze_plans=false` to use estimated plans only (~10-50 ms overhead).
-- **Other platforms**: estimated plans only, adds ~10-50 ms per query.
+  plan — a 2-second query costs ~2 extra seconds. Disable re-execution with
+  `--no-analyze-plans` to use estimated plans only (~1-5 ms overhead). The capture re-run happens
+  in the isolated post-measurement phase, so it never inflates the measured query time.
+- **PostgreSQL** (SELECT queries): uses `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`, which also
+  re-executes the query. Overhead is approximately **1× query cost** per captured plan.
+- **PostgreSQL** (DML — INSERT/UPDATE/DELETE/MERGE): uses `EXPLAIN (FORMAT JSON)` without
+  ANALYZE to prevent double-execution of writes. Overhead is low (~1-5 ms, estimated plan only).
+  Note: PostgreSQL `EXPLAIN` does not accept `COPY`, so COPY statements are not plan-captured.
+- **Redshift, DataFusion, SQLite**: estimated plans only (no ANALYZE), adds ~1-5 ms per query.
 
 In all cases:
 - Benchmark timing measurements are unaffected (plan capture runs after the timed execution)
 - Failed plan captures are logged but don't halt execution
+
+### Capture Isolation (the canonical post-measurement phase)
+
+Query plan capture is a **fully separate, fully isolated** concern from the timed measurement run.
+There is exactly **one capture path** for every EXPLAIN-based engine: a single post-measurement
+phase that runs after all timed queries of *every* test type (power, throughput, maintenance,
+combined) complete. After measurement, BenchBox issues one `EXPLAIN` pass over the
+successfully-executed queries on the measurement connection and merges the resulting
+`plan_fingerprint` / `query_plan` back into each query result. This means:
+
+- **Default-ON for every EXPLAIN engine.** Plan capture via the isolated phase is the default for
+  all engines whose plan a standalone `EXPLAIN` reproduces — DuckDB, MotherDuck, PostgreSQL,
+  Redshift, SQLite, DataFusion, ClickHouse, Athena, Presto/Trino/Starburst, Spark, Databricks,
+  Snowflake, Firebolt, Doris, SingleStore, Databend, Azure Synapse, Fabric, and others. There is
+  no per-adapter opt-in.
+- **No EXPLAIN on the measurement path.** Capture never interleaves with a timed query or holds the
+  connection between measured queries — the `EXPLAIN` pass runs strictly after the timed loop, so
+  measured per-query execution times are never inflated by capture cost, for any test type.
+- **`analyze_plans` is the one and only capture-detail knob.** It is a first-class flag:
+  `--analyze-plans` (the default) re-runs each SELECT once with `EXPLAIN (ANALYZE)` *after*
+  measurement, so captured plans carry actual per-operator timing and cardinality (~1× extra query
+  cost, outside the measured window); `--no-analyze-plans` uses a static (non-`ANALYZE`) `EXPLAIN`,
+  giving estimated plans only with no re-execution cost (~1-5 ms). The structural `plan_fingerprint`
+  is identical either way (it excludes timing/cardinality by design); the measured execution times
+  in the result bundle remain the authoritative timings.
+  **Note:** only engines whose `EXPLAIN` has an ANALYZE mode (DuckDB, MotherDuck, PostgreSQL) honour
+  the knob. SQLite (`EXPLAIN QUERY PLAN`), DataFusion, and Redshift (plain `EXPLAIN`) have no ANALYZE
+  mode: they always capture a static, estimated plan and `analyze_plans` is a no-op for them (no
+  per-operator timing is available).
+- **DML runs exactly once.** Even with `--analyze-plans`, an INSERT/UPDATE/DELETE/MERGE/COPY (or
+  CTAS / `SELECT ... INTO`) query is downgraded to a non-`ANALYZE` `EXPLAIN` by the shared
+  `is_dml_query` write guard, so writes are captured without being re-executed a second time.
+- **Capture once per query.** Each distinct executed query is captured exactly once — a plan is a
+  property of `(query, schema, engine)`, not of an execution. `--plan-config queries:<ids>`
+  restricts *which* queries are captured. The old per-iteration / per-stream sampling options
+  (`sample:` / `first:`) have been retired: under capture-once-per-query they had no meaning.
+
+The single genuine exception is **BigQuery**: it has no `EXPLAIN` statement (the real plan and
+stage timing are only available from the executed `QueryJob`), so it sets
+`plan_capture_phase_eligible = False` and harvests its plan from the completed job rather than
+through the isolated phase. `analyze_plans` is a no-op for it.
+
+#### Mid-run data mutation: capture before the mutation
+
+The isolated `EXPLAIN` pass runs *after* the timed loop, so for a **read-only** workload it sees the
+exact data state every query was measured against — captured plans and their cardinality estimates
+match what the optimizer chose during measurement. Standard TPC-H/TPC-DS **power** and **throughput**
+sets are `SELECT`-only, so this is always true for them.
+
+A workload that **mutates data mid-run** would otherwise break that guarantee. In **combined mode**
+the order is *power → throughput → maintenance*: the maintenance step (TPC-H RF1/RF2 inserts+deletes,
+TPC-DS data maintenance) changes table cardinalities, so a single capture pass at the very end would
+`EXPLAIN` the power/throughput read queries against the **post-maintenance** data — describing a plan
+the optimizer never chose during measurement.
+
+BenchBox resolves this by capturing **before the mutation**. A capture *checkpoint* runs at the start
+of the maintenance phase — after the read phases, before any maintenance write — so the
+power/throughput plans are EXPLAINed against the pre-maintenance state they were measured against.
+The maintenance writes themselves are then captured in the final post-measurement pass (downgraded to
+a non-`ANALYZE` `EXPLAIN`, so they are never re-executed). Each query is still captured exactly once,
+and plans are attached to result rows once, at the end. The checkpoint runs strictly between phases —
+never inside a timed query or a concurrent throughput stream — so measured timings are unaffected.
+
+Capture is driven by the recorded-query buffer (every distinct query that succeeded during the timed
+run), and each captured plan is attached to its result row by the exact recorded query - including the
+TPC power/throughput drivers, which carry the recorded query's key through their result rows, so each
+seed-varied stream attaches its own plan rather than falling back to an id-only match. A row that
+somehow lacks the key (a bespoke driver that cannot supply one) falls back to matching by bare query id,
+which only succeeds when that id maps to a single executed SQL variant.
+
+Multi-stream runs persist one plan record per `(query_id, stream_id)` in the `.plans.json` companion -
+streams are never deduplicated or last-writer-wins collapsed, so every stream's plan and fingerprint
+survive a result-file round trip (`show-plan`, `compare-plans`).
+
+> **Bespoke DML query sets.** A *bespoke* query set that runs an `INSERT`/`UPDATE`/`DELETE` partway
+> through and then more `SELECT`s has no maintenance phase boundary, so the isolated model captures
+> those later reads against the end-of-run state. Keep data-mutating steps in a maintenance phase (or a
+> separate run) when you need read-query fingerprints to reflect their measured data state.
+
+### Captured Fields
+
+Each query result includes three plan-related fields when `--capture-plans` is active:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `query_plan` | `QueryPlan \| None` | Parsed logical plan tree; `None` if capture failed or was skipped |
+| `plan_fingerprint` | `str \| None` | SHA256 of the plan's logical structure; `None` when `query_plan` is `None` |
+| `plan_capture_time_ms` | `float \| None` | Wall-clock milliseconds spent on plan capture (excludes the *timed* benchmark execution; see note below) |
+
+`plan_fingerprint` is `None` when `query_plan` is `None`. Both are `None` when `--capture-plans` is
+not set or when the query was excluded by `--plan-config`.
+
+> **`plan_capture_time_ms` is the full capture overhead, including EXPLAIN execution — not parse-only.**
+> Plan capture runs in a separate post-measurement phase, so it never affects the timed benchmark
+> result. But the metric does include the cost of running `EXPLAIN` itself. On DuckDB the default
+> `EXPLAIN (ANALYZE, FORMAT JSON)` **re-executes the query**, so `plan_capture_time_ms` there is
+> roughly the query's own runtime plus parsing (~1× query cost), not a few milliseconds of parsing.
+> Engines that capture estimated plans only (Redshift, DataFusion, SQLite, PostgreSQL DML) add just
+> ~1-5 ms because no re-execution occurs.
 
 ## Viewing Plans
 
@@ -410,13 +517,19 @@ benchbox platforms
 
 **Expected Impact**:
 - DuckDB (default): ~1× query cost per plan (re-executes via `EXPLAIN (ANALYZE, FORMAT JSON)`)
-- Other platforms: 10-50 ms per query
+- PostgreSQL SELECT queries: ~1× query cost per plan (re-executes via `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`)
+- PostgreSQL DML queries: ~1-5 ms (no re-execution; uses `EXPLAIN (FORMAT JSON)` only)
+- Redshift, DataFusion, SQLite: ~1-5 ms per query (estimated plans, no re-execution)
 
 **If DuckDB overhead is too high**:
-1. Use `--platform-option analyze_plans=false` to switch to estimated plans (~10-50 ms, no re-execution)
-2. Use `--queries` to capture plans for a subset of queries during development
+1. Use `--no-analyze-plans` to switch to estimated plans (~1-5 ms, no re-execution)
+2. Use `--plan-config queries:<ids>` to capture plans for a subset of queries during development
 
-**If overhead exceeds 100ms per query on non-DuckDB platforms**:
+**If PostgreSQL overhead is too high**:
+1. PostgreSQL SELECT capture re-executes each query; consider capturing a subset with `--queries`
+2. DML queries are already low-overhead by design (no ANALYZE)
+
+**If overhead exceeds 10ms per query on Redshift/DataFusion/SQLite**:
 1. Check if disk I/O is bottleneck (plan serialization)
 2. Verify platform EXPLAIN performance
 
@@ -497,9 +610,90 @@ fi
 
 Plans are fingerprinted using SHA256 of the logical structure:
 - **Included**: Operator types, table names, join types, filter expressions, aggregations
-- **Excluded**: Operator IDs, costs, row estimates, physical operator details
+- **Excluded**: Operator IDs, costs, row estimates, timing, cardinality, physical operator details
 
-Identical fingerprints guarantee identical logical plans.
+#### Stability contract
+
+`plan_fingerprint` is designed for **structural comparison**, not cost comparison:
+
+| Change | Fingerprint effect |
+|--------|--------------------|
+| Same query, same schema, same engine version | **Same fingerprint** |
+| Stats refresh / `VACUUM ANALYZE` (no plan change) | **Same fingerprint** |
+| Adding an index that is not used by the query | **Same fingerprint** |
+| Adding an index the planner starts using | **May differ** — only when it changes the *logical* structure (e.g. an index join replacing a hash join). A pure scan-method switch (Seq Scan → Index Scan on the same table) keeps the **same fingerprint**, because scan variants normalize to a logical `Scan` and physical operator details are excluded from the hash. Use `compare-plans` or the physical-plan details to detect scan-method changes. |
+| Engine minor version upgrade with no plan change | **Usually same** — not guaranteed across major versions |
+| `analyze_plans=true` vs `analyze_plans=false` (DuckDB) | **Same fingerprint** — timing/cardinality excluded from hash |
+| Same query, **different benchmark seed** (data-driven filter literal) | **Differs by default** — filter/join/projection *literals* are part of the hash, so a seed-varied threshold (`l_quantity < 1234.56` vs `< 2345.67`) changes the fingerprint even though the plan shape is identical. Use literal normalization (below) for seed-independent comparison. |
+
+**What fingerprint equality does NOT guarantee:**
+- That query performance is the same (costs may differ with identical logical structure)
+- That the plan is optimal for the current data distribution
+- Stability across major engine version upgrades
+
+> **Cross-run comparison requires identical seeds (or literal normalization).**
+> Because the default fingerprint embeds filter expression literals, comparing
+> fingerprints across two runs that used *different* benchmark seeds produces false
+> positives: a query whose only change is a seed-driven filter value (e.g.
+> `customer_acctbal < 1234.56` → `< 2345.67`) appears "changed" when the plan shape
+> did not. Either hold the seed constant across the runs you compare, or use the
+> literal-normalized fingerprint below.
+
+#### Literal normalization (seed-independent fingerprints)
+
+Literal normalization is an **opt-in** structural fingerprint that masks numeric and
+single-quoted string literals in the filter, join, and projection predicates to
+`<NUM>` / `<STR>` before hashing. Two structurally identical plans whose only
+difference is a seed-varied literal then share a fingerprint, so cross-run
+regression detection stops flagging seed changes as plan changes. Identifier fields
+— table names, group-by / sort keys, aggregation functions, operator and join types
+— are **never** masked, so a genuine structural change still changes the fingerprint.
+
+Normalization is opt-in and never alters the default `plan_fingerprint` (which stays
+literal-sensitive, for users who intentionally track filter-threshold changes):
+
+- **API:** `QueryPlanDAG.normalized_fingerprint` (a lazily-computed, cached property)
+  or `compute_plan_fingerprint(normalize_literals=True)` returns the masked hash;
+  `LogicalOperator.get_structural_signature(normalize_literals=True)` exposes the
+  underlying signature.
+- **Cross-run metadata:** `create_plan_metadata_from_results(..., normalize_literals=True)`
+  records the normalized fingerprint per query for seed-independent comparison.
+
+A `benchbox run --normalize-plan-literals` flag to surface the normalized fingerprint
+directly in the result bundle is planned; today the normalized fingerprint is
+available through the API above and the metadata helper.
+
+**Recommended use:**
+- Within a single run: deduplicate identical plans across concurrent streams
+- Cross-run regression detection: flag queries where the fingerprint changed between runs on the same engine version
+- Cross-platform comparison: use `compare-plans` for structural similarity; fingerprints will differ across platforms
+
+### Literal-Normalized Fingerprints
+
+By default the fingerprint includes literal constants (filter values, limits, etc.),
+so two queries that differ only in their parameter substitutions produce different
+fingerprints. Pass `--normalize-plan-literals` (together with `--capture-plans`) to
+*also* record a literal-normalized fingerprint that collapses such queries to the
+same value:
+
+```bash
+benchbox run --platform duckdb --benchmark tpch --capture-plans --normalize-plan-literals
+```
+
+When enabled, each captured plan in the `*.plans.json` companion file gains a
+`fingerprint_normalized` key alongside the default `fingerprint`. The default
+fingerprint is never changed. Literal normalization replaces string/date literals
+and standalone numeric literals (and `LIMIT`/`OFFSET` counts) with a placeholder
+while preserving identifiers, so structurally identical queries with different
+constants share a normalized fingerprint.
+
+The capability is also available programmatically:
+
+```python
+plan.plan_fingerprint          # literal-sensitive (default)
+plan.normalized_fingerprint    # literal-normalized
+plan.compute_plan_fingerprint(normalize_literals=True)
+```
 
 ### Comparison Algorithm
 
@@ -514,8 +708,10 @@ The comparison engine uses:
 - Uses `EXPLAIN (ANALYZE, FORMAT JSON)` by default - machine-readable JSON with actual per-operator
   timing (`operator_timing`) and cardinality (`operator_cardinality`) from real execution
 - Captures logical and physical operators; parser handles both ANALYZE and estimated-plan schemas
-- Re-executes the query at capture time (~1× query cost); use
-  `--platform-option analyze_plans=false` to opt out and capture estimated plans only
+- Re-executes the query at capture time (~1× query cost, in the isolated post-measurement phase);
+  use `--no-analyze-plans` to opt out and capture estimated plans only
+- DML statements (INSERT/UPDATE/DELETE/MERGE/COPY) use `FORMAT JSON` without `ANALYZE` to
+  prevent double-execution side effects
 - Fingerprints exclude timing/cardinality - structural comparisons are unaffected by this setting
 
 **SQLite**:
@@ -524,10 +720,17 @@ The comparison engine uses:
 - Limited cost information
 
 **PostgreSQL**:
-- Uses `EXPLAIN (FORMAT JSON)` for machine-readable output
+- SELECT queries use `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` — re-executes the query to collect
+  actual timing and I/O statistics (~1× query cost overhead)
+- DML queries (INSERT, UPDATE, DELETE, MERGE) use `EXPLAIN (FORMAT JSON)` without ANALYZE
+  to prevent writing data twice (~1-5 ms overhead, estimated plan only). `COPY` is not
+  plan-captured: PostgreSQL `EXPLAIN` does not accept `COPY` statements.
 - Provides detailed cost estimates, row counts, and operator properties
 - Supports all PostgreSQL node types (Seq Scan, Index Scan, Hash Join, etc.)
 - Requires PostgreSQL 12+ for full JSON format support
+- Note: adding an index can change the fingerprint for PostgreSQL plans (Seq Scan uses
+  `Filter` nodes captured in the signature; Index Scan uses `Index Cond` which is not
+  captured). Do not compare fingerprints across index additions on PostgreSQL.
 
 **Redshift**:
 - Uses text-based `EXPLAIN` output

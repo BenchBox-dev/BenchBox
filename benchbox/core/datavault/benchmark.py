@@ -28,6 +28,7 @@ from benchbox.core.datavault.schema import (
     get_create_all_tables_sql,
     get_table_loading_order,
 )
+from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 from benchbox.utils.scale_factor import format_scale_factor
 
 logger = logging.getLogger(__name__)
@@ -118,8 +119,9 @@ class DataVaultBenchmark(BaseBenchmark):
         if output_dir is not None:
             self.output_dir = Path(output_dir) if isinstance(output_dir, str) else output_dir
         elif not hasattr(self, "output_dir") or self.output_dir is None:
-            sf_str = format_scale_factor(self.scale_factor)
-            self.output_dir = Path.cwd() / "benchmark_runs" / "datagen" / f"{self._get_benchmark_name()}_{sf_str}"
+            # Honor BENCHBOX_OUTPUT_DIR at construction; falls back to
+            # Path.cwd()/benchmark_runs/datagen when no override is set.
+            self.output_dir = get_benchmark_runs_datagen_path(self._get_benchmark_name(), self.scale_factor)
 
         # Lazy-loaded components
         self._tpch_generator: Optional[Any] = None
@@ -472,7 +474,7 @@ class DataVaultBenchmark(BaseBenchmark):
 # Register benchmark-specific CLI option specs
 # ---------------------------------------------------------------------------
 
-from benchbox.cli.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
 )

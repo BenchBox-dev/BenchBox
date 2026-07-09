@@ -54,7 +54,7 @@ PR should update only live callers and active docs.
 | `results-explorer/scripts/generate-browser-fixtures.mjs:489` | Fixture generation | runs `uv run -- ...contract.commandArgs` | Mostly automatic once contract command args change; error string update. |
 | `tests/uat/phases/explorer_smoke.py:51` | UAT smoke | constructs `["benchbox", "explorer", "build", ...]` | Small helper update plus fast tests. |
 | `tests/uat/test_explorer_smoke.py` | UAT tests | asserts the legacy argv | Small assertion updates. |
-| `tests/unit/cli/test_explorer_build_contract.py` | Contract tests | imports `explorer_group` directly | Replace or move to the new script tests. |
+| `tests/unit/scripts/test_explorer_build_contract.py` (moved from `tests/unit/cli/`) | Contract tests | imports the migrated `_project.scripts.explorer_pipeline` contract | Relocated to mirror the migrated source. |
 | `docs/development/browser-test-architecture.md:35,119,130` | Developer docs | describes `benchbox explorer build` | Three doc replacements. |
 | `docs/operations/results-phase-2-runbook.md` | Operations runbook | describes rerunning Explorer build/deploy | Replace with maintainer command where applicable. |
 | `results-explorer/src/db.ts:196` | Runtime remediation string | tells users to run `benchbox explorer build` | Replace with published-snapshot guidance and maintainer-only command. |
@@ -71,7 +71,7 @@ Imports outside `benchbox/core/explorer_pipeline/` fall into three groups:
 | Importer | Examples | Classification | Migration cost |
 | --- | --- | --- | --- |
 | CLI wrapper | `benchbox/cli/commands/explorer.py` imports the contract and `ExplorerPipeline` | Wrapper only; should move with the entry point | Small. |
-| Unit tests | `tests/unit/core/explorer_pipeline/*`, `tests/unit/cli/test_explorer_build_contract.py`, `tests/unit/core/test_platform_labels.py` | Test coverage, not a production API promise | Mechanical import/path update if the package moves. |
+| Unit tests | `tests/unit/scripts/explorer_pipeline/*`, `tests/unit/scripts/test_explorer_build_contract.py` (both relocated from `tests/unit/core/`/`tests/unit/cli/` to mirror the migrated source), `tests/unit/core/test_platform_labels.py` | Test coverage, not a production API promise | Relocated to mirror the migrated source. |
 | Historical project docs | `_project/DONE/main/active/explorer-emit-comparison-artifact-from-pipeline.yaml` | Completed planning record | Do not rewrite. |
 
 There are no production benchmark-runner imports of

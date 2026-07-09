@@ -41,9 +41,11 @@ from ..utils.dependencies import (
     get_dependency_error_message,
 )
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.config_utils import make_registered_platform_config_builder
 from .base.data_loading import DataSourceResolver, FileFormatRegistry
 from .base.ddl_helpers import strip_with_properties
 from .base.runtime_metadata import build_default_normalized_result_metadata
+from .presto_trino_utils import normalize_existing_files, show_tables_lower
 
 try:
     import boto3
@@ -70,6 +72,8 @@ class AthenaAdapter(PlatformAdapter):
     - AWS Glue Data Catalog for metadata management
     - Workgroup-based resource management and cost controls
     """
+
+    plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
@@ -278,47 +282,34 @@ class AthenaAdapter(PlatformAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create Athena adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-
-        # Generate database name using benchmark characteristics
-        if "database" in config and config["database"]:
-            adapter_config["database"] = config["database"]
-        else:
-            database_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                config,
                 platform="athena",
-                tuning_config=config.get("tuning_config"),
+                fields=[
+                    "region",
+                    "aws_region",
+                    "aws_access_key_id",
+                    "aws_secret_access_key",
+                    "aws_profile",
+                    "workgroup",
+                    "catalog",
+                    "s3_output_location",
+                    "s3_staging_dir",
+                    "staging_root",
+                    "s3_bucket",
+                    "s3_prefix",
+                    "query_timeout",
+                    "encryption",
+                    "data_format",
+                    "default_format",
+                    "compression",
+                    "cleanup_staging",
+                ],
             )
-            adapter_config["database"] = database_name
-
-        # AWS configuration
-        for key in ["region", "aws_region", "aws_access_key_id", "aws_secret_access_key", "aws_profile"]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        # Athena-specific configuration
-        for key in [
-            "workgroup",
-            "catalog",
-            "s3_output_location",
-            "s3_staging_dir",
-            "staging_root",
-            "s3_bucket",
-            "s3_prefix",
-            "query_timeout",
-            "encryption",
-            "data_format",
-            "default_format",
-            "compression",
-            "cleanup_staging",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
     def _get_s3_client(self):
         """Get or create S3 client."""
@@ -1010,16 +1001,7 @@ class AthenaAdapter(PlatformAdapter):
             raise ValueError("No data files found")
         return data_source.tables
 
-    @staticmethod
-    def _normalize_existing_files(file_paths: Any) -> list[Path]:
-        """Normalize file inputs to existing, non-empty local paths."""
-        normalized_paths = file_paths if isinstance(file_paths, list) else [file_paths]
-        valid_files: list[Path] = []
-        for file_path in normalized_paths:
-            path = Path(file_path)
-            if path.exists() and path.stat().st_size > 0:
-                valid_files.append(path)
-        return valid_files
+    _normalize_existing_files = staticmethod(normalize_existing_files)
 
     def _build_s3_table_path(self, table_name_lower: str, is_parquet_mode: bool) -> str:
         """Build the destination S3 prefix for a table load."""
@@ -1266,8 +1248,6 @@ class AthenaAdapter(PlatformAdapter):
                 "cost_usd": cost,
             }
 
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             return {
@@ -1280,6 +1260,16 @@ class AthenaAdapter(PlatformAdapter):
             }
         finally:
             cursor.close()
+
+        # Plan capture routes through the shared chokepoint, outside the try so that
+        # in strict_plan_capture mode a PlanCaptureError propagates rather than being
+        # swallowed by the broad `except` above. For phase-eligible engines (the
+        # default) the chokepoint records the executed query for the isolated
+        # post-measurement phase instead of running EXPLAIN inline; otherwise it
+        # captures inline (capture_query_plan opens its own cursor).
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
+
+        return result_dict
 
     def get_cost_summary(self) -> dict[str, Any]:
         """Get cost summary for the benchmark run."""
@@ -1312,10 +1302,34 @@ class AthenaAdapter(PlatformAdapter):
         return normalize_table_name_in_sql(sql)
 
     def get_query_plan(self, connection: Any, query: str) -> str:
-        """Get query execution plan."""
-        from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
+        """Get the query execution plan as ``EXPLAIN (FORMAT JSON)``.
 
-        return get_query_plan_from_cursor(connection, query)
+        Athena runs the Presto engine, so its EXPLAIN JSON is parsed by
+        PrestoTrinoQueryPlanParser. EXPLAIN does not execute the query, so this
+        does not scan data or incur cost. If a given Athena engine version
+        returns a non-JSON plan, the parser degrades gracefully (returns None).
+        """
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"EXPLAIN (FORMAT JSON) {query}")
+            plan_rows = cursor.fetchall()
+            return "\n".join(str(row[0]) for row in plan_rows)
+        except Exception as e:
+            self.logger.debug(f"Could not get query plan: {e}")
+            return f"Could not get query plan: {e}"
+        finally:
+            cursor.close()
+
+    def get_query_plan_parser(self):
+        """Return the Presto/Trino parser stamped as ``athena``.
+
+        Athena runs the Presto engine and shares the parser, but the captured
+        ``QueryPlanDAG.platform`` records the concrete ``athena`` platform rather
+        than the generic ``presto_trino`` family name.
+        """
+        from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
+
+        return PrestoTrinoQueryPlanParser(platform_name="athena")
 
     def close_connection(self, connection: Any) -> None:
         """Close Athena connection."""
@@ -1361,16 +1375,7 @@ class AthenaAdapter(PlatformAdapter):
             self.logger.debug(f"Connection test failed: {e}")
             return False
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if Athena supports a specific tuning type."""
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {
-                TuningType.PARTITIONING,
-            }
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("PARTITIONING",)
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Athena-specific tuning clauses."""
@@ -1425,67 +1430,40 @@ class AthenaAdapter(PlatformAdapter):
         if primary_key_config and primary_key_config.enabled:
             self.logger.info("Primary key constraints noted (Athena does not enforce constraints)")
 
-    def _get_existing_tables(self, connection: Any) -> list[str]:
-        """Get list of existing tables."""
-        cursor = connection.cursor()
-        try:
-            cursor.execute("SHOW TABLES")
-            return [row[0].lower() for row in cursor.fetchall()]
-        except Exception:
-            return []
-        finally:
-            cursor.close()
+    _get_existing_tables = staticmethod(show_tables_lower)
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Run ANALYZE on table (not needed for Athena - stats auto-collected)."""
         self.logger.debug(f"ANALYZE not needed for Athena - statistics are auto-collected for {table_name}")
 
 
-def _build_athena_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build Athena database configuration with credential loading."""
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    config = build_platform_config(
-        platform_type="athena",
-        credential_key="athena",
-        default_display_name="AWS Athena",
-        default_driver_package="pyathena",
-        platform_fields=[
-            "workgroup",
-            "database",
-            "catalog",
-            "s3_output_location",
-            "s3_staging_dir",
-            "staging_root",
-            "s3_bucket",
-            "s3_prefix",
-            "aws_profile",
-            "aws_access_key_id",
-            "aws_secret_access_key",
-            "data_format",
-            "default_format",
-            "compression",
-            "cleanup_staging",
-            "query_timeout",
-            "encryption",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
-    )
+def _apply_athena_config_fields(config: Any) -> None:
     config.region = config.options.get("region") or config.options.get("aws_region")
-    return config
 
 
-# Register the config builder with the platform hook registry
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("athena", _build_athena_config)
-except ImportError:
-    pass
+_build_athena_config = make_registered_platform_config_builder(
+    "athena",
+    __name__,
+    "AWS Athena",
+    "pyathena",
+    [
+        "workgroup",
+        "database",
+        "catalog",
+        "s3_output_location",
+        "s3_staging_dir",
+        "staging_root",
+        "s3_bucket",
+        "s3_prefix",
+        "aws_profile",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "data_format",
+        "default_format",
+        "compression",
+        "cleanup_staging",
+        "query_timeout",
+        "encryption",
+    ],
+    postprocess=_apply_athena_config_fields,
+)

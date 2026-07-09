@@ -480,6 +480,7 @@ class DuckDBAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.SUPPORTED
     supports_external_tables = True
+    plan_capture_phase_eligible = True
 
     @property
     def platform_name(self) -> str:
@@ -757,8 +758,9 @@ class DuckDBAdapter(PlatformAdapter):
         self.log_very_verbose("DuckDB OLAP optimizations applied")
         # Note: enable_optimizer setting not available in current DuckDB versions
 
-        # Enable profiling only if requested
-        if self.show_query_plans:
+        # Enable profiling only when displaying plans; skip when capture_plans is active
+        # (EXPLAIN ANALYZE handles plan capture separately without requiring profiling).
+        if self.show_query_plans and not self.capture_plans:
             conn.execute("SET enable_profiling = 'query_tree_optimizer'")
             config_applied.append("query profiling")
             self.log_very_verbose("DuckDB query profiling enabled")
@@ -908,8 +910,8 @@ class DuckDBAdapter(PlatformAdapter):
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply DuckDB-specific optimizations based on benchmark type."""
-        # Only apply profiling when explicitly requested
-        if self.show_query_plans:
+        # Enable profiling only when displaying plans; skip when capture_plans is active.
+        if self.show_query_plans and not self.capture_plans:
             connection.execute("SET enable_profiling = 'query_tree'")
 
     def execute_query(
@@ -945,8 +947,8 @@ class DuckDBAdapter(PlatformAdapter):
         start_time = mono_time()
 
         try:
-            # Enable profiling only if query plans are requested
-            if self.show_query_plans:
+            # Enable profiling only if display is active (not when capture suppresses display)
+            if self.show_query_plans and not self.capture_plans:
                 connection.execute("PRAGMA enable_profiling = 'query_tree'")
                 logger.debug("DuckDB query profiling enabled for this query")
 
@@ -958,17 +960,10 @@ class DuckDBAdapter(PlatformAdapter):
             actual_row_count = len(rows)
             logger.debug(f"Query {query_id} completed in {execution_time:.3f}s, returned {actual_row_count} rows")
 
-            # Display query plan if enabled
-            self.display_query_plan_if_enabled(connection, query, query_id)
-
-            # Capture structured query plan if enabled
-            query_plan = None
-            plan_fingerprint = None
-            plan_capture_time_ms = None
-            if self.capture_plans:
-                query_plan, plan_capture_time_ms = self.capture_query_plan(connection, query, query_id)
-                if query_plan:
-                    plan_fingerprint = query_plan.plan_fingerprint
+            # Display query plan if enabled; skip when capture_plans is also active
+            # to avoid issuing EXPLAIN twice (display + capture would both call get_query_plan).
+            if not self.capture_plans:
+                self.display_query_plan_if_enabled(connection, query, query_id)
 
             # Validate row count if enabled and benchmark type is provided
             validation_result = None
@@ -995,6 +990,14 @@ class DuckDBAdapter(PlatformAdapter):
                         f"(expected: {validation_result.expected_row_count})"
                     )
 
+            # Gate-only value oracle: compute a digest of the FULL result set here,
+            # where the rows are materialized (the power-test seam only sees
+            # first_row + count). Behind BENCHBOX_EMIT_RESULT_DIGEST and stream 0 (the
+            # only stream with a stored reference digest), so a normal run is unchanged.
+            from benchbox.core.results.result_digest import compute_result_digest, result_digest_enabled
+
+            result_digest = compute_result_digest(rows) if result_digest_enabled() and stream_id in (None, 0) else None
+
             # Use centralized helper to build result with consistent validation field mapping
             result = self._build_query_result_with_validation(
                 query_id=query_id,
@@ -1002,14 +1005,11 @@ class DuckDBAdapter(PlatformAdapter):
                 actual_row_count=actual_row_count,
                 first_row=rows[0] if rows else None,
                 validation_result=validation_result,
+                result_digest=result_digest,
             )
 
-            # Add query plan to result if captured
-            if query_plan:
-                result["query_plan"] = query_plan
-                result["plan_fingerprint"] = plan_fingerprint
-            if plan_capture_time_ms is not None:
-                result["plan_capture_time_ms"] = plan_capture_time_ms
+            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
+            self._merge_plan_capture_into_result(result, connection, query, query_id)
 
             return result
 
@@ -1031,28 +1031,43 @@ class DuckDBAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
         finally:
-            # Disable profiling if it was enabled
-            if self.show_query_plans:
+            # Disable profiling if it was enabled (mirrors the enable condition)
+            if self.show_query_plans and not self.capture_plans:
                 connection.execute("PRAGMA disable_profiling")
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get DuckDB query execution plan using EXPLAIN (ANALYZE, FORMAT JSON).
+        """Get DuckDB query execution plan using EXPLAIN (FORMAT JSON).
 
-        Uses EXPLAIN (ANALYZE, FORMAT JSON) by default (PostgreSQL-style combined syntax)
-        to capture actual per-operator timing and cardinality from real query execution.
-        The ANALYZE format uses different field names than plain EXPLAIN (FORMAT JSON):
-        operator_timing/operator_cardinality/operator_name vs timing/cardinality/name.
-        DuckDBQueryPlanParser handles both schemas transparently.
+        Uses plain EXPLAIN (FORMAT JSON) by default (self.analyze_plans=False) to
+        capture the estimated plan with no re-execution overhead: plan fingerprints
+        are structure-only, so estimated plans lose nothing for structural comparison.
 
-        When self.analyze_plans is False, falls back to EXPLAIN (FORMAT JSON) which
-        captures estimated plans only (timing/cardinality fields absent). Use this
-        opt-out when plan capture overhead must be minimised.
+        When self.analyze_plans is True (opt-in), uses EXPLAIN (ANALYZE, FORMAT JSON)
+        (PostgreSQL-style combined syntax) to capture actual per-operator timing and
+        cardinality from real query execution. The ANALYZE format uses different field
+        names than plain EXPLAIN (FORMAT JSON): operator_timing/operator_cardinality/
+        operator_name vs timing/cardinality/name. DuckDBQueryPlanParser handles both
+        schemas transparently. capture_query_plan() prints a one-time run-level notice
+        the first time this opt-in actually captures a plan, since it roughly doubles
+        wall-clock cost for a --capture-plans run and perturbs cache state.
 
         Note: EXPLAIN (ANALYZE, ...) re-executes the query, adding ~1× query cost to the
         capture step. Plan fingerprints are unaffected - compute_plan_fingerprint()
         excludes timing/cardinality by design.
+
+        DML queries (INSERT/UPDATE/DELETE/MERGE/COPY) are explained without ANALYZE
+        to prevent double-execution, even when analyze_plans=True: DuckDB's
+        EXPLAIN ANALYZE physically runs the statement, which would mutate data a
+        second time. The plan structure is still captured (FORMAT JSON only);
+        execution statistics are absent for these statements.
         """
+        from benchbox.platforms.base.result_capture import is_dml_query
+
         analyze = self.analyze_plans
+        # EXPLAIN ANALYZE re-executes the statement; for DML that would double-mutate
+        # data, so downgrade to FORMAT JSON (estimated plan, no execution stats).
+        if analyze and is_dml_query(query):
+            analyze = False
         # EXPLAIN (ANALYZE, FORMAT JSON) is the PostgreSQL-style combined syntax supported by DuckDB.
         # Plain EXPLAIN (FORMAT JSON) produces estimated plans only (no timing/cardinality data).
         explain_options = "ANALYZE, FORMAT JSON" if analyze else "FORMAT JSON"

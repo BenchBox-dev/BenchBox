@@ -260,85 +260,27 @@ def test_resource_envelope_diagnostic_ignores_unrelated_errors():
     assert adapter._resource_envelope_diagnostic("compute", RuntimeError("bad column")) is None
 
 
-def test_tpch_q10_guard_and_skip_result_classification():
-    adapter = _make_adapter()
-    adapter.use_distributed = True
-    query = SimpleNamespace(query_id="Q10", query_name="Returned Item Reporting")
+def test_q10_not_preemptively_skipped_on_dask_local_envelope():
+    """The TPC-H Q10 dask skip guard was removed (dask-q10-guard-staleness).
 
-    result = adapter.execute_query(SimpleNamespace(), query)
-    assert result["status"] == "FAILED"
-    assert "Dask resource-envelope failure before query execution" in result["error"]
-    assert "exit 137" in result["error"]
-
-    benchmark = SimpleNamespace(name="TPC-H Benchmark")
-    skip_query_ids = adapter._collect_skip_query_ids(benchmark)
-    skipped = adapter._build_skipped_results(skip_query_ids)
-
-    q10_skip = next(item for item in skipped if item["query_id"] == "Q10")
-    assert q10_skip["status"] == "SKIPPED"
-    assert q10_skip["dask_resource_envelope_guarded"] is True
-    assert "Dask resource-envelope guard" in q10_skip["error"]
-
-
-def test_profiled_tpch_q10_guard_returns_failure_profile():
-    adapter = _make_adapter()
-    adapter.use_distributed = True
-    query = SimpleNamespace(query_id="Q10", query_name="Returned Item Reporting")
-
-    result, profile = adapter.execute_query_profiled(SimpleNamespace(), query)
-
-    assert result["status"] == "FAILED"
-    assert profile.query_id == "Q10"
-    assert profile.metrics["resource_envelope_guarded"] is True
-
-
-def test_q10_skip_dropped_when_external_scheduler_address_set():
-    """w8 regression: an external scheduler means the run is no longer in the
-    constrained local envelope that motivated the OOM guard. Q10 must run."""
-    adapter = _make_adapter()
-    adapter.use_distributed = True
-    adapter.scheduler_address = "tcp://scheduler.example:8786"
-    benchmark = SimpleNamespace(name="TPC-H Benchmark")
-    query = SimpleNamespace(query_id="Q10", query_name="Returned Item Reporting")
-
-    skip_query_ids = adapter._collect_skip_query_ids(benchmark)
-
-    assert "Q10" not in skip_query_ids
-    assert adapter._resource_envelope_skip_query_ids == set()
-    assert adapter._guarded_resource_query_diagnostic(query, "Q10") is None
-
-
-def test_q10_skip_dropped_when_local_resources_explicitly_configured():
-    """w8 regression: an explicitly provisioned local Dask run must not lose Q10 coverage."""
+    Dask 2026.3.0 makes the dask-expr optimizer mandatory, so Q10's projection-
+    pushed graph fits the default local envelope (validated at SF1 via parquet +
+    CSV: 37,967 groups, no OOM). Q10 must no longer be preemptively skipped, and
+    the guard machinery must be gone — while the generic worker-death catch stays.
+    """
     adapter = _make_adapter()
     adapter.use_distributed = True
     adapter.scheduler_address = None
-    adapter.n_workers = 8
-    adapter.threads_per_worker = 4
-    adapter._memory_limit = "16GB"
-    adapter._n_workers_configured = True
-    adapter._threads_per_worker_configured = True
-    adapter._memory_limit_configured = True
     benchmark = SimpleNamespace(name="TPC-H Benchmark")
-    query = SimpleNamespace(query_id="Q10", query_name="Returned Item Reporting")
 
     skip_query_ids = adapter._collect_skip_query_ids(benchmark)
-
     assert "Q10" not in skip_query_ids
-    assert adapter._resource_envelope_skip_query_ids == set()
-    assert adapter._guarded_resource_query_diagnostic(query, "Q10") is None
 
-
-def test_q10_skip_kept_for_default_local_distributed_envelope():
-    """w8 regression: default local LocalCluster runs remain inside the Q10 guard."""
-    adapter = _make_adapter()
-    adapter.scheduler_address = None
-    adapter.use_distributed = True
-    benchmark = SimpleNamespace(name="TPC-H Benchmark")
-
-    skip_query_ids = adapter._collect_skip_query_ids(benchmark)
-
-    assert "Q10" in skip_query_ids
+    # The preemptive Q10 guard machinery is removed...
+    assert not hasattr(adapter, "_guarded_resource_query_diagnostic")
+    assert not hasattr(adapter, "_tpch_q10_resource_envelope_diagnostic")
+    # ...but the generic resource-envelope worker-death safety net remains.
+    assert adapter._resource_envelope_diagnostic("compute", RuntimeError("exit code 137")) is not None
 
 
 def test_close_and_del_cleanup():

@@ -36,6 +36,9 @@ from benchbox.core.write_primitives.schema import (
     get_all_staging_tables_sql,
     get_create_table_sql,
 )
+from benchbox.sql_compat.rules.execution_filter.duckdb_write_primitives import (
+    duckdb_write_primitive_skip_reason,
+)
 from benchbox.sql_compat.rules.execution_filter.postgres_write_primitives import (
     POSTGRES_WRITE_PRIMITIVES_CATEGORY_SKIPS,
     POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS,
@@ -44,6 +47,18 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 _POSTGRES_OPERATION_SKIP_DIALECTS = frozenset({"postgres", "postgresql"})
+
+# Staging tables whose source TPC-H table is optional: if the source is absent
+# (e.g. a minimal fixture that loads only orders/lineitem), population is skipped
+# with a logged note rather than raising. supplier backs GDPR delete ops;
+# customer backs the SCD Type 2 dimension ops. In a full run the adapter loads
+# all 8 base tables, so these populate normally. Value = the capability lost when
+# the source is missing.
+_OPTIONAL_WHEN_SOURCE_MISSING = {
+    "delete_ops_supplier": "GDPR deletion operations will not be available.",
+    "scd2_ops_dim_customer": "SCD Type 2 dimension operations will not be available.",
+    "scd2_ops_stage_customer": "SCD Type 2 dimension operations will not be available.",
+}
 
 
 def _pk_lock_bypass_required(dialect: str) -> bool:
@@ -95,6 +110,8 @@ class OperationResult:
         cleanup_success: Whether cleanup succeeded
         error: Error message if operation failed
         cleanup_warning: Warning message for transaction cleanup failures
+        executed_sql: The final write SQL actually executed (after platform overrides,
+            dialect rewrites, and placeholder replacement); used for plan capture.
     """
 
     operation_id: str
@@ -110,6 +127,7 @@ class OperationResult:
     error: Optional[str] = None
     cleanup_warning: Optional[str] = None
     skip_reason: Optional[str] = None
+    executed_sql: Optional[str] = None
 
 
 def _check_validation_query(val_query: Any, actual_rows: int, val_result: list | None = None) -> bool:
@@ -356,6 +374,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         operation: Any,
         platform_key: str | None = None,
         sql_override: str | None = None,
+        connection: DatabaseConnection | None = None,
     ) -> tuple[str | None, str | None]:
         """Resolve effective write SQL (including platform overrides) or return skip reason.
 
@@ -363,6 +382,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             operation: WriteOperation with write_sql and platform_overrides
             platform_key: Platform dialect key (e.g. 'datafusion', 'duckdb') passed by adapter
             sql_override: Pre-processed SQL from adapter (e.g. bulk_load rewrite)
+            connection: Live connection, used ONLY to check whether a staging table
+                the operation depends on was left empty because its TPC-H source was
+                absent at setup (see :meth:`_check_staging_table_population`). When
+                ``None`` (e.g. a direct unit-test call with no connection), that
+                check is skipped rather than blocking - the caller could not verify
+                emptiness either way, so this mirrors the fail-open behavior of
+                :meth:`_check_bulk_load_file_dependencies` for a missing files_dir.
 
         Returns:
             Tuple of (effective_sql, skip_reason). If skip_reason is not None,
@@ -392,6 +418,11 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     f"{POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS[operation.id]}"
                 )
 
+        if (platform_key or "").lower() == "duckdb":
+            duckdb_skip_reason = duckdb_write_primitive_skip_reason(operation)
+            if duckdb_skip_reason is not None:
+                return None, (f"Operation '{operation.id}' is skipped on DuckDB: {duckdb_skip_reason}")
+
         effective_sql = operation.write_sql
 
         if platform_key and operation.platform_overrides and platform_key in operation.platform_overrides:
@@ -400,7 +431,90 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 return None, f"Operation '{operation.id}' is unsupported on platform '{platform_key}'."
             effective_sql = override
 
+        if (missing_file := self._check_bulk_load_file_dependencies(operation)) is not None:
+            return None, (
+                f"Operation '{operation.id}' is skipped because required bulk-load files are missing: {missing_file}"
+            )
+
+        if (empty_reason := self._check_staging_table_population(effective_sql, connection)) is not None:
+            return None, f"Operation '{operation.id}' is skipped because {empty_reason}"
+
         return effective_sql, None
+
+    def _check_staging_table_population(self, write_sql: str, connection: DatabaseConnection | None) -> str | None:
+        """Return a skip reason if ``write_sql`` depends on a staging table that was
+        left EMPTY because its TPC-H source table was absent at setup.
+
+        A minimal fixture that loads only orders/lineitem (no customer/supplier)
+        makes ``setup()`` skip populating ``scd2_ops_dim_customer`` /
+        ``scd2_ops_stage_customer`` (SCD Type 2) and ``delete_ops_supplier`` (GDPR
+        deletion) - see ``_OPTIONAL_WHEN_SOURCE_MISSING`` - while ``is_setup()``
+        still reports True, since those tables are not REQUIRED for the overall
+        setup check. Without this guard, an operation referencing one of them would
+        run its write SQL and validation queries against an EMPTY table: the SCD2
+        anti-join/count-zero validations, and a DELETE with no matching rows, both
+        trivially pass on empty data, so the operation reports SUCCESS without
+        exercising anything - corrupting reported coverage instead of surfacing the
+        missing prerequisite. Checked live (row count), not from setup()'s
+        one-time population result, so a mid-run reset() or a differently-scoped
+        connection is still caught.
+
+        ``connection=None`` (e.g. a direct unit-test call with no connection) skips
+        this check rather than blocking - the caller could not verify emptiness
+        either way, mirroring :meth:`_check_bulk_load_file_dependencies`'s fail-open
+        behavior for a missing ``files_dir``.
+        """
+        if connection is None:
+            return None
+        for table_name, capability_note in _OPTIONAL_WHEN_SOURCE_MISSING.items():
+            if not re.search(rf"\b{re.escape(table_name)}\b", write_sql):
+                continue
+            try:
+                quoted = self._quote_identifier(table_name)
+                result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
+                row_count = result[0] if result else 0
+            except Exception:
+                # Table missing entirely (never created) is the same "unavailable" case.
+                row_count = 0
+            if row_count == 0:
+                return (
+                    f"staging table '{table_name}' is empty (source data was unavailable at setup): {capability_note}"
+                )
+        return None
+
+    def _check_bulk_load_file_dependencies(self, operation: Any) -> str | None:
+        """Return a comma-separated list of missing file-dependency paths, if any.
+
+        Only operations that declare `file_dependencies` are checked. Missing files
+        are treated as a non-fatal skip reason to keep benchmark runs stable when
+        auxiliary data has not been generated yet.
+        """
+        dependencies = list(getattr(operation, "file_dependencies", []))
+        if not dependencies:
+            return None
+
+        files_dir = getattr(self.data_generator, "files_dir", None)
+        if files_dir is None:
+            return ", ".join(dependencies)
+
+        missing: list[str] = []
+        for filename in dependencies:
+            try:
+                if "*" in filename:
+                    matches = list(files_dir.glob(filename))
+                    if not matches:
+                        missing.append(filename)
+                else:
+                    dependency_path = files_dir / filename
+                    if not dependency_path.exists():
+                        missing.append(filename)
+            except Exception:
+                missing.append(filename)
+
+        if not missing:
+            return None
+
+        return ", ".join(missing)
 
     def _table_exists(self, connection: DatabaseConnection, table_name: str) -> bool:
         """Check if a table exists in the database.
@@ -425,6 +539,41 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             Table name is quoted using _quote_identifier() to prevent SQL injection.
         """
         return table_exists(connection, table_name, self.log_verbose)
+
+    @staticmethod
+    def _scd2_row_hash_expr(acctbal_expr: str) -> str:
+        """Build the portable SCD2 change-detection fingerprint expression.
+
+        Concatenates the tracked dimension attributes into a single string so
+        changed rows are detectable with a plain ``<>`` comparison on every
+        engine (no engine-specific hash function needed). The dimension seed and
+        the 'unchanged'/'new' staging groups pass ``c_acctbal`` so their
+        fingerprints match the dimension; the 'changed' staging group passes a
+        bumped expression so its fingerprint differs and triggers a new version.
+
+        Args:
+            acctbal_expr: SQL expression for the account-balance attribute
+                (``c_acctbal`` for an unchanged value, ``c_acctbal + 100`` for a
+                simulated change).
+
+        Returns:
+            A portable SQL string expression yielding the row fingerprint.
+
+        Safety assumptions (verified for TPC-H; revisit if reused elsewhere):
+            - Same-engine comparison only. The dimension and staging ``row_hash``
+              are both computed by this expression during setup on the SAME
+              engine, and the ops only ever compare ``s.row_hash <> d.row_hash``
+              within that engine, so ``CAST(... AS VARCHAR)`` formatting
+              differences across engines cannot cause a false match/miss.
+            - Delimiter safety. The literal ``'|'`` separator is collision-safe
+              only because the TPC-H attributes it joins contain no ``'|'``
+              (verified: SF0.01 customer has zero pipe chars in
+              name/address/mktsegment). Reusing this fingerprint over arbitrary
+              dimension data where an attribute may contain ``'|'`` could let a
+              changed row look unchanged (or vice versa); use a collision-
+              resistant separator or length-prefixed encoding in that case.
+        """
+        return f"c_name || '|' || c_address || '|' || CAST({acctbal_expr} AS VARCHAR) || '|' || c_mktsegment"
 
     def _get_population_sql(self, table_name: str, source_table: str) -> str:
         """Get the INSERT SQL to populate a staging table from its source.
@@ -458,6 +607,48 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             return (
                 f"INSERT INTO {quoted_table} SELECT * FROM {quoted_source} "
                 f"WHERE l_orderkey <= (SELECT CAST(MAX(l_orderkey) * 0.5 AS INTEGER) FROM {quoted_source})"
+            )
+        elif table_name == "scd2_ops_dim_customer":
+            # SCD Type 2 dimension seeded one current version per customer business
+            # key. row_hash is a portable change-detection fingerprint over the
+            # tracked attributes; valid_from is a fixed historical seed date and
+            # valid_to is the open-ended sentinel. Built from the full customer
+            # table so it scales with the scale factor.
+            fingerprint = self._scd2_row_hash_expr("c_acctbal")
+            return (
+                f"INSERT INTO {quoted_table} "
+                f"SELECT c_custkey AS sk, c_custkey, c_name, c_address, c_acctbal, c_mktsegment, "
+                f"{fingerprint} AS row_hash, true AS is_current, "
+                f"DATE '1990-01-01' AS valid_from, DATE '9999-12-31' AS valid_to "
+                f"FROM {quoted_source}"
+            )
+        elif table_name == "scd2_ops_stage_customer":
+            # SCD Type 2 incoming-change batch derived dynamically from the customer
+            # table (range-bounded so it runs at any scale factor). Three disjoint
+            # groups tag the SCD2 cases the catalog ops target:
+            #   changed   - existing keys whose tracked attribute moved (acctbal
+            #               bumped) so the fingerprint differs from the dimension;
+            #   unchanged - existing keys copied verbatim (fingerprint matches, so a
+            #               re-run produces zero new versions);
+            #   new       - brand-new business keys (custkey offset beyond the
+            #               current max) that have no current version yet.
+            fp_changed = self._scd2_row_hash_expr("c_acctbal + 100")
+            fp_same = self._scd2_row_hash_expr("c_acctbal")
+            effective = "DATE '2026-01-01'"
+            return (
+                f"INSERT INTO {quoted_table} "
+                f"SELECT c_custkey, c_name, c_address, c_acctbal + 100, c_mktsegment, "
+                f"{fp_changed} AS row_hash, {effective} AS effective_ts, 'changed' AS change_type "
+                f"FROM {quoted_source} WHERE c_custkey BETWEEN 1 AND 20;\n"
+                f"INSERT INTO {quoted_table} "
+                f"SELECT c_custkey, c_name, c_address, c_acctbal, c_mktsegment, "
+                f"{fp_same} AS row_hash, {effective} AS effective_ts, 'unchanged' AS change_type "
+                f"FROM {quoted_source} WHERE c_custkey BETWEEN 21 AND 40;\n"
+                f"INSERT INTO {quoted_table} "
+                f"SELECT c_custkey + (SELECT MAX(c_custkey) FROM {quoted_source}), "
+                f"c_name, c_address, c_acctbal, c_mktsegment, "
+                f"{fp_same} AS row_hash, {effective} AS effective_ts, 'new' AS change_type "
+                f"FROM {quoted_source} WHERE c_custkey BETWEEN 1 AND 20"
             )
         elif table_name == "ddl_truncate_target":
             # Take all rows but only 3 columns for truncate testing
@@ -495,11 +686,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     source_result = connection.execute(f"SELECT COUNT(*) FROM {quoted_source}").fetchone()
                     source_count = source_result[0] if source_result else 0
                 except Exception as e:
-                    # Source table doesn't exist - skip population for optional tables like supplier
-                    if table_name == "delete_ops_supplier":
+                    # Source table doesn't exist - skip population for optional tables
+                    # (see _OPTIONAL_WHEN_SOURCE_MISSING). Minimal test fixtures load
+                    # only orders/lineitem, so these are skipped rather than raising.
+                    if table_name in _OPTIONAL_WHEN_SOURCE_MISSING:
                         self.log_verbose(
                             f"Skipping {table_name} population - source table '{source_table}' does not exist. "
-                            f"GDPR deletion operations will not be available."
+                            f"{_OPTIONAL_WHEN_SOURCE_MISSING[table_name]}"
                         )
                         status[table_name] = 0
                         continue
@@ -617,6 +810,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 "merge_ops_target": "orders",
                 "merge_ops_source": "orders",
                 "merge_ops_lineitem_target": "lineitem",
+                "scd2_ops_dim_customer": "customer",
+                "scd2_ops_stage_customer": "customer",
                 "ddl_truncate_target": "orders",
             }
 
@@ -718,6 +913,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             "merge_ops_target": "orders",
             "merge_ops_source": "orders",
             "merge_ops_lineitem_target": "lineitem",
+            "scd2_ops_dim_customer": "customer",
+            "scd2_ops_stage_customer": "customer",
             "ddl_truncate_target": "orders",
         }
 
@@ -812,7 +1009,25 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         """
         normalized: dict[str, dict[str, Any]] = {}
 
+        # The 8 base TPC-H tables (fixed by the spec) plus the write-primitives
+        # staging tables. Anything else in TABLES (e.g. operation-created sketch
+        # tables) is created at execution time, not loaded, so it is excluded.
+        loadable_table_names = {
+            "region",
+            "nation",
+            "customer",
+            "supplier",
+            "part",
+            "partsupp",
+            "orders",
+            "lineitem",
+            *STAGING_TABLES.keys(),
+        }
+
         for table_name, table_def in TABLES.items():
+            if table_name not in loadable_table_names:
+                continue
+
             # Write Primitives staging tables are already dict-shaped.
             if isinstance(table_def, dict) and "columns" in table_def:
                 normalized[table_name] = table_def
@@ -866,16 +1081,63 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             raise ValueError(f"Operation '{operation.id}' is DataFrame aggregate-state only and is not exposed as SQL")
         return operation.write_sql
 
+    def get_all_operations(self) -> dict[str, Any]:
+        """Return SQL-operable operations.
+
+        Aggregate-state operations are routed through the DataFrame execution
+        path and intentionally excluded here so SQL-only counts and defaults
+        match legacy write-primitives behavior.
+        """
+        return {
+            op_id: operation
+            for op_id, operation in self.operations_manager.get_all_operations().items()
+            if operation.aggregate_state is None and operation.category.lower() != "sketch"
+        }
+
+    def get_operation_categories(self) -> list[str]:
+        """Get categories for SQL-operable operations."""
+        return sorted({operation.category for operation in self.get_all_operations().values()})
+
+    def get_operations_by_category(self, category: str) -> dict[str, Any]:
+        """Get SQL-operable operations filtered by category."""
+        normalized = category.lower()
+        return {
+            op_id: operation
+            for op_id, operation in self.get_all_operations().items()
+            if operation.category.lower() == normalized
+        }
+
+    def get_benchmark_info(self) -> dict[str, Any]:
+        """Return benchmark metadata using SQL operation count/category."""
+        return {
+            "name": self._name,
+            "version": self._version,
+            "description": self._description,
+            "scale_factor": self.scale_factor,
+            "total_operations": len(self.get_all_operations()),
+            "categories": self.get_operation_categories(),
+            "tables": list(self._staging_tables.keys()),
+            "data_source": "tpch",
+        }
+
     def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
         """Get SQL-runnable write operations, excluding DataFrame-only aggregate-state ops."""
         _ = dialect
         operations = self.operations_manager.get_all_operations()
-        return {op_id: op.write_sql for op_id, op in operations.items() if op.aggregate_state is None}
+        return {
+            op_id: op.write_sql
+            for op_id, op in operations.items()
+            if op.aggregate_state is None and op.category.lower() != "sketch"
+        }
 
     def get_queries_by_category(self, category: str) -> dict[str, str]:
         """Get SQL-runnable write operations for a category."""
         operations = self.operations_manager.get_operations_by_category(category)
-        return {op_id: op.write_sql for op_id, op in operations.items() if op.aggregate_state is None}
+        return {
+            op_id: op.write_sql
+            for op_id, op in operations.items()
+            if op.aggregate_state is None and op.category.lower() != "sketch"
+        }
 
     def execute_operation(
         self,
@@ -906,7 +1168,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
         try:
             effective_sql, skip_reason = self._get_effective_write_sql(
-                operation, platform_key=platform_key, sql_override=sql_override
+                operation, platform_key=platform_key, sql_override=sql_override, connection=connection
             )
             if skip_reason is not None:
                 self.log_verbose(f"Skipping operation {operation_id}: {skip_reason}")
@@ -958,6 +1220,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 cleanup_success=cleanup_success,
                 status="SUCCESS",
                 cleanup_warning=cleanup_warning,
+                executed_sql=write_sql,
             )
 
         except Exception as e:

@@ -40,8 +40,8 @@ skip_windows_file_io = pytest.mark.skipif(
 )
 
 SEED_CHECKSUMS = {
-    "dim_locations.csv": "5227b1b0f06f2719cd9a80303ac8953bb32ec89182f11b79696f1bbc48c67c1d",
-    "dim_products.csv": "f0960c23931618fc658cb0faab5980b7ce3a5731e561f912434fb9c01cbe447a",
+    "dim_locations.csv": "649a37932a6939bf81b363b8dbb2e0258c27a470cabe8aff3de27e6bfc8db915",
+    "dim_products.csv": "663af10fcd72d4c29ede2da457a5baa4a03656aa5ace7171ce5e4cb2c314cf26",
 }
 
 

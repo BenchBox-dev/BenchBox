@@ -11,9 +11,25 @@ from unittest.mock import patch
 import pytest
 
 from tests.uat import runner
+from tests.uat.artifact_hygiene import LocalArtifactGrowthError
 from tests.uat.timeouts import TimeoutResult
 
 pytestmark = pytest.mark.fast
+
+
+@pytest.fixture(autouse=True)
+def _isolate_cwd(tmp_path: Path, monkeypatch):
+    """Keep run_cell's hygiene snapshot off the real repo tree.
+
+    run_cell() defaults benchmark_runs_dir to a home-directory root outside
+    any worktree (see runner._default_benchmark_runs_dir), so the artifact
+    hygiene guard is armed for every call and snapshots cwd/benchmark_runs.
+    Without isolating cwd here, that snapshot targets the real, shared
+    worktree directory, which concurrent pytest-xdist workers or leftover
+    manual runs can mutate mid-test, causing spurious LocalArtifactGrowthError
+    failures unrelated to what the test is exercising.
+    """
+    monkeypatch.chdir(tmp_path)
 
 
 def _write_result_json(path: Path, *, failed: int = 0, compliance_class: str | None = None) -> None:
@@ -48,39 +64,33 @@ def _write_result_json(path: Path, *, failed: int = 0, compliance_class: str | N
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def test_extract_result_path_picks_last_match():
+def test_last_nonempty_output_line_picks_last_subprocess_line():
     log = """\
+# uv run -- benchbox run --quiet
+# BENCHBOX_OUTPUT_DIR=/tmp/shared-runs
 [info] running...
-benchmark_runs/results/duckdb_tpch_20260502.json
 [trace] retry...
 /Users/joe/Developer/benchmark_runs/results/duckdb_tpch_20260502_FINAL.json
-[done]
 """
-    out = runner.extract_result_path(log)
-    assert out is not None
-    assert out.endswith("FINAL.json")
+    out = runner.last_nonempty_output_line(log)
+    assert out == "/Users/joe/Developer/benchmark_runs/results/duckdb_tpch_20260502_FINAL.json"
 
 
-def test_extract_result_path_accepts_custom_runs_root():
+def test_last_nonempty_output_line_accepts_custom_runs_root():
     log = "/tmp/shared-runs/results/duckdb_tpch_custom_root.json\n"
-    assert runner.extract_result_path(log) == "/tmp/shared-runs/results/duckdb_tpch_custom_root.json"
+    assert runner.last_nonempty_output_line(log) == "/tmp/shared-runs/results/duckdb_tpch_custom_root.json"
 
 
-def test_extract_result_path_accepts_rich_wrapped_result_path():
+def test_last_nonempty_output_line_returns_none_when_only_uat_comments():
     log = """\
-Exported JSON:
-/Users/joe/Developer/benchmark_runs/results/joinorder_sf1_duckdb_sql_20260511_13
-4905_62698da0.json
+# uv run -- benchbox run --quiet
+# BENCHBOX_OUTPUT_DIR=/tmp/shared-runs
 """
-    assert (
-        runner.extract_result_path(log)
-        == "/Users/joe/Developer/benchmark_runs/results/joinorder_sf1_duckdb_sql_20260511_134905_62698da0.json"
-    )
+    assert runner.last_nonempty_output_line(log) is None
 
 
-def test_extract_result_path_returns_none_when_missing():
-    log = "[info] running\n[error] failed before result capture\n"
-    assert runner.extract_result_path(log) is None
+def test_last_nonempty_output_line_returns_none_when_missing():
+    assert runner.last_nonempty_output_line("") is None
 
 
 def test_run_cell_writes_log_and_returns_result(tmp_path: Path):
@@ -107,7 +117,7 @@ def test_run_cell_writes_log_and_returns_result(tmp_path: Path):
     assert result.result_path is not None
     assert str(result.result_path).endswith("duckdb_tpch_smoke.json")
     assert result.log_path.exists()
-    log_text = result.log_path.read_text().replace("\\", "/")
+    log_text = result.log_path.read_text()
     assert "benchmark_runs/results/" in log_text
 
 
@@ -120,9 +130,13 @@ def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):
     def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
         captured["env"] = env
         captured["argv"] = argv
-        if stdout is not None:
-            stdout.write(f"{result_path}\n")
-        return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1)
+        return TimeoutResult(
+            exit_code=0,
+            timed_out=False,
+            elapsed_s=0.1,
+            stdout=f"{result_path}\n".encode(),
+            stderr=b"[warning] ignored stderr after quiet stdout\n",
+        )
 
     def fake_benchbox_run_argv(*args, extra_args=(), **kwargs):
         return [*fake_argv, *extra_args]
@@ -145,7 +159,9 @@ def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):
     assert result.result_path == result_path
     assert captured["env"]["BENCHBOX_OUTPUT_DIR"] == str(tmp_path / "shared-runs")
     assert captured["argv"][-2:] == ["--output", str(tmp_path / "shared-runs" / "datagen")]
-    assert "BENCHBOX_OUTPUT_DIR=" in result.log_path.read_text()
+    log_text = result.log_path.read_text()
+    assert "BENCHBOX_OUTPUT_DIR=" in log_text
+    assert "ignored stderr" in log_text
 
 
 @pytest.mark.parametrize("local_managed_platform", [False, True])
@@ -176,7 +192,7 @@ def test_run_cell_defaults_benchbox_output_dir_to_shared(monkeypatch, tmp_path: 
 
     def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
         captured["env"] = env
-        return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1)
+        return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1, stdout=b"")
 
     with (
         patch.object(runner, "benchbox_run_argv", return_value=fake_argv),
@@ -203,6 +219,169 @@ def test_run_cell_marks_failure(tmp_path: Path):
     assert result.result_path is None
 
 
+def test_run_cell_diagnostic_rerun_fires_for_empty_stdout_failure(tmp_path: Path):
+    captured_quiet = []
+
+    def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
+        captured_quiet.append(quiet)
+        return [sys.executable, "-c", "unused"]
+
+    outcomes = [
+        TimeoutResult(exit_code=2, timed_out=False, elapsed_s=0.1, stdout=b"", stderr=b""),
+        TimeoutResult(exit_code=2, timed_out=False, elapsed_s=0.1, stdout=b"diagnostic detail\n", stderr=None),
+    ]
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        return outcomes.pop(0)
+
+    with (
+        patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert result.exit_code == 2
+    assert captured_quiet == [True, False]
+    log_text = result.log_path.read_text()
+    assert "verbose diagnostic re-run" in log_text
+    assert "diagnostic detail" in log_text
+
+
+def test_run_cell_skips_diagnostic_rerun_when_failure_has_stderr(tmp_path: Path):
+    captured_quiet = []
+
+    def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
+        captured_quiet.append(quiet)
+        return [sys.executable, "-c", "unused"]
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        if stderr is not None:
+            stderr.write("uv run warning on stderr\n")
+        return TimeoutResult(
+            exit_code=2,
+            timed_out=False,
+            elapsed_s=0.1,
+            stdout=b"",
+            stderr=None,
+        )
+
+    with (
+        patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert captured_quiet == [True]
+    log_text = result.log_path.read_text()
+    assert "uv run warning on stderr" in log_text
+    assert "verbose diagnostic re-run" not in log_text
+
+
+def test_run_cell_skips_diagnostic_rerun_for_real_stderr_only_failure(tmp_path: Path):
+    captured_quiet = []
+
+    def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
+        captured_quiet.append(quiet)
+        return [
+            sys.executable,
+            "-c",
+            "import sys; sys.stderr.write('stderr diagnostic\\n'); sys.exit(2)",
+        ]
+
+    with patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert result.exit_code == 2
+    assert captured_quiet == [True]
+    log_text = result.log_path.read_text()
+    assert "stderr diagnostic" in log_text
+    assert "verbose diagnostic re-run" not in log_text
+
+
+def test_run_cell_diagnostic_rerun_fires_when_failure_has_only_whitespace_stderr(tmp_path: Path):
+    captured_quiet = []
+
+    def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
+        captured_quiet.append(quiet)
+        return [sys.executable, "-c", "unused"]
+
+    outcomes = [
+        TimeoutResult(exit_code=2, timed_out=False, elapsed_s=0.1, stdout=b"", stderr=b"\n"),
+        TimeoutResult(exit_code=2, timed_out=False, elapsed_s=0.1, stdout=b"diagnostic detail\n", stderr=None),
+    ]
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        return outcomes.pop(0)
+
+    with (
+        patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert captured_quiet == [True, False]
+    assert "diagnostic detail" in result.log_path.read_text()
+
+
+def test_run_cell_skips_diagnostic_rerun_when_failure_has_stdout(tmp_path: Path):
+    captured_quiet = []
+
+    def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
+        captured_quiet.append(quiet)
+        return [sys.executable, "-c", "unused"]
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        return TimeoutResult(
+            exit_code=2,
+            timed_out=False,
+            elapsed_s=0.1,
+            stdout=b"already diagnostic stdout\n",
+            stderr=b"incidental stderr\n",
+        )
+
+    with (
+        patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert captured_quiet == [True]
+    log_text = result.log_path.read_text()
+    assert "already diagnostic stdout" in log_text
+    assert "incidental stderr" in log_text
+    assert "verbose diagnostic re-run" not in log_text
+
+
+def test_run_cell_diagnostic_rerun_error_does_not_mask_original_failure(tmp_path: Path):
+    def fake_benchbox_run_argv(*args, quiet=True, **kwargs):
+        return [sys.executable, "-c", "unused"]
+
+    calls = 0
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return TimeoutResult(exit_code=2, timed_out=False, elapsed_s=0.1, stdout=b"", stderr=b"")
+        raise RuntimeError("diagnostic boom")
+
+    with (
+        patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert result.exit_code == 2
+    assert calls == 2
+    assert "diagnostic re-run error RuntimeError: diagnostic boom" in result.log_path.read_text()
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX timeout semantics")
 def test_run_cell_marks_timeout(tmp_path: Path):
     fake_argv = [sys.executable, "-c", "import time; time.sleep(3)"]
@@ -211,6 +390,78 @@ def test_run_cell_marks_timeout(tmp_path: Path):
     assert result.status == "timed-out"
     assert result.exit_code == 124  # EXIT_TIMEOUT
     assert "UAT_TIMEOUT timeout_s=1 exit_code=124" in result.log_path.read_text()
+
+
+def test_run_cell_flags_local_datagen_leak_under_external_root(monkeypatch, tmp_path: Path):
+    """run_cell fails loudly when a subprocess leaks datagen into cwd/benchmark_runs."""
+    worktree = tmp_path / "wt"
+    worktree.mkdir()
+    external = tmp_path / "ext"
+    external.mkdir()
+    monkeypatch.chdir(worktree)
+
+    leaked_dir = worktree / "benchmark_runs" / "datagen" / "tpch_sf001"
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        leaked_dir.mkdir(parents=True, exist_ok=True)
+        (leaked_dir / "lineitem.tbl").write_bytes(b"x" * 4096)
+        return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1)
+
+    fake_argv = [sys.executable, "-c", "print('unused')"]
+    with (
+        patch.object(runner, "benchbox_run_argv", return_value=fake_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+        pytest.raises(LocalArtifactGrowthError) as excinfo,
+    ):
+        runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path / "logs",
+            benchmark_runs_dir=external,
+            now=_dt.datetime(2026, 6, 1, 12, 0, 0),
+        )
+
+    message = str(excinfo.value)
+    assert str(external) in message
+    assert str(worktree / "benchmark_runs") in message
+    # Report-only: the leaked artifact is left untouched.
+    assert (leaked_dir / "lineitem.tbl").exists()
+
+
+def test_run_cell_local_root_run_is_not_guarded(monkeypatch, tmp_path: Path):
+    """A run whose output root is inside cwd is a local run; the guard stays off."""
+    worktree = tmp_path / "wt"
+    worktree.mkdir()
+    monkeypatch.chdir(worktree)
+    local_runs = worktree / "benchmark_runs"
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        target = local_runs / "datagen" / "tpch_sf001"
+        target.mkdir(parents=True, exist_ok=True)
+        (target / "lineitem.tbl").write_bytes(b"x" * 4096)
+        return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1)
+
+    fake_argv = [sys.executable, "-c", "print('unused')"]
+    with (
+        patch.object(runner, "benchbox_run_argv", return_value=fake_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        # Output root inside the worktree => local run => no LocalArtifactGrowthError.
+        # (Reaching this point without an exception is the assertion.)
+        result = runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path / "logs",
+            benchmark_runs_dir=local_runs,
+            now=_dt.datetime(2026, 6, 1, 12, 0, 0),
+        )
+    assert isinstance(result, runner.CellResult)
+    # The local write is left untouched — the guard is off, not silently cleaning.
+    assert (local_runs / "datagen" / "tpch_sf001" / "lineitem.tbl").exists()
 
 
 def test_default_log_dir_honours_benchbox_output_dir(monkeypatch, tmp_path: Path):

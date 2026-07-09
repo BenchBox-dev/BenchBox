@@ -14,12 +14,16 @@ import json
 import pytest
 
 from benchbox.core.results.query_plan_models import (
+    FINGERPRINT_VERSION,
+    LEGACY_FINGERPRINT_VERSION,
     AggregateFunction,
+    FingerprintIntegrity,
     JoinType,
     LogicalOperator,
     LogicalOperatorType,
     PhysicalOperator,
     QueryPlanDAG,
+    _normalize_literal_text,
     compute_plan_fingerprint,
 )
 
@@ -27,6 +31,148 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def _scan(table: str, operator_id: str = "scan") -> LogicalOperator:
+    return LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id=operator_id, table_name=table)
+
+
+class TestFingerprintV2Encoding:
+    """qpc-03: the v2 structural encoding closes the F2.1 collision classes and
+    versions fingerprints so cross-version equality is never assumed."""
+
+    def test_sibling_children_vs_nested_chain_are_distinguished(self) -> None:
+        """F2.1 tree shape: Join[Scan(t1), Scan(t2)] (two siblings) and
+        Join[Scan(t1) -> Scan(t2)] (a nested chain) must NOT collide. The v1
+        pipe-joined encoding produced ``Join|Scan|table:t1|Scan|table:t2`` for
+        both."""
+        siblings = LogicalOperator(
+            operator_type=LogicalOperatorType.JOIN,
+            operator_id="j",
+            children=[_scan("t1", "s1"), _scan("t2", "s2")],
+        )
+        nested_inner = _scan("t1", "s1")
+        nested_inner.children = [_scan("t2", "s2")]
+        nested = LogicalOperator(operator_type=LogicalOperatorType.JOIN, operator_id="j", children=[nested_inner])
+
+        assert siblings.get_structural_signature() != nested.get_structural_signature()
+        assert compute_plan_fingerprint(siblings) != compute_plan_fingerprint(nested)
+
+    def test_filter_list_separator_injection_is_distinguished(self) -> None:
+        """F2.1 separator injection: two filters ["a","b"] must NOT collide with
+        a single filter ["a,b"] (the v1 ``,``-join made both ``filters:a,b``)."""
+        two = LogicalOperator(operator_type=LogicalOperatorType.FILTER, operator_id="f", filter_expressions=["a", "b"])
+        one = LogicalOperator(operator_type=LogicalOperatorType.FILTER, operator_id="f", filter_expressions=["a,b"])
+
+        assert two.get_structural_signature() != one.get_structural_signature()
+
+    def test_table_name_field_injection_is_distinguished(self) -> None:
+        """F2.1 separator injection: a table_name that embeds the v1 field
+        syntax (``x|filters:y``) must NOT collide with table ``x`` + filter
+        ``y``."""
+        crafted = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="s", table_name="x|filters:y")
+        genuine = LogicalOperator(
+            operator_type=LogicalOperatorType.SCAN, operator_id="s", table_name="x", filter_expressions=["y"]
+        )
+
+        assert crafted.get_structural_signature() != genuine.get_structural_signature()
+
+    def test_signature_is_canonical_json(self) -> None:
+        """The v2 signature is parseable canonical JSON with structural keys."""
+        op = LogicalOperator(
+            operator_type=LogicalOperatorType.JOIN,
+            operator_id="j",
+            join_type=JoinType.INNER,
+            children=[_scan("t1"), _scan("t2")],
+        )
+        parsed = json.loads(op.get_structural_signature())
+        assert parsed["op"] == "Join"
+        assert parsed["join"] == "inner"
+        assert [c["table"] for c in parsed["children"]] == ["t1", "t2"]
+
+    def test_set_like_fields_stay_order_independent(self) -> None:
+        """join_cond / filters / aggs remain set-like (sorted), so reordering
+        them does not change the fingerprint."""
+        a = LogicalOperator(
+            operator_type=LogicalOperatorType.FILTER, operator_id="f", filter_expressions=["a", "b", "c"]
+        )
+        b = LogicalOperator(
+            operator_type=LogicalOperatorType.FILTER, operator_id="f", filter_expressions=["c", "a", "b"]
+        )
+        assert a.get_structural_signature() == b.get_structural_signature()
+
+    def test_ordered_fields_are_order_sensitive(self) -> None:
+        """proj / group / sort preserve order (they affect output), so a
+        reorder DOES change the fingerprint."""
+        a = LogicalOperator(
+            operator_type=LogicalOperatorType.PROJECT, operator_id="p", projection_expressions=["x", "y"]
+        )
+        b = LogicalOperator(
+            operator_type=LogicalOperatorType.PROJECT, operator_id="p", projection_expressions=["y", "x"]
+        )
+        assert a.get_structural_signature() != b.get_structural_signature()
+
+
+class TestFingerprintVersioningAndIntegrity:
+    """qpc-03 / F2.2: honest integrity states and version handling on load."""
+
+    def test_fresh_plan_is_current_version_and_verified(self) -> None:
+        plan = QueryPlanDAG(query_id="q", platform="duckdb", logical_root=_scan("t"))
+        assert plan.fingerprint_version == FINGERPRINT_VERSION
+        assert plan.fingerprint_integrity == FingerprintIntegrity.VERIFIED
+        assert plan.is_fingerprint_trusted()
+
+    def test_to_dict_carries_fingerprint_version(self) -> None:
+        plan = QueryPlanDAG(query_id="q", platform="duckdb", logical_root=_scan("t"))
+        assert plan.to_dict()["fingerprint_version"] == FINGERPRINT_VERSION
+
+    def test_from_dict_roundtrips_version_and_verifies(self) -> None:
+        plan = QueryPlanDAG(query_id="q", platform="duckdb", logical_root=_scan("t"))
+        restored = QueryPlanDAG.from_dict(plan.to_dict())
+        assert restored.fingerprint_version == FINGERPRINT_VERSION
+        assert restored.fingerprint_integrity == FingerprintIntegrity.VERIFIED
+
+    def test_from_dict_absent_fingerprint_is_recomputed_not_verified(self) -> None:
+        """F2.2 trust laundering: deleting the stored fingerprint must yield
+        RECOMPUTED (untrusted-for-provenance), NOT VERIFIED -- otherwise
+        dropping the field bypasses stale-tamper detection."""
+        data = QueryPlanDAG(query_id="q", platform="duckdb", logical_root=_scan("t")).to_dict()
+        data.pop("plan_fingerprint")
+
+        restored = QueryPlanDAG.from_dict(data)
+
+        assert restored.fingerprint_integrity == FingerprintIntegrity.RECOMPUTED
+        # RECOMPUTED is still "trusted" for internal consistency (it was just
+        # computed from the tree), but it is explicitly NOT VERIFIED.
+        assert restored.fingerprint_integrity != FingerprintIntegrity.VERIFIED
+
+    def test_from_dict_tampered_fingerprint_is_stale(self) -> None:
+        data = QueryPlanDAG(query_id="q", platform="duckdb", logical_root=_scan("t")).to_dict()
+        data["plan_fingerprint"] = "deadbeef" * 8  # does not match the tree
+
+        restored = QueryPlanDAG.from_dict(data)
+
+        assert restored.fingerprint_integrity == FingerprintIntegrity.STALE
+        assert not restored.is_fingerprint_trusted()
+
+    def test_legacy_bundle_without_version_loads_as_v1_and_is_stale(self) -> None:
+        """must_preserve: an old bundle (v1 fingerprint, no fingerprint_version)
+        still LOADS. Its stored v1 fingerprint recomputes to a different v2
+        value, so it lands STALE (untrusted) and will compare via tree walk --
+        never via cross-version fingerprint equality."""
+        legacy = {
+            "query_id": "q",
+            "platform": "duckdb",
+            "logical_root": _scan("t").to_dict(),
+            "plan_fingerprint": "Scan|table:t",  # a v1-style pipe-joined stand-in
+            # no fingerprint_version key
+        }
+
+        restored = QueryPlanDAG.from_dict(legacy)
+
+        assert restored.fingerprint_version == LEGACY_FINGERPRINT_VERSION
+        assert restored.fingerprint_integrity == FingerprintIntegrity.STALE
+        assert not restored.is_fingerprint_trusted()
 
 
 class TestPhysicalOperator:
@@ -419,8 +565,11 @@ class TestLogicalOperator:
 
         signature = op.get_structural_signature()
 
-        assert "Scan" in signature
-        assert "table:orders" in signature
+        # v2 encoding is canonical JSON (qpc-03): the operator type and table
+        # appear as structured fields rather than pipe-joined tokens.
+        parsed = json.loads(signature)
+        assert parsed["op"] == "Scan"
+        assert parsed["table"] == "orders"
 
     def test_structural_signature_excludes_non_structural(self) -> None:
         """Test that structural signature excludes costs, IDs, etc."""
@@ -468,8 +617,8 @@ class TestLogicalOperator:
 
         # Different join types should produce different signatures
         assert inner_join.get_structural_signature() != left_join.get_structural_signature()
-        assert "join:inner" in inner_join.get_structural_signature()
-        assert "join:left" in left_join.get_structural_signature()
+        assert json.loads(inner_join.get_structural_signature())["join"] == "inner"
+        assert json.loads(left_join.get_structural_signature())["join"] == "left"
 
 
 class TestQueryPlanDAG:
@@ -1170,6 +1319,94 @@ class TestFingerprintCoverage:
         assert plan1.plan_fingerprint != plan2.plan_fingerprint
 
 
+class TestLiteralNormalization:
+    """Test the normalize_literals structural-signature / fingerprint option."""
+
+    def test_numeric_and_string_literals_are_masked(self) -> None:
+        assert _normalize_literal_text("l_quantity > 24") == "l_quantity > ?"
+        assert _normalize_literal_text("c_name = 'ALICE'") == "c_name = ?"
+
+    def test_ordinal_column_references_are_preserved(self) -> None:
+        """DuckDB (and others) emit ordinal refs like #0/#1 for projected/grouped
+        columns. Without excluding '#' from the numeric-literal lookbehind, every
+        ordinal collapses to the same '#?' placeholder, so plans that group/sort/
+        project DIFFERENT columns would spuriously fingerprint identically."""
+        assert _normalize_literal_text("#0") == "#0"
+        assert _normalize_literal_text("#1") == "#1"
+        assert _normalize_literal_text("group by #0, #1") == "group by #0, #1"
+        # A genuine numeric literal alongside an ordinal ref is still masked.
+        assert _normalize_literal_text("#0 > 24") == "#0 > ?"
+
+    def test_normalize_literals_distinguishes_different_ordinal_refs(self) -> None:
+        """End-to-end: two plans referencing different ordinal columns must NOT
+        collapse to the same normalized fingerprint."""
+        plan_col0 = QueryPlanDAG(
+            query_id="q1",
+            platform="duckdb",
+            logical_root=LogicalOperator(
+                operator_id="agg_1",
+                operator_type=LogicalOperatorType.AGGREGATE,
+                group_by_keys=["#0"],
+                children=[
+                    LogicalOperator(operator_id="scan_1", operator_type=LogicalOperatorType.SCAN, table_name="orders"),
+                ],
+            ),
+        )
+        plan_col1 = QueryPlanDAG(
+            query_id="q2",
+            platform="duckdb",
+            logical_root=LogicalOperator(
+                operator_id="agg_1",
+                operator_type=LogicalOperatorType.AGGREGATE,
+                group_by_keys=["#1"],
+                children=[
+                    LogicalOperator(operator_id="scan_1", operator_type=LogicalOperatorType.SCAN, table_name="orders"),
+                ],
+            ),
+        )
+
+        assert plan_col0.compute_plan_fingerprint(normalize_literals=True) != plan_col1.compute_plan_fingerprint(
+            normalize_literals=True
+        )
+
+    def test_normalize_literals_collapses_only_constant_differences(self) -> None:
+        """Plans differing only in a literal constant DO collapse under normalization,
+        while the default (literal-sensitive) fingerprint still distinguishes them."""
+        plan_a = QueryPlanDAG(
+            query_id="q1",
+            platform="duckdb",
+            logical_root=LogicalOperator(
+                operator_id="filter_1",
+                operator_type=LogicalOperatorType.FILTER,
+                filter_expressions=["l_quantity > 24"],
+                children=[
+                    LogicalOperator(
+                        operator_id="scan_1", operator_type=LogicalOperatorType.SCAN, table_name="lineitem"
+                    ),
+                ],
+            ),
+        )
+        plan_b = QueryPlanDAG(
+            query_id="q2",
+            platform="duckdb",
+            logical_root=LogicalOperator(
+                operator_id="filter_1",
+                operator_type=LogicalOperatorType.FILTER,
+                filter_expressions=["l_quantity > 30"],
+                children=[
+                    LogicalOperator(
+                        operator_id="scan_1", operator_type=LogicalOperatorType.SCAN, table_name="lineitem"
+                    ),
+                ],
+            ),
+        )
+
+        assert plan_a.plan_fingerprint != plan_b.plan_fingerprint
+        assert plan_a.compute_plan_fingerprint(normalize_literals=True) == plan_b.compute_plan_fingerprint(
+            normalize_literals=True
+        )
+
+
 class TestFingerprintVerification:
     """Test fingerprint verification and integrity tracking."""
 
@@ -1610,3 +1847,105 @@ class TestUnknownTypeWarnings:
         assert result is False
         # Should not trigger warnings during comparison
         assert "Unknown operator type" not in caplog.text
+
+
+class TestPlanDepthTruncation:
+    """qpc-10: deep plans serialize with a truncated_at_depth marker, not dropped."""
+
+    @staticmethod
+    def _linear_chain(depth: int) -> LogicalOperator:
+        """Build a linear operator chain ``depth`` levels below a SCAN leaf.
+
+        Returns the root; the chain is root -> child -> ... -> scan, so the deepest
+        node sits at ``current_depth == depth``.
+        """
+        node = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_leaf", table_name="t")
+        for level in range(depth):
+            node = LogicalOperator(
+                operator_type=LogicalOperatorType.FILTER,
+                operator_id=f"filter_{level}",
+                filter_expressions=[f"c > {level}"],
+                children=[node],
+            )
+        return node
+
+    def test_to_dict_emits_truncation_marker_beyond_max_depth(self) -> None:
+        root = self._linear_chain(6)
+
+        serialized = root.to_dict(max_depth=3)
+
+        # Walk down; at depth 4 (first node with current_depth > max_depth=3) we
+        # must hit a truncation marker instead of a raise or a dropped plan.
+        node = serialized
+        depth = 0
+        while "truncated_at_depth" not in node:
+            assert node["children"], f"reached a leaf at depth {depth} before truncation"
+            node = node["children"][0]
+            depth += 1
+        assert node["truncated_at_depth"] == 4
+        assert node["children_omitted"] >= 1
+        # The marker node carries operator identity but no recursed children key.
+        assert node["operator_id"].startswith(("filter_", "scan_"))
+        assert "children" not in node
+
+    def test_to_dict_no_truncation_when_within_max_depth(self) -> None:
+        root = self._linear_chain(3)
+        serialized = root.to_dict(max_depth=50)
+
+        # Full tree present, no marker anywhere.
+        node = serialized
+        while node.get("children"):
+            assert "truncated_at_depth" not in node
+            node = node["children"][0]
+        assert node["operator_id"] == "scan_leaf"
+
+    def test_deep_plan_serializes_instead_of_raising(self) -> None:
+        # A plan deeper than the default cap must NOT raise / disappear; it must
+        # produce a bounded serialization carrying the marker.
+        root = self._linear_chain(60)
+        plan = QueryPlanDAG(query_id="deep_q", platform="duckdb", logical_root=root)
+
+        size = plan.estimate_serialized_size()  # default max_depth
+        assert size > 0
+        payload = plan.to_json()
+        assert "truncated_at_depth" in payload
+
+    def test_truncation_marker_round_trips_as_leaf(self) -> None:
+        root = self._linear_chain(5)
+        serialized = root.to_dict(max_depth=2)
+        restored = LogicalOperator.from_dict(serialized)
+
+        # Traverse to the deepest restored node: it is a childless leaf (the
+        # marker's omitted children are not reconstructed).
+        node = restored
+        while node.children:
+            node = node.children[0]
+        assert node.children == []
+
+    def test_fingerprint_unaffected_by_serialization_truncation(self) -> None:
+        # The fingerprint is computed over the FULL in-memory tree, so shrinking
+        # the serialization depth must not change it (anti-pattern: never
+        # fingerprint a truncated tree as complete).
+        root = self._linear_chain(60)
+        plan = QueryPlanDAG(query_id="fp_q", platform="duckdb", logical_root=root)
+
+        fp = plan.plan_fingerprint
+        # Recompute after a shallow serialization round-trip of the size guard.
+        plan.estimate_serialized_size(max_depth=3)
+        assert plan.plan_fingerprint == fp
+        # And equals a fresh full-tree fingerprint (depth cap plays no role).
+        assert plan.compute_plan_fingerprint() == fp
+
+    def test_configurable_max_depth_changes_truncation_point(self) -> None:
+        root = self._linear_chain(10)
+
+        def _first_truncated_depth(md: int) -> int:
+            node = root.to_dict(max_depth=md)
+            depth = 0
+            while "truncated_at_depth" not in node:
+                node = node["children"][0]
+                depth += 1
+            return depth
+
+        assert _first_truncated_depth(2) == 3
+        assert _first_truncated_depth(5) == 6

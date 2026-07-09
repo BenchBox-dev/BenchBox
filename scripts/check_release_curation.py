@@ -79,12 +79,14 @@ def parse_curation_list(makefile: Path) -> set[str]:
     body = match.group(1)
     paths: set[str] = set()
     for line in body.splitlines():
-        # Match both `-git rm -rf <paths>` and `-git rm -f <paths>` (leading
-        # `-` is the Make convention for "ignore exit code").
-        rm_match = re.search(r"git rm (?:-rf|-f) (.+?)$", line.strip())
+        # Match `git rm -rf <paths>` and `git rm -f <paths>`, with or without
+        # `--ignore-unmatch` and with or without a leading `-` (the Make
+        # "ignore exit code" prefix used before --ignore-unmatch was added).
+        rm_match = re.search(r"git rm (?:-rf|-f)(?: --ignore-unmatch)? (.+?)$", line.strip())
         if not rm_match:
             continue
-        paths.update(rm_match.group(1).split())
+        # Skip option tokens such as --ignore-unmatch; only pathspecs count.
+        paths.update(p for p in rm_match.group(1).split() if not p.startswith("-"))
     return paths
 
 

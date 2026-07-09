@@ -22,6 +22,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from benchbox.core.expected_results.models import ValidationMode
 from benchbox.platforms.databricks import dataframe_adapter as mod
 
 pytestmark = [
@@ -36,38 +37,39 @@ pytestmark = [
 # ---------------------------------------------------------------------------
 
 
+def _fake_parent_init(self, **config):
+    self.server_hostname = config.get("server_hostname")
+    self.http_path = config.get("http_path")
+    self.access_token = config.get("access_token")
+    self.catalog = config.get("catalog", "main")
+    self.schema = config.get("schema", "default")
+    self.logger = logging.getLogger("test.databricks.parent")
+    self.log_verbose = lambda *_a, **_k: None
+    self.log_very_verbose = lambda *_a, **_k: None
+
+
 def _patch_parent_init(monkeypatch: pytest.MonkeyPatch) -> None:
     """Replace DatabricksAdapter.__init__ with a lightweight stub."""
 
-    def _fake_init(self, **config):
-        self.server_hostname = config.get("server_hostname")
-        self.http_path = config.get("http_path")
-        self.access_token = config.get("access_token")
-        self.catalog = config.get("catalog", "main")
-        self.schema = config.get("schema", "default")
-        self.logger = logging.getLogger("test.databricks.parent")
-        self.log_verbose = lambda *_a, **_k: None
-        self.log_very_verbose = lambda *_a, **_k: None
-
-    monkeypatch.setattr(mod.DatabricksAdapter, "__init__", _fake_init)
+    monkeypatch.setattr(mod.DatabricksAdapter, "__init__", _fake_parent_init)
 
 
 def _new_adapter(**overrides) -> mod.DatabricksDataFrameAdapter:
-    """Build a DatabricksDataFrameAdapter without hitting parent __init__."""
-    adapter = object.__new__(mod.DatabricksDataFrameAdapter)
-    adapter.server_hostname = overrides.get("server_hostname", "host.cloud.databricks.com")
-    adapter.access_token = overrides.get("access_token", "dapi_token")
-    adapter.catalog = overrides.get("catalog", "main")
-    adapter.schema = overrides.get("schema", "bench")
-    adapter.cluster_id = overrides.get("cluster_id")
-    adapter.execution_mode = overrides.get("execution_mode", "dataframe")
-    adapter._spark = None
-    adapter._spark_initialized = False
-    adapter.logger = logging.getLogger("test.databricks.adapter")
-    adapter.log_verbose = lambda *_a, **_k: None
-    adapter.log_very_verbose = lambda *_a, **_k: None
-    adapter._build_query_result_with_validation = lambda **kw: {"status": "OK", **kw}
-    return adapter
+    """Build a DatabricksDataFrameAdapter through its constructor with a fake parent init."""
+    config = {
+        "server_hostname": overrides.get("server_hostname", "host.cloud.databricks.com"),
+        "http_path": overrides.get("http_path", "/sql/path"),
+        "access_token": overrides.get("access_token", "dapi_token"),
+        "catalog": overrides.get("catalog", "main"),
+        "schema": overrides.get("schema", "bench"),
+        "cluster_id": overrides.get("cluster_id"),
+        "execution_mode": overrides.get("execution_mode", "dataframe"),
+    }
+    with (
+        patch.object(mod.DatabricksAdapter, "__init__", _fake_parent_init),
+        patch.object(mod, "DATABRICKS_CONNECT_AVAILABLE", True),
+    ):
+        return mod.DatabricksDataFrameAdapter(**config)
 
 
 def _make_fake_spark(registered: list | None = None):
@@ -104,6 +106,8 @@ def _make_result_df(rows=()):
 def _mock_validator(*, warning=None, is_valid=True, error=None):
     """Return a (mock_class, mock_result) pair for QueryValidator patching."""
     result = MagicMock()
+    result.expected_row_count = 2
+    result.validation_mode = ValidationMode.EXACT
     result.warning_message = warning
     result.is_valid = is_valid
     result.error_message = error
@@ -290,8 +294,8 @@ class TestExecuteDataFrameQueryValidation:
             validator_mock=validator,
         )
 
-        assert out["status"] == "OK"
-        assert out["actual_row_count"] == 2
+        assert out["status"] == "SUCCESS"
+        assert out["rows_returned"] == 2
         validator.validate_query_result.assert_called_once_with(
             benchmark_type="tpch",
             query_id="Q1",
@@ -323,7 +327,7 @@ class TestExecuteDataFrameQueryValidation:
     def test_empty_result_sets_first_row_none(self):
         adapter = _new_adapter()
         out, _ = self._run(adapter, [], validate=False)
-        assert out["actual_row_count"] == 0
+        assert out["rows_returned"] == 0
         assert out["first_row"] is None
 
     def test_tables_dict_registers_each_table(self):
@@ -334,7 +338,7 @@ class TestExecuteDataFrameQueryValidation:
             validate=False,
             tables={"lineitem": "/p/lineitem", "orders": "/p/orders"},
         )
-        assert out["status"] == "OK"
+        assert out["status"] == "SUCCESS"
         assert set(registered) == {"lineitem", "orders"}
 
     def test_stream_id_forwarded_to_validator(self):

@@ -28,7 +28,9 @@ BenchBox _loosely_ follows [Semantic Versioning](https://semver.org/) using the 
 - **MINOR** when we add backward-compatible changes _OR significantly expand functionality_.
 - **PATCH** when we make bug fixes or documentation updates, _bug-fixes may not be backward-compatible_.
 
-Current release: v0.3.0. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
+Current release: v0.3.1. This marker mirrors `pyproject.toml` on `develop` (bumped only during release-cut, so it trails the actual latest published release between cuts) and is checked for internal consistency by `benchbox --version`; it is **not** what `pip install benchbox` gets you today.
+
+**The actual PyPI-latest release is `v0.3.0`** (published 2026-05-16; see [PyPI's release history](https://pypi.org/project/benchbox/#history) or `pip index versions benchbox` for the authoritative answer). **Known issue:** `v0.3.0`'s clean install is broken — `pip install benchbox` followed by `import benchbox` fails with `ModuleNotFoundError: No module named 'pandas'`. The fix is complete on `develop` (see `CHANGELOG.md`'s Unreleased section) but not yet published under a released version; until a recovery release ships, install from `develop` if you hit this: `pip install git+https://github.com/joeharris76/BenchBox.git@develop`. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
 
 **For Developers**: See [Release Automation Guide](release/RELEASE_AUTOMATION.md) for the automated release process with reproducible builds and timestamp normalization.
 
@@ -38,14 +40,25 @@ Current release: v0.3.0. Check your installation with `benchbox --version`, whic
 
 The default wheel ships the `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, concurrency subsystems). This namespace is **outside the supported Beta product surface**: it has no stability guarantees, may change or be removed without notice, and is not integrated with the benchmark registry or public CLI. It is present in the wheel for developer convenience only.
 
+Public contract tiers, support-status vocabulary, and source-of-truth rules for platform and benchmark count claims are tracked in [Public Contracts and Support Taxonomy](docs/reference/public-contracts.md).
+
+Registry-backed count claims are checked by unit tests so README and platform docs do not drift from runtime metadata:
+
+<!-- benchbox-registry-counts:start -->
+
+- Platform registry: **50** metadata entries; **45** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=27, experimental=17, deprecated=1.
+- Benchmark registry: **23** metadata entries; **22** public discovery entries.
+
+<!-- benchbox-registry-counts:end -->
+
 ## Features
 
 - **Embedded Benchmarks**: Self-contained benchmark data and queries
-- **Twenty-Two Benchmarks**: TPC-H, TPC-DS, TPC-DI, TPC-DS-OBT, TPC-H Skew, TPC-Havoc, SSB, AMPLab, JoinOrder, ClickBench, H2ODB, NYC Taxi, Flight Data, TSBS DevOps, CoffeeShop, TPC-H Data Vault, Vector Search, Read Primitives, Write Primitives, Transaction Primitives, Metadata Primitives, AI Primitives
+- **Benchmark Catalog**: TPC-H, TPC-DS, TPC-DI, TPC-DS-OBT, TPC-H Skew, TPC-Havoc, SSB, AMPLab, JoinOrder, ClickBench, H2ODB, NYC Taxi, Flight Data, TSBS DevOps, CoffeeShop, TPC-H Data Vault, Vector Search, Read Primitives, Write Primitives, Transaction Primitives, Metadata Primitives, AI Primitives
 - **Cross-Database**: Same benchmarks work on any database platform
-- **DataFrame Mode**: Native DataFrame API benchmarking with Polars, Pandas, and 6 other libraries
-- **SQL Platforms** (42): DuckDB, MotherDuck, SQLite, DataFusion, PostgreSQL, TimescaleDB, ClickHouse (Local, Server, Cloud), CedarDB, Firebolt, Databend, Doris, StarRocks, SingleStore, QuestDB, InfluxDB, pg_duckdb, pg_mooncake, Databricks SQL, Snowflake, BigQuery, Redshift, Azure Synapse Analytics, Microsoft Fabric Warehouse, Microsoft Fabric Lakehouse SQL, Trino, Starburst, Presto, Amazon Athena, Spark, PySpark, LakeSail Sail, Apache Gluten + Velox, Onehouse Quanton, AWS Glue, Amazon EMR Serverless, Amazon Athena for Apache Spark, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Azure Synapse Analytics Spark
-- **DataFrame Platforms** (9): DataFusion-DF, Polars-DF, Pandas-DF, Modin-DF, Dask-DF, cuDF-DF (GPU), PySpark-DF, Databricks-DF, LakeSail-DF
+- **DataFrame Mode**: Native DataFrame API benchmarking with Polars, Pandas, DataFusion, Dask, and other DataFrame runtimes
+- **SQL Platforms**: DuckDB, MotherDuck, SQLite, DataFusion, PostgreSQL, TimescaleDB, ClickHouse (Local, Server, Cloud), CedarDB, Firebolt, Databend, Doris, StarRocks, SingleStore, QuestDB, InfluxDB, pg_duckdb, pg_mooncake, Databricks SQL, Snowflake, BigQuery, Redshift, Azure Synapse Analytics, Microsoft Fabric Warehouse, Microsoft Fabric Lakehouse SQL, Trino, Starburst, Presto, Amazon Athena, Spark, PySpark, LakeSail Sail, Apache Gluten + Velox, Onehouse Quanton, AWS Glue, Amazon EMR Serverless, Amazon Athena for Apache Spark, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Azure Synapse Analytics Spark
+- **DataFrame Platforms**: DataFusion-DF, Polars-DF, Pandas-DF, Modin-DF, Dask-DF, cuDF-DF (GPU), PySpark-DF, Databricks-DF, LakeSail-DF
 - **Open Table Formats**: Delta Lake, Apache Iceberg, Apache Hudi (via Databricks, Quanton, Trino, Spark platforms)
 - **SQL Translation**: Automatic query conversion between SQL dialects
 - **Self-Contained Python Package**: Core install requires no external database servers or system dependencies; opt-in to extra package installs for cloud platforms when needed.
@@ -106,7 +119,7 @@ BenchBox and [LakeBench](https://github.com/mwc360/LakeBench) are both Python-ba
 
 LakeBench focuses on **lakehouse compute engines** (Spark, Fabric, Synapse, HDInsight) and evaluates end-to-end ELT workflows - ingestion, transformation, maintenance, and queries - using Delta Lake tables. It offers 4 benchmarks including ELTBench, a custom workflow-oriented benchmark.
 
-BenchBox focuses on the **broad ecosystem of analytic platforms**-from single-node engines like DuckDB, to DataFrame libraries like Polars and Pandas, through to cloud data warehouses like Snowflake, BigQuery, and Redshift. It provides 22 benchmarks including TPC standards, academic workloads like SSB and JoinOrder, and BenchBox-original benchmarks like TPC-Havoc for optimizer stress testing.
+BenchBox focuses on the **broad ecosystem of analytic platforms**-from single-node engines like DuckDB, to DataFrame libraries like Polars and Pandas, through to cloud data warehouses like Snowflake, BigQuery, and Redshift. It provides 22 public-discovery benchmarks including TPC standards, academic workloads like SSB and JoinOrder, and BenchBox-original benchmarks like TPC-Havoc for optimizer stress testing.
 
 Consider LakeBench when evaluating Spark-based lakehouse engines, testing complete ELT pipeline performance, or working primarily in Microsoft Fabric/Azure environments. Consider BenchBox when benchmarking across the analytic platform spectrum, needing benchmark variety beyond TPC standards, or comparing DataFrame libraries alongside SQL engines.
 
@@ -466,7 +479,7 @@ Same benchmark, same scale factor, different execution paradigm.
 - Use `benchbox run` CLI for full benchmark execution
 
 **For Advanced Usage:**
-- Explore all 22 benchmark suites: TPC-H, TPC-DS, TPC-DI, ClickBench, H2ODB, NYC Taxi, Flight Data, Vector Search, and more
+- Explore the full benchmark suite: TPC-H, TPC-DS, TPC-DI, ClickBench, H2ODB, NYC Taxi, Flight Data, Vector Search, and more
 - Scale up with larger datasets (scale factors 1.0, 10.0, 100.0+)
 - Compare performance across different platforms
 - See [examples/INDEX.md](examples/INDEX.md) for complete examples navigation

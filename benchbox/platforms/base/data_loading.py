@@ -6,6 +6,7 @@ and file formats, with support for compression and batch processing.
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import gzip
 import hashlib
@@ -20,6 +21,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal
 from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any, Protocol
@@ -706,6 +709,20 @@ class DataSourceResolver:
         self._select_manifest_override_tables(source, benchmark, data_dir)
 
         return source
+
+
+def resolve_adapter_data_source(adapter: Any, benchmark: Any, data_dir: Path) -> DataSource:
+    """Resolve data files for adapters that use standard DataSourceResolver state."""
+    resolver = DataSourceResolver(
+        platform_name=adapter.platform_name,
+        table_mode=adapter.table_mode,
+        platform_config=adapter.platform_config,
+        requested_format=adapter.requested_table_format,
+    )
+    data_source = resolver.resolve(benchmark, data_dir)
+    if not data_source or not data_source.tables:
+        raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
+    return data_source
 
 
 class CompressionHandler(ABC):
@@ -1916,6 +1933,10 @@ class ClickHouseNativeHandler(FileFormatHandler):
         """Get delimiter for this file format."""
         return self.delimiter_char
 
+    def _uses_server_mode(self) -> bool:
+        """Return whether this handler targets a self-hosted ClickHouse server."""
+        return getattr(self.adapter, "deployment_mode", None) == "server"
+
     def _get_csv_loading_config(self, table_name: str) -> dict[str, str]:
         """Get CSV loading configuration for ClickHouse.
 
@@ -1966,6 +1987,12 @@ class ClickHouseNativeHandler(FileFormatHandler):
         validated_table = validate_sql_identifier(table_name, "table name")
 
         try:
+            if self._uses_server_mode():
+                base_ext = FileFormatRegistry.get_base_data_extension(file_path)
+                if base_ext == ".parquet":
+                    return self._load_parquet_via_client_insert(validated_table, file_path, connection)
+                return self._load_delimited_via_client_insert(validated_table, file_path, connection, benchmark, logger)
+
             escaped_path = escape_sql_string_literal(str(file_path))
 
             # ClickHouse natively supports Parquet via file().  Use that path
@@ -2009,6 +2036,138 @@ class ClickHouseNativeHandler(FileFormatHandler):
             logger.error(f"ClickHouse file loading failed: {e}")
             raise
 
+    def _load_delimited_via_client_insert(
+        self,
+        validated_table: str,
+        file_path: Path,
+        connection: Any,
+        benchmark: Any,
+        logger: Any,
+    ) -> int:
+        """Load host-local delimited files into ClickHouse server via client batches."""
+        compression_handler = FileFormatRegistry.get_compression_handler(file_path)
+
+        with compression_handler.open(file_path) as file_handle:
+            data_start = None
+            if self.has_header:
+                file_handle.readline()
+                data_start = file_handle.tell()
+
+            column_count = SchemaInspector.get_column_count(
+                benchmark, validated_table, file_handle, self.delimiter_char
+            )
+            if column_count is None:
+                logger.debug(f"Could not determine column count for {validated_table}")
+                return 0
+            if data_start is not None:
+                file_handle.seek(data_start)
+
+            total_rows = 0
+            processor = RowBatchProcessor()
+            insert_sql = f"INSERT INTO {validated_table} VALUES"
+            column_types = self._get_column_type_names(benchmark, validated_table)
+            for batch_data, current_count in processor.process_file(file_handle, self.delimiter_char, column_count):
+                connection.execute(insert_sql, self._convert_rows_for_clickhouse(batch_data, column_types))
+                total_rows = current_count
+
+        return total_rows
+
+    def _get_column_type_names(self, benchmark: Any, table_name: str) -> list[str | None]:
+        """Return schema type strings for a benchmark table when available."""
+        schema = benchmark.get_schema() if hasattr(benchmark, "get_schema") else {}
+        table_schema = schema.get(table_name, schema.get(table_name.lower(), {}))
+        columns = table_schema.get("columns", []) if isinstance(table_schema, dict) else []
+
+        type_names: list[str | None] = []
+        for column in columns:
+            if isinstance(column, dict):
+                type_names.append(str(column.get("type") or column.get("data_type") or "").upper() or None)
+            elif hasattr(column, "get_sql_type"):
+                type_names.append(str(column.get_sql_type()).upper())
+            else:
+                type_names.append(None)
+        return type_names
+
+    def _convert_rows_for_clickhouse(
+        self,
+        rows: list[tuple[Any, ...]],
+        column_types: list[str | None],
+    ) -> list[tuple[Any, ...]]:
+        """Convert text fields to Python values accepted by clickhouse-driver."""
+        if not column_types:
+            return rows
+        return [
+            tuple(
+                self._convert_field_for_clickhouse(
+                    value,
+                    column_types[index] if index < len(column_types) else None,
+                )
+                for index, value in enumerate(row)
+            )
+            for row in rows
+        ]
+
+    def _convert_field_for_clickhouse(self, value: Any, type_name: str | None) -> Any:
+        if type_name is None or not isinstance(value, str):
+            return value
+
+        type_upper = type_name.upper()
+
+        # Array types: parse the CSV string representation into a Python list so
+        # clickhouse-driver receives a sequence rather than a raw string.
+        if "ARRAY" in type_upper:
+            if not value or value.upper() in ("\\N", "NULL"):
+                return None
+            try:
+                parsed = ast.literal_eval(value)
+                if isinstance(parsed, (list, tuple)):
+                    return list(parsed)
+            except (ValueError, SyntaxError):
+                pass
+            return value
+
+        needs_non_string_value = (
+            "INT" in type_upper
+            or any(token in type_upper for token in ("DECIMAL", "NUMERIC", "DOUBLE", "FLOAT", "REAL"))
+            or type_upper.startswith("DATE")
+        )
+        if value == "":
+            return None if needs_non_string_value else value
+
+        if "INT" in type_upper:
+            return int(value)
+        if any(token in type_upper for token in ("DECIMAL", "NUMERIC")):
+            return Decimal(value)
+        if any(token in type_upper for token in ("DOUBLE", "FLOAT", "REAL")):
+            return float(value)
+        if type_upper.startswith("DATE"):
+            return date.fromisoformat(value)
+        return value
+
+    def _load_parquet_via_client_insert(self, validated_table: str, file_path: Path, connection: Any) -> int:
+        """Load host-local Parquet files into ClickHouse server via client batches."""
+        try:
+            import pyarrow.parquet as pq
+        except ImportError as e:
+            raise RuntimeError("pyarrow is required for Parquet loading") from e
+
+        table = pq.read_table(file_path)
+        if table.num_rows == 0:
+            return 0
+
+        column_names = table.schema.names
+        validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
+        rows = table.to_pylist()
+        insert_sql = f"INSERT INTO {validated_table} ({','.join(validated_columns)}) VALUES"
+
+        batch_size = 1000
+        for start in range(0, len(rows), batch_size):
+            batch_rows = rows[start : start + batch_size]
+            batch = [tuple(row[col] for col in column_names) for row in batch_rows]
+            connection.execute(insert_sql, batch)
+
+        return table.num_rows
+
     def load_table_bulk(
         self,
         table_name: str,
@@ -2025,6 +2184,9 @@ class ClickHouseNativeHandler(FileFormatHandler):
 
         Falls back to the default per-shard loop only when shards span multiple directories.
         """
+        if self._uses_server_mode():
+            return super().load_table_bulk(table_name, file_paths, connection, benchmark, logger)
+
         if len(file_paths) == 1:
             return self.load_table(table_name, file_paths[0], connection, benchmark, logger)
 
@@ -2319,7 +2481,8 @@ class DataLoader:
 
         table_stats = self._load_file_based_data(data_source)
 
-        self.connection.commit()
+        if hasattr(self.connection, "commit"):
+            self.connection.commit()
 
         duration = elapsed_seconds(start_time)
         total_rows = sum(table_stats.values())

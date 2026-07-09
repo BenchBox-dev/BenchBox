@@ -1,11 +1,5 @@
 """Platform/benchmark matrix machinery for the UAT framework.
 
-This is the Python port of the bash machinery in
-`scripts/local_stress_test.sh`. It is deliberately a structural mirror so
-that the parity test (`tests/uat/test_matrix.py::test_bash_parity`) can
-assert that every key in the bash case statements has a matching entry
-here, and vice versa.
-
 Sequential platform execution discipline. Per UAT W3 line 222 (in
 `_project/handoffs/results-explorer-uat-retrospective-20260502.md`),
 parallel platforms contaminate timings. Callers must iterate platforms
@@ -19,72 +13,19 @@ import socket
 from dataclasses import dataclass
 from typing import Iterable
 
-# Platform → "host:port" for TCP reachability probes. Mirrors
-# `get_platform_port` in scripts/local_stress_test.sh.
-PLATFORM_PORTS: dict[str, str] = {
-    "lakesail": "localhost:50051",
-    "singlestore": "localhost:13306",
-    "questdb": "localhost:8812",
-    "presto": "localhost:18081",
-    "trino": "localhost:18080",
-    "clickhouse-server": "localhost:9000",
-    "starrocks": "localhost:19030",
-    "cedardb": "localhost:5435",
-    "databend": "localhost:8000",
-    "doris": "localhost:19031",
-    "influxdb": "localhost:8181",
-    "pg-duckdb": "localhost:5432",
-    "pg-mooncake": "localhost:5432",
-    "timescaledb": "localhost:5432",
-    "postgresql": "localhost:5432",
-    "velox": "localhost:50051",
-}
+from benchbox.core.benchmark_registry import CATEGORY_ORDER
+from benchbox.core.platform_registry import PlatformRegistry
+from tests.uat import docker_assets
 
-# Platform → list of `--platform-option` argv to append. Mirrors
-# `get_platform_extra_opts` in scripts/local_stress_test.sh:164-173.
-PLATFORM_EXTRA_OPTS: dict[str, list[str]] = {
-    "questdb": ["--platform-option", "http_port=19000"],
-    "starrocks": [
-        "--platform-option",
-        "port=19030",
-        "--platform-option",
-        "http_port=18040",
-    ],
-    "doris": [
-        "--platform-option",
-        "port=19031",
-        "--platform-option",
-        "http_port=18030",
-        "--platform-option",
-        "be_http_port=18040",
-    ],
-    "singlestore": [
-        "--platform-option",
-        "port=13306",
-        "--platform-option",
-        "password=benchbox",
-    ],
-    "velox": [
-        "--platform-option",
-        "deployment=remote",
-        "--platform-option",
-        "endpoint=sc://localhost:50051",
-    ],
-}
+# Connection facts (reachability host:port, platform-option ports/credentials)
+# are owned by tests.uat.docker_assets and derived from the docker-compose
+# `ports:` mappings rather than duplicated here. matrix consumes them via
+# docker_assets.host_reachability_endpoint / platform_extra_opts /
+# local_managed_platform_extra_opts so the two surfaces cannot drift and an env
+# override (e.g. SINGLESTORE_HOST_PORT) flows through to the probe and the
+# adapter `port=` option alike.
 
-# Platform → local managed Docker credentials appended only when the caller is
-# running a UAT-managed Docker stack. Keep this separate from
-# PLATFORM_EXTRA_OPTS because that mapping is a parity mirror of
-# scripts/local_stress_test.sh.
-LOCAL_MANAGED_PLATFORM_EXTRA_OPTS: dict[str, list[str]] = {
-    "pg-duckdb": ["--platform-option", "password=benchbox"],
-    "pg-mooncake": ["--platform-option", "password=benchbox"],
-    "timescaledb": ["--platform-option", "password=benchbox"],
-    "postgresql": ["--platform-option", "password=benchbox"],
-}
-
-# Platform → extra benchbox CLI flags (not --platform-option). Mirrors
-# `get_platform_cli_flags` in scripts/local_stress_test.sh:187-192.
+# Platform -> extra benchbox CLI flags (not --platform-option).
 # velox: Docker Desktop's 11.7 GB ceiling cannot fit 3xSF=1 TPC-H passes
 # inside a Spark/Velox container; one warmup + one measurement run is
 # sufficient for functional verification.
@@ -92,19 +33,20 @@ PLATFORM_CLI_FLAGS: dict[str, list[str]] = {
     "velox": ["--iterations", "1"],
 }
 
-# Platform → uv extra name (`uv run --extra X`). Mirrors
-# `get_platform_uv_extra` in scripts/local_stress_test.sh:548-555.
+# Platform -> uv extra name (`uv run --extra X`).
 PLATFORM_UV_EXTRA: dict[str, str] = {
     "clickhouse-local": "clickhouse-local",
+    "clickhouse-server": "clickhouse-server",
     "lakesail": "lakesail",
     "singlestore": "singlestore",
     "influxdb": "influxdb",
 }
 
-# Platform groupings (mirrors lines 127-137 of the bash script).
-FAST_NATIVE_PLATFORMS: tuple[str, ...] = (
-    "duckdb",
-    "datafusion",
+# Platform groupings.
+# Consumed by both the UAT framework and the integration matrix test;
+# align with both before changing.
+LOCAL_SQL_PLATFORMS: tuple[str, ...] = ("duckdb", "sqlite", "datafusion")
+FAST_NATIVE_PLATFORMS: tuple[str, ...] = tuple(platform for platform in LOCAL_SQL_PLATFORMS if platform != "sqlite") + (
     "clickhouse-local",
 )
 FAST_DOCKER_PLATFORMS: tuple[str, ...] = (
@@ -113,7 +55,9 @@ FAST_DOCKER_PLATFORMS: tuple[str, ...] = (
     "cedardb",
     "starrocks",
 )
-SLOW_NATIVE_PLATFORMS: tuple[str, ...] = ("sqlite", "spark")
+SLOW_NATIVE_PLATFORMS: tuple[str, ...] = tuple(platform for platform in LOCAL_SQL_PLATFORMS if platform == "sqlite") + (
+    "spark",
+)
 SLOW_DOCKER_PLATFORMS: tuple[str, ...] = (
     "postgresql",
     "presto",
@@ -128,30 +72,62 @@ SLOW_DOCKER_PLATFORMS: tuple[str, ...] = (
     "singlestore",
     "velox",
 )
-DATAFRAME_PLATFORMS: tuple[str, ...] = (
-    "polars-df",
-    "pandas-df",
-    "modin-df",
-    "pyspark-df",
-    "dask-df",
-    "datafusion-df",
+UAT_DATAFRAME_PLATFORM_BASES: tuple[str, ...] = (
+    "polars",
+    "pandas",
+    "modin",
+    "pyspark",
+    "dask",
+    "datafusion",
 )
+
+SQL_PLATFORMS: tuple[str, ...] = ()
+DOCKER_PLATFORMS: tuple[str, ...] = ()
+DATAFRAME_PLATFORMS: tuple[str, ...] = ()
+
+
+def _registry_platform_subset(
+    group_name: str,
+    candidates: tuple[str, ...],
+    registry_platforms: Iterable[str],
+) -> tuple[str, ...]:
+    registry_set = set(registry_platforms)
+    missing = tuple(platform for platform in candidates if platform not in registry_set)
+    if missing:
+        raise ValueError(f"UAT {group_name} platforms missing from platform registry: {missing}")
+    return candidates
+
+
+def _dataframe_selector_platforms() -> tuple[str, ...]:
+    registry_platforms = set(PlatformRegistry.get_dataframe_platforms())
+    missing = tuple(platform for platform in UAT_DATAFRAME_PLATFORM_BASES if platform not in registry_platforms)
+    if missing:
+        raise ValueError(f"UAT dataframe platforms missing from platform registry: {missing}")
+    return tuple(f"{platform}-df" for platform in UAT_DATAFRAME_PLATFORM_BASES)
+
+
+SQL_PLATFORMS = _registry_platform_subset(
+    "sql",
+    FAST_NATIVE_PLATFORMS + FAST_DOCKER_PLATFORMS + SLOW_NATIVE_PLATFORMS + SLOW_DOCKER_PLATFORMS,
+    PlatformRegistry.get_sql_platforms(),
+)
+DOCKER_PLATFORMS = _registry_platform_subset(
+    "docker",
+    FAST_DOCKER_PLATFORMS + SLOW_DOCKER_PLATFORMS,
+    PlatformRegistry.get_self_hosted_platforms(),
+)
+DATAFRAME_PLATFORMS = _dataframe_selector_platforms()
 
 PLATFORM_GROUPS: dict[str, tuple[str, ...]] = {
     "fast": FAST_NATIVE_PLATFORMS + FAST_DOCKER_PLATFORMS,
     "slow": SLOW_NATIVE_PLATFORMS + SLOW_DOCKER_PLATFORMS,
-    "sql": (FAST_NATIVE_PLATFORMS + FAST_DOCKER_PLATFORMS + SLOW_NATIVE_PLATFORMS + SLOW_DOCKER_PLATFORMS),
+    "native-sql": FAST_NATIVE_PLATFORMS + SLOW_NATIVE_PLATFORMS,
+    "sql": SQL_PLATFORMS,
     "dataframe": DATAFRAME_PLATFORMS,
-    "docker": FAST_DOCKER_PLATFORMS + SLOW_DOCKER_PLATFORMS,
+    "docker": DOCKER_PLATFORMS,
     "docker-fast": FAST_DOCKER_PLATFORMS,
     "docker-slow": SLOW_DOCKER_PLATFORMS,
-    "all": (
-        FAST_NATIVE_PLATFORMS
-        + FAST_DOCKER_PLATFORMS
-        + SLOW_NATIVE_PLATFORMS
-        + SLOW_DOCKER_PLATFORMS
-        + DATAFRAME_PLATFORMS
-    ),
+    "all": SQL_PLATFORMS + DATAFRAME_PLATFORMS,
 }
 
 
@@ -186,24 +162,21 @@ def resolve_platforms(
 # TCP reachability with sentinel-file cache equivalent.
 # ---------------------------------------------------------------------------
 
-# Bash uses one sentinel file per platform under $TMPDIR; the Python port
+# Bash used one sentinel file per platform under $TMPDIR; the Python port
 # uses an in-process dict keyed by platform name. Same effect: probe once
-# per platform per sweep, not once per cell.
+# per platform for this process, not once per cell. Runtime code clears the
+# cache only after UAT-managed platform lifecycle changes that can make a
+# prior reachability answer stale.
 _REACHABILITY_CACHE: dict[str, bool] = {}
 
 
-def reset_reachability_cache() -> None:
-    """Clear the per-platform reachability cache (test/sweep-restart hook)."""
+def invalidate_reachability_cache_after_lifecycle_change() -> None:
+    """Clear cached reachability after UAT starts or mutates a local platform."""
     _REACHABILITY_CACHE.clear()
 
 
 def tcp_probe(host: str, port: int, timeout_s: float = 2.0) -> bool:
-    """Return True iff a TCP connection to (host, port) succeeds within timeout.
-
-    Mirrors `tcp_probe` in scripts/local_stress_test.sh:201-210, which uses
-    nc when available and falls back to bash /dev/tcp. The Python port uses
-    socket.create_connection with the same 2-second default timeout.
-    """
+    """Return True iff a TCP connection to (host, port) succeeds within timeout."""
     try:
         with socket.create_connection((host, port), timeout=timeout_s):
             return True
@@ -214,14 +187,15 @@ def tcp_probe(host: str, port: int, timeout_s: float = 2.0) -> bool:
 def platform_is_reachable(platform: str) -> bool:
     """Return True iff `platform` has no port mapping or its port is open.
 
-    Mirrors `platform_is_reachable` in scripts/local_stress_test.sh:213-227.
-    Cached per platform name (matching the bash sentinel-file semantics).
+    The reachability endpoint is re-resolved from the compose-derived facts on
+    each cache miss so an env override (e.g. SINGLESTORE_HOST_PORT) set before
+    the probe is honored.
     """
     if platform in _REACHABILITY_CACHE:
         return _REACHABILITY_CACHE[platform]
-    addr = PLATFORM_PORTS.get(platform)
+    addr = docker_assets.host_reachability_endpoint(platform)
     if addr is None:
-        # No probe configured → assume reachable (bash behaviour).
+        # No probe configured -> assume reachable.
         _REACHABILITY_CACHE[platform] = True
         return True
     host, _, port_s = addr.partition(":")
@@ -239,12 +213,6 @@ def platform_is_reachable(platform: str) -> bool:
 # Benchmark enumeration via the registry.
 # ---------------------------------------------------------------------------
 
-# Benchmarks the bash script flags as SQL-only (no DataFrame execution).
-# Source of truth is `BENCHMARK_METADATA[bid]['supports_dataframe']`; this
-# constant exists for clarity in tests and matches the bash hardcoded
-# fallback (lines 274-275).
-KNOWN_SQL_ONLY_BENCHMARKS: tuple[str, ...] = ("ai_primitives", "vector_search")
-
 
 @dataclass(frozen=True)
 class BenchmarkInfo:
@@ -260,13 +228,7 @@ class BenchmarkInfo:
 
 
 def load_benchmarks() -> dict[str, BenchmarkInfo]:
-    """Read the benchmark registry directly (no eval, no shell-out).
-
-    The bash script imports the same registry via
-    `uv run --no-sync -- python -c '...'` (lines 232-263); the Python
-    port imports it as a library. A registry rename surfaces as an
-    ImportError here, not as a silent skip.
-    """
+    """Read the benchmark registry directly."""
     from benchbox.core.benchmark_registry import BENCHMARK_METADATA
 
     out: dict[str, BenchmarkInfo] = {}
@@ -283,26 +245,14 @@ def load_benchmarks() -> dict[str, BenchmarkInfo]:
     return out
 
 
+def category_group_slug(category: str) -> str:
+    return "".join(ch for ch in category.lower() if ch.isalnum())
+
+
 CATEGORY_GROUPS: dict[str, tuple[str, ...]] = {
-    "tpc": ("TPC",),
-    "primitives": ("Primitives",),
-    "industry": ("Industry",),
-    "academic": ("Academic",),
-    "timeseries": ("Time Series",),
-    "realworld": ("Real World",),
-    "aiml": ("AI/ML",),
-    "experimental": ("Experimental",),
-    "all": (
-        "TPC",
-        "Primitives",
-        "Industry",
-        "Academic",
-        "Time Series",
-        "Real World",
-        "AI/ML",
-        "Experimental",
-    ),
+    category_group_slug(category): (category,) for category in CATEGORY_ORDER
 }
+CATEGORY_GROUPS["all"] = tuple(CATEGORY_ORDER)
 
 
 def resolve_benchmarks(
@@ -332,14 +282,39 @@ def resolve_benchmarks(
     return [b for b in resolved if b not in excluded]
 
 
+def missing_benchmarks_from_include(
+    include: Iterable[str],
+    benchmarks: dict[str, BenchmarkInfo] | None = None,
+) -> list[str]:
+    """Return `include` entries naming a benchmark absent from the registry.
+
+    `resolve_benchmarks` silently drops `include` entries that are not keys of
+    `benchmarks` (so its group/exclude filtering never has to special-case an
+    unknown id) - which means a typo'd or removed benchmark id in a sweep
+    config's `benchmarks.include` list vanishes with zero signal before
+    `enumerate_cells_with_pruning` ever sees it. This exposes exactly which
+    requested ids were dropped for that reason, preserving request order and
+    de-duplicating, so callers can turn them into accounting rows instead of
+    a silent drop.
+    """
+    if benchmarks is None:
+        benchmarks = load_benchmarks()
+    seen: set[str] = set()
+    missing: list[str] = []
+    for bid in include:
+        if bid not in benchmarks and bid not in seen:
+            seen.add(bid)
+            missing.append(bid)
+    return missing
+
+
 def smoke_scale_for(benchmark_id: str, info: BenchmarkInfo | None = None) -> float:
     """Return the per-benchmark smoke-test scale.
 
-    Mirrors the inline Python in scripts/local_stress_test.sh:240-245:
-    `min_scale` if set; `default_scale` otherwise. TPC-DS is forced to
-    0.01 because the registry default is 1.0 for methodology reasons but
-    the local smoke suite intentionally exercises patched subscale
-    support.
+    Use `min_scale` when set and `default_scale` otherwise. TPC-DS is
+    forced to 0.01 because the registry default is 1.0 for methodology
+    reasons but the local smoke suite intentionally exercises patched
+    subscale support.
     """
     if info is None:
         info = load_benchmarks()[benchmark_id]
@@ -356,11 +331,6 @@ def filter_scales_by_registry(
     info: BenchmarkInfo | None = None,
 ) -> list[float]:
     """Drop requested scales that fall outside the registry's scale_options.
-
-    Fix forward from bash, per the parent TODO's W2 note: the bash script
-    honours `min_scale` via the smoke-scale lookup but does not enforce
-    the upper bound on a `--scale` override. This Python port enforces
-    both bounds.
 
     A requested scale is kept when it appears in `scale_options` OR
     `scale_options` is empty (bench has no declared options). The result
@@ -385,7 +355,7 @@ def uv_run_argv(platform: str) -> list[str]:
 
     Platforms with a registered uv extra use `uv run --extra X --`;
     others use `uv run --no-sync --` to avoid per-invocation sync
-    overhead. Matches scripts/local_stress_test.sh:449-452.
+    overhead.
     """
     extra = PLATFORM_UV_EXTRA.get(platform)
     if extra is not None:
@@ -402,12 +372,16 @@ def benchbox_run_argv(
     compression: str | None = None,
     extra_args: Iterable[str] = (),
     local_managed_platform: bool = False,
+    quiet: bool = True,
 ) -> list[str]:
     """Build the full `uv run -- benchbox run ...` argv for a single cell.
 
     Combines uv extras, platform `--platform-option` blocks, platform CLI
-    flags, and any caller-provided extra argv. The shape mirrors
-    scripts/local_stress_test.sh:453-464 exactly.
+    flags, and any caller-provided extra argv.
+
+    ``quiet`` defaults to ``True`` so the final stdout line is the result-JSON
+    path (parsed by the runner). Pass ``quiet=False`` to capture a full
+    diagnostic transcript when a cell exits non-zero with no captured output.
     """
     argv = uv_run_argv(platform)
     argv += [
@@ -420,14 +394,18 @@ def benchbox_run_argv(
         "--scale",
         str(scale),
         "--non-interactive",
+    ]
+    if quiet:
+        argv += ["--quiet"]
+    argv += [
         "--phases",
         phases,
     ]
     if compression is not None:
         argv += ["--compression", compression]
     argv += PLATFORM_CLI_FLAGS.get(platform, [])
-    argv += PLATFORM_EXTRA_OPTS.get(platform, [])
+    argv += docker_assets.platform_extra_opts(platform)
     if local_managed_platform:
-        argv += LOCAL_MANAGED_PLATFORM_EXTRA_OPTS.get(platform, [])
+        argv += docker_assets.local_managed_platform_extra_opts(platform)
     argv += list(extra_args)
     return argv

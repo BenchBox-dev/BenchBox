@@ -18,6 +18,26 @@ pytestmark = [
 ]
 
 
+def _future_benchmark_meta(support_status: str, surface: str) -> dict[str, object]:
+    """Metadata for a hypothetical future benchmark used to pin visibility invariants."""
+    return {
+        "display_name": f"Future {support_status}/{surface}",
+        "description": "synthetic future-status fixture",
+        "category": "Test",
+        "num_queries": 0,
+        "query_description": "n/a",
+        "supports_streams": False,
+        "default_scale": 1.0,
+        "scale_options": [1.0],
+        "min_scale": 1.0,
+        "complexity": "Low",
+        "estimated_time_range": (0, 0),
+        "supports_dataframe": False,
+        "support_status": support_status,
+        "surface": surface,
+    }
+
+
 class TestBenchmarkResources:
     """Tests for benchmark resources."""
 
@@ -34,6 +54,7 @@ class TestBenchmarkResources:
                     "display_name": meta.get("display_name", name),
                     "description": meta.get("description", ""),
                     "category": meta.get("category", "unknown"),
+                    "support_status": meta.get("support_status", "unknown"),
                     "query_count": meta.get("num_queries", 0),
                 }
             )
@@ -47,6 +68,17 @@ class TestBenchmarkResources:
         assert "count" in parsed
         assert parsed["count"] > 0
 
+    def test_list_benchmarks_resource_projects_support_status(self):
+        """Resource benchmark list should expose registry support status."""
+        from benchbox.mcp.resources.registry import _build_benchmarks_list
+
+        parsed = json.loads(_build_benchmarks_list())
+        benchmarks = {row["name"]: row for row in parsed["benchmarks"]}
+
+        assert benchmarks["tpch"]["support_status"] == "stable"
+        assert benchmarks["ai_primitives"]["support_status"] == "experimental"
+        assert "joinorder_synthetic" not in benchmarks
+
     def test_get_benchmark_resource_tpch(self):
         """Test getting TPC-H benchmark resource."""
         from benchbox.core.benchmark_registry import get_all_benchmarks
@@ -58,12 +90,54 @@ class TestBenchmarkResources:
             "name": "tpch",
             "display_name": meta.get("display_name"),
             "description": meta.get("description"),
+            "support_status": meta.get("support_status"),
             "query_count": meta.get("num_queries"),
         }
 
         assert result["name"] == "tpch"
         assert result["display_name"] == "TPC-H"
+        assert result["support_status"] == "stable"
         assert result["query_count"] == 22
+
+    def test_get_benchmark_resource_projects_support_status(self):
+        """Detailed benchmark resource should expose registry support status."""
+        from benchbox.mcp.resources.registry import _build_benchmark_detail
+
+        parsed = json.loads(_build_benchmark_detail("tpch"))
+
+        assert parsed["name"] == "tpch"
+        assert parsed["support_status"] == "stable"
+
+    def test_internal_future_status_hidden_from_resources(self):
+        """A future internal benchmark must not surface on the resource list or detail."""
+        from unittest.mock import patch
+
+        from benchbox.core import benchmark_registry
+        from benchbox.mcp.resources.registry import _build_benchmark_detail, _build_benchmarks_list
+
+        fixtures = {"x_future_internal": _future_benchmark_meta("document_only", "internal")}
+        with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False):
+            listed = {row["name"] for row in json.loads(_build_benchmarks_list())["benchmarks"]}
+            assert "x_future_internal" not in listed
+
+            detail = json.loads(_build_benchmark_detail("x_future_internal"))
+            assert "error" in detail
+            assert "support_status" not in detail
+
+    def test_public_future_status_exposed_in_resources(self):
+        """A future public benchmark is listed with its registry support status."""
+        from unittest.mock import patch
+
+        from benchbox.core import benchmark_registry
+        from benchbox.mcp.resources.registry import _build_benchmark_detail, _build_benchmarks_list
+
+        fixtures = {"x_future_public": _future_benchmark_meta("deprecated", "public")}
+        with patch.dict(benchmark_registry.BENCHMARK_METADATA, fixtures, clear=False):
+            listed = {row["name"]: row for row in json.loads(_build_benchmarks_list())["benchmarks"]}
+            assert listed["x_future_public"]["support_status"] == "deprecated"
+
+            detail = json.loads(_build_benchmark_detail("x_future_public"))
+            assert detail["support_status"] == "deprecated"
 
 
 class TestPlatformResources:

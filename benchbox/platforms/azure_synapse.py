@@ -19,16 +19,17 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
         TuningColumn,
         UnifiedTuningConfiguration,
     )
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
 from .base import DriverIsolationCapability, PlatformAdapter
-from .base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
+from .base.config_utils import make_registered_platform_config_builder
+from .base.data_loading import NO_BENCHMARK, DataSource, resolve_adapter_data_source, resolve_csv_dialect
+from .base.tuning import make_informational_constraint_applier
+from .presto_trino_utils import normalize_existing_files
 
 # Azure Synapse uses T-SQL dialect (compatible with SQL Server)
 SYNAPSE_DIALECT = "tsql"
@@ -41,6 +42,8 @@ except ImportError:
 
 class AzureSynapseAdapter(PlatformAdapter):
     """Azure Synapse Analytics platform adapter with cloud data warehouse optimizations."""
+
+    plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
     supports_external_tables = True
@@ -195,53 +198,40 @@ class AzureSynapseAdapter(PlatformAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create Azure Synapse adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-
-        # Generate proper database name using benchmark characteristics
-        if "database" in config and config["database"]:
-            adapter_config["database"] = config["database"]
-        else:
-            database_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                config,
                 platform="synapse",
-                tuning_config=config.get("tuning_config"),
+                fields=[
+                    "server",
+                    "port",
+                    "username",
+                    "password",
+                    "schema",
+                    "auth_method",
+                    "tenant_id",
+                    "client_id",
+                    "client_secret",
+                    "driver",
+                    "connect_timeout",
+                    "query_timeout",
+                    "encrypt",
+                    "storage_account",
+                    "container",
+                    "storage_path",
+                    "staging_root",
+                    "storage_sas_token",
+                    "storage_account_key",
+                    "storage_credential",
+                    "resource_class",
+                    "distribution_default",
+                    "disable_result_cache",
+                    "strict_validation",
+                ],
             )
-            adapter_config["database"] = database_name
-
-        # Copy config keys
-        for key in [
-            "server",
-            "port",
-            "username",
-            "password",
-            "schema",
-            "auth_method",
-            "tenant_id",
-            "client_id",
-            "client_secret",
-            "driver",
-            "connect_timeout",
-            "query_timeout",
-            "encrypt",
-            "storage_account",
-            "container",
-            "storage_path",
-            "staging_root",
-            "storage_sas_token",
-            "storage_account_key",
-            "storage_credential",
-            "resource_class",
-            "distribution_default",
-            "disable_result_cache",
-            "strict_validation",
-        ]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
     def _extract_storage_account(self, url: str) -> str | None:
         """Extract storage account name from Azure blob URL."""
@@ -719,31 +709,11 @@ class AzureSynapseAdapter(PlatformAdapter):
 
         return ", ".join(column_defs)
 
-    @staticmethod
-    def _normalize_existing_files(file_paths: Any) -> list[Path]:
-        """Normalize file inputs to existing, non-empty local paths."""
-        normalized_paths = file_paths if isinstance(file_paths, list) else [file_paths]
-        valid_files: list[Path] = []
-        for file_path in normalized_paths:
-            path = Path(file_path)
-            if path.exists() and path.stat().st_size > 0:
-                valid_files.append(path)
-        return valid_files
+    _normalize_existing_files = staticmethod(normalize_existing_files)
 
     def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> DataSource:
         """Resolve benchmark data files via DataSourceResolver."""
-        from benchbox.platforms.base.data_loading import DataSourceResolver
-
-        resolver = DataSourceResolver(
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
-        )
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source
+        return resolve_adapter_data_source(self, benchmark, data_dir)
 
     def _upload_external_parquet_to_blob(self, table_name: str, files: list[Path]) -> str:
         """Upload Parquet files for external mode and return Synapse LOCATION path."""
@@ -1045,8 +1015,6 @@ class AzureSynapseAdapter(PlatformAdapter):
             self.log_verbose(f"Query {query_id} completed: {actual_row_count} rows in {execution_time:.3f}s")
             self.log_operation_complete("Azure Synapse query execution", query_id, f"returned {actual_row_count} rows")
 
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             self.log_verbose(f"Query {query_id} failed after {execution_time:.3f}s: {e}")
@@ -1061,6 +1029,14 @@ class AzureSynapseAdapter(PlatformAdapter):
             }
         finally:
             cursor.close()
+
+        # Capture and merge the structured query plan (SUCCESS-guarded in the
+        # helper). Deliberately outside the try: with strict_plan_capture=True a
+        # capture failure raises PlanCaptureError, which must propagate instead
+        # of being swallowed by the broad except and mislabeling the query FAILED.
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
+
+        return result_dict
 
     def _extract_table_name(self, statement: str) -> str | None:
         """Extract table name from CREATE TABLE statement."""
@@ -1160,20 +1136,36 @@ class AzureSynapseAdapter(PlatformAdapter):
 
         return platform_info
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
-        """Get query execution plan for analysis."""
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get query execution plan for analysis.
+
+        Azure Synapse Dedicated SQL pool ``EXPLAIN`` returns the distributed
+        query plan as a single XML cell. Returns ``None`` on EXPLAIN failure
+        (never an error string; see ``get_query_plan_from_cursor``).
+        """
         from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
 
         return get_query_plan_from_cursor(connection, query)
 
+    def get_query_plan_parser(self):
+        """Get Azure Synapse query plan parser."""
+        from benchbox.core.query_plans.parsers.azure_synapse import AzureSynapseQueryPlanParser
+
+        return AzureSynapseQueryPlanParser()
+
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Update statistics for query optimization."""
+        """Update statistics for query optimization.
+
+        Raises on failure (does not swallow) so the opt-in statistics phase's
+        gather_statistics() -> run_statistics_phase() caller can detect and
+        record a real failure as status=FAILED. apply_table_tunings' own
+        best-effort call site wraps this to preserve its log-and-continue
+        semantics.
+        """
         cursor = connection.cursor()
         try:
             cursor.execute(f"UPDATE STATISTICS [{self.schema}].[{table_name}]")
             self.logger.info(f"Updated statistics for {table_name}")
-        except Exception as e:
-            self.logger.warning(f"Failed to update statistics for {table_name}: {e}")
         finally:
             cursor.close()
 
@@ -1199,18 +1191,7 @@ class AzureSynapseAdapter(PlatformAdapter):
         except Exception:
             return False
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if Azure Synapse supports a specific tuning type."""
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {
-                TuningType.DISTRIBUTION,
-                TuningType.PARTITIONING,
-                TuningType.INDEXING,
-            }
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("DISTRIBUTION", "PARTITIONING", "INDEXING")
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Azure Synapse-specific tuning clauses for CREATE TABLE statements."""
@@ -1254,21 +1235,20 @@ class AzureSynapseAdapter(PlatformAdapter):
         table_name = table_tuning.table_name
         self.logger.info(f"Azure Synapse tunings for {table_name} applied during table creation")
 
-        # Update statistics after tuning
-        self.analyze_table(connection, table_name)
+        # Update statistics after tuning. Best-effort here (unlike the opt-in
+        # statistics phase's gather_statistics() caller): a post-tuning stats
+        # refresh failing should not abort table setup, so analyze_table's
+        # exception is caught and logged rather than propagated.
+        try:
+            self.analyze_table(connection, table_name)
+        except Exception as e:
+            self.logger.warning(f"Failed to update statistics for {table_name}: {e}")
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to Azure Synapse."""
-        if not unified_config:
-            return
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
         """Apply Azure Synapse-specific platform optimizations."""
@@ -1277,60 +1257,27 @@ class AzureSynapseAdapter(PlatformAdapter):
 
         self.logger.info("Azure Synapse platform optimizations applied")
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to Azure Synapse.
-
-        Note: Azure Synapse supports PRIMARY KEY and FOREIGN KEY for query optimization,
-        but constraints are not enforced.
-        """
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info("Primary key constraints enabled for Azure Synapse (informational only)")
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info("Foreign key constraints enabled for Azure Synapse (informational only)")
-
-
-def _build_synapse_config(
-    platform: str,
-    options: dict[str, Any],
-    overrides: dict[str, Any],
-    info: Any,
-) -> Any:
-    """Build Azure Synapse database configuration with credential loading."""
-    from benchbox.platforms.base.config_utils import build_platform_config
-
-    return build_platform_config(
-        platform_type="synapse",
-        credential_key="synapse",
-        default_display_name="Azure Synapse",
-        default_driver_package="pyodbc",
-        platform_fields=[
-            "server",
-            "port",
-            "username",
-            "password",
-            "schema",
-            "auth_method",
-            "storage_account",
-            "container",
-            "staging_root",
-            "storage_sas_token",
-        ],
-        options=options,
-        overrides=overrides,
-        info=info,
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints enabled for Azure Synapse (informational only)",
+        "Foreign key constraints enabled for Azure Synapse (informational only)",
     )
 
 
-# Register the config builder with the platform hook registry
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-    PlatformHookRegistry.register_config_builder("synapse", _build_synapse_config)
-except ImportError:
-    pass
+_build_synapse_config = make_registered_platform_config_builder(
+    "synapse",
+    __name__,
+    "Azure Synapse",
+    "pyodbc",
+    [
+        "server",
+        "port",
+        "username",
+        "password",
+        "schema",
+        "auth_method",
+        "storage_account",
+        "container",
+        "staging_root",
+        "storage_sas_token",
+    ],
+)

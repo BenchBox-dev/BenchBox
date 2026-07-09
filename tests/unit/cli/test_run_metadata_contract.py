@@ -23,6 +23,7 @@ def test_apply_driver_metadata_prefers_adapter_values() -> None:
         driver_runtime_python_executable=None,
         driver_auto_install=False,
         execution_metadata={},
+        platform_info={"driver_runtime_path": "preserved"},
     )
 
     db_config = SimpleNamespace(
@@ -52,6 +53,9 @@ def test_apply_driver_metadata_prefers_adapter_values() -> None:
     assert result.driver_runtime_strategy == "isolated-site-packages"
     assert result.execution_metadata["driver_version_resolved"] == "1.1.0"
     assert result.execution_metadata["driver_auto_install_used"] is True
+    assert result.platform_info["driver_package"] == "duckdb"
+    assert result.platform_info["driver_runtime_path"] == "preserved"
+    assert result.platform_info["driver_runtime_python_executable"] == "/tmp/runtime/bin/python"
 
 
 def test_apply_driver_metadata_config_only_when_no_adapter() -> None:
@@ -66,6 +70,7 @@ def test_apply_driver_metadata_config_only_when_no_adapter() -> None:
         driver_runtime_python_executable=None,
         driver_auto_install=False,
         execution_metadata={},
+        platform_info={},
     )
 
     db_config = SimpleNamespace(
@@ -86,6 +91,8 @@ def test_apply_driver_metadata_config_only_when_no_adapter() -> None:
     assert result.driver_version_resolved == "3.5.0"
     assert result.driver_version_actual is None
     assert result.driver_runtime_strategy is None
+    assert result.platform_info["driver_package"] == "snowflake-connector-python"
+    assert result.platform_info["driver_version_requested"] == "3.5.0"
 
 
 def test_apply_driver_metadata_all_none_leaves_defaults() -> None:

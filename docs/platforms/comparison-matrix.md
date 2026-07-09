@@ -3,23 +3,28 @@
 ```{tags} intermediate, reference
 ```
 
-This matrix provides a comprehensive comparison of all **41 supported platforms** in BenchBox, organized by category to help you choose the right platform for your benchmarking needs.
+This matrix compares BenchBox platform families and links exact platform counts back to runtime registry metadata.
 
 ## Platform Overview
 
-BenchBox supports platforms across seven categories:
+BenchBox supports platforms across registry categories and editorial documentation groups. Exact counts below are generated from `PlatformRegistry.get_platform_count_summary()` and checked by unit tests; the later sections remain human-oriented groupings for choosing a platform.
 
-| Category                                                       | Platforms | Description                                    |
-| -------------------------------------------------------------- | --------- | ---------------------------------------------- |
-| [Local/Embedded](#localembedded-platforms)                     | 5         | In-process engines, no infrastructure required |
-| [Cloud Data Warehouses](#cloud-data-warehouses)                | 8         | Managed cloud analytics platforms              |
-| [Distributed SQL Engines](#distributed-sql-engines)            | 5         | Federated and cluster-based query engines      |
-| [Spark-Compatible Engines](#spark-compatible-engines)          | 2         | Native-code Spark alternatives (LakeSail, Velox) |
-| [Relational & Time-Series](#relational--time-series-databases) | 3         | Traditional RDBMS and time-series databases    |
-| [Managed Spark Services](#managed-spark-services)              | 7         | Cloud-managed Spark execution environments     |
-| [DataFrame Platforms](#dataframe-platforms)                    | 11        | Native DataFrame API libraries                 |
+<!-- benchbox-registry-counts:start -->
 
-**Total: 41 platforms** (30 SQL + 11 DataFrame)
+Platform registry: **50** metadata entries; **45** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=27, experimental=17, deprecated=1.
+
+<!-- benchbox-registry-counts:end -->
+
+| Registry category | Platforms | Notes |
+| --- | ---: | --- |
+| analytical | 8 | Local and engine-native analytical platforms |
+| cloud | 23 | Managed warehouses, cloud Spark, and SaaS surfaces |
+| dataframe | 5 | DataFrame-only metadata entries |
+| distributed | 6 | Federated, cluster, and distributed SQL engines |
+| embedded | 1 | Built-in embedded runtime |
+| olap | 3 | PostgreSQL extension and embedded OLAP variants |
+| relational | 1 | General relational database support |
+| timeseries | 3 | Time-series engines with SQL/query support |
 
 ```{note}
 **CLI Naming Convention**: DataFrame platforms use the `-df` suffix (e.g., `polars-df`, `pandas-df`) to distinguish them from SQL mode platforms. Some platforms like DataFusion support both modes - see [Hybrid Platforms](#hybrid-platforms-sql--dataframe) for details.

@@ -1,4 +1,4 @@
-"""Tests for scripts/validate_submission.py."""
+"""Tests for public submission bundle validation."""
 
 from __future__ import annotations
 
@@ -7,21 +7,79 @@ import json
 from pathlib import Path
 
 import pytest
-from validate_submission import (
+
+from benchbox.validation.bundle import (
+    SUBMISSION_NOTES_MAX_LEN,
     ValidationResult,
     _validate_bundle,
     _validate_manifest_hash,
+    _validate_manifest_provenance,
     discover_bundles,
     format_pr_comment,
     format_summary,
-    main,
     validate_bundles,
 )
+from scripts.validate_submission import main
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+class TestManifestProvenance:
+    """Provenance/funding validation + vendor-label governance (item 3)."""
+
+    def _run(self, manifest: dict, bundle_name: str = "tpch_result.json", subdir: str = "bundles") -> ValidationResult:
+        vr = ValidationResult("test")
+        primary_path = Path("/repo") / "results-data" / subdir / bundle_name
+        _validate_manifest_provenance(manifest, primary_path, vr)
+        return vr
+
+    def test_absent_provenance_fields_ok(self):
+        assert self._run({"bundle_file": "x", "bundle_hash": "y"}).ok
+
+    def test_valid_funding_ok(self):
+        assert self._run({"funding": "free-trial"}).ok
+
+    def test_invalid_funding_rejected(self):
+        vr = self._run({"funding": "crowdfunded"})
+        assert not vr.ok
+        assert any("funding" in e for e in vr.errors)
+
+    def test_notes_too_long_rejected(self):
+        vr = self._run({"submission_notes": "x" * (SUBMISSION_NOTES_MAX_LEN + 1)})
+        assert not vr.ok
+        assert any("submission_notes" in e for e in vr.errors)
+
+    def test_notes_non_string_rejected(self):
+        vr = self._run({"submission_notes": 123})
+        assert not vr.ok
+
+    def test_notes_at_limit_ok(self):
+        assert self._run({"submission_notes": "x" * SUBMISSION_NOTES_MAX_LEN}).ok
+
+    def test_community_source_ok(self):
+        assert self._run({"result_source": "community"}).ok
+
+    def test_internal_source_ok(self):
+        assert self._run({"result_source": "internal"}).ok
+
+    def test_invalid_source_rejected(self):
+        vr = self._run({"result_source": "partner"})
+        assert not vr.ok
+        assert any("result_source" in e for e in vr.errors)
+
+    def test_self_asserted_vendor_outside_vendor_subtree_rejected(self):
+        # The core governance check: a community bundle cannot claim vendor.
+        vr = self._run({"result_source": "vendor"}, subdir="bundles")
+        assert not vr.ok
+        assert any("vendor" in e and "self-assert" in e for e in vr.errors)
+
+    def test_vendor_allowed_under_vendor_subtree(self):
+        vr = self._run({"result_source": "vendor"}, subdir="bundles/vendor")
+        assert vr.ok
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -47,6 +105,7 @@ def _minimal_bundle() -> dict:
             "version": "1.4.3",
         },
         "summary": {
+            "validation": "passed",
             "queries": {"total": 2, "passed": 2, "failed": 0},
         },
         "queries": [
@@ -194,6 +253,31 @@ class TestValidateBundle:
         _validate_bundle(data, vr)
         assert vr.ok
         assert not any("Unknown platform name" in w for w in vr.warnings)
+
+    def test_missing_public_validation_status_fails(self):
+        data = _minimal_bundle()
+        del data["summary"]["validation"]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("summary.validation is required" in e for e in vr.errors)
+
+    @pytest.mark.parametrize("status", ["not_run", "uncertain", "unknown"])
+    def test_non_clean_public_validation_status_fails(self, status: str):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = status
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("summary.validation must be 'passed'" in e for e in vr.errors)
+
+    def test_translation_fallback_fails_public_submission(self):
+        data = _minimal_bundle()
+        data["execution"] = {"translation": {"status": "fallback", "strict_mode": False}}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("execution.translation.status='fallback'" in e for e in vr.errors)
 
     def test_all_zero_timings_fails(self):
         data = _minimal_bundle()
@@ -372,27 +456,31 @@ class TestValidateManifestHash:
         assert any("hash mismatch" in e.lower() for e in vr.errors)
         assert any("result.json" in e for e in vr.errors)
 
-    def test_missing_hash_field_warns(self, tmp_path: Path):
+    def test_missing_hash_field_errors(self, tmp_path: Path):
+        # A present manifest whose whole purpose is the bundle-hash contract
+        # must carry it. Missing bundle_hash is an ERROR (not a warning), so an
+        # empty/incomplete manifest cannot pass CI while still granting the
+        # sidecar-derived community-submission trust label.
         manifest = tmp_path / "submission-manifest.json"
         manifest.write_text(json.dumps({"bundle_file": "result.json"}), encoding="utf-8")
 
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, tmp_path, vr)
-        assert vr.ok
-        assert any("no bundle_hash" in w for w in vr.warnings)
+        assert not vr.ok
+        assert any("no bundle_hash" in e for e in vr.errors)
 
-    def test_missing_bundle_file_field_warns(self, tmp_path: Path):
+    def test_missing_bundle_file_field_errors(self, tmp_path: Path):
         manifest = tmp_path / "submission-manifest.json"
         manifest.write_text(json.dumps({"bundle_hash": "deadbeef" * 8}), encoding="utf-8")
 
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, tmp_path, vr)
-        assert vr.ok
-        assert any("no bundle_file" in w for w in vr.warnings)
+        assert not vr.ok
+        assert any("no bundle_file" in e for e in vr.errors)
 
     @pytest.mark.parametrize("bad_hash", [123, None, ["abc"], {"hash": "x"}])
-    def test_non_string_hash_warns(self, tmp_path: Path, bad_hash):
-        """Non-string bundle_hash values should warn, not crash."""
+    def test_non_string_hash_errors(self, tmp_path: Path, bad_hash):
+        """Non-string bundle_hash values should error (not crash, not pass)."""
         manifest = tmp_path / "submission-manifest.json"
         manifest.write_text(
             json.dumps({"bundle_file": "result.json", "bundle_hash": bad_hash}),
@@ -401,8 +489,8 @@ class TestValidateManifestHash:
 
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, tmp_path, vr)
-        assert vr.ok
-        assert any("no bundle_hash" in w for w in vr.warnings)
+        assert not vr.ok
+        assert any("no bundle_hash" in e for e in vr.errors)
 
     def test_companion_hash_mismatch_fails(self, tmp_path: Path):
         """A companion file with a wrong hash must surface a per-file error."""
@@ -575,6 +663,64 @@ class TestValidateBundles:
 
         assert len(results) == 1
         assert results[0].ok
+
+    def test_present_but_empty_manifest_fails_end_to_end(self, tmp_path: Path):
+        # A present-but-contentless sidecar must not pass: it would otherwise
+        # grant the sidecar-derived community-submission trust label while the
+        # bundle bytes are never hash-verified.
+        bundle = tmp_path / "result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        manifest = tmp_path / "result.manifest.json"
+        manifest.write_text(json.dumps({}), encoding="utf-8")
+
+        results = validate_bundles([bundle])
+
+        assert len(results) == 1
+        assert not results[0].ok
+        assert any("bundle_hash" in e or "bundle_file" in e for e in results[0].errors)
+
+    def test_missing_sidecar_passes_by_default(self, valid_bundle_file: Path):
+        # Default (maintainer path): no sidecar is fine — absence of a sidecar
+        # is how a maintainer-run bundle is distinguished.
+        results = validate_bundles([valid_bundle_file])
+        assert results[0].ok
+
+    def test_require_manifest_errors_on_missing_sidecar(self, valid_bundle_file: Path):
+        # Community path: the sidecar is mandatory.
+        results = validate_bundles([valid_bundle_file], require_manifest=True)
+        assert len(results) == 1
+        assert not results[0].ok
+        assert any("manifest not found" in e.lower() for e in results[0].errors)
+
+    def test_require_manifest_passes_when_sidecar_present(self, tmp_path: Path):
+        bundle = tmp_path / "result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        manifest = tmp_path / "result.manifest.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "bundle_file": bundle.name,
+                    "bundle_hash": hashlib.sha256(bundle.read_bytes()).hexdigest(),
+                }
+            ),
+            encoding="utf-8",
+        )
+        results = validate_bundles([bundle], require_manifest=True)
+        assert results[0].ok
+
+
+class TestRequireManifestCli:
+    def test_cli_require_manifest_flag_fails_missing_sidecar(self, tmp_path: Path, capsys):
+        bundle = tmp_path / "result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        rc = main([str(bundle), "--require-manifest"])
+        assert rc == 1
+
+    def test_cli_without_flag_allows_missing_sidecar(self, tmp_path: Path, capsys):
+        bundle = tmp_path / "result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        rc = main([str(bundle)])
+        assert rc == 0
 
 
 # ---------------------------------------------------------------------------

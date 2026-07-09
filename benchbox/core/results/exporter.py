@@ -13,6 +13,7 @@ Schema v2.0 Companion Files:
 
 from __future__ import annotations
 
+import copy
 import csv
 import io
 import json
@@ -46,12 +47,11 @@ from benchbox.core.results.schema import (
     build_result_payload,
     build_tuning_payload,
 )
+from benchbox.core.results.schema_policy import is_loader_supported_result_schema
 from benchbox.core.runtime_paths import resolve_results_dir
 from benchbox.utils.cloud_storage import create_path_handler, is_cloud_path
 
 logger = logging.getLogger(__name__)
-
-SIGNIFICANT_IMPROVEMENT_ASSESSMENT = "significant_improvement"
 
 ResultLike = BenchmarkResults
 QueryResultLike = "QueryResult | dict[str, Any]"
@@ -74,6 +74,7 @@ class ResultExporter:
         anonymize: bool = True,
         anonymization_config: AnonymizationConfig | None = None,
         console: Console | None = None,
+        plan_history_dir: str | Path | None = None,
     ):
         """Initialize the result exporter.
 
@@ -82,6 +83,11 @@ class ResultExporter:
             anonymize: Whether to anonymize system information. Defaults to True.
             anonymization_config: Configuration for anonymization.
             console: Rich console for output. Creates new one if not provided.
+            plan_history_dir: Opt-in directory to record this run's plan
+                fingerprints into via ``PlanHistory.add_run`` (see
+                ``benchbox plan-history``). Falls back to the
+                ``BENCHBOX_PLAN_HISTORY_DIR`` env var; unset (the default)
+                means no plan-history recording, matching prior behavior.
         """
         if output_dir is None:
             self.output_dir = resolve_results_dir(env=os.environ)
@@ -106,6 +112,9 @@ class ResultExporter:
         )
         self._validator = SchemaV2Validator()
 
+        resolved_plan_history_dir = plan_history_dir or os.environ.get("BENCHBOX_PLAN_HISTORY_DIR")
+        self.plan_history_dir = Path(resolved_plan_history_dir) if resolved_plan_history_dir else None
+
     def _write_file(self, file_path: Path, content: str, mode: str = "w") -> None:
         """Write content to file, handling both local and cloud paths."""
         if self.is_cloud_output and hasattr(file_path, "write_text"):
@@ -113,7 +122,7 @@ class ResultExporter:
         elif self.is_cloud_output and hasattr(file_path, "write_bytes"):
             file_path.write_bytes(content.encode("utf-8"))
         else:
-            with open(file_path, mode, encoding="utf-8", newline="\n") as handle:
+            with open(file_path, mode, encoding="utf-8") as handle:
                 handle.write(content)
 
     def _create_file_path(self, filename: str):
@@ -248,6 +257,9 @@ class ResultExporter:
         # Write companion files
         self._write_companion_files(result, filename_base)
 
+        # Opt-in plan-history recording (single call site; see plan_history_dir).
+        self._record_plan_history(result)
+
         return filepath
 
     def _write_companion_files(self, result: ResultLike, filename_base: str) -> None:
@@ -255,6 +267,8 @@ class ResultExporter:
         # Plans companion file
         plans_payload = build_plans_payload(result)
         if plans_payload:
+            if self.anonymize and self.anonymization_manager:
+                plans_payload = self._anonymize_plans_payload(plans_payload)
             plans_path = self._create_file_path(f"{filename_base}.plans.json")
             self._write_file(plans_path, canonical_json_text(plans_payload))
             self.console.print(f"[dim]Exported plans: {plans_path}[/dim]")
@@ -265,6 +279,26 @@ class ResultExporter:
             tuning_path = self._create_file_path(f"{filename_base}.tuning.json")
             self._write_file(tuning_path, canonical_json_text(tuning_payload))
             self.console.print(f"[dim]Exported tuning: {tuning_path}[/dim]")
+
+    def _record_plan_history(self, result: ResultLike) -> None:
+        """Opt-in: append this run's plan fingerprints to a PlanHistory store.
+
+        No-op unless ``plan_history_dir`` was configured (constructor arg or
+        ``BENCHBOX_PLAN_HISTORY_DIR``) -- this is the wiring `add_run` never
+        had (qpc-08 / F1.2): it existed with zero production callers, so the
+        `benchbox plan-history` CLI could only ever read an empty store.
+        Recording failures are logged, never fatal to the export -- plan
+        history is a secondary observability feature, not part of the
+        result's correctness contract.
+        """
+        if not self.plan_history_dir:
+            return
+        try:
+            from benchbox.core.query_plans.history import PlanHistory
+
+            PlanHistory(self.plan_history_dir).add_run(result)
+        except Exception as exc:
+            logger.warning(f"Failed to record plan history: {exc}")
 
     def _apply_anonymization(self, payload: dict[str, Any]) -> None:
         """Apply public-export anonymization to environment, platform, config, and execution metadata."""
@@ -300,6 +334,66 @@ class ResultExporter:
                 client_host_block["machine_id"] = effective_machine_id
         elif not captured_machine_id:
             env_block["client_host"] = {"machine_id": effective_machine_id}
+
+    def _anonymize_plans_payload(self, plans_payload: dict[str, Any]) -> dict[str, Any]:
+        """Strip raw EXPLAIN text from the plans companion for anonymized exports.
+
+        The `.plans.json` companion is built independently of the main payload
+        (see ``_write_companion_files``) and never passes through
+        ``_apply_anonymization``, so an "anonymized" bundle previously still
+        leaked ``raw_explain_output`` verbatim -- opaque, platform-specific
+        EXPLAIN text that can embed absolute file paths, hostnames, or
+        usernames (e.g. a scan operator's file source). None of the existing
+        `AnonymizationManager` helpers (path/PII patterns tuned for structured
+        fields) can safely scrub arbitrary per-platform EXPLAIN text, so this
+        drops the field outright for anonymized exports rather than risk a
+        false sense of safety from a partial regex scrub.
+
+        The SAME raw text also gets copied verbatim into each operator node's
+        structured ``physical_operator.platform_metadata`` by many parsers
+        (e.g. Spark's FileScan ``details``, DuckDB's ``extra_info``, Presto's
+        ``details``) - clearing only the top-level ``raw_explain_output``
+        left it reachable via ``logical_root``'s operator tree (#1024
+        review). Per-parser field names differ too much to selectively
+        redact safely, so every node's ``platform_metadata`` is dropped
+        outright, mirroring the ``raw_explain_output`` policy above.
+
+        Operates on a deep copy; the caller's ``plans_payload`` (and the
+        in-memory ``BenchmarkResults``/``QueryPlanDAG`` it was built from) are
+        never mutated, mirroring the main-file anonymize-a-copy pattern in
+        ``_apply_anonymization``.
+        """
+        sanitized = copy.deepcopy(plans_payload)
+        queries = sanitized.get("queries")
+        if not isinstance(queries, dict):
+            return sanitized
+        for entry in queries.values():
+            if not isinstance(entry, dict):
+                continue
+            plan = entry.get("plan")
+            if not isinstance(plan, dict):
+                continue
+            if plan.get("raw_explain_output") is not None:
+                plan["raw_explain_output"] = None
+            self._strip_operator_platform_metadata(plan.get("logical_root"))
+        return sanitized
+
+    def _strip_operator_platform_metadata(self, node: Any) -> None:
+        """Recursively clear ``physical_operator.platform_metadata`` on a
+        logical-operator tree node and its children, in place.
+
+        Parsers copy raw (potentially path/host/user-bearing) EXPLAIN text
+        into this dict under per-platform key names, so it is dropped
+        outright rather than selectively redacted (see
+        ``_anonymize_plans_payload``).
+        """
+        if not isinstance(node, dict):
+            return
+        physical_operator = node.get("physical_operator")
+        if isinstance(physical_operator, dict) and physical_operator.get("platform_metadata"):
+            physical_operator["platform_metadata"] = {}
+        for child in node.get("children") or []:
+            self._strip_operator_platform_metadata(child)
 
     def _convert_datetimes_to_iso(self, obj: Any) -> Any:
         """Convert datetime objects to ISO format strings."""
@@ -543,7 +637,7 @@ class ResultExporter:
                     data = json.load(handle)
 
                 version = data.get("version")
-                if version not in ("2.0", "2.1"):
+                if not is_loader_supported_result_schema(data):
                     continue
 
                 # Schema v2.x format
@@ -758,7 +852,7 @@ class ResultExporter:
         avg_change = sum(time_changes) / len(time_changes)
 
         if avg_change < -10:
-            return SIGNIFICANT_IMPROVEMENT_ASSESSMENT
+            return "significant_improvement"
         if avg_change < -5:
             return "improvement"
         if avg_change > 10:

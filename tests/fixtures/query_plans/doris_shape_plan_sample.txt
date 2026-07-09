@@ -1,0 +1,14 @@
+PhysicalResultSink
+--PhysicalQuickSort[MERGE_SORT]
+----PhysicalDistribute[DistributionSpecGather]
+------PhysicalQuickSort[LOCAL_SORT]
+--------PhysicalHashAggregate[GLOBAL]
+----------PhysicalDistribute[DistributionSpecHash]
+------------PhysicalHashAggregate[LOCAL]
+--------------PhysicalProject
+----------------PhysicalHashJoin[INNER_JOIN]
+------------------PhysicalProject
+--------------------PhysicalOlapScan[lineitem]
+------------------PhysicalDistribute[DistributionSpecReplicated]
+--------------------PhysicalProject
+----------------------PhysicalOlapScan[orders]

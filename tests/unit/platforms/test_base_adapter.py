@@ -5,6 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import inspect
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -20,6 +21,8 @@ from benchbox.platforms.base import (
     ConnectionConfig,
     PlatformAdapter,
 )
+from benchbox.platforms.base.execution import _power_query_result, _power_test_error_result
+from benchbox.utils.dialect_utils import SQLTranslationError, SqlTranslationOutcome
 from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
@@ -223,6 +226,98 @@ class BenchmarkWithVersionAwareQueries:
             }
         )
         return {"Q1": "SELECT 1"}
+
+
+class BenchmarkWithStrictTranslationFailure:
+    """Benchmark stub whose dialect-aware path raises the strict translation exception."""
+
+    def get_queries(self, dialect: str | None = None, base_dialect: str | None = None) -> dict[str, str]:
+        if dialect is None:
+            return {"Q1": "SELECT fallback"}
+        outcome = SqlTranslationOutcome(
+            source_dialect=base_dialect or "ansi",
+            target_dialect=dialect,
+            translator="test",
+            status="failed",
+            strict_mode=True,
+            error_category="translation_failed",
+        )
+        raise SQLTranslationError("strict translation failed", outcome)
+
+
+class TestPowerResultConversionHelpers:
+    def test_power_query_result_preserves_warmup_fields(self):
+        result = _power_query_result(
+            {
+                "query_id": "Q1",
+                "execution_time_seconds": 1.25,
+                "success": True,
+                "result_count": 10,
+                "stream_id": 3,
+                "position": 7,
+            },
+            stream_id=99,
+            iteration=0,
+            run_type="warmup",
+        )
+
+        assert result == {
+            "query_id": "Q1",
+            "execution_time_seconds": 1.25,
+            "status": "SUCCESS",
+            "rows_returned": 10,
+            "test_type": "power",
+            "stream_id": 3,
+            "position": 7,
+            "iteration": 0,
+            "run_type": "warmup",
+        }
+
+    def test_power_query_result_preserves_measurement_failure_fields(self):
+        result = _power_query_result(
+            {
+                "query_id": "Q2",
+                "execution_time_seconds": 0.0,
+                "success": False,
+                "error": "boom",
+            },
+            stream_id=5,
+            iteration=2,
+            run_type="measurement",
+        )
+
+        assert result == {
+            "query_id": "Q2",
+            "execution_time_seconds": 0.0,
+            "status": "FAILED",
+            "rows_returned": 0,
+            "test_type": "power",
+            "stream_id": 5,
+            "position": 0,
+            "iteration": 2,
+            "run_type": "measurement",
+            "error": "boom",
+        }
+
+    def test_power_error_sentinel_keeps_optional_iteration_context(self):
+        assert _power_test_error_result("factory failed", iteration=4, run_type="measurement") == {
+            "query_id": "power_test_error",
+            "execution_time_seconds": 0.0,
+            "status": "FAILED",
+            "rows_returned": 0,
+            "error": "factory failed",
+            "test_type": "power",
+            "iteration": 4,
+            "run_type": "measurement",
+        }
+        assert _power_test_error_result("init failed") == {
+            "query_id": "power_test_error",
+            "execution_time_seconds": 0.0,
+            "status": "FAILED",
+            "rows_returned": 0,
+            "error": "init failed",
+            "test_type": "power",
+        }
 
 
 class TestConnectionConfig:
@@ -1780,6 +1875,27 @@ class TestBenchmarkIdentityInExecutionMetadata:
 class TestTPCExecutionRouting:
     """Exercise benchmark-family routing for specialized TPC helpers."""
 
+    def test_dispatch_paths_have_no_literal_tpc_benchmark_names(self):
+        """No dispatch method routes on a literal TPC benchmark name.
+
+        #914 extracted the power path; the throughput/maintenance/combined dispatch
+        now routes via the same capability registry, so the headline metric ("no
+        literal TPC names in execution.py dispatch") holds across all four methods,
+        not power-only.
+        """
+        from benchbox.platforms.base.execution import TestDriversMixin
+
+        dispatch_methods = (
+            TestDriversMixin._execute_power_test,
+            TestDriversMixin._execute_throughput_test,
+            TestDriversMixin._execute_maintenance_test,
+            TestDriversMixin._execute_combined_test,
+        )
+        for method in dispatch_methods:
+            source = inspect.getsource(method)
+            assert '"tpch"' not in source, f"{method.__name__} routes on a literal benchmark name"
+            assert '"tpcds"' not in source, f"{method.__name__} routes on a literal benchmark name"
+
     def test_execute_power_test_routes_tpch_via_run_config_benchmark_name(self):
         # Routing now reads benchmark_name from run_config, not display_name sniffing.
         adapter = MockPlatformAdapter()
@@ -3202,3 +3318,387 @@ class TestDialectQuerySelection:
 
         assert queries == {"Q1": "SELECT 1"}
         assert benchmark.calls == [{"dialect": "mock_dialect", "platform_version": "1.0.0"}]
+
+    def test_get_dialect_queries_preserves_strict_translation_failures(self):
+        adapter = MockPlatformAdapterWithDialect()
+        benchmark = BenchmarkWithStrictTranslationFailure()
+
+        with pytest.raises(SQLTranslationError):
+            adapter._get_dialect_queries(
+                benchmark,
+                benchmark_slug="tpch",
+                connection=Mock(name="strict_translation_connection"),
+            )
+
+
+class TestStatisticsPhase:
+    """Tests for the opt-in statistics phase (load -> statistics -> query)."""
+
+    def test_gather_statistics_prefers_whole_database_analyze(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_tables = Mock()
+        connection = Mock()
+
+        stats_mode, tables_analyzed = adapter.gather_statistics(connection, ["a", "b"])
+
+        adapter.analyze_tables.assert_called_once_with(connection)
+        assert (stats_mode, tables_analyzed) == ("explicit", 2)
+
+    def test_gather_statistics_falls_back_to_per_table_analyze(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        connection = Mock()
+
+        stats_mode, tables_analyzed = adapter.gather_statistics(connection, ["a", "b"])
+
+        assert adapter.analyze_table.call_args_list == [((connection, "a"),), ((connection, "b"),)]
+        assert (stats_mode, tables_analyzed) == ("explicit", 2)
+
+    def test_gather_statistics_reports_unsupported_without_analyze_surface(self):
+        adapter = MockPlatformAdapter()
+
+        assert adapter.gather_statistics(Mock(), ["a"]) == ("unsupported", 0)
+
+    def test_run_statistics_phase_skips_benchmark_without_opt_in(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+
+        phase = adapter.run_statistics_phase(Mock(), Mock(), benchmark_name="ssb", table_names=["customer"])
+
+        assert phase is None
+        adapter.analyze_table.assert_not_called()
+
+    def test_run_statistics_phase_completed_for_opted_in_benchmark(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+
+        phase = adapter.run_statistics_phase(Mock(), Mock(), benchmark_name="joinorder", table_names=["title", "name"])
+
+        assert phase is not None
+        assert phase.status == "COMPLETED"
+        assert phase.stats_mode == "explicit"
+        assert phase.tables_analyzed == 2
+        assert phase.error_message is None
+
+    def test_run_statistics_phase_records_failure_without_raising(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock(side_effect=RuntimeError("ANALYZE exploded"))
+
+        phase = adapter.run_statistics_phase(Mock(), Mock(), benchmark_name="tpch", table_names=["lineitem"])
+
+        assert phase is not None
+        assert phase.status == "FAILED"
+        assert phase.tables_analyzed == 0
+        assert "ANALYZE exploded" in (phase.error_message or "")
+
+    def test_run_statistics_phase_resolves_table_names_from_benchmark(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        benchmark = Mock()
+        benchmark.get_table_names = Mock(return_value=["lineitem", "orders"])
+
+        phase = adapter.run_statistics_phase(benchmark, Mock(), benchmark_name="tpch")
+
+        assert phase is not None and phase.tables_analyzed == 2
+        assert adapter.analyze_table.call_count == 2
+
+    def test_reset_statistics_default_is_safe_noop(self):
+        """Base adapters have no generic drop-stats primitive; the default must
+        never attempt an operation that could fail or corrupt state - it just
+        reports 'unsupported' and lets the imminent rebuild reflect current data."""
+        adapter = MockPlatformAdapter()
+
+        assert adapter.reset_statistics(Mock(), ["a", "b"]) == "unsupported"
+
+    def test_run_statistics_phase_reset_not_requested_omits_lifecycle_marker(self):
+        """Default behavior (reset=None, i.e. the knob is unused) must stay
+        byte-identical to PR #980: no stats_lifecycle marker at all."""
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+
+        phase = adapter.run_statistics_phase(Mock(), Mock(), benchmark_name="joinorder", table_names=["title"])
+
+        assert phase is not None
+        assert phase.stats_lifecycle is None
+
+    def test_run_statistics_phase_reset_true_invokes_reset_hook_and_records_mode(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        adapter.reset_statistics = Mock(return_value="reset")
+        connection = Mock()
+
+        phase = adapter.run_statistics_phase(
+            Mock(), connection, benchmark_name="joinorder", table_names=["title"], reset=True
+        )
+
+        adapter.reset_statistics.assert_called_once_with(connection, ["title"])
+        assert phase is not None
+        assert phase.stats_lifecycle == "reset"
+        assert phase.status == "COMPLETED"
+
+    def test_run_statistics_phase_reset_true_falls_back_safely_when_unsupported(self):
+        """An engine with no drop-stats primitive must never fail the run -
+        gather_statistics() still runs and the phase completes normally."""
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        # Base reset_statistics() default: "unsupported", no-op.
+
+        phase = adapter.run_statistics_phase(
+            Mock(), Mock(), benchmark_name="joinorder", table_names=["title"], reset=True
+        )
+
+        assert phase is not None
+        assert phase.status == "COMPLETED"
+        assert phase.stats_lifecycle == "unsupported"
+
+    def test_run_statistics_phase_reset_hook_exception_does_not_abort_run(self):
+        """A raising reset_statistics() must never fail the whole statistics
+        phase - degrade to 'unsupported' and continue with the rebuild."""
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        adapter.reset_statistics = Mock(side_effect=RuntimeError("cannot drop stats here"))
+
+        phase = adapter.run_statistics_phase(
+            Mock(), Mock(), benchmark_name="joinorder", table_names=["title"], reset=True
+        )
+
+        assert phase is not None
+        assert phase.status == "COMPLETED"
+        assert phase.stats_lifecycle == "unsupported"
+        adapter.analyze_table.assert_called_once()
+
+    def test_run_statistics_phase_reset_false_records_explicit_persist_marker(self):
+        """reset=False is an explicit warm-stats request: behavior matches the
+        default, but the marker is recorded so a bundle can say the control
+        was deliberately exercised (not merely omitted)."""
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        adapter.reset_statistics = Mock()
+
+        phase = adapter.run_statistics_phase(
+            Mock(), Mock(), benchmark_name="joinorder", table_names=["title"], reset=False
+        )
+
+        adapter.reset_statistics.assert_not_called()
+        assert phase is not None
+        assert phase.stats_lifecycle == "persist"
+
+    def test_run_statistics_phase_per_table_timing_omitted_by_default(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+
+        phase = adapter.run_statistics_phase(Mock(), Mock(), benchmark_name="joinorder", table_names=["title", "name"])
+
+        assert phase is not None
+        assert phase.per_table_ms is None
+
+    def test_run_statistics_phase_per_table_timing_collects_breakdown_when_opted_in(self):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+
+        phase = adapter.run_statistics_phase(
+            Mock(),
+            Mock(),
+            benchmark_name="joinorder",
+            table_names=["title", "name"],
+            collect_per_table_timing=True,
+        )
+
+        assert phase is not None
+        assert phase.per_table_ms is not None
+        assert set(phase.per_table_ms) == {"title", "name"}
+        assert all(isinstance(v, int) and v >= 0 for v in phase.per_table_ms.values())
+        assert phase.stats_mode == "explicit"
+        assert phase.tables_analyzed == 2
+
+    def test_run_statistics_phase_per_table_timing_unavailable_for_whole_database_analyze(self):
+        """Whole-database analyze_tables() adapters (e.g. DuckDB) have no
+        per-table granularity to report; the breakdown safely stays omitted
+        instead of being force-fabricated."""
+        adapter = MockPlatformAdapter()
+        adapter.analyze_tables = Mock()
+
+        phase = adapter.run_statistics_phase(
+            Mock(),
+            Mock(),
+            benchmark_name="joinorder",
+            table_names=["title", "name"],
+            collect_per_table_timing=True,
+        )
+
+        assert phase is not None
+        assert phase.per_table_ms is None
+        adapter.analyze_tables.assert_called_once()
+
+    def test_run_statistics_phase_per_table_timing_unavailable_when_gather_statistics_overridden(self):
+        """Adapters that override gather_statistics with platform-specific
+        routing (e.g. Redshift's auto-on-load special case) must keep deciding
+        stats_mode themselves: the per-table loop guard defers to their
+        gather_statistics and leaves per_table_ms unset, so it can never
+        double-run ANALYZE or bypass the auto-on-load attribution."""
+
+        class AutoOnLoadAdapter(MockPlatformAdapter):
+            def gather_statistics(self, connection, table_names):
+                return "auto-on-load", 0
+
+        adapter = AutoOnLoadAdapter()
+        adapter.analyze_table = Mock()
+
+        phase = adapter.run_statistics_phase(
+            Mock(),
+            Mock(),
+            benchmark_name="joinorder",
+            table_names=["title", "name"],
+            collect_per_table_timing=True,
+        )
+
+        assert phase is not None
+        assert phase.per_table_ms is None
+        assert phase.stats_mode == "auto-on-load"
+        # The per-table loop must not have run behind the override's back.
+        adapter.analyze_table.assert_not_called()
+
+    def test_run_statistics_phase_failed_build_still_records_reset_marker(self):
+        """When a reset was requested and the subsequent statistics build fails,
+        the FAILED phase must still carry the stats_lifecycle marker so a bundle
+        records which control produced the (failed) measurement."""
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock(side_effect=RuntimeError("ANALYZE exploded"))
+        adapter.reset_statistics = Mock(return_value="reset")
+
+        phase = adapter.run_statistics_phase(
+            Mock(), Mock(), benchmark_name="joinorder", table_names=["title"], reset=True
+        )
+
+        assert phase is not None
+        assert phase.status == "FAILED"
+        assert phase.stats_lifecycle == "reset"
+
+    def test_run_benchmark_gathers_statistics_between_load_and_query(self, mock_benchmark, tmp_path):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        mock_benchmark.output_dir = tmp_path
+        mock_benchmark.create_enhanced_benchmark_result.return_value = make_benchmark_results(
+            benchmark_name="tpch",
+            platform="mock",
+            scale_factor=1.0,
+            execution_id="stats_001",
+            duration_seconds=1.0,
+            total_queries=2,
+            successful_queries=2,
+            total_execution_time=0.2,
+            average_query_time=0.1,
+            data_loading_time=0.5,
+            schema_creation_time=0.1,
+            total_rows_loaded=100,
+            data_size_mb=1.0,
+            table_statistics={"table1": 100},
+        )
+
+        adapter.run_benchmark(mock_benchmark, gather_statistics=True, benchmark_name="tpch")
+
+        # load_data returns {"table1": 100}, so the phase analyzes exactly that table.
+        adapter.analyze_table.assert_called_once()
+        assert adapter.analyze_table.call_args[0][1] == "table1"
+        phases = mock_benchmark.create_enhanced_benchmark_result.call_args.kwargs["phases"]
+        stats = phases.setup.statistics_gathering
+        assert stats is not None
+        assert stats.status == "COMPLETED"
+        assert stats.stats_mode == "explicit"
+        assert stats.tables_analyzed == 1
+
+    def test_run_benchmark_statistics_benchmark_name_gates_without_setting_benchmark_name(
+        self, mock_benchmark, tmp_path
+    ):
+        """A caller (the MCP run_benchmark tool) can gate the statistics phase via the
+        dedicated `statistics_benchmark_name` key without ever setting `benchmark_name`
+        itself - that key also drives harness routing (_resolve_benchmark_slug) and
+        must not change based on whether statistics was requested."""
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        mock_benchmark.output_dir = tmp_path
+        mock_benchmark.create_enhanced_benchmark_result.return_value = make_benchmark_results(
+            benchmark_name="tpch",
+            platform="mock",
+            scale_factor=1.0,
+            execution_id="stats_003",
+            duration_seconds=1.0,
+            total_queries=2,
+            successful_queries=2,
+            total_execution_time=0.2,
+            average_query_time=0.1,
+            data_loading_time=0.5,
+            schema_creation_time=0.1,
+            total_rows_loaded=100,
+            data_size_mb=1.0,
+            table_statistics={"table1": 100},
+        )
+
+        adapter.run_benchmark(mock_benchmark, gather_statistics=True, statistics_benchmark_name="tpch")
+
+        adapter.analyze_table.assert_called_once()
+        phases = mock_benchmark.create_enhanced_benchmark_result.call_args.kwargs["phases"]
+        stats = phases.setup.statistics_gathering
+        assert stats is not None
+        assert stats.status == "COMPLETED"
+        assert stats.tables_analyzed == 1
+
+    def test_run_benchmark_without_flag_keeps_legacy_semantics(self, mock_benchmark, tmp_path):
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        mock_benchmark.output_dir = tmp_path
+        mock_benchmark.create_enhanced_benchmark_result.return_value = make_benchmark_results(
+            benchmark_name="tpch",
+            platform="mock",
+            scale_factor=1.0,
+            execution_id="stats_002",
+            duration_seconds=1.0,
+            total_queries=2,
+            successful_queries=2,
+            total_execution_time=0.2,
+            average_query_time=0.1,
+            data_loading_time=0.5,
+            schema_creation_time=0.1,
+            total_rows_loaded=100,
+            data_size_mb=1.0,
+            table_statistics={"table1": 100},
+        )
+
+        adapter.run_benchmark(mock_benchmark, benchmark_name="tpch")
+
+        adapter.analyze_table.assert_not_called()
+        phases = mock_benchmark.create_enhanced_benchmark_result.call_args.kwargs["phases"]
+        assert phases.setup.statistics_gathering is None
+
+    def test_run_benchmark_threads_stats_reset_through_run_config(self, mock_benchmark, tmp_path):
+        """End-to-end: the reset/persist control travels from run_benchmark's
+        **run_config kwargs (the same path RunConfig.gather_statistics uses)
+        through to the recorded phases.statistics-equivalent phase object."""
+        adapter = MockPlatformAdapter()
+        adapter.analyze_table = Mock()
+        adapter.reset_statistics = Mock(return_value="reset")
+        mock_benchmark.output_dir = tmp_path
+        mock_benchmark.create_enhanced_benchmark_result.return_value = make_benchmark_results(
+            benchmark_name="tpch",
+            platform="mock",
+            scale_factor=1.0,
+            execution_id="stats_004",
+            duration_seconds=1.0,
+            total_queries=2,
+            successful_queries=2,
+            total_execution_time=0.2,
+            average_query_time=0.1,
+            data_loading_time=0.5,
+            schema_creation_time=0.1,
+            total_rows_loaded=100,
+            data_size_mb=1.0,
+            table_statistics={"table1": 100},
+        )
+
+        adapter.run_benchmark(mock_benchmark, gather_statistics=True, stats_reset=True, benchmark_name="tpch")
+
+        adapter.reset_statistics.assert_called_once()
+        phases = mock_benchmark.create_enhanced_benchmark_result.call_args.kwargs["phases"]
+        stats = phases.setup.statistics_gathering
+        assert stats is not None
+        assert stats.stats_lifecycle == "reset"

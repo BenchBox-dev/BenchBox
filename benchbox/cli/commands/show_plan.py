@@ -14,7 +14,23 @@ from benchbox.core.query_plans.visualization import (
     render_plan,
     render_summary,
 )
-from benchbox.core.results.loader import load_result_file
+from benchbox.core.results.loader import iter_query_results, load_result_file
+from benchbox.core.results.query_normalizer import normalize_query_id
+
+
+def _find_query(results, query_id: str):
+    """Find a query result whose ID matches after normalization.
+
+    ``load_result_file`` returns already-normalized IDs from a real bundle's
+    compact ``queries[].id`` field (e.g. ``q05``/``Q05`` -> ``05``), so a raw
+    string comparison against the CLI's documented ``--query-id q05`` input
+    would report "not found" even when the plan is present.
+    """
+    normalized_target = normalize_query_id(query_id)
+    return next(
+        (qr for qr in iter_query_results(results) if normalize_query_id(qr.get("query_id", "")) == normalized_target),
+        None,
+    )
 
 
 @click.command("show-plan")
@@ -85,26 +101,26 @@ def show_plan(
         results, _ = load_result_file(run_path)
 
         # Find query execution
-        query_exec = None
-        for phase_name, phase_results in results.phases.items():
-            for exec_result in phase_results.queries:
-                if exec_result.query_id == query_id:
-                    query_exec = exec_result
-                    break
-            if query_exec:
-                break
+        query_exec = _find_query(results, query_id)
 
         if not query_exec:
             console.print(f"[red]Error:[/red] Query '{query_id}' not found in results")
             ctx.exit(1)
 
         # Check if plan was captured
-        if not hasattr(query_exec, "query_plan") or query_exec.query_plan is None:
-            console.print(f"[yellow]Warning:[/yellow] No query plan captured for query '{query_id}'")
-            console.print("Run benchmark with --capture-plans flag to capture query plans")
+        if query_exec.get("query_plan") is None:
+            # Distinguish "no plan captured" from "a .plans.json exists but
+            # failed to load" (qpc-05 / F4.3): the fix differs (re-run with
+            # --capture-plans vs. investigate the corrupt companion file).
+            plans_load_error = getattr(results, "plans_load_error", None)
+            if plans_load_error:
+                console.print(f"[red]Error:[/red] plans file exists but failed to load: {plans_load_error}")
+            else:
+                console.print(f"[yellow]Warning:[/yellow] No query plan captured for query '{query_id}'")
+                console.print("Run benchmark with --capture-plans flag to capture query plans")
             ctx.exit(1)
 
-        plan = query_exec.query_plan
+        plan = query_exec["query_plan"]
 
         # Handle different output formats
         if output_format == "json":

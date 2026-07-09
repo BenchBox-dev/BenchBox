@@ -30,10 +30,18 @@ except ImportError:
     SessionConfig = None  # type: ignore[assignment, misc]
     RuntimeEnv = None  # type: ignore[assignment, misc]  # ty: ignore[conflicting-declarations]
 
+from benchbox.core.dataframe.schema_utils import extract_schema_columns
+from benchbox.core.errors import PlanCaptureError
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
 from benchbox.platforms.base.no_constraint_mixin import NoConstraintEnforcementMixin
 from benchbox.utils.clock import elapsed_seconds, mono_time
+from benchbox.utils.file_format import (
+    TRAILING_DUMMY_COLUMN,
+    get_column_names_with_trailing,
+    get_data_extension,
+    has_trailing_delimiter,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +135,7 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.SUPPORTED
     supports_external_tables = True
+    plan_capture_phase_eligible = True
 
     # Process-wide lock bookkeeping keyed by working-dir lock file path.
     # This ensures ownership/reentrancy is shared across adapter instances.
@@ -646,33 +655,7 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             self.log_verbose("Benchmark returned empty schema, will rely on schema inference")
             return {}
 
-        # Convert benchmark schema format to our internal format
-        # Benchmark schema: {table_name: {'name': str, 'columns': [{'name': str, 'type': str, ...}]}}
-        for table_name_key, table_def in benchmark_schema.items():
-            # Normalize table name to lowercase
-            table_name = table_name_key.lower()
-
-            # Extract column information
-            columns = []
-            if isinstance(table_def, dict) and "columns" in table_def:
-                for col in table_def["columns"]:
-                    if isinstance(col, dict) and "name" in col:
-                        # Get type from the column definition
-                        col_type = col.get("type", "VARCHAR")
-                        # Handle both string types and potentially nested type info
-                        if not isinstance(col_type, str):
-                            col_type = "VARCHAR"
-
-                        columns.append({"name": col["name"], "type": col_type})
-                    else:
-                        self.log_very_verbose(f"Skipping invalid column definition in {table_name}: {col}")
-            elif hasattr(table_def, "columns"):
-                # Handle dataclass-style schema objects (e.g., OBTTable with OBTColumn instances)
-                for col in table_def.columns:
-                    if hasattr(col, "name"):
-                        col_type = col.sql_type() if hasattr(col, "sql_type") else "VARCHAR"
-                        columns.append({"name": col.name, "type": col_type})
-
+        for table_name, columns in extract_schema_columns(benchmark_schema).items():
             if columns:
                 schemas[table_name] = {"columns": columns}
                 self.log_very_verbose(f"Extracted schema for {table_name}: {len(columns)} columns")
@@ -784,7 +767,13 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                 row_count = self._load_table_iceberg(connection, table_name_lower, file_paths[0])
             elif self.data_format == "parquet":
                 row_count = self._load_table_parquet(
-                    connection, table_name_lower, file_paths, data_dir, csv_format=table_csv_format
+                    connection,
+                    table_name_lower,
+                    file_paths,
+                    data_dir,
+                    csv_format=table_csv_format,
+                    data_source=data_source,
+                    benchmark=benchmark,
                 )
             else:
                 # Load CSV directly
@@ -894,6 +883,29 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         # Get schema information for proper column names
         schema_info = self._table_schemas.get(table_name, {})
         columns = schema_info.get("columns", [])
+
+        # Raw TPC .tbl/.dat files use a field-TERMINATING delimiter (a row of N
+        # values ends with a trailing delimiter, splitting into N+1 fields).
+        # DataFusion's CSV reader has no "ignore trailing delimiter" option and a
+        # fixed CREATE EXTERNAL TABLE schema cannot drop the extra field, so route
+        # such files through the Parquet conversion path, which reads them with a
+        # dummy column and projects it away. Results and row counts are identical;
+        # only the storage form (Parquet in the working dir) differs. Detection is
+        # field-count aware, so well-formed CSVs keep the external-table path.
+        if columns and has_trailing_delimiter(file_paths[0], delimiter, [col["name"] for col in columns]):
+            self.log_verbose(
+                f"{table_name}: trailing-delimiter source detected; loading via Parquet conversion "
+                "(DataFusion CSV external tables cannot drop the extra trailing field)"
+            )
+            return self._load_table_parquet(
+                connection,
+                table_name,
+                file_paths,
+                data_dir,
+                csv_format=csv_format,
+                data_source=data_source,
+                benchmark=benchmark,
+            )
 
         # Build column schema for CREATE EXTERNAL TABLE
         if columns:
@@ -1063,7 +1075,14 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         return sql_type
 
     def _load_table_parquet(
-        self, connection: Any, table_name: str, file_paths: list[Path], data_dir: Path, csv_format: str | None = None
+        self,
+        connection: Any,
+        table_name: str,
+        file_paths: list[Path],
+        data_dir: Path,
+        csv_format: str | None = None,
+        data_source: DataSource | None = None,
+        benchmark: Any = None,
     ) -> int:
         """Load table as Parquet, converting from CSV/TBL if needed.
 
@@ -1079,7 +1098,16 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         if input_is_parquet:
             return self._register_parquet_files(connection, table_name, file_paths)
 
-        return self._convert_and_register_parquet(connection, table_name, file_paths, pa, pq, csv_format=csv_format)
+        return self._convert_and_register_parquet(
+            connection,
+            table_name,
+            file_paths,
+            pa,
+            pq,
+            csv_format=csv_format,
+            data_source=data_source,
+            benchmark=benchmark,
+        )
 
     def _is_parquet_file(self, file_path: Path) -> bool:
         """Check if a file is Parquet by extension (stripping compression suffixes)."""
@@ -1331,7 +1359,15 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             raise RuntimeError(f"Failed to register Parquet table {table_name}: {e}") from e
 
     def _convert_and_register_parquet(
-        self, connection: Any, table_name: str, file_paths: list[Path], pa: Any, pq: Any, csv_format: str | None = None
+        self,
+        connection: Any,
+        table_name: str,
+        file_paths: list[Path],
+        pa: Any,
+        pq: Any,
+        csv_format: str | None = None,
+        data_source: DataSource | None = None,
+        benchmark: Any = None,
     ) -> int:
         """Convert CSV/TBL files to Parquet and register with DataFusion."""
         import pyarrow.csv as csv
@@ -1340,17 +1376,75 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         parquet_dir.mkdir(exist_ok=True)
         parquet_file = parquet_dir / f"{table_name}.parquet"
 
-        delimiter = self._detect_csv_format(file_paths, csv_format=csv_format)
+        dialect = resolve_csv_dialect(
+            data_source or DataSource(source_type="datafusion_csv", tables={}),
+            table_name,
+            file_paths[0],
+            benchmark if benchmark is not None else NO_BENCHMARK,
+        )
+        delimiter = self._detect_csv_format(
+            file_paths,
+            csv_format=csv_format,
+            data_source=data_source,
+            table_name=table_name,
+            benchmark=benchmark,
+        )
         column_names, column_types = self._build_pyarrow_columns(table_name, pa)
 
         self.log_very_verbose(f"Converting {len(file_paths)} CSV file(s) to Parquet for {table_name}")
 
-        read_opts = csv.ReadOptions(
-            column_names=column_names,
-            autogenerate_column_names=(column_names is None),
+        # Raw TPC .tbl/.dat files use a field-TERMINATING delimiter: a row of N
+        # values ends with a trailing delimiter and so splits into N+1 fields.
+        # When that happens, read with an extra dummy column so PyArrow does not
+        # error on the extra field, and project the output back to just the real
+        # columns via include_columns. Detection is field-count aware (it skips
+        # files like TPC-DS time_dim whose row already has exactly N fields), so a
+        # well-formed file is read unchanged. include_columns=[] means "all
+        # columns", the correct default for the non-trailing case.
+        read_column_names = column_names
+        include_columns: list[str] = []
+        # Restrict the trailing-delimiter probe to raw TPC .tbl/.dat files.
+        # `has_trailing_delimiter` uses a raw split() which returns true for any
+        # line whose last quoted field happens to contain the delimiter character.
+        # Quoted CSVs (non-TPC sources) must use the standard quoted-parsing path.
+        # Use the base data extension, not Path.suffix: real dbgen output is
+        # compressed and/or shard-numbered (customer.tbl.zst, customer.tbl.1,
+        # customer.tbl.1.zst), whose Path.suffix is .zst/.1 — a bare Path.suffix
+        # check would wrongly treat those chunks as quoted CSV and fail on the
+        # trailing field.
+        _is_tpc_raw = get_data_extension(file_paths[0]) in {".tbl", ".dat"}
+        is_trailing = (
+            column_names is not None and _is_tpc_raw and has_trailing_delimiter(file_paths[0], delimiter, column_names)
         )
-        parse_opts = csv.ParseOptions(delimiter=delimiter, quote_char='"', escape_char="\\")
-        conv_opts = csv.ConvertOptions(null_values=[""], strings_can_be_null=True, column_types=column_types)
+        if is_trailing:
+            read_column_names = get_column_names_with_trailing(column_names, True)
+            include_columns = column_names
+            self.log_very_verbose(
+                f"Detected trailing delimiter for {table_name}; reading with a dummy "
+                f"'{TRAILING_DUMMY_COLUMN}' column and projecting it away"
+            )
+
+        read_opts = csv.ReadOptions(
+            column_names=read_column_names,
+            autogenerate_column_names=(read_column_names is None and not dialect.has_header),
+            skip_rows=1 if column_names is not None and dialect.has_header else 0,
+        )
+        # A field-terminating trailing delimiter is characteristic of raw TPC
+        # dbgen/dsdgen output, which is NOT quoted or escaped. Disable quoting and
+        # escaping for that case so a text field that legitimately begins with `"`
+        # (or contains a backslash) cannot be parsed as a quote/escape and mis-split
+        # the row. Genuinely quoted CSV benchmarks have no trailing delimiter and so
+        # keep the standard quote_char='"' / escape_char='\\' handling.
+        if is_trailing:
+            parse_opts = csv.ParseOptions(delimiter=delimiter, quote_char=False)
+        else:
+            parse_opts = csv.ParseOptions(delimiter=delimiter, quote_char='"', escape_char="\\")
+        conv_opts = csv.ConvertOptions(
+            null_values=[""],
+            strings_can_be_null=True,
+            column_types=column_types,
+            include_columns=include_columns,
+        )
 
         # writer_ref is a single-slot list so the helper can lazily open the shared writer
         writer_ref: list[Any] = [None]
@@ -1374,6 +1468,39 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         # DataFusion optimizations are set during connection creation
         # Additional benchmark-specific settings can be added here
         self.log_verbose(f"DataFusion configured for {benchmark_type} benchmark")
+
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get DataFusion query execution plan using EXPLAIN.
+
+        DataFusion's EXPLAIN returns a DataFrame with columns (plan_type, plan).
+        We reconstruct the pipe-delimited text format expected by DataFusionQueryPlanParser.
+        """
+        try:
+            batches = connection.sql(f"EXPLAIN {query}").collect()
+            if not batches:
+                return None
+            parts = []
+            for batch in batches:
+                for i in range(batch.num_rows):
+                    plan_type = batch.column(0)[i].as_py()
+                    plan_text = batch.column(1)[i].as_py()
+                    if not plan_type or not plan_text:
+                        continue
+                    lines = plan_text.split("\n")
+                    prefix = " " * len(plan_type)
+                    parts.append(f"{plan_type} | {lines[0]}")
+                    for line in lines[1:]:
+                        parts.append(f"{prefix} | {line}")
+            return "\n".join(parts) if parts else None
+        except Exception as e:
+            self.logger.debug(f"Failed to get DataFusion query plan: {e}")
+            return None
+
+    def get_query_plan_parser(self):
+        """Get DataFusion query plan parser."""
+        from benchbox.core.query_plans.parsers.datafusion import DataFusionQueryPlanParser
+
+        return DataFusionQueryPlanParser()
 
     def execute_query(
         self,
@@ -1468,7 +1595,7 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                     )
 
             # Use centralized helper to build result with validation
-            return self._build_query_result_with_validation(
+            result = self._build_query_result_with_validation(
                 query_id=query_id,
                 execution_time=execution_time,
                 actual_row_count=actual_row_count,
@@ -1476,6 +1603,20 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                 validation_result=validation_result,
             )
 
+            # Display plan in console when --show-query-plans is active.
+            # Skip here when --capture-plans is also active: capture_query_plan below
+            # already calls get_query_plan (running EXPLAIN); calling
+            # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
+            if not self.capture_plans:
+                self.display_query_plan_if_enabled(connection, query, query_id)
+
+            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
+            self._merge_plan_capture_into_result(result, connection, query, query_id)
+
+            return result
+
+        except PlanCaptureError:
+            raise
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             logger.error(

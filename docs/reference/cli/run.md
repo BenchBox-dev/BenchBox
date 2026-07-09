@@ -83,6 +83,7 @@ benchbox run [OPTIONS]
   - `disabled`: No validation
   - `full`: All validation checks enabled (preflight, postgen, postload, platform check)
   - `preflight`, `postgen`, `postload`, `check-platforms`: Individual validation types
+- `--strict-translation`: Fail instead of falling back when SQL dialect translation cannot produce target SQL
 
 **Platform-Specific Configuration:**
 - `--platform-option KEY=VALUE`: Platform-specific option (can be used multiple times)
@@ -307,7 +308,7 @@ benchbox run --platform snowflake --benchmark tpch --scale 1 \
 
 These overrides are Databricks-specific and are passed via `--platform-option`.
 
-- `--platform-option databricks_clustering_strategy=[z_order|liquid_clustering|none]`: SQL tuning strategy for Databricks tables
+- `--platform-option databricks_clustering_strategy=[z_order|liquid_clustering|liquid_clustering_auto|none]`: SQL tuning strategy for Databricks tables
 - `--platform-option liquid_clustering_columns=col1,col2`: Comma-separated liquid clustering columns
 
 ```bash
@@ -319,6 +320,10 @@ benchbox run --platform databricks --benchmark tpch --scale 1 \
 benchbox run --platform databricks --benchmark tpch --scale 1 \
   --platform-option databricks_clustering_strategy=liquid_clustering \
   --platform-option liquid_clustering_columns=l_shipdate,l_orderkey
+
+# Databricks with automatic liquid clustering
+benchbox run --platform databricks --benchmark tpch --scale 1 \
+  --platform-option databricks_clustering_strategy=liquid_clustering_auto
 ```
 
 ## Execution Control Options
@@ -333,16 +338,47 @@ These flags control monitoring, progress display, memory handling, and caching b
 
 ## Query Plan Capture Options
 
+- `--capture-plans`: Capture the logical query plan for each executed query and embed it in results.
+  Plans are persisted to the results bundle for later comparison or regression detection.
+  Display is not affected — plans are captured silently.
+  See [Query Plan Analysis](../../features/query-plan-analysis.md) for full details.
+
+- `--show-plans`: Display query plans in the console after each query executes.
+  Use for interactive inspection **without** `--capture-plans`. When `--capture-plans`
+  is also active, display is suppressed to avoid running EXPLAIN twice; use
+  `benchbox show-plan` to inspect plans already captured to the results bundle.
+
+- `--analyze-plans` / `--no-analyze-plans`: The single capture-detail knob (used with
+  `--capture-plans`). `--analyze-plans` (default) captures `EXPLAIN (ANALYZE)` plans with actual
+  per-operator timing/cardinality, re-running each query once in the isolated post-measurement
+  phase (~1× extra cost, outside the measured window). `--no-analyze-plans` captures the static
+  (estimated) plan with no re-execution. Write statements are never re-executed regardless (DML
+  stays on a non-`ANALYZE` `EXPLAIN`).
+
+- `--normalize-plan-literals`: In addition to the default fingerprint, record a literal-normalized fingerprint (`fingerprint_normalized` in the plans companion file) that collapses queries differing only in literal constants (e.g. parameter substitutions) to the same value. Requires `--capture-plans`; the default `fingerprint` is left unchanged.
+  - Example: `--capture-plans --normalize-plan-literals`
+
 - `--plan-config TEXT`: Fine-grained control over query plan capture
   - Format: comma-separated key:value pairs
   - Keys:
-    - `sample:FLOAT` - fraction of queries to capture plans for (e.g., `sample:0.1` for 10%)
-    - `first:INT` - capture plans for the first N queries only
-    - `queries:ID1,ID2,...` - capture plans for specific query IDs
+    - `queries:ID1,ID2,...` - capture plans for specific query IDs only
     - `strict:true|false` - fail if plan capture encounters errors
   - Requires `--capture-plans` to also be set
-  - Example: `--capture-plans --plan-config "sample:0.1,strict:true"`
-  - **Note:** On DuckDB, plan capture uses `EXPLAIN (ANALYZE, FORMAT JSON)` which roughly doubles query execution time. Use `--platform-option analyze_plans=false` for estimated plans without the overhead.
+  - Example: `--capture-plans --plan-config "queries:Q1,Q6,strict:true"`
+  - **Note:** Plan capture records each distinct query exactly once in an isolated
+    post-measurement phase, so the old per-iteration sampling keys (`sample:` / `first:`) have
+    been removed. On DuckDB the default `EXPLAIN (ANALYZE, FORMAT JSON)` re-runs each query once;
+    use `--no-analyze-plans` for estimated plans without that overhead.
+
+> **Cross-run fingerprint comparison and benchmark seeds.** The default
+> `plan_fingerprint` embeds filter/join/projection literals, so comparing fingerprints
+> across runs that used *different* seeds yields false positives when only a
+> seed-driven filter value changed. Hold the seed constant across compared runs, or
+> use the opt-in **literal-normalized** fingerprint
+> (`QueryPlanDAG.normalized_fingerprint`,
+> `create_plan_metadata_from_results(..., normalize_literals=True)`), which masks
+> literals so seed-varied plans compare equal. See
+> [Query Plan Analysis → Literal normalization](../../features/query-plan-analysis.md#literal-normalization-seed-independent-fingerprints).
 
 ## Related
 

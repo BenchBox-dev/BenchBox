@@ -12,6 +12,7 @@ Documentation for database platforms supported by BenchBox.
 - [Platform Selection Guide](platform-selection-guide.md) - Choose the right platform for your needs
 - [Quick Reference](quick-reference.md) - Quick comparison and feature matrix
 - [Comparison Matrix](comparison-matrix.md) - Detailed platform comparison
+- [Support Status](support-status.md) - Registry support taxonomy and optional import diagnostics
 - [**Deployment Modes**](deployment-modes.md) - Platform deployment architecture (local, self-hosted, cloud)
 
 ## DataFrame Platforms (Native API)
@@ -185,6 +186,7 @@ benchbox run --platform snowflake --benchmark tpch --scale 1.0
 platform-selection-guide
 quick-reference
 comparison-matrix
+support-status
 deployment-modes
 dataframe
 duckdb

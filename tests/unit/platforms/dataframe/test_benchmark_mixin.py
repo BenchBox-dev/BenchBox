@@ -38,7 +38,7 @@ class DummyAdapter(BenchmarkExecutionMixin):
     def create_context(self):
         return SimpleNamespace()
 
-    def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None):
+    def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None, benchmark=None, **kwargs):
         self.loaded_paths[table_name] = file_paths
         return 1
 
@@ -74,12 +74,12 @@ class DummyPandasProfiledAdapter(DummyAdapter):
             "execution_time_seconds": 0.01,
             "rows_returned": 1,
         }
-        profile = SimpleNamespace(query_plan=self._query_plan)
+        profile = SimpleNamespace(query_plan=self._query_plan, plan_capture_time_ms=0.0)
         return result, profile
 
 
 class FailingLoadAdapter(DummyAdapter):
-    def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None):
+    def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None, benchmark=None, **kwargs):
         raise RuntimeError("load failed")
 
 
@@ -402,6 +402,76 @@ def test_capture_plans_counts_missing_plan_as_failure(tmp_path):
     assert result.plan_capture_errors[0]["query_id"] == "Q1"
 
 
+class _RecordingCaptureFailureAdapter(DummyPandasProfiledAdapter):
+    """Mirrors ExpressionFamilyAdapter's real capture-failure recording: the
+    real exception cause is set on the row dict (plan_capture_error) and
+    appended to the per-run self.plan_capture_errors list."""
+
+    def execute_query_profiled(self, ctx, query, query_id=None):
+        result, profile = super().execute_query_profiled(ctx, query, query_id)
+        result["plan_capture_error"] = "TypeError: unsupported operand"
+        self.plan_capture_errors.append({"query_id": "Q1", "error": "TypeError: unsupported operand"})
+        return result, profile
+
+
+def test_capture_plans_preserves_real_capture_error_cause(tmp_path):
+    """qpc-05/#1032 review (F4.4): the real capture-failure cause recorded on
+    self.plan_capture_errors during execution must reach the companion
+    errors list via existing_errors=, and plan_capture_error must reach the
+    persisted main query row - not the generic "Query plan not captured"."""
+    adapter = _RecordingCaptureFailureAdapter(query_plan=None)
+    tbl_path = tmp_path / "customer.tbl"
+    tbl_path.write_text("1|Alice|\n")
+    benchmark = DummyBenchmark({"customer": tbl_path})
+    config = BenchmarkConfig(
+        name="dummy",
+        display_name="Dummy",
+        scale_factor=1.0,
+        options={"power_warmup_iterations": 0, "power_iterations": 1},
+        capture_plans=True,
+    )
+
+    result = adapter.run_benchmark(
+        benchmark,
+        benchmark_config=config,
+        phases=DataFramePhases(load=False, execute=True),
+        options=DataFrameRunOptions(prefer_parquet=False),
+    )
+
+    assert result.plan_capture_failures == 1
+    assert result.plan_capture_errors[0]["error"] == "TypeError: unsupported operand"
+    qr = next(q for q in result.query_results if q["query_id"] == "Q1")
+    assert qr["plan_capture_error"] == "TypeError: unsupported operand"
+
+
+def test_run_benchmark_resets_plan_capture_errors_between_runs(tmp_path):
+    """A reused adapter instance must not leak plan_capture_errors from a
+    prior run into the next run's companion errors list (qpc-15 F4.4)."""
+    adapter = _RecordingCaptureFailureAdapter(query_plan=None)
+    tbl_path = tmp_path / "customer.tbl"
+    tbl_path.write_text("1|Alice|\n")
+    benchmark = DummyBenchmark({"customer": tbl_path})
+    config = BenchmarkConfig(
+        name="dummy",
+        display_name="Dummy",
+        scale_factor=1.0,
+        options={"power_warmup_iterations": 0, "power_iterations": 1},
+        capture_plans=True,
+    )
+    run_kwargs = {
+        "benchmark_config": config,
+        "phases": DataFramePhases(load=False, execute=True),
+        "options": DataFrameRunOptions(prefer_parquet=False),
+    }
+
+    first = adapter.run_benchmark(benchmark, **run_kwargs)
+    second = adapter.run_benchmark(benchmark, **run_kwargs)
+
+    assert len(first.plan_capture_errors) == 1
+    # Not 2: the second run's errors must not be appended to the first run's.
+    assert len(second.plan_capture_errors) == 1
+
+
 def test_collect_skip_query_ids_routes_through_get_platform_skip_queries():
     """Platform-specific skips flow through get_platform_skip_queries, not a hardcoded check."""
     adapter = DummyDataFusionAdapter()
@@ -457,3 +527,115 @@ def test_tpcds_dataframe_requires_variant_parity_in_mixin():
 
     with pytest.raises(RuntimeError, match="missing variant DataFrame implementations"):
         adapter._get_queries_for_benchmark(config, benchmark, stream_id=0)
+
+
+class TestStructureDataFramePlan:
+    """qpc-06 w4 / F3.2: DataFrame text plans are promoted to QueryPlanDAGs via
+    a registered parser, with a text-only fallback when no parser exists or
+    parsing fails."""
+
+    def test_datafusion_text_plan_promoted_to_dag_preserving_raw_output(self):
+        from benchbox.core.dataframe.profiling import QueryPlan
+        from benchbox.core.results.query_plan_models import QueryPlanDAG
+
+        adapter = DummyAdapter()
+        plan_text = (
+            "Projection: lineitem.l_returnflag\n"
+            '  Filter: lineitem.l_shipdate <= Date32("1998-09-02")\n'
+            "    TableScan: lineitem"
+        )
+        captured = QueryPlan(platform="datafusion", plan_type="logical", plan_text=plan_text)
+
+        structured = adapter._structure_dataframe_plan(captured, "q1")
+
+        assert isinstance(structured, QueryPlanDAG)
+        assert structured.plan_fingerprint  # real structural fingerprint computed
+        # Original plan text preserved for debugging.
+        assert structured.raw_explain_output == plan_text
+
+    def test_platform_without_parser_falls_back_to_text_plan(self):
+        from benchbox.core.dataframe.profiling import QueryPlan
+
+        adapter = DummyAdapter()  # platform_name "Polars" (no registered parser)
+        captured = QueryPlan(platform="polars", plan_type="logical", plan_text="FILTER\n  SCAN lineitem")
+
+        structured = adapter._structure_dataframe_plan(captured, "q1")
+
+        # Returned unchanged (still the text-only QueryPlan), not a DAG.
+        assert structured is captured
+
+    def test_parser_failure_falls_back_to_text_plan(self, monkeypatch):
+        from benchbox.core.dataframe.profiling import QueryPlan
+
+        adapter = DummyAdapter()
+
+        class _BoomParser:
+            def parse_explain_output(self, _qid, _txt):
+                raise ValueError("unparseable")
+
+        monkeypatch.setattr(
+            "benchbox.core.query_plans.parsers.registry.get_parser_for_platform",
+            lambda _platform: _BoomParser(),
+        )
+        captured = QueryPlan(platform="datafusion", plan_type="logical", plan_text="garbage")
+
+        structured = adapter._structure_dataframe_plan(captured, "q1")
+
+        assert structured is captured
+
+    def test_parser_returning_none_falls_back_to_text_plan(self, monkeypatch):
+        from benchbox.core.dataframe.profiling import QueryPlan
+
+        adapter = DummyAdapter()
+
+        class _NoneParser:
+            def parse_explain_output(self, _qid, _txt):
+                return None
+
+        monkeypatch.setattr(
+            "benchbox.core.query_plans.parsers.registry.get_parser_for_platform",
+            lambda _platform: _NoneParser(),
+        )
+        captured = QueryPlan(platform="datafusion", plan_type="logical", plan_text="x")
+
+        structured = adapter._structure_dataframe_plan(captured, "q1")
+
+        assert structured is captured
+
+    def test_error_plan_type_falls_back_without_parsing(self, monkeypatch):
+        from benchbox.core.dataframe.profiling import QueryPlan
+
+        adapter = DummyAdapter()
+
+        def _fail_if_called(_platform):
+            raise AssertionError("parser should not be looked up for a failed capture")
+
+        monkeypatch.setattr(
+            "benchbox.core.query_plans.parsers.registry.get_parser_for_platform",
+            _fail_if_called,
+        )
+        captured = QueryPlan(platform="datafusion", plan_type="error", plan_text="Could not capture plan: boom")
+
+        structured = adapter._structure_dataframe_plan(captured, "q1")
+
+        assert structured is captured
+
+    def test_capture_unavailable_sentinel_text_falls_back_without_parsing(self, monkeypatch):
+        from benchbox.core.dataframe.profiling import QueryPlan
+
+        adapter = DummyAdapter()
+
+        def _fail_if_called(_platform):
+            raise AssertionError("parser should not be looked up for capture-unavailable sentinel text")
+
+        monkeypatch.setattr(
+            "benchbox.core.query_plans.parsers.registry.get_parser_for_platform",
+            _fail_if_called,
+        )
+        # plan_type stays "logical" on this path (see capture_datafusion_plan);
+        # only the sentinel text signals capture was unavailable.
+        captured = QueryPlan(platform="datafusion", plan_type="logical", plan_text="Plan capture not available")
+
+        structured = adapter._structure_dataframe_plan(captured, "q1")
+
+        assert structured is captured

@@ -30,7 +30,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.dataframe.maintenance_interface import get_maintenance_operations_for_platform
 from benchbox.core.tpcdi.config import TPCDIConfig
 from benchbox.core.tpcdi.etl import (
@@ -83,7 +83,7 @@ _POSTGRES_BOOLEAN_NUMBER_RE = re.compile(
 )
 
 
-class TPCDIBenchmark(BaseBenchmark):
+class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     """TPC-DI (Data Integration) benchmark implementation.
 
     Tests data integration and ETL processes in data warehousing scenarios.
@@ -163,15 +163,11 @@ class TPCDIBenchmark(BaseBenchmark):
         else:
             self.config = config
 
-        # Set up directories from config
+        # Set up directories from config. Assigning output_dir re-derives the
+        # ETL directories via _sync_output_dir_to_generators.
         self.output_dir = self.config.output_dir
         self.config.create_directories()
-
-        # ETL directories - always enabled (output_dir is guaranteed set by config.__post_init__)
         assert self.output_dir is not None
-        self.source_dir = self.output_dir / "source"
-        self.staging_dir = self.output_dir / "staging"
-        self.warehouse_dir = self.output_dir / "warehouse"
 
         # Simple parallel processing configuration from config
         self.enable_parallel = self.config.enable_parallel
@@ -209,6 +205,28 @@ class TPCDIBenchmark(BaseBenchmark):
 
         # Data files mapping
         self.tables: dict[str, Any] = {}
+
+    def _sync_output_dir_to_generators(self, path: Any) -> None:
+        """Keep the TPC-DI config and ETL directories in sync with output_dir.
+
+        TPC-DI derives its ETL layout (source/staging/warehouse) and its
+        data_generator path from the configured output root, so a
+        post-construction output_dir reassignment (e.g. an explicit CLI
+        ``--output`` resolved by the runner) must re-derive all of them.
+        Path math is owned by TPCDIConfig; this hook only re-reads it.
+        """
+        super()._sync_output_dir_to_generators(path)
+        config = getattr(self, "config", None)
+        if config is None:
+            # BaseBenchmark.__init__ assigns output_dir before the config
+            # exists; the constructor re-assigns from config afterwards.
+            return
+        # Store the handler as-is so cloud wrappers (e.g. DatabricksPath) keep
+        # their upload target; config path math works on any PathLike.
+        config.output_dir = path
+        self.source_dir = config.source_dir
+        self.staging_dir = config.staging_dir
+        self.warehouse_dir = config.warehouse_dir
 
     def generate_data(self, tables: Optional[list[str]] = None, output_format: str = "csv") -> list[Union[str, Path]]:
         """Generate TPC-DI data.
@@ -2722,7 +2740,7 @@ class TPCDIBenchmark(BaseBenchmark):
 # Register benchmark-specific CLI option specs
 # ---------------------------------------------------------------------------
 
-from benchbox.cli.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
     parse_bool,

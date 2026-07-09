@@ -15,163 +15,31 @@ import logging
 import random
 from dataclasses import dataclass
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any, Optional, Union
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
 
+def _load_query_parameter_specs() -> dict[str, list[str]]:
+    with (Path(__file__).with_name("query_parameter_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
 # TPC-H reference data for parameter generation
-REGIONS = ["AFRICA", "AMERICA", "ASIA", "EUROPE", "MIDDLE EAST"]
-NATIONS = [
-    "ALGERIA",
-    "ARGENTINA",
-    "BRAZIL",
-    "CANADA",
-    "EGYPT",
-    "ETHIOPIA",
-    "FRANCE",
-    "GERMANY",
-    "INDIA",
-    "INDONESIA",
-    "IRAN",
-    "IRAQ",
-    "JAPAN",
-    "JORDAN",
-    "KENYA",
-    "MOROCCO",
-    "MOZAMBIQUE",
-    "PERU",
-    "CHINA",
-    "ROMANIA",
-    "SAUDI ARABIA",
-    "VIETNAM",
-    "RUSSIA",
-    "UNITED KINGDOM",
-    "UNITED STATES",
-]
-SEGMENTS = ["AUTOMOBILE", "BUILDING", "FURNITURE", "HOUSEHOLD", "MACHINERY"]
-TYPES_SYLLABLE1 = ["STANDARD", "SMALL", "MEDIUM", "LARGE", "ECONOMY", "PROMO"]
-TYPES_SYLLABLE2 = ["ANODIZED", "BURNISHED", "PLATED", "POLISHED", "BRUSHED"]
-TYPES_SYLLABLE3 = ["TIN", "NICKEL", "BRASS", "STEEL", "COPPER"]
-CONTAINERS = [
-    "SM CASE",
-    "SM BOX",
-    "SM PACK",
-    "SM PKG",
-    "MED BAG",
-    "MED BOX",
-    "MED PKG",
-    "MED PACK",
-    "LG CASE",
-    "LG BOX",
-    "LG PACK",
-    "LG PKG",
-    "JUMBO CASE",
-    "JUMBO BOX",
-    "JUMBO PACK",
-    "JUMBO PKG",
-    "WRAP CASE",
-    "WRAP BOX",
-    "WRAP PACK",
-    "WRAP PKG",
-]
-SHIPMODES = ["REG AIR", "AIR", "RAIL", "SHIP", "TRUCK", "MAIL", "FOB"]
-COLORS = [
-    "almond",
-    "antique",
-    "aquamarine",
-    "azure",
-    "beige",
-    "bisque",
-    "black",
-    "blanched",
-    "blue",
-    "blush",
-    "brown",
-    "burlywood",
-    "burnished",
-    "chartreuse",
-    "chiffon",
-    "chocolate",
-    "coral",
-    "cornflower",
-    "cornsilk",
-    "cream",
-    "cyan",
-    "dark",
-    "deep",
-    "dim",
-    "dodger",
-    "drab",
-    "firebrick",
-    "floral",
-    "forest",
-    "frosted",
-    "gainsboro",
-    "ghost",
-    "goldenrod",
-    "green",
-    "grey",
-    "honeydew",
-    "hot",
-    "indian",
-    "ivory",
-    "khaki",
-    "lace",
-    "lavender",
-    "lawn",
-    "lemon",
-    "light",
-    "lime",
-    "linen",
-    "magenta",
-    "maroon",
-    "medium",
-    "metallic",
-    "midnight",
-    "mint",
-    "misty",
-    "moccasin",
-    "navajo",
-    "navy",
-    "olive",
-    "orange",
-    "orchid",
-    "pale",
-    "papaya",
-    "peach",
-    "peru",
-    "pink",
-    "plum",
-    "powder",
-    "puff",
-    "purple",
-    "red",
-    "rose",
-    "rosy",
-    "royal",
-    "saddle",
-    "salmon",
-    "sandy",
-    "seashell",
-    "sienna",
-    "sky",
-    "slate",
-    "smoke",
-    "snow",
-    "spring",
-    "steel",
-    "tan",
-    "thistle",
-    "tomato",
-    "turquoise",
-    "violet",
-    "wheat",
-    "white",
-    "yellow",
-]
-# TPC-H brand numbers (Brand#11 to Brand#55 for 5 manufacturers)
-BRAND_NUMBERS = [f"Brand#{m}{b}" for m in range(1, 6) for b in range(1, 6)]
+_QUERY_PARAMETER_SPECS = _load_query_parameter_specs()
+REGIONS = _QUERY_PARAMETER_SPECS["regions"]
+NATIONS = _QUERY_PARAMETER_SPECS["nations"]
+SEGMENTS = _QUERY_PARAMETER_SPECS["segments"]
+TYPES_SYLLABLE1 = _QUERY_PARAMETER_SPECS["types_syllable1"]
+TYPES_SYLLABLE2 = _QUERY_PARAMETER_SPECS["types_syllable2"]
+TYPES_SYLLABLE3 = _QUERY_PARAMETER_SPECS["types_syllable3"]
+CONTAINERS = _QUERY_PARAMETER_SPECS["containers"]
+SHIPMODES = _QUERY_PARAMETER_SPECS["shipmodes"]
+COLORS = _QUERY_PARAMETER_SPECS["colors"]
+BRAND_NUMBERS = _QUERY_PARAMETER_SPECS["brand_numbers"]
 
 
 @dataclass

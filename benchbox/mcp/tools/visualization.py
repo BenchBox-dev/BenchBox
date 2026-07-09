@@ -16,13 +16,68 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from benchbox.core.visualization.ascii_api import render_ascii_chart_from_results
-from benchbox.core.visualization.chart_types import CHART_TYPE_DESCRIPTIONS, CHART_TYPE_SPECS
-from benchbox.core.visualization.utils import extract_chart_subtitle
+from benchbox.core.visualization.chart_types import CHART_TYPE_DESCRIPTIONS
+from benchbox.core.visualization.orchestration import render_chart_set
+from benchbox.core.visualization.suggestions import build_visualization_profile, recommend_charts, select_primary_chart
 from benchbox.mcp.errors import ErrorCode, make_error
 from benchbox.mcp.tools.path_utils import resolve_result_file_path
 
 logger = logging.getLogger(__name__)
+
+BENCHBOX_CHART_NAMESPACE_NOTE = (
+    "BenchBox chart_type values are result-aware semantic chart IDs from "
+    "benchbox.core.visualization.chart_types. They are not raw textcharts primitive "
+    "tool names such as bar or heatmap."
+)
+
+
+def _semantic_chart_id_help() -> str:
+    return ", ".join(CHART_TYPE_DESCRIPTIONS)
+
+
+def _template_name_help() -> str:
+    from benchbox.core.visualization.templates import list_templates
+
+    return ", ".join(t.name for t in list_templates())
+
+
+def _renderer_failure_error(
+    skipped: Any | None,
+    *,
+    chart_type: str | None = None,
+    template_name: str | None = None,
+) -> dict[str, Any] | None:
+    if skipped is None or skipped.reason != "renderer failed":
+        return None
+
+    message = skipped.details.get("message") or skipped.details.get("exception_type") or skipped.reason
+    details: dict[str, Any] = {"skip": skipped.as_dict()}
+    if chart_type is not None:
+        details["chart_type"] = chart_type
+    if template_name is not None:
+        details["template"] = template_name
+    if "exception_type" in skipped.details:
+        details["exception_type"] = skipped.details["exception_type"]
+
+    return make_error(
+        ErrorCode.INTERNAL_ERROR,
+        f"ASCII chart generation failed: {message}",
+        details=details,
+    )
+
+
+MCP_SUGGEST_CHARTS_DESCRIPTION = (
+    "Analyze BenchBox result files and suggest result-aware semantic chart IDs. "
+    f"{BENCHBOX_CHART_NAMESPACE_NOTE} "
+    f"Current semantic chart IDs: {_semantic_chart_id_help()}."
+)
+
+MCP_GENERATE_CHART_DESCRIPTION = (
+    "Generate ASCII chart output from BenchBox result files using semantic chart IDs or chart templates. "
+    f"{BENCHBOX_CHART_NAMESPACE_NOTE} "
+    f"Current semantic chart IDs: {_semantic_chart_id_help()}. "
+    f"Current templates: {_template_name_help()}."
+)
 
 # Tool annotations for read-only visualization info tools
 VIZ_READONLY_ANNOTATIONS = ToolAnnotations(
@@ -43,16 +98,6 @@ VIZ_GENERATE_ANNOTATIONS = ToolAnnotations(
 )
 
 
-def _render_single_ascii_chart(
-    results: list,
-    chart_type: str,
-    opts: Any,
-) -> str | None:
-    """Render a single ASCII chart for the given chart type."""
-    subtitle = extract_chart_subtitle(results)
-    return render_ascii_chart_from_results(results, chart_type, options=opts, subtitle=subtitle)
-
-
 def _generate_ascii_chart(
     resolved_paths: list[Path],
     chart_type: str,
@@ -71,96 +116,86 @@ def _generate_ascii_chart(
         results = plotter.results
 
         opts = ChartOptions(use_color=False)
+        outcome = render_chart_set(
+            results,
+            [chart_type],
+            template_name=template_name,
+            options=opts,
+            strict_pairwise_validation=True,
+        )
 
-        if template_name is not None:
-            from benchbox.core.visualization.templates import get_template
+        if outcome.validation_error:
+            return make_error(
+                ErrorCode.VALIDATION_ERROR,
+                outcome.validation_error.message,
+                details=outcome.validation_error.details,
+            )
 
-            try:
-                chart_template = get_template(template_name)
-            except Exception:
-                from benchbox.core.visualization.templates import list_templates
-
-                available = [t.name for t in list_templates()]
-                return make_error(
-                    ErrorCode.VALIDATION_ERROR,
-                    f"Unknown template: {template_name}",
-                    details={"available_templates": available},
-                )
-
-            # Comparison template semantics are strictly pairwise.
-            if chart_template.name == "comparison" and len(results) != 2:
+        if template_name is not None and outcome.template is not None:
+            if outcome.template.name == "comparison" and len(results) != 2:
                 return make_error(
                     ErrorCode.VALIDATION_ERROR,
                     "Template 'comparison' requires exactly 2 result files",
                     details={"template": "comparison", "expected_result_count": 2, "actual_result_count": len(results)},
                 )
 
-            chart_contents: list[str] = []
-            chart_types_rendered: list[str] = []
-            skipped_chart_types: list[dict[str, str]] = []
             separator = "\n" + "─" * 60 + "\n\n"
 
-            for ct in chart_template.chart_types:
-                content = _render_single_ascii_chart(results, ct, opts)
-                if content:
-                    chart_contents.append(content)
-                    chart_types_rendered.append(ct)
-                else:
-                    skipped_chart_types.append(
-                        {
-                            "chart_type": ct,
-                            "reason": "not applicable for provided inputs",
-                        }
-                    )
+            if not outcome.rendered:
+                renderer_failure = next(
+                    (skipped for skipped in outcome.skipped if skipped.reason == "renderer failed"),
+                    None,
+                )
+                if error := _renderer_failure_error(renderer_failure, template_name=template_name):
+                    return error
 
-            if not chart_contents:
                 return make_error(
-                    ErrorCode.INTERNAL_ERROR,
-                    "No charts could be generated from the template",
+                    ErrorCode.VALIDATION_ERROR,
+                    "No charts were applicable for the provided template inputs",
                     details={
                         "template": template_name,
-                        "chart_types": list(chart_template.chart_types),
-                        "skipped_chart_types": skipped_chart_types,
+                        "chart_types": list(outcome.template.chart_types),
+                        "skipped_chart_types": [skipped.as_dict() for skipped in outcome.skipped],
                     },
                 )
 
-            combined_content = separator.join(chart_contents)
+            combined_content = separator.join(chart.content for chart in outcome.rendered)
 
             return {
                 "status": "generated",
                 "template": template_name,
-                "template_description": chart_template.description,
-                "chart_types": chart_types_rendered,
-                "chart_count": len(chart_contents),
+                "template_description": outcome.template.description,
+                "chart_types": outcome.chart_types_rendered,
+                "chart_count": len(outcome.rendered),
                 "format": "ascii",
                 "content": combined_content,
                 "source_files": file_list,
-                "skipped_chart_types": skipped_chart_types,
-                "note": f"Template '{template_name}' rendered {len(chart_contents)} ASCII charts inline.",
+                "skipped_chart_types": [skipped.as_dict() for skipped in outcome.skipped],
+                "note": f"Template '{template_name}' rendered {len(outcome.rendered)} ASCII charts inline.",
             }
 
-        content = _render_single_ascii_chart(results, chart_type, opts)
+        if not outcome.rendered:
+            skipped_chart = outcome.skipped[0] if outcome.skipped else None
+            if error := _renderer_failure_error(skipped_chart, chart_type=chart_type):
+                return error
 
-        spec = CHART_TYPE_SPECS.get(chart_type)
-        if spec and spec.requires_two_results and len(results) != 2:
+            skipped = skipped_chart.as_dict() if skipped_chart is not None else {"chart_type": chart_type}
             return make_error(
                 ErrorCode.VALIDATION_ERROR,
-                f"Chart type '{chart_type}' requires exactly 2 result files",
-                details={"chart_type": chart_type, "expected_result_count": 2, "actual_result_count": len(results)},
+                f"Chart type '{chart_type}' is not applicable for the provided result data",
+                details={
+                    "chart_type": chart_type,
+                    "valid_types": list(CHART_TYPE_DESCRIPTIONS.keys()),
+                    "skip": skipped,
+                },
             )
 
-        if content is None:
-            return make_error(
-                ErrorCode.VALIDATION_ERROR,
-                f"Unsupported chart type for ASCII format: {chart_type}",
-                details={"valid_types": list(CHART_TYPE_DESCRIPTIONS.keys())},
-            )
-
+        rendered = outcome.rendered[0]
         return {
             "status": "generated",
-            "chart_type": chart_type,
+            "chart_type": rendered.chart_type,
             "format": "ascii",
-            "content": content,
+            "content": rendered.content,
             "source_files": file_list,
             "note": "ASCII chart rendered inline. Copy the 'content' field to display.",
         }
@@ -207,159 +242,13 @@ def _resolve_and_validate_result_files(
 
 def _build_chart_suggestions(results: list) -> list[dict[str, str]]:
     """Build chart type suggestions based on result data characteristics."""
-    num_results = len(results)
-    total_queries = sum(len(r.queries) for r in results)
-    platforms = sorted({r.platform for r in results})
-    has_cost_data = any(r.cost_total is not None for r in results)
-    has_query_data = any(r.queries for r in results)
-    has_timestamps = any(r.timestamp is not None for r in results)
-    has_phase_data = any(
-        isinstance((getattr(r, "raw", {}) or {}).get("phases"), dict)
-        or isinstance((((getattr(r, "raw", {}) or {}).get("results") or {}).get("timing") or {}).get("phases"), dict)
-        for r in results
-    )
-
-    suggestions: list[dict[str, str]] = []
-
-    suggestions.append(
-        {
-            "chart_type": "performance_bar",
-            "reason": "Compare total runtime across platforms/configurations",
-            "priority": "high",
-        }
-    )
-
-    if has_query_data:
-        suggestions.append(
-            {
-                "chart_type": "distribution_box",
-                "reason": f"Show query time distribution ({total_queries} queries)",
-                "priority": "high" if total_queries > 5 else "medium",
-            }
-        )
-
-    if num_results >= 2 and has_query_data:
-        suggestions.append(
-            {
-                "chart_type": "query_heatmap",
-                "reason": f"Compare per-query performance across {len(platforms)} platform(s)",
-                "priority": "high" if num_results == 2 else "medium",
-            }
-        )
-
-    if has_query_data:
-        suggestions.append(
-            {
-                "chart_type": "query_histogram",
-                "reason": f"Show per-query latency bars ({total_queries} queries)"
-                + (" - auto-splits for readability" if total_queries > 33 else ""),
-                "priority": "high" if total_queries > 20 else "medium",
-            }
-        )
-        suggestions.append(
-            {
-                "chart_type": "percentile_ladder",
-                "reason": "Highlight P50/P90/P95/P99 tail-latency spread across platforms",
-                "priority": "medium",
-            }
-        )
-        suggestions.append(
-            {
-                "chart_type": "cdf_chart",
-                "reason": "Visualize cumulative latency distribution differences across platforms",
-                "priority": "medium",
-            }
-        )
-
-    if has_cost_data:
-        suggestions.append(
-            {
-                "chart_type": "cost_scatter",
-                "reason": "Plot cost vs performance trade-offs",
-                "priority": "high",
-            }
-        )
-
-    if num_results >= 3 and has_timestamps:
-        suggestions.append(
-            {
-                "chart_type": "time_series",
-                "reason": f"Show performance trends over {num_results} runs",
-                "priority": "medium",
-            }
-        )
-
-    if num_results >= 2:
-        suggestions.append(
-            {
-                "chart_type": "normalized_speedup",
-                "reason": "Compare relative speedups against a baseline platform",
-                "priority": "medium",
-            }
-        )
-        suggestions.append(
-            {
-                "chart_type": "sparkline_table",
-                "reason": "Compact overview of total, geo-mean, and tail latency metrics",
-                "priority": "medium",
-            }
-        )
-
-    if num_results >= 2 and has_query_data:
-        suggestions.append(
-            {
-                "chart_type": "rank_table",
-                "reason": "Rank each platform per query to highlight consistency of wins/losses",
-                "priority": "medium",
-            }
-        )
-
-    if num_results == 2 and has_query_data:
-        suggestions.append(
-            {
-                "chart_type": "comparison_bar",
-                "reason": "Compare two runs per query with paired bars and percent deltas",
-                "priority": "high",
-            }
-        )
-        suggestions.append(
-            {
-                "chart_type": "diverging_bar",
-                "reason": "Show regression/improvement distribution around zero baseline",
-                "priority": "high",
-            }
-        )
-        suggestions.append(
-            {
-                "chart_type": "summary_box",
-                "reason": "Summarize geo-mean, total time, and improved/regressed query counts",
-                "priority": "high",
-            }
-        )
-
-    if has_phase_data:
-        suggestions.append(
-            {
-                "chart_type": "stacked_phase",
-                "reason": "Break down runtime by benchmark phase across platforms",
-                "priority": "medium",
-            }
-        )
-
-    return suggestions
+    return [recommendation.as_dict() for recommendation in recommend_charts(results)]
 
 
 def _select_primary_chart(results: list) -> dict[str, str]:
     """Select the primary recommended chart type based on result characteristics."""
-    num_results = len(results)
-    has_query_data = any(r.queries for r in results)
-
-    if num_results >= 2 and has_query_data:
-        return {"chart_type": "query_heatmap", "reason": "Best for comparing per-query performance"}
-    elif has_query_data:
-        return {"chart_type": "distribution_box", "reason": "Best for understanding query time distribution"}
-    else:
-        return {"chart_type": "performance_bar", "reason": "Best general-purpose comparison chart"}
+    recommendation = select_primary_chart(results)
+    return {"chart_type": recommendation.chart_type, "reason": recommendation.reason}
 
 
 def _suggest_charts_impl(file_list: list[str], resolved_paths: list[Path]) -> dict[str, Any]:
@@ -374,22 +263,12 @@ def _suggest_charts_impl(file_list: list[str], resolved_paths: list[Path]) -> di
         suggestions = _build_chart_suggestions(results)
         primary = _select_primary_chart(results)
 
-        num_results = len(results)
-        platforms = sorted({r.platform for r in results})
-        total_queries = sum(len(r.queries) for r in results)
-        has_cost_data = any(r.cost_total is not None for r in results)
-        has_timestamps = any(r.timestamp is not None for r in results)
+        profile = build_visualization_profile(results)
 
         return {
             "suggestions": suggestions,
             "primary": primary,
-            "data_profile": {
-                "result_count": num_results,
-                "platforms": platforms,
-                "total_queries": total_queries,
-                "has_cost_data": has_cost_data,
-                "has_timestamps": has_timestamps,
-            },
+            "data_profile": profile.as_mcp_dict(),
             "source_files": file_list,
         }
 
@@ -450,7 +329,7 @@ def register_visualization_tools(
     configured_results_dir = Path(results_dir)
     configured_charts_dir = Path(charts_dir)
 
-    @mcp.tool(annotations=VIZ_READONLY_ANNOTATIONS)
+    @mcp.tool(description=MCP_SUGGEST_CHARTS_DESCRIPTION, annotations=VIZ_READONLY_ANNOTATIONS)
     def suggest_charts(result_files: str) -> dict[str, Any]:
         """Analyze results and suggest appropriate chart types.
 
@@ -475,7 +354,7 @@ def register_visualization_tools(
 
         return _suggest_charts_impl(file_list, resolved_paths)
 
-    @mcp.tool(annotations=VIZ_GENERATE_ANNOTATIONS)
+    @mcp.tool(description=MCP_GENERATE_CHART_DESCRIPTION, annotations=VIZ_GENERATE_ANNOTATIONS)
     def generate_chart(
         result_files: str,
         chart_type: str = "performance_bar",
@@ -487,8 +366,8 @@ def register_visualization_tools(
 
         Args:
             result_files: Comma-separated list of result filenames
-            chart_type: Chart type from CHART_TYPE_DESCRIPTIONS (e.g. performance_bar, query_heatmap, comparison_bar, percentile_ladder)
-            template: Template for chart sets: default, flagship, head_to_head, trends, cost_optimization, comparison, latency_deep_dive, regression_triage, executive_summary
+            chart_type: Semantic BenchBox chart ID from CHART_TYPE_DESCRIPTIONS
+            template: Template name from benchbox.core.visualization.templates
             output_dir: Custom output directory (relative to charts dir)
             format: Output format: 'ascii' for terminal-friendly text output
 

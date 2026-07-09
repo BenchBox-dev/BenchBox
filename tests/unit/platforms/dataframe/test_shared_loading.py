@@ -132,6 +132,31 @@ class TestLoadTablesFromDataSourceImpl:
         column_names = call_args[3] if len(call_args) > 3 else call_kwargs.get("column_names")
         assert column_names == ["o_orderkey", "o_custkey"]
 
+    def test_uses_table_object_schema_column_names(self, tmp_path: Path) -> None:
+        """Column names from Table-like schema objects are forwarded to load_table."""
+        adapter = _make_adapter(load_row_count=3)
+        (tmp_path / "sat_lineitem.tbl").write_bytes(b"data")
+        schema_info = {
+            "sat_lineitem": SimpleNamespace(
+                columns=[
+                    SimpleNamespace(name="lineitem_hk"),
+                    SimpleNamespace(name="load_end_dts"),
+                ]
+            )
+        }
+
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
+            mock_resolver = MagicMock()
+            mock_cls.return_value = mock_resolver
+            mock_resolver.resolve.return_value = SimpleNamespace(
+                tables={"sat_lineitem": [tmp_path / "sat_lineitem.tbl"]}
+            )
+            load_tables_from_data_source_impl(adapter, MagicMock(), tmp_path, schema_info=schema_info)
+
+        _, call_args, call_kwargs = adapter.load_table.mock_calls[0]
+        column_names = call_args[3] if len(call_args) > 3 else call_kwargs.get("column_names")
+        assert column_names == ["lineitem_hk", "load_end_dts"]
+
     def test_platform_name_attribute_used_directly(self, tmp_path: Path) -> None:
         """Verifies adapter.platform_name is accessed as an attribute (AttributeError if missing)."""
         adapter = MagicMock(spec=[])  # spec=[] prevents auto-creating platform_name

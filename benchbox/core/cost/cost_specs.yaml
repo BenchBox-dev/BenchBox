@@ -1,0 +1,199 @@
+resource_usage_schema:
+  snowflake:
+    required:
+    - credits_used
+    optional:
+    - bytes_scanned
+    - execution_time_ms
+    - warehouse_size
+  bigquery:
+    required: []
+    optional:
+    - bytes_billed
+    - bytes_processed
+    - slot_ms
+    - creation_time
+    - start_time
+    - end_time
+    requires_one_of:
+    - bytes_billed
+    - bytes_processed
+  redshift:
+    required:
+    - execution_time_seconds
+    optional: []
+  databricks:
+    required: []
+    optional:
+    - dbu_consumed
+    - execution_time_seconds
+    requires_one_of:
+    - dbu_consumed
+    - execution_time_seconds
+  duckdb:
+    required: []
+    optional:
+    - execution_time_seconds
+    - memory_usage
+    - rows_processed
+  clickhouse:
+    required: []
+    optional:
+    - execution_time_seconds
+    - memory_usage
+    - bytes_read
+  clickhouse-local:
+    required: []
+    optional:
+    - execution_time_seconds
+    - memory_usage
+    - bytes_read
+  clickhouse-server:
+    required: []
+    optional:
+    - execution_time_seconds
+    - memory_usage
+    - bytes_read
+  athena:
+    required:
+    - data_scanned_bytes
+    optional:
+    - cost_usd
+    - execution_time_ms
+  synapse:
+    required: []
+    optional:
+    - bytes_processed
+    - execution_time_seconds
+    - mode
+    requires_one_of:
+    - bytes_processed
+    - execution_time_seconds
+  fabric_dw:
+    required: []
+    optional:
+    - cu_seconds
+    - execution_time_seconds
+    requires_one_of:
+    - cu_seconds
+    - execution_time_seconds
+  firebolt:
+    required: []
+    optional:
+    - fbu_consumed
+    - execution_time_seconds
+    requires_one_of:
+    - fbu_consumed
+    - execution_time_seconds
+  databricks-df:
+    required: []
+    optional:
+    - dbu_consumed
+    - execution_time_seconds
+    requires_one_of:
+    - dbu_consumed
+    - execution_time_seconds
+  postgresql:
+    required: []
+    optional:
+    - execution_time_seconds
+    - rows_processed
+    - shared_blks_hit
+    - shared_blks_read
+  sqlite:
+    required: []
+    optional:
+    - execution_time_seconds
+  timescaledb:
+    required: []
+    optional:
+    - execution_time_seconds
+    - chunks_accessed
+    - rows_processed
+  trino:
+    required: []
+    optional:
+    - execution_time_seconds
+    - bytes_read
+    - splits_processed
+    - rows_read
+  presto:
+    required: []
+    optional:
+    - execution_time_seconds
+    - bytes_read
+    - splits_processed
+    - rows_read
+  influxdb:
+    required: []
+    optional:
+    - execution_time_seconds
+    - series_scanned
+    - bytes_read
+  spark:
+    required: []
+    optional:
+    - execution_time_seconds
+    - shuffle_bytes_written
+    - shuffle_bytes_read
+    - stages
+  pyspark:
+    required: []
+    optional:
+    - execution_time_seconds
+    - shuffle_bytes_written
+    - shuffle_bytes_read
+    - stages
+  datafusion:
+    required: []
+    optional:
+    - execution_time_seconds
+    - rows_processed
+  polars:
+    required: []
+    optional:
+    - execution_time_seconds
+    - memory_usage
+    - rows_processed
+  polars-df:
+    required: []
+    optional:
+    - execution_time_seconds
+    - memory_usage
+    - rows_processed
+  pandas-df:
+    required: []
+    optional:
+    - execution_time_seconds
+    - memory_usage
+  cudf-df:
+    required: []
+    optional:
+    - execution_time_seconds
+    - gpu_memory_usage
+platform_config_requirements:
+  snowflake:
+    required:
+    - edition
+    - cloud
+    - region
+    optional:
+    - warehouse_size
+  bigquery:
+    required:
+    - location
+    optional: []
+  redshift:
+    required:
+    - node_type
+    - node_count
+    - region
+    optional: []
+  databricks:
+    required:
+    - cloud
+    - tier
+    - workload_type
+    - cluster_size_dbu_per_hour
+    optional:
+    - warehouse_size

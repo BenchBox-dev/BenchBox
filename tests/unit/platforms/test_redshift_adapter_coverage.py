@@ -1840,14 +1840,18 @@ class TestAnalyzeAndVacuumTable:
         adapter.analyze_table(mock_conn, "lineitem")
         mock_cursor.execute.assert_called_once_with("ANALYZE lineitem")
 
-    def test_analyze_table_swallows_exception(self):
+    def test_analyze_table_raises_on_failure(self):
+        """Must raise (not swallow) so gather_statistics()'s caller can detect
+        and record a real failure as status=FAILED."""
         adapter = _make_adapter()
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.execute.side_effect = Exception("permission denied")
 
-        adapter.analyze_table(mock_conn, "lineitem")
+        with pytest.raises(Exception, match="permission denied"):
+            adapter.analyze_table(mock_conn, "lineitem")
+        mock_cursor.close.assert_called_once()
 
     def test_vacuum_table_executes_vacuum(self):
         adapter = _make_adapter()
@@ -1889,7 +1893,7 @@ class TestGetQueryPlan:
         plan = adapter.get_query_plan(mock_conn, "SELECT * FROM lineitem")
         assert "XN Seq Scan" in plan
 
-    def test_returns_error_message_on_exception(self):
+    def test_returns_none_on_exception(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -1897,7 +1901,7 @@ class TestGetQueryPlan:
         mock_cursor.execute.side_effect = Exception("permission denied")
 
         plan = adapter.get_query_plan(mock_conn, "SELECT * FROM forbidden_table")
-        assert "Could not get query plan" in plan
+        assert plan is None
 
 
 # ---------------------------------------------------------------------------
@@ -3640,27 +3644,18 @@ class TestResolveDataFiles:
         data_source = MagicMock()
         data_source.tables = {"lineitem": [tmp_path / "lineitem.tbl"]}
 
-        with patch("benchbox.platforms.redshift.DataSourceResolver") as mock_resolver_cls:
-            mock_resolver = mock_resolver_cls.return_value
-            mock_resolver.resolve.return_value = data_source
-
+        with patch("benchbox.platforms.redshift.resolve_adapter_data_source", return_value=data_source) as resolve:
             result = adapter._resolve_data_files(benchmark, tmp_path)
 
-        mock_resolver_cls.assert_called_once_with(
-            platform_name=adapter.platform_name,
-            table_mode=adapter.table_mode,
-            platform_config=adapter.platform_config,
-            requested_format=None,
-        )
-        mock_resolver.resolve.assert_called_once_with(benchmark, tmp_path)
+        resolve.assert_called_once_with(adapter, benchmark, tmp_path)
         assert result.tables == {"lineitem": [tmp_path / "lineitem.tbl"]}
 
     def test_resolve_data_files_raises_when_resolver_returns_empty(self, tmp_path):
         adapter = _make_adapter()
 
-        with patch("benchbox.platforms.redshift.DataSourceResolver") as mock_resolver_cls:
-            mock_resolver_cls.return_value.resolve.return_value = None
-
+        with patch(
+            "benchbox.platforms.redshift.resolve_adapter_data_source", side_effect=ValueError("No data files found")
+        ):
             with pytest.raises(ValueError, match="No data files found"):
                 adapter._resolve_data_files(MagicMock(), tmp_path)
 

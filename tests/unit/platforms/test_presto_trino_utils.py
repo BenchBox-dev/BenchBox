@@ -5,7 +5,7 @@ Pins the contract for the five helpers extracted by the dedup consolidation:
   * is_date_value: date pattern detection
   * normalize_existing_files: path list normalization and empty-file exclusion
   * load_file_batches: batched INSERT VALUES cursor delegation
-  * resolve_data_files: DataSourceResolver delegation and ValueError on empty result
+  * show_tables_lower: SHOW TABLES result normalization
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from benchbox.platforms.presto_trino_utils import (
     is_date_value,
     load_file_batches,
     normalize_existing_files,
-    resolve_data_files,
+    show_tables_lower,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -130,6 +130,27 @@ class TestNormalizeExistingFiles:
         assert all(isinstance(p, Path) for p in result)
 
 
+class TestShowTablesLower:
+    def test_returns_lowercase_table_names_and_closes_cursor(self) -> None:
+        cursor = MagicMock()
+        cursor.fetchall.return_value = [("ORDERS",), ("LineItem",)]
+        connection = MagicMock()
+        connection.cursor.return_value = cursor
+
+        assert show_tables_lower(connection) == ["orders", "lineitem"]
+        cursor.execute.assert_called_once_with("SHOW TABLES")
+        cursor.close.assert_called_once_with()
+
+    def test_returns_empty_list_and_closes_cursor_on_error(self) -> None:
+        cursor = MagicMock()
+        cursor.execute.side_effect = RuntimeError("boom")
+        connection = MagicMock()
+        connection.cursor.return_value = cursor
+
+        assert show_tables_lower(connection) == []
+        cursor.close.assert_called_once_with()
+
+
 class TestLoadFileBatches:
     def _make_file(self, tmp_path: Path, content: str) -> Path:
         f = tmp_path / "data.tbl"
@@ -167,49 +188,3 @@ class TestLoadFileBatches:
             mock_reg.get_compression_handler.return_value.open.return_value = ctx
             rows = load_file_batches(cursor, f, "s.t")
         assert rows == 5
-
-
-class TestResolveDataFiles:
-    def test_raises_value_error_when_no_files(self) -> None:
-        empty_source = MagicMock()
-        empty_source.tables = {}
-        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
-            mock_cls.return_value.resolve.return_value = empty_source
-            with pytest.raises(ValueError, match="No data files found"):
-                resolve_data_files(
-                    MagicMock(),
-                    Path("/data"),
-                    platform_name="presto",
-                    table_mode="native",
-                    platform_config=MagicMock(),
-                    requested_format=None,
-                )
-
-    def test_raises_value_error_when_resolver_returns_none(self) -> None:
-        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
-            mock_cls.return_value.resolve.return_value = None
-            with pytest.raises(ValueError, match="No data files found"):
-                resolve_data_files(
-                    MagicMock(),
-                    Path("/data"),
-                    platform_name="presto",
-                    table_mode="native",
-                    platform_config=MagicMock(),
-                    requested_format=None,
-                )
-
-    def test_returns_tables_dict_on_success(self) -> None:
-        tables = {"lineitem": [Path("/data/lineitem.tbl")]}
-        source = MagicMock()
-        source.tables = tables
-        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
-            mock_cls.return_value.resolve.return_value = source
-            result = resolve_data_files(
-                MagicMock(),
-                Path("/data"),
-                platform_name="trino",
-                table_mode="native",
-                platform_config=MagicMock(),
-                requested_format=None,
-            )
-        assert result is tables

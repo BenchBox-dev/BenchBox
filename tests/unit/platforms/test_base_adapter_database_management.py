@@ -171,10 +171,73 @@ def test_handle_existing_database_skips_in_dry_run(adapter):
 
 def test_handle_existing_database_skips_managed_cloud_database(adapter):
     adapter.skip_database_management = True
+    adapter.check_benchmark_tables_exist = Mock(wraps=adapter.check_benchmark_tables_exist)
+    adapter.check_database_exists = Mock(return_value=True)
 
     adapter.handle_existing_database()
 
+    adapter.check_benchmark_tables_exist.assert_called_once()
+    adapter.check_database_exists.assert_not_called()
     assert adapter.database_was_reused is True
+
+
+def test_handle_existing_database_reuses_managed_database_when_tables_present(adapter):
+    adapter.skip_database_management = True
+    adapter.check_benchmark_tables_exist = Mock(return_value=True)
+    adapter.check_database_exists = Mock(return_value=True)
+
+    adapter.handle_existing_database()
+
+    adapter.check_benchmark_tables_exist.assert_called_once()
+    adapter.check_database_exists.assert_not_called()
+    assert adapter.database_was_reused is True
+
+
+def test_handle_existing_database_treats_managed_database_as_fresh_when_tables_missing(adapter):
+    adapter.skip_database_management = True
+    adapter.check_benchmark_tables_exist = Mock(return_value=False)
+    adapter.check_database_exists = Mock(return_value=True)
+
+    adapter.handle_existing_database()
+
+    adapter.check_benchmark_tables_exist.assert_called_once()
+    adapter.check_database_exists.assert_not_called()
+    assert adapter.database_was_reused is False
+
+
+def test_handle_existing_database_dry_run_skips_managed_table_hook(adapter):
+    adapter.dry_run = True
+    adapter.skip_database_management = True
+    adapter.check_benchmark_tables_exist = Mock(return_value=False)
+
+    adapter.handle_existing_database()
+
+    adapter.check_benchmark_tables_exist.assert_not_called()
+    assert adapter.database_was_reused is False
+
+
+def test_get_expected_tables_normalizes_schema_dict(adapter):
+    benchmark = SimpleNamespace(get_schema=lambda: {"Orders": {}, "LINEITEM": {}})
+
+    assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
+
+
+def test_get_expected_tables_normalizes_schema_list_of_dicts(adapter):
+    benchmark = SimpleNamespace(get_schema=lambda: [{"name": "Orders"}, {"name": "LINEITEM"}])
+
+    assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
+
+
+def test_get_expected_tables_normalizes_schema_list_of_names(adapter):
+    benchmark = SimpleNamespace(get_schema=lambda: ["Orders", "LINEITEM"])
+
+    assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
+
+
+def test_get_expected_tables_normalizes_table_name_api(adapter):
+    benchmark = SimpleNamespace(get_table_names=lambda: ["Orders", "LINEITEM"])
+
+    assert adapter._get_expected_tables(benchmark) == ["orders", "lineitem"]
 
 
 def test_handle_existing_database_skips_reuse_logic_while_validating(adapter):
@@ -342,31 +405,26 @@ class TestAdapterPlanCaptureGaps:
         assert plan is None
         assert timing == 0.0
 
-    def test_capture_query_plan_first_n_limit(self, adapter):
+    def test_capture_query_plan_query_filter(self, adapter):
+        """plan_query_filter (query selection) still gates capture; ids not in the
+        set are skipped. The per-iteration sampling machinery has been retired."""
         adapter.capture_plans = True
-        adapter.plan_first_n = 1
+        adapter.plan_query_filter = {"Q1"}
 
         mock_plan = Mock()
         mock_plan.estimate_serialized_size.return_value = 1024
         mock_parser = Mock()
         mock_parser.parse_explain_output.return_value = mock_plan
 
-        # First call succeeds
         with patch.object(adapter, "get_query_plan", return_value="PLAN"):
             with patch.object(adapter, "get_query_plan_parser", return_value=mock_parser):
+                # Selected query is captured.
                 plan, _ = adapter.capture_query_plan(Mock(), "SELECT 1", "Q1")
                 assert plan == mock_plan
-                # Second call should be filtered out
-                plan2, timing2 = adapter.capture_query_plan(Mock(), "SELECT 1", "Q1")
+                # Non-selected query is filtered out.
+                plan2, timing2 = adapter.capture_query_plan(Mock(), "SELECT 1", "Q2")
                 assert plan2 is None
                 assert timing2 == 0.0
-
-    def test_capture_query_plan_sampling_filtered(self, adapter):
-        adapter.capture_plans = True
-        adapter.plan_sampling_rate = 0.0  # Never sample
-        plan, timing = adapter.capture_query_plan(Mock(), "SELECT 1", "Q1")
-        assert plan is None
-        assert timing == 0.0
 
     def test_capture_query_plan_timeout(self, adapter):
         adapter.capture_plans = True
@@ -461,6 +519,29 @@ class TestAdapterPlanCaptureGaps:
 
         assert plan == mock_plan
         assert "Large query plan" in caplog.text
+        # No dangling "external plan storage" advice (that feature does not exist).
+        assert "external plan storage" not in caplog.text
+
+    def test_plan_max_depth_defaults_and_is_configurable(self):
+        from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
+
+        assert _TrackingAdapter().plan_max_depth == DEFAULT_PLAN_MAX_DEPTH
+        assert _TrackingAdapter(plan_max_depth=12).plan_max_depth == 12
+
+    def test_capture_query_plan_sizes_with_configured_plan_max_depth(self):
+        adapter = _TrackingAdapter(plan_max_depth=7)
+        adapter.capture_plans = True
+        adapter.get_query_plan = Mock(return_value="SOME PLAN")
+        mock_parser = Mock()
+        mock_plan = Mock()
+        mock_plan.estimate_serialized_size.return_value = 1024
+        mock_parser.parse_explain_output.return_value = mock_plan
+        adapter.get_query_plan_parser = Mock(return_value=mock_parser)
+
+        adapter.capture_query_plan(Mock(), "SELECT 1", "Q1")
+
+        # The configured plan_max_depth is threaded into the size estimate.
+        mock_plan.estimate_serialized_size.assert_called_once_with(max_depth=7)
 
 
 class TestAdapterValidationGaps:

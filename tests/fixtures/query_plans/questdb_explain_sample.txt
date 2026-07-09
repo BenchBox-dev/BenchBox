@@ -1,0 +1,11 @@
+QUERY PLAN
+Sort light lo: 10
+  keys: [symbol]
+    GroupBy vectorized: true workers: 1
+      keys: [symbol]
+      values: [sum(price)]
+        Async JIT Filter workers: 1
+          filter: 100<price
+            PageFrame
+                Row forward scan
+                Frame forward scan on: trades

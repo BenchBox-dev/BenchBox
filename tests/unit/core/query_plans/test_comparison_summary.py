@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
 import pytest
 
 from benchbox.core.query_plans.comparison import (
@@ -25,20 +23,9 @@ pytestmark = [
 ]
 
 
-@dataclass
-class MockQueryExecution:
-    """Mock query execution for testing."""
-
-    query_id: str
-    execution_time_ms: float = 100.0
-    query_plan: QueryPlanDAG | None = None
-
-
-@dataclass
-class MockPhaseResults:
-    """Mock phase results for testing."""
-
-    queries: list[MockQueryExecution] = field(default_factory=list)
+def _qr(query_id: str, execution_time_ms: float = 100.0, query_plan: QueryPlanDAG | None = None) -> dict:
+    """Build a query_results dict matching the real BenchmarkResults.query_results shape."""
+    return {"query_id": query_id, "execution_time_ms": execution_time_ms, "query_plan": query_plan}
 
 
 def _create_simple_plan(query_id: str, table_name: str = "orders") -> QueryPlanDAG:
@@ -49,11 +36,17 @@ def _create_simple_plan(query_id: str, table_name: str = "orders") -> QueryPlanD
         table_name=table_name,
         children=[],
     )
+    # No explicit plan_fingerprint: let it compute the real structural
+    # fingerprint so the plan is VERIFIED/trusted and versioned. The summary
+    # fast path now (qpc-03) requires trusted, same-version fingerprints, so a
+    # fixture with a fabricated non-matching fingerprint left UNVERIFIED would
+    # no longer be eligible for the unchanged fast path. The real fingerprint
+    # still distinguishes tables (orders vs customers) and matches identical
+    # structures, preserving each test's intent.
     return QueryPlanDAG(
         query_id=query_id,
         platform="test",
         logical_root=root,
-        plan_fingerprint=f"fp_{query_id}_{table_name}",
         raw_explain_output="test",
     )
 
@@ -77,11 +70,11 @@ def _create_join_plan(query_id: str) -> QueryPlanDAG:
         operator_type=LogicalOperatorType.JOIN,
         children=[left_scan, right_scan],
     )
+    # See _create_simple_plan: compute the real fingerprint (trusted, versioned).
     return QueryPlanDAG(
         query_id=query_id,
         platform="test",
         logical_root=root,
-        plan_fingerprint=f"fp_join_{query_id}",
         raw_explain_output="test",
     )
 
@@ -162,11 +155,11 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)])},
+            query_results=[_qr("q1", 100.0, plan1)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan2)])},
+            query_results=[_qr("q1", 100.0, plan2)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current)
@@ -184,11 +177,11 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)])},
+            query_results=[_qr("q1", 100.0, plan1)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan2)])},
+            query_results=[_qr("q1", 100.0, plan2)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current)
@@ -200,6 +193,32 @@ class TestGeneratePlanComparisonSummary:
         assert summary.structural_differences[0].query_id == "q1"
         assert summary.structural_differences[0].change_type != "unchanged"
 
+    def test_fingerprint_version_bump_on_identical_plan_is_not_a_change(self) -> None:
+        """A pure fingerprint-encoding-version bump (v1 -> v2) on an otherwise
+        structurally identical plan must not be misreported as plan_changed
+        (qpc-03 anti-pattern, #1028 review F-comparison). fingerprints_comparable
+        is False here (version mismatch), so the fast path is skipped and the
+        full tree-walk fallback must correct the verdict to "unchanged"."""
+        plan1 = _create_simple_plan("q1", "orders")
+        plan2 = _create_simple_plan("q1", "orders")
+        plan2.fingerprint_version = plan1.fingerprint_version + 1
+
+        baseline = make_benchmark_results(
+            run_id="baseline",
+            query_results=[_qr("q1", 100.0, plan1)],
+        )
+        current = make_benchmark_results(
+            run_id="current",
+            query_results=[_qr("q1", 100.0, plan2)],
+        )
+
+        summary = generate_plan_comparison_summary(baseline, current)
+
+        assert summary.plans_compared == 1
+        assert summary.plans_unchanged == 1
+        assert summary.plans_changed == 0
+        assert summary.structural_differences[0].change_type == "unchanged"
+
     def test_multiple_queries(self) -> None:
         """Test comparison with multiple queries."""
         plan1a = _create_simple_plan("q1", "orders")
@@ -209,25 +228,11 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={
-                "power": MockPhaseResults(
-                    queries=[
-                        MockQueryExecution("q1", 100.0, plan1a),
-                        MockQueryExecution("q2", 200.0, plan2a),
-                    ]
-                )
-            },
+            query_results=[_qr("q1", 100.0, plan1a), _qr("q2", 200.0, plan2a)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={
-                "power": MockPhaseResults(
-                    queries=[
-                        MockQueryExecution("q1", 100.0, plan1b),
-                        MockQueryExecution("q2", 200.0, plan2b),
-                    ]
-                )
-            },
+            query_results=[_qr("q1", 100.0, plan1b), _qr("q2", 200.0, plan2b)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current)
@@ -243,16 +248,12 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)])},
+            query_results=[_qr("q1", 100.0, plan1)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={
-                "power": MockPhaseResults(
-                    # 150% slower (from 100ms to 250ms)
-                    queries=[MockQueryExecution("q1", 250.0, plan2)]
-                )
-            },
+            # 150% slower (from 100ms to 250ms)
+            query_results=[_qr("q1", 250.0, plan2)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current, regression_threshold_pct=20.0)
@@ -274,16 +275,12 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)])},
+            query_results=[_qr("q1", 100.0, plan1)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={
-                "power": MockPhaseResults(
-                    # Slower but plan unchanged
-                    queries=[MockQueryExecution("q1", 200.0, plan2)]
-                )
-            },
+            # Slower but plan unchanged
+            query_results=[_qr("q1", 200.0, plan2)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current, regression_threshold_pct=20.0)
@@ -301,16 +298,12 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)])},
+            query_results=[_qr("q1", 100.0, plan1)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={
-                "power": MockPhaseResults(
-                    # 15% slower - below 20% threshold but above 10%
-                    queries=[MockQueryExecution("q1", 115.0, plan2)]
-                )
-            },
+            # 15% slower - below 20% threshold but above 10%
+            query_results=[_qr("q1", 115.0, plan2)],
         )
 
         # With 20% threshold - not a regression
@@ -327,25 +320,11 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={
-                "power": MockPhaseResults(
-                    queries=[
-                        MockQueryExecution("q1", 100.0, plan),
-                        MockQueryExecution("q2", 100.0, None),  # No plan
-                    ]
-                )
-            },
+            query_results=[_qr("q1", 100.0, plan), _qr("q2", 100.0, None)],  # q2: no plan
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={
-                "power": MockPhaseResults(
-                    queries=[
-                        MockQueryExecution("q1", 100.0, plan),
-                        MockQueryExecution("q2", 100.0, None),
-                    ]
-                )
-            },
+            query_results=[_qr("q1", 100.0, plan), _qr("q2", 100.0, None)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current)
@@ -359,11 +338,11 @@ class TestGeneratePlanComparisonSummary:
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)])},
+            query_results=[_qr("q1", 100.0, plan1)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={"power": MockPhaseResults(queries=[MockQueryExecution("q2", 100.0, plan2)])},
+            query_results=[_qr("q2", 100.0, plan2)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current)
@@ -371,23 +350,17 @@ class TestGeneratePlanComparisonSummary:
         assert summary.plans_compared == 0  # No common queries
 
     def test_multiple_phases(self) -> None:
-        """Test that queries from multiple phases are collected."""
+        """Test that all queries in query_results are collected regardless of phase."""
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_simple_plan("q2", "customers")
 
         baseline = make_benchmark_results(
             run_id="baseline",
-            phases={
-                "warmup": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)]),
-                "power": MockPhaseResults(queries=[MockQueryExecution("q2", 200.0, plan2)]),
-            },
+            query_results=[_qr("q1", 100.0, plan1), _qr("q2", 200.0, plan2)],
         )
         current = make_benchmark_results(
             run_id="current",
-            phases={
-                "warmup": MockPhaseResults(queries=[MockQueryExecution("q1", 100.0, plan1)]),
-                "power": MockPhaseResults(queries=[MockQueryExecution("q2", 200.0, plan2)]),
-            },
+            query_results=[_qr("q1", 100.0, plan1), _qr("q2", 200.0, plan2)],
         )
 
         summary = generate_plan_comparison_summary(baseline, current)

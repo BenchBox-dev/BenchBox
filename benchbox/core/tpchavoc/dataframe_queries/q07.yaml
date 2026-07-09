@@ -1,0 +1,41 @@
+variants:
+- id: 1
+  expression_impl: q7_v1_expression_impl
+  pandas_impl: q7_v1_pandas_impl
+  description: 'Baseline: direct delegation to TPC-H Q7 implementation'
+- id: 2
+  expression_impl: q7_v2_expression_impl
+  pandas_impl: q7_v2_pandas_impl
+  description: 'Pre-filter: filter lineitem by date before joining'
+- id: 3
+  expression_impl: q7_v3_expression_impl
+  pandas_impl: q7_v3_pandas_impl
+  description: 'Column prune: select only needed columns from each table'
+- id: 4
+  expression_impl: q7_v4_expression_impl
+  pandas_impl: q7_v4_pandas_impl
+  description: 'Intermediate vars: named DataFrames for each join and filter step'
+- id: 5
+  expression_impl: q7_v5_expression_impl
+  pandas_impl: q7_v5_pandas_impl
+  description: 'Pre-compute derived: add volume column before groupby'
+- id: 6
+  expression_impl: q7_v6_expression_impl
+  pandas_impl: q7_v6_pandas_impl
+  description: 'Chained style: maximum method chaining'
+- id: 7
+  expression_impl: q7_v7_expression_impl
+  pandas_impl: q7_v7_pandas_impl
+  description: "Join reorder: start from lineitem\u2192supplier instead of supplier\u2192lineitem"
+- id: 8
+  expression_impl: q7_v8_expression_impl
+  pandas_impl: q7_v8_pandas_impl
+  description: 'Filter combination: pre-filter lineitem and apply nation filter after join'
+- id: 9
+  expression_impl: q7_v9_expression_impl
+  pandas_impl: q7_v9_pandas_impl
+  description: 'Explicit sort: descending=[False, False, False] explicitly specified'
+- id: 10
+  expression_impl: q7_v10_expression_impl
+  pandas_impl: q7_v10_pandas_impl
+  description: 'Alternative formula: volume = price - price*disc instead of price*(1-disc)'

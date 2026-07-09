@@ -34,21 +34,20 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
+from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
         PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
         UnifiedTuningConfiguration,
     )
 
 from benchbox.core.exceptions import ConfigurationError
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
-from benchbox.platforms.base.data_loading import FileFormatRegistry
+from benchbox.platforms.base.data_loading import FileFormatRegistry, resolve_adapter_data_source
 from benchbox.platforms.base.ddl_helpers import strip_foreign_keys
 from benchbox.utils.dependencies import (
     check_platform_dependencies,
@@ -82,6 +81,8 @@ class DatabendAdapter(PlatformAdapter):
     - Databend claims ~100% Snowflake SQL compatibility
     - Edge-case optimizations applied via _optimize_table_definition()
     """
+
+    plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
@@ -207,37 +208,16 @@ class DatabendAdapter(PlatformAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]):
         """Create Databend adapter from unified configuration."""
-        from benchbox.utils.database_naming import generate_database_name
+        from benchbox.platforms.base.config_utils import build_adapter_config
 
-        adapter_config: dict[str, Any] = {}
-
-        # Generate database name using benchmark characteristics
-        if "database" in config and config["database"]:
-            adapter_config["database"] = config["database"]
-        else:
-            database_name = generate_database_name(
-                benchmark_name=config["benchmark"],
-                scale_factor=config["scale_factor"],
+        return cls(
+            **build_adapter_config(
+                config,
                 platform="databend",
-                tuning_config=config.get("tuning_config"),
+                fields=["host", "port", "username", "password", "dsn", "ssl", "warehouse", "disable_result_cache"],
+                include_none=False,
             )
-            adapter_config["database"] = database_name
-
-        # Map connection parameters
-        for key in [
-            "host",
-            "port",
-            "username",
-            "password",
-            "dsn",
-            "ssl",
-            "warehouse",
-            "disable_result_cache",
-        ]:
-            if key in config and config[key] is not None:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
+        )
 
     def get_target_dialect(self) -> str:
         """Return the target SQL dialect for Databend.
@@ -519,18 +499,7 @@ class DatabendAdapter(PlatformAdapter):
 
     def _resolve_data_files(self, benchmark, data_dir: Path) -> Any:
         """Resolve data files via DataSourceResolver."""
-        from benchbox.platforms.base.data_loading import DataSourceResolver
-
-        resolver = DataSourceResolver(
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
-        )
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source
+        return resolve_adapter_data_source(self, benchmark, data_dir)
 
     def execute_query(
         self,
@@ -596,8 +565,6 @@ class DatabendAdapter(PlatformAdapter):
             result_dict["query_statistics"] = query_stats
             result_dict["resource_usage"] = query_stats
 
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             return {
@@ -609,14 +576,33 @@ class DatabendAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
-        """Get query execution plan for analysis."""
+        # Capture and merge the structured query plan (SUCCESS-guarded in the
+        # helper). Kept outside the try so a strict_plan_capture PlanCaptureError
+        # propagates instead of being swallowed and mislabeling the query FAILED.
+        self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
+
+        return result_dict
+
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get query execution plan for analysis.
+
+        Databend ``EXPLAIN <query>`` returns a box-drawing text tree (one plan
+        line per row). Returns None on failure so plan capture degrades silently.
+        """
         try:
             rows = connection.query_iter(f"EXPLAIN {query}")
             plan_rows = list(rows)
-            return "\n".join([str(row.values()[0]) if hasattr(row, "values") else str(row) for row in plan_rows])
+            text = "\n".join([str(row.values()[0]) if hasattr(row, "values") else str(row) for row in plan_rows])
+            return text or None
         except Exception as e:
-            return f"Could not get query plan: {e}"
+            self.logger.debug(f"Failed to get Databend query plan: {e}")
+            return None
+
+    def get_query_plan_parser(self):
+        """Get the Databend query plan parser."""
+        from benchbox.core.query_plans.parsers.databend import DatabendQueryPlanParser
+
+        return DatabendQueryPlanParser()
 
     def close_connection(self, connection: Any) -> None:
         """Close Databend connection."""
@@ -751,21 +737,7 @@ class DatabendAdapter(PlatformAdapter):
             if connection and hasattr(connection, "close"):
                 connection.close()
 
-    def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if Databend supports a specific tuning type.
-
-        Databend supports:
-        - CLUSTERING: Via CLUSTER BY clause (similar to Snowflake clustering keys)
-        - PARTITIONING: Not directly supported (uses automatic micro-partitioning)
-        """
-        try:
-            from benchbox.core.tuning.interface import TuningType
-
-            return tuning_type in {
-                TuningType.CLUSTERING,
-            }
-        except ImportError:
-            return False
+    _supported_tuning_type_names = ("CLUSTERING",)
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Databend-specific tuning clauses.
@@ -820,19 +792,9 @@ class DatabendAdapter(PlatformAdapter):
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to Databend."""
-        if not unified_config:
-            return
+        from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
-        # Apply constraint configurations (informational only in Databend)
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        # Apply platform optimizations
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        # Apply table-level tunings
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
+        apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
         """Apply Databend-specific platform optimizations."""
@@ -841,21 +803,10 @@ class DatabendAdapter(PlatformAdapter):
 
         self.logger.info("Databend platform optimizations noted (engine pre-optimized for analytics)")
 
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to Databend.
-
-        Note: Databend does not enforce foreign key constraints.
-        """
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info("Primary key constraints noted for Databend (informational)")
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info("Foreign key constraints noted for Databend (not enforced)")
+    apply_constraint_configuration = make_informational_constraint_applier(
+        "Primary key constraints noted for Databend (informational)",
+        "Foreign key constraints noted for Databend (not enforced)",
+    )
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Run ANALYZE on table for query optimization.

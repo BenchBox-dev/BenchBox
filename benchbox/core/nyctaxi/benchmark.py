@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.nyctaxi.downloader import GreenTaxiDataDownloader, HVFHVDataDownloader, NYCTaxiDataDownloader
 from benchbox.core.nyctaxi.queries import NYCTaxiQueryManager
 from benchbox.core.nyctaxi.schema import (
@@ -30,12 +30,13 @@ from benchbox.core.nyctaxi.schema import (
 )
 from benchbox.utils.compression_mixin import extract_compression_kwargs
 from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
+from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 if TYPE_CHECKING:
     from benchbox.core.connection import DatabaseConnection
 
 
-class NYCTaxiBenchmark(BaseBenchmark):
+class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     """NYC Taxi OLAP benchmark implementation.
 
     Uses real NYC TLC trip data for OLAP analytics workloads. Supports three
@@ -88,6 +89,9 @@ class NYCTaxiBenchmark(BaseBenchmark):
     # Available years for validation
     AVAILABLE_YEARS = list(range(2019, 2026))
 
+    # Nested downloaders that must track output_dir reassignment.
+    OUTPUT_DIR_GENERATOR_ATTRS = ("downloader", "green_downloader", "hvfhv_downloader")
+
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -123,8 +127,11 @@ class NYCTaxiBenchmark(BaseBenchmark):
         if year not in self.AVAILABLE_YEARS:
             raise ValueError(f"year must be in {self.AVAILABLE_YEARS[0]}-{self.AVAILABLE_YEARS[-1]}, got {year}")
 
+        # Resolve through the shared helper so BENCHBOX_OUTPUT_DIR is honored at
+        # construction time (matching the canonical nyctaxi_sf<N> datagen name);
+        # falls back to Path.cwd()/benchmark_runs/datagen when no override is set.
         resolved_output_dir = (
-            Path(output_dir) if output_dir else Path.cwd() / "benchmark_runs" / "datagen" / f"nyctaxi_{scale_factor}"
+            Path(output_dir) if output_dir else get_benchmark_runs_datagen_path("nyctaxi", scale_factor)
         )
         super().__init__(
             scale_factor=scale_factor,
@@ -633,7 +640,7 @@ class NYCTaxiBenchmark(BaseBenchmark):
 # Register benchmark-specific CLI option specs
 # ---------------------------------------------------------------------------
 
-from benchbox.cli.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
     parse_enum_list,

@@ -423,8 +423,6 @@ class ClickHouseWorkloadMixin:
                     row_count_validation["warning"] = validation_result.warning_message
                 result_dict["row_count_validation"] = row_count_validation
 
-            return result_dict
-
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             error_type = type(e).__name__
@@ -440,6 +438,17 @@ class ClickHouseWorkloadMixin:
                 "error": error_message,
                 "error_type": error_type,
             }
+
+        # Plan capture routes through the shared chokepoint, outside the try so a
+        # strict-mode PlanCaptureError propagates rather than being swallowed by the
+        # broad `except` above. For phase-eligible engines (the default) the
+        # chokepoint records the executed query for the isolated post-measurement
+        # phase instead of running EXPLAIN inline; otherwise it captures inline.
+        # EXPLAIN targets the transformed query (the one that actually ran): the
+        # original may not parse under ClickHouse without the compatibility transforms.
+        self._merge_plan_capture_into_result(result_dict, connection, transformed_query, query_id)
+
+        return result_dict
 
 
 __all__ = ["ClickHouseWorkloadMixin"]

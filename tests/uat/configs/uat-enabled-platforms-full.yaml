@@ -3,7 +3,6 @@ description: "Release-gate UAT sweep for enabled local SQL platforms"
 
 phases:
   - preflight
-  - enumerate
   - execute
   - validate
   - package

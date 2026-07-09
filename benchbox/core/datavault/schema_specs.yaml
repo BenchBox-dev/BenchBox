@@ -1,0 +1,1030 @@
+tables:
+- id: HUB_REGION
+  name: hub_region
+  table_type: hub
+  columns:
+  - - hk_region
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - r_regionkey
+    - INTEGER
+    - null
+    - false
+    - false
+    - null
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: HUB_NATION
+  name: hub_nation
+  table_type: hub
+  columns:
+  - - hk_nation
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - n_nationkey
+    - INTEGER
+    - null
+    - false
+    - false
+    - null
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: HUB_CUSTOMER
+  name: hub_customer
+  table_type: hub
+  columns:
+  - - hk_customer
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - c_custkey
+    - INTEGER
+    - null
+    - false
+    - false
+    - null
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: HUB_SUPPLIER
+  name: hub_supplier
+  table_type: hub
+  columns:
+  - - hk_supplier
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - s_suppkey
+    - INTEGER
+    - null
+    - false
+    - false
+    - null
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: HUB_PART
+  name: hub_part
+  table_type: hub
+  columns:
+  - - hk_part
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - p_partkey
+    - INTEGER
+    - null
+    - false
+    - false
+    - null
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: HUB_ORDER
+  name: hub_order
+  table_type: hub
+  columns:
+  - - hk_order
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - o_orderkey
+    - INTEGER
+    - null
+    - false
+    - false
+    - null
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: HUB_LINEITEM
+  name: hub_lineitem
+  table_type: hub
+  columns:
+  - - hk_lineitem
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - l_orderkey
+    - INTEGER
+    - null
+    - false
+    - false
+    - null
+  - - l_linenumber
+    - INTEGER
+    - null
+    - false
+    - false
+    - null
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: LINK_NATION_REGION
+  name: link_nation_region
+  table_type: link
+  columns:
+  - - hk_nation_region
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - hk_nation
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_nation
+      - hk_nation
+  - - hk_region
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_region
+      - hk_region
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: LINK_CUSTOMER_NATION
+  name: link_customer_nation
+  table_type: link
+  columns:
+  - - hk_customer_nation
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - hk_customer
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_customer
+      - hk_customer
+  - - hk_nation
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_nation
+      - hk_nation
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: LINK_SUPPLIER_NATION
+  name: link_supplier_nation
+  table_type: link
+  columns:
+  - - hk_supplier_nation
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - hk_supplier
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_supplier
+      - hk_supplier
+  - - hk_nation
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_nation
+      - hk_nation
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: LINK_PART_SUPPLIER
+  name: link_part_supplier
+  table_type: link
+  columns:
+  - - hk_part_supplier
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - hk_part
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_part
+      - hk_part
+  - - hk_supplier
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_supplier
+      - hk_supplier
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: LINK_ORDER_CUSTOMER
+  name: link_order_customer
+  table_type: link
+  columns:
+  - - hk_order_customer
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - hk_order
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_order
+      - hk_order
+  - - hk_customer
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_customer
+      - hk_customer
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: LINK_LINEITEM
+  name: link_lineitem
+  table_type: link
+  columns:
+  - - hk_lineitem_link
+    - HASHKEY
+    - null
+    - false
+    - true
+    - null
+  - - hk_lineitem
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_lineitem
+      - hk_lineitem
+  - - hk_order
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_order
+      - hk_order
+  - - hk_part
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_part
+      - hk_part
+  - - hk_supplier
+    - HASHKEY
+    - null
+    - false
+    - false
+    - - hub_supplier
+      - hk_supplier
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+- id: SAT_REGION
+  name: sat_region
+  table_type: satellite
+  columns:
+  - - hk_region
+    - HASHKEY
+    - null
+    - false
+    - true
+    - - hub_region
+      - hk_region
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - true
+    - null
+  - - load_end_dts
+    - TIMESTAMP
+    - null
+    - true
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+  - - hashdiff
+    - HASHKEY
+    - null
+    - false
+    - false
+    - null
+  - - r_name
+    - CHAR
+    - 25
+    - false
+    - false
+    - null
+  - - r_comment
+    - VARCHAR
+    - 152
+    - true
+    - false
+    - null
+- id: SAT_NATION
+  name: sat_nation
+  table_type: satellite
+  columns:
+  - - hk_nation
+    - HASHKEY
+    - null
+    - false
+    - true
+    - - hub_nation
+      - hk_nation
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - true
+    - null
+  - - load_end_dts
+    - TIMESTAMP
+    - null
+    - true
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+  - - hashdiff
+    - HASHKEY
+    - null
+    - false
+    - false
+    - null
+  - - n_name
+    - CHAR
+    - 25
+    - false
+    - false
+    - null
+  - - n_comment
+    - VARCHAR
+    - 152
+    - true
+    - false
+    - null
+- id: SAT_CUSTOMER
+  name: sat_customer
+  table_type: satellite
+  columns:
+  - - hk_customer
+    - HASHKEY
+    - null
+    - false
+    - true
+    - - hub_customer
+      - hk_customer
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - true
+    - null
+  - - load_end_dts
+    - TIMESTAMP
+    - null
+    - true
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+  - - hashdiff
+    - HASHKEY
+    - null
+    - false
+    - false
+    - null
+  - - c_name
+    - VARCHAR
+    - 25
+    - false
+    - false
+    - null
+  - - c_address
+    - VARCHAR
+    - 40
+    - false
+    - false
+    - null
+  - - c_phone
+    - CHAR
+    - 15
+    - false
+    - false
+    - null
+  - - c_acctbal
+    - DECIMAL
+    - null
+    - false
+    - false
+    - null
+  - - c_mktsegment
+    - CHAR
+    - 10
+    - false
+    - false
+    - null
+  - - c_comment
+    - VARCHAR
+    - 117
+    - false
+    - false
+    - null
+- id: SAT_SUPPLIER
+  name: sat_supplier
+  table_type: satellite
+  columns:
+  - - hk_supplier
+    - HASHKEY
+    - null
+    - false
+    - true
+    - - hub_supplier
+      - hk_supplier
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - true
+    - null
+  - - load_end_dts
+    - TIMESTAMP
+    - null
+    - true
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+  - - hashdiff
+    - HASHKEY
+    - null
+    - false
+    - false
+    - null
+  - - s_name
+    - CHAR
+    - 25
+    - false
+    - false
+    - null
+  - - s_address
+    - VARCHAR
+    - 40
+    - false
+    - false
+    - null
+  - - s_phone
+    - CHAR
+    - 15
+    - false
+    - false
+    - null
+  - - s_acctbal
+    - DECIMAL
+    - null
+    - false
+    - false
+    - null
+  - - s_comment
+    - VARCHAR
+    - 101
+    - false
+    - false
+    - null
+- id: SAT_PART
+  name: sat_part
+  table_type: satellite
+  columns:
+  - - hk_part
+    - HASHKEY
+    - null
+    - false
+    - true
+    - - hub_part
+      - hk_part
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - true
+    - null
+  - - load_end_dts
+    - TIMESTAMP
+    - null
+    - true
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+  - - hashdiff
+    - HASHKEY
+    - null
+    - false
+    - false
+    - null
+  - - p_name
+    - VARCHAR
+    - 55
+    - false
+    - false
+    - null
+  - - p_mfgr
+    - CHAR
+    - 25
+    - false
+    - false
+    - null
+  - - p_brand
+    - CHAR
+    - 10
+    - false
+    - false
+    - null
+  - - p_type
+    - VARCHAR
+    - 25
+    - false
+    - false
+    - null
+  - - p_size
+    - INTEGER
+    - null
+    - false
+    - false
+    - null
+  - - p_container
+    - CHAR
+    - 10
+    - false
+    - false
+    - null
+  - - p_retailprice
+    - DECIMAL
+    - null
+    - false
+    - false
+    - null
+  - - p_comment
+    - VARCHAR
+    - 23
+    - false
+    - false
+    - null
+- id: SAT_PARTSUPP
+  name: sat_partsupp
+  table_type: satellite
+  columns:
+  - - hk_part_supplier
+    - HASHKEY
+    - null
+    - false
+    - true
+    - - link_part_supplier
+      - hk_part_supplier
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - true
+    - null
+  - - load_end_dts
+    - TIMESTAMP
+    - null
+    - true
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+  - - hashdiff
+    - HASHKEY
+    - null
+    - false
+    - false
+    - null
+  - - ps_availqty
+    - INTEGER
+    - null
+    - false
+    - false
+    - null
+  - - ps_supplycost
+    - DECIMAL
+    - null
+    - false
+    - false
+    - null
+  - - ps_comment
+    - VARCHAR
+    - 199
+    - false
+    - false
+    - null
+- id: SAT_ORDER
+  name: sat_order
+  table_type: satellite
+  columns:
+  - - hk_order
+    - HASHKEY
+    - null
+    - false
+    - true
+    - - hub_order
+      - hk_order
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - true
+    - null
+  - - load_end_dts
+    - TIMESTAMP
+    - null
+    - true
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+  - - hashdiff
+    - HASHKEY
+    - null
+    - false
+    - false
+    - null
+  - - o_orderstatus
+    - CHAR
+    - 1
+    - false
+    - false
+    - null
+  - - o_totalprice
+    - DECIMAL
+    - null
+    - false
+    - false
+    - null
+  - - o_orderdate
+    - DATE
+    - null
+    - false
+    - false
+    - null
+  - - o_orderpriority
+    - CHAR
+    - 15
+    - false
+    - false
+    - null
+  - - o_clerk
+    - CHAR
+    - 15
+    - false
+    - false
+    - null
+  - - o_shippriority
+    - INTEGER
+    - null
+    - false
+    - false
+    - null
+  - - o_comment
+    - VARCHAR
+    - 79
+    - false
+    - false
+    - null
+- id: SAT_LINEITEM
+  name: sat_lineitem
+  table_type: satellite
+  columns:
+  - - hk_lineitem_link
+    - HASHKEY
+    - null
+    - false
+    - true
+    - - link_lineitem
+      - hk_lineitem_link
+  - - load_dts
+    - TIMESTAMP
+    - null
+    - false
+    - true
+    - null
+  - - load_end_dts
+    - TIMESTAMP
+    - null
+    - true
+    - false
+    - null
+  - - record_source
+    - VARCHAR
+    - 50
+    - false
+    - false
+    - null
+  - - hashdiff
+    - HASHKEY
+    - null
+    - false
+    - false
+    - null
+  - - l_quantity
+    - DECIMAL
+    - null
+    - false
+    - false
+    - null
+  - - l_extendedprice
+    - DECIMAL
+    - null
+    - false
+    - false
+    - null
+  - - l_discount
+    - DECIMAL
+    - null
+    - false
+    - false
+    - null
+  - - l_tax
+    - DECIMAL
+    - null
+    - false
+    - false
+    - null
+  - - l_returnflag
+    - CHAR
+    - 1
+    - false
+    - false
+    - null
+  - - l_linestatus
+    - CHAR
+    - 1
+    - false
+    - false
+    - null
+  - - l_shipdate
+    - DATE
+    - null
+    - false
+    - false
+    - null
+  - - l_commitdate
+    - DATE
+    - null
+    - false
+    - false
+    - null
+  - - l_receiptdate
+    - DATE
+    - null
+    - false
+    - false
+    - null
+  - - l_shipinstruct
+    - CHAR
+    - 25
+    - false
+    - false
+    - null
+  - - l_shipmode
+    - CHAR
+    - 10
+    - false
+    - false
+    - null
+  - - l_comment
+    - VARCHAR
+    - 44
+    - false
+    - false
+    - null
+groups:
+  hubs:
+  - hub_region
+  - hub_nation
+  - hub_customer
+  - hub_supplier
+  - hub_part
+  - hub_order
+  - hub_lineitem
+  links:
+  - link_nation_region
+  - link_customer_nation
+  - link_supplier_nation
+  - link_part_supplier
+  - link_order_customer
+  - link_lineitem
+  satellites:
+  - sat_region
+  - sat_nation
+  - sat_customer
+  - sat_supplier
+  - sat_part
+  - sat_partsupp
+  - sat_order
+  - sat_lineitem
+loading_order:
+- hub_region
+- hub_nation
+- hub_customer
+- hub_supplier
+- hub_part
+- hub_order
+- hub_lineitem
+- link_nation_region
+- link_customer_nation
+- link_supplier_nation
+- link_part_supplier
+- link_order_customer
+- link_lineitem
+- sat_region
+- sat_nation
+- sat_customer
+- sat_supplier
+- sat_part
+- sat_partsupp
+- sat_order
+- sat_lineitem

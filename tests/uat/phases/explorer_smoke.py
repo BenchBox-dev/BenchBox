@@ -1,9 +1,12 @@
-"""Explorer-smoke phase: build Explorer data + run Playwright directly.
+"""Explorer-smoke phase: validate the packaged corpus, then delegate the browser smoke.
 
-Mirrors the Results Explorer browser workflow entrypoint: install the
-Explorer npm dependencies, build the static app, then invoke Playwright
-with explicit projects. The UAT phase owns only the BenchBox data build;
-Playwright remains the single browser-test runner.
+The phase always runs a cheap, no-Node corpus contract over the packaged
+bundles. The heavy path only runs when the explorer build inputs are present on
+the branch (they live on `develop`, not `main`): UAT builds the BenchBox data,
+installs npm dependencies, then hands off to the Results Explorer's
+`uat-external-corpus-smoke` script, which owns the static build and the
+external-corpus Playwright run. UAT no longer issues `npm run build` /
+`npx playwright` itself.
 """
 
 from __future__ import annotations
@@ -16,9 +19,17 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from tests.uat.phases import PhaseResult
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 EXPLORER_DIR = REPO_ROOT / "results-explorer"
+EXPLORER_PUBLISH_SCRIPT = REPO_ROOT / "_project" / "scripts" / "explorer_publish.py"
 EXTERNAL_CORPUS_SMOKE_TAG = "@uat-external-corpus"
+# Single delegated entrypoint owned by the Results Explorer: it builds the
+# static app and runs the external-corpus Playwright grep. UAT forwards browser
+# `--project` flags via `npm run <script> -- ...` rather than re-issuing
+# npm/build/playwright itself (see results-explorer/package.json).
+EXPLORER_SMOKE_NPM_SCRIPT = "uat-external-corpus-smoke"
 EXPLORER_BUILD_ARGV = (
     "uv",
     "run",
@@ -30,7 +41,7 @@ EXPLORER_BUILD_ARGV = (
 
 
 @dataclass(frozen=True)
-class ExplorerSmokeResult:
+class ExplorerSmokeResult(PhaseResult):
     build_returncode: int
     smoke_returncode: int
     build_log: Path | None
@@ -39,6 +50,8 @@ class ExplorerSmokeResult:
     skip_reason: str | None
 
     def exit_code(self) -> int:
+        if self.aborted:
+            return 2
         if self.skipped:
             return 0
         if self.build_returncode != 0:
@@ -48,6 +61,29 @@ class ExplorerSmokeResult:
 
 def has_node() -> bool:
     return shutil.which("node") is not None
+
+
+def explorer_present() -> bool:
+    """Return True only when both explorer build inputs exist on this branch.
+
+    The phase ships on `main`, but `_project/scripts/explorer_publish.py` and
+    `results-explorer/` live only on `develop`. Without this guard a clean
+    `main` checkout false-gates: the heavy build shells out to files that are
+    not there. When absent we skip-with-reason instead of hard-failing.
+    """
+    return EXPLORER_PUBLISH_SCRIPT.is_file() and (EXPLORER_DIR / "package.json").is_file()
+
+
+def _explorer_absent_reason() -> str:
+    missing = [
+        str(path)
+        for path, present in (
+            (EXPLORER_PUBLISH_SCRIPT, EXPLORER_PUBLISH_SCRIPT.is_file()),
+            (EXPLORER_DIR / "package.json", (EXPLORER_DIR / "package.json").is_file()),
+        )
+        if not present
+    ]
+    return "explorer assets absent on this branch: " + ", ".join(missing)
 
 
 def build_argv(
@@ -67,9 +103,15 @@ def build_argv(
     ]
 
 
-def playwright_argv(playwright_browsers: tuple[str, ...] = ("chromium",)) -> list[str]:
-    """Return the direct Playwright smoke argv for the requested browser projects."""
-    argv = ["npx", "playwright", "test", "--grep", EXTERNAL_CORPUS_SMOKE_TAG]
+def smoke_npm_argv(playwright_browsers: tuple[str, ...] = ("chromium",)) -> list[str]:
+    """Return the delegated Results Explorer smoke command for the requested projects.
+
+    UAT does not own build/playwright mechanics: it calls the explorer's
+    `uat-external-corpus-smoke` script (which builds and runs the
+    external-corpus grep) and forwards browser `--project` flags through npm's
+    `--` argument passthrough.
+    """
+    argv = ["npm", "run", EXPLORER_SMOKE_NPM_SCRIPT, "--"]
     for browser in playwright_browsers:
         argv.extend(["--project", browser])
     return argv
@@ -87,14 +129,37 @@ def run_explorer_smoke(
 ) -> ExplorerSmokeResult:
     """Build the explorer and run a browser smoke against the bundles in bundles_dir.
 
-    Returns a skipped result if `node` is not on PATH (CI environments
-    without browser tooling installed). Requested Playwright projects are
-    passed through explicitly; if a project/browser is unavailable, the
-    Playwright command fails loudly.
+    Always runs the cheap, no-Node corpus contract on the packaged bundles.
+    Returns a skipped result (never a hard failure) when the explorer build
+    inputs are absent on this branch, or when `node` is not on PATH. Requested
+    Playwright projects are passed through explicitly; if a project/browser is
+    unavailable, the Playwright command fails loudly.
     """
     log_dir.mkdir(parents=True, exist_ok=True)
+
+    # Minimal always-on gate: validate the packaged corpus regardless of
+    # explorer presence or Node availability. This is the check that has value
+    # on a clean `main` checkout where the heavy browser path cannot run.
+    resolved_bundles_dir = _resolve_bundles_dir(bundles_dir)
+    contract = _validate_external_corpus(bundles_dir=resolved_bundles_dir)
+    (log_dir / "explorer_corpus_contract.json").write_text(
+        json.dumps(contract, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    if not explorer_present():
+        return ExplorerSmokeResult(
+            phase="explorer_smoke",
+            build_returncode=0,
+            smoke_returncode=0,
+            build_log=None,
+            smoke_log=None,
+            skipped=True,
+            skip_reason=_explorer_absent_reason(),
+        )
     if not has_node():
         return ExplorerSmokeResult(
+            phase="explorer_smoke",
             build_returncode=0,
             smoke_returncode=0,
             build_log=None,
@@ -105,12 +170,6 @@ def run_explorer_smoke(
 
     build_log = log_dir / "explorer_build.log"
     smoke_log = log_dir / "playwright_smoke.log"
-    resolved_bundles_dir = _resolve_bundles_dir(bundles_dir)
-    contract = _validate_external_corpus(bundles_dir=resolved_bundles_dir)
-    (log_dir / "explorer_corpus_contract.json").write_text(
-        json.dumps(contract, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
     data_dir = _prepare_data_dir(bundles_dir=resolved_bundles_dir, log_dir=log_dir)
     explorer_build_argv = build_argv(data_dir=data_dir, output_dir=output_dir, build_extra_args=build_extra_args)
 
@@ -119,6 +178,7 @@ def run_explorer_smoke(
         build = runner(explorer_build_argv, stdout=fh, stderr=fh, check=False)
     if getattr(build, "returncode", 0) != 0:
         return ExplorerSmokeResult(
+            phase="explorer_smoke",
             build_returncode=build.returncode,
             smoke_returncode=0,
             build_log=build_log,
@@ -137,6 +197,7 @@ def run_explorer_smoke(
         runner=runner,
     )
     return ExplorerSmokeResult(
+        phase="explorer_smoke",
         build_returncode=build.returncode,
         smoke_returncode=smoke_returncode,
         build_log=build_log,
@@ -214,8 +275,7 @@ def _run_browser_smoke(
     env.setdefault("E2E_PORT", str(_find_free_local_port()))
     commands = (
         ["npm", "ci"],
-        ["npm", "run", "build"],
-        playwright_argv(playwright_browsers),
+        smoke_npm_argv(playwright_browsers),
     )
     with smoke_log.open("w", encoding="utf-8") as fh:
         for argv in commands:

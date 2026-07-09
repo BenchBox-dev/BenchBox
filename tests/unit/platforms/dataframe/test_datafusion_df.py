@@ -200,12 +200,94 @@ class TestDataFusionDataLoading:
         result = adapter.collect(df)
         assert result.num_rows == 2
 
+    def test_read_csv_headerless_with_schema_string_columns_does_not_raise(self, tmp_path):
+        """Headerless non-.tbl CSV with declared schema names.
+
+        ClickBench's generated hits.csv is written without a header and the
+        non-.tbl CSV path never applies `column_names`, so the frame columns
+        are DataFusion's inferred names (column_1, …). The empty-string
+        coalesce for declared `string_columns` must guard on the frame's
+        actual columns instead of calling col(<schema_name>) blindly, which
+        would raise and abort the load before any rows are counted.
+        """
+        adapter = DataFusionDataFrameAdapter()
+
+        csv_path = tmp_path / "hits.csv"
+        # Headerless: column_2 (the would-be string column) has an empty field.
+        csv_path.write_text("1,Alice\n2,\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            has_header=False,
+            null_marker=None,
+            # Declared benchmark schema name that is NOT a frame column.
+            string_columns=["url"],
+        )
+
+        result = adapter.collect(df)
+        assert result.num_rows == 2
+
+    def test_read_csv_coalesces_present_string_columns_to_empty(self, tmp_path):
+        """Columns that ARE present keep the empty-string coalesce contract."""
+        adapter = DataFusionDataFrameAdapter()
+
+        csv_path = tmp_path / "with_header.csv"
+        csv_path.write_text("id,name\n1,Alice\n2,\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            has_header=True,
+            null_marker=None,
+            string_columns=["name"],
+        )
+
+        result = adapter.collect(df)
+        names = result.column("name").to_pylist()
+        assert "" in names
+        assert None not in names
+
+    def test_read_csv_headerless_with_column_names_coalesces_declared_string_columns(self, tmp_path):
+        """The real ClickBench path: headerless CSV + column_names + string_columns.
+
+        DataFusion's non-.tbl read_csv ignores column_names, so without
+        re-applying them the declared schema-named string columns are not frame
+        columns (the frame has column_1, …) and the empty-string coalesce is
+        skipped, leaving empty text fields as NULL. The real benchmark run passes
+        column_names (unlike the does-not-raise test above), so a declared string
+        column's empty field must come back as "" addressed by its schema name —
+        ClickBench filters SearchPhrase <> '' and would otherwise lose those rows.
+        """
+        adapter = DataFusionDataFrameAdapter()
+
+        csv_path = tmp_path / "hits.csv"
+        # Headerless: id, then a string column whose 2nd row is an empty field.
+        csv_path.write_text("1,Alice\n2,\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            has_header=False,
+            column_names=["id", "search_phrase"],
+            null_marker=None,
+            string_columns=["search_phrase"],
+        )
+
+        result = adapter.collect(df)
+        assert result.column_names == ["id", "search_phrase"]
+        phrases = result.column("search_phrase").to_pylist()
+        assert phrases == ["Alice", ""]
+        assert None not in phrases
+
     def test_read_tbl_with_column_names(self, tmp_path):
-        """Test reading TPC-style .tbl with trailing delimiter."""
+        """Test reading TPC-style .tbl with a genuine trailing delimiter.
+
+        Each row ends with a trailing `|`, so it splits into 3 fields for 2
+        columns — the field-terminating framing raw dbgen emits. read_csv must
+        drop the extra field rather than surface it as a third column.
+        """
         adapter = DataFusionDataFrameAdapter()
 
         tbl_path = tmp_path / "test.tbl"
-        tbl_path.write_text("1|Alice\n2|Bob\n")
+        tbl_path.write_text("1|Alice|\n2|Bob|\n")
 
         df = adapter.read_csv(
             tbl_path,

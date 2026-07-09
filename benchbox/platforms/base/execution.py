@@ -32,25 +32,50 @@ import contextlib
 import signal
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
-    TPCDS_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
-    TPCDS_POWER_DEFAULT_WARMUP_ITERATIONS,
-    TPCH_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
-    TPCH_POWER_DEFAULT_WARMUP_ITERATIONS,
 )
 from benchbox.core.errors import PlanCaptureError
 from benchbox.core.operations import OperationExecutor
+from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
+from benchbox.core.power_harnesses import (
+    resolve_combined_harness,
+    resolve_maintenance_harness,
+    resolve_power_harness,
+    resolve_throughput_harness,
+)
 from benchbox.core.results.builder import benchmark_family, normalize_benchmark_id
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT, QUERY_RUN_TYPE_WARMUP
+from benchbox.core.tpch.platform_power import _power_query_result, _power_test_error_result
 from benchbox.platforms.base.connection_wrappers import (
     PlatformAdapterConnection,
     _make_stream_cursor,
 )
+from benchbox.utils.dialect_utils import SQLTranslationError
 from benchbox.utils.printing import quiet_console
+
+__all__ = ["TestDriversMixin", "_power_query_result", "_power_test_error_result"]
+
+
+class _CapturedPlan(NamedTuple):
+    """One query's captured plan, accumulated across isolated capture passes.
+
+    Stored in the per-run ``_captured_plans`` accumulator keyed by capture key so a
+    pre-mutation checkpoint and the final post-measurement pass can each contribute
+    plans that are attached to result rows exactly once. ``plan`` is ``None`` when
+    capture failed or the query was filtered out; ``capture_ms`` is recorded even
+    then so plan-capture timing is reported honestly. ``normalized_fingerprint`` is
+    only populated when the adapter's ``normalize_plan_literals`` option is enabled
+    (see --normalize-plan-literals); otherwise it stays ``None``.
+    """
+
+    plan: Any
+    fingerprint: str | None
+    capture_ms: float | None
+    normalized_fingerprint: str | None = None
 
 
 class TestDriversMixin:
@@ -69,179 +94,32 @@ class TestDriversMixin:
       `_build_query_failure_result`, `_build_dry_run_result`
     """
 
+    def _make_power_connection_adapter(self, connection: Any, benchmark_id: str, scale_factor: float):
+        """Wrap a platform connection for core TPC power harnesses."""
+        connection_adapter = PlatformAdapterConnection(_make_stream_cursor(connection), self)
+        connection_adapter.benchmark_type = benchmark_id
+        connection_adapter.scale_factor = scale_factor
+        return connection_adapter
+
+    def _make_direct_power_connection_adapter(self, connection: Any, benchmark_id: str, scale_factor: float):
+        """Wrap a direct platform connection for single-stream core TPC power harnesses."""
+        connection_adapter = PlatformAdapterConnection(connection, self)
+        connection_adapter.benchmark_type = benchmark_id
+        connection_adapter.scale_factor = scale_factor
+        return connection_adapter
+
     def _execute_tpch_power_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
-        """Execute TPC-H Power Test using production TPCHPowerTest implementation."""
-        from benchbox.core.tpch.power_test import TPCHPowerTest
+        """Execute TPC-H Power Test using the core TPCH power harness."""
+        from benchbox.core.tpch.platform_power import execute_tpch_power_test
 
-        console = quiet_console
-
-        try:
-            # Extract configuration
-            scale_factor = run_config.get("scale_factor", 1.0)
-            seed = run_config.get("seed")
-            validation_mode = run_config.get("validation_mode")  # Universal validation mode
-            stream_id = run_config.get("stream_id", 0)
-            query_subset = run_config.get("query_subset")
-            getattr(self, "get_target_dialect", lambda: "standard")()
-            verbose = run_config.get("verbose", False)
-            timeout = run_config.get("timeout")
-            iterations = run_config.get("iterations", TPCH_POWER_DEFAULT_MEASUREMENT_ITERATIONS)
-            warm_up_iterations = run_config.get("warm_up_iterations", TPCH_POWER_DEFAULT_WARMUP_ITERATIONS)
-            fail_fast = run_config.get("power_fail_fast", False)
-
-            console.print(
-                f"[green]Running TPC-H Power Test (Scale Factor: {scale_factor}, Stream ID: {stream_id})[/green]"
-            )
-            console.print(f"[green]Warm-up runs: {warm_up_iterations}, Measurement runs: {iterations}[/green]")
-
-            # Create connection adapter that wraps the platform adapter connection
-            connection_adapter = PlatformAdapterConnection(connection, self)
-            # Configure benchmark context for query validation
-            connection_adapter.benchmark_type = "tpch"
-            connection_adapter.scale_factor = scale_factor
-
-            all_results = []
-
-            # Warm-up runs
-            for i in range(warm_up_iterations):
-                current_stream_id = i  # Start at 0 for warmup
-                console.print(f"[cyan]--- Warm-up Run {i + 1}/{warm_up_iterations} ---[/cyan]")
-                power_test = TPCHPowerTest(
-                    benchmark=benchmark,
-                    connection=connection_adapter,
-                    scale_factor=scale_factor,
-                    seed=seed,
-                    stream_id=current_stream_id,
-                    verbose=verbose,
-                    timeout=timeout,
-                    dialect=self.get_target_dialect(),
-                    validation_mode=validation_mode,
-                    query_subset=query_subset,
-                )
-                # Mirror the power test's resolved validation policy instead of
-                # re-deriving it from stream IDs in the adapter.
-                connection_adapter._validate_row_count = power_test.config.validation
-                power_test_result = power_test.run()
-                for query_result in power_test_result.query_results:
-                    platform_result = {
-                        "query_id": query_result["query_id"],
-                        "execution_time_seconds": query_result["execution_time_seconds"],
-                        "status": "SUCCESS" if query_result["success"] else "FAILED",
-                        "rows_returned": query_result.get("result_count", 0),
-                        "test_type": "power",
-                        "stream_id": query_result.get("stream_id", current_stream_id),
-                        "position": query_result.get("position", 0),
-                        "iteration": 0,
-                        "run_type": "warmup",
-                    }
-                    if not query_result["success"]:
-                        platform_result["error"] = query_result.get("error", "Unknown error")
-                    all_results.append(platform_result)
-
-            # Measurement runs
-            for i in range(iterations):
-                current_stream_id = warm_up_iterations + i  # Continue from where warmup left off
-                console.print(f"[cyan]--- Measurement Run {i + 1}/{iterations} ---[/cyan]")
-                power_test = TPCHPowerTest(
-                    benchmark=benchmark,
-                    connection=connection_adapter,
-                    scale_factor=scale_factor,
-                    seed=seed,
-                    stream_id=current_stream_id,
-                    verbose=verbose,
-                    timeout=timeout,
-                    dialect=self.get_target_dialect(),
-                    validation_mode=validation_mode,
-                    query_subset=query_subset,
-                )
-                # Mirror the power test's resolved validation policy instead of
-                # re-deriving it from stream IDs in the adapter.
-                connection_adapter._validate_row_count = power_test.config.validation
-
-                # Execute the power test
-                power_test_result = power_test.run()
-
-                # Cache the power test result for metric extraction
-                self._last_power_test_result = power_test_result
-
-                # Display results
-                if power_test_result.success:
-                    success_rate = power_test_result.queries_successful / max(power_test_result.queries_executed, 1)
-                    console.print(
-                        f"[green]✅ TPC-H Power Test completed: Power@Size = {power_test_result.power_at_size:.2f}[/green]"
-                    )
-                    console.print(
-                        f"  Queries executed: {power_test_result.queries_executed}, Successful: {power_test_result.queries_successful}"
-                    )
-                    console.print(f"  Success rate: {success_rate:.1%} (TPC-H requires ≥95%)")
-                    console.print(f"  Total execution time: {power_test_result.total_time:.2f}s")
-                else:
-                    console.print("[red]❌ TPC-H Power Test failed[/red]")
-                    for error in power_test_result.errors:
-                        console.print(f"  Error: {error}")
-
-                # Convert TPCHPowerTestResult to platform adapter format
-                query_results = []
-                for query_result in power_test_result.query_results:
-                    platform_result = {
-                        "query_id": query_result["query_id"],
-                        "execution_time_seconds": query_result["execution_time_seconds"],
-                        "status": "SUCCESS" if query_result["success"] else "FAILED",
-                        "rows_returned": query_result.get("result_count", 0),
-                        "test_type": "power",
-                        "stream_id": query_result.get("stream_id", current_stream_id),
-                        "position": query_result.get("position", 0),
-                        "iteration": i + 1,
-                        "run_type": "measurement",
-                    }
-                    if not query_result["success"]:
-                        platform_result["error"] = query_result.get("error", "Unknown error")
-                    query_results.append(platform_result)
-                all_results.extend(query_results)
-
-                # Abort remaining iterations if all queries failed (connection/infra issue)
-                # or if fail_fast is enabled and any query failed
-                if not power_test_result.success:
-                    if power_test_result.queries_successful == 0:
-                        console.print("[yellow]⚠️  All queries failed - aborting remaining measurement runs[/yellow]")
-                        # If the factory itself failed (no queries ran at all), add a sentinel
-                        # so total_queries > 0 and the benchmark is marked FAILED, not PASSED.
-                        if not query_results:
-                            all_results.append(
-                                {
-                                    "query_id": "power_test_error",
-                                    "execution_time_seconds": 0.0,
-                                    "status": "FAILED",
-                                    "rows_returned": 0,
-                                    "error": "; ".join(power_test_result.errors)
-                                    if power_test_result.errors
-                                    else "Power test failed",
-                                    "test_type": "power",
-                                    "iteration": i + 1,
-                                    "run_type": "measurement",
-                                }
-                            )
-                        break
-                    if fail_fast:
-                        console.print(
-                            "[yellow]⚠️  Query failures detected (fail_fast enabled) - aborting remaining runs[/yellow]"
-                        )
-                        break
-
-            return all_results
-
-        except Exception as e:
-            console.print(f"[red]❌ TPC-H Power Test failed: {e}[/red]")
-            return [
-                {
-                    "query_id": "power_test_error",
-                    "execution_time_seconds": 0.0,
-                    "status": "FAILED",
-                    "rows_returned": 0,
-                    "error": str(e),
-                    "test_type": "power",
-                }
-            ]
+        return execute_tpch_power_test(
+            self,
+            benchmark,
+            connection,
+            run_config,
+            make_connection_adapter=self._make_direct_power_connection_adapter,
+            console=quiet_console,
+        )
 
     def _execute_generic_power_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Execute power test for non-TPC benchmarks with warmup + iterations.
@@ -329,195 +207,17 @@ class TestDriversMixin:
         return all_measurement_results
 
     def _execute_tpcds_power_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
-        """Execute TPC-DS Power Test using production TPCDSPowerTest implementation."""
-        from benchbox.core.expected_results.tpcds_results import set_config_validation_mode
-        from benchbox.core.tpcds.power_test import TPCDSPowerTest
+        """Execute TPC-DS Power Test using the core TPCDS power harness."""
+        from benchbox.core.tpcds.platform_power import execute_tpcds_power_test
 
-        console = quiet_console
-
-        try:
-            # Extract configuration
-            scale_factor = run_config.get("scale_factor", 1.0)
-            seed = run_config.get("seed", 1)
-            validation_mode = run_config.get("validation_mode")  # Universal validation mode
-            stream_id = run_config.get("stream_id", 0)
-            query_subset = run_config.get("query_subset")
-            dialect = getattr(self, "get_target_dialect", lambda: "standard")()
-            verbose = run_config.get("verbose", False)
-            timeout = run_config.get("timeout")
-            iterations = run_config.get("iterations", TPCDS_POWER_DEFAULT_MEASUREMENT_ITERATIONS)
-            warm_up_iterations = run_config.get("warm_up_iterations", TPCDS_POWER_DEFAULT_WARMUP_ITERATIONS)
-            fail_fast = run_config.get("power_fail_fast", False)
-
-            # Set TPC-DS validation mode from config (takes precedence over environment variable)
-            set_config_validation_mode(validation_mode)
-
-            console.print(
-                f"[green]Running TPC-DS Power Test (Scale Factor: {scale_factor}, Stream ID: {stream_id})[/green]"
-            )
-            console.print(f"[green]Warm-up runs: {warm_up_iterations}, Measurement runs: {iterations}[/green]")
-
-            # Create connection factory that wraps the platform adapter connection
-            def connection_factory():
-                # Create thread-safe cursor for concurrent stream execution
-                # See: https://duckdb.org/docs/stable/guides/python/multiple_threads
-                # Some clients (e.g. ClickHouseLocalClient) expose execute() directly
-                # without a cursor() method.  In that case we wrap the connection in a
-                # non-closing proxy so that PlatformAdapterConnection.close() (called at
-                # the end of every power-test run) doesn't destroy the shared underlying
-                # connection before the next warmup/measurement run can use it.
-                stream_cursor = _make_stream_cursor(connection)
-
-                conn_wrapper = PlatformAdapterConnection(stream_cursor, self)
-                # Configure benchmark context for query validation
-                conn_wrapper.benchmark_type = "tpcds"
-                conn_wrapper.scale_factor = scale_factor
-                return conn_wrapper
-
-            all_results = []
-
-            # Warm-up runs
-            for i in range(warm_up_iterations):
-                current_stream_id = i  # Start at 0 for warmup
-                console.print(f"[cyan]--- Warm-up Run {i + 1}/{warm_up_iterations} ---[/cyan]")
-                power_test = TPCDSPowerTest(
-                    benchmark=benchmark,
-                    connection_factory=connection_factory,
-                    scale_factor=scale_factor,
-                    seed=seed,
-                    stream_id=current_stream_id,
-                    verbose=verbose,
-                    timeout=timeout,
-                    dialect=self.get_target_dialect(),
-                    query_subset=query_subset,
-                )
-                power_test_result = power_test.run()
-                for query_result in power_test_result.query_results:
-                    platform_result = {
-                        "query_id": query_result["query_id"],
-                        "execution_time_seconds": query_result["execution_time_seconds"],
-                        "status": "SUCCESS" if query_result["success"] else "FAILED",
-                        "rows_returned": query_result.get("result_count", 0),
-                        "test_type": "power",
-                        "stream_id": query_result.get("stream_id", current_stream_id),
-                        "position": query_result.get("position", 0),
-                        "iteration": 0,
-                        "run_type": "warmup",
-                    }
-                    if not query_result["success"]:
-                        platform_result["error"] = query_result.get("error", "Unknown error")
-                    all_results.append(platform_result)
-
-            # Measurement runs
-            for i in range(iterations):
-                current_stream_id = warm_up_iterations + i  # Continue from where warmup left off
-                console.print(f"[cyan]--- Measurement Run {i + 1}/{iterations} ---[/cyan]")
-                power_test = TPCDSPowerTest(
-                    benchmark=benchmark,
-                    connection_factory=connection_factory,
-                    scale_factor=scale_factor,
-                    seed=seed,
-                    stream_id=current_stream_id,
-                    verbose=verbose,
-                    timeout=timeout,
-                    dialect=self.get_target_dialect(),
-                    query_subset=query_subset,
-                )
-
-                # Execute the power test
-                power_test_result = power_test.run()
-
-                # Cache the power test result for metric extraction
-                self._last_power_test_result = power_test_result
-
-                # Display results
-                if self.very_verbose:
-                    with contextlib.suppress(Exception):
-                        console.print(f"[dim]Target dialect: {dialect} | Detailed per-query results:[/dim]")
-                    for qr in power_test_result.query_results:
-                        qname = f"q{qr.get('query_id')}"
-                        dur = qr.get("execution_time_seconds", 0.0)
-                        status = "SUCCESS" if qr.get("success") else "FAILED"
-                        rows = qr.get("result_count", 0)
-                        console.print(f"  • {qname}: {dur:.2f}s, {status}, rows={rows}")
-
-                if power_test_result.success:
-                    success_rate = power_test_result.queries_successful / max(power_test_result.queries_executed, 1)
-                    console.print(
-                        f"[green]✅ TPC-DS Power Test completed: Power@Size = {power_test_result.power_at_size:.2f}[/green]"
-                    )
-                    console.print(
-                        f"  Queries executed: {power_test_result.queries_executed}, Successful: {power_test_result.queries_successful}"
-                    )
-                    console.print(f"  Success rate: {success_rate:.1%}")
-                    console.print(f"  Total execution time: {power_test_result.total_time:.2f}s")
-                else:
-                    console.print("[red]❌ TPC-DS Power Test failed[/red]")
-                    for error in power_test_result.errors:
-                        console.print(f"  Error: {error}")
-
-                # Convert TPCDSPowerTestResult to platform adapter format
-                query_results = []
-                for query_result in power_test_result.query_results:
-                    platform_result = {
-                        "query_id": query_result["query_id"],
-                        "execution_time_seconds": query_result["execution_time_seconds"],
-                        "status": "SUCCESS" if query_result["success"] else "FAILED",
-                        "rows_returned": query_result.get("result_count", 0),
-                        "test_type": "power",
-                        "stream_id": query_result.get("stream_id", current_stream_id),
-                        "position": query_result.get("position", 0),
-                        "iteration": i + 1,  # Add iteration tracking
-                        "run_type": "measurement",
-                    }
-                    if not query_result["success"]:
-                        platform_result["error"] = query_result.get("error", "Unknown error")
-                    query_results.append(platform_result)
-                all_results.extend(query_results)  # Accumulate results from all iterations
-
-                # Abort remaining iterations if all queries failed (connection/infra issue)
-                # or if fail_fast is enabled and any query failed
-                if not power_test_result.success:
-                    if power_test_result.queries_successful == 0:
-                        console.print("[yellow]⚠️  All queries failed - aborting remaining measurement runs[/yellow]")
-                        # If the factory itself failed (no queries ran at all), add a sentinel
-                        # so total_queries > 0 and the benchmark is marked FAILED, not PASSED.
-                        if not query_results:
-                            all_results.append(
-                                {
-                                    "query_id": "power_test_error",
-                                    "execution_time_seconds": 0.0,
-                                    "status": "FAILED",
-                                    "rows_returned": 0,
-                                    "error": "; ".join(power_test_result.errors)
-                                    if power_test_result.errors
-                                    else "Power test failed",
-                                    "test_type": "power",
-                                    "iteration": i + 1,
-                                    "run_type": "measurement",
-                                }
-                            )
-                        break
-                    if fail_fast:
-                        console.print(
-                            "[yellow]⚠️  Query failures detected (fail_fast enabled) - aborting remaining runs[/yellow]"
-                        )
-                        break
-
-            return all_results
-
-        except Exception as e:
-            console.print(f"[red]❌ TPC-DS Power Test failed: {e}[/red]")
-            return [
-                {
-                    "query_id": "power_test_error",
-                    "execution_time_seconds": 0.0,
-                    "status": "FAILED",
-                    "rows_returned": 0,
-                    "error": str(e),
-                    "test_type": "power",
-                }
-            ]
+        return execute_tpcds_power_test(
+            self,
+            benchmark,
+            connection,
+            run_config,
+            make_connection_adapter=self._make_power_connection_adapter,
+            console=quiet_console,
+        )
 
     def _execute_tpcds_throughput_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Execute TPC-DS Throughput Test using production TPCDSThroughputTest implementation."""
@@ -631,6 +331,11 @@ class TestDriversMixin:
                     }
                     if not query_result["success"]:
                         platform_result["error"] = query_result.get("error", "Unknown error")
+                    # Carry the internal _plan_capture_key (and any captured plan
+                    # fields) through to the row _attach_captured_plans sees, so a
+                    # combined power+throughput run matches by exact key instead of
+                    # the ambiguous public-id fallback.
+                    propagate_plan_capture_fields(query_result, platform_result)
                     query_results.append(platform_result)
 
             return query_results
@@ -725,6 +430,11 @@ class TestDriversMixin:
                     }
                     if not qr.get("success"):
                         platform_result["error"] = qr.get("error", "Unknown error")
+                    # Carry the internal _plan_capture_key (and any captured plan
+                    # fields) through to the row _attach_captured_plans sees, so a
+                    # combined power+throughput run matches by exact key instead of
+                    # the ambiguous public-id fallback.
+                    propagate_plan_capture_fields(qr, platform_result)
                     query_results.append(platform_result)
 
             return query_results
@@ -747,6 +457,11 @@ class TestDriversMixin:
         """Execute TPC-DS Maintenance Test using production TPCDSMaintenanceTest implementation."""
 
         from benchbox.core.tpcds.maintenance_test import TPCDSMaintenanceTest
+
+        # Maintenance mutates table cardinalities. Capture any read-phase plans
+        # recorded so far (combined mode: power/throughput) against the current
+        # pre-mutation data state, before this phase changes it.
+        self._plan_capture_checkpoint(connection)
 
         console = quiet_console
 
@@ -835,6 +550,11 @@ class TestDriversMixin:
 
         from benchbox.core.tpch.maintenance_test import TPCHMaintenanceTest
 
+        # Maintenance mutates table cardinalities. Capture any read-phase plans
+        # recorded so far (combined mode: power/throughput) against the current
+        # pre-mutation data state, before this phase changes it.
+        self._plan_capture_checkpoint(connection)
+
         console = quiet_console
 
         try:
@@ -916,7 +636,43 @@ class TestDriversMixin:
             ]
 
     def _execute_queries_by_type(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
-        """Execute queries based on test execution type."""
+        """Execute queries for the requested test type, with isolated plan capture.
+
+        Plan capture is fully isolated from measured execution for EVERY test type
+        (power, throughput, maintenance, combined). For phase-eligible EXPLAIN-based
+        engines, inline capture is suppressed for the entire timed run — the inline
+        chokepoint records each executed query instead — and all plans are captured in
+        a single post-measurement pass on the same connection, strictly after the last
+        timed query and never inside a concurrent stream. This is the canonical
+        contract (see ``benchbox/core/plan_capture_phase.py``); engines that obtain a
+        plan only as a side effect of the measured job keep inline capture.
+        """
+        phase_eligible = (
+            bool(getattr(self, "capture_plans", False))
+            and getattr(self, "plan_capture_phase_eligible", False)
+            and not getattr(self, "dry_run_mode", False)
+        )
+        if not phase_eligible:
+            return self._dispatch_queries_by_type(benchmark, connection, run_config)
+
+        # Isolate capture: record executed queries during the timed run, capture after.
+        # ``_captured_plans`` is the per-run accumulator keyed by capture key; it lets
+        # capture happen in more than one isolated pass (a pre-mutation checkpoint plus
+        # the final pass) while plans are attached to result rows exactly once at the
+        # end. Reset here so a reused adapter never carries plans across runs.
+        self._plan_capture_phase_active = True
+        self._phase_recorded_queries = {}
+        self._captured_plans = {}
+        try:
+            results = self._dispatch_queries_by_type(benchmark, connection, run_config)
+        finally:
+            self._plan_capture_phase_active = False
+
+        self._capture_plans_post_measurement(connection, dict(self._phase_recorded_queries), results)
+        return results
+
+    def _dispatch_queries_by_type(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
+        """Route to the per-test-type driver (no plan-capture concerns)."""
         test_execution_type = run_config.get("test_execution_type", "standard")
 
         if test_execution_type == "power":
@@ -982,13 +738,10 @@ class TestDriversMixin:
         benchmark_name = self._resolve_benchmark_slug(benchmark, run_config)
         benchmark_id = normalize_benchmark_id(benchmark_name)
 
-        if benchmark_id == "tpch":
-            return self._execute_tpch_power_test(benchmark, connection, run_config)
-        elif benchmark_id == "tpcds":
-            return self._execute_tpcds_power_test(benchmark, connection, run_config)
-        else:
-            # Use generic power test handler for non-TPC benchmarks
-            return self._execute_generic_power_test(benchmark, connection, run_config)
+        harness = resolve_power_harness(benchmark_id)
+        if harness is not None:
+            return getattr(self, harness.adapter_method)(benchmark, connection, run_config)
+        return self._execute_generic_power_test(benchmark, connection, run_config)
 
     def _execute_throughput_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Execute TPC Throughput Test with concurrent query streams.
@@ -1006,15 +759,13 @@ class TestDriversMixin:
         benchmark_name = self._resolve_benchmark_slug(benchmark, run_config)
         benchmark_id = normalize_benchmark_id(benchmark_name)
 
-        if benchmark_id == "tpch":
-            return self._execute_tpch_throughput_test(benchmark, connection, run_config)
-        elif benchmark_id == "tpcds":
-            return self._execute_tpcds_throughput_test(benchmark, connection, run_config)
-        else:
-            console.print(f"[yellow]⚠️ Throughput test not supported for benchmark: {benchmark_name}[/yellow]")
-            console.print("[yellow]  Falling back to standard query execution[/yellow]")
-            run_config["_effective_execution_type"] = "power"
-            return self._execute_all_queries(benchmark, connection, run_config)
+        harness = resolve_throughput_harness(benchmark_id)
+        if harness is not None:
+            return getattr(self, harness.adapter_method)(benchmark, connection, run_config)
+        console.print(f"[yellow]⚠️ Throughput test not supported for benchmark: {benchmark_name}[/yellow]")
+        console.print("[yellow]  Falling back to standard query execution[/yellow]")
+        run_config["_effective_execution_type"] = "power"
+        return self._execute_all_queries(benchmark, connection, run_config)
 
     def _execute_maintenance_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Execute TPC Maintenance Test with data maintenance operations."""
@@ -1023,15 +774,13 @@ class TestDriversMixin:
         benchmark_name = self._resolve_benchmark_slug(benchmark, run_config)
         benchmark_id = normalize_benchmark_id(benchmark_name)
 
-        if benchmark_id == "tpch":
-            return self._execute_tpch_maintenance_test(benchmark, connection, run_config)
-        elif benchmark_id == "tpcds":
-            return self._execute_tpcds_maintenance_test(benchmark, connection, run_config)
-        else:
-            console.print(f"[yellow]⚠️ Maintenance test not supported for benchmark: {benchmark_name}[/yellow]")
-            console.print("[yellow]  Falling back to standard query execution[/yellow]")
-            run_config["_effective_execution_type"] = "power"
-            return self._execute_all_queries(benchmark, connection, run_config)
+        harness = resolve_maintenance_harness(benchmark_id)
+        if harness is not None:
+            return getattr(self, harness.adapter_method)(benchmark, connection, run_config)
+        console.print(f"[yellow]⚠️ Maintenance test not supported for benchmark: {benchmark_name}[/yellow]")
+        console.print("[yellow]  Falling back to standard query execution[/yellow]")
+        run_config["_effective_execution_type"] = "power"
+        return self._execute_all_queries(benchmark, connection, run_config)
 
     def _execute_combined_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Execute requested combined TPC phases.
@@ -1047,61 +796,27 @@ class TestDriversMixin:
         benchmark_name = self._resolve_benchmark_slug(benchmark, run_config)
         benchmark_id = normalize_benchmark_id(benchmark_name)
 
-        if benchmark_id == "tpcds":
-            console.print("[blue]Running combined TPC-DS test[/blue]")
-
-            # Execute each test phase
-            all_results = []
-
-            # Phase 1: Power Test
-            if "power" in requested_phases:
-                console.print("[cyan]Phase: Power Test[/cyan]")
-                power_results = self._execute_tpcds_power_test(benchmark, connection, run_config)
-                all_results.extend(power_results)
-
-            # Phase 2: Throughput Test
-            if "throughput" in requested_phases:
-                console.print("[cyan]Phase: Throughput Test[/cyan]")
-                throughput_results = self._execute_tpcds_throughput_test(benchmark, connection, run_config)
-                all_results.extend(throughput_results)
-
-            # Phase 3: Maintenance Test
-            if "maintenance" in requested_phases:
-                console.print("[cyan]Phase: Maintenance Test[/cyan]")
-                maintenance_results = self._execute_tpcds_maintenance_test(benchmark, connection, run_config)
-                all_results.extend(maintenance_results)
-
-            return all_results
-        elif benchmark_id == "tpch":
-            console.print("[blue]Running combined TPC-H test[/blue]")
-
-            # Execute each test phase
-            all_results = []
-
-            # Phase 1: Power Test
-            if "power" in requested_phases:
-                console.print("[cyan]Phase: Power Test[/cyan]")
-                power_results = self._execute_tpch_power_test(benchmark, connection, run_config)
-                all_results.extend(power_results)
-
-            # Phase 2: Throughput Test
-            if "throughput" in requested_phases:
-                console.print("[cyan]Phase: Throughput Test[/cyan]")
-                throughput_results = self._execute_tpch_throughput_test(benchmark, connection, run_config)
-                all_results.extend(throughput_results)
-
-            # Phase 3: Maintenance Test
-            if "maintenance" in requested_phases:
-                console.print("[cyan]Phase: Maintenance Test[/cyan]")
-                maintenance_results = self._execute_tpch_maintenance_test(benchmark, connection, run_config)
-                all_results.extend(maintenance_results)
-
-            return all_results
-        else:
+        combined = resolve_combined_harness(benchmark_id)
+        if combined is None:
             console.print(f"[yellow]⚠️ Combined test not supported for benchmark: {benchmark_name}[/yellow]")
             console.print("[yellow]  Falling back to standard query execution[/yellow]")
             run_config["_effective_execution_type"] = "power"
             return self._execute_all_queries(benchmark, connection, run_config)
+
+        console.print(f"[blue]Running combined {combined.label} test[/blue]")
+
+        # Execute each requested phase in order (power -> throughput -> maintenance).
+        all_results: list[dict[str, Any]] = []
+        phases = (
+            ("power", "Power Test", combined.power_method),
+            ("throughput", "Throughput Test", combined.throughput_method),
+            ("maintenance", "Maintenance Test", combined.maintenance_method),
+        )
+        for phase_key, phase_label, method_name in phases:
+            if phase_key in requested_phases:
+                console.print(f"[cyan]Phase: {phase_label}[/cyan]")
+                all_results.extend(getattr(self, method_name)(benchmark, connection, run_config))
+        return all_results
 
     def _get_runtime_platform_version(self, connection: Any | None) -> str | None:
         """Return the current platform version for version-gated compat rules."""
@@ -1150,6 +865,8 @@ class TestDriversMixin:
                     return benchmark.get_queries(**query_kwargs)
                 else:
                     return benchmark.get_queries()
+            except SQLTranslationError:
+                raise
             except Exception:
                 return benchmark.get_queries()
         return benchmark.get_queries()
@@ -1274,14 +991,39 @@ class TestDriversMixin:
         op_kwargs["platform_key"] = self.get_target_dialect()
         op_kwargs["platform_name"] = self.platform_name
 
+        # Adapter SQL preprocessing (e.g. bulk-load rewrites) is threaded through as
+        # sql_override so execute_operation runs the rewritten statement.
+        operation = None
         if hasattr(self, "preprocess_operation_sql") and hasattr(benchmark, "get_operation"):
-            operation = benchmark.get_operation(str(query_id))
+            with contextlib.suppress(Exception):
+                operation = benchmark.get_operation(str(query_id))
+        if operation is not None:
             preprocessed = self.preprocess_operation_sql(str(query_id), operation)
             if preprocessed is not None:
                 op_kwargs["sql_override"] = preprocessed
 
         op_result = benchmark.execute_operation(query_id, connection, **op_kwargs)
         op_status = getattr(op_result, "status", None) or ("SUCCESS" if op_result.success else "FAILED")
+
+        # Record the SQL the operation ACTUALLY executed for deferred plan capture, so
+        # write/transaction primitives get structural plans under --capture-plans.
+        # execute_operation exposes the final statement (after platform overrides,
+        # dialect rewrites, and placeholder replacement) as ``executed_sql``; we never
+        # fall back to the catalog-default ``operation.write_sql``, which can differ
+        # from what ran (e.g. ON CONFLICT -> INSERT OR IGNORE on sqlite/duckdb) and
+        # would make the post-measurement phase EXPLAIN a wrong/dialect-incompatible
+        # statement. Operations bypass execute_query()/_merge_plan_capture_into_result(),
+        # so this mirrors that chokepoint's phase-recording (SUCCESS only, under the
+        # shared lock since throughput streams run concurrently).
+        phase_active = getattr(self, "_plan_capture_phase_active", False)
+        executed_sql = getattr(op_result, "executed_sql", None)
+        plan_capture_key = None
+        if phase_active and op_status == "SUCCESS" and executed_sql:
+            from benchbox.platforms.base.result_capture import _plan_capture_key
+
+            plan_capture_key = _plan_capture_key(query_id, executed_sql)
+            with self._plan_capture_lock:
+                self._phase_recorded_queries.setdefault(plan_capture_key, executed_sql)
 
         result: dict[str, Any] = {
             "query_id": str(query_id),
@@ -1293,6 +1035,8 @@ class TestDriversMixin:
             "validation_passed": op_result.validation_passed,
             "cleanup_time": op_result.cleanup_duration_ms / 1000.0,
         }
+        if plan_capture_key is not None:
+            result["_plan_capture_key"] = plan_capture_key
         if op_result.skip_reason:
             result["skip_reason"] = op_result.skip_reason
         return result
@@ -1379,6 +1123,12 @@ class TestDriversMixin:
         if hasattr(signal, "SIGTERM"):
             original_sigterm = signal.signal(signal.SIGTERM, signal_handler)
 
+        # Plan capture isolation is handled centrally by _execute_queries_by_type
+        # (it records executed queries during the timed loop and runs a single
+        # post-measurement capture phase for every test type). This loop only
+        # executes the timed queries; for phase-eligible engines the inline capture
+        # chokepoint records instead of running EXPLAIN, so nothing extra is needed
+        # here.
         try:
             console.print(
                 f"[cyan]Running {total_queries} {benchmark_name} queries. Press Ctrl+C to cancel (will stop after current query).[/cyan]"
@@ -1429,6 +1179,166 @@ class TestDriversMixin:
         self._log_execution_summary(results, total_queries, cancelled)
 
         return results
+
+    def _capture_plans_post_measurement(
+        self,
+        connection: Any,
+        queries: dict[str, str],
+        results: list[dict[str, Any]],
+    ) -> None:
+        """Capture query plans in an isolated pass after the timed run.
+
+        Driven by ``_execute_queries_by_type`` for EVERY test type (power,
+        throughput, maintenance, combined): ``queries`` is the set of distinct
+        executed queries recorded by the inline chokepoint during the timed run
+        (``_phase_recorded_queries``), so the capture covers exactly what ran and
+        fires once per distinct query — never inside a concurrent stream.
+
+        Runs ``run_plan_capture_phase`` for the successfully-executed queries on
+        the *measurement* connection, strictly after all timed queries have run,
+        then merges ``query_plan`` / ``plan_fingerprint`` / ``plan_capture_time_ms``
+        into every result row sharing that ``query_id`` (a throughput run has one
+        row per stream for the same query).
+
+        The measurement connection is reused (rather than a fresh one) so embedded
+        in-memory engines still see the loaded data; isolation comes from running
+        post-measurement, not from a separate connection.
+
+        The phase honours the adapter's ``analyze_plans`` (the canonical, and only,
+        capture knob): with ``analyze_plans=True`` (the default) each SELECT is
+        re-run once with EXPLAIN ANALYZE for full execution detail — strictly after
+        the timed loop, so measured timing is unaffected — while DML/write-DDL is
+        downgraded to a non-ANALYZE EXPLAIN by the ``is_dml_query`` guard in
+        ``get_query_plan`` and is therefore never re-executed. With
+        ``analyze_plans=False`` the phase captures the static (structural) plan
+        only. Previously the phase hard-coded structural-only and silently dropped
+        ANALYZE timing for ``--capture-plans``; honouring ``analyze_plans`` restores
+        the one knob the canonical contract defines.
+
+        The ``plan_query_filter`` query-selection set (``--plan-queries``) is still
+        honoured; the per-iteration / per-stream sampling machinery
+        (``plan_first_n`` / ``plan_sampling_rate``) has been retired.
+
+        Capture and attachment are split: :meth:`_capture_recorded_plans` runs the
+        isolated EXPLAIN pass and accumulates plans by capture key, while
+        :meth:`_attach_captured_plans` merges them into the result rows. This lets a
+        workload that mutates data mid-run capture its read-phase plans earlier, at a
+        pre-mutation checkpoint (:meth:`_plan_capture_checkpoint`), so a captured plan
+        always reflects the data state its query was measured against rather than the
+        post-mutation end state — while still attaching every plan exactly once here.
+
+        ``results`` is accepted for backward compatibility but capture is driven by
+        ``queries`` (the recorded-query buffer), which is already SUCCESS-only.
+        """
+        self._capture_recorded_plans(connection, queries)
+        self._attach_captured_plans(results)
+
+    def _capture_recorded_plans(self, connection: Any, queries: dict[str, str]) -> None:
+        """Run the isolated EXPLAIN pass for not-yet-captured recorded queries.
+
+        ``queries`` is the recorded-query buffer (``_phase_recorded_queries``),
+        keyed by capture key (``<public_id>#<sql_digest>``) and populated only for
+        queries that SUCCEEDED during the timed run. Capture is buffer-driven rather
+        than results-driven because the TPC power/throughput drivers rebuild their
+        result rows and drop the internal capture key — so a results-driven selection
+        would silently capture nothing for them. Each not-yet-captured key is
+        EXPLAINed exactly once and stored in the per-run ``_captured_plans``
+        accumulator; a key captured by an earlier pass (a pre-mutation checkpoint) is
+        skipped, so its plan reflects the data state present at its FIRST capture.
+        """
+        from benchbox.core.plan_capture_phase import run_plan_capture_phase
+
+        captured = self._ensure_plan_capture_accumulator()
+        pending = {key: sql for key, sql in queries.items() if key not in captured}
+        if not pending:
+            return
+
+        phase = run_plan_capture_phase(
+            self,
+            pending,
+            connection=connection,
+            analyze_plans=getattr(self, "analyze_plans", True),
+        )
+
+        for capture_key in pending:
+            captured[capture_key] = _CapturedPlan(
+                plan=phase.plans.get(capture_key),
+                fingerprint=phase.fingerprints.get(capture_key),
+                capture_ms=phase.per_query_capture_ms.get(capture_key),
+                normalized_fingerprint=phase.normalized_fingerprints.get(capture_key),
+            )
+
+    def _attach_captured_plans(self, results: list[dict[str, Any]]) -> None:
+        """Merge accumulated captured plans into result rows.
+
+        Per-row SUCCESS guard mirrors the inline capture chokepoint: a captured plan
+        is attached only to rows whose own status succeeded; a failed row sharing a
+        query_id must never be annotated as plan-captured (it would skew downstream
+        plan stats). The internal ``_plan_capture_key`` is popped from every row.
+
+        A row is matched to its captured plan by exact capture key when it carries
+        one (the standard ``_execute_all_queries`` path), else by its public
+        query_id — the TPC power/throughput drivers rebuild result rows without the
+        capture key, leaving only the bare id. The public-id fallback attaches a plan
+        only when that id maps to a single captured variant; a query_id that ran as
+        multiple distinct SQL variants (e.g. seed-varied throughput streams) is left
+        unattached rather than risk pairing a row with another variant's plan.
+        """
+        from benchbox.platforms.base.result_capture import _plan_capture_public_id
+
+        captured = self._ensure_plan_capture_accumulator()
+
+        # Public-id -> the single captured variant for that id, or None when the id
+        # ran as several distinct variants (ambiguous: do not guess which row ran which).
+        by_public_id: dict[str, _CapturedPlan | None] = {}
+        for capture_key, entry in captured.items():
+            public_id = _plan_capture_public_id(capture_key)
+            by_public_id[public_id] = None if public_id in by_public_id else entry
+
+        for result in results:
+            if result.get("status") != "SUCCESS":
+                result.pop("_plan_capture_key", None)
+                continue
+            query_id = str(result.get("query_id"))
+            row_key = result.pop("_plan_capture_key", None)
+            entry = captured.get(str(row_key)) if row_key else by_public_id.get(query_id)
+            if entry is None:
+                continue
+            if entry.plan is not None:
+                entry.plan.query_id = query_id
+                result["query_plan"] = entry.plan
+                result["plan_fingerprint"] = entry.fingerprint
+                if entry.normalized_fingerprint is not None:
+                    result["plan_fingerprint_normalized"] = entry.normalized_fingerprint
+            if entry.capture_ms is not None:
+                result["plan_capture_time_ms"] = entry.capture_ms
+
+    def _ensure_plan_capture_accumulator(self) -> dict[str, _CapturedPlan]:
+        """Return the per-run captured-plan accumulator, creating it if absent.
+
+        ``_execute_queries_by_type`` resets this at the start of every run; the lazy
+        fallback here keeps direct callers of ``_capture_plans_post_measurement``
+        (tests, bespoke pipelines) working without going through that wrapper.
+        """
+        captured = getattr(self, "_captured_plans", None)
+        if captured is None:
+            captured = {}
+            self._captured_plans = captured
+        return captured
+
+    def _plan_capture_checkpoint(self, connection: Any) -> None:
+        """Capture recorded plans now, before a subsequent data-mutating phase.
+
+        No-op unless the isolated capture phase is active (so it never fires for
+        non-eligible adapters or read-only inline capture). Captures the read-phase
+        plans recorded so far against the current pre-mutation data state so they are
+        not later EXPLAINed against post-mutation cardinalities (the combined-mode
+        divergence). Attachment still happens once, in the final post-measurement
+        pass; this only fixes *when* each read plan is captured.
+        """
+        if not getattr(self, "_plan_capture_phase_active", False):
+            return
+        self._capture_recorded_plans(connection, dict(self._phase_recorded_queries))
 
     # -------------------------------------------------------------------------
     # Dry-run and SQL capture helpers (extracted w9)

@@ -357,6 +357,8 @@ class TestExecuteOperation:
         assert result.status == "SKIPPED"
         assert result.success is True
         assert result.validation_passed is True
+        assert result.error is None
+        assert "unsupported on platform 'datafusion'" in (result.skip_reason or "")
         mock_conn.execute.assert_not_called()
 
     def test_execute_operation_skips_postgres_bulk_load_operation(self, wp_benchmark, monkeypatch):
@@ -402,6 +404,42 @@ class TestExecuteOperation:
         assert result.error is None
         assert "MERGE" in (result.skip_reason or "")
         mock_conn.execute.assert_not_called()
+
+    def test_execute_operation_skips_duckdb_merge_gap(self, wp_benchmark, monkeypatch):
+        """DuckDB 1.3.2 does not accept the write-primitives MERGE catalog."""
+        mock_conn = Mock()
+        mock_conn.execute = Mock()
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("merge_simple_upsert_small", mock_conn, platform_key="duckdb")
+
+        assert result.status == "SKIPPED"
+        assert result.success is True
+        assert result.error is None
+        assert "MERGE" in (result.skip_reason or "")
+        mock_conn.execute.assert_not_called()
+
+    def test_scd2_merge_category_ops_are_not_skipped_on_duckdb(self, wp_benchmark):
+        """SCD Type 2 ops keep the ``merge`` category for taxonomy/reporting but
+        are portable UPDATE/INSERT, so DuckDB must NOT skip them under the
+        category-wide MERGE gap. Otherwise a real ``platform_key='duckdb'`` run
+        reports them skipped and loses the coverage the catalog adds (they run
+        fine when ``execute_operation`` is called without a platform key)."""
+        for op_id in (
+            "merge_scd_type2_basic",
+            "merge_scd_type2_no_change",
+            "merge_scd_type2_new_keys_only",
+        ):
+            operation = wp_benchmark.get_operation(op_id)
+            assert operation.category == "merge"  # still classified under merge
+            effective_sql, skip_reason = wp_benchmark._get_effective_write_sql(operation, platform_key="duckdb")
+            assert skip_reason is None, f"{op_id} was wrongly skipped on DuckDB: {skip_reason}"
+            assert effective_sql, f"{op_id} returned no effective SQL"
+
+        # A genuine MERGE-statement op in the same category is still skipped.
+        merge_op = wp_benchmark.get_operation("merge_simple_upsert_small")
+        _, merge_skip = wp_benchmark._get_effective_write_sql(merge_op, platform_key="duckdb")
+        assert merge_skip is not None and "MERGE" in merge_skip
 
     def test_execute_operation_uses_platform_override_when_available(self, wp_benchmark, monkeypatch):
         """Platform override SQL should be used instead of base write_sql."""
@@ -1348,6 +1386,13 @@ def test_get_schema_returns_normalized_dict(fast_bench):
         assert "columns" in table_def or isinstance(table_def, dict)
 
 
+def test_get_schema_excludes_operation_created_sketch_tables(fast_bench):
+    schema = fast_bench.get_schema()
+
+    assert "sketch_ops_daily_users" not in schema
+    assert "sketch_ops_topk" not in schema
+
+
 # ---------------------------------------------------------------------------
 # get_benchmark_info() (line 878 etc.)
 # ---------------------------------------------------------------------------
@@ -1374,6 +1419,20 @@ def test_get_queries_returns_all(fast_bench):
     queries = fast_bench.get_queries()
     assert isinstance(queries, dict)
     assert len(queries) > 0
+
+
+def test_default_sql_operations_exclude_sketch_category(fast_bench):
+    operations = fast_bench.get_all_operations()
+
+    assert "sketch_query_theta_union_merge" not in operations
+    assert all(operation.category != "sketch" for operation in operations.values())
+
+
+def test_get_query_allows_explicit_sql_sketch_operation(fast_bench):
+    result = fast_bench.get_query("sketch_query_theta_union_merge")
+
+    assert isinstance(result, str)
+    assert "sketch_ops_daily_users" in result
 
 
 def test_get_queries_by_category_returns_subset(fast_bench):
@@ -1526,6 +1585,150 @@ def test_get_effective_write_sql_no_overrides(fast_bench):
     sql, skip = fast_bench._get_effective_write_sql(operation)
     assert sql == "INSERT INTO t VALUES (1)"
     assert skip is None
+
+
+def test_get_effective_write_sql_duckdb_skips_merge_into(fast_bench):
+    """DuckDB 1.3.2 rejects MERGE INTO, so such ops are gated out by the SQL token."""
+    operation = SimpleNamespace(
+        id="merge_simple_upsert_small",
+        write_sql="MERGE INTO t AS target USING s ON t.k = s.k WHEN MATCHED THEN UPDATE SET v = s.v",
+        platform_overrides={},
+        category="merge",
+    )
+    sql, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb")
+    assert sql is None
+    assert skip is not None
+    assert "MERGE INTO" in skip
+
+
+def test_get_effective_write_sql_duckdb_runs_portable_merge(fast_bench):
+    """Portable merge ops (UPDATE + INSERT, no MERGE INTO) run on DuckDB despite the merge category.
+
+    The skip is gated on the ``MERGE INTO`` token, not on the broad ``merge`` category, so portable
+    SCD Type 2 style ops are not skipped.
+    """
+    operation = SimpleNamespace(
+        id="merge_scd_type2_basic",
+        write_sql="UPDATE dim SET is_current = false WHERE k IN (SELECT k FROM stage);\nINSERT INTO dim SELECT * FROM stage",
+        platform_overrides={},
+        category="merge",
+    )
+    sql, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb")
+    assert skip is None
+    assert sql == operation.write_sql
+
+
+class _FakeCountConnection:
+    """Minimal connection stand-in: SELECT COUNT(*) FROM <table> returns a canned count."""
+
+    def __init__(self, counts_by_table: dict[str, int]):
+        self._counts_by_table = counts_by_table
+
+    def execute(self, sql: str):
+        for table, count in self._counts_by_table.items():
+            if table in sql:
+                return SimpleNamespace(fetchone=lambda count=count: (count,))
+        raise RuntimeError(f"unexpected query in fake connection: {sql}")
+
+
+def test_get_effective_write_sql_skips_scd2_when_customer_staging_is_empty(fast_bench):
+    """A minimal fixture (orders/lineitem only, no customer) leaves
+    scd2_ops_dim_customer/scd2_ops_stage_customer empty; is_setup() still reports
+    True since those tables are not REQUIRED, so without this guard the SCD2 op
+    would execute its UPDATE/INSERT and anti-join validations against empty
+    tables and trivially report SUCCESS - corrupting coverage rather than
+    surfacing that the prerequisite is missing."""
+    operation = fast_bench.get_operation("merge_scd_type2_basic")
+    empty_connection = _FakeCountConnection({"scd2_ops_dim_customer": 0, "scd2_ops_stage_customer": 0})
+
+    sql, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb", connection=empty_connection)
+
+    assert sql is None
+    assert skip is not None
+    assert "empty" in skip.lower()
+    assert "scd2_ops_dim_customer" in skip or "scd2_ops_stage_customer" in skip
+
+
+def test_get_effective_write_sql_runs_scd2_when_customer_staging_is_populated(fast_bench):
+    """The common case (full 8-table load): staging tables are non-empty, op runs."""
+    operation = fast_bench.get_operation("merge_scd_type2_basic")
+    populated_connection = _FakeCountConnection({"scd2_ops_dim_customer": 40, "scd2_ops_stage_customer": 10})
+
+    sql, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb", connection=populated_connection)
+
+    assert skip is None
+    assert sql == operation.write_sql
+
+
+def test_get_effective_write_sql_without_connection_does_not_check_staging_population(fast_bench):
+    """No connection supplied (e.g. a direct unit-test call) -> the emptiness check
+    is skipped rather than blocking, matching the existing tests in this file that
+    call _get_effective_write_sql with no connection at all."""
+    operation = fast_bench.get_operation("merge_scd_type2_basic")
+
+    sql, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb")
+
+    assert skip is None
+    assert sql == operation.write_sql
+
+
+def test_get_effective_write_sql_empty_supplier_staging_skips_gdpr_delete(fast_bench):
+    """The same emptiness guard covers delete_ops_supplier (GDPR deletion ops),
+    not just SCD2 - both are keyed in _OPTIONAL_WHEN_SOURCE_MISSING because both
+    lose their source table (supplier / customer) on a minimal fixture."""
+    operation = SimpleNamespace(
+        id="delete_gdpr_suppliers_5pct",
+        write_sql="DELETE FROM delete_ops_supplier WHERE s_suppkey <= 5",
+        platform_overrides={},
+        category="delete",
+    )
+    empty_connection = _FakeCountConnection({"delete_ops_supplier": 0})
+
+    sql, skip = fast_bench._get_effective_write_sql(operation, connection=empty_connection)
+
+    assert sql is None
+    assert skip is not None
+    assert "delete_ops_supplier" in skip
+
+
+def test_get_effective_write_sql_duckdb_gate_matches_catalog(fast_bench):
+    """The real catalog: portable SCD2 ops run on DuckDB while legacy MERGE INTO ops skip."""
+    portable_ops = (
+        "merge_scd_type2_basic",
+        "merge_scd_type2_no_change",
+        "merge_scd_type2_new_keys_only",
+    )
+    for op_id in portable_ops:
+        operation = fast_bench.get_operation(op_id)
+        assert operation.category == "merge"
+        assert "MERGE INTO" not in operation.write_sql.upper()
+        _, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb")
+        assert skip is None, f"{op_id} should run on DuckDB, got skip: {skip}"
+
+    legacy = fast_bench.get_operation("merge_simple_upsert_small")
+    assert "MERGE INTO" in legacy.write_sql.upper()
+    _, legacy_skip = fast_bench._get_effective_write_sql(legacy, platform_key="duckdb")
+    assert legacy_skip is not None
+    assert "MERGE INTO" in legacy_skip
+
+
+def test_get_effective_write_sql_skips_when_file_dependencies_missing(fast_bench, tmp_path):
+    """Bulk-load operations should be skipped when required files are unavailable."""
+    fast_bench.data_generator.files_dir = tmp_path
+    operation = SimpleNamespace(
+        id="bulk_load_csv_small_uncompressed",
+        write_sql="COPY bulk_load_ops_target FROM 'unused';",
+        platform_overrides={},
+        category="bulk_load",
+        file_dependencies=["csv_small_1k.csv", "csv_missing.csv"],
+    )
+
+    sql, skip = fast_bench._get_effective_write_sql(operation)
+
+    assert sql is None
+    assert skip is not None
+    assert "csv_small_1k.csv" in skip
+    assert "csv_missing.csv" in skip
 
 
 # ---------------------------------------------------------------------------

@@ -249,9 +249,9 @@ The support matrix separates catalog support from live verification. Cloud verif
 
 [^8]: Snowflake, [`APPROX_TOP_K_ACCUMULATE`](https://docs.snowflake.com/en/sql-reference/functions/approx_top_k_accumulate), accessed May 18, 2026.
 
-[^9]: BigQuery, [HyperLogLog++ functions](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions), accessed May 18, 2026.
+[^9]: BigQuery, [HyperLogLog++ functions](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions), accessed May 18, 2026.
 
-[^10]: BigQuery, [KLL quantile functions](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions), accessed May 18, 2026.
+[^10]: BigQuery, [KLL quantile functions](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions), accessed May 18, 2026.
 
 [^11]: ClickHouse, ["Using Aggregate Combinators in ClickHouse"](https://clickhouse.com/blog/aggregate-functions-combinators-in-clickhouse-for-arrays-maps-and-states), accessed May 18, 2026.
 

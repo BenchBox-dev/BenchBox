@@ -21,7 +21,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.benchmark_mixins import DataGenerationMixin
 from benchbox.core.query_catalog_base import QuerySkippedError, TranslatableQueryMixin
 from benchbox.core.utils.tuning import extract_constraint_flags
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 DEFAULT_DIMENSIONS = 128
 
 
-class VectorSearchBenchmark(TranslatableQueryMixin, DataGenerationMixin, BaseBenchmark):
+class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, DataGenerationMixin, BaseBenchmark):
     """Vector search benchmark implementation.
 
     Tests similarity-search performance across OLAP databases that support
@@ -345,7 +345,7 @@ class VectorSearchBenchmark(TranslatableQueryMixin, DataGenerationMixin, BaseBen
 # Register benchmark-specific CLI option specs
 # ---------------------------------------------------------------------------
 
-from benchbox.cli.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
     parse_int,

@@ -14,7 +14,7 @@ from benchbox.core.results.builder import (
     normalize_benchmark_id,
 )
 from benchbox.core.results.platform_info import PlatformInfoInput
-from benchbox.core.results.query_normalizer import QueryResultInput
+from benchbox.core.results.query_normalizer import QueryResultInput, normalize_query_result
 
 pytestmark = [
     pytest.mark.unit,
@@ -367,6 +367,34 @@ class TestResultBuilder:
         assert qr["iteration"] == 2
         assert qr["stream_id"] == 1
 
+    def test_query_results_format_includes_plan_capture_error(self) -> None:
+        """A DataFrame plan-capture failure's real cause (qpc-05 / F4.4) must
+        reach the persisted query row, not just the companion errors list."""
+        builder = self.create_builder()
+        builder.add_query_result(
+            QueryResultInput(
+                query_id="1",
+                execution_time_seconds=1.5,
+                rows_returned=100,
+                status="SUCCESS",
+                plan_capture_error="TypeError: unsupported operand",
+            )
+        )
+
+        result = builder.build()
+        qr = result.query_results[0]
+
+        assert qr["plan_capture_error"] == "TypeError: unsupported operand"
+
+    def test_query_results_format_omits_plan_capture_error_when_none(self) -> None:
+        builder = self.create_builder()
+        builder.add_query_result(self.create_query_result("1", 1.0, 100))
+
+        result = builder.build()
+        qr = result.query_results[0]
+
+        assert "plan_capture_error" not in qr
+
     def test_platform_info_dict_format(self) -> None:
         """Test that platform_info dict is formatted correctly."""
         builder = ResultBuilder(
@@ -389,6 +417,43 @@ class TestResultBuilder:
         assert result.platform_info["execution_mode"] == "sql"
         assert result.platform_info["connection_mode"] == "in-memory"
         assert result.platform_info["configuration"] == {"threads": 4}
+
+    def test_build_preserves_test_type_through_real_pipeline(self) -> None:
+        """test_type must survive the REAL production pipeline: raw platform-adapter
+        dict -> normalize_query_result -> ResultBuilder.add_query_result -> build()
+        -> BenchmarkResults.query_results. This is the phase discriminator
+        build_plans_payload uses to disambiguate a power row and a throughput row
+        sharing the same query_id/stream_id in a combined run; a synthetic
+        QueryResultInput built directly (bypassing normalize_query_result) would
+        hide a regression where the raw dict's "test_type" key gets silently
+        dropped at the normalization boundary."""
+        power_raw = {
+            "query_id": "Q6",
+            "execution_time_seconds": 1.0,
+            "rows_returned": 10,
+            "status": "SUCCESS",
+            "stream_id": 0,
+            "test_type": "power",
+        }
+        throughput_raw = {
+            "query_id": "Q6",
+            "execution_time_seconds": 2.0,
+            "rows_returned": 10,
+            "status": "SUCCESS",
+            "stream_id": 0,
+            "test_type": "throughput",
+        }
+
+        builder = self.create_builder()
+        builder.add_query_result(normalize_query_result(power_raw))
+        builder.add_query_result(normalize_query_result(throughput_raw))
+
+        result = builder.build()
+
+        assert len(result.query_results) == 2
+        power_row, throughput_row = result.query_results
+        assert power_row["test_type"] == "power"
+        assert throughput_row["test_type"] == "throughput"
 
 
 class TestBuildBenchmarkResults:

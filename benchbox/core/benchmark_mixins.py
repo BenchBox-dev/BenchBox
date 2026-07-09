@@ -168,6 +168,7 @@ class CursorValidationQueryExecutionMixin:
     _REQUIRED_METHODS = ("log_verbose", "log_very_verbose", "_build_query_result_with_validation")
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Validate that concrete consumers provide the cursor execution hooks."""
         super().__init_subclass__(**kwargs)
         # Skip enforcement on intermediate mixins that aren't concrete adapters.
         # Concrete adapters will be checked when they are defined.

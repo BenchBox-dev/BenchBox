@@ -674,6 +674,8 @@ class TestRunOfficialCommandBranches:
                 catch_exceptions=False,
             )
         assert "deprecated" in result.output.lower() or "DeprecationWarning" in result.output
+        assert "validate_results" not in mock_run.call_args.kwargs
+        assert mock_run.call_args.kwargs["validation"] is None
 
     def test_tpc_allowed_scale_factors_constant(self):
         from benchbox.cli.commands.run_official import TPC_ALLOWED_SCALE_FACTORS
@@ -692,6 +694,8 @@ class TestRunOfficialCommandBranches:
         assert "seed" in result.output.lower() or "not TPC-compliant" in result.output
 
     def test_validate_results_forwarded(self):
+        from benchbox.cli.composite_params import ValidationConfig
+
         runner = CliRunner()
         with patch.object(_run_official_module, "run") as mock_run:
             mock_run.return_value = None
@@ -712,8 +716,15 @@ class TestRunOfficialCommandBranches:
                 ],
                 catch_exceptions=False,
             )
-        # deprecated command still runs; just verify it didn't crash unexpectedly
-        assert result.exit_code in (0, 1)
+        assert result.exit_code == 0
+        assert "validate_results" not in mock_run.call_args.kwargs
+        validation = mock_run.call_args.kwargs["validation"]
+        assert isinstance(validation, ValidationConfig)
+        assert validation.mode == "exact"
+        assert validation.preflight is True
+        assert validation.postgen is True
+        assert validation.postload is True
+        assert validation.check_platforms is True
 
 
 if __name__ == "__main__":

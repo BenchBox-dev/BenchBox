@@ -24,6 +24,30 @@ BenchBox includes a three-tier integrity validator for benchmark result JSON fil
 - **Specs are hardcoded** from DuckDB SF1 reference runs, not dynamically imported from benchmark modules (avoids transitive import issues)
 - **Two severity levels**: FAIL (mathematical impossibility / corruption) and WARN (suspicious but plausible)
 - **Skipped checks emit PASS** with a "skipped" message so check counts remain consistent across benchmarks
+- **Unchecked validation is not a pass**: `summary.validation` values of `not_run`, `not_validated`, `unknown`, or `uncertain` are non-clean publication/ranking states even when all queries succeeded
+
+## Validation Status Semantics
+
+`summary.validation` is a public correctness signal, not a generic run-success
+flag. Query success and validation success are separate claims:
+
+| Status | Meaning | Clean publication/ranking status |
+|---|---|---|
+| `passed` | Validation ran and did not find failures. | Yes |
+| `warnings` | Validation ran but emitted warnings. | Consumer-specific; do not treat as stronger than the recorded warnings. |
+| `failed`, `partial`, `interrupted`, `error` | Validation or execution found a non-clean condition. | No |
+| `not_run`, `not_validated`, `unknown` | No validation evidence was recorded. | No |
+| `uncertain` | A run completed, but translation fallback or equivalent uncertainty prevents a clean correctness claim. | No |
+
+Lifecycle finalization converts default `PASSED` placeholders to `NOT_RUN` when
+no validation records or validation details exist. SQL translation fallback is
+recorded under `execution.translation`; if fallback occurred and the result
+otherwise looked clean, the lifecycle marks `summary.validation` as `uncertain`.
+Strict translation mode is available through CLI `--strict-translation` or
+runtime options (`strict_translation=true`, `translation_strict=true`, or
+`sql_translation_strict=true`) for CI, publishing, and compatibility gates that
+should fail closed. Public submission and publishing gates also reject
+`execution.translation.status` values of `fallback` or `failed`.
 
 ## Three-Tier Validation Model
 

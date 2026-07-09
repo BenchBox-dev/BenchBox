@@ -1,0 +1,178 @@
+# Databricks TPC-DS Liquid AUTO Tuned Configuration
+# Renders the shared logical TPC profile through Databricks Liquid Clustering AUTO.
+
+primary_keys:
+  enabled: true
+  enforce_uniqueness: true
+  nullable: false
+
+foreign_keys:
+  enabled: true
+  enforce_referential_integrity: true
+  on_delete_action: CASCADE
+  on_update_action: RESTRICT
+
+unique_constraints:
+  enabled: true
+  ignore_nulls: false
+
+check_constraints:
+  enabled: true
+  enforce_on_insert: true
+  enforce_on_update: true
+
+platform_optimizations:
+  z_ordering_enabled: false
+  z_ordering_columns: []
+  liquid_clustering_enabled: true
+  liquid_clustering_columns: []
+  databricks_clustering_strategy: liquid_clustering_auto
+  physical_rendering_id: databricks_liquid_auto
+  auto_optimize_enabled: true
+  auto_compact_enabled: true
+  materialized_views_enabled: true
+
+table_tunings:
+  STORE_SALES:
+    table_name: STORE_SALES
+    clustering:
+    - name: SS_SOLD_DATE_SK
+      type: INTEGER
+      order: 1
+    - name: SS_ITEM_SK
+      type: INTEGER
+      order: 2
+    - name: SS_CUSTOMER_SK
+      type: INTEGER
+      order: 3
+    - name: SS_STORE_SK
+      type: INTEGER
+      order: 4
+    - name: SS_PROMO_SK
+      type: INTEGER
+      order: 5
+    - name: SS_TICKET_NUMBER
+      type: INTEGER
+      order: 6
+
+  STORE_RETURNS:
+    table_name: STORE_RETURNS
+    clustering:
+    - name: SR_RETURNED_DATE_SK
+      type: INTEGER
+      order: 1
+    - name: SR_ITEM_SK
+      type: INTEGER
+      order: 2
+    - name: SR_CUSTOMER_SK
+      type: INTEGER
+      order: 3
+    - name: SR_STORE_SK
+      type: INTEGER
+      order: 4
+    - name: SR_TICKET_NUMBER
+      type: INTEGER
+      order: 5
+
+  CATALOG_SALES:
+    table_name: CATALOG_SALES
+    clustering:
+    - name: CS_SOLD_DATE_SK
+      type: INTEGER
+      order: 1
+    - name: CS_ITEM_SK
+      type: INTEGER
+      order: 2
+    - name: CS_SHIP_MODE_SK
+      type: INTEGER
+      order: 3
+
+  CATALOG_RETURNS:
+    table_name: CATALOG_RETURNS
+    clustering:
+    - name: CR_RETURNED_DATE_SK
+      type: INTEGER
+      order: 1
+    - name: CR_ITEM_SK
+      type: INTEGER
+      order: 2
+
+  WEB_SALES:
+    table_name: WEB_SALES
+    clustering:
+    - name: WS_SOLD_DATE_SK
+      type: INTEGER
+      order: 1
+    - name: WS_ITEM_SK
+      type: INTEGER
+      order: 2
+    - name: WS_WEB_PAGE_SK
+      type: INTEGER
+      order: 3
+    - name: WS_WEB_SITE_SK
+      type: INTEGER
+      order: 4
+    - name: WS_SHIP_MODE_SK
+      type: INTEGER
+      order: 5
+
+  WEB_RETURNS:
+    table_name: WEB_RETURNS
+    clustering:
+    - name: WR_RETURNED_DATE_SK
+      type: INTEGER
+      order: 1
+    - name: WR_ITEM_SK
+      type: INTEGER
+      order: 2
+
+  DATE_DIM:
+    table_name: DATE_DIM
+    clustering:
+    - name: D_DATE_SK
+      type: INTEGER
+      order: 1
+    - name: D_YEAR
+      type: INTEGER
+      order: 2
+    - name: D_MOY
+      type: INTEGER
+      order: 3
+
+  ITEM:
+    table_name: ITEM
+    clustering:
+    - name: I_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: I_CATEGORY
+      type: VARCHAR
+      order: 2
+    - name: I_CLASS
+      type: VARCHAR
+      order: 3
+
+  CUSTOMER:
+    table_name: CUSTOMER
+    clustering:
+    - name: C_CUSTOMER_SK
+      type: INTEGER
+      order: 1
+    - name: C_CURRENT_ADDR_SK
+      type: INTEGER
+      order: 2
+    - name: C_CURRENT_CDEMO_SK
+      type: INTEGER
+      order: 3
+
+_metadata:
+  version: '2.0'
+  format: unified_tuning
+  database: databricks
+  benchmark: tpcds
+  configuration_type: tuned
+  logical_tuning_profile_id: tpc-v1
+  physical_rendering_id: databricks_liquid_auto
+  description: "Databricks TPC-DS Liquid AUTO rendering of the platform-neutral TPC tuning profile"
+  created: '2026-05-26'
+  generated_by: benchbox-project

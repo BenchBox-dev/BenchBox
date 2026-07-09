@@ -1,0 +1,68 @@
+[
+    {
+        "name": "TOP_N",
+        "children": [
+            {
+                "name": "HASH_GROUP_BY",
+                "children": [
+                    {
+                        "name": "PROJECTION",
+                        "children": [
+                            {
+                                "name": "HASH_JOIN",
+                                "children": [
+                                    {
+                                        "name": "SEQ_SCAN ",
+                                        "children": [],
+                                        "extra_info": {
+                                            "Table": "lineitem",
+                                            "Type": "Sequential Scan",
+                                            "Projections": [
+                                                "l_orderkey",
+                                                "l_quantity"
+                                            ],
+                                            "Filters": "optional: Dynamic Filter (l_orderkey)",
+                                            "Estimated Cardinality": "0"
+                                        }
+                                    },
+                                    {
+                                        "name": "SEQ_SCAN ",
+                                        "children": [],
+                                        "extra_info": {
+                                            "Table": "orders",
+                                            "Type": "Sequential Scan",
+                                            "Projections": "o_orderkey",
+                                            "Filters": "o_orderdate>='1993-01-01'::DATE",
+                                            "Estimated Cardinality": "0"
+                                        }
+                                    }
+                                ],
+                                "extra_info": {
+                                    "Join Type": "INNER",
+                                    "Conditions": "l_orderkey = o_orderkey",
+                                    "Estimated Cardinality": "1"
+                                }
+                            }
+                        ],
+                        "extra_info": {
+                            "Projections": [
+                                "l_orderkey",
+                                "l_quantity"
+                            ],
+                            "Estimated Cardinality": "1"
+                        }
+                    }
+                ],
+                "extra_info": {
+                    "Groups": "#0",
+                    "Aggregates": "sum(#1)",
+                    "Estimated Cardinality": "0"
+                }
+            }
+        ],
+        "extra_info": {
+            "Top": "10",
+            "Order By": "l_orderkey ASC"
+        }
+    }
+]

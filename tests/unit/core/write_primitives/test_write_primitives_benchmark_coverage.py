@@ -1070,7 +1070,7 @@ class TestExecuteDataframeWorkload:
 class TestSelectDataframeOperationIds:
     def test_returns_all_when_no_filter(self, wp):
         ids = wp._select_dataframe_operation_ids(query_filter=None)
-        assert len(ids) == len(wp.get_all_operations())
+        assert len(ids) == len(wp.operations_manager.get_all_operations())
 
     def test_filters_by_op_id(self, wp):
         all_ids = list(wp.get_all_operations().keys())
@@ -1087,4 +1087,4 @@ class TestSelectDataframeOperationIds:
 
     def test_empty_filter_returns_all(self, wp):
         ids = wp._select_dataframe_operation_ids(query_filter=set())
-        assert len(ids) == len(wp.get_all_operations())
+        assert len(ids) == len(wp.operations_manager.get_all_operations())

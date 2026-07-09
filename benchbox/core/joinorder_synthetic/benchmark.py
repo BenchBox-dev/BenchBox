@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
-from benchbox.base import BaseBenchmark
+from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.joinorder.schema import JoinOrderSchema
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from benchbox.core.tuning import UnifiedTuningConfiguration
 
 
-class JoinOrderSyntheticBenchmark(BaseBenchmark):
+class JoinOrderSyntheticBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     """Synthetic Join Order Benchmark implementation.
 
     This internal surface is for fast schema and loader smoke tests only.
@@ -42,6 +42,9 @@ class JoinOrderSyntheticBenchmark(BaseBenchmark):
     # that produce lines like "1,Comedy Adventure,,4,1957,,,,,,,".
     csv_delimiter = ","
     csv_null_marker = ""
+
+    # Nested generator that must track output_dir reassignment.
+    OUTPUT_DIR_GENERATOR_ATTRS = ("_generator",)
 
     def __init__(
         self,
@@ -73,10 +76,11 @@ class JoinOrderSyntheticBenchmark(BaseBenchmark):
         quiet = kwargs.pop("quiet", False)
 
         if output_dir is None:
-            from benchbox.utils.scale_factor import format_scale_factor
+            # Honor BENCHBOX_OUTPUT_DIR at construction; falls back to
+            # Path.cwd()/benchmark_runs/datagen when no override is set.
+            from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
-            sf_str = format_scale_factor(scale_factor)
-            output_dir = Path.cwd() / "benchmark_runs" / "datagen" / f"joinorder_synthetic_{sf_str}"
+            output_dir = get_benchmark_runs_datagen_path("joinorder_synthetic", scale_factor)
 
         super().__init__(
             scale_factor=scale_factor,
@@ -333,7 +337,7 @@ class JoinOrderSyntheticBenchmark(BaseBenchmark):
 # Register benchmark-specific CLI option specs
 # ---------------------------------------------------------------------------
 
-from benchbox.cli.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
 )

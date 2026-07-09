@@ -599,6 +599,6 @@ DataFusion has some limitations compared to full database systems:
 - [Benchmark Catalog](../benchmarks/index.md) - All available benchmarks
 
 ### External Resources
-- [Apache DataFusion Documentation](https://arrow.apache.org/datafusion/) - Official DataFusion docs
-- [DataFusion Python Bindings](https://arrow.apache.org/datafusion-python/) - Python API reference
+- [Apache DataFusion Documentation](https://datafusion.apache.org/) - Official DataFusion docs
+- [DataFusion Python Bindings](https://datafusion.apache.org/python/) - Python API reference
 - [Apache Arrow](https://arrow.apache.org/) - Arrow columnar format

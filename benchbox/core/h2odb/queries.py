@@ -123,7 +123,11 @@ GROUP BY passenger_count
 ORDER BY passenger_count;
 """
 
-        # Q10: Top 10 pickup locations by trip count
+        # Q10: Top 10 pickup locations by trip count. The secondary
+        # `pickup_location_id` sort key makes the top-N a total order: trip counts
+        # tie across locations (near-uniform assignment), and a bare `ORDER BY
+        # trip_count DESC LIMIT 10` would otherwise pick an arbitrary, engine- and
+        # run-dependent member at the tied cutoff (non-reproducible results).
         queries["Q10"] = """
 SELECT
     pickup_location_id,
@@ -131,7 +135,7 @@ SELECT
 FROM trips
 WHERE pickup_location_id IS NOT NULL
 GROUP BY pickup_location_id
-ORDER BY trip_count DESC
+ORDER BY trip_count DESC, pickup_location_id
 LIMIT 10;
 """
 

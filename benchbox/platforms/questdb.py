@@ -125,6 +125,8 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
     - PARTITION BY for time-series tables
     """
 
+    plan_capture_phase_eligible = True
+
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     _max_identifier_length = 127  # QuestDB supports identifiers up to 127 chars (PostgreSQL caps at 63)
 
@@ -329,8 +331,8 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         )
         return conn
 
-    def handle_existing_database(self, **connection_config) -> None:
-        """Override to validate that required tables exist before marking database as reused.
+    def check_benchmark_tables_exist(self, **connection_config) -> bool | None:
+        """Validate that required benchmark tables exist and are non-empty.
 
         QuestDB is a server-based database (skip_database_management=True) but we still need
         to check if the required benchmark tables for the current benchmark exist. If the
@@ -342,17 +344,9 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
             msg = "psycopg is required for QuestDB but is not installed"
             raise ImportError(msg)
 
-        self.log_operation_start("Database validation", "Checking existing database compatibility")
-
-        # Quick checks that can't be overridden
-        if self.dry_run:
-            self.log_verbose("Database validation skipped (dry run mode)")
-            return
-
         if self.force_recreate:
             self.log_verbose("Force recreate enabled - will recreate schema and reload data")
-            self.database_was_reused = False
-            return
+            return False
 
         # For external databases like QuestDB, validate that the expected tables for
         # the current benchmark exist (not just any tables from a previous benchmark)
@@ -363,25 +357,25 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
             try:
                 # Get expected table names from the current benchmark
-                if not hasattr(self, "benchmark") or self.benchmark is None:
+                benchmark = getattr(self, "benchmark", None) or getattr(self, "benchmark_instance", None)
+                if benchmark is None:
                     self.log_verbose("Benchmark not available - treating as fresh database")
-                    self.database_was_reused = False
-                    return
+                    return False
 
-                expected_tables = set(self.benchmark.tables.keys())
+                expected_tables = self._get_expected_tables(benchmark)
                 if not expected_tables:
                     # Benchmarks that initialize tables={} (e.g. clickbench, which populates
                     # tables only after downloading data) will always take this path, meaning
                     # QuestDB reuse detection is disabled for them. Acceptable for now since
                     # QuestDB is primarily used with TPC benchmarks that pre-declare tables.
                     self.log_verbose("Benchmark has no tables - treating as fresh database")
-                    self.database_was_reused = False
-                    return
+                    return False
+                expected_tables = set(expected_tables)
 
                 # Query QuestDB for all table names
                 with test_conn.cursor() as cursor:
                     cursor.execute("SELECT table_name FROM tables()")
-                    existing_tables = {row[0] for row in cursor.fetchall()}
+                    existing_tables = {str(row[0]).lower() for row in cursor.fetchall()}
 
                 # Check if all expected tables are present
                 missing_tables = expected_tables - existing_tables
@@ -390,8 +384,7 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
                         f"Expected benchmark tables not found: {', '.join(sorted(missing_tables))} "
                         "- treating as fresh database (will create schema)"
                     )
-                    self.database_was_reused = False
-                    return
+                    return False
 
                 # All expected tables exist; verify they are non-empty.
                 # A prior partial run may have created the schema without ever
@@ -411,14 +404,13 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
                         f"Tables exist but are empty: {', '.join(empty_tables)} "
                         "- treating as fresh database (will reload data)"
                     )
-                    self.database_was_reused = False
-                    return
+                    return False
 
                 self.log_verbose(
                     f"Found all {len(expected_tables)} expected benchmark tables with data - "
                     "attempting to reuse existing database"
                 )
-                self.database_was_reused = True
+                return True
 
             finally:
                 test_conn.close()
@@ -426,7 +418,7 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         except (psycopg.Error, OSError) as e:
             self.logger.debug(f"Error checking existing tables: {e}")
             self.log_verbose("Unable to verify existing tables - treating as fresh database")
-            self.database_was_reused = False
+            return False
 
     # ──────────────────────────────────────────────────────────────
     # Schema creation with designated timestamp, partitioning, and
@@ -1214,7 +1206,7 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
     ) -> dict[str, Any]:
         """Execute a single query and return detailed results."""
         query = _rewriter_rewrite(query)
-        return execute_sql_query(
+        result = execute_sql_query(
             connection,
             query,
             query_id,
@@ -1226,6 +1218,13 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
             stream_id=stream_id,
         )
 
+        # Capture and merge the structured query plan (SUCCESS-guarded in the
+        # helper; no EXPLAIN issued when capture_plans is off). The rewriter is
+        # idempotent, so re-rewriting inside get_query_plan is safe.
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
+
+        return result
+
     def get_query_plan(
         self,
         connection: Any,
@@ -1235,23 +1234,37 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         """Get query execution plan using EXPLAIN.
 
         QuestDB supports EXPLAIN for query plans but with fewer options
-        than standard PostgreSQL.
+        than standard PostgreSQL. The plan is returned as a ``QUERY PLAN`` text
+        column (one row per line). On failure returns an error string (which the
+        plan-capture parser rejects via its error-sentinel guard, so capture
+        degrades silently rather than fabricating a plan).
         """
         query = _rewriter_rewrite(query)
-        cursor = connection.cursor()
+        # In TPC-DS streaming paths a per-stream cursor is passed as
+        # `connection`; detect by checking for a callable .cursor() method.
+        _owns_cursor = callable(getattr(connection, "cursor", None))
+        cursor = connection.cursor() if _owns_cursor else connection
 
         explain_query = f"EXPLAIN {query}"
 
         try:
             cursor.execute(explain_query)
             plan_rows = cursor.fetchall()
-            cursor.close()
+            if _owns_cursor:
+                cursor.close()
 
-            return "\n".join(row[0] for row in plan_rows)
+            return "\n".join(str(row[0]) for row in plan_rows)
 
         except Exception as e:
-            cursor.close()
+            if _owns_cursor:
+                cursor.close()
             return f"Failed to get query plan: {e}"
+
+    def get_query_plan_parser(self):
+        """Get the QuestDB query plan parser."""
+        from benchbox.core.query_plans.parsers.questdb import QuestDBQueryPlanParser
+
+        return QuestDBQueryPlanParser()
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get QuestDB platform information."""
