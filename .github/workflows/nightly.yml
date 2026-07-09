@@ -71,6 +71,42 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  binary-framing:
+    # Exercise each bundled TPC-H dbgen binary the runner can natively execute
+    # and assert its rows carry no trailing '|' (-DEOL_HANDLING convention, see
+    # PR #1056/#1069). The test skips foreign-arch binaries per-binary, so the
+    # ubuntu/macos/windows runners together cover linux-x86_64, darwin-arm64,
+    # windows-x86_64 and windows-arm64 (an x86_64 PE) natively. This is the only
+    # lane that runs the slow framing guard, so binary drift is caught here.
+    name: TPC-H binary framing guard
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Verify bundled dbgen binaries emit clean framing
+        run: |
+          uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m slow -v
+
   check-test-patterns:
     runs-on: ubuntu-latest
     steps:
