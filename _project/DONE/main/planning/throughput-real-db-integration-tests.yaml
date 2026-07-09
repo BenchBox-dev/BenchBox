@@ -2,7 +2,8 @@ id: throughput-real-db-integration-tests
 title: "Add real-database multi-stream throughput integration tests (currently mocks only)"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-07-09"
 category: Testing and Quality Assurance
 
 description: |
@@ -36,19 +37,19 @@ prior_art:
 work:
   - id: w1
     summary: "Build a real-DuckDB throughput fixture (SF small) with tables loaded once and reused across streams"
-    status: pending
+    status: done
   - id: w2
     summary: "TPC-H happy-path test: N streams each run 22 queries against real data, all succeed, throughput_at_size > 0"
     needs: [w1]
-    status: pending
+    status: done
   - id: w3
     summary: "TPC-DS happy-path test: N streams run the permuted set against real data"
     needs: [w1]
-    status: pending
+    status: done
   - id: w4
     summary: "Concurrency-correctness assertions: no cross-stream result bleed; per-stream query counts correct; streams_successful == N"
     needs: [w2, w3]
-    status: pending
+    status: done
 
 must_preserve:
   - "Existing mock-based unit tests remain (fast lane) — real-DB tests are additive and marked slow/integration."
@@ -58,8 +59,9 @@ anti_patterns:
 
 verification:
   - description: "Real-DB throughput tests pass"
-    command: "uv run -- python -m pytest tests/integration -k 'throughput and duckdb' -v"
+    command: "uv run -- python -m pytest tests/integration -k 'throughput and duckdb' -m integration -v"
     expected_output: "N-stream runs pass against real DuckDB"
+    actual_output: "4 passed in ~30-53s (TestTPCHThroughputRealDuckDB, TestTPCDSThroughputRealDuckDB). Note: -m integration overrides pytest.ini's default '-m \"not slow and not stress...\"' addopts, which otherwise deselects these slow-marked tests -- the bare command from the original verification entry collects 0 tests."
 
 scope_limit:
   only_modify:
