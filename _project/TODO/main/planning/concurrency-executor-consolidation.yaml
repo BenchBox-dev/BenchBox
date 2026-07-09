@@ -1,0 +1,86 @@
+id: concurrency-executor-consolidation
+title: "Consolidate overlapping concurrent executors and remove the non-executing stream stub"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+
+description: |
+  There are three overlapping concurrent-stream executors plus a dead stub. This
+  fragmentation is a maintenance and correctness hazard: fixes to one path (the
+  production one) do not reach the others, and it is not obvious which is live.
+
+  - LIVE: benchbox/core/throughput/runner.py:StreamRunner — the real executor
+    used by the CLI/adapter throughput path.
+  - EFFECTIVELY DEAD: benchbox/utils/execution_manager.py:ConcurrentQueryExecutor
+    (+ PowerRunExecutor) — config-driven, reachable only through the stubbed
+    run_concurrent_streams paths below.
+  - UNUSED EXTERNALLY: benchbox/core/tpc_patterns.py:StreamExecutor — a full
+    concurrent framework instantiated only inside its own module; external
+    consumers import only generate_official_benchmark_audit_trail from it.
+  - NON-EXECUTING STUB: benchbox/core/tpch/streams.py:TPCHStreamRunner.run_stream
+    (~lines 431-454) counts `-- Query` comment lines and marks every query
+    successful WITHOUT executing SQL. Any path through
+    run_concurrent_streams (tpch/streams.py, and the parallel
+    tpcds/benchmark/runner.py:988-1011 path) measures nothing real. A test or
+    caller that reaches this reports fake success.
+
+  Fix: make StreamRunner the single throughput executor; delete or clearly
+  quarantine the dead/unused executors; and either remove the non-executing
+  stub or make it raise NotImplementedError so it cannot silently report fake
+  success.
+
+prior_art:
+  - "benchbox/core/throughput/runner.py:StreamRunner — the canonical executor to standardize on."
+  - "benchbox/utils/execution_manager.py:ConcurrentQueryExecutor — legacy path to retire."
+  - "benchbox/core/tpc_patterns.py:StreamExecutor — unused framework to retire or fold in."
+  - "_project/DONE/unknown/planning/tpc-h-stream-processing-implementation.yaml — the completed item that originally filled these stubs; context for why they exist."
+
+work:
+  - id: w0
+    summary: "Map every caller of each executor and the stub; confirm which are truly reachable in production/tests"
+    status: pending
+    notes: "grep + call-graph; capture the reachability table to /tmp/concurrency-consolidation-w0.log and summarize."
+  - id: w1
+    summary: "Neutralize the non-executing run_stream stub (raise NotImplementedError or route to real execution)"
+    needs: [w0]
+    status: pending
+  - id: w2
+    summary: "Retire ConcurrentQueryExecutor / PowerRunExecutor and StreamExecutor, or fold their unique value into StreamRunner"
+    needs: [w0]
+    status: pending
+  - id: w3
+    summary: "Update tests/docs that reference retired paths"
+    needs: [w1, w2]
+    status: pending
+
+must_preserve:
+  - "The production StreamRunner throughput path behavior."
+  - "generate_official_benchmark_audit_trail (the one thing external code imports from tpc_patterns)."
+
+anti_patterns:
+  - "DO NOT delete code that a passing test depends on without first proving the test is asserting fake success (the stub case)."
+
+verification:
+  - description: "No production/test path reaches a non-executing stream stub"
+    command: "uv run -- python -m pytest tests/unit -k 'stream' -v"
+    expected_output: "stream tests pass against real or explicitly-not-implemented paths"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpch/streams.py"
+    - "benchbox/utils/execution_manager.py"
+    - "benchbox/core/tpc_patterns.py"
+    - "benchbox/core/tpcds/benchmark/runner.py"
+    - "tests/unit/"
+    - "docs/"
+
+impact:
+  technical_debt: |
+    Collapses 3+ parallel implementations to one, removing a class of
+    "fixed it in the wrong executor" bugs and fake-success reporting.
+
+metadata:
+  tags: [concurrency, refactor, dead-code, tech-debt]
+  estimated_effort: Medium
+  created_date: "2026-07-09"

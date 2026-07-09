@@ -1,0 +1,96 @@
+id: throughput-stream-count-wiring-defect
+title: "Fix dropped stream count: user-requested concurrency never reaches the throughput driver"
+worktree: main
+priority: Critical
+status: Not Started
+category: Core Functionality
+
+description: |
+  Strong evidence that the number of concurrent streams a user requests never
+  reaches the throughput test, which silently runs at the hard-coded default
+  (2). Two independent breaks in the chain:
+
+  1. `run-official --streams N` VALIDATES that --streams is provided
+     (benchbox/cli/commands/run_official.py:36-38), prints it (line 46, 52-53
+     "Note: Stream configuration ({streams} streams) applies when supported"),
+     then invokes `run` WITHOUT passing `streams`
+     (run_official.py:56-67). The value is discarded.
+
+  2. Through the main pipeline, the run config carries `concurrent_streams`
+     (from BenchmarkConfig.concurrency): benchbox/cli/execution_pipeline.py:106,
+     benchbox/cli/orchestrator.py:494, benchbox/core/runner/runner.py:726,
+     benchbox/core/schemas.py:98 (`RunConfig.concurrent_streams`). But the
+     throughput drivers read a DIFFERENT key:
+     - benchbox/platforms/base/execution.py:368
+       `num_streams = run_config.get("num_streams", run_config.get("streams", 2))`
+     - benchbox/platforms/base/execution.py:233 (TPC-DS) `run_config.get("num_streams", 2)`.
+     Neither `num_streams` nor `streams` is ever populated from
+     `concurrent_streams`, so both default to 2 regardless of user input.
+
+  Net effect: `benchbox run ... --phases throughput` and `run-official
+  --streams 8` both execute 2 streams. The headline throughput metric is
+  computed for the wrong concurrency level, and QphH/QphDS composed from it is
+  wrong. This is a functional defect, not just a UX gap.
+
+  NOTE (w0): confirm the break end-to-end with a live run before fixing, since
+  a legacy alias could exist somewhere not yet found. If a path is found that
+  DOES honor the count, narrow the fix accordingly.
+
+work:
+  - id: w0
+    summary: "Prove the defect end-to-end: run throughput with --streams/concurrency=4 and assert only 2 streams execute today"
+    status: pending
+    notes: |
+      Drive a real DuckDB throughput run requesting 4 streams; inspect
+      streams_executed / stream_results length. Capture the command + observed
+      count to /tmp/throughput-wiring-w0.log and summarize here. This both
+      confirms the bug and becomes the regression oracle for w3.
+  - id: w1
+    summary: "Thread concurrent_streams -> num_streams through the adapter throughput drivers"
+    needs: [w0]
+    status: pending
+    notes: |
+      In _execute_tpch_throughput_test / _execute_tpcds_throughput_test resolve
+      the stream count from concurrent_streams (falling back to num_streams /
+      streams for back-compat). Single helper so both drivers agree.
+  - id: w2
+    summary: "Pass --streams from run-official into run (or route through the same concurrency field)"
+    needs: [w0]
+    status: pending
+    notes: |
+      run_official.py must forward the validated streams value; drop the
+      misleading 'applies when supported' note once it actually applies.
+  - id: w3
+    summary: "End-to-end regression test: requesting N streams executes N streams"
+    needs: [w1, w2]
+    status: pending
+
+must_preserve:
+  - "Existing default of 2 streams when the user requests nothing."
+  - "back-compat callers that already pass num_streams= directly (official_benchmark.py path)."
+
+anti_patterns:
+  - "DO NOT rename concurrent_streams across the schema — because it is used by cost models and result metrics — map it at the driver boundary instead."
+
+verification:
+  - description: "Requesting N streams runs N streams against DuckDB"
+    command: "uv run -- python -m pytest tests/integration -k throughput_stream_count -v"
+    expected_output: "test asserts streams_executed == requested N for N in {1,4}"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/execution.py"
+    - "benchbox/cli/commands/run_official.py"
+    - "tests/integration/"
+
+impact:
+  business_value: |
+    A throughput benchmark that ignores the requested concurrency produces
+    invalid QphH/QphDS. Highest-severity kind of correctness bug for this feature.
+  user_impact: |
+    Users tuning at 8/16 streams unknowingly measure 2.
+
+metadata:
+  tags: [concurrency, throughput, cli, defect, soundness]
+  estimated_effort: Small
+  created_date: "2026-07-09"

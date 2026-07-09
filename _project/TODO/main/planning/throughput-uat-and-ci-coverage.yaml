@@ -1,0 +1,78 @@
+id: throughput-uat-and-ci-coverage
+title: "Add UAT and CI coverage for the throughput/concurrent phase (currently zero)"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Concurrency has no acceptance or CI coverage at all.
+
+  - UAT: no config under tests/uat/configs/*.yaml runs a `throughput` or
+    concurrent phase. Every config's phases are preflight -> execute -> validate
+    -> package -> report, and `execute` runs single-stream power-style
+    workloads. `make uat-stress` sweeps the PLATFORM MATRIX, not concurrent
+    query streams. `release-gate-03-docker-oltp.yaml` sounds concurrency-related
+    but runs single-stream.
+  - CI: no workflow runs the throughput phase or a concurrency test selection.
+    The `concurrency:` keys in .github/workflows/test.yml and nightly.yml are
+    GitHub Actions cancel-in-progress groups, not test concurrency. The `stress`
+    pytest marker marks EXPENSIVE tests generically, not concurrency load tests,
+    and default suites exclude it.
+
+  So a regression that breaks multi-stream execution (or silently drops to 2
+  streams, per throughput-stream-count-wiring-defect) would ship green. Add real
+  acceptance + CI coverage on top of the new real-DB tests.
+
+prior_art:
+  - "tests/uat/configs/release-gate-03-docker-oltp.yaml — closest existing gate; add a throughput phase or a sibling config."
+  - "tests/uat/_cli.py:476 — default cell phases (load,power); a throughput phase option is the extension point."
+  - "tests/uat/phases/execute.py — the phase runner to teach about a concurrent/throughput execution mode."
+  - ".github/workflows/nightly.yml — the right place for a slow real-DB throughput job."
+
+work:
+  - id: w1
+    summary: "Add a UAT config that runs a real throughput phase on DuckDB (small SF, N streams)"
+    status: pending
+  - id: w2
+    summary: "Teach the UAT execute phase / matrix to run a throughput mode and validate Throughput@Size > 0 and stream count == requested"
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "Add a nightly CI job that runs the real-DB throughput integration tests and the DuckDB throughput UAT cell"
+    needs: [w2]
+    status: pending
+  - id: w4
+    summary: "Optionally add one docker server-engine (Postgres) throughput UAT cell to cover independent-session concurrency"
+    needs: [w2]
+    status: pending
+
+must_preserve:
+  - "Existing UAT configs and phases keep working; new coverage is additive."
+  - "pr fast-lane runtime is not inflated — heavy throughput coverage runs nightly."
+
+verification:
+  - description: "Throughput UAT cell passes on DuckDB"
+    command: "make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=1"
+    expected_output: "throughput phase runs N streams and validates"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/"
+    - ".github/workflows/"
+    - "Makefile"
+
+deps:
+  needs:
+    - throughput-real-db-integration-tests
+    - throughput-stream-count-wiring-defect
+
+impact:
+  business_value: |
+    Locks in the concurrency fixes so they cannot silently regress; gives the
+    release gate a real multi-user signal.
+
+metadata:
+  tags: [concurrency, throughput, uat, ci]
+  estimated_effort: Medium
+  created_date: "2026-07-09"

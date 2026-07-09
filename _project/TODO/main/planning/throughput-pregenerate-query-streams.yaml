@@ -1,0 +1,115 @@
+id: throughput-pregenerate-query-streams
+title: "Pre-generate throughput query streams outside the timed concurrent loop"
+worktree: main
+priority: Critical
+status: Not Started
+category: Core Functionality
+
+description: |
+  The TPC-H and TPC-DS throughput tests generate each query INSIDE the timed,
+  concurrent per-stream loop, and query generation shells out to a subprocess.
+
+  - TPC-H: `TPCHThroughputTest._execute_stream` (benchbox/core/tpch/throughput_test.py:207-228)
+    captures `query_start = mono_time()` (line 208) and THEN calls
+    `self.benchmark.get_query(...)` (line 223). `get_query` -> `QGen.generate`
+    (benchbox/core/tpch/queries.py:28-78) spawns a `qgen` subprocess, creates a
+    `TemporaryDirectory`, and `shutil.copy2` copies `dists.dss` on EVERY call.
+  - TPC-DS: `TPCDSThroughputTest._execute_single_query`
+    (benchbox/core/tpcds/throughput_test.py:333-346) captures `query_start`
+    then calls `_get_stream_query_text` -> `get_query` -> `dsqgen`
+    (benchbox/core/tpcds/c_tools.py:933) subprocess.
+
+  Two distinct second-order problems, both of which distort the throughput
+  measurement the test exists to produce:
+
+  1. MEASUREMENT CONTAMINATION: subprocess spawn + temp-dir + file-copy time is
+     counted inside `execution_time_seconds`, so per-query timings and the
+     derived `query_throughput` include query-generation cost, not just DB
+     execution. TTT itself (first-stream-start -> last-stream-end) is also
+     inflated by generation done during the concurrent window.
+  2. ARTIFICIAL BOTTLENECK UNDER CONCURRENCY: with N streams, N threads each
+     fork a `qgen`/`dsqgen` process, create a temp dir, and copy a dists file
+     concurrently. Process creation, the GIL around subprocess management, and
+     filesystem contention serialize what is supposed to be parallel DB work.
+     The more streams you add (the whole point of a throughput test), the worse
+     the generation contention becomes -- so the harness can mask real platform
+     scaling behind its own driver overhead.
+
+  Fix: generate the full per-stream query text (the ordered list of SQL strings
+  for each stream) BEFORE `StreamRunner.execute` starts the concurrent window,
+  and have `_execute_stream` iterate over pre-materialized SQL. The timed region
+  must contain only connection use and DB execution. This mirrors how a real
+  TPC driver submits a prepared query set per session.
+
+prior_art:
+  - "benchbox/core/throughput/runner.py:StreamRunner.execute — the concurrent window whose body must contain only DB execution; generation must happen before it."
+  - "benchbox/core/tpcds/throughput_test.py:_preflight_validate_generation — already generates all queries up front (outside TTT); extend this idea to CAPTURE and reuse the generated SQL instead of regenerating inside the loop."
+  - "benchbox/core/tpch/streams.py:generate_streams — emits per-stream .sql files via qgen; a batched generation path already exists to reuse."
+  - "benchbox/core/tpcds/streams.py:create_standard_streams — builds the StreamQuery ordering used per stream."
+
+work:
+  - id: w1
+    summary: "Add a pre-generation step that materializes ordered SQL per stream for TPC-H before the concurrent window"
+    status: pending
+    notes: |
+      In TPCHThroughputTest.run, before StreamRunner.execute, build a
+      {stream_id: [sql, ...]} map using the existing PERMUTATION_MATRIX and the
+      same per-position seed (`seed + stream_id*1000 + position`). _execute_stream
+      then consumes pre-built SQL; move the qgen call out of the timed loop.
+  - id: w2
+    summary: "Do the same for TPC-DS: reuse/capture the preflight-generated SQL instead of regenerating in _execute_single_query"
+    needs: [w1]
+    status: pending
+    notes: |
+      _preflight_validate_generation already generates every query; capture its
+      output keyed by (stream_id, position) and feed _execute_single_query from
+      that cache. Keep preflight's fail-fast behavior.
+  - id: w3
+    summary: "Assert the timed region excludes generation; add a regression test that generation time is not in execution_time_seconds"
+    needs: [w2]
+    status: pending
+    notes: |
+      Test with an instrumented get_query that sleeps; confirm per-query
+      execution_time_seconds and TTT do not include the sleep.
+
+must_preserve:
+  - "Per-stream, per-position seeds remain `seed + stream_id*1000 + position` so generated SQL is byte-identical to today (only WHEN it is generated changes)."
+  - "TPC-H PERMUTATION_MATRIX stream ordering and TPC-DS StreamQuery ordering are unchanged."
+  - "dry-run captured_items still records the labeled SQL for every stream/position."
+
+anti_patterns:
+  - "DO NOT cache qgen output globally across seeds — because throughput streams use per-stream seeds — key any cache by (stream_id, position, seed)."
+  - "DO NOT move DB execution out of the timed region — only generation moves out."
+
+verification:
+  - description: "Throughput unit/integration tests still pass"
+    command: "uv run -- python -m pytest tests/integration/test_tpch_throughput_test.py tests/integration/test_tpcds_throughput_test.py tests/unit/core/throughput/ -v"
+    expected_output: "all pass"
+  - description: "Generation cost is excluded from measured execution time"
+    command: "uv run -- python -m pytest tests/integration/test_throughput_corrections.py -v"
+    expected_output: "timing tests pass; generation sleep not counted"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpch/throughput_test.py"
+    - "benchbox/core/tpcds/throughput_test.py"
+    - "tests/integration/test_tpch_throughput_test.py"
+    - "tests/integration/test_tpcds_throughput_test.py"
+    - "tests/integration/test_throughput_corrections.py"
+
+impact:
+  business_value: |
+    Throughput@Size and query-throughput numbers are only credible if the
+    harness measures DB work, not its own subprocess overhead. This is the
+    single largest correctness risk in the concurrency path.
+  technical_debt: |
+    Removes per-call subprocess/temp-dir churn from the hot path.
+
+deferred:
+  - summary: "Batch qgen/dsqgen generation into a single subprocess per stream"
+    reason: "Optimization; correctness fix (move-out-of-timed-loop) lands first."
+
+metadata:
+  tags: [concurrency, throughput, tpc-h, tpc-ds, soundness]
+  estimated_effort: Medium
+  created_date: "2026-07-09"

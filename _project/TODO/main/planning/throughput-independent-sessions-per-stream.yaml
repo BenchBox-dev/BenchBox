@@ -1,0 +1,93 @@
+id: throughput-independent-sessions-per-stream
+title: "Give each throughput stream an independent DB session, not a shared connection's cursor"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  The production throughput path gives every concurrent stream a separate
+  *cursor* on ONE shared underlying platform connection, not an independent
+  session. In benchbox/platforms/base/execution.py the connection_factory
+  closures (TPC-H lines 375-383, TPC-DS lines 244-252) call
+  `_make_stream_cursor(connection)` -> `connection.cursor()`
+  (benchbox/platforms/base/connection_wrappers.py:121-129) against the single
+  connection passed into the driver.
+
+  This is safe and intentional for DuckDB (its Python client is documented as
+  thread-safe at cursor level and cursors share the embedded DB), and the
+  DuckDB caveat is documented in docs/benchmarks/tpc-h.md. But TPC throughput
+  semantics model N INDEPENDENT concurrent users/sessions, and for
+  client/server engines a single connection is a single session:
+  - Many DB-API drivers (e.g. psycopg, Snowflake, Databricks SQL, Trino) do not
+    support truly concurrent statement execution across cursors of one
+    connection — calls serialize on the connection lock or raise.
+  - Even where they don't error, all streams share one session's server-side
+    resources, so it is not a real multi-user concurrency measurement.
+
+  Fix: make the per-stream connection acquisition a platform capability. Engines
+  that model concurrency at the connection level (server engines) must hand each
+  stream its OWN connection/session from a factory or pool; embedded engines
+  (DuckDB) keep the cursor-sharing fast path. The throughput driver already
+  calls `connection_factory()` per stream (throughput_test.py) -- the gap is
+  that the adapter closure returns cursors of one connection instead of
+  independent sessions.
+
+prior_art:
+  - "benchbox/platforms/base/connection_wrappers.py:_make_stream_cursor — the current shared-cursor helper; needs a per-platform 'independent session' variant."
+  - "benchbox/experimental/concurrency/pool_tester.py:ConnectionPoolTester — an existing connection-pool abstraction to borrow the acquire/release shape from."
+  - "benchbox/experimental/concurrency/executor.py:ConcurrentLoadExecutor — already calls connection_factory() per stream for independent connections; reuse its contract."
+  - "benchbox/platforms/base/adapter.py — where per-platform connection creation lives; add a 'new independent connection for stream' hook."
+
+work:
+  - id: w1
+    summary: "Define a platform capability: per-stream independent connection vs shared-cursor, defaulting per engine"
+    status: pending
+    notes: |
+      Add a hook (e.g. adapter.new_stream_connection()) with a default that
+      preserves today's DuckDB cursor behavior; server adapters override to open
+      a fresh connection/session per stream.
+  - id: w2
+    summary: "Wire the throughput connection_factory closures to use the capability"
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "Add a test proving streams get isolated sessions on a server-style engine (session-scoped setting does not leak across streams)"
+    needs: [w2]
+    status: pending
+    notes: |
+      Use Postgres (docker) or SQLite-per-connection as a stand-in: set a
+      session-local value in one stream, assert it is invisible in another.
+
+must_preserve:
+  - "DuckDB throughput continues to use cursor sharing (documented, correct) with no perf regression."
+  - "Connections are still closed per stream in _execute_stream's finally block."
+
+anti_patterns:
+  - "DO NOT open N real connections for embedded DuckDB — because cursor sharing is the correct model there — gate behind the capability."
+
+verification:
+  - description: "Server-engine streams are session-isolated"
+    command: "uv run -- python -m pytest tests/integration -k throughput_session_isolation -v"
+    expected_output: "session-local state does not leak across streams"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/connection_wrappers.py"
+    - "benchbox/platforms/base/execution.py"
+    - "benchbox/platforms/base/adapter.py"
+    - "tests/integration/"
+
+impact:
+  business_value: |
+    Multi-user throughput on cloud warehouses is a primary use case; measuring
+    it over a single shared session under-reports concurrency and can error.
+
+deps:
+  needs:
+    - throughput-real-db-integration-tests
+
+metadata:
+  tags: [concurrency, throughput, platforms, sessions]
+  estimated_effort: Medium
+  created_date: "2026-07-09"

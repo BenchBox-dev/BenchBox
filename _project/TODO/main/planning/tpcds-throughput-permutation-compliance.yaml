@@ -1,0 +1,95 @@
+id: tpcds-throughput-permutation-compliance
+title: "Audit TPC-DS throughput stream permutation for spec compliance and fix per-stream regeneration"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Two related concerns in how TPC-DS builds its concurrent stream orderings.
+
+  1. HOME-GROWN PERMUTATION (compliance): TPC-DS throughput streams are ordered
+     by a deterministic swap algorithm with a hardcoded PERMUTATION_SEED =
+     19620718 in benchbox/core/tpcds/streams.py (TPCDS_STANDARD mode, ~lines
+     77-104), NOT the official dsqgen query-ordering permutation. TPC-H by
+     contrast uses the real 41x22 PERMUTATION_MATRIX from permute.h
+     (benchbox/core/tpch/streams.py:39-81). Per-stream query ordering is part of
+     TPC-DS throughput compliance, so a home-grown ordering may make QphDS
+     non-compliant. Determine whether dsqgen can emit the official per-stream
+     ordering and either adopt it or explicitly document the deviation.
+
+  2. SUSPICIOUS PER-STREAM REGENERATION: TPCDSThroughputTest._build_stream_queries
+     (benchbox/core/tpcds/throughput_test.py:264-293) calls
+     `create_standard_streams(num_streams=stream_id + 1, base_seed=seed +
+     stream_id)` and then picks `streams.get(stream_id, [])`. Each stream
+     regenerates the full stream set with a DIFFERENT num_streams and a
+     stream-shifted seed, so the ordering a given stream runs depends on how many
+     streams happened to be generated and on a per-stream seed offset. This looks
+     unintended: the permutation for stream K should be stable and defined by the
+     run's stream count, not `K+1`. Verify against the spec and the TPC-H
+     approach (which indexes PERMUTATION_MATRIX[stream_id % 41] once).
+
+  This is soundness-adjacent (comparator/plan-parser paths are Code-Owner gated;
+  query ordering feeds the compliance story) -- treat carefully and back every
+  change with evidence.
+
+prior_art:
+  - "benchbox/core/tpch/streams.py:PERMUTATION_MATRIX — the official-matrix exemplar to mirror for TPC-DS if dsqgen ordering is available."
+  - "benchbox/core/tpcds/streams.py:TPCDSPermutationGenerator — the home-grown generator to audit/replace."
+  - "benchbox/core/tpcds/c_tools.py — dsqgen wrapper; check whether it exposes RNGSEED / -streams ordering."
+  - "docs/benchmarks/tpc-ds.md:330-342 — documents the PermutationMode (sequential/random/tpcds); update if behavior changes."
+
+work:
+  - id: w0
+    summary: "Determine the official TPC-DS per-stream ordering source and whether bundled dsqgen can emit it"
+    status: pending
+    notes: |
+      Check dsqgen flags (-streams / RNGSEED) and the TPC-DS spec section on
+      throughput query sequencing. Capture findings to /tmp/tpcds-perm-w0.log
+      and summarize. Gates whether w1 is 'adopt official' or 'document deviation'.
+  - id: w1
+    summary: "Adopt official ordering OR document the deviation with rationale; make behavior explicit"
+    needs: [w0]
+    status: pending
+  - id: w2
+    summary: "Fix/verify _build_stream_queries so a stream's ordering is stable and defined by the run's stream count, not stream_id+1"
+    needs: [w0]
+    status: pending
+  - id: w3
+    summary: "Add tests pinning per-stream ordering for a fixed (num_streams, seed)"
+    needs: [w1, w2]
+    status: pending
+
+must_preserve:
+  - "Deterministic, reproducible orderings for a fixed seed."
+  - "Existing PermutationMode config surface (sequential/random/tpcds) unless deliberately changed and documented."
+
+anti_patterns:
+  - "DO NOT change ordering silently — because it affects compliance and result comparability across historical runs — gate on w0 evidence and document."
+
+verification:
+  - description: "Per-stream ordering is stable and spec-justified"
+    command: "uv run -- python -m pytest tests/unit -k 'tpcds and (stream or permut)' -v"
+    expected_output: "ordering pinned; matches chosen policy"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpcds/streams.py"
+    - "benchbox/core/tpcds/throughput_test.py"
+    - "docs/benchmarks/tpc-ds.md"
+    - "tests/unit/"
+
+impact:
+  business_value: |
+    QphDS credibility depends on spec-correct per-stream query sequencing.
+
+metadata:
+  tags: [concurrency, throughput, tpc-ds, compliance, soundness]
+  estimated_effort: Medium
+  created_date: "2026-07-09"
+
+open_questions:
+  - question: "Does the bundled dsqgen expose the official throughput stream permutation, or must it be reconstructed?"
+    gating: true
+    affects: ["w1"]
+    default: "Document the current deterministic ordering as a named, reproducible deviation until official ordering is confirmed available."
