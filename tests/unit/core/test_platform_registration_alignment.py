@@ -146,6 +146,7 @@ class TestPlatformRegistrationAlignment:
         )
         from benchbox.platforms.databend import DatabendAdapter
         from benchbox.platforms.doris import DorisAdapter
+        from benchbox.platforms.ducklake import DuckLakeAdapter
         from benchbox.platforms.lakesail import LakeSailAdapter
         from benchbox.platforms.questdb import QuestDBAdapter
         from benchbox.platforms.starburst import StarburstAdapter
@@ -155,6 +156,7 @@ class TestPlatformRegistrationAlignment:
         return {
             "duckdb": DuckDBAdapter,
             "motherduck": MotherDuckAdapter,
+            "ducklake": DuckLakeAdapter,
             "sqlite": SQLiteAdapter,
             "sqlite3": SQLiteAdapter,
             "datafusion": DataFusionAdapter,

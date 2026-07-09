@@ -11,7 +11,7 @@ BenchBox supports platforms across registry categories and editorial documentati
 
 <!-- benchbox-registry-counts:start -->
 
-Platform registry: **50** metadata entries; **45** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=27, experimental=17, deprecated=1.
+Platform registry: **51** metadata entries; **46** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=27, experimental=18, deprecated=1.
 
 <!-- benchbox-registry-counts:end -->
 
@@ -22,7 +22,7 @@ Platform registry: **50** metadata entries; **45** SQL-capable; **19** DataFrame
 | dataframe | 5 | DataFrame-only metadata entries |
 | distributed | 6 | Federated, cluster, and distributed SQL engines |
 | embedded | 1 | Built-in embedded runtime |
-| olap | 3 | PostgreSQL extension and embedded OLAP variants |
+| olap | 4 | PostgreSQL extension, embedded OLAP, and DuckLake lakehouse variants |
 | relational | 1 | General relational database support |
 | timeseries | 3 | Time-series engines with SQL/query support |
 
@@ -85,6 +85,7 @@ BenchBox supports multiple deployment modes for platforms, enabling the same ben
 | -------------------- | --------------------- | ------------------ | ---------------------------- |
 | **ClickHouse Cloud** | ClickHouse            | `clickhouse-cloud` | Managed ClickHouse service   |
 | **MotherDuck**       | DuckDB                | `motherduck`       | Serverless DuckDB cloud      |
+| **DuckLake**         | DuckDB                | `ducklake`         | Local DuckDB lakehouse (Parquet + SQL catalog) |
 | **Starburst**        | Trino                 | `starburst`        | Starburst Galaxy managed Trino |
 
 

@@ -78,6 +78,7 @@ _PLATFORM_SUPPORT_STATUS: dict[str, SupportStatus] = {
     "singlestore": "beta",
     # Shipped for evaluation, migration work, or ecosystem breadth.
     "cedardb": "experimental",
+    "ducklake": "experimental",
     "pg-duckdb": "experimental",
     "pg-mooncake": "experimental",
     "databricks-df": "experimental",
@@ -124,6 +125,7 @@ _PLATFORM_METADATA_JSON = """{
 "sqlite": {"display_name": "SQLite", "description": "Row-based OLTP database • Single-node • File-based", "category": "embedded", "libraries": [{"name": "sqlite3", "required": true}], "requirements": ["sqlite3 (built-in)"], "installation_command": "Built-in Python library", "adoption": "niche", "supports": ["transactional", "file_based"], "driver_package": null, "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql"}, "support_status": "stable"},
 "polars": {"display_name": "Polars", "description": "DataFrame engine • In-memory • Columnar", "category": "analytical", "libraries": [{"name": "polars", "required": true}], "requirements": ["polars>=0.20.0"], "installation_command": "uv add polars", "adoption": "established", "supports": ["olap", "in_memory", "columnar", "dataframe"], "driver_package": "polars", "capabilities": {"supports_sql": false, "supports_dataframe": true, "default_mode": "dataframe"}, "support_status": "stable"},
 "motherduck": {"display_name": "MotherDuck", "description": "Serverless DuckDB cloud • Managed • Cloud storage", "category": "cloud", "libraries": [{"name": "duckdb", "required": true}], "requirements": ["duckdb>=0.9.0"], "installation_command": "uv add duckdb", "adoption": "emerging", "supports": ["olap", "cloud", "columnar", "serverless"], "driver_package": "duckdb", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "duckdb", "inherits_from": "duckdb", "cost_class": "paid_credits", "default_deployment": "managed", "deployment_modes": {"managed": {"mode": "managed", "display_name": "MotherDuck Cloud", "description": "Serverless DuckDB in MotherDuck cloud", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["duckdb"], "auth_methods": ["token"]}}}, "support_status": "beta"},
+"ducklake": {"display_name": "DuckLake", "description": "Open lakehouse format • DuckDB engine • Parquet + SQL catalog", "category": "olap", "libraries": [{"name": "duckdb", "required": true}], "requirements": ["duckdb>=1.3.0"], "installation_command": "uv add duckdb", "adoption": "emerging", "supports": ["olap", "lakehouse", "columnar", "parquet"], "driver_package": "duckdb", "notes": "MVP: DuckDB-file catalog metadata + local Parquet DATA_PATH only. Requires a live DuckDB runtime >= 1.3 for the ducklake extension; SQLite/Postgres catalogs and S3 DATA_PATH are a follow-on.", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "duckdb", "inherits_from": "duckdb", "default_deployment": "local", "deployment_modes": {"local": {"mode": "local", "display_name": "DuckLake Local", "description": "Local DuckDB-file catalog with Parquet on local disk", "requires_credentials": false, "requires_cloud_storage": false, "requires_network": false, "default_for_platform": true, "dependencies": ["duckdb"], "auth_methods": []}}}, "support_status": "experimental"},
 "clickhouse": {"display_name": "ClickHouse", "description": "Columnar OLAP database • Local/server • Distributed", "category": "analytical", "libraries": [{"name": "clickhouse_driver", "required": true, "import_name": "clickhouse_driver"}, {"name": "chdb", "required": false, "description": "Local ClickHouse"}], "requirements": ["clickhouse-driver>=0.2.0"], "installation_command": "uv add clickhouse-driver", "adoption": "established", "supports": ["olap", "columnar", "distributed"], "driver_package": "clickhouse-driver", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "clickhouse", "default_deployment": "local", "deployment_modes": {"local": {"mode": "local", "display_name": "ClickHouse Local (chDB)", "description": "Embedded ClickHouse via chDB library", "requires_credentials": false, "requires_cloud_storage": false, "requires_network": false, "default_for_platform": true, "dependencies": ["chdb"], "auth_methods": []}, "server": {"mode": "self-hosted", "display_name": "ClickHouse Server", "description": "Self-hosted ClickHouse server or cluster", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": false, "dependencies": ["clickhouse-driver"], "auth_methods": ["password"]}}}, "support_status": "deprecated"},
 "clickhouse-local": {"display_name": "ClickHouse Local (chDB)", "description": "Embedded ClickHouse via chDB • In-process • Zero network", "category": "analytical", "libraries": [{"name": "chdb", "required": true, "import_name": "chdb"}], "requirements": ["chdb>=0.10.0"], "installation_command": "uv add benchbox --extra clickhouse-local", "adoption": "established", "supports": ["olap", "columnar", "embedded", "in-process"], "driver_package": "chdb", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "clickhouse", "inherits_from": "clickhouse"}, "support_status": "beta"},
 "clickhouse-server": {"display_name": "ClickHouse Server", "description": "Self-hosted ClickHouse • Docker/dedicated • High-performance columnar", "category": "analytical", "libraries": [{"name": "clickhouse_driver", "required": true, "import_name": "clickhouse_driver"}], "requirements": ["clickhouse-driver>=0.2.0"], "installation_command": "uv add benchbox --extra clickhouse-server", "adoption": "established", "supports": ["olap", "columnar", "distributed", "self-hosted"], "driver_package": "clickhouse-driver", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "clickhouse", "inherits_from": "clickhouse", "default_deployment": "self-hosted", "deployment_modes": {"self-hosted": {"mode": "self-hosted", "display_name": "ClickHouse Server Self-Hosted", "description": "Self-hosted ClickHouse Server server", "requires_credentials": true, "requires_cloud_storage": false, "requires_network": true, "default_for_platform": true, "dependencies": ["clickhouse_driver"], "auth_methods": ["password"]}}}, "support_status": "beta"},
@@ -1135,7 +1137,7 @@ class PlatformRegistry:
 
         Platform families group related platforms that share SQL dialect,
         benchmark compatibility, and data type mappings. For example:
-        - 'duckdb' family: duckdb, motherduck
+        - 'duckdb' family: duckdb, motherduck, ducklake
         - 'clickhouse' family: clickhouse (local, server, cloud modes)
         - 'trino' family: trino, starburst, athena
 
@@ -1156,7 +1158,7 @@ class PlatformRegistry:
 
         Child platforms inherit SQL dialect, benchmark compatibility, and
         data type mappings from their parent. For example:
-        - motherduck inherits from duckdb
+        - motherduck, ducklake inherit from duckdb
         - starburst inherits from trino
 
         Args:
@@ -1234,6 +1236,7 @@ class PlatformRegistry:
 _OPTIONAL_ADAPTERS: tuple[tuple[str, str, str], ...] = (
     ("duckdb", "benchbox.platforms.duckdb", "DuckDBAdapter"),
     ("motherduck", "benchbox.platforms.motherduck", "MotherDuckAdapter"),
+    ("ducklake", "benchbox.platforms.ducklake", "DuckLakeAdapter"),
     ("datafusion", "benchbox.platforms.datafusion", "DataFusionAdapter"),
     ("databricks", "benchbox.platforms.databricks", "DatabricksAdapter"),
     ("databricks-df", "benchbox.platforms.databricks", "DatabricksDataFrameAdapter"),
