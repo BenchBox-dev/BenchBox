@@ -48,6 +48,7 @@ or verify the data files. That's manager.py's job.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -58,6 +59,7 @@ except ModuleNotFoundError:  # Python 3.10: stdlib tomllib is 3.11+
     import tomli as tomllib  # type: ignore[no-redef]
 
 from .errors import ManifestValidationError
+from .logical_hash import LOGICAL_CONTENT_VERSION, update_sized_hash_part
 
 # Required top-level keys; missing any of these fails parse.
 _REQUIRED_TOP_KEYS = (
@@ -88,18 +90,66 @@ def _manifest_hash_input(raw: bytes) -> bytes:
 
 
 def compute_manifest_hash(path: str | Path) -> str:
-    """Compute the pinned manifest hash with `manifest_hash` itself excluded."""
+    """Compute the legacy pinned manifest hash with `manifest_hash` excluded.
+
+    This is the byte-inclusive, text-projection hash used by manifests that do
+    not carry per-table `logical_sha256` (legacy mode). Logical-mode manifests
+    use `compute_manifest_identity_hash` instead.
+    """
     return hashlib.sha256(_manifest_hash_input(Path(path).read_bytes())).hexdigest()
 
 
 @dataclass(frozen=True)
 class TableEntry:
-    """One [[tables]] block from data_manifest.toml."""
+    """One [[tables]] block from data_manifest.toml.
+
+    `sha256` is the transport-integrity byte hash of the Parquet file (verified
+    on the hot fetch path). `logical_sha256` is the reproducible row-content hash
+    (present only in logical-mode manifests); `schema` maps column name ->
+    PostgreSQL type in column order, and is what the logical hash is computed
+    over.
+    """
 
     name: str
     file: str
     sha256: str
     row_count: int
+    logical_sha256: str | None = None
+    schema: dict[str, str] = field(default_factory=dict)
+
+
+def compute_manifest_identity_hash(
+    *,
+    dataset_version: str,
+    data_archive_hash: str,
+    url: str,
+    license_file: str,
+    tables: Sequence[TableEntry],
+) -> str:
+    """Compute the logical-mode manifest identity hash.
+
+    Hashes a canonical *structured* projection — dataset version, the logical
+    `data_archive_hash`, url, license, and each table's name/file/logical hash/
+    row count/ordered schema — rather than the manifest's raw text. It therefore
+    excludes everything that varies per rebuild (byte `sha256`, `archive_sha256`,
+    `[provenance]`), so a logically-identical rebuild reproduces it exactly. The
+    build script and this loader share this function so they cannot diverge.
+    """
+    hasher = hashlib.sha256()
+    update_sized_hash_part(hasher, "V", LOGICAL_CONTENT_VERSION.encode("ascii"))
+    update_sized_hash_part(hasher, "dsv", dataset_version.encode("utf-8"))
+    update_sized_hash_part(hasher, "dah", data_archive_hash.encode("utf-8"))
+    update_sized_hash_part(hasher, "url", url.encode("utf-8"))
+    update_sized_hash_part(hasher, "lic", license_file.encode("utf-8"))
+    for entry in sorted(tables, key=lambda e: e.name):
+        update_sized_hash_part(hasher, "tbl", entry.name.encode("utf-8"))
+        update_sized_hash_part(hasher, "file", entry.file.encode("utf-8"))
+        update_sized_hash_part(hasher, "lsh", (entry.logical_sha256 or "").encode("utf-8"))
+        update_sized_hash_part(hasher, "rc", str(entry.row_count).encode("ascii"))
+        for column_name, column_type in entry.schema.items():
+            update_sized_hash_part(hasher, "scn", column_name.encode("utf-8"))
+            update_sized_hash_part(hasher, "sct", column_type.encode("utf-8"))
+    return hasher.hexdigest()
 
 
 @dataclass(frozen=True)
@@ -122,6 +172,11 @@ class DataManifest:
             if t.name == name:
                 return t
         raise KeyError(f"table {name!r} not found in manifest {self.dataset_version}")
+
+    @property
+    def is_logical(self) -> bool:
+        """True if this manifest pins per-table logical hashes (logical mode)."""
+        return bool(self.tables) and all(t.logical_sha256 for t in self.tables)
 
 
 def load_manifest(path: str | Path) -> DataManifest:
@@ -148,13 +203,6 @@ def load_manifest(path: str | Path) -> DataManifest:
     if missing:
         raise ManifestValidationError(f"manifest at {p} is missing required keys: {sorted(missing)}")
 
-    expected_manifest_hash = str(raw["manifest_hash"])
-    actual_manifest_hash = hashlib.sha256(_manifest_hash_input(raw_bytes)).hexdigest()
-    if expected_manifest_hash != actual_manifest_hash:
-        raise ManifestValidationError(
-            f"manifest_hash mismatch for {p}: expected {expected_manifest_hash}, got {actual_manifest_hash}"
-        )
-
     tables_raw = raw.get("tables", [])
     if not isinstance(tables_raw, list):
         raise ManifestValidationError(f"manifest at {p}: `tables` must be an array of tables")
@@ -162,16 +210,50 @@ def load_manifest(path: str | Path) -> DataManifest:
     for i, t in enumerate(tables_raw):
         if not isinstance(t, dict):
             raise ManifestValidationError(f"manifest at {p}: tables[{i}] is not a table")
+        schema_raw = t["schema"] if "schema" in t else {}
+        if not isinstance(schema_raw, dict):
+            raise ManifestValidationError(f"manifest at {p}: tables[{i}].schema must be a TOML table")
+        logical_sha256 = t["logical_sha256"] if "logical_sha256" in t else None
         try:
             entry = TableEntry(
                 name=str(t["name"]),
                 file=str(t["file"]),
                 sha256=str(t["sha256"]),
                 row_count=int(t["row_count"]),
+                logical_sha256=None if logical_sha256 is None else str(logical_sha256),
+                schema={str(k): str(v) for k, v in schema_raw.items()},
             )
         except KeyError as exc:
             raise ManifestValidationError(f"manifest at {p}: tables[{i}] missing field {exc.args[0]!r}") from exc
         tables.append(entry)
+
+    # Feature-detect the verification mode: a manifest that pins per-table
+    # `logical_sha256` is a logical-mode manifest whose identity survives a
+    # non-deterministic transport rebuild; older manifests fall back to the
+    # byte-inclusive text hash. Mixing (some tables logical, some not) is an
+    # inconsistent manifest, not a supported mode.
+    logical_flags = [t.logical_sha256 is not None for t in tables]
+    if any(logical_flags) and not all(logical_flags):
+        without = [t.name for t in tables if t.logical_sha256 is None]
+        raise ManifestValidationError(
+            f"manifest at {p}: logical_sha256 is present on some tables but missing on {sorted(without)}"
+        )
+
+    expected_manifest_hash = str(raw["manifest_hash"])
+    if logical_flags and all(logical_flags):
+        actual_manifest_hash = compute_manifest_identity_hash(
+            dataset_version=str(raw["dataset_version"]),
+            data_archive_hash=str(raw["data_archive_hash"]),
+            url=str(raw["url"]),
+            license_file=str(raw["license_file"]),
+            tables=tables,
+        )
+    else:
+        actual_manifest_hash = hashlib.sha256(_manifest_hash_input(raw_bytes)).hexdigest()
+    if expected_manifest_hash != actual_manifest_hash:
+        raise ManifestValidationError(
+            f"manifest_hash mismatch for {p}: expected {expected_manifest_hash}, got {actual_manifest_hash}"
+        )
 
     provenance = raw.get("provenance", {})
     if not isinstance(provenance, dict):

@@ -10,13 +10,23 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+import duckdb
 import pytest
 
 from benchbox.core.data_fetch import (
     ChecksumMismatchError,
+    DataFetchError,
     ExtractionRequiredError,
+    TableEntry,
     compute_manifest_hash,
+    compute_manifest_identity_hash,
     fetch_data,
+    load_manifest,
+    verify_logical_content,
+)
+from benchbox.core.data_fetch.logical_hash import (
+    logical_columns_from_schema,
+    logical_table_hash_from_parquet,
 )
 
 pytestmark = [
@@ -178,3 +188,112 @@ def test_post_extraction_with_bad_sha_raises_checksum_mismatch(tmp_path: Path) -
         fetch_data("test", manifest_path, out_dir, downloader=buggy_extracting_downloader)
     assert "alpha.parquet" in excinfo.value.path
     assert excinfo.value.expected_sha256 == ALPHA_SHA
+
+
+# ---- logical-content verification (opt-in assurance path) ----
+
+_LOGICAL_SCHEMA = {"id": "integer", "val": "character varying"}
+
+
+def _write_parquet(con: object, path: Path, rows: list[tuple[int, str]]) -> None:
+    values = ", ".join(f"({i}, '{v}')" for i, v in rows)
+    con.execute(f"COPY (SELECT * FROM (VALUES {values}) t(id, val)) TO '{path}' (FORMAT PARQUET)")
+
+
+def _write_logical_manifest(tmp: Path, con: object, tables: dict[str, list[tuple[int, str]]]) -> Path:
+    data_dir = tmp / "data"
+    data_dir.mkdir(exist_ok=True)
+    cols = logical_columns_from_schema(_LOGICAL_SCHEMA)
+    entries = []
+    for name, rows in tables.items():
+        parquet = data_dir / f"{name}.parquet"
+        _write_parquet(con, parquet, rows)
+        h = logical_table_hash_from_parquet(con=con, parquet_path=parquet, table=name, columns=cols)
+        # A deterministic byte sha for the hot-path field; irrelevant to logical verify.
+        entries.append(
+            TableEntry(
+                name=name,
+                file=f"{name}.parquet",
+                sha256=hashlib.sha256(parquet.read_bytes()).hexdigest(),
+                row_count=h.row_count,
+                logical_sha256=h.sha256,
+                schema=_LOGICAL_SCHEMA,
+            )
+        )
+    manifest_hash = compute_manifest_identity_hash(
+        dataset_version="logical-v1",
+        data_archive_hash="cd" * 32,
+        url="https://example.com/x.tar.zst",
+        license_file="DATA-LICENSE.md",
+        tables=entries,
+    )
+    lines = [
+        'dataset_version = "logical-v1"',
+        f'manifest_hash = "{manifest_hash}"',
+        f'data_archive_hash = "{"cd" * 32}"',
+        'url = "https://example.com/x.tar.zst"',
+        f'archive_sha256 = "{"00" * 32}"',
+        'license_file = "DATA-LICENSE.md"',
+        "",
+    ]
+    for e in entries:
+        lines += [
+            "[[tables]]",
+            f'name = "{e.name}"',
+            f'file = "{e.file}"',
+            f'sha256 = "{e.sha256}"',
+            f'logical_sha256 = "{e.logical_sha256}"',
+            f"row_count = {e.row_count}",
+            'schema.id = "integer"',
+            'schema.val = "character varying"',
+            "",
+        ]
+    p = tmp / "data_manifest.toml"
+    p.write_text("\n".join(lines))
+    return p
+
+
+def test_verify_logical_content_passes_on_matching_data(tmp_path: Path) -> None:
+    con = duckdb.connect()
+    manifest_path = _write_logical_manifest(tmp_path, con, {"t1": [(1, "a"), (2, "b")], "t2": [(1, "x")]})
+    manifest = load_manifest(manifest_path)
+    assert manifest.is_logical
+    assert verify_logical_content(manifest, tmp_path / "data") == []
+
+
+def test_verify_logical_content_survives_reencoded_parquet(tmp_path: Path) -> None:
+    """A byte-different but logically-identical re-write of the Parquet still
+    verifies — the reproducibility guarantee for a non-deterministic rebuild."""
+    con = duckdb.connect()
+    manifest_path = _write_logical_manifest(tmp_path, con, {"t1": [(2, "b"), (1, "a")]})
+    manifest = load_manifest(manifest_path)
+    # Re-write t1 with a different row order / compression; content unchanged.
+    con.execute("SET threads=1")
+    _write_parquet(con, tmp_path / "data" / "t1.parquet", [(1, "a"), (2, "b")])
+    assert verify_logical_content(manifest, tmp_path / "data") == []
+
+
+def test_verify_logical_content_flags_content_change(tmp_path: Path) -> None:
+    con = duckdb.connect()
+    manifest_path = _write_logical_manifest(tmp_path, con, {"t1": [(1, "a"), (2, "b")]})
+    manifest = load_manifest(manifest_path)
+    _write_parquet(con, tmp_path / "data" / "t1.parquet", [(1, "a"), (2, "CHANGED")])
+    mismatches = verify_logical_content(manifest, tmp_path / "data")
+    assert [m.kind for m in mismatches] == ["hash_mismatch"]
+    assert mismatches[0].table == "t1"
+
+
+def test_verify_logical_content_flags_missing_file(tmp_path: Path) -> None:
+    con = duckdb.connect()
+    manifest_path = _write_logical_manifest(tmp_path, con, {"t1": [(1, "a")]})
+    manifest = load_manifest(manifest_path)
+    (tmp_path / "data" / "t1.parquet").unlink()
+    mismatches = verify_logical_content(manifest, tmp_path / "data")
+    assert [m.kind for m in mismatches] == ["missing"]
+
+
+def test_verify_logical_content_requires_logical_manifest(tmp_path: Path) -> None:
+    legacy_manifest = _write_manifest(tmp_path)
+    manifest = load_manifest(legacy_manifest)
+    with pytest.raises(DataFetchError, match="logical-mode manifest"):
+        verify_logical_content(manifest, tmp_path)
