@@ -7,13 +7,13 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import pytest
 
-from benchbox.experimental.concurrency.analyzer import (
-    ConcurrencyAnalyzer,
+from benchbox.experimental.load_testing.analyzer import (
     ContentionAnalysis,
+    LoadAnalyzer,
     QueueAnalysis,
     ScalingAnalysis,
 )
-from benchbox.experimental.concurrency.executor import (
+from benchbox.experimental.load_testing.executor import (
     ConcurrentLoadResult,
     QueryExecution,
     StreamResult,
@@ -110,7 +110,7 @@ class TestQueueAnalysis:
 
     def test_analyze_queue_with_wait_times(self, sample_result):
         """Should analyze queue wait times."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         analysis = analyzer.analyze_queue()
 
         assert isinstance(analysis, QueueAnalysis)
@@ -119,7 +119,7 @@ class TestQueueAnalysis:
 
     def test_analyze_queue_no_wait_times(self, result_with_no_queuing):
         """Should handle results with no queue times."""
-        analyzer = ConcurrencyAnalyzer(result_with_no_queuing)
+        analyzer = LoadAnalyzer(result_with_no_queuing)
         analysis = analyzer.analyze_queue()
 
         assert analysis.queueing_detected is False
@@ -127,14 +127,14 @@ class TestQueueAnalysis:
 
     def test_queue_severity_none(self, result_with_no_queuing):
         """Should detect no queueing."""
-        analyzer = ConcurrencyAnalyzer(result_with_no_queuing)
+        analyzer = LoadAnalyzer(result_with_no_queuing)
         analysis = analyzer.analyze_queue()
 
         assert analysis.queueing_severity == "none"
 
     def test_queue_time_ratio(self, sample_result):
         """Should calculate queue time ratio."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         analysis = analyzer.analyze_queue()
 
         assert 0 <= analysis.queue_time_ratio <= 1
@@ -145,7 +145,7 @@ class TestContentionAnalysis:
 
     def test_analyze_contention_basic(self, sample_result):
         """Should analyze contention patterns."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         analysis = analyzer.analyze_contention()
 
         assert isinstance(analysis, ContentionAnalysis)
@@ -154,7 +154,7 @@ class TestContentionAnalysis:
 
     def test_contention_slow_query_detection(self, sample_result):
         """Should detect slow queries."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         analysis = analyzer.analyze_contention()
 
         assert isinstance(analysis.slow_query_count, int)
@@ -162,14 +162,14 @@ class TestContentionAnalysis:
 
     def test_contention_type_detection(self, sample_result):
         """Should detect contention type."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         analysis = analyzer.analyze_contention()
 
         assert analysis.contention_type in ["none", "resource", "lock", "connection", "unknown"]
 
     def test_contention_recommendations(self, sample_result):
         """Should provide recommendations."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         analysis = analyzer.analyze_contention()
 
         assert isinstance(analysis.recommendations, list)
@@ -189,7 +189,7 @@ class TestContentionAnalysis:
             overall_throughput=0,
             max_concurrency_reached=0,
         )
-        analyzer = ConcurrencyAnalyzer(empty_result)
+        analyzer = LoadAnalyzer(empty_result)
         analysis = analyzer.analyze_contention()
 
         assert analysis.contention_detected is False
@@ -200,7 +200,7 @@ class TestScalingAnalysis:
 
     def test_analyze_scaling_single_result(self, sample_result):
         """Should analyze scaling from single result."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         analysis = analyzer.analyze_scaling()
 
         assert isinstance(analysis, ScalingAnalysis)
@@ -245,7 +245,7 @@ class TestScalingAnalysis:
                 max_concurrency_reached=concurrency,
             )
 
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         analysis = analyzer.analyze_scaling(results_by_concurrency)
 
         assert len(analysis.concurrency_levels) == 3
@@ -253,25 +253,25 @@ class TestScalingAnalysis:
 
     def test_scaling_type_detection(self, sample_result):
         """Should detect scaling type."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         analysis = analyzer.analyze_scaling()
 
         assert analysis.scaling_type in ["linear", "sublinear", "saturation", "degradation", "unknown"]
 
     def test_parallelizable_fraction(self, sample_result):
         """Should estimate parallelizable fraction."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         analysis = analyzer.analyze_scaling()
 
         assert 0 <= analysis.parallelizable_fraction <= 1
 
 
-class TestConcurrencyAnalyzerSummary:
+class TestLoadAnalyzerSummary:
     """Tests for analyzer summary."""
 
     def test_get_summary(self, sample_result):
         """Should produce summary dict."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         summary = analyzer.get_summary()
 
         assert "test_info" in summary
@@ -281,7 +281,7 @@ class TestConcurrencyAnalyzerSummary:
 
     def test_summary_test_info(self, sample_result):
         """Summary should include test info."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         summary = analyzer.get_summary()
 
         assert "duration_seconds" in summary["test_info"]
@@ -291,7 +291,7 @@ class TestConcurrencyAnalyzerSummary:
 
     def test_summary_queue_info(self, sample_result):
         """Summary should include queue info."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         summary = analyzer.get_summary()
 
         assert "detected" in summary["queue"]
@@ -299,7 +299,7 @@ class TestConcurrencyAnalyzerSummary:
 
     def test_summary_contention_info(self, sample_result):
         """Summary should include contention info."""
-        analyzer = ConcurrencyAnalyzer(sample_result)
+        analyzer = LoadAnalyzer(sample_result)
         summary = analyzer.get_summary()
 
         assert "detected" in summary["contention"]
@@ -344,7 +344,7 @@ class TestContentionAnalysisWithErrors:
             max_concurrency_reached=1,
         )
 
-        analyzer = ConcurrencyAnalyzer(result)
+        analyzer = LoadAnalyzer(result)
         analysis = analyzer.analyze_contention()
 
         assert analysis.timeout_count == 1
@@ -383,7 +383,7 @@ class TestContentionAnalysisWithErrors:
             max_concurrency_reached=1,
         )
 
-        analyzer = ConcurrencyAnalyzer(result)
+        analyzer = LoadAnalyzer(result)
         analysis = analyzer.analyze_contention()
 
         assert analysis.connection_error_count == 1

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from benchbox.experimental.concurrency.executor import ConcurrentLoadResult
+    from benchbox.experimental.load_testing.executor import ConcurrentLoadResult
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ class ScalingAnalysis:
     scaling_type: str  # "linear", "sublinear", "saturation", "degradation"
 
 
-class ConcurrencyAnalyzer:
+class LoadAnalyzer:
     """Analyzes concurrent load test results for patterns and bottlenecks."""
 
     def __init__(self, result: ConcurrentLoadResult):
