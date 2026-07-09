@@ -50,6 +50,16 @@ def test_utc_now_iso_uses_python310_compatible_timezone(monkeypatch: pytest.Monk
     assert build_joinorder_data.utc_now_iso() == "2026-05-11T03:22:11Z"
 
 
+def test_container_cli_defaults_to_docker(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("BENCHBOX_CONTAINER_CLI", raising=False)
+    assert build_joinorder_data.container_cli() == "docker"
+
+
+def test_container_cli_honours_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BENCHBOX_CONTAINER_CLI", "mocker")
+    assert build_joinorder_data.container_cli() == "mocker"
+
+
 def _metadata(files: list[dict]) -> dict:
     return {"data": {"latestVersion": {"files": files}}}
 

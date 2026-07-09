@@ -17,6 +17,10 @@ description: |
   Tail failures:
     - JoinOrder SF=1 failed before ClickHouse execution because the external data archive URL returned 404:
       `https://github.com/joeharris76/BenchBox/releases/download/data%2Fjoinorder-imdb-2013-v1/joinorder-imdb-2013-v1.tar.zst`.
+      RESOLVED 2026-07-09: shared data availability, not a ClickHouse adapter
+      issue. The release asset was restored (logical-mode republish) under
+      joinorder-canonical-release-asset-restore; the URL now returns 200. w1 is
+      answered — re-run the JoinOrder cell to clear this tail failure.
     - TPCHavoc SF=1 timed out after 1200s with no subprocess output captured.
     - FlightData SF=1 timed out after 1200s with no subprocess output captured.
 
@@ -35,7 +39,7 @@ prior_art:
 work:
   - id: w1
     summary: "Confirm whether JoinOrder archive 404 is shared data availability or corpus config drift"
-    status: pending
+    status: done
     notes: |
       Reproduce outside ClickHouse if needed. If the release asset is missing
       or renamed, route to shared data-fetch / benchmark-data ownership rather

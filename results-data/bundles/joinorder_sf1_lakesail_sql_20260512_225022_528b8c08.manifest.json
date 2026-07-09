@@ -1,7 +1,7 @@
 {
   "benchmark": "JoinOrderBenchmark",
   "bundle_file": "joinorder_sf1_lakesail_sql_20260512_225022_528b8c08.json",
-  "bundle_hash": "19bdde6910fbe187f1119db9d13d550c8856de9187f6480dce29d2307f7c80c3",
+  "bundle_hash": "22044f340c9fb978834b549e11cdc521928e9e25cfea68e7ef7dce5ba9bb49bf",
   "companion_hashes": {},
   "phase": 2,
   "platform": "LakeSail",

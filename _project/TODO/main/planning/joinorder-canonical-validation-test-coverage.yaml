@@ -2,7 +2,7 @@ id: joinorder-canonical-validation-test-coverage
 title: "test(joinorder): FK-integrity, full-archive cardinality, and encoding assertions for canonical data"
 worktree: main
 priority: Medium
-status: Blocked
+status: Not Started
 category: Testing and Quality Assurance
 
 description: |

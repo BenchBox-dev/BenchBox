@@ -60,6 +60,58 @@ from benchbox.utils.printing import quiet_console
 __all__ = ["TestDriversMixin", "_power_query_result", "_power_test_error_result"]
 
 
+def _resolve_requested_stream_count(run_config: dict, default: int = 2) -> int:
+    """Resolve the concurrent stream count a throughput driver should use.
+
+    Both TPC-H and TPC-DS throughput drivers must agree on precedence, so this
+    is the single shared mapping point ("driver boundary") between the
+    RunConfig/BenchmarkConfig schema and the legacy ad hoc keys some callers
+    still pass directly:
+
+    1. ``num_streams`` / ``streams`` - back-compat keys some callers (and
+       existing unit tests) populate directly on a hand-built ``run_config``
+       dict, without going through ``RunConfig`` at all.
+    2. ``concurrent_streams`` - the canonical field
+       (``RunConfig.concurrent_streams`` <- ``BenchmarkConfig.concurrency``,
+       see ``benchbox/core/schemas.py``), present whenever ``run_config`` was
+       built from a real ``RunConfig`` (``benchbox/core/runner/runner.py``
+       spreads ``RunConfig.__dict__`` into the adapter kwargs). This is what
+       lets a user-requested stream count actually reach the driver.
+    3. ``default`` (2) - preserved only when NONE of the above keys are
+       present at all, i.e. a bare/legacy ``run_config`` dict that never
+       carried any stream-count information (must_preserve: existing default
+       of 2 streams when the user requests nothing).
+
+    Do NOT rename ``concurrent_streams`` across the schema to close this gap
+    elsewhere; this function is the intended mapping boundary.
+
+    Floor to the TPC throughput minimum (2)
+    ----------------------------------------
+    ``BenchmarkConfig.concurrency`` defaults to 1 (``benchbox/core/schemas.py``),
+    and the real pipeline *always* spreads it into ``run_config`` as
+    ``concurrent_streams=1`` (``RunConfig.concurrent_streams`` <-
+    ``benchmark_config.concurrency`` in ``benchbox/core/runner/runner.py:726``,
+    then ``run_config.__dict__`` is spread into the adapter kwargs at
+    ``runner.py:803``). That means a resolved count of 1 -- whether it came
+    from the schema default or an explicit user request of 1 -- is bitwise
+    indistinguishable at this boundary; there is no "unset" sentinel on the
+    wire to tell them apart. Both TPC-H and TPC-DS throughput tests have a
+    hard 2-stream minimum, and the must_preserve contract requires the
+    default (no stream count requested at all) to still run 2 streams. The
+    only resolution that satisfies both is to floor the final result to 2
+    regardless of how it was resolved above. Values >= 2 from any precedence
+    tier pass through unchanged; the num_streams/streams/concurrent_streams
+    precedence order above is untouched by this floor.
+    """
+    resolved = default
+    for key in ("num_streams", "streams", "concurrent_streams"):
+        value = run_config.get(key)
+        if value is not None:
+            resolved = int(value)
+            break
+    return max(resolved, 2)
+
+
 class _CapturedPlan(NamedTuple):
     """One query's captured plan, accumulated across isolated capture passes.
 
@@ -230,7 +282,7 @@ class TestDriversMixin:
             # Extract configuration
             scale_factor = run_config.get("scale_factor", 1.0)
             validation_mode = run_config.get("validation_mode")  # Universal validation mode
-            num_streams = run_config.get("num_streams", 2)
+            num_streams = _resolve_requested_stream_count(run_config)
             verbose = run_config.get("verbose", False)
 
             # Set TPC-DS validation mode from config (takes precedence over environment variable)
@@ -365,7 +417,7 @@ class TestDriversMixin:
 
         try:
             scale_factor = run_config.get("scale_factor", 1.0)
-            num_streams = run_config.get("num_streams", run_config.get("streams", 2))
+            num_streams = _resolve_requested_stream_count(run_config)
             verbose = run_config.get("verbose", False)
 
             console.print(

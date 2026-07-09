@@ -33,6 +33,7 @@ from typing import Literal
 from .downloader import download, sha256_of
 from .errors import ChecksumMismatchError, DataFetchError
 from .locking import archive_lock
+from .logical_hash import logical_columns_from_schema, logical_table_hash_from_parquet
 from .manifest import DataManifest, load_manifest
 
 
@@ -85,6 +86,87 @@ def _verify_table_files(manifest: DataManifest, data_dir: Path) -> list[_BadFile
                 )
             )
     return bad
+
+
+@dataclass(frozen=True)
+class LogicalMismatch:
+    """Why a table failed logical-content verification."""
+
+    table: str
+    kind: Literal["missing", "no_schema", "row_count_mismatch", "hash_mismatch"]
+    expected: str | None = None
+    actual: str | None = None
+
+
+def verify_logical_content(
+    manifest: DataManifest,
+    data_dir: str | Path,
+    *,
+    con: object | None = None,
+) -> list[LogicalMismatch]:
+    """Recompute per-table logical hashes from extracted Parquet and compare.
+
+    This is an explicit, opt-in assurance check — NOT part of the hot
+    ``fetch_data`` path — that confirms the extracted files carry the canonical
+    logical content even when their Parquet bytes differ from the published
+    archive (which a non-deterministic rebuild guarantees they will). It reads
+    every row of every table ``ORDER BY id``, so it is deliberately kept off the
+    per-fetch path.
+
+    Returns an empty list when every table matches. Raises ``DataFetchError`` if
+    the manifest is not a logical-mode manifest (no per-table logical hashes to
+    check against).
+    """
+    if not manifest.is_logical:
+        raise DataFetchError(
+            f"manifest {manifest.dataset_version} does not pin per-table logical_sha256; "
+            "logical verification requires a logical-mode manifest"
+        )
+
+    data_dir = Path(data_dir)
+    owns_con = con is None
+    if con is None:
+        import duckdb  # local import: only the assurance path needs DuckDB here
+
+        con = duckdb.connect()
+    try:
+        mismatches: list[LogicalMismatch] = []
+        for entry in manifest.tables:
+            parquet_path = data_dir / entry.file
+            if not parquet_path.exists():
+                mismatches.append(LogicalMismatch(table=entry.name, kind="missing"))
+                continue
+            if not entry.schema:
+                mismatches.append(LogicalMismatch(table=entry.name, kind="no_schema"))
+                continue
+            result = logical_table_hash_from_parquet(
+                con=con,
+                parquet_path=parquet_path,
+                table=entry.name,
+                columns=logical_columns_from_schema(entry.schema),
+            )
+            if result.row_count != entry.row_count:
+                mismatches.append(
+                    LogicalMismatch(
+                        table=entry.name,
+                        kind="row_count_mismatch",
+                        expected=str(entry.row_count),
+                        actual=str(result.row_count),
+                    )
+                )
+            elif result.sha256 != entry.logical_sha256:
+                mismatches.append(
+                    LogicalMismatch(
+                        table=entry.name,
+                        kind="hash_mismatch",
+                        expected=entry.logical_sha256,
+                        actual=result.sha256,
+                    )
+                )
+        return mismatches
+    finally:
+        if owns_con:
+            con.close()
 
 
 def fetch_data(

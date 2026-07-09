@@ -29,14 +29,28 @@ from .errors import (
     DownloadError,
     ManifestValidationError,
 )
-from .manager import ExtractionRequiredError, fetch_data
-from .manifest import DataManifest, TableEntry, compute_manifest_hash, load_manifest
+from .manager import (
+    ExtractionRequiredError,
+    LogicalMismatch,
+    fetch_data,
+    verify_logical_content,
+)
+from .manifest import (
+    DataManifest,
+    TableEntry,
+    compute_manifest_hash,
+    compute_manifest_identity_hash,
+    load_manifest,
+)
 
 __all__ = [
     "fetch_data",
+    "verify_logical_content",
+    "LogicalMismatch",
     "DataManifest",
     "TableEntry",
     "compute_manifest_hash",
+    "compute_manifest_identity_hash",
     "load_manifest",
     "DataFetchError",
     "ManifestValidationError",

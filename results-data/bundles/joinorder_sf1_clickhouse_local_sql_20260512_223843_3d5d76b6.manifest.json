@@ -1,7 +1,7 @@
 {
   "benchmark": "JoinOrderBenchmark",
   "bundle_file": "joinorder_sf1_clickhouse_local_sql_20260512_223843_3d5d76b6.json",
-  "bundle_hash": "205f3514747a6394269729501cfe80fa4717752deb39e25b82f90823486ed62c",
+  "bundle_hash": "6bf70fde8ce50331e3a10c0c8486b07a80e51e2dabbdf2abfab636158971747e",
   "companion_hashes": {},
   "phase": 2,
   "platform": "ClickHouse Local",

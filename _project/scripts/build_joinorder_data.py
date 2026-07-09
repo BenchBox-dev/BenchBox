@@ -37,6 +37,25 @@ from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+import tomllib
+
+# Shared, single-source-of-truth logical-hash algorithm. The build script runs
+# under the repo-root uv environment, so it imports the same primitives the
+# runtime loader/verifier use — build and runtime therefore cannot compute the
+# logical hash differently (see
+# _project/decisions/joinorder-logical-verification-2026-07-08.md).
+from benchbox.core.data_fetch.logical_hash import (
+    LOGICAL_CONTENT_VERSION,
+    LogicalColumn,
+    LogicalTableHash,
+    aggregate_logical_content_hash,
+    is_integer_postgres_type,
+    logical_table_hash_from_parquet as _shared_logical_table_hash_from_parquet,
+    update_logical_row_hash,
+    update_sized_hash_part,
+)
+from benchbox.core.data_fetch.manifest import TableEntry, compute_manifest_identity_hash
+
 DATASET_VERSION = "joinorder-imdb-2013-v1"
 SOURCE_DOI = "10.7910/DVN/2QYZBT"
 SOURCE_PERSISTENT_ID = f"doi:{SOURCE_DOI}"
@@ -217,15 +236,6 @@ class TableFile:
     sha256: str
     bytes: int
     row_count: int
-
-
-@dataclasses.dataclass(frozen=True)
-class LogicalTableHash:
-    """Canonical row-content hash for one table."""
-
-    table: str
-    row_count: int
-    sha256: str
 
 
 @dataclasses.dataclass(frozen=True)
@@ -442,6 +452,19 @@ def compute_manifest_hash(path: Path) -> str:
     return hashlib.sha256(manifest_hash_input(path.read_bytes())).hexdigest()
 
 
+def rendered_manifest_identity(manifest_path: Path) -> tuple[str, str]:
+    """Return the (manifest_hash, data_archive_hash) actually written to a
+    rendered manifest.
+
+    Build-manifest records and reference_cardinalities must reflect the identity
+    that shipped in data_manifest.toml. In logical mode those values come from
+    the logical-content hash, not the legacy text/byte hashes, so they are read
+    back from the rendered file rather than recomputed.
+    """
+    raw = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+    return str(raw["manifest_hash"]), str(raw["data_archive_hash"])
+
+
 def aggregate_table_hash(table_files: Sequence[TableFile]) -> str:
     """Stable data identity hash over table sha256s, independent of tar metadata."""
 
@@ -449,50 +472,25 @@ def aggregate_table_hash(table_files: Sequence[TableFile]) -> str:
     return hashlib.sha256((payload + "\n").encode("utf-8")).hexdigest()
 
 
-def aggregate_logical_content_hash(table_hashes: Sequence[LogicalTableHash]) -> str:
-    """Stable dataset hash over logical table-content hashes."""
+def _logical_columns(columns: Sequence[ColumnSchema]) -> list[LogicalColumn]:
+    """Adapt build ColumnSchema to the shared LogicalColumn projection.
 
-    payload = "\n".join(
-        f"{entry.table}:{entry.row_count}:{entry.sha256}" for entry in sorted(table_hashes, key=lambda f: f.table)
-    )
-    return hashlib.sha256((payload + "\n").encode("utf-8")).hexdigest()
-
-
-def is_integer_schema(column: ColumnSchema) -> bool:
-    return column.duckdb_type in DUCKDB_INTEGER_RANGES
+    Integer-ness is derived from the PostgreSQL type — the same source the
+    runtime reads from the pinned manifest schema — so build and runtime agree.
+    """
+    return [
+        LogicalColumn(name=column.name, is_integer=is_integer_postgres_type(column.postgres_type)) for column in columns
+    ]
 
 
-def update_sized_hash_part(hasher: Any, tag: str, payload: bytes) -> None:
-    hasher.update(tag.encode("ascii"))
-    hasher.update(str(len(payload)).encode("ascii"))
-    hasher.update(b":")
-    hasher.update(payload)
-    hasher.update(b";")
+def _csv_value_to_plain(value: CsvLogicalValue) -> str | None:
+    r"""Collapse a CSV field to the plain value the shared row hash expects.
 
-
-def canonical_logical_value(value: Any, column: ColumnSchema) -> tuple[str, bytes]:
-    """Return a type-tagged value payload independent of CSV/Parquet encoding."""
-
-    if value is None:
-        return ("N", b"")
-    if isinstance(value, CsvLogicalValue):
-        if value.value == CSV_NULL and not value.quoted:
-            return ("N", b"")
-        value = value.value
-    if is_integer_schema(column):
-        return ("I", str(int(value)).encode("ascii"))
-    return ("S", str(value).encode("utf-8"))
-
-
-def update_logical_row_hash(hasher: Any, columns: Sequence[ColumnSchema], row_values: Sequence[Any]) -> None:
-    if len(row_values) != len(columns):
-        raise JoinOrderBuildError(f"Logical hash row has {len(row_values)} values for {len(columns)} columns")
-    hasher.update(b"row{")
-    for column, value in zip(columns, row_values, strict=True):
-        update_sized_hash_part(hasher, "C", column.name.encode("utf-8"))
-        tag, payload = canonical_logical_value(value, column)
-        update_sized_hash_part(hasher, tag, payload)
-    hasher.update(b"}\n")
+    An unquoted ``\N`` is a SQL NULL; a quoted empty string is the empty string.
+    """
+    if value.value == CSV_NULL and not value.quoted:
+        return None
+    return value.value
 
 
 def parse_postgres_csv_record(record: str) -> list[CsvLogicalValue]:
@@ -572,9 +570,16 @@ def iter_postgres_csv_records(path: Path) -> Iterator[list[CsvLogicalValue]]:
                     record = record[:-1]
                 if record.endswith("\r"):
                     record = record[:-1]
-                yield parse_postgres_csv_record(record)
                 record_parts = []
                 at_field_start = True
+                if record == "":
+                    # Skip blank lines. A FORCE_QUOTE row is never empty, so an
+                    # empty record is a stray line — e.g. the trailing newline
+                    # that some container runtimes' `exec` stdout capture appends
+                    # to COPY output. Row-count validation guards against real
+                    # data loss.
+                    continue
+                yield parse_postgres_csv_record(record)
         if record_parts:
             raise JoinOrderBuildError(f"CSV file {path} ended inside a quoted record")
 
@@ -606,7 +611,9 @@ def logical_content_report_from_hashes(
     return report
 
 
-def logical_content_table_report(csv_hash: LogicalTableHash, parquet_hash: LogicalTableHash) -> tuple[dict[str, Any], list[str]]:
+def logical_content_table_report(
+    csv_hash: LogicalTableHash, parquet_hash: LogicalTableHash
+) -> tuple[dict[str, Any], list[str]]:
     table_report = {
         "table": parquet_hash.table,
         "row_count": parquet_hash.row_count,
@@ -617,7 +624,9 @@ def logical_content_table_report(csv_hash: LogicalTableHash, parquet_hash: Logic
     }
     failures: list[str] = []
     if csv_hash.row_count != parquet_hash.row_count:
-        failures.append(f"{parquet_hash.table}: row count mismatch csv={csv_hash.row_count} parquet={parquet_hash.row_count}")
+        failures.append(
+            f"{parquet_hash.table}: row count mismatch csv={csv_hash.row_count} parquet={parquet_hash.row_count}"
+        )
     if csv_hash.sha256 != parquet_hash.sha256:
         failures.append(
             f"{parquet_hash.table}: logical content hash mismatch csv={csv_hash.sha256} parquet={parquet_hash.sha256}"
@@ -633,8 +642,9 @@ def logical_table_hash_from_csv(csv_path: Path, columns: Sequence[ColumnSchema])
     rather than an accidental file-byte contract.
     """
 
+    logical_columns = _logical_columns(columns)
     hasher = hashlib.sha256()
-    update_sized_hash_part(hasher, "V", b"joinorder-logical-content-v1")
+    update_sized_hash_part(hasher, "V", LOGICAL_CONTENT_VERSION.encode("ascii"))
     update_sized_hash_part(hasher, "T", columns[0].table.encode("utf-8"))
     column_names = [column.name for column in columns]
     last_id: int | None = None
@@ -649,13 +659,17 @@ def logical_table_hash_from_csv(csv_path: Path, columns: Sequence[ColumnSchema])
         raise JoinOrderBuildError(f"CSV header mismatch for {csv_path}: expected {column_names}, got {fieldnames}")
     for row in records:
         if len(row) != len(columns):
-            raise JoinOrderBuildError(f"CSV row for {columns[0].table} has {len(row)} values for {len(columns)} columns")
+            raise JoinOrderBuildError(
+                f"CSV row for {columns[0].table} has {len(row)} values for {len(columns)} columns"
+            )
         row_values = dict(zip(column_names, row, strict=True))
         row_id = int(row_values["id"].value)
         if last_id is not None and row_id <= last_id:
             raise JoinOrderBuildError(f"CSV rows for {columns[0].table} are not strictly ordered by id")
         last_id = row_id
-        update_logical_row_hash(hasher, columns, [row_values[column.name] for column in columns])
+        update_logical_row_hash(
+            hasher, logical_columns, [_csv_value_to_plain(row_values[column.name]) for column in columns]
+        )
         row_count += 1
     return LogicalTableHash(table=columns[0].table, row_count=row_count, sha256=hasher.hexdigest())
 
@@ -668,24 +682,15 @@ def logical_table_hash_from_parquet(
     columns: Sequence[ColumnSchema],
     batch_size: int = 100_000,
 ) -> LogicalTableHash:
-    """Hash canonical Parquet rows in id order, ignoring Parquet file layout."""
+    """Hash canonical Parquet rows in id order via the shared runtime algorithm."""
 
-    hasher = hashlib.sha256()
-    update_sized_hash_part(hasher, "V", b"joinorder-logical-content-v1")
-    update_sized_hash_part(hasher, "T", table.encode("utf-8"))
-    select_list = ", ".join(quote_ident(column.name) for column in columns)
-    cursor = con.execute(
-        f"SELECT {select_list} FROM read_parquet({duckdb_literal(parquet_path)}) ORDER BY {quote_ident('id')}"
+    return _shared_logical_table_hash_from_parquet(
+        con=con,
+        parquet_path=parquet_path,
+        table=table,
+        columns=_logical_columns(columns),
+        batch_size=batch_size,
     )
-    row_count = 0
-    while True:
-        rows = cursor.fetchmany(batch_size)
-        if not rows:
-            break
-        for row in rows:
-            update_logical_row_hash(hasher, columns, row)
-            row_count += 1
-    return LogicalTableHash(table=table, row_count=row_count, sha256=hasher.hexdigest())
 
 
 def sql_literal(value: str) -> str:
@@ -868,14 +873,25 @@ def write_source_manifest(work_dir: Path, artifact: PgDumpArtifact, *, reused: b
     )
 
 
+def container_cli() -> str:
+    """Container runtime CLI to shell out to.
+
+    Defaults to ``docker``; set ``BENCHBOX_CONTAINER_CLI`` to a Docker-CLI-
+    compatible runtime (e.g. ``mocker`` on Apple Containerization) to build
+    without Docker Desktop.
+    """
+    return os.environ.get("BENCHBOX_CONTAINER_CLI", "docker")
+
+
 def require_docker() -> None:
-    if shutil.which("docker") is None:
-        raise DockerUnavailableError("Docker CLI is not available on PATH")
-    result = run_command(["docker", "version", "--format", "{{.Server.Version}}"], check=False)
+    cli = container_cli()
+    if shutil.which(cli) is None:
+        raise DockerUnavailableError(f"Container CLI {cli!r} is not available on PATH")
+    result = run_command([cli, "version", "--format", "{{.Server.Version}}"], check=False)
     if result.returncode != 0:
         raise DockerUnavailableError(
-            "Docker daemon is not available: "
-            + (result.stderr.strip() or result.stdout.strip() or "docker version failed")
+            f"Container runtime {cli!r} is not available: "
+            + (result.stderr.strip() or result.stdout.strip() or f"{cli} version failed")
         )
 
 
@@ -888,8 +904,8 @@ def run_command(args: Sequence[str], *, check: bool = True) -> subprocess.Comple
     return result
 
 
-def stream_command(args: Sequence[str], *, check: bool = True) -> subprocess.CompletedProcess[None]:
-    result = subprocess.run(args, check=False)
+def stream_command(args: Sequence[str], *, check: bool = True, stdin: Any = None) -> subprocess.CompletedProcess[None]:
+    result = subprocess.run(args, check=False, stdin=stdin)
     if check and result.returncode != 0:
         command = " ".join(args)
         raise JoinOrderBuildError(f"Command failed ({result.returncode}): {command}")
@@ -897,9 +913,10 @@ def stream_command(args: Sequence[str], *, check: bool = True) -> subprocess.Com
 
 
 def ensure_postgres_image(image: str) -> None:
-    if run_command(["docker", "image", "inspect", image], check=False).returncode == 0:
+    cli = container_cli()
+    if run_command([cli, "image", "inspect", image], check=False).returncode == 0:
         return
-    stream_command(["docker", "pull", image])
+    stream_command([cli, "pull", image])
 
 
 def default_container_name() -> str:
@@ -908,7 +925,7 @@ def default_container_name() -> str:
 
 def remove_container(container_name: str) -> None:
     subprocess.run(
-        ["docker", "rm", "-f", container_name], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        [container_cli(), "rm", "-f", container_name], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
 
 
@@ -924,7 +941,7 @@ def start_postgres_container(
         remove_container(container_name)
     stream_command(
         [
-            "docker",
+            container_cli(),
             "run",
             "--detach",
             "--name",
@@ -948,7 +965,7 @@ def wait_for_postgres(*, container_name: str, database: str, user: str, timeout_
     last_message = ""
     while time.monotonic() < deadline:
         result = run_command(
-            ["docker", "exec", container_name, "pg_isready", "-U", user, "-d", database],
+            [container_cli(), "exec", container_name, "pg_isready", "-U", user, "-d", database],
             check=False,
         )
         if result.returncode == 0:
@@ -985,24 +1002,30 @@ def restore_pgdump(
             replace_existing=replace_existing,
         )
         started = True
-        container_dump_path = f"/tmp/{artifact.path.name}"
-        stream_command(["docker", "cp", str(artifact.path), f"{actual_container_name}:{container_dump_path}"])
-        stream_command(
-            [
-                "docker",
-                "exec",
-                actual_container_name,
-                "pg_restore",
-                "-U",
-                user,
-                "-d",
-                database,
-                "--no-owner",
-                "--no-privileges",
-                "--exit-on-error",
-                container_dump_path,
-            ]
-        )
+        # Stream the dump straight into pg_restore over stdin rather than
+        # staging it inside the container: some runtimes' `cp` silently
+        # truncate large files (mocker/Apple Containerization delivers a
+        # 0-byte file for a ~1.2 GB dump), and `exec -i` avoids a second
+        # in-container copy of the dump entirely. pg_restore reads a serial
+        # custom-format archive from a pipe fine.
+        with artifact.path.open("rb") as dump:
+            stream_command(
+                [
+                    container_cli(),
+                    "exec",
+                    "-i",
+                    actual_container_name,
+                    "pg_restore",
+                    "-U",
+                    user,
+                    "-d",
+                    database,
+                    "--no-owner",
+                    "--no-privileges",
+                    "--exit-on-error",
+                ],
+                stdin=dump,
+            )
         validation = validate_restored_database(
             container_name=actual_container_name,
             database=database,
@@ -1123,7 +1146,7 @@ def psql(*, container_name: str, database: str, user: str, sql: str) -> str:
     sql_to_run = f"SET max_parallel_workers_per_gather = 0; {sql}"
     result = run_command(
         [
-            "docker",
+            container_cli(),
             "exec",
             container_name,
             "psql",
@@ -1244,7 +1267,7 @@ def copy_table_to_csv(
     with destination.open("wb") as handle:
         result = subprocess.run(
             [
-                "docker",
+                container_cli(),
                 "exec",
                 container_name,
                 "psql",
@@ -1306,8 +1329,7 @@ def verify_csv_utf8_fidelity(
         csv_hex = csv_value.encode("utf-8").hex()
         if csv_hex != sample["utf8_hex"]:
             raise JoinOrderBuildError(
-                f"CSV UTF-8 drift for {table}.{column} id={sample['id']}: "
-                f"postgres {sample['utf8_hex']} csv {csv_hex}"
+                f"CSV UTF-8 drift for {table}.{column} id={sample['id']}: postgres {sample['utf8_hex']} csv {csv_hex}"
             )
         samples.append({"table": table, "column": column, "id": sample["id"], "utf8_hex": csv_hex})
     return samples
@@ -1640,28 +1662,67 @@ def render_data_manifest(
     restore = manifest.get("restore", {})
     parquet = manifest.get("parquet", {})
     query_import = manifest.get("query_import", {})
-    data_archive_hash = aggregate_table_hash(table_files)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Logical mode: if the logical-content gate has run and passed, pin per-table
+    # logical hashes and make manifest_hash / data_archive_hash logical (stable
+    # across a non-deterministic transport rebuild). Otherwise fall back to the
+    # legacy byte-based manifest so partial/older builds still render.
+    logical_content = manifest.get("logical_content", {})
+    logical_by_table = {t["table"]: t["parquet_logical_sha256"] for t in logical_content.get("tables", [])}
+    logical_aggregate = logical_content.get("aggregate_hash")
+    ordered_files = sorted(table_files, key=lambda f: f.table)
+    logical_mode = (
+        logical_content.get("logical_content_rebuild") == "PASS"
+        and bool(logical_aggregate)
+        and all(tf.table in logical_by_table for tf in ordered_files)
+    )
+
+    if logical_mode:
+        data_archive_hash = str(logical_aggregate)
+        entries = [
+            TableEntry(
+                name=tf.table,
+                file=tf.path.name,
+                sha256=tf.sha256,
+                row_count=tf.row_count,
+                logical_sha256=str(logical_by_table[tf.table]),
+                schema={column.name: column.postgres_type for column in schema[tf.table]},
+            )
+            for tf in ordered_files
+        ]
+        manifest_hash = compute_manifest_identity_hash(
+            dataset_version=DATASET_VERSION,
+            data_archive_hash=data_archive_hash,
+            url=url,
+            license_file="DATA-LICENSE.md",
+            tables=entries,
+        )
+    else:
+        data_archive_hash = aggregate_table_hash(table_files)
+        manifest_hash = "0"
 
     lines: list[str] = [
         f"dataset_version = {format_toml_string(DATASET_VERSION)}",
-        'manifest_hash = "0"',
+        f"manifest_hash = {format_toml_string(manifest_hash)}",
         f"data_archive_hash = {format_toml_string(data_archive_hash)}",
         f"url = {format_toml_string(url)}",
         f"archive_sha256 = {format_toml_string(archive_sha256)}",
         'license_file = "DATA-LICENSE.md"',
         "",
     ]
-    for table_file in sorted(table_files, key=lambda f: f.table):
+    for table_file in ordered_files:
         lines.extend(
             [
                 "[[tables]]",
                 f"name = {format_toml_string(table_file.table)}",
                 f"file = {format_toml_string(table_file.path.name)}",
                 f"sha256 = {format_toml_string(table_file.sha256)}",
-                f"row_count = {table_file.row_count}",
             ]
         )
+        if logical_mode:
+            lines.append(f"logical_sha256 = {format_toml_string(str(logical_by_table[table_file.table]))}")
+        lines.append(f"row_count = {table_file.row_count}")
         for column in schema[table_file.table]:
             lines.append(f"schema.{column.name} = {format_toml_string(column.postgres_type)}")
         lines.append("")
@@ -1681,9 +1742,11 @@ def render_data_manifest(
     lines.append("")
 
     output_path.write_text("\n".join(lines), encoding="utf-8")
-    digest = compute_manifest_hash(output_path)
-    text = output_path.read_text(encoding="utf-8")
-    output_path.write_text(text.replace('manifest_hash = "0"', f'manifest_hash = "{digest}"'), encoding="utf-8")
+    if not logical_mode:
+        # Legacy: manifest_hash is a hash of the file text with itself excluded.
+        digest = compute_manifest_hash(output_path)
+        text = output_path.read_text(encoding="utf-8")
+        output_path.write_text(text.replace('manifest_hash = "0"', f'manifest_hash = "{digest}"'), encoding="utf-8")
     return output_path
 
 
@@ -1703,13 +1766,14 @@ def assemble_manifest(
         archive_sha256=archive_sha256,
         output_path=manifest_path,
     )
+    manifest_hash, data_archive_hash = rendered_manifest_identity(manifest_path)
     write_build_manifest(
         work_dir,
         {
             "data_manifest": {
                 "path": str(manifest_path),
-                "manifest_hash": compute_manifest_hash(manifest_path),
-                "data_archive_hash": aggregate_table_hash(table_files),
+                "manifest_hash": manifest_hash,
+                "data_archive_hash": data_archive_hash,
                 "archive_sha256": archive_sha256,
                 "assembled_at": utc_now_iso(),
             }
@@ -1961,7 +2025,9 @@ def validate_predicate_domain(
     report = {
         "query_underlying_row_counts": counts,
         "known_zero_underlying_queries": sorted(KNOWN_ZERO_UNDERLYING_QUERIES, key=query_sort_key),
-        "known_zero_underlying_row_counts": dict(sorted(known_zero_counts.items(), key=lambda item: query_sort_key(item[0]))),
+        "known_zero_underlying_row_counts": dict(
+            sorted(known_zero_counts.items(), key=lambda item: query_sort_key(item[0]))
+        ),
         "query_count_failures": query_count_failures,
         "query_failures": failures,
         "unexpected_empty_query_failures": [failure for failure in failures if failure["reason"] == "unexpected_empty"],
@@ -2213,7 +2279,9 @@ def validate_conversion_fidelity(
     }
     write_build_manifest(work_dir, {"conversion_fidelity": report})
     if failures:
-        raise JoinOrderBuildError(f"Conversion fidelity validation failed with {len(failures)} issue(s): {failures[:5]}")
+        raise JoinOrderBuildError(
+            f"Conversion fidelity validation failed with {len(failures)} issue(s): {failures[:5]}"
+        )
     return report
 
 
@@ -2276,7 +2344,9 @@ def compute_reference_cardinalities(
 ) -> Path:
     manifest = load_build_manifest(work_dir)
     queries: dict[str, dict[str, Any]] = {}
-    postgres_version = psql(container_name=container_name, database=database, user=user, sql="SHOW server_version").strip()
+    postgres_version = psql(
+        container_name=container_name, database=database, user=user, sql="SHOW server_version"
+    ).strip()
     for path in query_files(query_dir):
         sql = strip_query_semicolon(path.read_text(encoding="utf-8"))
         row_count = int(
@@ -2369,7 +2439,9 @@ def verify_reference_results(
             }
         )
 
-    postgres_version = psql(container_name=container_name, database=database, user=user, sql="SHOW server_version").strip()
+    postgres_version = psql(
+        container_name=container_name, database=database, user=user, sql="SHOW server_version"
+    ).strip()
     verified: dict[str, dict[str, Any]] = {}
 
     for query_id, path in sorted(paths.items(), key=lambda item: query_sort_key(item[0])):
@@ -2741,17 +2813,19 @@ def export_tiny_fixture(
                 (FORMAT 'parquet', COMPRESSION 'zstd', ROW_GROUP_SIZE 100000)
                 """
             )
-            row_count = con.execute(
-                f"SELECT count(*) FROM read_parquet({duckdb_literal(parquet_path)})"
-            ).fetchone()[0]
+            row_count = con.execute(f"SELECT count(*) FROM read_parquet({duckdb_literal(parquet_path)})").fetchone()[0]
             sha256, _md5, size = hash_file(parquet_path)
-            table_files.append(TableFile(table=table, path=parquet_path, sha256=sha256, bytes=size, row_count=row_count))
+            table_files.append(
+                TableFile(table=table, path=parquet_path, sha256=sha256, bytes=size, row_count=row_count)
+            )
         load_queries_for_duckdb(con, output_dir)
         tiny_cardinalities: dict[str, dict[str, Any]] = {}
         for path in query_files(query_dir):
             sql = strip_query_semicolon(path.read_text(encoding="utf-8"))
             duckdb_sql = duckdb_compatible_query_sql(sql)
-            underlying = con.execute(duckdb_compatible_query_sql(underlying_count_sql(sql, query_id=path.stem))).fetchone()[0]
+            underlying = con.execute(
+                duckdb_compatible_query_sql(underlying_count_sql(sql, query_id=path.stem))
+            ).fetchone()[0]
             failure = underlying_count_failure(path.stem, int(underlying))
             if failure is not None:
                 raise JoinOrderBuildError(
@@ -2930,7 +3004,9 @@ def stage_draft_release(*, work_dir: Path, archive_path: Path, archive_sha_path:
                 str(notes_path),
             ]
         )
-        stream_command(["gh", "release", "upload", GITHUB_RELEASE_TAG, "--clobber", str(archive_path), str(archive_sha_path)])
+        stream_command(
+            ["gh", "release", "upload", GITHUB_RELEASE_TAG, "--clobber", str(archive_path), str(archive_sha_path)]
+        )
     write_build_manifest(
         work_dir,
         {
@@ -2960,12 +3036,13 @@ def write_runtime_manifest(*, work_dir: Path, schema: Mapping[str, Sequence[Colu
         archive_sha256=archive_sha,
         output_path=output_path,
     )
+    runtime_manifest_hash, _ = rendered_manifest_identity(output_path)
     write_build_manifest(
         work_dir,
         {
             "runtime_manifest": {
                 "path": str(output_path),
-                "manifest_hash": compute_manifest_hash(output_path),
+                "manifest_hash": runtime_manifest_hash,
                 "archive_sha256": archive_sha,
                 "written_at": utc_now_iso(),
             }
@@ -3048,7 +3125,9 @@ def add_query_dir_arg(parser: argparse.ArgumentParser) -> None:
 
 
 def query_dir_from_arg(raw: str | None) -> Path:
-    return Path(raw).expanduser().resolve() if raw else repo_root() / "_project" / "joinorder" / "build-inputs" / "queries"
+    return (
+        Path(raw).expanduser().resolve() if raw else repo_root() / "_project" / "joinorder" / "build-inputs" / "queries"
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -3141,7 +3220,9 @@ def build_parser() -> argparse.ArgumentParser:
     cross_check.add_argument("--cardinalities", default=None)
     cross_check.add_argument("--output", default=None)
 
-    package = subparsers.add_parser("package", help="w13: Package Parquets, manifest, license, checksums, cardinalities.")
+    package = subparsers.add_parser(
+        "package", help="w13: Package Parquets, manifest, license, checksums, cardinalities."
+    )
     add_common_args(package)
     package.add_argument("--manifest", default=None)
     package.add_argument("--cardinalities", default=None)
@@ -3165,7 +3246,9 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_args(runtime_manifest)
     add_existing_postgres_args(runtime_manifest)
 
-    foundation = subparsers.add_parser("foundation", help="Run w5-w16 after restoring PostgreSQL from the cached pg_dump.")
+    foundation = subparsers.add_parser(
+        "foundation", help="Run w5-w16 after restoring PostgreSQL from the cached pg_dump."
+    )
     add_common_args(foundation)
     foundation.add_argument("--force-download", action="store_true", help="Re-download before restoring.")
     add_restore_args(foundation)
@@ -3378,13 +3461,17 @@ def run_cross_check(args: argparse.Namespace) -> int:
 
 def run_package(args: argparse.Namespace) -> int:
     work_dir = work_dir_from_arg(args.work_dir)
-    manifest_path = Path(args.manifest).expanduser().resolve() if args.manifest else work_dir / "manifest" / "data_manifest.toml"
+    manifest_path = (
+        Path(args.manifest).expanduser().resolve() if args.manifest else work_dir / "manifest" / "data_manifest.toml"
+    )
     cardinalities = (
         Path(args.cardinalities).expanduser().resolve()
         if args.cardinalities
         else repo_root() / "_project" / "joinorder" / "reference_cardinalities.json"
     )
-    archive_path, sha_path = package_archive(work_dir=work_dir, manifest_path=manifest_path, cardinalities_path=cardinalities)
+    archive_path, sha_path = package_archive(
+        work_dir=work_dir, manifest_path=manifest_path, cardinalities_path=cardinalities
+    )
     print(f"Packaged archive: {archive_path}")
     print(f"Archive sha256:   {sha_path}")
     return 0

@@ -104,6 +104,16 @@ class TPCDSThroughputTest:
             self.logger.setLevel(logging.INFO)
         # Captured SQL items for dry-run preview: (label, sql)
         self.captured_items: list[tuple[str, str]] = []
+
+        # Populated by run() via _pregenerate_stream_queries() before the
+        # timed concurrent window starts: {stream_id: [(stream_query, sql_or_
+        # exception), ...]} aligned by position. When set, _execute_single_
+        # query() consumes the cached SQL instead of regenerating inline.
+        # Left as None when _execute_stream()/_execute_single_query() are
+        # invoked directly (bypassing run()), preserving the historical
+        # inline-generation behavior for direct/unit callers.
+        self._pregenerated_queries: Optional[dict[int, list[tuple[Any, Any]]]] = None
+
         # Lock for concurrent stream capture
         import threading
 
@@ -170,9 +180,15 @@ class TPCDSThroughputTest:
             # Reraise any logging/prep errors
             raise
 
-        # Run preflight outside of try so failures raise
+        # Pre-generate every stream's ordered SQL before the timed concurrent
+        # window starts (outside try, so failures raise -- matching the
+        # historical fail-fast preflight contract). This removes dsqgen
+        # subprocess cost from execution_time_seconds and TTT. Left disabled
+        # (falls back to inline per-query generation in _execute_single_query)
+        # when enable_preflight=False, matching today's behavior for callers
+        # that explicitly opt out of upfront validation/generation.
         if config.enable_preflight:
-            self._preflight_validate_generation(config)
+            self._pregenerated_queries = self._pregenerate_stream_queries(config)
 
         try:
             # Execute concurrent streams
@@ -246,6 +262,64 @@ class TPCDSThroughputTest:
             )
             raise RuntimeError(msg)
 
+    def _pregenerate_stream_queries(self, config: TPCDSThroughputTestConfig) -> dict[int, list[tuple[Any, str]]]:
+        """Pre-generate every stream's ordered (StreamQuery, SQL) pairs before
+        the timed concurrent window starts.
+
+        This is the real generation cache that ``_execute_single_query``
+        consumes, keyed by (stream_id, position): for each stream,
+        ``_build_stream_queries`` resolves the ordering/variant subset exactly
+        as it does today (TPC-DS stream/permutation logic --
+        ``create_standard_streams`` / ``streams.py`` -- is untouched and out
+        of scope for this TODO), then each entry is generated with the
+        *exact* per-position seed formula ``seed + stream_id * 1000 +
+        position`` (``seed = config.base_seed + stream_id``, matching
+        ``StreamRunner.execute``'s per-stream seed) via
+        ``_get_stream_query_text``, so generated SQL is byte-identical to
+        before -- only *when* it is generated changes.
+
+        This supersedes ``_preflight_validate_generation`` as the source of
+        truth for what actually runs: that legacy sweep iterated query IDs
+        1..99 in natural order with ``stream_seed = config.base_seed +
+        stream_id * 1000 + position`` -- no permutation, no variant
+        selection, and (notably) missing the ``+ stream_id`` seed offset
+        that real execution applies -- so it never matched the queries a
+        stream actually executes. It is kept unchanged (unused by ``run()``)
+        purely for API/test back-compat.
+
+        Only called when ``config.enable_preflight`` is True; any generation
+        failure raises immediately (matching the historical fail-fast
+        preflight contract) before the timed window starts.
+        """
+        stream_queries: dict[int, list[tuple[Any, str]]] = {}
+        failures: list[str] = []
+
+        for stream_id in range(config.num_streams):
+            seed = config.base_seed + stream_id
+            query_subset = self._build_stream_queries(stream_id, seed, config)
+            entries: list[tuple[Any, str]] = []
+
+            for position, stream_query in enumerate(query_subset):
+                stream_seed = seed + stream_id * 1000 + position
+                try:
+                    sql_text = self._get_stream_query_text(
+                        stream_query.query_id, stream_query.variant, stream_seed, config.scale_factor
+                    )
+                    entries.append((stream_query, sql_text))
+                except Exception as e:
+                    failures.append(f"stream {stream_id} q{stream_query.query_id} pos {position + 1}: {e}")
+
+            stream_queries[stream_id] = entries
+
+        if failures:
+            msg = (
+                f"TPC-DS ThroughputTest preflight failed for {len(failures)} queries. "
+                f"Examples: {', '.join(failures[:3])}"
+            )
+            raise RuntimeError(msg)
+
+        return stream_queries
+
     def _resolve_available_query_ids(self) -> list[int]:
         try:
             all_queries = self.benchmark.get_queries()
@@ -291,6 +365,21 @@ class TPCDSThroughputTest:
                 f"Stream {stream_id} using TPC-DS permutation with {len(all_queries)} queries (full query set)"
             )
         return all_queries
+
+    def _cached_query_text(self, stream_id: int, position: int) -> Optional[str]:
+        """Return pre-generated SQL for (stream_id, position), if available.
+
+        Returns None when no pre-generation cache exists (enable_preflight is
+        False, or _execute_stream/_execute_single_query were invoked directly
+        without going through run()), signalling the caller should generate
+        the query text inline instead -- exactly as it always has.
+        """
+        if self._pregenerated_queries is None:
+            return None
+        entries = self._pregenerated_queries.get(stream_id)
+        if entries is None or position >= len(entries):
+            return None
+        return entries[position][1]
 
     def _get_stream_query_text(self, query_id: int, variant, stream_seed: int, scale_factor) -> str:
         if variant is not None:
@@ -342,8 +431,12 @@ class TPCDSThroughputTest:
         }
 
         try:
-            stream_seed = seed + stream_id * 1000 + position
-            query_text = self._get_stream_query_text(query_id, variant, stream_seed, config.scale_factor)
+            cached_text = self._cached_query_text(stream_id, position)
+            if cached_text is not None:
+                query_text = cached_text
+            else:
+                stream_seed = seed + stream_id * 1000 + position
+                query_text = self._get_stream_query_text(query_id, variant, stream_seed, config.scale_factor)
             label = f"Stream_{stream_id}_Position_{position + 1}_Query_{query_display_id}"
             try:
                 platform_result = self._run_single_stream_query(connection, query_text, query_display_id, stream_id)
@@ -429,7 +522,19 @@ class TPCDSThroughputTest:
                 self.logger.info(f"Starting stream {stream_id} with seed {seed}")
 
             connection = self.connection_factory()
-            query_subset = self._build_stream_queries(stream_id, seed, config)
+
+            # When run() pre-generated this stream (the normal path with
+            # enable_preflight=True), reuse its already-resolved ordering
+            # instead of calling _build_stream_queries() again inside the
+            # timed window -- that call also (re-)invokes stream permutation
+            # generation, which this avoids repeating here entirely.
+            cached_entries = (
+                self._pregenerated_queries.get(stream_id) if self._pregenerated_queries is not None else None
+            )
+            if cached_entries is not None:
+                query_subset = [stream_query for stream_query, _sql in cached_entries]
+            else:
+                query_subset = self._build_stream_queries(stream_id, seed, config)
 
             for position, stream_query in enumerate(query_subset):
                 self._execute_single_query(connection, stream_id, position, stream_query, seed, config, stream_result)

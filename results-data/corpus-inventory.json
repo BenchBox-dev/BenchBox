@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-07-07T12:12:56.177827+00:00",
+  "generated_at": "2026-07-09T19:30:23.886503+00:00",
   "bundles": [
     {
       "file": "ai_primitives_sf001_doris_sql_20260506_133640_6e90e5e7.json",
@@ -2665,7 +2665,7 @@
       "query_count": 339,
       "trust_label": "community-submission",
       "funding": "unspecified",
-      "bundle_sha256": "205f3514747a6394269729501cfe80fa4717752deb39e25b82f90823486ed62c"
+      "bundle_sha256": "6bf70fde8ce50331e3a10c0c8486b07a80e51e2dabbdf2abfab636158971747e"
     },
     {
       "file": "joinorder_sf1_duckdb_sql_20260512_202135_4bd91dc4.json",
@@ -2678,7 +2678,7 @@
       "query_count": 339,
       "trust_label": "community-submission",
       "funding": "unspecified",
-      "bundle_sha256": "c03c8511ff5ba2971db955082b8ff264b7f8b3fd14db78017ebbc3607c5a883c"
+      "bundle_sha256": "0e18c952f66be9390c6772bfd68be2e894126cff1513de3b449ac1ae468d1872"
     },
     {
       "file": "joinorder_sf1_lakesail_sql_20260512_225022_528b8c08.json",
@@ -2691,7 +2691,7 @@
       "query_count": 339,
       "trust_label": "community-submission",
       "funding": "unspecified",
-      "bundle_sha256": "19bdde6910fbe187f1119db9d13d550c8856de9187f6480dce29d2307f7c80c3"
+      "bundle_sha256": "22044f340c9fb978834b549e11cdc521928e9e25cfea68e7ef7dce5ba9bb49bf"
     },
     {
       "file": "metadata_primitives_sf1_datafusion_sql_20260502_182730_9bf19029.json",

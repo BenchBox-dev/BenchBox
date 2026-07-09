@@ -1,0 +1,139 @@
+id: "df-suffix-platform-options-unreachable"
+title: "DataFrame -df platform options are unreachable from `benchbox run`"
+worktree: "main"
+priority: "Medium"
+status: "Completed"
+completed_date: "2026-07-09"
+
+description: |
+  RESOLVED by merged PR #1054 "fix(cli): key DataFrame platform options by base
+  name so run can reach them" (branch fix/dataframe-platform-option-keying,
+  merged 2026-07-08) plus review follow-up PR #1062 "fix: forward DataFrame
+  platform options to adapter construction (#1054 review)". This TODO fell out
+  of the PR #1042 (fix/datafusion-df-mode-erasure) audit; the in-flight session
+  task_ce5bd997 that was implementing it landed as #1054. No re-implementation
+  was needed. See the "resolution" block below for the empirical confirmation.
+
+  ---
+
+  All DataFrame-platform `--platform-option` specs are registered under
+  suffixed keys (`datafusion-df`, `polars-df`, `pandas-df`, `modin-df`,
+  `cudf-df`, `dask-df`) in the `_OPTION_SPEC_ROWS` table in
+  benchbox/platforms/__init__.py (~lines 768-786). But `benchbox run` parses
+  platform options with the POST-alias platform key:
+  benchbox/cli/commands/run.py `_parse_plat_bench_options` (:584) calls
+  `PlatformHookRegistry.parse_options(s.platform_key, ...)` where
+  `s.platform_key` has already been normalized by PLATFORM_ALIASES in
+  benchbox/cli/platform.py (datafusion-df -> datafusion, polars-df -> polars,
+  etc.). The specs are registered under the suffixed key, so the base-name
+  lookup finds nothing.
+
+  Result: `benchbox run --platform datafusion-df --platform-option
+  target_partitions=4` fails with
+  "Unknown platform option 'target_partitions' for platform 'datafusion'".
+  Verified empirically on develop 2026-07-07. Every DataFrame platform option
+  (streaming, rechunk, n_rows, dtype_backend, engine, device_id,
+  target_partitions, repartition_joins, parquet_pushdown, batch_size,
+  memory_limit, temp_dir, n_workers, ...) is unreachable from the run CLI.
+
+  Same key mismatch affects the sibling lookups in run.py:
+  `PlatformHookRegistry.get_default_options(s.platform_key)` (:645) and
+  `list_option_specs(platform_key)` (:658). Note an asymmetry to preserve or
+  reconcile: `_describe_platform_options` (:453-455) lowercases the raw name
+  WITHOUT alias normalization, so `--describe-platform-options datafusion-df`
+  DOES list the options — while `run --platform datafusion-df` then rejects
+  them. Describe and parse must agree after the fix.
+
+  Distinct from qpc-16 (that TODO is about plan_max_depth /
+  plan_capture_timeout_seconds in benchbox/core/results/platform_options.py, a
+  different allowlist). This one is the cli.platform_hooks PlatformHookRegistry
+  used by `run`.
+
+  IN FLIGHT: a background session (spawned task task_ce5bd997) is actively
+  implementing this fix as of 2026-07-07. If that lands a PR, complete this
+  TODO against it rather than starting fresh work.
+
+  Context: PR #1042 (fix/datafusion-df-mode-erasure) added
+  `_apply_dataframe_suffix_mode` in run.py so `-df` names resolve DataFrame
+  mode while the platform key stays the base name by design. DO NOT undo that;
+  the option-spec fix must keep the base-name platform key and instead make
+  the specs reachable under it.
+
+resolution:
+  merged_by:
+  - "PR #1054 fix/dataframe-platform-option-keying (merged 2026-07-08) — re-keyed _OPTION_SPEC_ROWS to base names; added tests/unit/cli/test_run_dataframe_platform_options.py"
+  - "PR #1062 chore/pr-review-followup-sweep-4 (merged 2026-07-08) — forwards DataFrame platform options to adapter construction (#1054 review follow-up)"
+  in_flight_session: "task_ce5bd997 (its work landed as #1054; no re-implementation needed)"
+  verified_on_develop: "2026-07-09 at 99db4caf3"
+  evidence:
+  - "benchbox/platforms/__init__.py _OPTION_SPEC_ROWS now keys DataFusion options under base name `datafusion` (e.g. `datafusion|target_partitions|...`), reachable via the post-alias key used by run.py."
+  - "Live repro: `benchbox run --dry-run <dir> --platform datafusion-df --benchmark tpch --scale 0.01 --platform-option target_partitions=4` exits 0 with no 'Unknown platform option' error; Database Type resolves to base name `datafusion` (PR #1042 design preserved)."
+  - "Verification suite `pytest tests/unit/cli/test_run_command_branches.py tests/unit/cli/test_platform.py -k 'option or dataframe or df'` -> 24 passed; dedicated regression file test_run_dataframe_platform_options.py -> 13 passed."
+  - "must_preserve honored: base-name run platform key retained; alias normalization not reverted; SQL-platform options unchanged."
+  - "w4 describe/parse asymmetry: the run-level describe path is inert (run.py sets `s.describe_platforms = ()` unconditionally), so no live `--describe-platform-options` vs `run` divergence exists at the run command post-fix."
+
+category: "Usability / Config"
+
+prior_art:
+- "benchbox/platforms/__init__.py _OPTION_SPEC_ROWS:768-786 — DataFrame option specs keyed by `<platform>-df`; EXTEND: re-key to base name or register under both"
+- "benchbox/cli/commands/run.py _parse_plat_bench_options:584 — parse_options(s.platform_key) with normalized base name (the consumer that fails)"
+- "benchbox/cli/platform.py PLATFORM_ALIASES:55-63 + _apply_dataframe_suffix_mode (PR #1042) — where `-df` is normalized to base name; the option key must match this"
+- "benchbox/core/hooks/platform_hooks.py PlatformHookRegistry.register_option_specs / parse_options / get_default_options / describe_options — the registry keying"
+
+work:
+- id: w1
+  summary: "Reproduce and pin: assert `run --platform datafusion-df --platform-option target_partitions=4 --dry-run` currently rejects the option; capture the failing message as the regression baseline."
+  status: done
+- id: w2
+  summary: "Decide keying: re-key DataFrame specs in _OPTION_SPEC_ROWS to base names, or register under both keys. Confirm adapter_factory._get_dataframe_adapter config passthrough unaffected."
+  needs: [w1]
+  status: done
+- id: w3
+  summary: "Implement chosen keying so parse_options/get_default_options/list_option_specs resolve DataFrame options under the base key used by run.py."
+  needs: [w2]
+  status: done
+- id: w4
+  summary: "Reconcile describe/parse asymmetry: --describe-platform-options and run --platform-option must accept the same names for `<platform>-df` and base names."
+  needs: [w3]
+  status: done
+- id: w5
+  summary: "Regression tests: datafusion-df target_partitions parses and reaches adapter config; base and suffixed paths agree; cover a second DataFrame platform (polars-df streaming)."
+  needs: [w4]
+  status: done
+- id: w6
+  summary: "Adversarial `code` review; fix Critical/Required findings; re-verify."
+  needs: [w5]
+  status: done
+- id: w7
+  summary: "Open PR to develop."
+  needs: [w6]
+  status: done
+
+must_preserve:
+- "PR #1042 behavior: `-df` names resolve DataFrame mode and the platform key stays the base name."
+- "SQL-platform --platform-option behavior (e.g. databricks, postgresql) unchanged."
+- "Registered default values for DataFrame options unchanged when the option is not set."
+
+anti_patterns:
+- "DO NOT revert alias normalization or make the run platform key the suffixed `-df` name to work around the mismatch (breaks result labeling and `platforms status/enable/install`)."
+
+verification:
+- description: "DataFrame -df platform options are accepted by run and reach adapter config"
+  command: "uv run -- python -m pytest tests/unit/cli/test_run_command_branches.py tests/unit/cli/test_platform.py -q -k 'option or dataframe or df'"
+  expected_output: "all pass, including new datafusion-df / polars-df --platform-option acceptance tests"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/__init__.py"
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/core/hooks/platform_hooks.py"
+  - "tests/"
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["cli", "config", "dataframe", "platform-options"]
+  estimated_effort: "Small"
+  created_date: "2026-07-07"
+  review_findings: ["pr-1042-audit", "task_ce5bd997"]
