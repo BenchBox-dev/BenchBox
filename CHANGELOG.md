@@ -5,29 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-> **Accounting note:** the content below was previously (incorrectly) dated
-> as a released `[0.3.1] - 2026-05-30` section, but no `v0.3.1` git tag was
-> ever pushed and PyPI never served a `0.3.1` release — `0.3.0` (published
-> 2026-05-16) remains PyPI-latest as of 2026-07-03. `0.3.0` shipped with a
-> broken clean install (`ModuleNotFoundError: No module named 'pandas'` on
-> `import benchbox`); the fix is the "Clean install now imports" entry
-> below. This work is complete on `develop` but not yet published under a
-> released version. See `release-recovery-v0-3-1` for the recovery release
-> that will publish it, and `release-accounting-drift-correction` for this
-> bookkeeping fix.
+## [0.3.1] - 2026-07-09
 
 ### New
 
-- **Result provenance vocabulary** - Added a canonical
-  `benchbox.core.results.provenance` module defining the result-source →
-  trust-label → visibility mapping (including the new `vendor-supplied` label
-  for vendor-produced results) and a funding-disclosure vocabulary
-  (`employer` / `personal` / `free-trial` / `vendor-sponsored` / `grant` /
-  `unspecified`). `vendor-supplied` is a valid publish label and is
-  ranking-eligible with a distinct badge. Foundation for surfacing vendor vs
-  internal vs community provenance and run funding in the results explorer.
 - **Databricks Liquid Clustering** - Added TPC-H and TPC-DS tuning profiles that
   apply Databricks Liquid Clustering for more representative runs.
 
@@ -51,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without pulling pandas. Optional engine and DataFrame imports (ClickHouse
   local, DataFrame mode) are now loaded lazily, so the base install stays
   minimal. This resolves the v0.3.0 clean-install failure.
+- **Consistent TPC-H data across platforms** - Bundled Linux and Windows
+  `dbgen` now emit rows without a stray trailing delimiter, matching macOS, so
+  generated TPC-H `.tbl` column counts are consistent on every platform.
 - **Trino table creation** - JoinOrder `CREATE TABLE` no longer emits
   primary-key clauses that Trino rejects.
 - **JoinOrder across engines** - SQLite now indexes JoinOrder tables, Spark
@@ -690,7 +674,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 - **Issues**: [Report bugs and request features](https://github.com/joeharris76/benchbox/issues)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
-[Unreleased]: https://github.com/joeharris76/benchbox/compare/v0.2.1...HEAD
+[0.3.1]: https://github.com/joeharris76/benchbox/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/joeharris76/benchbox/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/joeharris76/benchbox/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/joeharris76/benchbox/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/joeharris76/benchbox/compare/v0.1.4...v0.1.5
