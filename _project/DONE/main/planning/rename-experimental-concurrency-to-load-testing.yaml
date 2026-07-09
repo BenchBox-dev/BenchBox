@@ -2,7 +2,8 @@ id: rename-experimental-concurrency-to-load-testing
 title: "Rename experimental/concurrency to load_testing to clarify intent (stays experimental)"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-07-09"
 category: Core Functionality
 
 description: |
@@ -36,14 +37,14 @@ prior_art:
 work:
   - id: w1
     summary: "git mv benchbox/experimental/concurrency -> benchbox/experimental/load_testing and rewrite internal imports in __init__.py"
-    status: pending
+    status: done
     notes: |
       Update the four `from benchbox.experimental.concurrency.<mod> import`
       lines in __init__.py to the new package path. Keep __all__ unchanged.
   - id: w2
     summary: "Rename the test dir and update all importers"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       git mv tests/unit/core/concurrency -> tests/unit/core/load_testing.
       Update imports in test_analyzer.py, test_executor.py, test_patterns.py,
@@ -52,7 +53,7 @@ work:
   - id: w3
     summary: "Update coverage/config references"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       pyproject.toml:666-667 and .coveragerc_core:22,24 list
       benchbox/experimental/concurrency/{executor,pool_tester}.py -- repoint to
@@ -60,7 +61,7 @@ work:
   - id: w4
     summary: "Rename the one class that perpetuates the confusion: ConcurrencyAnalyzer -> LoadAnalyzer (or WorkloadAnalyzer)"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Optional but recommended for consistency with the package name. Update
       __all__, the class def in analyzer.py, and its importers/tests. The
@@ -68,7 +69,7 @@ work:
   - id: w5
     summary: "Re-document honestly: update README.md:41 and docs/usage/faq.md:20 to name 'load_testing' and describe it as unsupported load-testing/workload-analysis research"
     needs: [w1]
-    status: pending
+    status: done
 
 must_preserve:
   - "The package stays under benchbox.experimental and remains unsupported/undocumented as a product feature (no CLI/registry wiring in this item)."

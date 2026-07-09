@@ -17,7 +17,7 @@ BenchBox is a benchmarking toolbox that makes it simple to benchmark analytical 
 
 BenchBox is currently **Beta software**. Core functionality is stable (TPC-H, TPC-DS with DuckDB and major cloud platforms). APIs may still change before 1.0. We recommend thorough testing before using BenchBox in production. See the main README for details on Beta status.
 
-The default wheel includes a `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, concurrency). This namespace is **not part of the supported Beta surface** - it has no stability guarantees and is not integrated with the benchmark registry or CLI. Use it at your own risk.
+The default wheel includes a `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, load_testing). This namespace is **not part of the supported Beta surface** - it has no stability guarantees and is not integrated with the benchmark registry or CLI. Use it at your own risk. `load_testing` in particular is unsupported load-testing/workload-analysis research code, not a supported concurrency-testing feature.
 
 ### Which databases does BenchBox support?
 

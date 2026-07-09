@@ -38,7 +38,7 @@ Current release: v0.2.1. This marker mirrors `pyproject.toml` on `develop` (bump
 
 > **BenchBox is BETA software.** Core functionality and the CLI are stable. APIs may still change before 1.0. See [DISCLAIMER.md](DISCLAIMER.md) for full details on what this means and how to get help.
 
-The default wheel ships the `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, concurrency subsystems). This namespace is **outside the supported Beta product surface**: it has no stability guarantees, may change or be removed without notice, and is not integrated with the benchmark registry or public CLI. It is present in the wheel for developer convenience only.
+The default wheel ships the `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, load_testing subsystems). This namespace is **outside the supported Beta product surface**: it has no stability guarantees, may change or be removed without notice, and is not integrated with the benchmark registry or public CLI. It is present in the wheel for developer convenience only.
 
 Public contract tiers, support-status vocabulary, and source-of-truth rules for platform and benchmark count claims are tracked in [Public Contracts and Support Taxonomy](docs/reference/public-contracts.md).
 
