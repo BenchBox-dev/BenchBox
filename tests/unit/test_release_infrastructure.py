@@ -431,6 +431,10 @@ class TestReleaseInfrastructure:
         base. The restore-from-develop step must run, and must run before
         the ruleset drift check, or bootstrap evidence would ModuleNotFoundError
         on every real release PR.
+
+        The helper itself imports auto_merge_soundness_paths from the same
+        curated-out directory, so restoring only the helper still fails
+        (v0.3.1 release PR #1072). Both modules must be restored.
         """
         job = _workflow("validate-main-pr.yml")["jobs"]["validate-base"]
         step_names = [step.get("name") for step in job["steps"]]
@@ -441,6 +445,7 @@ class TestReleaseInfrastructure:
         restore_step = job["steps"][restore_index]
         assert restore_step["if"] == "steps.release-readiness.outputs.bootstrap_required == 'true'"
         assert "_project/scripts/ruleset_review_enforcement.py" in restore_step["run"]
+        assert "_project/scripts/auto_merge_soundness_paths.py" in restore_step["run"]
         assert "origin/develop" in restore_step["run"]
 
     def test_release_docs_name_canary_and_ruleset_drift(self):
