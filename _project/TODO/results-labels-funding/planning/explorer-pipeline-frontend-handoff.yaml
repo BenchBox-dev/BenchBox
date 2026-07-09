@@ -61,23 +61,37 @@ work:
       (bare-column projection, G-11 rule), and add funding to the matching
       EXPECTED_VIEWS set in test_duckdb_browser_contract.py. No new base-table
       column, so no read_model_version bump.
+    notes: >-
+      DONE in PR #1080: r.funding added to result_detail_metrics in
+      duckdb_builder.py + browser-duckdb-schema.sql; EXPECTED_VIEWS guards it.
     needs: [w1]
-    status: pending
+    status: done
   - id: w3
     summary: >-
-      Render a funding chip on result cards + the detail page, reading funding
-      from the projected view; add a legend row explaining chip + vendor badge.
+      Render a funding chip on the detail page (ResultDetail.tsx), reading funding
+      from result_detail_metrics; add a legend row explaining chip + vendor badge.
     notes: >-
-      Reuse the StatusBadge/chip pattern and an approved design token (token scan
-      gate). Label/tooltip text from provenance.py display strings; do not
-      re-list the funding enum in TS. 'unspecified' should render muted or be
-      omitted per design review.
+      REQUIRES a node env (tsc/vitest not available in the develop checkout).
+      Integration points: (1) results-explorer/src/db.ts - add `funding` to the
+      result_detail_metrics SELECT/row type; (2) new
+      results-explorer/src/components/FundingChip.tsx mirroring
+      StatusBadge.tsx/TrustBadge.tsx (StatusTone: info/success/warning/danger/
+      neutral); (3) render it in results-explorer/src/pages/ResultDetail.tsx next
+      to the TrustBadge; (4) add a legend row wherever the trust-label legend
+      lives. Label/tooltip text from provenance.py display strings; do NOT re-list
+      the funding enum in TS. 'unspecified' renders muted or omitted per design.
+      Use an approved design token (tests/unit/scripts/test_scan_explorer_tokens.py
+      gate). Consider whether the index/leaderboard pages (BenchmarkIndex.tsx,
+      PlatformIndex.tsx, MetaLeaderboard.tsx, Compare.tsx) also show the chip -
+      those query different views (platform_index_rows / benchmark_rankings) that
+      do NOT yet project funding, so a card-level chip needs its own view
+      projection first (scope decision).
     needs: [w2]
     status: pending
   - id: w4
     summary: >-
-      Add results-explorer e2e for the funding chip + legend (the vendor badge is
-      already covered by TrustBadge unit tests); update any legend-set smoke.
+      Add results-explorer e2e (results-explorer/e2e/) for the funding chip +
+      legend; update any legend-set smoke. Needs a node env.
     needs: [w3]
     status: pending
 
