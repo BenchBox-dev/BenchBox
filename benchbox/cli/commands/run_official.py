@@ -1,6 +1,7 @@
 """Deprecated run-official compatibility command."""
 
 import contextlib
+import functools
 import sys
 from collections.abc import Iterator
 
@@ -39,19 +40,20 @@ def _forward_requested_streams(streams: int | None) -> Iterator[None]:
 
     original = BenchmarkOrchestrator.execute_benchmark
 
-    def _patched(
-        self, config, system_profile, database_config, phases_to_run=None, progress=None, execution_context=None
-    ):
+    @functools.wraps(original)
+    def _patched(self, *args, **kwargs):
+        # Forward everything via *args/**kwargs (rather than a hardcoded
+        # execute_benchmark(config, system_profile, database_config, ...)
+        # signature) so a future signature change to execute_benchmark can't
+        # silently break this monkeypatch or drop a parameter. `config` is
+        # always the first argument callers pass -- positionally by every
+        # production call site, or by keyword if a caller ever changes that.
+        if args:
+            config = args[0]
+        else:
+            config = kwargs["config"]
         config.concurrency = streams
-        return original(
-            self,
-            config,
-            system_profile,
-            database_config,
-            phases_to_run,
-            progress=progress,
-            execution_context=execution_context,
-        )
+        return original(self, *args, **kwargs)
 
     BenchmarkOrchestrator.execute_benchmark = _patched
     try:
@@ -84,6 +86,15 @@ def run_official(ctx, benchmark, platform, scale, phases, streams, seed, output_
 
     if "throughput" in {phase.strip().lower() for phase in phases.split(",")} and streams is None:
         console.print("[red]Error: --streams is required for throughput test[/red]")
+        sys.exit(1)
+
+    # Guard here (the forwarding boundary) rather than letting a negative
+    # value silently reach BenchmarkConfig.concurrency: _forward_requested_streams
+    # only no-ops on falsy (None/0) values, so a negative --streams would
+    # otherwise set concurrency to a negative number and only fail later, deep
+    # in RunConfig/BenchmarkConfig field validation, with a raw pydantic error.
+    if streams is not None and streams < 0:
+        console.print(f"[red]Error: --streams must be a non-negative integer, got: {streams}[/red]")
         sys.exit(1)
 
     console.print("[bold blue]TPC-Compliant Official Benchmark Run[/bold blue]")

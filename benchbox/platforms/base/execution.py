@@ -84,12 +84,32 @@ def _resolve_requested_stream_count(run_config: dict, default: int = 2) -> int:
 
     Do NOT rename ``concurrent_streams`` across the schema to close this gap
     elsewhere; this function is the intended mapping boundary.
+
+    Floor to the TPC throughput minimum (2)
+    ----------------------------------------
+    ``BenchmarkConfig.concurrency`` defaults to 1 (``benchbox/core/schemas.py``),
+    and the real pipeline *always* spreads it into ``run_config`` as
+    ``concurrent_streams=1`` (``RunConfig.concurrent_streams`` <-
+    ``benchmark_config.concurrency`` in ``benchbox/core/runner/runner.py:726``,
+    then ``run_config.__dict__`` is spread into the adapter kwargs at
+    ``runner.py:803``). That means a resolved count of 1 -- whether it came
+    from the schema default or an explicit user request of 1 -- is bitwise
+    indistinguishable at this boundary; there is no "unset" sentinel on the
+    wire to tell them apart. Both TPC-H and TPC-DS throughput tests have a
+    hard 2-stream minimum, and the must_preserve contract requires the
+    default (no stream count requested at all) to still run 2 streams. The
+    only resolution that satisfies both is to floor the final result to 2
+    regardless of how it was resolved above. Values >= 2 from any precedence
+    tier pass through unchanged; the num_streams/streams/concurrent_streams
+    precedence order above is untouched by this floor.
     """
+    resolved = default
     for key in ("num_streams", "streams", "concurrent_streams"):
         value = run_config.get(key)
         if value is not None:
-            return int(value)
-    return default
+            resolved = int(value)
+            break
+    return max(resolved, 2)
 
 
 class _CapturedPlan(NamedTuple):
