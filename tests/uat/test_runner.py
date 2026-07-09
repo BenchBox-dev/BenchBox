@@ -17,6 +17,21 @@ from tests.uat.timeouts import TimeoutResult
 pytestmark = pytest.mark.fast
 
 
+@pytest.fixture(autouse=True)
+def _isolate_cwd(tmp_path: Path, monkeypatch):
+    """Keep run_cell's hygiene snapshot off the real repo tree.
+
+    run_cell() defaults benchmark_runs_dir to a home-directory root outside
+    any worktree (see runner._default_benchmark_runs_dir), so the artifact
+    hygiene guard is armed for every call and snapshots cwd/benchmark_runs.
+    Without isolating cwd here, that snapshot targets the real, shared
+    worktree directory, which concurrent pytest-xdist workers or leftover
+    manual runs can mutate mid-test, causing spurious LocalArtifactGrowthError
+    failures unrelated to what the test is exercising.
+    """
+    monkeypatch.chdir(tmp_path)
+
+
 def _write_result_json(path: Path, *, failed: int = 0, compliance_class: str | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     passed = 1 if failed == 0 else 0
