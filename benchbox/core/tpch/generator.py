@@ -45,84 +45,6 @@ _GENERATOR_SPECS = _load_generator_specs()
 _TPCH_TABLE_CODES = dict(_GENERATOR_SPECS["table_codes"])
 _TPCH_BASE_ROW_COUNTS = dict(_GENERATOR_SPECS["base_row_counts"])
 
-# Chunk size for the streaming trailing-delimiter rewrite (bytes).
-_NORMALIZE_CHUNK_SIZE = 1 << 20
-
-
-def _has_trailing_delimiter(path: Path) -> bool:
-    """Probe the last bytes of ``path`` for a classic dbgen trailing delimiter.
-
-    dbgen row framing is decided at compile time (EOL_HANDLING), so every row
-    in a file shares the same framing; inspecting the file tail is sufficient
-    to classify the whole file.
-    """
-    size = path.stat().st_size
-    if size == 0:
-        return False
-    with path.open("rb") as handle:
-        handle.seek(max(0, size - 2))
-        tail = handle.read()
-    return tail.endswith((b"|\n", b"|"))
-
-
-def normalize_tbl_trailing_delimiters(path: Path) -> bool:
-    """Strip exactly one trailing ``|`` before each newline, rewriting in place.
-
-    Classic dbgen file mode (binaries without the BenchBox stdout-streaming
-    patch, e.g. the bundled Linux dbgen) terminates every row with a field
-    delimiter (``...|BUILDING|comment.|``), while the patched ``-z`` streaming
-    mode does not. Normalizing file-mode output keeps generated data identical
-    across platforms.
-
-    Only the delimiter immediately before the line terminator is removed;
-    interior empty fields are preserved. In ``.tbl`` format a trailing empty
-    field is a delimiter artifact, not a NULL (see
-    :func:`benchbox.utils.file_format.get_data_extension`).
-
-    The rewrite streams fixed-size chunks through a temporary file, so large
-    scale-factor outputs are never loaded into memory. Files that are already
-    clean are detected with an O(1) tail probe and left untouched, which also
-    makes the operation idempotent.
-
-    Args:
-        path: Uncompressed ``.tbl`` (or ``.tbl.N`` chunk) file to normalize.
-
-    Returns:
-        True if the file was rewritten, False if it was already clean.
-    """
-    if not _has_trailing_delimiter(path):
-        return False
-
-    tmp_path = path.with_name(path.name + ".normalize.tmp")
-    try:
-        with path.open("rb") as src, tmp_path.open("wb") as dst:
-            carry = b""
-            while True:
-                chunk = src.read(_NORMALIZE_CHUNK_SIZE)
-                if not chunk:
-                    break
-                data = carry + chunk
-                # Hold back a chunk-final "|": it may be followed by "\n" in
-                # the next chunk and must be stripped together with it.
-                if data.endswith(b"|"):
-                    carry = b"|"
-                    data = data[:-1]
-                else:
-                    carry = b""
-                # "\n" only occurs at row boundaries, so "|\n" is always the
-                # trailing delimiter; str.replace removes exactly one "|" per
-                # newline and never touches interior empty fields.
-                dst.write(data.replace(b"|\n", b"\n"))
-            # A held-back "|" at EOF means the final row is unterminated but
-            # still carries the trailing delimiter; drop it.
-        with contextlib.suppress(OSError):
-            shutil.copystat(path, tmp_path)
-        os.replace(tmp_path, path)
-    finally:
-        with contextlib.suppress(OSError):
-            tmp_path.unlink(missing_ok=True)
-    return True
-
 
 class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityMixin):
     """TPC-H data generator.
@@ -1052,13 +974,6 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
         """
         table_paths, precompressed_tables = self._gather_generated_table_paths(target_dir)
 
-        # Classic (non -z) dbgen writes a trailing field delimiter on every
-        # row. Normalize file-mode output before any compression or data
-        # organization so results match the streaming path byte-for-byte
-        # (release PR #1043 canary: the bundled Linux dbgen lacks the stdout
-        # patch, falls back to file mode, and emitted trailing pipes).
-        self._normalize_table_delimiters(table_paths, precompressed_tables)
-
         # Data organization is a post-generation output mode. When configured,
         # prefer organized outputs over raw compression artifacts.
         if self._data_organization_config is not None:
@@ -1079,25 +994,6 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
 
         self._write_manifest(target_dir, table_paths)
         return table_paths
-
-    def _normalize_table_delimiters(
-        self,
-        table_paths: dict[str, Path | list[Path]],
-        precompressed_tables: set[str],
-    ) -> None:
-        """Strip classic dbgen trailing row delimiters from uncompressed outputs.
-
-        Covers both single-file mode (``customer.tbl``) and parallel chunked
-        mode (``customer.tbl.1`` ... ``customer.tbl.N``). Pre-compressed
-        tables are skipped: they come from the streaming (-z) path or a
-        previous run and are already normalized.
-        """
-        for table_name, paths in table_paths.items():
-            if table_name in precompressed_tables:
-                continue
-            for file_path in paths if isinstance(paths, list) else [paths]:
-                if normalize_tbl_trailing_delimiters(file_path):
-                    self.log_verbose(f"Stripped trailing row delimiters from {file_path.name}")
 
     def _apply_data_organization(
         self,
