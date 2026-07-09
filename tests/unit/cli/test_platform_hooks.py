@@ -66,15 +66,38 @@ def test_parse_options_unknown_key_raises():
 
 
 def test_spark_platform_options_adaptive_enabled():
-    # Default is the registered spec-row string "true" (same convention as the
-    # velox row); it only needs to be truthy for the adapter default.
+    # Spec-row string defaults are normalized through the declared parser, so
+    # the default arrives with the same type as parsed user input.
     parsed = PlatformHookRegistry.parse_options("spark", [])
-    assert parsed["adaptive_enabled"] == "true"
+    assert parsed["adaptive_enabled"] is True
 
     # Explicit values go through parse_bool, so AQE-off runs are reachable via
     # --platform-option adaptive_enabled=false.
     parsed = PlatformHookRegistry.parse_options("spark", [("adaptive_enabled", "false")])
     assert parsed["adaptive_enabled"] is False
+
+
+@pytest.mark.parametrize(
+    ("platform", "option", "expected"),
+    [
+        # str 'true' reaching polars scan_parquet(rechunk=...) raised
+        # "failed to extract field Extract.rechunk" once #1062 started
+        # forwarding options into DataFrame adapter constructors.
+        ("polars", "rechunk", True),
+        # str 'false' defaults are truthy — without parser normalization the
+        # effective default inverts wherever consumers rely on truthiness.
+        ("polars", "streaming", False),
+        ("sqlite", "check_same_thread", False),
+        ("datafusion", "batch_size", 8192),
+        ("sqlite", "timeout", 30.0),
+        ("cudf", "device_id", 0),
+        ("velox", "shuffle_partitions", 200),
+    ],
+)
+def test_spec_row_string_defaults_are_parser_typed(platform, option, expected):
+    defaults = PlatformHookRegistry.get_default_options(platform)
+    assert defaults[option] == expected
+    assert type(defaults[option]) is type(expected)
 
 
 @pytest.mark.parametrize(

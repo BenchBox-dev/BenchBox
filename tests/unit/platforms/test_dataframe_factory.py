@@ -179,8 +179,8 @@ class TestPlatformHookRegistration:
 
         defaults = PlatformHookRegistry.get_default_options("polars")
 
-        assert defaults["streaming"] == "false"
-        assert defaults["rechunk"] == "true"
+        assert defaults["streaming"] is False
+        assert defaults["rechunk"] is True
         assert defaults["n_rows"] is None
 
     def test_pandas_df_option_defaults(self):

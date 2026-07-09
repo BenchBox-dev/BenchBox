@@ -42,6 +42,16 @@ class PlatformOptionSpec:
     choices: Iterable[Any] | None = None
     aliases: tuple[str, ...] = field(default_factory=tuple)
 
+    def __post_init__(self) -> None:
+        # Defaults declared as raw strings (e.g. 'true', '8192') must carry the
+        # same type as parsed user input: get_default_options() feeds them into
+        # database_config.options and, since #1062, straight into DataFrame
+        # adapter constructors, where a str 'true' breaks bool consumers
+        # (polars scan_parquet rejects rechunk='true') and a str 'false' is
+        # truthy — silently inverting the default.
+        if isinstance(self.default, str) and self.parser is not _identity:
+            object.__setattr__(self, "default", self.parse(self.default))
+
     def parse(self, raw: str) -> Any:
         value = self.parser(raw)
         if self.choices and value not in self.choices:
