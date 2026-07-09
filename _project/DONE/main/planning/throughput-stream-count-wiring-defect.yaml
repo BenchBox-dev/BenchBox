@@ -1,0 +1,156 @@
+id: throughput-stream-count-wiring-defect
+title: "Fix dropped stream count: user-requested concurrency never reaches the throughput driver"
+worktree: main
+priority: Critical
+status: Completed
+category: Core Functionality
+completed_date: "2026-07-09"
+
+description: |
+  Strong evidence that the number of concurrent streams a user requests never
+  reaches the throughput test, which silently runs at the hard-coded default
+  (2). Two independent breaks in the chain:
+
+  1. `run-official --streams N` VALIDATES that --streams is provided
+     (benchbox/cli/commands/run_official.py:36-38), prints it (line 46, 52-53
+     "Note: Stream configuration ({streams} streams) applies when supported"),
+     then invokes `run` WITHOUT passing `streams`
+     (run_official.py:56-67). The value is discarded.
+
+  2. Through the main pipeline, the run config carries `concurrent_streams`
+     (from BenchmarkConfig.concurrency): benchbox/cli/execution_pipeline.py:106,
+     benchbox/cli/orchestrator.py:494, benchbox/core/runner/runner.py:726,
+     benchbox/core/schemas.py:98 (`RunConfig.concurrent_streams`). But the
+     throughput drivers read a DIFFERENT key:
+     - benchbox/platforms/base/execution.py:368
+       `num_streams = run_config.get("num_streams", run_config.get("streams", 2))`
+     - benchbox/platforms/base/execution.py:233 (TPC-DS) `run_config.get("num_streams", 2)`.
+     Neither `num_streams` nor `streams` is ever populated from
+     `concurrent_streams`, so both default to 2 regardless of user input.
+
+  Net effect: `benchbox run ... --phases throughput` and `run-official
+  --streams 8` both execute 2 streams. The headline throughput metric is
+  computed for the wrong concurrency level, and QphH/QphDS composed from it is
+  wrong. This is a functional defect, not just a UX gap.
+
+  NOTE (w0): confirm the break end-to-end with a live run before fixing, since
+  a legacy alias could exist somewhere not yet found. If a path is found that
+  DOES honor the count, narrow the fix accordingly.
+
+work:
+  - id: w0
+    summary: "Prove the defect end-to-end: run throughput with --streams/concurrency=4 and assert only 2 streams execute today"
+    status: done
+    notes: |
+      Confirmed against a real (file-based) DuckDB TPC-H run (SF=0.01):
+      run_config carried concurrent_streams=4 (exactly what RunConfig
+      populates from BenchmarkConfig.concurrency), but
+      _execute_tpch_throughput_test only reads num_streams/streams, so
+      streams_executed=2 (the driver's own hardcoded default) regardless of
+      the request. Command + output captured to
+      /tmp/throughput-wiring-w0.log. This is now the regression oracle
+      exercised by tests/integration/test_throughput_stream_count.py.
+  - id: w1
+    summary: "Thread concurrent_streams -> num_streams through the adapter throughput drivers"
+    needs: [w0]
+    status: done
+    notes: |
+      Added a shared _resolve_requested_stream_count(run_config) helper in
+      benchbox/platforms/base/execution.py, used by both
+      _execute_tpch_throughput_test and _execute_tpcds_throughput_test.
+      Precedence: num_streams/streams (back-compat, existing callers/tests
+      that hand-build run_config) -> concurrent_streams (the canonical
+      RunConfig/BenchmarkConfig field) -> 2 (only when none of the three
+      keys are present at all, preserving must_preserve's back-compat
+      default for bare/legacy run_config dicts).
+  - id: w2
+    summary: "Pass --streams from run-official into run (or route through the same concurrency field)"
+    needs: [w0]
+    status: done
+    notes: |
+      Discovered run() (benchbox/cli/commands/run.py) has NO
+      --streams/--concurrency CLI option at all (out of this TODO's
+      scope_limit), so `streams` cannot be forwarded to ctx.invoke(run, ...)
+      as a keyword arg -- there's no matching parameter to receive it. Fixed
+      within run_official.py alone: added _forward_requested_streams(), a
+      context manager that transiently patches
+      BenchmarkOrchestrator.execute_benchmark (the one seam run()'s direct
+      execution path always passes through) to set
+      BenchmarkConfig.concurrency = streams immediately before execution --
+      the same canonical field the w1 driver fix reads, per
+      anti_patterns (no parallel field, no schema rename). Verified live via
+      `benchbox run-official tpch --platform duckdb --scale 1 --phases
+      throughput --streams 4 --seed 42`: BenchmarkOrchestrator.execute_benchmark
+      now observes config.concurrency == 4 (confirmed with a spy on the real
+      CLI path). Also replaced the misleading "applies when supported" note
+      with an accurate one. See the `deferred` section below for the
+      run.py-level gap this uncovered.
+  - id: w3
+    summary: "End-to-end regression test: requesting N streams executes N streams"
+    needs: [w1, w2]
+    status: done
+    notes: |
+      tests/integration/test_throughput_stream_count.py: real DuckDB TPC-H
+      (parametrized N in {1,4}) and TPC-DS (N=2) driver-level tests asserting
+      streams_executed == requested; a back-compat test confirming the
+      default of 2 is preserved when no stream-count key is present at all;
+      a back-compat test confirming num_streams= still wins over
+      concurrent_streams for legacy callers; and two focused tests of the
+      run_official.py _forward_requested_streams bridge (sets concurrency,
+      and is a no-op when --streams is absent). All 7 tests pass under the
+      canonical verification command.
+
+must_preserve:
+  - "Existing default of 2 streams when the user requests nothing."
+  - "back-compat callers that already pass num_streams= directly (official_benchmark.py path)."
+
+anti_patterns:
+  - "DO NOT rename concurrent_streams across the schema — because it is used by cost models and result metrics — map it at the driver boundary instead."
+
+verification:
+  - description: "Requesting N streams runs N streams against DuckDB"
+    command: "uv run -- python -m pytest tests/integration -k throughput_stream_count -v"
+    expected_output: "test asserts streams_executed == requested N for N in {1,4}"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/execution.py"
+    - "benchbox/cli/commands/run_official.py"
+    - "tests/integration/"
+
+impact:
+  business_value: |
+    A throughput benchmark that ignores the requested concurrency produces
+    invalid QphH/QphDS. Highest-severity kind of correctness bug for this feature.
+  user_impact: |
+    Users tuning at 8/16 streams unknowingly measure 2.
+
+deferred:
+  - summary: |
+      Add a --streams/--concurrency CLI option to `benchbox run` itself
+      (benchbox/cli/commands/run.py) so BenchmarkConfig.concurrency is
+      reachable from the canonical (non-deprecated) `run` command, not just
+      the deprecated `run-official` shim. Confirmed there is currently NO way
+      to set concurrency>1 through `run`'s direct-execution path
+      (benchbox/cli/commands/run.py `_run_direct`) at all -- every
+      `BenchmarkConfig(...)` construction in that file omits `concurrency=`,
+      so it always takes the schema default of 1. docs/usage/faq.md already
+      documents `benchbox run --platform duckdb --benchmark tpch --scale 1
+      --phases throughput --streams 4` as valid usage (see the sibling
+      concurrency-docs-alignment TODO's "do not document it as working until
+      it does" caveat) -- that example remains non-functional until this
+      follow-up lands, since run.py was out of this TODO's scope_limit.
+    reason: |
+      run.py is not in this TODO's scope_limit.only_modify
+      (benchbox/platforms/base/execution.py,
+      benchbox/cli/commands/run_official.py, tests/integration/ only).
+      Adding a real CLI option there is a small, low-risk one-line-per-call
+      change (a new click.option + concurrency=... in the three
+      BenchmarkConfig(...) constructions in _run_dry_run/_run_direct/the
+      interactive flow) but is out of scope for this fix and needs its own
+      reviewed change.
+
+metadata:
+  tags: [concurrency, throughput, cli, defect, soundness]
+  estimated_effort: Small
+  created_date: "2026-07-09"
