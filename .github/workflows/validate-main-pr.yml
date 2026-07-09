@@ -130,11 +130,12 @@ jobs:
           # dependency (auto_merge_soundness_paths) from develop, which always
           # has them, so bootstrap evidence doesn't ModuleNotFoundError.
           mkdir -p _project/scripts
-          for helper in ruleset_review_enforcement auto_merge_soundness_paths; do
-            if [ ! -f "_project/scripts/$helper.py" ]; then
-              git show "origin/develop:_project/scripts/$helper.py" > "_project/scripts/$helper.py"
-            fi
-          done
+          if [ ! -f _project/scripts/ruleset_review_enforcement.py ]; then
+            git show origin/develop:_project/scripts/ruleset_review_enforcement.py > _project/scripts/ruleset_review_enforcement.py
+          fi
+          if [ ! -f _project/scripts/auto_merge_soundness_paths.py ]; then
+            git show origin/develop:_project/scripts/auto_merge_soundness_paths.py > _project/scripts/auto_merge_soundness_paths.py
+          fi
 
       - name: Bootstrap ruleset drift evidence
         if: steps.release-readiness.outputs.bootstrap_required == 'true'
