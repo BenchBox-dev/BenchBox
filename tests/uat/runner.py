@@ -146,7 +146,13 @@ def run_cell(
     # external root (runs_dir resolves outside cwd), the worktree-local
     # benchmark_runs/ must not grow — see tests.uat.artifact_hygiene and the
     # 2026-06-01 datagen-leak incident. Default local runs leave this None.
-    external_root = configured_external_root(output=runs_dir)
+    # NB: pass the raw `benchmark_runs_dir` (None unless the caller explicitly
+    # set it), not the already-defaulted `runs_dir` — configured_external_root
+    # falls back to checking BENCHBOX_OUTPUT_DIR itself when output is None, so
+    # passing the resolved default here would make every unconfigured run look
+    # "externally configured" (the home-directory fallback always resolves
+    # outside cwd) and spuriously arm the guard against the real local tree.
+    external_root = configured_external_root(output=benchmark_runs_dir)
     local_snapshot = snapshot_local_runs() if external_root is not None else None
     argv = benchbox_run_argv(
         platform,
