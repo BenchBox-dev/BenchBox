@@ -1,0 +1,87 @@
+id: throughput-result-handling-and-metrics
+title: "Standardize throughput result handling: avoid GIL-serialized fetchall, fix TPC-DS row counts"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Result handling inside the concurrent streams both distorts measurement and
+  is inconsistent between the two benchmarks.
+
+  1. FULL MATERIALIZATION UNDER THE GIL: every stream calls
+     `cursor.fetchall()` for every query:
+     - TPC-H: benchbox/core/tpch/throughput_test.py:238 `rows = cursor.fetchall()`
+       then `result_count = len(rows)`.
+     - TPC-DS: benchbox/core/tpcds/throughput_test.py:314-315 fetchall() then
+       the result is DISCARDED.
+     fetchall materializes the entire result set into Python objects while
+     holding the GIL. For embedded engines (DuckDB) that release the GIL during
+     query execution but not during Python-object materialization, this
+     serializes result handling across streams -- an artificial bottleneck that
+     grows with result size and stream count, again masking real platform
+     scaling. It is also timed inside execution_time_seconds.
+
+  2. INCONSISTENT ROW-COUNT SEMANTICS: TPC-H reports len(rows); TPC-DS hardcodes
+     result_count = 0 (throughput_test.py:365). Downstream the adapter maps this
+     to `rows_returned` (execution.py:427, :... ), so TPC-DS throughput rows all
+     report 0 rows -- rows/sec and any result-volume sanity check are impossible
+     for TPC-DS, and the two benchmarks are not comparable.
+
+  Fix: (a) use a row-count that does not require full Python materialization
+  where the driver supports it (e.g. consume the cursor / use rowcount / fetch
+  in bounded batches), and only materialize when validation actually needs the
+  rows; (b) make TPC-DS report real row counts like TPC-H; (c) document the GIL
+  implication for embedded engines so users interpret in-process throughput
+  correctly.
+
+prior_art:
+  - "benchbox/core/tpch/throughput_test.py:238 — the len(fetchall()) pattern to replace with a non-materializing count where possible."
+  - "benchbox/platforms/base/connection_wrappers.py:PlatformAdapterConnection — where result validation already inspects platform_result; the right layer to standardize row counting."
+  - "benchbox/core/tpcds/throughput_test.py:_run_single_stream_query — fetchall-then-discard; align with TPC-H counting."
+
+work:
+  - id: w1
+    summary: "Introduce a shared, non-materializing row-count/consume helper for stream query results"
+    status: pending
+    notes: |
+      Prefer cursor.rowcount or a bounded consume loop over fetchall(); fall
+      back to len(fetchall()) only where the driver gives no count and
+      validation needs rows anyway.
+  - id: w2
+    summary: "Make TPC-DS report real result_count (parity with TPC-H)"
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "Document GIL / result-materialization implications for embedded-engine throughput"
+    needs: [w1]
+    status: pending
+    notes: "Extend docs/benchmarks/tpc-h.md and tpc-ds.md concurrency caveats."
+
+must_preserve:
+  - "Result-count validation used by PlatformAdapterConnection still fires when enabled."
+  - "TPC-H result_count remains correct."
+
+verification:
+  - description: "TPC-DS throughput rows report non-zero counts where results exist"
+    command: "uv run -- python -m pytest tests/integration/test_tpcds_throughput_test.py -v"
+    expected_output: "result_count reflects actual rows"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpch/throughput_test.py"
+    - "benchbox/core/tpcds/throughput_test.py"
+    - "benchbox/platforms/base/connection_wrappers.py"
+    - "docs/benchmarks/tpc-h.md"
+    - "docs/benchmarks/tpc-ds.md"
+    - "tests/integration/"
+
+impact:
+  business_value: |
+    Consistent, low-overhead result handling makes throughput numbers
+    comparable across benchmarks and less contaminated by driver-side work.
+
+metadata:
+  tags: [concurrency, throughput, results, gil, metrics]
+  estimated_effort: Medium
+  created_date: "2026-07-09"

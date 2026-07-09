@@ -1,0 +1,77 @@
+id: throughput-real-db-integration-tests
+title: "Add real-database multi-stream throughput integration tests (currently mocks only)"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  The entire production throughput path is exercised only against Mock/Dummy
+  connections. No test runs concurrent streams against a real engine, so real
+  concurrent-execution correctness is unverified:
+
+  - tests/unit/core/throughput/test_runner.py — stream_fn is a Mock; docstring
+    states it does NOT test real multi-threaded timing.
+  - tests/integration/test_tpch_throughput_test.py, test_tpcds_throughput_test.py
+    — real ThreadPoolExecutor but Mock DB; the TPC-DS file notes "can't easily
+    test full execution without a real database".
+  - tests/integration/test_throughput_corrections.py — strongest (real threads +
+    timing) but still mock connections.
+
+  What is therefore unverified today: result integrity under concurrency,
+  connection/session isolation between streams, that all N streams actually run
+  all queries against loaded data, TTT/Throughput@Size math on real timings, and
+  behavior under real contention. DuckDB is embedded, fast, and already a test
+  dependency -- there is no reason the happy path is not covered end-to-end.
+
+  This item is foundational: the wiring-defect fix, independent-sessions work,
+  result-handling changes, and pre-generation change all need a real-DB oracle
+  to prove they did not regress or silently no-op.
+
+prior_art:
+  - "tests/integration/test_throughput_corrections.py — closest existing harness (real threads); extend it to a real DuckDB fixture instead of mocks."
+  - "tests/integration/test_tpch_power_test.py / test_tpcds_power_test.py — existing real-DuckDB single-stream fixtures to reuse for schema+load setup."
+  - "benchbox/platforms/base/execution.py:_execute_tpch_throughput_test — the code path under test."
+
+work:
+  - id: w1
+    summary: "Build a real-DuckDB throughput fixture (SF small) with tables loaded once and reused across streams"
+    status: pending
+  - id: w2
+    summary: "TPC-H happy-path test: N streams each run 22 queries against real data, all succeed, throughput_at_size > 0"
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "TPC-DS happy-path test: N streams run the permuted set against real data"
+    needs: [w1]
+    status: pending
+  - id: w4
+    summary: "Concurrency-correctness assertions: no cross-stream result bleed; per-stream query counts correct; streams_successful == N"
+    needs: [w2, w3]
+    status: pending
+
+must_preserve:
+  - "Existing mock-based unit tests remain (fast lane) — real-DB tests are additive and marked slow/integration."
+
+anti_patterns:
+  - "DO NOT gate the fast test lane on these — mark them integration/slow so pr fast-lane stays quick."
+
+verification:
+  - description: "Real-DB throughput tests pass"
+    command: "uv run -- python -m pytest tests/integration -k 'throughput and duckdb' -v"
+    expected_output: "N-stream runs pass against real DuckDB"
+
+scope_limit:
+  only_modify:
+    - "tests/integration/"
+    - "tests/conftest.py"
+
+impact:
+  business_value: |
+    Establishes the first real proof that concurrent benchmarking works, and the
+    regression oracle every other concurrency fix depends on.
+
+metadata:
+  tags: [concurrency, throughput, testing, duckdb]
+  estimated_effort: Medium
+  created_date: "2026-07-09"

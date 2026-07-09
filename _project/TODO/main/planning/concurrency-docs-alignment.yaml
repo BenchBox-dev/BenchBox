@@ -1,0 +1,66 @@
+id: concurrency-docs-alignment
+title: "Align concurrency/throughput documentation with actual behavior"
+worktree: main
+priority: Low
+status: Not Started
+category: Documentation
+
+description: |
+  Documentation gaps/inconsistencies found while reviewing the concurrency
+  surface. These are low-severity on their own but compound user confusion about
+  a feature that (per the sibling TODOs) already behaves unexpectedly.
+
+  - `--streams` is documented in docs/usage/faq.md and docs/concepts/workflow.md
+    but is ABSENT from the canonical CLI reference docs/reference/cli/run.md.
+    (Note: throughput-stream-count-wiring-defect must land first, since today
+    --streams is effectively ignored -- do not document it as working until it
+    does.)
+  - Config default mismatch: docs/reference/cli/configuration.md documents
+    `execution.concurrent_queries.max_concurrent` default = 2, while
+    docs/advanced/power-run-concurrent-queries.md shows an example with
+    max_concurrent = 4. Reconcile to the real default.
+  - docs/advanced/power-run-concurrent-queries.md references
+    `_project/TPC_SPECIFICATION_COMPLIANCE.md`, which does not exist. Fix or
+    remove the dangling link.
+  - Ensure the documented DuckDB single-connection/per-cursor caveat and the
+    TPC-H(0.99)/TPC-DS(0.70) success-gate divergence stay in sync with whatever
+    the code changes in the sibling TODOs settle on.
+
+prior_art:
+  - "docs/reference/cli/run.md — canonical CLI reference missing --streams."
+  - "docs/reference/cli/configuration.md — the max_concurrent default of record."
+  - "docs/advanced/power-run-concurrent-queries.md — the guide with the 4-vs-2 example and the dangling link."
+  - "docs/benchmarks/tpc-h.md / tpc-ds.md — where the DuckDB and permutation caveats live."
+
+work:
+  - id: w1
+    summary: "Reconcile max_concurrent default across configuration.md and the guide"
+    status: pending
+  - id: w2
+    summary: "Fix/remove the dangling _project/TPC_SPECIFICATION_COMPLIANCE.md reference"
+    status: pending
+  - id: w3
+    summary: "Document --streams in run.md once throughput-stream-count-wiring-defect lands"
+    status: pending
+    notes: "Blocked-by the wiring fix so docs don't describe a no-op."
+
+must_preserve:
+  - "Existing accurate caveats (DuckDB cursor sharing, success-gate divergence) remain documented."
+
+verification:
+  - description: "Docs link-check passes and no dangling internal references remain"
+    command: "make docs-linkcheck"
+    expected_output: "no broken internal links"
+
+scope_limit:
+  only_modify:
+    - "docs/"
+
+deps:
+  needs:
+    - throughput-stream-count-wiring-defect
+
+metadata:
+  tags: [concurrency, docs]
+  estimated_effort: Small
+  created_date: "2026-07-09"

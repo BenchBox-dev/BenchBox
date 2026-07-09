@@ -1,0 +1,107 @@
+id: tpcds-throughput-permutation-compliance
+title: "Use dsqgen -STREAMS for TPC-DS throughput instead of home-grown ordering and parameters"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  BenchBox bypasses dsqgen's official multi-stream mode and hand-rolls TPC-DS
+  throughput stream ordering and per-stream parameters. This is the core
+  compliance gap; two symptoms and the root cause:
+
+  ROOT CAUSE -- dsqgen -STREAMS is never used. dsqgen (the official binary) has
+  a -STREAMS N mode (with -INPUT templates.lst) that emits the official
+  per-stream query ORDERING and the official per-stream substitution PARAMETERS
+  in a single invocation. BenchBox never calls it (grep: no -STREAMS anywhere).
+  Instead, DSQGenBinary.generate (benchbox/core/tpcds/c_tools.py:161-259) calls
+  dsqgen ONE query template at a time (`-TEMPLATE queryN.tpl -RNGSEED <seed>
+  -FILTER Y`), and the higher layers reconstruct streams by hand:
+
+  1. HOME-GROWN ORDERING: stream query order comes from a deterministic swap
+     with hardcoded PERMUTATION_SEED = 19620718 in
+     benchbox/core/tpcds/streams.py (TPCDS_STANDARD mode, ~lines 77-104), NOT the
+     official dsqgen permutation. (TPC-H by contrast uses the real 41x22
+     PERMUTATION_MATRIX from permute.h, benchbox/core/tpch/streams.py:39-81.)
+  2. HOME-GROWN PER-STREAM PARAMETERS: stream_id passed to generate() never
+     reaches dsqgen; it only seeds a Python RNG jitter in
+     _generate_parameter_variations (c_tools.py:437+,
+     `effective_seed = base_seed*7919 + stream_id*3037`). So per-stream parameter
+     diversity is invented in Python, not produced by dsqgen's stream seeding.
+
+  SECONDARY -- suspicious per-stream regeneration:
+  TPCDSThroughputTest._build_stream_queries
+  (benchbox/core/tpcds/throughput_test.py:264-293) calls
+  `create_standard_streams(num_streams=stream_id + 1, base_seed=seed +
+  stream_id)` then picks `streams.get(stream_id, [])`. Each stream regenerates
+  the full set with a DIFFERENT num_streams and a shifted seed, so a stream's
+  ordering depends on its index rather than the run's stream count -- looks
+  unintended vs TPC-H's single PERMUTATION_MATRIX[stream_id % 41] index.
+
+  FIX DIRECTION: adopt `dsqgen -STREAMS N` to generate all throughput streams in
+  one call. This simultaneously (a) restores official ordering + official
+  per-stream substitution parameters (compliance), and (b) collapses the
+  per-query subprocess spawns into ONE generation pass -- directly serving
+  throughput-pregenerate-query-streams (which needs streams materialized before
+  the timed window anyway). Retire the home-grown permutation and RNG jitter for
+  the throughput path.
+
+  This is soundness-critical (query ordering + substitution parameters feed the
+  QphDS compliance story) -- back every change with a dsqgen-output diff.
+
+prior_art:
+  - "benchbox/core/tpcds/c_tools.py:DSQGenBinary._build_dsqgen_cmd — current single-template dsqgen invocation; extend to a -STREAMS N / -INPUT templates.lst batch mode."
+  - "benchbox/core/tpch/streams.py:generate_streams — TPC-H already shells qgen to emit per-stream .sql files; mirror that batch shape for dsqgen -STREAMS."
+  - "benchbox/core/tpcds/streams.py:TPCDSPermutationGenerator — the home-grown ordering to retire for the throughput path."
+  - "benchbox/core/tpcds/c_tools.py:_generate_parameter_variations — the home-grown per-stream RNG jitter that -STREAMS makes unnecessary."
+  - "_project/TODO/main/planning/throughput-pregenerate-query-streams.yaml — the batch-generation-before-timed-window item this converges with."
+  - "docs/benchmarks/tpc-ds.md:330-342 — documents PermutationMode (sequential/random/tpcds); update when behavior changes."
+
+work:
+  - id: w0
+    summary: "Confirm bundled dsqgen -STREAMS N output: capture official ordering + per-stream parameters and diff against the current home-grown output"
+    status: pending
+    notes: |
+      Run `dsqgen -STREAMS N -INPUT q/templates.lst -DIRECTORY q -SCALE ... -RNGSEED ...`
+      with the bundled binary; capture to /tmp/tpcds-perm-w0.log and summarize
+      the ordering + parameter differences vs streams.py + _generate_parameter_variations.
+  - id: w1
+    summary: "Add a dsqgen -STREAMS batch path in DSQGenBinary and route throughput stream generation through it"
+    needs: [w0]
+    status: pending
+  - id: w2
+    summary: "Retire the home-grown ordering + RNG jitter for the throughput path; fix _build_stream_queries's stream_id+1 regeneration"
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "Add tests pinning per-stream ordering AND substitution parameters to dsqgen -STREAMS output for a fixed (num_streams, seed)"
+    needs: [w1, w2]
+    status: pending
+
+must_preserve:
+  - "Deterministic, reproducible streams for a fixed (num_streams, seed) — now anchored to dsqgen output rather than the Python permutation."
+  - "Single-query get_query (non-throughput uses like power/dry-run) keeps working via the existing per-template path."
+
+anti_patterns:
+  - "DO NOT keep the home-grown permutation as the throughput default once -STREAMS works — because it is the compliance gap — adopt dsqgen's ordering and back it with a checked-in output diff."
+
+verification:
+  - description: "Per-stream ordering is stable and spec-justified"
+    command: "uv run -- python -m pytest tests/unit -k 'tpcds and (stream or permut)' -v"
+    expected_output: "ordering pinned; matches chosen policy"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpcds/streams.py"
+    - "benchbox/core/tpcds/throughput_test.py"
+    - "docs/benchmarks/tpc-ds.md"
+    - "tests/unit/"
+
+impact:
+  business_value: |
+    QphDS credibility depends on spec-correct per-stream query sequencing.
+
+metadata:
+  tags: [concurrency, throughput, tpc-ds, compliance, soundness, dsqgen]
+  estimated_effort: Medium
+  created_date: "2026-07-09"
