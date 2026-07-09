@@ -36,47 +36,24 @@ from .results import (
 
 
 def _execute_single_stream(stream_id: int, stream_file: Path) -> dict[str, Any]:
-    """Execute a single TPC-DS stream file and return result metrics."""
-    import time
+    """Execute a single TPC-DS stream file and return result metrics.
 
-    stream_start = time.time()
-    result: dict[str, Any] = {
-        "stream_id": stream_id,
-        "stream_file": str(stream_file),
-        "start_time": stream_start,
-        "end_time": 0.0,
-        "duration": 0.0,
-        "queries_executed": 0,
-        "queries_successful": 0,
-        "queries_failed": 0,
-        "success": False,
-        "error": None,
-    }
-
-    try:
-        if not stream_file.exists():
-            raise FileNotFoundError(f"Stream file {stream_file} not found")
-
-        with open(stream_file, encoding="utf-8") as f:
-            stream_content = f.read()
-
-        query_lines = [
-            line for line in stream_content.split("\n") if line.strip().startswith("-- Query") and "Position" in line
-        ]
-
-        result["queries_executed"] = len(query_lines)
-        result["queries_successful"] = len(query_lines)
-        result["queries_failed"] = 0
-        result["success"] = True
-
-    except Exception as e:
-        result["error"] = str(e)
-
-    finally:
-        result["end_time"] = time.time()
-        result["duration"] = result["end_time"] - result["start_time"]
-
-    return result
+    Raises:
+        NotImplementedError: Always. This function never executed SQL against
+            a database -- it only counted ``-- Query`` comment lines in
+            ``stream_file`` and reported every query as successful, regardless
+            of the file's actual contents or any database connection. Use
+            :meth:`TPCDSBenchmark.run_throughput_test` for the production,
+            spec-compliant TPC-DS Throughput Test, which executes real
+            concurrent query streams against a real connection.
+    """
+    raise NotImplementedError(
+        f"_execute_single_stream (stream {stream_id}, {stream_file}) does not "
+        "execute SQL. It previously faked success by counting '-- Query' "
+        "comment lines in the stream file without running anything against a "
+        "database. Use TPCDSBenchmark.run_throughput_test() for real TPC-DS "
+        "Throughput Test execution."
+    )
 
 
 def _aggregate_stream_results(stream_results: list[dict[str, Any]], start_time: float) -> dict[str, Any]:
@@ -980,62 +957,24 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             concurrent: Whether to run streams concurrently or sequentially
             dialect: SQL dialect (standard, postgres, mysql, etc.)
 
-        Returns:
-            Dictionary with execution results and timing information
+        Raises:
+            NotImplementedError: Always. This method never executed real SQL
+                against ``connection`` -- both its "concurrent" branch (via a
+                now-retired ``ConcurrentQueryExecutor`` wrapper) and its
+                sequential branch bottomed out in ``_execute_single_stream``,
+                which only counted ``-- Query`` comment lines in each stream
+                file and reported every stream as successful. Use
+                :meth:`run_throughput_test` for the production, spec-compliant
+                TPC-DS Throughput Test, which executes real concurrent query
+                streams against a real connection.
         """
-        import time
-
-        from benchbox.utils.execution_manager import ConcurrentQueryExecutor
-
-        start_time = time.time()
-
-        # If no stream files provided, generate them
-        if stream_files is None:
-            stream_files = self.generate_streams(num_streams=2)
-
-        if concurrent and len(stream_files) > 1:
-            # Use existing concurrent execution infrastructure
-            concurrent_executor = ConcurrentQueryExecutor()
-
-            files = stream_files
-
-            def stream_executor_factory(stream_id: int) -> Any:
-                class StreamExecutor:
-                    def __init__(self, stream_file):
-                        self.stream_file = stream_file
-
-                    def run(self):
-                        return _execute_single_stream(stream_id, self.stream_file)
-
-                idx = stream_id if stream_id < len(files) else 0
-                return StreamExecutor(files[idx])
-
-            if concurrent_executor.config.get("enabled", False):
-                concurrent_result = concurrent_executor.execute_concurrent_queries(
-                    query_executor_factory=stream_executor_factory,
-                    num_streams=len(stream_files),
-                )
-                end_time = time.time()
-                return {
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "total_duration": end_time - start_time,
-                    "num_streams": len(stream_files),
-                    "streams_executed": len(stream_files),
-                    "streams_successful": len([r for r in concurrent_result.stream_results if r.get("success", False)]),
-                    "streams_failed": len([r for r in concurrent_result.stream_results if not r.get("success", False)]),
-                    "total_queries_executed": concurrent_result.queries_executed,
-                    "total_queries_successful": concurrent_result.queries_successful,
-                    "total_queries_failed": concurrent_result.queries_failed,
-                    "success": concurrent_result.success,
-                    "errors": concurrent_result.errors,
-                    "stream_results": concurrent_result.stream_results,
-                }
-
-        # Sequential execution or single stream
-        stream_results = [_execute_single_stream(i, sf) for i, sf in enumerate(stream_files)]
-
-        return _aggregate_stream_results(stream_results, start_time)
+        raise NotImplementedError(
+            "TPCDSBenchmark.run_streams does not execute SQL against "
+            "`connection`. It previously faked success by counting "
+            "'-- Query' comment lines in stream files without running "
+            "anything. Use TPCDSBenchmark.run_throughput_test() for the "
+            "production, spec-compliant TPC-DS Throughput Test."
+        )
 
     def _load_data(self, connection: _DatabaseConnection) -> None:
         """Load TPC-DS data into the database.
