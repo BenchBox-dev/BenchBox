@@ -18,6 +18,7 @@ deps:
   needs:
     - joinorder-scale-stress-decision-framework
     - track2-joinorder-stats-phase
+    - track2-joinorder-stats-phase-controls
 
 context_sections:
   "Why start with replication": |
