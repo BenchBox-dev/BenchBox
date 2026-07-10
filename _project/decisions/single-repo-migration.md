@@ -272,7 +272,8 @@ Bookkeeping consequences, decided explicitly rather than left implicit:
 
 ### Two release-flow gaps this release exposed
 
-1. **`release-cut` does not align release histories.** Because the 2026-04-27
+1. **`release-cut` did not align release histories.** *(Closed — folded into
+   `release-cut`; see the note below.)* Because the 2026-04-27
    amendment removed A4 step 6 (`rebase develop onto main`), `main` and
    `develop` diverge permanently — `main` carries one squash commit per release
    that `develop` never sees, and the two have unrelated roots since the Phase 4
@@ -289,8 +290,15 @@ Bookkeeping consequences, decided explicitly rather than left implicit:
    `-s ours` preserves the curated release tree byte-for-byte and only records
    `main` as a second parent. `release-finalize`'s squash-merge then collapses
    the branch into a single commit on `main`, so this merge never pollutes
-   `main`'s release-only ledger. **This remains a manual step**; folding it into
-   `release-cut` is the obvious follow-up.
+   `main`'s release-only ledger.
+
+   **Now automated.** `release-cut` performs this merge itself, between the
+   `Release vX.Y.Z` commit and the push, and guards it by asserting the tree is
+   unchanged across the merge (a non-`ours` strategy would drag `main`-only
+   content back into the curated tree). Pinned by
+   `tests/unit/test_release_infrastructure.py::TestReleaseInfrastructure::test_release_cut_aligns_release_histories_before_pushing`.
+   Ordering matters: the merge must follow `generate_changelog_entry.py
+   --since-ref origin/main`, which needs `main` to still be a non-ancestor.
 
 2. **`validate-base` bootstrap under-restored its helpers.** The trusted-base
    bootstrap path (taken while `main` lacks `scripts/release_readiness_check.py`)
