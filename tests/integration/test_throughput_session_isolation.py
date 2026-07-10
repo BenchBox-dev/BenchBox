@@ -66,6 +66,10 @@ from benchbox.platforms.duckdb import DuckDBAdapter
 
 pytestmark = [
     pytest.mark.integration,
+    # Real DuckDB + per-connection SQLite I/O (~4s). `medium` keeps this out of
+    # the `fast` PR lane while still selecting it for the canonical
+    # `pytest tests/integration -k throughput_session_isolation` command.
+    pytest.mark.medium,
 ]
 
 
