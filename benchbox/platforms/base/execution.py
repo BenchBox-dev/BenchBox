@@ -292,17 +292,12 @@ class TestDriversMixin:
                 f"[green]Running TPC-DS Throughput Test (Scale Factor: {scale_factor}, Streams: {num_streams})[/green]"
             )
 
-            # Create connection factory that wraps the platform adapter connection.
-            # new_stream_connection() dispatches on stream_connection_capability:
-            # SHARED_CURSOR (default) returns a thread-safe cursor of this one
-            # shared connection - correct and unchanged for embedded engines like
-            # DuckDB (https://duckdb.org/docs/stable/guides/python/multiple_threads).
-            # INDEPENDENT_CONNECTION (server-style adapter override) instead opens
-            # a brand-new connection/session per stream - see
-            # PlatformAdapter.new_stream_connection() for the full contract.
+            # Create connection factory that wraps the platform adapter connection
             def connection_factory():
-                stream_connection = self.new_stream_connection(connection)
-                conn_wrapper = PlatformAdapterConnection(stream_connection, self)
+                # Create thread-safe cursor for concurrent stream execution
+                # See: https://duckdb.org/docs/stable/guides/python/multiple_threads
+                stream_cursor = _make_stream_cursor(connection)
+                conn_wrapper = PlatformAdapterConnection(stream_cursor, self)
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpcds"
                 conn_wrapper.scale_factor = scale_factor
@@ -429,11 +424,11 @@ class TestDriversMixin:
                 f"[green]Running TPC-H Throughput Test (Scale Factor: {scale_factor}, Streams: {num_streams})[/green]"
             )
 
-            # See new_stream_connection() docstring / connection_factory comment
-            # in _execute_tpcds_throughput_test above for the capability contract.
             def connection_factory():
-                stream_connection = self.new_stream_connection(connection)
-                conn_wrapper = PlatformAdapterConnection(stream_connection, self)
+                # Create thread-safe cursor for concurrent stream execution
+                # See: https://duckdb.org/docs/stable/guides/python/multiple_threads
+                stream_cursor = _make_stream_cursor(connection)
+                conn_wrapper = PlatformAdapterConnection(stream_cursor, self)
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpch"
                 conn_wrapper.scale_factor = scale_factor

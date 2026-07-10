@@ -48,43 +48,6 @@ class DriverIsolationCapability(Enum):
     FEASIBLE_CLIENT_ONLY = "feasible_client_only"
 
 
-class StreamConnectionCapability(Enum):
-    """Declares how a platform adapter hands each concurrent throughput/pool-test
-    stream its query-execution handle.
-
-    This is the seam that closes the gap described in
-    ``throughput-independent-sessions-per-stream``: the production throughput
-    drivers give every concurrent stream a ``connection_factory()`` call
-    (``benchbox/platforms/base/execution.py``), but until this capability
-    existed every adapter answered that call the same way - a cursor of one
-    shared connection - regardless of whether the underlying engine actually
-    models concurrency at the connection level.
-
-    Values:
-        SHARED_CURSOR: (default) The adapter's single underlying connection is
-            safe to share across concurrent stream threads via one cursor per
-            stream (``_make_stream_cursor`` - a DB-API cursor, or a
-            ``_NoCloseProxy`` for execute-only clients). This is the correct,
-            documented fast path for embedded engines whose Python client is
-            thread-safe at cursor level against one process-local database
-            (e.g. DuckDB - see docs/benchmarks/tpc-h.md). Streams are NOT
-            independent sessions in this mode: they share one connection's
-            server-side session state, and no new connections are opened.
-        INDEPENDENT_CONNECTION: Each concurrent stream gets its OWN
-            connection/session, returned by the adapter's
-            ``new_stream_connection()`` override. Required for client/server
-            engines whose driver does not support true concurrent statement
-            execution across cursors of one connection (many DB-API drivers,
-            e.g. psycopg, Snowflake, Databricks SQL, Trino, serialize on the
-            connection lock or raise), and where TPC throughput semantics
-            model N independent user sessions rather than N cursors of one
-            session.
-    """
-
-    SHARED_CURSOR = "shared_cursor"
-    INDEPENDENT_CONNECTION = "independent_connection"
-
-
 _ISOLATION_REMEDIATION = {
     DriverIsolationCapability.NOT_APPLICABLE: (
         "This platform has no versioned driver package. Driver version isolation is not applicable."
