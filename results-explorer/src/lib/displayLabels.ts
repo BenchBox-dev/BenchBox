@@ -27,6 +27,19 @@ const VISIBILITY_LABELS: Record<string, string> = {
   internal: "internal",
 };
 
+// Source of truth: benchbox/core/results/provenance.py::FUNDING_SOURCES.
+// Mirrored here (rather than generated) because the explorer ships as a static
+// bundle with no Python build step; add a label here when that tuple grows.
+// Unrecognised values fall through to `formatEnumLabel`.
+const FUNDING_LABELS: Record<string, string> = {
+  employer: "employer funded",
+  personal: "personally funded",
+  "free-trial": "free trial",
+  "vendor-sponsored": "vendor sponsored",
+  grant: "grant funded",
+  unspecified: "unspecified",
+};
+
 const COST_STATUS_LABELS: Record<string, string> = {
   normalized: "normalized",
   not_applicable: "not applicable",
@@ -37,6 +50,17 @@ const COST_STATUS_LABELS: Record<string, string> = {
 export function formatTrustLabel(raw: string | null | undefined): string {
   if (raw === null || raw === undefined || raw === "") return "unknown";
   return TRUST_LABEL_LABELS[raw] ?? formatEnumLabel(raw);
+}
+
+/**
+ * Humanize a funding disclosure. A missing/empty value is treated as
+ * `unspecified` rather than "unknown": `funding` is NOT NULL in the snapshot
+ * schema and the producer default is literally `unspecified`, so an absent
+ * value carries the same meaning as a declared one.
+ */
+export function formatFunding(raw: string | null | undefined): string {
+  if (raw === null || raw === undefined || raw === "") return "unspecified";
+  return FUNDING_LABELS[raw] ?? formatEnumLabel(raw);
 }
 
 export function formatValidationStatus(raw: string | null | undefined): string {

@@ -46,6 +46,7 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
     bundle_download_url: "https://example.test/bundles/abcdef1234567890.json",
     trust_label: "maintainer-run",
     visibility: "public-curated",
+    funding: "unspecified",
     platform_version: "1.2.0",
     execution_mode: "sql",
     tuning_mode: "tuned",
@@ -92,6 +93,10 @@ describe("RunReceipt", () => {
     expect(within(receipt).getByText("maintainer run")).toBeTruthy();
     expect(within(receipt).getByText("public (curated)")).toBeTruthy();
     expect(within(receipt).getByText("exact")).toBeTruthy();
+    // Funding is recorded on the receipt even when undisclosed. The chip is
+    // omitted for "unspecified"; the receipt states it.
+    expect(within(receipt).getByText("Funding")).toBeTruthy();
+    expect(within(receipt).getByText("unspecified")).toBeTruthy();
     expect(within(receipt).getByText("Eligible")).toBeTruthy();
     expect(within(receipt).getByText("abc12345")).toBeTruthy();
     expect(within(receipt).getByText("Plans not published")).toBeTruthy();
@@ -297,5 +302,10 @@ describe("RunReceipt", () => {
         makeDetail({ has_plans: true, plans_published: true, bundle_download_url: "" }),
       ),
     ).toBeNull();
+  });
+
+  it("humanizes a disclosed funding source on the receipt", () => {
+    render(<RunReceipt detail={makeDetail({ funding: "vendor-sponsored" })} />);
+    expect(screen.getByText("vendor sponsored")).toBeTruthy();
   });
 });

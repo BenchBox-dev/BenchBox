@@ -78,6 +78,11 @@ const DEFAULT_CONFIG = {
   title: "Trust level not recorded",
 };
 
+/** Tooltip/legend prose for a trust label. Single source for both surfaces. */
+export function trustLabelDescription(trustLabel: string): string {
+  return TRUST_CONFIG[trustLabel]?.title ?? DEFAULT_CONFIG.title;
+}
+
 interface TrustBadgeProps {
   trustLabel: string;
   /** When true, show only the first word of the label. */

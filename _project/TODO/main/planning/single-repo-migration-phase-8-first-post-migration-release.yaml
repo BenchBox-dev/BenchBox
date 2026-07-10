@@ -79,10 +79,11 @@ work:
 
     The exercise did surface two real gaps, both recorded in
     _project/decisions/single-repo-migration.md (2026-07-09 amendment):
-    `release-cut` does not perform the `-s ours` history alignment that a
+    `release-cut` did not perform the `-s ours` history alignment that a
     `vX.Y.Z -> main` PR needs, and the `validate-base` bootstrap failed to
-    restore `auto_merge_soundness_paths`. The latter is fixed and
-    regression-tested; the former remains a documented manual step.
+    restore `auto_merge_soundness_paths`. Both are now fixed and
+    regression-tested — the alignment merge was folded into `release-cut`
+    itself (PR #1089), so a future cut no longer performs it by hand.
     Recorded in _project/decisions/single-repo-migration.md, not left implicit.
 
 - id: w1

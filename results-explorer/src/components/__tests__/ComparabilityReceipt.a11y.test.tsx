@@ -35,6 +35,7 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
     bundle_download_url: "",
     trust_label: "maintainer-run",
     visibility: "public-curated",
+    funding: "unspecified",
     platform_version: "0.10",
     execution_mode: "sql",
     tuning_mode: "default",
