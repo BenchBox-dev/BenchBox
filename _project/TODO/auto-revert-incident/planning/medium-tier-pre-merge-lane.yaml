@@ -16,9 +16,11 @@ description: |
     asserted on.
 
   Fix: add a `medium-test` job to .github/workflows/pr.yml, gated on the
-  existing ci-paths classifier's `code-paths` output so docs/TODO-only PRs
-  skip it. Mirror the develop-post-merge job (python 3.12, uv sync --group
-  dev, make test-medium, timeout-minutes 30).
+  existing ci-paths classifier's `needs-code-ci` boolean output (the gate
+  every existing conditional code job uses - `code-paths` is a newline-joined
+  path LIST, never 'true') so docs/TODO-only PRs skip it. Mirror the
+  develop-post-merge job (python 3.12, uv sync --group dev, make
+  test-medium, timeout-minutes 30).
 
   Note the residual gap this does NOT close: a stale-base squash race
   (#1095 x #1100) can still land a semantic conflict because PR CI tests the
@@ -30,26 +32,31 @@ impact:
   user_impact: "Code-PR authors get a pre-merge medium signal; docs/TODO PRs stay fast."
   technical_debt: "Closes the 'blocking post-merge lane with no pre-merge consumer' asymmetry introduced by the 2026-07-06 medium-tier promotion."
 prior_art:
-- ".github/workflows/pr.yml:16-56 ci-paths job with code-paths output - gate the new job on it exactly like existing conditional jobs"
+- ".github/workflows/pr.yml:263,393 code-lint/code-test gate on needs-code-ci == 'true' - the exact gating precedent to copy (NOT code-paths, which is a path list)"
+- ".github/workflows/pr.yml:16-56 ci-paths job that computes the needs-code-ci output"
 - ".github/workflows/develop-post-merge.yml:74-110 the medium-test job to mirror (steps, python version, timeout, promotion-history comment)"
 - "Makefile:90-91 test-medium target - reuse as-is, no new pytest invocation"
-- "_project/TODO/main/planning/medium-tier-ci-home.yaml - the original 'where should medium run' decision record referenced by the post-merge job comment; update its trail"
+- "_project/DONE/main/medium-tier-ci-home.yaml - the original 'where should medium run' decision record (already in DONE; read-only, do not edit)"
 work:
 - id: w1
-  summary: "Add the medium-test job to pr.yml: needs ci-paths, if code-paths == 'true', checkout + setup-python 3.12 + setup-uv + uv sync --group dev + make test-medium, timeout-minutes 30."
+  summary: "Add the medium-test job to pr.yml: needs ci-paths, if needs-code-ci == 'true' (mirror code-test's gate at pr.yml:393), make test-medium, timeout-minutes 30."
   status: pending
   notes: |
-    Confirm pr.yml's concurrency block cancels superseded runs so force-push
-    storms do not stack 30-minute jobs; add cancel-in-progress if absent.
+    Steps: checkout + setup-python 3.12 + setup-uv + uv sync --group dev +
+    make test-medium. Confirm pr.yml's concurrency block cancels superseded
+    runs so force-push storms do not stack 30-minute jobs; add
+    cancel-in-progress if absent.
 - id: w2
   summary: "Update the develop-post-merge medium-test job comment to record the new PR-lane consumer; post-merge stays as the squash-race safety net."
   needs: [w1]
   status: pending
   notes: |
-    Also update the medium-tier-ci-home planning trail
-    (_project/TODO/main/planning/medium-tier-ci-home.yaml) if it still
-    exists; if it moved to DONE, leave the DONE record untouched and note
-    that in the PR body instead.
+    The original decision record already moved to
+    _project/DONE/main/medium-tier-ci-home.yaml - leave the DONE record
+    untouched and note the new consumer in the PR body instead.
+    Coordination: auto-revert-signature-attribution rewrites
+    develop-post-merge.yml heavily; this TODO lands AFTER it (deps.needs)
+    so this comment tweak rebases trivially.
 - id: w3
   summary: "Validate on this TODO's own PR: the job must trigger (workflow files count as code paths or adjust the classifier lists accordingly) and pass; capture the run link in the PR body."
   needs: [w1]
@@ -76,7 +83,7 @@ verification:
   expected_output: "exit 0"
 - description: "Path classifier fires for code diffs and skips docs-only diffs."
   command: "uv run -- python scripts/path_filter_decision.py --help then dry-run per its documented usage against a docs-only and a code file list"
-  expected_output: "code-paths true only for the code diff"
+  expected_output: "needs-code-ci is 'true' only for the code diff"
 - description: "This TODO's own PR run executes the new medium-test job."
   command: "PR checks on the branch (gh pr checks or GitHub MCP get_check_runs)"
   expected_output: "medium-test job present and green; run link captured in PR body"
@@ -84,6 +91,5 @@ scope_limit:
   only_modify:
   - ".github/workflows/pr.yml"
   - ".github/workflows/develop-post-merge.yml"
-  - "_project/TODO/main/planning/medium-tier-ci-home.yaml"
 deps:
-  needs: []
+  needs: [fix-session-isolation-placeholder-rows, auto-revert-signature-attribution]

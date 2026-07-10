@@ -51,8 +51,18 @@ prior_art:
 - "scripts/path_filter_decision.py - precedent for workflow logic extracted to a stdlib-only tested script instead of inline bash (pr.yml ci-paths job)"
 - ".github/workflows/develop-post-merge.yml:432-552 metrics job - stale MEDIUM_TEST_RESULT comment lives here; metrics JSON schema must stay backward-compatible"
 work:
+- id: w0
+  summary: "Re-validate the incident evidence: confirm the auto-revert job's if-condition still fires on any gate failure at develop tip, and pin the 2026-07-10 facts."
+  status: pending
+  notes: |
+    The CI run links (29097093548 etc.) expire; the durable pins are the
+    revert PRs themselves (#1099, #1104, #1107-#1112, #1115, #1120-#1122,
+    #1125-#1127 - only #1099/#1112 blamed guilty commits) and the
+    if-condition at develop-post-merge.yml:239. Record the re-check (SHA +
+    condition text) in the PR body.
 - id: w1
   summary: "Emit failure signatures: junit XML via PYTEST_ADDOPTS on the pytest gates plus an always-run signature-artifact upload step per gate job."
+  needs: [w0]
   status: pending
   notes: |
     Set PYTEST_ADDOPTS="--junitxml=<file>" as a step env in the workflow so
@@ -99,7 +109,8 @@ approach: |
   Keep the workflow as orchestration; put comparison logic in a tested
   stdlib-only script following the path_filter_decision.py precedent. Fail
   open (current always-revert behavior) whenever the previous run's signature
-  is unavailable.
+  is unavailable. Coordination: medium-tier-pre-merge-lane also touches
+  develop-post-merge.yml and deps.needs on this TODO - land this one first.
 anti_patterns:
 - "Do not implement a green->red-transition-only guard (misses new failures on an already-red develop)"
 - "Do not parse human-oriented pytest terminal output; use junit XML"
