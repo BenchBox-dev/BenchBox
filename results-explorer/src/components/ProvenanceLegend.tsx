@@ -16,11 +16,10 @@ import { TrustBadge, trustLabelDescription } from "@/components/TrustBadge";
 // fundingDescription(). The legend therefore cannot drift from the badges it
 // explains - there is one source for each string.
 //
-// Rendered on every page that shows a TrustBadge or FundingChip - ResultDetail,
-// BenchmarkIndex, PlatformIndex, Compare, and Home (meta leaderboard) - per the
-// hosted-results-contract rule that a legend explaining the labels is reachable
-// from every surface that displays them. It is collapsed by default so it costs
-// a line of chrome, not a screenful.
+// Today this renders on ResultDetail only. The index, leaderboard, and compare
+// surfaces also show trust badges and still need it; that is tracked alongside
+// the card-level funding chip, which needs its own read-model view projection
+// first (platform_index_rows / benchmark_rankings do not project funding).
 // ---------------------------------------------------------------------------
 
 /**

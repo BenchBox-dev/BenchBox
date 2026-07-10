@@ -28,13 +28,11 @@ import { BenchmarkMatrixSkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
-import { FundingChip } from "@/components/FundingChip";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { QueryHeatmap } from "@/components/QueryHeatmap";
 import { RankTable } from "@/components/RankTable";
 import { ChartPanel } from "@/components/ChartPanel";
 import { SegmentedControl } from "@/components/SegmentedControl";
-import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -804,7 +802,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                       <span>{cohortPhase}</span>
                       <span>{row.run_date}</span>
                       <TrustBadge trustLabel={row.trust_label} compact />
-                      <FundingChip funding={row.funding} compact />
                       <span class="font-mono text-[var(--bb-data-fg-muted)]">
                         Public ID {visibleResultIdForRow(row)}
                       </span>
@@ -828,8 +825,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           </div>
         </div>
       )}
-      <ProvenanceLegend />
-</div>
+    </div>
   );
 }
 
@@ -1144,7 +1140,6 @@ function BenchmarkRow({ entry }: { entry: ResultRow }) {
       <td class="table-td">
         <div class="flex flex-wrap gap-1">
           <TrustBadge trustLabel={entry.trust_label} compact />
-          <FundingChip funding={entry.funding} compact />
           <ValidationBadge validationStatus={entry.validation_status} showMissing />
           {entry.tuning_mode && <TuningBadge tuningMode={entry.tuning_mode} />}
         </div>

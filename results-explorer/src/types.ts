@@ -130,8 +130,6 @@ export interface PlatformRow extends CostDeploymentFields {
   tuning_hash: string | null;
   execution_mode: string | null;
   trust_label: string;
-  /** Funding disclosure; "unspecified" when the bundle declares none. */
-  funding: string;
   validation_status?: string | null;
   run_date: string;
   is_ranking_eligible: boolean;

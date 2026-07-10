@@ -46,7 +46,6 @@ function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRow
     comparison_exclusion_reason: "insufficient_query_coverage",
     ranking_exclusion_reason: "insufficient_query_coverage",
     trust_label: "maintainer-run",
-    funding: "unspecified",
     validation_status: "exact",
     tuning_mode: null,
     execution_mode: null,

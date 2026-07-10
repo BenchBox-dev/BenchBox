@@ -13,7 +13,6 @@ import { formatTimingExclusion } from "@/lib/displayEligibility";
 import { formatAverageRank, formatCoverage, formatRank, formatSpeedup } from "@/lib/metricFormatters";
 import { fmtGeomean, fmtScoreCompact, fmtScoreExact } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
-import { FundingChip } from "@/components/FundingChip";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import {
@@ -28,7 +27,6 @@ type MetaLeaderboardSort = "avg_rank" | "coverage" | "best_rank" | "recent_activ
 
 interface MetaResultMetadata {
   trust_label: string;
-  funding?: string | null;
   validation_status?: string | null;
   run_date?: string | null;
 }
@@ -392,7 +390,6 @@ export function MetaLeaderboard({
                         {metadata && (
                           <div class="mt-0.5 flex flex-wrap justify-center gap-1">
                             <TrustBadge trustLabel={metadata.trust_label} compact />
-                            <FundingChip funding={metadata.funding} compact />
                             <ValidationBadge validationStatus={metadata.validation_status} showMissing />
                           </div>
                         )}

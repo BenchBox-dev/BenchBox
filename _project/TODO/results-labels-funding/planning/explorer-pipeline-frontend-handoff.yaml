@@ -2,7 +2,7 @@ id: "explorer-pipeline-frontend-handoff"
 title: "Project funding into read-model views + render the funding chip/legend + e2e"
 worktree: "results-labels-funding"
 priority: "Medium"
-status: "Under Review"
+status: "In Progress"
 description: |
   Correction (2026-07-07): the explorer pipeline (`_project/scripts/explorer_pipeline/`)
   and the frontend (`results-explorer/`) ARE present in this checkout (they were
@@ -103,29 +103,21 @@ work:
       Project funding into the card-level views and render the chip on the
       index/leaderboard/compare surfaces.
     notes: >-
-      Done. Two corrections to the plan as written, both found during
-      implementation. (1) The cards do NOT all read the views this note named:
-      PlatformIndex reads `bench.results` directly via loadPlatformIndexRows,
-      and the frontend PlatformRow is mapped from benchmark_rankings - so the
-      real changes were a bare `funding` column in the platform_index_rows view
-      (kept so the view still mirrors its base table), a new `funding` column on
-      the benchmark_rankings TABLE (not a view; populated from
-      ManifestEntry.funding, since PlatformRow is serialized into the
-      BenchmarkSummary artifact and widening that is a separate contract
-      change), and `r.funding` added to the SELECT lists in duckdbQueries.ts.
-      benchmark_matrix_cells was left alone - it is per-query heatmap data and
-      carries no badges. (2) read_model_version WAS bumped, 2 -> 3, contrary to
-      this note. A v2 snapshot has results.funding but not the projections the
-      cards read, and the version guard is exact-match, so without the bump a
-      stale snapshot passed the guard and then failed deep inside a card query
-      as a Binder Error. The guard tracks the shape of every view the UI reads,
-      not just the shape of `results`. Bumped in contract.py, db.ts, and
-      explorer-build-contract.mjs (all three are pinned together by
-      db-remediation-pin.test.ts). Chip added to PlatformIndex, BenchmarkIndex,
-      MetaLeaderboard, Compare, and QueryHeatmap; ProvenanceLegend now renders
-      on ResultDetail, BenchmarkIndex, PlatformIndex, Compare, and Home.
+      Deferred out of the w3/w4 PR (detail page only). The cards read
+      platform_index_rows / benchmark_rankings / benchmark_matrix_cells, none of
+      which project funding. Steps, mirroring exactly what PR #1080 did for
+      result_detail_metrics: (1) add a BARE `r.funding` column reference to the
+      relevant view DDL in _project/scripts/explorer_pipeline/duckdb_builder.py
+      (no computed expression - G-11); (2) mirror it in
+      docs/development/browser-duckdb-schema.sql; (3) add "funding" to the
+      matching EXPECTED_VIEWS entry in
+      tests/unit/scripts/explorer_pipeline/test_duckdb_browser_contract.py. No
+      read_model_version bump - the base `results` table already has the column.
+      Then render <FundingChip> in the card components and extend
+      ProvenanceLegend to those pages (the hosted-results-contract legend rule
+      applies to every page that shows the badges).
     needs: [w4]
-    status: done
+    status: pending
 
 must_preserve:
   - "test_explorer_build_contract.py + test_duckdb_browser_contract.py stay green."

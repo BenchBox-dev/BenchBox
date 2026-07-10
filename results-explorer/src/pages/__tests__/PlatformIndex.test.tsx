@@ -53,7 +53,6 @@ function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRow
     comparison_exclusion_reason: null,
     ranking_exclusion_reason: null,
     trust_label: "maintainer-run",
-    funding: "unspecified",
     validation_status: "exact",
     tuning_mode: null,
     execution_mode: null,
@@ -809,28 +808,5 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(plural.textContent).not.toContain("runin");
     expect(singular.textContent).not.toContain("runin");
     expect(plural.textContent).toContain("Geomean latency (lower is better)");
-  });
-
-  // w5: funding is projected into the card surfaces. The chip is additive to
-  // TrustBadge and appears only for a disclosed value.
-  it("renders a funding chip on a row that discloses funding, and none otherwise", async () => {
-    vi.mocked(getPlatformIndexRows).mockResolvedValue([
-      makeRow({ result_id: "r-funded", short_id: "funded01", funding: "employer" }),
-      makeRow({ result_id: "r-silent", short_id: "silent01", funding: "unspecified" }),
-    ]);
-
-    const { container } = render(<PlatformIndex platform="duckdb" />);
-    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
-
-    // Two rows, one disclosure: exactly one chip, carrying the compact label.
-    const fundingChips = container.querySelectorAll('[data-role="funding"]');
-    expect(fundingChips.length).toBe(1);
-    expect(fundingChips[0]?.textContent).toContain("Employer");
-  });
-
-  it("exposes the provenance legend on a page that shows the badges", async () => {
-    render(<PlatformIndex platform="duckdb" />);
-    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
-    expect(screen.getByTestId("provenance-legend")).toBeTruthy();
   });
 });

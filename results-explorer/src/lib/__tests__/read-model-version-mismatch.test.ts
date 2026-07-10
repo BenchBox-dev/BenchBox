@@ -45,7 +45,7 @@ describe("read-model version guard", () => {
     const conn = makeConn(null);
     await expect(
       _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
-    ).rejects.toThrow(new RegExp(`read-model v0; UI requires v${_EXPECTED_READ_MODEL_VERSION_FOR_TEST}`));
+    ).rejects.toThrow(/read-model v0; UI requires v2/);
     await expect(
       _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
     ).rejects.not.toThrow(/is missing required columns/);
@@ -85,7 +85,7 @@ describe("read-model version guard", () => {
     const conn = makeConn(0);
     await expect(
       _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
-    ).rejects.toThrow(new RegExp(`read-model v0; UI requires v${_EXPECTED_READ_MODEL_VERSION_FOR_TEST}`));
+    ).rejects.toThrow(/read-model v0; UI requires v2/);
     await expect(
       _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
     ).rejects.toThrow(/npm run dev:snapshot/);
@@ -129,7 +129,7 @@ describe("read-model version guard", () => {
 
     await expect(
       _validateAttachedSnapshotForTest(conn as unknown as Parameters<typeof _validateAttachedSnapshotForTest>[0]),
-    ).rejects.toThrow(new RegExp(`read-model v0; UI requires v${_EXPECTED_READ_MODEL_VERSION_FOR_TEST}`));
+    ).rejects.toThrow(/read-model v0; UI requires v2/);
 
     expect(queries).toEqual(["SELECT read_model_version FROM bench.metadata LIMIT 1"]);
   });
@@ -170,16 +170,5 @@ describe("read-model version guard", () => {
       "SELECT read_model_version FROM bench.metadata LIMIT 1",
     ]);
     expect(queries[2]).toBe("SELECT result_id FROM bench.results LIMIT 1");
-  });
-
-  // A v2 snapshot has results.funding but NOT the funding projections in
-  // platform_index_rows / benchmark_rankings that the card surfaces now read.
-  // Before the v3 bump such a snapshot passed this guard and then failed deep
-  // inside a card query as a Binder Error. It must be refused up front.
-  it("refuses a v2 snapshot, which lacks the funding projections the cards read", async () => {
-    const conn = makeConn(2);
-    await expect(
-      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
-    ).rejects.toThrow(new RegExp(`read-model v2; UI requires v${_EXPECTED_READ_MODEL_VERSION_FOR_TEST}`));
   });
 });

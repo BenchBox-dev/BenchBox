@@ -31,10 +31,8 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
-import { FundingChip } from "@/components/FundingChip";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { TimeSeries } from "@/components/TimeSeries";
-import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -794,7 +792,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                       <span>{row.phase}</span>
                       <span>{row.run_date}</span>
                       <TrustBadge trustLabel={row.trust_label} compact />
-                      <FundingChip funding={row.funding} compact />
                       <span class="font-mono text-[var(--bb-data-fg-muted)]">
                         Public ID {visibleResultIdForRow(row)}
                       </span>
@@ -860,8 +857,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
           )}
         </section>
       )}
-      <ProvenanceLegend />
-</div>
+    </div>
   );
 }
 
@@ -964,7 +960,6 @@ function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowPr
       <td class="table-td">
         <div class="flex flex-wrap gap-1">
           <TrustBadge trustLabel={entry.trust_label} compact />
-          <FundingChip funding={entry.funding} compact />
           <ValidationBadge validationStatus={entry.validation_status} showMissing />
           {entry.tuning_mode && <TuningBadge tuningMode={entry.tuning_mode} />}
         </div>

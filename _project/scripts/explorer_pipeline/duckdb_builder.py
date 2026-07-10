@@ -536,7 +536,6 @@ class DuckDBSnapshotBuilder:
                 platform                     VARCHAR  NOT NULL,
                 short_id                     VARCHAR  NOT NULL,
                 trust_label                  VARCHAR  NOT NULL,
-                funding                      VARCHAR  NOT NULL,
                 tuning_mode                  VARCHAR,
                 tuning_hash                  VARCHAR,
                 execution_mode               VARCHAR,
@@ -595,7 +594,6 @@ class DuckDBSnapshotBuilder:
                 comparison_exclusion_reason,
                 ranking_exclusion_reason,
                 trust_label,
-                funding,
                 tuning_mode,
                 execution_mode,
                 compliance_class,
@@ -891,13 +889,6 @@ class DuckDBSnapshotBuilder:
                         platform_row.platform,
                         full_to_short.get(platform_row.result_id, ""),
                         platform_row.trust_label,
-                        # funding comes off the manifest entry rather than
-                        # PlatformRow: PlatformRow is serialized into the
-                        # BenchmarkSummary artifact, and widening that artifact
-                        # is a separate contract change. Absent entry means a
-                        # row with no manifest, which is the same "no disclosure
-                        # was made" state as the producer default.
-                        entry.funding if entry is not None else "unspecified",
                         platform_row.tuning_mode,
                         platform_row.tuning_hash,
                         platform_row.execution_mode,

@@ -35,7 +35,6 @@ function makePlatformRow(overrides: Partial<PlatformRow> = {}): PlatformRow {
     tuning_hash: overrides.tuning_hash ?? null,
     execution_mode: overrides.execution_mode ?? "sql",
     trust_label: overrides.trust_label ?? "maintainer-run",
-    funding: overrides.funding ?? "unspecified",
     run_date: overrides.run_date ?? "2026-04-17T12:00:00Z",
     is_ranking_eligible: overrides.is_ranking_eligible ?? true,
     has_display_timing: overrides.has_display_timing ?? true,

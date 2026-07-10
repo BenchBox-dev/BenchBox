@@ -16,7 +16,6 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import type { MetaLeaderboardMode } from "@/components/MetaLeaderboard";
-import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import {
   FACET_KEYS,
   useFacetState,
@@ -570,8 +569,7 @@ export function Home(_: RoutableProps) {
           />
         </div>
       </div>
-      <ProvenanceLegend />
-</div>
+    </div>
   );
 }
 

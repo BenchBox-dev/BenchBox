@@ -408,7 +408,6 @@ function detailToPlatformRow(detail: DetailResult): PlatformRow {
     tuning_hash: detail.tuning_hash,
     execution_mode: detail.execution_mode,
     trust_label: detail.trust_label,
-    funding: detail.funding,
     run_date: detail.run_date,
     is_ranking_eligible: detail.ranking_exclusion_reason === null,
     has_display_timing: detail.has_display_timing,
