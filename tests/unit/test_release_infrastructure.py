@@ -263,6 +263,16 @@ class TestReleaseInfrastructure:
             "the build/publish version pin, plus both PyPI and Test PyPI install steps, must reference it"
         )
 
+        steps = test_installation_job["steps"]
+        install_steps = [s for s in steps if s.get("name", "").startswith("Test installation from")]
+        assert len(install_steps) == 2, "expected exactly the PyPI and Test PyPI install steps"
+        for step in install_steps:
+            assert step.get("shell") == "bash", (
+                f"{step['name']!r} must pin shell: bash - the matrix includes windows-latest, whose "
+                "default runner shell is PowerShell and does not understand ${BENCHBOX_VERSION} bash "
+                "syntax, so the Windows leg would silently install an unversioned/empty package name"
+            )
+
     def test_release_required_result_contract(self):
         """Test the main-PR release-required umbrella check shape."""
         jobs = _workflow("test.yml")["jobs"]

@@ -214,6 +214,7 @@ jobs:
 
       - name: Test installation from PyPI
         if: github.event.inputs.test_pypi != 'true'
+        shell: bash
         env:
           BENCHBOX_VERSION: ${{ needs.build.outputs.version }}
         run: |
@@ -223,6 +224,7 @@ jobs:
 
       - name: Test installation from Test PyPI
         if: github.event.inputs.test_pypi == 'true'
+        shell: bash
         env:
           BENCHBOX_VERSION: ${{ needs.build.outputs.version }}
         run: |
