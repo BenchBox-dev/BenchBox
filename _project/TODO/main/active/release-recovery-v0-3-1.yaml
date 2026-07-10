@@ -2,7 +2,7 @@ id: release-recovery-v0-3-1
 title: "Recover the failed v0.3.0 install smoke with a monotonic v0.3.1 release"
 worktree: main
 priority: Critical
-status: In Progress
+status: Completed
 category: Release Tooling
 
 deps:
@@ -55,69 +55,142 @@ work:
   needs: [w2]
   status: done
   notes: |
-    DONE (maintainer): the v0.3.1 release was cut and finalized by the
-    maintainer — evidenced by the published tag `v0.3.1`, `main` carrying
-    pyproject 0.3.1 + a `[0.3.1] - 2026-07-09` CHANGELOG section, and a
-    working PyPI artifact (see w6). Original recipe:
+    This is a real public release. Do not proceed without explicit maintainer
+    approval after w1/w2 evidence is available.
+
+    Command:
       make release-cut VERSION=0.3.1
+
     Expected result: a `v0.3.1 -> main` release PR with curated release-tree
     changes, version bumps, and changelog updates.
+
+    Outcome (2026-07-09): maintainer approval granted; cut from
+    `develop@99db4caf3`; release PR #1072 opened. Two mechanical snags:
+      - a stale local `v0.3.1` branch + worktree from prior aborted cuts
+        (#711/#712/#1029/#1043) blocked `git checkout -b v0.3.1` and had to be
+        removed first;
+      - `scripts/generate_changelog_entry.py` shells out to a nested `claude`
+        CLI (`CLAUDE_TIMEOUT_SECONDS = 120`) which stalls when release-cut is
+        driven from inside a Claude Code session. Worked around with a
+        fail-fast `claude` shim on PATH so it fell back to the raw changelog,
+        which was then hand-curated before the commit was pushed.
 
 - id: w4
   summary: "Review the v0.3.1 release PR and required release context"
   needs: [w3]
   status: done
   notes: |
-    DONE (maintainer): release PR reviewed and its required release context
-    passed prior to finalization (a published, importable v0.3.1 could not
-    exist otherwise). Confirm the release PR diff is only the expected release
-    curation, version, changelog, docs, and landing marker changes.
+    Confirm the release PR diff is only the expected release curation,
+    version, changelog, docs, and landing marker changes. Confirm
+    `release-required-result` is the required context and succeeds before
+    finalization. Do not use post-merge push-to-main checks as pre-publish
+    evidence.
+
+    Outcome (2026-07-09): PR #1072 verified — release tree carries
+    `__version__ = "0.3.1"`, the hand-curated `[0.3.1]` CHANGELOG section, zero
+    dev-only paths, and the rebuilt Linux dbgen binaries. Required contexts
+    `validate-base` and `release-required-result` both green before finalize.
+
+    Two release-infrastructure gaps surfaced here (both fixed, see w7):
+      - a clean cut from `develop` CONFLICTS with `main`: the two diverge by
+        design (the 2026-04-27 amendment removed the develop-rebase), so
+        GitHub could not compute a merge ref and no CI ran at all. Needs
+        `git merge -s ours --allow-unrelated-histories origin/main` on the
+        release branch ("align release histories") -- tree-preserving, and
+        what every prior aborted cut had done by hand. `release-cut` does not
+        do this.
+      - `validate-base` bootstrap restored `ruleset_review_enforcement.py`
+        from develop but not its sibling import `auto_merge_soundness_paths`,
+        so the ruleset-drift step died with ModuleNotFoundError. Prior cuts
+        never reached that step (they failed earlier on the non-fast suite),
+        which is why it stayed latent.
 
 - id: w5
   summary: "Run release-finalize VERSION=0.3.1 after required checks pass"
   needs: [w4]
   status: done
   notes: |
-    DONE (maintainer): release finalized — tag `v0.3.1` (7550c423) pushed and
-    release.yml published the immutable artifact to PyPI. Original recipe:
+    Command:
       make release-finalize VERSION=0.3.1
+
+    Expected result: release PR squash-merged to `main`, tag `v0.3.1` pushed,
+    and release.yml triggered for the immutable `v0.3.1` artifact.
+
+    Outcome (2026-07-09): PR #1072 squash-merged to `main` as the single
+    commit `7550c423d` ("Release v0.3.1 (#1072)"); tag `v0.3.1` points at it;
+    `release.yml` run 29055922350 triggered and concluded success.
+
+    Snag: `release-finalize`'s `git push origin v$(VERSION)` fails with
+    "src refspec v0.3.1 matches more than one" because a `v0.3.1` branch and a
+    `v0.3.1` tag both exist at that point. Pushed explicitly with
+    `git push origin refs/tags/v0.3.1`. Also, `release-finalize` (and the
+    release-branch push) trip the local pre-commit pre-push hook, since
+    curation removes `.pre-commit-config.yaml` from the release tree; run with
+    `PRE_COMMIT_ALLOW_NO_CONFIG=1` (do NOT disable hooks wholesale).
 
 - id: w6
   summary: "Verify v0.3.1 publishes and clean install/import passes"
   needs: [w5]
   status: done
   notes: |
-    DONE 2026-07-09 (independently reproduced):
-      - tag `v0.3.1` present on origin (7550c423);
-      - `main` (release branch) carries pyproject version 0.3.1 and a
-        `[0.3.1] - 2026-07-09` CHANGELOG section;
-      - clean isolated install/import from PyPI SUCCEEDS — the exact 0.3.0
-        failure mode is gone:
-        `uv run --isolated --no-project --with 'benchbox==0.3.1' -- python -c
-        'import benchbox; print(benchbox.__version__)'` -> `0.3.1`
-        (37 packages installed, no ModuleNotFoundError: pandas).
-    Original required checks (all satisfied):
+    Required checks:
       - release.yml for tag `v0.3.1` concludes success;
       - PyPI lists `benchbox 0.3.1`;
-      - clean isolated install/import succeeds;
+      - clean isolated install/import succeeds:
+        `uv run --isolated --no-project --with 'benchbox==0.3.1' -- python -c 'import benchbox; print(benchbox.__version__)'`;
       - wheel contents remain clean of maintainer scaffolding.
+
+    Outcome (2026-07-09): all four pass.
+      - `release.yml` run 29055922350 concluded `success` (verify-tag-on-main,
+        dependency-bounds, build, publish, github-release, and
+        test-installation on ubuntu/macos/windows x 3.10/3.12/3.13).
+      - `pip index versions benchbox` lists `0.3.1` as the available/latest
+        version, ahead of the broken `0.3.0`.
+      - Clean isolated import prints `0.3.1`; the install resolves 29 packages
+        and pandas is NOT among them, so the exact `ModuleNotFoundError: No
+        module named 'pandas'` that broke `v0.3.0` is repaired.
+      - `pip show -f benchbox` yields zero hits for `_project`,
+        `automate_release`, `benchbox/release/`, `.claude`, `AGENTS.md`,
+        `CLAUDE.md`, `_blog`, `results-explorer`, or `skill-sync`.
+
+    The emergency override variables were never set: `validate-base` takes the
+    trusted-base bootstrap path while `main` lacks
+    `scripts/release_readiness_check.py`, and that path never consults
+    `RELEASE_READINESS_OVERRIDE_SHA/REASON`. The circular
+    `pypi-latest-installability` canary failure therefore never gated this
+    release. Nothing to remove.
 
 - id: w7
   summary: "Close migration bookkeeping from the recovery evidence"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
-    ONLY REMAINDER (maintainer decision — 2026-07-09): w1-w6 are done and the
-    recovery release is verified (see w6). What is left is a maintainer
-    judgment call, deliberately NOT made by an agent:
-      - update Phase 4 w8 with the recovery-release evidence and move Phase 4
-        to DONE if the maintainer accepts the monotonic recovery as terminal
-        for the failed v0.3.0 installability gate;
-      - make an explicit Phase 8 decision: either retire Phase 8 as satisfied
-        by the v0.3.1 recovery release, or keep it as a separate later
-        post-migration release. Do not let that decision remain implicit.
-    Post-release doc accounting on `develop` (README PyPI-latest status +
-    CHANGELOG accounting note) was reconciled separately once v0.3.1 shipped.
+    After v0.3.1 is verified, update Phase 4 w8 with the recovery-release
+    evidence and move Phase 4 to DONE if the maintainer accepts the monotonic
+    recovery as terminal for the failed v0.3.0 installability gate.
+
+    Then make an explicit Phase 8 decision: either retire Phase 8 as
+    satisfied by the v0.3.1 recovery release, or keep Phase 8 as a separate
+    later post-migration release. Do not let that decision remain implicit.
+
+    Outcome (2026-07-09), maintainer-approved:
+      - Phase 4 w8 recorded the recovery evidence and Phase 4 moved to
+        `Completed`. The monotonic v0.3.1 release is accepted as terminal for
+        the failed v0.3.0 installability gate; immutable `0.3.0` was never
+        re-tagged or re-uploaded.
+      - Phase 8 is RETIRED as satisfied by this recovery release. Rationale:
+        `_project/decisions/single-repo-migration.md` already scopes Phase 8 as
+        "exercises the full flow end-to-end on `v0.3.1`", and v0.3.1 did
+        exactly that -- cut from `develop` with `release-cut`, curated,
+        squash-merged to `main`, tagged, and published via `release.yml`, with
+        the old `automate_release.py` long gone. A second post-migration
+        release would re-run an already-passed exercise.
+      - The two release-infrastructure gaps this release exposed (the
+        `-s ours` history alignment that `release-cut` does not perform, and
+        the missing `auto_merge_soundness_paths` restore in the `validate-base`
+        bootstrap) are recorded in the decision-doc amendment. The bootstrap
+        restore is fixed and regression-tested in this PR; the alignment merge
+        remains a documented manual step.
 
 verification:
 - description: "Recovery release workflow succeeded"

@@ -15,7 +15,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from benchbox.experimental.concurrency.patterns import SteadyPattern, WorkloadPattern
+from benchbox.experimental.load_testing.patterns import SteadyPattern, WorkloadPattern
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 logger = logging.getLogger(__name__)

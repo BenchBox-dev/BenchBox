@@ -184,6 +184,26 @@ gh api -X PUT repos/joeharris76/BenchBox/rulesets/15611785 --input /tmp/develop-
 After applying, re-run the Verify command (expect exit 0) and confirm a zero-approval
 soundness-path PR can no longer be squash-merged.
 
+**Order of operations (the flag flip is coupled to this PUT — do it second, never first):**
+
+1. Apply the PUT above so the live `develop-squash-only` ruleset actually carries
+   `require_code_owner_review: true`, and update this section's "Live state" line to `true`.
+2. Only then flip the one-line constant in `scripts/ruleset_drift_check.py:47`:
+
+   ```diff
+   -DEVELOP_REVIEW_RULE_ENFORCED = False
+   +DEVELOP_REVIEW_RULE_ENFORCED = True
+   ```
+
+Flipping the constant **before** step 1 turns the (still-live) missing-review gap from a
+`WARNING (non-blocking):` finding into a blocking one, which reddens **both** the daily
+`release-canary.yml` run **and** `validate-main-pr.yml`'s drift-check on every real develop
+PR until the PUT lands. Done in the correct order, the flip's own CI is green (the live
+ruleset already satisfies the rule). No test changes are required: `compare_ruleset`'s
+`enforce_review_rule` parameter is exercised in both `False`/`True` modes by
+`tests/unit/release/test_ruleset_drift_review_coverage.py`, so the constant's value does
+not itself make any unit test pass or fail.
+
 History:
 
 - Switched required status check from

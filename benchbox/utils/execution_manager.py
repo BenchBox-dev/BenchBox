@@ -3,6 +3,27 @@
 This module provides utilities for managing power run iterations and concurrent query
 execution patterns, integrating with the BenchBox configuration system.
 
+QUARANTINED (2026-07-09): ``PowerRunExecutor`` and ``ConcurrentQueryExecutor``
+below are orphaned infrastructure -- as of the concurrency-executor
+consolidation, nothing in ``benchbox`` calls either class. They previously
+looked "live" only because ``benchbox.core.tpch.streams.TPCHStreamRunner``
+and ``benchbox.core.tpcds.benchmark.runner.TPCDSBenchmark.run_streams`` routed
+through ``ConcurrentQueryExecutor``, but that routing always terminated in a
+non-executing stub that faked query success without running any SQL -- so no
+real workload ever reached these executors. Both stub call sites have since
+been changed to raise ``NotImplementedError`` instead of faking success, which
+severs the only path that could reach this module's executors.
+
+The classes are kept (rather than deleted) only because
+``benchbox/utils/__init__.py`` re-exports them and that file is outside this
+consolidation's scope; they are not wired into any current benchmark
+execution path. The single production concurrent-stream executor is
+``benchbox.core.throughput.runner.StreamRunner``, used by
+``benchbox.core.tpch.throughput_test.TPCHThroughputTest`` and
+``benchbox.core.tpcds.throughput_test.TPCDSThroughputTest``. Do not add new
+callers of ``PowerRunExecutor``/``ConcurrentQueryExecutor``; extend
+``StreamRunner`` instead.
+
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.
@@ -146,7 +167,13 @@ class ConcurrentQueryResult:
 
 
 class PowerRunExecutor:
-    """Manages power run execution with multiple iterations and warm-up."""
+    """Manages power run execution with multiple iterations and warm-up.
+
+    QUARANTINED: no production caller. TPC-H/TPC-DS power tests implement
+    their own iteration/warm-up loops directly (see ``run_power_test`` on
+    each benchmark class) instead of using this class. See the module
+    docstring for the full consolidation rationale.
+    """
 
     def __init__(
         self,
@@ -458,7 +485,18 @@ class PowerRunExecutor:
 
 
 class ConcurrentQueryExecutor:
-    """Manages concurrent query execution for throughput testing."""
+    """Manages concurrent query execution for throughput testing.
+
+    QUARANTINED: no production caller. The only two call sites that ever
+    routed through this class (``benchbox.core.tpch.streams.TPCHStreamRunner``
+    and ``benchbox.core.tpcds.benchmark.runner.TPCDSBenchmark.run_streams``)
+    always terminated in a non-executing stub that faked query success
+    without running SQL, so no real workload ever reached this executor. Both
+    stub call sites now raise ``NotImplementedError`` instead. The production
+    concurrent-stream executor is
+    ``benchbox.core.throughput.runner.StreamRunner``. See the module
+    docstring for the full consolidation rationale.
+    """
 
     def __init__(
         self,

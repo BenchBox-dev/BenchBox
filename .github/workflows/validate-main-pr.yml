@@ -126,11 +126,15 @@ jobs:
           # scripts/ruleset_drift_check.py imports the enforcement helper from
           # _project/scripts, but both the release head and the trusted main
           # base are curated (no _project/) once the release-cut curation
-          # step removes it. Pull the helper from develop, which always has
-          # it, so bootstrap evidence doesn't ModuleNotFoundError.
+          # step removes it. Pull the helper AND its _project/scripts
+          # dependency (auto_merge_soundness_paths) from develop, which always
+          # has them, so bootstrap evidence doesn't ModuleNotFoundError.
+          mkdir -p _project/scripts
           if [ ! -f _project/scripts/ruleset_review_enforcement.py ]; then
-            mkdir -p _project/scripts
             git show origin/develop:_project/scripts/ruleset_review_enforcement.py > _project/scripts/ruleset_review_enforcement.py
+          fi
+          if [ ! -f _project/scripts/auto_merge_soundness_paths.py ]; then
+            git show origin/develop:_project/scripts/auto_merge_soundness_paths.py > _project/scripts/auto_merge_soundness_paths.py
           fi
 
       - name: Bootstrap ruleset drift evidence

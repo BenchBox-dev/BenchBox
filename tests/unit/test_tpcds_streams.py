@@ -266,119 +266,57 @@ SELECT COUNT(*) FROM ITEM LIMIT 1;
                 stream_files.append(Path(f.name))
         return stream_files
 
-    def test_run_streams_basic_functionality(self, tpcds_benchmark, mock_stream_files):
-        """Test basic stream execution functionality."""
+    def test_run_streams_raises_not_implemented(self, tpcds_benchmark, mock_stream_files):
+        """run_streams never executes SQL; it always raises NotImplementedError.
 
+        This previously "executed" stream files by counting `-- Query`
+        comment lines (both in its concurrent branch, via a now-retired
+        ConcurrentQueryExecutor wrapper, and in its sequential branch) and
+        reported success without ever touching `connection`. Both branches
+        bottomed out in the same fake-success stub, so run_streams now
+        raises NotImplementedError unconditionally regardless of the
+        `concurrent` flag.
+        """
         mock_connection = Mock()
-        result = tpcds_benchmark.run_streams(
-            connection=mock_connection,
-            stream_files=mock_stream_files,
-            concurrent=False,  # Use sequential execution for simplicity
-        )
+        try:
+            with pytest.raises(NotImplementedError, match="does not execute SQL"):
+                tpcds_benchmark.run_streams(
+                    connection=mock_connection,
+                    stream_files=mock_stream_files,
+                    concurrent=False,
+                )
+        finally:
+            for stream_file in mock_stream_files:
+                stream_file.unlink()
 
-        # Verify result structure
-        assert isinstance(result, dict)
-        assert "start_time" in result
-        assert "end_time" in result
-        assert "total_duration" in result
-        assert "num_streams" in result
-        assert "streams_executed" in result
-        assert "streams_successful" in result
-        assert "streams_failed" in result
-        assert "total_queries_executed" in result
-        assert "total_queries_successful" in result
-        assert "total_queries_failed" in result
-        assert "success" in result
-        assert "errors" in result
-        assert "stream_results" in result
-
-        # Verify basic execution worked
-        assert result["num_streams"] == 2
-        assert result["streams_executed"] == 2
-        # Use >= 0 for cross-platform compatibility (Windows timer resolution)
-        assert result["total_duration"] >= 0
-
-        # Clean up
-        for stream_file in mock_stream_files:
-            stream_file.unlink()
-
-    def test_run_streams_nonexistent_files(self, tpcds_benchmark):
-        """Test stream execution with nonexistent files."""
-
+    def test_run_streams_raises_not_implemented_for_nonexistent_files(self, tpcds_benchmark):
+        """run_streams raises NotImplementedError even when the stream files don't exist."""
         nonexistent_files = [
             Path("/tmp/nonexistent_stream_1.sql"),
             Path("/tmp/nonexistent_stream_2.sql"),
         ]
         mock_connection = Mock()
 
-        result = tpcds_benchmark.run_streams(
-            connection=mock_connection, stream_files=nonexistent_files, concurrent=False
-        )
+        with pytest.raises(NotImplementedError, match="does not execute SQL"):
+            tpcds_benchmark.run_streams(connection=mock_connection, stream_files=nonexistent_files, concurrent=False)
 
-        # Should handle errors gracefully
-        assert not result["success"]
-        assert len(result["errors"]) > 0
-        assert all("not found" in error for error in result["errors"])
-
-        # Should still have proper structure
-        assert result["streams_executed"] == 2
-        assert result["streams_successful"] == 0
-        assert result["streams_failed"] == 2
-
-    def test_run_streams_generates_streams_when_none_provided(self, tpcds_benchmark):
-        """Test that run_streams generates streams when none are provided."""
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Set benchmark output directory to temp directory
-            tpcds_benchmark.output_dir = Path(temp_dir)
-            mock_connection = Mock()
-
-            result = tpcds_benchmark.run_streams(connection=mock_connection, concurrent=False)
-
-            # Should have generated and executed streams
-            assert result["streams_executed"] == 2  # Default num_streams
-            assert "stream_results" in result
-            assert len(result["stream_results"]) == 2
-
-    def test_run_streams_concurrent_execution_disabled(self, tpcds_benchmark, mock_stream_files):
-        """Test concurrent stream execution when concurrent queries are disabled."""
-
-        # Mock the ConcurrentQueryExecutor to be disabled
-        with patch("benchbox.utils.execution_manager.ConcurrentQueryExecutor") as mock_executor_class:
-            mock_executor = Mock()
-            mock_executor.config = {"enabled": False}
-            mock_executor_class.return_value = mock_executor
-            mock_connection = Mock()
-
-            result = tpcds_benchmark.run_streams(
-                connection=mock_connection,
-                stream_files=mock_stream_files,
-                concurrent=True,  # Request concurrent but it will fallback to sequential
-            )
-
-            # Should still work with sequential execution
-            assert result["streams_executed"] == 2
-            assert "stream_results" in result
-
-        # Clean up
-        for stream_file in mock_stream_files:
-            stream_file.unlink()
-
-    def test_run_streams_single_stream(self, tpcds_benchmark, mock_stream_files):
-        """Test execution with single stream."""
-
-        single_stream = [mock_stream_files[0]]
+    def test_run_streams_raises_not_implemented_when_concurrent_true(self, tpcds_benchmark, mock_stream_files):
+        """run_streams raises NotImplementedError for the concurrent branch too, without touching ConcurrentQueryExecutor."""
         mock_connection = Mock()
-
-        result = tpcds_benchmark.run_streams(connection=mock_connection, stream_files=single_stream, concurrent=False)
-
-        # Should handle single stream correctly
-        assert result["num_streams"] == 1
-        assert result["streams_executed"] == 1
-        assert len(result["stream_results"]) == 1
-
-        # Clean up
-        single_stream[0].unlink()
+        try:
+            with (
+                patch("benchbox.utils.execution_manager.ConcurrentQueryExecutor") as mock_executor_class,
+                pytest.raises(NotImplementedError, match="does not execute SQL"),
+            ):
+                tpcds_benchmark.run_streams(
+                    connection=mock_connection,
+                    stream_files=mock_stream_files,
+                    concurrent=True,
+                )
+            mock_executor_class.assert_not_called()
+        finally:
+            for stream_file in mock_stream_files:
+                stream_file.unlink()
 
 
 class TestTPCDSStreamsIntegration:
