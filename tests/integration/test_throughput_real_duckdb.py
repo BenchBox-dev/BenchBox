@@ -36,7 +36,7 @@ driver layers would be caught here.
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -44,6 +44,7 @@ from typing import Any
 import pytest
 
 from benchbox.core.tpcds.benchmark import TPCDSBenchmark
+from benchbox.core.tpcds.streams import MULTI_PART_QUERY_IDS
 from benchbox.core.tpch.benchmark import TPCHBenchmark
 from benchbox.core.tpch.streams import TPCHStreams
 from benchbox.platforms.duckdb import DuckDBAdapter
@@ -72,6 +73,20 @@ _TPCDS_NUM_STREAMS = 2
 # from this test's own run output), so it can safely serve as an independent
 # expected-count oracle.
 _TPCDS_QUERIES_PER_STREAM = 103
+# The exact multiset of query_id strings every stream must produce, derived
+# independently from the same seed-invariant properties as
+# _TPCDS_QUERIES_PER_STREAM above (query range 1-99, MULTI_PART_QUERY_IDS
+# expand into "<id>a"/"<id>b" instead of the plain "<id>" - see
+# benchbox/core/tpcds/throughput_test.py's query_display_id construction).
+# A stream that duplicates one query while omitting another, or collapses a
+# variant pair like "14a"/"14b" into the same id, keeps the same length but
+# changes this multiset - which len(...) == _TPCDS_QUERIES_PER_STREAM alone
+# cannot detect.
+_TPCDS_EXPECTED_QUERY_IDS = Counter(
+    f"{query_id}{variant}" if variant else str(query_id)
+    for query_id in range(1, 100)
+    for variant in (["a", "b"] if query_id in MULTI_PART_QUERY_IDS else [None])
+)
 # Shared base seed for both throughput runs below.
 _BASE_SEED = 7
 
@@ -342,12 +357,19 @@ class TestTPCDSThroughputRealDuckDB:
 
         assert set(by_stream.keys()) == set(range(_TPCDS_NUM_STREAMS))
 
-        # Each stream must have run the expected, seed-invariant TPC-DS query
-        # count - independent of what the flattened rows/stream_results
-        # themselves report.
+        # Each stream must have run the exact expected, seed-invariant TPC-DS
+        # query multiset - not just the right count. A stream that duplicates
+        # one query while omitting another, or collapses a variant pair like
+        # "14a"/"14b" into the same id, keeps len(query_ids) == 103 but
+        # changes which ids are present; Counter equality catches that.
         for stream_id, query_ids in by_stream.items():
             assert len(query_ids) == _TPCDS_QUERIES_PER_STREAM, (
                 f"stream {stream_id} ran {len(query_ids)} queries, expected {_TPCDS_QUERIES_PER_STREAM}"
+            )
+            assert Counter(query_ids) == _TPCDS_EXPECTED_QUERY_IDS, (
+                f"stream {stream_id} ran the wrong query/variant multiset: "
+                f"missing={_TPCDS_EXPECTED_QUERY_IDS - Counter(query_ids)}, "
+                f"unexpected={Counter(query_ids) - _TPCDS_EXPECTED_QUERY_IDS}"
             )
 
         # Structured stream_results must agree with the flattened adapter
