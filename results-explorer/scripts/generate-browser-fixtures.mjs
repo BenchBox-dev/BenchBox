@@ -55,6 +55,12 @@ const VARIANTS = [
     // `submission-manifest.json` sidecar to `trust_label=community-submission`,
     // so the derived file must land in its own subdirectory to avoid
     // tainting the adjacent maintainer-run bundles.
+    //
+    // This is also the corpus's only funding-disclosing bundle
+    // (`provenance.funding`), which is what gives the funding-chip e2e a row to
+    // assert on. Community + employer-funded is a deliberate pairing: it proves
+    // the two axes are independent, since every other fixture leaves funding at
+    // the `unspecified` producer default and therefore renders no chip.
     source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
     subdir: "community",
     derived: "tpch-duckdb-sf0.01-20260403-community.json",
@@ -76,6 +82,9 @@ const VARIANTS = [
       if (mutated.run) {
         mutated.run.id = `${mutated.run.id ?? "run"}-community`;
       }
+      // Declare a funding source so the read model carries a non-default
+      // `funding` value. See transformer.py::_funding.
+      mutated.provenance = { ...(mutated.provenance ?? {}), funding: "employer" };
       return mutated;
     },
   },

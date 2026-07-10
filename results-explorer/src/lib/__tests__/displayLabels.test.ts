@@ -3,6 +3,7 @@ import {
   formatBenchmarkLabel,
   formatCostStatus,
   formatEnumLabel,
+  formatFunding,
   formatTrustLabel,
   formatValidationStatus,
   formatVisibility,
@@ -23,6 +24,31 @@ describe("formatTrustLabel", () => {
   it("falls back to underscore/dash humanization for unknown values", () => {
     expect(formatTrustLabel("future_tier")).toBe("future tier");
     expect(formatTrustLabel("some-new-tier")).toBe("some new tier");
+  });
+});
+
+describe("formatFunding", () => {
+  it("humanizes every canonical funding source", () => {
+    expect(formatFunding("employer")).toBe("employer funded");
+    expect(formatFunding("personal")).toBe("personally funded");
+    expect(formatFunding("free-trial")).toBe("free trial");
+    expect(formatFunding("vendor-sponsored")).toBe("vendor sponsored");
+    expect(formatFunding("grant")).toBe("grant funded");
+    expect(formatFunding("unspecified")).toBe("unspecified");
+  });
+
+  // Unlike formatTrustLabel, a missing value maps to "unspecified" rather than
+  // "unknown": `unspecified` is the producer default, so absent and declared
+  // carry the same meaning.
+  it("returns 'unspecified' for null/empty values", () => {
+    expect(formatFunding(null)).toBe("unspecified");
+    expect(formatFunding("")).toBe("unspecified");
+    expect(formatFunding(undefined)).toBe("unspecified");
+  });
+
+  it("falls back to underscore/dash humanization for unknown values", () => {
+    expect(formatFunding("crowd_funded")).toBe("crowd funded");
+    expect(formatFunding("some-new-source")).toBe("some new source");
   });
 });
 

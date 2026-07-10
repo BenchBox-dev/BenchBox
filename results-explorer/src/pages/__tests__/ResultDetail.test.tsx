@@ -66,6 +66,7 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
     bundle_download_url: "https://example.test/download/r1.json",
     trust_label: "maintainer-run",
     visibility: "public-curated",
+    funding: "unspecified",
     platform_version: null,
     execution_mode: null,
     tuning_mode: null,
@@ -210,5 +211,40 @@ describe("ResultDetail - median-first contract", () => {
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
     expect(screen.queryAllByRole("link", { name: "Download plans" })).toHaveLength(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // Funding disclosure (chip + legend)
+  // -------------------------------------------------------------------------
+
+  it("renders the funding chip alongside the trust badge when funding is disclosed", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(
+      makeDetail({ funding: "employer", trust_label: "vendor-supplied" }),
+    );
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    // Orthogonal axes: a vendor-supplied result can still be employer-funded,
+    // and each renders its own independent element.
+    expect(document.querySelector('[data-role="funding"]')?.textContent).toBe("Employer funded");
+    expect(document.querySelector('[data-role="trust"]')?.textContent).toBe("Vendor");
+  });
+
+  it("omits the funding chip when funding is unspecified, leaving the trust badge intact", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ funding: "unspecified" }));
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    expect(document.querySelector('[data-role="funding"]')).toBeNull();
+    expect(document.querySelector('[data-role="trust"]')).not.toBeNull();
+  });
+
+  it("exposes the provenance legend explaining the badges it renders", async () => {
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    expect(screen.getByRole("button", { name: /What do these labels mean\?/i })).toBeTruthy();
   });
 });

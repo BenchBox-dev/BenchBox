@@ -159,6 +159,7 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
     bundle_download_url: overrides.bundle_download_url ?? "/bundle.json",
     trust_label: overrides.trust_label ?? "maintainer-run",
     visibility: overrides.visibility ?? "public-curated",
+    funding: overrides.funding ?? "unspecified",
     platform_version: overrides.platform_version ?? null,
     execution_mode: overrides.execution_mode ?? "sql",
     tuning_mode: overrides.tuning_mode ?? "default",

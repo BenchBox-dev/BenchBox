@@ -3,6 +3,7 @@ import type { ComponentChildren } from "preact";
 export type StatusTone = "info" | "success" | "warning" | "danger" | "neutral";
 export type StatusRole =
   | "trust"
+  | "funding"
   | "validation"
   | "visibility"
   | "computed"

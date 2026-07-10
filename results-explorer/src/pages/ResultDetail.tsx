@@ -8,6 +8,8 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
+import { FundingChip } from "@/components/FundingChip";
+import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { TuningBadge } from "@/components/TuningBadge";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -224,6 +226,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                 {benchmarkLabel} - {detail.platform}
               </h1>
               <TrustBadge trustLabel={detail.trust_label} />
+              <FundingChip funding={detail.funding} />
               <ValidationBadge validationStatus={detail.validation_status} showMissing />
               {detail.tuning_mode && <TuningBadge tuningMode={detail.tuning_mode} />}
               {detail.visibility === "public-curated" && (
@@ -444,6 +447,8 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
           </section>
 
           <MethodologyDisclosure detail={detail} />
+
+          <ProvenanceLegend />
         </div>
       </div>
     </div>
