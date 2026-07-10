@@ -134,3 +134,99 @@ def test_execute_stream_runs_query_path(monkeypatch):
     assert result.queries_executed == 1
     assert result.queries_successful == 1
     assert result.success is True
+
+
+def test_build_stream_queries_uses_run_num_streams_and_base_seed_not_stream_id(monkeypatch):
+    """Regression test for the retired `num_streams=stream_id + 1,
+    base_seed=seed + stream_id` bug: a stream's ordering must depend on the
+    run's actual `config.num_streams` / `config.base_seed`, not on its own
+    stream_id -- mirroring TPC-H's single PERMUTATION_MATRIX indexed by
+    `stream_id % 41` (benchbox/core/tpch/streams.py)."""
+    query_manager = object()
+    benchmark = SimpleNamespace(
+        query_manager=query_manager,
+        get_queries=lambda: {"1": "SELECT 1"},
+        get_query=lambda *_args, **_kwargs: "SELECT 1",
+    )
+    throughput = TPCDSThroughputTest(benchmark=benchmark, connection_factory=DummyConn, num_streams=4)
+
+    captured_kwargs = []
+
+    def _fake_create_standard_streams(**kwargs):
+        captured_kwargs.append(kwargs)
+        return DummyStreamManager([DummyStreamQuery(query_id=1)])
+
+    monkeypatch.setattr(
+        "benchbox.core.tpcds.streams.create_standard_streams",
+        _fake_create_standard_streams,
+    )
+
+    config = TPCDSThroughputTestConfig(num_streams=4, base_seed=100, enable_preflight=False)
+
+    throughput._build_stream_queries(stream_id=0, seed=100, config=config)
+    throughput._build_stream_queries(stream_id=3, seed=103, config=config)
+
+    assert len(captured_kwargs) == 2
+    # Both calls -- regardless of stream_id -- must resolve to the SAME
+    # num_streams/base_seed (the run's config), not stream_id-dependent
+    # values like the retired `stream_id + 1` / `seed + stream_id` formula.
+    for kwargs in captured_kwargs:
+        assert kwargs["num_streams"] == config.num_streams == 4
+        assert kwargs["base_seed"] == config.base_seed == 100
+
+
+class DummyStreamQueryWithSql:
+    def __init__(self, query_id, sql, variant=None):
+        self.query_id = query_id
+        self.variant = variant
+        self.sql = sql
+
+
+def test_pregenerate_stream_queries_routes_through_dsqgen_streams(monkeypatch):
+    """`_pregenerate_stream_queries` must call the -STREAMS batch generator
+    exactly once for the whole run (not per-stream), then translate each
+    stream's raw dsqgen SQL to the target platform dialect."""
+    benchmark = SimpleNamespace(
+        translate_query_text=lambda sql, _src, _tgt: f"TRANSLATED::{sql}",
+        _apply_target_dialect_overrides=lambda _qid, sql, _tgt: sql,
+    )
+    throughput = TPCDSThroughputTest(benchmark=benchmark, connection_factory=DummyConn, num_streams=2, dialect="duckdb")
+
+    calls = []
+
+    def _fake_generate_dsqgen_streams(*, num_streams, scale_factor, seed):
+        calls.append({"num_streams": num_streams, "scale_factor": scale_factor, "seed": seed})
+        return {
+            0: [DummyStreamQueryWithSql(query_id=1, sql="select 1;")],
+            1: [DummyStreamQueryWithSql(query_id=2, sql="select 2;")],
+        }
+
+    monkeypatch.setattr(
+        "benchbox.core.tpcds.streams.generate_dsqgen_streams",
+        _fake_generate_dsqgen_streams,
+    )
+
+    config = TPCDSThroughputTestConfig(num_streams=2, base_seed=7, scale_factor=3.0, enable_preflight=True)
+    result = throughput._pregenerate_stream_queries(config)
+
+    assert len(calls) == 1
+    assert calls[0] == {"num_streams": 2, "scale_factor": 3.0, "seed": 7}
+
+    assert result[0][0][1] == "TRANSLATED::select 1;"
+    assert result[1][0][1] == "TRANSLATED::select 2;"
+
+
+def test_pregenerate_stream_queries_wraps_dsqgen_failure(monkeypatch):
+    from benchbox.core.tpcds.streams import DSQGenStreamsError
+
+    benchmark = SimpleNamespace(get_query=lambda *_args, **_kwargs: "SELECT 1")
+    throughput = TPCDSThroughputTest(benchmark=benchmark, connection_factory=DummyConn, num_streams=1)
+
+    def _raise(*_args, **_kwargs):
+        raise DSQGenStreamsError("boom")
+
+    monkeypatch.setattr("benchbox.core.tpcds.streams.generate_dsqgen_streams", _raise)
+
+    config = TPCDSThroughputTestConfig(num_streams=1, enable_preflight=True)
+    with pytest.raises(RuntimeError, match="dsqgen -STREAMS generation failed"):
+        throughput._pregenerate_stream_queries(config)
