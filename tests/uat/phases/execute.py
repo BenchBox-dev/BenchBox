@@ -508,6 +508,9 @@ def _run_platform_benchmark(
             and docker_assets.is_docker_platform(cell.platform),
             log_dir=log_dir,
             benchmark_runs_dir=benchmark_runs_dir,
+            official=config.execute.official,
+            streams=config.execute.streams,
+            seed=config.execute.seed,
         )
         cell_result = _apply_submit_classification(cell_result)
         results.append(cell_result)

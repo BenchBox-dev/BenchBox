@@ -1,0 +1,73 @@
+# Nightly-only real acceptance coverage for the throughput/concurrent phase
+# (throughput-uat-and-ci-coverage). Concurrency previously had zero UAT/CI
+# coverage: no config ran a real `throughput` phase, so a regression that
+# broke multi-stream execution -- or silently floored the requested stream
+# count -- would have shipped green.
+#
+# `benchbox run` has no `--streams` option; `benchbox run-official --streams N`
+# is, today, the only CLI surface that forwards a requested stream count to
+# the throughput driver (see tests/uat/throughput.py and the
+# throughput-stream-count-wiring-defect TODO). `run-official` requires a
+# TPC-compliant scale factor, so SF=1 (the smallest allowed rung) is used
+# here rather than the usual SF=0.01 smoke scale.
+#
+# `streams: 3` is intentionally > the driver's 2-stream floor
+# (`_resolve_requested_stream_count` in
+# benchbox/platforms/base/execution.py floors any requested count < 2 up to
+# 2) so this cell actually exercises "was my N-stream request honored?"
+# rather than "did the floor's default of 2 happen to match?" -- the exact
+# defect class (silently dropping to 2 streams) this TODO exists to catch.
+#
+# Not run in the PR fast lane: invoke via `make uat-sweep
+# CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml` from the
+# nightly workflow (see .github/workflows/nightly.yml "throughput-uat" job).
+name: "uat-throughput-duckdb-nightly"
+description: "Nightly: real multi-stream throughput phase on DuckDB TPC-H SF1 (run-official --streams 3)"
+
+phases:
+  - preflight
+  - execute
+  - validate
+  - report
+
+platforms:
+  include: ["duckdb"]
+
+benchmarks:
+  include: ["tpch"]
+
+scales:
+  rungs: [1]
+
+execute:
+  per_cell_timeout_s: 900
+  early_stop_after_s: 900
+  early_stop_on_failure: false
+  phases_arg: "load,throughput"
+  skip_unreachable: true
+  parallel_platforms: false
+  official: true
+  streams: 3
+  seed: 20260709
+
+preflight:
+  free_space_min_gib: 5
+  free_space_path: "~/Developer/benchmark_runs"
+  docker_required: false
+
+cleanup:
+  preserve_datagen: true
+  prune_databases: true
+  docker_manage_platforms: false
+  docker_platform_switch: "off"
+
+validate:
+  validator_clean_rate_floor: 1.0
+
+report:
+  matrix_summary_tsv: "matrix_summary.tsv"
+
+output:
+  benchmark_runs_dir_template: "~/Developer/benchmark_runs"
+  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_throughput_duckdb_nightly_{date}"
+  submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"

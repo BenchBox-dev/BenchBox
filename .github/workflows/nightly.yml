@@ -511,6 +511,82 @@ jobs:
           print(f"All {checked} scheduled workflow(s) alive within their cadence windows.")
           PY
 
+  throughput-uat:
+    # Closes the throughput-uat-and-ci-coverage gap: concurrency previously had
+    # zero UAT/CI coverage, so a regression that broke multi-stream execution
+    # (or silently floored the requested stream count -- see
+    # throughput-stream-count-wiring-defect) would have shipped green. This
+    # job is the nightly-only real-DB/real-CLI lane; PR fast-lane runtime is
+    # unaffected (see tests/uat/configs/uat-throughput-duckdb-nightly.yaml).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run real-DB throughput integration tests (DuckDB)
+        run: |
+          uv run -- python -m pytest tests/integration -k "throughput and duckdb" -m integration --tb=short -v
+
+      - name: Run DuckDB throughput UAT cell (TPC-H SF1, run-official --streams 3)
+        # KNOWN, TRACKED, PRE-EXISTING DEFECT (independent of this TODO):
+        # TPC-H throughput mode's per-stream/per-position seed derivation
+        # (seed + stream_id * 1000 + position, benchbox/core/tpch/throughput_test.py)
+        # means queries 11/16/18/20 (TPC-H's own "non-deterministic" query
+        # set) never land on the reference-seed exact-match validation path
+        # after the first query of stream 0, so they fail BenchBox's LOOSE
+        # (+-50%) row-count check on every stream -- reproduced with a custom
+        # seed, a different custom seed, and no seed at all. Confirmed
+        # independent of concurrency: the identical 4 queries fail the same
+        # way in single-stream POWER mode with a non-reference seed. This
+        # keeps the cell's overall clean-pass status red until that separate
+        # defect is fixed; continue-on-error here so it doesn't block the
+        # nightly workflow. The actual concurrency invariant this TODO
+        # protects (requested stream count reaches the driver) is hard-gated
+        # by the step below, independent of this known gap -- see
+        # tests/uat/throughput.py's validate_stream_count/validate_throughput_metric split.
+        continue-on-error: true
+        run: |
+          make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
+
+      - name: Assert the requested stream count reached the driver
+        run: |
+          uv run -- python -c "
+          import datetime, sys
+          from pathlib import Path
+          from tests.uat.throughput import resolve_official_result_path, validate_stream_count
+
+          results_dir = Path.home() / 'Developer' / 'benchmark_runs' / 'results'
+          result_path = resolve_official_result_path(
+              results_dir,
+              platform='duckdb',
+              benchmark='tpch',
+              started_after=datetime.datetime.now() - datetime.timedelta(hours=1),
+          )
+          if result_path is None:
+              print('::error::No throughput UAT result JSON found for duckdb/tpch')
+              sys.exit(1)
+          import json
+          result_json = json.loads(result_path.read_text(encoding='utf-8'))
+          ok, reason = validate_stream_count(result_json, requested_streams=3)
+          if not ok:
+              print(f'::error::{reason}')
+              sys.exit(1)
+          print(f'OK: {reason} ({result_path})')
+          "
+
   pyspark-tests:
     runs-on: ubuntu-latest
     continue-on-error: true
