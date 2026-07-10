@@ -199,10 +199,15 @@ Flipping the constant **before** step 1 turns the (still-live) missing-review ga
 `WARNING (non-blocking):` finding into a blocking one, which reddens **both** the daily
 `release-canary.yml` run **and** `validate-main-pr.yml`'s drift-check on every real develop
 PR until the PUT lands. Done in the correct order, the flip's own CI is green (the live
-ruleset already satisfies the rule). No test changes are required: `compare_ruleset`'s
-`enforce_review_rule` parameter is exercised in both `False`/`True` modes by
-`tests/unit/release/test_ruleset_drift_review_coverage.py`, so the constant's value does
-not itself make any unit test pass or fail.
+ruleset already satisfies the rule). **One test must be updated alongside the flip:**
+`compare_ruleset`'s `enforce_review_rule` parameter defaults to the module constant
+(`enforce_review_rule: bool = DEVELOP_REVIEW_RULE_ENFORCED`), so flipping the constant also
+flips that default. `tests/unit/release/test_ruleset_drift_review_coverage.py::test_missing_review_enforcement_is_a_non_blocking_warning_by_default`
+calls `compare_ruleset(...)` without passing `enforce_review_rule` explicitly, relying on
+that default to exercise the non-blocking/`False` path — after the flip it would exercise
+the blocking/`True` path instead and fail its own `blocking_findings(findings) == []`
+assertion. Pass `enforce_review_rule=False` explicitly in that one test call so it keeps
+pinning the non-blocking-by-default behavior regardless of the live constant's value.
 
 History:
 
