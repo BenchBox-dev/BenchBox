@@ -35,6 +35,7 @@ import { formatPlainNumber } from "@/lib/metricFormatters";
 import {
   formatBenchmarkLabel,
   formatCostStatus,
+  formatFunding,
   formatTrustLabel,
   formatValidationStatus,
   formatVisibility,
@@ -1135,6 +1136,7 @@ function projectVisibleRow(row: ResultRow, visibleColumns: string[]): ResultRow 
 function formatQueryRowCell(column: string, value: unknown): string {
   if (typeof value === "string" && value !== "") {
     if (column === "trust_label") return formatTrustLabel(value);
+    if (column === "funding") return formatFunding(value);
     if (column === "validation_status") return formatValidationStatus(value);
     if (column === "visibility") return formatVisibility(value);
     if (column === "cost_status") return formatCostStatus(value);

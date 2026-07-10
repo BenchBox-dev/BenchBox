@@ -59,7 +59,6 @@ export function ProvenanceLegend() {
         class="flex w-full items-center justify-between text-left"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        aria-controls="provenance-legend-body"
       >
         <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">
           What do these labels mean?
@@ -68,7 +67,7 @@ export function ProvenanceLegend() {
       </button>
 
       {expanded && (
-        <div id="provenance-legend-body" class="mt-4 space-y-6 text-sm">
+        <div class="mt-4 space-y-6 text-sm">
           <div>
             <h3 class="mb-1 font-semibold text-[var(--bb-data-fg-primary)]">Trust label</h3>
             <p class="mb-3 text-[var(--bb-data-fg-muted)]">
