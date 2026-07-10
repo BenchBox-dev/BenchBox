@@ -24,18 +24,6 @@ from tests.uat.throughput import (
 pytestmark = pytest.mark.fast
 
 
-# ``resolve_official_result_path`` filters candidates by ``st_mtime >=
-# started_after``. Capturing ``started_after = datetime.now()`` immediately
-# before writing the fixture file is racy: filesystem mtime granularity (or a
-# small backward NTP step between the two calls) can floor the written file's
-# mtime just *below* ``started_after``, dropping the file and returning None
-# (observed as a one-off CI flake). Backdating ``started_after`` by a slack
-# margin makes the boundary robust without weakening any test's intent -- the
-# "ignores older files" case backdates its stale file by a full hour, well
-# outside this margin.
-_MTIME_SLACK = _dt.timedelta(seconds=2)
-
-
 # ---------------------------------------------------------------------------
 # resolve_official_result_path
 # ---------------------------------------------------------------------------
@@ -62,7 +50,7 @@ def test_resolve_official_result_path_returns_none_when_no_candidates(tmp_path: 
 def test_resolve_official_result_path_matches_platform_and_benchmark(tmp_path: Path):
     results_dir = tmp_path / "results"
     results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
+    started = _dt.datetime.now()
     match = results_dir / "tpch_sf1_duckdb_sql_20260709_223304_0865bb91.json"
     match.write_text("{}", encoding="utf-8")
     # A same-timestamp but different-platform file must not match.
@@ -90,7 +78,7 @@ def test_resolve_official_result_path_ignores_files_older_than_started_after(tmp
 def test_resolve_official_result_path_picks_newest_of_multiple_candidates(tmp_path: Path):
     results_dir = tmp_path / "results"
     results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
+    started = _dt.datetime.now()
     older = results_dir / "tpch_sf1_duckdb_sql_older.json"
     newer = results_dir / "tpch_sf1_duckdb_sql_newer.json"
     older.write_text("{}", encoding="utf-8")
@@ -109,7 +97,7 @@ def test_resolve_official_result_path_is_case_and_dash_insensitive(tmp_path: Pat
     """Platform tokens with dashes (e.g. `pg-duckdb`) normalize like the CLI's own output filenames."""
     results_dir = tmp_path / "results"
     results_dir.mkdir()
-    started = _dt.datetime.now() - _MTIME_SLACK
+    started = _dt.datetime.now()
     match = results_dir / "tpch_sf1_pg_duckdb_sql_20260709.json"
     match.write_text("{}", encoding="utf-8")
     out = resolve_official_result_path(results_dir, platform="pg-duckdb", benchmark="tpch", started_after=started)
