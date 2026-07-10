@@ -8,17 +8,36 @@ category: Core Functionality
 description: |
   Two smaller robustness/consistency issues in the throughput executor.
 
-  1. TIMED-OUT STREAM LEAK: StreamRunner.execute enforces per-stream timeout via
-     `future.result(timeout=...)` but cannot cancel a running thread
-     (benchbox/core/throughput/runner.py:87-113). A timed-out stream keeps
-     executing in the background, still holding its connection and consuming
-     CPU/server resources, while the executor records it as failed and moves on.
-     During a long throughput run this means the reported TTT window can overlap
-     zombie streams that are still hammering the DB -- skewing both the failed
-     run's accounting and any subsequent phase (e.g. maintenance) that starts
-     while zombies run. At minimum this should be surfaced; ideally streams
-     should be cooperatively cancellable or isolated so a timeout actually stops
-     work.
+  1. TIMED-OUT STREAM LEAK: StreamRunner.execute's timeout enforcement is dead
+     code, not just unable to cancel a running thread. It iterates
+     `for future in concurrent.futures.as_completed(future_to_stream_id.keys())`
+     with no `timeout=` argument to `as_completed` itself
+     (benchbox/core/throughput/runner.py:88), then calls
+     `future.result(timeout=timeout)` (line 93). `as_completed()` only ever
+     yields a future once that future is ALREADY done, so by the time the loop
+     body runs, `.result(timeout=...)` is called on a completed future and
+     returns/raises immediately -- it can never itself raise
+     `concurrent.futures.TimeoutError`, because there is nothing left to wait
+     for. The `except concurrent.futures.TimeoutError` branch (lines 108-113) is
+     therefore unreachable: a genuinely hung stream is never detected as timed
+     out at all, and the loop just blocks indefinitely inside `as_completed`
+     waiting for that stream's future to eventually finish (if ever), rather
+     than moving on and recording a timeout. This must be fixed BEFORE "cannot
+     cancel a running thread" becomes the relevant limitation: detecting the
+     timeout at all requires polling with an actual deadline (e.g.
+     `concurrent.futures.wait(pending, timeout=remaining, return_when=FIRST_COMPLETED)`
+     in a loop, checking elapsed time against `config.stream_timeout` each
+     iteration) instead of a bare `as_completed()` walk. Once detection works,
+     the still-true secondary problem applies: Python cannot cancel a running
+     thread, so a detected-as-timed-out stream keeps executing in the
+     background, still holding its connection and consuming CPU/server
+     resources, while the executor records it as failed and moves on. During a
+     long throughput run this means the reported TTT window can overlap zombie
+     streams that are still hammering the DB -- skewing both the failed run's
+     accounting and any subsequent phase (e.g. maintenance) that starts while
+     zombies run. At minimum the leak should be surfaced; ideally streams
+     should be cooperatively cancellable or isolated so a timeout actually
+     stops work.
 
   2. DIVERGENT SUCCESS GATES: TPC-H throughput uses a configurable
      min_success_rate (default 0.99) (benchbox/core/tpch/throughput_test.py:38,
@@ -34,12 +53,12 @@ description: |
 prior_art:
   - "benchbox/core/throughput/runner.py:StreamRunner.execute — timeout handling + the as_completed loop."
   - "benchbox/core/tpch/throughput_test.py:TPCHThroughputTestConfig.min_success_rate — the configurable-gate pattern to mirror for TPC-DS."
-  - "benchbox/experimental/concurrency/executor.py — has a resource-monitor thread pattern usable to detect/report zombie streams."
+  - "benchbox/experimental/load_testing/executor.py — has a resource-monitor thread pattern usable to detect/report zombie streams."
   - "docs/development/throughput-result-alignment.md — documents the current divergence; update alongside any change."
 
 work:
   - id: w1
-    summary: "Surface timed-out (leaked) streams: annotate the result and log that background execution may continue"
+    summary: "Fix timeout detection first (as_completed never yields an unfinished future, so future.result(timeout=) is dead code) via a wait()-with-deadline poll loop, then annotate leaked streams"
     status: pending
   - id: w2
     summary: "Add a cooperative-cancellation or isolation option so a stream timeout can actually stop work (opt-in)"

@@ -154,7 +154,7 @@ def reclaim_container_usage(
         )
     run = runner or docker_assets.run_docker_command
 
-    resources = _inventory_resources(run)
+    resources = _inventory_resources(run, project_prefix)
     targets, retained = _partition_targets(resources, mode)
     planned = _plan_commands(targets, mode)
     footprint_before = _read_footprint(run)
@@ -321,27 +321,33 @@ def _is_forbidden(argv: tuple[str, ...]) -> bool:
 # --------------------------------------------------------------------------
 
 
-def _inventory_resources(run: ContainerRunner) -> tuple[ContainerResource, ...]:
+def _inventory_resources(run: ContainerRunner, project_prefix: str) -> tuple[ContainerResource, ...]:
     resources: list[ContainerResource] = []
-    resources.extend(_list_images(run))
-    resources.extend(_list_containers(run))
-    resources.extend(_list_volumes(run))
+    resources.extend(_list_images(run, project_prefix))
+    resources.extend(_list_containers(run, project_prefix))
+    resources.extend(_list_volumes(run, project_prefix))
     return tuple(resources)
 
 
-def _list_images(run: ContainerRunner) -> list[ContainerResource]:
+def _list_images(run: ContainerRunner, project_prefix: str) -> list[ContainerResource]:
     rows = _run_json_array(run, [CONTAINER_BIN, "image", "ls", "--format", "json"])
     out: list[ContainerResource] = []
     for row in rows:
+        row = row if isinstance(row, dict) else {}
         config = row.get("configuration") if isinstance(row, dict) else None
         config = config if isinstance(config, dict) else {}
-        name = str(config.get("name") or "")
-        identifier = str(row.get("id") or "")
+        # Current `container image ls --format json` renders ImageResource rows
+        # with the reference at the top-level `displayReference` field (see
+        # upstream ImageList.swift); `configuration.name` is empty on those
+        # rows. Fall back to `configuration.name` for older/other CLI versions
+        # that still populate it there.
+        name = str(row.get("displayReference") or config.get("name") or "")
+        identifier = str(row.get("id") or row.get("digest") or "")
         created_at = str(config.get("creationDate") or "")
         category: ContainerCategory
         if _BUILDER_IMAGE_MARKER in name:
             category = "system"
-        elif _is_owned_image_name(name, DEFAULT_UAT_PROJECT_PREFIX):
+        elif _is_owned_image_name(name, project_prefix):
             category = "owned"
         else:
             category = "shared"
@@ -357,7 +363,7 @@ def _list_images(run: ContainerRunner) -> list[ContainerResource]:
     return out
 
 
-def _list_containers(run: ContainerRunner) -> list[ContainerResource]:
+def _list_containers(run: ContainerRunner, project_prefix: str) -> list[ContainerResource]:
     rows = _run_json_array(run, [CONTAINER_BIN, "ls", "-a", "--format", "json"])
     out: list[ContainerResource] = []
     for row in rows:
@@ -376,9 +382,7 @@ def _list_containers(run: ContainerRunner) -> list[ContainerResource]:
 
         if labels.get(_BUILDER_ROLE_LABEL) == "builder" or _BUILDER_IMAGE_MARKER in image_ref:
             category = "system"
-        elif _is_owned(project, DEFAULT_UAT_PROJECT_PREFIX) or _is_owned_image_name(
-            image_ref, DEFAULT_UAT_PROJECT_PREFIX
-        ):
+        elif _is_owned(project, project_prefix) or _is_owned_image_name(image_ref, project_prefix):
             category = "owned"
         else:
             category = "shared"
@@ -395,7 +399,7 @@ def _list_containers(run: ContainerRunner) -> list[ContainerResource]:
     return out
 
 
-def _list_volumes(run: ContainerRunner) -> list[ContainerResource]:
+def _list_volumes(run: ContainerRunner, project_prefix: str) -> list[ContainerResource]:
     rows = _run_json_array(run, [CONTAINER_BIN, "volume", "ls", "--format", "json"])
     out: list[ContainerResource] = []
     for row in rows:
@@ -404,7 +408,7 @@ def _list_volumes(run: ContainerRunner) -> list[ContainerResource]:
         name = str(row.get("name") or row.get("Name") or "")
         if not name:
             continue
-        category: ContainerCategory = "owned" if _is_owned(name, DEFAULT_UAT_PROJECT_PREFIX) else "shared"
+        category: ContainerCategory = "owned" if _is_owned(name, project_prefix) else "shared"
         out.append(
             ContainerResource(
                 kind="volume",

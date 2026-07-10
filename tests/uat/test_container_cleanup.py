@@ -183,3 +183,75 @@ def test_report_renders_mode_and_store_path():
     assert "mode: owned (dry-run)" in rendered
     assert "com.apple.container" in rendered
     assert "Retained (widen --mode to reclaim):" in rendered
+
+
+def test_custom_project_prefix_reaches_classification():
+    """#1065 review: --prefix must actually classify resources, not just be
+    echoed in the report. _inventory_resources/_list_images/_list_containers/
+    _list_volumes previously ignored the caller's project_prefix and always
+    classified against the hard-coded DEFAULT_UAT_PROJECT_PREFIX."""
+    custom_images = [
+        {"id": "img-custom", "configuration": {"name": "foo-tpc-h:latest", "creationDate": "2026-07-08T00:00:00Z"}},
+    ]
+    custom_containers = [
+        {
+            "id": "custom-leftover",
+            "configuration": {
+                "id": "custom-leftover",
+                "image": {"reference": "postgres:18"},
+                "labels": {"com.docker.compose.project": "foo-smoke-postgresql"},
+            },
+            "status": {"state": "stopped"},
+        },
+    ]
+
+    def fake(argv, **kwargs):
+        argv_tuple = tuple(argv)
+        if argv_tuple[:4] == ("container", "image", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(custom_images), "")
+        if argv_tuple[:3] == ("container", "ls", "-a"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(custom_containers), "")
+        if argv_tuple[:4] == ("container", "volume", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, "[]", "")
+        if argv_tuple == ("container", "system", "df"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, _SYSTEM_DF, "")
+        return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+    report = container_cleanup.reclaim_container_usage(mode="owned", apply=False, project_prefix="foo", runner=fake)
+    assert _targets_by_kind(report) == {
+        "image": {"foo-tpc-h:latest"},
+        "container": {"custom-leftover"},
+    }
+
+
+def test_image_reference_read_from_display_reference_field():
+    """#1065 review: current `container image ls --format json` renders
+    ImageResource rows with the reference at the top-level `displayReference`
+    field, not `configuration.name` (which is empty on those rows)."""
+    images = [
+        {
+            "id": "sha256:abc123",
+            "displayReference": "benchbox/tpc-h-linux-arm64:latest",
+            "configuration": {"descriptor": {"digest": "sha256:abc123"}},
+        },
+        {
+            "id": "sha256:def456",
+            "displayReference": "postgres:18",
+            "configuration": {"descriptor": {"digest": "sha256:def456"}},
+        },
+    ]
+
+    def fake(argv, **kwargs):
+        argv_tuple = tuple(argv)
+        if argv_tuple[:4] == ("container", "image", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(images), "")
+        if argv_tuple[:3] == ("container", "ls", "-a"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, "[]", "")
+        if argv_tuple[:4] == ("container", "volume", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, "[]", "")
+        if argv_tuple == ("container", "system", "df"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, _SYSTEM_DF, "")
+        return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+    report = container_cleanup.reclaim_container_usage(mode="owned", apply=False, runner=fake)
+    assert _targets_by_kind(report) == {"image": {"benchbox/tpc-h-linux-arm64:latest"}}
