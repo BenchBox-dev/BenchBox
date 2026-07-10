@@ -448,6 +448,27 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "DuckDB"
     },
     {
+      "cost_class": "free",
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "local",
+        "self-hosted"
+      ],
+      "id": "ducklake",
+      "install_command": "uv add duckdb",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "DuckLake",
+      "safety_terms": {
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
       "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"

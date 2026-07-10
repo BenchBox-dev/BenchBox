@@ -13,7 +13,7 @@ The authoritative source is `benchbox/core/platform_registry.py`.
 
 <!-- benchbox-registry-counts:start -->
 
-Platform registry: **50** metadata entries; **45** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=27, experimental=17, deprecated=1.
+Platform registry: **51** metadata entries; **46** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=27, experimental=18, deprecated=1.
 
 <!-- benchbox-registry-counts:end -->
 
@@ -21,7 +21,7 @@ Platform registry: **50** metadata entries; **45** SQL-capable; **19** DataFrame
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |
 | `stable` | 5 | 3 | 3 | Core or single local extra | Listed by registry; runnable when dependency is installed | Discovery/control-plane metadata via registry | Full platform docs |
 | `beta` | 27 | 26 | 3 | Optional extras, credentials, or local services | Listed by registry; may need SDK/credentials | Discovery/control-plane metadata via registry | Platform docs and setup notes |
-| `experimental` | 17 | 15 | 13 | Optional, GPU/native, or cloud Spark extras | Listed but labeled experimental in metadata/docs | Discovery metadata only unless tool support is documented | Experimental caveats required |
+| `experimental` | 18 | 16 | 13 | Optional, GPU/native, or cloud Spark extras | Listed but labeled experimental in metadata/docs | Discovery metadata only unless tool support is documented | Experimental caveats required |
 | `repo_only` | 0 | 0 | 0 | Source checkout only | Hidden from normal runtime | Not exposed | Developer docs only |
 | `deprecated` | 1 | 1 | 0 | Compatibility selector | Retained for migration | Existing-client exposure only | Migration docs required |
 | `document_only` | 0 | 0 | 0 | None | Not runnable | Not exposed | Docs must say not executable |

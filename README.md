@@ -46,7 +46,7 @@ Registry-backed count claims are checked by unit tests so README and platform do
 
 <!-- benchbox-registry-counts:start -->
 
-- Platform registry: **50** metadata entries; **45** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=27, experimental=17, deprecated=1.
+- Platform registry: **51** metadata entries; **46** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=27, experimental=18, deprecated=1.
 - Benchmark registry: **23** metadata entries; **22** public discovery entries.
 
 <!-- benchbox-registry-counts:end -->
@@ -57,7 +57,7 @@ Registry-backed count claims are checked by unit tests so README and platform do
 - **Benchmark Catalog**: TPC-H, TPC-DS, TPC-DI, TPC-DS-OBT, TPC-H Skew, TPC-Havoc, SSB, AMPLab, JoinOrder, ClickBench, H2ODB, NYC Taxi, Flight Data, TSBS DevOps, CoffeeShop, TPC-H Data Vault, Vector Search, Read Primitives, Write Primitives, Transaction Primitives, Metadata Primitives, AI Primitives
 - **Cross-Database**: Same benchmarks work on any database platform
 - **DataFrame Mode**: Native DataFrame API benchmarking with Polars, Pandas, DataFusion, Dask, and other DataFrame runtimes
-- **SQL Platforms**: DuckDB, MotherDuck, SQLite, DataFusion, PostgreSQL, TimescaleDB, ClickHouse (Local, Server, Cloud), CedarDB, Firebolt, Databend, Doris, StarRocks, SingleStore, QuestDB, InfluxDB, pg_duckdb, pg_mooncake, Databricks SQL, Snowflake, BigQuery, Redshift, Azure Synapse Analytics, Microsoft Fabric Warehouse, Microsoft Fabric Lakehouse SQL, Trino, Starburst, Presto, Amazon Athena, Spark, PySpark, LakeSail Sail, Apache Gluten + Velox, Onehouse Quanton, AWS Glue, Amazon EMR Serverless, Amazon Athena for Apache Spark, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Azure Synapse Analytics Spark
+- **SQL Platforms**: DuckDB, MotherDuck, DuckLake, SQLite, DataFusion, PostgreSQL, TimescaleDB, ClickHouse (Local, Server, Cloud), CedarDB, Firebolt, Databend, Doris, StarRocks, SingleStore, QuestDB, InfluxDB, pg_duckdb, pg_mooncake, Databricks SQL, Snowflake, BigQuery, Redshift, Azure Synapse Analytics, Microsoft Fabric Warehouse, Microsoft Fabric Lakehouse SQL, Trino, Starburst, Presto, Amazon Athena, Spark, PySpark, LakeSail Sail, Apache Gluten + Velox, Onehouse Quanton, AWS Glue, Amazon EMR Serverless, Amazon Athena for Apache Spark, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Azure Synapse Analytics Spark
 - **DataFrame Platforms**: DataFusion-DF, Polars-DF, Pandas-DF, Modin-DF, Dask-DF, cuDF-DF (GPU), PySpark-DF, Databricks-DF, LakeSail-DF
 - **Open Table Formats**: Delta Lake, Apache Iceberg, Apache Hudi (via Databricks, Quanton, Trino, Spark platforms)
 - **SQL Translation**: Automatic query conversion between SQL dialects

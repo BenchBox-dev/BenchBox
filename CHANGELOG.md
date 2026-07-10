@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   internal vs community provenance and run funding in the results explorer.
 - **Databricks Liquid Clustering** - Added TPC-H and TPC-DS tuning profiles that
   apply Databricks Liquid Clustering for more representative runs.
+- **DuckLake platform** - Run benchmarks against DuckLake (DuckDB lakehouse
+  format: Parquet table data + SQL-database catalog metadata) via
+  `--platform ducklake`. DuckDB-file catalog + local Parquet storage; requires
+  DuckDB >= 1.3. Experimental.
 
 ### Added
 

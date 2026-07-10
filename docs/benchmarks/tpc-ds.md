@@ -329,17 +329,28 @@ Implementation: `benchbox/core/tpcds/reporting.py` (surfacing) and
 
 ### Throughput Permutation
 
-Throughput streams are generated with a configurable permutation mode
-(`benchbox/core/tpcds/streams.py::PermutationMode`):
+The Throughput Test's default stream generation calls the official
+`dsqgen -STREAMS N` batch mode (`benchbox/core/tpcds/streams.py::generate_dsqgen_streams`,
+`-INPUT templates.lst`) once per run. This single invocation produces the
+**official per-stream query ORDERING and the official per-stream substitution
+PARAMETERS** for every stream, exactly as the reference TPC-DS kit would --
+superseding a previous home-grown Python permutation and RNG-based parameter
+jitter that did not reproduce dsqgen's ordering or parameters. Streams are
+reproducible for a fixed `(num_streams, base_seed)` pair: ordering is fully
+deterministic, and 98 of the 99 query templates' substitution parameters are
+byte-stable. The one exception is query46, whose 5-city `IN` list comes from a
+dsqgen-internal `ulist(random(1, rowcount("active_cities","store"), uniform), 5)`
+substitution that the bundled reference binary does not reproduce even for a
+fixed `-RNGSEED` (a property of the binary, not of BenchBox); its ordering slot
+is unaffected.
 
-| Mode | Behaviour |
-|------|-----------|
-| `sequential` | Queries run in ID order (1, 2, 3, …). Useful for debugging. |
-| `random` | Uniform random permutation, seeded for reproducibility. |
-| `tpcds` | TPC-DS standard permutation algorithm (default for compliance runs). |
-
-Per-stream ordering is emitted via `TPCDSStreamManager` so runs are reproducible
-with a fixed `base_seed`.
+`PermutationMode` (`sequential` / `random` / `tpcds`) and
+`create_standard_streams`/`TPCDSStreamManager` remain in the codebase and are
+still used by the single-query `get_query()` path (power test, dry-run,
+dataframe query resolution) and as an inline fallback for direct/unit callers
+that bypass the throughput test's `run()` pre-generation step
+(`enable_preflight=False`). They are **not** the throughput default, and their
+ordering does not match the official dsqgen permutation.
 
 ### Maintenance Operations
 
