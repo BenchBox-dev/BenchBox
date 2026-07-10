@@ -29,6 +29,20 @@ def _make_benchmark_mock() -> Mock:
     return benchmark
 
 
+class _SlowFetchCursor:
+    """Raw DB-API-shaped cursor double with no ``row_count()``/``rowcount``,
+    forcing ``_count_cursor_rows()``'s ``len(cursor.fetchall())`` fallback -
+    the path a non-PlatformAdapterCursor connection factory would exercise."""
+
+    def __init__(self, delay: float, rows: list) -> None:
+        self._delay = delay
+        self._rows = rows
+
+    def fetchall(self):
+        time.sleep(self._delay)
+        return self._rows
+
+
 def _make_connection_factory(registry: list[Mock]) -> Callable[[], Mock]:
     def factory() -> Mock:
         conn = Mock()
@@ -111,6 +125,33 @@ class TestThroughputExecution:
         assert stream_result.queries_failed == 0
         assert len(stream_result.query_results) == 22
         assert connections and connections[0].close.called
+
+    def test_execute_stream_times_include_raw_cursor_row_counting(self) -> None:
+        """#1100 review: for a raw DB-API cursor/test double lacking
+        row_count(), _count_cursor_rows() falls back to
+        len(cursor.fetchall()), which does real materialization work. That
+        cost must stay inside execution_time_seconds, not be excluded by
+        counting rows only after the timer already stopped (the TPC-DS
+        driver already counts before stopping its timer; TPC-H must match)."""
+        benchmark = _make_benchmark_mock()
+        connections: list[Mock] = []
+        delay = 0.05
+
+        def factory() -> Mock:
+            conn = Mock()
+            conn.close.return_value = None
+            conn.execute.return_value = _SlowFetchCursor(delay, [(1,)])
+            connections.append(conn)
+            return conn
+
+        test = TPCHThroughputTest(benchmark=benchmark, connection_factory=factory, scale_factor=0.01, num_streams=1)
+        stream_result = test._execute_stream(stream_id=0, seed=101, config=test.config)
+
+        assert stream_result.queries_failed == 0
+        assert len(stream_result.query_results) == 22
+        for query_result in stream_result.query_results:
+            assert query_result["result_count"] == 1
+            assert query_result["execution_time_seconds"] >= delay
 
     def test_run_with_single_stream(self) -> None:
         benchmark = _make_benchmark_mock()
