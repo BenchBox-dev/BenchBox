@@ -246,8 +246,8 @@ class DuckLakeAdapter(DuckDBAdapter):
 
         adapter_config: dict[str, Any] = {}
 
-        metadata_path = config.get("ducklake_metadata_path") or config.get("metadata_path")
-        data_path = config.get("ducklake_data_path") or config.get("data_path")
+        metadata_path = config.get("ducklake_metadata_path") or _resolve_option("metadata_path")
+        data_path = config.get("ducklake_data_path") or _resolve_option("data_path")
 
         if not metadata_path or not data_path:
             if config.get("output_dir"):
@@ -280,7 +280,13 @@ class DuckLakeAdapter(DuckDBAdapter):
         # Pass through DuckDB-family configuration (base DuckDB connection
         # settings for the "shell" connection the DuckLake catalog attaches to).
         adapter_config["memory_limit"] = config.get("memory_limit", "4GB")
-        adapter_config["force_recreate"] = config.get("force", False)
+        # "force" (flat) is the legacy config_utils.py build_config() shape;
+        # "force_recreate" (flat or nested in config["options"]) is what the
+        # real --force CLI flag actually threads through as via the modern
+        # PlatformHookRegistry default config builder (see _resolve_option's
+        # docstring above for why nested lookups are needed at all). Check
+        # both so a real --force request is never silently dropped to False.
+        adapter_config["force_recreate"] = bool(config.get("force") or _resolve_option("force_recreate", False))
         for key in ["tuning_config", "verbose_enabled", "very_verbose"]:
             if key in config:
                 adapter_config[key] = config[key]

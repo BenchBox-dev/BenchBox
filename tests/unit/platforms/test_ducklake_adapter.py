@@ -127,6 +127,26 @@ class TestDuckLakeFromConfig:
 
         assert adapter.metadata_path == preferred
 
+    def test_honors_metadata_and_data_path_from_nested_options(self, tmp_path):
+        """#1082 review: benchbox run --platform ducklake --platform-option
+        metadata_path=... --platform-option data_path=... nests those values
+        under config["options"] (DuckLake has no registered PlatformHookRegistry
+        config builder to promote them to top-level flat keys), but the old
+        code only ever read the flat config.get("metadata_path")/
+        ("data_path"), so a real CLI-supplied catalog/data location was
+        silently ignored and the generated-default paths were used instead."""
+        metadata_path = tmp_path / "nested" / "catalog.ducklake"
+        data_path = tmp_path / "nested" / "data"
+        config = {
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+            "options": {"metadata_path": str(metadata_path), "data_path": str(data_path)},
+        }
+        adapter = DuckLakeAdapter.from_config(config)
+
+        assert adapter.metadata_path == metadata_path
+        assert adapter.data_path == data_path
+
 
 class TestDuckLakeAdapterBasics:
     """Test basic adapter properties and construction."""
@@ -497,6 +517,40 @@ class TestDuckLakeFromConfigCatalogOptions:
         assert adapter.s3_key_id == "AKIA..."
         assert adapter.s3_secret == "shh"
         assert adapter.s3_region == "us-east-1"
+
+    def test_resolves_force_recreate_from_nested_options(self, tmp_path):
+        """#1082 review: the real --force CLI flag threads through as
+        force_recreate nested in config["options"] (via PlatformHookRegistry's
+        default config builder), not as a flat "force" key. The old code only
+        read config.get("force", False), so a real --force request was
+        silently reset to False and an existing catalog would be reused
+        instead of wiped for a clean rebuild."""
+        config = {
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+            "output_dir": str(tmp_path),
+            "options": {"force_recreate": True},
+        }
+        adapter = DuckLakeAdapter.from_config(config)
+        assert adapter.force_recreate is True
+
+    def test_resolves_force_recreate_from_legacy_flat_force_key(self, tmp_path):
+        """Back-compat: the legacy config_utils.py build_config() path passes
+        a flat "force" key (not "force_recreate") - must keep working
+        alongside the nested force_recreate resolution above."""
+        config = {
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+            "output_dir": str(tmp_path),
+            "force": True,
+        }
+        adapter = DuckLakeAdapter.from_config(config)
+        assert adapter.force_recreate is True
+
+    def test_force_recreate_defaults_to_false(self, tmp_path):
+        config = {"benchmark": "tpch", "scale_factor": 0.01, "output_dir": str(tmp_path)}
+        adapter = DuckLakeAdapter.from_config(config)
+        assert adapter.force_recreate is False
 
 
 class TestDuckLakeS3Routing:
