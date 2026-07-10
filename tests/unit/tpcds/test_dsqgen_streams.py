@@ -14,11 +14,15 @@ This implementation is based on the TPC-DS specification.
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import sys
+from pathlib import Path
+
 import pytest
 
 from benchbox.core.tpcds.streams import (
     DSQGenStreamsError,
     _parse_dsqgen_stream_log,
+    _resolve_dsqgen_binary_and_templates,
     _split_dsqgen_stream_sql,
     generate_dsqgen_streams,
 )
@@ -28,6 +32,31 @@ pytestmark = [
     pytest.mark.fast,
     pytest.mark.tpcds,
 ]
+
+
+def _get_dsqgen_path() -> Path | None:
+    """Resolve the bundled dsqgen binary path, returning None instead of
+    raising when it (or its templates) are unavailable.
+
+    ``_resolve_dsqgen_binary_and_templates()`` itself never raises (it just
+    resolves paths, which may not exist) but ``generate_dsqgen_streams()``
+    raises ``DSQGenStreamsError`` once it notices the binary/templates are
+    missing. This is a non-raising probe kept local to this TEST file --
+    mirrors ``get_dsdgen_path()`` in
+    ``tests/unit/core/tpcds/test_tpcds_stdout_datagen.py`` for the dsqgen
+    -STREAMS path so the real-binary test class here can skip cleanly on
+    unsupported arches / partial checkouts instead of hard-failing.
+    """
+    try:
+        tools_dir, templates_dir = _resolve_dsqgen_binary_and_templates()
+    except Exception:
+        return None
+
+    dsqgen_path = tools_dir / ("dsqgen.exe" if sys.platform == "win32" else "dsqgen")
+    if not dsqgen_path.exists() or not templates_dir.exists():
+        return None
+    return dsqgen_path
+
 
 # Pinned against the bundled darwin-arm64 dsqgen (qgen2 Version 4.0.0) via
 # `dsqgen -STREAMS 2 -INPUT q/templates.lst -DIRECTORY q -SCALE 1
@@ -62,7 +91,28 @@ DSQGEN_NONREPRODUCIBLE_QUERY_IDS = {46}
 
 
 class TestGenerateDsqgenStreamsRealBinary:
-    """Exercises the bundled dsqgen binary end-to-end (fast: ~60ms for N=2)."""
+    """Exercises the bundled dsqgen binary end-to-end (fast: ~60ms for N=2).
+
+    Skips (rather than hard-failing) when the bundled dsqgen binary or its
+    query templates aren't available for this platform -- e.g. an
+    unsupported arch or a partial checkout -- mirroring the
+    ``pytest.mark.skipif(get_dsdgen_path() is None, ...)`` convention in
+    ``tests/unit/core/tpcds/test_tpcds_stdout_datagen.py``.
+    """
+
+    pytestmark = pytest.mark.skipif(
+        _get_dsqgen_path() is None,
+        reason="dsqgen binary (or its query templates) not available for this platform",
+    )
+
+    @pytest.fixture(autouse=True)
+    def _require_dsqgen_binary(self) -> None:
+        """Belt-and-suspenders skip guard (redundant with the class-level
+        skipif above): if collection-time resolution somehow disagreed with
+        the runtime environment, skip cleanly here instead of letting
+        ``generate_dsqgen_streams`` raise ``DSQGenStreamsError``."""
+        if _get_dsqgen_path() is None:
+            pytest.skip("dsqgen binary (or its query templates) not available for this platform")
 
     def test_official_ordering_pinned_for_fixed_seed(self):
         streams = generate_dsqgen_streams(num_streams=PINNED_NUM_STREAMS, scale_factor=1.0, seed=PINNED_SEED)

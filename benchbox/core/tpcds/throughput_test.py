@@ -346,6 +346,9 @@ class TPCDSThroughputTest:
         raw_sql = stream_query.sql
         target = (self.target_dialect or "netezza").lower()
 
+        # NOTE: the `else raw_sql` branch is a test-double tolerance only --
+        # the real TPC-DS benchmark always provides translate_query_text, so
+        # untranslated netezza SQL must never reach this path in production.
         translate_fn = getattr(self.benchmark, "translate_query_text", None)
         translated = translate_fn(raw_sql, "netezza", target) if callable(translate_fn) else raw_sql
 
