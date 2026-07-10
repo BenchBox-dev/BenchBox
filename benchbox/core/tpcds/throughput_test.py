@@ -267,54 +267,44 @@ class TPCDSThroughputTest:
         the timed concurrent window starts.
 
         This is the real generation cache that ``_execute_single_query``
-        consumes, keyed by (stream_id, position). All streams for the run are
-        generated in ONE official ``dsqgen -STREAMS <num_streams>`` pass
-        (``benchbox.core.tpcds.streams.generate_dsqgen_streams``), which
-        yields both the official per-stream query ORDERING and the official
-        per-stream substitution PARAMETERS -- the TPC-DS compliance-relevant
-        inputs to QphDS. This is the throughput-test default and retires the
-        home-grown ``TPCDSPermutationGenerator`` ordering / RNG-jitter
-        parameter path for this (the timed, scored) path; that Python path
-        remains available, unchanged, via ``_build_stream_queries`` for
-        direct/unit callers that bypass ``run()`` (see its docstring), and
-        for non-throughput callers (power test, dry-run, dataframe query
-        resolution) which are out of scope for this change.
+        consumes, keyed by (stream_id, position): for each stream,
+        ``_build_stream_queries`` resolves the ordering/variant subset exactly
+        as it does today (TPC-DS stream/permutation logic --
+        ``create_standard_streams`` / ``streams.py`` -- is untouched and out
+        of scope for this TODO), then each entry is generated with the
+        *exact* per-position seed formula ``seed + stream_id * 1000 +
+        position`` (``seed = config.base_seed + stream_id``, matching
+        ``StreamRunner.execute``'s per-stream seed) via
+        ``_get_stream_query_text``, so generated SQL is byte-identical to
+        before -- only *when* it is generated changes.
 
-        dsqgen emits SQL in a base template dialect (netezza); each
-        statement is translated to the target platform dialect via
-        ``_translate_stream_query_sql``, mirroring the
-        ``TPCDSBenchmark.get_query()`` translate + override pipeline used by
-        the single-query path, so the resulting SQL is platform-executable
-        exactly like before -- only *how* the base SQL + ordering is sourced
-        changes (dsqgen batch instead of per-template dsqgen calls).
+        This supersedes ``_preflight_validate_generation`` as the source of
+        truth for what actually runs: that legacy sweep iterated query IDs
+        1..99 in natural order with ``stream_seed = config.base_seed +
+        stream_id * 1000 + position`` -- no permutation, no variant
+        selection, and (notably) missing the ``+ stream_id`` seed offset
+        that real execution applies -- so it never matched the queries a
+        stream actually executes. It is kept unchanged (unused by ``run()``)
+        purely for API/test back-compat.
 
         Only called when ``config.enable_preflight`` is True; any generation
-        or translation failure raises immediately (matching the historical
-        fail-fast preflight contract) before the timed window starts.
+        failure raises immediately (matching the historical fail-fast
+        preflight contract) before the timed window starts.
         """
-        from benchbox.core.tpcds.streams import DSQGenStreamsError, generate_dsqgen_streams
-
-        try:
-            all_streams = generate_dsqgen_streams(
-                num_streams=config.num_streams,
-                scale_factor=config.scale_factor,
-                seed=config.base_seed,
-            )
-        except (DSQGenStreamsError, ValueError) as e:
-            raise RuntimeError(f"TPC-DS ThroughputTest dsqgen -STREAMS generation failed: {e}") from e
-
         stream_queries: dict[int, list[tuple[Any, str]]] = {}
         failures: list[str] = []
 
         for stream_id in range(config.num_streams):
-            query_subset = all_streams.get(stream_id, [])
-            if config.queries_per_stream is not None:
-                query_subset = query_subset[: min(config.queries_per_stream, len(query_subset))]
-
+            seed = config.base_seed + stream_id
+            query_subset = self._build_stream_queries(stream_id, seed, config)
             entries: list[tuple[Any, str]] = []
+
             for position, stream_query in enumerate(query_subset):
+                stream_seed = seed + stream_id * 1000 + position
                 try:
-                    sql_text = self._translate_stream_query_sql(stream_query)
+                    sql_text = self._get_stream_query_text(
+                        stream_query.query_id, stream_query.variant, stream_seed, config.scale_factor
+                    )
                     entries.append((stream_query, sql_text))
                 except Exception as e:
                     failures.append(f"stream {stream_id} q{stream_query.query_id} pos {position + 1}: {e}")
@@ -329,34 +319,6 @@ class TPCDSThroughputTest:
             raise RuntimeError(msg)
 
         return stream_queries
-
-    def _translate_stream_query_sql(self, stream_query: Any) -> str:
-        """Translate a dsqgen -STREAMS-generated raw SQL statement to the
-        target platform dialect.
-
-        Mirrors ``TPCDSBenchmark.get_query()``'s
-        ``translate_query_text`` + ``_apply_target_dialect_overrides``
-        pipeline, without re-invoking dsqgen per query: the batch
-        ``-STREAMS`` call already produced the official ordering and
-        substitution parameters baked into ``stream_query.sql``. Falls back
-        to the raw SQL untranslated if ``self.benchmark`` doesn't expose
-        these methods (e.g. minimal test doubles), matching the target
-        dialect used by ``_get_stream_query_text`` elsewhere in this class.
-        """
-        raw_sql = stream_query.sql
-        target = (self.target_dialect or "netezza").lower()
-
-        # NOTE: the `else raw_sql` branch is a test-double tolerance only --
-        # the real TPC-DS benchmark always provides translate_query_text, so
-        # untranslated netezza SQL must never reach this path in production.
-        translate_fn = getattr(self.benchmark, "translate_query_text", None)
-        translated = translate_fn(raw_sql, "netezza", target) if callable(translate_fn) else raw_sql
-
-        override_fn = getattr(self.benchmark, "_apply_target_dialect_overrides", None)
-        if callable(override_fn):
-            translated = override_fn(stream_query.query_id, translated, target)
-
-        return translated
 
     def _resolve_available_query_ids(self) -> list[int]:
         try:
@@ -374,26 +336,6 @@ class TPCDSThroughputTest:
         raise RuntimeError("No query_manager found - ThroughputTest requires a TPCDSBenchmark instance")
 
     def _build_stream_queries(self, stream_id: int, seed: int, config: TPCDSThroughputTestConfig) -> list:
-        """Resolve one stream's ordered query subset via the home-grown
-        TPC-DS permutation (streams.py's ``create_standard_streams``).
-
-        This is the historical inline-generation fallback used only when no
-        pregeneration cache exists (``enable_preflight=False``, or
-        ``_execute_stream``/``_execute_single_query`` invoked directly,
-        bypassing ``run()``) -- the throughput-test *default* path now uses
-        ``dsqgen -STREAMS`` via ``_pregenerate_stream_queries`` instead (see
-        its docstring). ``must_preserve`` keeps this fallback's existing
-        per-template behavior working for those direct/unit callers.
-
-        Generates the FULL matrix for the run's actual ``config.num_streams``
-        and ``config.base_seed`` exactly once per call, then indexes by
-        ``stream_id`` -- mirroring TPC-H's single ``PERMUTATION_MATRIX``
-        indexed by ``stream_id % 41`` (benchbox/core/tpch/streams.py). The
-        previous ``num_streams=stream_id + 1, base_seed=seed + stream_id``
-        formula regenerated a differently-sized matrix per stream and
-        double-counted ``stream_id`` in the seed, so a stream's ordering
-        depended on its own index rather than the run's stream count.
-        """
         from benchbox.core.tpcds.streams import create_standard_streams
 
         available_query_ids = self._resolve_available_query_ids()
@@ -402,9 +344,9 @@ class TPCDSThroughputTest:
         query_range = (min(available_query_ids), max(available_query_ids)) if available_query_ids else (1, 99)
         stream_manager = create_standard_streams(
             query_manager=query_manager,
-            num_streams=config.num_streams,
+            num_streams=stream_id + 1,
             query_range=query_range,
-            base_seed=config.base_seed,
+            base_seed=seed + stream_id,
         )
 
         streams = stream_manager.generate_streams()

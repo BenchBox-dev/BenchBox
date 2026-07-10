@@ -2,24 +2,7 @@ id: tpcds-throughput-permutation-compliance
 title: "Use dsqgen -STREAMS for TPC-DS throughput instead of home-grown ordering and parameters"
 worktree: main
 priority: Medium-High
-status: Completed
-completed_date: "2026-07-09"
-completed_note: |
-  Adopted `dsqgen -STREAMS N` (via benchbox/core/tpcds/streams.py::
-  generate_dsqgen_streams) as the throughput-test default: one invocation
-  emits the official per-stream ORDERING + per-stream substitution
-  PARAMETERS. Routed TPCDSThroughputTest._pregenerate_stream_queries through
-  it (translating dsqgen's netezza base SQL to the target dialect) and fixed
-  _build_stream_queries's stream_id+1/seed+stream_id regeneration bug (now
-  keys on the run's config.num_streams/base_seed). Home-grown
-  TPCDSPermutationGenerator ordering + c_tools RNG jitter retired from the
-  throughput path (kept for get_query power/dry-run/dataframe + the
-  enable_preflight=False inline fallback). w0 evidence: official stream-0
-  ordering [96,7,75,44,39,...] vs home-grown [2,21,8,30,35,...]; c_tools
-  _generate_parameter_variations jitter is cached but never passed to dsqgen
-  (no effect on generated SQL). Finding: query46's 5-city IN-list is
-  non-reproducible in the bundled dsqgen even with fixed -RNGSEED (binary
-  quirk, not integration); ordering + other 98 queries fully deterministic.
+status: Not Started
 category: Core Functionality
 
 description: |
@@ -77,7 +60,7 @@ prior_art:
 work:
   - id: w0
     summary: "Confirm bundled dsqgen -STREAMS N output: capture official ordering + per-stream parameters and diff against the current home-grown output"
-    status: done
+    status: pending
     notes: |
       Run `dsqgen -STREAMS N -INPUT q/templates.lst -DIRECTORY q -SCALE ... -RNGSEED ...`
       with the bundled binary; capture to /tmp/tpcds-perm-w0.log and summarize
@@ -85,15 +68,15 @@ work:
   - id: w1
     summary: "Add a dsqgen -STREAMS batch path in DSQGenBinary and route throughput stream generation through it"
     needs: [w0]
-    status: done
+    status: pending
   - id: w2
     summary: "Retire the home-grown ordering + RNG jitter for the throughput path; fix _build_stream_queries's stream_id+1 regeneration"
     needs: [w1]
-    status: done
+    status: pending
   - id: w3
     summary: "Add tests pinning per-stream ordering AND substitution parameters to dsqgen -STREAMS output for a fixed (num_streams, seed)"
     needs: [w1, w2]
-    status: done
+    status: pending
 
 must_preserve:
   - "Deterministic, reproducible streams for a fixed (num_streams, seed) — now anchored to dsqgen output rather than the Python permutation."
