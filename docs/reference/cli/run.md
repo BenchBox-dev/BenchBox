@@ -405,6 +405,8 @@ benchbox run-official {tpch|tpcds} [OPTIONS]
   non-negative integer. Sets `BenchmarkConfig.concurrency` (the same field
   `run`'s throughput driver reads internally), so `run-official ... --streams 4`
   is equivalent to running with 4 concurrent throughput streams.
+  The throughput driver floors the resolved stream count at the TPC minimum
+  of **2**, so `--streams 0` and `--streams 1` both run 2 streams.
 - `--seed INTEGER`: Random seed for reproducible official runs (a warning is
   printed if omitted)
 - `--output PATH`: Output directory
