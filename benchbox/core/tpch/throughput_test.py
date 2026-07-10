@@ -14,6 +14,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import concurrent.futures
 import logging
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Optional
@@ -34,8 +35,26 @@ class TPCHThroughputTestConfig:
     stream_timeout: int = 3600  # Timeout per stream in seconds (0 = no timeout)
     max_workers: Optional[int] = None
     verbose: bool = False
+    # Opt-in cooperative cancellation (default OFF, behavior-preserving): when
+    # True, a timed-out stream (see StreamRunner.execute()) gets a
+    # threading.Event signalled so its query loop can notice and stop between
+    # queries instead of continuing to run in the background indefinitely.
+    # Python cannot forcibly cancel a running thread, so this is opt-in and
+    # never hard-kills anything -- see benchbox/core/throughput/runner.py's
+    # module docstring ("Timed-out streams") for the full design.
+    cancel_on_timeout: bool = False
     # Minimum success rate for streams (0.0-1.0). Default 0.99 = 99% must succeed.
-    # TPC-H spec allows up to 1% query failures in production environments.
+    #
+    # Spec citation: NOT derived from a TPC-H "acceptable failure rate" clause
+    # -- no such partial-success allowance exists. TPC-H specification 5.1.1.6
+    # defines: "A failed run is defined as a run that did not complete
+    # successfully due to unforeseen system failures," i.e. an
+    # audited/compliant run requires every stream to complete successfully.
+    # 0.99 is a BenchBox-internal tolerance for treating a run as "usable" for
+    # iterative development/CI despite an occasional stream failure; it is NOT
+    # an official TPC-H compliance gate, and results with
+    # streams_successful < num_streams are not eligible for TPC-H-compliant/
+    # audited reporting regardless of this setting.
     min_success_rate: float = 0.99
 
 
@@ -145,8 +164,9 @@ class TPCHThroughputTest:
             # Calculate metrics
             StreamRunner.compute_metrics(result, config, start_time)
 
-            # TPC-H success criteria: configurable stream success rate
-            # Default is 99% (allows up to 1% failures per TPC-H spec)
+            # TPC-H success criteria: configurable stream success rate (see
+            # TPCHThroughputTestConfig.min_success_rate for the spec citation
+            # -- this default is a BenchBox tolerance, not an official gate).
             if config.num_streams > 0:
                 success_rate = result.streams_successful / config.num_streams
                 result.success = success_rate >= config.min_success_rate
@@ -272,6 +292,59 @@ class TPCHThroughputTest:
             scale_factor=config.scale_factor,
         )
 
+    def _resolve_cancel_event(self, config: TPCHThroughputTestConfig, stream_id: int) -> Optional[threading.Event]:
+        """Return this stream's cooperative-cancel event, if any.
+
+        StreamRunner.execute() only attaches ``_stream_cancel_events`` to
+        *config* when ``config.cancel_on_timeout`` is True; absent that
+        (the default), this always returns None and the per-query loop
+        never checks for cancellation, preserving today's behavior exactly.
+        """
+        cancel_events = getattr(config, "_stream_cancel_events", None)
+        return cancel_events.get(stream_id) if cancel_events else None
+
+    def _cooperative_cancel_requested(
+        self,
+        cancel_event: Optional[threading.Event],
+        config: TPCHThroughputTestConfig,
+        stream_id: int,
+        position: int,
+        total_queries: int,
+    ) -> bool:
+        """Check + log a cooperative-cancel request for one loop iteration.
+
+        Extracted from ``_execute_stream`` purely to keep that method's
+        cyclomatic complexity within the linter's threshold; behavior is
+        identical to an inline check.
+        """
+        if cancel_event is None or not cancel_event.is_set():
+            return False
+        if config.verbose:
+            self.logger.warning(
+                f"Stream {stream_id} cooperative cancel signalled; stopping after {position}/{total_queries} queries"
+            )
+        return True
+
+    def _finalize_stream_outcome(
+        self, stream_result: TPCHThroughputStreamResult, cancelled: bool, total_queries: int
+    ) -> None:
+        """Set final `success`/`error` once the per-query loop has finished.
+
+        A cooperatively-cancelled stream (see ``_cooperative_cancel_requested``)
+        never counts as successful, regardless of how many of its queries
+        that did run happened to succeed -- it stopped before completing its
+        permutation. Extracted from ``_execute_stream`` to keep that method's
+        cyclomatic complexity within the linter's threshold.
+        """
+        if cancelled:
+            stream_result.success = False
+            stream_result.error = (
+                f"Stream cancelled cooperatively after timeout "
+                f"({stream_result.queries_executed}/{total_queries} queries completed)"
+            )
+        else:
+            stream_result.success = stream_result.queries_failed == 0
+
     def _execute_stream(
         self, stream_id: int, seed: int, config: TPCHThroughputTestConfig
     ) -> TPCHThroughputStreamResult:
@@ -319,7 +392,21 @@ class TPCHThroughputTest:
             # run()) fall back to inline generation exactly as before.
             pregenerated = self._pregenerated_queries.get(stream_id) if self._pregenerated_queries is not None else None
 
+            # Opt-in cooperative cancellation (config.cancel_on_timeout,
+            # default OFF): StreamRunner.execute() sets this stream's event
+            # when its per-stream timeout elapses. Checked once per query so
+            # a timed-out stream can stop soon instead of running unbounded
+            # in the background. See runner.py's module docstring.
+            cancel_event = self._resolve_cancel_event(config, stream_id)
+
+            cancelled = False
             for position, query_id in enumerate(query_permutation):
+                if self._cooperative_cancel_requested(
+                    cancel_event, config, stream_id, position, len(query_permutation)
+                ):
+                    cancelled = True
+                    break
+
                 query_start = mono_time()
                 query_result = {
                     "query_id": query_id,
@@ -395,7 +482,7 @@ class TPCHThroughputTest:
                 stream_result.query_results.append(query_result)
                 stream_result.queries_executed += 1
 
-            stream_result.success = stream_result.queries_failed == 0
+            self._finalize_stream_outcome(stream_result, cancelled, len(query_permutation))
 
             if config.verbose:
                 self.logger.info(

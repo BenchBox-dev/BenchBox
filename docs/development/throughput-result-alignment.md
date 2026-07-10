@@ -77,16 +77,95 @@ names and public API unchanged. Their `stream_results` field type becomes
 
 ## Success-Rate Gate Difference
 
+**Update (`throughput-timeout-leak-and-success-gates`, 2026-07):** TPC-DS's
+gate is now configurable, mirroring TPC-H. The two hard-coded `0.7` literals
+that previously existed (the run-level gate in `run()` and the per-stream
+gate in `_finalize_stream_success()`) have been replaced with a single
+`TPCDSThroughputTestConfig.min_success_rate` field (default `0.70`), which
+`validate_results()` also now reads instead of a third hard-coded `0.7`.
+
 | | TPC-H | TPC-DS |
 |---|---|---|
-| Gate expression | `streams_successful / num_streams >= config.min_success_rate` | `streams_successful / max(num_streams, 1) >= 0.7` |
-| Default threshold | `0.99` (from `TPCHThroughputTestConfig.min_success_rate`) | Hard-coded `0.7` |
-| Configurable? | Yes - `TPCHThroughputTestConfig.min_success_rate` | No (must_preserve: keep 0.7 as default; `quality-extract-throughput-runner` makes it config-overridable) |
+| Gate expression | `streams_successful / num_streams >= config.min_success_rate` | `streams_successful / max(num_streams, 1) >= config.min_success_rate` |
+| Default threshold | `0.99` (from `TPCHThroughputTestConfig.min_success_rate`) | `0.70` (from `TPCDSThroughputTestConfig.min_success_rate`) |
+| Configurable? | Yes | Yes |
+
+**Spec citation (both benchmarks): none exists.** Neither the TPC-H
+specification nor the TPC-DS specification v4.0.0 defines a partial-success
+/ "acceptable failure rate" allowance for the Throughput Test. Checked
+directly against the specification PDFs bundled in this repo
+(`_sources/tpc-h/specification.pdf`, `_sources/tpc-ds/specification/
+specification_4.0.0.pdf`):
+
+- TPC-H specification, Clause 5.1.1.6: *"A failed run is defined as a run
+  that did not complete successfully due to unforeseen system failures."*
+  There is no companion clause tolerating a percentage of stream or query
+  failures in a compliant run.
+- The TPC-H spec's only "1%" / "0.99" occurrences are unrelated numeric
+  *result-value* tolerances for ratio/AVG aggregate validation (Clause
+  2.2.4.2), not a query- or stream-failure allowance. The previous comment
+  in `TPCHThroughputTestConfig` ("TPC-H spec allows up to 1% query failures
+  in production environments") was an invented citation; it has been
+  corrected.
+- The TPC-DS specification has no equivalent clause either; its "success"
+  occurrences are about individual operations (e.g. data-maintenance
+  functions, Data Accessibility Test) completing, not a benchmark-wide
+  partial-success tolerance.
+
+**Conclusion:** both `0.99` and `0.70` are BenchBox-internal tolerances for
+treating a throughput run as "usable" for iterative development/CI despite
+some stream or query failures. Neither is an official TPC compliance gate;
+a result with `streams_successful < num_streams` (TPC-H) or any
+sub-100%-successful stream (TPC-DS) is not eligible for TPC-compliant/
+audited reporting regardless of how these config knobs are set. This is now
+documented directly on each config dataclass (`min_success_rate`
+docstring/comment) rather than only here.
 
 **Outcome:** The success-rate gate is NOT extracted to `StreamRunner`. Each
 spec's `run()` applies its own gate after `StreamRunner.compute_metrics()`
-returns. This preserves TPC-H's configurable threshold and TPC-DS's 70%
-contract.
+returns, reading its own dataclass's `min_success_rate` field. This
+preserves TPC-H's configurable threshold and gives TPC-DS the same
+single-source-of-truth pattern instead of duplicated hard-coded literals.
+
+---
+
+## Timed-Out Stream Leak (`throughput-timeout-leak-and-success-gates`, 2026-07)
+
+`StreamRunner.execute()` previously enforced its per-stream timeout via
+`future.result(timeout=timeout)` inside a `concurrent.futures.as_completed()`
+loop. This is dead code: `as_completed()` only yields a future once it is
+already `done()`, so calling `.result(timeout=...)` on it can never raise
+`TimeoutError` — the loop would silently wait as long as the slowest stream
+took, with no timeout enforcement at all in practice.
+
+**Fix:** the timeout is now passed to `as_completed(pending, timeout=...)`
+itself (bounding the whole wait), with a fallback loop that classifies any
+still-pending future as timed-out/leaked when that call raises
+`TimeoutError`. This is a detection-accuracy fix only; the
+`streams_executed` / `streams_successful` / `errors` accounting contract for
+every future -- whether processed via the main loop or the timeout fallback
+-- is unchanged (see `StreamRunner.execute()`'s shared `_record_completed_future`
+helper).
+
+A leaked/timed-out stream is now:
+- Always logged via `logger.warning(...)`, not gated on `config.verbose`
+  (previously gated, meaning it could be entirely silent).
+- Recorded in `result.errors` with an explicit message noting the stream's
+  worker thread may still be running and holding its DB connection (Python
+  cannot forcibly cancel a running thread).
+
+An opt-in, default-OFF `cancel_on_timeout` config flag (mirrored on both
+`TPCHThroughputTestConfig` and `TPCDSThroughputTestConfig`) adds cooperative
+cancellation: `StreamRunner.execute()` gives every stream a `threading.Event`
+and sets the timed-out stream's event; each spec's `_execute_stream` query
+loop polls its own event between queries and stops early if set, marking
+the stream unsuccessful. This lets a leaked stream actually wind down soon
+after a timeout instead of running unbounded — the only safe mechanism,
+since Python threads cannot be hard-killed. Even with this enabled, exiting
+`execute()`'s `ThreadPoolExecutor` context still blocks until every
+submitted thread returns (`shutdown(wait=True)` on `__exit__`); cooperative
+cancellation shortens that wait to roughly one more query's execution time
+instead of leaving it unbounded.
 
 ---
 
