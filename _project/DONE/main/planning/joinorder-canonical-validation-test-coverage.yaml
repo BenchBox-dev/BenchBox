@@ -2,7 +2,7 @@ id: joinorder-canonical-validation-test-coverage
 title: "test(joinorder): FK-integrity, full-archive cardinality, and encoding assertions for canonical data"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -74,7 +74,7 @@ work:
       source the allowed set from its committed artifact.
   - id: w1
     summary: "Add an opt-in full-archive cardinality test against reference_cardinalities.json"
-    status: pending
+    status: done
     notes: |
       Load the canonical archive into DuckDB, run the 113 queries, assert
       underlying/reference cardinalities match
@@ -82,24 +82,51 @@ work:
       queries 2c/5a/5b/10b/32a). Mark with the existing `slow`+`integration`
       markers (or `stress`); do not run by default. Mirror
       test_canonical_queries.py assertions at full scale.
+
+      DONE 2026-07-10: tests/integration/test_joinorder_full_archive.py, marked
+      @slow @integration @duckdb (deselected by default). The parametrized
+      cardinality test loads all 21 verified Parquet as DuckDB views and asserts
+      each query's row_count==1 and underlying_row_count == the PostgreSQL 16.2
+      oracle in reference_cardinalities.json, with the 5 known-zero queries
+      pinned to 0 -- mirroring test_canonical_queries.py at full scale. Executed
+      against the real 74M-row archive: 113/113 match the PG oracle.
   - id: w2
     summary: "Add an FK referential-integrity test pinning the legitimate dangling-ref set"
     needs: [w0, w1]
-    status: pending
+    status: done
     notes: |
       Assert each declared FK resolves EXCEPT the documented legitimate dangling
       references (schema.py:67-68). Source the allowed-dangling set from a
       committed artifact/helper produced or verified by w0; do not re-derive or
       hardcode the exception policy directly in this test. Same existing opt-in
       markers.
+
+      DONE 2026-07-10: test_full_archive_fk_integrity_matches_allowed_dangling_set
+      sources the allowed set from the committed _project/joinorder/
+      allowed_dangling_fks.json (from joinorder-fk-allowed-dangling-artifact),
+      asserts the artifact is hash-locked to the shipped manifest
+      (data_archive_hash), asserts its FK set equals the schema's declared FKs
+      (no drift), then recomputes each FK's live dangling count over the archive
+      and asserts it equals the reviewed allowed value. Exception policy lives in
+      the reviewed artifact, not the test. Executed at full scale: all 27 FKs
+      match (only aka_title.movie_id->title dangles, 93 rows).
   - id: w3
     summary: "Add a full-archive UTF-8 / NULL-vs-empty fidelity assertion"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Reproduce the build-time encoding round-trip check
       (build_joinorder_data.py validate_encoding_round_trip) on the loaded
       archive for the name/title tables. Same existing opt-in markers.
+
+      DONE 2026-07-10: two assertions, values derived from the hash-locked
+      archive. NULL-vs-empty: movie_companies.note / cast_info.note /
+      title.episode_of_id NULL counts match the build pipeline's
+      CANONICAL_NULL_COUNTS oracle, with 0 empty-strings (NULL never coerced to
+      ''). UTF-8: for title.title / char_name.name / aka_title.title, the count
+      of non-ASCII rows and a sha256 over the ordered id/value stream are pinned
+      -- a latin1 misread, truncation, or re-encode would change either. Executed
+      at full scale: passes.
 
 must_preserve:
   - "The default `uv run -- python -m pytest` unit run stays fast; the new tests are opt-in behind the existing slow/integration (or stress) markers and do not run by default."
