@@ -70,15 +70,14 @@ BenchBox supports multiple deployment modes for platforms, enabling the same ben
 
 ### Platforms with Multiple Deployment Modes
 
-| Platform        | Default Mode  | Available Modes                              | Syntax Examples                                 |
-| --------------- | ------------- | -------------------------------------------- | ----------------------------------------------- |
-| **ClickHouse**  | `local`       | `local`, `server`                            | `clickhouse-local`, `clickhouse-server`         |
-| **Firebolt**    | `core`        | `core`, `cloud`                              | `firebolt:core`, `firebolt:cloud`               |
-| **TimescaleDB** | `self-hosted` | `self-hosted`, `cloud`                       | `timescaledb`, `timescaledb:cloud`              |
-| **PySpark**     | `local`       | `local`                                      | `pyspark`                                       |
-| **LakeSail**    | `local`       | `local`, `distributed`                       | `lakesail` (+ `lakesail-df` for DataFrame mode) |
-| **Velox**       | `local`       | `local`, `remote`                            | `velox` with `--velox-deployment local\|remote` |
-| **DuckLake**    | `local`       | `local`, `postgres_catalog`, `cloud_storage` | `ducklake` with `--platform-option catalog=...` |
+| Platform        | Default Mode  | Available Modes        | Syntax Examples                                 |
+| --------------- | ------------- | ---------------------- | ----------------------------------------------- |
+| **ClickHouse**  | `local`       | `local`, `server`      | `clickhouse-local`, `clickhouse-server`         |
+| **Firebolt**    | `core`        | `core`, `cloud`        | `firebolt:core`, `firebolt:cloud`               |
+| **TimescaleDB** | `self-hosted` | `self-hosted`, `cloud` | `timescaledb`, `timescaledb:cloud`              |
+| **PySpark**     | `local`       | `local`                | `pyspark`                                       |
+| **LakeSail**    | `local`       | `local`, `distributed` | `lakesail` (+ `lakesail-df` for DataFrame mode) |
+| **Velox**       | `local`       | `local`, `remote`      | `velox` with `--velox-deployment local\|remote` |
 
 ### First-Class Cloud Platforms (Dialect Inheritance)
 

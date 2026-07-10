@@ -8,7 +8,7 @@
 DuckLake is an open lakehouse table format shipped as a DuckDB extension: table **data** is stored as Parquet files, while table **metadata** (the catalog) lives in a SQL database. BenchBox runs DuckLake through the same DuckDB engine used by the `duckdb` platform, inheriting DuckDB's SQL dialect and benchmark compatibility unchanged.
 
 ```{warning}
-The DuckLake platform is **experimental**. The DuckDB-file catalog combined with local Parquet storage is the best-tested path. SQLite/PostgreSQL catalogs and S3-backed `DATA_PATH` are now supported (experimental) - see [Catalog Backends](#catalog-backends) below.
+The DuckLake platform is **experimental**. This MVP supports the DuckDB-file catalog combined with local Parquet storage only. SQLite/Postgres catalogs and S3-backed `DATA_PATH` are a follow-on scope.
 ```
 
 ## Features
@@ -17,8 +17,6 @@ The DuckLake platform is **experimental**. The DuckDB-file catalog combined with
 - **DuckDB dialect** - Inherits SQL dialect and query translation from DuckDB
 - **Reused engine** - Schema creation, data loading, query execution, plan capture, and tuning are all inherited from `DuckDBAdapter` unchanged
 - **Catalog reuse** - Re-attaches an existing catalog by default; `--force` wipes catalog + data for a clean rebuild
-- **Pluggable catalog backend** - DuckDB-file (default), SQLite, or self-hosted PostgreSQL metadata catalog via `--platform-option catalog=...`
-- **Local or cloud storage** - Parquet `DATA_PATH` may be a local directory or an `s3://` URI (via DuckDB's `httpfs` extension)
 
 ## Quick Start
 
@@ -40,72 +38,15 @@ The first run also needs network access once, to `INSTALL` the `ducklake` extens
 
 | Option | CLI Flag | Default | Description |
 |--------|----------|---------|--------------|
-| `metadata_path` | `--ducklake-metadata-path` | Generated under `benchmark_runs/databases/` | Path to the DuckLake catalog metadata file (`.ducklake`, or `.sqlite` for the sqlite backend) |
-| `data_path` | `--ducklake-data-path` | Generated under `benchmark_runs/databases/.../ducklake_data/` | Path to the DuckLake Parquet data directory (local path or `s3://` URI) |
-| `catalog` | `--ducklake-catalog` | `duckdb` | Catalog metadata backend: `duckdb`, `sqlite`, or `postgres` |
-| `pg_host` | *(platform-option only)* | `localhost` | PostgreSQL hostname (`catalog=postgres` only) |
-| `pg_port` | *(platform-option only)* | `5432` | PostgreSQL port (`catalog=postgres` only) |
-| `pg_database` | *(platform-option only)* | `ducklake_catalog` | PostgreSQL database name - **must already exist** (`catalog=postgres` only) |
-| `pg_user` | *(platform-option only)* | `postgres` | PostgreSQL username (`catalog=postgres` only) |
-| `pg_password` | *(platform-option only)* | *(none)* | PostgreSQL password (`catalog=postgres` only) |
-| `s3_key_id` | *(platform-option only)* | *(none - uses `credential_chain`)* | AWS access key ID for S3 `DATA_PATH` |
-| `s3_secret` | *(platform-option only)* | *(none - uses `credential_chain`)* | AWS secret access key for S3 `DATA_PATH` |
-| `s3_region` | *(platform-option only)* | *(none)* | AWS region for S3 `DATA_PATH` |
+| `metadata_path` | `--ducklake-metadata-path` | Generated under `benchmark_runs/databases/` | Path to the DuckLake catalog metadata file (`.ducklake`) |
+| `data_path` | `--ducklake-data-path` | Generated under `benchmark_runs/databases/.../ducklake_data/` | Path to the DuckLake Parquet data directory |
 
-`metadata_path`/`data_path` can also be set with `--platform-option`:
+Both can also be set with `--platform-option`:
 
 ```bash
 benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
     --platform-option metadata_path=/path/to/catalog.ducklake \
     --platform-option data_path=/path/to/parquet_data
-```
-
-## Catalog Backends
-
-The catalog metadata backend is selected with `--platform-option catalog=<duckdb|sqlite|postgres>`. All three backends reuse the same DuckDB query engine and dialect; only the metadata storage (and, for `postgres`, the extension INSTALL/LOAD and connection setup) changes.
-
-| Backend | Required DuckDB Extensions | Metadata Storage | Notes |
-|---------|-----------------------------|-------------------|-------|
-| `duckdb` (default) | `ducklake` | Local `.ducklake` file | Best-tested path |
-| `sqlite` | `ducklake`, `sqlite` | Local `.sqlite` file | `metadata_path` suffix is swapped to `.sqlite` automatically when it is left at its generated default |
-| `postgres` | `ducklake`, `postgres` | Self-hosted PostgreSQL database | The target database **must already exist** - DuckLake's `ATTACH` does not run `CREATE DATABASE` |
-
-```bash
-# SQLite catalog, local Parquet data
-benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
-    --platform-option catalog=sqlite
-
-# Self-hosted PostgreSQL catalog (the "ducklake_catalog" database must
-# already exist on the target server)
-benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
-    --platform-option catalog=postgres \
-    --platform-option pg_host=localhost \
-    --platform-option pg_database=ducklake_catalog \
-    --platform-option pg_user=postgres \
-    --platform-option pg_password=postgres
-```
-
-MySQL is deliberately not supported as a catalog backend - DuckLake's own documentation flags it as not recommended (compatibility issues).
-
-### Cloud Storage (S3 `DATA_PATH`)
-
-Any catalog backend can be combined with an `s3://` `data_path`; BenchBox installs DuckDB's `httpfs` extension and creates an S3 secret before the `ATTACH`. No credentials are required for local `data_path`.
-
-By default the secret uses the `credential_chain` provider, so ambient AWS credentials (environment variables, shared profile, or IMDS) are picked up the same way the AWS CLI would - no BenchBox-level configuration is needed beyond a reachable bucket:
-
-```bash
-benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
-    --platform-option data_path=s3://my-bucket/ducklake-data
-```
-
-To use explicit static credentials instead of the credential chain, pass both `s3_key_id` and `s3_secret` (and, optionally, `s3_region`):
-
-```bash
-benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
-    --platform-option data_path=s3://my-bucket/ducklake-data \
-    --platform-option s3_key_id=AKIA... \
-    --platform-option s3_secret=... \
-    --platform-option s3_region=us-east-1
 ```
 
 ## Usage Examples
@@ -183,7 +124,7 @@ parent = PlatformRegistry.get_inherited_platform("ducklake")
 |---------|----------|--------|
 | Table data | Parquet files under `DATA_PATH` | DuckDB native storage format |
 | Catalog | Separate SQL-database metadata file | Embedded in the database file |
-| Deployment | Local (default), self-hosted PostgreSQL catalog, or S3-backed storage - see [Catalog Backends](#catalog-backends) | Local embedded |
+| Deployment | Local (this MVP); catalog/storage backends are pluggable | Local embedded |
 | Requirements | DuckDB >= 1.3 + `ducklake` extension | DuckDB (any supported version) |
 | Support status | Experimental | Stable |
 | Best For | Evaluating lakehouse table-format overhead on DuckDB | General local benchmarking |
@@ -199,6 +140,13 @@ parent = PlatformRegistry.get_inherited_platform("ducklake")
 - You do not need a separate catalog/data-file split
 - You are on a DuckDB runtime older than 1.3
 - You want the most stable, non-experimental local platform
+
+## Follow-On Scope
+
+This MVP adapter supports only the DuckDB-file catalog with local Parquet `DATA_PATH`. The following are tracked as follow-on work, not yet supported:
+
+- SQLite and Postgres catalog backends
+- S3-backed (or other object storage) `DATA_PATH`
 
 ## Troubleshooting
 
@@ -225,16 +173,6 @@ RuntimeError: Failed to initialize the DuckLake catalog (INSTALL/LOAD/ATTACH 'du
 ### Table Already Exists
 
 If a benchmark run is interrupted mid-load, a subsequent run without `--force` reuses the existing (partially loaded) catalog. Pass `--force` to wipe the catalog metadata file and Parquet data directory and rebuild from scratch.
-
-For `catalog=postgres`, `--force` only clears local artifacts and does **not** reach the remote catalog (see below) - use a fresh `pg_database` per run instead if you hit this with a PostgreSQL catalog.
-
-### PostgreSQL Catalog: Database Does Not Exist
-
-```
-... database "ducklake_catalog" does not exist ...
-```
-
-**Solution:** DuckLake's `postgres` catalog `ATTACH` does not run `CREATE DATABASE` - create the target database on the PostgreSQL server first (e.g. `createdb ducklake_catalog`), then re-run with `--platform-option pg_database=ducklake_catalog`. Because reuse/force detection for this backend is keyed off a local file that does not exist for a remote catalog, re-running against an already-populated PostgreSQL catalog can raise "table already exists" - use a fresh or dedicated `pg_database` per run until this gets proper remote-catalog reuse detection.
 
 ## Related Documentation
 
