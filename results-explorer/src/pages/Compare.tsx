@@ -318,6 +318,7 @@ export function Compare({ url }: CompareProps) {
     publicId: visibleResultIdForRow(r),
     label: cohortIdentities[idx]!,
     trustLabel: r.trust_label,
+    funding: r.funding,
     runDate: r.run_date,
     tuningMode: r.tuning_mode,
     executionMode: r.execution_mode,
@@ -444,6 +445,7 @@ export function Compare({ url }: CompareProps) {
                 <span class="font-semibold text-[var(--bb-data-fg-primary)]">{r.label}</span>
                 <div class="flex flex-wrap gap-1">
                   <TrustBadge trustLabel={r.trustLabel} compact />
+                  <FundingChip funding={r.funding} compact />
                   {r.tuningMode && <TuningBadge tuningMode={r.tuningMode} />}
                   {isFastest && <StatusBadge role="ranking" tone="success">fastest</StatusBadge>}
                 </div>

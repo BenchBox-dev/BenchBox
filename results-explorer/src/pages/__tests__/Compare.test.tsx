@@ -573,6 +573,26 @@ describe("Compare", () => {
     expect(screen.getAllByText("10.00x").length).toBeGreaterThan(0);
   });
 
+  it("renders a funding chip on the primary compare cards, not just the builder table", async () => {
+    // #1105 review: showBuilder is false for a normal ids= compare, so the
+    // page renders these DetailResult-backed cards (not the ResultRow-backed
+    // builder table further down, which already carried FundingChip).
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1" ? Promise.resolve(makeResult({ result_id: "r1", platform: "DuckDB", funding: "employer" })) : Promise.resolve(SQLITE),
+    );
+
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+    });
+
+    // FundingChip's compact label for "employer" is "Employer" - distinct
+    // from TrustBadge's compact "Maintainer", so this can only come from the
+    // chip. SQLite's funding stays at the default "unspecified", which
+    // FundingChip deliberately renders as no chip at all.
+    expect(screen.getAllByText("Employer").length).toBeGreaterThan(0);
+  });
+
   it("renders a computed decision summary before charts and query evidence", async () => {
     render(<Compare />);
     await waitFor(() => {
