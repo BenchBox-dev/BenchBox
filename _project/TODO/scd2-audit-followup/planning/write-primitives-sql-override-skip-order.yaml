@@ -1,0 +1,99 @@
+id: "write-primitives-sql-override-skip-order"
+title: "Apply write-primitives skip checks before sql_override short-circuit"
+worktree: "scd2-audit-followup"
+priority: "Medium"
+status: "Not Started"
+category: "Core Functionality"
+description: |
+  SCD2 adversarial audit finding N8 (live defect, broader than SCD2).
+  benchbox/core/write_primitives/benchmark.py:398-399 returns sql_override
+  before EVERY skip check: the aggregate-state check, the Postgres skips, the
+  DuckDB MERGE token gate, the platform_overrides null check, the bulk-load file
+  check, AND the staging-population guard.
+
+  Consequence verified (scratchpad repro3.py ATTACK 6c + a direct check):
+  bulk_load_upsert_mode carries platform_overrides: {datafusion: null,
+  starrocks: null}, yet DataFusionAdapter.preprocess_operation_sql
+  (benchbox/platforms/datafusion.py:170-178) returns rewritten SQL for every
+  bulk_load op. That rewritten SQL is threaded in as sql_override
+  (execution.py:1052-1055), so _get_effective_write_sql returns it at :398-399
+  and the datafusion:null override is never consulted - an op explicitly marked
+  unsupported on DataFusion RUNS there.
+
+  This also answers the audit's question about the SCD2 datafusion:null
+  overrides: they are honored today only BY ACCIDENT of category. The three SCD2
+  ops are category 'merge', so preprocess_operation_sql returns None
+  (datafusion.py:179) and no sql_override is set, so the null override is
+  respected. Nothing structural protects them - a future SCD2 preprocess hook
+  would silently bypass the override.
+impact:
+  business_value: "An operation marked unsupported on a platform must not execute there via a preprocessing side-channel."
+  user_impact: "DataFusion (and any platform with a preprocess hook) no longer runs ops the catalog marks unsupported."
+  technical_debt: "Removes an ordering hazard where adapter preprocessing outranks the entire skip policy."
+prior_art:
+- "benchbox/core/write_primitives/benchmark.py:372-442 _get_effective_write_sql - the ordering to fix (:398-399 early return vs :408-440 skip checks)"
+- "benchbox/platforms/datafusion.py:170-179 preprocess_operation_sql (returns rewritten SQL for every bulk_load op)"
+- "benchbox/platforms/base/execution.py:1048-1055 where preprocessed SQL becomes sql_override"
+- "benchbox/core/write_primitives/catalog/operations.yaml bulk_load_upsert_mode platform_overrides {datafusion: null, starrocks: null} - the override being bypassed"
+
+work:
+- id: w1
+  summary: "Reorder _get_effective_write_sql so all skip checks run before the sql_override short-circuit."
+  status: pending
+  notes: |
+    Affected checks that currently sit AFTER the :398-399 early return:
+    aggregate-state, Postgres skips, DuckDB token gate, platform_overrides null,
+    bulk-load file check, staging-population guard. The skip decision depends on
+    (operation, platform_key), not on the preprocessed SQL text, so compute it
+    first and apply the override only if the op is not skipped. Keep
+    adapter-preprocessing priority for the SQL body once the op is runnable.
+- id: w2
+  summary: "Regression test: bulk_load_upsert_mode (datafusion:null) is SKIPPED on datafusion even though preprocess_operation_sql returns rewritten SQL."
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Document that the SCD2 datafusion:null overrides are honored only because category='merge' yields no preprocess override; note the ordering now enforces it structurally."
+  needs: [w1]
+  status: pending
+
+must_preserve:
+- "Legitimate adapter preprocessing (e.g. DataFusion bulk_load COPY -> CREATE EXTERNAL TABLE rewrite) still applies for ops that are NOT skipped."
+- "The staging-population guard, bulk-load file check, and Postgres/DuckDB skips still fire for their ops."
+- "SCD2 ops on DuckDB/Postgres remain runnable and unaffected (they set no sql_override)."
+
+approach: |
+  Compute the skip decision from (operation, platform_key) first; only if the op
+  is runnable, apply sql_override (or the platform override, or the base SQL).
+  This preserves adapter-rewrite priority for the SQL body while making the
+  skip policy authoritative. Minimal reorder inside _get_effective_write_sql;
+  no call-site changes needed.
+
+anti_patterns:
+- "DO NOT drop adapter preprocessing - because DataFusion bulk_load genuinely needs the CREATE EXTERNAL TABLE rewrite - only make skip checks outrank it."
+- "DO NOT special-case bulk_load_upsert_mode - because the ordering bug is general (any preprocess hook + any null override) - fix the ordering."
+
+verification:
+- description: "Write-primitives unit + DuckDB integration green."
+  command: "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py -n 0 -q"
+  expected_output: "all pass"
+- description: "New test: datafusion:null op skips despite a returned sql_override."
+  command: "uv run -- python -m pytest tests/unit/core/write_primitives -n 0 -q -k override_skip_order"
+  expected_output: "new test passes"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/write_primitives/benchmark.py"
+  - "tests/unit/core/write_primitives"
+  do_not_modify:
+  - "benchbox/platforms/datafusion.py"
+  - "benchbox/core/write_primitives/catalog/operations.yaml"
+
+success_metrics:
+- "An operation with platform_overrides {<platform>: null} is skipped on that platform even when a preprocess hook returns rewritten SQL."
+- "Adapter preprocessing still applies to runnable ops."
+- "SCD2 datafusion:null enforcement is now structural, not category-accidental."
+
+metadata:
+  tags: ["write-primitives", "datafusion", "platform-overrides", "skip-policy", "audit-followup"]
+  estimated_effort: "Small"
+  created_date: "2026-07-10"

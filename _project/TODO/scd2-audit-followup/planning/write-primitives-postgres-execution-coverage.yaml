@@ -1,0 +1,103 @@
+id: "write-primitives-postgres-execution-coverage"
+title: "Add PostgreSQL execution coverage for SCD2 write-primitives ops"
+worktree: "scd2-audit-followup"
+priority: "Medium"
+status: "Not Started"
+category: "Testing and Quality Assurance"
+description: |
+  SCD2 adversarial audit finding C (prior review's Postgres gate item, now
+  closed empirically). The three SCD2 ops are correctly NOT in the Postgres
+  per-operation skip list (postgres_write_primitives.py:15-25), but "not
+  skipped" was never "verified passing" - no test, no CI workflow, and no UAT
+  cell executes write_primitives on PostgreSQL at all.
+
+  During the audit I stood up PostgreSQL 16.14 (Apple container runtime) and ran
+  the full SCD2 surface via scratchpad/pg_scd2.py: the DDL, BOTH _get_population_
+  sql bodies (the 3-statement stage population runs in a single execute() -
+  psycopg3 falls to the simple query protocol when there are no params and TEXT
+  format, per Cursor._execute_send), all three ops' multi-statement write_sql,
+  all 10 validation queries, and all three cleanup_sql bodies ran GREEN. The
+  dimension came back byte-identical to the pristine seed (0 rows deviating);
+  dim/stage row_hash agree 20/20 for the 'unchanged' group. Cross-engine
+  fingerprint formatting (|| concat + CAST AS VARCHAR) was byte-identical between
+  DuckDB and Postgres for c_acctbal, c_acctbal+100, -999.99, and integer-valued
+  decimals.
+
+  So the SQL is genuinely portable; the gap is purely coverage. This TODO turns
+  the one-off manual verification into a durable test + UAT cell.
+impact:
+  business_value: "Locks in the portability claim with executable evidence on a second standard-DML engine, not just DuckDB."
+  user_impact: "Regressions in SCD2 portability to PostgreSQL would be caught by CI/UAT rather than a manual audit."
+  technical_debt: "Removes a correct-but-unverified surface (ops that only avoid the skip list)."
+prior_art:
+- "tests/integration/test_write_primitives_duckdb.py:983 TestWritePrimitivesSCD2DuckDB - mirror this fixture for postgres"
+- "benchbox/platforms/postgresql.py PostgreSQLAdapter / PsycopgConnectionMixin - the adapter under test"
+- "benchbox/platforms/base/psycopg2_mixin.py:39 execute_query - psycopg connection path"
+- "tests/uat/test_phases.py:165-199 UAT benchmark/platform enumeration - add a postgresql x write_primitives cell"
+- "scratchpad/pg_scd2.py (audit) - the manual verification to convert into a fixture"
+
+work:
+- id: w0
+  summary: "Re-validate the audit evidence: re-run the SCD2 surface on a fresh PostgreSQL 16 container and confirm 0 rows deviating from seed."
+  status: pending
+  notes: |
+    Audit result to reproduce: setup DDL + both population bodies + 3 ops + 10
+    validations + 3 cleanups all green; final dim identical to pristine seed.
+    Capture stdout to /tmp; summarize PG version, per-op pass/fail, and the
+    deviation count here and in the PR body. Container runtime: Apple
+    `container` (docker shim hangs on this host - see MEMORY mocker gotchas).
+- id: w1
+  summary: "Add a postgres SCD2 integration test mirroring TestWritePrimitivesSCD2DuckDB, gated on a container fixture (skip if no PG available)."
+  needs: [w0]
+  status: pending
+- id: w2
+  summary: "Add a postgresql x write_primitives UAT cell so the surface is enumerated and executed in the matrix."
+  needs: [w0]
+  status: pending
+- id: w3
+  summary: "Document in the test that psycopg3's simple query protocol (no params + TEXT format) is what lets the multi-statement write_sql run in one execute()."
+  needs: [w1]
+  status: pending
+
+must_preserve:
+- "The DuckDB SCD2 integration tests are unchanged and still green."
+- "The new postgres test SKIPS cleanly (not fails) when no PostgreSQL container is available, so local fast-test runs are unaffected."
+- "No change to operation SQL or population SQL - this TODO is coverage only."
+
+approach: |
+  Reuse the DuckDB SCD2 fixture shape (seed 50 customers, run each op, assert
+  close/insert counts + seed restoration). Parameterize the connection over a
+  container-backed psycopg fixture, skipping when unavailable. Add the UAT cell
+  via the existing enumeration config. Keep runtime notes (container CLI,
+  simple-protocol) in the test so the next maintainer does not re-derive them.
+
+anti_patterns:
+- "DO NOT hard-require a live PostgreSQL for the default/fast test run - because most local runs have none - skip when the container/DSN is absent."
+- "DO NOT use the docker CLI on this host - because it hangs (mocker shim) - use the Apple `container` runtime or a CI service container."
+- "DO NOT modify operation/population SQL to 'help' Postgres - because it already passes verbatim - coverage only."
+
+verification:
+- description: "New postgres SCD2 test passes when a PG container is present, skips otherwise."
+  command: "uv run -- python -m pytest tests/integration -n 0 -q -k scd2_postgres"
+  expected_output: "passes with PG available; skipped (not failed) without"
+- description: "DuckDB SCD2 tests unchanged and green."
+  command: "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -k scd2 -n 0 -q"
+  expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+  - "tests/integration"
+  - "tests/uat"
+  do_not_modify:
+  - "benchbox/core/write_primitives/catalog/operations.yaml"
+  - "benchbox/core/write_primitives/benchmark.py"
+
+success_metrics:
+- "A PostgreSQL SCD2 integration test exists and passes against PG 16."
+- "A postgresql x write_primitives UAT cell is enumerated."
+- "The multi-statement / simple-protocol dependency is documented in-test."
+
+metadata:
+  tags: ["scd2", "write-primitives", "postgresql", "coverage", "uat", "audit-followup"]
+  estimated_effort: "Medium"
+  created_date: "2026-07-10"

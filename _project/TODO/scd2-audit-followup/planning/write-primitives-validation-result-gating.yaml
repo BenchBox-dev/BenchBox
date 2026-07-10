@@ -1,0 +1,128 @@
+id: "write-primitives-validation-result-gating"
+title: "Gate write/transaction-primitives run status on validation_passed"
+worktree: "scd2-audit-followup"
+priority: "High"
+status: "Not Started"
+category: "Core Functionality"
+description: |
+  SCD2 adversarial audit finding N1 (keystone). An operation whose validation
+  queries FAIL still reports success. OperationResult is built with a hardcoded
+  success=True / status="SUCCESS" regardless of validation_passed
+  (benchbox/core/write_primitives/benchmark.py:1211-1224), and the same shape
+  exists in benchbox/core/transaction_primitives/benchmark.py:809-816. The
+  adapter copies validation_passed into the result dict at
+  benchbox/platforms/base/execution.py:1087, but NOTHING in benchbox/ ever reads
+  it: _log_query_result (execution.py:1103-1126) keys its console line off
+  row_count_validation_status, which _execute_operation_query never sets, so a
+  SUCCESS op with validation_passed=False renders a green check; and
+  _log_execution_summary (execution.py:1128-1140) counts only
+  SUCCESS/SKIPPED/FAILED. Net effect: a SCD2 op that corrupts the dimension
+  (e.g. after a swallowed cleanup on the next warmup/measurement iteration, which
+  never resets between runs - execution.py:213-225) prints a passing result.
+
+  Reproduced (scratchpad repro4.py): seed the dirty state a swallowed cleanup
+  leaves, re-run merge_scd_type2_basic -> success=True, status=SUCCESS,
+  validation_passed=False, at_most_one_current_per_business_key returns 40
+  offending rows. The blog's "validation | passed" column happens to be correct
+  only because it reads the operation API directly, not the runner.
+
+  This is the keystone: hardening the SCD2 validations (sibling TODOs) is
+  unobservable until a failing validation actually fails the run.
+impact:
+  business_value: "A benchmark tool that silently reports incorrect writes as passing is unsound as a measurement instrument."
+  user_impact: "Corrupting or no-op operations surface as green; results and the honesty story depend on this being fixed first."
+  technical_debt: "Dead validation-status plumbing (row_count_validation_status) that operations never populate."
+prior_art:
+- "benchbox/core/write_primitives/benchmark.py:1211-1224 OperationResult construction (hardcoded success=True)"
+- "benchbox/core/transaction_primitives/benchmark.py:809-816 identical construction in sibling benchmark"
+- "benchbox/platforms/base/execution.py:1080-1094 _execute_operation_query result dict (writes validation_passed, read by nothing)"
+- "benchbox/platforms/base/execution.py:1103-1126 _log_query_result (keys off unset row_count_validation_status) - extend / supersede"
+- "benchbox/core/write_primitives/benchmark.py:126-130 OperationResult.status field already exists (SUCCESS/SKIPPED/FAILED) - reuse"
+
+work:
+- id: w0
+  summary: "Re-validate blast radius on write + transaction primitives and a second engine before flipping status."
+  status: pending
+  notes: |
+    Measured on DuckDB SF0.01 (scratchpad blast.py): write_primitives
+    SUCCESS=56 SKIPPED=56 FAILED=0, with ZERO ops SUCCESS-but-validation_failed.
+    So no op currently relies on validation failure being ignored -> the flip is
+    non-breaking today. Re-run for transaction_primitives and one non-DuckDB
+    engine (sqlite is local, no container). Capture stdout to /tmp, summarize
+    counts here. If any op legitimately returns validation_passed=False on the
+    happy path, STOP and reclassify - that op has a bad validation, not a
+    gating gap.
+- id: w1
+  summary: "Decision gate: reuse status=FAILED vs add a distinct VALIDATION_FAILED status."
+  needs: [w0]
+  status: pending
+  notes: |
+    Recommend a distinct VALIDATION_FAILED: it separates 'the SQL raised' from
+    'the SQL ran and the post-condition is wrong', which matters for a
+    benchmarking tool's reporting and for not conflating infra errors with
+    correctness errors. Record the decision before touching call sites.
+- id: w2
+  summary: "Derive success/status from validation_passed in both benchmark.py OperationResult constructions."
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Propagate status through _execute_operation_query; make _log_query_result and _log_execution_summary reflect validation failure."
+  needs: [w2]
+  status: pending
+  notes: |
+    _log_query_result currently reads result['row_count_validation_status'],
+    never set for operations. Either populate it from validation_passed in
+    _execute_operation_query, or branch on validation_passed directly. Ensure
+    the summary line counts a validation failure as not-passed.
+- id: w4
+  summary: "Regression test: an op with a deliberately failing validation must not report SUCCESS/green."
+  needs: [w3]
+  status: pending
+
+must_preserve:
+- "All 56 currently-passing write_primitives ops on DuckDB SF0.01 keep reporting success (w0 confirms zero rely on ignored validation failure)."
+- "SKIPPED semantics unchanged: a skipped op still reports success with status=SKIPPED (skip means not-applicable, not failure)."
+- "transaction_primitives operation reporting stays behaviorally consistent with write_primitives after the change."
+
+approach: |
+  Single semantic change threaded through two layers. In each benchmark.py,
+  compute status/success from validation_passed at the OperationResult return.
+  In execution.py, thread the resulting status into the result dict and the two
+  logging helpers. Prefer reusing the existing status field over inventing new
+  plumbing; only add VALIDATION_FAILED if w1 chooses it. Keep the change
+  mechanical and symmetric across write + transaction primitives.
+
+anti_patterns:
+- "DO NOT gate only write_primitives - because transaction_primitives shares the identical hardcoded success=True (benchmark.py:809-816) - fix both."
+- "DO NOT resurrect row_count_validation_status as a second source of truth - because it is unset dead plumbing - drive the console off validation_passed / status instead."
+- "DO NOT change what counts as SKIPPED - because skip is not failure - only SUCCESS-with-failed-validation changes."
+
+verification:
+- description: "SCD2 unit + DuckDB integration still green (single-threaded to respect the shared test lock)."
+  command: "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py tests/integration/test_write_primitives_duckdb.py -k scd2 -n 0 -q"
+  expected_output: "all pass"
+- description: "New regression: a failing validation flips status away from SUCCESS/green."
+  command: "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -n 0 -q -k validation_fail"
+  expected_output: "new test passes; op reports validation failure, not SUCCESS"
+- description: "transaction_primitives operation tests still green."
+  command: "uv run -- python -m pytest tests/unit/core/transaction_primitives -n 0 -q"
+  expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/write_primitives/benchmark.py"
+  - "benchbox/core/transaction_primitives/benchmark.py"
+  - "benchbox/platforms/base/execution.py"
+  - "tests/integration/test_write_primitives_duckdb.py"
+  do_not_modify:
+  - "benchbox/core/write_primitives/catalog/operations.yaml"
+
+success_metrics:
+- "An operation with a failing validation query no longer reports SUCCESS or a green console line."
+- "Both write_primitives and transaction_primitives gate on validation_passed."
+- "Zero regressions across the 56 currently-passing DuckDB SF0.01 write_primitives ops."
+
+metadata:
+  tags: ["scd2", "write-primitives", "transaction-primitives", "validation", "correctness", "audit-followup"]
+  estimated_effort: "Medium"
+  created_date: "2026-07-10"

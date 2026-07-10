@@ -1,0 +1,140 @@
+id: "duckdb-merge-token-gate-hardening"
+title: "Harden DuckDB MERGE INTO token gate and reconcile its dead REGISTRY/comments"
+worktree: "scd2-audit-followup"
+priority: "Medium"
+status: "Not Started"
+category: "Core Functionality"
+description: |
+  SCD2 adversarial audit findings N6 and N7.
+
+  N6 - benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py:
+  40-42 tests "MERGE INTO" in write_sql.upper(). Verified (scratchpad repro3.py)
+  false positives and false negatives, both real against DuckDB 1.3.2:
+    - false positive: token only in a comment ('-- ... MERGE INTO ...') -> gate
+      skips an op DuckDB would run fine.
+    - false positive: token only in a string literal ('MERGE INTO staging')
+      -> same.
+    - false negatives: 'MERGE  INTO' (two spaces), 'MERGE\nINTO', and MERGE
+      reached via a CTE -> gate does NOT skip, and DuckDB 1.3.2 raises
+      ParserException on all three (confirmed).
+  No live instance today (all 21 catalog ops with the token use the exact
+  single-space form), so this is a regression trap for the next MERGE op added:
+  it would run and hard-error instead of skipping cleanly. The gate also reads
+  operation.write_sql (benchmark.py:422) and runs BEFORE platform_overrides
+  resolution (benchmark.py:428-432), so it does not see the effective SQL.
+
+  N7 - the gate's own metadata is wrong and its REGISTRY is write-only:
+    - duckdb_write_primitives.py:10-19 says "20 legacy MERGE INTO ops"; the
+      actual count of catalog ops whose write_sql contains MERGE INTO is 21 (the
+      20 merge-category ops + bulk_load_upsert_mode).
+    - :27 says DUCKDB_WRITE_PRIMITIVES_OPERATION_SKIPS holds "gaps that cannot be
+      detected from the write_sql token", but its only entry
+      (bulk_load_upsert_mode) IS token-detectable (verified), so that entry and
+      the operation_id lookup at :43-45 are dead code.
+    - the REGISTRY.register loop at :49-66 registers 1 duckdb execution-filter
+      rule while the runtime skips 21. Nothing resolves Phase.EXECUTION_FILTER:
+      benchmark.py:42-45 imports the dicts directly, so the registry is
+      decorative today - but a future consumer (coverage matrix, compat report)
+      would get a wrong DuckDB answer. postgres_write_primitives.py:97-114 has
+      the same write-only-registry shape.
+    - tests/integration/test_write_primitives_duckdb.py:515 repeats the
+      "112 - 20 failing MERGE INTO" arithmetic.
+impact:
+  business_value: "Prevents a future MERGE op from silently hard-erroring on DuckDB instead of skipping, and removes a registry that would mislead any future consumer."
+  user_impact: "New MERGE-family ops will be gated correctly regardless of whitespace/comments; DuckDB skip counts stay honest."
+  technical_debt: "Dead operation-skip dict, write-only registry, and stale comments in both duckdb and postgres execution-filter rules."
+prior_art:
+- "benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py:33-46 the token gate function - harden"
+- "benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py:49-66 write-only REGISTRY.register loop - decide populate vs delete"
+- "benchbox/sql_compat/rules/execution_filter/postgres_write_primitives.py:97-114 same write-only-registry shape - reconcile consistently"
+- "benchbox/core/write_primitives/benchmark.py:421-424 the token-gate call site (before platform_overrides resolution)"
+- "benchbox/sql_compat/context.py:17 Phase.EXECUTION_FILTER - resolved by nothing today"
+
+work:
+- id: w1
+  summary: "Replace substring test with a whitespace-tolerant regex over comment- and string-literal-stripped SQL (MERGE\\s+INTO)."
+  status: pending
+  notes: |
+    Strip line comments (--...), block comments (/*...*/), and single-quoted
+    string literals before matching, then apply re.search(r'\bMERGE\s+INTO\b').
+    Cover the exact cases in scratchpad repro3.py ATTACK 6.
+- id: w2
+  summary: "Evaluate the gate against the effective SQL (after platform_overrides), not operation.write_sql, so an override that swaps MERGE in/out is gated correctly."
+  needs: [w1]
+  status: pending
+  notes: |
+    Requires moving the gate call after override resolution in
+    benchmark.py:428-432, or passing the resolved SQL into the gate. Keep the
+    change minimal and covered by a test with a duckdb override. This edits the
+    SAME _get_effective_write_sql control flow as
+    write-primitives-sql-override-skip-order; land AFTER that TODO (see
+    deps.needs) and rebase on its reordering to avoid a benchmark.py conflict.
+- id: w3
+  summary: "Fix stale comments: :10-19 '20' -> 21 (incl bulk_load_upsert_mode); remove/justify the dead OPERATION_SKIPS entry + :43-45 lookup."
+  needs: [w1]
+  status: pending
+- id: w4
+  summary: "Reconcile the write-only REGISTRY: populate token-derived skips or delete the decorative register loop (duckdb + postgres)."
+  needs: [w3]
+  status: pending
+  notes: |
+    Pick ONE source of truth. The runtime reads the dicts directly, so either
+    wire the registry to the same derivation or drop the register loop entirely
+    in both duckdb_write_primitives.py and postgres_write_primitives.py.
+    Document the choice so no future consumer re-diverges (1 rule vs 21 skips).
+- id: w5
+  summary: "Correct the arithmetic comment at tests/integration/test_write_primitives_duckdb.py:515."
+  needs: [w3]
+  status: pending
+
+must_preserve:
+- "All 3 portable SCD2 ops (UPDATE+INSERT) continue to RUN on DuckDB (not skipped)."
+- "All 21 genuine MERGE INTO ops continue to skip cleanly on DuckDB."
+- "bulk_load_upsert_mode still skips on DuckDB (whether via token or an explicit rule)."
+- "postgres_write_primitives skip behavior is unchanged for the SCD2 and merge ops."
+
+approach: |
+  Harden the single gate function, then reconcile its metadata and registry.
+  Prefer a small comment/literal stripper + regex over a full SQL parser
+  (no parser dependency on this hot path). For the registry, pick one source of
+  truth: the runtime already reads the dicts directly, so either wire the
+  registry to the same derivation or drop the register loop entirely - do not
+  leave two mechanisms that can diverge. Apply the same decision symmetrically
+  to the postgres rule.
+
+anti_patterns:
+- "DO NOT pull in a SQL parser for the gate - because it is on the per-op resolution path - use a targeted comment/literal-stripped regex."
+- "DO NOT leave both a decorative registry and direct dict imports - because they can silently disagree (1 vs 21) - collapse to one source of truth."
+- "DO NOT widen the gate to the whole merge category - because portable SCD2 ops are merge-category and must keep running on DuckDB - gate on the MERGE INTO token only."
+
+verification:
+- description: "SCD2 ops still run (not skipped) on DuckDB; all MERGE INTO ops still skip."
+  command: "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -k scd2 -n 0 -q"
+  expected_output: "all pass"
+- description: "New gate unit test covers comment/literal false positives and whitespace/CTE false negatives."
+  command: "uv run -- python -m pytest tests/unit/sql_compat -n 0 -q -k merge_token_gate"
+  expected_output: "new test passes"
+
+scope_limit:
+  only_modify:
+  - "benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py"
+  - "benchbox/sql_compat/rules/execution_filter/postgres_write_primitives.py"
+  - "benchbox/core/write_primitives/benchmark.py"
+  - "tests/integration/test_write_primitives_duckdb.py"
+  - "tests/unit/sql_compat"
+  do_not_modify:
+  - "benchbox/core/write_primitives/catalog/operations.yaml"
+
+deps:
+  needs: ["write-primitives-sql-override-skip-order"]
+
+success_metrics:
+- "Comment-only and string-literal MERGE INTO no longer trigger a false skip."
+- "Whitespace/newline/CTE MERGE INTO variants are correctly skipped on DuckDB."
+- "The execution-filter registry and the runtime skip set cannot disagree (one source of truth)."
+- "Stale '20' comment and test arithmetic corrected to 21."
+
+metadata:
+  tags: ["write-primitives", "duckdb", "sql-compat", "execution-filter", "audit-followup"]
+  estimated_effort: "Medium"
+  created_date: "2026-07-10"
