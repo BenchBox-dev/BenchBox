@@ -73,7 +73,7 @@ work:
       hard-gate on the concurrency-wiring signal this TODO actually protects
       (validate_stream_count) independent of that separately-tracked defect.
 
-      Added tests/uat/test_throughput.py (24 new fast unit tests: result-path
+      Added tests/uat/test_throughput.py (18 new fast unit tests: result-path
       resolution incl. platform/benchmark/mtime filtering, both split
       validators, the composed validator, and a drift guard against
       run_official.py's TPC_ALLOWED_SCALE_FACTORS constant).
