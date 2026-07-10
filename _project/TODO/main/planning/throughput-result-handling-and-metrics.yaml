@@ -2,30 +2,7 @@ id: throughput-result-handling-and-metrics
 title: "Standardize throughput result handling: avoid GIL-serialized fetchall, fix TPC-DS row counts"
 worktree: main
 priority: Medium-High
-status: Completed
-completed_date: "2026-07-09"
-completed_note: |
-  Fixed both confirmed bugs. (1) TPC-H: PlatformAdapterCursor._extract_rows()
-  (connection_wrappers.py) preferred a `first_row` sample over `rows_returned`,
-  so every non-empty result collapsed to a length-1 list; reordered priority
-  to rows(list) > rows_returned(int) > first_row(last resort), and made
-  `.rows` a lazy property so counting never has to build it at all. (2)
-  TPC-DS: _execute_single_query (throughput_test.py) hardcoded
-  result_count=0; _run_single_stream_query now returns the real count
-  alongside platform_result. Introduced count_query_rows() in
-  connection_wrappers.py as the shared, non-materializing helper both
-  benchmarks' throughput drivers call: prefers platform_result["rows"/
-  "rows_returned"] (zero extra work - the adapter already computed it one
-  layer down in sql_execution.py, out of scope here), then cursor.rowcount,
-  then a bounded per-row consume loop, then len(fetchall()) as the last
-  resort. Documented the GIL/result-materialization implication in
-  docs/benchmarks/tpc-h.md and tpc-ds.md (new callouts, existing DuckDB
-  cursor-sharing/permutation caveats preserved verbatim). Updated
-  tests/integration/test_tpc_power_tests.py's
-  test_tpch_power_test_uses_adapter_reported_row_count, which had pinned the
-  old buggy 1-row behavior, and added truthful-row-count regression tests to
-  tests/integration/test_throughput_real_duckdb.py for both benchmarks
-  against a real, loaded DuckDB database.
+status: Not Started
 category: Core Functionality
 
 description: |
@@ -66,38 +43,24 @@ prior_art:
 work:
   - id: w1
     summary: "Introduce a shared, non-materializing row-count/consume helper for stream query results"
-    status: done
+    status: pending
     notes: |
       Prefer cursor.rowcount or a bounded consume loop over fetchall(); fall
       back to len(fetchall()) only where the driver gives no count and
       validation needs rows anyway.
-
-      Done: count_query_rows() added to connection_wrappers.py; also fixed
-      PlatformAdapterCursor._extract_rows()'s first_row-over-rows_returned
-      priority bug (see completed_note) and made .rows lazy.
   - id: w2
     summary: "Make TPC-DS report real result_count (parity with TPC-H)"
     needs: [w1]
-    status: done
+    status: pending
   - id: w3
     summary: "Document GIL / result-materialization implications for embedded-engine throughput"
     needs: [w1]
-    status: done
+    status: pending
     notes: "Extend docs/benchmarks/tpc-h.md and tpc-ds.md concurrency caveats."
 
 must_preserve:
   - "Result-count validation used by PlatformAdapterConnection still fires when enabled."
   - "TPC-H result_count remains correct."
-  # NOTE (2026-07-09): this guardrail as originally written was already
-  # FALSE at the time this TODO was authored - PlatformAdapterCursor's
-  # first_row-over-rows_returned bug made TPC-H result_count collapse to 1
-  # for every non-empty result. Read as intent, not a pre-existing
-  # invariant: TPC-H result_count is now correct AFTER this change (verified
-  # against a real DuckDB run - see test_tpch_reports_truthful_row_counts in
-  # tests/integration/test_throughput_real_duckdb.py), and no caller that
-  # already depended on the old len(fetchall())/rows_returned values has
-  # regressed (test_tpc_power_tests.py's row-count test updated to assert
-  # the corrected, truthful value).
 
 verification:
   - description: "TPC-DS throughput rows report non-zero counts where results exist"

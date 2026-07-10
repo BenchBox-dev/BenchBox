@@ -75,46 +75,50 @@ _TPCDS_QUERIES_PER_STREAM = 103
 # Shared base seed for both throughput runs below.
 _BASE_SEED = 7
 
-# HISTORICAL NOTE (fixed by throughput-result-handling-and-metrics): this
-# suite originally had no "rows_returned must be truthful" check because two
-# independent production bugs made the field meaningless for both
-# benchmarks. Both are now fixed (see
-# ``benchbox/platforms/base/connection_wrappers.py::PlatformAdapterCursor._extract_rows``
-# / ``count_query_rows``, ``benchbox/core/tpch/throughput_test.py``,
-# ``benchbox/core/tpcds/throughput_test.py``); the regression coverage lives
-# in ``test_tpch_reports_truthful_row_counts`` /
-# ``test_tpcds_reports_truthful_row_counts`` below. Kept for context:
+# NOTE on why there is no "rows_returned must be equal/match across streams"
+# check here (an earlier draft of this suite had one, per review comment):
+# it is not achievable today for either benchmark, for two independent
+# reasons discovered while implementing it - both are real production bugs
+# in the row-count reporting path, out of scope to fix from this tests-only
+# worktree, and are flagged separately rather than papered over with a check
+# that would either always trivially pass or always fail:
 #
-# - TPC-H: ``rows_returned`` was corrupted by
-#   ``PlatformAdapterCursor._extract_rows()``. It preferred a ``first_row``
-#   field over reconstructing the full row list from ``rows_returned``:
-#   ``first_row = rows[0] if rows else None`` is non-None for any non-empty
-#   result, so ``_extract_rows()`` returned ``[first_row]`` - a length-1
-#   list - for every query that returns >= 1 row, regardless of the true
-#   count. The TPC-H throughput driver
-#   (benchbox/core/tpch/throughput_test.py::_execute_stream) did
+# - TPC-H: ``rows_returned`` is corrupted by
+#   ``PlatformAdapterCursor._extract_rows()``
+#   (benchbox/platforms/base/connection_wrappers.py:247-262). It prefers a
+#   ``first_row`` field over reconstructing the full row list from
+#   ``rows_returned``: ``first_row = rows[0] if rows else None`` is
+#   non-None for any non-empty result, so ``_extract_rows()`` returns
+#   ``[first_row]`` - a length-1 list - for every query that returns >= 1
+#   row, regardless of the true count. The TPC-H throughput driver
+#   (benchbox/core/tpch/throughput_test.py::_execute_stream) does
 #   ``rows = cursor.fetchall(); result_count = len(rows)`` against that
-#   cursor, so ``result_count``/``rows_returned`` collapsed to 1 (or 0 when
-#   the true result was empty) for essentially every TPC-H query. Verified
+#   cursor, so ``result_count``/``rows_returned`` collapses to 1 (or 0 when
+#   the true result is empty) for essentially every TPC-H query. Verified
 #   empirically: every one of stream 0's 22 queries in a real run reported
 #   result_count 1 except query 18 (0); re-executing the *exact* SQL text
 #   production captured (via ``captured_items``) against the same
 #   connection immediately afterward returned 3 rows for query 2 - not 1.
+#   This also means the field cannot legitimately be compared *within* a
+#   single stream, let alone across streams.
 #
 # - TPC-DS: benchbox/core/tpcds/throughput_test.py::_execute_single_query
-#   unconditionally hardcoded ``"result_count": 0`` for every successful
-#   query - ``_run_single_stream_query`` called ``cursor.fetchall()`` but
-#   discarded the return value, then ``_execute_single_query`` set
-#   ``"result_count": 0`` regardless. So ``rows_returned`` was always ``0``
+#   unconditionally hardcodes ``"result_count": 0`` for every successful
+#   query - ``_run_single_stream_query`` calls ``cursor.fetchall()`` but
+#   discards the return value, then ``_execute_single_query`` sets
+#   ``"result_count": 0`` regardless. So ``rows_returned`` is always ``0``
 #   for every successful TPC-DS throughput row regardless of the real
 #   result set.
 #
-# Both only ever affected the throughput-test row-count *metric* (a separate
-# count made by the throughput drivers after execution), not the row-count
-# *validation* that ``DuckDBAdapter.execute_query`` performs inline against
-# the expected TPC-H/TPC-DS answer set (computed from the real
-# ``actual_row_count`` before the ``PlatformAdapterCursor`` wrapping
-# occurred).
+# Both are believed to affect only the throughput-test row-count *metric*
+# (a separate ``cursor.fetchall()`` call made by the throughput drivers
+# after execution), not the row-count *validation* that
+# ``DuckDBAdapter.execute_query`` performs inline against the expected TPC-H/
+# TPC-DS answer set (computed from the real ``actual_row_count`` before the
+# ``PlatformAdapterCursor`` wrapping/loss occurs) - but that scope has not
+# been fully verified and the row-count metric bug plausibly extends to the
+# analogous *power*-test code path, since both share
+# ``PlatformAdapterConnection``/``PlatformAdapterCursor``.
 
 
 @pytest.fixture(scope="module")
@@ -249,9 +253,11 @@ class TestTPCHThroughputRealDuckDB:
         purely coverage-based check (all 22 ids present, once each) cannot
         tell positions apart.
 
-        This does not attempt to verify per-query *row content* - see
-        ``test_tpch_reports_truthful_row_counts`` below for the
-        rows_returned-truthfulness regression coverage.
+        This does not attempt to verify per-query *row content* - see the
+        module-level NOTE on why a rows_returned-based content check is not
+        achievable today for either benchmark (a discovered production
+        row-count-reporting defect, out of scope for this tests-only
+        worktree).
         """
         _rows, result = tpch_throughput_run
 
@@ -267,31 +273,6 @@ class TestTPCHThroughputRealDuckDB:
                     f"{qr['position']} does not match canonical TPC-H permutation "
                     f"position {expected_position}"
                 )
-
-    def test_tpch_reports_truthful_row_counts(self, tpch_throughput_run: tuple[list[dict[str, Any]], Any]) -> None:
-        """Regression test for the fixed TPC-H result_count truthfulness bug.
-
-        Previously ``PlatformAdapterCursor._extract_rows()`` preferred
-        ``first_row`` over ``rows_returned``, so EVERY non-empty result
-        collapsed to ``rows_returned == 1`` regardless of the true row count
-        (see the module-level HISTORICAL NOTE). Assert that is no longer the
-        case against a real, loaded DuckDB database: at least one query must
-        report a genuinely multi-row result, and results must not be
-        uniformly stuck at the old sentinel values (0 or 1).
-        """
-        rows, _result = tpch_throughput_run
-
-        result_counts = [row["rows_returned"] for row in rows if row["status"] == "SUCCESS"]
-        assert result_counts, "expected at least one successful TPC-H throughput row"
-        assert all(isinstance(count, int) for count in result_counts)
-
-        assert any(count > 1 for count in result_counts), (
-            "expected at least one TPC-H query to report >1 row - if every "
-            "result_count is <= 1, the first_row-collapse bug has regressed"
-        )
-        assert not all(count in (0, 1) for count in result_counts), (
-            "TPC-H row counts must not be uniformly collapsed to the old 0/1 sentinel values"
-        )
 
 
 @pytest.mark.duckdb
@@ -328,9 +309,13 @@ class TestTPCDSThroughputRealDuckDB:
         themselves report, so this actually detects a stream silently running
         a truncated or duplicated query subset.
 
-        See ``test_tpcds_reports_truthful_row_counts`` below for the
-        rows_returned-truthfulness regression coverage (formerly always 0 -
-        see the module-level HISTORICAL NOTE).
+        Unlike the TPC-H variant of this test, there is no content-level
+        (rows_returned) bleed check here: benchbox/core/tpcds/throughput_test.py
+        ::_execute_single_query hardcodes ``result_count: 0`` for every
+        successful query regardless of the real result set (see the
+        module-level NOTE), so rows_returned carries no signal for TPC-DS
+        today. Fixing that is a production-source change out of scope for
+        this tests-only worktree.
         """
         rows, result = tpcds_throughput_run
 
@@ -354,26 +339,3 @@ class TestTPCDSThroughputRealDuckDB:
         # rows on the expected per-stream count too.
         for stream_result in result.stream_results:
             assert stream_result.queries_executed == _TPCDS_QUERIES_PER_STREAM
-
-    def test_tpcds_reports_truthful_row_counts(self, tpcds_throughput_run: tuple[list[dict[str, Any]], Any]) -> None:
-        """Regression test for the fixed TPC-DS result_count-always-0 bug.
-
-        Previously ``_execute_single_query`` unconditionally hardcoded
-        ``"result_count": 0`` (see the module-level HISTORICAL NOTE). Assert
-        that is no longer the case against a real, loaded DuckDB database: at
-        least one query must report a nonzero, and at least one a
-        genuinely multi-row, result.
-        """
-        rows, _result = tpcds_throughput_run
-
-        result_counts = [row["rows_returned"] for row in rows if row["status"] == "SUCCESS"]
-        assert result_counts, "expected at least one successful TPC-DS throughput row"
-        assert all(isinstance(count, int) for count in result_counts)
-
-        assert any(count > 0 for count in result_counts), (
-            "expected at least one TPC-DS query to report a nonzero row count - "
-            "if every result_count is 0, the hardcoded-zero bug has regressed"
-        )
-        assert any(count > 1 for count in result_counts), (
-            "expected at least one TPC-DS query to report a genuinely multi-row result"
-        )

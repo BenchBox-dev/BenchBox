@@ -279,50 +279,24 @@ class PlatformAdapterCursor:
             platform_result: Result dictionary from platform adapter
         """
         self.platform_result = platform_result
-        # Lazily materialized on first fetchall()/fetchone()/.rows access - see
-        # the `rows` property. Callers that only need a row *count* (e.g. the
-        # TPC-H/TPC-DS throughput drivers) should use count_query_rows()
-        # instead, which reads platform_result directly and never builds this
-        # placeholder list at all.
-        self._rows: list | None = None
+        self.rows = self._extract_rows()
 
     def _extract_rows(self):
-        """Extract rows (or cardinality-preserving placeholders) from platform result.
-
-        Priority order:
-          1. An explicit ``rows`` list/tuple - already fully materialized upstream.
-          2. ``rows_returned`` int - reconstructs a placeholder list of the *correct
-             length*. This must be checked before ``first_row``: ``first_row`` is only
-             ONE sample row (see ``sql_execution.execute_sql_query``'s
-             ``first_row=results[0] if results else None``), so treating its mere
-             presence as "the whole result" silently collapsed every non-empty result
-             to a length-1 list regardless of the true row count - a real correctness
-             bug (empirically: 21/22 TPC-H throughput queries in a real run reported
-             result_count=1; re-executing query 2's captured SQL returned 3 rows).
-          3. ``first_row`` alone, only when no ``rows_returned`` count is present at
-             all - the last remaining cardinality signal, so it fabricates a
-             single-row list.
-        """
+        """Extract rows from platform result."""
         explicit_rows = self.platform_result.get("rows")
         if isinstance(explicit_rows, (list, tuple)):
             return list(explicit_rows)
-
-        row_count = self.platform_result.get("rows_returned")
-        if isinstance(row_count, int):
-            return [(None,)] * row_count if row_count > 0 else []
 
         first_row = self.platform_result.get("first_row")
         if first_row is not None:
             return [first_row]
 
-        return []
+        row_count = self.platform_result.get("rows_returned", 0)
+        if isinstance(row_count, int) and row_count > 0:
+            # Preserve cardinality semantics even when the adapter only reports row counts.
+            return [(None,)] * row_count
 
-    @property
-    def rows(self):
-        """Materialized rows, computed lazily on first access."""
-        if self._rows is None:
-            self._rows = self._extract_rows()
-        return self._rows
+        return []
 
     def fetchall(self):
         """Return all rows."""
@@ -331,59 +305,3 @@ class PlatformAdapterCursor:
     def fetchone(self):
         """Return one row."""
         return self.rows[0] if self.rows else None
-
-    def row_count(self) -> int:
-        """Return this cursor's row count without forcing full materialization.
-
-        Thin delegate to ``count_query_rows(self)``. Exists so that
-        `benchbox.core` callers (e.g. the TPC-H/TPC-DS throughput drivers)
-        can duck-type on a ``row_count()`` method instead of importing
-        ``count_query_rows`` directly - the layering convention
-        ``utils < core < platforms < cli`` forbids ``core`` importing from
-        ``platforms``. See `benchbox.core.tpch.throughput_test` and
-        `benchbox.core.tpcds.throughput_test` for the call sites.
-        """
-        return count_query_rows(self)
-
-
-def count_query_rows(cursor: Any) -> int:
-    """Return a stream query result's row count without forcing full materialization.
-
-    Used by the TPC-H/TPC-DS throughput drivers in place of
-    ``len(cursor.fetchall())`` so that counting results doesn't add a second,
-    redundant materialization pass under the GIL on top of whatever the
-    platform adapter already did. Priority (cheapest/most-truthful first):
-
-      1. ``cursor.platform_result`` (``PlatformAdapterCursor``, the normal
-         validation-mode path): read the adapter-reported ``rows``/
-         ``rows_returned`` directly. The real driver fetch already happened
-         one layer down (``sql_execution.execute_sql_query``), so this costs
-         nothing extra and never builds a placeholder row list.
-      2. ``cursor.rowcount`` (DB-API 2.0): some drivers populate this without
-         requiring a fetch at all.
-      3. A bounded consume loop over an iterable cursor: counts rows one at a
-         time instead of materializing the whole result set into a single
-         list in memory.
-      4. ``len(cursor.fetchall())``: last resort, for cursors/test-doubles
-         that expose none of the above.
-    """
-    platform_result = getattr(cursor, "platform_result", None)
-    if isinstance(platform_result, dict):
-        explicit_rows = platform_result.get("rows")
-        if isinstance(explicit_rows, (list, tuple)):
-            return len(explicit_rows)
-        reported = platform_result.get("rows_returned")
-        if isinstance(reported, int) and reported >= 0:
-            return reported
-
-    rowcount = getattr(cursor, "rowcount", None)
-    if isinstance(rowcount, int) and rowcount >= 0:
-        return rowcount
-
-    if hasattr(cursor, "__iter__"):
-        return sum(1 for _ in cursor)
-
-    if hasattr(cursor, "fetchall"):
-        return len(cursor.fetchall())
-
-    return 0

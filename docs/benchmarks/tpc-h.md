@@ -249,26 +249,6 @@ for i, stream_info in enumerate(tpch.get_all_streams_info()):
 > If you run BenchBox throughput tests from your own harness against DuckDB,
 > follow the same pattern: one connection, one cursor per thread.
 
-> **GIL / result-materialization note:** for embedded engines (DuckDB,
-> SQLite, DataFusion, ...) that release the GIL during native query
-> execution but not while converting result rows into Python objects,
-> fetching a query's full result set (`cursor.fetchall()`) re-acquires the
-> GIL for the duration of that conversion. Every concurrent stream that
-> materializes a result at the same time serializes on this step, so larger
-> result sets and higher stream counts inflate `execution_time_seconds` (and
-> therefore depress `Throughput@Size`) independently of the engine's actual
-> query-execution concurrency - an artifact of Python result handling, not
-> of the platform under test. BenchBox's throughput drivers
-> (`benchbox/core/tpch/throughput_test.py`,
-> `benchbox/core/tpcds/throughput_test.py`) avoid forcing this
-> materialization to compute `result_count`: they read the platform
-> adapter's already-computed row count directly
-> (`benchbox.platforms.base.connection_wrappers.count_query_rows`) instead
-> of calling `fetchall()` a second time. If you build a custom harness that
-> calls `fetchall()` per stream to inspect or log results, be aware that
-> under this GIL constraint doing so measures Python object materialization
-> throughput as much as it measures the database engine.
-
 ## Query Characteristics
 
 ### Query Complexity Categories

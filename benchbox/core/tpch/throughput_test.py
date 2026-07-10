@@ -43,31 +43,6 @@ class TPCHThroughputTestConfig:
 TPCHThroughputStreamResult = ThroughputStreamResult
 
 
-def _count_cursor_rows(cursor: Any) -> int:
-    """Return a row count without importing benchbox.platforms from core.
-
-    The layering convention `utils < core < platforms < cli` forbids `core`
-    importing from `platforms`, so this duck-types on the `row_count()`
-    method `PlatformAdapterCursor` exposes (see
-    `benchbox.platforms.base.connection_wrappers`) instead of importing
-    `count_query_rows` directly. On the real throughput path the cursor IS
-    a `PlatformAdapterCursor`, so this always resolves there and the
-    "never materialize rows just to count them" behavior is preserved.
-
-    The fallback below only serves raw DB-API cursors / test doubles that
-    lack `row_count()`, and mirrors `count_query_rows`'s truthfulness rule:
-    a `-1` (unknown) rowcount must never be reported as a count.
-    """
-    counter = getattr(cursor, "row_count", None)
-    if callable(counter):
-        return counter()
-
-    rowcount = getattr(cursor, "rowcount", None)
-    if isinstance(rowcount, int) and rowcount >= 0:
-        return rowcount
-    return len(cursor.fetchall())
-
-
 @dataclass
 class TPCHThroughputTestResult(ThroughputResult):
     """Result of TPC-H Throughput Test."""
@@ -367,6 +342,7 @@ class TPCHThroughputTest:
                             connection.set_query_context(query_id)
 
                         cursor = connection.execute(query_text)
+                        rows = cursor.fetchall() if hasattr(cursor, "fetchall") else []
 
                         # Check for validation failures from platform adapter
                         if hasattr(cursor, "platform_result"):
@@ -391,15 +367,11 @@ class TPCHThroughputTest:
 
                     execution_time = elapsed_seconds(query_start)
 
-                    # _count_cursor_rows() reads the adapter-reported count
-                    # directly (when available) instead of re-materializing
-                    # the result set via fetchall() a second time - see
-                    # PlatformAdapterCursor.row_count() in connection_wrappers.py.
                     query_result.update(
                         {
                             "execution_time_seconds": execution_time,
                             "success": True,
-                            "result_count": _count_cursor_rows(cursor),
+                            "result_count": len(rows),
                         }
                     )
 
