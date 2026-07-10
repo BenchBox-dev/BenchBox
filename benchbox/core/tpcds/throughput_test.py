@@ -14,6 +14,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import logging
 import sqlite3
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Optional
@@ -151,7 +152,6 @@ class TPCDSThroughputTest:
         self._pregenerated_queries: Optional[dict[int, list[tuple[Any, Any]]]] = None
 
         # Lock for concurrent stream capture
-        import threading
 
         self._capture_lock = threading.Lock()
 
@@ -659,19 +659,27 @@ class TPCDSThroughputTest:
             # a timed-out stream can stop soon instead of running unbounded
             # in the background. See runner.py's module docstring.
             #
-            # Gated directly on config.cancel_on_timeout (not just presence
-            # of _stream_cancel_events) so a stale/leftover dict from a prior
-            # run that reused this config object (e.g. run 1 with
+            # Gated directly on config.cancel_on_timeout being the literal
+            # True (not just presence of _stream_cancel_events, and not
+            # merely truthy) so a stale/leftover dict from a prior run that
+            # reused this config object (e.g. run 1 with
             # cancel_on_timeout=True where a stream timed out and its Event
             # was set(), then run 2 reusing the same config with
             # cancel_on_timeout=False) can never take effect here -- belt and
             # suspenders alongside StreamRunner.execute() resetting
             # _stream_cancel_events to {} whenever cooperative cancel is
-            # disabled.
+            # disabled. Also requires _stream_cancel_events to be a genuine
+            # dict and the resolved entry to be a genuine threading.Event --
+            # not merely truthy -- so a malformed config (e.g. a MagicMock in
+            # a test double, where every attribute access is truthy by
+            # default) can never be mistaken for a real cancellation signal.
             cancel_event = None
-            if getattr(config, "cancel_on_timeout", False):
+            if getattr(config, "cancel_on_timeout", False) is True:
                 cancel_events = getattr(config, "_stream_cancel_events", None)
-                cancel_event = cancel_events.get(stream_id) if cancel_events else None
+                if isinstance(cancel_events, dict):
+                    candidate = cancel_events.get(stream_id)
+                    if isinstance(candidate, threading.Event):
+                        cancel_event = candidate
 
             cancelled = False
             for position, stream_query in enumerate(query_subset):

@@ -295,12 +295,13 @@ class TPCHThroughputTest:
     def _resolve_cancel_event(self, config: TPCHThroughputTestConfig, stream_id: int) -> Optional[threading.Event]:
         """Return this stream's cooperative-cancel event, if any.
 
-        Gated directly on ``config.cancel_on_timeout``: when it is False
-        (the default), this always returns None and the per-query loop
-        never checks for cancellation, preserving today's behavior exactly
-        -- regardless of what ``config._stream_cancel_events`` currently
-        holds. This guard is deliberately independent of (belt-and-suspenders
-        alongside) ``StreamRunner.execute()`` resetting
+        Gated directly on ``config.cancel_on_timeout``: when it is not the
+        literal ``True`` (the default is ``False``, and a malformed/mock
+        config's attribute is neither), this always returns None and the
+        per-query loop never checks for cancellation, preserving today's
+        behavior exactly -- regardless of what ``config._stream_cancel_events``
+        currently holds. This guard is deliberately independent of
+        (belt-and-suspenders alongside) ``StreamRunner.execute()`` resetting
         ``_stream_cancel_events`` to ``{}`` when cooperative cancel is
         disabled: if a config object is reused across runs (e.g. run 1 with
         ``cancel_on_timeout=True`` where a stream times out and its Event
@@ -308,11 +309,20 @@ class TPCHThroughputTest:
         ``cancel_on_timeout=False``), a stale/leftover ``_stream_cancel_events``
         entry can never take effect here even if that reset were ever
         skipped or bypassed.
+
+        Also requires ``_stream_cancel_events`` to be a genuine ``dict`` and
+        the resolved per-stream entry to be a genuine ``threading.Event`` --
+        not merely truthy -- so a malformed config (e.g. a ``MagicMock`` in a
+        test double, where every attribute access is truthy by default) can
+        never be mistaken for a real cancellation signal.
         """
-        if not getattr(config, "cancel_on_timeout", False):
+        if getattr(config, "cancel_on_timeout", False) is not True:
             return None
         cancel_events = getattr(config, "_stream_cancel_events", None)
-        return cancel_events.get(stream_id) if cancel_events else None
+        if not isinstance(cancel_events, dict):
+            return None
+        cancel_event = cancel_events.get(stream_id)
+        return cancel_event if isinstance(cancel_event, threading.Event) else None
 
     def _cooperative_cancel_requested(
         self,
