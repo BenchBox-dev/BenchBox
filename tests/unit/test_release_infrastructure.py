@@ -431,6 +431,10 @@ class TestReleaseInfrastructure:
         base. The restore-from-develop step must run, and must run before
         the ruleset drift check, or bootstrap evidence would ModuleNotFoundError
         on every real release PR.
+
+        The helper itself imports auto_merge_soundness_paths from the same
+        curated-out directory, so restoring only the helper still fails
+        (v0.3.1 release PR #1072). Both modules must be restored.
         """
         job = _workflow("validate-main-pr.yml")["jobs"]["validate-base"]
         step_names = [step.get("name") for step in job["steps"]]
@@ -441,6 +445,7 @@ class TestReleaseInfrastructure:
         restore_step = job["steps"][restore_index]
         assert restore_step["if"] == "steps.release-readiness.outputs.bootstrap_required == 'true'"
         assert "_project/scripts/ruleset_review_enforcement.py" in restore_step["run"]
+        assert "_project/scripts/auto_merge_soundness_paths.py" in restore_step["run"]
         assert "origin/develop" in restore_step["run"]
 
     def test_release_docs_name_canary_and_ruleset_drift(self):
@@ -597,6 +602,54 @@ class TestReleaseInfrastructure:
         assert commit_match, "expected a git commit line in release-cut"
         assert "--no-verify" in commit_match.group(1).split(), (
             f"release commit must skip hooks (curation already deleted the hook config): {commit_match.group(1)}"
+        )
+
+    def test_release_cut_aligns_release_histories_before_pushing(self):
+        """release-cut must merge `origin/main` with `-s ours` before it pushes.
+
+        `main` and `develop` have unrelated roots (Phase 4 filter-merge) and
+        diverge permanently — `main` gains one squash commit per release that
+        `develop` never sees, and A4 step 6 (rebase develop onto main) was
+        removed by the 2026-04-27 amendment. A `vX.Y.Z` branch cut cleanly from
+        `develop` is therefore not mergeable into `main`: GitHub cannot compute
+        a merge ref, the PR sits at CONFLICTING, and *no CI runs at all* —
+        neither `validate-base` nor `release-required-result` ever trigger.
+        Every cut before v0.3.1 fixed this by hand (#711/#712/#1029/#1043/#1072).
+        """
+        recipe = _make_target_recipe("release-cut")
+        # `\t@?git merge`, not `\t.*git merge`: recipe comments are `\t@# ...` lines
+        # that precede the command, so a loose anchor would match a comment first.
+        merge_match = re.search(r"^\t@?git merge (.+?)$", recipe, re.MULTILINE)
+        assert merge_match, "release-cut must merge origin/main to make the release PR mergeable"
+
+        merge_args = merge_match.group(1).split()
+        # `-s ours` keeps the curated release tree byte-for-byte and only records
+        # origin/main as a second parent; any other strategy drags main-only
+        # content back into the release tree, silently un-curating the release.
+        assert "-s" in merge_args and merge_args[merge_args.index("-s") + 1] == "ours", (
+            f"alignment merge must use `-s ours` to preserve the curated tree: {merge_match.group(1)}"
+        )
+        assert "--allow-unrelated-histories" in merge_args, (
+            "main and develop have unrelated roots; the merge needs --allow-unrelated-histories"
+        )
+        assert "origin/main" in merge_args, "the alignment merge must target the fetched origin/main"
+
+        # A `-s ours` merge cannot change the tree by construction, so the guard is
+        # really an assertion that the strategy above is still `ours`. It must stay.
+        assert "alignment merge changed the curated release tree" in recipe, (
+            "expected a post-merge guard asserting the curated release tree is unchanged"
+        )
+
+        # Ordering: changelog (--since-ref origin/main) needs main to still be a
+        # non-ancestor; the merge must land on top of the release commit; and the
+        # push must carry the merge, or the PR is born CONFLICTING again.
+        commit_match = re.search(r"^\tgit commit .*Release v\$\(VERSION\)", recipe, re.MULTILINE)
+        push_match = re.search(r"^\tgit push -u origin v\$\(VERSION\)", recipe, re.MULTILINE)
+        assert commit_match, "expected the `Release v$(VERSION)` commit line in release-cut"
+        assert push_match, "expected `git push -u origin v$(VERSION)` in release-cut"
+        changelog_idx = recipe.index("generate_changelog_entry.py")
+        assert changelog_idx < commit_match.start() < merge_match.start() < push_match.start(), (
+            "alignment merge must run after the `Release v$(VERSION)` commit and before the push"
         )
 
     def test_release_cut_branch_sweep_matches_only_release_branches(self):

@@ -17,7 +17,7 @@ BenchBox is a benchmarking toolbox that makes it simple to benchmark analytical 
 
 BenchBox is currently **Beta software**. Core functionality is stable (TPC-H, TPC-DS with DuckDB and major cloud platforms). APIs may still change before 1.0. We recommend thorough testing before using BenchBox in production. See the main README for details on Beta status.
 
-The default wheel includes a `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, concurrency). This namespace is **not part of the supported Beta surface** - it has no stability guarantees and is not integrated with the benchmark registry or CLI. Use it at your own risk.
+The default wheel includes a `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, load_testing). This namespace is **not part of the supported Beta surface** - it has no stability guarantees and is not integrated with the benchmark registry or CLI. Use it at your own risk. `load_testing` in particular is unsupported load-testing/workload-analysis research code, not a supported concurrency-testing feature.
 
 ### Which databases does BenchBox support?
 
@@ -320,13 +320,17 @@ This is a limitation of the upstream TPC-DS tools, not BenchBox.
 
 ### Can I run benchmarks in parallel?
 
-Yes! Some benchmarks support throughput tests with concurrent queries:
+Yes! Some benchmarks support throughput tests with concurrent queries. The
+primary `run` command does not have a `--streams`/`--concurrency` flag yet, so
+today the number of concurrent streams is set through the deprecated
+`run-official` compatibility command:
 
 ```bash
-benchbox run --platform duckdb --benchmark tpch --scale 1 --phases throughput --streams 4
+benchbox run-official tpch --platform duckdb --scale 1 --phases throughput --streams 4 --seed 42
 ```
 
-See [Power Run & Concurrent Queries](../advanced/power-run-concurrent-queries.md).
+See [CLI Reference → Deprecated: `run-official`](../reference/cli/run.md#deprecated-run-official)
+and [Power Run & Concurrent Queries](../advanced/power-run-concurrent-queries.md).
 
 ### How do I compare results across runs?
 

@@ -19,9 +19,9 @@ omit =
     # generated/templated per-query DataFrame implementations; verified via golden-output tests (tests/unit/core/nyctaxi/test_nyctaxi_dataframe_queries.py), not line coverage
     benchbox/core/nyctaxi/dataframe_queries/queries.py
     # experimental load-test executor; not imported by any production/release-gate code path
-    benchbox/experimental/concurrency/executor.py
+    benchbox/experimental/load_testing/executor.py
     # experimental connection-pool tester; not imported by any production/release-gate code path
-    benchbox/experimental/concurrency/pool_tester.py
+    benchbox/experimental/load_testing/pool_tester.py
     # generated/templated per-query DataFrame implementations; verified via golden-output tests (tests/unit/core/clickbench/test_clickbench_dataframe_queries.py), not line coverage
     benchbox/core/clickbench/dataframe_queries/queries.py
 

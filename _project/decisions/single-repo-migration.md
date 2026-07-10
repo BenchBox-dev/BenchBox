@@ -250,3 +250,85 @@ extension above because they are not part of the v0.3.0 release tree.
 `scripts/check_release_curation.py` now pins these required removals in
 addition to the top-level split, so the drift guard fails if a future edit
 accidentally reclassifies the results explorer as shipping content.
+
+## Amendment 2026-07-09 — v0.3.1 recovery release; Phase 4 closed, Phase 8 retired
+
+The `v0.3.1` recovery release published successfully (tag `v0.3.1`,
+`release.yml` run 29055922350, squash commit `7550c423d` on `main`). A clean
+isolated install of `benchbox==0.3.1` imports without pandas, resolving the
+`v0.3.0` installability failure. `0.3.0` was neither re-tagged nor re-uploaded;
+it remains permanently broken on PyPI and is superseded, not repaired.
+
+Bookkeeping consequences, decided explicitly rather than left implicit:
+
+- **Phase 4 is `Completed`** — its w8 installability gate is closed as
+  recovery-complete on the `v0.3.1` evidence.
+- **Phase 8 is `Completed` (RETIRED), satisfied by `v0.3.1`.** Phase 8 exists
+  to exercise the new flow end-to-end in the canonical single-repo state with
+  no fallback; `v0.3.1` did exactly that, with `automate_release.py` already
+  deleted (Phase 6) and docs aligned (Phase 7). Its w1-w7 are deliberately
+  skipped. A `v0.3.2` cut solely to re-run a passed exercise would be a public
+  release with no user-facing content.
+
+### Two release-flow gaps this release exposed
+
+1. **`release-cut` did not align release histories.** *(Closed — folded into
+   `release-cut`; see the note below.)* Because the 2026-04-27
+   amendment removed A4 step 6 (`rebase develop onto main`), `main` and
+   `develop` diverge permanently — `main` carries one squash commit per release
+   that `develop` never sees, and the two have unrelated roots since the Phase 4
+   filter-merge. A `vX.Y.Z` branch cut cleanly from `develop` is therefore
+   *not mergeable* into `main`: GitHub cannot compute a merge ref, so **no CI
+   runs at all** and the release PR sits at `CONFLICTING`. The fix, applied by
+   hand on `v0.3.1` (and, in hindsight, by every prior aborted cut):
+
+   ```bash
+   git merge -s ours --allow-unrelated-histories origin/main \
+     -m "Merge main into vX.Y.Z (strategy: ours) to align release histories"
+   ```
+
+   `-s ours` preserves the curated release tree byte-for-byte and only records
+   `main` as a second parent. `release-finalize`'s squash-merge then collapses
+   the branch into a single commit on `main`, so this merge never pollutes
+   `main`'s release-only ledger.
+
+   **Now automated.** `release-cut` performs this merge itself, between the
+   `Release vX.Y.Z` commit and the push, and guards it by asserting the tree is
+   unchanged across the merge (a non-`ours` strategy would drag `main`-only
+   content back into the curated tree). Pinned by
+   `tests/unit/test_release_infrastructure.py::TestReleaseInfrastructure::test_release_cut_aligns_release_histories_before_pushing`.
+   Ordering matters: the merge must follow `generate_changelog_entry.py
+   --since-ref origin/main`, which needs `main` to still be a non-ancestor.
+
+2. **`validate-base` bootstrap under-restored its helpers.** The trusted-base
+   bootstrap path (taken while `main` lacks `scripts/release_readiness_check.py`)
+   restored `_project/scripts/ruleset_review_enforcement.py` from `develop` but
+   not its sibling import `auto_merge_soundness_paths`, so the ruleset-drift
+   step died with `ModuleNotFoundError`. Prior cuts never reached that step —
+   they failed earlier on the non-fast suite — which is why it stayed latent.
+   Fixed in `.github/workflows/validate-main-pr.yml` and pinned by
+   `tests/unit/test_release_infrastructure.py::TestReleaseInfrastructure::test_validate_main_pr_restores_ruleset_helper_before_drift_check`.
+
+### Operational notes for the next release
+
+- The **emergency override variables were never set.** While `main` lacks
+  `scripts/release_readiness_check.py`, `validate-base` short-circuits into the
+  trusted-base bootstrap *before* `release_readiness_check.py` runs, so
+  `RELEASE_READINESS_OVERRIDE_SHA`/`_REASON` are not consulted and the circular
+  `pypi-latest-installability` canary failure does not gate the release. The
+  real gates on that path are the inline non-fast suite and the inline ruleset
+  drift check (which requires the `RULESET_DRIFT_TOKEN` repo secret). Once
+  `v0.3.1` lands the readiness script on `main`, later releases return to the
+  canary-consuming path and the override becomes meaningful again.
+- Release-branch pushes and `release-finalize`'s tag push trip the local
+  pre-commit **pre-push** hook, because curation removes
+  `.pre-commit-config.yaml` from the release tree. Use
+  `PRE_COMMIT_ALLOW_NO_CONFIG=1`; do not disable hooks wholesale.
+- `release-finalize`'s `git push origin v$(VERSION)` is ambiguous once both a
+  `vX.Y.Z` branch and tag exist (`src refspec ... matches more than one`). Push
+  the tag explicitly: `git push origin refs/tags/vX.Y.Z`.
+- `scripts/generate_changelog_entry.py` shells out to a nested `claude` CLI
+  (`CLAUDE_TIMEOUT_SECONDS = 120`) to summarize commits. That stalls when
+  `release-cut` is driven from inside a Claude Code session; the generated
+  section is raw commit subjects anyway and needs hand-curation, so the
+  changelog should be curated deliberately rather than accepted as generated.

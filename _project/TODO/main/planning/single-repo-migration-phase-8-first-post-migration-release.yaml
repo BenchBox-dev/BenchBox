@@ -2,7 +2,7 @@ id: single-repo-migration-phase-8-first-post-migration-release
 title: "Single-repo migration phase 8: cut the first release after deletion and docs cleanup"
 worktree: main
 priority: Medium-High
-status: Blocked
+status: Completed
 category: Release Tooling
 
 deps:
@@ -50,7 +50,7 @@ description: |
 work:
 - id: w0
   summary: "Decide: is Phase 8 satisfied by the v0.3.1 recovery release, or is a separate release needed?"
-  status: pending
+  status: done
   notes: |
     release-recovery-v0-3-1 cuts and verifies v0.3.1 as the first real
     release on the new flow with no fallback — the exact exercise this phase
@@ -63,6 +63,28 @@ work:
         proceed to w1-w7 using v0.3.2+ (v0.3.1 is consumed by recovery).
     Mirrors the decision required by release-recovery-v0-3-1 w7; do not leave
     it implicit in the dependency graph.
+
+    DECISION 2026-07-09 (maintainer-approved): RETIRE — Phase 8 is satisfied
+    by the v0.3.1 recovery release. w1-w7 are deliberately skipped, not
+    forgotten.
+
+    Rationale: this phase exists to prove the new flow works end-to-end in the
+    canonical single-repo state with no fallback. v0.3.1 did precisely that —
+    `make release-cut VERSION=0.3.1` off `develop`, curation, squash-merge to
+    `main` (`7550c423d`), tag, and `release.yml` run 29055922350 publishing to
+    PyPI with green cross-platform install smoke — with `automate_release.py`
+    already deleted (Phase 6) and docs aligned (Phase 7). Phase 4 closed the
+    same day as recovery-complete. Cutting a v0.3.2 solely to re-run a passed
+    exercise would add a public release with no user-facing content.
+
+    The exercise did surface two real gaps, both recorded in
+    _project/decisions/single-repo-migration.md (2026-07-09 amendment):
+    `release-cut` did not perform the `-s ours` history alignment that a
+    `vX.Y.Z -> main` PR needs, and the `validate-base` bootstrap failed to
+    restore `auto_merge_soundness_paths`. Both are now fixed and
+    regression-tested — the alignment merge was folded into `release-cut`
+    itself (PR #1089), so a future cut no longer performs it by hand.
+    Recorded in _project/decisions/single-repo-migration.md, not left implicit.
 
 - id: w1
   summary: "Confirm main is green and all migration phases are merged"

@@ -2,7 +2,7 @@ id: single-repo-migration-phase-4-test-release-with-new-flow
 title: "Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)"
 worktree: main
 priority: High
-status: Blocked
+status: Completed
 category: Release Tooling
 
 deps:
@@ -229,8 +229,22 @@ work:
 - id: w8
   summary: "Verify the release published to PyPI and is installable"
   needs: [w7]
-  status: pending
+  status: done
   notes: |
+    CLOSED 2026-07-09 as recovery-complete via `release-recovery-v0-3-1`.
+    Immutable `0.3.0` was never re-tagged or re-uploaded; the installability
+    gate is satisfied by the later monotonic `v0.3.1`:
+      - `release.yml` run 29055922350 (tag `v0.3.1`) concluded `success`,
+        including every `test-installation` job across ubuntu/macos/windows.
+      - `pip index versions benchbox` lists `0.3.1` as available/latest.
+      - `uv run --isolated --no-project --with 'benchbox==0.3.1' -- python -c 'import benchbox; print(benchbox.__version__)'`
+        prints `0.3.1`; pandas is absent from the 29 resolved packages.
+      - `pip show -f benchbox` shows zero maintainer-scaffolding entries.
+    `0.3.0` remains permanently broken on PyPI by design; it is superseded,
+    not repaired.
+
+    ---- original blocker record (2026-05-25) ----
+
     Blocked as of 2026-05-25. The publish half succeeded, but the
     installability half failed and cannot be repaired in-place because
     PyPI rejects replacement uploads for an existing version.

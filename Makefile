@@ -1062,8 +1062,9 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 #   4. $EDITOR opens CHANGELOG.md for hand-curation (skipped if EDITOR unset).
 #   5. Curate: git rm dev-only/deferred paths (per A3 in single-repo-migration.md).
 #   6. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).
-#   7. Push, open PR vs main.
-#   8. Sweep stale v* branches on origin (option-c lifecycle).
+#   7. Merge origin/main with `-s ours` so the PR is mergeable and CI can run.
+#   8. Push, open PR vs main.
+#   9. Sweep stale v* branches on origin (option-c lifecycle).
 # Pre-conditions: on develop, clean tree.
 # Usage: make release-cut VERSION=X.Y.Z
 release-cut:
@@ -1121,6 +1122,34 @@ release-cut:
 	@# every release cut. Nothing is skipped that matters: develop's PRs
 	@# already ran these hooks before this content was curated.
 	git commit --no-verify -m "Release v$(VERSION)"
+	@# Align release histories. main and develop have unrelated roots (Phase 4
+	@# filter-merge) and diverge permanently: main carries one squash commit per
+	@# release that develop never sees, and A4 step 6 (rebase develop onto main)
+	@# was removed by the 2026-04-27 amendment. So a branch cut cleanly from
+	@# develop is NOT mergeable into main — GitHub cannot compute a merge ref, the
+	@# PR sits at CONFLICTING, and *no CI runs at all*: neither validate-base nor
+	@# release-required-result ever trigger. Every cut before v0.3.1 (#711, #712,
+	@# #1029, #1043, #1072) fixed this by hand.
+	@#
+	@# `-s ours` records origin/main as a second parent while keeping the curated
+	@# release tree byte-for-byte; release-finalize's squash-merge then collapses
+	@# the branch to one commit, so this merge never reaches main's release-only
+	@# ledger. Run AFTER the changelog step: --since-ref origin/main computes the
+	@# patch delta against a main that is not yet an ancestor of this branch.
+	@#
+	@# --no-verify: merge fires pre-merge-commit (not pre-commit). That hook is not
+	@# in default_install_hook_types today, so this is defensive — but curation has
+	@# already deleted .pre-commit-config.yaml and the repo:local hook entrypoints,
+	@# so adding pre-merge-commit later would otherwise break every cut here.
+	@echo "==> Aligning release histories: merging origin/main into v$(VERSION) (strategy: ours)"
+	@RELEASE_TREE=$$(git rev-parse 'HEAD^{tree}') && \
+	git merge -s ours --no-verify --allow-unrelated-histories origin/main \
+		-m "Merge main into v$(VERSION) (strategy: ours) to align release histories" && \
+	MERGED_TREE=$$(git rev-parse 'HEAD^{tree}') && \
+	if [ "$$RELEASE_TREE" != "$$MERGED_TREE" ]; then \
+		echo "ERROR: alignment merge changed the curated release tree ($$RELEASE_TREE -> $$MERGED_TREE)" >&2; \
+		exit 1; \
+	fi
 	git push -u origin v$(VERSION)
 	gh pr create --base main --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
 	@# Option-c lifecycle: delete any prior release branches on origin (loop sweeps stale entries).
