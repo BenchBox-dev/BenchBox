@@ -97,8 +97,8 @@ work:
         GitHub could not compute a merge ref and no CI ran at all. Needs
         `git merge -s ours --allow-unrelated-histories origin/main` on the
         release branch ("align release histories") -- tree-preserving, and
-        what every prior aborted cut had done by hand. `release-cut` does not
-        do this.
+        what every prior aborted cut had done by hand. `release-cut` did not
+        do this at the time; it was folded into the target by PR #1089.
       - `validate-base` bootstrap restored `ruleset_review_enforcement.py`
         from develop but not its sibling import `auto_merge_soundness_paths`,
         so the ruleset-drift step died with ModuleNotFoundError. Prior cuts
@@ -186,11 +186,11 @@ work:
         the old `automate_release.py` long gone. A second post-migration
         release would re-run an already-passed exercise.
       - The two release-infrastructure gaps this release exposed (the
-        `-s ours` history alignment that `release-cut` does not perform, and
+        `-s ours` history alignment that `release-cut` did not perform, and
         the missing `auto_merge_soundness_paths` restore in the `validate-base`
         bootstrap) are recorded in the decision-doc amendment. The bootstrap
         restore is fixed and regression-tested in this PR; the alignment merge
-        remains a documented manual step.
+        was folded into `release-cut` afterwards by PR #1089.
 
 verification:
 - description: "Recovery release workflow succeeded"
