@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import time
 from threading import Lock
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -459,3 +459,222 @@ class TestConnectionCleanup:
 
         assert len(connections_closed) == 2
         assert set(connections_created) == set(connections_closed)
+
+
+class TestTimeoutDetectionAndCooperativeCancellation:
+    """Validate the throughput-timeout-leak-and-success-gates fixes end-to-end
+    through real ThreadPoolExecutor/timing (not mocked internals):
+
+    1. Per-stream timeout detection was dead code (future.result(timeout=...)
+       inside an as_completed() loop can never raise TimeoutError once
+       as_completed() has already yielded that future as done()). It now
+       surfaces as a timed-out/leaked stream in result.errors.
+    2. Opt-in cooperative cancellation (config.cancel_on_timeout, default
+       OFF) lets a stream stuck past its timeout actually stop soon instead
+       of continuing to run every remaining query in the background.
+    """
+
+    def test_tpch_timed_out_stream_is_surfaced_as_leaked(self):
+        """A stream whose very first query never returns within
+        stream_timeout must be reported as timed-out/leaked -- not silently
+        recorded as a generic failure and not silently ignored."""
+
+        def connection_factory():
+            conn = Mock()
+            cursor = Mock()
+            cursor.fetchall.return_value = []
+            call_count = {"n": 0}
+
+            def slow_execute(_query_text):
+                call_count["n"] += 1
+                if call_count["n"] == 1:
+                    # Only the first of 22 queries is slow (comfortably past
+                    # stream_timeout=1 below); the rest return immediately so
+                    # the leaked-but-uncancelled stream still finishes this
+                    # test quickly instead of running 22 slow queries serially.
+                    time.sleep(1.5)
+                return cursor
+
+            conn.execute.side_effect = slow_execute
+            conn.close.return_value = None
+            return conn
+
+        benchmark = Mock()
+        benchmark.get_query.return_value = "SELECT 1"
+
+        config = TPCHThroughputTestConfig(scale_factor=0.01, num_streams=1, stream_timeout=1, verbose=False)
+        test = TPCHThroughputTest(
+            benchmark=benchmark,
+            connection_factory=connection_factory,
+            scale_factor=config.scale_factor,
+            num_streams=config.num_streams,
+            verbose=config.verbose,
+        )
+
+        result = test.run(config)
+
+        assert result.success is False
+        assert result.streams_executed == 1
+        assert result.streams_successful == 0
+        assert any("timed out" in e.lower() and "leaked" in e.lower() for e in result.errors)
+
+    def test_tpch_cooperative_cancel_stops_a_hung_stream_promptly(self):
+        """With cancel_on_timeout=True, a stream stuck on slow queries notices
+        the cancellation signal set once its timeout elapses and returns
+        promptly, instead of continuing to run every one of its 22 queries."""
+        executed_queries: list[str] = []
+        lock = Lock()
+
+        def connection_factory():
+            conn = Mock()
+            cursor = Mock()
+            cursor.fetchall.return_value = []
+
+            def slow_execute(query_text):
+                with lock:
+                    executed_queries.append(query_text)
+                time.sleep(0.3)
+                return cursor
+
+            conn.execute.side_effect = slow_execute
+            conn.close.return_value = None
+            return conn
+
+        benchmark = Mock()
+        benchmark.get_query.return_value = "SELECT 1"
+
+        config = TPCHThroughputTestConfig(
+            scale_factor=0.01,
+            num_streams=1,
+            stream_timeout=1,
+            cancel_on_timeout=True,
+            verbose=False,
+        )
+        test = TPCHThroughputTest(
+            benchmark=benchmark,
+            connection_factory=connection_factory,
+            scale_factor=config.scale_factor,
+            num_streams=config.num_streams,
+            verbose=config.verbose,
+        )
+
+        start = time.time()
+        result = test.run(config)
+        elapsed = time.time() - start
+
+        # 22 queries * 0.3s = 6.6s if it ran to completion; cooperative
+        # cancellation must stop it soon after the 1s timeout instead.
+        assert elapsed < 3.0
+        assert len(executed_queries) < 22
+        assert result.success is False
+
+    def test_tpcds_timed_out_stream_is_surfaced_as_leaked(self):
+        def connection_factory():
+            conn = Mock()
+            cursor = Mock()
+            cursor.fetchall.return_value = []
+
+            def slow_execute(_query_text):
+                time.sleep(1.5)
+                return cursor
+
+            conn.execute.side_effect = slow_execute
+            conn.close.return_value = None
+            conn.commit.return_value = None
+            return conn
+
+        benchmark = Mock()
+        benchmark.get_query.return_value = "SELECT 1"
+        benchmark.get_queries.return_value = {"1": "SELECT 1"}
+        benchmark.query_manager = Mock()
+
+        config = TPCDSThroughputTestConfig(
+            scale_factor=1.0,
+            num_streams=1,
+            stream_timeout=1,
+            verbose=False,
+            queries_per_stream=1,
+            enable_preflight=False,
+        )
+
+        test = TPCDSThroughputTest(
+            benchmark=benchmark,
+            connection_factory=connection_factory,
+            scale_factor=config.scale_factor,
+            num_streams=config.num_streams,
+            verbose=config.verbose,
+        )
+
+        with patch("benchbox.core.tpcds.streams.create_standard_streams") as mock_create:
+            mock_manager = Mock()
+            mock_manager.generate_streams.return_value = {
+                0: [Mock(stream_id=0, query_id=1, position=1, variant=None, sql="SELECT 1")],
+            }
+            mock_create.return_value = mock_manager
+
+            result = test.run(config)
+
+        assert result.success is False
+        assert result.streams_executed == 1
+        assert result.streams_successful == 0
+        assert any("timed out" in e.lower() and "leaked" in e.lower() for e in result.errors)
+
+    def test_tpcds_cooperative_cancel_stops_a_hung_stream_promptly(self):
+        executed_queries: list[str] = []
+        lock = Lock()
+
+        def connection_factory():
+            conn = Mock()
+            cursor = Mock()
+            cursor.fetchall.return_value = []
+
+            def slow_execute(query_text):
+                with lock:
+                    executed_queries.append(query_text)
+                time.sleep(0.3)
+                return cursor
+
+            conn.execute.side_effect = slow_execute
+            conn.close.return_value = None
+            conn.commit.return_value = None
+            return conn
+
+        benchmark = Mock()
+        benchmark.get_query.return_value = "SELECT 1"
+        benchmark.get_queries.return_value = {str(i): f"SELECT {i}" for i in range(1, 11)}
+        benchmark.query_manager = Mock()
+
+        config = TPCDSThroughputTestConfig(
+            scale_factor=1.0,
+            num_streams=1,
+            stream_timeout=1,
+            cancel_on_timeout=True,
+            verbose=False,
+            queries_per_stream=10,
+            enable_preflight=False,
+        )
+
+        test = TPCDSThroughputTest(
+            benchmark=benchmark,
+            connection_factory=connection_factory,
+            scale_factor=config.scale_factor,
+            num_streams=config.num_streams,
+            verbose=config.verbose,
+        )
+
+        with patch("benchbox.core.tpcds.streams.create_standard_streams") as mock_create:
+            mock_manager = Mock()
+            mock_manager.generate_streams.return_value = {
+                0: [
+                    Mock(stream_id=0, query_id=i, position=i - 1, variant=None, sql=f"SELECT {i}") for i in range(1, 11)
+                ],
+            }
+            mock_create.return_value = mock_manager
+
+            start = time.time()
+            result = test.run(config)
+            elapsed = time.time() - start
+
+        assert elapsed < 3.0
+        assert len(executed_queries) < 10
+        assert result.success is False

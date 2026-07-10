@@ -1,0 +1,137 @@
+id: throughput-timeout-leak-and-success-gates
+title: "Mitigate timed-out stream leakage and reconcile divergent throughput success gates"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-07-09"
+category: Core Functionality
+
+description: |
+  Two smaller robustness/consistency issues in the throughput executor.
+
+  1. TIMED-OUT STREAM LEAK: StreamRunner.execute enforces per-stream timeout via
+     `future.result(timeout=...)` but cannot cancel a running thread
+     (benchbox/core/throughput/runner.py:87-113). A timed-out stream keeps
+     executing in the background, still holding its connection and consuming
+     CPU/server resources, while the executor records it as failed and moves on.
+     During a long throughput run this means the reported TTT window can overlap
+     zombie streams that are still hammering the DB -- skewing both the failed
+     run's accounting and any subsequent phase (e.g. maintenance) that starts
+     while zombies run. At minimum this should be surfaced; ideally streams
+     should be cooperatively cancellable or isolated so a timeout actually stops
+     work.
+
+  2. DIVERGENT SUCCESS GATES: TPC-H throughput uses a configurable
+     min_success_rate (default 0.99) (benchbox/core/tpch/throughput_test.py:38,
+     135-137) while TPC-DS hardcodes 0.70
+     (benchbox/core/tpcds/throughput_test.py:186, and again per-stream at :393).
+     The divergence is documented as intentional
+     (benchbox/core/throughput/runner.py:11-15 and
+     docs/development/throughput-result-alignment.md) but 0.70 vs 0.99 is a large
+     gap that changes whether a run is declared successful. Reconcile against the
+     TPC-DS spec: make the TPC-DS gate configurable like TPC-H (keeping the
+     spec-derived default) and document the spec citation for each threshold.
+
+prior_art:
+  - "benchbox/core/throughput/runner.py:StreamRunner.execute — timeout handling + the as_completed loop."
+  - "benchbox/core/tpch/throughput_test.py:TPCHThroughputTestConfig.min_success_rate — the configurable-gate pattern to mirror for TPC-DS."
+  - "benchbox/experimental/concurrency/executor.py — has a resource-monitor thread pattern usable to detect/report zombie streams."
+  - "docs/development/throughput-result-alignment.md — documents the current divergence; update alongside any change."
+
+work:
+  - id: w1
+    summary: "Surface timed-out (leaked) streams: annotate the result and log that background execution may continue"
+    status: done
+    notes: |
+      Discovered the per-stream timeout was dead code: StreamRunner.execute()
+      called future.result(timeout=timeout) on a future already yielded by
+      as_completed() (which only yields done() futures), so TimeoutError could
+      never actually raise in real usage -- verified with a standalone repro
+      before changing anything. Fixed by passing timeout to
+      as_completed(pending, timeout=...) itself, with a fallback loop that
+      classifies any still-pending future as timed-out/leaked when that call
+      raises. streams_executed/streams_successful/errors accounting is
+      unchanged (shared via a small _record_completed_future helper used by
+      both the main loop and the fallback). A leaked stream now always logs
+      via logger.warning(...) (previously gated on config.verbose, so it could
+      be entirely silent) and result.errors gets an explicit message noting
+      Python cannot forcibly cancel the running thread.
+  - id: w2
+    summary: "Add a cooperative-cancellation or isolation option so a stream timeout can actually stop work (opt-in)"
+    needs: [w1]
+    status: done
+    notes: |
+      Added config.cancel_on_timeout (default False) on both
+      TPCHThroughputTestConfig and TPCDSThroughputTestConfig. When enabled,
+      StreamRunner.execute() creates one threading.Event per stream, exposed
+      via a runtime-only config._stream_cancel_events attribute (not a
+      declared config field, so unaffected configs/test doubles are
+      unaffected), and sets the timed-out stream's own event only (never
+      every stream's event -- one slow stream must not cancel healthy ones).
+      Each spec's _execute_stream query loop polls its own event once per
+      query and breaks early if set, marking the stream unsuccessful with an
+      explicit cancellation error message. Never hard-kills a thread. Even
+      with this enabled, exiting execute()'s ThreadPoolExecutor context still
+      blocks until every submitted thread returns (implicit
+      shutdown(wait=True)); cooperative cancellation shortens that wait to
+      roughly one more query's execution time instead of leaving it
+      unbounded.
+  - id: w3
+    summary: "Make the TPC-DS throughput success gate configurable (spec-default) and cite the spec threshold for both benchmarks"
+    status: done
+    notes: |
+      Added TPCDSThroughputTestConfig.min_success_rate (default 0.70,
+      mirroring TPCHThroughputTestConfig.min_success_rate). Replaced all
+      THREE independently hard-coded 0.7 literals (run()'s overall gate,
+      _finalize_stream_success()'s per-stream gate, and
+      validate_results()'s gate -- the TODO's own description only names the
+      first two, but a third existed) with reads of this single field.
+      Checked both bundled spec PDFs (_sources/tpc-h/specification.pdf,
+      _sources/tpc-ds/specification/specification_4.0.0.pdf) directly for a
+      partial-success/acceptable-failure-rate clause: none exists in either
+      spec. TPC-H 5.1.1.6 defines a failed run as one that "did not complete
+      successfully due to unforeseen system failures" -- no tolerance
+      percentage. The prior TPC-H comment ("TPC-H spec allows up to 1% query
+      failures") was an invented citation (the spec's only 1%/0.99
+      occurrences are unrelated numeric result-value tolerances, Clause
+      2.2.4.2) and has been corrected. Both 0.99 and 0.70 are now documented
+      as BenchBox-internal usability tolerances, not official TPC compliance
+      gates, on each config dataclass and in
+      docs/development/throughput-result-alignment.md.
+
+must_preserve:
+  - "Default TPC-H gate stays 0.99; default TPC-DS gate stays its current spec value unless the spec says otherwise."
+  - "as_completed accounting (streams_executed/successful/errors) semantics."
+
+anti_patterns:
+  - "DO NOT hard-kill threads — because Python cannot safely — prefer cooperative cancel / process isolation / explicit surfacing."
+
+verification:
+  - description: "Timeout path annotates leaked streams; TPC-DS gate is configurable"
+    command: "uv run -- python -m pytest tests/unit/core/throughput/ tests/integration/test_throughput_corrections.py -v"
+    expected_output: "timeout + gate tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/throughput/runner.py"
+    - "benchbox/core/tpcds/throughput_test.py"
+    - "benchbox/core/tpch/throughput_test.py"
+    - "docs/development/throughput-result-alignment.md"
+    - "tests/unit/core/throughput/"
+    - "tests/integration/"
+
+files_affected:
+  modified:
+    - "benchbox/core/throughput/runner.py"
+    - "benchbox/core/tpcds/throughput_test.py"
+    - "benchbox/core/tpch/throughput_test.py"
+    - "docs/development/throughput-result-alignment.md"
+    - "tests/unit/core/throughput/test_runner.py"
+    - "tests/integration/test_tpch_throughput_test.py"
+    - "tests/integration/test_tpcds_throughput_test.py"
+    - "tests/integration/test_throughput_corrections.py"
+
+metadata:
+  tags: [concurrency, throughput, robustness, success-gate]
+  estimated_effort: Medium
+  created_date: "2026-07-09"
