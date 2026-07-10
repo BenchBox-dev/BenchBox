@@ -1358,7 +1358,7 @@ pr-open:
 	@$(MAKE) -s agent-write-preflight
 	@CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
-		develop|release) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
+		develop|main|release) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
 	esac; \
 	if [ -n "$(PR_BODY_FILE)" ] && [ ! -f "$(PR_BODY_FILE)" ]; then \
 		echo "PR_BODY_FILE does not exist: $(PR_BODY_FILE)" >&2; \
@@ -1402,7 +1402,7 @@ pr-fanout:
 	git worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r wt; do \
 		[ "$$(realpath "$$wt")" = "$$MAIN_CLONE" ] && { echo "(skip $$wt: main clone)"; continue; }; \
 		BR=$$(git -C "$$wt" branch --show-current 2>/dev/null); \
-		case "$$BR" in develop|release|"") echo "(skip $$wt: branch=$$BR)"; continue ;; esac; \
+		case "$$BR" in develop|main|release|"") echo "(skip $$wt: branch=$$BR)"; continue ;; esac; \
 		IDX=$$(($${IDX:-0} + 1)); \
 		printf '%06d|%s\0' "$$IDX" "$$wt" >> "$$TMP"; \
 	done; \
@@ -1420,7 +1420,7 @@ pr-fanout:
 pr-refresh:
 	@CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
-		develop|release|"") echo "Refusing to refresh $$CURRENT — switch to a feature branch worktree."; exit 1 ;; \
+		develop|main|release|"") echo "Refusing to refresh $$CURRENT — switch to a feature branch worktree."; exit 1 ;; \
 	esac; \
 	git fetch origin develop --quiet && \
 	git merge --no-edit origin/develop && \
@@ -1748,7 +1748,7 @@ worktree-release-locked:
 	top=$$(git rev-parse --show-toplevel); \
 	branch=$$(git branch --show-current); \
 	test -n "$$branch" || { echo "Refusing: this pool worktree is already detached/free."; exit 1; }; \
-	case "$$branch" in develop|release) echo "Refusing to release protected branch $$branch."; exit 1 ;; esac; \
+	case "$$branch" in develop|main|release) echo "Refusing to release protected branch $$branch."; exit 1 ;; esac; \
 	dirty=$$(git status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
 	if [ -n "$$dirty" ] && [ "$(FORCE)" != "1" ]; then \
 		echo "Refusing to release dirty pool worktree $$top. Review changes or rerun with FORCE=1."; \
@@ -1964,7 +1964,7 @@ worktree-pool-reset-locked:
 	git -C "$$wt" reset --hard origin/develop; \
 	if [ "$(FORCE)" = "1" ]; then git -C "$$wt" clean -fdx -e .benchbox >/dev/null; fi; \
 	if [ "$(FORCE)" = "1" ] && [ -n "$$branch" ]; then \
-		case "$$branch" in develop|release) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
+		case "$$branch" in develop|main|release) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
 	fi; \
 	echo "Reset pool-$(POOL): $$wt"
 

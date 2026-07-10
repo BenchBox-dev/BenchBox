@@ -761,6 +761,35 @@ class TestReleaseInfrastructure:
             f"sweep must match only true release branches, got: {sorted(matched)}"
         )
 
+    def test_worktree_and_pr_guards_still_block_stale_main(self):
+        """#1114 review: the main->release rename must not drop `main` from the
+        protected-branch guards.
+
+        The rename commit (c194f2d2) did a blanket `develop|main` ->
+        `develop|release` text replace across every one of these guards,
+        which silently un-blocked `main` instead of adding `release`
+        alongside it. A developer clone/worktree can still have a local
+        `main` branch after the GitHub-side rename; without this guard,
+        `make pr-open` from a stale `main` would push and open a `develop`
+        PR from release-only history. All five sites use the identical
+        `develop|main|release` shape so a future rename can't repeat the
+        mistake with a targeted single-site fix.
+        """
+        recipe = _make_target_recipe("pr-open")
+        assert 'develop|main|release) echo "Refusing to open PR from $$CURRENT' in recipe
+
+        recipe = _make_target_recipe("pr-fanout")
+        assert 'develop|main|release|"") echo "(skip $$wt: branch=$$BR)"' in recipe
+
+        recipe = _make_target_recipe("pr-refresh")
+        assert 'develop|main|release|"") echo "Refusing to refresh $$CURRENT' in recipe
+
+        recipe = _make_target_recipe("worktree-release-locked")
+        assert 'develop|main|release) echo "Refusing to release protected branch' in recipe
+
+        makefile_content = _makefile_text()
+        assert 'develop|main|release) ;; *) git branch -D "$$branch"' in makefile_content
+
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""
         templates_dir = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
