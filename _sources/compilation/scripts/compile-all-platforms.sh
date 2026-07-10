@@ -35,21 +35,73 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Resolve a Docker-compatible container engine for the Linux/Windows builds.
-# `mocker` (Apple Containerization, macOS) and `docker` (Linux CI) share a
-# CLI, so the same `build`/`run -v` invocations work with either. Preference
-# order puts `mocker` first because CI Linux runners ship `docker` but not
-# `mocker`, so this resolves correctly in both environments; override with
-# BENCHBOX_CONTAINER_ENGINE when needed.
+# Resolve a container engine for the Linux/Windows builds.
+#
+# The engines share a Docker-style CLI for native-arch work, but they are NOT
+# interchangeable when the target arch differs from the host:
+#
+#   docker/podman  Emulate linux/amd64 transparently (binfmt/qemu). No flags.
+#   container      (Apple) Needs `run --rosetta` to execute an amd64 image;
+#                  without it the image dies with "Exec format error". Its
+#                  `--platform`/`--arch` flags are *rejected* for locally built
+#                  images, because `container build` stamps the image metadata
+#                  arm64 even when the Dockerfile says
+#                  `FROM --platform=linux/amd64` (the rootfs is still amd64).
+#   mocker         Cannot execute amd64 at all.
+#
+# Preference is therefore capability-ordered, not availability-ordered: prefer
+# the Apple-native `container` on macOS, fall back to docker/podman, and take
+# `mocker` only as a last resort (it can build the arm64 targets, and
+# _assert_engine_supports_arch below hard-fails on the amd64 ones). CI Linux
+# runners ship only `docker`, so this still resolves correctly there.
+# Override with BENCHBOX_CONTAINER_ENGINE when needed.
 CONTAINER_ENGINE="${BENCHBOX_CONTAINER_ENGINE:-}"
 if [ -z "$CONTAINER_ENGINE" ]; then
-    for _engine in mocker docker podman; do
+    for _engine in container docker podman mocker; do
         if command -v "$_engine" >/dev/null 2>&1; then
             CONTAINER_ENGINE="$_engine"
             break
         fi
     done
 fi
+
+# Host architecture, normalised to the names used in PLATFORMS/_binaries.
+_host_arch() {
+    case "$(uname -m)" in
+        arm64 | aarch64) echo "arm64" ;;
+        x86_64 | amd64) echo "x86_64" ;;
+        *) uname -m ;;
+    esac
+}
+
+# Abort early, with an actionable message, if the resolved engine cannot
+# execute images for $1. Called before the image build so a doomed run fails
+# loudly up front instead of deep inside a compile step.
+_assert_engine_supports_arch() {
+    local target_arch=$1
+
+    [ "$target_arch" = "$(_host_arch)" ] && return 0
+
+    if [ "$CONTAINER_ENGINE" = "mocker" ]; then
+        log_error "mocker cannot execute ${target_arch} images on $(_host_arch)."
+        log_info "Install Apple 'container' (emulates amd64 via Rosetta) or Docker,"
+        log_info "or select one explicitly with BENCHBOX_CONTAINER_ENGINE=<engine>."
+        exit 1
+    fi
+}
+
+# Extra `run` flags needed to execute a $1-arch image on this host. Echoes an
+# empty string when the target is native or the engine emulates transparently.
+# Callers must leave the expansion unquoted so an empty result vanishes.
+_engine_run_flags() {
+    local target_arch=$1
+
+    [ "$target_arch" = "$(_host_arch)" ] && return 0
+
+    if [ "$CONTAINER_ENGINE" = "container" ]; then
+        printf '%s' "--rosetta"
+    fi
+}
 
 # Platform configurations for all supported targets
 PLATFORMS=(
@@ -311,10 +363,12 @@ compile_with_docker() {
     local benchmark_upper=$(echo "$benchmark" | tr '[:lower:]' '[:upper:]')
     log_info "Compiling ${benchmark_upper} for ${platform}-${arch} using ${CONTAINER_ENGINE}..."
 
-    local platform_dir="$PROJECT_ROOT/_binaries/${benchmark}/${platform}-${arch}"
-    local docker_platform="linux/${arch}"
+    _assert_engine_supports_arch "$arch"
 
-    # Build the container image
+    local platform_dir="$PROJECT_ROOT/_binaries/${benchmark}/${platform}-${arch}"
+
+    # Build the container image. The target arch comes from the Dockerfile's
+    # `FROM --platform=`, so no --platform flag is passed here.
     local image_name="benchbox/${benchmark}-${platform}-${arch}"
     "$CONTAINER_ENGINE" build -f "$PROJECT_ROOT/_sources/compilation/docker/Dockerfile.${platform}-${arch}" \
                  -t "$image_name" \
@@ -336,7 +390,9 @@ compile_tpch_docker() {
     local image_name=$3
     local platform_dir=$4
 
-    "$CONTAINER_ENGINE" run --rm \
+    # Unquoted on purpose: empty unless the engine needs cross-arch flags.
+    # shellcheck disable=SC2046
+    "$CONTAINER_ENGINE" run --rm $(_engine_run_flags "$arch") \
         -v "$PROJECT_ROOT/_sources/tpc-h/dbgen:/build/source" \
         -v "$platform_dir:/build/output" \
         "$image_name" \
@@ -377,7 +433,9 @@ compile_tpcds_docker() {
     local image_name=$3
     local platform_dir=$4
 
-    "$CONTAINER_ENGINE" run --rm \
+    # Unquoted on purpose: empty unless the engine needs cross-arch flags.
+    # shellcheck disable=SC2046
+    "$CONTAINER_ENGINE" run --rm $(_engine_run_flags "$arch") \
         -v "$PROJECT_ROOT/_sources/tpc-ds/tools:/build/source" \
         -v "$PROJECT_ROOT/_sources/tpc-ds/query_templates:/build/query_templates" \
         -v "$platform_dir:/build/output" \
@@ -612,7 +670,7 @@ main() {
 
     # Check container-engine availability for the Linux/Windows builds.
     if [ -z "$CONTAINER_ENGINE" ]; then
-        log_error "No container engine found (looked for: mocker, docker, podman)"
+        log_error "No container engine found (looked for: container, docker, podman, mocker)"
         log_info "Install one, set BENCHBOX_CONTAINER_ENGINE=<engine>, or run with"
         log_info "--native to compile for the current platform only (no engine needed)"
         exit 1
