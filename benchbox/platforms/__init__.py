@@ -52,6 +52,7 @@ from .base.adapter import check_isolation_capability
 # Adapters loaded eagerly (light dependencies or core):
 #   - DuckDBAdapter (duckdb - core dependency, always available)
 #   - MotherDuckAdapter (duckdb - shares core dependency)
+#   - DuckLakeAdapter (duckdb - shares core dependency; requires duckdb>=1.3 at runtime)
 #   - SQLiteAdapter (stdlib sqlite3)
 #   - DataFusionAdapter (datafusion - ~68 MB native lib, now lazy)
 #   - PolarsAdapter (polars - ~142 MB native lib, now lazy)
@@ -68,6 +69,7 @@ _lazy_adapter_diagnostics: dict[str, dict[str, object]] = {}
 _LAZY_ADAPTER_ROWS = """\
 DuckDBAdapter|.duckdb
 MotherDuckAdapter|.motherduck
+DuckLakeAdapter|.ducklake
 SQLiteAdapter|.sqlite
 PostgreSQLAdapter|.postgresql
 TimescaleDBAdapter|.timescaledb
@@ -274,7 +276,7 @@ def _load_optional_adapter(module_path: str, class_name: str) -> Optional[Type[P
 
 
 _EXPORT_NAMES = """\
-PlatformAdapter ConnectionConfig BenchmarkResults DuckDBAdapter MotherDuckAdapter DataFusionAdapter PolarsAdapter
+PlatformAdapter ConnectionConfig BenchmarkResults DuckDBAdapter MotherDuckAdapter DuckLakeAdapter DataFusionAdapter PolarsAdapter
 ClickHouseAdapter ClickHouseCloudAdapter DatabricksAdapter BigQueryAdapter RedshiftAdapter SnowflakeAdapter
 TrinoAdapter AthenaAdapter SparkAdapter PySparkSQLAdapter FireboltAdapter DatabendAdapter InfluxDBAdapter
 PrestoAdapter PostgreSQLAdapter PgDuckDBAdapter PgMooncakeAdapter CedarDBAdapter QuestDBAdapter AzureSynapseAdapter
@@ -680,6 +682,8 @@ pg-duckdb|max_parallel_workers_per_gather|PostgreSQL max_parallel_workers_per_ga
 pg-duckdb|force_execution|Force DuckDB execution engine for all queries|{'parser': 'parse_bool', 'default': True}
 pg-duckdb|postgres_scan_threads|Threads for parallel PostgreSQL table scanning (0 = auto)|{'parser': 'int', 'default': 0}
 pg-duckdb|compare_native|Run native DuckDB comparison for matched queries|{'parser': 'parse_bool', 'default': False}
+ducklake|metadata_path|DuckLake catalog metadata file path (.ducklake)|{}
+ducklake|data_path|DuckLake Parquet data directory (local path)|{}
 pg-mooncake|host|PostgreSQL server hostname (with pg_mooncake installed)|{'default': 'localhost'}
 pg-mooncake|port|PostgreSQL server port|{'parser': 'int', 'default': 5432}
 pg-mooncake|database|PostgreSQL database name (auto-generated if not specified)|{}

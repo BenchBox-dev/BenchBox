@@ -448,6 +448,18 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "DuckDB"
     },
     {
+      "cost_class": "free",
+      "deployments": [
+        "local"
+      ],
+      "id": "ducklake",
+      "install_command": "uv add duckdb",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "DuckLake"
+    },
+    {
       "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
