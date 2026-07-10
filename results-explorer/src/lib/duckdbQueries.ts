@@ -51,6 +51,8 @@ export interface ResultRow extends CostDeploymentFields {
   comparison_exclusion_reason: string | null;
   ranking_exclusion_reason: string | null;
   trust_label: string;
+  /** Funding disclosure; "unspecified" when the bundle declares none. */
+  funding: string;
   visibility: string;
   platform_version: string | null;
   execution_mode: string | null;
@@ -119,6 +121,8 @@ export interface BenchmarkRankingRow extends CostDeploymentFields {
   platform: string;
   short_id: string;
   trust_label: string;
+  /** Funding disclosure; "unspecified" when the bundle declares none. */
+  funding: string;
   platform_version?: string | null;
   validation_status?: string | null;
   tuning_mode: string | null;
@@ -177,6 +181,8 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   comparison_exclusion_reason: string | null;
   ranking_exclusion_reason: string | null;
   trust_label: string;
+  /** Funding disclosure; "unspecified" when the bundle declares none. */
+  funding: string;
   validation_status?: string | null;
   tuning_mode: string | null;
   execution_mode: string | null;
@@ -266,6 +272,7 @@ const RESULT_COLUMNS = [
   "comparison_exclusion_reason",
   "ranking_exclusion_reason",
   "trust_label",
+  "funding",
   "visibility",
   "platform_version",
   "execution_mode",
@@ -399,6 +406,7 @@ const BENCHMARK_RANKING_COLUMNS = [
   "br.platform",
   "br.short_id",
   "br.trust_label",
+  "br.funding",
   "br.tuning_mode",
   "br.tuning_hash",
   "br.execution_mode",
@@ -768,6 +776,7 @@ async function loadBenchmarkSummaryFromDuckDB(
       tuning_hash: row.tuning_hash,
       execution_mode: row.execution_mode,
       trust_label: row.trust_label,
+      funding: row.funding,
       validation_status: row.validation_status ?? null,
       run_date: row.run_date,
       is_ranking_eligible: row.is_ranking_eligible,
@@ -857,6 +866,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.comparison_exclusion_reason," +
     " r.ranking_exclusion_reason," +
     " r.trust_label," +
+    " r.funding," +
     " r.validation_status," +
     " r.tuning_mode," +
     " r.execution_mode," +

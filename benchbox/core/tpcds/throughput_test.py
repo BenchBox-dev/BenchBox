@@ -83,6 +83,31 @@ class TPCDSThroughputTestConfig:
 TPCDSThroughputStreamResult = ThroughputStreamResult
 
 
+def _count_cursor_rows(cursor: Any) -> int:
+    """Return a row count without importing benchbox.platforms from core.
+
+    The layering convention `utils < core < platforms < cli` forbids `core`
+    importing from `platforms`, so this duck-types on the `row_count()`
+    method `PlatformAdapterCursor` exposes (see
+    `benchbox.platforms.base.connection_wrappers`) instead of importing
+    `count_query_rows` directly. On the real throughput path the cursor IS
+    a `PlatformAdapterCursor`, so this always resolves there and the
+    "never materialize rows just to count them" behavior is preserved.
+
+    The fallback below only serves raw DB-API cursors / test doubles that
+    lack `row_count()`, and mirrors `count_query_rows`'s truthfulness rule:
+    a `-1` (unknown) rowcount must never be reported as a count.
+    """
+    counter = getattr(cursor, "row_count", None)
+    if callable(counter):
+        return counter()
+
+    rowcount = getattr(cursor, "rowcount", None)
+    if isinstance(rowcount, int) and rowcount >= 0:
+        return rowcount
+    return len(cursor.fetchall())
+
+
 @dataclass
 class TPCDSThroughputTestResult(ThroughputResult):
     """Result of TPC-DS Throughput Test."""
@@ -492,15 +517,20 @@ class TPCDSThroughputTest:
 
     def _run_single_stream_query(
         self, connection, query_text: str, query_display_id: str, stream_id: int
-    ) -> dict[str, Any] | None:
+    ) -> tuple[dict[str, Any] | None, int]:
         if hasattr(connection, "set_query_context"):
             connection.set_query_context(query_display_id, stream_id=stream_id)
         cursor = connection.execute(query_text)
-        if hasattr(cursor, "fetchall"):
-            cursor.fetchall()
+        # _count_cursor_rows() reads the adapter-reported count directly (when
+        # available) instead of materializing the result set via fetchall() -
+        # see PlatformAdapterCursor.row_count() in connection_wrappers.py.
+        # Previously this called cursor.fetchall() and discarded the return
+        # value entirely, so TPC-DS result_count was hardcoded to 0 below
+        # regardless of the true result size.
+        row_count = _count_cursor_rows(cursor)
         if hasattr(connection, "commit"):
             connection.commit()
-        return getattr(cursor, "platform_result", None)
+        return getattr(cursor, "platform_result", None), row_count
 
     def _execute_single_query(
         self,
@@ -535,7 +565,9 @@ class TPCDSThroughputTest:
                 query_text = self._get_stream_query_text(query_id, variant, stream_seed, config.scale_factor)
             label = f"Stream_{stream_id}_Position_{position + 1}_Query_{query_display_id}"
             try:
-                platform_result = self._run_single_stream_query(connection, query_text, query_display_id, stream_id)
+                platform_result, row_count = self._run_single_stream_query(
+                    connection, query_text, query_display_id, stream_id
+                )
             finally:
                 with self._capture_lock:
                     self.captured_items.append((label, query_text))
@@ -551,7 +583,7 @@ class TPCDSThroughputTest:
                 {
                     "execution_time_seconds": elapsed_seconds(query_start),
                     "success": True,
-                    "result_count": 0,
+                    "result_count": row_count,
                 }
             )
             stream_result.queries_successful += 1

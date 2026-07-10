@@ -41,6 +41,7 @@ function makePlatform(
     tuning_hash: null,
     execution_mode: null,
     trust_label: "maintainer-run",
+    funding: "unspecified",
     run_date: "2026-04-01",
     is_ranking_eligible: true,
     has_display_timing: true,
