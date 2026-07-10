@@ -87,9 +87,15 @@ must not be bypassed with an undocumented local change.
    delta against `main`, not `git log origin/main..HEAD` ancestry and not the
    latest tag reachable from `develop`, because `release-finalize`
    intentionally does not replay release commits onto `develop`.
-3. Opens `$EDITOR` on `CHANGELOG.md` for hand-curation. (Headless mode:
-   refuses to skip the curation step rather than silently committing
-   raw output.)
+3. Opens `$EDITOR` on `CHANGELOG.md` for hand-curation when a terminal is
+   attached, then gates on `generate_changelog_entry.py --check-curation`,
+   which inspects the drafted section's text: it rejects verbatim commit
+   subjects (trailing `(#NNNN)`), the manual-edit placeholder, and more than
+   60 bullets. Curation is always required — the draft is the raw
+   `origin/main..HEAD` delta, hundreds of commits whenever `main` lags
+   `develop`. Headless runs stop here: hand-curate the section, then re-run
+   `make release-cut` (see "Resuming or aborting a cut" below).
+   `RELEASE_ALLOW_RAW_CHANGELOG=1` accepts the raw draft deliberately.
 4. Curates the release branch — `git rm`'s the dev-only and deferred
    release paths (`_project/`, `_blog/`, results explorer/data, agent
    configs, dev-tooling root files; full list in the `release-cut:`
@@ -108,6 +114,34 @@ must not be bypassed with an undocumented local change.
 7. Pushes and opens a PR against `main`.
 8. Sweeps prior `v*` branches on origin (option-c lifecycle: keep until
    superseded, then auto-delete on the next `release-cut`).
+
+### Resuming or aborting a cut
+
+Steps 1-3 are idempotent, so an interrupted cut is resumed by re-running the
+same command from the `vX.Y.Z` branch:
+
+```bash
+make release-cut VERSION=X.Y.Z      # reuses the branch, keeps the CHANGELOG section
+```
+
+The branch is reused rather than recreated, the version bump and `uv lock`
+re-apply to the same values, and an existing `## [X.Y.Z]` section is left
+untouched — so a section you curated between runs survives. To throw the cut
+away instead:
+
+```bash
+make release-cut-abort VERSION=X.Y.Z   # reset, return to develop, delete the branch
+```
+
+`release-cut-abort` refuses once `vX.Y.Z` exists on origin, and refuses to run
+from any branch other than `vX.Y.Z` or `develop`. `release-cut` likewise
+refuses to resume a branch that already carries its `Release vX.Y.Z` commit.
+
+Changelog summarization shells out to the `claude` CLI. It is skipped
+automatically inside a Claude Code session (where the nested call blocks until
+its 120s timeout) and whenever `BENCHBOX_CHANGELOG_SUMMARIZE=0`; set
+`BENCHBOX_CHANGELOG_SUMMARIZE=1` to force it. Skipping only means the draft is
+raw commit subjects, which step 3 requires you to curate anyway.
 
 ### What `release-finalize` does
 

@@ -543,6 +543,50 @@ class TestReleaseInfrastructure:
         assert "origin/main" in release_guide
         assert "intentionally does not replay release commits onto" in release_guide
 
+    def test_release_cut_gates_on_changelog_curation_not_on_editor(self):
+        """`EDITOR=true` must not wave a raw commit dump into a release.
+
+        The old gate refused to skip curation only when EDITOR was unset AND
+        there was no TTY, so setting EDITOR to any no-op binary defeated it.
+        The gate is now the drafted section's own text.
+        """
+        recipe = _make_target_recipe("release-cut")
+
+        assert "scripts/generate_changelog_entry.py --check-curation --version $(VERSION)" in recipe
+        assert "refusing to skip changelog curation" not in recipe
+        gen_idx = recipe.index("--version $(VERSION) --since-ref origin/main")
+        check_idx = recipe.index("--check-curation")
+        rm_idx = recipe.index("git rm")
+        assert gen_idx < check_idx < rm_idx, "curation check must gate between changelog draft and `git rm`"
+
+    def test_release_cut_is_resumable_and_has_an_abort_target(self):
+        """An interrupted cut must be resumable or discardable, not a manual cleanup.
+
+        The v0.3.1 cut died at the changelog step twice, each time leaving the
+        vX.Y.Z branch created, versions bumped and uv.lock rewritten with no
+        commit.
+        """
+        recipe = _make_target_recipe("release-cut")
+        assert "Resuming interrupted cut" in recipe
+        assert "already carries its release commit" in recipe
+        assert "git checkout -b v$(VERSION) develop" in recipe
+        assert "git rev-parse --verify --quiet refs/heads/v$(VERSION)" in recipe
+
+        assert "--first-parent" in recipe, (
+            "the resume guard must walk first-parent: the `-s ours` alignment merge puts "
+            "origin/main's release ledger (full of 'Release vX.Y.Z' subjects) on the second parent, "
+            "and a plain `git log -1` misses a release commit sitting beneath that merge"
+        )
+
+        abort = _make_target_recipe("release-cut-abort")
+        assert "git reset --hard HEAD" in abort
+        assert "git checkout develop" in abort
+        assert "git branch -D v$(VERSION)" in abort
+        assert "git ls-remote --exit-code --heads origin" in abort, (
+            "abort must refuse to discard a release branch that already exists on origin"
+        )
+        assert ".PHONY: release-cut release-cut-abort release-finalize" in _makefile_text()
+
     def test_release_cut_curation_survives_untracked_paths(self):
         """Curation `git rm` lines must use --ignore-unmatch and abort on real failures.
 

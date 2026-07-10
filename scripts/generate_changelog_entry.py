@@ -16,9 +16,13 @@ _summarize_changelog_with_claude, and generate_changelog_entry helpers:
   non-conventional commits.
 - If the Claude CLI is available, summarises the raw bullets into a
   compact, themed section (10-25 user-facing bullets). Falls back to
-  raw commit messages otherwise.
+  raw commit messages otherwise. Summarization is skipped inside a
+  Claude Code session unless BENCHBOX_CHANGELOG_SUMMARIZE=1, because the
+  nested CLI call blocks (see the 2026-07-09 amendment of
+  _project/decisions/single-repo-migration.md).
 - Inserts the new section into CHANGELOG.md before the first existing
-  `## [` entry.
+  `## [` entry, or leaves an existing section for that version alone so
+  an interrupted `make release-cut` can be re-run.
 
 Usage:
     uv run python scripts/generate_changelog_entry.py --version 0.3.0
@@ -26,6 +30,8 @@ Usage:
         --release-date 2026-04-30 --since-tag v0.2.1
     uv run python scripts/generate_changelog_entry.py --version 0.3.1 \
         --since-ref origin/main
+    uv run python scripts/generate_changelog_entry.py --version 0.3.1 \
+        --check-curation
 """
 
 from __future__ import annotations
@@ -33,12 +39,35 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import signal
 import subprocess
 import sys
 from datetime import date
 from pathlib import Path
 
 CLAUDE_TIMEOUT_SECONDS = 120
+
+# Set by the Claude Code CLI in every session it spawns. Shelling out to a
+# nested `claude` from inside one stalls (the v0.3.1 cut hung here twice), so
+# summarization defaults off when any of these are present.
+_NESTED_CLAUDE_ENV_VARS = ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID")
+
+_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+_FALSE_VALUES = frozenset({"0", "false", "no", "off"})
+
+# Curation gate. `_build_raw_changelog` emits verbatim commit subjects, which
+# keep their squash-merge PR suffix (e.g. "... (#1086)"); the Claude summary
+# and any hand-curated section do not. That suffix is the precise signal; the
+# bullet ceiling is a backstop for drafts written by other means.
+#
+# The ceiling is set from evidence, not the prompt's 10-25 target: the largest
+# genuinely hand-curated section shipped so far is 0.2.1 at 39 bullets, while
+# the raw origin/main..HEAD delta at v0.3.1 was 231 conventional commits. 60
+# separates the two with room to spare.
+MAX_CURATED_BULLETS = 60
+RAW_PLACEHOLDER = "(no user-facing changes detected -- please edit manually)"
+_PR_SUFFIX_RE = re.compile(r"\(#\d+\)\s*$")
+_BULLET_RE = re.compile(r"^\s*- \S")
 
 # Matches a dated released-version CHANGELOG.md header, e.g. "## [0.3.0] - 2026-05-16".
 # Deliberately does not match "## [Unreleased]" (no version number) or an
@@ -93,15 +122,78 @@ def _build_raw_changelog(
     return "\n".join(lines)
 
 
+def summarize_skip_reason(env: dict[str, str] | None = None) -> str | None:
+    """Return why Claude summarization is skipped, or None to run it.
+
+    `BENCHBOX_CHANGELOG_SUMMARIZE` decides explicitly in both directions. With
+    it unset, summarization runs only outside a Claude Code session: a nested
+    `claude --print` blocks until the timeout, which is how `make release-cut`
+    stalled during the v0.3.1 cut.
+    """
+    env = os.environ if env is None else env
+    flag = env.get("BENCHBOX_CHANGELOG_SUMMARIZE", "").strip().lower()
+    if flag in _FALSE_VALUES:
+        return "BENCHBOX_CHANGELOG_SUMMARIZE opts out"
+    if flag in _TRUE_VALUES:
+        return None
+    nested = next((name for name in _NESTED_CLAUDE_ENV_VARS if env.get(name)), None)
+    if nested:
+        return f"already inside a Claude Code session ({nested} set); set BENCHBOX_CHANGELOG_SUMMARIZE=1 to force"
+    return None
+
+
+def _kill_process_tree(proc: subprocess.Popen[str]) -> None:
+    """SIGKILL the child's whole process group, falling back to the child alone."""
+    try:
+        if hasattr(os, "killpg"):
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        else:  # pragma: no cover - Windows
+            proc.kill()
+    except (ProcessLookupError, PermissionError):  # pragma: no cover - already reaped
+        proc.kill()
+
+
+def _run_claude_cli(prompt: str) -> subprocess.CompletedProcess[str]:
+    """Run `claude --print` under a timeout that reaps the entire child tree.
+
+    `subprocess.run(timeout=...)` kills only the direct child, then re-waits on
+    the captured pipes; a surviving grandchild holding stdout open blocks that
+    wait forever, which is what left an orphaned `claude` tree behind the
+    stalled v0.3.1 cut. Running the child in its own process group lets the
+    timeout path kill every pipe holder. stdin is closed so the CLI can never
+    block waiting for input it will not get.
+    """
+    with subprocess.Popen(
+        ["claude", "--print", "--model", "sonnet", "-p", prompt],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    ) as proc:
+        try:
+            stdout, stderr = proc.communicate(timeout=CLAUDE_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            _kill_process_tree(proc)
+            proc.communicate()
+            raise
+    return subprocess.CompletedProcess(proc.args, proc.returncode, stdout, stderr)
+
+
 def _summarize_changelog_with_claude(
     version: str, release_date: str, added: list[str], fixed: list[str], changed: list[str]
 ) -> str | None:
     """Use Claude Code CLI to summarize raw commits into a compact changelog.
 
-    Returns the summarized changelog section, or None if claude is unavailable
-    or the summarization fails.
+    Returns the summarized changelog section, or None if summarization is
+    skipped, claude is unavailable, or the summarization fails.
     """
     if not added and not fixed and not changed:
+        return None
+
+    skip_reason = summarize_skip_reason()
+    if skip_reason is not None:
+        print(f"  Skipping Claude summarization: {skip_reason}")
         return None
 
     raw_parts: list[str] = []
@@ -141,12 +233,7 @@ Now summarize the following raw commits:
 {raw_input}"""
 
     try:
-        result = subprocess.run(
-            ["claude", "--print", "--model", "sonnet", "-p", prompt],
-            capture_output=True,
-            text=True,
-            timeout=CLAUDE_TIMEOUT_SECONDS,
-        )
+        result = _run_claude_cli(prompt)
     except FileNotFoundError:
         print("  Claude CLI not found, falling back to raw changelog")
         return None
@@ -203,6 +290,58 @@ def released_versions_in_changelog(changelog_text: str) -> list[str]:
     Excludes '## [Unreleased]', which is not a released-version claim.
     """
     return [m.group("version") for m in _CHANGELOG_VERSION_HEADER_RE.finditer(changelog_text)]
+
+
+def section_body(changelog_text: str, version: str) -> str | None:
+    """Return the body of `## [version] - <date>`, or None when absent."""
+    header = re.search(rf"^## \[{re.escape(version)}\] - .*$", changelog_text, re.MULTILINE)
+    if header is None:
+        return None
+    rest = changelog_text[header.end() :]
+    following = re.search(r"^## \[", rest, re.MULTILINE)
+    return rest[: following.start()] if following else rest
+
+
+def has_changelog_section(source: Path, version: str) -> bool:
+    """True when CHANGELOG.md carries a dated section for `version`."""
+    changelog = source / "CHANGELOG.md"
+    if not changelog.exists():
+        return False
+    return section_body(changelog.read_text(encoding="utf-8"), version) is not None
+
+
+def check_changelog_curation(source: Path, version: str) -> tuple[bool, list[str]]:
+    """Return (ok, problems) for the drafted `version` section.
+
+    `release-cut` generates a section from every conventional commit in the
+    `origin/main..HEAD` patch delta, which for a `main` that lags `develop` is
+    a raw dump of hundreds of commit subjects. The old gate only refused to
+    skip curation when `EDITOR` was unset *and* stdin was not a TTY, so
+    `EDITOR=true` waved the raw dump through. This checks the text instead.
+    """
+    changelog = source / "CHANGELOG.md"
+    if not changelog.exists():
+        return False, [f"{changelog} not found"]
+
+    body = section_body(changelog.read_text(encoding="utf-8"), version)
+    if body is None:
+        return False, [f"no '## [{version}] - <date>' section found in CHANGELOG.md"]
+
+    bullets = [line.strip() for line in body.splitlines() if _BULLET_RE.match(line)]
+    problems: list[str] = []
+    if not bullets:
+        problems.append("section contains no bullets")
+    if RAW_PLACEHOLDER in body:
+        problems.append("section still carries the generator's manual-edit placeholder")
+    raw_bullets = [b for b in bullets if _PR_SUFFIX_RE.search(b)]
+    if raw_bullets:
+        problems.append(
+            f"{len(raw_bullets)} bullet(s) are verbatim commit subjects "
+            f"(trailing PR number), e.g. {raw_bullets[0][:70]!r}"
+        )
+    if len(bullets) > MAX_CURATED_BULLETS:
+        problems.append(f"{len(bullets)} bullets exceeds the {MAX_CURATED_BULLETS}-bullet curated ceiling")
+    return (not problems), problems
 
 
 def existing_tags(source: Path) -> set[str]:
@@ -432,6 +571,19 @@ def generate_changelog_entry(
         True if changelog was updated, False otherwise.
     """
     print(f"\n  Auto-generating changelog entry for v{version}...")
+
+    changelog = source / "CHANGELOG.md"
+    if not changelog.exists():
+        print(f"  Error: {changelog} not found")
+        return False
+
+    # An interrupted `make release-cut` leaves the drafted section in place.
+    # Re-running the cut must not append a second one, and must not discard a
+    # hand-curated section the operator wrote between the two runs.
+    if section_body(changelog.read_text(encoding="utf-8"), version) is not None:
+        print(f"  CHANGELOG.md already has a [{version}] section; leaving it untouched")
+        return True
+
     if since_ref is not None:
         print(f"  Since ref: {since_ref} (patch delta)")
         commits = _patch_delta_commit_subjects(source, since_ref)
@@ -485,11 +637,6 @@ def generate_changelog_entry(
     if new_section is None:
         new_section = _build_raw_changelog(version, release_date, added, fixed, changed)
 
-    changelog = source / "CHANGELOG.md"
-    if not changelog.exists():
-        print(f"  Error: {changelog} not found")
-        return False
-
     content = changelog.read_text()
     insertion_marker = "\n## ["
     idx = content.find(insertion_marker)
@@ -513,6 +660,16 @@ def main() -> int:
         help=(
             "Check CHANGELOG.md for dated released-version sections with no matching "
             "vX.Y.Z git tag, then exit (skips entry generation; --version not required)."
+        ),
+    )
+    parser.add_argument(
+        "--check-curation",
+        action="store_true",
+        help=(
+            "Check that the '## [VERSION]' section has been hand-curated (no raw commit "
+            "subjects, no placeholder, at most "
+            f"{MAX_CURATED_BULLETS} bullets), then exit. Requires --version. "
+            "Override with RELEASE_ALLOW_RAW_CHANGELOG=1."
         ),
     )
     parser.add_argument(
@@ -559,6 +716,27 @@ def main() -> int:
 
     if not args.version:
         parser.error("--version is required unless --check-tag-claims is set")
+
+    if args.check_curation:
+        ok, problems = check_changelog_curation(args.source, args.version)
+        if ok:
+            print(f"  CHANGELOG.md curation guard: OK ([{args.version}] section looks hand-curated)")
+            return 0
+        print(f"  CHANGELOG.md section [{args.version}] does not look hand-curated:")
+        for problem in problems:
+            print(f"    - {problem}")
+        # The override forgives an uncurated section, not a missing one: with no
+        # section at all there is nothing to accept, and the cut would fail later.
+        if has_changelog_section(args.source, args.version) and (
+            os.environ.get("RELEASE_ALLOW_RAW_CHANGELOG", "").strip().lower() in _TRUE_VALUES
+        ):
+            print("  RELEASE_ALLOW_RAW_CHANGELOG is set; accepting the section as-is")
+            return 0
+        print()
+        print(f"  Edit the [{args.version}] section in CHANGELOG.md, then re-run the cut:")
+        print(f"    make release-cut VERSION={args.version}")
+        print("  To accept the raw draft deliberately: RELEASE_ALLOW_RAW_CHANGELOG=1 make release-cut ...")
+        return 1
 
     success = generate_changelog_entry(
         source=args.source,
