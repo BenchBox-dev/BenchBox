@@ -389,17 +389,24 @@ class TPCHThroughputTest:
                         if hasattr(self, "captured_items"):
                             self.captured_items.append((label, query_text))
 
-                    execution_time = elapsed_seconds(query_start)
-
                     # _count_cursor_rows() reads the adapter-reported count
                     # directly (when available) instead of re-materializing
                     # the result set via fetchall() a second time - see
                     # PlatformAdapterCursor.row_count() in connection_wrappers.py.
+                    # Counted before elapsed_seconds() (matching the TPC-DS
+                    # driver's _run_single_stream_query): a raw DB-API
+                    # cursor/test double without row_count() falls through to
+                    # len(cursor.fetchall()), which does real materialization
+                    # work, so that cost must stay inside the timed window
+                    # rather than being excluded from execution_time_seconds.
+                    result_count = _count_cursor_rows(cursor)
+                    execution_time = elapsed_seconds(query_start)
+
                     query_result.update(
                         {
                             "execution_time_seconds": execution_time,
                             "success": True,
-                            "result_count": _count_cursor_rows(cursor),
+                            "result_count": result_count,
                         }
                     )
 
