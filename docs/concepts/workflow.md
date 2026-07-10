@@ -215,13 +215,13 @@ Running benchmarks according to TPC specifications for official results:
 ```bash
 # 1. Power Test (single query stream)
 benchbox run-official tpch --platform snowflake --scale 100 \
-  --test-type power \
+  --phases power \
   --seed 42 \
   --output results/power/
 
 # 2. Throughput Test (concurrent streams)
 benchbox run-official tpch --platform snowflake --scale 100 \
-  --test-type throughput \
+  --phases throughput \
   --streams 4 \
   --seed 42 \
   --output results/throughput/
@@ -231,6 +231,12 @@ benchbox calculate-qphh \
   --power-results results/power/results.json \
   --throughput-results results/throughput/results.json
 ```
+
+`run-official` is deprecated (kept for backward compatibility) in favor of
+`benchbox run --official`; see
+[CLI Reference → Deprecated: `run-official`](../reference/cli/run.md#deprecated-run-official)
+for the full accepted option list (`--test-type` was never a real option —
+official test selection is via `--phases`).
 
 **Requirements**:
 - Specific scale factors (1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000)
