@@ -1,0 +1,86 @@
+id: "placeholder-rows-fetch-safety"
+title: "Make PlatformAdapterCursor placeholder rows impossible to mistake for real data"
+worktree: "auto-revert-incident"
+priority: "Medium"
+status: "Not Started"
+category: "Code Quality and Technical Debt"
+description: |
+  Since #1100, PlatformAdapterCursor.fetchall()/fetchone()/.rows fabricate
+  cardinality-preserving placeholders `[(None,)] * rows_returned` whenever
+  the platform result carries only a count (benchbox/platforms/base/
+  connection_wrappers.py:287-320). That design is correct for the throughput
+  drivers (truthful counts, no GIL-serialized materialization) but is a
+  correctness footgun for any consumer that reads VALUES: the data looks like
+  a real result set full of NULLs. First bite: the session-isolation test
+  incident of 2026-07-10 (see fix-session-isolation-placeholder-rows), where
+  `assert fetchall() == [(7,)]` silently became `[(None,)]`.
+
+  Make placeholder materialization unmistakable without changing the
+  contract:
+  - expose an explicit `has_real_rows` (or equivalent) property derived from
+    which _extract_rows branch fired;
+  - log a one-time warning when placeholder rows are actually materialized
+    via fetchall()/fetchone()/.rows (not when only row_count() is used -
+    that path must stay silent and lazy);
+  - audit in-repo consumers of fetchall()/fetchone()/.rows on
+    PlatformAdapterCursor for value-dependence and fix or annotate each;
+  - document the contract in the class docstring.
+impact:
+  business_value: "Prevents the next silent wrong-values bug in benchmark result handling - a soundness-adjacent class of error for a benchmarking tool."
+  user_impact: "Anyone driving platforms through the wrapper gets a loud signal the first time they touch placeholder data."
+  technical_debt: "Converts an implicit, discoverable-only-by-incident contract into an explicit, warned, documented one."
+prior_art:
+- "benchbox/platforms/base/connection_wrappers.py:279-330 PlatformAdapterCursor - extend; the lazy `rows` property and row_count() fast path are the #1100 contract to preserve"
+- "benchbox/platforms/base/connection_wrappers.py count_query_rows()/row_count() - the sanctioned count-only path that must remain warning-free"
+- "tests/integration/test_throughput_real_duckdb.py - pins truthful row counts from #1100; must stay green"
+work:
+- id: w1
+  summary: "Audit all in-repo call sites of PlatformAdapterCursor fetchall/fetchone/.rows; classify each as count-only, value-dependent-with-real-rows, or value-dependent-at-risk; record the table in the PR body."
+  status: pending
+- id: w2
+  summary: "Implement has_real_rows plus a once-per-cursor warning on placeholder materialization; document the three-branch contract."
+  notes: |
+    Keep row_count()/count_query_rows and the lazy no-materialization path
+    silent; the warning fires only when placeholder rows are actually
+    materialized via fetchall()/fetchone()/.rows.
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Unit-test the warning/has_real_rows matrix and fix any at-risk consumer found in w1 within scope."
+  needs: [w2]
+  status: pending
+  notes: |
+    Matrix: placeholder fetch warns once and has_real_rows is False;
+    explicit-rows fetch does not warn and has_real_rows is True; count-only
+    usage (row_count()/count_query_rows) never warns.
+deferred:
+- summary: "Sentinel row objects or hard errors on placeholder fetch"
+  reason: "Behavior-breaking for legitimate cardinality-only consumers; revisit only if the warning proves insufficient."
+- summary: "Adapter-side full-row materialization below a size threshold"
+  reason: "Reintroduces the GIL/materialization cost #1100 removed; needs its own perf evidence."
+must_preserve:
+- "#1100 semantics: rows > rows_returned > first_row priority; truthful counts; no materialization on the count-only path"
+- "fetchall() return SHAPE unchanged (list of tuples) - only observability is added"
+- "tests/integration/test_throughput_real_duckdb.py and the throughput drivers' row_count() path stay green and warning-free"
+approach: |
+  Additive observability on the existing class; no consumer-facing API
+  breaks. Audit first (w1) so the warning lands with the consumer table as
+  evidence, not speculation.
+anti_patterns:
+- "Do not warn on every fetch call (once per cursor) or on count-only paths"
+- "Do not change what fetchall() returns for real rows"
+- "Do not fix at-risk consumers by re-materializing full results inside the throughput drivers"
+verification:
+- description: "Wrapper unit tests including the new warning/has_real_rows cases are green."
+  command: "uv run -- python -m pytest tests/unit/platforms/ -k connection_wrapper -q"
+  expected_output: "all pass, including new placeholder-warning cases"
+- description: "The #1100 contract tests and the incident test stay green."
+  command: "uv run -- python -m pytest tests/integration/test_throughput_real_duckdb.py tests/integration/test_throughput_session_isolation.py -q"
+  expected_output: "all pass"
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/base/connection_wrappers.py"
+  - "tests/unit/**"
+  - "Files identified in the w1 audit as at-risk value consumers (list them in the PR body before editing)"
+deps:
+  needs: [fix-session-isolation-placeholder-rows]

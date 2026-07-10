@@ -1,0 +1,108 @@
+id: "fix-session-isolation-placeholder-rows"
+title: "Fix session-isolation test broken by placeholder-row fetchall (develop red since 13:42Z 2026-07-10)"
+worktree: "auto-revert-incident"
+priority: "Critical"
+status: "Not Started"
+category: "Testing and Quality Assurance"
+description: |
+  Develop's post-merge medium-test lane has been red continuously since
+  2026-07-10 13:42Z. The live breakage:
+
+  tests/integration/test_throughput_session_isolation.py:243
+  TestSharedCursorCapabilityIsDuckDBDefault::
+  test_streams_share_one_connection_no_new_connections_opened
+  fails `assert [(None,)] == [(7,)]`.
+
+  Root cause: PR #1100 (squash 7b6d1eef) changed
+  PlatformAdapterCursor._extract_rows() (benchbox/platforms/base/
+  connection_wrappers.py) so `rows_returned` takes priority over `first_row`
+  and, when the adapter reports only a count, fetchall() returns
+  cardinality-preserving placeholders `[(None,)] * row_count`. The test
+  (added by PR #1095, squash 7d8370bc, merged 25 min earlier - classic
+  stale-base squash race) asserts the ACTUAL VALUE fetched through the
+  validation-mode wrapper, which is now placeholder data by design.
+
+  Evidence (re-runnable, see w0):
+  - Fails deterministically at develop tip fc31f360 in isolation:
+    `uv run -- python -m pytest tests/integration/test_throughput_session_isolation.py -q`
+    -> 1 failed, 3 passed.
+  - Passes with pre-#1100 wrapper:
+    `git checkout 7b6d1eef~1 -- benchbox/platforms/base/connection_wrappers.py`
+    then same command -> 4 passed (restore with `git checkout HEAD -- ...`).
+  - CI: #1100's own merge run 29097093548 shows this failure appearing
+    alongside the (since fixed-forward by #1113) preflight failure; every
+    develop-post-merge run since fails on it (e.g. 29117490896, 29121630594).
+
+  The fix is test-side: #1100's placeholder contract is reviewed, intentional
+  behavior (truthful counts without GIL-serialized materialization). The test
+  must keep proving the SHARED_CURSOR capability (a table created via stream
+  A's handle is visible via stream B's handle; closing A does not tear down
+  the shared connection) without depending on wrapper-fetched VALUES:
+  assert cardinality through the wrapper, and verify the actual value through
+  the raw shared DuckDB connection, which shares the same session/catalog.
+
+  Once merged and the develop-post-merge run is green, the flood of bogus
+  auto-revert PRs stops and the superseded ones must be closed (w3).
+impact:
+  business_value: "Unblocks develop: every merge currently triggers a red post-merge run and a bogus auto-revert PR blaming an innocent commit."
+  user_impact: "Restores trust in the incident:develop-red signal; stops reviewer time being burned on revert PRs that would not fix anything."
+  technical_debt: "None added; removes a value-assertion that contradicts the reviewed placeholder-rows contract."
+prior_art:
+- "benchbox/platforms/base/connection_wrappers.py:287-320 _extract_rows placeholder priority order (rows > rows_returned > first_row) - the contract the test must respect, not change"
+- "tests/integration/test_throughput_session_isolation.py:227-252 the failing test - fix in place, keep both post-close assertions"
+- "tests/integration/test_throughput_session_isolation.py:153-157 _stream_wrapper - reproduces execution.py's per-stream connection_factory; keep using it"
+work:
+- id: w0
+  summary: "Re-validate the evidence at current develop tip: run the single failing test, confirm the [(None,)] failure signature, and record command + SHA + FAIL line in the PR body."
+  status: pending
+- id: w1
+  summary: "Rewrite the two value assertions (lines 243, 250): cardinality via the wrapper cursor, actual value via the raw shared_connection."
+  needs: [w0]
+  status: pending
+  notes: |
+    The raw `shared_connection` (duckdb connection from
+    adapter.create_connection()) sees the same catalog/session as both stream
+    cursors, so `shared_connection.execute("SELECT value FROM shared_state")
+    .fetchall() == [(7,)]` proves the INSERT through stream A landed with the
+    real value while `len(stream_b.execute(...).fetchall()) == 1` proves
+    stream B's handle shares the session. Update the test docstring to say
+    why values are checked on the raw connection (placeholder-rows contract).
+- id: w2
+  summary: "Run the full test file plus the throughput real-duckdb regression file locally; both green."
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Post-merge ops: once develop-post-merge is green, close superseded open auto-revert PRs with a comment linking this fix-forward PR."
+  needs: [w2]
+  status: pending
+  notes: |
+    Ops action, not code: use gh/GitHub MCP. Close #1120, #1121, #1122,
+    #1125, #1126, plus any opened since. Do NOT merge any of them -
+    reverting the blamed PRs would not fix develop. The one revert PR that
+    correctly blamed #1100 (#1112) was already closed on 2026-07-10 19:22.
+deferred:
+- summary: "Change _extract_rows to thread first_row into the first placeholder slot"
+  reason: "Design change to the reviewed #1100 contract; superseded by the placeholder-rows-fetch-safety TODO which handles consumer-facing safety holistically."
+must_preserve:
+- "The test still fails if streams were given independent connections (the anti-pattern the SHARED_CURSOR capability forbids for DuckDB)"
+- "The post-close assertion: closing stream A's cursor must not tear down the shared connection under stream B"
+- "TestIndependentConnectionCapabilityIsolatesSessions is untouched"
+approach: |
+  Test-only fix. Keep the existing structure and _stream_wrapper seam; swap
+  value assertions for cardinality-via-wrapper + value-via-raw-connection.
+anti_patterns:
+- "Do not modify benchbox/platforms/base/connection_wrappers.py to special-case this test"
+- "Do not skip/xfail the test or drop it from the medium tier"
+- "Do not weaken to an existence-only check (must still verify the inserted value, via the raw connection)"
+verification:
+- description: "The incident test file is fully green."
+  command: "uv run -- python -m pytest tests/integration/test_throughput_session_isolation.py -q"
+  expected_output: "4 passed"
+- description: "The #1100 truthful-row-count contract tests stay green (untouched)."
+  command: "uv run -- python -m pytest tests/integration/test_throughput_real_duckdb.py -q"
+  expected_output: "all pass"
+scope_limit:
+  only_modify:
+  - "tests/integration/test_throughput_session_isolation.py"
+deps:
+  needs: []
