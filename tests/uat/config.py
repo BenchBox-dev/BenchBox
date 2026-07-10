@@ -40,6 +40,13 @@ class ExecuteConfig:
     extra_args: tuple[str, ...] = ()
     skip_unreachable: bool = True
     parallel_platforms: bool = False  # reserved; must remain False
+    # official/streams/seed drive a real multi-stream throughput cell via
+    # `benchbox run-official --streams N` instead of the default `benchbox
+    # run` -- see tests.uat.throughput for why `run-official` is the only
+    # CLI surface that can request N>1 streams today.
+    official: bool = False
+    streams: int | None = None
+    seed: int | None = None
 
 
 @dataclass(frozen=True)
@@ -279,6 +286,9 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
                 "extra_args",
                 "skip_unreachable",
                 "parallel_platforms",
+                "official",
+                "streams",
+                "seed",
             }
         ),
         "execute",
@@ -298,16 +308,64 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
         extra_args = tuple(extra_args_raw)
     else:
         raise ConfigError("`execute.extra_args` must be a list of strings")
+    phases_arg = str(payload.get("phases_arg", "load,power"))
+    official = _require_bool(payload, "official", default=False, section="execute")
+    streams = _optional_positive_int(payload, "streams", section="execute")
+    seed = _optional_int(payload, "seed", section="execute")
+    if streams is not None and not official:
+        raise ConfigError("`execute.streams` requires `execute.official: true` — see tests.uat.throughput")
+    wants_throughput = "throughput" in {phase.strip().lower() for phase in phases_arg.split(",")}
+    if official and wants_throughput and streams is None:
+        raise ConfigError(
+            "`execute.streams` is required when `execute.official: true` and "
+            "`execute.phases_arg` includes `throughput` — `run-official` itself "
+            "rejects a throughput phase without --streams"
+        )
     return ExecuteConfig(
         per_cell_timeout_s=timeout,
         early_stop_after_s=early_after,
         early_stop_on_failure=_require_bool(payload, "early_stop_on_failure", default=True, section="execute"),
-        phases_arg=str(payload.get("phases_arg", "load,power")),
+        phases_arg=phases_arg,
         compression=payload.get("compression"),
         extra_args=extra_args,
         skip_unreachable=_require_bool(payload, "skip_unreachable", default=True, section="execute"),
         parallel_platforms=parallel_platforms,
+        official=official,
+        streams=streams,
+        seed=seed,
     )
+
+
+def _optional_positive_int(payload: dict[str, Any], key: str, *, section: str) -> int | None:
+    """Coerce payload[key] to a positive int, or None if absent/null."""
+    if key not in payload or payload[key] is None:
+        return None
+    value = payload[key]
+    if isinstance(value, bool):
+        raise ConfigError(f"`{section}.{key}` must be an int, got bool")
+    if isinstance(value, int):
+        coerced = value
+    elif isinstance(value, str) and value.lstrip("-").isdigit():
+        coerced = int(value)
+    else:
+        raise ConfigError(f"`{section}.{key}` must be an int, got {type(value).__name__}={value!r}")
+    if coerced <= 0:
+        raise ConfigError(f"`{section}.{key}` must be > 0")
+    return coerced
+
+
+def _optional_int(payload: dict[str, Any], key: str, *, section: str) -> int | None:
+    """Coerce payload[key] to an int (any sign), or None if absent/null."""
+    if key not in payload or payload[key] is None:
+        return None
+    value = payload[key]
+    if isinstance(value, bool):
+        raise ConfigError(f"`{section}.{key}` must be an int, got bool")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.lstrip("-").isdigit():
+        return int(value)
+    raise ConfigError(f"`{section}.{key}` must be an int, got {type(value).__name__}={value!r}")
 
 
 def _validate_output(payload: dict[str, Any]) -> OutputConfig:
@@ -550,6 +608,15 @@ def validate_config(payload: dict[str, Any]) -> UATConfig:
     benchmarks = _validate_matrix_filter(payload.get("benchmarks"), section="benchmarks")
     scales = _validate_scales(payload.get("scales"))
     execute = _validate_execute(payload.get("execute") or {})
+    if execute.official:
+        from tests.uat.throughput import TPC_ALLOWED_SCALE_FACTORS
+
+        non_compliant = sorted(rung for rung in scales.rungs if rung not in TPC_ALLOWED_SCALE_FACTORS)
+        if non_compliant:
+            raise ConfigError(
+                f"`scales.rungs` {non_compliant} not TPC-compliant for `execute.official: true` "
+                f"(run-official requires one of {sorted(TPC_ALLOWED_SCALE_FACTORS)})"
+            )
     output = _validate_output(payload.get("output") or {})
     preflight = _validate_preflight(payload.get("preflight"))
     cleanup = _validate_cleanup(payload.get("cleanup"))

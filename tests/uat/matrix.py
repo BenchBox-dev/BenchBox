@@ -409,3 +409,51 @@ def benchbox_run_argv(
         argv += docker_assets.local_managed_platform_extra_opts(platform)
     argv += list(extra_args)
     return argv
+
+
+def benchbox_run_official_argv(
+    platform: str,
+    benchmark: str,
+    scale: float,
+    *,
+    phases: str,
+    streams: int,
+    seed: int | None = None,
+    extra_args: Iterable[str] = (),
+    local_managed_platform: bool = False,
+) -> list[str]:
+    """Build the `uv run -- benchbox run-official ...` argv for a throughput cell.
+
+    `run-official` (unlike `run`) has a `--streams` option that reaches
+    `BenchmarkConfig.concurrency` via `_forward_requested_streams`
+    (`benchbox/cli/commands/run_official.py`) -- the only CLI surface that
+    can request N>1 concurrent throughput streams today; see
+    `tests.uat.throughput` and the `throughput-stream-count-wiring-defect`
+    TODO's `deferred` note. `run-official` requires a TPC-compliant scale
+    factor (`tests.uat.throughput.TPC_ALLOWED_SCALE_FACTORS`) and has no
+    `--quiet`/`--non-interactive` flags of its own, so this does not include
+    them -- see `tests.uat.throughput.resolve_official_result_path` for how
+    the runner locates the result JSON without a parseable stdout line.
+    """
+    argv = uv_run_argv(platform)
+    argv += [
+        "benchbox",
+        "run-official",
+        benchmark,
+        "--platform",
+        platform,
+        "--scale",
+        str(scale),
+        "--phases",
+        phases,
+        "--streams",
+        str(streams),
+    ]
+    if seed is not None:
+        argv += ["--seed", str(seed)]
+    argv += PLATFORM_CLI_FLAGS.get(platform, [])
+    argv += docker_assets.platform_extra_opts(platform)
+    if local_managed_platform:
+        argv += docker_assets.local_managed_platform_extra_opts(platform)
+    argv += list(extra_args)
+    return argv

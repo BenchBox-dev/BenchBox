@@ -12,6 +12,7 @@ must iterate sequentially.
 from __future__ import annotations
 
 import datetime as _dt
+import json
 import os
 import subprocess
 from dataclasses import dataclass
@@ -26,7 +27,8 @@ from tests.uat.artifact_hygiene import (
     configured_external_root,
     snapshot_local_runs,
 )
-from tests.uat.matrix import benchbox_run_argv
+from tests.uat.matrix import benchbox_run_argv, benchbox_run_official_argv
+from tests.uat.throughput import resolve_official_result_path, validate_throughput_result
 from tests.uat.timeouts import TimeoutResult, run_with_timeout
 
 # SubmitTerminalState is re-exported so existing UAT consumers
@@ -54,6 +56,10 @@ class CellResult:
     log_path: Path
     result_path: Path | None
     submit_terminal_state: str = SubmitTerminalState.submittable.value
+    # Set only for official/throughput cells (see tests.uat.throughput):
+    # "ok" on a clean pass, else the validation failure reason. None for
+    # every other (non-throughput) cell.
+    throughput_check: str | None = None
 
 
 def last_nonempty_output_line(log_text: str) -> str | None:
@@ -134,9 +140,20 @@ def run_cell(
     benchmark_runs_dir: Path | str | None = None,
     extra_args=(),
     local_managed_platform: bool = False,
+    official: bool = False,
+    streams: int | None = None,
+    seed: int | None = None,
     now: _dt.datetime | None = None,
 ) -> CellResult:
-    """Run a single cell end-to-end and return the cell result."""
+    """Run a single cell end-to-end and return the cell result.
+
+    ``official``/``streams``/``seed`` route the cell through `benchbox
+    run-official --streams N` instead of the default `benchbox run` --
+    the only CLI surface that can request N>1 concurrent throughput streams
+    today (see `tests.uat.throughput`). `official=True` requires `streams`.
+    """
+    if official and streams is None:
+        raise ValueError("run_cell(official=True) requires `streams`")
     now = now or _dt.datetime.now()
     log_dir = Path(log_dir) if log_dir is not None else _default_log_dir(now)
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -148,15 +165,27 @@ def run_cell(
     # 2026-06-01 datagen-leak incident. Default local runs leave this None.
     external_root = configured_external_root(output=runs_dir)
     local_snapshot = snapshot_local_runs() if external_root is not None else None
-    argv = benchbox_run_argv(
-        platform,
-        benchmark,
-        scale,
-        phases=phases,
-        compression=compression,
-        extra_args=("--output", str(runs_dir / "datagen"), *extra_args),
-        local_managed_platform=local_managed_platform,
-    )
+    if official:
+        argv = benchbox_run_official_argv(
+            platform,
+            benchmark,
+            scale,
+            phases=phases,
+            streams=streams,
+            seed=seed,
+            extra_args=("--output", str(runs_dir / "datagen"), *extra_args),
+            local_managed_platform=local_managed_platform,
+        )
+    else:
+        argv = benchbox_run_argv(
+            platform,
+            benchmark,
+            scale,
+            phases=phases,
+            compression=compression,
+            extra_args=("--output", str(runs_dir / "datagen"), *extra_args),
+            local_managed_platform=local_managed_platform,
+        )
 
     with log_path.open("w", encoding="utf-8") as log_fh:
         log_fh.write(f"# {' '.join(argv)}\n")
@@ -183,7 +212,12 @@ def run_cell(
             log_fh.write(stdout_text)
         if timeout_result.timed_out:
             log_fh.write(f"# UAT_TIMEOUT timeout_s={timeout_s} exit_code={timeout_result.exit_code}\n")
-        elif timeout_result.exit_code != 0 and not stdout_text.strip() and not stderr_has_content:
+        elif not official and timeout_result.exit_code != 0 and not stdout_text.strip() and not stderr_has_content:
+            # Only `--quiet` `benchbox run` cells can suppress their own error
+            # reporting this way; `run-official` never runs quiet, so an
+            # empty-output failure there is a real crash, not a suppressed
+            # one, and re-running with `quiet=False` would also silently
+            # drop the --streams/--seed flags this cell was built with.
             _append_diagnostic_rerun(
                 log_fh,
                 benchbox_run_argv(
@@ -204,16 +238,43 @@ def run_cell(
         # Fail loudly if datagen (or anything else) leaked into the local tree.
         assert_no_local_growth(local_snapshot, external_root)
 
-    result_path_str = last_nonempty_output_line(stdout_text) if timeout_result.exit_code == 0 else None
-    result_path = _resolve_result_path(result_path_str, runs_dir) if result_path_str else None
+    if official:
+        # `run-official` has no --quiet flag, so it never prints a bare,
+        # parseable result-path stdout line -- resolve the exported JSON by
+        # filename + mtime instead. It also still exports a result JSON for
+        # a non-clean (exit code != 0) run, so this isn't gated on exit_code.
+        result_path = resolve_official_result_path(
+            runs_dir / "results",
+            platform=platform,
+            benchmark=benchmark,
+            started_after=now,
+        )
+    else:
+        result_path_str = last_nonempty_output_line(stdout_text) if timeout_result.exit_code == 0 else None
+        result_path = _resolve_result_path(result_path_str, runs_dir) if result_path_str else None
     status = _classify(timeout_result)
-    submit_state = (
-        classify_for_submit(result_path) if timeout_result.exit_code == 0 else SubmitTerminalState.missing_manifest
-    )
+    submit_state = classify_for_submit(result_path) if result_path is not None else SubmitTerminalState.missing_manifest
     exit_code = timeout_result.exit_code
     if status == "passed" and submit_state_is_cell_failure(submit_state):
         status = "failed"
         exit_code = exit_code or 1
+    throughput_check: str | None = None
+    if official and streams is not None:
+        if result_path is not None and result_path.exists():
+            try:
+                result_json = json.loads(result_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                throughput_check = f"could not read result JSON: {exc}"
+            else:
+                ok, reason = validate_throughput_result(result_json, requested_streams=streams)
+                throughput_check = reason
+                if not ok:
+                    status = "failed"
+                    exit_code = exit_code or 1
+        else:
+            throughput_check = "no result JSON resolved for throughput validation"
+            status = "failed"
+            exit_code = exit_code or 1
     return CellResult(
         platform=platform,
         benchmark=benchmark,
@@ -224,6 +285,7 @@ def run_cell(
         log_path=log_path,
         result_path=result_path,
         submit_terminal_state=submit_state.value,
+        throughput_check=throughput_check,
     )
 
 
