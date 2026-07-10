@@ -11,5 +11,5 @@ Current subsystems:
 - ``aiml_functions`` - AI/ML SQL function benchmarks
 - ``multiregion`` - Multi-region latency and orchestration
 - ``gpu`` - GPU detection, metrics, and benchmark primitives
-- ``concurrency`` - Concurrent load testing patterns
+- ``load_testing`` - Concurrent load testing patterns
 """
