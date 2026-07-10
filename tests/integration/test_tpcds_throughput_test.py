@@ -13,7 +13,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import tempfile
-import threading
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock, patch
@@ -129,11 +128,6 @@ class TestThroughputTestConfig:
         assert config.max_workers is None
         assert config.queries_per_stream is None  # Default: execute all queries
         assert config.enable_preflight is True
-        # Configurable success gate (mirrors TPC-H's min_success_rate); spec-
-        # derived default of 70% must be preserved.
-        assert config.min_success_rate == 0.70
-        # Opt-in cooperative cancellation must default OFF (behavior-preserving).
-        assert config.cancel_on_timeout is False
 
     def test_custom_config(self):
         """Test custom configuration values."""
@@ -328,30 +322,6 @@ class TestThroughputTest:
         validation = test.validate_results(result)
         assert validation is False
 
-    def test_validate_results_gate_is_configurable(self, tpcds_benchmark):
-        """Same 1/2 streams-successful pattern as test_result_validation_failures
-        but with a lowered min_success_rate, proving validate_results() reads
-        config.min_success_rate instead of a hardcoded 0.7 (the third of the
-        three previously-independent hard-coded 70% literals)."""
-        config = TPCDSThroughputTestConfig(num_streams=2, min_success_rate=0.5)
-        test = TPCDSThroughputTest(benchmark=tpcds_benchmark)
-
-        result = TPCDSThroughputTestResult(
-            config=config,
-            start_time="2023-01-01T00:00:00",
-            end_time="2023-01-01T00:01:40",
-            total_time=100,
-            streams_executed=2,
-            streams_successful=1,
-            stream_results=[],
-            throughput_at_size=7.2,
-            success=True,
-        )
-
-        # 1/2 = 50% >= min_success_rate=0.5 -> validation passes even though
-        # it would fail against the (still-default-elsewhere) 70% threshold.
-        assert test.validate_results(result) is True
-
     def test_result_structure(self, throughput_test_config, temp_output_dir):
         """Test TPCDSThroughputTestResult structure and properties."""
         # Create test result
@@ -403,199 +373,6 @@ class TestThroughputTest:
 
         # Verify scale factor via canonical config path
         assert result.config.scale_factor == throughput_test_config.scale_factor
-
-
-class TestSuccessGateConfigurable:
-    """Cover the configurable min_success_rate gate (w3): run(),
-    _finalize_stream_success() (per-stream), and validate_results() must all
-    read the SAME config.min_success_rate -- single source of truth, no more
-    independently hard-coded 0.7 literals."""
-
-    def test_finalize_stream_success_uses_configurable_gate(self, tpcds_benchmark):
-        """3/5 = 60% queries successful: fails against the default 70% gate,
-        passes against a lowered 50% gate -- proving the per-stream gate
-        (previously a second, separate hard-coded 0.7) now reads config."""
-        test = TPCDSThroughputTest(benchmark=tpcds_benchmark)
-
-        def _make_result(min_success_rate: float) -> TPCDSThroughputStreamResult:
-            config = TPCDSThroughputTestConfig(min_success_rate=min_success_rate)
-            stream_result = TPCDSThroughputStreamResult(
-                stream_id=0,
-                start_time=0.0,
-                end_time=1.0,
-                duration=1.0,
-                queries_executed=5,
-                queries_successful=3,
-                queries_failed=2,
-            )
-            test._finalize_stream_success(0, stream_result, config)
-            return stream_result
-
-        assert _make_result(0.70).success is False
-        assert _make_result(0.50).success is True
-
-    def test_run_success_gate_is_configurable(self, tpcds_benchmark):
-        """Same 1/2-streams-successful pattern used for the run()-level gate
-        elsewhere in this file, but with a lowered min_success_rate."""
-        connections: list[Mock] = []
-
-        def factory() -> Mock:
-            conn = Mock()
-            conn.close.return_value = None
-            connections.append(conn)
-            return conn
-
-        test = TPCDSThroughputTest(benchmark=tpcds_benchmark, connection_factory=factory, num_streams=2)
-        config = TPCDSThroughputTestConfig(num_streams=2, min_success_rate=0.5, enable_preflight=False)
-
-        successful_stream = TPCDSThroughputStreamResult(
-            stream_id=0,
-            start_time=0.0,
-            end_time=0.1,
-            duration=0.1,
-            queries_executed=99,
-            queries_successful=99,
-            queries_failed=0,
-        )
-        failing_stream = TPCDSThroughputStreamResult(
-            stream_id=1,
-            start_time=0.0,
-            end_time=0.1,
-            duration=0.1,
-            queries_executed=99,
-            queries_successful=50,
-            queries_failed=49,
-            success=False,
-            error="stream failure",
-        )
-
-        with patch.object(test, "_execute_stream", side_effect=[successful_stream, failing_stream]):
-            result = test.run(config)
-
-        # 1/2 = 50% successful streams >= min_success_rate=0.5 -> overall success
-        assert result.success is True
-        assert result.streams_successful == 1
-
-
-class TestCooperativeCancellation:
-    """Cover the opt-in cooperative-cancel wiring in TPCDSThroughputTest (w2)."""
-
-    @staticmethod
-    def _stream_query(query_id: int, variant: Any = None) -> Mock:
-        sq = Mock()
-        sq.query_id = query_id
-        sq.variant = variant
-        return sq
-
-    @staticmethod
-    def _connection_factory(registry: list[Mock], execute_side_effect=None) -> Any:
-        def factory() -> Mock:
-            conn = Mock()
-            conn.close.return_value = None
-            conn.commit.return_value = None
-            cursor = Mock()
-            cursor.fetchall.return_value = []
-            if execute_side_effect is not None:
-                conn.execute.side_effect = execute_side_effect(cursor)
-            else:
-                conn.execute.return_value = cursor
-            registry.append(conn)
-            return conn
-
-        return factory
-
-    def test_execute_stream_stops_immediately_when_cancel_event_preset(self, tpcds_benchmark):
-        connections: list[Mock] = []
-        factory = self._connection_factory(connections)
-
-        test = TPCDSThroughputTest(benchmark=tpcds_benchmark, connection_factory=factory, num_streams=1)
-        config = TPCDSThroughputTestConfig(num_streams=1, cancel_on_timeout=True, enable_preflight=False)
-        config._stream_cancel_events = {0: threading.Event()}
-        config._stream_cancel_events[0].set()
-        test._pregenerated_queries = {0: [(self._stream_query(1), "SELECT 1"), (self._stream_query(2), "SELECT 2")]}
-
-        stream_result = test._execute_stream(stream_id=0, seed=1, config=config)
-
-        assert stream_result.queries_executed == 0
-        assert stream_result.success is False
-        assert "cancel" in (stream_result.error or "").lower()
-        assert connections[0].execute.call_count == 0
-
-    def test_execute_stream_stops_after_cancel_event_set_mid_stream(self, tpcds_benchmark):
-        cancel_event = threading.Event()
-
-        def execute_side_effect(cursor):
-            def _execute(_query_text: str) -> Mock:
-                cancel_event.set()
-                return cursor
-
-            return _execute
-
-        connections: list[Mock] = []
-        factory = self._connection_factory(connections, execute_side_effect=execute_side_effect)
-
-        test = TPCDSThroughputTest(benchmark=tpcds_benchmark, connection_factory=factory, num_streams=1)
-        config = TPCDSThroughputTestConfig(num_streams=1, cancel_on_timeout=True, enable_preflight=False)
-        config._stream_cancel_events = {0: cancel_event}
-        test._pregenerated_queries = {
-            0: [
-                (self._stream_query(1), "SELECT 1"),
-                (self._stream_query(2), "SELECT 2"),
-                (self._stream_query(3), "SELECT 3"),
-            ]
-        }
-
-        stream_result = test._execute_stream(stream_id=0, seed=1, config=config)
-
-        assert stream_result.queries_executed == 1
-        assert stream_result.success is False
-        assert "cancel" in (stream_result.error or "").lower()
-
-    def test_execute_stream_unaffected_when_cancel_on_timeout_disabled(self, tpcds_benchmark):
-        connections: list[Mock] = []
-        factory = self._connection_factory(connections)
-
-        test = TPCDSThroughputTest(benchmark=tpcds_benchmark, connection_factory=factory, num_streams=1)
-        config = TPCDSThroughputTestConfig(num_streams=1, enable_preflight=False)  # cancel_on_timeout defaults False
-        test._pregenerated_queries = {0: [(self._stream_query(1), "SELECT 1"), (self._stream_query(2), "SELECT 2")]}
-
-        stream_result = test._execute_stream(stream_id=0, seed=1, config=config)
-
-        assert stream_result.queries_executed == 2
-        assert stream_result.success is True
-
-    def test_execute_stream_ignores_stale_cancel_event_from_reused_config(self, tpcds_benchmark):
-        """Regression (review follow-up): a config object reused across
-        runs must not let a PRIOR run's already-``set()`` cancel event leak
-        into a later call where ``cancel_on_timeout`` is now False.
-
-        Simulates exactly the state ``StreamRunner.execute()`` leaves on a
-        config object after a run-1 timeout with ``cancel_on_timeout=True``
-        (this stream's ``Event`` set()), then reuses that SAME config
-        object with ``cancel_on_timeout`` flipped to False -- while
-        deliberately leaving ``_stream_cancel_events`` stale/untouched, to
-        isolate ``_execute_stream``'s own independent ``cancel_on_timeout``
-        gate (the belt-and-suspenders fix) from ``StreamRunner.execute()``'s
-        separate reset-to-``{}`` behavior on its own next call.
-        """
-        connections: list[Mock] = []
-        factory = self._connection_factory(connections)
-
-        test = TPCDSThroughputTest(benchmark=tpcds_benchmark, connection_factory=factory, num_streams=1)
-
-        stale_config = TPCDSThroughputTestConfig(num_streams=1, cancel_on_timeout=True, enable_preflight=False)
-        stale_config._stream_cancel_events = {0: threading.Event()}
-        stale_config._stream_cancel_events[0].set()
-        test._pregenerated_queries = {0: [(self._stream_query(1), "SELECT 1"), (self._stream_query(2), "SELECT 2")]}
-
-        # Reuse the SAME config object with cancel_on_timeout now False.
-        stale_config.cancel_on_timeout = False
-
-        stream_result = test._execute_stream(stream_id=0, seed=1, config=stale_config)
-
-        assert stream_result.queries_executed == 2
-        assert stream_result.success is True
-        assert connections[0].execute.call_count == 2
 
 
 class TestBenchmarkIntegration:

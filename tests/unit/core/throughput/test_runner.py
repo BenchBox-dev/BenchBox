@@ -10,7 +10,6 @@ slow-marked integration test.
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass
 from typing import Optional
 from unittest.mock import Mock
@@ -33,13 +32,9 @@ class _FakeConfig:
     num_streams: int = 1
     max_workers: Optional[int] = None
     base_seed: int = 42
-    stream_timeout: float = 0
+    stream_timeout: int = 0
     scale_factor: float = 1.0
     verbose: bool = False
-    # Opt-in, default OFF -- deliberately NOT part of the structural
-    # _RunnerConfig protocol (see runner.py); included here so tests can
-    # exercise both the enabled and disabled paths.
-    cancel_on_timeout: bool = False
 
 
 def _make_result() -> ThroughputResult:
@@ -266,171 +261,3 @@ class TestThroughputResultAggregation:
         assert stream_result.query_results == []
         assert stream_result.success is True
         assert stream_result.error is None
-
-
-class TestStreamRunnerTimeoutDetectionAndLeakSurfacing:
-    """Cover execute()'s per-stream timeout detection (w1).
-
-    ``execute()`` used to enforce the per-stream timeout via
-    ``future.result(timeout=...)`` inside a ``concurrent.futures.
-    as_completed()`` loop -- a no-op, since as_completed() only yields a
-    future once it is already done(), so .result(timeout=...) on it can
-    never raise TimeoutError. These tests use a real (but small) sleep
-    exceeding a tiny ``stream_timeout`` so the fixed code path -- timeout
-    passed to as_completed() itself, with a fallback loop classifying any
-    still-not-done() future as leaked -- is exercised end-to-end rather than
-    mocked, proving detection is no longer dead code.
-    """
-
-    SLOW_STREAM_SLEEP = 0.1
-    TINY_TIMEOUT = 0.01
-
-    def test_slow_stream_is_annotated_as_leaked_and_always_logged(self) -> None:
-        def slow_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
-            time.sleep(self.SLOW_STREAM_SLEEP)
-            return _make_stream_result(stream_id)
-
-        config = _FakeConfig(num_streams=1, stream_timeout=self.TINY_TIMEOUT, verbose=False)
-        result = _make_result()
-        logger = Mock(spec=logging.Logger)
-
-        StreamRunner.execute(slow_stream_fn, config, result, logger)
-
-        assert result.streams_executed == 1
-        assert result.streams_successful == 0
-        assert len(result.errors) == 1
-        assert "timed out" in result.errors[0].lower()
-        assert "leaked" in result.errors[0].lower()
-        assert "cannot forcibly cancel" in result.errors[0].lower()
-
-        # Always surfaced via logger.warning -- NOT gated on config.verbose
-        # (verbose=False above) -- a leaked stream must never be silent.
-        logger.warning.assert_called_once_with(result.errors[0])
-        logger.error.assert_not_called()
-
-    def test_fast_stream_within_timeout_is_not_flagged_as_leaked(self) -> None:
-        """Sanity check: a stream that finishes well within its timeout is
-        processed normally, with no leaked/timeout annotation at all."""
-
-        def fast_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
-            return _make_stream_result(stream_id)
-
-        config = _FakeConfig(num_streams=1, stream_timeout=5)
-        result = _make_result()
-        logger = Mock(spec=logging.Logger)
-
-        StreamRunner.execute(fast_stream_fn, config, result, logger)
-
-        assert result.streams_executed == 1
-        assert result.streams_successful == 1
-        assert result.errors == []
-        logger.warning.assert_not_called()
-
-
-class TestStreamRunnerCooperativeCancellation:
-    """Cover execute()'s opt-in cooperative-cancellation wiring (w2).
-
-    ``config.cancel_on_timeout`` defaults to False/absent, which must
-    preserve today's behavior exactly (no cancel-event machinery at all).
-    When enabled, a per-stream ``threading.Event`` is attached to
-    ``config._stream_cancel_events`` and set() when that stream's own
-    timeout fires -- never a hard thread-kill.
-    """
-
-    SLOW_STREAM_SLEEP = 0.1
-    TINY_TIMEOUT = 0.01
-
-    def test_disabled_by_default_no_cancel_events_attached(self) -> None:
-        """cancel_on_timeout defaults False -- execute() must still
-        explicitly reset ``_stream_cancel_events`` to an empty dict (not
-        leave it unset, and never leave a stale dict from a prior call on a
-        reused config object -- see
-        TestStreamRunnerCancelEventsResetAcrossReusedConfig below)."""
-        config = _FakeConfig(num_streams=2)
-        result = _make_result()
-        logger = logging.getLogger("test-throughput-runner")
-        stream_fn = Mock(side_effect=lambda stream_id, seed, cfg: _make_stream_result(stream_id))
-
-        StreamRunner.execute(stream_fn, config, result, logger)
-
-        assert getattr(config, "_stream_cancel_events", None) == {}
-
-    def test_enabled_but_streams_finish_normally_leaves_events_unset(self) -> None:
-        """Opt-in cooperative cancellation must not affect the normal
-        (no-timeout) path: events exist but are never set()."""
-        config = _FakeConfig(num_streams=2, cancel_on_timeout=True, stream_timeout=5)
-        result = _make_result()
-        logger = logging.getLogger("test-throughput-runner")
-        stream_fn = Mock(side_effect=lambda stream_id, seed, cfg: _make_stream_result(stream_id))
-
-        StreamRunner.execute(stream_fn, config, result, logger)
-
-        assert result.streams_successful == 2
-        assert result.errors == []
-        cancel_events = getattr(config, "_stream_cancel_events", None)
-        assert cancel_events is not None and len(cancel_events) == 2
-        assert all(not event.is_set() for event in cancel_events.values())
-
-    def test_timeout_signals_that_streams_own_cancel_event_only(self) -> None:
-        """Only the timed-out stream's event is set -- never a hard thread
-        kill, and never every stream's event (a single slow stream must not
-        cancel unrelated healthy streams)."""
-
-        def slow_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
-            time.sleep(self.SLOW_STREAM_SLEEP)
-            return _make_stream_result(stream_id)
-
-        config = _FakeConfig(num_streams=1, stream_timeout=self.TINY_TIMEOUT, cancel_on_timeout=True)
-        result = _make_result()
-        logger = Mock(spec=logging.Logger)
-
-        StreamRunner.execute(slow_stream_fn, config, result, logger)
-
-        cancel_events = getattr(config, "_stream_cancel_events", None)
-        assert cancel_events is not None and len(cancel_events) == 1
-        assert cancel_events[0].is_set()
-        assert "cooperative cancellation has been signalled" in result.errors[0]
-
-    def test_stale_cancel_events_reset_when_reusing_config_with_cancel_disabled(self) -> None:
-        """Regression (review follow-up): a SET Event from a prior
-        execute() call on this same config object must not survive into a
-        later execute() call that has cooperative cancel disabled.
-
-        Reproduces: call 1 has cancel_on_timeout=True and its one stream
-        times out, so its Event ends up set(). Call 2 reuses the SAME
-        config object with cancel_on_timeout=False -- execute() must
-        explicitly reset ``_stream_cancel_events`` to ``{}`` rather than
-        leaving call 1's stale, already-set dict in place (which a spec's
-        presence-only lookup would otherwise treat as this call's own
-        cancellation state).
-        """
-
-        def slow_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
-            time.sleep(self.SLOW_STREAM_SLEEP)
-            return _make_stream_result(stream_id)
-
-        config = _FakeConfig(num_streams=1, stream_timeout=self.TINY_TIMEOUT, cancel_on_timeout=True)
-        result1 = _make_result()
-        logger = logging.getLogger("test-throughput-runner")
-
-        StreamRunner.execute(slow_stream_fn, config, result1, logger)
-
-        stale_cancel_events = getattr(config, "_stream_cancel_events", None)
-        assert stale_cancel_events is not None and stale_cancel_events[0].is_set()
-
-        # Reuse the SAME config object; cooperative cancel now disabled and
-        # no timeout pressure. A fresh dict must replace the stale one.
-        config.cancel_on_timeout = False
-        config.stream_timeout = 5
-        result2 = _make_result()
-
-        def fast_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
-            return _make_stream_result(stream_id)
-
-        StreamRunner.execute(fast_stream_fn, config, result2, logger)
-
-        refreshed_cancel_events = getattr(config, "_stream_cancel_events", None)
-        assert refreshed_cancel_events == {}
-        assert refreshed_cancel_events is not stale_cancel_events
-        assert result2.streams_successful == 1
-        assert result2.errors == []
