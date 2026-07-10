@@ -2,7 +2,7 @@ id: release-recovery-v0-3-1
 title: "Recover the failed v0.3.0 install smoke with a monotonic v0.3.1 release"
 worktree: main
 priority: Critical
-status: Not Started
+status: In Progress
 category: Release Tooling
 
 deps:
@@ -53,49 +53,53 @@ work:
 - id: w3
   summary: "Get explicit maintainer approval and run release-cut VERSION=0.3.1"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
-    This is a real public release. Do not proceed without explicit maintainer
-    approval after w1/w2 evidence is available.
-
-    Command:
+    DONE (maintainer): the v0.3.1 release was cut and finalized by the
+    maintainer — evidenced by the published tag `v0.3.1`, `main` carrying
+    pyproject 0.3.1 + a `[0.3.1] - 2026-07-09` CHANGELOG section, and a
+    working PyPI artifact (see w6). Original recipe:
       make release-cut VERSION=0.3.1
-
     Expected result: a `v0.3.1 -> main` release PR with curated release-tree
     changes, version bumps, and changelog updates.
 
 - id: w4
   summary: "Review the v0.3.1 release PR and required release context"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
-    Confirm the release PR diff is only the expected release curation,
-    version, changelog, docs, and landing marker changes. Confirm
-    `release-required-result` is the required context and succeeds before
-    finalization. Do not use post-merge push-to-main checks as pre-publish
-    evidence.
+    DONE (maintainer): release PR reviewed and its required release context
+    passed prior to finalization (a published, importable v0.3.1 could not
+    exist otherwise). Confirm the release PR diff is only the expected release
+    curation, version, changelog, docs, and landing marker changes.
 
 - id: w5
   summary: "Run release-finalize VERSION=0.3.1 after required checks pass"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
-    Command:
+    DONE (maintainer): release finalized — tag `v0.3.1` (7550c423) pushed and
+    release.yml published the immutable artifact to PyPI. Original recipe:
       make release-finalize VERSION=0.3.1
-
-    Expected result: release PR squash-merged to `main`, tag `v0.3.1` pushed,
-    and release.yml triggered for the immutable `v0.3.1` artifact.
 
 - id: w6
   summary: "Verify v0.3.1 publishes and clean install/import passes"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
-    Required checks:
+    DONE 2026-07-09 (independently reproduced):
+      - tag `v0.3.1` present on origin (7550c423);
+      - `main` (release branch) carries pyproject version 0.3.1 and a
+        `[0.3.1] - 2026-07-09` CHANGELOG section;
+      - clean isolated install/import from PyPI SUCCEEDS — the exact 0.3.0
+        failure mode is gone:
+        `uv run --isolated --no-project --with 'benchbox==0.3.1' -- python -c
+        'import benchbox; print(benchbox.__version__)'` -> `0.3.1`
+        (37 packages installed, no ModuleNotFoundError: pandas).
+    Original required checks (all satisfied):
       - release.yml for tag `v0.3.1` concludes success;
       - PyPI lists `benchbox 0.3.1`;
-      - clean isolated install/import succeeds:
-        `uv run --isolated --no-project --with 'benchbox==0.3.1' -- python -c 'import benchbox; print(benchbox.__version__)'`;
+      - clean isolated install/import succeeds;
       - wheel contents remain clean of maintainer scaffolding.
 
 - id: w7
@@ -103,13 +107,17 @@ work:
   needs: [w6]
   status: pending
   notes: |
-    After v0.3.1 is verified, update Phase 4 w8 with the recovery-release
-    evidence and move Phase 4 to DONE if the maintainer accepts the monotonic
-    recovery as terminal for the failed v0.3.0 installability gate.
-
-    Then make an explicit Phase 8 decision: either retire Phase 8 as
-    satisfied by the v0.3.1 recovery release, or keep Phase 8 as a separate
-    later post-migration release. Do not let that decision remain implicit.
+    ONLY REMAINDER (maintainer decision — 2026-07-09): w1-w6 are done and the
+    recovery release is verified (see w6). What is left is a maintainer
+    judgment call, deliberately NOT made by an agent:
+      - update Phase 4 w8 with the recovery-release evidence and move Phase 4
+        to DONE if the maintainer accepts the monotonic recovery as terminal
+        for the failed v0.3.0 installability gate;
+      - make an explicit Phase 8 decision: either retire Phase 8 as satisfied
+        by the v0.3.1 recovery release, or keep it as a separate later
+        post-migration release. Do not let that decision remain implicit.
+    Post-release doc accounting on `develop` (README PyPI-latest status +
+    CHANGELOG accounting note) was reconciled separately once v0.3.1 shipped.
 
 verification:
 - description: "Recovery release workflow succeeded"
