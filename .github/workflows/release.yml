@@ -189,7 +189,7 @@ jobs:
 
   # Verify installation works across platforms after publishing
   test-installation:
-    needs: publish
+    needs: [build, publish]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -214,15 +214,19 @@ jobs:
 
       - name: Test installation from PyPI
         if: github.event.inputs.test_pypi != 'true'
+        env:
+          BENCHBOX_VERSION: ${{ needs.build.outputs.version }}
         run: |
-          pip install benchbox
+          pip install "benchbox==${BENCHBOX_VERSION}"
           python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'published core wheel must not pull pandas'; print(f'BenchBox {benchbox.__version__} installed successfully (minimal import surface)')"
           benchbox --help
 
       - name: Test installation from Test PyPI
         if: github.event.inputs.test_pypi == 'true'
+        env:
+          BENCHBOX_VERSION: ${{ needs.build.outputs.version }}
         run: |
-          pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ benchbox
+          pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ "benchbox==${BENCHBOX_VERSION}"
           python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'published core wheel must not pull pandas'; print(f'BenchBox {benchbox.__version__} installed successfully (minimal import surface)')"
           benchbox --help
 
