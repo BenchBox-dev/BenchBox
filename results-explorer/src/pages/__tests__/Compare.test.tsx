@@ -146,6 +146,7 @@ function makeResultRow(overrides: Partial<ResultRow> = {}): ResultRow {
     comparison_exclusion_reason: null,
     ranking_exclusion_reason: null,
     trust_label: "maintainer-run",
+    funding: "unspecified",
     visibility: "public-curated",
     platform_version: null,
     execution_mode: null,

@@ -28,6 +28,7 @@ import { CompareSummarySkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
+import { FundingChip } from "@/components/FundingChip";
 import { TuningBadge } from "@/components/TuningBadge";
 import {
   COMPARABILITY_RECEIPT_ID,
@@ -59,6 +60,7 @@ import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
 import { Select } from "@/components/Select";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 type PrimaryMetric = "power_score" | "display_geomean_ms";
@@ -519,7 +521,8 @@ export function Compare({ url }: CompareProps) {
         suppressionReason={decisionSummary.claimSuppressionReason}
       />
       <ComparabilityReceipt results={results} />
-    </div>
+      <ProvenanceLegend />
+</div>
   );
 }
 
@@ -1006,7 +1009,12 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
                   <td class="table-td font-mono">SF {row.scale_factor}</td>
                   <td class="table-td">{row.test_type ?? "-"}</td>
                   <td class="table-td">{row.run_date.slice(0, 10)}</td>
-                  <td class="table-td"><TrustBadge trustLabel={row.trust_label} compact /></td>
+                  <td class="table-td">
+                    <div class="flex flex-wrap gap-1">
+                      <TrustBadge trustLabel={row.trust_label} compact />
+                      <FundingChip funding={row.funding} compact />
+                    </div>
+                  </td>
                   <td class="table-td max-w-[16rem]">
                     <CompareReasonStatus
                       id={reasonId}
