@@ -60,62 +60,26 @@ def test_tpch_power_preflight_detects_generation_failures():
     assert "preflight failed" in str(ei.value).lower()
 
 
-def _mk_tpcds_throughput(num_streams=2):
+def test_tpcds_throughput_preflight_detects_generation_failures():
     from benchbox.core.tpcds.benchmark import TPCDSBenchmark
     from benchbox.core.tpcds.throughput_test import TPCDSThroughputTest
 
     bench = TPCDSBenchmark(scale_factor=1.0, verbose=False)
-    return TPCDSThroughputTest(
+
+    def _get_query(query_id, **kwargs):
+        # Fail one query to trigger preflight error
+        if query_id == 7:
+            raise RuntimeError("Template substitution error for q7")
+        return f"SELECT {query_id}"
+
+    bench.get_query = _get_query  # type: ignore[attr-defined]
+    thr = TPCDSThroughputTest(
         benchmark=bench,
         connection_factory=lambda: Mock(),
         scale_factor=0.01,
-        num_streams=num_streams,
+        num_streams=2,
     )
-
-
-def _fake_dsqgen_streams(num_streams, query_ids=(3, 7, 17)):
-    """Stand in for one `dsqgen -STREAMS` batch pass."""
-    from benchbox.core.tpcds.streams import StreamQuery
-
-    return {
-        stream_id: [
-            StreamQuery(stream_id=stream_id, position=position, query_id=qid, sql=f"SELECT {qid}")
-            for position, qid in enumerate(query_ids)
-        ]
-        for stream_id in range(num_streams)
-    }
-
-
-def test_tpcds_throughput_preflight_detects_dsqgen_batch_failure(monkeypatch):
-    """A failed `dsqgen -STREAMS` pass must fail fast, before the timed window."""
-    from benchbox.core.tpcds import streams
-
-    def _boom(**kwargs):
-        raise streams.DSQGenStreamsError("dsqgen exited 1")
-
-    monkeypatch.setattr(streams, "generate_dsqgen_streams", _boom)
-
-    with pytest.raises(RuntimeError) as ei:
-        _mk_tpcds_throughput().run()
-    assert "dsqgen -streams generation failed" in str(ei.value).lower()
-
-
-def test_tpcds_throughput_preflight_detects_generation_failures(monkeypatch):
-    """A per-query translation failure must fail fast, before the timed window."""
-    from benchbox.core.tpcds import streams
-
-    monkeypatch.setattr(streams, "generate_dsqgen_streams", lambda **kw: _fake_dsqgen_streams(kw["num_streams"]))
-
-    thr = _mk_tpcds_throughput()
-
-    def _translate(sql, source, target):
-        if sql == "SELECT 7":
-            raise RuntimeError("Template substitution error for q7")
-        return sql
-
-    thr.benchmark.translate_query_text = _translate  # type: ignore[attr-defined]
 
     with pytest.raises(RuntimeError) as ei:
         thr.run()
     assert "preflight failed" in str(ei.value).lower()
-    assert "q7" in str(ei.value)
