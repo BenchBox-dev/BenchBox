@@ -295,6 +295,19 @@ class PlatformAdapterCursor:
         """Return one row."""
         return self.rows[0] if self.rows else None
 
+    def row_count(self) -> int:
+        """Return this cursor's row count without forcing full materialization.
+
+        Thin delegate to ``count_query_rows(self)``. Exists so that
+        `benchbox.core` callers (e.g. the TPC-H/TPC-DS throughput drivers)
+        can duck-type on a ``row_count()`` method instead of importing
+        ``count_query_rows`` directly - the layering convention
+        ``utils < core < platforms < cli`` forbids ``core`` importing from
+        ``platforms``. See `benchbox.core.tpch.throughput_test` and
+        `benchbox.core.tpcds.throughput_test` for the call sites.
+        """
+        return count_query_rows(self)
+
 
 def count_query_rows(cursor: Any) -> int:
     """Return a stream query result's row count without forcing full materialization.
