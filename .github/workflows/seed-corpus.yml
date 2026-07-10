@@ -277,11 +277,12 @@ jobs:
 
           ### Merging
 
-          Merge triggers the \`docs\` workflow which rebuilds the read model and
-          redeploys the results explorer.
+          Merge into \`develop\` triggers \`sync-results-data-to-published\`, which
+          opens a draft PR mirroring these bundles onto the \`published-results\`
+          corpus branch.
           EOF
           )" \
-            --base main \
+            --base develop \
             --head "${{ steps.commit.outputs.branch }}"
 
       - name: No changes to commit
