@@ -1359,8 +1359,16 @@ pr-refresh:
 	$(MAKE) -s pr-open
 
 # Pure-git pairwise textual-conflict probe. Caller passes BRANCH=<current>;
-# we compare HEAD against every other open PR head via `git merge-tree` and
-# print warnings. Warn-only; does not exit non-zero. Used internally by pr-open.
+# we compare HEAD against every other open PR head via `git merge-tree
+# --write-tree` and print warnings. Warn-only; does not exit non-zero. Used
+# internally by pr-open.
+#
+# Exit status is the signal: 0 clean, 1 conflict, >1 error (e.g. unrelated
+# histories). Bad refs also exit 1, hence the rev-parse guard above the probe.
+# Do not parse the deprecated three-arg `git merge-tree <base> <a> <b>`: its
+# `changed in both` / `added in both` / `removed in {local,remote}` lines are
+# informational trivial-merge headers, not conflicts, and its real conflict
+# markers are diff-prefixed (`+<<<<<<< .our`), so `^<<<<<<<` never matches.
 pr-conflict-scan:
 	@CURRENT="$(BRANCH)"; \
 	[ -n "$$CURRENT" ] || CURRENT=$$(git branch --show-current); \
@@ -1369,11 +1377,11 @@ pr-conflict-scan:
 	while read num branch; do \
 		[ "$$branch" = "$$CURRENT" ] && continue; \
 		git fetch origin "$$branch" --quiet 2>/dev/null || continue; \
-		base=$$(git merge-base HEAD "origin/$$branch" 2>/dev/null) || continue; \
-		out=$$(git merge-tree "$$base" HEAD "origin/$$branch" 2>/dev/null); \
-		if echo "$$out" | grep -qE '^(<<<<<<<|changed in both|added in both|removed in local|removed in remote|CONFLICT )'; then \
-			echo "  ⚠ textual conflict with PR #$$num ($$branch) — coordinate before landing"; \
-		fi; \
+		git rev-parse --verify --quiet "origin/$$branch^{commit}" >/dev/null || continue; \
+		out=$$(git merge-tree --write-tree --name-only HEAD "origin/$$branch" 2>/dev/null); \
+		[ $$? -eq 1 ] || continue; \
+		files=$$(printf '%s\n' "$$out" | awk 'NR>1 && NF==0{exit} NR>1{printf "%s%s", sep, $$0; sep=", "}'); \
+		echo "  ⚠ textual conflict with PR #$$num ($$branch) in $$files — coordinate before landing"; \
 	done; true
 
 # Show open PRs against develop and their CI + auto-merge state.
