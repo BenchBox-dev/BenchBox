@@ -8,6 +8,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import itertools
 import re
 import subprocess
 import sys
@@ -542,6 +543,50 @@ class TestReleaseInfrastructure:
         assert "git log origin/main..HEAD" in release_guide
         assert "origin/main" in release_guide
         assert "intentionally does not replay release commits onto" in release_guide
+
+    def test_release_cut_gates_on_changelog_curation_not_on_editor(self):
+        """`EDITOR=true` must not wave a raw commit dump into a release.
+
+        The old gate refused to skip curation only when EDITOR was unset AND
+        there was no TTY, so setting EDITOR to any no-op binary defeated it.
+        The gate is now the drafted section's own text.
+        """
+        recipe = _make_target_recipe("release-cut")
+
+        assert "scripts/generate_changelog_entry.py --check-curation --version $(VERSION)" in recipe
+        assert "refusing to skip changelog curation" not in recipe
+        gen_idx = recipe.index("--version $(VERSION) --since-ref origin/main")
+        check_idx = recipe.index("--check-curation")
+        rm_idx = recipe.index("git rm")
+        assert gen_idx < check_idx < rm_idx, "curation check must gate between changelog draft and `git rm`"
+
+    def test_release_cut_is_resumable_and_has_an_abort_target(self):
+        """An interrupted cut must be resumable or discardable, not a manual cleanup.
+
+        The v0.3.1 cut died at the changelog step twice, each time leaving the
+        vX.Y.Z branch created, versions bumped and uv.lock rewritten with no
+        commit.
+        """
+        recipe = _make_target_recipe("release-cut")
+        assert "Resuming interrupted cut" in recipe
+        assert "already carries its release commit" in recipe
+        assert "git checkout -b v$(VERSION) develop" in recipe
+        assert "git rev-parse --verify --quiet refs/heads/v$(VERSION)" in recipe
+
+        assert "--first-parent" in recipe, (
+            "the resume guard must walk first-parent: the `-s ours` alignment merge puts "
+            "origin/main's release ledger (full of 'Release vX.Y.Z' subjects) on the second parent, "
+            "and a plain `git log -1` misses a release commit sitting beneath that merge"
+        )
+
+        abort = _make_target_recipe("release-cut-abort")
+        assert "git reset --hard HEAD" in abort
+        assert "git checkout develop" in abort
+        assert "git branch -D v$(VERSION)" in abort
+        assert "git ls-remote --exit-code --heads origin" in abort, (
+            "abort must refuse to discard a release branch that already exists on origin"
+        )
+        assert ".PHONY: release-cut release-cut-abort release-finalize" in _makefile_text()
 
     def test_release_cut_curation_survives_untracked_paths(self):
         """Curation `git rm` lines must use --ignore-unmatch and abort on real failures.
@@ -1118,3 +1163,189 @@ class TestBetaReleaseSurface:
             "ty check reported diagnostics on Beta-critical entrypoints.\n"
             "Fix the diagnostics before releasing Beta:\n" + result.stdout + result.stderr
         )
+
+
+def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+
+
+def _init_repo(root: Path) -> None:
+    """Init a scratch repo insulated from the developer's ambient git config."""
+    root.mkdir(parents=True, exist_ok=True)
+    _git("init", "-q", ".", cwd=root)
+    # A global commit.gpgsign or core.hooksPath would otherwise break _commit_all.
+    for key, value in (
+        ("user.email", "test@benchbox.invalid"),
+        ("user.name", "BenchBox Test"),
+        ("commit.gpgsign", "false"),
+        ("tag.gpgsign", "false"),
+        ("core.hooksPath", str(root / ".no-hooks")),
+    ):
+        _git("config", key, value, cwd=root)
+
+
+def _commit_all(root: Path, message: str) -> None:
+    _git("add", "-A", cwd=root)
+    result = _git("commit", "-q", "--no-verify", "-m", message, cwd=root)
+    assert result.returncode == 0, f"scratch commit failed: {result.stdout}{result.stderr}"
+
+
+def _default_branch(root: Path) -> str:
+    return _git("symbolic-ref", "--short", "HEAD", cwd=root).stdout.strip()
+
+
+def _probe(root: Path, theirs: str) -> subprocess.CompletedProcess:
+    """Run the exact merge probe `pr-conflict-scan` uses, HEAD vs `theirs`."""
+    return _git("merge-tree", "--write-tree", "--name-only", "HEAD", theirs, cwd=root)
+
+
+def _git_version() -> tuple[int, ...]:
+    out = subprocess.run(["git", "--version"], capture_output=True, text=True, check=True).stdout
+    match = re.search(r"(\d+)\.(\d+)\.(\d+)", out)
+    assert match is not None, f"unparseable git version: {out!r}"
+    return tuple(int(part) for part in match.groups())
+
+
+# `git merge-tree --write-tree` landed in git 2.38.
+requires_modern_merge_tree = pytest.mark.skipif(
+    _git_version() < (2, 38, 0),
+    reason="pr-conflict-scan requires git >= 2.38 for `merge-tree --write-tree`",
+)
+
+
+class TestPrConflictScan:
+    """`pr-conflict-scan` must warn on real conflicts and stay silent otherwise.
+
+    Regression guard for the false-positive storm caused by parsing the
+    deprecated three-arg `git merge-tree <base> <ours> <theirs>` output: its
+    `changed in both` / `added in both` / `removed in {local,remote}` lines are
+    informational trivial-merge headers emitted for any file both sides touched,
+    not conflicts. Because nearly every PR edits CHANGELOG.md, the old probe
+    warned on almost every pair.
+    """
+
+    def test_probe_uses_modern_write_tree_form(self):
+        """The recipe must use the modern form and gate on a verified ref."""
+        recipe = _make_target_recipe("pr-conflict-scan")
+
+        assert 'git merge-tree --write-tree --name-only HEAD "origin/$$branch"' in recipe
+        # A bad ref also exits 1, indistinguishable from a conflict, so the ref
+        # must be verified before the probe runs.
+        assert 'git rev-parse --verify --quiet "origin/$$branch^{commit}"' in recipe
+        assert recipe.index("rev-parse --verify") < recipe.index("merge-tree")
+        # Only exit status 1 means conflict; >1 is an error and must not warn.
+        assert "[ $$? -eq 1 ] || continue" in recipe
+
+    def test_probe_does_not_parse_legacy_informational_headers(self):
+        """The legacy trivial-merge headers must never be treated as conflicts."""
+        # _make_target_recipe returns recipe lines only, so the explanatory
+        # comment above the target -- which names these headers -- is excluded.
+        recipe = _make_target_recipe("pr-conflict-scan")
+
+        for header in ("changed in both", "added in both", "removed in local", "removed in remote"):
+            assert header not in recipe, f"{header!r} is an informational header, not a conflict"
+        # The legacy three-arg form takes an explicit merge base as $1.
+        assert 'git merge-tree "$$base"' not in recipe
+
+    def test_scan_is_warn_only(self):
+        """The probe reports; it must never fail the caller's `pr-open`."""
+        recipe = _make_target_recipe("pr-conflict-scan")
+        assert recipe.rstrip().endswith("done; true")
+
+    @requires_modern_merge_tree
+    def test_probe_is_silent_when_sides_touch_disjoint_files(self, tmp_path: Path):
+        repo = tmp_path / "disjoint"
+        _init_repo(repo)
+        (repo / "ours.txt").write_text("a\n")
+        (repo / "theirs.txt").write_text("b\n")
+        _commit_all(repo, "base")
+        base = _default_branch(repo)
+
+        _git("checkout", "-q", "-b", "feature", cwd=repo)
+        (repo / "theirs.txt").write_text("theirs edit\n")
+        _commit_all(repo, "feature")
+
+        _git("checkout", "-q", base, cwd=repo)
+        (repo / "ours.txt").write_text("ours edit\n")
+        _commit_all(repo, "ours")
+
+        assert _probe(repo, "feature").returncode == 0
+
+    @requires_modern_merge_tree
+    def test_probe_is_silent_when_both_sides_edit_one_file_cleanly(self, tmp_path: Path):
+        """The exact false positive: both sides edit one file, far-apart hunks."""
+        repo = tmp_path / "same_file_clean"
+        _init_repo(repo)
+        (repo / "CHANGELOG.md").write_text("".join(f"line{i}\n" for i in range(1, 21)))
+        _commit_all(repo, "base")
+        base = _default_branch(repo)
+
+        _git("checkout", "-q", "-b", "feature", cwd=repo)
+        lines = (repo / "CHANGELOG.md").read_text().splitlines(keepends=True)
+        lines[-1] = "feature entry\n"
+        (repo / "CHANGELOG.md").write_text("".join(lines))
+        _commit_all(repo, "feature")
+
+        _git("checkout", "-q", base, cwd=repo)
+        lines = (repo / "CHANGELOG.md").read_text().splitlines(keepends=True)
+        lines[0] = "ours entry\n"
+        (repo / "CHANGELOG.md").write_text("".join(lines))
+        _commit_all(repo, "ours")
+
+        assert _probe(repo, "feature").returncode == 0, "clean auto-merge must not warn"
+
+        # The legacy probe the recipe used to run would have warned here.
+        merge_base = _git("merge-base", "HEAD", "feature", cwd=repo).stdout.strip()
+        legacy = _git("merge-tree", merge_base, "HEAD", "feature", cwd=repo).stdout
+        assert "changed in both" in legacy, "the legacy false-positive trigger is still reproducible"
+
+    @requires_modern_merge_tree
+    def test_probe_warns_on_a_true_conflict(self, tmp_path: Path):
+        repo = tmp_path / "conflict"
+        _init_repo(repo)
+        (repo / "Makefile").write_text("target:\n\techo base\n")
+        _commit_all(repo, "base")
+        base = _default_branch(repo)
+
+        _git("checkout", "-q", "-b", "feature", cwd=repo)
+        (repo / "Makefile").write_text("target:\n\techo feature\n")
+        _commit_all(repo, "feature")
+
+        _git("checkout", "-q", base, cwd=repo)
+        (repo / "Makefile").write_text("target:\n\techo ours\n")
+        _commit_all(repo, "ours")
+
+        result = _probe(repo, "feature")
+        assert result.returncode == 1, "a same-line conflict must be detected"
+        # Line 1 is the tree OID; conflicted names follow, terminated by a blank line.
+        conflicted = list(itertools.takewhile(bool, result.stdout.splitlines()[1:]))
+        assert conflicted == ["Makefile"]
+
+    @requires_modern_merge_tree
+    def test_legacy_conflict_marker_is_diff_prefixed(self, tmp_path: Path):
+        """`^<<<<<<<` can never match legacy output, so that fallback is unsafe.
+
+        Guards against "just anchor the grep to `<<<<<<<`" — in the legacy
+        format the marker is emitted inside a diff body as `+<<<<<<< .our`,
+        so an anchored grep matches nothing and the scan goes permanently
+        silent: a false negative on every real conflict.
+        """
+        repo = tmp_path / "legacy_marker"
+        _init_repo(repo)
+        (repo / "f.txt").write_text("base\nkeep\n")
+        _commit_all(repo, "base")
+        base = _default_branch(repo)
+
+        _git("checkout", "-q", "-b", "feature", cwd=repo)
+        (repo / "f.txt").write_text("feature\nkeep\n")
+        _commit_all(repo, "feature")
+
+        _git("checkout", "-q", base, cwd=repo)
+        (repo / "f.txt").write_text("ours\nkeep\n")
+        _commit_all(repo, "ours")
+
+        merge_base = _git("merge-base", "HEAD", "feature", cwd=repo).stdout.strip()
+        legacy = _git("merge-tree", merge_base, "HEAD", "feature", cwd=repo).stdout
+
+        assert "<<<<<<<" in legacy
+        assert not any(line.startswith("<<<<<<<") for line in legacy.splitlines())
