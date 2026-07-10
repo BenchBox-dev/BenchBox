@@ -264,21 +264,21 @@ jobs:
             --body "$(cat <<'EOF'
           ## Seed corpus update
 
-          Automated PR from the \`seed-corpus\` workflow (run [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})).
+          Automated PR from the `seed-corpus` workflow (run [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})).
 
           ### Bundles included
 
-          New or updated result bundles are committed under \`results-data/bundles/\`.
+          New or updated result bundles are committed under `results-data/bundles/`.
           Review the diff to confirm expected benchmark × platform × scale coverage.
 
           ### Trust label
 
-          All bundles in this PR carry the \`maintainer-run\` / \`public-curated\` trust label.
+          All bundles in this PR carry the `maintainer-run` / `public-curated` trust label.
 
           ### Merging
 
-          Merge into \`develop\` triggers \`sync-results-data-to-published\`, which
-          opens a draft PR mirroring these bundles onto the \`published-results\`
+          Merge into `develop` triggers `sync-results-data-to-published`, which
+          opens a draft PR mirroring these bundles onto the `published-results`
           corpus branch.
           EOF
           )" \

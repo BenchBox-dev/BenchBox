@@ -67,6 +67,19 @@ def test_seed_corpus_head_branch_can_never_target_the_release_branch() -> None:
     assert not RELEASE_HEAD_RE.match(head)
 
 
+def test_seed_corpus_pr_body_does_not_escape_backticks() -> None:
+    """The PR body heredoc is quoted (`<<'EOF'`), so nothing inside is expanded.
+
+    Backslash-escaping a backtick there is not protection, it is a literal
+    backslash in the rendered PR body.
+    """
+    run = _create_pr_steps()["Open pull request"]
+    body = run.split("<<'EOF'", 1)[1].split("\nEOF", 1)[0]
+
+    assert "`" in body, "sanity: the body is expected to contain backticks"
+    assert "\\`" not in body
+
+
 def test_release_head_regex_matches_real_release_branches() -> None:
     """Guard the mirrored regex itself, so the test above cannot pass vacuously."""
     assert RELEASE_HEAD_RE.match("v0.3.1")
