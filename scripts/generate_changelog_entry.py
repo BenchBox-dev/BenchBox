@@ -29,7 +29,7 @@ Usage:
     uv run python scripts/generate_changelog_entry.py --version 0.3.0 \
         --release-date 2026-04-30 --since-tag v0.2.1
     uv run python scripts/generate_changelog_entry.py --version 0.3.1 \
-        --since-ref origin/main
+        --since-ref origin/release
     uv run python scripts/generate_changelog_entry.py --version 0.3.1 \
         --check-curation
 """
@@ -62,7 +62,7 @@ _FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 #
 # The ceiling is set from evidence, not the prompt's 10-25 target: the largest
 # genuinely hand-curated section shipped so far is 0.2.1 at 39 bullets, while
-# the raw origin/main..HEAD delta at v0.3.1 was 231 conventional commits. 60
+# the raw origin/release..HEAD delta at v0.3.1 was 231 conventional commits. 60
 # separates the two with room to spare.
 MAX_CURATED_BULLETS = 60
 RAW_PLACEHOLDER = "(no user-facing changes detected -- please edit manually)"
@@ -76,7 +76,7 @@ _BULLET_RE = re.compile(r"^\s*- \S")
 _CHANGELOG_VERSION_HEADER_RE = re.compile(r"^## \[(?P<version>\d+\.\d+\.\d+)\] - ", re.MULTILINE)
 
 # Matches a release-cut branch name, e.g. "v0.3.1" or "v0.3.1-rc1". Mirrors
-# the HEAD_REF regex in .github/workflows/validate-main-pr.yml so the two
+# the HEAD_REF regex in .github/workflows/validate-release-pr.yml so the two
 # checks agree on what counts as an in-progress release branch.
 _RELEASE_BRANCH_RE = re.compile(r"^v(?P<version>\d+\.\d+\.\d+)(-[A-Za-z0-9.+-]+)?$")
 
@@ -314,7 +314,7 @@ def check_changelog_curation(source: Path, version: str) -> tuple[bool, list[str
     """Return (ok, problems) for the drafted `version` section.
 
     `release-cut` generates a section from every conventional commit in the
-    `origin/main..HEAD` patch delta, which for a `main` that lags `develop` is
+    `origin/release..HEAD` patch delta, which for a `release` branch that lags `develop` is
     a raw dump of hundreds of commit subjects. The old gate only refused to
     skip curation when `EDITOR` was unset *and* stdin was not a TTY, so
     `EDITOR=true` waved the raw dump through. This checks the text instead.
@@ -381,7 +381,7 @@ def find_untagged_changelog_versions(
     being cut before its tag exists (the tag is pushed later, by
     `release-finalize`, after squash-merge to main). So when
     `current_branch` matches the release-branch shape recognised by
-    `.github/workflows/validate-main-pr.yml` (`vX.Y.Z[-suffix]`), the one
+    `.github/workflows/validate-release-pr.yml` (`vX.Y.Z[-suffix]`), the one
     untagged version matching that branch's own version number is exempt.
 
     Every other untagged dated section is flagged - in particular, any
@@ -563,7 +563,7 @@ def generate_changelog_entry(
         since_tag: Tag to use as the lower bound (e.g. 'v0.2.1'). Ignored
             when since_ref is set. If neither is set, the latest matching v*
             tag is auto-detected.
-        since_ref: Ref to use as the lower bound (e.g. 'origin/main'). This is
+        since_ref: Ref to use as the lower bound (e.g. 'origin/release'). This is
             the release-branch flow default because `develop` is intentionally
             not tagged after releases.
 
@@ -690,7 +690,7 @@ def main() -> int:
     parser.add_argument(
         "--since-ref",
         default=None,
-        help="Lower-bound ref for commit range, e.g. origin/main. Overrides --since-tag.",
+        help="Lower-bound ref for commit range, e.g. origin/release. Overrides --since-tag.",
     )
     parser.add_argument(
         "--source",

@@ -1,12 +1,12 @@
-name: Validate main PR base
+name: Validate release PR base
 
 on:
   pull_request:
     branches:
-      - main
+      - release
 
 concurrency:
-  group: validate-main-pr-${{ github.ref }}
+  group: validate-release-pr-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -18,16 +18,16 @@ jobs:
     name: validate-base
     runs-on: ubuntu-latest
     steps:
-      - name: Reject non-release-branch PRs to main
+      - name: Reject non-release-branch PRs to release
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |
           set -euo pipefail
           if [[ "${HEAD_REF}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.+-]+)?$ ]]; then
-            echo "Release branch '${HEAD_REF}' approved for merge into main."
+            echo "Release branch '${HEAD_REF}' approved for merge into release."
             exit 0
           fi
-          echo "::error::Only release branches matching 'vX.Y.Z' (optionally with a '-suffix') may merge into main. Got '${HEAD_REF}'."
+          echo "::error::Only release branches matching 'vX.Y.Z' (optionally with a '-suffix') may merge into release. Got '${HEAD_REF}'."
           echo "::error::Open this PR against 'develop' instead, or cut a release branch via 'make release-cut VERSION=X.Y.Z'."
           exit 1
 
@@ -57,16 +57,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_CANARY_WORKFLOW: release-canary.yml
-          RELEASE_CANARY_BRANCH: main
+          # The canary workflow fires from the DEFAULT branch (develop as of the
+          # 2026-07-08 default-branch switch), so its runs carry head_branch=develop.
+          RELEASE_CANARY_BRANCH: develop
           RELEASE_CANARY_CHECKED_REF: develop
           RELEASE_CANARY_MAX_AGE_HOURS: "48"
           RELEASE_READINESS_OVERRIDE_SHA: ${{ vars.RELEASE_READINESS_OVERRIDE_SHA }}
           RELEASE_READINESS_OVERRIDE_REASON: ${{ vars.RELEASE_READINESS_OVERRIDE_REASON }}
         run: |
           if [ ! -f scripts/release_readiness_check.py ]; then
-            # Trusted-base bootstrap: the readiness script ships to main with
-            # this release, so the base checkout cannot have it yet. Mirror the
-            # missing-workflow bootstrap path and run inline release evidence.
+            # Trusted-base bootstrap: the readiness script ships to the release
+            # branch as part of this release, so the base checkout cannot have it
+            # yet. Mirror the missing-workflow bootstrap path and run inline
+            # release evidence.
             echo "bootstrap_required=true" >> "$GITHUB_OUTPUT"
             echo "::warning::scripts/release_readiness_check.py is not on the trusted base yet; running inline release evidence."
             exit 0
@@ -92,7 +95,7 @@ jobs:
         with:
           # Inline bootstrap evidence must run against the release content
           # being validated; the trusted base cannot supply it while the
-          # canary tooling has not shipped to main yet.
+          # canary tooling has not shipped to the release branch yet.
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Bootstrap non-fast release evidence
@@ -124,7 +127,7 @@ jobs:
         run: |
           set -euo pipefail
           # scripts/ruleset_drift_check.py imports the enforcement helper from
-          # _project/scripts, but both the release head and the trusted main
+          # _project/scripts, but both the release head and the trusted release
           # base are curated (no _project/) once the release-cut curation
           # step removes it. Pull the helper AND its _project/scripts
           # dependency (auto_merge_soundness_paths) from develop, which always

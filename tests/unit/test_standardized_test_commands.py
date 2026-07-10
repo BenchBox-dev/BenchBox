@@ -474,7 +474,7 @@ class TestMakefileCommands:
         job = workflow["jobs"]["correctness-gate"]
         aggregate = workflow["jobs"]["release-required-result"]
 
-        assert "github.base_ref == 'main'" in job["if"]
+        assert "github.base_ref == 'release'" in job["if"]
         assert "make test-correctness-gate" in _workflow_job_run_text(
             repo_root / ".github" / "workflows" / "test.yml",
             "correctness-gate",

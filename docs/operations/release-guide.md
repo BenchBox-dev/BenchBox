@@ -2,7 +2,7 @@
 
 BenchBox releases follow a **version-branch flow** on a single repo
 (`joeharris76/BenchBox`) with two long-lived branches: `develop` (dev work)
-and `main` (release-only). This guide is the maintainer runbook.
+and `release` (release-only). This guide is the maintainer runbook.
 
 ## The flow (2 commands)
 
@@ -18,8 +18,8 @@ That's the entire flow. The two Make targets do the rest.
 ## Pre-merge release-required contract
 
 Release PRs target `main` and must be opened from branches accepted by
-`.github/workflows/validate-main-pr.yml` (`vX.Y.Z`, optionally with a suffix).
-Before a release PR can merge, the `main-release-only` ruleset must require:
+`.github/workflows/validate-release-pr.yml` (`vX.Y.Z`, optionally with a suffix).
+Before a release PR can merge, the `release-only` ruleset must require:
 
 - `validate-base`
 - `release-required-result`
@@ -83,8 +83,8 @@ must not be bypassed with an undocumented local change.
 1. Cuts a `vX.Y.Z` branch off `develop` (`develop` itself is never modified).
 2. Bumps the 6 version sources via `scripts/update_version.py` and generates
    the CHANGELOG entry via `scripts/generate_changelog_entry.py --since-ref
-   origin/main`. The release note boundary is the current release branch patch
-   delta against `main`, not `git log origin/main..HEAD` ancestry and not the
+   origin/release`. The release note boundary is the current release branch patch
+   delta against `release`, not `git log origin/release..HEAD` ancestry and not the
    latest tag reachable from `develop`, because `release-finalize`
    intentionally does not replay release commits onto `develop`.
 3. Opens `$EDITOR` on `CHANGELOG.md` for hand-curation when a terminal is
@@ -92,7 +92,7 @@ must not be bypassed with an undocumented local change.
    which inspects the drafted section's text: it rejects verbatim commit
    subjects (trailing `(#NNNN)`), the manual-edit placeholder, and more than
    60 bullets. Curation is always required — the draft is the raw
-   `origin/main..HEAD` delta, hundreds of commits whenever `main` lags
+   `origin/release..HEAD` delta, hundreds of commits whenever `release` lags
    `develop`. Headless runs stop here: hand-curate the section, then re-run
    `make release-cut` (see "Resuming or aborting a cut" below).
    `RELEASE_ALLOW_RAW_CHANGELOG=1` accepts the raw draft deliberately.
@@ -104,14 +104,14 @@ must not be bypassed with an undocumented local change.
    `/prompts/` and promoted release posts ship; `results-explorer/`,
    `results-data/`, and explorer/results-data workflows do not.
 5. Commits a single `Release vX.Y.Z` commit on `vX.Y.Z`.
-6. Merges `origin/main` into `vX.Y.Z` with `-s ours
-   --allow-unrelated-histories`. `main` and `develop` have unrelated roots and
+6. Merges `origin/release` into `vX.Y.Z` with `-s ours
+   --allow-unrelated-histories`. `release` and `develop` have unrelated roots and
    diverge permanently, so without this the release PR is unmergeable, GitHub
    cannot compute a merge ref, and **no CI runs at all**. `-s ours` keeps the
    curated release tree byte-for-byte (the merge is guarded on that) and only
-   records `main` as a second parent, which `release-finalize`'s squash-merge
+   records `release` as a second parent, which `release-finalize`'s squash-merge
    then collapses away.
-7. Pushes and opens a PR against `main`.
+7. Pushes and opens a PR against `release`.
 8. Sweeps prior `v*` branches on origin (option-c lifecycle: keep until
    superseded, then auto-delete on the next `release-cut`).
 
@@ -150,28 +150,28 @@ raw commit subjects, which step 3 requires you to curate anyway.
    both `validate-base` and `release-required-result` are present and green.
    Missing means the ruleset/workflow contract is broken; pending means wait
    in GitHub Actions and rerun the command. `release-finalize` does not poll.
-3. Squash-merges the PR. (Ruleset `main-release-only` also blocks the merge
+3. Squash-merges the PR. (Ruleset `release-only` also blocks the merge
    unless `validate-base` and `release-required-result` are green.)
-4. Fast-forwards `main` and tags `vX.Y.Z`.
+4. Fast-forwards `release` and tags `vX.Y.Z`.
 5. Pushes the tag — which fires `.github/workflows/release.yml`:
    `dependency-bounds` → `build` (with `SOURCE_DATE_EPOCH` from the tag
    commit) → `publish` (PyPI trusted publisher) → `github-release` →
    `test-installation` (cross-platform pip install verification).
 6. Leaves `develop` untouched. Dev-only paths persist on develop by
    design (per A3 in `_project/decisions/single-repo-migration.md`); the
-   release squash on `main` does not need to be replayed onto develop.
+   release squash on `release` does not need to be replayed onto develop.
 
-Push-to-main jobs are post-merge signals. They may still start when `main`
+Push-to-release jobs are post-merge signals. They may still start when `release`
 advances, but they are not pre-publish evidence: the tag push follows the
 successful release PR merge and `.github/workflows/release.yml` begins from
-that public tag. If a post-merge `main` check fails after the tag is pushed,
+that public tag. If a post-merge `release` check fails after the tag is pushed,
 handle it as a patch release or incident; do not treat the already-published
 release as if it had been blocked.
 
 ## Recovering from common failures
 
 - **`validate-base` or `release-required-result` is missing**: stop. The
-  `main-release-only` ruleset or release workflow contract is out of sync;
+  `release-only` ruleset or release workflow contract is out of sync;
   do not finalize until both stable required contexts exist.
 - **`validate-base` or `release-required-result` is pending or failed**: wait
   for GitHub Actions or fix on a feature branch off `develop`, PR back to

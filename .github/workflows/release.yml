@@ -12,37 +12,37 @@ on:
         type: boolean
 
 jobs:
-  # Note: ruleset main-release-only gates the release-cut PR on lint + test
-  # before squash-merge to main, so the tag fired here is expected to have
-  # already been CI-validated. verify-tag-on-main below enforces that
+  # Note: ruleset release-only gates the release-cut PR on lint + test
+  # before squash-merge to release, so the tag fired here is expected to have
+  # already been CI-validated. verify-tag-on-release below enforces that
   # invariant in the workflow itself (rather than relying solely on the
-  # out-of-band process of "nobody tags/dispatches from anywhere but main")
+  # out-of-band process of "nobody tags/dispatches from anywhere but release")
   # before any build/publish work starts. The previous check-ci-passed JS
   # poller was redundant with the ruleset and has been removed.
-  verify-tag-on-main:
+  verify-tag-on-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Assert release ref is main or an ancestor of main
+      - name: Assert release ref is release or an ancestor of release
         run: |
-          git fetch origin main --quiet
+          git fetch origin release --quiet
           target_sha="${{ github.sha }}"
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            echo "Tag push ${{ github.ref_name }}: verifying $target_sha is an ancestor of origin/main"
+            echo "Tag push ${{ github.ref_name }}: verifying $target_sha is an ancestor of origin/release"
           else
-            echo "workflow_dispatch from ${{ github.ref }}: verifying $target_sha is origin/main or an ancestor of it"
+            echo "workflow_dispatch from ${{ github.ref }}: verifying $target_sha is origin/release or an ancestor of it"
           fi
-          if ! git merge-base --is-ancestor "$target_sha" origin/main; then
-            echo "::error::Ref $target_sha (${{ github.ref }}) is not origin/main or an ancestor of it. Refusing to build/publish."
+          if ! git merge-base --is-ancestor "$target_sha" origin/release; then
+            echo "::error::Ref $target_sha (${{ github.ref }}) is not origin/release or an ancestor of it. Refusing to build/publish."
             exit 1
           fi
-          echo "OK: $target_sha is origin/main or an ancestor of it."
+          echo "OK: $target_sha is origin/release or an ancestor of it."
 
   dependency-bounds:
-    needs: verify-tag-on-main
+    needs: verify-tag-on-release
     runs-on: ubuntu-latest
     outputs:
       report_path: ${{ steps.gate.outputs.report_path }}
@@ -79,7 +79,7 @@ jobs:
           retention-days: 90
 
   build:
-    needs: [verify-tag-on-main, dependency-bounds]
+    needs: [verify-tag-on-release, dependency-bounds]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -139,8 +139,8 @@ jobs:
         # below). Test PyPI publishing via workflow_dispatch from any ref is
         # the intended pre-release validation path and is lower risk by
         # design (test.pypi.org is not the real distribution channel);
-        # verify-tag-on-main above still requires the dispatched ref be
-        # main or an ancestor of it, which is sufficient here.
+        # verify-tag-on-release above still requires the dispatched ref be
+        # release or an ancestor of it, which is sufficient here.
         if: github.event.inputs.test_pypi == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
@@ -150,7 +150,7 @@ jobs:
           verbose: true
 
       - name: Publish to PyPI
-        # Defense in depth alongside verify-tag-on-main: even if that job is
+        # Defense in depth alongside verify-tag-on-release: even if that job is
         # ever bypassed or miswired, this step alone refuses to publish to
         # real PyPI unless the triggering ref is an actual v* tag. A
         # workflow_dispatch from a branch (with the test_pypi input left at

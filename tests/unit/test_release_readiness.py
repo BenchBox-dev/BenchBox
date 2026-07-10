@@ -204,7 +204,7 @@ def test_main_queries_trusted_default_branch(monkeypatch: pytest.MonkeyPatch) ->
     assert rc == 1
     assert captured_urls == [
         "https://api.github.com/repos/joeharris76/BenchBox/actions/workflows/release-canary.yml/runs?"
-        "branch=main&status=completed&per_page=20"
+        "branch=develop&status=completed&per_page=20"
     ]
 
 

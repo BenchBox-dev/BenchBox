@@ -375,7 +375,7 @@ benchbox-mcp = "benchbox.mcp.cli:main"
 "Bug Tracker" = "https://github.com/joeharris76/benchbox/issues"
 "Documentation" = "https://benchbox.readthedocs.io/"
 "Repository" = "https://github.com/joeharris76/benchbox.git"
-"Changelog" = "https://github.com/joeharris76/benchbox/blob/main/CHANGELOG.md"
+"Changelog" = "https://github.com/joeharris76/benchbox/blob/release/CHANGELOG.md"
 
 [tool.ty]
 # ty configuration

@@ -154,10 +154,10 @@ def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
     Empty list == at least one ACTIVE ruleset with ``target == "tag"`` whose
     ref conditions cover ``refs/tags/v*`` (or ``~ALL``) AND that carries a
     ``creation`` rule. That is the repo-admin layer closing the last
-    zero-human path to publish: ``release.yml``'s ``verify-tag-on-main`` only
-    stops a tag that does not point at a main-ancestor commit; it does nothing
+    zero-human path to publish: ``release.yml``'s ``verify-tag-on-release`` only
+    stops a tag that does not point at a release-ancestor commit; it does nothing
     to stop a collaborator with push access from creating a ``v*`` tag ON an
-    existing main commit out of band. A tag-creation ruleset restricts who may
+    existing release commit out of band. A tag-creation ruleset restricts who may
     mint the tag in the first place.
 
     Accepts FULL ruleset objects (``GET /repos/{o}/{r}/rulesets/{id}``). The

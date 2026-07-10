@@ -126,7 +126,7 @@ gh run watch --repo joeharris76/BenchBox
 Use `workflow_dispatch` only after confirming there is no newer push already
 rebuilding the site. Note that `workflow_dispatch` runs the `build` job but
 **not** the `deploy` job — the Pages deploy is gated on
-`github.event_name == 'push' && github.ref == 'refs/heads/main'` — so a manual
+`github.event_name == 'push' && github.ref == 'refs/heads/release'` — so a manual
 run validates the build without publishing. A publish requires a push to
 `main` (and, per §1.3, the explorer paths actually being present on `main`).
 

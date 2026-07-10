@@ -888,7 +888,7 @@ class TodoCLI:
             )
             if branch_result.returncode == 0:
                 current_branch = branch_result.stdout.strip()
-                if current_branch in ("develop", "main"):
+                if current_branch in ("develop", "release"):
                     print(
                         f"❌ Error: Direct commits to '{current_branch}' are prohibited by BenchBox durable commit guidelines.\n"
                         f"Please claim a worktree first (e.g., 'make worktree-claim BRANCH=chore/...') and run cleanup from a feature branch.\n",

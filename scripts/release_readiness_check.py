@@ -209,8 +209,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workflow", default=os.environ.get("RELEASE_CANARY_WORKFLOW", "release-canary.yml"))
     parser.add_argument(
         "--branch",
-        default=os.environ.get("RELEASE_CANARY_BRANCH", "main"),
-        help="Trusted branch/ref that owns the release-canary workflow runs.",
+        default=os.environ.get("RELEASE_CANARY_BRANCH", "develop"),
+        help="Trusted branch/ref that owns the release-canary workflow runs (the default branch, develop as of the 2026-07-08 switch).",
     )
     parser.add_argument(
         "--max-age-hours", type=float, default=float(os.environ.get("RELEASE_CANARY_MAX_AGE_HOURS", "48"))

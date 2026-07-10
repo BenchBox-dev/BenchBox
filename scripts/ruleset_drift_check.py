@@ -40,7 +40,7 @@ WARNING_PREFIX = "WARNING (non-blocking): "
 # enforcement" section - deferred admin action tracked by
 # auto-merge-review-gate-admin-enforcement). Flipping this straight to a
 # blocking check would make the daily release-canary.yml run (and the
-# validate-main-pr.yml bootstrap invocation) permanently red until that
+# validate-release-pr.yml bootstrap invocation) permanently red until that
 # admin PUT lands. Flip this constant to True once that TODO's w3 confirms
 # the PUT has landed - this is the one-line change referenced by that
 # decision; no other code here needs to change.
@@ -116,7 +116,7 @@ def _other_properties(section: str, name: str) -> dict[str, str]:
 def parse_expected_rulesets(runbook_text: str) -> dict[str, ExpectedRuleset]:
     """Extract expected ruleset state from docs/operations/repo-admin-settings.md."""
     expected: dict[str, ExpectedRuleset] = {}
-    for name in ("develop-squash-only", "main-release-only"):
+    for name in ("develop-squash-only", "release-only"):
         section = _section_for_ruleset(runbook_text, name)
         ref_match = re.search(r"targets?\s+`([^`]+)`", section)
         if not ref_match:
@@ -171,7 +171,7 @@ def compare_ruleset(
 ) -> list[str]:
     """Return human-readable drift findings for one ruleset.
 
-    For ``develop-squash-only`` only (``main-release-only`` has no equivalent
+    For ``develop-squash-only`` only (``release-only`` has no equivalent
     documented requirement), also runs the shared
     ``ruleset_review_enforcement.review_enforcement_findings`` predicate
     against the already-fetched live payload (via ``extract_rules`` - no

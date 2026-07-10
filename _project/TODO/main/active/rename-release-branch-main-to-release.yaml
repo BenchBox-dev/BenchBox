@@ -2,7 +2,7 @@ id: rename-release-branch-main-to-release
 title: "Rename the release branch main->release (Decision B of the branching-strategy review)"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "In Progress"
 category: "Release Tooling"
 
 description: |
@@ -34,7 +34,7 @@ prior_art:
 work:
   - id: w1
     summary: "Rename in-repo across workflows (incl. the functional publish gate)"
-    status: pending
+    status: done
     notes: |
       Triggers main->release: lint.yml, test.yml, perf-smoke.yml, docs.yml
       (incl. Pages deploy gate refs/heads/main). Dev-only
@@ -49,7 +49,7 @@ work:
       validate-release-pr.yml and its strings.
   - id: w2
     summary: "Rename in-repo across Makefile"
-    status: pending
+    status: done
     notes: |
       release-cut / release-finalize base branch (--base main), checkout/pull
       release, generate_changelog_entry --since-ref origin/main,
@@ -59,7 +59,7 @@ work:
       MAIN_CLONE / "main clone" worktree-pool concept untouched (unrelated).
   - id: w3
     summary: "Rename in docs/templates + pin external URLs"
-    status: pending
+    status: done
     notes: |
       release-guide.md, RELEASE_PR_TEMPLATE.md, CONTRIBUTING.md, and — CAREFUL,
       NON-MECHANICAL — repo-admin-settings.md (its scheduling section logic
@@ -70,7 +70,7 @@ work:
       `git cat-file -e <tag>:<path>`.
   - id: w4
     summary: "Add the migration runbook doc"
-    status: pending
+    status: done
     notes: |
       Land docs/operations/branch-rename-runbook.md (recreate from the session
       scratchpad patch): default-branch switch, branch rename, ruleset
@@ -78,7 +78,7 @@ work:
       verified-safe notes (PyPI/Pages branch-independence).
   - id: w5
     summary: "Record the branching-strategy decision (A+B)"
-    status: pending
+    status: done
     notes: |
       Capture the decision + rationale in _project/decisions/ (new sibling to
       single-repo-migration.md, or an amendment): why release is the accurate

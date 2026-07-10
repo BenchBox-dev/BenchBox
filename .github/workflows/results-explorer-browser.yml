@@ -2,7 +2,7 @@ name: Results Explorer browser tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ release ]
     paths:
       - 'results-explorer/**'
       - '_project/scripts/explorer_pipeline/**'
@@ -10,7 +10,7 @@ on:
       - 'results-data/**'
       - '.github/workflows/results-explorer-browser.yml'
   pull_request:
-    branches: [ main, develop ]
+    branches: [ release, develop ]
     paths:
       - 'results-explorer/**'
       - '_project/scripts/explorer_pipeline/**'

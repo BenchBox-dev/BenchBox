@@ -281,7 +281,7 @@ jobs:
           redeploys the results explorer.
           EOF
           )" \
-            --base main \
+            --base release \
             --head "${{ steps.commit.outputs.branch }}"
 
       - name: No changes to commit
