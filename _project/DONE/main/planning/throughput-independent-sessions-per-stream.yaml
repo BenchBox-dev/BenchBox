@@ -2,7 +2,25 @@ id: throughput-independent-sessions-per-stream
 title: "Give each throughput stream an independent DB session, not a shared connection's cursor"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-07-09"
+completed_note: |
+  Added StreamConnectionCapability (benchbox/platforms/base/connection_wrappers.py)
+  and the PlatformAdapter.new_stream_connection() hook (benchbox/platforms/base/adapter.py).
+  Default capability is SHARED_CURSOR, whose base implementation is byte-for-byte
+  the old _make_stream_cursor(connection) call - DuckDB (and every adapter that
+  does not opt in) is unchanged. Declaring INDEPENDENT_CONNECTION without
+  overriding new_stream_connection() raises NotImplementedError (fail fast,
+  not silent fallback). Wired both throughput connection_factory closures in
+  benchbox/platforms/base/execution.py (_execute_tpcds_throughput_test,
+  _execute_tpch_throughput_test) to call self.new_stream_connection(connection)
+  instead of _make_stream_cursor(connection) directly. Added
+  tests/integration/test_throughput_session_isolation.py: a SQLite-per-connection
+  stand-in proves INDEPENDENT_CONNECTION gives each stream its own session (a
+  CREATE TEMP TABLE in one stream is invisible in another), and a
+  real-DuckDB pair of tests pins the SHARED_CURSOR default (a plain table
+  created via one stream's cursor is immediately visible via another's -
+  same shared connection, zero extra connections opened).
 category: Core Functionality
 
 description: |
@@ -42,22 +60,48 @@ prior_art:
 work:
   - id: w1
     summary: "Define a platform capability: per-stream independent connection vs shared-cursor, defaulting per engine"
-    status: pending
+    status: done
     notes: |
-      Add a hook (e.g. adapter.new_stream_connection()) with a default that
+      Added a hook (e.g. adapter.new_stream_connection()) with a default that
       preserves today's DuckDB cursor behavior; server adapters override to open
       a fresh connection/session per stream.
+
+      Implemented as StreamConnectionCapability (SHARED_CURSOR default /
+      INDEPENDENT_CONNECTION) in benchbox/platforms/base/connection_wrappers.py,
+      plus PlatformAdapter.stream_connection_capability (class attribute) and
+      PlatformAdapter.new_stream_connection() (the hook) in
+      benchbox/platforms/base/adapter.py. Base new_stream_connection() returns
+      _make_stream_cursor(connection) unchanged for SHARED_CURSOR; it raises
+      NotImplementedError for INDEPENDENT_CONNECTION unless a subclass overrides
+      it, so declaring the capability without an override fails fast instead of
+      silently reproducing the shared-session bug.
   - id: w2
     summary: "Wire the throughput connection_factory closures to use the capability"
     needs: [w1]
-    status: pending
+    status: done
+    notes: |
+      Both throughput connection_factory closures in
+      benchbox/platforms/base/execution.py (_execute_tpcds_throughput_test,
+      _execute_tpch_throughput_test) now call self.new_stream_connection(connection)
+      instead of _make_stream_cursor(connection) directly. The generic legacy
+      run_throughput_test()/_default_connection_factory path (execution.py ~1520,
+      not one of the two named closures and not on the production
+      _execute_queries_by_type dispatch path exercised by real benchmark runs)
+      was intentionally left unchanged - out of the TODO's named scope.
   - id: w3
     summary: "Add a test proving streams get isolated sessions on a server-style engine (session-scoped setting does not leak across streams)"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
-      Use Postgres (docker) or SQLite-per-connection as a stand-in: set a
-      session-local value in one stream, assert it is invisible in another.
+      Used SQLite-per-connection as the server-style stand-in (per the note's
+      own preference over Postgres/docker): tests/integration/test_throughput_session_isolation.py.
+      A CREATE TEMP TABLE (SQLite's connection-scoped, session-local construct)
+      set in one stream's independent connection is invisible from another's -
+      proving real session isolation. A companion pair of real-DuckDB tests
+      pins the SHARED_CURSOR default: a plain (non-TEMP) table created via one
+      stream's cursor is immediately visible via another's, proving they share
+      one connection/session with zero extra connections opened (the
+      anti_pattern this TODO forbids).
 
 must_preserve:
   - "DuckDB throughput continues to use cursor sharing (documented, correct) with no perf regression."

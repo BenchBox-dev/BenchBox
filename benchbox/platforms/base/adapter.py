@@ -25,7 +25,8 @@ from benchbox.platforms.base.connection_wrappers import (
     DriverIsolationCapability,
     PlatformAdapterConnection,  # noqa: F401 - re-exported for external imports
     PlatformAdapterCursor,  # noqa: F401 - re-exported for external imports
-    _make_stream_cursor,  # noqa: F401 - re-exported for external imports
+    StreamConnectionCapability,
+    _make_stream_cursor,
     _NoCloseProxy,  # noqa: F401 - re-exported for external imports
     check_isolation_capability,  # noqa: F401 - re-exported for external imports
 )
@@ -107,6 +108,16 @@ class PlatformAdapter(
     # Subclasses should override this class variable to declare their capability.
     # Default is NOT_APPLICABLE - adapters that support isolation must opt in.
     driver_isolation_capability: DriverIsolationCapability = DriverIsolationCapability.NOT_APPLICABLE
+    # Per-stream connection capability for concurrent throughput/pool-test streams
+    # (see StreamConnectionCapability docstring). Default is SHARED_CURSOR, which
+    # preserves today's behavior for every adapter that does not opt in: streams
+    # share one cursor per connection, correct for embedded engines like DuckDB.
+    # Server-style (client/server) adapters that need one independent connection
+    # per stream must set this to INDEPENDENT_CONNECTION *and* override
+    # new_stream_connection() below - declaring the capability alone is not
+    # enough, since the base new_stream_connection() raises for that value to
+    # fail fast instead of silently falling back to cursor sharing.
+    stream_connection_capability: StreamConnectionCapability = StreamConnectionCapability.SHARED_CURSOR
     # External table mode capability declaration.
     # Subclasses that implement external table/view registration should set this to True.
     supports_external_tables: bool = False
@@ -578,6 +589,58 @@ class PlatformAdapter(
         """
         if connection and hasattr(connection, "close"):
             connection.close()
+
+    def new_stream_connection(self, connection: Any) -> Any:
+        """Return a per-stream execution handle for one concurrent throughput
+        (or connection-pool test) stream.
+
+        This is the capability seam for ``throughput-independent-sessions-per-stream``:
+        the throughput drivers' ``connection_factory`` closures
+        (``benchbox/platforms/base/execution.py``,
+        ``_execute_tpch_throughput_test`` / ``_execute_tpcds_throughput_test``)
+        call this once per stream instead of unconditionally sharing one
+        cursor, so the behavior is now a declared, overridable platform
+        capability rather than an implicit one-size-fits-all default.
+
+        Dispatches on ``stream_connection_capability``:
+
+        - ``SHARED_CURSOR`` (default): returns ``_make_stream_cursor(connection)``
+          - a cursor of (or ``_NoCloseProxy`` over) the single shared
+          ``connection`` passed in. This is the existing, unchanged fast path:
+          correct for embedded engines whose client is documented thread-safe
+          at cursor level against one process-local database (e.g. DuckDB -
+          see docs/benchmarks/tpc-h.md). No new connections are opened, and
+          closing the returned handle never closes the shared connection
+          (``_NoCloseProxy.close()`` is a no-op; a real cursor's ``close()``
+          only closes the cursor).
+        - ``INDEPENDENT_CONNECTION``: server-style adapters (client/server
+          engines whose driver does not support true concurrent statement
+          execution across cursors of one connection) MUST override this
+          method to open and return a brand-new connection/session, typically
+          ignoring the ``connection`` argument entirely. The base
+          implementation deliberately raises ``NotImplementedError`` for this
+          capability value instead of falling back to cursor sharing, so a
+          subclass that declares ``INDEPENDENT_CONNECTION`` without overriding
+          fails loudly rather than silently reproducing the shared-session bug
+          this capability exists to fix.
+
+        Args:
+            connection: The adapter's shared platform connection (as created by
+                ``create_connection``). Used as-is for ``SHARED_CURSOR``;
+                available for reference (e.g. to read connection parameters)
+                but not required for ``INDEPENDENT_CONNECTION`` overrides.
+
+        Returns:
+            A connection-like object suitable for one stream: either a cursor/
+            proxy over the shared connection, or an independent connection.
+        """
+        if self.stream_connection_capability is StreamConnectionCapability.INDEPENDENT_CONNECTION:
+            raise NotImplementedError(
+                f"{self.platform_name} declares stream_connection_capability="
+                "StreamConnectionCapability.INDEPENDENT_CONNECTION but does not override "
+                "new_stream_connection() to open an independent per-stream connection/session."
+            )
+        return _make_stream_cursor(connection)
 
     def validate_platform_capabilities(self, benchmark_type: str) -> ValidationResult:
         """Validate platform-specific capabilities for the benchmark.
