@@ -7,14 +7,14 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import pytest
 
-from benchbox.experimental.concurrency.executor import (
+from benchbox.experimental.load_testing.executor import (
     ConcurrentLoadConfig,
     ConcurrentLoadExecutor,
     ConcurrentLoadResult,
     QueryExecution,
     StreamResult,
 )
-from benchbox.experimental.concurrency.patterns import SteadyPattern, StepPattern
+from benchbox.experimental.load_testing.patterns import SteadyPattern, StepPattern
 
 pytestmark = [
     pytest.mark.unit,
