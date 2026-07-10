@@ -64,6 +64,17 @@ class TPCDSThroughputTestConfig:
     # despite some stream/query failures; it is NOT an official TPC-DS
     # compliance gate, and results below 100% success are not eligible for
     # TPC-DS-compliant/audited reporting regardless of this setting.
+    #
+    # COUPLING: this single field now drives BOTH gates -- the run-level
+    # stream-success gate in run() (result.success = streams_successful /
+    # num_streams >= min_success_rate) AND the per-stream query-success gate
+    # in _finalize_stream_success() (stream_result.success = queries_successful
+    # / queries_executed >= min_success_rate). Before this change they were
+    # two independent hardcoded 0.7 literals that happened to share a value;
+    # they are now the same configurable knob, so lowering (or raising) it
+    # to relax/tighten one gate relaxes/tightens the other identically. There
+    # is currently no way to configure the run-level and per-stream
+    # thresholds independently.
     min_success_rate: float = 0.70
 
 
@@ -647,8 +658,20 @@ class TPCDSThroughputTest:
             # when its per-stream timeout elapses. Checked once per query so
             # a timed-out stream can stop soon instead of running unbounded
             # in the background. See runner.py's module docstring.
-            cancel_events = getattr(config, "_stream_cancel_events", None)
-            cancel_event = cancel_events.get(stream_id) if cancel_events else None
+            #
+            # Gated directly on config.cancel_on_timeout (not just presence
+            # of _stream_cancel_events) so a stale/leftover dict from a prior
+            # run that reused this config object (e.g. run 1 with
+            # cancel_on_timeout=True where a stream timed out and its Event
+            # was set(), then run 2 reusing the same config with
+            # cancel_on_timeout=False) can never take effect here -- belt and
+            # suspenders alongside StreamRunner.execute() resetting
+            # _stream_cancel_events to {} whenever cooperative cancel is
+            # disabled.
+            cancel_event = None
+            if getattr(config, "cancel_on_timeout", False):
+                cancel_events = getattr(config, "_stream_cancel_events", None)
+                cancel_event = cancel_events.get(stream_id) if cancel_events else None
 
             cancelled = False
             for position, stream_query in enumerate(query_subset):

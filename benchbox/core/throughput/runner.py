@@ -36,7 +36,12 @@ exceeds ``config.stream_timeout``:
   ``_execute_stream`` query loop polls between queries. On timeout, this
   method sets that stream's event so its loop can notice and return soon
   after its current query finishes -- the only safe way to make a timeout
-  actually stop work without hard-killing a thread.
+  actually stop work without hard-killing a thread. When disabled,
+  ``execute()`` explicitly resets ``config._stream_cancel_events`` to ``{}``
+  (never leaving a stale dict from a prior call on a reused config object);
+  each spec's cancel-event lookup also independently gates on
+  ``config.cancel_on_timeout`` directly, so a stale/leftover attribute value
+  can never be mistaken for this run's cancellation state.
 
 Even with both enabled, exiting this method's ``with
 ThreadPoolExecutor(...)`` block still blocks (via the implicit
@@ -107,6 +112,24 @@ class StreamRunner:
         max_workers = config.max_workers or config.num_streams
         timeout: float | None = config.stream_timeout if config.stream_timeout > 0 else None
 
+        # The as_completed(timeout=...) deadline below is a single overall
+        # wait bound, not a per-future one (see the NOTE at that call site).
+        # Treating it as equivalent to each stream's own per-stream timeout
+        # relies on every stream starting to run immediately -- true only
+        # when max_workers >= num_streams (all streams submitted back-to-back
+        # with no queueing). If max_workers < num_streams, later streams sit
+        # queued behind earlier ones and are still charged against the same
+        # t0 deadline, so a queued stream could be flagged as timed-out
+        # before it ever ran a single query.
+        if max_workers < config.num_streams and timeout is not None:
+            logger.warning(
+                f"max_workers ({max_workers}) < num_streams ({config.num_streams}) with a "
+                f"stream_timeout of {timeout}s set: queued streams share the same overall "
+                "deadline as immediately-started ones and may be reported as timed-out before "
+                "executing a single query. Set max_workers >= num_streams (or leave it unset) "
+                "for the timeout to behave as a true per-stream timeout."
+            )
+
         # Opt-in cooperative cancellation (default OFF, behavior-preserving).
         # See module docstring "Timed-out streams" for the full design.
         cooperative_cancel = bool(getattr(config, "cancel_on_timeout", False))
@@ -123,6 +146,18 @@ class StreamRunner:
                 # event between queries; set() below when that stream's own
                 # timeout elapses.
                 config._stream_cancel_events = cancel_events  # type: ignore[attr-defined]
+            else:
+                # Explicitly reset (never leave stale) -- if this same config
+                # object was reused from a prior execute() call that had
+                # cancel_on_timeout=True and a stream timed out, that stream's
+                # Event would still be set(). Without this reset, this run's
+                # _resolve_cancel_event would observe the leftover dict purely
+                # by presence and immediately treat an unrelated stream as
+                # cancelled. Each spec's _resolve_cancel_event also gates on
+                # config.cancel_on_timeout directly as a second, independent
+                # guard -- see that method's docstring -- but resetting here
+                # keeps the attribute itself honest for any other reader.
+                config._stream_cancel_events = {}  # type: ignore[attr-defined]
 
             for stream_id in range(config.num_streams):
                 future = executor.submit(

@@ -295,11 +295,22 @@ class TPCHThroughputTest:
     def _resolve_cancel_event(self, config: TPCHThroughputTestConfig, stream_id: int) -> Optional[threading.Event]:
         """Return this stream's cooperative-cancel event, if any.
 
-        StreamRunner.execute() only attaches ``_stream_cancel_events`` to
-        *config* when ``config.cancel_on_timeout`` is True; absent that
+        Gated directly on ``config.cancel_on_timeout``: when it is False
         (the default), this always returns None and the per-query loop
-        never checks for cancellation, preserving today's behavior exactly.
+        never checks for cancellation, preserving today's behavior exactly
+        -- regardless of what ``config._stream_cancel_events`` currently
+        holds. This guard is deliberately independent of (belt-and-suspenders
+        alongside) ``StreamRunner.execute()`` resetting
+        ``_stream_cancel_events`` to ``{}`` when cooperative cancel is
+        disabled: if a config object is reused across runs (e.g. run 1 with
+        ``cancel_on_timeout=True`` where a stream times out and its Event
+        gets ``set()``, then run 2 reusing the same config object with
+        ``cancel_on_timeout=False``), a stale/leftover ``_stream_cancel_events``
+        entry can never take effect here even if that reset were ever
+        skipped or bypassed.
         """
+        if not getattr(config, "cancel_on_timeout", False):
+            return None
         cancel_events = getattr(config, "_stream_cancel_events", None)
         return cancel_events.get(stream_id) if cancel_events else None
 

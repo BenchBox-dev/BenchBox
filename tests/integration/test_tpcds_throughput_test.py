@@ -564,6 +564,39 @@ class TestCooperativeCancellation:
         assert stream_result.queries_executed == 2
         assert stream_result.success is True
 
+    def test_execute_stream_ignores_stale_cancel_event_from_reused_config(self, tpcds_benchmark):
+        """Regression (review follow-up): a config object reused across
+        runs must not let a PRIOR run's already-``set()`` cancel event leak
+        into a later call where ``cancel_on_timeout`` is now False.
+
+        Simulates exactly the state ``StreamRunner.execute()`` leaves on a
+        config object after a run-1 timeout with ``cancel_on_timeout=True``
+        (this stream's ``Event`` set()), then reuses that SAME config
+        object with ``cancel_on_timeout`` flipped to False -- while
+        deliberately leaving ``_stream_cancel_events`` stale/untouched, to
+        isolate ``_execute_stream``'s own independent ``cancel_on_timeout``
+        gate (the belt-and-suspenders fix) from ``StreamRunner.execute()``'s
+        separate reset-to-``{}`` behavior on its own next call.
+        """
+        connections: list[Mock] = []
+        factory = self._connection_factory(connections)
+
+        test = TPCDSThroughputTest(benchmark=tpcds_benchmark, connection_factory=factory, num_streams=1)
+
+        stale_config = TPCDSThroughputTestConfig(num_streams=1, cancel_on_timeout=True, enable_preflight=False)
+        stale_config._stream_cancel_events = {0: threading.Event()}
+        stale_config._stream_cancel_events[0].set()
+        test._pregenerated_queries = {0: [(self._stream_query(1), "SELECT 1"), (self._stream_query(2), "SELECT 2")]}
+
+        # Reuse the SAME config object with cancel_on_timeout now False.
+        stale_config.cancel_on_timeout = False
+
+        stream_result = test._execute_stream(stream_id=0, seed=1, config=stale_config)
+
+        assert stream_result.queries_executed == 2
+        assert stream_result.success is True
+        assert connections[0].execute.call_count == 2
+
 
 class TestBenchmarkIntegration:
     """Test integration with TPC-DS benchmark class."""
