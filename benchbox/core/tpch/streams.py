@@ -398,80 +398,25 @@ class TPCHStreamRunner(VerbosityMixin):
             stream_file: Path to stream SQL file
             stream_id: Stream identifier
 
-        Returns:
-            Dictionary with execution results and timing information
+        Raises:
+            NotImplementedError: Always. This method never executed SQL against
+                a real database connection -- despite accepting
+                ``connection_string``/``dialect`` at construction time, it only
+                counted ``-- Query`` comment lines in ``stream_file`` and
+                reported every query as successful, regardless of whether the
+                queries (or even the file) existed. That made it impossible to
+                distinguish a real pass from a benchmark that never ran. Use
+                :class:`benchbox.core.tpch.throughput_test.TPCHThroughputTest`
+                for the production, spec-compliant TPC-H Throughput Test,
+                which executes real queries against a real connection.
         """
-        import time
-
-        from benchbox.core.tpch.queries import TPCHQueries
-
-        self.log_verbose(f"Executing TPC-H stream {stream_id} from {stream_file}")
-
-        start_time = time.time()
-
-        # Initialize result structure
-        result = {
-            "stream_id": stream_id,
-            "stream_file": str(stream_file),
-            "start_time": start_time,
-            "end_time": 0.0,
-            "duration": 0.0,
-            "queries_executed": 0,
-            "queries_successful": 0,
-            "queries_failed": 0,
-            "success": True,
-            "error": None,
-            "query_results": [],
-        }
-
-        try:
-            # Get the query manager for TPC-H
-            TPCHQueries()
-
-            # For now, this is a basic implementation that executes the stream queries
-            # In a full implementation, this would use the actual database connection
-            # and execute each query in the stream file
-
-            # Read and parse the stream file
-            if not stream_file.exists():
-                raise FileNotFoundError(f"Stream file not found: {stream_file}")
-
-            with open(stream_file, encoding="utf-8") as f:
-                stream_content = f.read()
-
-            # Count queries in the stream (basic implementation)
-            # This counts SQL statements by looking for query separators
-            query_lines = [
-                line
-                for line in stream_content.split("\n")
-                if line.strip().startswith("-- Query") and "Position" in line
-            ]
-            result["queries_executed"] = len(query_lines)
-
-            # For basic implementation, assume all queries are successful
-            # In a real implementation, each query would be executed against the database
-            result["queries_successful"] = result["queries_executed"]
-            result["queries_failed"] = 0
-
-            if self.verbose_enabled:
-                self.logger.info(
-                    "Stream %s completed: %s/%s queries successful",
-                    stream_id,
-                    result["queries_successful"],
-                    result["queries_executed"],
-                )
-
-        except Exception as e:
-            result["success"] = False
-            result["error"] = str(e)
-            result["queries_failed"] = result["queries_executed"] - result["queries_successful"]
-            self.logger.error("Stream %s failed: %s", stream_id, e)
-
-        finally:
-            result["end_time"] = time.time()
-            result["duration"] = result["end_time"] - result["start_time"]
-
-        return result
+        raise NotImplementedError(
+            "TPCHStreamRunner.run_stream does not execute SQL. It previously "
+            "faked success by counting '-- Query' comment lines in the stream "
+            "file without running anything against a database connection. Use "
+            "benchbox.core.tpch.throughput_test.TPCHThroughputTest for real "
+            "TPC-H Throughput Test execution."
+        )
 
     def run_concurrent_streams(self, stream_files: list[Path]) -> dict[str, Any]:
         """Run multiple TPC-H streams concurrently.
@@ -479,106 +424,17 @@ class TPCHStreamRunner(VerbosityMixin):
         Args:
             stream_files: List of stream SQL files
 
-        Returns:
-            Dictionary with aggregated execution results
+        Raises:
+            NotImplementedError: Always; delegates to the non-executing
+                :meth:`run_stream`. See :meth:`run_stream` for details. Use
+                :class:`benchbox.core.tpch.throughput_test.TPCHThroughputTest`
+                for the production, spec-compliant TPC-H Throughput Test.
         """
-        import time
-
-        from benchbox.utils.execution_manager import ConcurrentQueryExecutor
-
-        self.log_verbose(f"Executing {len(stream_files)} TPC-H streams concurrently")
-
-        start_time = time.time()
-
-        # Initialize result structure
-        result = {
-            "start_time": start_time,
-            "end_time": 0.0,
-            "total_duration": 0.0,
-            "num_streams": len(stream_files),
-            "streams_executed": 0,
-            "streams_successful": 0,
-            "streams_failed": 0,
-            "total_queries_executed": 0,
-            "total_queries_successful": 0,
-            "total_queries_failed": 0,
-            "success": True,
-            "errors": [],
-            "stream_results": [],
-        }
-
-        try:
-            # Use existing ConcurrentQueryExecutor infrastructure
-            concurrent_executor = ConcurrentQueryExecutor()
-
-            # Create a factory function that returns a stream executor for each stream
-            def stream_executor_factory(stream_id: int) -> Any:
-                """Factory to create stream executor for given stream ID."""
-
-                class StreamExecutor:
-                    def __init__(self, stream_runner, stream_file, stream_id):
-                        self.stream_runner = stream_runner
-                        self.stream_file = stream_file
-                        self.stream_id = stream_id
-
-                    def run(self):
-                        """Execute the stream using the stream runner."""
-                        return self.stream_runner.run_stream(self.stream_file, self.stream_id)
-
-                # Get the corresponding stream file for this stream ID
-                if stream_id < len(stream_files):
-                    return StreamExecutor(self, stream_files[stream_id], stream_id)
-                else:
-                    raise ValueError(f"Stream ID {stream_id} exceeds available stream files ({len(stream_files)})")
-
-            # Configure concurrent execution for TPC-H streams
-            # Temporarily enable concurrent queries for this execution
-            original_enabled = concurrent_executor.config["enabled"]
-            concurrent_executor.config["enabled"] = True
-
-            try:
-                # Execute concurrent streams using the existing infrastructure
-                concurrent_result = concurrent_executor.execute_concurrent_queries(
-                    stream_executor_factory, num_streams=len(stream_files)
-                )
-
-                # Extract results from concurrent execution
-                result["streams_executed"] = len(concurrent_result.stream_results)
-                result["streams_successful"] = sum(
-                    1 for sr in concurrent_result.stream_results if sr.get("success", False)
-                )
-                result["streams_failed"] = result["streams_executed"] - result["streams_successful"]
-                result["total_queries_executed"] = concurrent_result.queries_executed
-                result["total_queries_successful"] = concurrent_result.queries_successful
-                result["total_queries_failed"] = concurrent_result.queries_failed
-                result["stream_results"] = concurrent_result.stream_results
-                result["success"] = concurrent_result.success
-                if concurrent_result.errors:
-                    result["errors"].extend(concurrent_result.errors)
-
-            finally:
-                # Restore original configuration
-                concurrent_executor.config["enabled"] = original_enabled
-
-            if self.verbose_enabled:
-                self.logger.info(
-                    "Concurrent streams completed: %s/%s streams successful",
-                    result["streams_successful"],
-                    result["streams_executed"],
-                )
-                self.logger.info(
-                    "Total queries: %s/%s successful",
-                    result["total_queries_successful"],
-                    result["total_queries_executed"],
-                )
-
-        except Exception as e:
-            result["success"] = False
-            result["errors"].append(str(e))
-            self.logger.error("Concurrent stream execution failed: %s", e)
-
-        finally:
-            result["end_time"] = time.time()
-            result["total_duration"] = result["end_time"] - result["start_time"]
-
-        return result
+        raise NotImplementedError(
+            "TPCHStreamRunner.run_concurrent_streams does not execute SQL. It "
+            "previously delegated to the non-executing run_stream() per "
+            "stream via a now-retired ConcurrentQueryExecutor wrapper, so it "
+            "never ran real queries either. Use "
+            "benchbox.core.tpch.throughput_test.TPCHThroughputTest for real "
+            "concurrent TPC-H Throughput Test execution."
+        )

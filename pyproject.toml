@@ -661,10 +661,10 @@ omit = [
     # TPC-DI ETL: requires full CDC/SCD pipeline infrastructure with staged
     # incremental loads. Cannot be meaningfully unit-tested at unit granularity.
     "benchbox/core/tpcdi/etl/scd_processor.py",
-    # Experimental concurrency: changes frequently, pool tester requires real
+    # Experimental load testing: changes frequently, pool tester requires real
     # concurrent database connections (~284 miss stmts).
-    "benchbox/experimental/concurrency/executor.py",
-    "benchbox/experimental/concurrency/pool_tester.py",
+    "benchbox/experimental/load_testing/executor.py",
+    "benchbox/experimental/load_testing/pool_tester.py",
     # ClickBench DF queries: single wide table with 105 columns and specific
     # data patterns, same rationale as TPC-DS/datavault/nyctaxi DF omissions
     # (~310 miss stmts).

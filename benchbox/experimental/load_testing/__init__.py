@@ -1,4 +1,4 @@
-"""Concurrency testing framework for database workload analysis.
+"""Load testing framework for database workload analysis.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -12,19 +12,19 @@ This module provides tools for testing database performance under concurrent loa
 - Contention detection and bottleneck identification
 """
 
-from benchbox.experimental.concurrency.analyzer import (
-    ConcurrencyAnalyzer,
+from benchbox.experimental.load_testing.analyzer import (
     ContentionAnalysis,
+    LoadAnalyzer,
     QueueAnalysis,
     ScalingAnalysis,
 )
-from benchbox.experimental.concurrency.executor import (
+from benchbox.experimental.load_testing.executor import (
     ConcurrentLoadConfig,
     ConcurrentLoadExecutor,
     ConcurrentLoadResult,
     StreamResult,
 )
-from benchbox.experimental.concurrency.patterns import (
+from benchbox.experimental.load_testing.patterns import (
     BurstPattern,
     RampUpPattern,
     SpikePattern,
@@ -34,7 +34,7 @@ from benchbox.experimental.concurrency.patterns import (
     WorkloadPattern,
     WorkloadPhase,
 )
-from benchbox.experimental.concurrency.pool_tester import (
+from benchbox.experimental.load_testing.pool_tester import (
     ConnectionPoolTester,
     PoolTestConfig,
     PoolTestResult,
@@ -56,7 +56,7 @@ __all__ = [
     "StepPattern",
     "WavePattern",
     # Analysis
-    "ConcurrencyAnalyzer",
+    "LoadAnalyzer",
     "QueueAnalysis",
     "ContentionAnalysis",
     "ScalingAnalysis",

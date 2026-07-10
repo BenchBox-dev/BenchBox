@@ -1,0 +1,135 @@
+id: concurrency-docs-alignment
+title: "Align concurrency/throughput documentation with actual behavior"
+worktree: main
+priority: Low
+status: Completed
+category: Documentation
+completed_date: "2026-07-09"
+
+description: |
+  Documentation gaps/inconsistencies found while reviewing the concurrency
+  surface. These are low-severity on their own but compound user confusion about
+  a feature that (per the sibling TODOs) already behaves unexpectedly.
+
+  - `--streams` is documented in docs/usage/faq.md and docs/concepts/workflow.md
+    but is ABSENT from the canonical CLI reference docs/reference/cli/run.md.
+    (Note: throughput-stream-count-wiring-defect must land first, since today
+    --streams is effectively ignored -- do not document it as working until it
+    does.)
+  - Config default mismatch: docs/reference/cli/configuration.md documents
+    `execution.concurrent_queries.max_concurrent` default = 2, while
+    docs/advanced/power-run-concurrent-queries.md shows an example with
+    max_concurrent = 4. Reconcile to the real default.
+  - docs/advanced/power-run-concurrent-queries.md references
+    `_project/TPC_SPECIFICATION_COMPLIANCE.md`, which does not exist. Fix or
+    remove the dangling link.
+  - Ensure the documented DuckDB single-connection/per-cursor caveat and the
+    TPC-H(0.99)/TPC-DS(0.70) success-gate divergence stay in sync with whatever
+    the code changes in the sibling TODOs settle on.
+
+prior_art:
+  - "docs/reference/cli/run.md — canonical CLI reference missing --streams."
+  - "docs/reference/cli/configuration.md — the max_concurrent default of record."
+  - "docs/advanced/power-run-concurrent-queries.md — the guide with the 4-vs-2 example and the dangling link."
+  - "docs/benchmarks/tpc-h.md / tpc-ds.md — where the DuckDB and permutation caveats live."
+
+work:
+  - id: w1
+    summary: "Reconcile max_concurrent default across configuration.md and the guide"
+    status: done
+    notes: |
+      Verified the real default in code: benchbox/utils/config_helpers.py:78
+      and benchbox/cli/config.py:50/280 all default
+      execution.concurrent_queries.max_concurrent to 2, matching
+      docs/reference/cli/configuration.md:297 (already correct). The
+      mismatch was entirely in
+      docs/advanced/power-run-concurrent-queries.md's illustrative YAML
+      example, which showed max_concurrent: 4 with nothing marking it as a
+      non-default example. Added an explicit callout above the block
+      ("illustrative example, not the shipped defaults") linking to
+      Configuration reference -> `execution`, plus inline "(default: N)"
+      comments on every field in that YAML block. Python-code examples
+      further down that pass max_concurrent=4/level as explicit function
+      arguments were left as-is -- self-evidently overrides, not claimed
+      defaults.
+  - id: w2
+    summary: "Fix/remove the dangling _project/TPC_SPECIFICATION_COMPLIANCE.md reference"
+    status: done
+    notes: |
+      That file never existed in docs/ or _project/. Replaced the dangling
+      reference in docs/advanced/power-run-concurrent-queries.md with links
+      to the docs that actually cover TPC compliance/permutations:
+      docs/guides/tpc/tpc-h-official-guide.md#tpc-h-specification-compliance,
+      docs/guides/tpc/tpc-ds-official-guide.md, and the shared
+      docs/guides/tpc/tpc-patterns-usage.md. All three targets confirmed to
+      exist; scripts/check_doc_relative_links.py baseline unchanged (43, no
+      new broken links) after the edit.
+  - id: w3
+    summary: "Document --streams in run.md once throughput-stream-count-wiring-defect lands"
+    status: done
+    notes: |
+      throughput-stream-count-wiring-defect (sibling #1) is merged to
+      develop. Verified the actual CLI surface directly (`benchbox run
+      --help-topic all` and `benchbox run-official --help`): plain `run`
+      (including `run --official`) has NO `--streams`/`--concurrency`
+      option at all -- confirmed live: `benchbox run --platform duckdb
+      --benchmark tpch --scale 1 --phases throughput --streams 4` errors
+      with "Error: No such option: --streams". Only the deprecated
+      `run-official` command exposes `--streams INTEGER` (required when
+      --phases includes throughput). Since docs/reference/cli/run.md is
+      exclusively the `run` command's reference, documenting --streams as
+      a `run` option would itself be inaccurate. Added a note under the
+      `throughput` phase bullet stating plain `run` has no such flag, plus
+      a full "Deprecated: `run-official`" section documenting its real
+      option list (including --streams) accurately.
+
+      Extended fix (same "don't document --streams as working where it
+      isn't" goal, and directly named in this TODO's own description):
+      docs/usage/faq.md documented `benchbox run ... --streams 4` (the
+      non-official command) as working -- verified it errors identically.
+      Fixed to the working `run-official ... --streams 4` form.
+      docs/concepts/workflow.md's compliance-workflow example used
+      `run-official ... --test-type power/throughput`, but `--test-type`
+      is not a real run-official option (the real option is --phases) --
+      verified against run_official.py's click options and a live
+      `run-official tpch --platform duckdb --scale 1 --phases power --seed
+      42 --output <tmp>` invocation (parsed and executed with no "no such
+      option" error). Fixed to --phases; both files now cross-link the new
+      CLI reference section.
+  - id: w4
+    summary: "Keep the DuckDB single-connection/success-gate divergence caveats in sync with sibling TODOs"
+    status: done
+    notes: |
+      DEFERRED per explicit handoff instructions for this run: sibling
+      TODOs tpcds-throughput-permutation-compliance and
+      throughput-timeout-leak-and-success-gates own the code behind the
+      DuckDB single-connection/per-cursor caveat and the TPC-H(0.99)/
+      TPC-DS(0.70) success-gate divergence, and are updating
+      docs/benchmarks/tpc-ds.md and
+      docs/development/throughput-result-alignment.md in parallel in
+      sibling worktrees. This run did not touch either file
+      (conflict-avoidance) and did not re-derive what those caveats should
+      say -- that decision belongs to whichever of those two TODOs lands
+      the underlying behavior change. Do not reopen this item without
+      first checking whether those TODOs already reconciled the caveats.
+
+must_preserve:
+  - "Existing accurate caveats (DuckDB cursor sharing, success-gate divergence) remain documented."
+
+verification:
+  - description: "Docs link-check passes and no dangling internal references remain"
+    command: "make docs-linkcheck"
+    expected_output: "no broken internal links"
+
+scope_limit:
+  only_modify:
+    - "docs/"
+
+deps:
+  needs:
+    - throughput-stream-count-wiring-defect
+
+metadata:
+  tags: [concurrency, docs]
+  estimated_effort: Small
+  created_date: "2026-07-09"

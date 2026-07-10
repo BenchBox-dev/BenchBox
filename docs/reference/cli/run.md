@@ -32,6 +32,10 @@ benchbox run [OPTIONS]
     - `maintenance` - **Data modification operations (DATABASE RELOAD REQUIRED AFTER)** - See [TPC-H Maintenance](../../guides/tpc/tpc-h-official-guide.md#maintenance-test) or [TPC-DS Maintenance](../../guides/tpc/tpc-ds-official-guide.md#3-maintenance-test)
   - Use comma-separated list: `--phases generate,load,power`
   - **Warning:** Maintenance phase permanently modifies data; reload database before running power/throughput again
+  - **Note:** `run` has no `--streams`/`--concurrency` flag of its own to set the
+    number of concurrent streams for the `throughput` phase. The only CLI flag
+    that sets stream count is `--streams` on the deprecated `run-official`
+    command — see [Deprecated: `run-official`](#deprecated-run-official) below.
 - `--force [MODE]`: Force regeneration of data (modes: `all`, `datagen`, `upload`, or `datagen,upload`)
 - `--non-interactive`: Use defaults for all prompts (useful for automation)
 
@@ -379,6 +383,39 @@ These flags control monitoring, progress display, memory handling, and caching b
 > `create_plan_metadata_from_results(..., normalize_literals=True)`), which masks
 > literals so seed-varied plans compare equal. See
 > [Query Plan Analysis → Literal normalization](../../features/query-plan-analysis.md#literal-normalization-seed-independent-fingerprints).
+
+(deprecated-run-official)=
+## Deprecated: `run-official`
+
+`run-official {tpch|tpcds} [OPTIONS]` is a hidden, deprecated compatibility
+shim kept for older scripts. Prefer `run --official` for all new usage — it
+covers everything `run-official` does except concurrent-stream count (see
+below).
+
+```bash
+benchbox run-official {tpch|tpcds} [OPTIONS]
+```
+
+- `--platform TEXT` (required): Platform to run on
+- `--scale FLOAT` (required): TPC scale factor (must be one of the
+  TPC-allowed values: 1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000)
+- `--phases TEXT` (required): Comma-separated test phases
+- `--streams INTEGER`: Number of concurrent streams for the `throughput`
+  phase. **Required** when `--phases` includes `throughput`; must be a
+  non-negative integer. Sets `BenchmarkConfig.concurrency` (the same field
+  `run`'s throughput driver reads internally), so `run-official ... --streams 4`
+  is equivalent to running with 4 concurrent throughput streams.
+  The throughput driver floors the resolved stream count at the TPC minimum
+  of **2**, so `--streams 0` and `--streams 1` both run 2 streams.
+- `--seed INTEGER`: Random seed for reproducible official runs (a warning is
+  printed if omitted)
+- `--output PATH`: Output directory
+- `-v`, `--verbose`: Enable verbose logging
+- `--validate-results`: Enable result validation
+
+**Note:** plain `run` (including `run --official`) has no `--streams` or
+`--concurrency` CLI flag today, so `run-official --streams N` has no direct
+equivalent on `run` yet — see the `throughput` phase note above.
 
 ## Related
 

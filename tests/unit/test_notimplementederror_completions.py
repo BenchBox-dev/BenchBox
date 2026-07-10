@@ -115,8 +115,26 @@ class TestPlatformDropDatabase:
 class TestDocumentedNotImplementedMethods:
     """Test that documented NotImplementedError methods provide clear guidance."""
 
-    def test_stream_processing_methods_documented(self):
-        """Test stream-processing APIs are present and callable without NotImplementedError stubs."""
+    def test_stream_generation_apis_documented(self):
+        """Stream generation/info APIs are present, callable, and actually work."""
+        from benchbox.core.tpcds.benchmark import TPCDSBenchmark
+
+        tpcds = TPCDSBenchmark(scale_factor=1.0)
+
+        assert callable(getattr(tpcds, "generate_streams", None))
+        assert callable(getattr(tpcds, "get_stream_info", None))
+
+    def test_non_executing_stream_stubs_now_raise_not_implemented(self):
+        """Stream-execution APIs that used to fake success now raise NotImplementedError.
+
+        `TPCHStreamRunner.run_stream`/`run_concurrent_streams` and
+        `TPCDSBenchmark.run_streams` previously reported every query as
+        successful by counting `-- Query` comment lines, without executing
+        any SQL. As part of the concurrency-executor consolidation, they now
+        raise NotImplementedError unconditionally rather than silently
+        reporting fake success. Use `TPCHThroughputTest`/`TPCDSThroughputTest`
+        (or `TPCDSBenchmark.run_throughput_test`) for real execution.
+        """
         from benchbox.core.tpcds.benchmark import TPCDSBenchmark
         from benchbox.core.tpch.streams import TPCHStreamRunner
 
@@ -125,9 +143,14 @@ class TestDocumentedNotImplementedMethods:
 
         assert callable(getattr(runner, "run_stream", None))
         assert callable(getattr(runner, "run_concurrent_streams", None))
-        assert callable(getattr(tpcds, "generate_streams", None))
-        assert callable(getattr(tpcds, "get_stream_info", None))
         assert callable(getattr(tpcds, "run_streams", None))
+
+        with pytest.raises(NotImplementedError):
+            runner.run_stream(Path("/fake/stream.sql"), stream_id=0)
+        with pytest.raises(NotImplementedError):
+            runner.run_concurrent_streams([])
+        with pytest.raises(NotImplementedError):
+            tpcds.run_streams(connection=Mock())
 
 
 class TestNoPlatformNotImplementedErrors:

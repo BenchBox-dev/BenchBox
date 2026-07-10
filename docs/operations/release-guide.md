@@ -97,9 +97,16 @@ must not be bypassed with an undocumented local change.
    For v0.3.0, `landing/` and `docs/blog/` stay in the release tree so
    `/prompts/` and promoted release posts ship; `results-explorer/`,
    `results-data/`, and explorer/results-data workflows do not.
-5. Commits a single `Release vX.Y.Z` commit on `vX.Y.Z`, pushes, and
-   opens a PR against `main`.
-6. Sweeps prior `v*` branches on origin (option-c lifecycle: keep until
+5. Commits a single `Release vX.Y.Z` commit on `vX.Y.Z`.
+6. Merges `origin/main` into `vX.Y.Z` with `-s ours
+   --allow-unrelated-histories`. `main` and `develop` have unrelated roots and
+   diverge permanently, so without this the release PR is unmergeable, GitHub
+   cannot compute a merge ref, and **no CI runs at all**. `-s ours` keeps the
+   curated release tree byte-for-byte (the merge is guarded on that) and only
+   records `main` as a second parent, which `release-finalize`'s squash-merge
+   then collapses away.
+7. Pushes and opens a PR against `main`.
+8. Sweeps prior `v*` branches on origin (option-c lifecycle: keep until
    superseded, then auto-delete on the next `release-cut`).
 
 ### What `release-finalize` does
