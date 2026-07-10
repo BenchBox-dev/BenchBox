@@ -40,7 +40,7 @@ WARNING_PREFIX = "WARNING (non-blocking): "
 # enforcement" section - deferred admin action tracked by
 # auto-merge-review-gate-admin-enforcement). Flipping this straight to a
 # blocking check would make the daily release-canary.yml run (and the
-# validate-main-pr.yml bootstrap invocation) permanently red until that
+# validate-release-pr.yml bootstrap invocation) permanently red until that
 # admin PUT lands. Flip this constant to True once that TODO's w3 confirms
 # the PUT has landed - this is the one-line change referenced by that
 # decision; no other code here needs to change.

@@ -197,7 +197,7 @@ soundness-path PR can no longer be squash-merged.
 
 Flipping the constant **before** step 1 turns the (still-live) missing-review gap from a
 `WARNING (non-blocking):` finding into a blocking one, which reddens **both** the daily
-`release-canary.yml` run **and** `validate-main-pr.yml`'s drift-check on every real develop
+`release-canary.yml` run **and** `validate-release-pr.yml`'s drift-check on every real develop
 PR until the PUT lands. Done in the correct order, the flip's own CI is green (the live
 ruleset already satisfies the rule). No test changes are required: `compare_ruleset`'s
 `enforce_review_rule` parameter is exercised in both `False`/`True` modes by

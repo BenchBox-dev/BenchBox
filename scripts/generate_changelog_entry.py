@@ -25,7 +25,7 @@ Usage:
     uv run python scripts/generate_changelog_entry.py --version 0.3.0 \
         --release-date 2026-04-30 --since-tag v0.2.1
     uv run python scripts/generate_changelog_entry.py --version 0.3.1 \
-        --since-ref origin/main
+        --since-ref origin/release
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ CLAUDE_TIMEOUT_SECONDS = 120
 _CHANGELOG_VERSION_HEADER_RE = re.compile(r"^## \[(?P<version>\d+\.\d+\.\d+)\] - ", re.MULTILINE)
 
 # Matches a release-cut branch name, e.g. "v0.3.1" or "v0.3.1-rc1". Mirrors
-# the HEAD_REF regex in .github/workflows/validate-main-pr.yml so the two
+# the HEAD_REF regex in .github/workflows/validate-release-pr.yml so the two
 # checks agree on what counts as an in-progress release branch.
 _RELEASE_BRANCH_RE = re.compile(r"^v(?P<version>\d+\.\d+\.\d+)(-[A-Za-z0-9.+-]+)?$")
 
@@ -240,9 +240,9 @@ def find_untagged_changelog_versions(
 
     `make release-cut` legitimately drafts a dated section for the version
     being cut before its tag exists (the tag is pushed later, by
-    `release-finalize`, after squash-merge to main). So when
+    `release-finalize`, after squash-merge to release). So when
     `current_branch` matches the release-branch shape recognised by
-    `.github/workflows/validate-main-pr.yml` (`vX.Y.Z[-suffix]`), the one
+    `.github/workflows/validate-release-pr.yml` (`vX.Y.Z[-suffix]`), the one
     untagged version matching that branch's own version number is exempt.
 
     Every other untagged dated section is flagged - in particular, any
@@ -424,7 +424,7 @@ def generate_changelog_entry(
         since_tag: Tag to use as the lower bound (e.g. 'v0.2.1'). Ignored
             when since_ref is set. If neither is set, the latest matching v*
             tag is auto-detected.
-        since_ref: Ref to use as the lower bound (e.g. 'origin/main'). This is
+        since_ref: Ref to use as the lower bound (e.g. 'origin/release'). This is
             the release-branch flow default because `develop` is intentionally
             not tagged after releases.
 
@@ -533,7 +533,7 @@ def main() -> int:
     parser.add_argument(
         "--since-ref",
         default=None,
-        help="Lower-bound ref for commit range, e.g. origin/main. Overrides --since-tag.",
+        help="Lower-bound ref for commit range, e.g. origin/release. Overrides --since-tag.",
     )
     parser.add_argument(
         "--source",
