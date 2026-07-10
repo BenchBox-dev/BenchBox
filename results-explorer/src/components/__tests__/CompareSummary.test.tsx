@@ -37,6 +37,7 @@ function makeResult(overrides: Partial<DetailResult> = {}): DetailResult {
     bundle_download_url: "",
     trust_label: "maintainer-run",
     visibility: "public-curated",
+    funding: "unspecified",
     platform_version: null,
     execution_mode: null,
     tuning_mode: null,

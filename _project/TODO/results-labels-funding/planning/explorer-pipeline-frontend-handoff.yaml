@@ -71,28 +71,52 @@ work:
       Render a funding chip on the detail page (ResultDetail.tsx), reading funding
       from result_detail_metrics; add a legend row explaining chip + vendor badge.
     notes: >-
-      REQUIRES a node env (tsc/vitest not available in the develop checkout).
-      Integration points: (1) results-explorer/src/db.ts - add `funding` to the
-      result_detail_metrics SELECT/row type; (2) new
-      results-explorer/src/components/FundingChip.tsx mirroring
-      StatusBadge.tsx/TrustBadge.tsx (StatusTone: info/success/warning/danger/
-      neutral); (3) render it in results-explorer/src/pages/ResultDetail.tsx next
-      to the TrustBadge; (4) add a legend row wherever the trust-label legend
-      lives. Label/tooltip text from provenance.py display strings; do NOT re-list
-      the funding enum in TS. 'unspecified' renders muted or omitted per design.
-      Use an approved design token (tests/unit/scripts/test_scan_explorer_tokens.py
-      gate). Consider whether the index/leaderboard pages (BenchmarkIndex.tsx,
-      PlatformIndex.tsx, MetaLeaderboard.tsx, Compare.tsx) also show the chip -
-      those query different views (platform_index_rows / benchmark_rankings) that
-      do NOT yet project funding, so a card-level chip needs its own view
-      projection first (scope decision).
+      DONE: funding threaded through duckdbQueries.ts
+      (RESULT_DETAIL_METRICS_COLUMNS + ResultDetailMetricsRow + the DetailResult
+      mapping) and types.ts; new FundingChip.tsx renders via the StatusBadge
+      primitive with a new StatusRole "funding" and a uniform `neutral` tone (a
+      tone gradient would re-encode funding as a trust signal); 'unspecified'
+      renders NO chip; formatFunding() added to displayLabels.ts. New
+      ProvenanceLegend.tsx satisfies the hosted-results-contract legend rule and
+      pulls its prose from trustLabelDescription()/fundingDescription() so it
+      cannot drift from the badges. SCOPE: detail page only - see w5 for the
+      card-level chip.
     needs: [w2]
-    status: pending
+    status: done
   - id: w4
     summary: >-
       Add results-explorer e2e (results-explorer/e2e/) for the funding chip +
       legend; update any legend-set smoke. Needs a node env.
+    notes: >-
+      DONE: results-explorer/e2e/routes/funding-disclosure.spec.ts covers chip
+      render, chip omission on 'unspecified', neutral tone, trust/funding
+      orthogonality, and the legend (reachable + expands to explain both axes).
+      The browser fixture corpus gained its first funding-disclosing bundle: the
+      `community` variant in scripts/generate-browser-fixtures.mjs now declares
+      provenance.funding=employer, so community-submission + employer-funded
+      proves the two axes are independent. Unit coverage in
+      FundingChip.test.tsx, ProvenanceLegend.test.tsx, ResultDetail.test.tsx.
     needs: [w3]
+    status: done
+  - id: w5
+    summary: >-
+      Project funding into the card-level views and render the chip on the
+      index/leaderboard/compare surfaces.
+    notes: >-
+      Deferred out of the w3/w4 PR (detail page only). The cards read
+      platform_index_rows / benchmark_rankings / benchmark_matrix_cells, none of
+      which project funding. Steps, mirroring exactly what PR #1080 did for
+      result_detail_metrics: (1) add a BARE `r.funding` column reference to the
+      relevant view DDL in _project/scripts/explorer_pipeline/duckdb_builder.py
+      (no computed expression - G-11); (2) mirror it in
+      docs/development/browser-duckdb-schema.sql; (3) add "funding" to the
+      matching EXPECTED_VIEWS entry in
+      tests/unit/scripts/explorer_pipeline/test_duckdb_browser_contract.py. No
+      read_model_version bump - the base `results` table already has the column.
+      Then render <FundingChip> in the card components and extend
+      ProvenanceLegend to those pages (the hosted-results-contract legend rule
+      applies to every page that shows the badges).
+    needs: [w4]
     status: pending
 
 must_preserve:

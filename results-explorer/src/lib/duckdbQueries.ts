@@ -69,6 +69,9 @@ export interface ResultRow extends CostDeploymentFields {
 
 export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_eligible" | "visibility"> {
   visibility: string;
+  // NOT NULL in the snapshot schema; "unspecified" when the bundle declares
+  // no funding. Orthogonal to trust_label - a disclosure, not a rank signal.
+  funding: string;
   os: string | null;
   arch: string | null;
   cpu_count: number | null;
@@ -319,6 +322,7 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "ranking_exclusion_reason",
   "trust_label",
   "visibility",
+  "funding",
   "platform_version",
   "execution_mode",
   "tuning_mode",
@@ -599,6 +603,7 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     bundle_download_url: wide.bundle_download_url,
     trust_label: wide.trust_label,
     visibility: wide.visibility,
+    funding: wide.funding,
     platform_version: wide.platform_version,
     execution_mode: wide.execution_mode,
     tuning_mode: wide.tuning_mode,

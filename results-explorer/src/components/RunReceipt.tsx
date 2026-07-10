@@ -3,7 +3,12 @@ import type { ComponentChildren } from "preact";
 import type { DetailResult } from "@/types";
 import { humanizeBenchmark } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
-import { formatTrustLabel, formatValidationStatus, formatVisibility } from "@/lib/displayLabels";
+import {
+  formatFunding,
+  formatTrustLabel,
+  formatValidationStatus,
+  formatVisibility,
+} from "@/lib/displayLabels";
 import { StatusBadge } from "@/components/StatusBadge";
 
 interface RunReceiptProps {
@@ -93,6 +98,10 @@ export function RunReceipt({
       title: "Integrity",
       rows: [
         rowFromString("Trust", detail.trust_label, formatTrustLabel),
+        // The receipt states funding even when it is "unspecified". The chip
+        // stays silent in that case to avoid noise, but a provenance receipt
+        // should record that no disclosure was made rather than omit the row.
+        rowFromString("Funding", detail.funding, formatFunding),
         rowFromString("Visibility", detail.visibility, formatVisibility),
         rowFromString("Validation", detail.validation_status, formatValidationStatus),
         rowFromString("Compliance", detail.compliance_class),

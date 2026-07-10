@@ -84,6 +84,10 @@ export interface DetailResult extends CostDeploymentFields {
   bundle_download_url: string;
   trust_label: string;
   visibility: string;
+  // How the run was paid for. "unspecified" when the bundle declares no
+  // funding. Orthogonal to trust_label: a vendor-supplied result can be
+  // employer-funded, and a community submission can be vendor-sponsored.
+  funding: string;
   // Extended fields (null for bundles predating these fields)
   platform_version: string | null;
   execution_mode: string | null;
