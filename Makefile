@@ -1053,40 +1053,80 @@ run-test:
 
 RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 
-.PHONY: release-cut release-finalize
+.PHONY: release-cut release-cut-abort release-finalize
 
 # Cut a release branch from develop in one shot:
 #   1. Create v$(VERSION) branch off develop (develop is not modified).
 #   2. On v$(VERSION): bump version sources (scripts/update_version.py).
 #   3. On v$(VERSION): generate CHANGELOG.md entry from the origin/main patch delta.
-#   4. $EDITOR opens CHANGELOG.md for hand-curation (skipped if EDITOR unset).
-#   5. Curate: git rm dev-only/deferred paths (per A3 in single-repo-migration.md).
-#   6. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).
-#   7. Merge origin/main with `-s ours` so the PR is mergeable and CI can run.
-#   8. Push, open PR vs main.
-#   9. Sweep stale v* branches on origin (option-c lifecycle).
-# Pre-conditions: on develop, clean tree.
+#   4. $EDITOR opens CHANGELOG.md for hand-curation when interactive.
+#   5. Gate on the changelog curation check (--check-curation).
+#   6. Curate: git rm dev-only/deferred paths (per A3 in single-repo-migration.md).
+#   7. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).
+#   8. Merge origin/main with `-s ours` so the PR is mergeable and CI can run.
+#   9. Push, open PR vs main.
+#  10. Sweep stale v* branches on origin (option-c lifecycle).
+# Pre-conditions: on develop with a clean tree (new cut), or on v$(VERSION)
+# with no release commit yet (resume).
+#
+# Steps 1-5 are idempotent, so an interrupted cut is resumed by re-running the
+# same command: the branch is reused, the bump and `uv lock` re-apply to the
+# same values, and an existing CHANGELOG.md section is left untouched. The
+# v0.3.1 cut died at step 3 twice and left exactly that half-applied state.
+# `make release-cut-abort VERSION=X.Y.Z` discards it instead.
 # Usage: make release-cut VERSION=X.Y.Z
 release-cut:
 	@test -n "$(VERSION)" || (echo "Usage: make release-cut VERSION=X.Y.Z" && exit 1)
-	@[ "$$(git rev-parse --abbrev-ref HEAD)" = "develop" ] || (echo "Error: must be on develop branch" && exit 1)
-	@[ -z "$$(git status --porcelain)" ] || (echo "Error: working tree must be clean" && exit 1)
+	@# Resume guard. --first-parent matters: the `-s ours` alignment merge below
+	@# puts origin/main's whole release ledger -- which contains commits literally
+	@# titled "Release vX.Y.Z" -- on the merge's second parent. Walking first-parent
+	@# only sees this branch's own commits, so the guard fires for both post-commit
+	@# states: release commit at HEAD, and release commit beneath the alignment merge.
+	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$BRANCH" = "v$(VERSION)" ]; then \
+		if git log --first-parent --format=%s develop..HEAD 2>/dev/null | grep -Fxq "Release v$(VERSION)"; then \
+			echo "Error: v$(VERSION) already carries its release commit; nothing left to resume." >&2; \
+			echo "       Finish it by hand (git push -u origin v$(VERSION) && gh pr create --base main ...)," >&2; \
+			echo "       remembering the -s ours alignment merge if it has not run yet, or start over:" >&2; \
+			echo "         make release-cut-abort VERSION=$(VERSION)" >&2; \
+			exit 1; \
+		fi; \
+		echo "==> Resuming interrupted cut on v$(VERSION)"; \
+	elif [ "$$BRANCH" = "develop" ]; then \
+		[ -z "$$(git status --porcelain)" ] || { echo "Error: working tree must be clean" >&2; exit 1; }; \
+		if git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null; then \
+			echo "Error: branch v$(VERSION) already exists but HEAD is develop." >&2; \
+			echo "       Resume it (git checkout v$(VERSION) && make release-cut VERSION=$(VERSION))" >&2; \
+			echo "       or discard it (make release-cut-abort VERSION=$(VERSION))." >&2; \
+			exit 1; \
+		fi; \
+	else \
+		echo "Error: must be on develop (new cut) or v$(VERSION) (resume), not $$BRANCH" >&2; exit 1; \
+	fi
 	git fetch origin
-	git checkout -b v$(VERSION) develop
+	@git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null \
+		&& git checkout v$(VERSION) \
+		|| git checkout -b v$(VERSION) develop
 	uv run -- python scripts/update_version.py --version $(VERSION) --update-pyproject
 	@# Refresh uv.lock now that pyproject.toml carries the new version, so the
 	@# pre-commit uv-lock hook has nothing to regenerate mid-commit (v0.3.1
 	@# aborted because the tracked lock was stale and the hook rewrote it).
 	uv lock
 	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/main
-	@if [ -n "$$EDITOR" ]; then \
+	@# The generated section is raw commit subjects across the whole
+	@# origin/main..HEAD delta (main lags develop by many releases), so it always
+	@# needs hand-curation. Open $$EDITOR when there is a terminal to open it in;
+	@# either way the --check-curation gate below decides, on the section's own
+	@# text, whether curation actually happened. The old gate tested only whether
+	@# EDITOR was set and stdin was a TTY, which `EDITOR=true` defeated.
+	@if [ -n "$$EDITOR" ] && [ -t 0 ]; then \
 		echo "==> Opening CHANGELOG.md in $$EDITOR for hand-curation"; \
 		$$EDITOR CHANGELOG.md; \
-	elif [ -t 0 ]; then \
-		echo "==> EDITOR unset; skipping interactive CHANGELOG curation"; \
 	else \
-		echo "ERROR: EDITOR unset and no TTY — refusing to skip changelog curation in headless mode." >&2; exit 1; \
+		echo "==> Non-interactive: CHANGELOG.md holds the raw generated draft."; \
+		echo "    Hand-curate the [$(VERSION)] section, then re-run: make release-cut VERSION=$(VERSION)"; \
 	fi
+	uv run -- python scripts/generate_changelog_entry.py --check-curation --version $(VERSION)
 	@# Curation FIRST so dev-only paths are never staged. Order matters: git rm
 	@# before git add ensures untracked files inside _project/ etc. don't end up
 	@# staged-for-add by a later git add.
@@ -1167,6 +1207,33 @@ release-cut:
 	@echo "  1. Review the PR diff; confirm CHANGELOG and curation are correct."
 	@echo "  2. Wait for the required release contexts: $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "  3. make release-finalize VERSION=$(VERSION)"
+
+# Discard a local, unpushed release cut: reset the working tree, return to
+# develop, delete the v$(VERSION) branch. Use when a cut died partway through
+# (bumped versions, rewritten uv.lock, curated-away paths, no commit) and you
+# want to start over rather than resume with `make release-cut VERSION=X.Y.Z`.
+# Refuses once the branch exists on origin — deleting a pushed release branch
+# is release-finalize's or the option-c sweep's job, not this target's.
+# Usage: make release-cut-abort VERSION=X.Y.Z
+release-cut-abort:
+	@test -n "$(VERSION)" || (echo "Usage: make release-cut-abort VERSION=X.Y.Z" && exit 1)
+	@git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null \
+		|| (echo "Nothing to abort: no local v$(VERSION) branch" >&2 && exit 1)
+	@if git ls-remote --exit-code --heads origin "v$(VERSION)" >/dev/null 2>&1; then \
+		echo "Error: v$(VERSION) exists on origin; aborting would discard a pushed branch." >&2; \
+		echo "       Close its release PR and delete the remote branch first." >&2; \
+		exit 1; \
+	fi
+	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$BRANCH" = "v$(VERSION)" ]; then \
+		echo "==> Discarding uncommitted cut state on v$(VERSION)"; \
+		git reset --hard HEAD; \
+		git checkout develop; \
+	elif [ "$$BRANCH" != "develop" ]; then \
+		echo "Error: expected to be on v$(VERSION) or develop, not $$BRANCH" >&2; exit 1; \
+	fi; \
+	git branch -D v$(VERSION)
+	@echo "==> Aborted: v$(VERSION) deleted; develop untouched."
 
 # After release-cut's PR is approved and all required release contexts are
 # green: squash-merge it, tag main, push the tag (fires release.yml), and
@@ -1359,8 +1426,16 @@ pr-refresh:
 	$(MAKE) -s pr-open
 
 # Pure-git pairwise textual-conflict probe. Caller passes BRANCH=<current>;
-# we compare HEAD against every other open PR head via `git merge-tree` and
-# print warnings. Warn-only; does not exit non-zero. Used internally by pr-open.
+# we compare HEAD against every other open PR head via `git merge-tree
+# --write-tree` and print warnings. Warn-only; does not exit non-zero. Used
+# internally by pr-open.
+#
+# Exit status is the signal: 0 clean, 1 conflict, >1 error (e.g. unrelated
+# histories). Bad refs also exit 1, hence the rev-parse guard above the probe.
+# Do not parse the deprecated three-arg `git merge-tree <base> <a> <b>`: its
+# `changed in both` / `added in both` / `removed in {local,remote}` lines are
+# informational trivial-merge headers, not conflicts, and its real conflict
+# markers are diff-prefixed (`+<<<<<<< .our`), so `^<<<<<<<` never matches.
 pr-conflict-scan:
 	@CURRENT="$(BRANCH)"; \
 	[ -n "$$CURRENT" ] || CURRENT=$$(git branch --show-current); \
@@ -1369,11 +1444,11 @@ pr-conflict-scan:
 	while read num branch; do \
 		[ "$$branch" = "$$CURRENT" ] && continue; \
 		git fetch origin "$$branch" --quiet 2>/dev/null || continue; \
-		base=$$(git merge-base HEAD "origin/$$branch" 2>/dev/null) || continue; \
-		out=$$(git merge-tree "$$base" HEAD "origin/$$branch" 2>/dev/null); \
-		if echo "$$out" | grep -qE '^(<<<<<<<|changed in both|added in both|removed in local|removed in remote|CONFLICT )'; then \
-			echo "  ⚠ textual conflict with PR #$$num ($$branch) — coordinate before landing"; \
-		fi; \
+		git rev-parse --verify --quiet "origin/$$branch^{commit}" >/dev/null || continue; \
+		out=$$(git merge-tree --write-tree --name-only HEAD "origin/$$branch" 2>/dev/null); \
+		[ $$? -eq 1 ] || continue; \
+		files=$$(printf '%s\n' "$$out" | awk 'NR>1 && NF==0{exit} NR>1{printf "%s%s", sep, $$0; sep=", "}'); \
+		echo "  ⚠ textual conflict with PR #$$num ($$branch) in $$files — coordinate before landing"; \
 	done; true
 
 # Show open PRs against develop and their CI + auto-merge state.
@@ -2302,7 +2377,8 @@ help:
 	@echo "  make blind-spots-sweep  Alias for blind-spots-report"
 	@echo ""
 	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
-	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs main"
+	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs main (re-run to resume)"
+	@echo "  make release-cut-abort VERSION=X.Y.Z  Discard an unpushed v\$$VERSION cut and return to develop"
 	@echo "  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag main, push tag"
 	@echo ""
 	@echo "  make help            Show this help message"

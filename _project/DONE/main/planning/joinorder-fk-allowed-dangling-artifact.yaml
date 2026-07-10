@@ -2,7 +2,7 @@ id: joinorder-fk-allowed-dangling-artifact
 title: "data(joinorder): durable, reviewed allowed-dangling FK artifact for the full canonical archive"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -29,7 +29,7 @@ deps:
 work:
   - id: w1
     summary: "Generate the allowed-dangling FK census from the canonical archive"
-    status: pending
+    status: done
     notes: |
       Extend _project/scripts/build_joinorder_data.py (or a sibling script)
       with a subcommand that, for every declared FK in the JOB schema
@@ -40,20 +40,42 @@ work:
       artifact under _project/joinorder/ (e.g. allowed_dangling_fks.json)
       recording per-FK dangling counts plus the manifest data_archive_hash it
       was computed against.
+
+      DONE 2026-07-10: added the `fk-dangling-census` subcommand to
+      build_joinorder_data.py. FKs are sourced from schema_specs.yaml (via
+      JoinOrderSchema, no Postgres container); dangling counts are computed with
+      DuckDB LEFT JOIN anti-matches over the sha256-verified shipped Parquet
+      (fetched via JoinOrderBenchmark.generate_data()). Emitted
+      _project/joinorder/allowed_dangling_fks.json (27 FKs; hash-locked to
+      manifest data_archive_hash 0f9061ba...). Result: a single legitimate
+      dangling FK, aka_title.movie_id -> title.id (93 rows, 1 distinct missing
+      title); all 26 other declared FKs are fully closed. Cross-checked the 93
+      via NOT EXISTS and EXCEPT ALL; NULL counting validated against the
+      in-repo CANONICAL_NULL_COUNTS oracle.
   - id: w2
     summary: "Review and commit the artifact with provenance"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Human-review the census (sanity: dangling sets concentrated in the
       known-noisy IMDb link/info tables; zero dangling where the schema
       guarantees closure), then commit it alongside a short provenance note
       (generator command, archive hash, date) following the
       reference_cardinalities.json precedent.
+
+      DONE 2026-07-10: committed _project/joinorder/allowed_dangling_fks.md
+      (generator command, archive/manifest hashes, date, review findings)
+      alongside the JSON, following the reference_cardinalities.json precedent.
+      Review note: the census is MORE closed than the seed anticipated -- the
+      only dangling FK is aka_title.movie_id (93 rows), and every
+      closure-guaranteed relationship/dimension FK is zero. That is consistent
+      with schema.py:67-68 (dangling references legitimate but rare in the
+      Dataverse restore); the 93 aka_title rows point at one absent title id, a
+      minor source artifact, not corruption.
   - id: w3
     summary: "Expose a loader helper for tests"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       A small _project/scripts function (this seed's scope_limit excludes
       tests/) that loads the artifact and verifies its recorded
@@ -62,6 +84,13 @@ work:
       tests/) consumes the reviewed set through it -- or through its own
       trivial JSON load of the committed artifact -- instead of embedding
       policy.
+
+      DONE 2026-07-10: added load_allowed_dangling_fks() in
+      build_joinorder_data.py -- it loads the committed JSON and raises if the
+      artifact's data_archive_hash no longer matches the shipped manifest
+      (stale-census guard). The downstream FK integration test can consume it,
+      or do its own trivial JSON load + manifest hash check per the seed's
+      allowance (that test owns tests/; this seed's scope excludes it).
 
 must_preserve:
   - "The artifact records the manifest data_archive_hash it was generated against, so a future dataset version cannot silently reuse a stale dangling census."
